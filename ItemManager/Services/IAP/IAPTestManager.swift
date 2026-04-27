@@ -318,6 +318,19 @@ class IAPTestManager: ObservableObject {
             return .failure("无效的商品ID")
         }
 
+        guard type != .offerBonus88866666 else {
+            Task {
+                await IAPDiagnosticStore.shared.record(
+                    category: .flow,
+                    name: "iap_mock_payment_offer_bonus_blocked",
+                    level: .notice,
+                    productID: productID,
+                    fields: ["reason": "offer_code_only_hidden_product"]
+                )
+            }
+            return .failure("兑换码礼包仅支持通过 App Store 优惠码兑换")
+        }
+
         let (baseAmount, bonus) = getMockCoinAmount(for: type)
 
         // 应用首充双倍（按商品档位独立计算）

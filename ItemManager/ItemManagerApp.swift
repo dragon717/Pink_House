@@ -373,6 +373,8 @@ struct MainContentView: View {
     private func checkAndShowDailyCheckIn() {
         guard !showDailyCheckIn else { return }
         guard !hasAutoShownDailyCheckInToday() else { return }
+        // 服装创建/编辑 sheet 正在展示时，不自动弹每日打卡，避免抢占 sheet 导致草稿视图重建。
+        guard !ClothingEditDraftManager.shared.hasActiveEditor else { return }
 
         // 检查今天是否已经打卡
         if !DailyCheckInManager.shared.hasCheckedInToday {
@@ -380,6 +382,7 @@ struct MainContentView: View {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                 guard !showDailyCheckIn, !DailyCheckInManager.shared.hasCheckedInToday else { return }
                 guard !hasAutoShownDailyCheckInToday() else { return }
+                guard !ClothingEditDraftManager.shared.hasActiveEditor else { return }
                 markDailyCheckInAutoShownToday()
                 showDailyCheckIn = true
             }

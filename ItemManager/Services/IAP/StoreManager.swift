@@ -225,7 +225,7 @@ class StoreManager: ObservableObject {
                 }
             }
 
-            let returnedIDs = Set(coinProducts.map(\.id))
+            let returnedIDs = Set(products.map(\.id))
             let missingIDs = allProductIDs.filter { !returnedIDs.contains($0) }
             if !missingIDs.isEmpty {
                 print("\(logPrefix) missingIDs=\(missingIDs.joined(separator: ", "))")
@@ -341,6 +341,17 @@ class StoreManager: ObservableObject {
                 )
                 return .failed(.purchaseFailed(error))
             }
+
+        case .offerBonus88866666:
+            await IAPDiagnosticStore.shared.record(
+                category: .flow,
+                name: "purchase_test_mode_offer_bonus_blocked",
+                level: .notice,
+                attemptID: attemptID,
+                productID: product.id,
+                fields: ["reason": "offer_code_only_hidden_product"]
+            )
+            return .failed(.purchaseFailed("兑换码礼包仅支持通过 App Store 优惠码兑换"))
         }
     }
 
@@ -503,6 +514,8 @@ class StoreManager: ObservableObject {
             switch productType {
             case .meowCoin60, .meowCoin120, .meowCoin300, .meowCoin500, .meowCoin1280, .meowCoin3280:
                 await deliverMeowCoins(for: transaction, productType: productType, attemptID: attemptID, source: source)
+            case .offerBonus88866666:
+                await deliverOfferCodeBonus(for: transaction, attemptID: attemptID, source: source)
             }
         }
 
@@ -606,6 +619,7 @@ class StoreManager: ObservableObject {
             productID: transaction.productID,
             purchaseDate: transaction.purchaseDate,
             coinAmount: totalAmount,
+            fishCoinAmount: nil,
             subscriptionMonths: nil,
             isVerified: true,
             verificationDate: Date()
@@ -625,6 +639,102 @@ class StoreManager: ObservableObject {
                 "bonusAmount": String(bonus),
                 "totalAmount": String(totalAmount),
                 "isFirstDouble": String(isFirstDouble)
+            ]
+        )
+    }
+
+    // MARK: - 发放 App Store 兑换码礼包
+    // 隐藏消耗型商品：com.pinkhouse.app.offer.bonus_888_66666
+    // 仅通过 App Store Connect Offer Codes 兑换；App 内不提供付费购买入口。
+    private func deliverOfferCodeBonus(for transaction: Transaction, attemptID: String?, source: String) async {
+        let meowCoinAmount = IAPOfferCodeBonus.meowCoinAmount
+        let fishCoinAmount = IAPOfferCodeBonus.fishCoinAmount
+
+        await MainActor.run {
+            let previousAccountBalance = Self.loadMeowCoinAccount().balance
+            let previousStatusMeowCoin = PetDataManager.shared.status.meowCoin
+            let previousStatusFishCoin = PetDataManager.shared.status.fishCoin
+
+            var account = Self.loadMeowCoinAccount()
+            account.balance += meowCoinAmount
+            account.totalPurchased += meowCoinAmount
+            account.lastUpdated = Date()
+            Self.saveMeowCoinAccount(account)
+
+            var status = PetDataManager.shared.status
+            status.meowCoin = account.balance
+            status.fishCoin += fishCoinAmount
+
+            Task {
+                await IAPDiagnosticStore.shared.record(
+                    category: .balance,
+                    name: "offer_bonus_delivery_pre_save",
+                    attemptID: attemptID,
+                    productID: transaction.productID,
+                    transactionID: String(transaction.id),
+                    fields: [
+                        "source": source,
+                        "previousAccountBalance": String(previousAccountBalance),
+                        "previousStatusMeowCoin": String(previousStatusMeowCoin),
+                        "previousStatusFishCoin": String(previousStatusFishCoin),
+                        "newAccountBalance": String(account.balance),
+                        "newStatusMeowCoin": String(status.meowCoin),
+                        "newStatusFishCoin": String(status.fishCoin),
+                        "deliveredMeowCoin": String(meowCoinAmount),
+                        "deliveredFishCoin": String(fishCoinAmount)
+                    ]
+                )
+            }
+
+            PetDataManager.shared.saveStatus(status)
+            Self.notifyPetStatusDidChange()
+
+            Task {
+                await IAPDiagnosticStore.shared.record(
+                    category: .balance,
+                    name: "offer_bonus_delivery_post_save",
+                    attemptID: attemptID,
+                    productID: transaction.productID,
+                    transactionID: String(transaction.id),
+                    fields: [
+                        "source": source,
+                        "storedAccountBalance": String(Self.loadMeowCoinAccount().balance),
+                        "storedStatusMeowCoin": String(PetDataManager.shared.status.meowCoin),
+                        "storedStatusFishCoin": String(PetDataManager.shared.status.fishCoin)
+                    ]
+                )
+            }
+        }
+
+        await publishPurchaseSuccess(
+            IAPOfferCodeBonus.successMessage,
+            attemptID: attemptID,
+            source: source
+        )
+
+        let record = IAPPurchaseRecord(
+            id: String(transaction.id),
+            productID: transaction.productID,
+            purchaseDate: transaction.purchaseDate,
+            coinAmount: meowCoinAmount,
+            fishCoinAmount: fishCoinAmount,
+            subscriptionMonths: nil,
+            isVerified: true,
+            verificationDate: Date()
+        )
+        savePurchaseRecord(record)
+
+        print("[StoreManager] 发放兑换码礼包: \(meowCoinAmount) 喵币 + \(fishCoinAmount) 鱼币")
+        await IAPDiagnosticStore.shared.record(
+            category: .flow,
+            name: "offer_bonus_delivery_completed",
+            attemptID: attemptID,
+            productID: transaction.productID,
+            transactionID: String(transaction.id),
+            fields: [
+                "source": source,
+                "meowCoinAmount": String(meowCoinAmount),
+                "fishCoinAmount": String(fishCoinAmount)
             ]
         )
     }

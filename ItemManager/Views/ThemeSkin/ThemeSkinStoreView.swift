@@ -37,7 +37,7 @@ struct ThemeSkinStoreView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 summaryCard
-                featuredThemeCard
+                themeProductList
                 purchaseNotesCard
             }
             .padding(.horizontal, 16)
@@ -107,6 +107,34 @@ struct ThemeSkinStoreView: View {
         }
         .padding(18)
         .background(cardShell(cornerRadius: 26))
+    }
+
+    private var themeProductList: some View {
+        VStack(spacing: 16) {
+            ForEach(themeSkinManager.products) { product in
+                ThemeSkinProductStoreCard(
+                    product: product,
+                    currentBalance: currentBalance,
+                    quote: themeSkinManager.priceQuote(for: product.themeId),
+                    isPurchased: themeSkinManager.isPurchased(product.themeId),
+                    isActive: themeSkinManager.isActiveTheme(product.themeId),
+                    purchaseAction: {
+                        guard let quote = themeSkinManager.priceQuote(for: product.themeId) else { return }
+                        if currentBalance < quote.finalPrice {
+                            showCoinStore = true
+                        } else {
+                            present(themeSkinManager.purchaseTheme(product.themeId, autoActivateIfNeeded: true))
+                        }
+                    },
+                    toggleAction: {
+                        let result = themeSkinManager.isActiveTheme(product.themeId)
+                            ? themeSkinManager.deactivateCurrentTheme()
+                            : themeSkinManager.activateTheme(product.themeId)
+                        present(result)
+                    }
+                )
+            }
+        }
     }
 
     private var featuredThemeCard: some View {
@@ -295,6 +323,14 @@ struct ThemeSkinStoreView: View {
     }
 
     private var themePreview: some View {
+        ThemeSkinOptionalFittedAsset(ThemeSkinAssetName.previewStoreHero) {
+            fallbackThemePreview
+        }
+        .frame(width: 112, height: 132)
+        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+    }
+
+    private var fallbackThemePreview: some View {
         ZStack(alignment: .topLeading) {
             RoundedRectangle(cornerRadius: 24, style: .continuous)
                 .fill(
@@ -449,6 +485,126 @@ struct ThemeSkinStoreView: View {
         alertTitle = result.success ? "操作成功" : "操作失败"
         alertMessage = result.message
         showAlert = true
+    }
+}
+
+private struct ThemeSkinProductStoreCard: View {
+    let product: ThemeSkinProduct
+    let currentBalance: Int
+    let quote: ThemeSkinPriceQuote?
+    let isPurchased: Bool
+    let isActive: Bool
+    let purchaseAction: () -> Void
+    let toggleAction: () -> Void
+
+    @Environment(ThemeManager.self) private var themeManager
+
+    private var displayPrice: Int { quote?.finalPrice ?? product.basePrice }
+    private var previewAssetName: String { product.previewAssetNames.first ?? ThemeSkinAssetName.previewStoreHero }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack(alignment: .top, spacing: 14) {
+                ThemeSkinOptionalFittedAsset(previewAssetName) {
+                    RoundedRectangle(cornerRadius: 24, style: .continuous)
+                        .fill(themeManager.cardTintColor.opacity(0.18))
+                        .overlay(Image(systemName: "sparkles").foregroundStyle(themeManager.accentTextColor))
+                }
+                .frame(width: 112, height: 132)
+                .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(alignment: .top) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(product.name)
+                                .font(.system(size: 22, weight: .bold, design: .rounded))
+                                .foregroundStyle(themeManager.primaryTextColor)
+                            Text(product.subtitle)
+                                .font(.subheadline)
+                                .foregroundStyle(themeManager.secondaryTextColor)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        Spacer(minLength: 8)
+                        ThemeSkinStatusBadge(isPurchased: isPurchased, isActive: isActive)
+                    }
+
+                    HStack(alignment: .lastTextBaseline, spacing: 8) {
+                        Text("\(displayPrice)")
+                            .font(.system(size: 30, weight: .heavy, design: .rounded))
+                            .foregroundStyle(themeManager.primaryTextColor)
+                        Text("喵币")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(themeManager.secondaryTextColor)
+                        Text("原价 \(product.basePrice)")
+                            .font(.footnote.weight(.medium))
+                            .foregroundStyle(themeManager.secondaryTextColor)
+                            .strikethrough()
+                    }
+                }
+            }
+
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 72), spacing: 8, alignment: .leading)], alignment: .leading, spacing: 8) {
+                ForEach(product.defaultEnabledSlots) { slot in
+                    ThemeSkinSlotTag(title: slot.displayName)
+                }
+            }
+
+            VStack(spacing: 10) {
+                Button(action: purchaseAction) {
+                    ThemeSkinActionLabel(
+                        title: isPurchased ? "已购买\(product.name)主题" : "购买主题",
+                        subtitle: isPurchased ? "主题组件已加入你的皮肤库" : "立即支付 \(displayPrice) 喵币，VIP 自动享 9 折",
+                        systemImage: isPurchased ? "checkmark.seal.fill" : "bag.fill"
+                    )
+                }
+                .buttonStyle(.plain)
+                .disabled(isPurchased)
+                .opacity(isPurchased ? 0.6 : 1)
+                .background(
+                    LinearGradient(
+                        colors: isPurchased ? [Color.gray.opacity(0.28), Color.gray.opacity(0.18)] : [Color(hex: "FFB7CF"), Color(hex: "FFC7AB")],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+
+                HStack(spacing: 10) {
+                    Button(action: toggleAction) {
+                        ThemeSkinMiniActionLabel(title: isActive ? "停用主题" : "应用主题", systemImage: isActive ? "power.circle.fill" : "wand.and.stars")
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(!isPurchased)
+                    .frame(maxWidth: .infinity)
+                    .background(
+                        RoundedRectangle(cornerRadius: 16, style: .continuous)
+                            .fill(isPurchased ? themeManager.cardTintColor.opacity(0.18) : Color.gray.opacity(0.12))
+                    )
+                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    .opacity(isPurchased ? 1 : 0.45)
+
+                    NavigationLink {
+                        ThemeSkinDetailView(themeId: product.themeId)
+                    } label: {
+                        ThemeSkinMiniActionLabel(title: "进入详情", systemImage: "arrow.right.circle.fill")
+                    }
+                    .buttonStyle(.plain)
+                    .frame(maxWidth: .infinity)
+                    .background(Color.white.opacity(0.72))
+                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                }
+            }
+        }
+        .padding(18)
+        .background(
+            RoundedRectangle(cornerRadius: 28, style: .continuous)
+                .fill(Color.clear)
+                .background(CardBackgroundView(cornerRadius: 28))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 28, style: .continuous)
+                        .stroke(Color.white.opacity(0.78), lineWidth: 1.1)
+                )
+        )
     }
 }
 

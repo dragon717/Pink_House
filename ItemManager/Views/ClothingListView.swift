@@ -235,6 +235,7 @@ struct ClothingListView: View {
             status: item.status
         )
         // 复制其他属性
+        newItem.copyCurrencyAndShippingMetadata(from: item)
         newItem.tags = item.tags
         newItem.sortIndex = item.sortIndex
         newItem.replacedCutoutID = item.replacedCutoutID

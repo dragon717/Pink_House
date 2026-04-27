@@ -1,10 +1,11 @@
 import SwiftUI
 
 enum WardrobeThemeSkinSupport {
-    static let girlClosetNamespace = "girl_closet"
+    static let supportedNamespaces: Set<String> = ["girl_closet", "sky_concert", "swan_dream"]
 
-    static func isGirlClosetDescriptor(_ descriptor: ThemeSkinDescriptor?) -> Bool {
-        descriptor?.assetNamespace == girlClosetNamespace
+    static func isThemeSkinDescriptor(_ descriptor: ThemeSkinDescriptor?) -> Bool {
+        guard let namespace = descriptor?.assetNamespace else { return false }
+        return supportedNamespaces.contains(namespace)
     }
 }
 
@@ -16,7 +17,6 @@ private enum WardrobeGirlClosetTokens {
     static let accent = Color(hex: "D793AA")
     static let accentSoft = Color(hex: "F4D5DF")
     static let label = Color(hex: "8A5C6F")
-    static let chocolate = Color(hex: "7A5A54")
     static let lavender = Color(hex: "9E86B8")
     static let shadow = Color(hex: "DFAEBF").opacity(0.28)
 }
@@ -37,7 +37,15 @@ struct WardrobeThemeStatsCardContainer<Content: View>: View {
     }
 
     private var isGirlClosetEnabled: Bool {
-        WardrobeThemeSkinSupport.isGirlClosetDescriptor(descriptor)
+        WardrobeThemeSkinSupport.isThemeSkinDescriptor(descriptor)
+    }
+
+    private var descriptorTitle: String {
+        switch descriptor?.assetNamespace {
+        case "sky_concert": return "天空音乐会"
+        case "swan_dream": return "天鹅入梦"
+        default: return "少女衣橱"
+        }
     }
 
     var body: some View {
@@ -64,47 +72,64 @@ struct WardrobeThemeStatsCardContainer<Content: View>: View {
             HStack(spacing: 6) {
                 Image(systemName: "sparkles")
                     .font(.system(size: 10, weight: .bold))
-                Text("少女衣橱")
+                Text(descriptorTitle)
                     .font(.system(size: 12, weight: .semibold, design: .rounded))
                     .tracking(0.4)
             }
             .foregroundStyle(WardrobeGirlClosetTokens.label)
             .padding(.horizontal, 10)
             .padding(.vertical, 6)
-            .background(
-                Capsule()
-                    .fill(
-                        LinearGradient(
-                            colors: [
-                                Color.white.opacity(0.96),
-                                WardrobeGirlClosetTokens.accentSoft.opacity(0.96)
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-            )
-            .overlay(
-                Capsule()
-                    .stroke(WardrobeGirlClosetTokens.shellStroke.opacity(0.95), lineWidth: 1)
-            )
+            .background(statsHeaderBackground)
 
             content
         }
         .padding(.horizontal, 16)
         .padding(.top, 14)
         .padding(.bottom, 12)
-        .background(shellBackground(cornerRadius: 24))
-        .overlay(shellOutline(cornerRadius: 24))
+        .background {
+            ThemeSkinOptionalResizableAsset(
+                ThemeSkinAssetName.cardStatsDefault,
+                capInsets: ThemeSkinAssetName.capInsets(for: ThemeSkinAssetName.cardStatsDefault)
+            ) {
+                shellBackground(cornerRadius: 24)
+            }
+        }
+        .overlay {
+            if !ThemeSkinAssetAvailability.hasImage(named: ThemeSkinAssetName.cardStatsDefault) {
+                shellOutline(cornerRadius: 24)
+            }
+        }
         .overlay(alignment: .topTrailing) {
-            WardrobeThemeDoodle(icon: "star.fill")
-                .offset(x: 10, y: -10)
+            if !ThemeSkinAssetAvailability.hasImage(named: ThemeSkinAssetName.cardStatsDefault) {
+                WardrobeThemeDoodle(icon: "star.fill")
+                    .offset(x: 10, y: -10)
+            }
         }
         .overlay(alignment: .bottomLeading) {
-            WardrobeThemeDoodle(icon: "sparkles", tint: WardrobeGirlClosetTokens.accent)
-                .offset(x: -6, y: 8)
+            if !ThemeSkinAssetAvailability.hasImage(named: ThemeSkinAssetName.cardStatsDefault) {
+                WardrobeThemeDoodle(icon: "sparkles", tint: WardrobeGirlClosetTokens.accent)
+                    .offset(x: -6, y: 8)
+            }
         }
         .shadow(color: WardrobeGirlClosetTokens.shadow, radius: 12, x: 0, y: 6)
+    }
+
+    private var statsHeaderBackground: some View {
+        Capsule()
+            .fill(
+                LinearGradient(
+                    colors: [
+                        Color.white.opacity(0.96),
+                        WardrobeGirlClosetTokens.accentSoft.opacity(0.96)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            )
+            .overlay(
+                Capsule()
+                    .stroke(WardrobeGirlClosetTokens.shellStroke.opacity(0.95), lineWidth: 1)
+            )
     }
 }
 
@@ -124,24 +149,33 @@ struct WardrobeThemeClothingCardContainer<Content: View>: View {
     }
 
     private var isGirlClosetEnabled: Bool {
-        WardrobeThemeSkinSupport.isGirlClosetDescriptor(descriptor)
+        WardrobeThemeSkinSupport.isThemeSkinDescriptor(descriptor)
     }
 
     var body: some View {
         Group {
             if isGirlClosetEnabled {
                 content
-                    .background(shellBackground(cornerRadius: 22))
-                    .overlay(shellOutline(cornerRadius: 22))
-                    .overlay(alignment: .topLeading) {
-                        WardrobeThemeDoodle(icon: "star.fill")
-                            .padding(.top, 10)
-                            .padding(.leading, 8)
+                    .background {
+                        ThemeSkinOptionalResizableAsset(
+                            ThemeSkinAssetName.cardWardrobeItem,
+                            capInsets: ThemeSkinAssetName.capInsets(for: ThemeSkinAssetName.cardWardrobeItem)
+                        ) {
+                            shellBackground(cornerRadius: 22)
+                        }
                     }
-                    .overlay(alignment: .bottomTrailing) {
-                        WardrobeThemeDoodle(icon: "sparkles", tint: WardrobeGirlClosetTokens.accent)
-                            .padding(.bottom, 10)
-                            .padding(.trailing, 8)
+                    .overlay {
+                        if !ThemeSkinAssetAvailability.hasImage(named: ThemeSkinAssetName.cardWardrobeItem) {
+                            shellOutline(cornerRadius: 22)
+                        }
+                    }
+                    .overlay(alignment: .topLeading) {
+                        ThemeSkinOptionalFittedAsset(ThemeSkinAssetName.cardWardrobeRibbonTopLeft) {
+                            WardrobeThemeDoodle(icon: "star.fill")
+                        }
+                        .frame(width: 58, height: 40)
+                        .padding(.top, 10)
+                        .padding(.leading, 8)
                     }
                     .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
                     .shadow(color: WardrobeGirlClosetTokens.shadow.opacity(0.65), radius: 10, x: 0, y: 5)
@@ -166,7 +200,7 @@ struct WardrobeThemeCardTitle: View {
     }
 
     private var isGirlClosetEnabled: Bool {
-        WardrobeThemeSkinSupport.isGirlClosetDescriptor(descriptor)
+        WardrobeThemeSkinSupport.isThemeSkinDescriptor(descriptor)
     }
 
     var body: some View {
@@ -225,7 +259,7 @@ struct WardrobeThemeCornerBadge: View {
     }
 
     private var isGirlClosetEnabled: Bool {
-        WardrobeThemeSkinSupport.isGirlClosetDescriptor(descriptor)
+        WardrobeThemeSkinSupport.isThemeSkinDescriptor(descriptor)
     }
 
     var body: some View {

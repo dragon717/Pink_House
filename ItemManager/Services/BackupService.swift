@@ -265,15 +265,27 @@ class BackupService {
                     sizeChartImagePath: safeSizeChartImagePath,
                     priceChartImagePath: safePriceChartImagePath,
                     isShared: c.isShared,
+                    originalPrice: c.originalPrice,
+                    originalPriceJPY: c.originalPriceJPY,
+                    originalPriceCurrencyCode: c.originalPriceCurrencyCode,
+                    originalPriceExchangeRateJPY: c.originalPriceExchangeRateJPY,
+                    originalPriceRateUpdatedAt: c.originalPriceRateUpdatedAt,
                     price: c.price,
                     deposit: c.deposit,
                     balance: c.balance,
                     accessoriesPrice: c.accessoriesPrice,
+                    shippingFee: c.shippingFee,
+                    shippingFeeJPY: c.shippingFeeJPY,
+                    shippingFeeCurrencyCode: c.shippingFeeCurrencyCode,
+                    shippingExchangeRateJPY: c.shippingExchangeRateJPY,
+                    shippingRateUpdatedAt: c.shippingRateUpdatedAt,
                     purchaseDate: c.purchaseDate,
                     depositDate: c.depositDate,
                     isDepositPlan: c.isDepositPlan,
                     finalPaymentDate: c.finalPaymentDate,
                     finalPaymentEndDate: c.finalPaymentEndDate,
+                    isFinalPaymentSavedToWealth: c.isFinalPaymentSavedToWealth,
+                    finalPaymentSavedAt: c.finalPaymentSavedAt,
                     note: c.note,
                     stock: c.stock,
                     status: c.status.rawValue,
@@ -1573,10 +1585,20 @@ class BackupService {
             clothingBack.isShared = dto.isShared ?? false
 
             // Prices: backup data overwrites (user may have updated prices)
+            clothingBack.originalPrice = dto.originalPrice ?? 0
+            clothingBack.originalPriceJPY = dto.originalPriceJPY ?? 0
+            clothingBack.originalPriceCurrencyCode = dto.originalPriceCurrencyCode ?? ClothingPriceCurrency.cny.rawValue
+            clothingBack.originalPriceExchangeRateJPY = dto.originalPriceExchangeRateJPY ?? 21.0
+            clothingBack.originalPriceRateUpdatedAt = dto.originalPriceRateUpdatedAt
             clothingBack.price = dto.price
             clothingBack.deposit = dto.deposit
             clothingBack.balance = dto.balance
             clothingBack.accessoriesPrice = dto.accessoriesPrice ?? 0
+            clothingBack.shippingFee = dto.shippingFee ?? 0
+            clothingBack.shippingFeeJPY = dto.shippingFeeJPY ?? 0
+            clothingBack.shippingFeeCurrencyCode = dto.shippingFeeCurrencyCode ?? ClothingPriceCurrency.cny.rawValue
+            clothingBack.shippingExchangeRateJPY = dto.shippingExchangeRateJPY ?? 21.0
+            clothingBack.shippingRateUpdatedAt = dto.shippingRateUpdatedAt
             
             // Dates: backup data overwrites
             clothingBack.purchaseDate = dto.purchaseDate
@@ -1584,6 +1606,8 @@ class BackupService {
             clothingBack.isDepositPlan = dto.isDepositPlan
             clothingBack.finalPaymentDate = dto.finalPaymentDate
             clothingBack.finalPaymentEndDate = dto.finalPaymentEndDate
+            clothingBack.isFinalPaymentSavedToWealth = dto.isDepositPlan && (dto.isFinalPaymentSavedToWealth ?? false)
+            clothingBack.finalPaymentSavedAt = clothingBack.isFinalPaymentSavedToWealth ? dto.finalPaymentSavedAt : nil
             
             clothingBack.note = dto.note
             

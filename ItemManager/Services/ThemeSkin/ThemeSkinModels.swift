@@ -129,7 +129,7 @@ struct ThemeSkinProduct: Identifiable, Codable, Equatable {
         subtitle: "旋转木马 · 奶白蕾丝 · 贴纸感装饰",
         basePrice: 99,
         vipPrice: 89,
-        previewAssetNames: ["temp/主题-旋转木马/少女衣橱.png"],
+        previewAssetNames: ["preview_store_hero"],
         supportedSlots: [
             .topBarMain,
             .topBarIconButton,
@@ -151,6 +151,67 @@ struct ThemeSkinProduct: Identifiable, Codable, Equatable {
             .wardrobeItemCard
         ]
     )
+
+    static let skyConcert = ThemeSkinProduct(
+        id: "theme_skin.sky_concert",
+        themeId: "theme_skin.sky_concert",
+        name: "天空音乐会",
+        subtitle: "云端管弦 · 星河谱表 · 鎏金五线谱",
+        basePrice: 99,
+        vipPrice: 89,
+        previewAssetNames: ["preview_store_hero"],
+        supportedSlots: [
+            .topBarMain,
+            .topBarIconButton,
+            .topBarSegment,
+            .searchBar,
+            .tabBarMain,
+            .tabBarItem,
+            .statsCard,
+            .wardrobeItemCard,
+            .settingsGridCard,
+            .discountBadge
+        ],
+        defaultEnabledSlots: [
+            .topBarMain,
+            .topBarIconButton,
+            .tabBarMain,
+            .tabBarItem,
+            .statsCard,
+            .wardrobeItemCard
+        ]
+    )
+
+    static let swanDream = ThemeSkinProduct(
+        id: "theme_skin.swan_dream",
+        themeId: "theme_skin.swan_dream",
+        name: "天鹅入梦",
+        subtitle: "月色湖面 · 天鹅羽翼 · 蕾丝纱裙",
+        basePrice: 99,
+        vipPrice: 89,
+        previewAssetNames: ["preview_store_hero"],
+        supportedSlots: [
+            .topBarMain,
+            .topBarIconButton,
+            .topBarSegment,
+            .searchBar,
+            .tabBarMain,
+            .tabBarItem,
+            .statsCard,
+            .wardrobeItemCard,
+            .settingsGridCard,
+            .discountBadge
+        ],
+        defaultEnabledSlots: [
+            .topBarMain,
+            .topBarIconButton,
+            .tabBarMain,
+            .tabBarItem,
+            .statsCard,
+            .wardrobeItemCard
+        ]
+    )
+
 }
 
 struct OwnedThemeSkin: Identifiable, Codable, Equatable {

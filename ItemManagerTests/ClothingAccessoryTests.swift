@@ -68,4 +68,28 @@ final class ClothingAccessoryTests: XCTestCase {
         XCTAssertEqual(clothing.unitTotalPrice, 600.0)
         XCTAssertEqual(clothing.inventoryTotalPrice, 1100.0)
     }
+
+    func testInventoryTotalIncludesShippingOnce() throws {
+        let clothing = Clothing(name: "Shipping JSK", price: 500.0, accessoriesPrice: 100.0, shippingFee: 30.0, stock: 2)
+        context.insert(clothing)
+
+        XCTAssertEqual(clothing.unitTotalPrice, 600.0)
+        XCTAssertEqual(clothing.inventoryTotalPrice, 1130.0)
+    }
+
+    func testOriginalPriceJPYConvertsToCNYForStatisticsSource() throws {
+        let clothing = Clothing(
+            name: "JPY OP",
+            originalPrice: 100.0,
+            originalPriceJPY: 2100.0,
+            originalPriceCurrencyCode: ClothingPriceCurrency.jpy.rawValue,
+            originalPriceExchangeRateJPY: 21.0
+        )
+        context.insert(clothing)
+
+        XCTAssertEqual(clothing.originalPriceCurrency, .jpy)
+        XCTAssertEqual(clothing.originalPrice, 100.0)
+        XCTAssertEqual(clothing.originalPriceJPY, 2100.0)
+    }
+
 }

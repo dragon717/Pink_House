@@ -50,24 +50,27 @@ struct ThemeSkinDetailView: View {
                 .font(.subheadline)
                 .foregroundStyle(themeManager.secondaryTextColor)
 
-            RoundedRectangle(cornerRadius: 20)
-                .fill(themeManager.cardBackgroundColor.opacity(0.85))
-                .frame(height: 220)
-                .overlay(
-                    VStack(spacing: 10) {
-                        Image(systemName: "sparkles")
-                            .font(.system(size: 36))
-                            .foregroundStyle(themeManager.accentTextColor)
-                        Text("少女衣橱主题预览")
-                            .font(.headline)
-                            .foregroundStyle(themeManager.primaryTextColor)
-                        Text("顶部栏 / 卡片 / TabBar 会从同一主题包里解析，不允许和其他主题混用。")
-                            .font(.footnote)
-                            .multilineTextAlignment(.center)
-                            .foregroundStyle(themeManager.secondaryTextColor)
-                            .padding(.horizontal)
-                    }
-                )
+            ThemeSkinOptionalFittedAsset(ThemeSkinAssetName.previewStoreHero) {
+                RoundedRectangle(cornerRadius: 20)
+                    .fill(themeManager.cardBackgroundColor.opacity(0.85))
+                    .overlay(
+                        VStack(spacing: 10) {
+                            Image(systemName: "sparkles")
+                                .font(.system(size: 36))
+                                .foregroundStyle(themeManager.accentTextColor)
+                            Text("少女衣橱主题预览")
+                                .font(.headline)
+                                .foregroundStyle(themeManager.primaryTextColor)
+                            Text("顶部栏 / 卡片 / TabBar 会从同一主题包里解析，不允许和其他主题混用。")
+                                .font(.footnote)
+                                .multilineTextAlignment(.center)
+                                .foregroundStyle(themeManager.secondaryTextColor)
+                                .padding(.horizontal)
+                        }
+                    )
+            }
+            .frame(height: 220)
+            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(18)

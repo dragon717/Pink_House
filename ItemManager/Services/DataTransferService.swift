@@ -30,7 +30,7 @@ class DataTransferService {
             
             let clothings = try context.fetch(descriptor)
             
-            var csvString = "名称,品牌,标签,类型,颜色,尺码,衣长,状态,小物,价格,定金,尾款,购买日期,是否定金,定金日期,尾款开始,尾款截止,备注,库存\n"
+            var csvString = "名称,品牌,标签,类型,颜色,尺码,衣长,状态,小物,原价人民币,原价日元,原价币种,价格,定金,尾款,小物总价,邮费人民币,邮费日元,邮费币种,含邮合计,购买日期,是否定金,定金日期,尾款开始,尾款截止,备注,库存\n"
             
             let dateFormatter = DateFormatter()
             dateFormatter.dateFormat = "yyyy-MM-dd"
@@ -61,9 +61,17 @@ class DataTransferService {
                     self.escapeCSV(item.length),
                     self.escapeCSV(item.condition),
                     self.escapeCSV(item.accessories),
+                    "\(item.originalPrice)",
+                    "\(item.originalPriceJPY)",
+                    self.escapeCSV(item.originalPriceCurrencyCode),
                     "\(item.price)",
                     "\(item.deposit)",
                     "\(item.balance)",
+                    "\(item.resolvedAccessoriesPrice)",
+                    "\(item.resolvedShippingFee)",
+                    "\(item.shippingFeeJPY)",
+                    self.escapeCSV(item.shippingFeeCurrencyCode),
+                    "\(item.inventoryTotalPrice)",
                     purchaseDateStr,
                     "\(item.isDepositPlan)",
                     depositDateStr,

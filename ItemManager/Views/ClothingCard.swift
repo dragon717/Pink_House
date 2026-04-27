@@ -53,7 +53,7 @@ struct ClothingCard: View, Equatable {
     }
 
     private var isGirlClosetThemed: Bool {
-        WardrobeThemeSkinSupport.isGirlClosetDescriptor(wardrobeThemeDescriptor)
+        WardrobeThemeSkinSupport.isThemeSkinDescriptor(wardrobeThemeDescriptor)
     }
     
     var body: some View {

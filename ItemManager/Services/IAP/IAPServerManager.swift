@@ -54,6 +54,8 @@ class IAPServerManager: ObservableObject {
         switch productType {
         case .meowCoin60, .meowCoin120, .meowCoin300, .meowCoin500, .meowCoin1280, .meowCoin3280:
             return await deliverMeowCoins(for: transaction, productType: productType)
+        case .offerBonus88866666:
+            return await deliverOfferCodeBonus(for: transaction)
         }
     }
 
@@ -98,6 +100,7 @@ class IAPServerManager: ObservableObject {
             productID: transaction.productID,
             purchaseDate: transaction.purchaseDate,
             coinAmount: totalAmount,
+            fishCoinAmount: nil,
             subscriptionMonths: nil,
             isVerified: true,
             verificationDate: Date()
@@ -105,6 +108,44 @@ class IAPServerManager: ObservableObject {
         savePurchaseRecord(record)
 
         print("[IAPServerManager] 发放喵币: \(totalAmount) (基础: \(baseAmount), 赠送: \(bonus), 首充双倍: \(isFirstDouble))")
+        return true
+    }
+
+    // MARK: - 发放 App Store 兑换码礼包
+
+    private func deliverOfferCodeBonus(for transaction: Transaction) async -> Bool {
+        let meowCoinAmount = IAPOfferCodeBonus.meowCoinAmount
+        let fishCoinAmount = IAPOfferCodeBonus.fishCoinAmount
+
+        await MainActor.run {
+            var account = StoreManager.loadMeowCoinAccount()
+            account.balance += meowCoinAmount
+            account.totalPurchased += meowCoinAmount
+            account.lastUpdated = Date()
+            StoreManager.saveMeowCoinAccount(account)
+
+            var status = PetDataManager.shared.status
+            status.meowCoin = account.balance
+            status.fishCoin += fishCoinAmount
+            PetDataManager.shared.saveStatus(status)
+            notifyPetStatusDidChange()
+
+            self.meowCoinBalance = account.balance
+        }
+
+        let record = IAPPurchaseRecord(
+            id: String(transaction.id),
+            productID: transaction.productID,
+            purchaseDate: transaction.purchaseDate,
+            coinAmount: meowCoinAmount,
+            fishCoinAmount: fishCoinAmount,
+            subscriptionMonths: nil,
+            isVerified: true,
+            verificationDate: Date()
+        )
+        savePurchaseRecord(record)
+
+        print("[IAPServerManager] 发放兑换码礼包: \(meowCoinAmount) 喵币 + \(fishCoinAmount) 鱼币")
         return true
     }
 

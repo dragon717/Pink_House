@@ -3,6 +3,10 @@ import SwiftData
 
 struct WealthHapticsSettingsView: View {
     @ObservedObject private var hapticManager = HapticEngineManager.shared
+    @ObservedObject private var vipManager = VIPManager.shared
+    @State private var appearanceManager = WealthAppearanceManager.shared
+    @State private var showVIPRequiredAlert = false
+    @State private var showVIPCenter = false
     
     var body: some View {
         AdaptiveSettingsView(title: "马上来财设置") {
@@ -23,7 +27,22 @@ struct WealthHapticsSettingsView: View {
                         }
                     }
                 }
-                .adaptiveRow(showDivider: false)
+                .adaptiveRow()
+
+                if vipManager.isVIP {
+                    NavigationLink(destination: FinalPaymentVaultMascotSettingsView()) {
+                        mascotSettingsRow(showLock: false)
+                    }
+                    .adaptiveRow(showDivider: false)
+                } else {
+                    Button {
+                        showVIPRequiredAlert = true
+                    } label: {
+                        mascotSettingsRow(showLock: true)
+                    }
+                    .buttonStyle(.plain)
+                    .adaptiveRow(showDivider: false)
+                }
             }
 
             // 1. 金豆银珠震动 (原应用内触感)
@@ -63,6 +82,133 @@ struct WealthHapticsSettingsView: View {
                     }
                 }
                 .adaptiveRow(showDivider: false)
+            }
+        }
+        .alert("VIP 专属权益", isPresented: $showVIPRequiredAlert) {
+            Button("取消", role: .cancel) { }
+            Button("去开通 VIP") {
+                showVIPCenter = true
+            }
+        } message: {
+            Text("尾款小金库形象是 VIP 专属个性化能力。开通 VIP 后可切换小金库、招财猫、存钱罐、金币猪。")
+        }
+        .sheet(isPresented: $showVIPCenter) {
+            NavigationStack {
+                VIPCenterView()
+            }
+        }
+    }
+
+    private func mascotSettingsRow(showLock: Bool) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: appearanceManager.finalPaymentVaultMascot.symbolName)
+                .foregroundStyle(.orange)
+                .frame(width: 24)
+
+            VStack(alignment: .leading) {
+                HStack(spacing: 6) {
+                    Text("尾款小金库形象")
+                        .foregroundStyle(.primary)
+                    if showLock {
+                        Image(systemName: "crown.fill")
+                            .font(.caption2)
+                            .foregroundStyle(.yellow)
+                    }
+                }
+                Text(showLock ? "VIP 专属 · 当前默认招财猫" : "当前：\(appearanceManager.finalPaymentVaultMascot.displayName)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer()
+        }
+    }
+}
+
+struct FinalPaymentVaultMascotSettingsView: View {
+    @State private var appearanceManager = WealthAppearanceManager.shared
+
+    var body: some View {
+        AdaptiveSettingsView(title: "尾款小金库形象") {
+            AdaptiveSection(
+                header: "VIP 专属形象",
+                footer: "选择后会应用到马上来财「安财 → 尾款」里的小金库主形象。"
+            ) {
+                ForEach(FinalPaymentVaultMascot.allCases) { mascot in
+                    Button {
+                        appearanceManager.finalPaymentVaultMascot = mascot
+                    } label: {
+                        HStack(spacing: 12) {
+                            FinalPaymentVaultMascotPreview(mascot: mascot)
+                                .frame(width: 52, height: 52)
+
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(mascot.displayName)
+                                    .foregroundStyle(.primary)
+                                Text(mascot.subtitle)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+
+                            Spacer()
+
+                            if appearanceManager.finalPaymentVaultMascot == mascot {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .foregroundStyle(.orange)
+                            }
+                        }
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .adaptiveRow(showDivider: mascot != FinalPaymentVaultMascot.allCases.last)
+                }
+            }
+        }
+    }
+}
+
+private struct FinalPaymentVaultMascotPreview: View {
+    let mascot: FinalPaymentVaultMascot
+
+    var body: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 16)
+                .fill(
+                    LinearGradient(
+                        colors: [Color.orange.opacity(0.18), Color.yellow.opacity(0.12)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+
+            switch mascot {
+            case .miniVault:
+                Image(systemName: "lock.shield.fill")
+                    .font(.system(size: 24, weight: .bold))
+                    .foregroundStyle(.orange)
+            case .fortuneCat:
+                if let uiImage = UIImage(named: "wealth_fortune_cat") {
+                    Image(uiImage: uiImage)
+                        .resizable()
+                        .scaledToFit()
+                        .padding(5)
+                } else {
+                    Image(systemName: "cat.fill")
+                        .font(.system(size: 24, weight: .bold))
+                        .foregroundStyle(.orange)
+                }
+            case .piggyBank:
+                Image(systemName: "banknote.fill")
+                    .font(.system(size: 24, weight: .bold))
+                    .foregroundStyle(.pink)
+            case .goldPig:
+                Text("🐷")
+                    .font(.system(size: 28))
+                    .overlay(alignment: .bottomTrailing) {
+                        Image(systemName: "yensign.circle.fill")
+                            .font(.caption)
+                            .foregroundStyle(.yellow)
+                    }
             }
         }
     }

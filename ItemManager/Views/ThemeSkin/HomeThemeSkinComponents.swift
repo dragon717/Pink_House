@@ -1,7 +1,7 @@
 import SwiftUI
 
 private enum HomeThemeSkinTokens {
-    static let girlClosetNamespace = "girl_closet"
+    static let supportedNamespaces: Set<String> = ["girl_closet", "sky_concert", "swan_dream"]
 
     static let creamTop = Color(red: 1.0, green: 0.977, blue: 0.965)
     static let creamBottom = Color(red: 1.0, green: 0.938, blue: 0.95)
@@ -40,8 +40,8 @@ enum HomeThemeSkinChromeStyle {
 }
 
 private extension ThemeSkinDescriptor {
-    var usesGirlClosetChrome: Bool {
-        assetNamespace == HomeThemeSkinTokens.girlClosetNamespace
+    var usesThemeSkinChrome: Bool {
+        HomeThemeSkinTokens.supportedNamespaces.contains(assetNamespace)
     }
 }
 
@@ -80,7 +80,7 @@ struct HomeThemeSkinToolbarShell<Content: View>: View {
     }
 
     private var isActive: Bool {
-        descriptor?.usesGirlClosetChrome == true
+        descriptor?.usesThemeSkinChrome == true
     }
 }
 
@@ -108,31 +108,33 @@ struct HomeThemeSkinToolbarIconShell<Content: View>: View {
                 .frame(minWidth: minWidth, minHeight: minHeight)
                 .padding(6)
                 .background {
-                    RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .fill(
-                            LinearGradient(
-                                colors: [
-                                    HomeThemeSkinTokens.creamTop.opacity(0.98),
-                                    HomeThemeSkinTokens.blush.opacity(0.9)
-                                ],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                        .overlay {
-                            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                .stroke(
-                                    LinearGradient(
-                                        colors: [
-                                            .white.opacity(0.95),
-                                            HomeThemeSkinTokens.pinkBorder.opacity(0.82)
-                                        ],
-                                        startPoint: .topLeading,
-                                        endPoint: .bottomTrailing
-                                    ),
-                                    lineWidth: 1
+                    ThemeSkinOptionalResizableAsset(ThemeSkinAssetName.topBarIconButton) {
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .fill(
+                                LinearGradient(
+                                    colors: [
+                                        HomeThemeSkinTokens.creamTop.opacity(0.98),
+                                        HomeThemeSkinTokens.blush.opacity(0.9)
+                                    ],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
                                 )
-                        }
+                            )
+                            .overlay {
+                                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                    .stroke(
+                                        LinearGradient(
+                                            colors: [
+                                                .white.opacity(0.95),
+                                                HomeThemeSkinTokens.pinkBorder.opacity(0.82)
+                                            ],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        ),
+                                        lineWidth: 1
+                                    )
+                            }
+                    }
                 }
                 .shadow(color: HomeThemeSkinTokens.pinkShadow.opacity(0.16), radius: 8, x: 0, y: 4)
         } else {
@@ -141,7 +143,7 @@ struct HomeThemeSkinToolbarIconShell<Content: View>: View {
     }
 
     private var isActive: Bool {
-        descriptor?.usesGirlClosetChrome == true
+        descriptor?.usesThemeSkinChrome == true
     }
 }
 
@@ -175,14 +177,35 @@ struct HomeThemeSkinSearchMenuLabel: View {
     }
 
     private var isActive: Bool {
-        descriptor?.usesGirlClosetChrome == true
+        descriptor?.usesThemeSkinChrome == true
     }
 }
 
 private struct HomeThemeSkinChromeBackground: View {
     let style: HomeThemeSkinChromeStyle
 
+    private var assetName: String {
+        switch style {
+        case .group:
+            return ThemeSkinAssetName.topBarMain
+        case .segment:
+            return ThemeSkinAssetName.topBarSegment
+        case .searchEntry:
+            return ThemeSkinAssetName.searchBarCompact
+        }
+    }
+
     var body: some View {
+        ThemeSkinOptionalResizableAsset(
+            assetName,
+            capInsets: ThemeSkinAssetName.capInsets(for: assetName)
+        ) {
+            fallbackBackground
+        }
+        .shadow(color: HomeThemeSkinTokens.pinkShadow.opacity(0.18), radius: style.shadowRadius, x: 0, y: 6)
+    }
+
+    private var fallbackBackground: some View {
         ZStack {
             RoundedRectangle(cornerRadius: style.cornerRadius, style: .continuous)
                 .fill(
@@ -231,6 +254,5 @@ private struct HomeThemeSkinChromeBackground: View {
                 }
                 .offset(x: 28, y: 12)
         }
-        .shadow(color: HomeThemeSkinTokens.pinkShadow.opacity(0.18), radius: style.shadowRadius, x: 0, y: 6)
     }
 }

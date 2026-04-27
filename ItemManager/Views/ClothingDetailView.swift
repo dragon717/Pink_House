@@ -73,6 +73,12 @@ struct ClothingDetailView: View {
                         purchaseInfoCard
                             .padding(.horizontal)
                             .offset(y: -40)
+
+                        if clothing.isDepositPlan {
+                            finalPaymentWealthCard
+                                .padding(.horizontal)
+                                .offset(y: -40)
+                        }
                         
                         // MARK: - Pay Balance Button
                         if clothing.isDepositPlan {
@@ -279,9 +285,14 @@ struct ClothingDetailView: View {
         }
         
         clothing.isDepositPlan = false
+        clothing.isFinalPaymentSavedToWealth = false
+        clothing.finalPaymentSavedAt = nil
         clothing.depositDate = nil
         clothing.finalPaymentDate = nil
         clothing.finalPaymentEndDate = nil
+        let now = Date()
+        clothing.updatedAt = now
+        clothing.lastModified = now
         // Try to save context (though it autosaves usually)
         try? modelContext.save()
         Task { @MainActor in
@@ -342,6 +353,7 @@ struct ClothingDetailView: View {
             status: clothing.status
         )
         
+        newClothing.copyCurrencyAndShippingMetadata(from: clothing)
         newClothing.tags = clothing.tags
         
         // 复制尺码表图和价格表图
@@ -622,6 +634,32 @@ struct ClothingDetailView: View {
         }
     }
     
+    private var formattedOriginalPrice: String {
+        switch clothing.originalPriceCurrency {
+        case .cny:
+            if clothing.originalPriceJPY > 0 {
+                return "¥\(clothing.originalPrice.formatted(.number.precision(.fractionLength(0...2))))（约 JP¥\(clothing.originalPriceJPY.formatted(.number.precision(.fractionLength(0...2))))）"
+            }
+            return "¥\(clothing.originalPrice.formatted(.number.precision(.fractionLength(0...2))))"
+        case .jpy:
+            let jpy = clothing.originalPriceJPY > 0 ? clothing.originalPriceJPY : clothing.originalPrice * clothing.originalPriceExchangeRateJPY
+            return "JP¥\(jpy.formatted(.number.precision(.fractionLength(0...2))))（折合 ¥\(clothing.originalPrice.formatted(.number.precision(.fractionLength(0...2))))）"
+        }
+    }
+
+    private var formattedShippingFee: String {
+        switch clothing.shippingFeeCurrency {
+        case .cny:
+            if clothing.shippingFeeJPY > 0 {
+                return "¥\(clothing.resolvedShippingFee.formatted(.number.precision(.fractionLength(0...2))))（约 JP¥\(clothing.shippingFeeJPY.formatted(.number.precision(.fractionLength(0...2))))）"
+            }
+            return "¥\(clothing.resolvedShippingFee.formatted(.number.precision(.fractionLength(0...2))))"
+        case .jpy:
+            let jpy = clothing.shippingFeeJPY > 0 ? clothing.shippingFeeJPY : clothing.resolvedShippingFee * clothing.shippingExchangeRateJPY
+            return "JP¥\(jpy.formatted(.number.precision(.fractionLength(0...2))))（折合 ¥\(clothing.resolvedShippingFee.formatted(.number.precision(.fractionLength(0...2))))）"
+        }
+    }
+
     /// 价格信息卡片 - 使用统一配色
     private var priceInfoCard: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -666,8 +704,12 @@ struct ClothingDetailView: View {
                 InfoRow(label: "裙装尾款", value: "¥\(clothing.balance.formatted(.number.precision(.fractionLength(0))))")
             }
             
-            if clothing.originalPrice > 0 {
-                InfoRow(label: "原价", value: "¥\(clothing.originalPrice.formatted(.number.precision(.fractionLength(0))))")
+            if clothing.originalPrice > 0 || clothing.originalPriceJPY > 0 {
+                InfoRow(label: "原价", value: formattedOriginalPrice)
+            }
+
+            if clothing.resolvedShippingFee > 0 || clothing.shippingFeeJPY > 0 {
+                InfoRow(label: "邮费", value: formattedShippingFee)
             }
             
             InfoRow(label: "裙装单价", value: "¥\(clothing.price.formatted(.number.precision(.fractionLength(0))))")
@@ -722,7 +764,7 @@ struct ClothingDetailView: View {
             }
             
             HStack {
-                Label("合计金额", systemImage: "star.circle.fill")
+                Label("合计金额（含邮）", systemImage: "star.circle.fill")
                     .font(.subheadline)
                     .unifiedSecondary()
                 Spacer()
@@ -739,7 +781,7 @@ struct ClothingDetailView: View {
             .cornerRadius(12)
             
             if clothing.stock > 1 {
-                Text("包含 \(clothing.stock) 件库存，单套价值 ¥\(clothing.unitTotalPrice.formatted(.number.precision(.fractionLength(0))))")
+                Text("包含 \(clothing.stock) 件库存，单套价值 ¥\(clothing.unitTotalPrice.formatted(.number.precision(.fractionLength(0))))；邮费不随库存倍增")
                     .font(.caption)
                     .unifiedTertiary()
                     .padding(.horizontal, 4)
@@ -759,6 +801,82 @@ struct ClothingDetailView: View {
             } else {
                 Color.black
             }
+        }
+    }
+
+    private var finalPaymentWealthCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Label("招财猫尾款小金库", systemImage: "cat.fill")
+                .font(.headline)
+                .unifiedPrimary()
+
+            HStack(spacing: 10) {
+                Image(systemName: clothing.isFinalPaymentSavedToWealth ? "checkmark.seal.fill" : "yensign.circle.fill")
+                    .font(.title2)
+                    .foregroundStyle(.orange)
+                    .frame(width: 42, height: 42)
+                    .background(Color.orange.opacity(0.12))
+                    .clipShape(Circle())
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(clothing.isFinalPaymentSavedToWealth ? "已存入招财猫" : "整笔存入尾款")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(themeManager.primaryTextColor)
+                    Text(clothing.isFinalPaymentSavedToWealth ? finalPaymentSavedText : "存入后计入马上来财统计")
+                        .font(.caption)
+                        .foregroundStyle(themeManager.secondaryTextColor)
+                }
+
+                Spacer()
+
+                Text("¥\(NSDecimalNumber(decimal: clothing.totalBalance).stringValue)")
+                    .font(.subheadline.weight(.bold))
+                    .foregroundStyle(Color(hex: "C94C72"))
+                    .monospacedDigit()
+            }
+
+            if !clothing.isFinalPaymentSavedToWealth {
+                Button {
+                    saveFinalPaymentToWealth()
+                } label: {
+                    Label("存入招财猫", systemImage: "cat")
+                        .font(.subheadline.weight(.bold))
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 11)
+                        .background(Color.orange)
+                        .clipShape(RoundedRectangle(cornerRadius: 14))
+                }
+                .buttonStyle(.plain)
+                .disabled(clothing.totalBalance <= 0)
+                .opacity(clothing.totalBalance > 0 ? 1 : 0.55)
+            }
+        }
+        .padding()
+        .unifiedCardBackground(style: .current(from: themeManager), colorScheme: colorScheme)
+        .unifiedShadow(.card)
+    }
+
+    private var finalPaymentSavedText: String {
+        guard let date = clothing.finalPaymentSavedAt else {
+            return "已计入马上来财统计"
+        }
+        return "存入于 \(date.formatted(date: .numeric, time: .omitted))，付款后会自动转为已用"
+    }
+
+    private func saveFinalPaymentToWealth() {
+        guard clothing.isDepositPlan, clothing.totalBalance > 0, !clothing.isFinalPaymentSavedToWealth else { return }
+        let now = Date()
+        clothing.isFinalPaymentSavedToWealth = true
+        clothing.finalPaymentSavedAt = now
+        clothing.updatedAt = now
+        clothing.lastModified = now
+
+        do {
+            try modelContext.save()
+            Task { await SharedPersistence.shared.syncWidgetData() }
+        } catch {
+            print("ClothingDetailView: Failed to save final payment to wealth: \(error)")
         }
     }
     

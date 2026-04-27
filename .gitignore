@@ -30,3 +30,10 @@ project.xcworkspace/
 android/.gradle/*
 android/app/build/*
 android/local.properties
+android/.idea/*
+android/build/*
+
+# Local secrets
+.env
+.env.*
+!.env.example

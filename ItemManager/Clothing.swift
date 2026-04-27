@@ -10,6 +10,36 @@ import Foundation
 import SwiftData
 import SwiftUI
 
+
+
+enum ClothingPriceCurrency: String, Codable, CaseIterable, Identifiable {
+    case cny = "CNY"
+    case jpy = "JPY"
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .cny: return "人民币"
+        case .jpy: return "日元"
+        }
+    }
+
+    var shortName: String {
+        switch self {
+        case .cny: return "人民币"
+        case .jpy: return "日元"
+        }
+    }
+
+    var symbol: String {
+        switch self {
+        case .cny: return "¥"
+        case .jpy: return "JP¥"
+        }
+    }
+}
+
 enum ClothingStatus: String, Codable, CaseIterable, Identifiable {
     case onShelf = "上架"
     case offShelf = "下架"
@@ -38,11 +68,20 @@ final class Clothing {
     var priceChartImagePath: String? = nil // 价格表图片路径
     
     // 价格信息
-    var originalPrice: Decimal = 0.0 // 原价
+    var originalPrice: Decimal = 0.0 // 原价（人民币，统计 source of truth）
+    var originalPriceJPY: Decimal = 0.0 // 原价（日元，保留历史显示习惯）
+    var originalPriceCurrencyCode: String = ClothingPriceCurrency.cny.rawValue // 原价显示币种
+    var originalPriceExchangeRateJPY: Decimal = 21.0 // 保存时 CNY -> JPY 汇率
+    var originalPriceRateUpdatedAt: Date? = nil // 原价汇率更新时间
     var price: Decimal = 0.0 // 裙装总价
     var deposit: Decimal = 0.0 // 定金
     var balance: Decimal = 0.0 // 尾款
     var accessoriesPrice: Decimal = 0.0 // 小物总价
+    var shippingFee: Decimal = 0.0 // 邮费（人民币，合计 source of truth）
+    var shippingFeeJPY: Decimal = 0.0 // 邮费（日元）
+    var shippingFeeCurrencyCode: String = ClothingPriceCurrency.cny.rawValue // 邮费显示币种
+    var shippingExchangeRateJPY: Decimal = 21.0 // 保存时 CNY -> JPY 汇率
+    var shippingRateUpdatedAt: Date? = nil // 邮费汇率更新时间
     var sortIndex: Int = 0 // 自定义排序索引
     
     // 购买信息
@@ -51,6 +90,8 @@ final class Clothing {
     var isDepositPlan: Bool = false // 是否加入心愿尾款
     var finalPaymentDate: Date? = nil // 预估尾款时间（开始）
     var finalPaymentEndDate: Date? = nil // 预估尾款时间（结束）
+    var isFinalPaymentSavedToWealth: Bool = false // 是否已将尾款存入马上来财招财猫
+    var finalPaymentSavedAt: Date? = nil // 尾款存入招财猫时间
     var note: String = ""
     
     // 系统信息
@@ -107,10 +148,19 @@ final class Clothing {
          imagePaths: [String] = [],
          isShared: Bool = false,
          originalPrice: Decimal = 0.0,
+         originalPriceJPY: Decimal = 0.0,
+         originalPriceCurrencyCode: String = ClothingPriceCurrency.cny.rawValue,
+         originalPriceExchangeRateJPY: Decimal = 21.0,
+         originalPriceRateUpdatedAt: Date? = nil,
          price: Decimal = 0.0,
          deposit: Decimal = 0.0,
          balance: Decimal = 0.0,
          accessoriesPrice: Decimal = 0.0,
+         shippingFee: Decimal = 0.0,
+         shippingFeeJPY: Decimal = 0.0,
+         shippingFeeCurrencyCode: String = ClothingPriceCurrency.cny.rawValue,
+         shippingExchangeRateJPY: Decimal = 21.0,
+         shippingRateUpdatedAt: Date? = nil,
          purchaseDate: Date = Date(),
          depositDate: Date? = nil,
          isDepositPlan: Bool = false,
@@ -131,10 +181,19 @@ final class Clothing {
         self.imagePaths = imagePaths
         self.isShared = isShared
         self.originalPrice = originalPrice
+        self.originalPriceJPY = originalPriceJPY
+        self.originalPriceCurrencyCode = originalPriceCurrencyCode
+        self.originalPriceExchangeRateJPY = originalPriceExchangeRateJPY
+        self.originalPriceRateUpdatedAt = originalPriceRateUpdatedAt
         self.price = price
         self.deposit = deposit
         self.balance = balance
         self.accessoriesPrice = accessoriesPrice
+        self.shippingFee = shippingFee
+        self.shippingFeeJPY = shippingFeeJPY
+        self.shippingFeeCurrencyCode = shippingFeeCurrencyCode
+        self.shippingExchangeRateJPY = shippingExchangeRateJPY
+        self.shippingRateUpdatedAt = shippingRateUpdatedAt
         self.purchaseDate = purchaseDate
         self.depositDate = depositDate
         self.isDepositPlan = isDepositPlan
@@ -155,14 +214,28 @@ final class Clothing {
         return items.reduce(Decimal(0)) { $0 + $1.price }
     }
 
-    // 单套总价（含自定义小物）
+    var originalPriceCurrency: ClothingPriceCurrency {
+        get { ClothingPriceCurrency(rawValue: originalPriceCurrencyCode) ?? .cny }
+        set { originalPriceCurrencyCode = newValue.rawValue }
+    }
+
+    var shippingFeeCurrency: ClothingPriceCurrency {
+        get { ClothingPriceCurrency(rawValue: shippingFeeCurrencyCode) ?? .cny }
+        set { shippingFeeCurrencyCode = newValue.rawValue }
+    }
+
+    var resolvedShippingFee: Decimal {
+        shippingFee
+    }
+
+    // 单套总价（含自定义小物，不含一次性邮费）
     var unitTotalPrice: Decimal {
         price + resolvedAccessoriesPrice
     }
 
-    // 全部持有总价：裙装价格按库存累加，自定义小物总价只计算一次
+    // 全部持有总价：裙装价格按库存累加，自定义小物总价只计算一次，邮费不随库存倍增
     var inventoryTotalPrice: Decimal {
-        (price * Decimal(stock)) + resolvedAccessoriesPrice
+        (price * Decimal(stock)) + resolvedAccessoriesPrice + resolvedShippingFee
     }
 
     // 总定金 = (裙装定金 + 小物定金总和) * 库存数量
@@ -175,6 +248,18 @@ final class Clothing {
     var totalBalance: Decimal {
         let accBalance = accessoryItems?.reduce(Decimal(0)) { $0 + $1.balance } ?? 0
         return (balance + accBalance) * Decimal(stock)
+    }
+
+    func copyCurrencyAndShippingMetadata(from source: Clothing) {
+        originalPriceJPY = source.originalPriceJPY
+        originalPriceCurrencyCode = source.originalPriceCurrencyCode
+        originalPriceExchangeRateJPY = source.originalPriceExchangeRateJPY
+        originalPriceRateUpdatedAt = source.originalPriceRateUpdatedAt
+        shippingFee = source.shippingFee
+        shippingFeeJPY = source.shippingFeeJPY
+        shippingFeeCurrencyCode = source.shippingFeeCurrencyCode
+        shippingExchangeRateJPY = source.shippingExchangeRateJPY
+        shippingRateUpdatedAt = source.shippingRateUpdatedAt
     }
 }
 

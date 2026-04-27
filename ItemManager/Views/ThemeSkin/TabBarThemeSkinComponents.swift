@@ -1,20 +1,19 @@
 import SwiftUI
 
 private enum TabBarThemeSkinTokens {
-    static let girlClosetNamespace = "girl_closet"
+    static let supportedNamespaces: Set<String> = ["girl_closet", "sky_concert", "swan_dream"]
 
     static let creamTop = Color(red: 1.0, green: 0.981, blue: 0.965)
     static let creamBottom = Color(red: 0.989, green: 0.934, blue: 0.955)
     static let pinkBorder = Color(red: 0.91, green: 0.75, blue: 0.81)
     static let pinkAccent = Color(red: 0.84, green: 0.56, blue: 0.68)
-    static let pinkSoft = Color(red: 0.97, green: 0.86, blue: 0.9)
     static let roseText = Color(red: 0.54, green: 0.34, blue: 0.42)
     static let shadow = Color(red: 0.84, green: 0.62, blue: 0.72).opacity(0.22)
 }
 
 private extension ThemeSkinDescriptor {
-    var usesGirlClosetTabBarChrome: Bool {
-        assetNamespace == TabBarThemeSkinTokens.girlClosetNamespace
+    var usesThemeSkinTabBarChrome: Bool {
+        TabBarThemeSkinTokens.supportedNamespaces.contains(assetNamespace)
     }
 }
 
@@ -25,49 +24,58 @@ struct ThemeSkinTabBarBackdrop: View {
     var bottomPadding: CGFloat? = nil
 
     private var isActive: Bool {
-        descriptor?.usesGirlClosetTabBarChrome == true
+        descriptor?.usesThemeSkinTabBarChrome == true
     }
 
     var body: some View {
         if isActive {
-            ZStack {
-                Capsule(style: .continuous)
-                    .fill(
-                        LinearGradient(
-                            colors: [
-                                TabBarThemeSkinTokens.creamTop.opacity(0.98),
-                                TabBarThemeSkinTokens.creamBottom.opacity(0.96)
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-                    .overlay {
-                        Capsule(style: .continuous)
-                            .stroke(
-                                LinearGradient(
-                                    colors: [
-                                        .white.opacity(0.98),
-                                        TabBarThemeSkinTokens.pinkBorder.opacity(0.9)
-                                    ],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                ),
-                                lineWidth: 1.25
-                            )
-                    }
-                    .shadow(color: TabBarThemeSkinTokens.shadow, radius: 16, x: 0, y: 6)
-
-                HStack {
-                    tabBarDoodle(icon: "star.fill")
-                    Spacer()
-                    tabBarDoodle(icon: "sparkles")
-                }
-                .padding(.horizontal, 18)
+            ThemeSkinOptionalResizableAsset(
+                ThemeSkinAssetName.tabBarMain,
+                capInsets: ThemeSkinAssetName.capInsets(for: ThemeSkinAssetName.tabBarMain)
+            ) {
+                fallbackBackdrop
             }
             .frame(height: 58 + safeAreaBottom)
             .padding(.horizontal, horizontalPadding)
             .padding(.bottom, bottomPadding ?? (safeAreaBottom > 0 ? 2 : 8))
+        }
+    }
+
+    private var fallbackBackdrop: some View {
+        ZStack {
+            Capsule(style: .continuous)
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            TabBarThemeSkinTokens.creamTop.opacity(0.98),
+                            TabBarThemeSkinTokens.creamBottom.opacity(0.96)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .overlay {
+                    Capsule(style: .continuous)
+                        .stroke(
+                            LinearGradient(
+                                colors: [
+                                    .white.opacity(0.98),
+                                    TabBarThemeSkinTokens.pinkBorder.opacity(0.9)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                            lineWidth: 1.25
+                        )
+                }
+                .shadow(color: TabBarThemeSkinTokens.shadow, radius: 16, x: 0, y: 6)
+
+            HStack {
+                tabBarDoodle(icon: "star.fill")
+                Spacer()
+                tabBarDoodle(icon: "sparkles")
+            }
+            .padding(.horizontal, 18)
         }
     }
 
@@ -94,7 +102,11 @@ struct ThemeSkinModernTabLabel: View {
     let isSelected: Bool
 
     private var isActive: Bool {
-        descriptor?.usesGirlClosetTabBarChrome == true
+        descriptor?.usesThemeSkinTabBarChrome == true
+    }
+
+    private var assetName: String {
+        isSelected ? ThemeSkinAssetName.tabBarItemSelected : ThemeSkinAssetName.tabBarItemDefault
     }
 
     var body: some View {
@@ -110,13 +122,17 @@ struct ThemeSkinModernTabLabel: View {
             .padding(.horizontal, 10)
             .padding(.vertical, 6)
             .background {
-                if isSelected {
-                    Capsule(style: .continuous)
-                        .fill(Color.white.opacity(0.96))
-                        .overlay {
-                            Capsule(style: .continuous)
-                                .stroke(TabBarThemeSkinTokens.pinkBorder.opacity(0.9), lineWidth: 1)
-                        }
+                ThemeSkinOptionalResizableAsset(assetName) {
+                    if isSelected {
+                        Capsule(style: .continuous)
+                            .fill(Color.white.opacity(0.96))
+                            .overlay {
+                                Capsule(style: .continuous)
+                                    .stroke(TabBarThemeSkinTokens.pinkBorder.opacity(0.9), lineWidth: 1)
+                            }
+                    } else {
+                        Color.clear
+                    }
                 }
             }
         } else {
@@ -134,7 +150,11 @@ struct ThemeSkinLegacyTabLabel: View {
     let inactiveColor: Color
 
     private var isActive: Bool {
-        descriptor?.usesGirlClosetTabBarChrome == true
+        descriptor?.usesThemeSkinTabBarChrome == true
+    }
+
+    private var assetName: String {
+        isSelected ? ThemeSkinAssetName.tabBarItemSelected : ThemeSkinAssetName.tabBarItemDefault
     }
 
     var body: some View {
@@ -151,13 +171,17 @@ struct ThemeSkinLegacyTabLabel: View {
             .padding(.vertical, 8)
             .frame(maxWidth: .infinity)
             .background {
-                if isSelected {
-                    RoundedRectangle(cornerRadius: 18, style: .continuous)
-                        .fill(Color.white.opacity(0.96))
-                        .overlay {
-                            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                                .stroke(TabBarThemeSkinTokens.pinkBorder.opacity(0.92), lineWidth: 1.1)
-                        }
+                ThemeSkinOptionalResizableAsset(assetName) {
+                    if isSelected {
+                        RoundedRectangle(cornerRadius: 18, style: .continuous)
+                            .fill(Color.white.opacity(0.96))
+                            .overlay {
+                                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                                    .stroke(TabBarThemeSkinTokens.pinkBorder.opacity(0.92), lineWidth: 1.1)
+                            }
+                    } else {
+                        Color.clear
+                    }
                 }
             }
         } else {

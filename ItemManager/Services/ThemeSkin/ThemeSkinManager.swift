@@ -4,7 +4,11 @@ import Combine
 final class ThemeSkinManager: ObservableObject, ThemeSkinProviding {
     static let shared = ThemeSkinManager()
 
-    @Published private(set) var products: [ThemeSkinProduct] = [ThemeSkinProduct.girlCloset]
+    @Published private(set) var products: [ThemeSkinProduct] = [
+        ThemeSkinProduct.girlCloset,
+        ThemeSkinProduct.skyConcert,
+        ThemeSkinProduct.swanDream
+    ]
     @Published private(set) var ownedThemeSkins: [OwnedThemeSkin] = []
     @Published private(set) var activeSelection: ActiveThemeSkinSelection = .inactive
 

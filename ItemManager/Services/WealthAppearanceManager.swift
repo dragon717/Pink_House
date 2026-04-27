@@ -1,6 +1,42 @@
 import SwiftUI
 import Observation
 
+enum FinalPaymentVaultMascot: String, CaseIterable, Identifiable {
+    case miniVault = "miniVault"
+    case fortuneCat = "fortuneCat"
+    case piggyBank = "piggyBank"
+    case goldPig = "goldPig"
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .miniVault: return "小金库"
+        case .fortuneCat: return "招财猫"
+        case .piggyBank: return "存钱罐"
+        case .goldPig: return "金币猪"
+        }
+    }
+
+    var subtitle: String {
+        switch self {
+        case .miniVault: return "稳稳收好每一笔尾款"
+        case .fortuneCat: return "招财进宝，尾款不慌"
+        case .piggyBank: return "可爱储蓄，安心备款"
+        case .goldPig: return "金币满满，富贵加成"
+        }
+    }
+
+    var symbolName: String {
+        switch self {
+        case .miniVault: return "lock.shield.fill"
+        case .fortuneCat: return "cat.fill"
+        case .piggyBank: return "banknote.fill"
+        case .goldPig: return "yensign.circle.fill"
+        }
+    }
+}
+
 @Observable
 class WealthAppearanceManager {
     static let shared = WealthAppearanceManager()
@@ -18,15 +54,25 @@ class WealthAppearanceManager {
     var containerBackgroundImage: UIImage?
     
     // MARK: - Settings
+    static let finalPaymentVaultMascotKey = "wealth.finalPaymentVaultMascot"
+
     var shouldShowWealthContainerBackground: Bool {
         didSet {
             UserDefaults.standard.set(shouldShowWealthContainerBackground, forKey: "shouldShowWealthContainerBackground")
+        }
+    }
+
+    var finalPaymentVaultMascot: FinalPaymentVaultMascot {
+        didSet {
+            UserDefaults.standard.set(finalPaymentVaultMascot.rawValue, forKey: Self.finalPaymentVaultMascotKey)
         }
     }
     
     // MARK: - Initialization
     init() {
         self.shouldShowWealthContainerBackground = UserDefaults.standard.object(forKey: "shouldShowWealthContainerBackground") as? Bool ?? false
+        let mascotRawValue = UserDefaults.standard.string(forKey: Self.finalPaymentVaultMascotKey)
+        self.finalPaymentVaultMascot = mascotRawValue.flatMap(FinalPaymentVaultMascot.init(rawValue:)) ?? .fortuneCat
         loadImages()
     }
     

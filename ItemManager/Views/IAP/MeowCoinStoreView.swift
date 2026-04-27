@@ -1,4 +1,5 @@
 import SwiftUI
+import StoreKit
 import UIKit
 import MessageUI
 
@@ -16,6 +17,9 @@ struct MeowCoinStoreView: View {
     @State private var diagnosticAlertMessage = ""
     @State private var shouldOpenDiagnosticShareAfterAlert = false
     @State private var isPreparingDiagnosticFeedback = false
+    @State private var showingOfferCodeInfoAlert = false
+    @State private var showingOfferCodeRedemption = false
+    @State private var showingOfferCodeErrorAlert = false
 
     var body: some View {
         NavigationStack {
@@ -27,6 +31,9 @@ struct MeowCoinStoreView: View {
 
                         // 喵币充值选项
                         coinPurchaseSection
+
+                        // App Store 兑换码
+                        offerCodeSection
 
                         // VIP说明
                         vipExchangeHintSection
@@ -76,6 +83,19 @@ struct MeowCoinStoreView: View {
             } message: {
                 Text(diagnosticAlertMessage)
             }
+            .alert("使用 App Store 兑换码", isPresented: $showingOfferCodeInfoAlert) {
+                Button("取消", role: .cancel) { }
+                Button("继续") {
+                    showingOfferCodeRedemption = true
+                }
+            } message: {
+                Text("请输入官方 App Store 优惠码。兑换成功后，系统交易会自动到账；专属礼包将发放 888 喵币和 66666 鱼币。")
+            }
+            .alert("App Store 兑换码", isPresented: $showingOfferCodeErrorAlert) {
+                Button("知道了", role: .cancel) { }
+            } message: {
+                Text("暂时无法打开 App Store 优惠码兑换界面，请稍后重试。")
+            }
             .sheet(isPresented: $showDiagnosticMailComposer) {
                 MailComposer(
                     subject: diagnosticMailSubject,
@@ -91,6 +111,11 @@ struct MeowCoinStoreView: View {
             }
             .task {
                 await viewModel.fetchProducts()
+            }
+            .offerCodeRedemption(isPresented: $showingOfferCodeRedemption) { result in
+                if case .failure = result {
+                    showingOfferCodeErrorAlert = true
+                }
             }
         }
     }
@@ -187,6 +212,53 @@ struct MeowCoinStoreView: View {
                 }
                 .padding(.horizontal)
             }
+        }
+    }
+
+    // MARK: - App Store 兑换码入口
+    private var offerCodeSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("兑换码礼包")
+                .font(.title2.bold())
+                .padding(.horizontal)
+
+            Button {
+                showingOfferCodeInfoAlert = true
+            } label: {
+                HStack(spacing: 14) {
+                    Image(systemName: "gift.fill")
+                        .font(.title2)
+                        .foregroundStyle(.pink)
+                        .frame(width: 36, height: 36)
+                        .background(
+                            Circle()
+                                .fill(.pink.opacity(0.12))
+                        )
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("兑换 App Store 优惠码")
+                            .font(.headline)
+                            .foregroundStyle(.primary)
+
+                        Text("专属礼包：888 喵币 + 66666 鱼币")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    Spacer()
+
+                    Image(systemName: "chevron.right")
+                        .font(.caption.bold())
+                        .foregroundStyle(.tertiary)
+                }
+                .padding(16)
+                .background(
+                    RoundedRectangle(cornerRadius: 16)
+                        .fill(Color(uiColor: .secondarySystemBackground))
+                )
+            }
+            .buttonStyle(.plain)
+            .padding(.horizontal)
         }
     }
 

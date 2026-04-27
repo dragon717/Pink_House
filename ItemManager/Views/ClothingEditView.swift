@@ -15,13 +15,13 @@ struct TagData: Codable {
     let id: UUID
     let name: String
     let colorHex: String
-    
+
     init(from tag: Tag) {
         self.id = tag.id
         self.name = tag.name
         self.colorHex = tag.colorHex
     }
-    
+
     init(id: UUID, name: String, colorHex: String) {
         self.id = id
         self.name = name
@@ -43,10 +43,15 @@ struct ClothingEditDraft: Codable {
     let imagePaths: [String]
     let isShared: Bool
     let originalPrice: Double
+    let originalPriceJPY: Double?      // v1.11+ 原价日元，旧草稿可能不存在
+    let originalPriceCurrencyCode: String? // v1.11+ 原价显示币种，旧草稿默认 CNY
     let priceTotal: Double
     let deposit: Double
     let balance: Double
     let accessoriesPrice: Double
+    let shippingFee: Double?           // v1.11+ 邮费人民币，旧草稿默认 0
+    let shippingFeeJPY: Double?        // v1.11+ 邮费日元，旧草稿默认 0
+    let shippingFeeCurrencyCode: String? // v1.11+ 邮费显示币种，旧草稿默认 CNY
     let stock: Int
     let purchaseDate: Date
     let depositDate: Date
@@ -59,7 +64,7 @@ struct ClothingEditDraft: Codable {
     let priceChartImagePath: String? // 价格表图片路径
     let selectedTags: [TagData]      // 选中的标签
     let timestamp: Date
-    
+
     init(id: UUID = UUID(),
          name: String,
          brandName: String,
@@ -72,10 +77,15 @@ struct ClothingEditDraft: Codable {
          imagePaths: [String],
          isShared: Bool,
          originalPrice: Double,
+         originalPriceJPY: Double? = nil,
+         originalPriceCurrencyCode: String? = nil,
          priceTotal: Double,
          deposit: Double,
          balance: Double,
          accessoriesPrice: Double,
+         shippingFee: Double? = nil,
+         shippingFeeJPY: Double? = nil,
+         shippingFeeCurrencyCode: String? = nil,
          stock: Int,
          purchaseDate: Date,
          depositDate: Date,
@@ -99,10 +109,15 @@ struct ClothingEditDraft: Codable {
         self.imagePaths = imagePaths
         self.isShared = isShared
         self.originalPrice = originalPrice
+        self.originalPriceJPY = originalPriceJPY
+        self.originalPriceCurrencyCode = originalPriceCurrencyCode
         self.priceTotal = priceTotal
         self.deposit = deposit
         self.balance = balance
         self.accessoriesPrice = accessoriesPrice
+        self.shippingFee = shippingFee
+        self.shippingFeeJPY = shippingFeeJPY
+        self.shippingFeeCurrencyCode = shippingFeeCurrencyCode
         self.stock = stock
         self.purchaseDate = purchaseDate
         self.depositDate = depositDate
@@ -116,6 +131,27 @@ struct ClothingEditDraft: Codable {
         self.selectedTags = selectedTags
         self.timestamp = Date()
     }
+
+    var hasMeaningfulData: Bool {
+        !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
+        !brandName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
+        !types.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
+        !colors.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
+        !sizes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
+        !imagePaths.isEmpty ||
+        originalPrice > 0 ||
+        (originalPriceJPY ?? 0) > 0 ||
+        priceTotal > 0 ||
+        deposit > 0 ||
+        balance > 0 ||
+        (shippingFee ?? 0) > 0 ||
+        (shippingFeeJPY ?? 0) > 0 ||
+        !note.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
+        !accessoryList.isEmpty ||
+        !selectedTags.isEmpty ||
+        !(sizeChartImagePath?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true) ||
+        !(priceChartImagePath?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true)
+    }
 }
 
 // MARK: - 草稿管理器
@@ -125,9 +161,16 @@ final class ClothingEditDraftManager {
     private let userDefaults = UserDefaults.standard
     private let draftKey = "ClothingEditDraft"
     private let draftIDKey = "ClothingEditDraftID"
+    private let editingDraftKeyPrefix = "ClothingEditDraft.edit."
 
-    // 当前编辑状态（用于后台保存）
+    // 当前新建状态（用于前后台/失活时保存）
     @Published var currentDraft: ClothingEditDraft?
+    private var currentEditingDrafts: [UUID: ClothingEditDraft] = [:]
+    private var activeEditorTokens: Set<UUID> = []
+
+    var hasActiveEditor: Bool {
+        !activeEditorTokens.isEmpty
+    }
 
     private init() {
         // 监听应用进入后台通知
@@ -137,17 +180,23 @@ final class ClothingEditDraftManager {
             queue: .main
         ) { [weak self] _ in
             print("DraftManager: Background notification received")
-            if let draft = self?.currentDraft {
-                print("DraftManager: Saving current draft on background, images: \(draft.imagePaths.count)")
-                self?.saveDraft(draft)
-            } else {
-                print("DraftManager: No current draft to save on background")
-            }
+            self?.persistActiveDrafts(reason: "didEnterBackgroundNotification")
         }
+    }
+
+    func registerActiveEditor(_ token: UUID) {
+        activeEditorTokens.insert(token)
+        print("DraftManager: Active editor registered, count: \(activeEditorTokens.count)")
+    }
+
+    func unregisterActiveEditor(_ token: UUID) {
+        activeEditorTokens.remove(token)
+        print("DraftManager: Active editor unregistered, count: \(activeEditorTokens.count)")
     }
 
     func saveDraft(_ draft: ClothingEditDraft) {
         print("DraftManager: Saving draft with ID: \(draft.id), images: \(draft.imagePaths.count)")
+        currentDraft = draft
         if let data = try? JSONEncoder().encode(draft) {
             userDefaults.set(data, forKey: draftKey)
             userDefaults.set(draft.id.uuidString, forKey: draftIDKey)
@@ -198,6 +247,73 @@ final class ClothingEditDraftManager {
         // 避免每次重绘都解码草稿并刷日志。
         userDefaults.data(forKey: draftKey) != nil
     }
+
+    func updateEditingDraft(_ draft: ClothingEditDraft, for clothingID: UUID) {
+        currentEditingDrafts[clothingID] = draft
+        print("DraftManager: Updated editing draft for clothing: \(clothingID), images: \(draft.imagePaths.count)")
+    }
+
+    func saveEditingDraft(_ draft: ClothingEditDraft, for clothingID: UUID) {
+        currentEditingDrafts[clothingID] = draft
+        print("DraftManager: Saving editing draft for clothing: \(clothingID), images: \(draft.imagePaths.count)")
+        if let data = try? JSONEncoder().encode(draft) {
+            userDefaults.set(data, forKey: editingDraftKey(for: clothingID))
+            userDefaults.synchronize()
+            print("DraftManager: Editing draft saved successfully")
+        } else {
+            print("DraftManager: Failed to encode editing draft")
+        }
+    }
+
+    func loadEditingDraft(for clothingID: UUID) -> ClothingEditDraft? {
+        if let draft = currentEditingDrafts[clothingID] {
+            print("DraftManager: Loaded in-memory editing draft for clothing: \(clothingID), images: \(draft.imagePaths.count)")
+            return draft
+        }
+
+        guard let data = userDefaults.data(forKey: editingDraftKey(for: clothingID)) else {
+            print("DraftManager: No editing draft found for clothing: \(clothingID)")
+            return nil
+        }
+        guard let draft = try? JSONDecoder().decode(ClothingEditDraft.self, from: data) else {
+            print("DraftManager: Failed to decode editing draft for clothing: \(clothingID)")
+            return nil
+        }
+        currentEditingDrafts[clothingID] = draft
+        print("DraftManager: Loaded persisted editing draft for clothing: \(clothingID), images: \(draft.imagePaths.count)")
+        return draft
+    }
+
+    func clearEditingDraft(for clothingID: UUID) {
+        print("DraftManager: Clearing editing draft for clothing: \(clothingID)")
+        currentEditingDrafts.removeValue(forKey: clothingID)
+        userDefaults.removeObject(forKey: editingDraftKey(for: clothingID))
+        userDefaults.synchronize()
+        print("DraftManager: Editing draft cleared")
+    }
+
+    func persistActiveDrafts(reason: String) {
+        if let draft = currentDraft {
+            if draft.hasMeaningfulData {
+                print("DraftManager: Persisting current new draft, reason: \(reason), images: \(draft.imagePaths.count)")
+                saveDraft(draft)
+            } else {
+                print("DraftManager: Skip empty current new draft, reason: \(reason)")
+            }
+        } else {
+            print("DraftManager: No current new draft to persist, reason: \(reason)")
+        }
+
+        let editingDraftsToPersist = currentEditingDrafts
+        for (clothingID, draft) in editingDraftsToPersist {
+            print("DraftManager: Persisting editing draft, reason: \(reason), clothing: \(clothingID)")
+            saveEditingDraft(draft, for: clothingID)
+        }
+    }
+
+    private func editingDraftKey(for clothingID: UUID) -> String {
+        "\(editingDraftKeyPrefix)\(clothingID.uuidString)"
+    }
 }
 
 struct ClothingEditView: View {
@@ -205,14 +321,15 @@ struct ClothingEditView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(ThemeManager.self) private var themeManager
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.scenePhase) private var scenePhase
     // 统一使用 deletedAt == nil 作为未删除的判断条件，与其他视图保持一致
     @Query(filter: #Predicate<Clothing> { $0.deletedAt == nil }) private var allClothings: [Clothing]
     @ObservedObject private var visibilityManager = FieldVisibilityManager.shared
     @State private var draftManager = ClothingEditDraftManager.shared
-    
+
     @State private var clothing: Clothing?
     @State private var draftID: UUID = UUID()
-    
+
     // Form States
     @State private var name: String = ""
     @State private var brandName: String = ""
@@ -224,32 +341,40 @@ struct ClothingEditView: View {
     @State private var accessories: String = ""
     @State private var imagePaths: [String] = []
     @State private var isShared: Bool = false
-    
+
     // 表图字段
     @State private var sizeChartImagePath: String? = nil
     @State private var priceChartImagePath: String? = nil
-    
+
     // Tag States
     @State private var showingAddTagSheet = false
     @State private var selectedTags: [Tag] = []
-    
+
     // Price States
     @State private var originalPrice: Double = 0.0
+    @State private var originalPriceJPY: Double = 0.0
+    @State private var originalPriceCurrency: ClothingPriceCurrency = .cny
+    @State private var originalPriceRateUpdatedAt: Date? = nil
     @State private var priceTotal: Double = 0.0
     @State private var deposit: Double = 0.0
     @State private var balance: Double = 0.0
     @State private var accessoriesPrice: Double = 0.0
+    @State private var shippingFee: Double = 0.0
+    @State private var shippingFeeJPY: Double = 0.0
+    @State private var shippingFeeCurrency: ClothingPriceCurrency = .cny
+    @State private var shippingRateUpdatedAt: Date? = nil
+    @State private var jpyExchangeRate: Double = CurrencyExchangeRateService.defaultJPYRate
     @State private var stock: Int = 1
-    
+
     // Selection Sheets
     @State private var showingBrandSelection = false
     @State private var tempSelectedBrand: Brand?
     @State private var activeSelectionField: ClothingField?
     @State private var showingGenericSelection = false
-    
+
     // Custom Accessories
     @State private var accessoryList: [AccessoryItemData] = []
-    
+
     // Purchase States
     @State private var purchaseDate: Date = Date()
     @State private var depositDate: Date = Date()
@@ -257,9 +382,10 @@ struct ClothingEditView: View {
     @State private var finalPaymentDate: Date = Date()
     @State private var finalPaymentEndDate: Date = Date()
     @State private var note: String = ""
-    
+
     // 标记是否是通过"保存"按钮离开的
     @State private var isSaving = false
+    @State private var isCancelling = false
 
     // 标记是否从草稿继续（false表示新建，清除草稿）
     private var continueFromDraft: Bool
@@ -267,18 +393,19 @@ struct ClothingEditView: View {
     // 标记是否已经处理过草稿逻辑（防止onAppear多次执行）
     @State private var hasProcessedDraft = false
 
-    // 标记是否已经进入后台（避免onDisappear重复保存草稿）
-    @State private var didEnterBackground = false
-    
+    // 标记是否已经因前后台/失活持久化过（避免onDisappear重复保存草稿）
+    @State private var didPersistForLifecycle = false
+    @State private var editorSessionID = UUID()
+
     // Toast 提示状态
     @State private var showToast = false
     @State private var toastMessage = ""
     @State private var toastType: ToastType = .error
-    
+
     // Toast 类型
     enum ToastType {
         case success, error, warning
-        
+
         var icon: String {
             switch self {
             case .success: return "checkmark.circle.fill"
@@ -286,7 +413,7 @@ struct ClothingEditView: View {
             case .warning: return "info.circle.fill"
             }
         }
-        
+
         var color: Color {
             switch self {
             case .success: return .green
@@ -295,10 +422,10 @@ struct ClothingEditView: View {
             }
         }
     }
-    
+
     private var initialBrandID: UUID?
     private var initialTypes: Set<String>?
-    
+
     init(clothing: Clothing?, initialBrandID: UUID? = nil, initialTypes: Set<String>? = nil, continueFromDraft: Bool = true) {
         _clothing = State(initialValue: clothing)
         self.initialBrandID = initialBrandID
@@ -306,16 +433,16 @@ struct ClothingEditView: View {
         self.continueFromDraft = continueFromDraft
         print("ClothingEditView: INIT called, isEditing: \(clothing != nil), continueFromDraft: \(continueFromDraft)")
     }
-    
+
     var isEditing: Bool { clothing != nil }
-    
+
     private var containerPalette: AdaptivePaletteV2 {
         themeManager.getPaletteForContainer(
             containerBackground: .ultraThinMaterial,
             colorScheme: colorScheme
         )
     }
-    
+
     // 提取基础信息视图，避免 body 中表达式过于复杂
     private var basicInfoSection: some View {
         ClothingBasicInfoView(
@@ -336,7 +463,7 @@ struct ClothingEditView: View {
             activeSelectionField: $activeSelectionField
         )
     }
-    
+
     // 提取标签视图
     private var tagsSection: some View {
         ClothingTagsView(
@@ -344,17 +471,23 @@ struct ClothingEditView: View {
             showingAddTagSheet: $showingAddTagSheet
         )
     }
-    
+
     // 提取价格视图
     private var priceSection: some View {
         ClothingPriceView(
             originalPrice: $originalPrice,
+            originalPriceJPY: $originalPriceJPY,
+            originalPriceCurrency: $originalPriceCurrency,
             priceTotal: $priceTotal,
             deposit: $deposit,
             balance: $balance,
             accessoriesPrice: $accessoriesPrice,
+            shippingFee: $shippingFee,
+            shippingFeeJPY: $shippingFeeJPY,
+            shippingFeeCurrency: $shippingFeeCurrency,
             stock: $stock,
             accessoryList: $accessoryList,
+            jpyExchangeRate: jpyExchangeRate,
             priceChartImagePath: $priceChartImagePath,
             deleteChartFileImmediately: !isEditing,
             onShowToast: handleShowToast
@@ -376,10 +509,15 @@ struct ClothingEditView: View {
         let accessories: String
         let isShared: Bool
         let originalPrice: Double
+        let originalPriceJPY: Double
+        let originalPriceCurrency: ClothingPriceCurrency
         let priceTotal: Double
         let deposit: Double
         let balance: Double
         let accessoriesPrice: Double
+        let shippingFee: Double
+        let shippingFeeJPY: Double
+        let shippingFeeCurrency: ClothingPriceCurrency
         let stock: Int
         let purchaseDate: Date
         let depositDate: Date
@@ -405,10 +543,15 @@ struct ClothingEditView: View {
             accessories: accessories,
             isShared: isShared,
             originalPrice: originalPrice,
+            originalPriceJPY: originalPriceJPY,
+            originalPriceCurrency: originalPriceCurrency,
             priceTotal: priceTotal,
             deposit: deposit,
             balance: balance,
             accessoriesPrice: accessoriesPrice,
+            shippingFee: shippingFee,
+            shippingFeeJPY: shippingFeeJPY,
+            shippingFeeCurrency: shippingFeeCurrency,
             stock: stock,
             purchaseDate: purchaseDate,
             depositDate: depositDate,
@@ -422,7 +565,7 @@ struct ClothingEditView: View {
             priceChartImagePath: priceChartImagePath
         )
     }
-    
+
     // 提取购买信息视图
     private var purchaseInfoSection: some View {
         ClothingPurchaseInfoView(
@@ -434,7 +577,7 @@ struct ClothingEditView: View {
             note: $note
         )
     }
-    
+
     // 处理 Toast 显示的回调
     private func handleShowToast(message: String, type: ClothingPriceView.ToastType) {
         let toastType: ToastType
@@ -445,31 +588,31 @@ struct ClothingEditView: View {
         }
         showToastMessage(message, type: toastType)
     }
-    
+
     var body: some View {
         ZStack {
             // Background
             LiquidBackground()
                 .ignoresSafeArea()
                 .environment(\.containerPalette, containerPalette)
-            
+
             ScrollView {
                 VStack(spacing: 24) {
                     // MARK: - 裙装信息
                     basicInfoSection
-                    
+
                     // MARK: - 标签分类
                     tagsSection
-                    
+
                     // MARK: - 价格信息
                     priceSection
-                    
+
                     // MARK: - 购买信息
                     purchaseInfoSection
                 }
                 .padding()
             }
-            
+
             // Toast 提示层
             toastOverlay
         }
@@ -478,6 +621,7 @@ struct ClothingEditView: View {
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
                 Button("取消") {
+                    isCancelling = true
                     // 取消时如果有有效信息则保存草稿，方便用户下次恢复
                     // 注意：保存草稿后不能删除图片文件，否则恢复草稿时图片会丢失
                     if !isEditing && hasMeaningfulData() {
@@ -490,17 +634,20 @@ struct ClothingEditView: View {
                         for path in imagePaths {
                             ImageManager.shared.deleteImage(fileName: path, context: modelContext)
                         }
+                        draftManager.clearDraft()
+                    } else if let clothingID = clothing?.id {
+                        draftManager.clearEditingDraft(for: clothingID)
                     }
                     dismiss()
                 }
             }
-            
+
             ToolbarItem(placement: .confirmationAction) {
                 Button("保存") {
                     // 标记为保存操作
                     isSaving = true
                     // 保存前清除草稿
-                    draftManager.clearDraft()
+                    clearCurrentDraftStorage()
                     save()
                 }
                 .disabled(name.isEmpty)
@@ -528,131 +675,53 @@ struct ClothingEditView: View {
             }
         }
         .onAppear {
-            print("ClothingEditView: onAppear triggered, isEditing: \(isEditing), draftID: \(draftID), continueFromDraft: \(continueFromDraft), hasProcessedDraft: \(hasProcessedDraft)")
-            
-            // 防止多次处理草稿逻辑
-            guard !hasProcessedDraft else {
-                print("ClothingEditView: Draft already processed, skipping")
-                return
-            }
-            hasProcessedDraft = true
-            
-            // 加载自动补全数据
-            SuggestionManager.shared.loadDataAndBuildIndex(modelContext: modelContext)
-
-            // 尝试恢复草稿（视图可能被重新创建）
-            if isEditing {
-                print("ClothingEditView: Skipping draft restore, in editing mode")
-            } else if continueFromDraft, let draft = draftManager.loadDraft() {
-                print("ClothingEditView: Found draft with \(draft.imagePaths.count) images")
-                // 恢复草稿
-                restoreFromDraft(draft)
-            } else {
-                print("ClothingEditView: No draft found to restore")
-            }
-
-            // 更新当前草稿到管理器（用于后台保存）
-            updateCurrentDraft()
-            
-            if let c = clothing {
-                // 编辑模式：从数据库加载
-                name = c.name
-                brandName = c.brand?.name ?? ""
-                types = c.types
-                colors = c.colors
-                sizes = c.sizes
-                length = c.length
-                condition = c.condition
-                accessories = c.accessories
-                imagePaths = c.imagePaths
-                isShared = c.isShared
-                originalPrice = NSDecimalNumber(decimal: c.originalPrice).doubleValue
-                let depositVal = NSDecimalNumber(decimal: c.deposit).doubleValue
-                let balanceVal = NSDecimalNumber(decimal: c.balance).doubleValue
-                deposit = depositVal
-                balance = balanceVal
-                
-                accessoriesPrice = NSDecimalNumber(decimal: c.accessoriesPrice).doubleValue
-                
-                // Load accessory items
-                if let items = c.accessoryItems {
-                    accessoryList = items.sorted(by: { $0.sortIndex < $1.sortIndex })
-                        .map {
-                            AccessoryItemData(
-                                id: UUID(),
-                                name: $0.name,
-                                price: NSDecimalNumber(decimal: $0.price).doubleValue,
-                                deposit: NSDecimalNumber(decimal: $0.deposit).doubleValue,
-                                balance: NSDecimalNumber(decimal: $0.balance).doubleValue,
-                                imagePaths: $0.imagePaths
-                            )
-                        }
-                }
-                
-                stock = c.stock
-                purchaseDate = c.purchaseDate
-                depositDate = c.depositDate ?? Date()
-                isDepositPlan = c.isDepositPlan
-                finalPaymentDate = c.finalPaymentDate ?? Date()
-                finalPaymentEndDate = c.finalPaymentEndDate ?? (c.finalPaymentDate ?? Date())
-                note = c.note
-                selectedTags = c.tags ?? []
-                
-                // 加载表图字段
-                sizeChartImagePath = c.sizeChartImagePath
-                priceChartImagePath = c.priceChartImagePath
-                
-                // 加载时，如果定金和尾款都存在，则自动校正总价
-                if depositVal > 0 && balanceVal > 0 {
-                    priceTotal = depositVal + balanceVal
-                } else {
-                    priceTotal = NSDecimalNumber(decimal: c.price).doubleValue
-                }
-            } else {
-                // New Item: Apply initial values from filters if available
-                if brandName.isEmpty, let brandID = initialBrandID {
-                    let descriptor = FetchDescriptor<Brand>(predicate: #Predicate { $0.id == brandID })
-                    if let brand = try? modelContext.fetch(descriptor).first {
-                        brandName = brand.name
-                    }
-                }
-                
-                if types.isEmpty, let initTypes = initialTypes, !initTypes.isEmpty {
-                    // Filter out empty strings just in case
-                    let validTypes = initTypes.filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
-                    if !validTypes.isEmpty {
-                        types = validTypes.joined(separator: ",")
-                    }
-                }
-            }
+            draftManager.registerActiveEditor(editorSessionID)
+            initializeEditorIfNeeded()
+            Task { await refreshJPYRateForEditor() }
         }
         .onChange(of: imagePaths) { oldValue, newValue in
             print("ClothingEditView: imagePaths changed from \(oldValue.count) to \(newValue.count) images")
+            didPersistForLifecycle = false
             // 更新当前草稿到管理器
             updateCurrentDraft()
             // 图片变化后立即保存草稿到磁盘，防止丢失
             if !isEditing {
                 print("ClothingEditView: Image paths changed, immediately saving draft to disk")
                 saveCurrentStateAsDraft()
+            } else {
+                saveCurrentStateAsDraft()
             }
         }
         .onChange(of: draftObservationKey) { oldValue, newValue in
+            didPersistForLifecycle = false
             updateCurrentDraft()
             let chartChanged =
                 oldValue.sizeChartImagePath != newValue.sizeChartImagePath ||
                 oldValue.priceChartImagePath != newValue.priceChartImagePath
-            if !isEditing && chartChanged { saveCurrentStateAsDraft() }
+            if chartChanged { saveCurrentStateAsDraft() }
+        }
+        .onChange(of: jpyExchangeRate) { _, _ in
+            syncCurrencyAmountsFromPreferredCurrency()
+        }
+        .onChange(of: scenePhase) { _, newPhase in
+            if newPhase == .active {
+                didPersistForLifecycle = false
+                return
+            }
+            guard newPhase == .inactive || newPhase == .background else { return }
+            print("ClothingEditView: scenePhase changed to \(newPhase), saving draft snapshot")
+            persistCurrentStateForLifecycle(reason: "scenePhase-\(newPhase)")
         }
         // 监听应用进入后台通知，设置标记避免重复保存
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.didEnterBackgroundNotification)) { _ in
             print("ClothingEditView: App did enter background")
-            didEnterBackground = true
+            persistCurrentStateForLifecycle(reason: "didEnterBackgroundNotification")
         }
         .onDisappear {
             print("ClothingEditView: onDisappear")
-            // 如果不是保存操作且不是编辑模式且没有进入过后台，保存草稿
-            // 如果已经进入过后台，DraftManager会在后台通知中保存草稿，这里不需要重复保存
-            let shouldSaveDraft = !isSaving && !isEditing && !didEnterBackground
+            draftManager.unregisterActiveEditor(editorSessionID)
+            // 如果不是保存/明确取消，且没有因前后台/失活保存过，则保留当前快照。
+            let shouldSaveDraft = !isSaving && !isCancelling && !didPersistForLifecycle
             if shouldSaveDraft {
                 print("ClothingEditView: Saving draft on disappear")
                 saveCurrentStateAsDraft()
@@ -667,15 +736,132 @@ struct ClothingEditView: View {
             updateTotalPrice()
         }
     }
-    
+
     // MARK: - Helpers
-    
-    // 保存当前状态为草稿
-    private func saveCurrentStateAsDraft() {
-        print("ClothingEditView: saveCurrentStateAsDraft called, draftID: \(draftID), imagePaths count: \(imagePaths.count), name: \(name)")
-        // 将选中的标签转换为可编码的TagData数组
+
+    private func initializeEditorIfNeeded() {
+        print("ClothingEditView: onAppear triggered, isEditing: \(isEditing), draftID: \(draftID), continueFromDraft: \(continueFromDraft), hasProcessedDraft: \(hasProcessedDraft)")
+
+        // 防止多次处理草稿逻辑
+        guard !hasProcessedDraft else {
+            print("ClothingEditView: Draft already processed, skipping")
+            return
+        }
+        hasProcessedDraft = true
+
+        // 加载自动补全数据
+        SuggestionManager.shared.loadDataAndBuildIndex(modelContext: modelContext)
+
+        if let c = clothing {
+            // 编辑模式：先从数据库加载，再覆盖未保存的编辑草稿。
+            loadFromClothing(c)
+            if let editDraft = draftManager.loadEditingDraft(for: c.id) {
+                print("ClothingEditView: Restoring editing draft for clothing: \(c.id)")
+                restoreFromDraft(editDraft)
+            }
+        } else {
+            if continueFromDraft, let persistedDraft = draftManager.loadDraft() {
+                print("ClothingEditView: Found persisted draft with \(persistedDraft.imagePaths.count) images")
+                restoreFromDraft(persistedDraft)
+            } else if let inMemoryDraft = draftManager.currentDraft {
+                // 手动创建入口会清掉旧持久草稿；这里仅恢复本次正在编辑的内存快照，
+                // 避免下拉通知栏/失活导致 SwiftUI 重建后表单回到空白。
+                print("ClothingEditView: Restoring in-memory draft with \(inMemoryDraft.imagePaths.count) images")
+                restoreFromDraft(inMemoryDraft)
+            } else {
+                print("ClothingEditView: No draft found to restore")
+            }
+            applyInitialValuesIfNeeded()
+        }
+
+        // 更新当前草稿到管理器（用于失活/后台保存）
+        updateCurrentDraft()
+    }
+
+    private func loadFromClothing(_ c: Clothing) {
+        name = c.name
+        brandName = c.brand?.name ?? ""
+        types = c.types
+        colors = c.colors
+        sizes = c.sizes
+        length = c.length
+        condition = c.condition
+        accessories = c.accessories
+        imagePaths = c.imagePaths
+        isShared = c.isShared
+        originalPrice = NSDecimalNumber(decimal: c.originalPrice).doubleValue
+        originalPriceJPY = NSDecimalNumber(decimal: c.originalPriceJPY).doubleValue
+        originalPriceCurrency = c.originalPriceCurrency
+        originalPriceRateUpdatedAt = c.originalPriceRateUpdatedAt
+        shippingFee = NSDecimalNumber(decimal: c.shippingFee).doubleValue
+        shippingFeeJPY = NSDecimalNumber(decimal: c.shippingFeeJPY).doubleValue
+        shippingFeeCurrency = c.shippingFeeCurrency
+        shippingRateUpdatedAt = c.shippingRateUpdatedAt
+        jpyExchangeRate = NSDecimalNumber(decimal: c.originalPriceExchangeRateJPY).doubleValue > 0
+            ? NSDecimalNumber(decimal: c.originalPriceExchangeRateJPY).doubleValue
+            : CurrencyExchangeRateService.shared.cnyToJPYRate
+        syncCurrencyAmountsFromPreferredCurrency()
+        let depositVal = NSDecimalNumber(decimal: c.deposit).doubleValue
+        let balanceVal = NSDecimalNumber(decimal: c.balance).doubleValue
+        deposit = depositVal
+        balance = balanceVal
+
+        accessoriesPrice = NSDecimalNumber(decimal: c.accessoriesPrice).doubleValue
+
+        if let items = c.accessoryItems {
+            accessoryList = items.sorted(by: { $0.sortIndex < $1.sortIndex })
+                .map {
+                    AccessoryItemData(
+                        id: UUID(),
+                        name: $0.name,
+                        price: NSDecimalNumber(decimal: $0.price).doubleValue,
+                        deposit: NSDecimalNumber(decimal: $0.deposit).doubleValue,
+                        balance: NSDecimalNumber(decimal: $0.balance).doubleValue,
+                        imagePaths: $0.imagePaths
+                    )
+                }
+        } else {
+            accessoryList = []
+        }
+
+        stock = c.stock
+        purchaseDate = c.purchaseDate
+        depositDate = c.depositDate ?? Date()
+        isDepositPlan = c.isDepositPlan
+        finalPaymentDate = c.finalPaymentDate ?? Date()
+        finalPaymentEndDate = c.finalPaymentEndDate ?? (c.finalPaymentDate ?? Date())
+        note = c.note
+        selectedTags = c.tags ?? []
+
+        sizeChartImagePath = c.sizeChartImagePath
+        priceChartImagePath = c.priceChartImagePath
+
+        if depositVal > 0 && balanceVal > 0 {
+            priceTotal = depositVal + balanceVal
+        } else {
+            priceTotal = NSDecimalNumber(decimal: c.price).doubleValue
+        }
+    }
+
+    private func applyInitialValuesIfNeeded() {
+        if brandName.isEmpty, let brandID = initialBrandID {
+            let descriptor = FetchDescriptor<Brand>(predicate: #Predicate { $0.id == brandID })
+            if let brand = try? modelContext.fetch(descriptor).first {
+                brandName = brand.name
+            }
+        }
+
+        if types.isEmpty, let initTypes = initialTypes, !initTypes.isEmpty {
+            let validTypes = initTypes.filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
+            if !validTypes.isEmpty {
+                types = validTypes.joined(separator: ",")
+            }
+        }
+    }
+
+    private func makeCurrentDraft() -> ClothingEditDraft {
         let tagDataList = selectedTags.map { TagData(from: $0) }
-        let draft = ClothingEditDraft(
+        return ClothingEditDraft(
             id: draftID,
             name: name,
             brandName: brandName,
@@ -688,10 +874,15 @@ struct ClothingEditView: View {
             imagePaths: imagePaths,
             isShared: isShared,
             originalPrice: originalPrice,
+            originalPriceJPY: originalPriceJPY,
+            originalPriceCurrencyCode: originalPriceCurrency.rawValue,
             priceTotal: priceTotal,
             deposit: deposit,
             balance: balance,
             accessoriesPrice: accessoriesPrice,
+            shippingFee: shippingFee,
+            shippingFeeJPY: shippingFeeJPY,
+            shippingFeeCurrencyCode: shippingFeeCurrency.rawValue,
             stock: stock,
             purchaseDate: purchaseDate,
             depositDate: depositDate,
@@ -704,48 +895,47 @@ struct ClothingEditView: View {
             priceChartImagePath: priceChartImagePath,
             selectedTags: tagDataList
         )
-        draftManager.saveDraft(draft)
-        print("ClothingEditView: Draft saved successfully with \(draft.imagePaths.count) images, \(tagDataList.count) tags")
+    }
+
+    private func persistCurrentStateForLifecycle(reason: String) {
+        guard !isSaving, !isCancelling else { return }
+        guard isEditing || hasMeaningfulData() else {
+            print("ClothingEditView: Skip lifecycle draft save, no meaningful data, reason: \(reason)")
+            return
+        }
+        saveCurrentStateAsDraft()
+        didPersistForLifecycle = true
+    }
+
+    private func clearCurrentDraftStorage() {
+        if let clothingID = clothing?.id {
+            draftManager.clearEditingDraft(for: clothingID)
+        } else {
+            draftManager.clearDraft()
+        }
+    }
+
+    // 保存当前状态为草稿
+    private func saveCurrentStateAsDraft() {
+        print("ClothingEditView: saveCurrentStateAsDraft called, draftID: \(draftID), imagePaths count: \(imagePaths.count), name: \(name)")
+        let draft = makeCurrentDraft()
+        if let clothingID = clothing?.id {
+            draftManager.saveEditingDraft(draft, for: clothingID)
+        } else {
+            draftManager.saveDraft(draft)
+        }
+        print("ClothingEditView: Draft saved successfully with \(draft.imagePaths.count) images, \(draft.selectedTags.count) tags")
     }
 
     // 更新当前草稿到管理器（用于后台保存）
     private func updateCurrentDraft() {
-        // 只有在新建模式下才更新草稿
-        guard !isEditing else { return }
-
-        // 将选中的标签转换为可编码的TagData数组
-        let tagDataList = selectedTags.map { TagData(from: $0) }
-        let draft = ClothingEditDraft(
-            id: draftID,
-            name: name,
-            brandName: brandName,
-            types: types,
-            colors: colors,
-            sizes: sizes,
-            length: length,
-            condition: condition,
-            accessories: accessories,
-            imagePaths: imagePaths,
-            isShared: isShared,
-            originalPrice: originalPrice,
-            priceTotal: priceTotal,
-            deposit: deposit,
-            balance: balance,
-            accessoriesPrice: accessoriesPrice,
-            stock: stock,
-            purchaseDate: purchaseDate,
-            depositDate: depositDate,
-            isDepositPlan: isDepositPlan,
-            finalPaymentDate: finalPaymentDate,
-            finalPaymentEndDate: finalPaymentEndDate,
-            note: note,
-            accessoryList: accessoryList,
-            sizeChartImagePath: sizeChartImagePath,
-            priceChartImagePath: priceChartImagePath,
-            selectedTags: tagDataList
-        )
-        draftManager.currentDraft = draft
-        print("ClothingEditView: Updated current draft with \(draft.imagePaths.count) images, \(tagDataList.count) tags")
+        let draft = makeCurrentDraft()
+        if let clothingID = clothing?.id {
+            draftManager.updateEditingDraft(draft, for: clothingID)
+        } else {
+            draftManager.currentDraft = draft
+        }
+        print("ClothingEditView: Updated current draft with \(draft.imagePaths.count) images, \(draft.selectedTags.count) tags")
     }
 
     // 从草稿恢复状态
@@ -765,6 +955,12 @@ struct ClothingEditView: View {
         imagePaths = draft.imagePaths
         isShared = draft.isShared
         originalPrice = draft.originalPrice
+        originalPriceJPY = draft.originalPriceJPY ?? 0
+        originalPriceCurrency = ClothingPriceCurrency(rawValue: draft.originalPriceCurrencyCode ?? "") ?? .cny
+        shippingFee = draft.shippingFee ?? 0
+        shippingFeeJPY = draft.shippingFeeJPY ?? 0
+        shippingFeeCurrency = ClothingPriceCurrency(rawValue: draft.shippingFeeCurrencyCode ?? "") ?? .cny
+        syncCurrencyAmountsFromPreferredCurrency()
         priceTotal = draft.priceTotal
         deposit = draft.deposit
         balance = draft.balance
@@ -780,14 +976,14 @@ struct ClothingEditView: View {
         sizeChartImagePath = draft.sizeChartImagePath
         priceChartImagePath = draft.priceChartImagePath
         draftID = draft.id
-        
+
         // 恢复标签：从TagData数组中恢复Tag对象
         // 先尝试从数据库中找到对应的Tag，如果找不到则创建临时Tag对象
         restoreTags(from: draft.selectedTags)
-        
+
         print("ClothingEditView: Draft restored, draftID set to \(draftID), restored \(selectedTags.count) tags")
     }
-    
+
     // 从TagData恢复标签对象
     private func restoreTags(from tagDataList: [TagData]) {
         var restoredTags: [Tag] = []
@@ -808,7 +1004,7 @@ struct ClothingEditView: View {
         }
         selectedTags = restoredTags
     }
-    
+
     // 重置所有状态（用于新建时清除草稿）
     private func resetAllStates() {
         print("ClothingEditView: resetAllStates called")
@@ -823,10 +1019,17 @@ struct ClothingEditView: View {
         imagePaths = []
         isShared = false
         originalPrice = 0.0
+        originalPriceJPY = 0.0
+        originalPriceCurrency = .cny
+        originalPriceRateUpdatedAt = nil
         priceTotal = 0.0
         deposit = 0.0
         balance = 0.0
         accessoriesPrice = 0.0
+        shippingFee = 0.0
+        shippingFeeJPY = 0.0
+        shippingFeeCurrency = .cny
+        shippingRateUpdatedAt = nil
         stock = 1
         purchaseDate = Date()
         depositDate = Date()
@@ -841,7 +1044,7 @@ struct ClothingEditView: View {
         draftID = UUID()
         print("ClothingEditView: All states reset, new draftID: \(draftID)")
     }
-    
+
     // 检查是否有有效信息（用于判断是否需要保存草稿）
     private func hasMeaningfulData() -> Bool {
         // 如果有名称、图片、品牌、类型、颜色、尺码等任何有效信息，则认为有草稿价值
@@ -851,18 +1054,18 @@ struct ClothingEditView: View {
         let hasTypes = !types.trimmingCharacters(in: .whitespaces).isEmpty
         let hasColors = !colors.trimmingCharacters(in: .whitespaces).isEmpty
         let hasSizes = !sizes.trimmingCharacters(in: .whitespaces).isEmpty
-        let hasPrice = priceTotal > 0 || deposit > 0 || balance > 0
+        let hasPrice = originalPrice > 0 || originalPriceJPY > 0 || priceTotal > 0 || deposit > 0 || balance > 0 || shippingFee > 0 || shippingFeeJPY > 0
         let hasNote = !note.trimmingCharacters(in: .whitespaces).isEmpty
         let hasAccessories = !accessoryList.isEmpty
         let hasTags = !selectedTags.isEmpty
         let hasSizeChart = !(sizeChartImagePath?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true)
         let hasPriceChart = !(priceChartImagePath?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true)
-        
+
         let result = hasName || hasImages || hasBrand || hasTypes || hasColors || hasSizes || hasPrice || hasNote || hasAccessories || hasTags || hasSizeChart || hasPriceChart
         print("ClothingEditView: hasMeaningfulData = \(result) (name: \(hasName), images: \(hasImages), brand: \(hasBrand), types: \(hasTypes), colors: \(hasColors), sizes: \(hasSizes), price: \(hasPrice), note: \(hasNote), accessories: \(hasAccessories), tags: \(hasTags), sizeChart: \(hasSizeChart), priceChart: \(hasPriceChart))")
         return result
     }
-    
+
     private func normalizeTags(_ input: String) -> String {
         let components = input.replacingOccurrences(of: "，", with: ",")
             .split(separator: ",")
@@ -870,15 +1073,15 @@ struct ClothingEditView: View {
             .filter { !$0.isEmpty }
         return components.joined(separator: ",")
     }
-    
+
     private func getOrCreateBrand(name: String) -> Brand? {
         let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedName.isEmpty else { return nil }
-        
+
         let descriptor = FetchDescriptor<Brand>(
             predicate: #Predicate { $0.name == trimmedName }
         )
-        
+
         do {
             let brands = try modelContext.fetch(descriptor)
             if let existingBrand = brands.first {
@@ -896,15 +1099,53 @@ struct ClothingEditView: View {
             return newBrand
         }
     }
-    
+
     private func updateTotalPrice() {
         // 定金和尾款都为0时，保留用户手动填的总价
         guard deposit > 0 || balance > 0 else { return }
         priceTotal = ClothingPriceHelper.shared.calculateTotal(deposit: deposit, balance: balance)
     }
-    
+
+
+    private var effectiveJPYRate: Double {
+        jpyExchangeRate > 0 ? jpyExchangeRate : CurrencyExchangeRateService.defaultJPYRate
+    }
+
+    private func syncCurrencyAmountsFromPreferredCurrency() {
+        let rate = effectiveJPYRate
+        switch originalPriceCurrency {
+        case .cny:
+            originalPriceJPY = originalPrice * rate
+        case .jpy:
+            if originalPriceJPY == 0, originalPrice > 0 {
+                originalPriceJPY = originalPrice * rate
+            } else {
+                originalPrice = originalPriceJPY / rate
+            }
+        }
+
+        switch shippingFeeCurrency {
+        case .cny:
+            shippingFeeJPY = shippingFee * rate
+        case .jpy:
+            if shippingFeeJPY == 0, shippingFee > 0 {
+                shippingFeeJPY = shippingFee * rate
+            } else {
+                shippingFee = shippingFeeJPY / rate
+            }
+        }
+    }
+
+    private func refreshJPYRateForEditor() async {
+        let service = CurrencyExchangeRateService.shared
+        let rate = await service.refreshJPYRateIfAllowed()
+        jpyExchangeRate = rate
+        originalPriceRateUpdatedAt = service.lastUpdatedAt
+        shippingRateUpdatedAt = service.lastUpdatedAt
+    }
+
     // MARK: - Toast 提示
-    
+
     /// 显示提示信息
     private func showToastMessage(_ message: String, type: ToastType) {
         toastMessage = message
@@ -919,7 +1160,7 @@ struct ClothingEditView: View {
             }
         }
     }
-    
+
     /// Toast 提示视图
     @ViewBuilder
     private var toastOverlay: some View {
@@ -930,12 +1171,12 @@ struct ClothingEditView: View {
                     Image(systemName: toastType.icon)
                         .font(.title3)
                         .foregroundStyle(toastType.color)
-                    
+
                     Text(toastMessage)
                         .font(.subheadline)
                         .foregroundStyle(.primary)
                         .multilineTextAlignment(.leading)
-                    
+
                     Spacer()
                 }
                 .padding()
@@ -951,7 +1192,7 @@ struct ClothingEditView: View {
             .zIndex(100)
         }
     }
-    
+
     private func getAllOptions(for field: ClothingField) -> [String] {
         // Collect all unique values from existing clothings
         var options: Set<String> = []
@@ -975,7 +1216,7 @@ struct ClothingEditView: View {
         }
         return options.filter { !$0.isEmpty }.sorted()
     }
-    
+
     private func isMultiSelect(_ field: ClothingField) -> Bool {
         switch field {
         case .types, .colors, .sizes, .accessories:
@@ -984,7 +1225,7 @@ struct ClothingEditView: View {
             return false
         }
     }
-    
+
     private func binding(for field: ClothingField) -> Binding<String> {
         switch field {
         case .types: return $types
@@ -997,8 +1238,9 @@ struct ClothingEditView: View {
     }
 
     private func save() {
+        syncCurrencyAmountsFromPreferredCurrency()
         updateTotalPrice()
-        
+
         let finalBrand = getOrCreateBrand(name: brandName)
         let finalTypes = normalizeTags(types)
         let finalColors = normalizeTags(colors)
@@ -1006,7 +1248,7 @@ struct ClothingEditView: View {
         let finalAccessories = normalizeTags(accessories)
         let finalLength = length.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
         let finalCondition = condition.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
-        
+
         // 更新自动补全索引
         SuggestionManager.shared.addData(field: .name, value: name)
         SuggestionManager.shared.addData(field: .brand, value: brandName)
@@ -1015,11 +1257,11 @@ struct ClothingEditView: View {
         SuggestionManager.shared.addData(field: .size, value: finalSizes)
         SuggestionManager.shared.addData(field: .accessory, value: finalAccessories)
         SuggestionManager.shared.addData(field: .condition, value: finalCondition)
-        
+
         // 特殊逻辑：如果类型包含"小物"，则该物品名称也加入小物索引
         SuggestionManager.shared.addAccessoryNameIfTypeContainsAccessory(name: name, types: finalTypes)
         var notificationTarget: Clothing?
-        
+
         if let c = clothing {
             // Update
             AppLogger.info("Updating clothing: \(c.id)")
@@ -1037,20 +1279,20 @@ struct ClothingEditView: View {
             if let replacedID = c.replacedCutoutID {
                 // 如果图片列表为空，或者 replacedCutoutID 对应的图片已经不在 imagePaths 中，则重置
                 // 注意：imagePaths 存储的是文件名，我们需要根据 replacedCutoutID 找到对应的 CutoutItem，然后获取其 imagePath
-                
+
                 // 为了性能，我们先不查数据库，而是直接在 CutoutService 中提供一个辅助检查方法
                 // 或者更简单：我们不依赖 CutoutItem 的查找，而是依赖 CutoutService.handleCutoutDeletion 已经在删除时处理了。
                 // 但是！这里是全量替换 imagePaths。如果是 UI 上的“删除”操作，已经在 ImagePickerGrid 中触发了 handleCutoutDeletion。
                 // 如果是“移动”或“添加”操作，imagePaths 会变化，但文件没被删。
-                
+
                 // 用户的需求是：若图片里删除抠图，则保存时，clothing.replacedCutoutID, 也应该重新保存（置空或更新）。
                 // 在 ClothingEditView 中，imagePaths 是最终状态。
                 // 如果 replacedCutoutID 对应的抠图图片还在 imagePaths 中，则保留。
                 // 如果不在了，则置空。
-                
+
                 // 问题：我们只知道 replacedCutoutID (UUID)，不知道它对应的 imagePath。
                 // 所以必须查询 CutoutItem。
-                
+
                 let descriptor = FetchDescriptor<CutoutItem>(predicate: #Predicate { $0.id == replacedID })
                 if let cutout = try? modelContext.fetch(descriptor).first {
                     if !imagePaths.contains(cutout.imagePath) {
@@ -1061,15 +1303,24 @@ struct ClothingEditView: View {
                     c.replacedCutoutID = nil
                 }
             }
-            
+
             c.imagePaths = imagePaths
             c.isShared = isShared
             c.originalPrice = Decimal(originalPrice)
+            c.originalPriceJPY = Decimal(originalPriceJPY)
+            c.originalPriceCurrencyCode = originalPriceCurrency.rawValue
+            c.originalPriceExchangeRateJPY = Decimal(effectiveJPYRate)
+            c.originalPriceRateUpdatedAt = originalPriceRateUpdatedAt
+            c.shippingFee = Decimal(shippingFee)
+            c.shippingFeeJPY = Decimal(shippingFeeJPY)
+            c.shippingFeeCurrencyCode = shippingFeeCurrency.rawValue
+            c.shippingExchangeRateJPY = Decimal(effectiveJPYRate)
+            c.shippingRateUpdatedAt = shippingRateUpdatedAt
             c.price = Decimal(priceTotal)
             c.deposit = Decimal(deposit)
             c.balance = Decimal(balance)
             c.accessoriesPrice = Decimal(accessoriesPrice)
-            
+
             // Update accessory items
             // Remove old items (since we are replacing the list)
             if let oldItems = c.accessoryItems {
@@ -1089,19 +1340,23 @@ struct ClothingEditView: View {
                 )
             }
             c.accessoryItems = newItems
-            
+
             c.purchaseDate = purchaseDate
             c.depositDate = depositDate
             c.isDepositPlan = isDepositPlan
             c.finalPaymentDate = finalPaymentDate
             c.finalPaymentEndDate = finalPaymentEndDate
+            if !isDepositPlan {
+                c.isFinalPaymentSavedToWealth = false
+                c.finalPaymentSavedAt = nil
+            }
             c.note = note
             c.stock = stock
             c.tags = selectedTags
             let now = Date()
             c.updatedAt = now
             c.lastModified = now
-            
+
             // 保存表图字段
             let newSizeChartPath = sizeChartImagePath?.trimmingCharacters(in: .whitespacesAndNewlines)
             let newPriceChartPath = priceChartImagePath?.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -1130,10 +1385,19 @@ struct ClothingEditView: View {
                 imagePaths: imagePaths,
                 isShared: isShared,
                 originalPrice: Decimal(originalPrice),
+                originalPriceJPY: Decimal(originalPriceJPY),
+                originalPriceCurrencyCode: originalPriceCurrency.rawValue,
+                originalPriceExchangeRateJPY: Decimal(effectiveJPYRate),
+                originalPriceRateUpdatedAt: originalPriceRateUpdatedAt,
                 price: Decimal(priceTotal),
                 deposit: Decimal(deposit),
                 balance: Decimal(balance),
                 accessoriesPrice: Decimal(accessoriesPrice),
+                shippingFee: Decimal(shippingFee),
+                shippingFeeJPY: Decimal(shippingFeeJPY),
+                shippingFeeCurrencyCode: shippingFeeCurrency.rawValue,
+                shippingExchangeRateJPY: Decimal(effectiveJPYRate),
+                shippingRateUpdatedAt: shippingRateUpdatedAt,
                 purchaseDate: purchaseDate,
                 depositDate: depositDate,
                 isDepositPlan: isDepositPlan,
@@ -1142,13 +1406,13 @@ struct ClothingEditView: View {
                 note: note,
                 stock: stock
             )
-            
+
             // 保存表图字段
             let newSizeChartPath = sizeChartImagePath?.trimmingCharacters(in: .whitespacesAndNewlines)
             let newPriceChartPath = priceChartImagePath?.trimmingCharacters(in: .whitespacesAndNewlines)
             newClothing.sizeChartImagePath = (newSizeChartPath?.isEmpty == true) ? nil : newSizeChartPath
             newClothing.priceChartImagePath = (newPriceChartPath?.isEmpty == true) ? nil : newPriceChartPath
-            
+
             let newItems = accessoryList.enumerated().map { index, data in
                 AccessoryItem(
                     name: data.name,
@@ -1160,18 +1424,18 @@ struct ClothingEditView: View {
                 )
             }
             newClothing.accessoryItems = newItems
-            
+
             newClothing.tags = selectedTags
             let now = Date()
             newClothing.updatedAt = now
             newClothing.lastModified = now
             modelContext.insert(newClothing)
             notificationTarget = newClothing
-            
+
             // Trigger Reward for adding new clothing
             RewardManager.shared.triggerReward(type: .addClothing)
         }
-        
+
         // Save context and sync widget
         do {
             try modelContext.save()
@@ -1179,16 +1443,16 @@ struct ClothingEditView: View {
                 NotificationManager.shared.scheduleNotification(for: notificationTarget, modelContext: modelContext)
             }
             Task { await SharedPersistence.shared.syncWidgetData(reason: "clothing-edit-save") }
-            
+
             // 更新衣物数量缓存，用于魔法任务进度实时显示
             updateClothingCountCache()
         } catch {
             AppLogger.error("Failed to save context: \(error)")
         }
-        
+
         dismiss()
     }
-    
+
     /// 更新衣物数量缓存，用于魔法任务进度实时显示
     private func updateClothingCountCache() {
         do {

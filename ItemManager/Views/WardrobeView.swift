@@ -868,6 +868,7 @@ struct WardrobeView: View {
             stock: item.stock,
             status: item.status
         )
+        newItem.copyCurrencyAndShippingMetadata(from: item)
         newItem.tags = item.tags
         
         // 复制尺码表图和价格表图
@@ -943,6 +944,7 @@ struct WardrobeView: View {
                     stock: item.stock,
                     status: item.status
                 )
+                newItem.copyCurrencyAndShippingMetadata(from: item)
                 newItem.tags = item.tags
                 
                 // 复制小物

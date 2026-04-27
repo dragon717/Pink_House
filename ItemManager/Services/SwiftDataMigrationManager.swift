@@ -629,6 +629,7 @@ class SwiftDataMigrationManager: ObservableObject {
             stock: source.stock,
             status: source.status
         )
+        new.copyCurrencyAndShippingMetadata(from: source)
         new.id = source.id
         new.sortIndex = source.sortIndex
         new.isDeleted = source.isDeleted
@@ -636,6 +637,8 @@ class SwiftDataMigrationManager: ObservableObject {
         new.createdAt = source.createdAt
         new.updatedAt = source.updatedAt
         new.lastModified = source.lastModified
+        new.isFinalPaymentSavedToWealth = source.isFinalPaymentSavedToWealth
+        new.finalPaymentSavedAt = source.finalPaymentSavedAt
         new.model3DPath = source.model3DPath
         new.model3DType = source.model3DType
         new.model3DThumbnailPath = source.model3DThumbnailPath

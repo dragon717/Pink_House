@@ -15,7 +15,7 @@ struct SettingsGridItem: View {
         guard let descriptor = themeSkinManager.activeThemeDescriptor(for: .settingsGridCard, state: .default) else {
             return false
         }
-        return descriptor.assetNamespace == "girl_closet"
+        return ["girl_closet", "sky_concert", "swan_dream"].contains(descriptor.assetNamespace)
     }
     
     var body: some View {
@@ -57,7 +57,7 @@ struct SettingsGridItem: View {
         .background(cardBackground)
         .overlay(cardOverlay)
         .overlay(alignment: .topTrailing) {
-            if isGirlClosetThemed {
+            if isGirlClosetThemed && !ThemeSkinAssetAvailability.hasImage(named: ThemeSkinAssetName.cardSettingsGrid) {
                 Image(systemName: "sparkles")
                     .font(.system(size: 10, weight: .bold))
                     .foregroundStyle(Color(hex: "D17A9A"))
@@ -91,18 +91,23 @@ struct SettingsGridItem: View {
         
         return Group {
             if isGirlClosetThemed {
-                RoundedRectangle(cornerRadius: 20)
-                    .fill(
-                        LinearGradient(
-                            colors: [
-                                Color(hex: "FFFDF8"),
-                                Color(hex: "FCEEF3")
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
+                ThemeSkinOptionalResizableAsset(
+                    ThemeSkinAssetName.cardSettingsGrid,
+                    capInsets: ThemeSkinAssetName.capInsets(for: ThemeSkinAssetName.cardSettingsGrid)
+                ) {
+                    RoundedRectangle(cornerRadius: 20)
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    Color(hex: "FFFDF8"),
+                                    Color(hex: "FCEEF3")
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
                         )
-                    )
-                    .shadow(color: Color(hex: "E5B5C7").opacity(0.18), radius: 10, x: 0, y: 5)
+                        .shadow(color: Color(hex: "E5B5C7").opacity(0.18), radius: 10, x: 0, y: 5)
+                }
             } else {
                 switch themeManager.cardStyle {
                 case .solid:
@@ -138,24 +143,31 @@ struct SettingsGridItem: View {
         let isDark = colorScheme == .dark
         let cardColors = themeManager.themeColorConfig.currentTheme(forDarkMode: isDark).cardColors(forDarkMode: isDark)
         
-        return RoundedRectangle(cornerRadius: 20)
-            .stroke(
-                isGirlClosetThemed
-                    ? LinearGradient(
-                        colors: [
-                            Color.white.opacity(0.95),
-                            Color(hex: "E7C7D3").opacity(0.95)
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
+        return Group {
+            if isGirlClosetThemed && ThemeSkinAssetAvailability.hasImage(named: ThemeSkinAssetName.cardSettingsGrid) {
+                RoundedRectangle(cornerRadius: 20)
+                    .stroke(Color.clear, lineWidth: 0)
+            } else {
+                RoundedRectangle(cornerRadius: 20)
+                    .stroke(
+                        isGirlClosetThemed
+                            ? LinearGradient(
+                                colors: [
+                                    Color.white.opacity(0.95),
+                                    Color(hex: "E7C7D3").opacity(0.95)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                            : LinearGradient(
+                                colors: [cardColors.accentRGBA.color.opacity(isDark ? 0.3 : 0.2)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                        lineWidth: 1
                     )
-                    : LinearGradient(
-                        colors: [cardColors.accentRGBA.color.opacity(isDark ? 0.3 : 0.2)],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ),
-                lineWidth: 1
-            )
+            }
+        }
     }
 }
 

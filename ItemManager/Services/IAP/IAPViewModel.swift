@@ -236,7 +236,8 @@ class IAPViewModel: ObservableObject {
         loadUserData()
 
         let isCurrentAttempt = context.attemptID != nil && context.attemptID == activePurchaseAttemptID
-        guard isCurrentAttempt else {
+        let isOfferCodeBonus = context.message == IAPOfferCodeBonus.successMessage
+        guard isCurrentAttempt || isOfferCodeBonus else {
             Task {
                 await IAPDiagnosticStore.shared.record(
                     category: .flow,
