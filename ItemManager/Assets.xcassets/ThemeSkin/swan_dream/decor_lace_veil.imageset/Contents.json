@@ -1,0 +1,19 @@
+{
+  "info": {
+    "version": 1,
+    "author": "xcode"
+  },
+  "comment": "source: psd_composite_crop; pipeline: sips_flattened_psd_crop; file: temp/主题2/_artifacts/generated/psd_composite.png; crop: (2460, 2780, 3350, 3660)",
+  "images": [
+    {
+      "idiom": "universal",
+      "scale": "2x",
+      "filename": "decor_lace_veil@2x.png"
+    },
+    {
+      "idiom": "universal",
+      "scale": "3x",
+      "filename": "decor_lace_veil@3x.png"
+    }
+  ]
+}

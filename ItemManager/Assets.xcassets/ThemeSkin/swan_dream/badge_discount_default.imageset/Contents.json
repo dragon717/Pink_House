@@ -1,0 +1,19 @@
+{
+  "info": {
+    "version": 1,
+    "author": "xcode"
+  },
+  "comment": "source: psd_composite_crop; pipeline: sips_flattened_psd_crop; file: temp/主题2/_artifacts/generated/psd_composite.png; crop: (2440, 630, 2860, 1040)",
+  "images": [
+    {
+      "idiom": "universal",
+      "scale": "2x",
+      "filename": "badge_discount_default@2x.png"
+    },
+    {
+      "idiom": "universal",
+      "scale": "3x",
+      "filename": "badge_discount_default@3x.png"
+    }
+  ]
+}

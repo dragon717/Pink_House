@@ -1,0 +1,35 @@
+{
+  "info": {
+    "version": 1,
+    "author": "xcode"
+  },
+  "comment": "source: psd_composite_crop; pipeline: sips_flattened_psd_crop; file: temp/主题1/_artifacts/generated/psd_composite.png; crop: (1250, 700, 2100, 2100)",
+  "images": [
+    {
+      "idiom": "universal",
+      "scale": "2x",
+      "filename": "card_wardrobe_item_default@2x.png"
+    },
+    {
+      "idiom": "universal",
+      "scale": "3x",
+      "filename": "card_wardrobe_item_default@3x.png"
+    }
+  ],
+  "properties": {
+    "resizing": {
+      "mode": "9-part",
+      "center": {
+        "mode": "stretch",
+        "width": 740,
+        "height": 1040
+      },
+      "cap-insets": {
+        "top": 80,
+        "left": 80,
+        "bottom": 80,
+        "right": 80
+      }
+    }
+  }
+}

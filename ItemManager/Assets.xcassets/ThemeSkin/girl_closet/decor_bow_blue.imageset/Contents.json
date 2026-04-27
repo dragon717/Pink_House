@@ -1,0 +1,19 @@
+{
+  "info": {
+    "version": 1,
+    "author": "xcode"
+  },
+  "comment": "source: sticker_bbox; pipeline: jpg_bbox_crop; bbox: [430,320,800,510]; file: temp/主题-旋转木马/主题参考图.jpg",
+  "images": [
+    {
+      "idiom": "universal",
+      "scale": "2x",
+      "filename": "decor_bow_blue@2x.png"
+    },
+    {
+      "idiom": "universal",
+      "scale": "3x",
+      "filename": "decor_bow_blue@3x.png"
+    }
+  ]
+}

@@ -1,0 +1,35 @@
+{
+  "info": {
+    "version": 1,
+    "author": "xcode"
+  },
+  "comment": "source: preview_crop; pipeline: design_screenshot_crop; file: temp/主题-旋转木马/少女衣橱.png; crop: (58, 165, 710, 348)",
+  "images": [
+    {
+      "idiom": "universal",
+      "scale": "2x",
+      "filename": "card_stats_default@2x.png"
+    },
+    {
+      "idiom": "universal",
+      "scale": "3x",
+      "filename": "card_stats_default@3x.png"
+    }
+  ],
+  "properties": {
+    "resizing": {
+      "mode": "9-part",
+      "center": {
+        "mode": "stretch",
+        "width": 660,
+        "height": 200
+      },
+      "cap-insets": {
+        "top": 30,
+        "left": 30,
+        "bottom": 30,
+        "right": 30
+      }
+    }
+  }
+}
