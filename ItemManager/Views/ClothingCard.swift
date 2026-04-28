@@ -52,7 +52,7 @@ struct ClothingCard: View, Equatable {
         themeSkinManager.descriptor(for: .wardrobeItemCard)
     }
 
-    private var isGirlClosetThemed: Bool {
+    private var isThemeSkinThemed: Bool {
         WardrobeThemeSkinSupport.isThemeSkinDescriptor(wardrobeThemeDescriptor)
     }
     
@@ -104,7 +104,7 @@ struct ClothingCard: View, Equatable {
                     
                     // 3D模型标签
                     if clothing.is3DModel, let typeDesc = clothing.model3DTypeDescription {
-                        if isGirlClosetThemed {
+                        if isThemeSkinThemed {
                             WardrobeThemeCornerBadge(
                                 text: typeDesc,
                                 tint: Color(hex: "9E86B8"),
@@ -124,7 +124,7 @@ struct ClothingCard: View, Equatable {
                     }
                     
                     if clothing.isDepositPlan {
-                        if isGirlClosetThemed {
+                        if isThemeSkinThemed {
                             WardrobeThemeCornerBadge(
                                 text: "心愿尾款",
                                 tint: Color(hex: "7A5A54"),
@@ -148,7 +148,7 @@ struct ClothingCard: View, Equatable {
                             Spacer()
                             HStack {
                                 Spacer()
-                                if isGirlClosetThemed {
+                                if isThemeSkinThemed {
                                     WardrobeThemeCornerBadge(
                                         text: "x\(clothing.stock)",
                                         tint: Color(hex: "8A5C6F"),
@@ -193,7 +193,7 @@ struct ClothingCard: View, Equatable {
                 
                 // Info Area
                 VStack(alignment: .leading, spacing: 0) {
-                    if isGirlClosetThemed {
+                    if isThemeSkinThemed {
                         WardrobeThemeCardTitle(title: clothing.name)
                     } else {
                         Text(clothing.name)

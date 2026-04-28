@@ -41,11 +41,7 @@ struct WardrobeThemeStatsCardContainer<Content: View>: View {
     }
 
     private var descriptorTitle: String {
-        switch descriptor?.assetNamespace {
-        case "sky_concert": return "天空音乐会"
-        case "swan_dream": return "天鹅入梦"
-        default: return "少女衣橱"
-        }
+        SkyConcertThemeSkin.title(for: descriptor)
     }
 
     var body: some View {
@@ -76,7 +72,7 @@ struct WardrobeThemeStatsCardContainer<Content: View>: View {
                     .font(.system(size: 12, weight: .semibold, design: .rounded))
                     .tracking(0.4)
             }
-            .foregroundStyle(WardrobeGirlClosetTokens.label)
+            .foregroundStyle(SkyConcertThemeSkin.labelColor(for: descriptor))
             .padding(.horizontal, 10)
             .padding(.vertical, 6)
             .background(statsHeaderBackground)
@@ -89,46 +85,64 @@ struct WardrobeThemeStatsCardContainer<Content: View>: View {
         .background {
             ThemeSkinOptionalResizableAsset(
                 ThemeSkinAssetName.cardStatsDefault,
+                namespace: descriptor?.assetNamespace,
+                allowShortNameFallback: !SkyConcertThemeSkin.shouldAvoidShortAssetFallback(for: descriptor),
                 capInsets: ThemeSkinAssetName.capInsets(for: ThemeSkinAssetName.cardStatsDefault)
             ) {
-                shellBackground(cornerRadius: 24)
+                shellBackground(cornerRadius: 24, descriptor: descriptor)
             }
         }
         .overlay {
-            if !ThemeSkinAssetAvailability.hasImage(named: ThemeSkinAssetName.cardStatsDefault) {
-                shellOutline(cornerRadius: 24)
+            if !ThemeSkinAssetAvailability.hasImage(
+                named: ThemeSkinAssetName.cardStatsDefault,
+                namespace: descriptor?.assetNamespace,
+                allowShortNameFallback: !SkyConcertThemeSkin.shouldAvoidShortAssetFallback(for: descriptor)
+            ) {
+                shellOutline(cornerRadius: 24, descriptor: descriptor)
+            }
+        }
+        .overlay {
+            if SkyConcertThemeSkin.isSkyConcert(descriptor) {
+                SkyConcertDecorationLayer(placements: SkyConcertThemeSkin.statsCardPlacements)
+            } else if SwanDreamThemeSkin.isSwanDream(descriptor) {
+                SkyConcertDecorationLayer(
+                    placements: SwanDreamThemeSkin.statsCardPlacements,
+                    namespace: SwanDreamThemeSkin.namespace
+                )
             }
         }
         .overlay(alignment: .topTrailing) {
-            if !ThemeSkinAssetAvailability.hasImage(named: ThemeSkinAssetName.cardStatsDefault) {
+            if !SkyConcertThemeSkin.hasDedicatedVisualProfile(descriptor),
+               !ThemeSkinAssetAvailability.hasImage(named: ThemeSkinAssetName.cardStatsDefault) {
                 WardrobeThemeDoodle(icon: "star.fill")
                     .offset(x: 10, y: -10)
             }
         }
         .overlay(alignment: .bottomLeading) {
-            if !ThemeSkinAssetAvailability.hasImage(named: ThemeSkinAssetName.cardStatsDefault) {
+            if !SkyConcertThemeSkin.hasDedicatedVisualProfile(descriptor),
+               !ThemeSkinAssetAvailability.hasImage(named: ThemeSkinAssetName.cardStatsDefault) {
                 WardrobeThemeDoodle(icon: "sparkles", tint: WardrobeGirlClosetTokens.accent)
                     .offset(x: -6, y: 8)
             }
         }
-        .shadow(color: WardrobeGirlClosetTokens.shadow, radius: 12, x: 0, y: 6)
+        .shadow(color: SkyConcertThemeSkin.shadowColor(for: descriptor), radius: 12, x: 0, y: 6)
     }
 
     private var statsHeaderBackground: some View {
         Capsule()
             .fill(
                 LinearGradient(
-                    colors: [
-                        Color.white.opacity(0.96),
-                        WardrobeGirlClosetTokens.accentSoft.opacity(0.96)
-                    ],
+                        colors: [
+                            Color.white.opacity(0.96),
+                            SkyConcertThemeSkin.accentSoft(for: descriptor).opacity(0.96)
+                        ],
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing
                 )
             )
             .overlay(
                 Capsule()
-                    .stroke(WardrobeGirlClosetTokens.shellStroke.opacity(0.95), lineWidth: 1)
+                    .stroke(SkyConcertThemeSkin.shellStroke(for: descriptor).opacity(0.95), lineWidth: 1)
             )
     }
 }
@@ -159,26 +173,47 @@ struct WardrobeThemeClothingCardContainer<Content: View>: View {
                     .background {
                         ThemeSkinOptionalResizableAsset(
                             ThemeSkinAssetName.cardWardrobeItem,
+                            namespace: descriptor?.assetNamespace,
+                            allowShortNameFallback: !SkyConcertThemeSkin.shouldAvoidShortAssetFallback(for: descriptor),
                             capInsets: ThemeSkinAssetName.capInsets(for: ThemeSkinAssetName.cardWardrobeItem)
                         ) {
-                            shellBackground(cornerRadius: 22)
+                            shellBackground(cornerRadius: 22, descriptor: descriptor)
                         }
                     }
                     .overlay {
-                        if !ThemeSkinAssetAvailability.hasImage(named: ThemeSkinAssetName.cardWardrobeItem) {
-                            shellOutline(cornerRadius: 22)
+                        if !ThemeSkinAssetAvailability.hasImage(
+                            named: ThemeSkinAssetName.cardWardrobeItem,
+                            namespace: descriptor?.assetNamespace,
+                            allowShortNameFallback: !SkyConcertThemeSkin.shouldAvoidShortAssetFallback(for: descriptor)
+                        ) {
+                            shellOutline(cornerRadius: 22, descriptor: descriptor)
+                        }
+                    }
+                    .overlay {
+                        if SkyConcertThemeSkin.isSkyConcert(descriptor) {
+                            SkyConcertDecorationLayer(placements: SkyConcertThemeSkin.wardrobeCardPlacements)
+                        } else if SwanDreamThemeSkin.isSwanDream(descriptor) {
+                            SkyConcertDecorationLayer(
+                                placements: SwanDreamThemeSkin.wardrobeCardPlacements,
+                                namespace: SwanDreamThemeSkin.namespace
+                            )
                         }
                     }
                     .overlay(alignment: .topLeading) {
-                        ThemeSkinOptionalFittedAsset(ThemeSkinAssetName.cardWardrobeRibbonTopLeft) {
-                            WardrobeThemeDoodle(icon: "star.fill")
+                        if !SkyConcertThemeSkin.hasDedicatedVisualProfile(descriptor) {
+                            ThemeSkinOptionalFittedAsset(
+                                ThemeSkinAssetName.cardWardrobeRibbonTopLeft,
+                                namespace: descriptor?.assetNamespace
+                            ) {
+                                WardrobeThemeDoodle(icon: "star.fill")
+                            }
+                            .frame(width: 58, height: 40)
+                            .padding(.top, 10)
+                            .padding(.leading, 8)
                         }
-                        .frame(width: 58, height: 40)
-                        .padding(.top, 10)
-                        .padding(.leading, 8)
                     }
                     .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
-                    .shadow(color: WardrobeGirlClosetTokens.shadow.opacity(0.65), radius: 10, x: 0, y: 5)
+                    .shadow(color: SkyConcertThemeSkin.shadowColor(for: descriptor).opacity(0.65), radius: 10, x: 0, y: 5)
             } else {
                 content
                     .background {
@@ -209,11 +244,11 @@ struct WardrobeThemeCardTitle: View {
                 HStack(spacing: 6) {
                     Image(systemName: "sparkles")
                         .font(.system(size: 9, weight: .bold))
-                        .foregroundStyle(WardrobeGirlClosetTokens.accent)
+                        .foregroundStyle(SkyConcertThemeSkin.accent(for: descriptor))
 
                     Text(title)
                         .font(.system(size: 13, weight: .semibold, design: .rounded))
-                        .foregroundStyle(WardrobeGirlClosetTokens.label)
+                        .foregroundStyle(SkyConcertThemeSkin.labelColor(for: descriptor))
                         .lineLimit(1)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
@@ -225,7 +260,7 @@ struct WardrobeThemeCardTitle: View {
                             LinearGradient(
                                 colors: [
                                     Color.white.opacity(0.96),
-                                    WardrobeGirlClosetTokens.accentSoft.opacity(0.92)
+                                    SkyConcertThemeSkin.accentSoft(for: descriptor).opacity(0.92)
                                 ],
                                 startPoint: .topLeading,
                                 endPoint: .bottomTrailing
@@ -234,7 +269,7 @@ struct WardrobeThemeCardTitle: View {
                 )
                 .overlay(
                     RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .stroke(WardrobeGirlClosetTokens.shellStroke.opacity(0.9), lineWidth: 1)
+                        .stroke(SkyConcertThemeSkin.shellStroke(for: descriptor).opacity(0.9), lineWidth: 1)
                 )
             } else {
                 Text(title)
@@ -280,11 +315,11 @@ struct WardrobeThemeCornerBadge: View {
                 .padding(.vertical, 5)
                 .background(
                     Capsule()
-                        .fill(Color.white.opacity(0.95))
+                        .fill(SkyConcertThemeSkin.hasDedicatedVisualProfile(descriptor) ? SkyConcertThemeSkin.shellFillTop(for: descriptor).opacity(0.95) : Color.white.opacity(0.95))
                 )
                 .overlay(
                     Capsule()
-                        .stroke(tint.opacity(0.45), lineWidth: 1)
+                        .stroke((SkyConcertThemeSkin.hasDedicatedVisualProfile(descriptor) ? SkyConcertThemeSkin.shellStroke(for: descriptor) : tint).opacity(0.45), lineWidth: 1)
                 )
                 .shadow(color: tint.opacity(0.16), radius: 6, x: 0, y: 2)
             } else {
@@ -320,13 +355,13 @@ private struct WardrobeThemeDoodle: View {
     }
 }
 
-private func shellBackground(cornerRadius: CGFloat) -> some View {
+private func shellBackground(cornerRadius: CGFloat, descriptor: ThemeSkinDescriptor?) -> some View {
     RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
         .fill(
             LinearGradient(
                 colors: [
-                    WardrobeGirlClosetTokens.shellFillTop,
-                    WardrobeGirlClosetTokens.shellFillBottom
+                    SkyConcertThemeSkin.shellFillTop(for: descriptor),
+                    SkyConcertThemeSkin.shellFillBottom(for: descriptor)
                 ],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
@@ -334,14 +369,14 @@ private func shellBackground(cornerRadius: CGFloat) -> some View {
         )
 }
 
-private func shellOutline(cornerRadius: CGFloat) -> some View {
+private func shellOutline(cornerRadius: CGFloat, descriptor: ThemeSkinDescriptor?) -> some View {
     RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
         .strokeBorder(
             LinearGradient(
                 colors: [
                     WardrobeGirlClosetTokens.shellStrokeSoft,
-                    WardrobeGirlClosetTokens.shellStroke,
-                    WardrobeGirlClosetTokens.shellStroke.opacity(0.88)
+                    SkyConcertThemeSkin.shellStroke(for: descriptor),
+                    SkyConcertThemeSkin.shellStroke(for: descriptor).opacity(0.88)
                 ],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing

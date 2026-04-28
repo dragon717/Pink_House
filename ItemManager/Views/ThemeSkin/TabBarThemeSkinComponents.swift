@@ -9,6 +9,30 @@ private enum TabBarThemeSkinTokens {
     static let pinkAccent = Color(red: 0.84, green: 0.56, blue: 0.68)
     static let roseText = Color(red: 0.54, green: 0.34, blue: 0.42)
     static let shadow = Color(red: 0.84, green: 0.62, blue: 0.72).opacity(0.22)
+
+    static func creamTop(for descriptor: ThemeSkinDescriptor?) -> Color {
+        SkyConcertThemeSkin.hasDedicatedVisualProfile(descriptor) ? SkyConcertThemeSkin.shellFillTop(for: descriptor) : creamTop
+    }
+
+    static func creamBottom(for descriptor: ThemeSkinDescriptor?) -> Color {
+        SkyConcertThemeSkin.hasDedicatedVisualProfile(descriptor) ? SkyConcertThemeSkin.shellFillBottom(for: descriptor) : creamBottom
+    }
+
+    static func border(for descriptor: ThemeSkinDescriptor?) -> Color {
+        SkyConcertThemeSkin.hasDedicatedVisualProfile(descriptor) ? SkyConcertThemeSkin.shellStroke(for: descriptor) : pinkBorder
+    }
+
+    static func accent(for descriptor: ThemeSkinDescriptor?) -> Color {
+        SkyConcertThemeSkin.hasDedicatedVisualProfile(descriptor) ? SkyConcertThemeSkin.accent(for: descriptor) : pinkAccent
+    }
+
+    static func text(for descriptor: ThemeSkinDescriptor?) -> Color {
+        SkyConcertThemeSkin.hasDedicatedVisualProfile(descriptor) ? SkyConcertThemeSkin.labelColor(for: descriptor) : roseText
+    }
+
+    static func shadow(for descriptor: ThemeSkinDescriptor?) -> Color {
+        SkyConcertThemeSkin.hasDedicatedVisualProfile(descriptor) ? SkyConcertThemeSkin.shadowColor(for: descriptor) : shadow
+    }
 }
 
 private extension ThemeSkinDescriptor {
@@ -31,24 +55,45 @@ struct ThemeSkinTabBarBackdrop: View {
         if isActive {
             ThemeSkinOptionalResizableAsset(
                 ThemeSkinAssetName.tabBarMain,
+                namespace: descriptor?.assetNamespace,
+                allowShortNameFallback: !SkyConcertThemeSkin.shouldAvoidShortAssetFallback(for: descriptor),
                 capInsets: ThemeSkinAssetName.capInsets(for: ThemeSkinAssetName.tabBarMain)
             ) {
                 fallbackBackdrop
             }
-            .frame(height: 58 + safeAreaBottom)
+            .overlay {
+                if SkyConcertThemeSkin.isSkyConcert(descriptor) {
+                    SkyConcertDecorationLayer(placements: SkyConcertThemeSkin.tabBarPlacements)
+                } else if SwanDreamThemeSkin.isSwanDream(descriptor) {
+                    SkyConcertDecorationLayer(
+                        placements: SwanDreamThemeSkin.tabBarPlacements,
+                        namespace: SwanDreamThemeSkin.namespace
+                    )
+                }
+            }
+            .frame(height: (SwanDreamThemeSkin.isSwanDream(descriptor) ? 66 : 58) + safeAreaBottom)
             .padding(.horizontal, horizontalPadding)
             .padding(.bottom, bottomPadding ?? (safeAreaBottom > 0 ? 2 : 8))
         }
     }
 
+    @ViewBuilder
     private var fallbackBackdrop: some View {
+        if SwanDreamThemeSkin.isSwanDream(descriptor) {
+            swanDreamBackdrop
+        } else {
+            standardBackdrop
+        }
+    }
+
+    private var standardBackdrop: some View {
         ZStack {
             Capsule(style: .continuous)
                 .fill(
                     LinearGradient(
                         colors: [
-                            TabBarThemeSkinTokens.creamTop.opacity(0.98),
-                            TabBarThemeSkinTokens.creamBottom.opacity(0.96)
+                            TabBarThemeSkinTokens.creamTop(for: descriptor).opacity(0.98),
+                            TabBarThemeSkinTokens.creamBottom(for: descriptor).opacity(0.96)
                         ],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
@@ -60,7 +105,7 @@ struct ThemeSkinTabBarBackdrop: View {
                             LinearGradient(
                                 colors: [
                                     .white.opacity(0.98),
-                                    TabBarThemeSkinTokens.pinkBorder.opacity(0.9)
+                                    TabBarThemeSkinTokens.border(for: descriptor).opacity(0.9)
                                 ],
                                 startPoint: .topLeading,
                                 endPoint: .bottomTrailing
@@ -68,7 +113,7 @@ struct ThemeSkinTabBarBackdrop: View {
                             lineWidth: 1.25
                         )
                 }
-                .shadow(color: TabBarThemeSkinTokens.shadow, radius: 16, x: 0, y: 6)
+                .shadow(color: TabBarThemeSkinTokens.shadow(for: descriptor), radius: 16, x: 0, y: 6)
 
             HStack {
                 tabBarDoodle(icon: "star.fill")
@@ -79,10 +124,73 @@ struct ThemeSkinTabBarBackdrop: View {
         }
     }
 
+    private var swanDreamBackdrop: some View {
+        ZStack {
+            UnevenRoundedRectangle(
+                topLeadingRadius: 34,
+                bottomLeadingRadius: 30,
+                bottomTrailingRadius: 34,
+                topTrailingRadius: 24,
+                style: .continuous
+            )
+            .fill(
+                LinearGradient(
+                    colors: [
+                        SwanDreamThemeSkin.creamTop.opacity(0.98),
+                        SwanDreamThemeSkin.ribbonPink.opacity(0.72),
+                        SwanDreamThemeSkin.moonLavender.opacity(0.9)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            )
+            .overlay {
+                UnevenRoundedRectangle(
+                    topLeadingRadius: 34,
+                    bottomLeadingRadius: 30,
+                    bottomTrailingRadius: 34,
+                    topTrailingRadius: 24,
+                    style: .continuous
+                )
+                .stroke(
+                    LinearGradient(
+                        colors: [
+                            .white.opacity(0.98),
+                            SwanDreamThemeSkin.roseLine.opacity(0.82),
+                            SwanDreamThemeSkin.moonGold.opacity(0.5)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 1.25
+                )
+            }
+            .shadow(color: SwanDreamThemeSkin.shadow.opacity(0.9), radius: 16, x: 0, y: 6)
+
+            HStack {
+                tabBarDoodle(icon: "star.fill")
+                Spacer()
+                tabBarDoodle(icon: "sparkles")
+            }
+            .padding(.horizontal, 20)
+
+            Circle()
+                .fill(SwanDreamThemeSkin.creamTop.opacity(0.92))
+                .frame(width: 58, height: 58)
+                .overlay {
+                    Circle()
+                        .stroke(SwanDreamThemeSkin.roseLine.opacity(0.6), lineWidth: 1)
+                }
+                .offset(y: -16)
+                .opacity(0.42)
+                .allowsHitTesting(false)
+        }
+    }
+
     private func tabBarDoodle(icon: String) -> some View {
         Image(systemName: icon)
             .font(.system(size: 10, weight: .bold))
-            .foregroundStyle(TabBarThemeSkinTokens.pinkAccent)
+            .foregroundStyle(TabBarThemeSkinTokens.accent(for: descriptor))
             .padding(6)
             .background(
                 Circle()
@@ -90,7 +198,7 @@ struct ThemeSkinTabBarBackdrop: View {
             )
             .overlay(
                 Circle()
-                    .stroke(TabBarThemeSkinTokens.pinkBorder.opacity(0.9), lineWidth: 1)
+                    .stroke(TabBarThemeSkinTokens.border(for: descriptor).opacity(0.9), lineWidth: 1)
             )
     }
 }
@@ -118,17 +226,21 @@ struct ThemeSkinModernTabLabel: View {
                     .font(.system(size: 10, weight: isSelected ? .semibold : .medium, design: .rounded))
                     .lineLimit(1)
             }
-            .foregroundStyle(isSelected ? TabBarThemeSkinTokens.pinkAccent : TabBarThemeSkinTokens.roseText.opacity(0.88))
+            .foregroundStyle(isSelected ? TabBarThemeSkinTokens.accent(for: descriptor) : TabBarThemeSkinTokens.text(for: descriptor).opacity(0.88))
             .padding(.horizontal, 10)
             .padding(.vertical, 6)
             .background {
-                ThemeSkinOptionalResizableAsset(assetName) {
+                ThemeSkinOptionalResizableAsset(
+                    assetName,
+                    namespace: descriptor?.assetNamespace,
+                    allowShortNameFallback: !SkyConcertThemeSkin.shouldAvoidShortAssetFallback(for: descriptor)
+                ) {
                     if isSelected {
                         Capsule(style: .continuous)
                             .fill(Color.white.opacity(0.96))
                             .overlay {
                                 Capsule(style: .continuous)
-                                    .stroke(TabBarThemeSkinTokens.pinkBorder.opacity(0.9), lineWidth: 1)
+                                    .stroke(TabBarThemeSkinTokens.border(for: descriptor).opacity(0.9), lineWidth: 1)
                             }
                     } else {
                         Color.clear
@@ -166,18 +278,22 @@ struct ThemeSkinLegacyTabLabel: View {
                     .font(.system(size: 11, weight: isSelected ? .semibold : .regular, design: .rounded))
                     .lineLimit(1)
             }
-            .foregroundStyle(isSelected ? TabBarThemeSkinTokens.pinkAccent : TabBarThemeSkinTokens.roseText.opacity(0.88))
+            .foregroundStyle(isSelected ? TabBarThemeSkinTokens.accent(for: descriptor) : TabBarThemeSkinTokens.text(for: descriptor).opacity(0.88))
             .padding(.horizontal, 8)
             .padding(.vertical, 8)
             .frame(maxWidth: .infinity)
             .background {
-                ThemeSkinOptionalResizableAsset(assetName) {
+                ThemeSkinOptionalResizableAsset(
+                    assetName,
+                    namespace: descriptor?.assetNamespace,
+                    allowShortNameFallback: !SkyConcertThemeSkin.shouldAvoidShortAssetFallback(for: descriptor)
+                ) {
                     if isSelected {
                         RoundedRectangle(cornerRadius: 18, style: .continuous)
                             .fill(Color.white.opacity(0.96))
                             .overlay {
                                 RoundedRectangle(cornerRadius: 18, style: .continuous)
-                                    .stroke(TabBarThemeSkinTokens.pinkBorder.opacity(0.92), lineWidth: 1.1)
+                                    .stroke(TabBarThemeSkinTokens.border(for: descriptor).opacity(0.92), lineWidth: 1.1)
                             }
                     } else {
                         Color.clear

@@ -337,7 +337,7 @@ struct ModernTabView: View {
 
     private func resolveTabBarDescriptor(for slot: ThemeSkinSlot) -> ThemeSkinDescriptor? {
         guard let descriptor = themeSkinManager.activeThemeDescriptor(for: slot, state: .default),
-              descriptor.assetNamespace == "girl_closet" else {
+              WardrobeThemeSkinSupport.isThemeSkinDescriptor(descriptor) else {
             return nil
         }
         return descriptor
@@ -960,7 +960,7 @@ struct LegacyTabView: View {
 
     private func resolveTabBarDescriptor(for slot: ThemeSkinSlot) -> ThemeSkinDescriptor? {
         guard let descriptor = themeSkinManager.activeThemeDescriptor(for: slot, state: .default),
-              descriptor.assetNamespace == "girl_closet" else {
+              WardrobeThemeSkinSupport.isThemeSkinDescriptor(descriptor) else {
             return nil
         }
         return descriptor
@@ -1537,8 +1537,9 @@ struct MainTabView: View {
     var body: some View {
         Group {
             if #available(iOS 26.0, *) {
-                // iOS 26+ 使用系统原生TabBar
-                ModernTabView(
+                // iOS 26 原生 TabBar 玻璃态会压低主题皮肤可读性；
+                // 主题皮肤页统一复用 iOS 18 的自定义底部栏结构。
+                LegacyTabView(
                     selectedTab: $selectedTab,
                     homeTabSelection: $homeTabSelection,
                     smallWorldDestination: $smallWorldDestination,

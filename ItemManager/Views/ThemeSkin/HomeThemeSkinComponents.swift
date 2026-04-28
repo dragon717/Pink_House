@@ -1,4 +1,7 @@
 import SwiftUI
+#if canImport(UIKit)
+import UIKit
+#endif
 
 private enum HomeThemeSkinTokens {
     static let supportedNamespaces: Set<String> = ["girl_closet", "sky_concert", "swan_dream"]
@@ -9,6 +12,30 @@ private enum HomeThemeSkinTokens {
     static let pinkShadow = Color(red: 0.89, green: 0.6, blue: 0.72)
     static let blush = Color(red: 0.996, green: 0.852, blue: 0.9)
     static let rose = Color(red: 0.878, green: 0.518, blue: 0.675)
+
+    static func creamTop(for descriptor: ThemeSkinDescriptor?) -> Color {
+        SkyConcertThemeSkin.hasDedicatedVisualProfile(descriptor) ? SkyConcertThemeSkin.shellFillTop(for: descriptor) : creamTop
+    }
+
+    static func creamBottom(for descriptor: ThemeSkinDescriptor?) -> Color {
+        SkyConcertThemeSkin.hasDedicatedVisualProfile(descriptor) ? SkyConcertThemeSkin.shellFillBottom(for: descriptor) : creamBottom
+    }
+
+    static func border(for descriptor: ThemeSkinDescriptor?) -> Color {
+        SkyConcertThemeSkin.hasDedicatedVisualProfile(descriptor) ? SkyConcertThemeSkin.shellStroke(for: descriptor) : pinkBorder
+    }
+
+    static func shadow(for descriptor: ThemeSkinDescriptor?) -> Color {
+        SkyConcertThemeSkin.hasDedicatedVisualProfile(descriptor) ? SkyConcertThemeSkin.shadowColor(for: descriptor) : pinkShadow
+    }
+
+    static func accent(for descriptor: ThemeSkinDescriptor?) -> Color {
+        SkyConcertThemeSkin.hasDedicatedVisualProfile(descriptor) ? SkyConcertThemeSkin.accent(for: descriptor) : rose
+    }
+
+    static func softAccent(for descriptor: ThemeSkinDescriptor?) -> Color {
+        SkyConcertThemeSkin.hasDedicatedVisualProfile(descriptor) ? SkyConcertThemeSkin.accentSoft(for: descriptor) : blush
+    }
 }
 
 enum HomeThemeSkinChromeStyle {
@@ -30,11 +57,11 @@ enum HomeThemeSkinChromeStyle {
     var shadowRadius: CGFloat {
         switch self {
         case .group:
-            return 14
+            return 11
         case .segment:
-            return 12
-        case .searchEntry:
             return 10
+        case .searchEntry:
+            return 8
         }
     }
 }
@@ -69,10 +96,10 @@ struct HomeThemeSkinToolbarShell<Content: View>: View {
     var body: some View {
         if isActive {
             content
-                .padding(.horizontal, horizontalPadding)
-                .padding(.vertical, verticalPadding)
+                .padding(.horizontal, effectiveHorizontalPadding)
+                .padding(.vertical, effectiveVerticalPadding)
                 .background {
-                    HomeThemeSkinChromeBackground(style: style)
+                    HomeThemeSkinChromeBackground(descriptor: descriptor, style: style)
                 }
         } else {
             content
@@ -81,6 +108,24 @@ struct HomeThemeSkinToolbarShell<Content: View>: View {
 
     private var isActive: Bool {
         descriptor?.usesThemeSkinChrome == true
+    }
+
+    private var shouldUseCompactChrome: Bool {
+        guard isActive else { return false }
+        #if canImport(UIKit)
+        if #available(iOS 26.0, *) {
+            return UIDevice.current.userInterfaceIdiom == .phone
+        }
+        #endif
+        return false
+    }
+
+    private var effectiveHorizontalPadding: CGFloat {
+        shouldUseCompactChrome ? min(horizontalPadding, 6) : horizontalPadding
+    }
+
+    private var effectiveVerticalPadding: CGFloat {
+        shouldUseCompactChrome ? min(verticalPadding, 4) : verticalPadding
     }
 }
 
@@ -105,16 +150,21 @@ struct HomeThemeSkinToolbarIconShell<Content: View>: View {
     var body: some View {
         if isActive {
             content
-                .frame(minWidth: minWidth, minHeight: minHeight)
-                .padding(6)
+                .font(.system(size: effectiveIconSize, weight: .semibold))
+                .frame(minWidth: effectiveMinWidth, minHeight: effectiveMinHeight)
+                .padding(effectivePadding)
                 .background {
-                    ThemeSkinOptionalResizableAsset(ThemeSkinAssetName.topBarIconButton) {
+                    ThemeSkinOptionalResizableAsset(
+                        ThemeSkinAssetName.topBarIconButton,
+                        namespace: descriptor?.assetNamespace,
+                        allowShortNameFallback: !SkyConcertThemeSkin.shouldAvoidShortAssetFallback(for: descriptor)
+                    ) {
                         RoundedRectangle(cornerRadius: 14, style: .continuous)
                             .fill(
                                 LinearGradient(
                                     colors: [
-                                        HomeThemeSkinTokens.creamTop.opacity(0.98),
-                                        HomeThemeSkinTokens.blush.opacity(0.9)
+                                        HomeThemeSkinTokens.creamTop(for: descriptor).opacity(0.98),
+                                        HomeThemeSkinTokens.softAccent(for: descriptor).opacity(0.9)
                                     ],
                                     startPoint: .topLeading,
                                     endPoint: .bottomTrailing
@@ -126,7 +176,7 @@ struct HomeThemeSkinToolbarIconShell<Content: View>: View {
                                         LinearGradient(
                                             colors: [
                                                 .white.opacity(0.95),
-                                                HomeThemeSkinTokens.pinkBorder.opacity(0.82)
+                                                HomeThemeSkinTokens.border(for: descriptor).opacity(0.82)
                                             ],
                                             startPoint: .topLeading,
                                             endPoint: .bottomTrailing
@@ -136,7 +186,7 @@ struct HomeThemeSkinToolbarIconShell<Content: View>: View {
                             }
                     }
                 }
-                .shadow(color: HomeThemeSkinTokens.pinkShadow.opacity(0.16), radius: 8, x: 0, y: 4)
+                .shadow(color: HomeThemeSkinTokens.shadow(for: descriptor).opacity(0.16), radius: 8, x: 0, y: 4)
         } else {
             content
         }
@@ -144,6 +194,32 @@ struct HomeThemeSkinToolbarIconShell<Content: View>: View {
 
     private var isActive: Bool {
         descriptor?.usesThemeSkinChrome == true
+    }
+
+    private var shouldUseCompactChrome: Bool {
+        guard isActive else { return false }
+        #if canImport(UIKit)
+        if #available(iOS 26.0, *) {
+            return UIDevice.current.userInterfaceIdiom == .phone
+        }
+        #endif
+        return false
+    }
+
+    private var effectiveMinWidth: CGFloat {
+        shouldUseCompactChrome ? min(minWidth, 24) : minWidth
+    }
+
+    private var effectiveMinHeight: CGFloat {
+        shouldUseCompactChrome ? min(minHeight, 24) : minHeight
+    }
+
+    private var effectivePadding: CGFloat {
+        shouldUseCompactChrome ? 4 : 6
+    }
+
+    private var effectiveIconSize: CGFloat {
+        shouldUseCompactChrome ? 13 : 14
     }
 }
 
@@ -157,7 +233,7 @@ struct HomeThemeSkinSearchMenuLabel: View {
             HStack(spacing: 10) {
                 Image(systemName: systemImage)
                     .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(HomeThemeSkinTokens.rose)
+                    .foregroundStyle(HomeThemeSkinTokens.accent(for: descriptor))
 
                 Text(title)
                     .font(.system(size: 14, weight: .semibold))
@@ -169,7 +245,7 @@ struct HomeThemeSkinSearchMenuLabel: View {
             .padding(.vertical, 8)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background {
-                HomeThemeSkinChromeBackground(style: .searchEntry)
+                HomeThemeSkinChromeBackground(descriptor: descriptor, style: .searchEntry)
             }
         } else {
             Label(title, systemImage: systemImage)
@@ -182,6 +258,7 @@ struct HomeThemeSkinSearchMenuLabel: View {
 }
 
 private struct HomeThemeSkinChromeBackground: View {
+    let descriptor: ThemeSkinDescriptor?
     let style: HomeThemeSkinChromeStyle
 
     private var assetName: String {
@@ -198,11 +275,23 @@ private struct HomeThemeSkinChromeBackground: View {
     var body: some View {
         ThemeSkinOptionalResizableAsset(
             assetName,
+            namespace: descriptor?.assetNamespace,
+            allowShortNameFallback: !SkyConcertThemeSkin.shouldAvoidShortAssetFallback(for: descriptor),
             capInsets: ThemeSkinAssetName.capInsets(for: assetName)
         ) {
             fallbackBackground
         }
-        .shadow(color: HomeThemeSkinTokens.pinkShadow.opacity(0.18), radius: style.shadowRadius, x: 0, y: 6)
+        .overlay {
+            if SkyConcertThemeSkin.isSkyConcert(descriptor) {
+                SkyConcertDecorationLayer(placements: SkyConcertThemeSkin.toolbarPlacements(for: style))
+            } else if SwanDreamThemeSkin.isSwanDream(descriptor) {
+                SkyConcertDecorationLayer(
+                    placements: SwanDreamThemeSkin.toolbarPlacements(for: style),
+                    namespace: SwanDreamThemeSkin.namespace
+                )
+            }
+        }
+        .shadow(color: HomeThemeSkinTokens.shadow(for: descriptor).opacity(0.18), radius: style.shadowRadius, x: 0, y: 6)
     }
 
     private var fallbackBackground: some View {
@@ -211,8 +300,8 @@ private struct HomeThemeSkinChromeBackground: View {
                 .fill(
                     LinearGradient(
                         colors: [
-                            HomeThemeSkinTokens.creamTop.opacity(0.98),
-                            HomeThemeSkinTokens.creamBottom.opacity(0.96)
+                            HomeThemeSkinTokens.creamTop(for: descriptor).opacity(0.98),
+                            HomeThemeSkinTokens.creamBottom(for: descriptor).opacity(0.96)
                         ],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
@@ -224,7 +313,7 @@ private struct HomeThemeSkinChromeBackground: View {
                     LinearGradient(
                         colors: [
                             .white.opacity(0.95),
-                            HomeThemeSkinTokens.pinkBorder.opacity(0.9)
+                            HomeThemeSkinTokens.border(for: descriptor).opacity(0.9)
                         ],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
@@ -233,11 +322,11 @@ private struct HomeThemeSkinChromeBackground: View {
                 )
 
             RoundedRectangle(cornerRadius: style.cornerRadius - 3, style: .continuous)
-                .stroke(HomeThemeSkinTokens.blush.opacity(0.45), lineWidth: 0.6)
+                .stroke(HomeThemeSkinTokens.softAccent(for: descriptor).opacity(0.45), lineWidth: 0.6)
                 .padding(3)
 
             Circle()
-                .fill(HomeThemeSkinTokens.blush.opacity(0.95))
+                .fill(HomeThemeSkinTokens.softAccent(for: descriptor).opacity(0.95))
                 .frame(width: 8, height: 8)
                 .overlay {
                     Circle()
@@ -246,11 +335,11 @@ private struct HomeThemeSkinChromeBackground: View {
                 .offset(x: -26, y: -11)
 
             Circle()
-                .fill(HomeThemeSkinTokens.creamTop.opacity(0.98))
+                .fill(HomeThemeSkinTokens.creamTop(for: descriptor).opacity(0.98))
                 .frame(width: 7, height: 7)
                 .overlay {
                     Circle()
-                        .stroke(HomeThemeSkinTokens.pinkBorder.opacity(0.65), lineWidth: 1)
+                        .stroke(HomeThemeSkinTokens.border(for: descriptor).opacity(0.65), lineWidth: 1)
                 }
                 .offset(x: 28, y: 12)
         }

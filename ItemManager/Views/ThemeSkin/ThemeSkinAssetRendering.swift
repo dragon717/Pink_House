@@ -38,28 +38,92 @@ enum ThemeSkinAssetName {
 }
 
 enum ThemeSkinAssetAvailability {
-    static func hasImage(named name: String) -> Bool {
+    static func hasImage(
+        named name: String,
+        namespace: String? = nil,
+        allowShortNameFallback: Bool = true
+    ) -> Bool {
         #if canImport(UIKit)
-        return UIImage(named: name) != nil
+        return ThemeSkinAssetResolver.image(
+            named: name,
+            namespace: namespace,
+            allowShortNameFallback: allowShortNameFallback
+        ) != nil
         #else
         return false
         #endif
     }
 }
 
+#if canImport(UIKit)
+enum ThemeSkinAssetResolver {
+    static func image(
+        named name: String,
+        namespace: String? = nil,
+        allowShortNameFallback: Bool = true
+    ) -> UIImage? {
+        for candidate in candidateNames(
+            for: name,
+            namespace: namespace,
+            allowShortNameFallback: allowShortNameFallback
+        ) {
+            if let image = UIImage(named: candidate) {
+                return image
+            }
+        }
+        return nil
+    }
+
+    private static func candidateNames(
+        for name: String,
+        namespace: String?,
+        allowShortNameFallback: Bool
+    ) -> [String] {
+        guard let namespace, !namespace.isEmpty else {
+            return [name]
+        }
+
+        let prefixedName = "\(namespace)_\(name)"
+        var names: [String] = []
+
+        if name.hasPrefix("\(namespace)_") {
+            names.append(name)
+        } else {
+            names.append(prefixedName)
+        }
+
+        if allowShortNameFallback {
+            names.append(name)
+        }
+
+        return names.reduce(into: [String]()) { result, candidate in
+            if !result.contains(candidate) {
+                result.append(candidate)
+            }
+        }
+    }
+}
+#endif
+
 struct ThemeSkinOptionalResizableAsset<Placeholder: View>: View {
     let name: String
+    let namespace: String?
+    let allowShortNameFallback: Bool
     var capInsets: EdgeInsets
     var resizingMode: Image.ResizingMode
     private let placeholder: () -> Placeholder
 
     init(
         _ name: String,
+        namespace: String? = nil,
+        allowShortNameFallback: Bool = true,
         capInsets: EdgeInsets = EdgeInsets(),
         resizingMode: Image.ResizingMode = .stretch,
         @ViewBuilder placeholder: @escaping () -> Placeholder
     ) {
         self.name = name
+        self.namespace = namespace
+        self.allowShortNameFallback = allowShortNameFallback
         self.capInsets = capInsets
         self.resizingMode = resizingMode
         self.placeholder = placeholder
@@ -67,7 +131,11 @@ struct ThemeSkinOptionalResizableAsset<Placeholder: View>: View {
 
     var body: some View {
         #if canImport(UIKit)
-        if let image = UIImage(named: name) {
+        if let image = ThemeSkinAssetResolver.image(
+            named: name,
+            namespace: namespace,
+            allowShortNameFallback: allowShortNameFallback
+        ) {
             Image(uiImage: image)
                 .resizable(capInsets: capInsets, resizingMode: resizingMode)
         } else {
@@ -81,19 +149,29 @@ struct ThemeSkinOptionalResizableAsset<Placeholder: View>: View {
 
 struct ThemeSkinOptionalFittedAsset<Placeholder: View>: View {
     let name: String
+    let namespace: String?
+    let allowShortNameFallback: Bool
     private let placeholder: () -> Placeholder
 
     init(
         _ name: String,
+        namespace: String? = nil,
+        allowShortNameFallback: Bool = true,
         @ViewBuilder placeholder: @escaping () -> Placeholder
     ) {
         self.name = name
+        self.namespace = namespace
+        self.allowShortNameFallback = allowShortNameFallback
         self.placeholder = placeholder
     }
 
     var body: some View {
         #if canImport(UIKit)
-        if let image = UIImage(named: name) {
+        if let image = ThemeSkinAssetResolver.image(
+            named: name,
+            namespace: namespace,
+            allowShortNameFallback: allowShortNameFallback
+        ) {
             Image(uiImage: image)
                 .resizable()
                 .scaledToFit()

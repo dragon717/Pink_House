@@ -181,6 +181,12 @@ struct HomeView: View {
                 // Background
                 LiquidBackground()
                     .ignoresSafeArea()
+
+                if selectedTab == .wardrobe {
+                    SkyConcertWardrobeBackdrop(descriptor: themedTopBarGroupDescriptor)
+                        .ignoresSafeArea()
+                        .allowsHitTesting(false)
+                }
                 
                 // Content
                 if selectedTab == .wardrobe {
@@ -1430,7 +1436,7 @@ struct HomeView: View {
 
     private func resolveThemeDescriptor(for slot: ThemeSkinSlot) -> ThemeSkinDescriptor? {
         guard let descriptor = themeSkinManager.activeThemeDescriptor(for: slot, state: .default),
-              descriptor.assetNamespace == "girl_closet" else {
+              WardrobeThemeSkinSupport.isThemeSkinDescriptor(descriptor) else {
             return nil
         }
         return descriptor

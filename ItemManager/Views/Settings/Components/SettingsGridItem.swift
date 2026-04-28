@@ -11,11 +11,12 @@ struct SettingsGridItem: View {
     let iconColor: Color
     var iconSystemName: Bool = true // 是否是 SF Symbol
 
-    private var isGirlClosetThemed: Bool {
-        guard let descriptor = themeSkinManager.activeThemeDescriptor(for: .settingsGridCard, state: .default) else {
-            return false
-        }
-        return ["girl_closet", "sky_concert", "swan_dream"].contains(descriptor.assetNamespace)
+    private var themeSkinDescriptor: ThemeSkinDescriptor? {
+        themeSkinManager.activeThemeDescriptor(for: .settingsGridCard, state: .default)
+    }
+
+    private var isThemeSkinThemed: Bool {
+        WardrobeThemeSkinSupport.isThemeSkinDescriptor(themeSkinDescriptor)
     }
     
     var body: some View {
@@ -57,24 +58,28 @@ struct SettingsGridItem: View {
         .background(cardBackground)
         .overlay(cardOverlay)
         .overlay(alignment: .topTrailing) {
-            if isGirlClosetThemed && !ThemeSkinAssetAvailability.hasImage(named: ThemeSkinAssetName.cardSettingsGrid) {
+            if isThemeSkinThemed && !ThemeSkinAssetAvailability.hasImage(
+                named: ThemeSkinAssetName.cardSettingsGrid,
+                namespace: themeSkinDescriptor?.assetNamespace,
+                allowShortNameFallback: !SkyConcertThemeSkin.shouldAvoidShortAssetFallback(for: themeSkinDescriptor)
+            ) {
                 Image(systemName: "sparkles")
                     .font(.system(size: 10, weight: .bold))
-                    .foregroundStyle(Color(hex: "D17A9A"))
+                    .foregroundStyle(SkyConcertThemeSkin.accent(for: themeSkinDescriptor))
                     .padding(8)
             }
         }
-        .shadow(color: isGirlClosetThemed ? Color(hex: "E5B5C7").opacity(0.22) : .clear, radius: 12, x: 0, y: 6)
+        .shadow(color: isThemeSkinThemed ? SkyConcertThemeSkin.shadowColor(for: themeSkinDescriptor).opacity(0.78) : .clear, radius: 12, x: 0, y: 6)
     }
 
     private var iconCircleBackground: some View {
         Group {
-            if isGirlClosetThemed {
+            if isThemeSkinThemed {
                 Circle()
                     .fill(Color.white.opacity(0.92))
                     .overlay(
                         Circle()
-                            .stroke(Color(hex: "E7C7D3").opacity(0.95), lineWidth: 1)
+                            .stroke(SkyConcertThemeSkin.shellStroke(for: themeSkinDescriptor).opacity(0.95), lineWidth: 1)
                     )
             } else if iconSystemName {
                 iconColor.opacity(0.1)
@@ -90,23 +95,25 @@ struct SettingsGridItem: View {
         let cardColors = themeManager.themeColorConfig.currentTheme(forDarkMode: isDark).cardColors(forDarkMode: isDark)
         
         return Group {
-            if isGirlClosetThemed {
+            if isThemeSkinThemed {
                 ThemeSkinOptionalResizableAsset(
                     ThemeSkinAssetName.cardSettingsGrid,
+                    namespace: themeSkinDescriptor?.assetNamespace,
+                    allowShortNameFallback: !SkyConcertThemeSkin.shouldAvoidShortAssetFallback(for: themeSkinDescriptor),
                     capInsets: ThemeSkinAssetName.capInsets(for: ThemeSkinAssetName.cardSettingsGrid)
                 ) {
                     RoundedRectangle(cornerRadius: 20)
                         .fill(
                             LinearGradient(
                                 colors: [
-                                    Color(hex: "FFFDF8"),
-                                    Color(hex: "FCEEF3")
+                                    SkyConcertThemeSkin.shellFillTop(for: themeSkinDescriptor),
+                                    SkyConcertThemeSkin.shellFillBottom(for: themeSkinDescriptor)
                                 ],
                                 startPoint: .topLeading,
                                 endPoint: .bottomTrailing
                             )
                         )
-                        .shadow(color: Color(hex: "E5B5C7").opacity(0.18), radius: 10, x: 0, y: 5)
+                        .shadow(color: SkyConcertThemeSkin.shadowColor(for: themeSkinDescriptor).opacity(0.56), radius: 10, x: 0, y: 5)
                 }
             } else {
                 switch themeManager.cardStyle {
@@ -144,17 +151,21 @@ struct SettingsGridItem: View {
         let cardColors = themeManager.themeColorConfig.currentTheme(forDarkMode: isDark).cardColors(forDarkMode: isDark)
         
         return Group {
-            if isGirlClosetThemed && ThemeSkinAssetAvailability.hasImage(named: ThemeSkinAssetName.cardSettingsGrid) {
+            if isThemeSkinThemed && ThemeSkinAssetAvailability.hasImage(
+                named: ThemeSkinAssetName.cardSettingsGrid,
+                namespace: themeSkinDescriptor?.assetNamespace,
+                allowShortNameFallback: !SkyConcertThemeSkin.shouldAvoidShortAssetFallback(for: themeSkinDescriptor)
+            ) {
                 RoundedRectangle(cornerRadius: 20)
                     .stroke(Color.clear, lineWidth: 0)
             } else {
                 RoundedRectangle(cornerRadius: 20)
                     .stroke(
-                        isGirlClosetThemed
+                        isThemeSkinThemed
                             ? LinearGradient(
                                 colors: [
                                     Color.white.opacity(0.95),
-                                    Color(hex: "E7C7D3").opacity(0.95)
+                                    SkyConcertThemeSkin.shellStroke(for: themeSkinDescriptor).opacity(0.95)
                                 ],
                                 startPoint: .topLeading,
                                 endPoint: .bottomTrailing

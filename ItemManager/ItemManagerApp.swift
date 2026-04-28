@@ -230,6 +230,9 @@ struct MainContentView: View {
     private func runStartupInitialization() async {
         let startedAt = Date()
         PetHistoryResetManager.shared.applyForcedResetIfNeeded()
+        #if DEBUG
+        DebugMeowCoinGrantManager.grantIfNeeded()
+        #endif
         
         // 0.5 Migrate 3D models from Clothing to Model3D
         await Model3DMigrationService.shared.migrateIfNeeded(modelContainer: SharedPersistence.shared.sharedModelContainer)
