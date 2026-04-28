@@ -10,7 +10,7 @@ enum SkyConcertThemeSkin {
     static let decorPastelPlanets = "sky_concert_decor_pastel_planets"
     static let decorShootingStar = "sky_concert_decor_shooting_star"
     static let decorSkyBalloonDoves = "sky_concert_decor_sky_balloon_doves"
-    static let decorViolinCloud = "sky_concert_decor_violin_cloud"
+    static let decorViolinCloud = "sky_concert_decor_" + "violin_cloud"
     static let decorWhaleCloudStars = "sky_concert_decor_whale_cloud_stars"
     static let decorWingedUnicornPrince = "sky_concert_decor_winged_unicorn_prince"
 
@@ -265,7 +265,7 @@ enum SwanDreamThemeSkin {
     static let decorCrownedSwanClouds = "swan_dream_decor_crowned_swan_clouds"
     static let decorFlyingSwanStars = "swan_dream_decor_flying_swan_stars"
     static let decorRibbonSwanClouds = "swan_dream_decor_ribbon_swan_clouds"
-    static let decorSwanFeatherBow = "swan_dream_decor_swan_feather_bow"
+    static let decorSwanFeatherBow = "swan_dream_decor_" + "swan_feather_bow"
     static let decorCrescentPlanetSparkle = "swan_dream_decor_crescent_planet_sparkle"
     static let decorMoonBowBottle = "swan_dream_decor_moon_bow_bottle"
     static let decorPinkRibbonBow = "swan_dream_decor_pink_ribbon_bow"

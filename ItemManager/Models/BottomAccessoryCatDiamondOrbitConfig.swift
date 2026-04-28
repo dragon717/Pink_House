@@ -10,6 +10,7 @@ enum BottomAccessoryCatOrbitStartAnchor {
     case bottom
 }
 
+@available(*, deprecated, message: "旧原生底栏已退役；下个 cycle 评估归并到 PetOverlayView")
 struct BottomAccessoryCatDiamondOrbitConfig {
     var direction: BottomAccessoryCatOrbitDirection = .clockwise
     var startAnchor: BottomAccessoryCatOrbitStartAnchor = .bottom

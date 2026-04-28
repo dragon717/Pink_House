@@ -58,7 +58,7 @@ struct ThemeSkinDetailView: View {
                             Image(systemName: "sparkles")
                                 .font(.system(size: 36))
                                 .foregroundStyle(themeManager.accentTextColor)
-                            Text("少女衣橱主题预览")
+                            Text("主题预览")
                                 .font(.headline)
                                 .foregroundStyle(themeManager.primaryTextColor)
                             Text("顶部栏 / 卡片 / TabBar 会从同一主题包里解析，不允许和其他主题混用。")

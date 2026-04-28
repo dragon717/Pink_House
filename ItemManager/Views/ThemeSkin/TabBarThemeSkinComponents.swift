@@ -1,7 +1,7 @@
 import SwiftUI
 
 private enum TabBarThemeSkinTokens {
-    static let supportedNamespaces: Set<String> = ["girl_closet", "sky_concert", "swan_dream"]
+    static let supportedNamespaces: Set<String> = ["sky_concert", "swan_dream"]
 
     static let creamTop = Color(red: 1.0, green: 0.981, blue: 0.965)
     static let creamBottom = Color(red: 0.989, green: 0.934, blue: 0.955)
@@ -51,6 +51,18 @@ struct ThemeSkinTabBarBackdrop: View {
         descriptor?.usesThemeSkinTabBarChrome == true
     }
 
+    private var shapeStyle: ThemeSkinTabBarShapeStyle {
+        ThemeSkinTabBarShapeStyle.style(for: descriptor)
+    }
+
+    private var backdropHeight: CGFloat {
+        shapeStyle.height + safeAreaBottom
+    }
+
+    private var resolvedHorizontalPadding: CGFloat {
+        horizontalPadding == 12 ? shapeStyle.horizontalPadding : horizontalPadding
+    }
+
     var body: some View {
         if isActive {
             ThemeSkinOptionalResizableAsset(
@@ -61,130 +73,106 @@ struct ThemeSkinTabBarBackdrop: View {
             ) {
                 fallbackBackdrop
             }
+            .clipShape(shapeStyle)
+            .compositingGroup()
+            .shadow(color: TabBarThemeSkinTokens.shadow(for: descriptor), radius: 14, x: 0, y: 6)
             .overlay {
-                if SkyConcertThemeSkin.isSkyConcert(descriptor) {
-                    SkyConcertDecorationLayer(placements: SkyConcertThemeSkin.tabBarPlacements)
-                } else if SwanDreamThemeSkin.isSwanDream(descriptor) {
-                    SkyConcertDecorationLayer(
-                        placements: SwanDreamThemeSkin.tabBarPlacements,
-                        namespace: SwanDreamThemeSkin.namespace
-                    )
-                }
+                tabBarDecorations
             }
-            .frame(height: (SwanDreamThemeSkin.isSwanDream(descriptor) ? 66 : 58) + safeAreaBottom)
-            .padding(.horizontal, horizontalPadding)
+            .frame(height: backdropHeight)
+            .padding(.horizontal, resolvedHorizontalPadding)
             .padding(.bottom, bottomPadding ?? (safeAreaBottom > 0 ? 2 : 8))
         }
     }
 
-    @ViewBuilder
     private var fallbackBackdrop: some View {
-        if SwanDreamThemeSkin.isSwanDream(descriptor) {
-            swanDreamBackdrop
-        } else {
-            standardBackdrop
-        }
-    }
-
-    private var standardBackdrop: some View {
         ZStack {
-            Capsule(style: .continuous)
+            shapeStyle
                 .fill(
                     LinearGradient(
-                        colors: [
-                            TabBarThemeSkinTokens.creamTop(for: descriptor).opacity(0.98),
-                            TabBarThemeSkinTokens.creamBottom(for: descriptor).opacity(0.96)
-                        ],
+                        colors: shellGradientColors,
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     )
                 )
                 .overlay {
-                    Capsule(style: .continuous)
+                    shapeStyle
                         .stroke(
                             LinearGradient(
-                                colors: [
-                                    .white.opacity(0.98),
-                                    TabBarThemeSkinTokens.border(for: descriptor).opacity(0.9)
-                                ],
+                                colors: shellStrokeColors,
                                 startPoint: .topLeading,
                                 endPoint: .bottomTrailing
                             ),
-                            lineWidth: 1.25
+                            lineWidth: 1.15
                         )
                 }
-                .shadow(color: TabBarThemeSkinTokens.shadow(for: descriptor), radius: 16, x: 0, y: 6)
 
             HStack {
                 tabBarDoodle(icon: "star.fill")
                 Spacer()
                 tabBarDoodle(icon: "sparkles")
             }
-            .padding(.horizontal, 18)
+            .padding(.horizontal, SwanDreamThemeSkin.isSwanDream(descriptor) ? 20 : 18)
         }
     }
 
-    private var swanDreamBackdrop: some View {
-        ZStack {
-            UnevenRoundedRectangle(
-                topLeadingRadius: 34,
-                bottomLeadingRadius: 30,
-                bottomTrailingRadius: 34,
-                topTrailingRadius: 24,
-                style: .continuous
-            )
-            .fill(
-                LinearGradient(
-                    colors: [
-                        SwanDreamThemeSkin.creamTop.opacity(0.98),
-                        SwanDreamThemeSkin.ribbonPink.opacity(0.72),
-                        SwanDreamThemeSkin.moonLavender.opacity(0.9)
-                    ],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
+    @ViewBuilder
+    private var tabBarDecorations: some View {
+        if SkyConcertThemeSkin.isSkyConcert(descriptor) {
+            SkyConcertDecorationLayer(placements: SkyConcertThemeSkin.tabBarPlacements)
+        } else if SwanDreamThemeSkin.isSwanDream(descriptor) {
+            ZStack {
+                SkyConcertDecorationLayer(
+                    placements: SwanDreamThemeSkin.tabBarPlacements,
+                    namespace: SwanDreamThemeSkin.namespace
                 )
-            )
-            .overlay {
-                UnevenRoundedRectangle(
-                    topLeadingRadius: 34,
-                    bottomLeadingRadius: 30,
-                    bottomTrailingRadius: 34,
-                    topTrailingRadius: 24,
-                    style: .continuous
-                )
-                .stroke(
-                    LinearGradient(
-                        colors: [
-                            .white.opacity(0.98),
-                            SwanDreamThemeSkin.roseLine.opacity(0.82),
-                            SwanDreamThemeSkin.moonGold.opacity(0.5)
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ),
-                    lineWidth: 1.25
-                )
+                swanDreamMoonDecoration
             }
-            .shadow(color: SwanDreamThemeSkin.shadow.opacity(0.9), radius: 16, x: 0, y: 6)
-
-            HStack {
-                tabBarDoodle(icon: "star.fill")
-                Spacer()
-                tabBarDoodle(icon: "sparkles")
-            }
-            .padding(.horizontal, 20)
-
-            Circle()
-                .fill(SwanDreamThemeSkin.creamTop.opacity(0.92))
-                .frame(width: 58, height: 58)
-                .overlay {
-                    Circle()
-                        .stroke(SwanDreamThemeSkin.roseLine.opacity(0.6), lineWidth: 1)
-                }
-                .offset(y: -16)
-                .opacity(0.42)
-                .allowsHitTesting(false)
         }
+    }
+
+    private var swanDreamMoonDecoration: some View {
+        ThemeSkinOptionalFittedAsset(
+            SwanDreamThemeSkin.decorCrescentPlanetSparkle,
+            namespace: SwanDreamThemeSkin.namespace,
+            allowShortNameFallback: false
+        ) {
+            Image(systemName: "moon.stars.fill")
+                .font(.system(size: 38, weight: .semibold))
+                .foregroundStyle(SwanDreamThemeSkin.moonGold.opacity(0.72))
+        }
+        .frame(width: 72, height: 72)
+        .offset(y: -22)
+        .opacity(0.58)
+        .allowsHitTesting(false)
+    }
+
+    private var shellGradientColors: [Color] {
+        if SwanDreamThemeSkin.isSwanDream(descriptor) {
+            return [
+                SwanDreamThemeSkin.creamTop.opacity(0.98),
+                SwanDreamThemeSkin.ribbonPink.opacity(0.72),
+                SwanDreamThemeSkin.moonLavender.opacity(0.9)
+            ]
+        }
+        return [
+            TabBarThemeSkinTokens.creamTop(for: descriptor).opacity(0.98),
+            TabBarThemeSkinTokens.creamBottom(for: descriptor).opacity(0.96)
+        ]
+    }
+
+    private var shellStrokeColors: [Color] {
+        if SwanDreamThemeSkin.isSwanDream(descriptor) {
+            return [
+                .white.opacity(0.98),
+                SwanDreamThemeSkin.roseLine.opacity(0.82),
+                SwanDreamThemeSkin.moonGold.opacity(0.5)
+            ]
+        }
+        return [
+            .white.opacity(0.98),
+            TabBarThemeSkinTokens.border(for: descriptor).opacity(0.9)
+        ]
     }
 
     private func tabBarDoodle(icon: String) -> some View {

@@ -1,7 +1,7 @@
 import SwiftUI
 
 enum WardrobeThemeSkinSupport {
-    static let supportedNamespaces: Set<String> = ["girl_closet", "sky_concert", "swan_dream"]
+    static let supportedNamespaces: Set<String> = ["sky_concert", "swan_dream"]
 
     static func isThemeSkinDescriptor(_ descriptor: ThemeSkinDescriptor?) -> Bool {
         guard let namespace = descriptor?.assetNamespace else { return false }

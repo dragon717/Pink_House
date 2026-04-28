@@ -8,9 +8,6 @@
 import SwiftUI
 import SwiftData
 import Combine
-#if canImport(UIKit)
-import UIKit
-#endif
 
 private struct IsSimulationActiveKey: EnvironmentKey {
     static let defaultValue: Bool = true
@@ -23,479 +20,7 @@ extension EnvironmentValues {
     }
 }
 
-// MARK: - View 扩展：条件应用 searchToolbarBehavior
-extension View {
-    @ViewBuilder
-    func applySearchToolbarBehavior() -> some View {
-        if #available(iOS 26.0, *) {
-            self.searchToolbarBehavior(.automatic)
-        } else {
-            self
-        }
-    }
-    
-    @ViewBuilder
-    func applyTabBarMinimizeBehavior() -> some View {
-        if #available(iOS 26.0, *) {
-            self.tabBarMinimizeBehavior(.onScrollDown)
-        } else {
-            self
-        }
-    }
-
-}
-
-// MARK: - iOS 18+ 现代 TabView
-@available(iOS 18.0, *)
-struct ModernTabView: View {
-    @Binding var selectedTab: Int
-    @Binding var homeTabSelection: HomeTab
-    @Binding var smallWorldDestination: SmallWorldDestination
-    @Binding var isPlayingOpeningAnimation: Bool
-    @Environment(ThemeManager.self) private var themeManager
-    @Environment(\.colorScheme) private var colorScheme
-    @ObservedObject private var themeSkinManager = ThemeSkinManager.shared
-    @ObservedObject private var petDataManager = PetDataManager.shared
-    @StateObject private var mediaStateManager = MediaStateManager.shared
-    @StateObject private var tabNavigationManager = TabNavigationManager.shared
-    
-    @State private var searchText = ""
-    @State private var isBottomBarCompact = false
-    @State private var compactCenterPlatterFrame: CGRect?
-    @State private var lastLoggedCompactSignature: String?
-    @State private var lastLoggedTabBarLayoutSignature: String?
-    @State private var lastLoggedOrbitLayoutSignature: String?
-
-    private let bottomAccessoryCatConfig = BottomAccessoryCatDiamondOrbitConfig()
-    // Reduce probe frequency to lower main-thread pressure during fast list scrolling.
-    private let tabBarStateTicker = Timer.publish(every: 0.35, on: .main, in: .common).autoconnect()
-    private var isBottomCatProbeLoggingEnabled: Bool {
-#if DEBUG
-        UserDefaults.standard.bool(forKey: "debug.bottom_cat.probe_logging")
-#else
-        false
-#endif
-    }
-    
-    // MARK: - 动态 Tab 标题和图标
-    private var smallWorldTabTitle: String {
-        switch smallWorldDestination {
-        case .bigWorld:
-            return "世界书"
-        case .calendar:
-            return "梦裙日历"
-        case .wealth(_):
-            return "来财"
-        case .pet:
-            return petDataManager.status.displayName
-        case .ootd:
-            return "穿搭手帐"
-        case .ootdDefaultBook:
-            return "魔法贴纸"
-        case .menu:
-            return "House"
-        case .perler:
-            return "拼豆工坊"
-        case .wardrobe:
-            return "衣橱"
-        case .depositPlan:
-            return "心愿尾款"
-        case .recycleBin:
-            return "回收站"
-        case .dressStock:
-            return "裙子股市"
-        }
-    }
-
-    private var smallWorldTabIcon: String {
-        switch smallWorldDestination {
-        case .bigWorld:
-            return "globe.asia.australia"
-        case .calendar:
-            return "calendar"
-        case .wealth(_):
-            return "yensign.circle"
-        case .pet:
-            return "pawprint"
-        case .ootd:
-            return "book.pages"
-        case .ootdDefaultBook:
-            return "book.pages"
-        case .menu:
-            return "house.fill"
-        case .perler:
-            return "circle.grid.2x2"
-        case .wardrobe:
-            return "cabinet.fill"
-        case .depositPlan:
-            return "tag.fill"
-        case .recycleBin:
-            return "trash.fill"
-        case .dressStock:
-            return "chart.line.uptrend.xyaxis"
-        }
-    }
-
-    private var isOnMenu: Bool {
-        if case .menu = smallWorldDestination {
-            return true
-        }
-        return false
-    }
-
-    private var magicPalette: MagicThemePalette {
-        MagicThemeDesignSystem.palette(themeManager: themeManager, colorScheme: colorScheme)
-    }
-
-    private var themedTabBarDescriptor: ThemeSkinDescriptor? {
-        resolveTabBarDescriptor(for: .tabBarMain)
-    }
-
-    private var themedTabItemDescriptor: ThemeSkinDescriptor? {
-        resolveTabBarDescriptor(for: .tabBarItem)
-    }
-
-    private var supportsBottomAccessoryCat: Bool {
-        if #available(iOS 26.0, *), UIDevice.current.userInterfaceIdiom == .phone {
-            return true
-        }
-        return false
-    }
-
-    private var shouldShowDiamondOrbitCat: Bool {
-        selectedTab != 1 && selectedTab != 3 && supportsBottomAccessoryCat && isBottomBarCompact && compactCenterPlatterFrame != nil
-    }
-
-    private var shouldShowFloatingOverlayCat: Bool {
-        selectedTab != 1 && selectedTab != 3 && !shouldShowDiamondOrbitCat
-    }
-
-    private var bottomAccessoryPetId: String {
-        petDataManager.status.selectedPetId ?? "naicha"
-    }
-
-    var body: some View {
-        TabView(selection: $selectedTab) {
-            Tab(value: 0) {
-                WardrobeTabContent(homeTabSelection: $homeTabSelection)
-            } label: {
-                ThemeSkinModernTabLabel(
-                    descriptor: themedTabItemDescriptor,
-                    title: "衣橱",
-                    systemImage: "cabinet.fill",
-                    isSelected: selectedTab == 0
-                )
-            }
-
-            Tab(value: 1) {
-                SmallWorldTabContent(
-                    selectedTab: $selectedTab,
-                    homeTab: $homeTabSelection,
-                    destination: $smallWorldDestination,
-                    isPlayingOpeningAnimation: $isPlayingOpeningAnimation
-                )
-            } label: {
-                ThemeSkinModernTabLabel(
-                    descriptor: themedTabItemDescriptor,
-                    title: smallWorldTabTitle,
-                    systemImage: smallWorldTabIcon,
-                    isSelected: selectedTab == 1
-                )
-                    .background {
-                        Color.clear
-                            .captureGuideTarget(.homeHouseTab)
-                            .allowsHitTesting(false)
-                    }
-            }
-
-            Tab(value: 2) {
-                MeTabContent()
-            } label: {
-                ThemeSkinModernTabLabel(
-                    descriptor: themedTabItemDescriptor,
-                    title: "我",
-                    systemImage: "face.smiling",
-                    isSelected: selectedTab == 2
-                )
-            }
-
-            Tab(value: 3, role: .search) {
-                PetChatView(searchText: $searchText)
-            } label: {
-                ThemeSkinModernTabLabel(
-                    descriptor: themedTabItemDescriptor,
-                    title: "萌宠对话",
-                    systemImage: "bubble.left.and.bubble.right.fill",
-                    isSelected: selectedTab == 3
-                )
-                    .background {
-                        Color.clear
-                            .captureGuideTarget(.homePetChatTab)
-                            .allowsHitTesting(false)
-                    }
-            }
-        }
-        // iOS 26+ 原生 API：向下滑动时自动最小化 TabBar
-        .applyTabBarMinimizeBehavior()
-        .applySearchToolbarBehavior()
-        .toolbarBackground(.clear, for: .tabBar)
-        .toolbarBackground(.hidden, for: .tabBar)
-        .tint(magicPalette.accent)
-        .environment(\.isSimulationActive, isSimulationActive)
-        .onReceive(tabBarStateTicker) { _ in
-            refreshCompactTabBarState()
-        }
-        .overlay {
-            GeometryReader { proxy in
-                ThemeSkinTabBarBackdrop(
-                    descriptor: themedTabBarDescriptor,
-                    safeAreaBottom: proxy.safeAreaInsets.bottom
-                )
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
-                .allowsHitTesting(false)
-            }
-            RewardBubbleView()
-            if #available(iOS 26.0, *) {
-                if shouldShowDiamondOrbitCat, let compactCenterPlatterFrame {
-                    let orbitLayout = diamondOrbitLayout(frame: compactCenterPlatterFrame)
-                    diamondOrbitOverlay(layout: orbitLayout)
-                        .position(x: orbitLayout.center.x, y: orbitLayout.center.y)
-                }
-            }
-            // 进入 House / 萌宠对话页后不再显示全局悬浮宠物，避免挡住房间热区或搜索/输入交互
-            if shouldShowFloatingOverlayCat {
-                PetOverlayView(action: {
-                    // 点击悬浮小猫：切换到萌宠对话 Tab
-                    withAnimation {
-                        selectedTab = 3
-                    }
-                }, petName: petDataManager.status.displayName)
-            }
-            // 修复：使用正确的 Binding 传递 selectedTab
-            SmallWorldMenuOverlay(
-                selectedTab: $selectedTab,
-                smallWorldDestination: $smallWorldDestination,
-                homeTab: $homeTabSelection
-            )
-        }
-        .onReceive(tabNavigationManager.$navigateToTab) { tab in
-            if let tab = tab {
-                withAnimation {
-                    // 如果是要跳转到HouseTab(1)，记录是从Tab 0进入的
-                    if tab == 1 && selectedTab != 1 {
-                        tabNavigationManager.recordEnteringSmallWorldFromHomeTab(homeTabSelection)
-                    }
-                    selectedTab = tab
-                }
-            }
-        }
-        .onReceive(tabNavigationManager.$navigateToHomeTab) { homeTab in
-            if let homeTab = homeTab {
-                withAnimation {
-                    homeTabSelection = homeTab
-                }
-                tabNavigationManager.navigateToHomeTab = nil
-            }
-        }
-        .onReceive(tabNavigationManager.$navigateToSmallWorld) { destination in
-            if let destination = destination {
-                withAnimation {
-                    // 注意：此时 selectedTab 可能已经被 navigateToTab 的处理器设置为 1
-                    // 所以不能依赖 selectedTab 来判断是否是House内部导航
-                    // 而是应该依赖 TabNavigationManager 中的 isNavigatingInsideSmallWorld 标记
-                    // 如果 isNavigatingInsideSmallWorld 为 false，说明是从外部进入
-                    if !tabNavigationManager.isNavigatingInsideSmallWorld {
-                        // 从其他Tab进入House，记录来源
-                        tabNavigationManager.recordEnteringSmallWorldFromHomeTab(homeTabSelection)
-                    }
-                    // 如果 isNavigatingInsideSmallWorld 为 true，保持标记不变（内部导航）
-                    smallWorldDestination = destination
-                }
-                tabNavigationManager.navigateToSmallWorld = nil
-            }
-        }
-        .onChange(of: selectedTab) { newTab in
-            if newTab == 3 {
-                isBottomBarCompact = false
-            }
-            // 发送Tab切换通知，用于新手引导
-            let tabName: String
-            switch newTab {
-            case 0: tabName = "wardrobe"
-            case 1: tabName = "smallWorld"
-            case 2: tabName = "me"
-            case 3: tabName = "petChat"
-            default: tabName = "unknown"
-            }
-            NotificationCenter.default.post(
-                name: .homeTabChanged,
-                object: nil,
-                userInfo: ["tab": tabName]
-            )
-        }
-    }
-
-    private func resolveTabBarDescriptor(for slot: ThemeSkinSlot) -> ThemeSkinDescriptor? {
-        guard let descriptor = themeSkinManager.activeThemeDescriptor(for: slot, state: .default),
-              WardrobeThemeSkinSupport.isThemeSkinDescriptor(descriptor) else {
-            return nil
-        }
-        return descriptor
-    }
-    
-    private var isSimulationActive: Bool {
-        if case .wealth(_) = smallWorldDestination {
-            return true
-        }
-        return false
-    }
-
-    private func refreshCompactTabBarState() {
-        let probeStart = CFAbsoluteTimeGetCurrent()
-
-        guard supportsBottomAccessoryCat, selectedTab != 1, selectedTab != 3 else {
-            let signature = "disabled-tab-\(selectedTab)"
-            if isBottomCatProbeLoggingEnabled, lastLoggedCompactSignature != signature {
-                print("[BottomCat] probe disabled, selectedTab=\(selectedTab), supportsBottomAccessoryCat=\(supportsBottomAccessoryCat)")
-                lastLoggedCompactSignature = signature
-            }
-            compactCenterPlatterFrame = nil
-            isBottomBarCompact = false
-            return
-        }
-
-        let state = TabBarItemAnchorResolver.compactCenterPlatterState()
-        compactCenterPlatterFrame = state?.frame
-        isBottomBarCompact = state?.isCompact == true
-
-        let frameText: String
-        if let frame = state?.frame {
-            frameText = String(
-                format: "(x:%.1f y:%.1f w:%.1f h:%.1f)",
-                frame.minX, frame.minY, frame.width, frame.height
-            )
-        } else {
-            frameText = "nil"
-        }
-        let signature = "compact=\(isBottomBarCompact)-frame=\(frameText)"
-        if isBottomCatProbeLoggingEnabled, lastLoggedCompactSignature != signature {
-            print("[BottomCat] compactState changed -> compact=\(isBottomBarCompact), frame=\(frameText), showDiamond=\(shouldShowDiamondOrbitCat)")
-            lastLoggedCompactSignature = signature
-        }
-
-        if isBottomCatProbeLoggingEnabled {
-            let snapshots = TabBarItemAnchorResolver.tabBarDebugSnapshots()
-            let layoutSignature = snapshots
-                .map {
-                    String(
-                        format: "d%ld %@:(%.1f,%.1f,%.1f,%.1f) a=%.2f h=%@",
-                        $0.depth,
-                        $0.className,
-                        $0.frame.minX,
-                        $0.frame.minY,
-                        $0.frame.width,
-                        $0.frame.height,
-                        $0.alpha,
-                        $0.isHidden ? "Y" : "N"
-                    )
-                }
-                .joined(separator: " | ")
-            if !layoutSignature.isEmpty, layoutSignature != lastLoggedTabBarLayoutSignature {
-                print("[BottomCat] tabBar subviews -> \(layoutSignature)")
-                lastLoggedTabBarLayoutSignature = layoutSignature
-            }
-        }
-
-        if isBottomCatProbeLoggingEnabled, isBottomBarCompact, let frame = compactCenterPlatterFrame {
-            let orbitLayout = diamondOrbitLayout(frame: frame)
-            let orbitSignature = String(
-                format: "anchor=(%.1f,%.1f) center=(%.1f,%.1f) size=(%.1f,%.1f) normalizedCenter=(%.3f,%.3f)",
-                orbitLayout.anchor.x,
-                orbitLayout.anchor.y,
-                orbitLayout.center.x,
-                orbitLayout.center.y,
-                orbitLayout.size.width,
-                orbitLayout.size.height,
-                orbitLayout.config.normalizedCenterPoint?.x ?? 0.5,
-                orbitLayout.config.normalizedCenterPoint?.y ?? 0.5
-            )
-            if lastLoggedOrbitLayoutSignature != orbitSignature {
-                print("[BottomCat] orbitLayout -> \(orbitSignature)")
-                lastLoggedOrbitLayoutSignature = orbitSignature
-            }
-        }
-
-        let elapsedMs = (CFAbsoluteTimeGetCurrent() - probeStart) * 1000
-        if isBottomCatProbeLoggingEnabled, elapsedMs >= 6 {
-            print(
-                String(
-                    format: "[BottomCat] slow probe %.2fms, selectedTab=%d, compact=%@",
-                    elapsedMs,
-                    selectedTab,
-                    isBottomBarCompact ? "true" : "false"
-                )
-            )
-        }
-    }
-
-    private func diamondOrbitLayout(
-        frame: CGRect
-    ) -> (config: BottomAccessoryCatDiamondOrbitConfig, size: CGSize, center: CGPoint, anchor: CGPoint) {
-        let overlayWidth = max(frame.width + 40, 236)
-        let overlayHeight = max(frame.height + 92, 156)
-        let overlaySize = CGSize(width: overlayWidth, height: overlayHeight)
-        let floatingCatAnchor = CGPoint(
-            x: UIScreen.main.bounds.midX,
-            y: frame.maxY - 49
-        )
-        let overlayCenter = CGPoint(
-            x: floatingCatAnchor.x,
-            y: floatingCatAnchor.y - max(overlayHeight * 0.26, 30)
-        )
-        let overlayOrigin = CGPoint(
-            x: overlayCenter.x - overlayWidth / 2,
-            y: overlayCenter.y - overlayHeight / 2
-        )
-
-        var config = bottomAccessoryCatConfig
-        config.startAnchor = .top
-        config.contentHeight = overlayHeight
-        config.diamondWidthRatio = 0.5
-        config.diamondHeightRatio = 0.54
-        config.centerYOffset = -0.08
-        config.speedScale = 0.5
-
-        let bottomAnchorNormalizedY = (floatingCatAnchor.y - overlayOrigin.y) / overlayHeight
-        let halfHeight = config.diamondHeightRatio / 2
-        let normalizedCenterY = max(
-            halfHeight + 0.02,
-            min(1 - halfHeight - 0.02, bottomAnchorNormalizedY - halfHeight)
-        )
-        config.normalizedCenterPoint = CGPoint(x: 0.5, y: normalizedCenterY)
-
-        return (config: config, size: overlaySize, center: overlayCenter, anchor: floatingCatAnchor)
-    }
-
-    @available(iOS 26.0, *)
-    private func diamondOrbitOverlay(
-        layout: (config: BottomAccessoryCatDiamondOrbitConfig, size: CGSize, center: CGPoint, anchor: CGPoint)
-    ) -> some View {
-        return BottomAccessoryCatDiamondOrbitView(
-            config: layout.config,
-            petName: bottomAccessoryPetId,
-            action: {
-                withAnimation {
-                    selectedTab = 3
-                }
-            }
-        )
-        .frame(width: layout.size.width, height: layout.size.height)
-        .allowsHitTesting(true)
-    }
-}
-
 // MARK: - 衣橱 Tab 内容
-@available(iOS 18.0, *)
 struct WardrobeTabContent: View {
     @Binding var homeTabSelection: HomeTab
     
@@ -507,7 +32,6 @@ struct WardrobeTabContent: View {
 }
 
 // MARK: - House Tab 内容
-@available(iOS 18.0, *)
 struct SmallWorldTabContent: View {
     @Binding var selectedTab: Int
     @Binding var homeTab: HomeTab
@@ -528,7 +52,6 @@ struct SmallWorldTabContent: View {
 }
 
 // MARK: - 我 Tab 内容
-@available(iOS 18.0, *)
 struct MeTabContent: View {
     var body: some View {
         NavigationStack {
@@ -539,7 +62,6 @@ struct MeTabContent: View {
 }
 
 // MARK: - 搜索容器视图
-@available(iOS 18.0, *)
 struct SearchContainerView: View {
     @Binding var searchText: String
     @Environment(\.modelContext) private var modelContext
@@ -636,7 +158,6 @@ struct SearchContainerView: View {
 }
 
 // MARK: - House容器视图
-@available(iOS 18.0, *)
 struct SmallWorldContainerView: View {
     @Binding var selectedTab: Int
     @Binding var homeTab: HomeTab
@@ -1530,57 +1051,27 @@ struct MainTabView: View {
     @State private var homeTabSelection: HomeTab = .wardrobe
     @State private var smallWorldDestination: SmallWorldDestination = .menu
     @State private var isPlayingOpeningAnimation = false
-    @ObservedObject private var petDataManager = PetDataManager.shared
-    @StateObject private var mediaStateManager = MediaStateManager.shared
-    @StateObject private var tabNavigationManager = TabNavigationManager.shared
 
     var body: some View {
-        Group {
-            if #available(iOS 26.0, *) {
-                // iOS 26 原生 TabBar 玻璃态会压低主题皮肤可读性；
-                // 主题皮肤页统一复用 iOS 18 的自定义底部栏结构。
-                LegacyTabView(
-                    selectedTab: $selectedTab,
-                    homeTabSelection: $homeTabSelection,
-                    smallWorldDestination: $smallWorldDestination,
-                    isPlayingOpeningAnimation: $isPlayingOpeningAnimation
-                )
-                .overlay {
-                    if isPlayingOpeningAnimation {
-                        OpeningVideoOverlay(
-                            isPlaying: $isPlayingOpeningAnimation,
-                            onComplete: {
-                                homeTabSelection = .wardrobe
-                                selectedTab = 0
-                            }
-                        )
+        LegacyTabView(
+            selectedTab: $selectedTab,
+            homeTabSelection: $homeTabSelection,
+            smallWorldDestination: $smallWorldDestination,
+            isPlayingOpeningAnimation: $isPlayingOpeningAnimation
+        )
+        .overlay {
+            if isPlayingOpeningAnimation {
+                OpeningVideoOverlay(
+                    isPlaying: $isPlayingOpeningAnimation,
+                    onComplete: {
+                        homeTabSelection = .wardrobe
+                        selectedTab = 0
                     }
-                }
-                .noticePopup()
-                .withMagicTaskCompletions()
-            } else {
-                // iOS 18-25 使用自定义红色背景底部导航栏
-                LegacyTabView(
-                    selectedTab: $selectedTab,
-                    homeTabSelection: $homeTabSelection,
-                    smallWorldDestination: $smallWorldDestination,
-                    isPlayingOpeningAnimation: $isPlayingOpeningAnimation
                 )
-                .overlay {
-                    if isPlayingOpeningAnimation {
-                        OpeningVideoOverlay(
-                            isPlaying: $isPlayingOpeningAnimation,
-                            onComplete: {
-                                homeTabSelection = .wardrobe
-                                selectedTab = 0
-                            }
-                        )
-                    }
-                }
-                .noticePopup()
-                .withMagicTaskCompletions()
             }
         }
+        .noticePopup()
+        .withMagicTaskCompletions()
         // 监听解锁后的跳转通知
         .onReceive(NotificationCenter.default.publisher(for: .navigateToSmallWorldDestination)) { notification in
             if let destination = notification.userInfo?["destination"] as? SmallWorldDestination {

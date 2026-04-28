@@ -9,28 +9,20 @@ struct ThemeSkinStoreView: View {
     @State private var alertMessage = ""
     @State private var showAlert = false
     @State private var showCoinStore = false
+    private let fallbackThemeBasePrice = 99
 
-    private let featuredThemeID = "theme_skin.girl_closet"
-    private let basePrice = 99
-
-    private var vipPrice: Int {
-        VIPManager.discountedPrice(basePrice, rate: VIPManager.themeSkinShopDiscountRate)
-    }
-
-    private var displayPrice: Int {
-        vipManager.isVIP ? vipPrice : basePrice
+    private var lowestVipPrice: Int {
+        themeSkinManager.products.map(\.vipPrice).min()
+            ?? VIPManager.discountedPrice(fallbackThemeBasePrice, rate: VIPManager.themeSkinShopDiscountRate)
     }
 
     private var currentBalance: Int {
         themeSkinManager.currentMeowCoinBalance
     }
 
-    private var isPurchased: Bool {
-        themeSkinManager.isPurchased(featuredThemeID)
-    }
-
-    private var isActive: Bool {
-        themeSkinManager.isActiveTheme(featuredThemeID)
+    private var activeProductName: String? {
+        guard let activeThemeId = themeSkinManager.activeThemeId else { return nil }
+        return themeSkinManager.product(for: activeThemeId)?.name
     }
 
     var body: some View {
@@ -137,66 +129,6 @@ struct ThemeSkinStoreView: View {
         }
     }
 
-    private var featuredThemeCard: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            ViewThatFits(in: .horizontal) {
-                featuredThemeHeader(isCompact: false)
-                featuredThemeHeader(isCompact: true)
-            }
-
-            themeHighlights
-
-            VStack(spacing: 10) {
-                Button {
-                    handlePurchase()
-                } label: {
-                    ThemeSkinActionLabel(
-                        title: isPurchased ? "已购买少女衣橱主题" : "购买主题",
-                        subtitle: isPurchased ? "主题组件已加入你的皮肤库" : "立即支付 \(displayPrice) 喵币，VIP 自动享 9 折",
-                        systemImage: isPurchased ? "checkmark.seal.fill" : "bag.fill"
-                    )
-                }
-                .buttonStyle(.plain)
-                .disabled(isPurchased)
-                .opacity(isPurchased ? 0.6 : 1)
-                .background(primaryActionBackground(disabled: isPurchased))
-                .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-
-                HStack(spacing: 10) {
-                    Button {
-                        handleActivationToggle()
-                    } label: {
-                        ThemeSkinMiniActionLabel(
-                            title: isActive ? "停用主题" : "应用主题",
-                            systemImage: isActive ? "power.circle.fill" : "wand.and.stars"
-                        )
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(!isPurchased)
-                    .frame(maxWidth: .infinity)
-                    .background(secondaryActionBackground(enabled: isPurchased))
-                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-                    .opacity(isPurchased ? 1 : 0.45)
-
-                    NavigationLink {
-                        ThemeSkinDetailView(themeId: featuredThemeID)
-                    } label: {
-                        ThemeSkinMiniActionLabel(
-                            title: "进入详情",
-                            systemImage: "arrow.right.circle.fill"
-                        )
-                    }
-                    .buttonStyle(.plain)
-                    .frame(maxWidth: .infinity)
-                    .background(detailActionBackground)
-                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-                }
-            }
-        }
-        .padding(18)
-        .background(cardShell(cornerRadius: 28))
-    }
-
     private var statusChipRow: some View {
         HStack(spacing: 10) {
             purchaseStateChip
@@ -218,17 +150,17 @@ struct ThemeSkinStoreView: View {
 
     private var purchaseStateChip: some View {
         ThemeSkinInfoChip(
-            title: isPurchased ? "已购" : "未购",
-            systemImage: isPurchased ? "checkmark.circle.fill" : "sparkles",
-            tint: isPurchased ? .green : themeManager.accentTextColor
+            title: "\(themeSkinManager.products.count) 个主题",
+            systemImage: "sparkles",
+            tint: themeManager.accentTextColor
         )
     }
 
     private var activeStateChip: some View {
         ThemeSkinInfoChip(
-            title: isActive ? "使用中" : "未启用",
-            systemImage: isActive ? "wand.and.stars.inverse" : "circle.dashed",
-            tint: isActive ? Color(hex: "FF6BA6") : themeManager.secondaryTextColor
+            title: activeProductName.map { "使用中：\($0)" } ?? "未启用",
+            systemImage: activeProductName == nil ? "circle.dashed" : "wand.and.stars.inverse",
+            tint: activeProductName == nil ? themeManager.secondaryTextColor : Color(hex: "FF6BA6")
         )
     }
 
@@ -238,72 +170,10 @@ struct ThemeSkinStoreView: View {
                 DiscountBadgeView(text: VIPManager.themeSkinDiscountText, style: .capsuleGlow, size: .small)
             } else {
                 ThemeSkinInfoChip(
-                    title: "VIP \(vipPrice)喵币",
+                    title: "VIP 最低 \(lowestVipPrice)喵币",
                     systemImage: "crown.fill",
                     tint: Color(hex: "FF8A5B")
                 )
-            }
-        }
-    }
-
-    private func featuredThemeHeader(isCompact: Bool) -> some View {
-        Group {
-            if isCompact {
-                VStack(alignment: .leading, spacing: 14) {
-                    themePreview
-                    featuredThemeHeaderText
-                }
-            } else {
-                HStack(alignment: .top, spacing: 14) {
-                    themePreview
-                    featuredThemeHeaderText
-                }
-            }
-        }
-    }
-
-    private var featuredThemeHeaderText: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .top) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("少女衣橱")
-                        .font(.system(size: 22, weight: .bold, design: .rounded))
-                        .foregroundStyle(themeManager.primaryTextColor)
-
-                    Text("奶白圆角壳、浅粉描边、贴纸感装饰，优先替换系统顶部栏、底部栏、搜索栏与核心卡片。")
-                        .font(.subheadline)
-                        .foregroundStyle(themeManager.secondaryTextColor)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-
-                Spacer(minLength: 10)
-
-                ThemeSkinStatusBadge(isPurchased: isPurchased, isActive: isActive)
-            }
-
-            HStack(alignment: .lastTextBaseline, spacing: 8) {
-                Text("\(displayPrice)")
-                    .font(.system(size: 30, weight: .heavy, design: .rounded))
-                    .foregroundStyle(themeManager.primaryTextColor)
-
-                Text("喵币")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(themeManager.secondaryTextColor)
-
-                Text("原价 \(basePrice)")
-                    .font(.footnote.weight(.medium))
-                    .foregroundStyle(themeManager.secondaryTextColor)
-                    .strikethrough()
-
-                Spacer(minLength: 0)
-
-                if vipManager.isVIP {
-                    DiscountBadgeView(
-                        text: VIPManager.themeSkinDiscountText,
-                        style: .capsuleGlow,
-                        size: .small
-                    )
-                }
             }
         }
     }
@@ -314,89 +184,12 @@ struct ThemeSkinStoreView: View {
                 .font(.headline)
                 .foregroundStyle(themeManager.primaryTextColor)
 
-            ThemeSkinBulletRow(text: "购买后只能启用“少女衣橱”主题内的组件，不会与其他主题皮肤混用。")
+            ThemeSkinBulletRow(text: "购买后只能启用同一主题包内的组件，不会与其他主题皮肤混用。")
             ThemeSkinBulletRow(text: "每个组件支持单独启用或停用，未启用时回退系统默认样式。")
             ThemeSkinBulletRow(text: "若喵币不足，可直接从右上角进入喵币商店补充。")
         }
         .padding(18)
         .background(cardShell(cornerRadius: 24))
-    }
-
-    private var themePreview: some View {
-        ThemeSkinOptionalFittedAsset(ThemeSkinAssetName.previewStoreHero) {
-            fallbackThemePreview
-        }
-        .frame(width: 112, height: 132)
-        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-    }
-
-    private var fallbackThemePreview: some View {
-        ZStack(alignment: .topLeading) {
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .fill(
-                    LinearGradient(
-                        colors: [
-                            Color(hex: "FFF7F4"),
-                            Color(hex: "FFE5EE"),
-                            Color(hex: "FFD7E5")
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
-                .frame(width: 112, height: 132)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 24, style: .continuous)
-                        .stroke(Color.white.opacity(0.85), lineWidth: 1.2)
-                )
-                .overlay(alignment: .bottomLeading) {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Capsule()
-                            .fill(Color.white.opacity(0.86))
-                            .frame(width: 56, height: 14)
-                        Capsule()
-                            .fill(Color(hex: "FF9BBC").opacity(0.28))
-                            .frame(width: 72, height: 16)
-                        Capsule()
-                            .fill(Color.white.opacity(0.76))
-                            .frame(width: 42, height: 12)
-                    }
-                    .padding(14)
-                }
-
-            Circle()
-                .fill(Color.white.opacity(0.92))
-                .frame(width: 30, height: 30)
-                .overlay(
-                    Image(systemName: "sparkles")
-                        .font(.system(size: 13, weight: .bold))
-                        .foregroundStyle(Color(hex: "FF8AAF"))
-                )
-                .offset(x: -8, y: -8)
-        }
-    }
-
-    private var themeHighlights: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("主题组件")
-                .font(.subheadline.weight(.bold))
-                .foregroundStyle(themeManager.primaryTextColor)
-
-            LazyVGrid(
-                columns: [
-                    GridItem(.adaptive(minimum: 72), spacing: 8, alignment: .leading)
-                ],
-                alignment: .leading,
-                spacing: 8
-            ) {
-                ThemeSkinSlotTag(title: "顶部栏")
-                ThemeSkinSlotTag(title: "底部栏")
-                ThemeSkinSlotTag(title: "搜索栏")
-                ThemeSkinSlotTag(title: "统计卡")
-                ThemeSkinSlotTag(title: "商品卡")
-                ThemeSkinSlotTag(title: "设置卡")
-            }
-        }
     }
 
     private var storeBackground: some View {
@@ -430,55 +223,6 @@ struct ThemeSkinStoreView: View {
                     )
             )
             .shadow(color: themeManager.cardTintColor.opacity(0.10), radius: 20, x: 0, y: 10)
-    }
-
-    private func primaryActionBackground(disabled: Bool) -> some View {
-        LinearGradient(
-            colors: disabled
-                ? [Color.gray.opacity(0.28), Color.gray.opacity(0.18)]
-                : [Color(hex: "FFB7CF"), Color(hex: "FFC7AB")],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
-    }
-
-    private func secondaryActionBackground(enabled: Bool) -> some View {
-        RoundedRectangle(cornerRadius: 16, style: .continuous)
-            .fill(enabled ? themeManager.cardTintColor.opacity(0.18) : Color.gray.opacity(0.12))
-            .overlay(
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .stroke(themeManager.cardTintColor.opacity(enabled ? 0.32 : 0.12), lineWidth: 1)
-            )
-    }
-
-    private var detailActionBackground: some View {
-        RoundedRectangle(cornerRadius: 16, style: .continuous)
-            .fill(Color.white.opacity(0.72))
-            .overlay(
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .stroke(Color.white.opacity(0.9), lineWidth: 1)
-            )
-    }
-
-    private func handlePurchase() {
-        guard !isPurchased else { return }
-
-        if currentBalance < displayPrice {
-            showCoinStore = true
-            return
-        }
-
-        let result = themeSkinManager.purchaseTheme(featuredThemeID, autoActivateIfNeeded: true)
-        present(result)
-    }
-
-    private func handleActivationToggle() {
-        guard isPurchased else { return }
-
-        let result = isActive
-            ? themeSkinManager.deactivateCurrentTheme()
-            : themeSkinManager.activateTheme(featuredThemeID)
-        present(result)
     }
 
     private func present(_ result: ThemeSkinActionResult) {

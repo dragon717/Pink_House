@@ -56,6 +56,43 @@ struct WheelMenuItem: Identifiable {
     let color: Color
 }
 
+struct WheelThemePalette {
+    let primary: Color
+    let secondary: Color
+    let glow: Color
+
+    static let monica = WheelThemePalette(
+        primary: Color(red: 1.0, green: 0.41, blue: 0.71),
+        secondary: Color(red: 0.85, green: 0.75, blue: 0.85),
+        glow: Color(red: 1.0, green: 0.41, blue: 0.71).opacity(0.5)
+    )
+
+    init(primary: Color, secondary: Color, glow: Color) {
+        self.primary = primary
+        self.secondary = secondary
+        self.glow = glow
+    }
+
+    init(namespace: String?) {
+        switch namespace {
+        case "sky_concert":
+            self.init(
+                primary: Color(hex: "A9D8F6"),
+                secondary: Color(hex: "E5C57C"),
+                glow: Color(hex: "94CBEA").opacity(0.42)
+            )
+        case "swan_dream":
+            self.init(
+                primary: Color(hex: "D8A4B4"),
+                secondary: Color(hex: "DBC7F2"),
+                glow: Color(hex: "CBA6D8").opacity(0.42)
+            )
+        default:
+            self = .monica
+        }
+    }
+}
+
 struct SmallWorldMenuOverlay: View {
     @Binding var selectedTab: Int
     @Binding var smallWorldDestination: SmallWorldDestination
@@ -84,6 +121,7 @@ struct SmallWorldMenuOverlay: View {
     @ObservedObject private var petDataManager = PetDataManager.shared
     @ObservedObject private var tabNavigationManager = TabNavigationManager.shared
     @ObservedObject private var guideManager = AppFirstLaunchGuideManager.shared
+    @ObservedObject private var themeSkinManager = ThemeSkinManager.shared
 
     private let isLowMemoryDevice: Bool = {
         return ProcessInfo.processInfo.physicalMemory < 4 * 1024 * 1024 * 1024
@@ -98,17 +136,13 @@ struct SmallWorldMenuOverlay: View {
     }
 
     private var menuExpansionDirection: WheelExpansionDirection {
-        if isIPad {
-            if #available(iOS 26.0, *) {
-                return .downward
-            }
-            return .upward
-        }
-        return .upward
+        .upward
     }
 
-    // 莫妮卡粉色
-    private let monicaPink = Color(red: 1.0, green: 0.41, blue: 0.71)
+    private var wheelThemePalette: WheelThemePalette {
+        let namespace = themeSkinManager.activeThemeId.flatMap { themeSkinManager.product(for: $0)?.assetNamespace }
+        return WheelThemePalette(namespace: namespace)
+    }
 
     // 常用菜单设置管理器
     @ObservedObject private var favoriteMenuManager = FavoriteMenuSettingsManager.shared
@@ -199,7 +233,7 @@ struct SmallWorldMenuOverlay: View {
                     items: menuItems,
                     radius: getMenuRadius(geometry: geometry),
                     isLowMemoryDevice: isLowMemoryDevice,
-                    monicaPink: monicaPink,
+                    palette: wheelThemePalette,
                     direction: menuExpansionDirection,
                     expansionProgress: menuExpansionProgress,
                     onItemSelected: { item in
@@ -221,8 +255,8 @@ struct SmallWorldMenuOverlay: View {
                         .stroke(
                             LinearGradient(
                                 colors: [
-                                    monicaPink,
-                                    Color(red: 0.85, green: 0.75, blue: 0.85)
+                                    wheelThemePalette.primary,
+                                    wheelThemePalette.secondary
                                 ],
                                 startPoint: .top,
                                 endPoint: .bottom
@@ -231,7 +265,7 @@ struct SmallWorldMenuOverlay: View {
                         )
                         .rotationEffect(.degrees(-90))
                         .frame(width: 60, height: 60)
-                        .shadow(color: monicaPink.opacity(0.5), radius: 5)
+                        .shadow(color: wheelThemePalette.glow, radius: 5)
                 }
                 .position(x: smallWorldTabCenterX, y: smallWorldTabCenterY)
             }
@@ -305,38 +339,25 @@ struct SmallWorldMenuOverlay: View {
         )
     }
 
-    /// iOS 26 的 Liquid Glass tab bar 不居中，需要根据设备类型计算合理的 fallback
+    /// LegacyTabView 自绘底栏几何 fallback：全宽减横向留白，House tab = index 1。
     static func buildFallbackFrame(
         screenSize: CGSize,
         safeAreaTop: CGFloat,
         safeAreaBottom: CGFloat,
         isIPad: Bool
     ) -> CGRect {
-        if isIPad {
-            // iPadOS 26: 顶部 floating pill，居中，高度约 50
-            let pillHeight: CGFloat = 50
-            let pillY = safeAreaTop + 4
-            // iPad 的 floating pill 大约占屏幕宽度的 40%，居中
-            let pillWidth = screenSize.width * 0.4
-            let pillX = (screenSize.width - pillWidth) / 2
-            let tabCount = CGFloat(TabBarItemAnchorResolver.mainTabCount)
-            let segmentWidth = pillWidth / tabCount
-            // House tab = index 1
-            let tabX = pillX + segmentWidth * 1
-            return CGRect(x: tabX, y: pillY, width: segmentWidth, height: pillHeight)
-        } else {
-            // iOS 26 iPhone: Liquid Glass tab bar 底部，platter 偏左（search 分离在右侧）
-            // 从日志：platter 约从 x=screenWidth*0.05 开始，宽约 screenWidth*0.74
-            let tabBarHeight: CGFloat = 62
-            let tabBarY = screenSize.height - tabBarHeight - safeAreaBottom
-            let platterX = screenSize.width * 0.05
-            let platterWidth = screenSize.width * 0.74
-            let tabCount = CGFloat(TabBarItemAnchorResolver.mainTabCount)
-            let segmentWidth = platterWidth / tabCount
-            // House tab = index 1
-            let tabX = platterX + segmentWidth * 1
-            return CGRect(x: tabX, y: tabBarY, width: segmentWidth, height: tabBarHeight)
-        }
+        _ = safeAreaTop
+        _ = isIPad
+
+        let tabBarHeight: CGFloat = 56
+        let horizontalPadding: CGFloat = 16
+        let bottomPadding: CGFloat = safeAreaBottom > 0 ? 2 : 4
+        let tabBarY = screenSize.height - tabBarHeight - max(safeAreaBottom, 0) - bottomPadding
+        let tabBarWidth = screenSize.width - horizontalPadding * 2
+        let tabCount = CGFloat(TabBarItemAnchorResolver.mainTabCount)
+        let segmentWidth = tabBarWidth / tabCount
+        let tabX = horizontalPadding + segmentWidth * 1
+        return CGRect(x: tabX, y: tabBarY, width: segmentWidth, height: tabBarHeight)
     }
 
     // MARK: - 单层轮盘菜单
@@ -344,7 +365,7 @@ struct SmallWorldMenuOverlay: View {
         let items: [WheelMenuItem]
         let radius: CGFloat
         let isLowMemoryDevice: Bool
-        let monicaPink: Color
+        let palette: WheelThemePalette
         let direction: WheelExpansionDirection
         let expansionProgress: CGFloat
         let onItemSelected: (WheelMenuItem) -> Void
@@ -378,7 +399,7 @@ struct SmallWorldMenuOverlay: View {
                     radius: radius + 40,
                     startAngle: WheelConfig.backgroundStartAngle(for: direction),
                     endAngle: WheelConfig.backgroundEndAngle(for: direction),
-                    monicaPink: monicaPink
+                    palette: palette
                 )
                 .scaleEffect(0.88 + 0.12 * expansionProgress)
                 .opacity(0.35 + 0.65 * expansionProgress)
@@ -485,16 +506,24 @@ struct SmallWorldMenuOverlay: View {
         let radius: CGFloat
         let startAngle: Double
         let endAngle: Double
-        let monicaPink: Color
+        let palette: WheelThemePalette
 
         var body: some View {
-            // 淡淡的莫妮卡粉背景扇形
             SectorShape(
                 radius: radius,
                 startAngle: .degrees(startAngle),
                 endAngle: .degrees(endAngle)
             )
-            .fill(monicaPink.opacity(0.08))
+            .fill(
+                LinearGradient(
+                    colors: [
+                        palette.primary.opacity(0.10),
+                        palette.secondary.opacity(0.07)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            )
         }
     }
 

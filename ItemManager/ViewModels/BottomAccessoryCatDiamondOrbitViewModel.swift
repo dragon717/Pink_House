@@ -1,7 +1,7 @@
 import SwiftUI
 import Combine
 
-@available(iOS 26.0, *)
+@available(*, deprecated, message: "旧原生底栏已退役；下个 cycle 评估归并到 PetOverlayView")
 final class BottomAccessoryCatDiamondOrbitViewModel: ObservableObject {
     @Published var currentPosition: CGPoint = CGPoint(x: 0.5, y: 0.5)
     @Published var currentMotionVideoName: String

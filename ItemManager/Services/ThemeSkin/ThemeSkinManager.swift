@@ -5,7 +5,6 @@ final class ThemeSkinManager: ObservableObject, ThemeSkinProviding {
     static let shared = ThemeSkinManager()
 
     @Published private(set) var products: [ThemeSkinProduct] = [
-        ThemeSkinProduct.girlCloset,
         ThemeSkinProduct.skyConcert,
         ThemeSkinProduct.swanDream
     ]

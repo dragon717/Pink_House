@@ -1,7 +1,7 @@
 import SwiftUI
 import Combine
 
-@available(iOS 26.0, *)
+@available(*, deprecated, message: "旧原生底栏已退役；下个 cycle 评估归并到 PetOverlayView")
 struct BottomAccessoryCatDiamondOrbitView: View {
     let config: BottomAccessoryCatDiamondOrbitConfig
     let petName: String

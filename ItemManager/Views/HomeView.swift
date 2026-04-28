@@ -553,7 +553,7 @@ struct HomeView: View {
         } label: {
             HomeThemeSkinToolbarIconShell(descriptor: themedTopBarButtonDescriptor) {
                 Image(systemName: "checkmark.circle.fill")
-                    .font(.system(size: 18))
+                    .font(.system(size: 15))
                     .foregroundStyle(magicPalette.accent)
             }
         }
@@ -569,11 +569,11 @@ struct HomeView: View {
             HomeThemeSkinToolbarIconShell(descriptor: themedTopBarButtonDescriptor) {
                 if #available(iOS 26.0, *) {
                     Image(systemName: "list.number.badge.ellipsis")
-                        .font(.system(size: 18))
+                        .font(.system(size: 15))
                         .foregroundStyle(magicPalette.accent)
                 } else {
                     Image(systemName: "checkmark.circle")
-                        .font(.system(size: 18))
+                        .font(.system(size: 15))
                         .foregroundStyle(magicPalette.accent)
                 }
             }
@@ -587,18 +587,18 @@ struct HomeView: View {
             HomeThemeSkinToolbarIconShell(descriptor: themedTopBarButtonDescriptor) {
                 ZStack {
                     Image(systemName: unreadNotificationCount > 0 ? "bell.badge" : "bell")
-                        .font(.system(size: 14))
+                        .font(.system(size: 12))
                         .foregroundStyle(magicPalette.navigationForeground)
 
                     if unreadNotificationCount > 0 {
                         Text("\(min(unreadNotificationCount, 99))")
-                            .font(.system(size: 8, weight: .bold))
+                            .font(.system(size: 7, weight: .bold))
                             .foregroundColor(.white)
                             .padding(.horizontal, 3)
                             .padding(.vertical, 1)
                             .background(magicPalette.cardAccent)
                             .clipShape(Capsule())
-                            .offset(x: 8, y: -6)
+                            .offset(x: 6, y: -5)
                     }
                 }
             }
@@ -642,7 +642,7 @@ struct HomeView: View {
         } label: {
             HomeThemeSkinToolbarIconShell(descriptor: themedTopBarButtonDescriptor) {
                 Image(systemName: "arrow.up.arrow.down")
-                    .font(.system(size: 14))
+                    .font(.system(size: 12))
                     .foregroundStyle(magicPalette.navigationForeground)
             }
         }
@@ -684,7 +684,7 @@ struct HomeView: View {
     private var filterButtonLabel: some View {
         HomeThemeSkinToolbarIconShell(descriptor: themedTopBarButtonDescriptor) {
             Image(systemName: "line.3.horizontal.decrease.circle")
-                .font(.system(size: 14))
+                .font(.system(size: 12))
                 .foregroundStyle(magicPalette.navigationForeground)
                 .symbolVariant(selectedTagIDs.isEmpty && selectedBrandIDs.isEmpty && selectedTypes.isEmpty && selectedColors.isEmpty && selectedSizes.isEmpty && selectedLengths.isEmpty && selectedConditions.isEmpty && selectedAccessories.isEmpty ? .none : .fill)
         }
@@ -1136,7 +1136,7 @@ struct HomeView: View {
         } label: {
             HomeThemeSkinToolbarIconShell(descriptor: themedTopBarButtonDescriptor) {
                 Image(systemName: selectedTab == .wardrobe ? viewLayout.icon : depositDisplayMode.icon)
-                    .font(.system(size: 14))
+                    .font(.system(size: 12))
                     .foregroundStyle(magicPalette.navigationForeground)
             }
         }
@@ -1159,7 +1159,7 @@ struct HomeView: View {
     private var moreMenuIcon: some View {
         HomeThemeSkinToolbarIconShell(descriptor: themedTopBarButtonDescriptor) {
             Image(systemName: "ellipsis.circle")
-                .font(.system(size: 14))
+                .font(.system(size: 12))
                 .foregroundStyle(magicPalette.navigationForeground)
                 .captureGuideToolbarIconTarget(.wardrobeMoreMenuButton)
         }
@@ -1413,7 +1413,7 @@ struct HomeView: View {
     private var addButtonIcon: some View {
         HomeThemeSkinToolbarIconShell(descriptor: themedTopBarAddButtonDescriptor) {
             Image(systemName: "plus")
-                .font(.system(size: 14))
+                .font(.system(size: 12))
                 .foregroundStyle(magicPalette.navigationForeground)
                 .captureGuideToolbarIconTarget(.wardrobeAddButton)
         }

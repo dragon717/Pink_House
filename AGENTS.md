@@ -19,10 +19,10 @@
 ```
 temp/_harness/
 ├── README.md          # 入口与流程图
-├── MANIFEST.yaml      # 三主题元数据 + 通用 imageset 清单 + 验收基准
+├── MANIFEST.yaml      # 两主题元数据 + 通用 imageset 清单 + 验收基准
 ├── EXEC_PLAN.md       # 通用执行（按 ${THEME_*} 变量替换）
 ├── ACCEPT_PLAN.md     # 通用验收（A–O 15 验收点）
-└── ASSETS_SPEC.md     # 双 pipeline（JPG 抠贴纸 / PSD 导图层）
+└── ASSETS_SPEC.md     # PSD 导图层 pipeline
 ```
 
 每主题自己的产物：
@@ -38,15 +38,13 @@ temp/<theme-dir>/_artifacts/
 
 | THEME_ID | 目录 | 设计稿 | source_type | 状态 |
 |---|---|---|---|---|
-| `theme_skin.girl_closet` | `temp/主题-旋转木马/` | 主题参考图.jpg + 少女衣橱.png | jpg | manifest ✅ / 代码 ✅ / 素材 dry-run ✅ / 验收待重跑 |
 | `theme_skin.sky_concert` | `temp/主题1/` | 天空音乐会.psd（2480×3319） | psd | manifest ✅ / 代码 ✅ / 素材 dry-run ✅ / 验收待跑 |
 | `theme_skin.swan_dream` | `temp/主题2/` | 天鹅入梦.psd（4000×4000） | psd | manifest ✅ / 代码 ✅ / 素材 dry-run ✅ / 验收待跑 |
 
 ### 复刻顺序
 
-1. 旋转木马（首批，验证整套流程）
-2. 主题1 天空音乐会
-3. 主题2 天鹅入梦
+1. 主题1 天空音乐会
+2. 主题2 天鹅入梦
 
 ### 跑 harness 的方式
 
@@ -54,7 +52,7 @@ temp/<theme-dir>/_artifacts/
 
 ```bash
 PROJ="/Users/muniao/Library/Mobile Documents/com~apple~CloudDocs/游戏/github/Pink_House"
-THEME_ID="theme_skin.girl_closet"   # 或 sky_concert / swan_dream
+THEME_ID="theme_skin.sky_concert"   # 或 theme_skin.swan_dream
 ```
 
 Codex prompt 顶端写 `THEME_ID = <value>`，整份 `EXEC_PLAN.md` 喂下去；Codex 自己用 `yq` / `pyyaml` 从 `MANIFEST.yaml` 解析 `${...}` 变量。验收同理喂 `ACCEPT_PLAN.md`。
@@ -72,7 +70,7 @@ Codex prompt 顶端写 `THEME_ID = <value>`，整份 `EXEC_PLAN.md` 喂下去；
 
 - `ThemeSkinSlot.rawValue` 不改（`enabledSlots` 持久化兼容）
 - `ThemeSkinManager` 存档 key 不改（`theme_skin.owned` / `theme_skin.active_selection`）
-- `ThemeSkinProduct.girlCloset` 字段不改（首批已上线，向后兼容）
+- 旧下线主题商品静态定义不改（历史归档兼容），但不要重新注册到商店列表
 - 素材必须进 `Assets.xcassets/ThemeSkin/<namespace>/`，不走 Bundle 文件路径
 - 三件套 Components（Home/TabBar/Wardrobe）的程序化绘制兜底**保留**，图缺失也得能跑
 - 主题未启用时，禁止任何主题装饰泄漏到默认皮肤

@@ -1,10 +1,7 @@
 import SwiftUI
-#if canImport(UIKit)
-import UIKit
-#endif
 
 private enum HomeThemeSkinTokens {
-    static let supportedNamespaces: Set<String> = ["girl_closet", "sky_concert", "swan_dream"]
+    static let supportedNamespaces: Set<String> = ["sky_concert", "swan_dream"]
 
     static let creamTop = Color(red: 1.0, green: 0.977, blue: 0.965)
     static let creamBottom = Color(red: 1.0, green: 0.938, blue: 0.95)
@@ -46,22 +43,22 @@ enum HomeThemeSkinChromeStyle {
     var cornerRadius: CGFloat {
         switch self {
         case .group:
-            return 19
+            return 16
         case .segment:
-            return 21
+            return 17
         case .searchEntry:
-            return 15
+            return 13
         }
     }
 
     var shadowRadius: CGFloat {
         switch self {
         case .group:
-            return 11
+            return 7
         case .segment:
-            return 10
+            return 6
         case .searchEntry:
-            return 8
+            return 5
         }
     }
 }
@@ -82,8 +79,8 @@ struct HomeThemeSkinToolbarShell<Content: View>: View {
     init(
         descriptor: ThemeSkinDescriptor?,
         style: HomeThemeSkinChromeStyle = .group,
-        horizontalPadding: CGFloat = 12,
-        verticalPadding: CGFloat = 8,
+        horizontalPadding: CGFloat = 8,
+        verticalPadding: CGFloat = 5,
         @ViewBuilder content: () -> Content
     ) {
         self.descriptor = descriptor
@@ -110,22 +107,12 @@ struct HomeThemeSkinToolbarShell<Content: View>: View {
         descriptor?.usesThemeSkinChrome == true
     }
 
-    private var shouldUseCompactChrome: Bool {
-        guard isActive else { return false }
-        #if canImport(UIKit)
-        if #available(iOS 26.0, *) {
-            return UIDevice.current.userInterfaceIdiom == .phone
-        }
-        #endif
-        return false
-    }
-
     private var effectiveHorizontalPadding: CGFloat {
-        shouldUseCompactChrome ? min(horizontalPadding, 6) : horizontalPadding
+        horizontalPadding
     }
 
     private var effectiveVerticalPadding: CGFloat {
-        shouldUseCompactChrome ? min(verticalPadding, 4) : verticalPadding
+        verticalPadding
     }
 }
 
@@ -137,8 +124,8 @@ struct HomeThemeSkinToolbarIconShell<Content: View>: View {
 
     init(
         descriptor: ThemeSkinDescriptor?,
-        minWidth: CGFloat = 30,
-        minHeight: CGFloat = 30,
+        minWidth: CGFloat = 24,
+        minHeight: CGFloat = 24,
         @ViewBuilder content: () -> Content
     ) {
         self.descriptor = descriptor
@@ -186,7 +173,7 @@ struct HomeThemeSkinToolbarIconShell<Content: View>: View {
                             }
                     }
                 }
-                .shadow(color: HomeThemeSkinTokens.shadow(for: descriptor).opacity(0.16), radius: 8, x: 0, y: 4)
+                .shadow(color: HomeThemeSkinTokens.shadow(for: descriptor).opacity(0.16), radius: HomeThemeSkinChromeStyle.group.shadowRadius, x: 0, y: 4)
         } else {
             content
         }
@@ -196,30 +183,20 @@ struct HomeThemeSkinToolbarIconShell<Content: View>: View {
         descriptor?.usesThemeSkinChrome == true
     }
 
-    private var shouldUseCompactChrome: Bool {
-        guard isActive else { return false }
-        #if canImport(UIKit)
-        if #available(iOS 26.0, *) {
-            return UIDevice.current.userInterfaceIdiom == .phone
-        }
-        #endif
-        return false
-    }
-
     private var effectiveMinWidth: CGFloat {
-        shouldUseCompactChrome ? min(minWidth, 24) : minWidth
+        minWidth
     }
 
     private var effectiveMinHeight: CGFloat {
-        shouldUseCompactChrome ? min(minHeight, 24) : minHeight
+        minHeight
     }
 
     private var effectivePadding: CGFloat {
-        shouldUseCompactChrome ? 4 : 6
+        3
     }
 
     private var effectiveIconSize: CGFloat {
-        shouldUseCompactChrome ? 13 : 14
+        12
     }
 }
 
@@ -318,30 +295,30 @@ private struct HomeThemeSkinChromeBackground: View {
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     ),
-                    lineWidth: 1.1
+                    lineWidth: 0.9
                 )
 
             RoundedRectangle(cornerRadius: style.cornerRadius - 3, style: .continuous)
-                .stroke(HomeThemeSkinTokens.softAccent(for: descriptor).opacity(0.45), lineWidth: 0.6)
+                .stroke(HomeThemeSkinTokens.softAccent(for: descriptor).opacity(0.45), lineWidth: 0.5)
                 .padding(3)
 
             Circle()
                 .fill(HomeThemeSkinTokens.softAccent(for: descriptor).opacity(0.95))
-                .frame(width: 8, height: 8)
+                .frame(width: 6, height: 6)
                 .overlay {
                     Circle()
                         .stroke(.white.opacity(0.8), lineWidth: 1)
                 }
-                .offset(x: -26, y: -11)
+                .offset(x: -20, y: -11)
 
             Circle()
                 .fill(HomeThemeSkinTokens.creamTop(for: descriptor).opacity(0.98))
-                .frame(width: 7, height: 7)
+                .frame(width: 5, height: 5)
                 .overlay {
                     Circle()
                         .stroke(HomeThemeSkinTokens.border(for: descriptor).opacity(0.65), lineWidth: 1)
                 }
-                .offset(x: 28, y: 12)
+                .offset(x: 22, y: 12)
         }
     }
 }

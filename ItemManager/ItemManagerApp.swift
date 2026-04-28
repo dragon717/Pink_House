@@ -19,19 +19,6 @@ class AppDelegate: NSObject, UIApplicationDelegate {
     }
     
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
-        // iOS 26+ 设置 TabBar 全局样式
-        if #available(iOS 26.0, *) {
-            let appearance = UITabBarAppearance()
-            appearance.configureWithTransparentBackground()
-
-            // 设置未选中项的颜色（黑色，适配暗黑模式）
-            appearance.stackedLayoutAppearance.normal.iconColor = UIColor.label
-            appearance.stackedLayoutAppearance.normal.titleTextAttributes = [.foregroundColor: UIColor.label]
-
-            UITabBar.appearance().standardAppearance = appearance
-            UITabBar.appearance().scrollEdgeAppearance = appearance
-        }
-
         // 注册裙装股市后台任务
         registerSkirtMarketBackgroundTask()
         
