@@ -40,10 +40,6 @@ struct WardrobeThemeStatsCardContainer<Content: View>: View {
         WardrobeThemeSkinSupport.isThemeSkinDescriptor(descriptor)
     }
 
-    private var descriptorTitle: String {
-        SkyConcertThemeSkin.title(for: descriptor)
-    }
-
     var body: some View {
         Group {
             if isGirlClosetEnabled {
@@ -65,23 +61,10 @@ struct WardrobeThemeStatsCardContainer<Content: View>: View {
 
     private var themedContent: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 6) {
-                Image(systemName: "sparkles")
-                    .font(.system(size: 10, weight: .bold))
-                Text(descriptorTitle)
-                    .font(.system(size: 12, weight: .semibold, design: .rounded))
-                    .tracking(0.4)
-            }
-            .foregroundStyle(SkyConcertThemeSkin.labelColor(for: descriptor))
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
-            .background(statsHeaderBackground)
-
             content
         }
         .padding(.horizontal, 16)
-        .padding(.top, 14)
-        .padding(.bottom, 12)
+        .padding(.vertical, 14)
         .background {
             ThemeSkinOptionalResizableAsset(
                 ThemeSkinAssetName.cardStatsDefault,
@@ -126,24 +109,6 @@ struct WardrobeThemeStatsCardContainer<Content: View>: View {
             }
         }
         .shadow(color: SkyConcertThemeSkin.shadowColor(for: descriptor), radius: 12, x: 0, y: 6)
-    }
-
-    private var statsHeaderBackground: some View {
-        Capsule()
-            .fill(
-                LinearGradient(
-                        colors: [
-                            Color.white.opacity(0.96),
-                            SkyConcertThemeSkin.accentSoft(for: descriptor).opacity(0.96)
-                        ],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-            )
-            .overlay(
-                Capsule()
-                    .stroke(SkyConcertThemeSkin.shellStroke(for: descriptor).opacity(0.95), lineWidth: 1)
-            )
     }
 }
 

@@ -82,9 +82,24 @@ struct WardrobeFashionTabSwitcher: View {
 
     @Binding var selectedTab: HomeTab
     let monthIndicator: WardrobeMonthIndicator?
+    let themeSkinDescriptor: ThemeSkinDescriptor?
+
+    init(
+        selectedTab: Binding<HomeTab>,
+        monthIndicator: WardrobeMonthIndicator?,
+        themeSkinDescriptor: ThemeSkinDescriptor? = nil
+    ) {
+        self._selectedTab = selectedTab
+        self.monthIndicator = monthIndicator
+        self.themeSkinDescriptor = themeSkinDescriptor
+    }
 
     private var palette: MagicThemePalette {
         MagicThemeDesignSystem.palette(themeManager: themeManager, colorScheme: colorScheme)
+    }
+
+    private var isThemeSkinActive: Bool {
+        WardrobeThemeSkinSupport.isThemeSkinDescriptor(themeSkinDescriptor)
     }
     
     var body: some View {
@@ -105,14 +120,22 @@ struct WardrobeFashionTabSwitcher: View {
         }
         .padding(.horizontal, 2)
         .padding(.vertical, 2)
-        .background(
-            Capsule()
-                .fill(palette.segmentedBackground)
-        )
+        .background(fashionSwitcherBackground)
         // 修复：减小固定高度，使导航栏更紧凑
         .frame(height: 32)
         // 修复：确保在 principal 位置居中显示
         .frame(maxWidth: .infinity, alignment: .center)
+    }
+
+    @ViewBuilder
+    private var fashionSwitcherBackground: some View {
+        if isThemeSkinActive {
+            Capsule()
+                .fill(Color.clear)
+        } else {
+            Capsule()
+                .fill(palette.segmentedBackground)
+        }
     }
 
     @ViewBuilder
@@ -135,15 +158,51 @@ struct WardrobeFashionTabSwitcher: View {
                 Text(title)
                     .font(.system(size: 8, weight: isSelected ? .semibold : .medium))
             }
-            .foregroundStyle(isSelected ? activeColor : .secondary)
+            .foregroundStyle(tabForeground(isSelected: isSelected, fallbackActiveColor: activeColor))
             .padding(.horizontal, 8)
             .padding(.vertical, 3)
-            .background(
-                Capsule()
-                    .fill(isSelected ? palette.segmentedSelectedBackground : Color.clear)
-                    .shadow(color: isSelected ? Color.black.opacity(0.08) : Color.clear, radius: 1, x: 0, y: 1)
-            )
+            .background {
+                tabSelectionBackground(isSelected: isSelected)
+            }
         }
         .buttonStyle(.plain)
+    }
+
+    private func tabForeground(isSelected: Bool, fallbackActiveColor: Color) -> Color {
+        guard isThemeSkinActive else {
+            return isSelected ? fallbackActiveColor : .secondary
+        }
+
+        return isSelected
+            ? SkyConcertThemeSkin.accent(for: themeSkinDescriptor)
+            : SkyConcertThemeSkin.labelColor(for: themeSkinDescriptor).opacity(0.68)
+    }
+
+    @ViewBuilder
+    private func tabSelectionBackground(isSelected: Bool) -> some View {
+        if isThemeSkinActive && isSelected {
+            Capsule()
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            SkyConcertThemeSkin.shellFillTop(for: themeSkinDescriptor).opacity(0.98),
+                            SkyConcertThemeSkin.accentSoft(for: themeSkinDescriptor).opacity(0.72)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .overlay {
+                    Capsule()
+                        .stroke(SkyConcertThemeSkin.shellStroke(for: themeSkinDescriptor).opacity(0.72), lineWidth: 0.8)
+                }
+                .shadow(color: SkyConcertThemeSkin.shadowColor(for: themeSkinDescriptor).opacity(0.22), radius: 3, x: 0, y: 1)
+        } else if isSelected {
+            Capsule()
+                .fill(palette.segmentedSelectedBackground)
+                .shadow(color: Color.black.opacity(0.08), radius: 1, x: 0, y: 1)
+        } else {
+            Color.clear
+        }
     }
 }

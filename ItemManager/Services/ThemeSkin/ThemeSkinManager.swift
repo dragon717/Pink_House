@@ -14,6 +14,7 @@ final class ThemeSkinManager: ObservableObject, ThemeSkinProviding {
     private let ownedKey = "theme_skin.owned"
     private let activeSelectionKey = "theme_skin.active_selection"
     private let coreSurfaceMigrationKeyPrefix = "theme_skin.core_surface_defaults_migrated_v1"
+    private let topNavigationMigrationKeyPrefix = "theme_skin.top_navigation_defaults_migrated_v1"
 
     private init() {
         reloadFromDisk(applyBackgroundHarmony: false)
@@ -42,6 +43,7 @@ final class ThemeSkinManager: ObservableObject, ThemeSkinProviding {
         }
 
         migrateCoreSurfaceDefaultsIfNeeded(defaults: defaults)
+        migrateTopNavigationDefaultsIfNeeded(defaults: defaults)
 
         if applyBackgroundHarmony {
             _ = ThemeManager.shared.enforceThemeSkinBackgroundHarmonyIfNeeded(activeThemeId: activeSelection.activeThemeId)
@@ -245,6 +247,31 @@ final class ThemeSkinManager: ObservableObject, ThemeSkinProviding {
             .emptyState
         ]
         let slotsToEnable = newCoreSlots.filter { product.supportedSlots.contains($0) }
+
+        if !slotsToEnable.isEmpty {
+            activeSelection.enabledSlots.formUnion(slotsToEnable)
+            activeSelection = sanitize(selection: activeSelection)
+            saveActiveSelection()
+        }
+
+        defaults.set(true, forKey: migrationKey)
+    }
+
+    private func migrateTopNavigationDefaultsIfNeeded(defaults: UserDefaults) {
+        guard let activeThemeId = activeSelection.activeThemeId,
+              let product = product(for: activeThemeId),
+              isPurchased(activeThemeId) else {
+            return
+        }
+
+        let migrationKey = "\(topNavigationMigrationKeyPrefix).\(product.themeId)"
+        guard !defaults.bool(forKey: migrationKey) else { return }
+
+        let navigationSlots: Set<ThemeSkinSlot> = [
+            .topBarSegment,
+            .topBarAddButton
+        ]
+        let slotsToEnable = navigationSlots.filter { product.supportedSlots.contains($0) }
 
         if !slotsToEnable.isEmpty {
             activeSelection.enabledSlots.formUnion(slotsToEnable)

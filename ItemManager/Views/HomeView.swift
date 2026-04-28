@@ -428,7 +428,12 @@ struct HomeView: View {
                     Text("少女衣橱")
                         .font(.system(size: 10, weight: selectedTab == .wardrobe ? .bold : .medium))
                 }
-                .foregroundStyle(selectedTab == .wardrobe ? magicPalette.accent : magicPalette.secondaryText)
+                .foregroundStyle(classicNavigationTabForeground(isSelected: selectedTab == .wardrobe, fallbackActiveColor: magicPalette.accent))
+                .padding(.horizontal, themedTopBarSegmentDescriptor == nil ? 0 : 8)
+                .padding(.vertical, themedTopBarSegmentDescriptor == nil ? 0 : 4)
+                .background {
+                    classicNavigationTabSelectionBackground(isSelected: selectedTab == .wardrobe)
+                }
                 .frame(height: 44) // Ensure touch target meets guidelines
             }
             
@@ -444,13 +449,13 @@ struct HomeView: View {
                             case .current(let day):
                                 CalendarDayIcon(day: day)
                                     .font(.system(size: 18))
-                                    .foregroundStyle(magicPalette.accent)
+                                    .foregroundStyle(classicNavigationTabForeground(isSelected: selectedTab == .depositPlan, fallbackActiveColor: magicPalette.accent))
                                     .frame(width: 24, height: 24)
                             case .next(let day):
                                 CalendarDayIcon(day: day)
                                     .font(.system(size: 18))
-                                    .foregroundStyle(magicPalette.cardAccent)
-                                .frame(width: 24, height: 24)
+                                    .foregroundStyle(classicNavigationTabForeground(isSelected: selectedTab == .depositPlan, fallbackActiveColor: magicPalette.cardAccent))
+                                    .frame(width: 24, height: 24)
                             }
                         } else {
                             Image(systemName: "calendar.badge.clock")
@@ -463,14 +468,57 @@ struct HomeView: View {
                     Text("心愿尾款")
                         .font(.system(size: 10, weight: selectedTab == .depositPlan ? .bold : .medium))
                 }
-                .foregroundStyle(selectedTab == .depositPlan ? magicPalette.cardAccent : magicPalette.secondaryText)
+                .foregroundStyle(classicNavigationTabForeground(isSelected: selectedTab == .depositPlan, fallbackActiveColor: magicPalette.cardAccent))
+                .padding(.horizontal, themedTopBarSegmentDescriptor == nil ? 0 : 8)
+                .padding(.vertical, themedTopBarSegmentDescriptor == nil ? 0 : 4)
+                .background {
+                    classicNavigationTabSelectionBackground(isSelected: selectedTab == .depositPlan)
+                }
                 .frame(height: 44) // Ensure touch target meets guidelines
             }
         }
     }
     
     private var fashionTabSwitcher: some View {
-        WardrobeFashionTabSwitcher(selectedTab: $selectedTab, monthIndicator: depositMonthIndicator)
+        WardrobeFashionTabSwitcher(
+            selectedTab: $selectedTab,
+            monthIndicator: depositMonthIndicator,
+            themeSkinDescriptor: themedTopBarSegmentDescriptor
+        )
+    }
+
+    private func classicNavigationTabForeground(isSelected: Bool, fallbackActiveColor: Color) -> Color {
+        guard let descriptor = themedTopBarSegmentDescriptor else {
+            return isSelected ? fallbackActiveColor : magicPalette.secondaryText
+        }
+
+        return isSelected
+            ? SkyConcertThemeSkin.accent(for: descriptor)
+            : SkyConcertThemeSkin.labelColor(for: descriptor).opacity(0.68)
+    }
+
+    @ViewBuilder
+    private func classicNavigationTabSelectionBackground(isSelected: Bool) -> some View {
+        if let descriptor = themedTopBarSegmentDescriptor, isSelected {
+            Capsule()
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            SkyConcertThemeSkin.shellFillTop(for: descriptor).opacity(0.98),
+                            SkyConcertThemeSkin.accentSoft(for: descriptor).opacity(0.72)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .overlay {
+                    Capsule()
+                        .stroke(SkyConcertThemeSkin.shellStroke(for: descriptor).opacity(0.72), lineWidth: 0.8)
+                }
+                .shadow(color: SkyConcertThemeSkin.shadowColor(for: descriptor).opacity(0.22), radius: 3, x: 0, y: 1)
+        } else {
+            Color.clear
+        }
     }
     
     private var isInWardrobeEditMode: Bool {

@@ -125,7 +125,9 @@ struct ThemeSkinProduct: Identifiable, Codable, Equatable {
     private static let allThemeSurfaceSlots = ThemeSkinSlot.allCases
     private static let coreDefaultEnabledSlots: [ThemeSkinSlot] = [
         .topBarMain,
+        .topBarSegment,
         .topBarIconButton,
+        .topBarAddButton,
         .tabBarMain,
         .tabBarItem,
         .statsCard,
