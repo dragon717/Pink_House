@@ -254,9 +254,7 @@ struct PetChatiPadInputBar: View {
                     useSectionLayout: false
                 )
             } label: {
-                Image(systemName: "plus.circle.fill")
-                    .font(.system(size: 28))
-                    .foregroundStyle(.pink)
+                ThemeSkinIconBadge(systemName: "plus", fallbackColor: .pink, size: 40, symbolSize: 20)
             }
             
             // 输入框部分（复用 PetDialogueInputView 的样式，但不带左侧按钮）
@@ -274,12 +272,9 @@ struct PetChatiPadInputBar: View {
                     onSend: onSend
                 )
             }
-            .background(Color(.systemBackground))
-            .clipShape(Capsule())
-            .overlay(
-                Capsule()
-                    .stroke(Color.gray.opacity(0.1), lineWidth: 1)
-            )
+            .themeSkinAdaptiveSectionCard(slot: .searchBar, cornerRadius: 22, showsDecoration: false) {
+                Capsule().fill(Color(.systemBackground))
+            }
             
             // 右侧发送按钮
             Button {
@@ -287,23 +282,7 @@ struct PetChatiPadInputBar: View {
                     onSend()
                 }
             } label: {
-                ZStack {
-                    Circle()
-                        .fill(
-                            LinearGradient(
-                                colors: [Color(hex: "FFC0CB"), Color(hex: "FFB6C1")],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                        .shadow(color: Color(hex: "FF69B4").opacity(0.3), radius: 2, x: 0, y: 2)
-                    
-                    Image(systemName: "pawprint.fill")
-                        .font(.system(size: 20))
-                        .foregroundStyle(.white)
-                        .shadow(color: .black.opacity(0.1), radius: 1, x: 0, y: 1)
-                }
-                .frame(width: 44, height: 44)
+                ThemeSkinIconBadge(systemName: "pawprint.fill", fallbackColor: .pink, size: 44, symbolSize: 20)
             }
             .disabled(text.isEmpty)
             .opacity(text.isEmpty ? 0.5 : 1.0)

@@ -69,11 +69,11 @@ struct MoneyCountingHeaderView: View {
             }
             .padding(.horizontal, 24)
             .padding(.vertical, 12)
-            .background(
+            .themeSkinAdaptiveSectionCard(slot: .statsCard, cornerRadius: 24) {
                 RoundedRectangle(cornerRadius: 24)
                     .fill(Color(uiColor: .secondarySystemBackground).opacity(0.6))
                     .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 24))
-            )
+            }
             .padding(.horizontal)
             .lineLimit(1)
             .minimumScaleFactor(0.5)

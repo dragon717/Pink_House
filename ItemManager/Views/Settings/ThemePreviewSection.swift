@@ -85,7 +85,7 @@ struct ThemePreviewSection: View {
             ZStack {
                 // 灰色遮罩 - 覆盖整个预览区域
                 Color.black
-                    .opacity(themeManager.backgroundStyle == .image ? 0.3 : 0.1)
+                    .opacity(themeManager.effectiveBackgroundStyle == .image ? 0.3 : 0.1)
 
                 TabView {
                     // 第 1 页：主题色卡片示例（原预览）

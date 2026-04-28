@@ -655,17 +655,21 @@ struct BookDetailView: View {
         VStack(spacing: 24) {
             Spacer()
 
-            Image(systemName: "book.closed")
-                .font(.system(size: 60))
-                .foregroundStyle(.secondary.opacity(0.5))
+            ThemeSkinEmptyStateSurface {
+                VStack(spacing: 12) {
+                    Image(systemName: "book.closed")
+                        .font(.system(size: 54))
+                        .foregroundStyle(.secondary.opacity(0.58))
 
-            Text("还没有穿搭书页")
-                .font(.title3)
-                .foregroundStyle(.secondary)
+                    Text("还没有穿搭书页")
+                        .font(.title3.weight(.semibold))
+                        .foregroundStyle(.secondary)
 
-            Text("点击右上角的+号新建新的穿搭书页")
-                .font(.caption)
-                .foregroundStyle(.tertiary)
+                    Text("点击右上角的+号新建新的穿搭书页")
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                }
+            }
 
             Spacer()
         }

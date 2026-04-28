@@ -61,8 +61,9 @@ struct PetShopFundingPromptOverlay: View {
                             .foregroundStyle(accentTint)
                             .padding(.horizontal, 10)
                             .padding(.vertical, 5)
-                            .background(accentTint.opacity(0.12))
-                            .clipShape(Capsule())
+                            .themeSkinAdaptiveSectionCard(slot: .filterChip, cornerRadius: 16, showsDecoration: false) {
+                                Capsule().fill(accentTint.opacity(0.12))
+                            }
 
                         Text(prompt.title)
                             .font(.system(size: 24, weight: .bold, design: .rounded))
@@ -81,8 +82,9 @@ struct PetShopFundingPromptOverlay: View {
                             .font(.system(size: 13, weight: .bold))
                             .foregroundStyle(.secondary)
                             .frame(width: 28, height: 28)
-                            .background(Color.black.opacity(0.05))
-                            .clipShape(Circle())
+                            .themeSkinAdaptiveSectionCard(slot: .iconCircleButton, cornerRadius: 14, showsDecoration: false) {
+                                Circle().fill(Color.black.opacity(0.05))
+                            }
                     }
                 }
 
@@ -93,8 +95,9 @@ struct PetShopFundingPromptOverlay: View {
                             .foregroundStyle(.secondary)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 14)
-                            .background(Color.black.opacity(0.05))
-                            .clipShape(Capsule())
+                            .themeSkinAdaptiveSectionCard(slot: .filterChip, cornerRadius: 22, showsDecoration: false) {
+                                Capsule().fill(Color.black.opacity(0.05))
+                            }
                     }
 
                     Button(action: onPrimaryAction) {
@@ -106,15 +109,18 @@ struct PetShopFundingPromptOverlay: View {
                         .foregroundStyle(.white)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 14)
-                        .background(accentGradient)
-                        .clipShape(Capsule())
+                        .themeSkinAdaptiveSectionCard(slot: .primaryButton, cornerRadius: 22, showsDecoration: false) {
+                            accentGradient
+                        }
                         .shadow(color: accentTint.opacity(0.24), radius: 12, x: 0, y: 8)
                     }
                 }
             }
             .padding(22)
-            .background(.ultraThinMaterial)
-            .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
+            .themeSkinAdaptiveSectionCard(slot: .sectionCard, cornerRadius: 28) {
+                RoundedRectangle(cornerRadius: 28, style: .continuous)
+                    .fill(.ultraThinMaterial)
+            }
             .overlay(
                 RoundedRectangle(cornerRadius: 28, style: .continuous)
                     .stroke(Color.white.opacity(0.65), lineWidth: 1)

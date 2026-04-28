@@ -35,7 +35,7 @@ struct MagicColorSettingsView: View {
     // 主题背景 - 不使用全局模糊
     private var themeBackground: some View {
         Group {
-            switch themeManager.backgroundStyle {
+            switch themeManager.effectiveBackgroundStyle {
             case .color:
                 themeManager.backgroundColor
             case .image:

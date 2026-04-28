@@ -64,6 +64,7 @@ struct PageThumbnailView: View {
                 .foregroundStyle(.primary)
         }
         .padding(8)
+        .themeSkinPageThumbnailSurface()
     }
     
     @ViewBuilder

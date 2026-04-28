@@ -47,7 +47,7 @@ struct LiquidBackground: View {
             themeManager.backgroundColor
                 .ignoresSafeArea()
             
-            if themeManager.backgroundStyle == .image, let image = themeManager.backgroundImage {
+            if themeManager.effectiveBackgroundStyle == .image, let image = themeManager.backgroundImage {
                 SmartBackgroundImage(image: image, opacity: themeManager.backgroundOpacity)
                 
                 // Dark Mode Overlay
@@ -105,7 +105,7 @@ struct OutlinedText: ViewModifier {
     var width: CGFloat = 1.0
     
     func body(content: Content) -> some View {
-        if themeManager.backgroundStyle == .image {
+        if themeManager.effectiveBackgroundStyle == .image {
             if colorScheme == .dark {
                 content
                     .shadow(color: .black, radius: 1, x: 0, y: 0)
@@ -126,4 +126,3 @@ extension View {
         modifier(OutlinedText())
     }
 }
-

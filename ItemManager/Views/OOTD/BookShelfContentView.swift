@@ -175,13 +175,13 @@ struct BookShelfContentView: View {
     private func editingBookCell(for book: BookGroup) -> some View {
         ThreeDBookView(book: book, namespace: namespace)
             .overlay(alignment: .topTrailing) {
-                Image(systemName: "line.3.horizontal")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .padding(4)
-                    .background(.ultraThinMaterial)
-                    .clipShape(Circle())
-                    .padding(4)
+                ThemeSkinIconBadge(
+                    systemName: "line.3.horizontal",
+                    fallbackColor: .gray,
+                    size: 24,
+                    symbolSize: 10
+                )
+                .padding(4)
             }
             .onDrag {
                 self.draggingItem = book
@@ -228,5 +228,4 @@ struct BookReorderableDropDelegate: DropDelegate {
         return false
     }
 }
-
 

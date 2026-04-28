@@ -390,28 +390,32 @@ struct LegacyTabView: View {
                     tabButton(
                         index: 0,
                         title: "衣橱",
-                        icon: "cabinet.fill"
+                        icon: "cabinet.fill",
+                        tabRole: .wardrobe
                     )
 
                     // House Tab
                     tabButton(
                         index: 1,
                         title: smallWorldTabTitle,
-                        icon: smallWorldTabIcon
+                        icon: smallWorldTabIcon,
+                        tabRole: .house
                     )
 
                     // 我 Tab
                     tabButton(
                         index: 2,
                         title: "我",
-                        icon: "face.smiling"
+                        icon: "face.smiling",
+                        tabRole: .me
                     )
 
                     // 萌宠对话 Tab
                     tabButton(
                         index: 3,
                         title: "萌宠对话",
-                        icon: "bubble.left.and.bubble.right.fill"
+                        icon: "bubble.left.and.bubble.right.fill",
+                        tabRole: .petChat
                     )
                 }
                 .frame(height: 56)
@@ -444,7 +448,7 @@ struct LegacyTabView: View {
         }
     }
 
-    private func tabButton(index: Int, title: String, icon: String) -> some View {
+    private func tabButton(index: Int, title: String, icon: String, tabRole: ThemeSkinTabRole) -> some View {
         let isSelected = selectedTab == index
         let isNotOnMenu: Bool = {
             if case .menu = smallWorldDestination { return false }
@@ -467,7 +471,8 @@ struct LegacyTabView: View {
                 systemImage: icon,
                 isSelected: isSelected,
                 selectedColor: magicPalette.accent,
-                inactiveColor: magicPalette.secondaryText
+                inactiveColor: magicPalette.secondaryText,
+                tabRole: tabRole
             )
             .captureGuideTarget(index == 1 ? .homeHouseTab : nil)
             .overlay {

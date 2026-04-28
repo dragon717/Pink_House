@@ -31,8 +31,7 @@ struct TotalBalanceCard: View {
                     handleQuickAccess(.calendar)
                 } label: {
                     VStack(spacing: 4) {
-                        Image(systemName: "calendar")
-                            .font(.system(size: 16))
+                        ThemeSkinIconBadge(systemName: "calendar", fallbackColor: .pink, size: 30, symbolSize: 14)
                         Text("梦裙日历")
                             .font(.caption)
                     }
@@ -50,8 +49,7 @@ struct TotalBalanceCard: View {
                     handleQuickAccess(.wealth(nil))
                 } label: {
                     VStack(spacing: 4) {
-                        Image(systemName: "dollarsign.circle")
-                            .font(.system(size: 16))
+                        ThemeSkinIconBadge(systemName: "dollarsign.circle", fallbackColor: .orange, size: 30, symbolSize: 14)
                         Text("马上来财")
                             .font(.caption)
                     }
@@ -69,8 +67,7 @@ struct TotalBalanceCard: View {
                     handleQuickAccess(.dressStock)
                 } label: {
                     VStack(spacing: 4) {
-                        Image(systemName: "chart.line.uptrend.xyaxis")
-                            .font(.system(size: 16))
+                        ThemeSkinIconBadge(systemName: "chart.line.uptrend.xyaxis", fallbackColor: .blue, size: 30, symbolSize: 14)
                         Text("裙装股市")
                             .font(.caption)
                     }
@@ -122,24 +119,19 @@ struct TotalBalanceCard: View {
                 
                 // 小眼睛按钮 - 闭眼 (eye.slash) 表示当前隐藏，点击显示；睁眼 (eye) 表示当前显示，点击隐藏
                 Button(action: onToggleVisibility) {
-                    Image(systemName: isVisible ? "eye" : "eye.slash")
-                        .font(.system(size: 16))
-                        .foregroundStyle(.pink)
-                        .frame(width: 32, height: 32)
-                        .background(Color.pink.opacity(0.1))
-                        .clipShape(Circle())
+                    ThemeSkinIconBadge(
+                        systemName: isVisible ? "eye" : "eye.slash",
+                        fallbackColor: .pink,
+                        size: 32,
+                        symbolSize: 15
+                    )
                 }
                 .buttonStyle(.plain)
                 
                 // 数钱按钮（仅显示时）
                 if isVisible {
                     Button(action: onCountMoney) {
-                        Image(systemName: "banknote")
-                            .font(.system(size: 16))
-                            .foregroundStyle(.green)
-                            .frame(width: 32, height: 32)
-                            .background(Color.green.opacity(0.1))
-                            .clipShape(Circle())
+                        ThemeSkinIconBadge(systemName: "banknote", fallbackColor: .green, size: 32, symbolSize: 15)
                     }
                     .buttonStyle(.plain)
                 }
@@ -166,9 +158,7 @@ struct TotalBalanceCard: View {
             }
 
         }
-        .background(CardBackgroundView(cornerRadius: 20))
-        .clipShape(RoundedRectangle(cornerRadius: 20))
-        .shadow(color: .black.opacity(0.05), radius: 5, x: 0, y: 2)
+        .themeSkinSectionCard(cornerRadius: 20)
     }
     
     // MARK: - 处理快捷入口点击
@@ -257,9 +247,7 @@ struct DepositStatsView: View {
             }
             .padding()
         }
-        .background(CardBackgroundView(cornerRadius: 24))
-        .clipShape(RoundedRectangle(cornerRadius: 24))
-        .shadow(color: .black.opacity(0.05), radius: 5, x: 0, y: 2)
+        .themeSkinSectionCard(slot: .statsCard, cornerRadius: 24)
     }
     
     private func statItem(title: String, value: String, valueColor: Color = .primary, showIcon: Bool = false) -> some View {
@@ -331,22 +319,19 @@ struct YearSelectorView: View {
                     .padding(.horizontal, 4)
 
                 Button(action: onToggle) {
-                    Image(systemName: showStats ? "eye" : "eye.slash")
-                        .font(.system(size: 14))
-                        .foregroundStyle(.pink)
-                        .frame(width: 28, height: 28)
-                        .background(Color.pink.opacity(0.1))
-                        .clipShape(Circle())
+                    ThemeSkinIconBadge(
+                        systemName: showStats ? "eye" : "eye.slash",
+                        fallbackColor: .pink,
+                        size: 28,
+                        symbolSize: 13
+                    )
                 }
                 .buttonStyle(.plain)
             }
         }
         .padding(.vertical, 8)
         .padding(.horizontal, 16)
-        .background(
-            CardBackgroundView(cornerRadius: 16)
-        )
-        .shadow(color: .black.opacity(0.05), radius: 5, x: 0, y: 2)
+        .themeSkinSectionCard(cornerRadius: 16, showsDecoration: false)
     }
 }
 
@@ -378,9 +363,7 @@ struct YearStatsCard: View {
                 .transition(.move(edge: .top).combined(with: .opacity))
             }
         }
-        .background(CardBackgroundView(cornerRadius: 16))
-        .clipShape(RoundedRectangle(cornerRadius: 16))
-        .shadow(color: .black.opacity(0.05), radius: 3, x: 0, y: 1)
+        .themeSkinSectionCard(slot: .statsCard, cornerRadius: 16, showsDecoration: false)
     }
 }
 

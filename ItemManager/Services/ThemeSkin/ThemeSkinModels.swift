@@ -122,6 +122,21 @@ struct ThemeSkinProduct: Identifiable, Codable, Equatable {
         themeId.replacingOccurrences(of: "theme_skin.", with: "")
     }
 
+    private static let allThemeSurfaceSlots = ThemeSkinSlot.allCases
+    private static let coreDefaultEnabledSlots: [ThemeSkinSlot] = [
+        .topBarMain,
+        .topBarIconButton,
+        .tabBarMain,
+        .tabBarItem,
+        .statsCard,
+        .wardrobeItemCard,
+        .settingsGridCard,
+        .sectionCard,
+        .primaryButton,
+        .iconCircleButton,
+        .emptyState
+    ]
+
     static let girlCloset = ThemeSkinProduct(
         id: "theme_skin.girl_closet",
         themeId: "theme_skin.girl_closet",
@@ -160,26 +175,8 @@ struct ThemeSkinProduct: Identifiable, Codable, Equatable {
         basePrice: 99,
         vipPrice: 89,
         previewAssetNames: ["preview_store_hero"],
-        supportedSlots: [
-            .topBarMain,
-            .topBarIconButton,
-            .topBarSegment,
-            .searchBar,
-            .tabBarMain,
-            .tabBarItem,
-            .statsCard,
-            .wardrobeItemCard,
-            .settingsGridCard,
-            .discountBadge
-        ],
-        defaultEnabledSlots: [
-            .topBarMain,
-            .topBarIconButton,
-            .tabBarMain,
-            .tabBarItem,
-            .statsCard,
-            .wardrobeItemCard
-        ]
+        supportedSlots: allThemeSurfaceSlots,
+        defaultEnabledSlots: coreDefaultEnabledSlots
     )
 
     static let swanDream = ThemeSkinProduct(
@@ -190,26 +187,8 @@ struct ThemeSkinProduct: Identifiable, Codable, Equatable {
         basePrice: 99,
         vipPrice: 89,
         previewAssetNames: ["preview_store_hero"],
-        supportedSlots: [
-            .topBarMain,
-            .topBarIconButton,
-            .topBarSegment,
-            .searchBar,
-            .tabBarMain,
-            .tabBarItem,
-            .statsCard,
-            .wardrobeItemCard,
-            .settingsGridCard,
-            .discountBadge
-        ],
-        defaultEnabledSlots: [
-            .topBarMain,
-            .topBarIconButton,
-            .tabBarMain,
-            .tabBarItem,
-            .statsCard,
-            .wardrobeItemCard
-        ]
+        supportedSlots: allThemeSurfaceSlots,
+        defaultEnabledSlots: coreDefaultEnabledSlots
     )
 
 }

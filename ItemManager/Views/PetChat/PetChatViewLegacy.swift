@@ -410,9 +410,7 @@ struct PetChatViewLegacy: View {
                         useSectionLayout: false
                     )
                 } label: {
-                    Image(systemName: "plus.circle.fill")
-                        .font(.system(size: 28))
-                        .foregroundStyle(.pink)
+                    ThemeSkinIconBadge(systemName: "plus", fallbackColor: .pink, size: 40, symbolSize: 20)
                 }
                 
                 // 中间输入框（萌宠对话框样式）
@@ -429,12 +427,9 @@ struct PetChatViewLegacy: View {
                         .padding(.horizontal, 16)
                         .padding(.vertical, 12)
                 }
-                .background(Color(.systemBackground))
-                .clipShape(Capsule())
-                .overlay(
-                    Capsule()
-                        .stroke(Color.gray.opacity(0.1), lineWidth: 1)
-                )
+                .themeSkinAdaptiveSectionCard(slot: .searchBar, cornerRadius: 22, showsDecoration: false) {
+                    Capsule().fill(Color(.systemBackground))
+                }
                 
                 // 右侧发送按钮（猫爪样式）
                 Button {
@@ -442,23 +437,7 @@ struct PetChatViewLegacy: View {
                         sendMessageFromInput()
                     }
                 } label: {
-                    ZStack {
-                        Circle()
-                            .fill(
-                                LinearGradient(
-                                    colors: [Color(hex: "FFC0CB"), Color(hex: "FFB6C1")],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                )
-                            )
-                            .shadow(color: Color(hex: "FF69B4").opacity(0.3), radius: 2, x: 0, y: 2)
-                        
-                        Image(systemName: "pawprint.fill")
-                            .font(.system(size: 20))
-                            .foregroundStyle(.white)
-                            .shadow(color: .black.opacity(0.1), radius: 1, x: 0, y: 1)
-                    }
-                    .frame(width: 44, height: 44)
+                    ThemeSkinIconBadge(systemName: "pawprint.fill", fallbackColor: .pink, size: 44, symbolSize: 20)
                 }
                 .disabled(inputText.isEmpty)
                 .opacity(inputText.isEmpty ? 0.5 : 1.0)

@@ -139,41 +139,6 @@ struct HomeThemeSkinToolbarIconShell<Content: View>: View {
             content
                 .font(.system(size: effectiveIconSize, weight: .semibold))
                 .frame(minWidth: effectiveMinWidth, minHeight: effectiveMinHeight)
-                .padding(effectivePadding)
-                .background {
-                    ThemeSkinOptionalResizableAsset(
-                        ThemeSkinAssetName.topBarIconButton,
-                        namespace: descriptor?.assetNamespace,
-                        allowShortNameFallback: !SkyConcertThemeSkin.shouldAvoidShortAssetFallback(for: descriptor)
-                    ) {
-                        RoundedRectangle(cornerRadius: 14, style: .continuous)
-                            .fill(
-                                LinearGradient(
-                                    colors: [
-                                        HomeThemeSkinTokens.creamTop(for: descriptor).opacity(0.98),
-                                        HomeThemeSkinTokens.softAccent(for: descriptor).opacity(0.9)
-                                    ],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                )
-                            )
-                            .overlay {
-                                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                    .stroke(
-                                        LinearGradient(
-                                            colors: [
-                                                .white.opacity(0.95),
-                                                HomeThemeSkinTokens.border(for: descriptor).opacity(0.82)
-                                            ],
-                                            startPoint: .topLeading,
-                                            endPoint: .bottomTrailing
-                                        ),
-                                        lineWidth: 1
-                                    )
-                            }
-                    }
-                }
-                .shadow(color: HomeThemeSkinTokens.shadow(for: descriptor).opacity(0.16), radius: HomeThemeSkinChromeStyle.group.shadowRadius, x: 0, y: 4)
         } else {
             content
         }
@@ -189,10 +154,6 @@ struct HomeThemeSkinToolbarIconShell<Content: View>: View {
 
     private var effectiveMinHeight: CGFloat {
         minHeight
-    }
-
-    private var effectivePadding: CGFloat {
-        3
     }
 
     private var effectiveIconSize: CGFloat {

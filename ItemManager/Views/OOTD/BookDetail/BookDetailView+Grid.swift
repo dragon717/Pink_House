@@ -38,22 +38,7 @@ extension BookDetailView {
     }
 
     private func selectionIndicator(isSelected: Bool) -> some View {
-        ZStack {
-            Circle()
-                .fill(isSelected ? Color.pink : Color.white.opacity(0.8))
-                .frame(width: 24, height: 24)
-
-            if isSelected {
-                Image(systemName: "checkmark")
-                    .font(.system(size: 12, weight: .bold))
-                    .foregroundStyle(.white)
-            } else {
-                Circle()
-                    .stroke(Color.gray.opacity(0.5), lineWidth: 2)
-                    .frame(width: 24, height: 24)
-            }
-        }
-        .padding(8)
+        ThemeSkinSelectionBadge(isSelected: isSelected)
     }
 
     @ViewBuilder
@@ -69,13 +54,13 @@ extension BookDetailView {
     }
 
     private var dragHandle: some View {
-        Image(systemName: "line.3.horizontal")
-            .font(.caption)
-            .foregroundStyle(.secondary)
-            .padding(4)
-            .background(.ultraThinMaterial)
-            .clipShape(Circle())
-            .padding(4)
+        ThemeSkinIconBadge(
+            systemName: "line.3.horizontal",
+            fallbackColor: .gray,
+            size: 24,
+            symbolSize: 10
+        )
+        .padding(4)
     }
 
     private func normalPageCell(for page: Outfit) -> some View {

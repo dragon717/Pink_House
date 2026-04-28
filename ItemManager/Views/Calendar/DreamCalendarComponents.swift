@@ -261,8 +261,7 @@ struct CalendarEventRow: View {
     @Environment(\.colorScheme) private var colorScheme
     
     var body: some View {
-        GlassCard {
-            HStack(spacing: 10) {
+        HStack(spacing: 10) {
                 // 1. Image
                 if let imagePath = clothing.imagePaths.first {
                     AsyncDownsampledImage(
@@ -344,7 +343,7 @@ struct CalendarEventRow: View {
                 }
             }
             .padding(10)
-        }
+            .themeSkinSectionCard(cornerRadius: 24)
     }
     
     private var isDepositDay: Bool {
@@ -381,7 +380,9 @@ struct WeekHeaderView: View {
             }
         }
         .padding(.vertical, 8)
-        .background(Color.white.opacity(0.1))
+        .themeSkinAdaptiveSectionCard(slot: .filterChip, cornerRadius: 10, showsDecoration: false) {
+            Color.white.opacity(0.1)
+        }
     }
 }
 
@@ -492,11 +493,11 @@ struct UnifiedEventsPopup: View {
                     }
                 }
                 .padding()
-                .background(
+                .themeSkinAdaptiveSectionCard(slot: .sectionCard, cornerRadius: 20, showsDecoration: false) {
                     colorScheme == .dark
                         ? Color(uiColor: .secondarySystemGroupedBackground).opacity(0.95)
                         : Color(uiColor: themeManager.currentTheme.backgroundColor).opacity(0.95)
-                )
+                }
                 
                 Divider()
                 
@@ -544,12 +545,11 @@ struct UnifiedEventsPopup: View {
                                     .padding(.horizontal)
                                 }
                                 .padding(.vertical, 6)
-                                .background(
+                                .themeSkinAdaptiveSectionCard(slot: .sectionCard, cornerRadius: 12, showsDecoration: false) {
                                     colorScheme == .dark
                                         ? Color(uiColor: .tertiarySystemGroupedBackground).opacity(0.6)
                                         : Color.white.opacity(0.5)
-                                )
-                                .clipShape(RoundedRectangle(cornerRadius: 12))
+                                }
                                 .padding(.horizontal)
                             }
                         }
@@ -558,13 +558,11 @@ struct UnifiedEventsPopup: View {
                     .frame(maxHeight: 450)
                 }
             }
-            .background(
+            .themeSkinAdaptiveSectionCard(slot: .sectionCard, cornerRadius: 20) {
                 colorScheme == .dark
                     ? Color(uiColor: .secondarySystemGroupedBackground).opacity(0.95)
                     : Color(uiColor: themeManager.currentTheme.backgroundColor).opacity(0.95)
-            )
-            .clipShape(RoundedRectangle(cornerRadius: 20))
-            .shadow(radius: 20)
+            }
             .padding(20)
         }
     }

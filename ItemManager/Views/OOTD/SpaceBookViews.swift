@@ -110,6 +110,7 @@ struct SpaceBookCoverVisuals: View {
             }
         }
         .clipShape(RoundedCorner(radius: 4, corners: [.topRight, .bottomRight]))
+        .overlay(ThemeSkinBookCoverFrame(cornerRadius: 4))
         .task(id: book.id) {
             await loadCoverImage()
         }
@@ -201,6 +202,7 @@ struct SpaceOutfitCard: View {
                     .clipShape(Capsule())
                     .padding(8)
             }
+            .themeSkinPageThumbnailSurface()
     }
 }
 

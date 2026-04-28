@@ -3,10 +3,12 @@ import PhotosUI
 
 struct GeneralSettingsView: View {
     @Environment(ThemeManager.self) private var themeManager
+    @ObservedObject private var themeSkinManager = ThemeSkinManager.shared
     @State private var languageManager = LanguageManager.shared
     @ObservedObject private var petDataManager = PetDataManager.shared
     @State private var showingRestartAlert = false
     @State private var showingMissingOriginalAlert = false
+    @State private var showingThemeBackgroundLockAlert = false
     @State private var selectedItem: PhotosPickerItem?
     @State private var cropRequest: CropRequest?
     @State private var isLoadingImage = false // Loading state
@@ -36,7 +38,7 @@ struct GeneralSettingsView: View {
                 }
             }
             
-            Picker("背景类型", selection: $theme.backgroundStyle) {
+            Picker("背景类型", selection: backgroundStyleBinding) {
                     ForEach(BackgroundStyle.allCases) { style in
                         Text(style.displayName).tag(style)
                     }
@@ -47,7 +49,7 @@ struct GeneralSettingsView: View {
 
             Section(header: Text("外观主题")) {    
                 
-                if theme.backgroundStyle == .color {
+                if theme.effectiveBackgroundStyle == .color {
                     ColorPicker("背景颜色", selection: Binding(
                         get: { theme.backgroundColor },
                         set: { theme.backgroundColorHex = $0.toHex() }
@@ -187,7 +189,7 @@ struct GeneralSettingsView: View {
                     .padding()
                     .background(
                         ZStack {
-                            if theme.backgroundStyle == .image, let image = theme.backgroundImage {
+                            if theme.effectiveBackgroundStyle == .image, let image = theme.backgroundImage {
                                     Image(uiImage: image)
                                     .resizable()
                                     .scaledToFill()
@@ -321,6 +323,12 @@ struct GeneralSettingsView: View {
         .background {
             LiquidBackground()
         }
+        .onAppear {
+            enforceThemeBackgroundHarmonyIfNeeded()
+        }
+        .onChange(of: themeSkinManager.activeThemeId) { _, _ in
+            enforceThemeBackgroundHarmonyIfNeeded()
+        }
         .navigationTitle("通用设置")
         .alert("需要重启", isPresented: $showingRestartAlert) {
             Button("稍后") { }
@@ -336,6 +344,11 @@ struct GeneralSettingsView: View {
             Button("取消", role: .cancel) { }
         } message: {
             Text("请重新选择一张图片以进行裁剪和移动。")
+        }
+        .alert(ThemeManager.themeSkinBackgroundLockAlertTitle, isPresented: $showingThemeBackgroundLockAlert) {
+            Button("知道啦", role: .cancel) { }
+        } message: {
+            Text(ThemeManager.themeSkinBackgroundLockAlertMessage(activeThemeName: activeThemeName))
         }
         .fullScreenCover(item: $cropRequest) { request in
             // Use 'request.image' here directly
@@ -368,6 +381,31 @@ struct GeneralSettingsView: View {
     }
     
     // MARK: - Subviews
+
+    private var activeThemeName: String? {
+        guard let activeThemeId = themeSkinManager.activeThemeId else { return nil }
+        return themeSkinManager.product(for: activeThemeId)?.name
+    }
+
+    private var backgroundStyleBinding: Binding<BackgroundStyle> {
+        Binding(
+            get: { themeManager.effectiveBackgroundStyle },
+            set: { newStyle in
+                guard newStyle != .image ||
+                        !themeManager.isThemeSkinBackgroundImageLocked(activeThemeId: themeSkinManager.activeThemeId) else {
+                    enforceThemeBackgroundHarmonyIfNeeded()
+                    showingThemeBackgroundLockAlert = true
+                    return
+                }
+
+                themeManager.backgroundStyle = newStyle
+            }
+        )
+    }
+
+    private func enforceThemeBackgroundHarmonyIfNeeded() {
+        _ = themeManager.enforceThemeSkinBackgroundHarmonyIfNeeded(activeThemeId: themeSkinManager.activeThemeId)
+    }
     
     @ViewBuilder
     private var personalizationSectionContent: some View {

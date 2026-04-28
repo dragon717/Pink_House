@@ -258,3 +258,58 @@ enum ThemeSkinTabBarShapeFactory {
 - 已有架构文档：`docs/少女衣橱主题皮肤重构方案.md`
 - 验收手册：`temp/_harness/ACCEPT_PLAN.md`（A–O 15 验收点 + 跨主题混搭抽查）
 - iOS 26 TabBar 历史决策：用户记忆 `project_ios26_tabbar_positioning.md`（UITabBarButton 消失，改用 PlatterView 等分定位）—— 本方案因彻底改自绘底栏，PlatterView fallback 路径在 P1 后退役
+
+---
+
+## 7. P5 — 核心页面主题皮肤扩展（2026-04-28 落地）
+
+### 7.1 范围
+
+本阶段在不新增必需美术素材、不修改 `ThemeSkinSlot.rawValue` 与既有持久化 key 的前提下，把主题皮肤从顶部栏 / 底部栏 / 衣橱卡片扩展到核心内容页：
+
+- 衣橱详情页：主信息、裙装信息、价格、购买信息、小金库存钱进度与主按钮。
+- 我界面：魔法任务卡、非 VIP 卡、账户卡、设置豆腐块与常用设置卡。
+- 平面 / 空间手帐：书架、书本封面外框、书页列表卡、选择徽标、拖拽徽标与空状态。
+- 主题商店 / 主题详情：精品画廊式 Hero、当前状态、实时组件预览、购买 / 应用 CTA、分组组件开关。
+
+### 7.2 实现原则
+
+- 新增共享 SwiftUI 程序化容器：`ThemeSkinSectionCardContainer`、`ThemeSkinPrimaryButtonStyle`、`ThemeSkinIconBadge`、`ThemeSkinEmptyStateSurface`。
+- 共享容器优先读取 `.sectionCard` / `.primaryButton` / `.iconCircleButton` / `.emptyState` 槽位；槽位关闭时回退到默认 `CardBackgroundView` 风格。
+- 不新增 `MANIFEST.yaml` 必需 imageset；只复用现有主题贴纸 PNG 与程序化渐变、描边、阴影。
+- 用户内容不染色：书本封面、书页截图、3D 预览只加外框 / 徽标 / 标题胶囊，不对图片内容套滤镜。
+- 已激活老主题执行一次性迁移，仅补开本阶段新增核心槽位；用户后续手动关闭某槽位后不会反复强制打开。
+
+### 7.3 验收补充
+
+- 主题详情页必须能看到 18 个 slot，按“顶部与搜索 / 底部导航 / 卡片与列表 / 按钮与控件 / 面板与空状态”分组。
+- 关闭 `.sectionCard` 后，详情页与手帐列表卡应回退默认样式；关闭 `.primaryButton` 后主按钮回退默认按钮色。
+- 默认皮肤、`theme_skin.sky_concert`、`theme_skin.swan_dream` 连续切换时，不得出现跨主题贴纸混用或旧主题残影。
+
+---
+
+## 8. P6 — 心愿尾款 / 统计 / 梦裙日历 / 萌宠对话 / 马上来财扩展（2026-04-28 落地）
+
+### 8.1 范围
+
+本阶段继续沿用 P5 的共享容器与槽位策略，扩展到以下高频核心页面：
+
+- 心愿尾款：总待付尾款卡、月 / 系列选择器、年份统计、明细 / 简略尾款行、小金库存钱按钮。
+- 衣橱统计：总览、标签分类、心愿尾款统计、购买时间统计，以及统计小盒子与表头。
+- 梦裙日历：最近 / 月度 / 年度卡片、事件行、弹窗分组、周标题与迷你月份卡。
+- 萌宠对话：对话气泡、衣橱 / 统计内嵌卡片、快捷选项、iPad / Legacy 输入区、数钱与请签内嵌面板。
+- 马上来财：请签按钮与解签卡、数钱总额卡、安财内黄金 / 白银 / 虚拟币卡、尾款小金库 Hero / 统计 / 存钱 / 空状态 / 列表行。
+
+### 8.2 实现原则
+
+- 新增 `ThemeSkinAdaptiveSectionCardContainer`：用于“主题启用时走主题皮肤、未启用时保留原页面 fallback 背景”的场景，尤其是萌宠对话气泡、日历主题色卡与来财毛玻璃卡。
+- 继续只使用现有 18 个 slot：`.sectionCard`、`.statsCard`、`.filterChip`、`.searchBar`、`.primaryButton`、`.iconCircleButton`、`.emptyState` 等；不新增 rawValue。
+- 用户内容不染色：裙装图片、日历缩略图、萌宠头像 / 表情、请签视频、数钱纸币 / 金银豆 / 虚拟币物理内容不套滤镜，只装饰外框、背景、徽标与按钮。
+- 默认皮肤回退保持可读：需要保留原 `CalendarTheme` / `PetChatSkinTheme` / `.regularMaterial` 的区域使用 adaptive fallback，避免主题未启用时视觉断层。
+
+### 8.3 验收补充
+
+- 关闭 `.sectionCard` 后：心愿尾款行、统计卡、日历弹窗、萌宠气泡、来财小金库卡片回退默认卡片或原毛玻璃背景。
+- 关闭 `.primaryButton` 后：请签 / 再请一签、萌宠内嵌按钮、尾款小金库存钱 CTA 回退默认按钮色。
+- 心愿尾款与来财尾款统计金额只改变外观，不改变 `WealthSavingLedger` 计算语义。
+- 萌宠对话的图片 / 视频 / 小物图标不被主题滤镜污染；只卡片壳与快捷按钮跟随主题。

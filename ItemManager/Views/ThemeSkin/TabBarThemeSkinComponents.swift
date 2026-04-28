@@ -1,5 +1,12 @@
 import SwiftUI
 
+enum ThemeSkinTabRole {
+    case wardrobe
+    case house
+    case me
+    case petChat
+}
+
 private enum TabBarThemeSkinTokens {
     static let supportedNamespaces: Set<String> = ["sky_concert", "swan_dream"]
 
@@ -32,6 +39,39 @@ private enum TabBarThemeSkinTokens {
 
     static func shadow(for descriptor: ThemeSkinDescriptor?) -> Color {
         SkyConcertThemeSkin.hasDedicatedVisualProfile(descriptor) ? SkyConcertThemeSkin.shadowColor(for: descriptor) : shadow
+    }
+
+    /// Bottom-tab stickers must use the complete, namespace-prefixed sticker exports.
+    /// Avoid the older short `decor_*` crops here: several of those are edge fragments.
+    static func fullStickerAssetName(for role: ThemeSkinTabRole?, descriptor: ThemeSkinDescriptor?) -> String? {
+        guard let role else { return nil }
+
+        switch descriptor?.assetNamespace {
+        case SkyConcertThemeSkin.namespace:
+            switch role {
+            case .wardrobe:
+                return SkyConcertThemeSkin.decorMusicScrollClouds
+            case .house:
+                return SkyConcertThemeSkin.decorSkyBalloonDoves
+            case .me:
+                return SkyConcertThemeSkin.decorWingedUnicornPrince
+            case .petChat:
+                return SkyConcertThemeSkin.decorBunnyAccordionStage
+            }
+        case SwanDreamThemeSkin.namespace:
+            switch role {
+            case .wardrobe:
+                return SwanDreamThemeSkin.decorPinkRibbonBow
+            case .house:
+                return SwanDreamThemeSkin.decorDreamCastleClouds
+            case .me:
+                return SwanDreamThemeSkin.decorCrownedSwanClouds
+            case .petChat:
+                return SwanDreamThemeSkin.decorFlyingSwanStars
+            }
+        default:
+            return nil
+        }
     }
 }
 
@@ -196,45 +236,32 @@ struct ThemeSkinModernTabLabel: View {
     let title: String
     let systemImage: String
     let isSelected: Bool
+    var tabRole: ThemeSkinTabRole? = nil
 
     private var isActive: Bool {
         descriptor?.usesThemeSkinTabBarChrome == true
     }
 
-    private var assetName: String {
-        isSelected ? ThemeSkinAssetName.tabBarItemSelected : ThemeSkinAssetName.tabBarItemDefault
-    }
-
     var body: some View {
         if isActive {
-            VStack(spacing: 3) {
-                Image(systemName: systemImage)
-                    .font(.system(size: 18, weight: isSelected ? .semibold : .medium))
+            VStack(spacing: 2) {
+                ThemeSkinTabStickerIcon(
+                    descriptor: descriptor,
+                    tabRole: tabRole,
+                    systemImage: systemImage,
+                    fallbackPointSize: 18
+                )
                 Text(title)
                     .font(.system(size: 10, weight: isSelected ? .semibold : .medium, design: .rounded))
                     .lineLimit(1)
+                    .foregroundStyle(
+                        isSelected
+                            ? TabBarThemeSkinTokens.accent(for: descriptor)
+                            : TabBarThemeSkinTokens.text(for: descriptor).opacity(0.88)
+                    )
             }
-            .foregroundStyle(isSelected ? TabBarThemeSkinTokens.accent(for: descriptor) : TabBarThemeSkinTokens.text(for: descriptor).opacity(0.88))
             .padding(.horizontal, 10)
-            .padding(.vertical, 6)
-            .background {
-                ThemeSkinOptionalResizableAsset(
-                    assetName,
-                    namespace: descriptor?.assetNamespace,
-                    allowShortNameFallback: !SkyConcertThemeSkin.shouldAvoidShortAssetFallback(for: descriptor)
-                ) {
-                    if isSelected {
-                        Capsule(style: .continuous)
-                            .fill(Color.white.opacity(0.96))
-                            .overlay {
-                                Capsule(style: .continuous)
-                                    .stroke(TabBarThemeSkinTokens.border(for: descriptor).opacity(0.9), lineWidth: 1)
-                            }
-                    } else {
-                        Color.clear
-                    }
-                }
-            }
+            .padding(.vertical, 5)
         } else {
             Label(title, systemImage: systemImage)
         }
@@ -248,46 +275,33 @@ struct ThemeSkinLegacyTabLabel: View {
     let isSelected: Bool
     let selectedColor: Color
     let inactiveColor: Color
+    var tabRole: ThemeSkinTabRole? = nil
 
     private var isActive: Bool {
         descriptor?.usesThemeSkinTabBarChrome == true
     }
 
-    private var assetName: String {
-        isSelected ? ThemeSkinAssetName.tabBarItemSelected : ThemeSkinAssetName.tabBarItemDefault
-    }
-
     var body: some View {
         if isActive {
-            VStack(spacing: 4) {
-                Image(systemName: systemImage)
-                    .font(.system(size: 20, weight: isSelected ? .semibold : .regular))
+            VStack(spacing: 2) {
+                ThemeSkinTabStickerIcon(
+                    descriptor: descriptor,
+                    tabRole: tabRole,
+                    systemImage: systemImage,
+                    fallbackPointSize: 20
+                )
                 Text(title)
                     .font(.system(size: 11, weight: isSelected ? .semibold : .regular, design: .rounded))
                     .lineLimit(1)
+                    .foregroundStyle(
+                        isSelected
+                            ? TabBarThemeSkinTokens.accent(for: descriptor)
+                            : TabBarThemeSkinTokens.text(for: descriptor).opacity(0.88)
+                    )
             }
-            .foregroundStyle(isSelected ? TabBarThemeSkinTokens.accent(for: descriptor) : TabBarThemeSkinTokens.text(for: descriptor).opacity(0.88))
             .padding(.horizontal, 8)
-            .padding(.vertical, 8)
+            .padding(.vertical, 5)
             .frame(maxWidth: .infinity)
-            .background {
-                ThemeSkinOptionalResizableAsset(
-                    assetName,
-                    namespace: descriptor?.assetNamespace,
-                    allowShortNameFallback: !SkyConcertThemeSkin.shouldAvoidShortAssetFallback(for: descriptor)
-                ) {
-                    if isSelected {
-                        RoundedRectangle(cornerRadius: 18, style: .continuous)
-                            .fill(Color.white.opacity(0.96))
-                            .overlay {
-                                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                                    .stroke(TabBarThemeSkinTokens.border(for: descriptor).opacity(0.92), lineWidth: 1.1)
-                            }
-                    } else {
-                        Color.clear
-                    }
-                }
-            }
         } else {
             VStack(spacing: 4) {
                 Image(systemName: systemImage)
@@ -300,5 +314,40 @@ struct ThemeSkinLegacyTabLabel: View {
             }
             .frame(maxWidth: .infinity)
         }
+    }
+}
+
+private struct ThemeSkinTabStickerIcon: View {
+    let descriptor: ThemeSkinDescriptor?
+    let tabRole: ThemeSkinTabRole?
+    let systemImage: String
+    let fallbackPointSize: CGFloat
+
+    private var stickerAssetName: String? {
+        TabBarThemeSkinTokens.fullStickerAssetName(for: tabRole, descriptor: descriptor)
+    }
+
+    var body: some View {
+        if let stickerAssetName {
+            ThemeSkinOptionalFittedAsset(
+                stickerAssetName,
+                namespace: descriptor?.assetNamespace,
+                allowShortNameFallback: false
+            ) {
+                fallbackIcon
+            }
+            .frame(width: 34, height: 30)
+            .accessibilityHidden(true)
+        } else {
+            fallbackIcon
+                .frame(width: 34, height: 30)
+                .accessibilityHidden(true)
+        }
+    }
+
+    private var fallbackIcon: some View {
+        Image(systemName: systemImage)
+            .font(.system(size: fallbackPointSize, weight: .medium))
+            .foregroundStyle(TabBarThemeSkinTokens.text(for: descriptor).opacity(0.88))
     }
 }

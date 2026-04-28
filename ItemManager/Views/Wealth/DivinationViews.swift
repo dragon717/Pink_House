@@ -154,16 +154,15 @@ struct DivinationView: View {
                                 .foregroundStyle(.white)
                                 .padding(.horizontal, 32)
                                 .padding(.vertical, 16)
-                                .background(
+                                .themeSkinAdaptiveSectionCard(slot: .primaryButton, cornerRadius: 26, showsDecoration: false) {
                                     LinearGradient(
                                         colors: [Color(red: 0.8, green: 0.3, blue: 0.3), Color(red: 0.6, green: 0.2, blue: 0.2)],
                                         startPoint: .leading,
                                         endPoint: .trailing
                                     )
-                                )
-                                .clipShape(Capsule())
-                                .shadow(color: Color(red: 0.8, green: 0.3, blue: 0.3).opacity(0.4), radius: 8, x: 0, y: 4)
+                                }
                             }
+                            .buttonStyle(.plain)
                             .transition(.opacity)
                         }
                         
@@ -186,16 +185,15 @@ struct DivinationView: View {
                                 .foregroundStyle(.white)
                                 .padding(.horizontal, 32)
                                 .padding(.vertical, 16)
-                                .background(
+                                .themeSkinAdaptiveSectionCard(slot: .primaryButton, cornerRadius: 26, showsDecoration: false) {
                                     LinearGradient(
                                         colors: [Color(red: 0.8, green: 0.3, blue: 0.3), Color(red: 0.6, green: 0.2, blue: 0.2)],
                                         startPoint: .leading,
                                         endPoint: .trailing
                                     )
-                                )
-                                .clipShape(Capsule())
-                                .shadow(color: Color(red: 0.8, green: 0.3, blue: 0.3).opacity(0.4), radius: 8, x: 0, y: 4)
+                                }
                             }
+                            .buttonStyle(.plain)
                             .transition(.opacity)
                         }
                     }
@@ -276,7 +274,7 @@ struct FortuneInterpretationView: View {
         }
         .padding(.vertical, 16)
         .padding(.horizontal, 20)
-        .background(
+        .themeSkinAdaptiveSectionCard(slot: .sectionCard, cornerRadius: 16) {
             RoundedRectangle(cornerRadius: 16)
                 .fill(
                     LinearGradient(
@@ -303,7 +301,7 @@ struct FortuneInterpretationView: View {
                         )
                 )
                 .shadow(color: Color(red: 0.8, green: 0.5, blue: 0.6).opacity(0.15), radius: 8, x: 0, y: 4)
-        )
+        }
         .padding(.horizontal, 32)
     }
 }

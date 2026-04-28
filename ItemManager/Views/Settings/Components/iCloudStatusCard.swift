@@ -16,14 +16,14 @@ struct iCloudStatusCard: View {
                             ProgressView()
                                 .tint(.blue)
                         } else {
-                            Image(systemName: "icloud.fill")
-                                .font(.title2)
-                                .foregroundStyle(iconColor)
+                            ThemeSkinIconBadge(
+                                systemName: "icloud.fill",
+                                fallbackColor: iconColor,
+                                size: 40,
+                                symbolSize: 19
+                            )
                         }
                     }
-                    .frame(width: 40, height: 40)
-                    .background(iconColor.opacity(0.1))
-                    .clipShape(Circle())
                     
                     Spacer()
                     
@@ -52,8 +52,7 @@ struct iCloudStatusCard: View {
             .padding(16)
             .frame(maxWidth: .infinity, alignment: .leading)
             .aspectRatio(1.0, contentMode: .fill)
-            .background(cardBackground)
-            .overlay(cardOverlay)
+            .themeSkinSectionCard(slot: .settingsGridCard, cornerRadius: 20)
         }
         .buttonStyle(PlainButtonStyle())
     }

@@ -156,14 +156,13 @@ struct OverviewStatsCard: View {
                         .foregroundStyle(.yellow.opacity(0.3))
                 }
                 .padding()
-                .background(Color(uiColor: .tertiarySystemGroupedBackground))
-                .cornerRadius(12)
+                .themeSkinAdaptiveSectionCard(slot: .statsCard, cornerRadius: 12, showsDecoration: false) {
+                    Color(uiColor: .tertiarySystemGroupedBackground)
+                }
             }
         }
         .padding()
-        .background(Color(uiColor: .secondarySystemGroupedBackground))
-        .cornerRadius(16)
-        .shadow(color: .black.opacity(0.05), radius: 5, x: 0, y: 2)
+        .themeSkinSectionCard(slot: .statsCard, cornerRadius: 16)
     }
     
     private func formatPrice(_ decimal: Decimal) -> String {
@@ -204,8 +203,9 @@ struct StatBox: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding()
-        .background(color.opacity(0.1))
-        .cornerRadius(12)
+        .themeSkinAdaptiveSectionCard(slot: .statsCard, cornerRadius: 12, showsDecoration: false) {
+            color.opacity(0.1)
+        }
     }
 }
 
@@ -339,9 +339,7 @@ struct TagStatsCard: View {
             }
         }
         .padding()
-        .background(CardBackgroundView(cornerRadius: 16))
-        .cornerRadius(16)
-        .shadow(color: .black.opacity(0.05), radius: 5, x: 0, y: 2)
+        .themeSkinSectionCard(slot: .statsCard, cornerRadius: 16)
     }
 }
 
@@ -363,8 +361,9 @@ struct HeaderRow: View {
         .foregroundStyle(.secondary)
         .padding(.horizontal, 4)
         .padding(.vertical, 8)
-        .background(Color(uiColor: .tertiarySystemGroupedBackground))
-        .cornerRadius(8)
+        .themeSkinAdaptiveSectionCard(slot: .statsCard, cornerRadius: 8, showsDecoration: false) {
+            Color(uiColor: .tertiarySystemGroupedBackground)
+        }
     }
 }
 
@@ -466,9 +465,7 @@ struct DepositStatsCard: View {
             }
         }
         .padding()
-        .background(CardBackgroundView(cornerRadius: 16))
-        .cornerRadius(16)
-        .shadow(color: .black.opacity(0.05), radius: 5, x: 0, y: 2)
+        .themeSkinSectionCard(slot: .statsCard, cornerRadius: 16)
     }
 }
 
@@ -622,8 +619,6 @@ struct PurchaseTimeStatsCard: View {
             }
         }
         .padding()
-        .background(Color(uiColor: .secondarySystemGroupedBackground))
-        .cornerRadius(16)
-        .shadow(color: .black.opacity(0.05), radius: 5, x: 0, y: 2)
+        .themeSkinSectionCard(slot: .statsCard, cornerRadius: 16)
     }
 }

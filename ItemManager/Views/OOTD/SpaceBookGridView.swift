@@ -21,12 +21,14 @@ struct SpaceBookGridView: View {
     var body: some View {
         ScrollView {
             if books.isEmpty {
-                ContentUnavailableView {
-                    Label("暂无空间手帐", systemImage: "cube.transparent")
-                } description: {
-                    Text("点击右上角 + 创建新的空间手帐")
+                ThemeSkinEmptyStateSurface {
+                    ContentUnavailableView {
+                        Label("暂无空间手帐", systemImage: "cube.transparent")
+                    } description: {
+                        Text("点击右上角 + 创建新的空间手帐")
+                    }
+                    .foregroundStyle(emptyStateForegroundColor)
                 }
-                .foregroundStyle(emptyStateForegroundColor)
                 .padding(.top, 100)
             } else {
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 160), spacing: 24)], spacing: 32) {

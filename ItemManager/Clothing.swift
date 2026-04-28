@@ -342,6 +342,36 @@ enum WealthSavingLedger {
         }
     }
 
+    static func assignableSavingCap(for clothing: Clothing) -> Decimal {
+        let target = purchaseTarget(for: clothing)
+        let cap: Decimal
+        if clothing.isDepositPlan {
+            cap = target - clothing.totalDeposit
+        } else {
+            cap = target
+        }
+        return max(cap, Decimal(0))
+    }
+
+    static func remainingAssignableAmount(for clothing: Clothing, entries: [WealthSavingEntry]) -> Decimal {
+        let remaining = assignableSavingCap(for: clothing) - activeTotal(for: clothing.id, in: entries)
+        return max(remaining, Decimal(0))
+    }
+
+    static func overflowAmount(for clothing: Clothing, entries: [WealthSavingEntry]) -> Decimal {
+        let overflow = activeTotal(for: clothing.id, in: entries) - assignableSavingCap(for: clothing)
+        return max(overflow, Decimal(0))
+    }
+
+    static func clampedSavingAmount(
+        _ amount: Decimal,
+        for clothing: Clothing,
+        entries: [WealthSavingEntry]
+    ) -> Decimal {
+        guard amount > 0 else { return 0 }
+        return min(amount, remainingAssignableAmount(for: clothing, entries: entries))
+    }
+
     static func purchaseTarget(for clothing: Clothing) -> Decimal {
         let target: Decimal
         if clothing.isDepositPlan {
@@ -393,6 +423,86 @@ enum WealthSavingLedger {
         context.insert(entry)
         try context.save()
         return entry
+    }
+
+    @discardableResult
+    @MainActor
+    static func addSaving(
+        amount: Decimal,
+        for clothing: Clothing,
+        entries: [WealthSavingEntry],
+        note: String = "",
+        context: ModelContext
+    ) throws -> WealthSavingEntry? {
+        let actualAmount = clampedSavingAmount(amount, for: clothing, entries: entries)
+        guard actualAmount > 0 else { return nil }
+        return try addSaving(
+            amount: actualAmount,
+            clothingID: clothing.id,
+            note: note,
+            context: context
+        )
+    }
+
+    @discardableResult
+    @MainActor
+    static func transferUnassignedSavings(
+        to clothing: Clothing,
+        entries: [WealthSavingEntry],
+        context: ModelContext,
+        note: String? = nil
+    ) throws -> Decimal {
+        let transferAmount = min(
+            activeUnassignedTotal(in: entries),
+            remainingAssignableAmount(for: clothing, entries: entries)
+        )
+        guard transferAmount > 0 else { return 0 }
+
+        let now = Date()
+        let unassignedEntries = entries
+            .filter { isActive($0) && $0.clothingID == nil }
+            .sorted { $0.createdAt < $1.createdAt }
+        let movedAmount = consumeActiveAmount(transferAmount, from: unassignedEntries, at: now)
+        guard movedAmount > 0 else { return 0 }
+
+        let entry = WealthSavingEntry(
+            amount: movedAmount,
+            clothingID: clothing.id,
+            note: note ?? "从未指定小金库填充「\(clothing.name)」",
+            createdAt: now
+        )
+        context.insert(entry)
+        try context.save()
+        return movedAmount
+    }
+
+    @discardableResult
+    @MainActor
+    static func moveOverflowToUnassigned(
+        for clothing: Clothing,
+        entries: [WealthSavingEntry],
+        context: ModelContext,
+        note: String? = nil
+    ) throws -> Decimal {
+        let overflow = overflowAmount(for: clothing, entries: entries)
+        guard overflow > 0 else { return 0 }
+
+        let now = Date()
+        let targetEntries = entries
+            .filter { isActive($0) && $0.clothingID == clothing.id }
+            .sorted { $0.createdAt > $1.createdAt }
+        let movedAmount = consumeActiveAmount(overflow, from: targetEntries, at: now)
+        guard movedAmount > 0 else { return 0 }
+
+        let entry = WealthSavingEntry(
+            amount: movedAmount,
+            clothingID: nil,
+            note: note ?? "从「\(clothing.name)」超额转回未指定",
+            createdAt: now
+        )
+        context.insert(entry)
+        try context.save()
+        return movedAmount
     }
 
     @MainActor
@@ -452,6 +562,35 @@ enum WealthSavingLedger {
         if didInsert {
             try? context.save()
         }
+    }
+
+    @MainActor
+    private static func consumeActiveAmount(
+        _ amount: Decimal,
+        from entries: [WealthSavingEntry],
+        at date: Date
+    ) -> Decimal {
+        var remaining = amount
+        var consumed = Decimal(0)
+
+        for entry in entries where remaining > 0 && isActive(entry) {
+            let entryAmount = entry.amount
+            if entryAmount <= remaining {
+                entry.voidedAt = date
+                entry.updatedAt = date
+                entry.lastModified = date
+                remaining -= entryAmount
+                consumed += entryAmount
+            } else {
+                entry.amount = entryAmount - remaining
+                entry.updatedAt = date
+                entry.lastModified = date
+                consumed += remaining
+                remaining = 0
+            }
+        }
+
+        return consumed
     }
 }
 

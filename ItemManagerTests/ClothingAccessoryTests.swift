@@ -126,6 +126,98 @@ final class ClothingAccessoryTests: XCTestCase {
         XCTAssertGreaterThan(WealthSavingLedger.progressRatio(for: clothing, entries: entries), 1.0)
     }
 
+    func testDepositPlanAssignableCapUsesRemainingPayableIncludingShipping() throws {
+        let clothing = Clothing(
+            name: "Shipping Deposit OP",
+            price: 1000,
+            deposit: 200,
+            balance: 800,
+            shippingFee: 50,
+            isDepositPlan: true
+        )
+        context.insert(clothing)
+
+        XCTAssertEqual(WealthSavingLedger.purchaseTarget(for: clothing), 1050)
+        XCTAssertEqual(WealthSavingLedger.assignableSavingCap(for: clothing), 850)
+        XCTAssertEqual(WealthSavingLedger.remainingAssignableAmount(for: clothing, entries: []), 850)
+    }
+
+    func testClampedClothingSavingOnlyAddsRemainingAssignableAmount() throws {
+        let clothing = Clothing(name: "Almost Full OP", price: 1000, deposit: 200, balance: 800, isDepositPlan: true)
+        context.insert(clothing)
+        try WealthSavingLedger.addSaving(amount: 780, clothingID: clothing.id, context: context)
+
+        let beforeEntries = try context.fetch(FetchDescriptor<WealthSavingEntry>())
+        let entry = try WealthSavingLedger.addSaving(
+            amount: 100,
+            for: clothing,
+            entries: beforeEntries,
+            context: context
+        )
+
+        let entries = try context.fetch(FetchDescriptor<WealthSavingEntry>())
+        XCTAssertEqual(entry?.amount, 20)
+        XCTAssertEqual(WealthSavingLedger.activeTotal(for: clothing.id, in: entries), 800)
+    }
+
+    func testTransferUnassignedSavingsFillsTargetWithoutExceedingCap() throws {
+        let clothing = Clothing(name: "Fill Target OP", price: 1000, deposit: 200, balance: 800, isDepositPlan: true)
+        context.insert(clothing)
+        try WealthSavingLedger.addSaving(amount: 1000, clothingID: nil, context: context)
+
+        let beforeEntries = try context.fetch(FetchDescriptor<WealthSavingEntry>())
+        let transferred = try WealthSavingLedger.transferUnassignedSavings(
+            to: clothing,
+            entries: beforeEntries,
+            context: context
+        )
+
+        let entries = try context.fetch(FetchDescriptor<WealthSavingEntry>())
+        XCTAssertEqual(transferred, 800)
+        XCTAssertEqual(WealthSavingLedger.activeTotal(for: clothing.id, in: entries), 800)
+        XCTAssertEqual(WealthSavingLedger.activeUnassignedTotal(in: entries), 200)
+    }
+
+    func testTransferUnassignedSavingsDoesNothingWhenTargetIsFull() throws {
+        let clothing = Clothing(name: "Full Target OP", price: 1000, deposit: 200, balance: 800, isDepositPlan: true)
+        context.insert(clothing)
+        try WealthSavingLedger.addSaving(amount: 800, clothingID: clothing.id, context: context)
+        try WealthSavingLedger.addSaving(amount: 200, clothingID: nil, context: context)
+
+        let beforeEntries = try context.fetch(FetchDescriptor<WealthSavingEntry>())
+        let transferred = try WealthSavingLedger.transferUnassignedSavings(
+            to: clothing,
+            entries: beforeEntries,
+            context: context
+        )
+
+        let entries = try context.fetch(FetchDescriptor<WealthSavingEntry>())
+        XCTAssertEqual(transferred, 0)
+        XCTAssertEqual(WealthSavingLedger.activeTotal(for: clothing.id, in: entries), 800)
+        XCTAssertEqual(WealthSavingLedger.activeUnassignedTotal(in: entries), 200)
+    }
+
+    func testMoveOverflowToUnassignedKeepsActiveTotalStable() throws {
+        let clothing = Clothing(name: "Overflow OP", price: 1000, deposit: 200, balance: 800, isDepositPlan: true)
+        context.insert(clothing)
+        try WealthSavingLedger.addSaving(amount: 900, clothingID: clothing.id, context: context)
+        try WealthSavingLedger.addSaving(amount: 20, clothingID: nil, context: context)
+
+        let beforeEntries = try context.fetch(FetchDescriptor<WealthSavingEntry>())
+        let beforeTotal = WealthSavingLedger.activeTotal(in: beforeEntries)
+        let moved = try WealthSavingLedger.moveOverflowToUnassigned(
+            for: clothing,
+            entries: beforeEntries,
+            context: context
+        )
+
+        let entries = try context.fetch(FetchDescriptor<WealthSavingEntry>())
+        XCTAssertEqual(moved, 100)
+        XCTAssertEqual(WealthSavingLedger.activeTotal(for: clothing.id, in: entries), 800)
+        XCTAssertEqual(WealthSavingLedger.activeUnassignedTotal(in: entries), 120)
+        XCTAssertEqual(WealthSavingLedger.activeTotal(in: entries), beforeTotal)
+    }
+
     func testMarkSavingsUsedRemovesFromActiveTotals() throws {
         let clothing = Clothing(name: "Paid OP", price: 1000, deposit: 200, balance: 800, isDepositPlan: true)
         context.insert(clothing)

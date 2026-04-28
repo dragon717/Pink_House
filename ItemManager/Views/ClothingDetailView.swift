@@ -87,16 +87,10 @@ struct ClothingDetailView: View {
                                 showingConfirmPaymentAlert = true
                             } label: {
                                 Text("已付尾款")
-                                    .font(.headline)
-                                    .foregroundStyle(.white)
-                                    .frame(maxWidth: .infinity)
-                                    .padding()
-                                    .background(Color.pink)
-                                    .cornerRadius(16)
                             }
+                            .buttonStyle(ThemeSkinPrimaryButtonStyle(fallbackTint: .pink, cornerRadius: 16, verticalPadding: 15))
                             .padding(.horizontal)
                             .offset(y: -40)
-                            .shadow(color: .pink.opacity(0.3), radius: 8, x: 0, y: 4)
                         }
                         
                         // MARK: - Metadata Info (Created/Updated)
@@ -586,8 +580,7 @@ struct ClothingDetailView: View {
             }
         }
         .padding()
-        .unifiedCardBackground(style: .current(from: themeManager), colorScheme: colorScheme)
-        .unifiedShadow(.card)
+        .themeSkinSectionCard(cornerRadius: 16)
     }
     
     /// 详细信息卡片 - 使用统一配色
@@ -604,8 +597,7 @@ struct ClothingDetailView: View {
             }
         }
         .padding()
-        .unifiedCardBackground(style: .current(from: themeManager), colorScheme: colorScheme)
-        .unifiedShadow(.card)
+        .themeSkinSectionCard(cornerRadius: 16)
     }
     
     @ViewBuilder
@@ -816,8 +808,7 @@ struct ClothingDetailView: View {
             }
         }
         .padding()
-        .unifiedCardBackground(style: .current(from: themeManager), colorScheme: colorScheme)
-        .unifiedShadow(.card)
+        .themeSkinSectionCard(cornerRadius: 16)
     }
     
     /// 表图大图查看 Sheet
@@ -836,6 +827,9 @@ struct ClothingDetailView: View {
         let saved = WealthSavingLedger.activeTotal(for: clothing.id, in: wealthSavingEntries)
         let numerator = WealthSavingLedger.progressNumerator(for: clothing, entries: wealthSavingEntries)
         let target = WealthSavingLedger.purchaseTarget(for: clothing)
+        let cap = WealthSavingLedger.assignableSavingCap(for: clothing)
+        let remaining = WealthSavingLedger.remainingAssignableAmount(for: clothing, entries: wealthSavingEntries)
+        let overflow = WealthSavingLedger.overflowAmount(for: clothing, entries: wealthSavingEntries)
         let ratio = WealthSavingLedger.progressRatio(for: clothing, entries: wealthSavingEntries)
 
         return VStack(alignment: .leading, spacing: 12) {
@@ -855,7 +849,7 @@ struct ClothingDetailView: View {
                     Text(saved > 0 ? "已存 ¥\(NSDecimalNumber(decimal: saved).stringValue)" : "为这条裙装存一笔")
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(themeManager.primaryTextColor)
-                    Text(clothing.isDepositPlan ? "进度包含已付定金，可超过目标金额" : "普通裙装只统计小金库存款进度")
+                    Text(clothing.isDepositPlan ? "进度包含已付定金，存款最多补齐剩余应付" : "普通裙装只统计小金库存款进度")
                         .font(.caption)
                         .foregroundStyle(themeManager.secondaryTextColor)
                 }
@@ -874,24 +868,36 @@ struct ClothingDetailView: View {
                 Text("进度 ¥\(NSDecimalNumber(decimal: numerator).stringValue) / ¥\(NSDecimalNumber(decimal: target).stringValue)")
                     .font(.caption2)
                     .foregroundStyle(themeManager.tertiaryTextColor)
+                Text("指定上限 ¥\(NSDecimalNumber(decimal: cap).stringValue) · 还能存 ¥\(NSDecimalNumber(decimal: remaining).stringValue)")
+                    .font(.caption2)
+                    .foregroundStyle(remaining > 0 ? themeManager.tertiaryTextColor : Color(hex: "C94C72"))
             }
 
             Button {
                 showingWealthSavingSheet = true
             } label: {
-                Label("存一笔到小金库", systemImage: "tray.and.arrow.down")
-                    .font(.subheadline.weight(.bold))
-                    .foregroundStyle(.white)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 11)
-                    .background(Color.orange)
-                    .clipShape(RoundedRectangle(cornerRadius: 14))
+                Label(remaining > 0 ? "存一笔到小金库" : "已存到上限", systemImage: "tray.and.arrow.down")
             }
-            .buttonStyle(.plain)
+            .buttonStyle(ThemeSkinPrimaryButtonStyle(fallbackTint: .orange, cornerRadius: 14, verticalPadding: 11))
+            .disabled(remaining <= 0)
+
+            if overflow > 0 {
+                Button {
+                    moveOverflowSavingToUnassigned()
+                } label: {
+                    Label("转出超额 ¥\(NSDecimalNumber(decimal: overflow).stringValue) 到未指定", systemImage: "arrow.uturn.left.circle.fill")
+                        .font(.caption.weight(.bold))
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 10)
+                        .foregroundStyle(Color(hex: "C94C72"))
+                        .background(Color(hex: "C94C72").opacity(0.12))
+                        .clipShape(RoundedRectangle(cornerRadius: 14))
+                }
+                .buttonStyle(.plain)
+            }
         }
         .padding()
-        .unifiedCardBackground(style: .current(from: themeManager), colorScheme: colorScheme)
-        .unifiedShadow(.card)
+        .themeSkinSectionCard(cornerRadius: 16)
     }
 
     private var finalPaymentSavedText: String {
@@ -903,16 +909,32 @@ struct ClothingDetailView: View {
 
     private func saveWealthSavingAmount(_ amount: Decimal) {
         do {
-            _ = try WealthSavingLedger.addSaving(
+            guard let entry = try WealthSavingLedger.addSaving(
                 amount: amount,
-                clothingID: clothing.id,
+                for: clothing,
+                entries: wealthSavingEntries,
                 note: "为「\(clothing.name)」存钱",
                 context: modelContext
-            )
+            ) else { return }
             Task { await SharedPersistence.shared.syncWidgetData() }
-            wealthSavingCelebrationAmount = amount
+            wealthSavingCelebrationAmount = entry.amount
         } catch {
             print("ClothingDetailView: Failed to save wealth saving entry: \(error)")
+        }
+    }
+
+    private func moveOverflowSavingToUnassigned() {
+        do {
+            let movedAmount = try WealthSavingLedger.moveOverflowToUnassigned(
+                for: clothing,
+                entries: wealthSavingEntries,
+                context: modelContext
+            )
+            if movedAmount > 0 {
+                Task { await SharedPersistence.shared.syncWidgetData() }
+            }
+        } catch {
+            print("ClothingDetailView: Failed to move overflow wealth saving: \(error)")
         }
     }
     
@@ -964,8 +986,7 @@ struct ClothingDetailView: View {
             }
         }
         .padding()
-        .unifiedCardBackground(style: .current(from: themeManager), colorScheme: colorScheme)
-        .unifiedShadow(.card)
+        .themeSkinSectionCard(cornerRadius: 16)
     }
     
     private func formatFinalPaymentDate(start: Date, end: Date?) -> String {

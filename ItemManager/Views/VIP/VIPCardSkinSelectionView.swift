@@ -12,7 +12,7 @@ struct VIPCardSkinSelectionView: View {
                 // Background
                 // Always use App Background with overlay for better consistency
                 Group {
-                    if themeManager.backgroundStyle == .image, let image = themeManager.backgroundImage {
+                    if themeManager.effectiveBackgroundStyle == .image, let image = themeManager.backgroundImage {
                         Image(uiImage: image)
                             .resizable()
                             .scaledToFill()

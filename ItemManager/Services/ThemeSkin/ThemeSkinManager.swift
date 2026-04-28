@@ -13,9 +13,10 @@ final class ThemeSkinManager: ObservableObject, ThemeSkinProviding {
 
     private let ownedKey = "theme_skin.owned"
     private let activeSelectionKey = "theme_skin.active_selection"
+    private let coreSurfaceMigrationKeyPrefix = "theme_skin.core_surface_defaults_migrated_v1"
 
     private init() {
-        reloadFromDisk()
+        reloadFromDisk(applyBackgroundHarmony: false)
     }
 
     var allOwnedThemeSkins: [OwnedThemeSkin] { ownedThemeSkins }
@@ -23,7 +24,7 @@ final class ThemeSkinManager: ObservableObject, ThemeSkinProviding {
     var currentEnabledSlots: Set<ThemeSkinSlot> { activeSelection.enabledSlots }
     var currentMeowCoinBalance: Int { StoreManager.getCurrentBalance() }
 
-    func reloadFromDisk() {
+    func reloadFromDisk(applyBackgroundHarmony: Bool = true) {
         let defaults = UserDefaults.standard
 
         if let data = defaults.data(forKey: ownedKey),
@@ -38,6 +39,12 @@ final class ThemeSkinManager: ObservableObject, ThemeSkinProviding {
             activeSelection = sanitize(selection: decoded)
         } else {
             activeSelection = .inactive
+        }
+
+        migrateCoreSurfaceDefaultsIfNeeded(defaults: defaults)
+
+        if applyBackgroundHarmony {
+            _ = ThemeManager.shared.enforceThemeSkinBackgroundHarmonyIfNeeded(activeThemeId: activeSelection.activeThemeId)
         }
     }
 
@@ -108,8 +115,8 @@ final class ThemeSkinManager: ObservableObject, ThemeSkinProviding {
 
         let purchaseMessage = "已购买「\(product.name)」，消费 \(quote.finalPrice) 喵币。"
         if autoActivateIfNeeded {
-            _ = activateTheme(product.themeId)
-            return .success("\(purchaseMessage) 已自动应用。")
+            let didAdjustBackground = applyThemeSelection(product)
+            return .success("\(purchaseMessage) 已自动应用。\(themeBackgroundHarmonySuffix(didAdjustBackground))")
         }
 
         broadcastChange()
@@ -125,13 +132,8 @@ final class ThemeSkinManager: ObservableObject, ThemeSkinProviding {
             return .failure("请先购买这个主题。")
         }
 
-        activeSelection = ActiveThemeSkinSelection(
-            activeThemeId: product.themeId,
-            enabledSlots: Set(product.defaultEnabledSlots.filter { product.supportedSlots.contains($0) })
-        )
-        saveActiveSelection()
-        broadcastChange()
-        return .success("已应用「\(product.name)」。")
+        let didAdjustBackground = applyThemeSelection(product)
+        return .success("已应用「\(product.name)」。\(themeBackgroundHarmonySuffix(didAdjustBackground))")
     }
 
     func deactivateCurrentTheme() -> ThemeSkinActionResult {
@@ -223,6 +225,51 @@ final class ThemeSkinManager: ObservableObject, ThemeSkinProviding {
         let filteredSlots = selection.enabledSlots.filter { product.supportedSlots.contains($0) }
         let enabledSlots = Set(filteredSlots)
         return ActiveThemeSkinSelection(activeThemeId: product.themeId, enabledSlots: enabledSlots)
+    }
+
+    private func migrateCoreSurfaceDefaultsIfNeeded(defaults: UserDefaults) {
+        guard let activeThemeId = activeSelection.activeThemeId,
+              let product = product(for: activeThemeId),
+              isPurchased(activeThemeId) else {
+            return
+        }
+
+        let migrationKey = "\(coreSurfaceMigrationKeyPrefix).\(product.themeId)"
+        guard !defaults.bool(forKey: migrationKey) else { return }
+
+        let newCoreSlots: Set<ThemeSkinSlot> = [
+            .settingsGridCard,
+            .sectionCard,
+            .primaryButton,
+            .iconCircleButton,
+            .emptyState
+        ]
+        let slotsToEnable = newCoreSlots.filter { product.supportedSlots.contains($0) }
+
+        if !slotsToEnable.isEmpty {
+            activeSelection.enabledSlots.formUnion(slotsToEnable)
+            activeSelection = sanitize(selection: activeSelection)
+            saveActiveSelection()
+        }
+
+        defaults.set(true, forKey: migrationKey)
+    }
+
+    @discardableResult
+    private func applyThemeSelection(_ product: ThemeSkinProduct) -> Bool {
+        activeSelection = ActiveThemeSkinSelection(
+            activeThemeId: product.themeId,
+            enabledSlots: Set(product.defaultEnabledSlots.filter { product.supportedSlots.contains($0) })
+        )
+        saveActiveSelection()
+        let wasUsingImageBackground = UserDefaults.standard.string(forKey: "theme_background_style") == BackgroundStyle.image.rawValue
+        let didAdjustBackground = ThemeManager.shared.enforceThemeSkinBackgroundHarmonyIfNeeded(activeThemeId: product.themeId)
+        broadcastChange()
+        return wasUsingImageBackground || didAdjustBackground
+    }
+
+    private func themeBackgroundHarmonySuffix(_ didAdjustBackground: Bool) -> String {
+        didAdjustBackground ? " \(ThemeManager.themeSkinBackgroundHarmonyAppendix)" : ""
     }
 
     private func saveOwnedThemeSkins() {

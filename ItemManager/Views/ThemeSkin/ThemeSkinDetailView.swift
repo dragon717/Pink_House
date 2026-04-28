@@ -25,6 +25,7 @@ struct ThemeSkinDetailView: View {
         ScrollView {
             VStack(spacing: 20) {
                 previewCard
+                livePreviewCard
                 purchaseCard
                 ThemeSkinSlotToggleSection(themeId: themeId)
             }
@@ -41,71 +42,136 @@ struct ThemeSkinDetailView: View {
     }
 
     private var previewCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text(product?.name ?? "主题")
-                .font(.title3.bold())
-                .foregroundStyle(themeManager.primaryTextColor)
+        ThemeSkinSectionCardContainer(cornerRadius: 28) {
+            VStack(alignment: .leading, spacing: 14) {
+                HStack(alignment: .top) {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(product?.name ?? "主题")
+                            .font(.system(size: 28, weight: .heavy, design: .rounded))
+                            .foregroundStyle(themeManager.primaryTextColor)
 
-            Text(product?.subtitle ?? "主题预览")
-                .font(.subheadline)
-                .foregroundStyle(themeManager.secondaryTextColor)
+                        Text(product?.subtitle ?? "主题预览")
+                            .font(.subheadline)
+                            .foregroundStyle(themeManager.secondaryTextColor)
+                    }
 
-            ThemeSkinOptionalFittedAsset(ThemeSkinAssetName.previewStoreHero) {
-                RoundedRectangle(cornerRadius: 20)
-                    .fill(themeManager.cardBackgroundColor.opacity(0.85))
-                    .overlay(
-                        VStack(spacing: 10) {
-                            Image(systemName: "sparkles")
-                                .font(.system(size: 36))
-                                .foregroundStyle(themeManager.accentTextColor)
-                            Text("主题预览")
-                                .font(.headline)
-                                .foregroundStyle(themeManager.primaryTextColor)
-                            Text("顶部栏 / 卡片 / TabBar 会从同一主题包里解析，不允许和其他主题混用。")
-                                .font(.footnote)
-                                .multilineTextAlignment(.center)
-                                .foregroundStyle(themeManager.secondaryTextColor)
-                                .padding(.horizontal)
-                        }
-                    )
+                    Spacer()
+
+                    Text(isActive ? "使用中" : (isPurchased ? "已拥有" : "未购买"))
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(isActive ? Color(hex: "FF5C93") : themeManager.accentTextColor)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(Capsule().fill(Color.white.opacity(0.72)))
+                }
+
+                ThemeSkinOptionalFittedAsset(
+                    ThemeSkinAssetName.previewStoreHero,
+                    namespace: product?.assetNamespace,
+                    allowShortNameFallback: false
+                ) {
+                    heroFallback
+                }
+                .frame(height: 236)
+                .frame(maxWidth: .infinity)
+                .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
             }
-            .frame(height: 220)
-            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .padding(18)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(18)
-        .background {
-            CardBackgroundView(cornerRadius: 24)
+    }
+
+    private var heroFallback: some View {
+        RoundedRectangle(cornerRadius: 24, style: .continuous)
+            .fill(themeManager.cardBackgroundColor.opacity(0.85))
+            .overlay(
+                VStack(spacing: 10) {
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 36))
+                        .foregroundStyle(themeManager.accentTextColor)
+                    Text("主题预览")
+                        .font(.headline)
+                        .foregroundStyle(themeManager.primaryTextColor)
+                    Text("顶部栏 / 卡片 / TabBar 会从同一主题包里解析，不允许和其他主题混用。")
+                        .font(.footnote)
+                        .multilineTextAlignment(.center)
+                        .foregroundStyle(themeManager.secondaryTextColor)
+                        .padding(.horizontal)
+                }
+            )
+    }
+
+    private var livePreviewCard: some View {
+        ThemeSkinSectionCardContainer(cornerRadius: 24) {
+            VStack(alignment: .leading, spacing: 14) {
+                Text("实时组件预览")
+                    .font(.headline)
+                    .foregroundStyle(themeManager.primaryTextColor)
+
+                VStack(spacing: 12) {
+                    HStack {
+                        ThemeSkinIconBadge(systemName: "sparkles", fallbackColor: themeManager.accentTextColor, size: 34, symbolSize: 14)
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text("精致顶栏")
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(themeManager.primaryTextColor)
+                            Text("卡片、按钮、空状态会随主题槽位开关实时回退。")
+                                .font(.caption)
+                                .foregroundStyle(themeManager.secondaryTextColor)
+                        }
+                        Spacer()
+                    }
+                    .padding(12)
+                    .themeSkinSectionCard(slot: .sectionCard, cornerRadius: 18, showsDecoration: false)
+
+                    HStack(spacing: 8) {
+                        Text("卡片")
+                        Text("按钮")
+                        Text("空状态")
+                    }
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(themeManager.secondaryTextColor)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                    Button {} label: {
+                        Label("主题主按钮示例", systemImage: "wand.and.stars")
+                    }
+                    .buttonStyle(ThemeSkinPrimaryButtonStyle(fallbackTint: themeManager.accentTextColor))
+                    .disabled(true)
+                }
+            }
+            .padding(18)
         }
     }
 
     private var purchaseCard: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            Text("购买与应用")
-                .font(.headline)
-                .foregroundStyle(themeManager.primaryTextColor)
+        ThemeSkinSectionCardContainer(cornerRadius: 24) {
+            VStack(alignment: .leading, spacing: 14) {
+                Text("购买与应用")
+                    .font(.headline)
+                    .foregroundStyle(themeManager.primaryTextColor)
 
-            if let product, let quote = themeSkinManager.priceQuote(for: themeId) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("原价 \(product.basePrice) 喵币")
-                        .font(.caption)
-                        .foregroundStyle(themeManager.secondaryTextColor)
-                    Text("当前价 \(quote.finalPrice) 喵币")
-                        .font(.title3.bold())
-                        .foregroundStyle(themeManager.primaryTextColor)
+                if let product, let quote = themeSkinManager.priceQuote(for: themeId) {
+                    HStack(alignment: .lastTextBaseline, spacing: 8) {
+                        Text("\(quote.finalPrice)")
+                            .font(.system(size: 30, weight: .heavy, design: .rounded))
+                            .foregroundStyle(themeManager.primaryTextColor)
+                        Text("喵币")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(themeManager.secondaryTextColor)
+                        Text("原价 \(product.basePrice)")
+                            .font(.footnote.weight(.medium))
+                            .foregroundStyle(themeManager.secondaryTextColor)
+                            .strikethrough()
+                    }
                 }
-            }
 
-            HStack(spacing: 10) {
                 if !isPurchased {
                     Button {
                         present(themeSkinManager.purchaseTheme(themeId, autoActivateIfNeeded: true).message)
                     } label: {
-                        Text("购买并应用")
-                            .frame(maxWidth: .infinity)
+                        Label("购买并应用", systemImage: "bag.fill")
                     }
-                    .buttonStyle(.borderedProminent)
-                    .tint(themeManager.accentTextColor)
+                    .buttonStyle(ThemeSkinPrimaryButtonStyle(fallbackTint: themeManager.accentTextColor))
                 } else {
                     Button {
                         let result = isActive
@@ -113,18 +179,13 @@ struct ThemeSkinDetailView: View {
                             : themeSkinManager.activateTheme(themeId)
                         present(result.message)
                     } label: {
-                        Text(isActive ? "停用主题" : "应用主题")
-                            .frame(maxWidth: .infinity)
+                        Label(isActive ? "停用主题" : "应用主题", systemImage: isActive ? "power.circle.fill" : "wand.and.stars")
                     }
-                    .buttonStyle(.borderedProminent)
-                    .tint(isActive ? .gray : themeManager.accentTextColor)
+                    .buttonStyle(ThemeSkinPrimaryButtonStyle(fallbackTint: isActive ? .gray : themeManager.accentTextColor))
                 }
             }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(18)
-        .background {
-            CardBackgroundView(cornerRadius: 24)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(18)
         }
     }
 

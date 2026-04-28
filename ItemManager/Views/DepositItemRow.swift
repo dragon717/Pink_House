@@ -23,8 +23,7 @@ struct DepositItemRow: View {
     }()
 
     var body: some View {
-        GlassCard {
-            VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: 16) {
                 // Top Section: Image + Basic Info
                 HStack(alignment: .center, spacing: 12) {
                     // Image
@@ -162,7 +161,8 @@ struct DepositItemRow: View {
                     }
                 }
             }
-        }
+            .padding(16)
+            .themeSkinSectionCard(cornerRadius: 24)
     }
 
     private func formatDate(_ date: Date?) -> String {
@@ -249,8 +249,7 @@ struct SimpleDepositItemRow: View {
     }()
 
     var body: some View {
-        GlassCard {
-            VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 10) {
                 HStack(spacing: 12) {
                     // 1. Image
                     if let uiImage = thumbnailImage {
@@ -351,7 +350,8 @@ struct SimpleDepositItemRow: View {
 
                 FinalPaymentWealthButton(clothing: clothing, compact: true)
             }
-        }
+            .padding(16)
+            .themeSkinSectionCard(cornerRadius: 24)
     }
 
     private func saveNoteChange() {
@@ -383,19 +383,28 @@ struct FinalPaymentWealthButton: View {
         WealthSavingLedger.activeTotal(for: clothing.id, in: wealthSavingEntries)
     }
 
+    private var remainingAmount: Decimal {
+        WealthSavingLedger.remainingAssignableAmount(for: clothing, entries: wealthSavingEntries)
+    }
+
+    private var overflowAmount: Decimal {
+        WealthSavingLedger.overflowAmount(for: clothing, entries: wealthSavingEntries)
+    }
+
     var body: some View {
         Button {
             showingSavingSheet = true
         } label: {
             statusLabel(
-                icon: savedAmount > 0 ? "tray.full.fill" : "tray.and.arrow.down",
-                title: savedAmount > 0 ? "小金库进度" : "存一笔到小金库",
-                detail: savedAmount > 0 ? "已存¥\(NSDecimalNumber(decimal: savedAmount).stringValue)" : "可多次存钱",
-                foreground: .orange,
+                icon: overflowAmount > 0 ? "exclamationmark.triangle.fill" : (savedAmount > 0 ? "tray.full.fill" : "tray.and.arrow.down"),
+                title: overflowAmount > 0 ? "小金库超额" : (remainingAmount <= 0 ? "已存到上限" : (savedAmount > 0 ? "小金库进度" : "存一笔到小金库")),
+                detail: overflowAmount > 0 ? "超额¥\(NSDecimalNumber(decimal: overflowAmount).stringValue)" : (savedAmount > 0 ? "已存¥\(NSDecimalNumber(decimal: savedAmount).stringValue)" : "剩余可存¥\(NSDecimalNumber(decimal: remainingAmount).stringValue)"),
+                foreground: overflowAmount > 0 ? Color(hex: "C94C72") : .orange,
                 background: Color.orange.opacity(0.10)
             )
         }
         .buttonStyle(.plain)
+        .disabled(remainingAmount <= 0)
         .sheet(isPresented: $showingSavingSheet) {
             VaultSavingSheet(
                 targetClothing: clothing,
@@ -445,20 +454,22 @@ struct FinalPaymentWealthButton: View {
         .padding(.horizontal, 12)
         .padding(.vertical, 7)
         .frame(maxWidth: compact ? .infinity : nil, alignment: .leading)
-        .background(background)
-        .clipShape(Capsule())
+        .themeSkinAdaptiveSectionCard(slot: .primaryButton, cornerRadius: 18, showsDecoration: false) {
+            Capsule().fill(background)
+        }
     }
 
     private func saveWealthSavingAmount(_ amount: Decimal) {
         do {
-            _ = try WealthSavingLedger.addSaving(
+            guard let entry = try WealthSavingLedger.addSaving(
                 amount: amount,
-                clothingID: clothing.id,
+                for: clothing,
+                entries: wealthSavingEntries,
                 note: "为「\(clothing.name)」存钱",
                 context: modelContext
-            )
+            ) else { return }
             Task { await SharedPersistence.shared.syncWidgetData() }
-            celebrationAmount = amount
+            celebrationAmount = entry.amount
         } catch {
             print("FinalPaymentWealthButton: Failed to save wealth saving entry: \(error)")
         }

@@ -340,13 +340,11 @@ struct RecentTimelineView: View {
                 }
             }
             .padding()
-            .background(
+            .themeSkinAdaptiveSectionCard(slot: .sectionCard, cornerRadius: 16) {
                 colorScheme == .dark
                     ? Color(uiColor: .secondarySystemGroupedBackground).opacity(0.8)
                     : Color(uiColor: themeManager.currentTheme.backgroundColor).opacity(0.9)
-            )
-            .clipShape(RoundedRectangle(cornerRadius: 16))
-            .shadow(color: .black.opacity(0.05), radius: 5, x: 0, y: 2)
+            }
         }
     }
 }
@@ -400,7 +398,9 @@ struct ClothingCardTiny: View {
             }
             .padding(6)
             .frame(width: 80)
-            .background(Color.white.opacity(0.7))
+            .themeSkinAdaptiveSectionCard(slot: .sectionCard, cornerRadius: 8, showsDecoration: false) {
+                Color.white.opacity(0.7)
+            }
         }
         .clipShape(RoundedRectangle(cornerRadius: 8))
         .shadow(radius: 1)
@@ -462,8 +462,9 @@ struct CompactDayRow: View {
                     .foregroundStyle(.tertiary)
             }
             .padding()
-            .background(Color(uiColor: theme.backgroundColor).opacity(0.9))
-            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .themeSkinAdaptiveSectionCard(slot: .sectionCard, cornerRadius: 12, showsDecoration: false) {
+                Color(uiColor: theme.backgroundColor).opacity(0.9)
+            }
         }
         .buttonStyle(.plain)
     }
@@ -521,12 +522,11 @@ struct DualMonthScrollView: View {
             }
             .padding(.horizontal)
         }
-        .background(
+        .themeSkinAdaptiveSectionCard(slot: .sectionCard, cornerRadius: 20) {
             colorScheme == .dark
                 ? Color(uiColor: .secondarySystemGroupedBackground).opacity(0.8)
                 : Color(uiColor: themeManager.currentTheme.backgroundColor).opacity(0.85)
-        )
-        .clipShape(RoundedRectangle(cornerRadius: 20))
+        }
         .padding(.horizontal)
     }
 }
@@ -601,13 +601,11 @@ struct YearlyHeatmapView: View {
                             .padding(8)
                             .frame(maxWidth: .infinity)
                             .aspectRatio(1.0, contentMode: .fit)
-                            .background(
+                            .themeSkinAdaptiveSectionCard(slot: .sectionCard, cornerRadius: 12, showsDecoration: false) {
                                 colorScheme == .dark
                                     ? Color(uiColor: .secondarySystemGroupedBackground).opacity(0.8)
                                     : Color(uiColor: themeManager.currentTheme.backgroundColor).opacity(0.85)
-                            )
-                            .clipShape(RoundedRectangle(cornerRadius: 12))
-                            .shadow(color: .black.opacity(0.05), radius: 2, x: 0, y: 1)
+                            }
                         }
                         .buttonStyle(.plain)
                     }
