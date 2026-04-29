@@ -155,7 +155,7 @@ struct ClothingEditDraft: Codable {
 }
 
 // MARK: - 草稿管理器
-final class ClothingEditDraftManager {
+final class ClothingEditDraftManager: ObservableObject {
     static let shared = ClothingEditDraftManager()
 
     private let userDefaults = UserDefaults.standard
@@ -165,6 +165,7 @@ final class ClothingEditDraftManager {
 
     // 当前新建状态（用于前后台/失活时保存）
     @Published var currentDraft: ClothingEditDraft?
+    @Published private(set) var hasPersistedDraft: Bool
     private var currentEditingDrafts: [UUID: ClothingEditDraft] = [:]
     private var activeEditorTokens: Set<UUID> = []
 
@@ -173,6 +174,7 @@ final class ClothingEditDraftManager {
     }
 
     private init() {
+        hasPersistedDraft = userDefaults.data(forKey: draftKey) != nil
         // 监听应用进入后台通知
         NotificationCenter.default.addObserver(
             forName: UIApplication.didEnterBackgroundNotification,
@@ -201,6 +203,7 @@ final class ClothingEditDraftManager {
             userDefaults.set(data, forKey: draftKey)
             userDefaults.set(draft.id.uuidString, forKey: draftIDKey)
             userDefaults.synchronize()
+            hasPersistedDraft = true
             print("DraftManager: Draft saved successfully")
         } else {
             print("DraftManager: Failed to encode draft")
@@ -239,13 +242,16 @@ final class ClothingEditDraftManager {
         userDefaults.removeObject(forKey: draftKey)
         userDefaults.removeObject(forKey: draftIDKey)
         userDefaults.synchronize()
+        hasPersistedDraft = false
         print("DraftManager: Draft cleared")
     }
 
     func hasDraft() -> Bool {
-        // HomeView/菜单渲染会高频读取这个状态，这里只做轻量 key 检查，
-        // 避免每次重绘都解码草稿并刷日志。
-        userDefaults.data(forKey: draftKey) != nil
+        hasPersistedDraft
+    }
+
+    func refreshDraftPresence() {
+        hasPersistedDraft = userDefaults.data(forKey: draftKey) != nil
     }
 
     func updateEditingDraft(_ draft: ClothingEditDraft, for clothingID: UUID) {

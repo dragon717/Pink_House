@@ -152,7 +152,9 @@ struct MultiDimensionalFilterSheet: View {
                 ToolbarItem(placement: .topBarTrailing) {
                     HStack(spacing: 12) {
                         // 心愿尾款筛选
+                        // menu-perf: multi-dimensional deposit status menu
                         Menu {
+                            let _ = MenuPerfSignpost.menuContent("wardrobe.multi_filter.deposit_status")
                             ForEach(DepositStatusFilter.allCases) { filter in
                                 Button {
                                     depositStatusFilter = filter

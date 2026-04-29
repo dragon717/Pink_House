@@ -80,7 +80,9 @@
 
 ### P2 — 顶部导航栏紧凑化（"小一些，精致优雅"）
 
-调整对象集中在 `HomeThemeSkinComponents.swift` 与 `HomeView.swift` 顶栏按钮字号，不动逻辑。
+调整对象集中在 `HomeThemeSkinComponents.swift`、`HomeView.swift` 和 `WardrobeNavigationStyle.swift` 顶栏视觉度量，不动导航逻辑。
+
+> 2026-04-29 补充：`HomeThemeSkinComponents.swift` 的默认圆角、阴影和按钮尺寸已经收紧，但非 iOS 26（iOS 17.4 / iOS 18）仍会出现截图中的大顶栏。根因不是系统版本分支，而是 `HomeView` 在实际调用 `HomeThemeSkinToolbarShell` 时仍显式传入 `horizontalPadding: 10` / `verticalPadding: 7`，同时 `tabSwitcher` 内部两个 tab 仍有 `frame(height: 44)`，两者叠加后会把主题胶囊撑到约 58pt。后续规范以 `WardrobeTopBarMetrics` 为唯一来源，视觉高度收紧，点击仍依赖系统 inline toolbar 的 44pt 可用区域。
 
 #### 2.1 `HomeThemeSkinChromeStyle` 度量收紧
 
@@ -127,6 +129,36 @@
 - `size: 18` → `size: 15`（done 类按钮）
 - `size: 14` → `size: 12`（普通操作按钮）
 - `bell.badge` 数字 `size: 8` → `size: 7`，`offset(x: 8, y: -6)` → `offset(x: 6, y: -5)`
+
+#### 2.6 `HomeView` / `WardrobeNavigationStyle` 衣橱主顶栏统一度量
+
+新增 `WardrobeTopBarMetrics` 作为衣橱主顶栏单一尺寸规范：
+
+| 字段 | 目标 |
+|---|---:|
+| shell horizontal / vertical padding | 8 / 4 |
+| 分段视觉高度 | 32 |
+| 分段间距 | 8 |
+| 普通图标 / 日历图标 | 13 / 15 |
+| 日历图标 frame | 20 |
+| 分段文字 | 9 |
+
+执行要求：
+
+- `HomeView` 中所有衣橱顶栏 `HomeThemeSkinToolbarShell` 调用都使用 `WardrobeTopBarMetrics.shellHorizontalPadding` / `shellVerticalPadding`，禁止再硬编码 `10 / 7`。
+- `tabSwitcher` 的两个 tab 改为 `frame(height: WardrobeTopBarMetrics.segmentVisualHeight)`，禁止再用 `frame(height: 44)` 撑大主题胶囊。
+- `WardrobeFashionTabSwitcher` 复用同一组 metrics，经典/时尚导航栏不再各自维护一套尺寸。
+
+#### 2.7 主题态经典导航左侧双标签与菜单图案层规范
+
+> 2026-04-29 补充：截图反馈显示，主题态经典导航栏在点击排序 / 筛选 / 更多等系统 `Menu` 后，左侧双标签容易被右侧操作组或弹层视觉挤占；同时顶部装饰图案需要保留，但必须位于文字下面。
+
+执行要求：
+
+- 经典导航左侧仍保留「少女衣橱 / 心愿尾款」双标签，不折叠成单标签；主题态使用固定宽度的左侧分段容器，避免右侧 action group 或系统 `Menu` 打开时挤压左侧。
+- 主题态左侧分段使用 `WardrobeTopBarMetrics.classicSegment*` 专用尺寸；默认皮肤继续走原有尺寸，禁止主题装饰泄漏到默认皮肤。
+- 顶部栏 / 菜单触发器的主题装饰图案属于**背景纹理层**：可以保留图案氛围，但必须放在文字、图标和按钮内容下方，且不参与点击命中。
+- SwiftUI 系统 `Menu` 弹层本体继续保持系统行为，不接管菜单气泡内部样式；本规范只约束菜单触发器和顶部栏主题背景层。
 
 ### P3 — 底部导航栏异形 + 主题相关
 

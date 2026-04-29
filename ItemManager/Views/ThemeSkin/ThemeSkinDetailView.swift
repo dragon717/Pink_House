@@ -50,6 +50,9 @@ struct ThemeSkinDetailView: View {
                     }
 
                     purchaseCard
+                    if let product {
+                        ThemeSkinBackgroundStickerSelectionCard(product: product)
+                    }
 
                     ThemeSkinSlotToggleSection(
                         themeId: themeId,

@@ -102,16 +102,16 @@ enum SkyConcertThemeSkin {
             return [
                 SkyConcertDecorationPlacement(
                     assetName: decorMusicScrollClouds,
-                    width: 62,
-                    opacity: 0.74,
+                    width: 64,
+                    opacity: 0.58,
                     alignment: .topTrailing,
                     offset: CGSize(width: 26, height: -24),
                     rotationDegrees: -8
                 ),
                 SkyConcertDecorationPlacement(
-                    assetName: decorShootingStar,
-                    width: 24,
-                    opacity: 0.68,
+                    assetName: decorViolinCloud,
+                    width: 32,
+                    opacity: 0.46,
                     alignment: .bottomLeading,
                     offset: CGSize(width: -10, height: 10),
                     rotationDegrees: -10
@@ -121,22 +121,22 @@ enum SkyConcertThemeSkin {
             return [
                 SkyConcertDecorationPlacement(
                     assetName: decorMoonStarClouds,
-                    width: 54,
-                    opacity: 0.42,
+                    width: 52,
+                    opacity: 0.28,
                     alignment: .topLeading,
-                    offset: CGSize(width: -24, height: -18),
+                    offset: CGSize(width: -22, height: -18),
                     rotationDegrees: 0
                 )
             ]
         case .searchEntry:
             return [
                 SkyConcertDecorationPlacement(
-                    assetName: decorShootingStar,
-                    width: 22,
+                    assetName: decorViolinCloud,
+                    width: 34,
                     opacity: 0.72,
                     alignment: .topTrailing,
-                    offset: CGSize(width: 8, height: -8),
-                    rotationDegrees: -12
+                    offset: CGSize(width: 12, height: -12),
+                    rotationDegrees: -8
                 )
             ]
         }
@@ -196,38 +196,38 @@ enum SkyConcertThemeSkin {
         ),
         SkyConcertDecorationPlacement(
             assetName: decorBunnyAccordionStage,
-            width: 78,
-            opacity: 0.86,
+            width: 92,
+            opacity: 0.9,
             alignment: .topTrailing,
-            offset: CGSize(width: 18, height: -42),
+            offset: CGSize(width: 26, height: -52),
             rotationDegrees: -5
         ),
         SkyConcertDecorationPlacement(
-            assetName: decorShootingStar,
-            width: 26,
-            opacity: 0.74,
+            assetName: decorViolinCloud,
+            width: 48,
+            opacity: 0.72,
             alignment: .topLeading,
-            offset: CGSize(width: -10, height: -10),
-            rotationDegrees: -12
+            offset: CGSize(width: -14, height: -14),
+            rotationDegrees: -8
         )
     ]
 
     static let wardrobeCardPlacements: [SkyConcertDecorationPlacement] = [
         SkyConcertDecorationPlacement(
             assetName: decorViolinCloud,
-            width: 46,
-            opacity: 0.58,
+            width: 56,
+            opacity: 0.68,
             alignment: .topTrailing,
-            offset: CGSize(width: 14, height: -18),
+            offset: CGSize(width: 20, height: -24),
             rotationDegrees: 7
         ),
         SkyConcertDecorationPlacement(
-            assetName: decorShootingStar,
-            width: 22,
+            assetName: decorMusicScrollClouds,
+            width: 36,
             opacity: 0.76,
             alignment: .topLeading,
-            offset: CGSize(width: -8, height: -8),
-            rotationDegrees: -12
+            offset: CGSize(width: -12, height: -12),
+            rotationDegrees: -8
         ),
         SkyConcertDecorationPlacement(
             assetName: decorPastelPlanets,
@@ -242,19 +242,19 @@ enum SkyConcertThemeSkin {
     static let tabBarPlacements: [SkyConcertDecorationPlacement] = [
         SkyConcertDecorationPlacement(
             assetName: decorCrescentRainCloud,
-            width: 50,
-            opacity: 0.74,
+            width: 62,
+            opacity: 0.82,
             alignment: .topTrailing,
-            offset: CGSize(width: -12, height: -30),
+            offset: CGSize(width: -6, height: -42),
             rotationDegrees: 4
         ),
         SkyConcertDecorationPlacement(
-            assetName: decorShootingStar,
-            width: 26,
-            opacity: 0.72,
+            assetName: decorSkyBalloonDoves,
+            width: 58,
+            opacity: 0.42,
             alignment: .topLeading,
-            offset: CGSize(width: 24, height: -12),
-            rotationDegrees: -10
+            offset: CGSize(width: 14, height: -28),
+            rotationDegrees: -6
         )
     ]
 }
@@ -292,18 +292,18 @@ enum SwanDreamThemeSkin {
             return [
                 SkyConcertDecorationPlacement(
                     assetName: decorPinkRibbonBow,
-                    width: 46,
-                    opacity: 0.72,
+                    width: 50,
+                    opacity: 0.56,
                     alignment: .topTrailing,
-                    offset: CGSize(width: 18, height: -22),
+                    offset: CGSize(width: 22, height: -22),
                     rotationDegrees: -7
                 ),
                 SkyConcertDecorationPlacement(
-                    assetName: decorCrystalStars,
-                    width: 28,
-                    opacity: 0.66,
+                    assetName: decorMoonBowBottle,
+                    width: 34,
+                    opacity: 0.46,
                     alignment: .bottomLeading,
-                    offset: CGSize(width: -8, height: 10),
+                    offset: CGSize(width: -9, height: 10),
                     rotationDegrees: -6
                 )
             ]
@@ -311,22 +311,22 @@ enum SwanDreamThemeSkin {
             return [
                 SkyConcertDecorationPlacement(
                     assetName: decorSwanFeatherBow,
-                    width: 50,
-                    opacity: 0.42,
+                    width: 52,
+                    opacity: 0.3,
                     alignment: .topLeading,
-                    offset: CGSize(width: -22, height: -20),
+                    offset: CGSize(width: -22, height: -18),
                     rotationDegrees: -9
                 )
             ]
         case .searchEntry:
             return [
                 SkyConcertDecorationPlacement(
-                    assetName: decorCrystalStars,
-                    width: 24,
+                    assetName: decorMoonBowBottle,
+                    width: 36,
                     opacity: 0.72,
                     alignment: .topTrailing,
-                    offset: CGSize(width: 8, height: -9),
-                    rotationDegrees: 0
+                    offset: CGSize(width: 12, height: -13),
+                    rotationDegrees: -4
                 )
             ]
         }
@@ -358,12 +358,12 @@ enum SwanDreamThemeSkin {
             rotationDegrees: 0
         ),
         SkyConcertDecorationPlacement(
-            assetName: decorCrystalStars,
-            width: 68,
-            opacity: 0.34,
+            assetName: decorMoonBowBottle,
+            width: 74,
+            opacity: 0.28,
             alignment: .trailing,
             offset: CGSize(width: 14, height: 22),
-            rotationDegrees: 2
+            rotationDegrees: -4
         )
     ]
 
@@ -378,18 +378,18 @@ enum SwanDreamThemeSkin {
         ),
         SkyConcertDecorationPlacement(
             assetName: decorCrownedSwanClouds,
-            width: 64,
-            opacity: 0.78,
+            width: 78,
+            opacity: 0.84,
             alignment: .topTrailing,
-            offset: CGSize(width: 14, height: -30),
+            offset: CGSize(width: 22, height: -40),
             rotationDegrees: -4
         ),
         SkyConcertDecorationPlacement(
             assetName: decorSwanFeatherBow,
-            width: 34,
-            opacity: 0.58,
+            width: 42,
+            opacity: 0.66,
             alignment: .topLeading,
-            offset: CGSize(width: -8, height: -8),
+            offset: CGSize(width: -13, height: -13),
             rotationDegrees: -12
         )
     ]
@@ -397,19 +397,19 @@ enum SwanDreamThemeSkin {
     static let wardrobeCardPlacements: [SkyConcertDecorationPlacement] = [
         SkyConcertDecorationPlacement(
             assetName: decorPinkRibbonBow,
-            width: 34,
-            opacity: 0.62,
+            width: 44,
+            opacity: 0.72,
             alignment: .topTrailing,
-            offset: CGSize(width: 9, height: -11),
+            offset: CGSize(width: 15, height: -18),
             rotationDegrees: 8
         ),
         SkyConcertDecorationPlacement(
-            assetName: decorCrystalStars,
-            width: 24,
-            opacity: 0.68,
+            assetName: decorMoonBowBottle,
+            width: 34,
+            opacity: 0.72,
             alignment: .topLeading,
-            offset: CGSize(width: -8, height: -8),
-            rotationDegrees: 0
+            offset: CGSize(width: -12, height: -12),
+            rotationDegrees: -4
         ),
         SkyConcertDecorationPlacement(
             assetName: decorSwanFeatherBow,
@@ -424,27 +424,27 @@ enum SwanDreamThemeSkin {
     static let tabBarPlacements: [SkyConcertDecorationPlacement] = [
         SkyConcertDecorationPlacement(
             assetName: decorMoonBowBottle,
-            width: 42,
-            opacity: 0.74,
+            width: 54,
+            opacity: 0.82,
             alignment: .topLeading,
-            offset: CGSize(width: 28, height: -34),
+            offset: CGSize(width: 22, height: -46),
             rotationDegrees: -4
         ),
         SkyConcertDecorationPlacement(
             assetName: decorRibbonSwanClouds,
-            width: 78,
-            opacity: 0.68,
+            width: 92,
+            opacity: 0.76,
             alignment: .topTrailing,
-            offset: CGSize(width: -12, height: -42),
+            offset: CGSize(width: -6, height: -54),
             rotationDegrees: 3
         ),
         SkyConcertDecorationPlacement(
-            assetName: decorCrystalStars,
-            width: 24,
-            opacity: 0.68,
+            assetName: decorCrownedSwanClouds,
+            width: 38,
+            opacity: 0.58,
             alignment: .top,
-            offset: CGSize(width: 8, height: -18),
-            rotationDegrees: 0
+            offset: CGSize(width: 8, height: -24),
+            rotationDegrees: -3
         )
     ]
 }

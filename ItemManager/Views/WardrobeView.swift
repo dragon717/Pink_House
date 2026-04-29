@@ -325,6 +325,26 @@ private struct WardrobeVisibleItemFramePreferenceKey: PreferenceKey {
     }
 }
 
+private struct BatchEditDraft: Equatable {
+    var selectedTags: [Tag] = []
+    var selectedBrand: Brand?
+    var selectedColors: [String] = []
+    var selectedSizes: [String] = []
+    var selectedLengths: [String] = []
+    var selectedAccessories: [String] = []
+    var selectedCondition: String?
+
+    static func == (lhs: BatchEditDraft, rhs: BatchEditDraft) -> Bool {
+        lhs.selectedTags.map(\.id) == rhs.selectedTags.map(\.id) &&
+            lhs.selectedBrand?.id == rhs.selectedBrand?.id &&
+            lhs.selectedColors == rhs.selectedColors &&
+            lhs.selectedSizes == rhs.selectedSizes &&
+            lhs.selectedLengths == rhs.selectedLengths &&
+            lhs.selectedAccessories == rhs.selectedAccessories &&
+            lhs.selectedCondition == rhs.selectedCondition
+    }
+}
+
 struct WardrobeView: View {
     @Binding var searchText: String
     @Binding var isSelectionMode: Bool
@@ -348,24 +368,18 @@ struct WardrobeView: View {
     // Batch Actions States
     @State private var showingDeleteAlert = false
     @State private var showingBatchCopyAlert = false
+    @State private var batchEditDraft = BatchEditDraft()
     @State private var showingTagSelection = false
-    @State private var tempSelectedTags: [Tag] = []
     @State private var showingAddTagsConfirmation = false
     @State private var showingBrandSelection = false
-    @State private var tempSelectedBrand: Brand?
     @State private var showingSetBrandConfirmation = false
     
     // Batch Edit States
     @State private var showingColorSelection = false
-    @State private var tempSelectedColors: [String] = []
     @State private var showingSizeSelection = false
-    @State private var tempSelectedSizes: [String] = []
     @State private var showingLengthSelection = false
-    @State private var tempSelectedLengths: [String] = []
     @State private var showingAccessorySelection = false
-    @State private var tempSelectedAccessories: [String] = []
     @State private var showingConditionSelection = false
-    @State private var tempSelectedCondition: String? = nil
     
     // 合并为小物到裙装
     @State private var showingMergeToAccessorySheet = false
@@ -514,13 +528,15 @@ struct WardrobeView: View {
             ClothingRowBrief(
                 snapshot: snapshot,
                 showPrice: showPrice,
-                showOriginalPrice: showOriginalPrice
+                showOriginalPrice: showOriginalPrice,
+                wardrobeThemeDescriptor: wardrobeThemeDescriptor
             )
         } else {
             ClothingRow(
                 snapshot: snapshot,
                 showPrice: showPrice,
-                showOriginalPrice: showOriginalPrice
+                showOriginalPrice: showOriginalPrice,
+                wardrobeThemeDescriptor: wardrobeThemeDescriptor
             )
         }
     }
@@ -683,16 +699,18 @@ struct WardrobeView: View {
                 Divider()
                     .frame(height: 20)
 
+                // menu-perf: wardrobe batch edit more menu
                 Menu {
+                    let _ = MenuPerfSignpost.menuContent("wardrobe.batch.more")
                     Button {
-                        tempSelectedTags = []
+                        batchEditDraft.selectedTags = []
                         showingTagSelection = true
                     } label: {
                         Label("添加标签", systemImage: "tag")
                     }
 
                     Button {
-                        tempSelectedBrand = nil
+                        batchEditDraft.selectedBrand = nil
                         showingBrandSelection = true
                     } label: {
                         Label("归类品牌", systemImage: "bag")
@@ -701,35 +719,35 @@ struct WardrobeView: View {
                     Divider()
 
                     Button {
-                        tempSelectedColors = []
+                        batchEditDraft.selectedColors = []
                         showingColorSelection = true
                     } label: {
                         Label("染上颜色", systemImage: "paintbrush")
                     }
 
                     Button {
-                        tempSelectedSizes = []
+                        batchEditDraft.selectedSizes = []
                         showingSizeSelection = true
                     } label: {
                         Label("变换尺码", systemImage: "ruler")
                     }
 
                     Button {
-                        tempSelectedLengths = []
+                        batchEditDraft.selectedLengths = []
                         showingLengthSelection = true
                     } label: {
                         Label("设置衣长", systemImage: "lines.measurement.vertical")
                     }
 
                     Button {
-                        tempSelectedAccessories = []
+                        batchEditDraft.selectedAccessories = []
                         showingAccessorySelection = true
                     } label: {
                         Label("搭配小物", systemImage: "sparkles")
                     }
 
                     Button {
-                        tempSelectedCondition = nil
+                        batchEditDraft.selectedCondition = nil
                         showingConditionSelection = true
                     } label: {
                         Label("改变成色", systemImage: "arrow.2.circlepath")
@@ -749,6 +767,9 @@ struct WardrobeView: View {
                             .font(.caption)
                     }
                     .frame(maxWidth: .infinity)
+                    .onTapGesture {
+                        _ = MenuPerfSignpost.menuOpen("wardrobe.batch.more")
+                    }
                 }
                 .disabled(selectedItemIDs.isEmpty)
 
@@ -781,17 +802,17 @@ struct WardrobeView: View {
     private func applySheets<Content: View>(to content: Content) -> some View {
         content
             .sheet(isPresented: $showingTagSelection) {
-                TagSelectionView(selectedTags: $tempSelectedTags)
+                TagSelectionView(selectedTags: $batchEditDraft.selectedTags)
                     .onDisappear {
-                        if !tempSelectedTags.isEmpty {
+                        if !batchEditDraft.selectedTags.isEmpty {
                             showingAddTagsConfirmation = true
                         }
                     }
             }
             .sheet(isPresented: $showingBrandSelection) {
-                BrandSelectionView(selectedBrand: $tempSelectedBrand)
+                BrandSelectionView(selectedBrand: $batchEditDraft.selectedBrand)
                     .onDisappear {
-                        if tempSelectedBrand != nil {
+                        if batchEditDraft.selectedBrand != nil {
                             showingSetBrandConfirmation = true
                         }
                     }
@@ -800,11 +821,11 @@ struct WardrobeView: View {
                 BatchStringSelectionView(
                     title: "染上颜色",
                     options: SuggestionManager.shared.getAllColors(),
-                    selectedItems: $tempSelectedColors
+                    selectedItems: $batchEditDraft.selectedColors
                 )
                 .onDisappear {
-                    if !tempSelectedColors.isEmpty {
-                        batchSetColors(tempSelectedColors)
+                    if !batchEditDraft.selectedColors.isEmpty {
+                        batchSetColors(batchEditDraft.selectedColors)
                     }
                 }
             }
@@ -812,11 +833,11 @@ struct WardrobeView: View {
                 BatchStringSelectionView(
                     title: "变换尺码",
                     options: SuggestionManager.shared.getAllSizes(),
-                    selectedItems: $tempSelectedSizes
+                    selectedItems: $batchEditDraft.selectedSizes
                 )
                 .onDisappear {
-                    if !tempSelectedSizes.isEmpty {
-                        batchSetSizes(tempSelectedSizes)
+                    if !batchEditDraft.selectedSizes.isEmpty {
+                        batchSetSizes(batchEditDraft.selectedSizes)
                     }
                 }
             }
@@ -824,11 +845,11 @@ struct WardrobeView: View {
                 BatchStringSelectionView(
                     title: "设置衣长",
                     options: SuggestionManager.shared.getAllLengths(),
-                    selectedItems: $tempSelectedLengths
+                    selectedItems: $batchEditDraft.selectedLengths
                 )
                 .onDisappear {
-                    if !tempSelectedLengths.isEmpty {
-                        batchSetLengths(tempSelectedLengths)
+                    if !batchEditDraft.selectedLengths.isEmpty {
+                        batchSetLengths(batchEditDraft.selectedLengths)
                     }
                 }
             }
@@ -836,21 +857,21 @@ struct WardrobeView: View {
                 BatchStringSelectionView(
                     title: "搭配小物",
                     options: SuggestionManager.shared.getAllAccessories(),
-                    selectedItems: $tempSelectedAccessories
+                    selectedItems: $batchEditDraft.selectedAccessories
                 )
                 .onDisappear {
-                    if !tempSelectedAccessories.isEmpty {
-                        batchSetAccessories(tempSelectedAccessories)
+                    if !batchEditDraft.selectedAccessories.isEmpty {
+                        batchSetAccessories(batchEditDraft.selectedAccessories)
                     }
                 }
             }
             .sheet(isPresented: $showingConditionSelection) {
                 BatchConditionSelectionView(
-                    selectedCondition: $tempSelectedCondition,
+                    selectedCondition: $batchEditDraft.selectedCondition,
                     options: conditionBatchOptions
                 )
                     .onDisappear {
-                        if let condition = tempSelectedCondition {
+                        if let condition = batchEditDraft.selectedCondition {
                             batchSetCondition(condition)
                         }
                     }
@@ -885,27 +906,27 @@ struct WardrobeView: View {
             }
             .alert("确认添加标签", isPresented: $showingAddTagsConfirmation) {
                 Button("取消", role: .cancel) {
-                    tempSelectedTags = []
+                    batchEditDraft.selectedTags = []
                 }
                 Button("确认添加") {
-                    if !tempSelectedTags.isEmpty {
-                        addTagsToSelectedItems(tempSelectedTags)
+                    if !batchEditDraft.selectedTags.isEmpty {
+                        addTagsToSelectedItems(batchEditDraft.selectedTags)
                     }
                 }
             } message: {
-                Text("确定要为选中的 \(selectedItemIDs.count) 件物品添加 \(tempSelectedTags.count) 个标签吗？")
+                Text("确定要为选中的 \(selectedItemIDs.count) 件物品添加 \(batchEditDraft.selectedTags.count) 个标签吗？")
             }
             .alert("确认归类品牌", isPresented: $showingSetBrandConfirmation) {
                 Button("取消", role: .cancel) {
-                    tempSelectedBrand = nil
+                    batchEditDraft.selectedBrand = nil
                 }
                 Button("确认修改") {
-                    if let brand = tempSelectedBrand {
+                    if let brand = batchEditDraft.selectedBrand {
                         setBrandForSelectedItems(brand)
                     }
                 }
             } message: {
-                if let brand = tempSelectedBrand {
+                if let brand = batchEditDraft.selectedBrand {
                     Text("确定要将选中的 \(selectedItemIDs.count) 件物品归类到品牌“\(brand.name)”吗？")
                 }
             }
@@ -1056,35 +1077,10 @@ struct WardrobeView: View {
                 }
             }
             .buttonStyle(.plain)
+            // menu-perf: wardrobe grid cell context menu
             .contextMenu {
-                Button {
-                    isSelectionMode = true
-                    selectedItemIDs.insert(clothing.id)
-                } label: {
-                    Label("选择", systemImage: "checkmark.circle")
-                }
-
-                Button {
-                    openDetail(clothing)
-                } label: {
-                    Label("查看详情", systemImage: "info.circle")
-                }
-
-                Divider()
-
-                Button {
-                    itemToCopy = clothing
-                    showingCopyAlert = true
-                } label: {
-                    Label("复制", systemImage: "doc.on.doc")
-                }
-
-                Button(role: .destructive) {
-                    itemToDelete = clothing
-                    showingDeleteSingleAlert = true
-                } label: {
-                    Label("删除", systemImage: "trash")
-                }
+                let _ = MenuPerfSignpost.contextMenuOpen("wardrobe.grid_cell")
+                contextMenuItems(for: clothing)
             }
         }
     }
@@ -1349,7 +1345,7 @@ struct WardrobeView: View {
         try? modelContext.save()
         
         // Keep selection mode active as requested
-        tempSelectedTags = []
+        batchEditDraft.selectedTags = []
     }
     
     private func setBrandForSelectedItems(_ brand: Brand) {
@@ -1360,7 +1356,7 @@ struct WardrobeView: View {
         try? modelContext.save()
         
         // Keep selection mode active as requested
-        tempSelectedBrand = nil
+        batchEditDraft.selectedBrand = nil
     }
     
     // MARK: - Batch Edit Methods
@@ -1372,7 +1368,7 @@ struct WardrobeView: View {
             item.colors = colorString
         }
         try? modelContext.save()
-        tempSelectedColors = []
+        batchEditDraft.selectedColors = []
     }
     
     private func batchSetSizes(_ sizes: [String]) {
@@ -1382,7 +1378,7 @@ struct WardrobeView: View {
             item.sizes = sizeString
         }
         try? modelContext.save()
-        tempSelectedSizes = []
+        batchEditDraft.selectedSizes = []
     }
     
     private func batchSetLengths(_ lengths: [String]) {
@@ -1393,7 +1389,7 @@ struct WardrobeView: View {
             item.length = lengthString
         }
         try? modelContext.save()
-        tempSelectedLengths = []
+        batchEditDraft.selectedLengths = []
     }
     
     private func batchSetAccessories(_ accessories: [String]) {
@@ -1403,7 +1399,7 @@ struct WardrobeView: View {
             item.accessories = accessoryString
         }
         try? modelContext.save()
-        tempSelectedAccessories = []
+        batchEditDraft.selectedAccessories = []
     }
     
     private func batchSetCondition(_ condition: String) {
@@ -1412,7 +1408,7 @@ struct WardrobeView: View {
             item.condition = condition
         }
         try? modelContext.save()
-        tempSelectedCondition = nil
+        batchEditDraft.selectedCondition = nil
     }
     
     // MARK: - 合并为小物到裙装
@@ -1691,11 +1687,14 @@ struct WardrobeView: View {
             }
         }
         .buttonStyle(.plain)
+        // menu-perf: wardrobe list cell context menu
         .contextMenu {
+            let _ = MenuPerfSignpost.contextMenuOpen("wardrobe.list_cell")
             contextMenuItems(for: clothing)
         }
     }
 
+    // MARK: keep this closure dependency-free for menu-perf
     private func contextMenuItems(for clothing: Clothing) -> some View {
         Group {
             Button {
@@ -2532,7 +2531,9 @@ struct MergeAccessoryFilterSheet: View {
                 ToolbarItem(placement: .topBarTrailing) {
                     HStack(spacing: 12) {
                         // 心愿尾款筛选
+                        // menu-perf: merge target deposit status menu
                         Menu {
+                            let _ = MenuPerfSignpost.menuContent("wardrobe.merge.deposit_status")
                             ForEach(DepositStatusFilter.allCases) { filter in
                                 Button {
                                     depositStatusFilter = filter

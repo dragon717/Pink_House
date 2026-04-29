@@ -61,102 +61,6 @@ struct MeTabContent: View {
     }
 }
 
-// MARK: - 搜索容器视图
-struct SearchContainerView: View {
-    @Binding var searchText: String
-    @Environment(\.modelContext) private var modelContext
-    @Query(filter: #Predicate<Clothing> { $0.deletedAt == nil }) var clothings: [Clothing]
-    
-    var filteredClothings: [Clothing] {
-        if searchText.isEmpty {
-            return []
-        }
-        return clothings.filter { clothing in
-            let nameMatch = clothing.name.localizedCaseInsensitiveContains(searchText)
-            let brandMatch = clothing.brand?.name.localizedCaseInsensitiveContains(searchText) ?? false
-            let tagMatch = clothing.tags?.contains { $0.name.localizedCaseInsensitiveContains(searchText) } ?? false
-            return nameMatch || brandMatch || tagMatch
-        }
-    }
-    
-    var body: some View {
-        NavigationStack {
-            ZStack {
-                // 背景
-                LiquidBackground()
-                    .ignoresSafeArea()
-                
-                List {
-                    if searchText.isEmpty {
-                        Section("搜索建议") {
-                            Label("裙装/小物名称", systemImage: "tshirt")
-                            Label("品牌/标签tag", systemImage: "tag")
-                        }
-                    } else if filteredClothings.isEmpty {
-                        ContentUnavailableView {
-                            Label("未找到结果", systemImage: "magnifyingglass")
-                        } description: {
-                            Text("尝试其他关键词搜索")
-                        }
-                    } else {
-                        Section("找到 \(filteredClothings.count) 件衣物") {
-                            ForEach(filteredClothings) { clothing in
-                                NavigationLink(destination: ClothingDetailView(clothing: clothing)) {
-                                    HStack {
-                                        clothingThumbnail(clothing)
-                                        VStack(alignment: .leading, spacing: 4) {
-                                            Text(clothing.name)
-                                                .font(.headline)
-                                            if let brand = clothing.brand {
-                                                Text(brand.name)
-                                                    .font(.caption)
-                                                    .foregroundStyle(.secondary)
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-                .scrollContentBackground(.hidden)
-            }
-            .navigationTitle("全局搜索")
-            .searchable(
-                text: $searchText,
-                placement: .navigationBarDrawer(displayMode: .always),
-                prompt: "全局搜索裙子、品牌、标签..."
-            )
-        }
-    }
-    
-    @ViewBuilder
-    private func clothingThumbnail(_ clothing: Clothing) -> some View {
-        if let firstImagePath = clothing.imagePaths.first {
-            AsyncLocalImageView(
-                fileName: firstImagePath,
-                displaySize: CGSize(width: 50, height: 50),
-                contentMode: .fill,
-                cornerRadius: 8,
-                placeholderColor: Color.gray.opacity(0.2)
-            )
-            .overlay(
-                Image(systemName: "tshirt")
-                    .foregroundStyle(.secondary)
-                    .opacity(0.5)
-            )
-        } else {
-            RoundedRectangle(cornerRadius: 8)
-                .fill(Color.gray.opacity(0.2))
-                .frame(width: 50, height: 50)
-                .overlay(
-                    Image(systemName: "tshirt")
-                        .foregroundStyle(.secondary)
-                )
-        }
-    }
-}
-
 // MARK: - House容器视图
 struct SmallWorldContainerView: View {
     @Binding var selectedTab: Int
@@ -421,10 +325,7 @@ struct LegacyTabView: View {
     private var contentView: some View {
         switch selectedTab {
         case 0:
-            NavigationStack {
-                HomeView(selectedTab: $homeTabSelection)
-                    .toolbarBackground(.hidden, for: .navigationBar)
-            }
+            HomeView(selectedTab: $homeTabSelection)
         case 1:
             NavigationStack {
                 SmallWorldContainerViewLegacy(
@@ -443,10 +344,7 @@ struct LegacyTabView: View {
         case 3:
             PetChatViewLegacy(searchText: $searchText)
         default:
-            NavigationStack {
-                HomeView(selectedTab: $homeTabSelection)
-                    .toolbarBackground(.hidden, for: .navigationBar)
-            }
+            HomeView(selectedTab: $homeTabSelection)
         }
     }
 
@@ -673,99 +571,6 @@ struct SmallWorldContainerViewLegacy: View {
             )
         case .wardrobe, .depositPlan:
             EmptyView()
-        }
-    }
-}
-
-// MARK: - iOS 18以下 全局搜索视图
-struct GlobalSearchViewLegacy: View {
-    @Environment(\.modelContext) private var modelContext
-    @Query(filter: #Predicate<Clothing> { $0.deletedAt == nil }) var clothings: [Clothing]
-    @State private var searchText = ""
-
-    var filteredClothings: [Clothing] {
-        if searchText.isEmpty { return [] }
-        return clothings.filter { clothing in
-            let nameMatch = clothing.name.localizedCaseInsensitiveContains(searchText)
-            let brandMatch = clothing.brand?.name.localizedCaseInsensitiveContains(searchText) ?? false
-            let tagMatch = clothing.tags?.contains { $0.name.localizedCaseInsensitiveContains(searchText) } ?? false
-            return nameMatch || brandMatch || tagMatch
-        }
-    }
-
-    var body: some View {
-        NavigationStack {
-            ZStack {
-                LiquidBackground()
-                    .ignoresSafeArea()
-
-                List {
-                    if searchText.isEmpty {
-                        Section("搜索建议") {
-                            Label("裙装/小物名称", systemImage: "tshirt")
-                            Label("品牌/标签tag", systemImage: "tag")
-                        }
-                    } else if filteredClothings.isEmpty {
-                        ContentUnavailableView {
-                            Label("未找到结果", systemImage: "magnifyingglass")
-                        } description: {
-                            Text("尝试其他关键词搜索")
-                        }
-                    } else {
-                        Section("找到 \(filteredClothings.count) 件衣物") {
-                            ForEach(filteredClothings) { clothing in
-                                NavigationLink(destination: ClothingDetailView(clothing: clothing)) {
-                                    HStack {
-                                        clothingThumbnail(clothing)
-                                        VStack(alignment: .leading, spacing: 4) {
-                                            Text(clothing.name)
-                                                .font(.headline)
-                                            if let brand = clothing.brand {
-                                                Text(brand.name)
-                                                    .font(.caption)
-                                                    .foregroundStyle(.secondary)
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-                .scrollContentBackground(.hidden)
-            }
-            .navigationTitle("全局搜索")
-            .searchable(
-                text: $searchText,
-                placement: .navigationBarDrawer(displayMode: .always),
-                prompt: "全局搜索裙子、品牌、标签..."
-            )
-        }
-    }
-
-    @ViewBuilder
-    private func clothingThumbnail(_ clothing: Clothing) -> some View {
-        if let firstImagePath = clothing.imagePaths.first {
-            AsyncLocalImageView(
-                fileName: firstImagePath,
-                displaySize: CGSize(width: 50, height: 50),
-                contentMode: .fill,
-                cornerRadius: 8,
-                placeholderColor: Color.gray.opacity(0.2)
-            )
-            .overlay(
-                Image(systemName: "tshirt")
-                    .foregroundStyle(.secondary)
-                    .opacity(0.5)
-            )
-        } else {
-            RoundedRectangle(cornerRadius: 8)
-                .fill(Color.gray.opacity(0.2))
-                .frame(width: 50, height: 50)
-                .overlay(
-                    Image(systemName: "tshirt")
-                        .foregroundStyle(.secondary)
-                )
         }
     }
 }

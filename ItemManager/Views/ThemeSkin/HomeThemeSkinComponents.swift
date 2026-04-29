@@ -100,6 +100,11 @@ struct HomeThemeSkinToolbarShell<Content: View>: View {
                 }
         } else {
             content
+                .padding(.horizontal, effectiveHorizontalPadding)
+                .padding(.vertical, effectiveVerticalPadding)
+                .background {
+                    defaultLiquidGlassBackground
+                }
         }
     }
 
@@ -113,6 +118,16 @@ struct HomeThemeSkinToolbarShell<Content: View>: View {
 
     private var effectiveVerticalPadding: CGFloat {
         verticalPadding
+    }
+
+    private var defaultLiquidGlassBackground: some View {
+        Capsule()
+            .fill(.ultraThinMaterial)
+            .overlay {
+                Capsule()
+                    .stroke(Color.white.opacity(0.46), lineWidth: 0.8)
+            }
+            .shadow(color: Color.black.opacity(0.06), radius: 8, x: 0, y: 3)
     }
 }
 
@@ -220,16 +235,24 @@ private struct HomeThemeSkinChromeBackground: View {
             fallbackBackground
         }
         .overlay {
-            if SkyConcertThemeSkin.isSkyConcert(descriptor) {
-                SkyConcertDecorationLayer(placements: SkyConcertThemeSkin.toolbarPlacements(for: style))
-            } else if SwanDreamThemeSkin.isSwanDream(descriptor) {
-                SkyConcertDecorationLayer(
-                    placements: SwanDreamThemeSkin.toolbarPlacements(for: style),
-                    namespace: SwanDreamThemeSkin.namespace
-                )
-            }
+            toolbarDecorationLayer
+                .allowsHitTesting(false)
+                .accessibilityHidden(true)
         }
         .shadow(color: HomeThemeSkinTokens.shadow(for: descriptor).opacity(0.18), radius: style.shadowRadius, x: 0, y: 6)
+    }
+
+    @ViewBuilder
+    private var toolbarDecorationLayer: some View {
+        // 主题顶部装饰属于背景纹理层：保留菜单/顶栏图案，但始终位于文字与按钮内容下方。
+        if SkyConcertThemeSkin.isSkyConcert(descriptor) {
+            SkyConcertDecorationLayer(placements: SkyConcertThemeSkin.toolbarPlacements(for: style))
+        } else if SwanDreamThemeSkin.isSwanDream(descriptor) {
+            SkyConcertDecorationLayer(
+                placements: SwanDreamThemeSkin.toolbarPlacements(for: style),
+                namespace: SwanDreamThemeSkin.namespace
+            )
+        }
     }
 
     private var fallbackBackground: some View {
@@ -251,35 +274,36 @@ private struct HomeThemeSkinChromeBackground: View {
                     LinearGradient(
                         colors: [
                             .white.opacity(0.95),
-                            HomeThemeSkinTokens.border(for: descriptor).opacity(0.9)
+                            HomeThemeSkinTokens.border(for: descriptor).opacity(0.95),
+                            HomeThemeSkinTokens.accent(for: descriptor).opacity(0.5)
                         ],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     ),
-                    lineWidth: 0.9
+                    lineWidth: 1.35
                 )
 
             RoundedRectangle(cornerRadius: style.cornerRadius - 3, style: .continuous)
-                .stroke(HomeThemeSkinTokens.softAccent(for: descriptor).opacity(0.45), lineWidth: 0.5)
-                .padding(3)
+                .stroke(HomeThemeSkinTokens.softAccent(for: descriptor).opacity(0.62), lineWidth: 0.75)
+                .padding(3.5)
 
             Circle()
                 .fill(HomeThemeSkinTokens.softAccent(for: descriptor).opacity(0.95))
-                .frame(width: 6, height: 6)
+                .frame(width: 8, height: 8)
                 .overlay {
                     Circle()
                         .stroke(.white.opacity(0.8), lineWidth: 1)
                 }
-                .offset(x: -20, y: -11)
+                .offset(x: -23, y: -13)
 
             Circle()
                 .fill(HomeThemeSkinTokens.creamTop(for: descriptor).opacity(0.98))
-                .frame(width: 5, height: 5)
+                .frame(width: 6, height: 6)
                 .overlay {
                     Circle()
                         .stroke(HomeThemeSkinTokens.border(for: descriptor).opacity(0.65), lineWidth: 1)
                 }
-                .offset(x: 22, y: 12)
+                .offset(x: 25, y: 14)
         }
     }
 }

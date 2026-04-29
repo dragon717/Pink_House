@@ -12,18 +12,427 @@ private enum ThemeSkinSharedSurfaceTokens {
         return supportedNamespaces.contains(namespace)
     }
 
-    static func stickerAssetName(for descriptor: ThemeSkinDescriptor?) -> String {
-        if SwanDreamThemeSkin.isSwanDream(descriptor) {
-            return SwanDreamThemeSkin.decorCrystalStars
+    static func primaryOrnamentAssetName(for descriptor: ThemeSkinDescriptor?, style: ThemeSkinOrnateFrameStyle) -> String {
+        switch style {
+        case .compact, .scrollOptimized:
+            return ThemeSkinEdgeStickerAssets.assetName(for: descriptor, role: .scrollPrimary)
+        case .standard:
+            return ThemeSkinEdgeStickerAssets.assetName(for: descriptor, role: .cardPrimary)
+        case .hero:
+            return ThemeSkinEdgeStickerAssets.assetName(for: descriptor, role: .heroPrimary)
         }
-        return SkyConcertThemeSkin.decorShootingStar
     }
 
-    static func secondaryStickerAssetName(for descriptor: ThemeSkinDescriptor?) -> String {
-        if SwanDreamThemeSkin.isSwanDream(descriptor) {
-            return SwanDreamThemeSkin.decorSwanFeatherBow
+    static func secondaryOrnamentAssetName(for descriptor: ThemeSkinDescriptor?, style: ThemeSkinOrnateFrameStyle) -> String {
+        switch style {
+        case .compact, .scrollOptimized:
+            return ThemeSkinEdgeStickerAssets.assetName(for: descriptor, role: .scrollSecondary)
+        case .standard:
+            return ThemeSkinEdgeStickerAssets.assetName(for: descriptor, role: .cardSecondary)
+        case .hero:
+            return ThemeSkinEdgeStickerAssets.assetName(for: descriptor, role: .heroSecondary)
         }
-        return SkyConcertThemeSkin.decorMusicScrollClouds
+    }
+}
+
+enum ThemeSkinEdgeStickerRole {
+    case cardPrimary
+    case cardSecondary
+    case heroPrimary
+    case heroSecondary
+    case scrollPrimary
+    case scrollSecondary
+    case tabBarLeading
+    case tabBarTrailing
+    case titleLeading
+    case iconCorner
+}
+
+enum ThemeSkinEdgeStickerAssets {
+    static func assetName(for descriptor: ThemeSkinDescriptor?, role: ThemeSkinEdgeStickerRole) -> String {
+        if SwanDreamThemeSkin.isSwanDream(descriptor) {
+            switch role {
+            case .cardPrimary, .titleLeading:
+                return SwanDreamThemeSkin.decorPinkRibbonBow
+            case .cardSecondary, .scrollSecondary:
+                return SwanDreamThemeSkin.decorSwanFeatherBow
+            case .heroPrimary:
+                return SwanDreamThemeSkin.decorRibbonSwanClouds
+            case .heroSecondary, .tabBarLeading:
+                return SwanDreamThemeSkin.decorCrownedSwanClouds
+            case .scrollPrimary, .iconCorner:
+                return SwanDreamThemeSkin.decorMoonBowBottle
+            case .tabBarTrailing:
+                return SwanDreamThemeSkin.decorCrescentPlanetSparkle
+            }
+        }
+
+        switch role {
+        case .cardPrimary, .scrollSecondary:
+            return SkyConcertThemeSkin.decorMusicScrollClouds
+        case .cardSecondary, .scrollPrimary, .titleLeading:
+            return SkyConcertThemeSkin.decorViolinCloud
+        case .heroPrimary:
+            return SkyConcertThemeSkin.decorBunnyAccordionStage
+        case .heroSecondary:
+            return SkyConcertThemeSkin.decorWingedUnicornPrince
+        case .tabBarLeading:
+            return SkyConcertThemeSkin.decorSkyBalloonDoves
+        case .tabBarTrailing:
+            return SkyConcertThemeSkin.decorCrescentRainCloud
+        case .iconCorner:
+            return SkyConcertThemeSkin.decorMusicScrollClouds
+        }
+    }
+}
+
+enum ThemeSkinOrnateFrameStyle: Equatable {
+    case compact
+    case standard
+    case hero
+    case scrollOptimized
+
+    var lineWidth: CGFloat {
+        switch self {
+        case .compact, .scrollOptimized:
+            return 1.35
+        case .standard:
+            return 1.75
+        case .hero:
+            return 2.1
+        }
+    }
+
+    var innerLineWidth: CGFloat {
+        switch self {
+        case .compact, .scrollOptimized:
+            return 0.65
+        case .standard:
+            return 0.85
+        case .hero:
+            return 1
+        }
+    }
+
+    var innerInset: CGFloat {
+        switch self {
+        case .compact, .scrollOptimized:
+            return 3
+        case .standard:
+            return 4.5
+        case .hero:
+            return 6
+        }
+    }
+
+    var primaryStickerSize: CGFloat {
+        switch self {
+        case .compact:
+            return 30
+        case .standard:
+            return 46
+        case .hero:
+            return 72
+        case .scrollOptimized:
+            return 0
+        }
+    }
+
+    var secondaryStickerSize: CGFloat {
+        switch self {
+        case .compact:
+            return 22
+        case .standard:
+            return 30
+        case .hero:
+            return 46
+        case .scrollOptimized:
+            return 0
+        }
+    }
+
+    var shadowRadius: CGFloat {
+        switch self {
+        case .compact:
+            return 7
+        case .standard:
+            return 13
+        case .hero:
+            return 20
+        case .scrollOptimized:
+            return 2
+        }
+    }
+
+    var shadowYOffset: CGFloat {
+        switch self {
+        case .compact:
+            return 3
+        case .standard:
+            return 7
+        case .hero:
+            return 10
+        case .scrollOptimized:
+            return 1
+        }
+    }
+
+    var primaryStickerOffset: CGSize {
+        switch self {
+        case .compact:
+            return CGSize(width: 9, height: -9)
+        case .standard:
+            return CGSize(width: 16, height: -18)
+        case .hero:
+            return CGSize(width: 28, height: -28)
+        case .scrollOptimized:
+            return .zero
+        }
+    }
+
+    var secondaryStickerOffset: CGSize {
+        switch self {
+        case .compact:
+            return CGSize(width: -8, height: 8)
+        case .standard:
+            return CGSize(width: -10, height: 13)
+        case .hero:
+            return CGSize(width: -18, height: 18)
+        case .scrollOptimized:
+            return .zero
+        }
+    }
+}
+
+struct ThemeSkinOrnateFrameSurface: View {
+    let descriptor: ThemeSkinDescriptor?
+    let cornerRadius: CGFloat
+    let style: ThemeSkinOrnateFrameStyle
+    let showsDecoration: Bool
+
+    init(
+        descriptor: ThemeSkinDescriptor?,
+        cornerRadius: CGFloat,
+        style: ThemeSkinOrnateFrameStyle = .standard,
+        showsDecoration: Bool = true
+    ) {
+        self.descriptor = descriptor
+        self.cornerRadius = cornerRadius
+        self.style = style
+        self.showsDecoration = showsDecoration
+    }
+
+    private var shape: RoundedRectangle {
+        RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+    }
+
+    var body: some View {
+        ZStack {
+            baseFill
+            ornateBorder
+            innerHighlight
+
+            if showsDecoration {
+                if style == .scrollOptimized {
+                    scrollOptimizedCornerMarks
+                } else {
+                    stickerDecorations
+                }
+            }
+        }
+        .shadow(
+            color: SkyConcertThemeSkin.shadowColor(for: descriptor).opacity(style == .scrollOptimized ? 0.2 : 0.58),
+            radius: style.shadowRadius,
+            x: 0,
+            y: style.shadowYOffset
+        )
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+
+    private var baseFill: some View {
+        shape
+            .fill(
+                LinearGradient(
+                    colors: gradientColors,
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            )
+    }
+
+
+    private var ornateBorder: some View {
+        shape
+            .stroke(
+                LinearGradient(
+                    colors: [
+                        Color.white.opacity(0.98),
+                        SkyConcertThemeSkin.shellStroke(for: descriptor).opacity(0.96),
+                        SkyConcertThemeSkin.accent(for: descriptor).opacity(0.58)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                ),
+                lineWidth: style.lineWidth
+            )
+    }
+
+    private var innerHighlight: some View {
+        RoundedRectangle(cornerRadius: max(cornerRadius - style.innerInset, 4), style: .continuous)
+            .stroke(
+                LinearGradient(
+                    colors: [
+                        Color.white.opacity(0.68),
+                        SkyConcertThemeSkin.accentSoft(for: descriptor).opacity(0.32),
+                        SkyConcertThemeSkin.accent(for: descriptor).opacity(0.22)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                ),
+                lineWidth: style.innerLineWidth
+            )
+            .padding(style.innerInset)
+    }
+
+    private var stickerDecorations: some View {
+        ZStack {
+            ThemeSkinCornerSticker(
+                descriptor: descriptor,
+                assetName: ThemeSkinSharedSurfaceTokens.primaryOrnamentAssetName(for: descriptor, style: style),
+                size: style.primaryStickerSize,
+                opacity: SwanDreamThemeSkin.isSwanDream(descriptor) ? 0.72 : 0.7,
+                offset: style.primaryStickerOffset
+            )
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+
+            ThemeSkinCornerSticker(
+                descriptor: descriptor,
+                assetName: ThemeSkinSharedSurfaceTokens.secondaryOrnamentAssetName(for: descriptor, style: style),
+                size: style.secondaryStickerSize,
+                opacity: SwanDreamThemeSkin.isSwanDream(descriptor) ? 0.54 : 0.5,
+                offset: style.secondaryStickerOffset
+            )
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
+
+            edgePearls
+        }
+    }
+
+    private var scrollOptimizedCornerMarks: some View {
+        ZStack {
+            ThemeSkinEdgeSticker(
+                descriptor: descriptor,
+                assetName: ThemeSkinEdgeStickerAssets.assetName(for: descriptor, role: .scrollPrimary),
+                size: 24,
+                opacity: 0.64,
+                offset: CGSize(width: 7, height: -7),
+                fallbackSystemName: SwanDreamThemeSkin.isSwanDream(descriptor) ? "moon.stars.fill" : "music.note"
+            )
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+
+            ThemeSkinEdgeSticker(
+                descriptor: descriptor,
+                assetName: ThemeSkinEdgeStickerAssets.assetName(for: descriptor, role: .scrollSecondary),
+                size: 20,
+                opacity: 0.52,
+                offset: CGSize(width: -5, height: 5),
+                fallbackSystemName: "sparkles"
+            )
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
+        }
+    }
+
+    private var edgePearls: some View {
+        ZStack {
+            ornatePearl(size: style == .hero ? 9 : 7)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                .offset(x: style == .hero ? -4 : -2, y: style == .hero ? 18 : 12)
+
+            ornatePearl(size: style == .hero ? 7 : 5)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
+                .offset(x: style == .hero ? 5 : 3, y: style == .hero ? -18 : -12)
+        }
+    }
+
+    private func ornatePearl(size: CGFloat) -> some View {
+        Circle()
+            .fill(SkyConcertThemeSkin.shellFillTop(for: descriptor).opacity(0.96))
+            .frame(width: size, height: size)
+            .overlay {
+                Circle()
+                    .stroke(SkyConcertThemeSkin.accent(for: descriptor).opacity(0.62), lineWidth: 1)
+            }
+    }
+
+    private var gradientColors: [Color] {
+        if SwanDreamThemeSkin.isSwanDream(descriptor) {
+            return [
+                SwanDreamThemeSkin.creamTop.opacity(0.99),
+                SwanDreamThemeSkin.ribbonPink.opacity(style == .scrollOptimized ? 0.58 : 0.74),
+                SwanDreamThemeSkin.moonLavender.opacity(0.96)
+            ]
+        }
+
+        return [
+            SkyConcertThemeSkin.shellFillTop(for: descriptor).opacity(0.99),
+            SkyConcertThemeSkin.accentSoft(for: descriptor).opacity(style == .scrollOptimized ? 0.46 : 0.68),
+            SkyConcertThemeSkin.shellFillBottom(for: descriptor).opacity(0.96)
+        ]
+    }
+}
+
+struct ThemeSkinOrnateFrameBorder: View {
+    let descriptor: ThemeSkinDescriptor?
+    let cornerRadius: CGFloat
+    let style: ThemeSkinOrnateFrameStyle
+    let showsDecoration: Bool
+
+    init(
+        descriptor: ThemeSkinDescriptor?,
+        cornerRadius: CGFloat,
+        style: ThemeSkinOrnateFrameStyle = .standard,
+        showsDecoration: Bool = true
+    ) {
+        self.descriptor = descriptor
+        self.cornerRadius = cornerRadius
+        self.style = style
+        self.showsDecoration = showsDecoration
+    }
+
+    var body: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                .stroke(
+                    LinearGradient(
+                        colors: [
+                            Color.white.opacity(0.98),
+                            SkyConcertThemeSkin.shellStroke(for: descriptor).opacity(0.96),
+                            SkyConcertThemeSkin.accent(for: descriptor).opacity(0.58)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: style.lineWidth
+                )
+
+            RoundedRectangle(cornerRadius: max(cornerRadius - style.innerInset, 4), style: .continuous)
+                .stroke(Color.white.opacity(0.42), lineWidth: style.innerLineWidth)
+                .padding(style.innerInset)
+
+            if showsDecoration && style != .scrollOptimized {
+                ThemeSkinCornerSticker(
+                    descriptor: descriptor,
+                    assetName: ThemeSkinSharedSurfaceTokens.primaryOrnamentAssetName(for: descriptor, style: style),
+                    size: style.primaryStickerSize,
+                    opacity: 0.62,
+                    offset: style.primaryStickerOffset
+                )
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+            }
+        }
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
     }
 }
 
@@ -56,70 +465,28 @@ struct ThemeSkinSectionCardContainer<Content: View>: View {
     }
 
     var body: some View {
-        content
-            .background(backgroundLayer)
-            .overlay(borderLayer)
-            .overlay(alignment: .topTrailing) {
-                if isThemed && showsDecoration {
-                    ThemeSkinCornerSticker(
+        if isThemed {
+            content
+                .background {
+                    ThemeSkinOrnateFrameSurface(
                         descriptor: descriptor,
-                        assetName: ThemeSkinSharedSurfaceTokens.stickerAssetName(for: descriptor),
-                        size: 34,
-                        opacity: 0.62,
-                        offset: CGSize(width: 10, height: -12)
+                        cornerRadius: cornerRadius,
+                        style: ornateStyle,
+                        showsDecoration: showsDecoration
                     )
                 }
-            }
-            .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
-            .shadow(
-                color: isThemed ? SkyConcertThemeSkin.shadowColor(for: descriptor).opacity(0.72) : Color.black.opacity(0.05),
-                radius: isThemed ? 12 : 5,
-                x: 0,
-                y: isThemed ? 6 : 2
-            )
-    }
-
-    @ViewBuilder
-    private var backgroundLayer: some View {
-        if isThemed {
-            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                .fill(
-                    LinearGradient(
-                        colors: [
-                            SkyConcertThemeSkin.shellFillTop(for: descriptor).opacity(0.98),
-                            SkyConcertThemeSkin.accentSoft(for: descriptor).opacity(SwanDreamThemeSkin.isSwanDream(descriptor) ? 0.76 : 0.58),
-                            SkyConcertThemeSkin.shellFillBottom(for: descriptor).opacity(0.94)
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
         } else {
-            CardBackgroundView(cornerRadius: cornerRadius)
+            content
+                .background {
+                    CardBackgroundView(cornerRadius: cornerRadius)
+                }
+                .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+                .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
         }
     }
 
-    @ViewBuilder
-    private var borderLayer: some View {
-        RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-            .stroke(
-                isThemed
-                    ? LinearGradient(
-                        colors: [
-                            Color.white.opacity(0.96),
-                            SkyConcertThemeSkin.shellStroke(for: descriptor).opacity(0.92),
-                            SkyConcertThemeSkin.accent(for: descriptor).opacity(0.32)
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                    : LinearGradient(
-                        colors: [Color.primary.opacity(0.08)],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ),
-                lineWidth: isThemed ? 1.1 : 1
-            )
+    private var ornateStyle: ThemeSkinOrnateFrameStyle {
+        cornerRadius >= 26 ? .hero : .standard
     }
 }
 
@@ -155,79 +522,35 @@ struct ThemeSkinAdaptiveSectionCardContainer<Content: View, FallbackBackground: 
     }
 
     var body: some View {
-        content
-            .background(backgroundLayer)
-            .overlay(borderLayer)
-            .overlay(alignment: .topTrailing) {
-                if isThemed && showsDecoration {
-                    ThemeSkinCornerSticker(
+        if isThemed {
+            content
+                .background {
+                    ThemeSkinOrnateFrameSurface(
                         descriptor: descriptor,
-                        assetName: ThemeSkinSharedSurfaceTokens.stickerAssetName(for: descriptor),
-                        size: 28,
-                        opacity: 0.48,
-                        offset: CGSize(width: 8, height: -10)
+                        cornerRadius: cornerRadius,
+                        style: ornateStyle,
+                        showsDecoration: showsDecoration
                     )
                 }
-            }
-            .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
-            .shadow(
-                color: isThemed ? SkyConcertThemeSkin.shadowColor(for: descriptor).opacity(0.62) : .clear,
-                radius: isThemed ? 10 : 0,
-                x: 0,
-                y: isThemed ? 5 : 0
-            )
-    }
-
-    @ViewBuilder
-    private var backgroundLayer: some View {
-        if isThemed {
-            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                .fill(
-                    LinearGradient(
-                        colors: [
-                            SkyConcertThemeSkin.shellFillTop(for: descriptor).opacity(0.97),
-                            SkyConcertThemeSkin.accentSoft(for: descriptor).opacity(SwanDreamThemeSkin.isSwanDream(descriptor) ? 0.64 : 0.48),
-                            SkyConcertThemeSkin.shellFillBottom(for: descriptor).opacity(0.92)
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
         } else {
-            fallbackBackground
+            content
+                .background(fallbackBackground)
+                .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
         }
     }
 
-    @ViewBuilder
-    private var borderLayer: some View {
-        RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-            .stroke(
-                isThemed
-                    ? LinearGradient(
-                        colors: [
-                            Color.white.opacity(0.92),
-                            SkyConcertThemeSkin.shellStroke(for: descriptor).opacity(0.78),
-                            SkyConcertThemeSkin.accent(for: descriptor).opacity(0.28)
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                    : LinearGradient(
-                        colors: [Color.clear],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ),
-                lineWidth: isThemed ? 1 : 0
-            )
+    private var ornateStyle: ThemeSkinOrnateFrameStyle {
+        cornerRadius >= 26 ? .hero : (showsDecoration ? .standard : .compact)
     }
 }
 
-private struct ThemeSkinCornerSticker: View {
+struct ThemeSkinEdgeSticker: View {
     let descriptor: ThemeSkinDescriptor?
     let assetName: String
     let size: CGFloat
     let opacity: Double
     let offset: CGSize
+    var fallbackSystemName: String = "sparkles"
 
     var body: some View {
         ThemeSkinOptionalFittedAsset(
@@ -235,7 +558,7 @@ private struct ThemeSkinCornerSticker: View {
             namespace: descriptor?.assetNamespace,
             allowShortNameFallback: false
         ) {
-            Image(systemName: "sparkles")
+            Image(systemName: fallbackSystemName)
                 .font(.system(size: max(12, size * 0.42), weight: .bold))
                 .foregroundStyle(SkyConcertThemeSkin.accent(for: descriptor))
         }
@@ -246,6 +569,8 @@ private struct ThemeSkinCornerSticker: View {
         .accessibilityHidden(true)
     }
 }
+
+private typealias ThemeSkinCornerSticker = ThemeSkinEdgeSticker
 
 private struct ThemeSkinSectionCardModifier: ViewModifier {
     let slot: ThemeSkinSlot
@@ -406,28 +731,49 @@ struct ThemeSkinIconBadge: View {
             .foregroundStyle(isThemed ? SkyConcertThemeSkin.accent(for: descriptor) : fallbackColor)
             .frame(width: size, height: size)
             .background {
-                Circle()
-                    .fill(
-                        isThemed
-                            ? SkyConcertThemeSkin.shellFillTop(for: descriptor).opacity(0.94)
-                            : fallbackColor.opacity(0.12)
+                if isThemed {
+                    ThemeSkinOrnateFrameSurface(
+                        descriptor: descriptor,
+                        cornerRadius: size / 2,
+                        style: .compact,
+                        showsDecoration: false
                     )
+                } else {
+                    Circle()
+                        .fill(fallbackColor.opacity(0.12))
+                }
             }
             .overlay {
                 Circle()
                     .stroke(
                         isThemed
-                            ? SkyConcertThemeSkin.shellStroke(for: descriptor).opacity(0.95)
+                            ? SkyConcertThemeSkin.accent(for: descriptor).opacity(0.58)
                             : fallbackColor.opacity(0.16),
-                        lineWidth: 1
+                        lineWidth: isThemed ? 1.35 : 1
                     )
             }
+            .overlay(alignment: .topTrailing) {
+                if isThemed && size >= 38 {
+                    ornateCornerDot
+                }
+            }
             .shadow(
-                color: isThemed ? SkyConcertThemeSkin.shadowColor(for: descriptor).opacity(0.42) : .clear,
-                radius: 6,
+                color: isThemed ? SkyConcertThemeSkin.shadowColor(for: descriptor).opacity(0.5) : .clear,
+                radius: isThemed ? 8 : 6,
                 x: 0,
-                y: 3
+                y: isThemed ? 4 : 3
             )
+    }
+
+    private var ornateCornerDot: some View {
+        ThemeSkinEdgeSticker(
+            descriptor: descriptor,
+            assetName: ThemeSkinEdgeStickerAssets.assetName(for: descriptor, role: .iconCorner),
+            size: max(16, size * 0.36),
+            opacity: 0.78,
+            offset: CGSize(width: size * 0.1, height: -size * 0.1),
+            fallbackSystemName: SwanDreamThemeSkin.isSwanDream(descriptor) ? "sparkle" : "music.note"
+        )
     }
 }
 
@@ -468,9 +814,27 @@ struct ThemeSkinSelectionBadge: View {
 
     var body: some View {
         ZStack {
-            Circle()
-                .fill(fillColor)
+            if isThemed {
+                ZStack {
+                    ThemeSkinOrnateFrameSurface(
+                        descriptor: descriptor,
+                        cornerRadius: 12,
+                        style: .compact,
+                        showsDecoration: false
+                    )
+
+                    if isSelected {
+                        Circle()
+                            .fill(SkyConcertThemeSkin.accent(for: descriptor).opacity(0.92))
+                            .padding(3)
+                    }
+                }
                 .frame(width: 24, height: 24)
+            } else {
+                Circle()
+                    .fill(fillColor)
+                    .frame(width: 24, height: 24)
+            }
 
             if isSelected {
                 Image(systemName: "checkmark")
@@ -525,29 +889,13 @@ struct ThemeSkinBookCoverFrame: View {
 
     var body: some View {
         if isThemed {
-            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                .stroke(
-                    LinearGradient(
-                        colors: [
-                            Color.white.opacity(0.98),
-                            SkyConcertThemeSkin.shellStroke(for: descriptor).opacity(0.95),
-                            SkyConcertThemeSkin.accent(for: descriptor).opacity(0.45)
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ),
-                    lineWidth: 1.4
-                )
-                .overlay(alignment: .topTrailing) {
-                    ThemeSkinCornerSticker(
-                        descriptor: descriptor,
-                        assetName: ThemeSkinSharedSurfaceTokens.secondaryStickerAssetName(for: descriptor),
-                        size: 28,
-                        opacity: 0.54,
-                        offset: CGSize(width: 8, height: -9)
-                    )
-                }
-                .shadow(color: SkyConcertThemeSkin.shadowColor(for: descriptor).opacity(0.45), radius: 7, x: 0, y: 4)
+            ThemeSkinOrnateFrameBorder(
+                descriptor: descriptor,
+                cornerRadius: cornerRadius,
+                style: .compact,
+                showsDecoration: true
+            )
+            .shadow(color: SkyConcertThemeSkin.shadowColor(for: descriptor).opacity(0.5), radius: 8, x: 0, y: 4)
         }
     }
 }

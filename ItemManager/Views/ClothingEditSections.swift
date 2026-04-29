@@ -107,8 +107,9 @@ struct ClothingBasicInfoView: View {
             }
         }
         .padding()
-        .background(Color(uiColor: .secondarySystemGroupedBackground))
-        .cornerRadius(16)
+        .themeSkinAdaptiveSectionCard(slot: .sectionCard, cornerRadius: 16) {
+            Color(uiColor: .secondarySystemGroupedBackground)
+        }
     }
     
     @ViewBuilder
@@ -220,8 +221,9 @@ struct ClothingTagsView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding()
-        .background(Color(uiColor: .secondarySystemGroupedBackground))
-        .cornerRadius(16)
+        .themeSkinAdaptiveSectionCard(slot: .sectionCard, cornerRadius: 16) {
+            Color(uiColor: .secondarySystemGroupedBackground)
+        }
     }
 }
 
@@ -513,8 +515,9 @@ struct ClothingPriceView: View {
             }
         }
         .padding()
-        .background(Color(uiColor: .secondarySystemGroupedBackground))
-        .cornerRadius(16)
+        .themeSkinAdaptiveSectionCard(slot: .sectionCard, cornerRadius: 16) {
+            Color(uiColor: .secondarySystemGroupedBackground)
+        }
     }
     
     // MARK: - Helpers for Accessories
@@ -787,8 +790,9 @@ struct ClothingPurchaseInfoView: View {
             }
         }
         .padding()
-        .background(Color(uiColor: .secondarySystemGroupedBackground))
-        .cornerRadius(16)
+        .themeSkinAdaptiveSectionCard(slot: .sectionCard, cornerRadius: 16) {
+            Color(uiColor: .secondarySystemGroupedBackground)
+        }
         .onAppear {
             // 初始化时根据当前finalPaymentEndDate反推滑块值
             initializeDurationSlider()

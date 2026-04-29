@@ -40,14 +40,20 @@ struct SmartBackgroundImage: View {
 struct LiquidBackground: View {
     @Environment(ThemeManager.self) private var themeManager
     @Environment(\.colorScheme) private var colorScheme
+    @ObservedObject private var themeSkinManager = ThemeSkinManager.shared
     
     var body: some View {
         ZStack {
             // 1. Base Layer (Color or Image)
             themeManager.backgroundColor
                 .ignoresSafeArea()
-            
-            if themeManager.effectiveBackgroundStyle == .image, let image = themeManager.backgroundImage {
+
+            if let activeProduct = themeSkinManager.activeProduct {
+                ThemeSkinStickerWallpaperBackground(
+                    product: activeProduct,
+                    heroAssetName: themeSkinManager.backgroundHeroAssetName(for: activeProduct.themeId)
+                )
+            } else if themeManager.effectiveBackgroundStyle == .image, let image = themeManager.backgroundImage {
                 SmartBackgroundImage(image: image, opacity: themeManager.backgroundOpacity)
                 
                 // Dark Mode Overlay
@@ -58,7 +64,7 @@ struct LiquidBackground: View {
             }
             
             // 2. Blur Layer (Material Overlay)
-            if themeManager.isBlurEnabled {
+            if themeManager.isBlurEnabled && themeSkinManager.activeProduct == nil {
                 Rectangle()
                     .foregroundStyle(.ultraThinMaterial)
                     .ignoresSafeArea()

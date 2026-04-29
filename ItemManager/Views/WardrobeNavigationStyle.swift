@@ -103,7 +103,7 @@ struct WardrobeFashionTabSwitcher: View {
     }
     
     var body: some View {
-        HStack(spacing: 2) {
+        HStack(spacing: WardrobeTopBarMetrics.segmentInterItemSpacing) {
             tabButton(
                 title: "少女衣橱",
                 icon: "cabinet.fill",
@@ -121,10 +121,7 @@ struct WardrobeFashionTabSwitcher: View {
         .padding(.horizontal, 2)
         .padding(.vertical, 2)
         .background(fashionSwitcherBackground)
-        // 修复：减小固定高度，使导航栏更紧凑
-        .frame(height: 32)
-        // 修复：确保在 principal 位置居中显示
-        .frame(maxWidth: .infinity, alignment: .center)
+        .frame(width: 132, height: WardrobeTopBarMetrics.segmentVisualHeight)
     }
 
     @ViewBuilder
@@ -152,18 +149,20 @@ struct WardrobeFashionTabSwitcher: View {
                 selectedTab = targetTab
             }
         } label: {
-            VStack(spacing: 1) {
+            VStack(spacing: WardrobeTopBarMetrics.segmentStackSpacing) {
                 Image(systemName: icon)
-                    .font(.system(size: 11, weight: isSelected ? .semibold : .regular))
+                    .font(.system(size: WardrobeTopBarMetrics.segmentIconSize, weight: isSelected ? .semibold : .regular))
                 Text(title)
-                    .font(.system(size: 8, weight: isSelected ? .semibold : .medium))
+                    .font(.system(size: WardrobeTopBarMetrics.segmentTextSize, weight: isSelected ? .semibold : .medium))
             }
             .foregroundStyle(tabForeground(isSelected: isSelected, fallbackActiveColor: activeColor))
-            .padding(.horizontal, 8)
-            .padding(.vertical, 3)
+            .padding(.horizontal, WardrobeTopBarMetrics.segmentItemHorizontalPadding)
+            .padding(.vertical, WardrobeTopBarMetrics.segmentItemVerticalPadding)
             .background {
                 tabSelectionBackground(isSelected: isSelected)
             }
+            .frame(height: WardrobeTopBarMetrics.segmentVisualHeight)
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
     }

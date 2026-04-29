@@ -143,14 +143,19 @@ struct ThemeSkinTabBarBackdrop: View {
                                 startPoint: .topLeading,
                                 endPoint: .bottomTrailing
                             ),
-                            lineWidth: 1.15
+                            lineWidth: 1.55
                         )
+                }
+                .overlay {
+                    shapeStyle
+                        .stroke(Color.white.opacity(0.5), lineWidth: 0.75)
+                        .padding(4)
                 }
 
             HStack {
-                tabBarDoodle(icon: "star.fill")
+                tabBarSticker(role: .tabBarLeading, fallbackSystemName: "star.fill")
                 Spacer()
-                tabBarDoodle(icon: "sparkles")
+                tabBarSticker(role: .tabBarTrailing, fallbackSystemName: "sparkles")
             }
             .padding(.horizontal, SwanDreamThemeSkin.isSwanDream(descriptor) ? 20 : 18)
         }
@@ -182,8 +187,8 @@ struct ThemeSkinTabBarBackdrop: View {
                 .foregroundStyle(SwanDreamThemeSkin.moonGold.opacity(0.72))
         }
         .frame(width: 72, height: 72)
-        .offset(y: -22)
-        .opacity(0.58)
+        .offset(y: -30)
+        .opacity(0.68)
         .allowsHitTesting(false)
     }
 
@@ -215,19 +220,15 @@ struct ThemeSkinTabBarBackdrop: View {
         ]
     }
 
-    private func tabBarDoodle(icon: String) -> some View {
-        Image(systemName: icon)
-            .font(.system(size: 10, weight: .bold))
-            .foregroundStyle(TabBarThemeSkinTokens.accent(for: descriptor))
-            .padding(6)
-            .background(
-                Circle()
-                    .fill(Color.white.opacity(0.96))
-            )
-            .overlay(
-                Circle()
-                    .stroke(TabBarThemeSkinTokens.border(for: descriptor).opacity(0.9), lineWidth: 1)
-            )
+    private func tabBarSticker(role: ThemeSkinEdgeStickerRole, fallbackSystemName: String) -> some View {
+        ThemeSkinEdgeSticker(
+            descriptor: descriptor,
+            assetName: ThemeSkinEdgeStickerAssets.assetName(for: descriptor, role: role),
+            size: SwanDreamThemeSkin.isSwanDream(descriptor) ? 30 : 32,
+            opacity: 0.34,
+            offset: .zero,
+            fallbackSystemName: fallbackSystemName
+        )
     }
 }
 

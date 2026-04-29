@@ -72,17 +72,21 @@ struct WardrobeThemeStatsCardContainer<Content: View>: View {
                 allowShortNameFallback: !SkyConcertThemeSkin.shouldAvoidShortAssetFallback(for: descriptor),
                 capInsets: ThemeSkinAssetName.capInsets(for: ThemeSkinAssetName.cardStatsDefault)
             ) {
-                shellBackground(cornerRadius: 24, descriptor: descriptor)
+                ThemeSkinOrnateFrameSurface(
+                    descriptor: descriptor,
+                    cornerRadius: 24,
+                    style: .hero,
+                    showsDecoration: false
+                )
             }
         }
         .overlay {
-            if !ThemeSkinAssetAvailability.hasImage(
-                named: ThemeSkinAssetName.cardStatsDefault,
-                namespace: descriptor?.assetNamespace,
-                allowShortNameFallback: !SkyConcertThemeSkin.shouldAvoidShortAssetFallback(for: descriptor)
-            ) {
-                shellOutline(cornerRadius: 24, descriptor: descriptor)
-            }
+            ThemeSkinOrnateFrameBorder(
+                descriptor: descriptor,
+                cornerRadius: 24,
+                style: .hero,
+                showsDecoration: false
+            )
         }
         .overlay {
             if SkyConcertThemeSkin.isSkyConcert(descriptor) {
@@ -140,13 +144,14 @@ struct WardrobeThemeClothingCardContainer<Content: View>: View {
                 if scrollOptimized {
                     content
                         .background {
-                            shellBackground(cornerRadius: 22, descriptor: descriptor)
+                            ThemeSkinOrnateFrameSurface(
+                                descriptor: descriptor,
+                                cornerRadius: 22,
+                                style: .scrollOptimized,
+                                showsDecoration: true
+                            )
                         }
-                        .overlay {
-                            shellOutline(cornerRadius: 22, descriptor: descriptor)
-                        }
-                        .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
-                        .shadow(color: SkyConcertThemeSkin.shadowColor(for: descriptor).opacity(0.18), radius: 1, x: 0, y: 1)
+                        .shadow(color: SkyConcertThemeSkin.shadowColor(for: descriptor).opacity(0.2), radius: 2, x: 0, y: 1)
                 } else {
                     content
                         .background {
@@ -156,17 +161,21 @@ struct WardrobeThemeClothingCardContainer<Content: View>: View {
                                 allowShortNameFallback: !SkyConcertThemeSkin.shouldAvoidShortAssetFallback(for: descriptor),
                                 capInsets: ThemeSkinAssetName.capInsets(for: ThemeSkinAssetName.cardWardrobeItem)
                             ) {
-                                shellBackground(cornerRadius: 22, descriptor: descriptor)
+                                ThemeSkinOrnateFrameSurface(
+                                    descriptor: descriptor,
+                                    cornerRadius: 22,
+                                    style: .standard,
+                                    showsDecoration: false
+                                )
                             }
                         }
                         .overlay {
-                            if !ThemeSkinAssetAvailability.hasImage(
-                                named: ThemeSkinAssetName.cardWardrobeItem,
-                                namespace: descriptor?.assetNamespace,
-                                allowShortNameFallback: !SkyConcertThemeSkin.shouldAvoidShortAssetFallback(for: descriptor)
-                            ) {
-                                shellOutline(cornerRadius: 22, descriptor: descriptor)
-                            }
+                            ThemeSkinOrnateFrameBorder(
+                                descriptor: descriptor,
+                                cornerRadius: 22,
+                                style: .standard,
+                                showsDecoration: false
+                            )
                         }
                         .overlay {
                             if SkyConcertThemeSkin.isSkyConcert(descriptor) {
@@ -191,7 +200,6 @@ struct WardrobeThemeClothingCardContainer<Content: View>: View {
                                 .padding(.leading, 8)
                             }
                         }
-                        .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
                         .shadow(color: SkyConcertThemeSkin.shadowColor(for: descriptor).opacity(0.65), radius: 10, x: 0, y: 5)
                 }
             } else {
@@ -222,9 +230,14 @@ struct WardrobeThemeCardTitle: View {
         Group {
             if isGirlClosetEnabled {
                 HStack(spacing: 6) {
-                    Image(systemName: "sparkles")
-                        .font(.system(size: 9, weight: .bold))
-                        .foregroundStyle(SkyConcertThemeSkin.accent(for: descriptor))
+                    ThemeSkinEdgeSticker(
+                        descriptor: descriptor,
+                        assetName: ThemeSkinEdgeStickerAssets.assetName(for: descriptor, role: .titleLeading),
+                        size: 18,
+                        opacity: 0.72,
+                        offset: .zero,
+                        fallbackSystemName: "sparkles"
+                    )
 
                     Text(title)
                         .font(.system(size: 13, weight: .semibold, design: .rounded))

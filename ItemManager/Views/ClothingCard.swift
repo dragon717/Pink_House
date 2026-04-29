@@ -531,12 +531,14 @@ struct ClothingRow: View, Equatable {
     static func == (lhs: ClothingRow, rhs: ClothingRow) -> Bool {
         lhs.snapshot == rhs.snapshot &&
         lhs.showPrice == rhs.showPrice &&
-        lhs.showOriginalPrice == rhs.showOriginalPrice
+        lhs.showOriginalPrice == rhs.showOriginalPrice &&
+        lhs.wardrobeThemeDescriptor == rhs.wardrobeThemeDescriptor
     }
 
     let snapshot: WardrobeCellSnapshot
     let showPrice: Bool
     let showOriginalPrice: Bool
+    let wardrobeThemeDescriptor: ThemeSkinDescriptor?
 
     @Environment(\.containerPalette) private var palette
     @State private var image: UIImage?
@@ -544,28 +546,52 @@ struct ClothingRow: View, Equatable {
     init(
         snapshot: WardrobeCellSnapshot,
         showPrice: Bool = UserDefaults.standard.object(forKey: "privacyShowPrice") as? Bool ?? true,
-        showOriginalPrice: Bool = UserDefaults.standard.object(forKey: "privacyShowOriginalPrice") as? Bool ?? true
+        showOriginalPrice: Bool = UserDefaults.standard.object(forKey: "privacyShowOriginalPrice") as? Bool ?? true,
+        wardrobeThemeDescriptor: ThemeSkinDescriptor? = ThemeSkinManager.shared.descriptor(for: .wardrobeItemCard)
     ) {
         self.snapshot = snapshot
         self.showPrice = showPrice
         self.showOriginalPrice = showOriginalPrice
+        self.wardrobeThemeDescriptor = wardrobeThemeDescriptor
     }
 
     @MainActor
     init(
         clothing: Clothing,
         showPrice: Bool = UserDefaults.standard.object(forKey: "privacyShowPrice") as? Bool ?? true,
-        showOriginalPrice: Bool = UserDefaults.standard.object(forKey: "privacyShowOriginalPrice") as? Bool ?? true
+        showOriginalPrice: Bool = UserDefaults.standard.object(forKey: "privacyShowOriginalPrice") as? Bool ?? true,
+        wardrobeThemeDescriptor: ThemeSkinDescriptor? = ThemeSkinManager.shared.descriptor(for: .wardrobeItemCard)
     ) {
         self.init(
             snapshot: WardrobeCellSnapshot(clothing: clothing),
             showPrice: showPrice,
-            showOriginalPrice: showOriginalPrice
+            showOriginalPrice: showOriginalPrice,
+            wardrobeThemeDescriptor: wardrobeThemeDescriptor
         )
+    }
+
+    private var isThemeSkinThemed: Bool {
+        WardrobeThemeSkinSupport.isThemeSkinDescriptor(wardrobeThemeDescriptor)
+    }
+
+    private var rowPrimaryColor: Color {
+        isThemeSkinThemed ? SkyConcertThemeSkin.labelColor(for: wardrobeThemeDescriptor) : palette.primary
+    }
+
+    private var rowSecondaryColor: Color {
+        isThemeSkinThemed ? SkyConcertThemeSkin.labelColor(for: wardrobeThemeDescriptor).opacity(0.72) : palette.secondary
+    }
+
+    private var rowAccentColor: Color {
+        isThemeSkinThemed ? SkyConcertThemeSkin.accent(for: wardrobeThemeDescriptor) : palette.accent
     }
     
     var body: some View {
-        WardrobeListCellContainer(cornerRadius: 24, padding: 16) {
+        WardrobeThemeClothingCardContainer(
+            cornerRadius: 24,
+            descriptor: wardrobeThemeDescriptor,
+            scrollOptimized: true
+        ) {
             HStack(spacing: 16) {
                 // Thumbnail
                 ZStack {
@@ -605,7 +631,7 @@ struct ClothingRow: View, Equatable {
                             .foregroundStyle(.white)
                             .padding(.horizontal, 4)
                             .padding(.vertical, 2)
-                            .background(Color.pink)
+                            .background(isThemeSkinThemed ? rowAccentColor : Color.pink)
                             .clipShape(RoundedRectangle(cornerRadius: 4))
                             .offset(x: 4, y: -4)
                     }
@@ -614,18 +640,18 @@ struct ClothingRow: View, Equatable {
                 VStack(alignment: .leading, spacing: 6) {
                     Text(snapshot.name)
                         .font(.headline)
-                        .foregroundStyle(palette.primary)
+                        .foregroundStyle(rowPrimaryColor)
                     
                     // Attribute Display: Type, Color, Size
                     HStack(spacing: 6) {
                         if !snapshot.types.isEmpty {
-                            AttributePill(text: snapshot.types, icon: "tshirt", color: palette.accent)
+                            AttributePill(text: snapshot.types, icon: "tshirt", color: rowAccentColor)
                         }
                         if !snapshot.colors.isEmpty {
-                            AttributePill(text: snapshot.colors, icon: "paintpalette", color: palette.secondary)
+                            AttributePill(text: snapshot.colors, icon: "paintpalette", color: rowSecondaryColor)
                         }
                         if !snapshot.sizes.isEmpty {
-                            AttributePill(text: snapshot.sizes, icon: "ruler", color: palette.tertiary)
+                            AttributePill(text: snapshot.sizes, icon: "ruler", color: isThemeSkinThemed ? rowAccentColor.opacity(0.82) : palette.tertiary)
                         }
                     }
                     
@@ -634,12 +660,12 @@ struct ClothingRow: View, Equatable {
                             ForEach(Array(snapshot.tagNames.prefix(3).enumerated()), id: \.offset) { _, tagName in
                                 Text("#\(tagName)")
                                     .font(.caption2)
-                                    .foregroundStyle(palette.tertiary)
+                                    .foregroundStyle(isThemeSkinThemed ? rowSecondaryColor : palette.tertiary)
                             }
                             if snapshot.tagNames.count > 3 {
                                 Text("...")
                                     .font(.caption2)
-                                    .foregroundStyle(palette.tertiary)
+                                    .foregroundStyle(isThemeSkinThemed ? rowSecondaryColor : palette.tertiary)
                             }
                         }
                     }
@@ -651,7 +677,7 @@ struct ClothingRow: View, Equatable {
                     if showOriginalPrice && snapshot.originalPrice > 0 {
                         Text("原价: ¥\(snapshot.originalPrice, format: .number.precision(.fractionLength(0)))")
                             .font(.caption2)
-                            .foregroundStyle(palette.secondary)
+                            .foregroundStyle(rowSecondaryColor)
                     }
                     
                     if showPrice {
@@ -662,28 +688,29 @@ struct ClothingRow: View, Equatable {
 
                             Text("定金: ¥\(totalDeposit, format: .number.precision(.fractionLength(0)))")
                                 .font(.caption)
-                                .foregroundStyle(palette.accent)
+                                .foregroundStyle(rowAccentColor)
                             Text("尾款: ¥\(totalBalance, format: .number.precision(.fractionLength(0)))")
                                 .font(.caption)
                                 .bold()
-                                .foregroundStyle(palette.accent)
+                                .foregroundStyle(rowAccentColor)
                         } else {
                             let totalWithAccessories = snapshot.inventoryTotalPrice
                             
                             Text("合计: ¥\(totalWithAccessories, format: .number.precision(.fractionLength(0)))")
                                 .font(.subheadline)
                                 .bold()
-                                .foregroundStyle(palette.primary)
+                                .foregroundStyle(rowPrimaryColor)
                         }
                     }
                     
                     if snapshot.stock > 1 {
                         Text("库存: \(snapshot.stock)")
                             .font(.caption)
-                            .foregroundStyle(palette.tertiary)
+                            .foregroundStyle(isThemeSkinThemed ? rowSecondaryColor : palette.tertiary)
                     }
                 }
             }
+            .padding(16)
         }
         .padding(.vertical, 4)
     }
@@ -693,12 +720,14 @@ struct ClothingRowBrief: View, Equatable {
     static func == (lhs: ClothingRowBrief, rhs: ClothingRowBrief) -> Bool {
         lhs.snapshot == rhs.snapshot &&
         lhs.showPrice == rhs.showPrice &&
-        lhs.showOriginalPrice == rhs.showOriginalPrice
+        lhs.showOriginalPrice == rhs.showOriginalPrice &&
+        lhs.wardrobeThemeDescriptor == rhs.wardrobeThemeDescriptor
     }
 
     let snapshot: WardrobeCellSnapshot
     let showPrice: Bool
     let showOriginalPrice: Bool
+    let wardrobeThemeDescriptor: ThemeSkinDescriptor?
 
     @Environment(\.containerPalette) private var palette
     @State private var image: UIImage?
@@ -706,28 +735,52 @@ struct ClothingRowBrief: View, Equatable {
     init(
         snapshot: WardrobeCellSnapshot,
         showPrice: Bool = UserDefaults.standard.object(forKey: "privacyShowPrice") as? Bool ?? true,
-        showOriginalPrice: Bool = UserDefaults.standard.object(forKey: "privacyShowOriginalPrice") as? Bool ?? true
+        showOriginalPrice: Bool = UserDefaults.standard.object(forKey: "privacyShowOriginalPrice") as? Bool ?? true,
+        wardrobeThemeDescriptor: ThemeSkinDescriptor? = ThemeSkinManager.shared.descriptor(for: .wardrobeItemCard)
     ) {
         self.snapshot = snapshot
         self.showPrice = showPrice
         self.showOriginalPrice = showOriginalPrice
+        self.wardrobeThemeDescriptor = wardrobeThemeDescriptor
     }
 
     @MainActor
     init(
         clothing: Clothing,
         showPrice: Bool = UserDefaults.standard.object(forKey: "privacyShowPrice") as? Bool ?? true,
-        showOriginalPrice: Bool = UserDefaults.standard.object(forKey: "privacyShowOriginalPrice") as? Bool ?? true
+        showOriginalPrice: Bool = UserDefaults.standard.object(forKey: "privacyShowOriginalPrice") as? Bool ?? true,
+        wardrobeThemeDescriptor: ThemeSkinDescriptor? = ThemeSkinManager.shared.descriptor(for: .wardrobeItemCard)
     ) {
         self.init(
             snapshot: WardrobeCellSnapshot(clothing: clothing),
             showPrice: showPrice,
-            showOriginalPrice: showOriginalPrice
+            showOriginalPrice: showOriginalPrice,
+            wardrobeThemeDescriptor: wardrobeThemeDescriptor
         )
+    }
+
+    private var isThemeSkinThemed: Bool {
+        WardrobeThemeSkinSupport.isThemeSkinDescriptor(wardrobeThemeDescriptor)
+    }
+
+    private var rowPrimaryColor: Color {
+        isThemeSkinThemed ? SkyConcertThemeSkin.labelColor(for: wardrobeThemeDescriptor) : palette.primary
+    }
+
+    private var rowSecondaryColor: Color {
+        isThemeSkinThemed ? SkyConcertThemeSkin.labelColor(for: wardrobeThemeDescriptor).opacity(0.72) : palette.secondary
+    }
+
+    private var rowAccentColor: Color {
+        isThemeSkinThemed ? SkyConcertThemeSkin.accent(for: wardrobeThemeDescriptor) : palette.accent
     }
     
     var body: some View {
-        WardrobeListCellContainer(cornerRadius: 24, padding: 16) {
+        WardrobeThemeClothingCardContainer(
+            cornerRadius: 24,
+            descriptor: wardrobeThemeDescriptor,
+            scrollOptimized: true
+        ) {
             HStack(spacing: 12) {
                 // Thumbnail (Smaller)
                 ZStack {
@@ -763,7 +816,7 @@ struct ClothingRowBrief: View, Equatable {
                 
                 Text(snapshot.name)
                     .font(.body)
-                    .foregroundStyle(palette.primary)
+                    .foregroundStyle(rowPrimaryColor)
                     .lineLimit(1)
 
                 Spacer()
@@ -771,7 +824,7 @@ struct ClothingRowBrief: View, Equatable {
                 if let brandName = snapshot.brandName {
                     Text(brandName)
                         .font(.caption)
-                        .foregroundStyle(palette.secondary)
+                        .foregroundStyle(rowSecondaryColor)
                         .lineLimit(1)
                 }
 
@@ -779,7 +832,7 @@ struct ClothingRowBrief: View, Equatable {
                     if snapshot.originalPrice > 0 {
                         Text("原价¥\(snapshot.originalPrice, format: .number.precision(.fractionLength(0)))")
                             .font(.caption)
-                            .foregroundStyle(palette.secondary)
+                            .foregroundStyle(rowSecondaryColor)
                     }
                 }
 
@@ -789,15 +842,16 @@ struct ClothingRowBrief: View, Equatable {
                         Text("定金¥\(snapshot.totalDeposit, format: .number.precision(.fractionLength(0)))+尾款¥\(snapshot.totalBalance, format: .number.precision(.fractionLength(0)))")
                             .font(.caption)
                             .bold()
-                            .foregroundStyle(palette.accent)
+                            .foregroundStyle(rowAccentColor)
                     } else {
                         Text("¥\(snapshot.inventoryTotalPrice, format: .number.precision(.fractionLength(0)))")
                             .font(.subheadline)
                             .bold()
-                            .foregroundStyle(palette.primary)
+                            .foregroundStyle(rowPrimaryColor)
                     }
                 }
             }
+            .padding(16)
         }
         .padding(.vertical, 2)
     }
