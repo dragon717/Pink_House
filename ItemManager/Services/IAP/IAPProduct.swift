@@ -14,9 +14,6 @@ enum IAPProductType: String, CaseIterable {
     case meowCoin1280 = "com.pinkhouse.app.mcoin_1280"  // 128元 = 1280喵币（最划算）
     case meowCoin3280 = "com.pinkhouse.app.mcoin_3280"  // 328元 = 3280喵币
 
-    // App Store Offer Codes 专属礼包（隐藏商品，不在喵币商店售卖）
-    case offerBonus88866666 = "com.pinkhouse.app.offer.bonus_888_66666" // 兑换码礼包：888喵币 + 66666鱼币
-
     // 商品ID列表，用于请求商品信息
     static var allProductIDs: [String] {
         return Self.allCases.map { $0.rawValue }
@@ -36,12 +33,17 @@ enum IAPProductType: String, CaseIterable {
     }
 }
 
-// MARK: - App Store 兑换码礼包配置
-enum IAPOfferCodeBonus {
-    static let productID = IAPProductType.offerBonus88866666.rawValue
-    static let meowCoinAmount = 888
-    static let fishCoinAmount = 66666
-    static let successMessage = "兑换成功！获得 888 喵币和 66666 鱼币"
+// MARK: - App Store 优惠码兑换配置
+// 优惠码不再绑定隐藏礼包商品，统一绑定现有 60 喵币档位。
+// 通过 App Store Offer Codes 免费兑换时只发放基础 60 喵币，不消耗首充双倍资格。
+enum IAPOfferCodeRedemption {
+    static let productID = IAPProductType.meowCoin60.rawValue
+    static let meowCoinAmount = 60
+    static let successMessage = "兑换成功！获得 60 喵币"
+    static let source = "offer_code_redemption"
+    static let pendingProductIDKey = "iap_offer_code_redemption_pending_product_id"
+    static let pendingStartedAtKey = "iap_offer_code_redemption_pending_started_at"
+    static let pendingSessionTTL: TimeInterval = 15 * 60
 }
 
 // MARK: - 喵币商品信息
@@ -110,7 +112,6 @@ struct IAPPurchaseRecord: Codable, Identifiable {
     let productID: String             // 商品ID
     let purchaseDate: Date            // 购买时间
     let coinAmount: Int?              // 获得的喵币数量（如果是喵币商品）
-    let fishCoinAmount: Int?          // 获得的鱼币数量（如果是兑换码礼包）
     let subscriptionMonths: Int?      // 历史字段：旧版本 VIP 时长（月）
     let isVerified: Bool              // 是否已通过服务器验证
     let verificationDate: Date?       // 验证时间

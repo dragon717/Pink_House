@@ -225,10 +225,12 @@ struct VIPCenterView: View {
         .alert("使用 App Store 优惠码", isPresented: $showingOfferCodeInfoAlert) {
             Button("取消", role: .cancel) { }
             Button("继续") {
-                showingOfferCodeRedemption = true
+                Task {
+                    await prepareAndShowOfferCodeRedemption()
+                }
             }
         } message: {
-            Text("优惠码仅适用于本 App 在 App Store 中提供的内购项目。")
+            Text("优惠码仅适用于本 App 在 App Store 中提供的内购项目。沙盒账号只能测试 Sandbox Codes；App Store Connect 列表里的“代码 10”表示已生成 10 个码，不是兑换码本身，请点“下载”使用 CSV 里的具体字母数字码。当前测试码绑定 60 喵币档。")
         }
         .overlay {
             if showTrialPopup {
@@ -270,12 +272,25 @@ struct VIPCenterView: View {
             AppFirstLaunchGuideManager.shared.resetGuideTargetFrames([.aiAnalysisVIPTrialConfirmButton])
         }
         .offerCodeRedemption(isPresented: $showingOfferCodeRedemption) { result in
-            if case .failure = result {
+            if case .failure(let error) = result {
+                StoreManager.shared.cancelOfferCodeRedemptionSession(reason: "vip_center_redemption_failed: \(error.localizedDescription)")
                 presentInfoAlert(
                     title: "暂时无法打开",
-                    message: "无法打开 App Store 优惠码兑换界面，请稍后重试。"
+                    message: "无法打开 App Store 优惠码兑换界面：\(error.localizedDescription)"
                 )
             }
+        }
+    }
+
+    private func prepareAndShowOfferCodeRedemption() async {
+        let isReady = await StoreManager.shared.prepareOfferCodeRedemptionSession(source: "vip_center")
+        if isReady {
+            showingOfferCodeRedemption = true
+        } else {
+            presentInfoAlert(
+                title: "暂时无法兑换",
+                message: "当前 App Store 环境没有返回 60 喵币商品，优惠码无法兑换。请检查 60 喵币档是否可用、Free Offer 是否绑定该商品；沙盒账号只能测试 Sandbox Codes，不能兑换生产环境 URL / Custom / One-Time Use Codes。"
+            )
         }
     }
 

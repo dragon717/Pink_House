@@ -41,6 +41,7 @@ class StoreManager: ObservableObject {
         startStorefrontListener()
         // 加载已处理的交易ID
         loadProcessedTransactions()
+        recoverUnfinishedTransactions()
     }
 
     deinit {
@@ -301,57 +302,43 @@ class StoreManager: ObservableObject {
             productID: product.id
         )
 
-        guard let productType = IAPProductType(rawValue: product.id) else {
+        guard IAPProductType(rawValue: product.id) != nil else {
             return .failed(.productNotFound(product.id))
         }
 
-        switch productType {
-        case .meowCoin60, .meowCoin120, .meowCoin300, .meowCoin500, .meowCoin1280, .meowCoin3280:
-            let result = IAPTestManager.shared.mockVerifyPayment(productID: product.id)
+        let result = IAPTestManager.shared.mockVerifyPayment(productID: product.id)
 
-            switch result {
-            case .success(let deliveredCoins, _, let isFirstDouble):
-                await IAPDiagnosticStore.shared.record(
-                    category: .flow,
-                    name: "purchase_test_mode_succeeded",
-                    attemptID: attemptID,
-                    productID: product.id,
-                    fields: [
-                        "deliveredCoins": String(deliveredCoins),
-                        "isFirstDouble": String(isFirstDouble)
-                    ]
-                )
-                await publishPurchaseSuccess(
-                    isFirstDouble
-                    ? "🎉 首充双倍！获得 \(deliveredCoins) 喵币"
-                    : "成功获得 \(deliveredCoins) 喵币",
-                    attemptID: attemptID,
-                    source: "test_mode"
-                )
-                return .success(transaction: nil, product: product)
-
-            case .failure(let error):
-                await IAPDiagnosticStore.shared.record(
-                    category: .flow,
-                    name: "purchase_test_mode_failed",
-                    level: .error,
-                    attemptID: attemptID,
-                    productID: product.id,
-                    fields: ["error": error]
-                )
-                return .failed(.purchaseFailed(error))
-            }
-
-        case .offerBonus88866666:
+        switch result {
+        case .success(let deliveredCoins, _, let isFirstDouble):
             await IAPDiagnosticStore.shared.record(
                 category: .flow,
-                name: "purchase_test_mode_offer_bonus_blocked",
-                level: .notice,
+                name: "purchase_test_mode_succeeded",
                 attemptID: attemptID,
                 productID: product.id,
-                fields: ["reason": "offer_code_only_hidden_product"]
+                fields: [
+                    "deliveredCoins": String(deliveredCoins),
+                    "isFirstDouble": String(isFirstDouble)
+                ]
             )
-            return .failed(.purchaseFailed("兑换码礼包仅支持通过 App Store 优惠码兑换"))
+            await publishPurchaseSuccess(
+                isFirstDouble
+                ? "🎉 首充双倍！获得 \(deliveredCoins) 喵币"
+                : "成功获得 \(deliveredCoins) 喵币",
+                attemptID: attemptID,
+                source: "test_mode"
+            )
+            return .success(transaction: nil, product: product)
+
+        case .failure(let error):
+            await IAPDiagnosticStore.shared.record(
+                category: .flow,
+                name: "purchase_test_mode_failed",
+                level: .error,
+                attemptID: attemptID,
+                productID: product.id,
+                fields: ["error": error]
+            )
+            return .failed(.purchaseFailed(error))
         }
     }
 
@@ -502,7 +489,9 @@ class StoreManager: ObservableObject {
             transactionID: String(transaction.id),
             fields: [
                 "source": source,
-                "purchaseDate": transaction.purchaseDate.ISO8601Format()
+                "purchaseDate": transaction.purchaseDate.ISO8601Format(),
+                "offerType": transaction.offerType.map { String(describing: $0) } ?? "nil",
+                "offerID": transaction.offerID ?? "nil"
             ]
         )
 
@@ -511,11 +500,17 @@ class StoreManager: ObservableObject {
 
         // 根据商品类型处理
         if let productType = IAPProductType(rawValue: transaction.productID) {
-            switch productType {
-            case .meowCoin60, .meowCoin120, .meowCoin300, .meowCoin500, .meowCoin1280, .meowCoin3280:
+            let shouldHandleAsOfferCodeRedemption: Bool
+            if isOfferCodeRedemptionTransaction(transaction) {
+                shouldHandleAsOfferCodeRedemption = true
+            } else {
+                shouldHandleAsOfferCodeRedemption = await consumeOfferCodeRedemptionSessionIfNeeded(for: transaction, source: source, attemptID: attemptID)
+            }
+
+            if shouldHandleAsOfferCodeRedemption {
+                await deliverOfferCodeMeowCoins(for: transaction, attemptID: attemptID, source: IAPOfferCodeRedemption.source)
+            } else {
                 await deliverMeowCoins(for: transaction, productType: productType, attemptID: attemptID, source: source)
-            case .offerBonus88866666:
-                await deliverOfferCodeBonus(for: transaction, attemptID: attemptID, source: source)
             }
         }
 
@@ -529,6 +524,210 @@ class StoreManager: ObservableObject {
             transactionID: String(transaction.id),
             fields: ["source": source]
         )
+    }
+
+    private func recoverUnfinishedTransactions() {
+        Task.detached { [weak self] in
+            for await result in Transaction.unfinished {
+                guard let self = self else { return }
+
+                do {
+                    let transaction = try await self.checkVerified(result)
+                    await IAPDiagnosticStore.shared.record(
+                        category: .flow,
+                        name: "unfinished_transaction_received",
+                        level: .notice,
+                        productID: transaction.productID,
+                        transactionID: String(transaction.id),
+                        fields: [
+                            "purchaseDate": transaction.purchaseDate.ISO8601Format(),
+                            "offerType": transaction.offerType.map { String(describing: $0) } ?? "nil",
+                            "offerID": transaction.offerID ?? "nil"
+                        ]
+                    )
+
+                    if await self.isTransactionProcessed(transaction.id) {
+                        await IAPDiagnosticStore.shared.record(
+                            category: .flow,
+                            name: "unfinished_transaction_already_processed",
+                            level: .notice,
+                            productID: transaction.productID,
+                            transactionID: String(transaction.id)
+                        )
+                        await transaction.finish()
+                        continue
+                    }
+
+                    await self.processTransaction(transaction, source: "unfinished_transactions", attemptID: nil)
+                } catch {
+                    await IAPDiagnosticStore.shared.record(
+                        category: .flow,
+                        name: "unfinished_transaction_verification_failed",
+                        level: .error,
+                        fields: ["error": error.localizedDescription]
+                    )
+                }
+            }
+        }
+    }
+
+    // MARK: - App Store 优惠码兑换会话
+
+    func prepareOfferCodeRedemptionSession(source: String) async -> Bool {
+        let canMakePurchases = canMakePurchases()
+        await IAPDiagnosticStore.shared.record(
+            category: .flow,
+            name: "offer_code_redemption_prepare_started",
+            level: .notice,
+            productID: IAPOfferCodeRedemption.productID,
+            fields: [
+                "source": source,
+                "canMakePurchases": String(canMakePurchases)
+            ]
+        )
+
+        guard canMakePurchases else {
+            await IAPDiagnosticStore.shared.record(
+                category: .flow,
+                name: "offer_code_redemption_prepare_blocked_cannot_make_payments",
+                level: .notice,
+                productID: IAPOfferCodeRedemption.productID,
+                fields: ["source": source]
+            )
+            return false
+        }
+
+        await fetchProducts()
+
+        let productIsAvailable = coinProducts.contains { $0.id == IAPOfferCodeRedemption.productID }
+        await IAPDiagnosticStore.shared.record(
+            category: .flow,
+            name: productIsAvailable ? "offer_code_redemption_prepare_product_available" : "offer_code_redemption_prepare_product_missing",
+            level: productIsAvailable ? .notice : .error,
+            productID: IAPOfferCodeRedemption.productID,
+            fields: [
+                "source": source,
+                "availableProductIDs": coinProducts.map(\.id).joined(separator: ",")
+            ]
+        )
+
+        guard productIsAvailable else {
+            clearOfferCodeRedemptionSession()
+            return false
+        }
+
+        beginOfferCodeRedemptionSession(source: source)
+        return true
+    }
+
+    func beginOfferCodeRedemptionSession(source: String) {
+        let defaults = UserDefaults.standard
+        defaults.set(IAPOfferCodeRedemption.productID, forKey: IAPOfferCodeRedemption.pendingProductIDKey)
+        defaults.set(Date().timeIntervalSince1970, forKey: IAPOfferCodeRedemption.pendingStartedAtKey)
+
+        Task {
+            await IAPDiagnosticStore.shared.record(
+                category: .flow,
+                name: "offer_code_redemption_session_started",
+                level: .notice,
+                productID: IAPOfferCodeRedemption.productID,
+                fields: [
+                    "source": source,
+                    "ttlSeconds": String(Int(IAPOfferCodeRedemption.pendingSessionTTL))
+                ]
+            )
+        }
+    }
+
+    func cancelOfferCodeRedemptionSession(reason: String) {
+        clearOfferCodeRedemptionSession()
+
+        Task {
+            await IAPDiagnosticStore.shared.record(
+                category: .flow,
+                name: "offer_code_redemption_session_cancelled",
+                level: .notice,
+                productID: IAPOfferCodeRedemption.productID,
+                fields: ["reason": reason]
+            )
+        }
+    }
+
+    private func consumeOfferCodeRedemptionSessionIfNeeded(
+        for transaction: Transaction,
+        source: String,
+        attemptID: String?
+    ) async -> Bool {
+        guard attemptID == nil,
+              source == "transaction_updates",
+              transaction.productID == IAPOfferCodeRedemption.productID else {
+            return false
+        }
+
+        let defaults = UserDefaults.standard
+        guard defaults.string(forKey: IAPOfferCodeRedemption.pendingProductIDKey) == transaction.productID else {
+            return false
+        }
+
+        let startedAt = defaults.double(forKey: IAPOfferCodeRedemption.pendingStartedAtKey)
+        guard startedAt > 0 else {
+            clearOfferCodeRedemptionSession()
+            return false
+        }
+
+        let elapsed = Date().timeIntervalSince1970 - startedAt
+        guard elapsed <= IAPOfferCodeRedemption.pendingSessionTTL else {
+            clearOfferCodeRedemptionSession()
+            await IAPDiagnosticStore.shared.record(
+                category: .flow,
+                name: "offer_code_redemption_session_expired",
+                level: .notice,
+                productID: transaction.productID,
+                transactionID: String(transaction.id),
+                fields: ["elapsedSeconds": String(Int(elapsed))]
+            )
+            return false
+        }
+
+        let transactionTime = transaction.purchaseDate.timeIntervalSince1970
+        guard transactionTime >= startedAt - 60 else {
+            await IAPDiagnosticStore.shared.record(
+                category: .flow,
+                name: "offer_code_redemption_old_transaction_ignored",
+                level: .notice,
+                productID: transaction.productID,
+                transactionID: String(transaction.id),
+                fields: [
+                    "sessionStartedAt": String(Int(startedAt)),
+                    "transactionPurchaseDate": String(Int(transactionTime))
+                ]
+            )
+            return false
+        }
+
+        clearOfferCodeRedemptionSession()
+        await IAPDiagnosticStore.shared.record(
+            category: .flow,
+            name: "offer_code_redemption_session_consumed",
+            level: .notice,
+            productID: transaction.productID,
+            transactionID: String(transaction.id),
+            fields: [
+                "source": source,
+                "elapsedSeconds": String(Int(elapsed))
+            ]
+        )
+        return true
+    }
+
+    private func isOfferCodeRedemptionTransaction(_ transaction: Transaction) -> Bool {
+        transaction.productID == IAPOfferCodeRedemption.productID && transaction.offerType == .code
+    }
+
+    private func clearOfferCodeRedemptionSession() {
+        let defaults = UserDefaults.standard
+        defaults.removeObject(forKey: IAPOfferCodeRedemption.pendingProductIDKey)
+        defaults.removeObject(forKey: IAPOfferCodeRedemption.pendingStartedAtKey)
     }
 
     // MARK: - 发放喵币
@@ -619,7 +818,6 @@ class StoreManager: ObservableObject {
             productID: transaction.productID,
             purchaseDate: transaction.purchaseDate,
             coinAmount: totalAmount,
-            fishCoinAmount: nil,
             subscriptionMonths: nil,
             isVerified: true,
             verificationDate: Date()
@@ -643,17 +841,14 @@ class StoreManager: ObservableObject {
         )
     }
 
-    // MARK: - 发放 App Store 兑换码礼包
-    // 隐藏消耗型商品：com.pinkhouse.app.offer.bonus_888_66666
-    // 仅通过 App Store Connect Offer Codes 兑换；App 内不提供付费购买入口。
-    private func deliverOfferCodeBonus(for transaction: Transaction, attemptID: String?, source: String) async {
-        let meowCoinAmount = IAPOfferCodeBonus.meowCoinAmount
-        let fishCoinAmount = IAPOfferCodeBonus.fishCoinAmount
+    // MARK: - 发放 App Store 优惠码喵币
+    // 优惠码绑定现有 60 喵币档位；免费兑换只发基础 60 喵币，不消耗首充双倍资格。
+    private func deliverOfferCodeMeowCoins(for transaction: Transaction, attemptID: String?, source: String) async {
+        let meowCoinAmount = IAPOfferCodeRedemption.meowCoinAmount
 
         await MainActor.run {
             let previousAccountBalance = Self.loadMeowCoinAccount().balance
             let previousStatusMeowCoin = PetDataManager.shared.status.meowCoin
-            let previousStatusFishCoin = PetDataManager.shared.status.fishCoin
 
             var account = Self.loadMeowCoinAccount()
             account.balance += meowCoinAmount
@@ -663,12 +858,11 @@ class StoreManager: ObservableObject {
 
             var status = PetDataManager.shared.status
             status.meowCoin = account.balance
-            status.fishCoin += fishCoinAmount
 
             Task {
                 await IAPDiagnosticStore.shared.record(
                     category: .balance,
-                    name: "offer_bonus_delivery_pre_save",
+                    name: "offer_code_redemption_delivery_pre_save",
                     attemptID: attemptID,
                     productID: transaction.productID,
                     transactionID: String(transaction.id),
@@ -676,12 +870,10 @@ class StoreManager: ObservableObject {
                         "source": source,
                         "previousAccountBalance": String(previousAccountBalance),
                         "previousStatusMeowCoin": String(previousStatusMeowCoin),
-                        "previousStatusFishCoin": String(previousStatusFishCoin),
                         "newAccountBalance": String(account.balance),
                         "newStatusMeowCoin": String(status.meowCoin),
-                        "newStatusFishCoin": String(status.fishCoin),
                         "deliveredMeowCoin": String(meowCoinAmount),
-                        "deliveredFishCoin": String(fishCoinAmount)
+                        "firstDoubleConsumed": "false"
                     ]
                 )
             }
@@ -692,22 +884,21 @@ class StoreManager: ObservableObject {
             Task {
                 await IAPDiagnosticStore.shared.record(
                     category: .balance,
-                    name: "offer_bonus_delivery_post_save",
+                    name: "offer_code_redemption_delivery_post_save",
                     attemptID: attemptID,
                     productID: transaction.productID,
                     transactionID: String(transaction.id),
                     fields: [
                         "source": source,
                         "storedAccountBalance": String(Self.loadMeowCoinAccount().balance),
-                        "storedStatusMeowCoin": String(PetDataManager.shared.status.meowCoin),
-                        "storedStatusFishCoin": String(PetDataManager.shared.status.fishCoin)
+                        "storedStatusMeowCoin": String(PetDataManager.shared.status.meowCoin)
                     ]
                 )
             }
         }
 
         await publishPurchaseSuccess(
-            IAPOfferCodeBonus.successMessage,
+            IAPOfferCodeRedemption.successMessage,
             attemptID: attemptID,
             source: source
         )
@@ -717,24 +908,23 @@ class StoreManager: ObservableObject {
             productID: transaction.productID,
             purchaseDate: transaction.purchaseDate,
             coinAmount: meowCoinAmount,
-            fishCoinAmount: fishCoinAmount,
             subscriptionMonths: nil,
             isVerified: true,
             verificationDate: Date()
         )
         savePurchaseRecord(record)
 
-        print("[StoreManager] 发放兑换码礼包: \(meowCoinAmount) 喵币 + \(fishCoinAmount) 鱼币")
+        print("[StoreManager] 发放 App Store 优惠码喵币: \(meowCoinAmount) 喵币")
         await IAPDiagnosticStore.shared.record(
             category: .flow,
-            name: "offer_bonus_delivery_completed",
+            name: "offer_code_redemption_delivery_completed",
             attemptID: attemptID,
             productID: transaction.productID,
             transactionID: String(transaction.id),
             fields: [
                 "source": source,
                 "meowCoinAmount": String(meowCoinAmount),
-                "fishCoinAmount": String(fishCoinAmount)
+                "firstDoubleConsumed": "false"
             ]
         )
     }
