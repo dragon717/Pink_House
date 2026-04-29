@@ -1459,14 +1459,6 @@ struct ClothingEditView: View {
 
     /// 更新衣物数量缓存，用于魔法任务进度实时显示
     private func updateClothingCountCache() {
-        do {
-            // 只统计未删除的衣物，与魔法任务进度检查保持一致
-            let descriptor = FetchDescriptor<Clothing>(predicate: #Predicate { $0.isDeleted == false })
-            let count = try modelContext.fetchCount(descriptor)
-            FeatureUnlockManager.shared.updateClothingCount(count)
-            print("👗 衣物数量缓存已更新: \(count)")
-        } catch {
-            print("❌ 更新衣物数量缓存失败: \(error)")
-        }
+        FeatureUnlockManager.shared.refreshClothingCountCache(from: modelContext, reason: "clothing-edit-save")
     }
 }

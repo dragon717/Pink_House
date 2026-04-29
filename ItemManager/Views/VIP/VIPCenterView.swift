@@ -4,6 +4,7 @@ import UIKit
 
 struct VIPCenterView: View {
     @ObservedObject private var vipManager = VIPManager.shared
+    @ObservedObject private var themeSkinManager = ThemeSkinManager.shared
     @Environment(\.dismiss) private var dismiss
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
@@ -27,6 +28,47 @@ struct VIPCenterView: View {
 
     private var visualTheme: VIPVisualTheme {
         vipManager.preferredVisualTheme
+    }
+
+    private var themeSkinDescriptor: ThemeSkinDescriptor? {
+        if let descriptor = themeSkinManager.activeThemeDescriptor(for: .sectionCard, state: .default),
+           VIPThemeSkinSupport.isSupported(descriptor) {
+            return descriptor
+        }
+        return nil
+    }
+
+    private var isThemeSkinActive: Bool {
+        VIPThemeSkinSupport.isSupported(themeSkinDescriptor)
+    }
+
+    private var primaryTextColor: Color {
+        themeSkinDescriptor.map { SkyConcertThemeSkin.labelColor(for: $0) } ?? .white
+    }
+
+    private var secondaryTextColor: Color {
+        themeSkinDescriptor.map { SkyConcertThemeSkin.labelColor(for: $0).opacity(0.72) }
+            ?? visualTheme.secondaryTextColor
+    }
+
+    private var accentColor: Color {
+        themeSkinDescriptor.map { SkyConcertThemeSkin.accent(for: $0) } ?? visualTheme.accentColor
+    }
+
+    private var benefitPrimaryTextColor: Color {
+        isThemeSkinActive ? primaryTextColor : .white
+    }
+
+    private var benefitSecondaryTextColor: Color {
+        isThemeSkinActive ? secondaryTextColor : Color.white.opacity(0.68)
+    }
+
+    private var buttonLabelColor: Color {
+        isThemeSkinActive ? primaryTextColor : Color.black.opacity(0.92)
+    }
+
+    private var buttonSecondaryLabelColor: Color {
+        isThemeSkinActive ? secondaryTextColor : Color.black.opacity(0.68)
     }
 
     private var selectedPlan: VIPPlan {
@@ -265,7 +307,7 @@ struct VIPCenterView: View {
         .frame(maxWidth: .infinity)
     }
 
-    private var purchasePanelBackground: some View {
+    private var purchasePanelBackground: AnyView {
         let panelShape = UnevenRoundedRectangle(
             cornerRadii: .init(
                 topLeading: 34,
@@ -276,7 +318,42 @@ struct VIPCenterView: View {
             style: .continuous
         )
 
-        return ZStack {
+        if let descriptor = themeSkinDescriptor {
+            return AnyView(ZStack {
+                panelShape
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                SkyConcertThemeSkin.shellFillTop(for: descriptor).opacity(0.98),
+                                SkyConcertThemeSkin.accentSoft(for: descriptor).opacity(SwanDreamThemeSkin.isSwanDream(descriptor) ? 0.68 : 0.48),
+                                SkyConcertThemeSkin.shellFillBottom(for: descriptor).opacity(0.94)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .overlay(
+                        panelShape
+                            .stroke(
+                                LinearGradient(
+                                    colors: [
+                                        Color.white.opacity(0.96),
+                                        SkyConcertThemeSkin.shellStroke(for: descriptor).opacity(0.92),
+                                        SkyConcertThemeSkin.accent(for: descriptor).opacity(0.52)
+                                    ],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                ),
+                                lineWidth: 1.35
+                            )
+                    )
+                    .shadow(color: SkyConcertThemeSkin.shadowColor(for: descriptor).opacity(0.66), radius: 18, x: 0, y: 10)
+
+                folderTabAccent
+            })
+        }
+
+        return AnyView(ZStack {
             panelShape
                 .fill(Color.black.opacity(0.12))
                 .background(panelShape.fill(.thinMaterial))
@@ -325,7 +402,7 @@ struct VIPCenterView: View {
                 .offset(x: -80, y: -56)
 
             folderTabAccent
-        }
+        })
     }
 
     private var folderTabAccent: some View {
@@ -339,7 +416,7 @@ struct VIPCenterView: View {
                 ),
                 style: .continuous
             )
-            .fill(Color.black.opacity(0.3))
+            .fill(isThemeSkinActive ? SkyConcertThemeSkin.shellFillTop(for: themeSkinDescriptor).opacity(0.72) : Color.black.opacity(0.3))
             .background(
                 UnevenRoundedRectangle(
                     cornerRadii: .init(
@@ -365,8 +442,8 @@ struct VIPCenterView: View {
                 .stroke(
                     LinearGradient(
                         colors: [
-                            visualTheme.accentColor.opacity(0.7),
-                            Color(hex: "F0E7A8").opacity(0.65)
+                            accentColor.opacity(0.82),
+                            (isThemeSkinActive ? SkyConcertThemeSkin.shellStroke(for: themeSkinDescriptor) : Color(hex: "F0E7A8")).opacity(0.72)
                         ],
                         startPoint: .leading,
                         endPoint: .trailing
@@ -377,7 +454,7 @@ struct VIPCenterView: View {
             .frame(width: 120, height: 24)
             .overlay(alignment: .leading) {
                 Capsule()
-                    .fill(Color.white.opacity(0.2))
+                    .fill((isThemeSkinActive ? accentColor : Color.white).opacity(0.2))
                     .frame(width: 42, height: 4)
                     .offset(x: 14)
             }
@@ -389,28 +466,54 @@ struct VIPCenterView: View {
 
     private var backgroundLayer: some View {
         ZStack {
-            LinearGradient(
-                colors: visualTheme.backgroundGradientColors,
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .ignoresSafeArea()
+            if let descriptor = themeSkinDescriptor {
+                LinearGradient(
+                    colors: [
+                        SkyConcertThemeSkin.shellFillTop(for: descriptor),
+                        SkyConcertThemeSkin.accentSoft(for: descriptor).opacity(SwanDreamThemeSkin.isSwanDream(descriptor) ? 0.68 : 0.46),
+                        SkyConcertThemeSkin.shellFillBottom(for: descriptor)
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .ignoresSafeArea()
 
-            Circle()
-                .fill(visualTheme.glowColor)
-                .frame(width: 260, height: 260)
-                .blur(radius: 48)
-                .offset(x: -88, y: -250)
+                if SkyConcertThemeSkin.isSkyConcert(descriptor) {
+                    SkyConcertDecorationLayer(placements: SkyConcertThemeSkin.wardrobeBackdropPlacements)
+                        .opacity(0.62)
+                        .ignoresSafeArea()
+                } else if SwanDreamThemeSkin.isSwanDream(descriptor) {
+                    SkyConcertDecorationLayer(
+                        placements: SwanDreamThemeSkin.wardrobeBackdropPlacements,
+                        namespace: SwanDreamThemeSkin.namespace
+                    )
+                    .opacity(0.62)
+                    .ignoresSafeArea()
+                }
+            } else {
+                LinearGradient(
+                    colors: visualTheme.backgroundGradientColors,
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .ignoresSafeArea()
 
-            Circle()
-                .fill(visualTheme.glowColor.opacity(0.75))
-                .frame(width: 220, height: 220)
-                .blur(radius: 56)
-                .offset(x: 108, y: -150)
+                Circle()
+                    .fill(visualTheme.glowColor)
+                    .frame(width: 260, height: 260)
+                    .blur(radius: 48)
+                    .offset(x: -88, y: -250)
+
+                Circle()
+                    .fill(visualTheme.glowColor.opacity(0.75))
+                    .frame(width: 220, height: 220)
+                    .blur(radius: 56)
+                    .offset(x: 108, y: -150)
+            }
 
             LinearGradient(
                 colors: [
-                    Color.white.opacity(0.06),
+                    Color.white.opacity(isThemeSkinActive ? 0.16 : 0.06),
                     .clear
                 ],
                 startPoint: .top,
@@ -429,15 +532,15 @@ struct VIPCenterView: View {
                     .font(.system(size: scaledFont(12), weight: .bold))
                     .padding(.horizontal, 8)
                     .padding(.vertical, 3)
-                    .background(Capsule().fill(visualTheme.accentColor.opacity(0.18)))
+                    .background(Capsule().fill(accentColor.opacity(0.18)))
                     .overlay(
                         Capsule()
-                            .stroke(visualTheme.accentColor.opacity(0.45), lineWidth: 1)
+                            .stroke(accentColor.opacity(0.45), lineWidth: 1)
                     )
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 10)
-            .background(
+            .themeSkinAdaptiveSectionCard(slot: .topBarMain, cornerRadius: 22, showsDecoration: false) {
                 Capsule()
                     .fill(Color.black.opacity(0.08))
                     .background(Capsule().fill(.thinMaterial))
@@ -446,8 +549,8 @@ struct VIPCenterView: View {
                             .stroke(Color.white.opacity(0.14), lineWidth: 1)
                     )
                     .shadow(color: Color.black.opacity(0.1), radius: 10, x: 0, y: 6)
-            )
-            .foregroundStyle(.white)
+            }
+            .foregroundStyle(primaryTextColor)
 
             Spacer()
 
@@ -499,30 +602,28 @@ struct VIPCenterView: View {
         VStack(spacing: 14) {
             Text(vipManager.isVIP ? "守护少女每一份美好" : "给你的心愿一份更尊贵的守护")
                 .font(.system(size: scaledFont(26), weight: .bold))
-                .foregroundStyle(.white)
+                .foregroundStyle(primaryTextColor)
                 .multilineTextAlignment(.center)
 
             Text(heroSubtitle)
                 .font(.system(size: scaledFont(14), weight: .medium))
-                .foregroundStyle(visualTheme.secondaryTextColor)
+                .foregroundStyle(secondaryTextColor)
                 .multilineTextAlignment(.center)
 
             ZStack {
-                VIPGlassCardBackground(glassStyle: visualTheme.primaryGlassStyle, cornerRadius: 28)
-
                 VStack(spacing: 12) {
                     HStack(spacing: 10) {
                         Image(systemName: vipManager.isVIP ? "checkmark.seal.fill" : "sparkles")
                             .font(.system(size: scaledFont(18), weight: .bold))
-                            .foregroundStyle(visualTheme.primaryGlassStyle.iconTint)
+                            .foregroundStyle(accentColor)
                         Text(statusTitle)
                             .font(.system(size: scaledFont(16), weight: .semibold))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(primaryTextColor)
                     }
 
                     Text(statusDescription)
                         .font(.system(size: scaledFont(13), weight: .medium))
-                        .foregroundStyle(Color.white.opacity(0.74))
+                        .foregroundStyle(secondaryTextColor)
                         .multilineTextAlignment(.center)
 
                     HStack(spacing: 8) {
@@ -533,11 +634,14 @@ struct VIPCenterView: View {
                 .padding(.horizontal, 18)
                 .padding(.vertical, 22)
             }
+            .themeSkinAdaptiveSectionCard(slot: .sectionCard, cornerRadius: 28) {
+                VIPGlassCardBackground(glassStyle: visualTheme.primaryGlassStyle, cornerRadius: 28)
+            }
             .frame(height: 154)
 
             Text("会员权益")
                 .font(.system(size: scaledFont(16), weight: .semibold))
-                .foregroundStyle(Color.white.opacity(0.76))
+                .foregroundStyle(secondaryTextColor)
                 .padding(.top, 4)
         }
     }
@@ -580,11 +684,11 @@ struct VIPCenterView: View {
                             VStack(alignment: .leading, spacing: 6) {
                                 Text(plan.title)
                                     .font(.system(size: scaledFont(17), weight: .bold))
-                                    .foregroundStyle(.white)
+                                    .foregroundStyle(primaryTextColor)
 
                                 Text(plan.subtitle)
                                     .font(.system(size: scaledFont(12), weight: .medium))
-                                    .foregroundStyle(Color.white.opacity(0.7))
+                                    .foregroundStyle(secondaryTextColor)
                             }
 
                             Spacer(minLength: 8)
@@ -618,7 +722,7 @@ struct VIPCenterView: View {
                             .font(.system(size: scaledFont(18), weight: .bold))
                         Text("开通后立即生效，可叠加有效期")
                             .font(.system(size: scaledFont(12), weight: .medium))
-                            .foregroundStyle(Color.black.opacity(0.68))
+                            .foregroundStyle(buttonSecondaryLabelColor)
                     }
 
                     Spacer()
@@ -626,10 +730,10 @@ struct VIPCenterView: View {
                     Text("\(selectedPlan.meowCoins)喵币")
                         .font(.system(size: scaledFont(16), weight: .bold))
                 }
-                .foregroundStyle(Color.black.opacity(0.92))
+                .foregroundStyle(buttonLabelColor)
                 .padding(.horizontal, 18)
                 .padding(.vertical, 14)
-                .background(
+                .themeSkinAdaptiveSectionCard(slot: .primaryButton, cornerRadius: 18, showsDecoration: false) {
                     LinearGradient(
                         colors: [
                             Color(hex: "A7AEFF"),
@@ -639,8 +743,7 @@ struct VIPCenterView: View {
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     )
-                )
-                .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                }
                 .overlay(
                     RoundedRectangle(cornerRadius: 18, style: .continuous)
                         .stroke(Color.white.opacity(0.3), lineWidth: 1.2)
@@ -655,7 +758,7 @@ struct VIPCenterView: View {
             } label: {
                 Text("喵币不足？前往商店获取喵币")
                     .font(.system(size: scaledFont(12), weight: .medium))
-                    .foregroundStyle(Color.white.opacity(0.72))
+                    .foregroundStyle(secondaryTextColor)
                     .underline()
             }
             .buttonStyle(.plain)
@@ -671,9 +774,9 @@ struct VIPCenterView: View {
                     HStack(spacing: 6) {
                         Image(systemName: hasAcceptedVIPAgreements ? "checkmark.circle.fill" : "circle")
                             .font(.system(size: scaledFont(11), weight: .semibold))
-                            .foregroundStyle(hasAcceptedVIPAgreements ? visualTheme.accentColor : Color.white.opacity(0.74))
+                            .foregroundStyle(hasAcceptedVIPAgreements ? accentColor : secondaryTextColor)
                         Text("请阅读并同意")
-                            .foregroundStyle(Color.white.opacity(0.62))
+                            .foregroundStyle(secondaryTextColor.opacity(0.86))
                     }
                 }
                 .buttonStyle(.plain)
@@ -682,82 +785,119 @@ struct VIPCenterView: View {
                     openExternalURL(LegalLinks.vipAgreementURL)
                 }
                 .buttonStyle(.plain)
-                .foregroundStyle(.white)
+                .foregroundStyle(primaryTextColor)
                 .underline()
 
                 Text("和")
-                    .foregroundStyle(Color.white.opacity(0.62))
+                    .foregroundStyle(secondaryTextColor.opacity(0.86))
 
                 Button("使用协议") {
                     openExternalURL(LegalLinks.userAgreementURL)
                 }
                 .buttonStyle(.plain)
-                .foregroundStyle(.white)
+                .foregroundStyle(primaryTextColor)
                 .underline()
             }
             .font(.system(size: scaledFont(10), weight: .medium))
 
             Text("VIP 为喵币兑换型权益，不自动续费。")
                 .font(.system(size: scaledFont(9), weight: .medium))
-                .foregroundStyle(Color.white.opacity(0.5))
+                .foregroundStyle(secondaryTextColor.opacity(0.72))
                 .multilineTextAlignment(.center)
         }
         .padding(.top, 1)
     }
 
+    @ViewBuilder
     private func planCardBackground(isSelected: Bool) -> some View {
         let cornerRadius: CGFloat = 22
 
-        return RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-            .fill(Color.black.opacity(isSelected ? 0.14 : 0.18))
-            .background(
-                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .fill(.thinMaterial)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .fill(
-                        LinearGradient(
-                            colors: [
-                                Color.white.opacity(isSelected ? 0.14 : 0.08),
-                                .clear,
-                                Color.black.opacity(0.03)
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
+        if let descriptor = themeSkinDescriptor {
+            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            SkyConcertThemeSkin.shellFillTop(for: descriptor).opacity(isSelected ? 0.98 : 0.86),
+                            SkyConcertThemeSkin.accentSoft(for: descriptor).opacity(isSelected ? 0.62 : 0.42),
+                            SkyConcertThemeSkin.shellFillBottom(for: descriptor).opacity(0.9)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
                     )
-                    .blur(radius: 4)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .stroke(Color.white.opacity(isSelected ? 0.12 : 0.08), lineWidth: 1)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .stroke(
-                        isSelected
-                        ? LinearGradient(
-                            colors: [
-                                Color(hex: "79D8FF"),
-                                Color(hex: "A9B2FF"),
-                                Color(hex: "F0E7A8")
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                        .stroke(
+                            LinearGradient(
+                                colors: [
+                                    Color.white.opacity(0.94),
+                                    SkyConcertThemeSkin.shellStroke(for: descriptor).opacity(isSelected ? 0.95 : 0.72),
+                                    SkyConcertThemeSkin.accent(for: descriptor).opacity(isSelected ? 0.64 : 0.26)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                            lineWidth: isSelected ? 1.45 : 1
                         )
-                        : LinearGradient(
-                            colors: [
-                                Color.white.opacity(0.1),
-                                Color.white.opacity(0.05)
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        ),
-                        lineWidth: isSelected ? 1.35 : 1
-                    )
-            )
-            .shadow(color: isSelected ? visualTheme.glowColor.opacity(0.12) : .clear, radius: 10, x: 0, y: 6)
+                )
+                .shadow(
+                    color: isSelected ? SkyConcertThemeSkin.shadowColor(for: descriptor).opacity(0.62) : .clear,
+                    radius: 12,
+                    x: 0,
+                    y: 7
+                )
+        } else {
+            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                .fill(Color.black.opacity(isSelected ? 0.14 : 0.18))
+                .background(
+                    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                        .fill(.thinMaterial)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    Color.white.opacity(isSelected ? 0.14 : 0.08),
+                                    .clear,
+                                    Color.black.opacity(0.03)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .blur(radius: 4)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                        .stroke(Color.white.opacity(isSelected ? 0.12 : 0.08), lineWidth: 1)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                        .stroke(
+                            isSelected
+                            ? LinearGradient(
+                                colors: [
+                                    Color(hex: "79D8FF"),
+                                    Color(hex: "A9B2FF"),
+                                    Color(hex: "F0E7A8")
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                            : LinearGradient(
+                                colors: [
+                                    Color.white.opacity(0.1),
+                                    Color.white.opacity(0.05)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                            lineWidth: isSelected ? 1.35 : 1
+                        )
+                )
+                .shadow(color: isSelected ? visualTheme.glowColor.opacity(0.12) : .clear, radius: 10, x: 0, y: 6)
+        }
     }
 
     private func openExternalURL(_ url: URL) {
@@ -771,25 +911,25 @@ struct VIPCenterView: View {
             VStack(alignment: .leading, spacing: 10) {
                 Image(systemName: benefit.icon)
                     .font(.system(size: scaledFont(22), weight: .bold))
-                    .foregroundStyle((benefit.preferredGlassStyle ?? visualTheme.secondaryGlassStyle).iconTint)
+                    .foregroundStyle(isThemeSkinActive ? accentColor : (benefit.preferredGlassStyle ?? visualTheme.secondaryGlassStyle).iconTint)
 
                 Spacer(minLength: 0)
 
                 Text(benefit.title)
                     .font(.system(size: scaledFont(16), weight: .bold))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(benefitPrimaryTextColor)
                     .multilineTextAlignment(.leading)
 
                 benefitSubtitleView(for: benefit, fontSize: scaledFont(11))
             }
             .padding(14)
             .frame(maxWidth: .infinity, minHeight: 118, alignment: .topLeading)
-            .background(
+            .themeSkinAdaptiveSectionCard(slot: .sectionCard, cornerRadius: 22) {
                 VIPGlassCardBackground(
                     glassStyle: benefit.preferredGlassStyle ?? visualTheme.secondaryGlassStyle,
                     cornerRadius: 22
                 )
-            )
+            }
         }
         .buttonStyle(.plain)
     }
@@ -801,58 +941,69 @@ struct VIPCenterView: View {
             HStack(spacing: 14) {
                 Image(systemName: benefit.icon)
                     .font(.system(size: scaledFont(20), weight: .bold))
-                    .foregroundStyle((benefit.preferredGlassStyle ?? visualTheme.secondaryGlassStyle).iconTint)
+                    .foregroundStyle(isThemeSkinActive ? accentColor : (benefit.preferredGlassStyle ?? visualTheme.secondaryGlassStyle).iconTint)
 
                 VStack(alignment: .leading, spacing: 6) {
                     Text(benefit.title)
                         .font(.system(size: scaledFont(17), weight: .bold))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(benefitPrimaryTextColor)
                     benefitSubtitleView(for: benefit, fontSize: scaledFont(12))
                 }
                 Spacer()
             }
             .padding(16)
             .frame(maxWidth: .infinity, minHeight: 118, alignment: .leading)
-            .background(
+            .themeSkinAdaptiveSectionCard(slot: .sectionCard, cornerRadius: 22) {
                 VIPGlassCardBackground(
                     glassStyle: benefit.preferredGlassStyle ?? visualTheme.secondaryGlassStyle,
                     cornerRadius: 22
                 )
-            )
+            }
         }
         .buttonStyle(.plain)
     }
 
+    @ViewBuilder
     private func floatingActionButton(icon: String) -> some View {
-        ZStack {
-            Circle()
-                .fill(Color.black.opacity(0.08))
-                .background(Circle().fill(.thinMaterial))
-                .overlay(
-                    Circle()
-                        .stroke(Color.white.opacity(0.14), lineWidth: 1)
-                )
-            Image(systemName: icon)
-                .font(.system(size: scaledFont(14), weight: .bold))
-                .foregroundStyle(.white)
+        if isThemeSkinActive {
+            ThemeSkinIconBadge(
+                systemName: icon,
+                fallbackColor: accentColor,
+                size: 42,
+                symbolSize: scaledFont(14),
+                slot: .topBarIconButton
+            )
+        } else {
+            ZStack {
+                Circle()
+                    .fill(Color.black.opacity(0.08))
+                    .background(Circle().fill(.thinMaterial))
+                    .overlay(
+                        Circle()
+                            .stroke(Color.white.opacity(0.14), lineWidth: 1)
+                    )
+                Image(systemName: icon)
+                    .font(.system(size: scaledFont(14), weight: .bold))
+                    .foregroundStyle(.white)
+            }
+            .frame(width: 42, height: 42)
+            .shadow(color: Color.black.opacity(0.1), radius: 10, x: 0, y: 6)
         }
-        .frame(width: 42, height: 42)
-        .shadow(color: Color.black.opacity(0.1), radius: 10, x: 0, y: 6)
     }
 
     private func heroTag(text: String) -> some View {
         Text(text)
             .font(.system(size: scaledFont(11), weight: .bold))
-            .foregroundStyle(.white)
+            .foregroundStyle(isThemeSkinActive ? primaryTextColor : .white)
             .padding(.horizontal, 10)
             .padding(.vertical, 6)
             .background(
                 Capsule()
-                    .fill(Color.white.opacity(0.12))
+                    .fill(isThemeSkinActive ? accentColor.opacity(0.16) : Color.white.opacity(0.12))
             )
             .overlay(
                 Capsule()
-                    .stroke(Color.white.opacity(0.14), lineWidth: 1)
+                    .stroke(isThemeSkinActive ? accentColor.opacity(0.38) : Color.white.opacity(0.14), lineWidth: 1)
             )
     }
 
@@ -863,7 +1014,7 @@ struct VIPCenterView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text("萌宠商店")
                     .font(.system(size: fontSize, weight: .medium))
-                    .foregroundStyle(Color.white.opacity(0.68))
+                    .foregroundStyle(benefitSecondaryTextColor)
                 DiscountBadgeView(
                     text: VIPManager.petShopDiscountText,
                     style: .inlineGlow,
@@ -875,7 +1026,7 @@ struct VIPCenterView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text("主题皮肤商店")
                     .font(.system(size: fontSize, weight: .medium))
-                    .foregroundStyle(Color.white.opacity(0.68))
+                    .foregroundStyle(benefitSecondaryTextColor)
                 DiscountBadgeView(
                     text: VIPManager.themeSkinDiscountText,
                     style: .inlineGlow,
@@ -883,13 +1034,13 @@ struct VIPCenterView: View {
                 )
                 Text("· 更多会员权益正在路上")
                     .font(.system(size: fontSize, weight: .medium))
-                    .foregroundStyle(Color.white.opacity(0.68))
+                    .foregroundStyle(benefitSecondaryTextColor)
             }
             .multilineTextAlignment(.leading)
         default:
             Text(benefit.subtitle)
                 .font(.system(size: fontSize, weight: .medium))
-                .foregroundStyle(Color.white.opacity(0.68))
+                .foregroundStyle(benefitSecondaryTextColor)
                 .multilineTextAlignment(.leading)
                 .lineLimit(2)
         }
@@ -917,6 +1068,12 @@ struct VIPCenterView: View {
             return "黑金尊享"
         case .monicaPink:
             return "莫妮卡粉"
+        case .themeSkinAdaptive:
+            return "跟随主题"
+        case .skyConcertTheme:
+            return "天空音乐会"
+        case .swanDreamTheme:
+            return "天鹅入梦"
         }
     }
 

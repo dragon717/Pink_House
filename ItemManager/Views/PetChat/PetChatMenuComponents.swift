@@ -40,7 +40,6 @@ struct PetChatMenuContext {
 }
 
 // MARK: - 可复用的菜单项组件
-@available(iOS 18.0, *)
 struct PetChatMenuContent: View {
     let callbacks: PetChatMenuCallbacks
     let context: PetChatMenuContext

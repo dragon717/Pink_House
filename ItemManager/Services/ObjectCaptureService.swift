@@ -3,7 +3,9 @@ import Combine
 
 #if os(iOS)
 import UIKit
+#if OBJECT_CAPTURE_ENABLED
 import RealityKit
+#endif
 #endif
 
 enum ObjectCaptureError: LocalizedError {
@@ -13,7 +15,7 @@ enum ObjectCaptureError: LocalizedError {
     case saveFailed
     case invalidInput
     case cancelled
-    
+
     var errorDescription: String? {
         switch self {
         case .notSupported:
@@ -40,22 +42,25 @@ enum ObjectCaptureStage {
     case failed(ObjectCaptureError)
 }
 
-#if os(iOS)
+// iOS 17.x 热修：不要把 Object Capture / Photogrammetry Swift 符号编进主二进制。
+// 这些符号在 iOS 17 RealityFoundation 中缺失时会在启动阶段触发 dyld 崩溃。
+// 后续若只投 iOS 18+，可在 Build Settings 中显式开启 OBJECT_CAPTURE_ENABLED 恢复完整实现。
+#if os(iOS) && OBJECT_CAPTURE_ENABLED
 
 @available(iOS 18.0, *)
 @MainActor
 class ObjectCaptureService: ObservableObject {
-    
+
     static let shared = ObjectCaptureService()
-    
+
     @Published var stage: ObjectCaptureStage = .idle
     @Published var progress: Double = 0.0
     @Published var statusMessage: String = ""
     @Published var estimatedRemainingTime: TimeInterval?
-    
+
     private var photogrammetrySession: PhotogrammetrySession?
     private var currentTask: Task<Void, Never>?
-    
+
     // MARK: - 暂停/恢复状态
     private var isPaused: Bool = false
     private var pendingContinuation: CheckedContinuation<URL, Error>?
@@ -63,40 +68,43 @@ class ObjectCaptureService: ObservableObject {
     private var savedStage: ObjectCaptureStage?
     private var savedProgress: Double = 0.0
     private var savedStatusMessage: String = ""
-    
+
     private init() {}
-    
+
     var isSupported: Bool {
-        PhotogrammetrySession.isSupported
+        // 避免直接引用 PhotogrammetrySession.isSupported：该符号在 iOS 17.x
+        // RealityFoundation 中不存在，即使调用点被 iOS 18 可用性保护，启动时
+        // dyld 仍可能因强符号绑定失败而崩溃。
+        true
     }
-    
+
     var canStartNewSession: Bool {
-        PhotogrammetrySession.isSupported && currentTask == nil
+        isSupported && currentTask == nil
     }
-    
+
     func processImages(_ images: [UIImage], detail: PhotogrammetrySession.Request.Detail = .reduced) async throws -> URL {
         guard images.count >= 10 else {
             throw ObjectCaptureError.insufficientImages
         }
-        
+
         // 限制图片数量，减少内存使用
         let maxImages = min(images.count, 100) // 最多使用100张图片
         let processedImages = Array(images.prefix(maxImages))
-        
+
         await MainActor.run {
             stage = .preparing
             progress = 0.0
             statusMessage = "准备图片数据..."
         }
-        
+
         let modelID = UUID()
         let tempDir = FileManager.default.temporaryDirectory
             .appendingPathComponent("ObjectCapture_\(modelID.uuidString)")
         try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
-        
+
         let imageDir = tempDir.appendingPathComponent("images")
         try FileManager.default.createDirectory(at: imageDir, withIntermediateDirectories: true)
-        
+
         // 使用 autoreleasepool 减少内存峰值
         for (index, image) in processedImages.enumerated() {
             autoreleasepool {
@@ -106,63 +114,63 @@ class ObjectCaptureService: ObservableObject {
                     try? data.write(to: imageURL)
                 }
             }
-            
+
             // 每处理10张图片暂停一下，让系统回收内存
             if index % 10 == 0 {
                 await Task.yield()
             }
-            
+
             await MainActor.run {
                 progress = Double(index + 1) / Double(processedImages.count) * 0.1
             }
         }
-        
+
         let modelURL = try await performPhotogrammetry(
             imageDirectory: imageDir,
             modelID: modelID,
             detail: detail
         )
-        
+
         // 立即清理临时文件
         try? FileManager.default.removeItem(at: tempDir)
-        
+
         return modelURL
     }
-    
+
     func processImagesFromDirectory(_ imageDirectory: URL, detail: PhotogrammetrySession.Request.Detail = .reduced) async throws -> URL {
         let modelID = UUID()
-        
+
         // ObjectCaptureSession 创建的目录结构是:
         // ObjectCapture_UUID/
         //   ├── images/          <-- 图片在这里
         //   └── checkpoints/
         // PhotogrammetrySession 需要传入 images 子目录
-        
+
         let imagesDir = imageDirectory.appendingPathComponent("images")
-        
+
         // 详细检查输入目录
         print("[ObjectCaptureService] 开始处理目录: \(imageDirectory.path)")
         print("[ObjectCaptureService] 图片目录: \(imagesDir.path)")
-        
+
         // 检查 images 目录是否存在
         var isDirectory: ObjCBool = false
         let exists = FileManager.default.fileExists(atPath: imagesDir.path, isDirectory: &isDirectory)
-        
+
         guard exists && isDirectory.boolValue else {
             print("[ObjectCaptureService] 错误: images 目录不存在")
             throw ObjectCaptureError.invalidInput
         }
-        
+
         do {
             let files = try FileManager.default.contentsOfDirectory(at: imagesDir, includingPropertiesForKeys: [.fileSizeKey, .creationDateKey])
             let imageFiles = files.filter { ["jpg", "jpeg", "heic", "png"].contains($0.pathExtension.lowercased()) }
             print("[ObjectCaptureService] 找到 \(imageFiles.count) 张图片")
-            
+
             guard imageFiles.count >= 10 else {
                 print("[ObjectCaptureService] 错误: 图片数量不足 (\(imageFiles.count)/10)")
                 throw ObjectCaptureError.insufficientImages
             }
-            
+
             for (index, file) in imageFiles.enumerated() {
                 let attrs = try? FileManager.default.attributesOfItem(atPath: file.path)
                 let size = attrs?[.size] as? Int64 ?? 0
@@ -172,7 +180,7 @@ class ObjectCaptureService: ObservableObject {
             print("[ObjectCaptureService] 读取目录失败: \(error)")
             throw ObjectCaptureError.invalidInput
         }
-        
+
         // 传入 images 子目录给 PhotogrammetrySession
         return try await performPhotogrammetry(
             imageDirectory: imagesDir,
@@ -180,64 +188,64 @@ class ObjectCaptureService: ObservableObject {
             detail: detail
         )
     }
-    
+
     func processImagesWithFallback(_ images: [UIImage]) async throws -> URL {
         return try await processImages(images, detail: .reduced)
     }
-    
+
     private func performPhotogrammetry(
         imageDirectory: URL,
         modelID: UUID,
         detail: PhotogrammetrySession.Request.Detail
     ) async throws -> URL {
-        
+
         await MainActor.run {
             stage = .processing
             progress = 0.0
             statusMessage = "正在初始化 3D 重建...\n这可能需要几分钟时间"
         }
-        
+
         guard let documentsDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else {
             throw ObjectCaptureError.saveFailed
         }
-        
+
         let modelDir = documentsDir.appendingPathComponent("Models/\(modelID.uuidString)")
         try FileManager.default.createDirectory(at: modelDir, withIntermediateDirectories: true)
-        
+
         let outputURL = modelDir.appendingPathComponent("model.usdz")
-        
+
         var configuration = PhotogrammetrySession.Configuration()
         configuration.isObjectMaskingEnabled = true
-        
+
         let session = try PhotogrammetrySession(
             input: imageDirectory,
             configuration: configuration
         )
         self.photogrammetrySession = session
-        
+
         let request = PhotogrammetrySession.Request.modelFile(
             url: outputURL,
             detail: detail
         )
-        
+
         return try await withCheckedThrowingContinuation { continuation in
             currentTask = Task {
                 do {
                     try session.process(requests: [request])
-                    
+
                     var hasReceivedProgress = false
-                    
+
                     for try await output in session.outputs {
                         if Task.isCancelled {
                             continuation.resume(throwing: ObjectCaptureError.cancelled)
                             return
                         }
-                        
+
                         // 检测是否开始收到进度
                         if case .requestProgress = output {
                             hasReceivedProgress = true
                         }
-                        
+
                         await self.handleOutput(output, continuation: continuation, outputURL: outputURL)
                     }
                 } catch {
@@ -249,7 +257,7 @@ class ObjectCaptureService: ObservableObject {
             }
         }
     }
-    
+
     private func handleOutput(
         _ output: PhotogrammetrySession.Output,
         continuation: CheckedContinuation<URL, Error>,
@@ -267,7 +275,7 @@ class ObjectCaptureService: ObservableObject {
                     }
                 }
             }
-            
+
         case .requestProgressInfo(let request, let progressInfo):
             if case .modelFile = request {
                 await MainActor.run {
@@ -277,7 +285,7 @@ class ObjectCaptureService: ObservableObject {
                     }
                 }
             }
-            
+
         case .requestComplete(let request, _):
             if case .modelFile = request {
                 if FileManager.default.fileExists(atPath: outputURL.path) {
@@ -294,44 +302,44 @@ class ObjectCaptureService: ObservableObject {
                     continuation.resume(throwing: ObjectCaptureError.saveFailed)
                 }
             }
-            
+
         case .requestError(_, let error):
             await MainActor.run {
                 self.stage = .failed(.processingFailed(error.localizedDescription))
             }
             continuation.resume(throwing: ObjectCaptureError.processingFailed(error.localizedDescription))
-            
+
         case .processingCancelled:
             await MainActor.run {
                 self.stage = .failed(.cancelled)
             }
             continuation.resume(throwing: ObjectCaptureError.cancelled)
-            
+
         case .inputComplete:
             await MainActor.run {
                 self.progress = 0.1
                 self.statusMessage = "📂 输入处理完成\n🚀 开始 3D 重建..."
             }
-            
+
         case .invalidSample(let id, let reason):
             print("[ObjectCapture] 无效样本 \(id): \(reason)")
             await MainActor.run {
                 self.statusMessage = "⚠️ 部分图片质量不佳\n继续处理其他图片..."
             }
-            
+
         case .skippedSample(let id):
             print("[ObjectCapture] 跳过样本 \(id)")
-            
+
         case .automaticDownsampling:
             await MainActor.run {
                 self.statusMessage = "📉 自动优化图片质量..."
             }
-            
+
         @unknown default:
             break
         }
     }
-    
+
     func cancelProcessing() {
         currentTask?.cancel()
         photogrammetrySession?.cancel()
@@ -344,7 +352,7 @@ class ObjectCaptureService: ObservableObject {
         pendingContinuation = nil
         pendingOutputURL = nil
     }
-    
+
     func reset() {
         cancelProcessing()
         stage = .idle
@@ -355,7 +363,7 @@ class ObjectCaptureService: ObservableObject {
         pendingContinuation = nil
         pendingOutputURL = nil
     }
-    
+
     // MARK: - 暂停/恢复功能
 
     /// 暂停当前处理（当离开页面时调用）
@@ -402,26 +410,26 @@ class ObjectCaptureService: ObservableObject {
         if case .preparing = stage { return true }
         return false
     }
-    
+
     // MARK: - 磁盘空间管理
-    
+
     /// 清理旧的模型文件，保留最近 N 个
     func cleanupOldModels(keepRecent: Int = 10) {
         guard let documentsDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else { return }
-        
+
         let modelsDir = documentsDir.appendingPathComponent("Models")
-        
+
         do {
             let fileManager = FileManager.default
             let contents = try fileManager.contentsOfDirectory(at: modelsDir, includingPropertiesForKeys: [.creationDateKey])
-            
+
             // 按创建日期排序
             let sortedContents = contents.sorted { url1, url2 in
                 let date1 = (try? url1.resourceValues(forKeys: [.creationDateKey]).creationDate) ?? Date.distantPast
                 let date2 = (try? url2.resourceValues(forKeys: [.creationDateKey]).creationDate) ?? Date.distantPast
                 return date1 > date2 // 最新的在前
             }
-            
+
             // 删除旧的模型
             if sortedContents.count > keepRecent {
                 let oldModels = sortedContents.suffix(from: keepRecent)
@@ -430,27 +438,27 @@ class ObjectCaptureService: ObservableObject {
                     print("[ObjectCaptureService] 清理旧模型: \(modelURL.lastPathComponent)")
                 }
             }
-            
+
             // 清理临时文件
             cleanupTempFiles()
-            
+
         } catch {
             print("[ObjectCaptureService] 清理旧模型失败: \(error)")
         }
     }
-    
+
     /// 清理临时文件
     private func cleanupTempFiles() {
         let tempDir = FileManager.default.temporaryDirectory
-        
+
         do {
             let contents = try FileManager.default.contentsOfDirectory(at: tempDir, includingPropertiesForKeys: nil)
             let objectCaptureDirs = contents.filter { $0.lastPathComponent.hasPrefix("ObjectCapture_") }
-            
+
             for dir in objectCaptureDirs {
                 try? FileManager.default.removeItem(at: dir)
             }
-            
+
             if !objectCaptureDirs.isEmpty {
                 print("[ObjectCaptureService] 清理 \(objectCaptureDirs.count) 个临时目录")
             }
@@ -458,24 +466,24 @@ class ObjectCaptureService: ObservableObject {
             print("[ObjectCaptureService] 清理临时文件失败: \(error)")
         }
     }
-    
+
     /// 获取模型目录总大小（MB）
     func getModelsDirectorySize() -> Double {
         guard let documentsDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else { return 0 }
-        
+
         let modelsDir = documentsDir.appendingPathComponent("Models")
-        
+
         do {
             let contents = try FileManager.default.contentsOfDirectory(at: modelsDir, includingPropertiesForKeys: nil)
             var totalSize: Int64 = 0
-            
+
             for url in contents {
                 if let attributes = try? FileManager.default.attributesOfItem(atPath: url.path),
                    let size = attributes[.size] as? Int64 {
                     totalSize += size
                 }
             }
-            
+
             return Double(totalSize) / 1024 / 1024 // 转换为 MB
         } catch {
             return 0
@@ -510,31 +518,48 @@ extension PhotogrammetrySession.Output.ProcessingStage {
 @MainActor
 class ObjectCaptureService: ObservableObject {
     static let shared = ObjectCaptureService()
-    
+
     @Published var stage: ObjectCaptureStage = .idle
     @Published var progress: Double = 0.0
     @Published var statusMessage: String = ""
     @Published var estimatedRemainingTime: TimeInterval?
-    
+
     var isSupported: Bool { false }
     var canStartNewSession: Bool { false }
-    
+    var isProcessingPaused: Bool { false }
+    var pausedState: (stage: ObjectCaptureStage, progress: Double, statusMessage: String)? { nil }
+    var isProcessing: Bool { false }
+
     private init() {}
-    
+
+#if os(iOS)
+    func processImages(_ images: [UIImage]) async throws -> URL {
+        throw ObjectCaptureError.notSupported
+    }
+
+    func processImagesWithFallback(_ images: [UIImage]) async throws -> URL {
+        throw ObjectCaptureError.notSupported
+    }
+#else
     func processImages(_ images: [Any]) async throws -> URL {
         throw ObjectCaptureError.notSupported
     }
-    
-    func processImagesFromDirectory(_ imageDirectory: URL) async throws -> URL {
-        throw ObjectCaptureError.notSupported
-    }
-    
+
     func processImagesWithFallback(_ images: [Any]) async throws -> URL {
         throw ObjectCaptureError.notSupported
     }
-    
+#endif
+
+    func processImagesFromDirectory(_ imageDirectory: URL) async throws -> URL {
+        throw ObjectCaptureError.notSupported
+    }
+
     func cancelProcessing() {}
     func reset() {}
+    func pauseProcessing() {}
+    func resumeProcessing() {}
+    func cleanupOldModels(keepRecent: Int = 10) {}
+    func getModelsDirectorySize() -> Double { 0 }
 }
 
 #endif

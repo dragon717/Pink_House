@@ -1,19 +1,22 @@
 {
-  "info": {
-    "version": 1,
-    "author": "xcode"
-  },
-  "comment": "source: psd_composite_crop; pipeline: sips_flattened_psd_crop; file: temp/主题2/_artifacts/generated/psd_composite.png; crop: (1800, 200, 3950, 2250)",
-  "images": [
+  "images" : [
     {
-      "idiom": "universal",
-      "scale": "2x",
-      "filename": "preview_store_hero@2x.png"
+      "idiom" : "universal",
+      "scale" : "1x"
     },
     {
-      "idiom": "universal",
-      "scale": "3x",
-      "filename": "preview_store_hero@3x.png"
+      "filename" : "preview_store_hero@2x.png",
+      "idiom" : "universal",
+      "scale" : "2x"
+    },
+    {
+      "filename" : "preview_store_hero@3x.png",
+      "idiom" : "universal",
+      "scale" : "3x"
     }
-  ]
+  ],
+  "info" : {
+    "author" : "xcode",
+    "version" : 1
+  }
 }

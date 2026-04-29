@@ -236,8 +236,8 @@ struct MainContentView: View {
             print("❌ 裙装股市初始化失败: \(error)")
         }
         
-        // 0.8 刷新魔法任务进度（在开屏期间完成）
-        FeatureUnlockManager.shared.refreshMagicTaskProgress(modelContext: modelContext)
+        // 0.8 刷新魔法任务进度（开屏关键路径仅使用缓存，避免 iOS 17.x SwiftData fetchCount/CoreData 崩溃）
+        FeatureUnlockManager.shared.refreshMagicTaskProgress(modelContext: nil, refreshClothingCount: false)
 
         // 0.9 OOTD 坐标版本迁移（将老数据的绝对坐标转换为相对坐标）
         await OOTDCoordinateMigrationService.shared.migrateIfNeeded(modelContext: modelContext)
@@ -329,6 +329,11 @@ struct MainContentView: View {
         NotificationManager.shared.updateApplicationBadge()
         let notificationDurationMs = Int(Date().timeIntervalSince(notificationStartedAt) * 1000)
         launchLogger.info("deferred_notification_finish trigger=\(trigger, privacy: .public) duration_ms=\(notificationDurationMs)")
+
+        let magicTaskStartedAt = Date()
+        FeatureUnlockManager.shared.refreshMagicTaskProgress(modelContext: modelContext)
+        let magicTaskDurationMs = Int(Date().timeIntervalSince(magicTaskStartedAt) * 1000)
+        launchLogger.info("deferred_magic_task_finish trigger=\(trigger, privacy: .public) duration_ms=\(magicTaskDurationMs)")
 
         Task(priority: .background) {
             await SharedPersistence.shared.syncWidgetData(reason: "launch-deferred")

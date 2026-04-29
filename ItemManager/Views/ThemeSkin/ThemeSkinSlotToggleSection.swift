@@ -2,6 +2,21 @@ import SwiftUI
 
 struct ThemeSkinSlotToggleSection: View {
     let themeId: String
+    let previewEnabledSlots: Set<ThemeSkinSlot>
+    let focusedSlot: ThemeSkinSlot?
+    let onFocusSlot: (ThemeSkinSlot) -> Void
+
+    init(
+        themeId: String,
+        previewEnabledSlots: Set<ThemeSkinSlot> = [],
+        focusedSlot: ThemeSkinSlot? = nil,
+        onFocusSlot: @escaping (ThemeSkinSlot) -> Void = { _ in }
+    ) {
+        self.themeId = themeId
+        self.previewEnabledSlots = previewEnabledSlots
+        self.focusedSlot = focusedSlot
+        self.onFocusSlot = onFocusSlot
+    }
 
     @ObservedObject private var themeSkinManager = ThemeSkinManager.shared
     @Environment(ThemeManager.self) private var themeManager
@@ -104,6 +119,66 @@ struct ThemeSkinSlotToggleSection: View {
         }
     }
 
+    private func slotStateText(_ slot: ThemeSkinSlot) -> String {
+        if isActive {
+            return themeSkinManager.isSlotEnabled(slot) ? "已启用" : "已停用"
+        }
+        return previewEnabledSlots.contains(slot) ? "主题预览" : "默认预览"
+    }
+
+    private func slotBinding(_ slot: ThemeSkinSlot) -> Binding<Bool> {
+        Binding(
+            get: { isActive && themeSkinManager.isSlotEnabled(slot) },
+            set: { newValue in
+                _ = themeSkinManager.setSlot(slot, enabled: newValue)
+                onFocusSlot(slot)
+            }
+        )
+    }
+
+    private func slotRow(_ slot: ThemeSkinSlot) -> some View {
+        HStack(spacing: 12) {
+            if let product {
+                ThemeSkinSlotPreviewThumbnail(
+                    product: product,
+                    slot: slot,
+                    enabledSlots: previewEnabledSlots,
+                    isFocused: focusedSlot == slot,
+                    size: 42
+                )
+            }
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(slot.displayName)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(themeManager.primaryTextColor)
+                Text(slot.rawValue)
+                    .font(.caption2)
+                    .foregroundStyle(themeManager.secondaryTextColor)
+            }
+
+            Spacer(minLength: 8)
+
+            Toggle("", isOn: slotBinding(slot))
+                .labelsHidden()
+                .toggleStyle(.switch)
+                .disabled(!isPurchased || !isActive)
+                .accessibilityHidden(true)
+        }
+        .padding(.vertical, 9)
+        .id(ThemeSkinSlotRowID.slot(slot))
+        .contentShape(Rectangle())
+        .onTapGesture { onFocusSlot(slot) }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(slot.displayName)，\(slot.rawValue)，\(slotStateText(slot))")
+        .accessibilityValue(slotStateText(slot))
+        .accessibilityHint(isPurchased && isActive ? "点按定位预览；可执行切换操作启用或停用组件。" : "请先购买并应用主题后再切换，当前仍可点按定位预览。")
+        .accessibilityAction(named: Text(themeSkinManager.isSlotEnabled(slot) ? "停用" : "启用")) {
+            guard isPurchased && isActive else { return }
+            slotBinding(slot).wrappedValue.toggle()
+        }
+    }
+
     private func slotGroupCard(_ group: SlotGroup) -> some View {
         ThemeSkinSectionCardContainer(cornerRadius: 22) {
             VStack(alignment: .leading, spacing: 12) {
@@ -124,23 +199,7 @@ struct ThemeSkinSlotToggleSection: View {
 
                 VStack(spacing: 0) {
                     ForEach(group.slots) { slot in
-                        Toggle(isOn: Binding(
-                            get: { isActive && themeSkinManager.isSlotEnabled(slot) },
-                            set: { newValue in
-                                _ = themeSkinManager.setSlot(slot, enabled: newValue)
-                            }
-                        )) {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(slot.displayName)
-                                    .font(.subheadline.weight(.semibold))
-                                    .foregroundStyle(themeManager.primaryTextColor)
-                                Text(slot.rawValue)
-                                    .font(.caption2)
-                                    .foregroundStyle(themeManager.secondaryTextColor)
-                            }
-                        }
-                        .disabled(!isPurchased || !isActive)
-                        .padding(.vertical, 9)
+                        slotRow(slot)
 
                         if slot.id != (group.slots.last?.id ?? "") {
                             Divider()

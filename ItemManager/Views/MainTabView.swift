@@ -179,60 +179,133 @@ struct SmallWorldContainerView: View {
                 isPlayingOpeningAnimation: $isPlayingOpeningAnimation
             )
         case .ootd:
-            OOTDViewWithBackButton(
-                selectedTab: $selectedTab,
-                homeTab: $homeTab,
-                destination: $destination
-            )
+            if #available(iOS 18.0, *) {
+                OOTDViewWithBackButton(
+                    selectedTab: $selectedTab,
+                    homeTab: $homeTab,
+                    destination: $destination
+                )
+            } else {
+                OOTDViewWithBackButtonLegacy(
+                    selectedTab: $selectedTab,
+                    homeTab: $homeTab,
+                    destination: $destination
+                )
+            }
         case .ootdDefaultBook:
-            OOTDDefaultBookViewWithBackButton(
-                selectedTab: $selectedTab,
-                homeTab: $homeTab,
-                destination: $destination
-            )
+            if #available(iOS 18.0, *) {
+                OOTDDefaultBookViewWithBackButton(
+                    selectedTab: $selectedTab,
+                    homeTab: $homeTab,
+                    destination: $destination
+                )
+            } else {
+                OOTDDefaultBookViewWithBackButtonLegacy(
+                    selectedTab: $selectedTab,
+                    homeTab: $homeTab,
+                    destination: $destination
+                )
+            }
         case .pet:
-            PetHomeViewWithBackButton(
-                selectedTab: $selectedTab,
-                homeTab: $homeTab,
-                destination: $destination
-            )
+            if #available(iOS 18.0, *) {
+                PetHomeViewWithBackButton(
+                    selectedTab: $selectedTab,
+                    homeTab: $homeTab,
+                    destination: $destination
+                )
+            } else {
+                PetHomeViewWithBackButtonLegacy(
+                    selectedTab: $selectedTab,
+                    homeTab: $homeTab,
+                    destination: $destination
+                )
+            }
         case .wealth(let initialTab):
-            WealthViewWithBackButton(
-                selectedTab: $selectedTab,
-                homeTab: $homeTab,
-                destination: $destination,
-                initialTab: initialTab
-            )
+            if #available(iOS 18.0, *) {
+                WealthViewWithBackButton(
+                    selectedTab: $selectedTab,
+                    homeTab: $homeTab,
+                    destination: $destination,
+                    initialTab: initialTab
+                )
+            } else {
+                WealthViewWithBackButtonLegacy(
+                    selectedTab: $selectedTab,
+                    homeTab: $homeTab,
+                    destination: $destination,
+                    initialTab: initialTab
+                )
+            }
         case .calendar:
-            DreamDressCalendarViewWithBackButton(
-                selectedTab: $selectedTab,
-                homeTab: $homeTab,
-                destination: $destination
-            )
+            if #available(iOS 18.0, *) {
+                DreamDressCalendarViewWithBackButton(
+                    selectedTab: $selectedTab,
+                    homeTab: $homeTab,
+                    destination: $destination
+                )
+            } else {
+                DreamDressCalendarViewWithBackButtonLegacy(
+                    selectedTab: $selectedTab,
+                    homeTab: $homeTab,
+                    destination: $destination
+                )
+            }
         case .bigWorld:
-            BigWorldViewWithBackButton(
-                selectedTab: $selectedTab,
-                homeTab: $homeTab,
-                destination: $destination
-            )
+            if #available(iOS 18.0, *) {
+                BigWorldViewWithBackButton(
+                    selectedTab: $selectedTab,
+                    homeTab: $homeTab,
+                    destination: $destination
+                )
+            } else {
+                BigWorldViewWithBackButtonLegacy(
+                    selectedTab: $selectedTab,
+                    homeTab: $homeTab,
+                    destination: $destination
+                )
+            }
         case .perler:
-            PerlerBeadPatternListViewWithBackButton(
-                selectedTab: $selectedTab,
-                homeTab: $homeTab,
-                destination: $destination
-            )
+            if #available(iOS 18.0, *) {
+                PerlerBeadPatternListViewWithBackButton(
+                    selectedTab: $selectedTab,
+                    homeTab: $homeTab,
+                    destination: $destination
+                )
+            } else {
+                PerlerBeadPatternListViewWithBackButtonLegacy(
+                    selectedTab: $selectedTab,
+                    homeTab: $homeTab,
+                    destination: $destination
+                )
+            }
         case .recycleBin:
-            RecycleBinViewWithBackButton(
-                selectedTab: $selectedTab,
-                homeTab: $homeTab,
-                destination: $destination
-            )
+            if #available(iOS 18.0, *) {
+                RecycleBinViewWithBackButton(
+                    selectedTab: $selectedTab,
+                    homeTab: $homeTab,
+                    destination: $destination
+                )
+            } else {
+                RecycleBinViewWithBackButtonLegacy(
+                    selectedTab: $selectedTab,
+                    homeTab: $homeTab,
+                    destination: $destination
+                )
+            }
         case .dressStock:
-            DressStockMarketViewWithBackButton(
-                selectedTab: $selectedTab,
-                homeTab: $homeTab,
-                destination: $destination
-            )
+            if #available(iOS 18.0, *) {
+                DressStockMarketViewWithBackButton(
+                    selectedTab: $selectedTab,
+                    homeTab: $homeTab,
+                    destination: $destination
+                )
+            } else {
+                DressStockMarketViewWithBackButtonLegacy(
+                    selectedTab: $selectedTab,
+                    homeTab: $homeTab,
+                    destination: $destination
+                )
+            }
         case .wardrobe, .depositPlan:
             // 这些功能直接跳转到 Tab 0，不会在这里显示
             EmptyView()

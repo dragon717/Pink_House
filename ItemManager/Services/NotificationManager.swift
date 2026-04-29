@@ -470,7 +470,7 @@ class NotificationManager: NSObject, UNUserNotificationCenterDelegate {
         let descriptor = FetchDescriptor<DepositNotificationRecord>(
             predicate: #Predicate { $0.isTriggered == true && $0.isRead == false }
         )
-        return (try? modelContext.fetchCount(descriptor)) ?? 0
+        return (try? modelContext.fetch(descriptor).count) ?? 0
     }
     
     /// 获取未读的通知记录列表

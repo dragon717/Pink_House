@@ -13,9 +13,9 @@ enum UnlockConditionType: String, CaseIterable, Identifiable {
     case petLevel = "petLevel"            // 萌宠等级解锁
     case redeemCode = "redeemCode"        // 兼容历史数据
     case manual = "manual"                // 手动控制（运营活动/限时开放）
-    
+
     var id: String { rawValue }
-    
+
     var displayName: String {
         switch self {
         case .free: return "免费"
@@ -28,7 +28,7 @@ enum UnlockConditionType: String, CaseIterable, Identifiable {
         case .manual: return "体验完成任务"
         }
     }
-    
+
     var icon: String {
         switch self {
         case .free: return "lock.open.fill"
@@ -48,7 +48,7 @@ struct UnlockCondition: Codable, Equatable {
     var type: String           // UnlockConditionType.rawValue
     var requiredValue: Int     // 需要的数值（如喵币数量、衣物数量等）
     var description: String    // 解锁条件描述（展示给用户）
-    
+
     static func free() -> UnlockCondition {
         UnlockCondition(type: "free", requiredValue: 0, description: "免费使用")
     }
@@ -56,28 +56,28 @@ struct UnlockCondition: Codable, Equatable {
     static func loginDays(_ days: Int) -> UnlockCondition {
         UnlockCondition(type: "loginDays", requiredValue: days, description: "累计登录 \(days) 天解锁")
     }
-    
+
     static func vip() -> UnlockCondition {
         UnlockCondition(type: "vip", requiredValue: 0, description: "开通VIP即可解锁")
     }
-    
+
     static func meowCoin(_ amount: Int) -> UnlockCondition {
         UnlockCondition(type: "meowCoin", requiredValue: amount, description: "累计消费 \(amount) 喵币后解锁")
     }
-    
+
     static func clothingCount(_ count: Int) -> UnlockCondition {
         UnlockCondition(type: "clothingCount", requiredValue: count, description: "收集 \(count) 件衣物解锁")
     }
- 
-    
+
+
     static func petLevel(_ level: Int) -> UnlockCondition {
         UnlockCondition(type: "petLevel", requiredValue: level, description: "萌宠达到 \(level) 级解锁")
     }
-    
+
     static func manual(description: String) -> UnlockCondition {
         UnlockCondition(type: "manual", requiredValue: 0, description: description)
     }
-    
+
 }
 
 // MARK: - 业务系统/功能项定义
@@ -121,9 +121,9 @@ enum FeatureItem: String, CaseIterable, Identifiable {
 
     // 魔法任务
     case magicTasks = "magicTasks"
-    
+
     var id: String { rawValue }
-    
+
     var displayName: String {
         switch self {
         case .wardrobe: return "少女衣橱"
@@ -168,7 +168,7 @@ enum FeatureItem: String, CaseIterable, Identifiable {
             return "云端的文件备份与恢复"
         }
     }
-    
+
     var icon: String {
         switch self {
         case .wardrobe: return "cabinet.fill"
@@ -213,7 +213,7 @@ enum FeatureItem: String, CaseIterable, Identifiable {
             return "arrow.triangle.2.circlepath.icloud"
         }
     }
-    
+
     // 默认解锁条件配置
     var defaultCondition: UnlockCondition {
         switch self {
@@ -270,7 +270,7 @@ enum FeatureItem: String, CaseIterable, Identifiable {
             return .manual(description: "体验云端的文件备份与恢复与 iCloud 同步")
         }
     }
-    
+
     // 是否默认隐藏
     var isHiddenByDefault: Bool {
         switch self {
@@ -304,7 +304,7 @@ enum FeatureItem: String, CaseIterable, Identifiable {
             return false
         }
     }
-    
+
     // 映射到 SmallWorldDestination
     var destination: SmallWorldDestination? {
         switch self {
@@ -322,7 +322,7 @@ enum FeatureItem: String, CaseIterable, Identifiable {
         default: return nil
         }
     }
-    
+
     /// 是否是设置中的子功能
     var isSettingsFeature: Bool {
         switch self {
@@ -429,24 +429,24 @@ enum UnlockResult {
 // MARK: - 功能解锁管理器
 final class FeatureUnlockManager: ObservableObject {
     static let shared = FeatureUnlockManager()
-    
+
     // 发布状态供UI绑定
     @Published private(set) var featureStatuses: [String: FeatureStatus] = [:]
     @Published private(set) var unlockConditions: [String: UnlockCondition] = [:]
-    
+
     // UserDefaults Keys
     private let statusKey = "featureUnlock.statuses"
     private let conditionKey = "featureUnlock.conditions"
-    
+
     // 通知名称
     static let featureUnlockedNotification = Notification.Name("FeatureUnlocked")
     static let featureStatusChangedNotification = Notification.Name("FeatureStatusChanged")
-    
+
     private init() {
         loadData()
         setupDefaultConditions()
     }
-    
+
     // MARK: - 从磁盘重新加载（用于备份恢复后）
     func reloadFromDisk() {
         print("🔄 FeatureUnlockManager: Reloading from disk...")
@@ -457,7 +457,7 @@ final class FeatureUnlockManager: ObservableObject {
         objectWillChange.send()
         print("✅ FeatureUnlockManager: Reload complete")
     }
-    
+
     // MARK: - 数据持久化
     private func loadData() {
         // 加载状态
@@ -465,26 +465,26 @@ final class FeatureUnlockManager: ObservableObject {
            let decoded = try? JSONDecoder().decode([String: FeatureStatus].self, from: data) {
             featureStatuses = decoded
         }
-        
+
         // 加载条件配置
         if let data = UserDefaults.standard.data(forKey: conditionKey),
            let decoded = try? JSONDecoder().decode([String: UnlockCondition].self, from: data) {
             unlockConditions = decoded
         }
     }
-    
+
     private func saveStatuses() {
         if let encoded = try? JSONEncoder().encode(featureStatuses) {
             UserDefaults.standard.set(encoded, forKey: statusKey)
         }
     }
-    
+
     private func saveConditions() {
         if let encoded = try? JSONEncoder().encode(unlockConditions) {
             UserDefaults.standard.set(encoded, forKey: conditionKey)
         }
     }
-    
+
     // MARK: - 初始化默认条件
     private func setupDefaultConditions() {
         for feature in FeatureItem.allCases {
@@ -502,7 +502,7 @@ final class FeatureUnlockManager: ObservableObject {
                 // 对已下线/调整为正式能力的功能，强制覆盖历史条件配置
                 unlockConditions[feature.rawValue] = defaultCondition
             }
-            
+
             // 设置默认显示状态（首次安装时）
             if featureStatuses[feature.rawValue] == nil {
                 var status = FeatureStatus(
@@ -511,13 +511,13 @@ final class FeatureUnlockManager: ObservableObject {
                     unlockedAt: nil,
                     unlockedBy: nil
                 )
-                
+
                 // 免费功能默认解锁
                 let condition = unlockConditions[feature.rawValue] ?? defaultCondition
                 if condition.type == UnlockConditionType.free.rawValue {
                     status.isUnlocked = true
                 }
-                
+
                 featureStatuses[feature.rawValue] = status
             }
 
@@ -535,20 +535,20 @@ final class FeatureUnlockManager: ObservableObject {
         saveConditions()
         saveStatuses()
     }
-    
+
     // MARK: - 查询方法
-    
+
     /// 获取功能项的解锁条件
     func getCondition(for feature: FeatureItem) -> UnlockCondition {
         return unlockConditions[feature.rawValue] ?? feature.defaultCondition
     }
-    
+
     /// 更新解锁条件（用于动态调整）
     func updateCondition(for feature: FeatureItem, condition: UnlockCondition) {
         unlockConditions[feature.rawValue] = condition
         saveConditions()
     }
-    
+
     /// 获取功能项当前状态
     func getStatus(for feature: FeatureItem) -> FeatureStatus {
         return featureStatuses[feature.rawValue] ?? FeatureStatus(
@@ -558,7 +558,7 @@ final class FeatureUnlockManager: ObservableObject {
             unlockedBy: nil
         )
     }
-    
+
     /// 是否已解锁
     func isUnlocked(_ feature: FeatureItem) -> Bool {
         // 免费功能直接返回true
@@ -568,13 +568,13 @@ final class FeatureUnlockManager: ObservableObject {
         }
         return getStatus(for: feature).isUnlocked
     }
-    
+
     /// 是否显示
     func isVisible(_ feature: FeatureItem) -> Bool {
         let status = getStatus(for: feature)
         return status.isVisible
     }
-    
+
     /// 是否可以访问（已解锁且显示）
     func canAccess(_ feature: FeatureItem) -> Bool {
         return isUnlocked(feature) && isVisible(feature)
@@ -593,106 +593,106 @@ final class FeatureUnlockManager: ObservableObject {
             return false
         }
     }
-    
+
     // MARK: - 解锁检查
-    
+
     /// 检查是否满足解锁条件
     func checkUnlockCondition(_ feature: FeatureItem) -> (met: Bool, message: String?) {
         let condition = getCondition(for: feature)
-        
+
         // 免费直接通过
         if condition.type == UnlockConditionType.free.rawValue {
             return (true, nil)
         }
-        
+
         // 已解锁直接通过
         if isUnlocked(feature) {
             return (true, nil)
         }
-        
+
         guard let conditionType = UnlockConditionType(rawValue: condition.type) else {
             return (false, "未知的解锁条件")
         }
-        
+
         switch conditionType {
         case .free:
             return (true, nil)
-            
+
         case .vip:
             let isVIP = VIPManager.shared.isVIP
             return (isVIP, isVIP ? nil : condition.description)
-            
+
         case .meowCoin:
             let totalSpent = StoreManager.synchronizedMeowCoinAccount().totalSpent
             let met = totalSpent >= condition.requiredValue
             return (met, met ? nil : "累计消费喵币: \(totalSpent)/\(condition.requiredValue)")
-            
+
         case .clothingCount:
             // 需要通过外部传入或从数据库查询
             let currentCount = getClothingCount()
             let met = currentCount >= condition.requiredValue
             return (met, met ? nil : "当前衣物: \(currentCount)/\(condition.requiredValue)")
-            
+
         case .loginDays:
             let currentDays = getLoginDays()
             let met = currentDays >= condition.requiredValue
             return (met, met ? nil : "累计登录: \(currentDays)/\(condition.requiredValue) 天")
-            
+
         case .petLevel:
             // 萌宠等级暂时返回0，因为PetStatus没有level属性
             let currentLevel = 0
             let met = currentLevel >= condition.requiredValue
             return (met, met ? nil : "萌宠等级: \(currentLevel)/\(condition.requiredValue)")
-            
+
         case .manual:
             // 手动控制，默认不满足
             return (false, condition.description)
-            
+
         case .redeemCode:
             // 历史数据兼容：当前版本不再提供该解锁入口
             return (false, condition.description)
         }
     }
-    
+
     // MARK: - 解锁操作
-    
+
     /// 尝试解锁功能
     func unlock(_ feature: FeatureItem, force: Bool = false) -> UnlockResult {
         // 已解锁
         if isUnlocked(feature) {
             return .alreadyUnlocked
         }
-        
+
         let condition = getCondition(for: feature)
-        
+
         // 免费直接解锁
         if condition.type == UnlockConditionType.free.rawValue {
             performUnlock(feature, by: "free")
             return .success
         }
-        
+
         // 强制解锁（用于测试或运营活动）
         if force {
             performUnlock(feature, by: "force")
             return .success
         }
-        
+
         // 检查条件
         let check = checkUnlockCondition(feature)
         if !check.met {
             return .conditionNotMet(check.message ?? condition.description)
         }
-        
+
         guard UnlockConditionType(rawValue: condition.type) != nil else {
             return .conditionNotMet("未知的解锁条件")
         }
-        
+
         // meowCoin 类型表示“累计消费达到条件”后可领取解锁，不在这里再次扣费
-        
+
         performUnlock(feature, by: condition.type)
         return .success
     }
-    
+
     /// 执行解锁
     private func performUnlock(_ feature: FeatureItem, by: String) {
         var status = getStatus(for: feature)
@@ -724,23 +724,23 @@ final class FeatureUnlockManager: ObservableObject {
             MagicTaskCompletionManager.shared.addCompletion(feature: feature)
         }
     }
-    
+
     // MARK: - 显示控制
-    
+
     /// 设置功能是否显示
     func setVisible(_ feature: FeatureItem, visible: Bool) {
         var status = getStatus(for: feature)
         status.isVisible = visible
         featureStatuses[feature.rawValue] = status
         saveStatuses()
-        
+
         NotificationCenter.default.post(
             name: Self.featureStatusChangedNotification,
             object: nil,
             userInfo: ["feature": feature.rawValue]
         )
     }
-    
+
     /// 锁定功能（重置解锁状态）
     func lock(_ feature: FeatureItem) {
         var status = getStatus(for: feature)
@@ -749,31 +749,31 @@ final class FeatureUnlockManager: ObservableObject {
         status.unlockedBy = nil
         featureStatuses[feature.rawValue] = status
         saveStatuses()
-        
+
         NotificationCenter.default.post(
             name: Self.featureStatusChangedNotification,
             object: nil,
             userInfo: ["feature": feature.rawValue]
         )
     }
-    
+
     // MARK: - 辅助方法
-    
+
     /// 获取所有可见的功能（用于菜单显示）
     func getVisibleFeatures() -> [FeatureItem] {
         return FeatureItem.allCases.filter { isVisible($0) }
     }
-    
+
     /// 获取所有已解锁的功能
     func getUnlockedFeatures() -> [FeatureItem] {
         return FeatureItem.allCases.filter { isUnlocked($0) }
     }
-    
+
     /// 获取所有可访问的功能（已解锁且显示）
     func getAccessibleFeatures() -> [FeatureItem] {
         return FeatureItem.allCases.filter { canAccess($0) }
     }
-    
+
     /// 获取需要解锁的功能列表（用于设置页面展示）
     func getLockableFeatures() -> [FeatureItem] {
         return FeatureItem.allCases.filter {
@@ -782,31 +782,33 @@ final class FeatureUnlockManager: ObservableObject {
                    $0.isPublicUnlockTask
         }
     }
-    
+
     // MARK: - 数据获取（需要接入实际数据源）
-    
+
     private func getClothingCount() -> Int {
-        // 这里需要从 Clothing 数据获取
-        // 暂时返回一个模拟值，实际使用时需要传入 ModelContext 查询
-        return UserDefaults.standard.integer(forKey: "clothingCount_cache")
+        return cachedClothingCount
     }
-    
+
+    private var cachedClothingCount: Int {
+        UserDefaults.standard.integer(forKey: "clothingCount_cache")
+    }
+
     private func getLoginDays() -> Int {
         // 从登录记录获取
         return UserDefaults.standard.integer(forKey: "loginDays")
     }
-    
+
     /// 更新衣物数量缓存
     func updateClothingCount(_ count: Int) {
         // 检查更新前是否有满足条件的任务
         let previouslyUnlockableFeatures = getUnlockableFeatures()
-        
+
         UserDefaults.standard.set(count, forKey: "clothingCount_cache")
-        
+
         // 更新后再次检查，找出新达到可解锁状态的任务
         let currentlyUnlockableFeatures = getUnlockableFeatures()
         let newlyUnlockableFeatures = currentlyUnlockableFeatures.filter { !previouslyUnlockableFeatures.contains($0) }
-        
+
         // 显示可解锁提示
         for feature in newlyUnlockableFeatures {
             print("🔓 新达到可解锁状态: \(feature.displayName)")
@@ -815,7 +817,18 @@ final class FeatureUnlockManager: ObservableObject {
             }
         }
     }
-    
+
+    /// 使用 SwiftData 安全路径刷新衣物数量缓存。
+    /// iOS 17.x 上 `ModelContext.fetchCount(_:)` 可能在 CoreData 层抛 Objective-C 异常导致 SIGABRT，
+    /// 因此统一走 `fetch(_:)` 后本地 count，失败时保留并返回旧缓存，避免启动或编辑流程崩溃。
+    @discardableResult
+    func refreshClothingCountCache(from context: ModelContext, reason: String = "manual") -> Int {
+        let clothingCount = fetchClothingCountSafely(from: context)
+        updateClothingCount(clothingCount)
+        print("👗 衣物数量缓存已刷新[\(reason)]: \(clothingCount)")
+        return clothingCount
+    }
+
     /// 获取当前可解锁的功能列表（满足条件但未解锁）
     func getUnlockableFeatures() -> [FeatureItem] {
         return getLockableFeatures().filter { feature in
@@ -824,59 +837,60 @@ final class FeatureUnlockManager: ObservableObject {
             return check.met
         }
     }
-    
+
     /// 更新登录天数
     func updateLoginDays(_ days: Int) {
         UserDefaults.standard.set(days, forKey: "loginDays")
     }
-    
+
     // MARK: - 启动时刷新进度
-    
-    /// 刷新所有魔法任务的进度数据
-    /// 在App启动时调用，用于更新衣物数量、登录天数等数据
-    func refreshMagicTaskProgress(modelContext: ModelContext? = nil) {
+
+    /// 刷新所有魔法任务的进度数据。
+    /// 启动关键路径默认只使用缓存，避免 iOS 17.x 在 `fetchCount`/CoreData 计数路径上崩溃。
+    func refreshMagicTaskProgress(modelContext: ModelContext? = nil, refreshClothingCount: Bool = true) {
         print("🔄 开始刷新魔法任务进度...")
-        
-        // 1. 更新衣物数量
-        if let context = modelContext {
-            let clothingCount = fetchClothingCount(from: context)
-            updateClothingCount(clothingCount)
+
+        // 1. 更新衣物数量。启动阶段可传 refreshClothingCount=false，仅使用缓存完成解锁状态刷新。
+        if refreshClothingCount, let context = modelContext {
+            let clothingCount = refreshClothingCountCache(from: context, reason: "magic-task-progress")
             print("👗 衣物数量已更新: \(clothingCount)")
+        } else {
+            print("👗 衣物数量使用缓存: \(cachedClothingCount)")
         }
-        
+
         // 2. 更新登录天数（这里可以接入实际的登录记录）
         // 暂时保持现有逻辑
-        
+
         // 3. 检查所有未解锁的功能，看是否满足条件并自动解锁
         checkAndAutoUnlockFeatures()
-        
+
         print("✅ 魔法任务进度刷新完成")
     }
-    
-    /// 从数据库获取衣物数量（排除已删除的）
-    private func fetchClothingCount(from context: ModelContext) -> Int {
+
+    /// 从数据库获取衣物数量（排除已删除的）。
+    /// 不使用 `fetchCount`：该 API 在部分 iOS 17.x + SwiftData/CoreData 组合上会绕过 Swift error
+    /// handling，以 Objective-C exception 形式终止进程。
+    private func fetchClothingCountSafely(from context: ModelContext) -> Int {
         do {
-            // 只统计未删除的衣物
             let descriptor = FetchDescriptor<Clothing>(predicate: #Predicate { $0.isDeleted == false })
-            let count = try context.fetchCount(descriptor)
-            return count
+            return try context.fetch(descriptor).count
         } catch {
-            print("❌ 获取衣物数量失败: \(error)")
-            return UserDefaults.standard.integer(forKey: "clothingCount_cache")
+            print("❌ 获取衣物数量失败，使用缓存: \(error)")
+            return cachedClothingCount
         }
     }
-    
+
     /// 检查并自动解锁满足条件的功能
     private func checkAndAutoUnlockFeatures() {
         let lockableFeatures = getLockableFeatures()
-        
+
         for feature in lockableFeatures {
             // 跳过已解锁的功能
             guard !isUnlocked(feature) else { continue }
-            
+
             // 检查是否满足解锁条件
             let check = checkUnlockCondition(feature)
-            
+
             if check.met {
                 print("🎉 自动解锁功能: \(feature.displayName)")
                 _ = unlock(feature)
@@ -928,19 +942,19 @@ extension SmallWorldDestination {
         case .menu: return nil
         }
     }
-    
+
     /// 检查该目的地是否已解锁
     var isUnlocked: Bool {
         guard let feature = featureItem else { return true }
         return FeatureUnlockManager.shared.isUnlocked(feature)
     }
-    
+
     /// 检查该目的地是否可见
     var isVisible: Bool {
         guard let feature = featureItem else { return true }
         return FeatureUnlockManager.shared.isVisible(feature)
     }
-    
+
     /// 检查该目的地是否可以访问
     var canAccess: Bool {
         guard let feature = featureItem else { return true }
@@ -957,7 +971,7 @@ extension View {
             self
         }
     }
-    
+
     /// 根据功能可访问状态条件显示
     @ViewBuilder
     func featureAccessible(_ feature: FeatureItem) -> some View {
@@ -971,11 +985,11 @@ extension View {
 struct FeatureUnlockButton: View {
     let feature: FeatureItem
     let action: () -> Void
-    
+
     @StateObject private var manager = FeatureUnlockManager.shared
     @State private var showAlert = false
     @State private var alertItem: FeatureUnlockAlert?
-    
+
     var body: some View {
         Button {
             handleTap()
@@ -1001,30 +1015,30 @@ struct FeatureUnlockButton: View {
             }
         }
     }
-    
+
     @ViewBuilder
     private var content: some View {
         let isUnlocked = manager.isUnlocked(feature)
         let condition = manager.getCondition(for: feature)
-        
+
         HStack {
             Image(systemName: feature.icon)
                 .foregroundColor(isUnlocked ? .pink : .gray)
-            
+
             VStack(alignment: .leading, spacing: 2) {
                 Text(feature.displayName)
                     .font(.system(size: 16, weight: isUnlocked ? .medium : .regular))
                     .foregroundColor(isUnlocked ? .primary : .secondary)
-                
+
                 if !isUnlocked {
                     Text(condition.description)
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
             }
-            
+
             Spacer()
-            
+
             if isUnlocked {
                 Image(systemName: "checkmark.circle.fill")
                     .foregroundColor(.green)
@@ -1035,10 +1049,10 @@ struct FeatureUnlockButton: View {
         }
         .padding(.vertical, 4)
     }
-    
+
     private func handleTap() {
         let isUnlocked = manager.isUnlocked(feature)
-        
+
         if isUnlocked {
             // 已解锁，直接执行操作
             action()
@@ -1054,10 +1068,10 @@ struct FeatureUnlockButton: View {
             )
         }
     }
-    
+
     private func unlockFeature() {
         let result = manager.unlock(feature)
-        
+
         switch result {
         case .success:
             action()
@@ -1077,24 +1091,24 @@ struct FeatureRow: View {
     let feature: FeatureItem
     var showLockStatus: Bool = true
     var action: (() -> Void)?
-    
+
     @StateObject private var manager = FeatureUnlockManager.shared
-    
+
     var body: some View {
         HStack {
             Image(systemName: feature.icon)
                 .frame(width: 24)
                 .foregroundColor(iconColor)
-            
+
             Text(feature.displayName)
                 .foregroundColor(textColor)
-            
+
             Spacer()
-            
+
             if showLockStatus {
                 lockStatusView
             }
-            
+
             if action != nil {
                 Image(systemName: "chevron.right")
                     .font(.caption)
@@ -1106,7 +1120,7 @@ struct FeatureRow: View {
             action?()
         }
     }
-    
+
     private var iconColor: Color {
         if manager.canAccess(feature) {
             return .pink
@@ -1116,7 +1130,7 @@ struct FeatureRow: View {
             return .gray
         }
     }
-    
+
     private var textColor: Color {
         if manager.canAccess(feature) {
             return .primary
@@ -1124,12 +1138,12 @@ struct FeatureRow: View {
             return .secondary
         }
     }
-    
+
     @ViewBuilder
     private var lockStatusView: some View {
         let isUnlocked = manager.isUnlocked(feature)
         let isVisible = manager.isVisible(feature)
-        
+
         if isUnlocked && !isVisible {
             // 已解锁但不显示
             Text("已隐藏")
@@ -1154,19 +1168,19 @@ struct FeatureRow: View {
             .cornerRadius(4)
         }
     }
-    
+
     private func conditionIcon(for condition: UnlockCondition) -> String {
         guard let type = UnlockConditionType(rawValue: condition.type) else {
             return "lock.fill"
         }
         return type.icon
     }
-    
+
     private func conditionShortText(for condition: UnlockCondition) -> String {
         guard let type = UnlockConditionType(rawValue: condition.type) else {
             return "锁定"
         }
-        
+
         switch type {
         case .free:
             return "免费"

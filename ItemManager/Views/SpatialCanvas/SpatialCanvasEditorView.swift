@@ -17,6 +17,7 @@ import UniformTypeIdentifiers
 
 // MARK: - 主编辑器视图
 
+@available(iOS 18.0, *)
 struct SpatialCanvasEditorView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss

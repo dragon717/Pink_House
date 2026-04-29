@@ -1,9 +1,13 @@
 import SwiftUI
+#if OBJECT_CAPTURE_ENABLED
 import RealityKit
+#endif
 import Foundation
 
-#if os(iOS)
+// iOS 17.x 热修：Object Capture UI 随服务一起通过编译开关降级，避免启动时绑定 iOS 18+ RealityKit 符号。
+#if os(iOS) && OBJECT_CAPTURE_ENABLED
 
+@available(iOS 18.0, *)
 struct ObjectCaptureScannerView: View {
 
     @StateObject private var sessionManager = ObjectCaptureSessionManager.shared
@@ -23,7 +27,7 @@ struct ObjectCaptureScannerView: View {
         ZStack {
             if isLowPowerMode {
                 lowPowerWarningView
-            } else if !ObjectCaptureSession.isSupported {
+            } else if !sessionManager.isSupported {
                 notSupportedView
             } else if let session = session {
                 ObjectCaptureView(session: session)
@@ -92,7 +96,7 @@ struct ObjectCaptureScannerView: View {
     }
 
     private func setupSession() {
-        guard ObjectCaptureSession.isSupported else {
+        guard sessionManager.isSupported else {
             showNotSupportedAlert = true
             return
         }
@@ -610,6 +614,34 @@ struct ObjectCaptureScannerView: View {
                     .cornerRadius(12)
             }
         }
+    }
+}
+
+#elseif os(iOS)
+
+@available(iOS 18.0, *)
+struct ObjectCaptureScannerView: View {
+    @Environment(\.dismiss) private var dismiss
+    var onComplete: (URL) -> Void
+
+    var body: some View {
+        VStack(spacing: 18) {
+            Image(systemName: "cube.transparent")
+                .font(.system(size: 52))
+                .foregroundStyle(.secondary)
+            Text("3D 扫描暂不可用")
+                .font(.headline)
+            Text("为兼容 iOS 17.x 热修包，Object Capture 已暂时降级，后续 iOS 18+ 版本可重新启用。")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 24)
+            Button("关闭") {
+                dismiss()
+            }
+            .buttonStyle(.borderedProminent)
+        }
+        .padding()
     }
 }
 

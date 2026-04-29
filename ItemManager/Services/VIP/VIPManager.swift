@@ -39,6 +39,7 @@ class VIPManager: ObservableObject {
     }
     
     func updateCardStyle(_ style: VIPCardStyle) {
+        guard VIPThemeSkinSupport.isSelectable(style) else { return }
         var status = PetDataManager.shared.status
         status.vipStatus.cardStyle = style
         PetDataManager.shared.saveStatus(status)
@@ -47,7 +48,12 @@ class VIPManager: ObservableObject {
 
     var preferredVisualTheme: VIPVisualTheme {
         if isVIP {
-            return cardStyle == .monicaPink ? .monicaPink : .black
+            switch cardStyle {
+            case .monicaPink, .themeSkinAdaptive:
+                return .monicaPink
+            case .blackGold, .skyConcertTheme, .swanDreamTheme:
+                return .black
+            }
         }
         return Self.versionDefaultCardStyle == .monicaPink ? .monicaPink : .deepBlue
     }

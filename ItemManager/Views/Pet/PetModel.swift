@@ -427,6 +427,9 @@ struct NaichaBehavior: PetBehavior {
 enum VIPCardStyle: String, Codable, CaseIterable, Identifiable {
     case blackGold = "blackGold"
     case monicaPink = "monicaPink"
+    case themeSkinAdaptive = "themeSkinAdaptive"
+    case skyConcertTheme = "skyConcertTheme"
+    case swanDreamTheme = "swanDreamTheme"
     
     var id: String { rawValue }
     
@@ -434,6 +437,9 @@ enum VIPCardStyle: String, Codable, CaseIterable, Identifiable {
         switch self {
         case .blackGold: return "黑金尊享"
         case .monicaPink: return "莫妮卡粉色萌梦幻"
+        case .themeSkinAdaptive: return "跟随当前主题"
+        case .skyConcertTheme: return "天空音乐会 VIP卡"
+        case .swanDreamTheme: return "天鹅入梦 VIP卡"
         }
     }
 }

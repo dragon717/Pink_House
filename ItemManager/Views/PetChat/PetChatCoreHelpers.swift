@@ -878,6 +878,9 @@ private func feedVideoAssetDescriptor(for item: PetItemDefinition) -> PetFeedVid
         fileExtension: "mov",
         supportsAlphaChannel: true
     )
+    guard TransparentVideoSupport.isEnabled else {
+        return nil
+    }
     let exists = Bundle.main.url(forResource: descriptor.resourceName, withExtension: descriptor.fileExtension) != nil
     return exists ? descriptor : nil
 }

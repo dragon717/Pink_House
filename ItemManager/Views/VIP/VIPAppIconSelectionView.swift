@@ -3,6 +3,7 @@ import SwiftUI
 struct VIPAppIconSelectionView: View {
     @ObservedObject private var vipManager = VIPManager.shared
     @ObservedObject private var iconManager = VIPAppIconManager.shared
+    @ObservedObject private var themeSkinManager = ThemeSkinManager.shared
     @Environment(\.dismiss) private var dismiss
 
     @State private var resultMessage = ""
@@ -12,26 +13,34 @@ struct VIPAppIconSelectionView: View {
         vipManager.preferredVisualTheme
     }
 
+    private var themeSkinDescriptor: ThemeSkinDescriptor? {
+        if let descriptor = themeSkinManager.activeThemeDescriptor(for: .sectionCard, state: .default),
+           VIPThemeSkinSupport.isSupported(descriptor) {
+            return descriptor
+        }
+        return nil
+    }
+
+    private var isThemeSkinActive: Bool {
+        VIPThemeSkinSupport.isSupported(themeSkinDescriptor)
+    }
+
+    private var primaryTextColor: Color {
+        themeSkinDescriptor.map { SkyConcertThemeSkin.labelColor(for: $0) } ?? .white
+    }
+
+    private var secondaryTextColor: Color {
+        themeSkinDescriptor.map { SkyConcertThemeSkin.labelColor(for: $0).opacity(0.72) }
+            ?? visualTheme.secondaryTextColor
+    }
+
+    private var accentColor: Color {
+        themeSkinDescriptor.map { SkyConcertThemeSkin.accent(for: $0) } ?? visualTheme.accentColor
+    }
+
     var body: some View {
         ZStack {
-            LinearGradient(
-                colors: visualTheme.backgroundGradientColors,
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-            .ignoresSafeArea()
-
-            Circle()
-                .fill(visualTheme.glowColor)
-                .frame(width: 260, height: 260)
-                .blur(radius: 56)
-                .offset(x: -100, y: -220)
-
-            Circle()
-                .fill(visualTheme.glowColor.opacity(0.7))
-                .frame(width: 220, height: 220)
-                .blur(radius: 60)
-                .offset(x: 120, y: -60)
+            backgroundLayer
 
             ScrollView(showsIndicators: false) {
                 VStack(spacing: 18) {
@@ -63,15 +72,74 @@ struct VIPAppIconSelectionView: View {
         }
     }
 
+    @ViewBuilder
+    private var backgroundLayer: some View {
+        if let descriptor = themeSkinDescriptor {
+            ZStack {
+                LinearGradient(
+                    colors: [
+                        SkyConcertThemeSkin.shellFillTop(for: descriptor),
+                        SkyConcertThemeSkin.accentSoft(for: descriptor).opacity(SwanDreamThemeSkin.isSwanDream(descriptor) ? 0.7 : 0.5),
+                        SkyConcertThemeSkin.shellFillBottom(for: descriptor)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+                .ignoresSafeArea()
+
+                if SkyConcertThemeSkin.isSkyConcert(descriptor) {
+                    SkyConcertDecorationLayer(placements: SkyConcertThemeSkin.wardrobeBackdropPlacements)
+                        .opacity(0.58)
+                        .ignoresSafeArea()
+                } else if SwanDreamThemeSkin.isSwanDream(descriptor) {
+                    SkyConcertDecorationLayer(
+                        placements: SwanDreamThemeSkin.wardrobeBackdropPlacements,
+                        namespace: SwanDreamThemeSkin.namespace
+                    )
+                    .opacity(0.58)
+                    .ignoresSafeArea()
+                }
+
+                LinearGradient(
+                    colors: [Color.white.opacity(0.14), .clear],
+                    startPoint: .top,
+                    endPoint: .center
+                )
+                .ignoresSafeArea()
+            }
+        } else {
+            ZStack {
+                LinearGradient(
+                    colors: visualTheme.backgroundGradientColors,
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+                .ignoresSafeArea()
+
+                Circle()
+                    .fill(visualTheme.glowColor)
+                    .frame(width: 260, height: 260)
+                    .blur(radius: 56)
+                    .offset(x: -100, y: -220)
+
+                Circle()
+                    .fill(visualTheme.glowColor.opacity(0.7))
+                    .frame(width: 220, height: 220)
+                    .blur(radius: 60)
+                    .offset(x: 120, y: -60)
+            }
+        }
+    }
+
     private var topBar: some View {
         HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 4) {
                 Text("个性图标库")
                     .font(.system(size: 24, weight: .bold))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(primaryTextColor)
                 Text("VIP 可自主切换应用图标")
                     .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(visualTheme.secondaryTextColor)
+                    .foregroundStyle(secondaryTextColor)
             }
 
             Spacer()
@@ -79,39 +147,53 @@ struct VIPAppIconSelectionView: View {
             Button {
                 dismiss()
             } label: {
-                ZStack {
-                    VIPGlassCardBackground(glassStyle: visualTheme.secondaryGlassStyle, cornerRadius: 18)
-                    Image(systemName: "xmark")
-                        .font(.system(size: 14, weight: .bold))
-                        .foregroundStyle(.white)
-                }
-                .frame(width: 38, height: 38)
+                closeButton
             }
             .buttonStyle(.plain)
         }
     }
 
-    private var introCard: some View {
-        ZStack {
-            VIPGlassCardBackground(glassStyle: visualTheme.primaryGlassStyle, cornerRadius: 26)
-
-            VStack(alignment: .leading, spacing: 12) {
-                HStack(spacing: 10) {
-                    Image(systemName: "app.badge.fill")
-                        .font(.system(size: 20, weight: .bold))
-                        .foregroundStyle(visualTheme.primaryGlassStyle.iconTint)
-                    Text("让 VIP 身份延伸到桌面")
-                        .font(.system(size: 18, weight: .bold))
-                        .foregroundStyle(.white)
-                }
-
-                Text("图标切换采用和 VIP 页同源的黑玻璃视觉语言。当前已接入「少女心愿立体」与「经典图标」两套方案，后续继续往图标库里扩。")
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(Color.white.opacity(0.76))
-                    .fixedSize(horizontal: false, vertical: true)
+    @ViewBuilder
+    private var closeButton: some View {
+        if isThemeSkinActive {
+            ThemeSkinIconBadge(
+                systemName: "xmark",
+                fallbackColor: accentColor,
+                size: 38,
+                symbolSize: 14,
+                slot: .topBarIconButton
+            )
+        } else {
+            ZStack {
+                VIPGlassCardBackground(glassStyle: visualTheme.secondaryGlassStyle, cornerRadius: 18)
+                Image(systemName: "xmark")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(.white)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(18)
+            .frame(width: 38, height: 38)
+        }
+    }
+
+    private var introCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 10) {
+                Image(systemName: "app.badge.fill")
+                    .font(.system(size: 20, weight: .bold))
+                    .foregroundStyle(isThemeSkinActive ? accentColor : visualTheme.primaryGlassStyle.iconTint)
+                Text("让 VIP 身份延伸到桌面")
+                    .font(.system(size: 18, weight: .bold))
+                    .foregroundStyle(primaryTextColor)
+            }
+
+            Text("图标切换采用和 VIP 页同源的精致卡片视觉。当前已接入「少女心愿立体」与「经典图标」两套方案，后续继续往图标库里扩。")
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(secondaryTextColor)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(18)
+        .themeSkinAdaptiveSectionCard(slot: .sectionCard, cornerRadius: 26) {
+            VIPGlassCardBackground(glassStyle: visualTheme.primaryGlassStyle, cornerRadius: 26)
         }
     }
 
@@ -119,16 +201,18 @@ struct VIPAppIconSelectionView: View {
         HStack(spacing: 12) {
             Image(systemName: iconManager.supportsAlternateIcons ? "checkmark.seal.fill" : "exclamationmark.triangle.fill")
                 .font(.system(size: 18, weight: .bold))
-                .foregroundStyle(iconManager.supportsAlternateIcons ? visualTheme.accentColor : Color.orange)
+                .foregroundStyle(iconManager.supportsAlternateIcons ? accentColor : Color.orange)
 
             Text(iconManager.supportsAlternateIcons ? "当前设备支持应用图标切换。" : "当前设备暂不支持应用图标切换，可先保留这套图标库设计。")
                 .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(.white.opacity(0.8))
+                .foregroundStyle(secondaryTextColor)
 
             Spacer()
         }
         .padding(16)
-        .background(VIPGlassCardBackground(glassStyle: .glossBlack, cornerRadius: 22))
+        .themeSkinAdaptiveSectionCard(slot: .sectionCard, cornerRadius: 22, showsDecoration: false) {
+            VIPGlassCardBackground(glassStyle: .glossBlack, cornerRadius: 22)
+        }
     }
 
     private func iconOptionCard(_ option: VIPAppIconOption) -> some View {
@@ -137,7 +221,7 @@ struct VIPAppIconSelectionView: View {
         return HStack(spacing: 16) {
             ZStack(alignment: .topTrailing) {
                 RoundedRectangle(cornerRadius: 24, style: .continuous)
-                    .fill(Color.white.opacity(0.08))
+                    .fill(isThemeSkinActive ? SkyConcertThemeSkin.shellFillTop(for: themeSkinDescriptor).opacity(0.74) : Color.white.opacity(0.08))
                     .frame(width: 92, height: 92)
 
                 Image(option.previewAssetName)
@@ -153,10 +237,10 @@ struct VIPAppIconSelectionView: View {
                         .foregroundStyle(.white)
                         .padding(.horizontal, 7)
                         .padding(.vertical, 4)
-                        .background(Capsule().fill(visualTheme.accentColor.opacity(0.28)))
+                        .background(Capsule().fill(accentColor.opacity(isThemeSkinActive ? 0.64 : 0.28)))
                         .overlay(
                             Capsule()
-                                .stroke(Color.white.opacity(0.18), lineWidth: 1)
+                                .stroke(isThemeSkinActive ? accentColor.opacity(0.42) : Color.white.opacity(0.18), lineWidth: 1)
                         )
                         .offset(x: 8, y: -8)
                 }
@@ -166,21 +250,25 @@ struct VIPAppIconSelectionView: View {
                 HStack(spacing: 8) {
                     Text(option.displayName)
                         .font(.system(size: 17, weight: .bold))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(primaryTextColor)
 
                     if isCurrent {
                         Text("当前使用")
                             .font(.system(size: 10, weight: .bold))
-                            .foregroundStyle(Color.black.opacity(0.9))
+                            .foregroundStyle(isThemeSkinActive ? primaryTextColor : Color.black.opacity(0.9))
                             .padding(.horizontal, 8)
                             .padding(.vertical, 4)
-                            .background(Capsule().fill(visualTheme.accentColor))
+                            .background(Capsule().fill(accentColor.opacity(isThemeSkinActive ? 0.2 : 1)))
+                            .overlay(
+                                Capsule()
+                                    .stroke(accentColor.opacity(isThemeSkinActive ? 0.42 : 0), lineWidth: 1)
+                            )
                     }
                 }
 
                 Text(option.subtitle)
                     .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(Color.white.opacity(0.68))
+                    .foregroundStyle(secondaryTextColor)
                     .fixedSize(horizontal: false, vertical: true)
 
                 Button {
@@ -193,17 +281,21 @@ struct VIPAppIconSelectionView: View {
                     HStack(spacing: 8) {
                         if iconManager.isApplying && !isCurrent {
                             ProgressView()
-                                .tint(Color.black.opacity(0.9))
+                                .tint(isThemeSkinActive ? primaryTextColor : Color.black.opacity(0.9))
                         }
                         Text(isCurrent ? "已启用" : "切换图标")
                     }
                     .font(.system(size: 13, weight: .bold))
-                    .foregroundStyle(Color.black.opacity(0.92))
+                    .foregroundStyle(isThemeSkinActive ? primaryTextColor : Color.black.opacity(0.92))
                     .padding(.horizontal, 14)
                     .padding(.vertical, 10)
                     .background(
                         Capsule()
-                            .fill(iconManager.supportsAlternateIcons ? visualTheme.accentColor : Color.white.opacity(0.35))
+                            .fill(iconManager.supportsAlternateIcons ? accentColor.opacity(isThemeSkinActive ? 0.22 : 1) : Color.white.opacity(0.35))
+                    )
+                    .overlay(
+                        Capsule()
+                            .stroke(isThemeSkinActive ? accentColor.opacity(0.48) : Color.clear, lineWidth: 1)
                     )
                 }
                 .buttonStyle(.plain)
@@ -213,12 +305,12 @@ struct VIPAppIconSelectionView: View {
             Spacer()
         }
         .padding(18)
-        .background(
+        .themeSkinAdaptiveSectionCard(slot: .sectionCard, cornerRadius: 24, showsDecoration: isCurrent) {
             VIPGlassCardBackground(
                 glassStyle: isCurrent ? visualTheme.primaryGlassStyle : .glossBlack,
                 cornerRadius: 24
             )
-        )
+        }
     }
 }
 

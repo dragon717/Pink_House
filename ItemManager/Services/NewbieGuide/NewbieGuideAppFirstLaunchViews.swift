@@ -10,13 +10,21 @@ struct GuideCatVideoPlayer: View {
     let onFinished: (() -> Void)?
 
     var body: some View {
-        PetVideoPlayer(
-            videoName: videoName,
-            isLooping: isLooping,
-            playbackRate: playbackRate,
-            isMuted: true,
-            onFinished: onFinished
-        )
+        Group {
+            if TransparentVideoSupport.shouldSuppress(videoName: videoName) {
+                Image("naicha_right_back")
+                    .resizable()
+                    .scaledToFit()
+            } else {
+                PetVideoPlayer(
+                    videoName: videoName,
+                    isLooping: isLooping,
+                    playbackRate: playbackRate,
+                    isMuted: true,
+                    onFinished: onFinished
+                )
+            }
+        }
         .frame(width: 100, height: 100)
         .scaleEffect(x: isFlipped ? -1 : 1, y: 1)
     }
