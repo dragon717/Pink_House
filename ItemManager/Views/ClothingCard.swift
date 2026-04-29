@@ -133,13 +133,15 @@ struct ClothingCard: View, Equatable {
         lhs.snapshot == rhs.snapshot &&
         lhs.showPrice == rhs.showPrice &&
         lhs.showOriginalPrice == rhs.showOriginalPrice &&
-        lhs.wardrobeThemeDescriptor == rhs.wardrobeThemeDescriptor
+        lhs.wardrobeThemeDescriptor == rhs.wardrobeThemeDescriptor &&
+        lhs.imageTargetSize == rhs.imageTargetSize
     }
     
     let snapshot: WardrobeCellSnapshot
     let showPrice: Bool
     let showOriginalPrice: Bool
     let wardrobeThemeDescriptor: ThemeSkinDescriptor?
+    let imageTargetSize: CGSize
     
     @Environment(ThemeManager.self) private var themeManager
     @Environment(\.colorScheme) private var colorScheme
@@ -150,13 +152,15 @@ struct ClothingCard: View, Equatable {
     init(
         snapshot: WardrobeCellSnapshot,
         showPrice: Bool = UserDefaults.standard.object(forKey: "privacyShowPrice") as? Bool ?? true,
-        showOriginalPrice: Bool = UserDefaults.standard.object(forKey: "privacyShowOriginalPrice") as? Bool ?? true
+        showOriginalPrice: Bool = UserDefaults.standard.object(forKey: "privacyShowOriginalPrice") as? Bool ?? true,
+        imageTargetSize: CGSize = CGSize(width: 160, height: 160)
     ) {
         self.init(
             snapshot: snapshot,
             showPrice: showPrice,
             showOriginalPrice: showOriginalPrice,
-            wardrobeThemeDescriptor: ThemeSkinManager.shared.descriptor(for: .wardrobeItemCard)
+            wardrobeThemeDescriptor: ThemeSkinManager.shared.descriptor(for: .wardrobeItemCard),
+            imageTargetSize: imageTargetSize
         )
     }
 
@@ -165,24 +169,28 @@ struct ClothingCard: View, Equatable {
         snapshot: WardrobeCellSnapshot,
         showPrice: Bool,
         showOriginalPrice: Bool,
-        wardrobeThemeDescriptor: ThemeSkinDescriptor?
+        wardrobeThemeDescriptor: ThemeSkinDescriptor?,
+        imageTargetSize: CGSize = CGSize(width: 160, height: 160)
     ) {
         self.snapshot = snapshot
         self.showPrice = showPrice
         self.showOriginalPrice = showOriginalPrice
         self.wardrobeThemeDescriptor = wardrobeThemeDescriptor
+        self.imageTargetSize = imageTargetSize
     }
 
     @MainActor
     init(
         clothing: Clothing,
         showPrice: Bool = UserDefaults.standard.object(forKey: "privacyShowPrice") as? Bool ?? true,
-        showOriginalPrice: Bool = UserDefaults.standard.object(forKey: "privacyShowOriginalPrice") as? Bool ?? true
+        showOriginalPrice: Bool = UserDefaults.standard.object(forKey: "privacyShowOriginalPrice") as? Bool ?? true,
+        imageTargetSize: CGSize = CGSize(width: 160, height: 160)
     ) {
         self.init(
             snapshot: WardrobeCellSnapshot(clothing: clothing),
             showPrice: showPrice,
-            showOriginalPrice: showOriginalPrice
+            showOriginalPrice: showOriginalPrice,
+            imageTargetSize: imageTargetSize
         )
     }
 
@@ -191,18 +199,24 @@ struct ClothingCard: View, Equatable {
         clothing: Clothing,
         showPrice: Bool,
         showOriginalPrice: Bool,
-        wardrobeThemeDescriptor: ThemeSkinDescriptor?
+        wardrobeThemeDescriptor: ThemeSkinDescriptor?,
+        imageTargetSize: CGSize = CGSize(width: 160, height: 160)
     ) {
         self.init(
             snapshot: WardrobeCellSnapshot(clothing: clothing),
             showPrice: showPrice,
             showOriginalPrice: showOriginalPrice,
-            wardrobeThemeDescriptor: wardrobeThemeDescriptor
+            wardrobeThemeDescriptor: wardrobeThemeDescriptor,
+            imageTargetSize: imageTargetSize
         )
     }
 
     private var isThemeSkinThemed: Bool {
         WardrobeThemeSkinSupport.isThemeSkinDescriptor(wardrobeThemeDescriptor)
+    }
+
+    private var imageTaskKey: String {
+        "\(snapshot.firstImagePath ?? "nil")_\(Int(imageTargetSize.width))x\(Int(imageTargetSize.height))"
     }
 
     private var titleColor: Color {
@@ -272,6 +286,7 @@ struct ClothingCard: View, Equatable {
                             .overlay(
                                 Image(uiImage: uiImage)
                                     .resizable()
+                                    .interpolation(.medium)
                                     .scaledToFit()
                             )
                             .clipped()
@@ -318,11 +333,9 @@ struct ClothingCard: View, Equatable {
                 // 图片区域圆角和阴影 - 增强层次感
                 .clipShape(RoundedRectangle(cornerRadius: 12))
                 .padding(8)
-                .task(id: snapshot.firstImagePath) {
+                .task(id: imageTaskKey) {
                     if let imagePath = snapshot.firstImagePath {
-                        // Grid 2 (卡片): 文档建议 200x200 (Points)
-                        // 之前是 500x500，内存优化降级
-                        let size = CGSize(width: 200, height: 200)
+                        let size = imageTargetSize
                         if let cached = ImageManager.shared.cachedImage(fileName: imagePath, targetSize: size) {
                             self.image = cached
                             return
@@ -387,31 +400,31 @@ struct ClothingCard: View, Equatable {
                 .frame(height: 60)
             }
         }
-        // 卡片整体静态阴影 - 避免 iPhone 列表滚动中无效 hover/spring diff
-        .shadow(
-            color: .black.opacity(0.025),
-            radius: 1,
-            x: 0,
-            y: 1
-        )
     }
 }
 
 struct ClothingThumbnail: View, Equatable {
     static func == (lhs: ClothingThumbnail, rhs: ClothingThumbnail) -> Bool {
-        lhs.snapshot == rhs.snapshot
+        lhs.snapshot == rhs.snapshot &&
+        lhs.imageTargetSize == rhs.imageTargetSize
     }
     
     let snapshot: WardrobeCellSnapshot
+    let imageTargetSize: CGSize
     @State private var image: UIImage?
 
-    init(snapshot: WardrobeCellSnapshot) {
+    init(snapshot: WardrobeCellSnapshot, imageTargetSize: CGSize = CGSize(width: 64, height: 64)) {
         self.snapshot = snapshot
+        self.imageTargetSize = imageTargetSize
     }
 
     @MainActor
-    init(clothing: Clothing) {
-        self.init(snapshot: WardrobeCellSnapshot(clothing: clothing))
+    init(clothing: Clothing, imageTargetSize: CGSize = CGSize(width: 64, height: 64)) {
+        self.init(snapshot: WardrobeCellSnapshot(clothing: clothing), imageTargetSize: imageTargetSize)
+    }
+
+    private var imageTaskKey: String {
+        "\(snapshot.firstImagePath ?? "nil")_\(Int(imageTargetSize.width))x\(Int(imageTargetSize.height))"
     }
     
     var body: some View {
@@ -422,6 +435,7 @@ struct ClothingThumbnail: View, Equatable {
                     .overlay(
                         Image(uiImage: uiImage)
                             .resizable()
+                            .interpolation(.low)
                             .scaledToFit()
                     )
                     .clipShape(RoundedRectangle(cornerRadius: 4))
@@ -432,11 +446,9 @@ struct ClothingThumbnail: View, Equatable {
                     .clipShape(RoundedRectangle(cornerRadius: 4))
             }
         }
-        .task(id: snapshot.firstImagePath) {
+        .task(id: imageTaskKey) {
             if let imagePath = snapshot.firstImagePath {
-                // Grid 6: 文档建议 80x80 (Points)
-                // 之前是 200x200
-                let size = CGSize(width: 80, height: 80)
+                let size = imageTargetSize
                 if let cached = ImageManager.shared.cachedImage(fileName: imagePath, targetSize: size) {
                     self.image = cached
                     return
@@ -629,6 +641,7 @@ struct ClothingRow: View, Equatable {
                     if let uiImage = image {
                         Image(uiImage: uiImage)
                             .resizable()
+                            .interpolation(.medium)
                             .scaledToFit()
                             .frame(width: 60, height: 60)
                             .clipShape(RoundedRectangle(cornerRadius: 12))
@@ -847,6 +860,7 @@ struct ClothingRowBrief: View, Equatable {
                     if let uiImage = image {
                         Image(uiImage: uiImage)
                             .resizable()
+                            .interpolation(.medium)
                             .scaledToFit()
                             .frame(width: 40, height: 40)
                             .clipShape(RoundedRectangle(cornerRadius: 8))

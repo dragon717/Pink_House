@@ -68,6 +68,7 @@ class ImageManager {
     
     // Cache
     private let memoryCache = NSCache<NSString, UIImage>()
+    private var cacheKeysByTargetBucket: [String: Set<String>] = [:]
     private var inFlightImageLoads: [String: Task<UIImage?, Never>] = [:]
     private var cachedImagesDirectory: URL?
     private var cachedICloudAvailability: Bool?
@@ -145,6 +146,8 @@ class ImageManager {
     func clearCache() {
         AppLogger.info("Memory warning received, clearing image cache")
         memoryCache.removeAllObjects()
+        cacheKeysByTargetBucket.removeAll()
+        inFlightImageLoads.removeAll()
     }
     
     // MARK: - Directory Management
@@ -692,6 +695,19 @@ class ImageManager {
         return memoryCache.object(forKey: cacheKey)
     }
 
+    /// 清理某个缩略图尺寸桶，避免 grid6 → grid3 这类切换后同时保留两套已解码 bitmap。
+    func evictCachedImages(targetSize: CGSize) {
+        let bucket = Self.targetBucket(targetSize)
+        guard let keys = cacheKeysByTargetBucket[bucket], !keys.isEmpty else { return }
+
+        for key in keys {
+            memoryCache.removeObject(forKey: key as NSString)
+            inFlightImageLoads[key]?.cancel()
+            inFlightImageLoads[key] = nil
+        }
+        cacheKeysByTargetBucket[bucket] = nil
+    }
+
     /// 异步获取图片 (用于列表滚动优化，自动处理 iCloud 下载)
     /// - Parameters:
     ///   - fileName: 文件名
@@ -747,6 +763,7 @@ class ImageManager {
         if let image = image {
             let cost = Int(image.size.width * image.size.height * 4)
             memoryCache.setObject(image, forKey: cacheKey, cost: cost)
+            registerCacheKey(cacheKeyString, targetSize: targetSize)
         }
         
         return image
@@ -781,7 +798,17 @@ class ImageManager {
 
     private nonisolated static func cacheKey(fileName: String, targetSize: CGSize?) -> String {
         guard let targetSize else { return fileName }
-        return "\(fileName)_\(Int(targetSize.width))x\(Int(targetSize.height))"
+        return "\(fileName)_\(targetBucket(targetSize))"
+    }
+
+    private nonisolated static func targetBucket(_ targetSize: CGSize) -> String {
+        "\(Int(targetSize.width))x\(Int(targetSize.height))"
+    }
+
+    private func registerCacheKey(_ cacheKey: String, targetSize: CGSize?) {
+        guard let targetSize else { return }
+        let bucket = Self.targetBucket(targetSize)
+        cacheKeysByTargetBucket[bucket, default: []].insert(cacheKey)
     }
 
     private nonisolated static func decodeImageFile(fileURL: URL, targetSize: CGSize?, scale: CGFloat) async -> UIImage? {

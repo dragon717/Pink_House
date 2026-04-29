@@ -483,7 +483,10 @@ struct WardrobeView: View {
         let snapshot = cellSnapshot(for: clothing)
         if viewLayout == .grid6 {
             guideSelectionAnchor(for: clothing, firstFilteredID: firstFilteredID) {
-                ClothingThumbnail(snapshot: snapshot)
+                ClothingThumbnail(
+                    snapshot: snapshot,
+                    imageTargetSize: wardrobeCellImageTargetSize
+                )
             }
             .background(visibleItemFrameReporter(for: clothing))
         } else {
@@ -492,7 +495,8 @@ struct WardrobeView: View {
                     snapshot: snapshot,
                     showPrice: showPrice,
                     showOriginalPrice: showOriginalPrice,
-                    wardrobeThemeDescriptor: wardrobeThemeDescriptor
+                    wardrobeThemeDescriptor: wardrobeThemeDescriptor,
+                    imageTargetSize: wardrobeCellImageTargetSize
                 )
             }
             .background(visibleItemFrameReporter(for: clothing))
@@ -651,7 +655,8 @@ struct WardrobeView: View {
             .task(id: filterSignature) {
                 await rebuildFilteredClothings()
             }
-            .onChange(of: viewLayout) { _, _ in
+            .onChange(of: viewLayout) { oldLayout, _ in
+                ImageManager.shared.evictCachedImages(targetSize: wardrobeCellImageTargetSize(for: oldLayout))
                 prefetchInitialWardrobeImages(filteredClothings)
             }
             .onDisappear {
@@ -1792,11 +1797,17 @@ struct WardrobeView: View {
     }
 
     private var wardrobeCellImageTargetSize: CGSize {
-        switch viewLayout {
-        case .grid2, .grid3:
-            return CGSize(width: 200, height: 200)
+        wardrobeCellImageTargetSize(for: viewLayout)
+    }
+
+    private func wardrobeCellImageTargetSize(for layout: HomeView.ViewLayout) -> CGSize {
+        switch layout {
+        case .grid2:
+            return CGSize(width: 160, height: 160)
+        case .grid3:
+            return CGSize(width: 112, height: 112)
         case .grid6:
-            return CGSize(width: 80, height: 80)
+            return CGSize(width: 64, height: 64)
         case .listDetailed:
             return CGSize(width: 60, height: 60)
         case .listBrief:
@@ -1807,11 +1818,11 @@ struct WardrobeView: View {
     private var initialImagePrefetchLimit: Int {
         switch viewLayout {
         case .grid2:
-            return 12
+            return 8
         case .grid3:
-            return 18
+            return 12
         case .grid6:
-            return 48
+            return 30
         case .listBrief, .listDetailed:
             return 18
         }
