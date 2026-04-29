@@ -18,7 +18,7 @@ class ClothingFilterService {
     
     // MARK: - 筛选配置
     
-    struct FilterConfig {
+    struct FilterConfig: Hashable {
         let selectedTagIDs: Set<UUID>
         let selectedBrandIDs: Set<UUID>
         let selectedTypes: Set<String>

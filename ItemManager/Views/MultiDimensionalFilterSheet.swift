@@ -17,7 +17,7 @@ enum FilterMode: String, CaseIterable, Identifiable {
 }
 
 // MARK: - 心愿尾款筛选状态
-enum DepositStatusFilter: String, CaseIterable, Identifiable {
+enum DepositStatusFilter: String, CaseIterable, Identifiable, Hashable, Sendable {
     case all = "all"
     case owned = "owned"
     case depositPlan = "depositPlan"

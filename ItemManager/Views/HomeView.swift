@@ -8,7 +8,7 @@
 import SwiftUI
 import SwiftData
 
-enum SortOption: String, CaseIterable, Identifiable {
+enum SortOption: String, CaseIterable, Identifiable, Hashable, Sendable {
     case createdAtDesc = "添加时间从晚到早"
     case priceAsc = "价格从低到高"
     case priceDesc = "价格从高到低"

@@ -113,18 +113,21 @@ struct WardrobeThemeStatsCardContainer<Content: View>: View {
 }
 
 struct WardrobeThemeClothingCardContainer<Content: View>: View {
-    @ObservedObject private var themeSkinManager = ThemeSkinManager.shared
-
     private let content: Content
     private let cornerRadius: CGFloat
+    private let descriptor: ThemeSkinDescriptor?
+    private let scrollOptimized: Bool
 
-    init(cornerRadius: CGFloat = 16, @ViewBuilder content: () -> Content) {
+    init(
+        cornerRadius: CGFloat = 16,
+        descriptor: ThemeSkinDescriptor? = ThemeSkinManager.shared.descriptor(for: .wardrobeItemCard),
+        scrollOptimized: Bool = false,
+        @ViewBuilder content: () -> Content
+    ) {
         self.cornerRadius = cornerRadius
+        self.descriptor = descriptor
+        self.scrollOptimized = scrollOptimized
         self.content = content()
-    }
-
-    private var descriptor: ThemeSkinDescriptor? {
-        themeSkinManager.descriptor(for: .wardrobeItemCard)
     }
 
     private var isGirlClosetEnabled: Bool {
@@ -134,55 +137,67 @@ struct WardrobeThemeClothingCardContainer<Content: View>: View {
     var body: some View {
         Group {
             if isGirlClosetEnabled {
-                content
-                    .background {
-                        ThemeSkinOptionalResizableAsset(
-                            ThemeSkinAssetName.cardWardrobeItem,
-                            namespace: descriptor?.assetNamespace,
-                            allowShortNameFallback: !SkyConcertThemeSkin.shouldAvoidShortAssetFallback(for: descriptor),
-                            capInsets: ThemeSkinAssetName.capInsets(for: ThemeSkinAssetName.cardWardrobeItem)
-                        ) {
+                if scrollOptimized {
+                    content
+                        .background {
                             shellBackground(cornerRadius: 22, descriptor: descriptor)
                         }
-                    }
-                    .overlay {
-                        if !ThemeSkinAssetAvailability.hasImage(
-                            named: ThemeSkinAssetName.cardWardrobeItem,
-                            namespace: descriptor?.assetNamespace,
-                            allowShortNameFallback: !SkyConcertThemeSkin.shouldAvoidShortAssetFallback(for: descriptor)
-                        ) {
+                        .overlay {
                             shellOutline(cornerRadius: 22, descriptor: descriptor)
                         }
-                    }
-                    .overlay {
-                        if SkyConcertThemeSkin.isSkyConcert(descriptor) {
-                            SkyConcertDecorationLayer(placements: SkyConcertThemeSkin.wardrobeCardPlacements)
-                        } else if SwanDreamThemeSkin.isSwanDream(descriptor) {
-                            SkyConcertDecorationLayer(
-                                placements: SwanDreamThemeSkin.wardrobeCardPlacements,
-                                namespace: SwanDreamThemeSkin.namespace
-                            )
-                        }
-                    }
-                    .overlay(alignment: .topLeading) {
-                        if !SkyConcertThemeSkin.hasDedicatedVisualProfile(descriptor) {
-                            ThemeSkinOptionalFittedAsset(
-                                ThemeSkinAssetName.cardWardrobeRibbonTopLeft,
-                                namespace: descriptor?.assetNamespace
+                        .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+                        .shadow(color: SkyConcertThemeSkin.shadowColor(for: descriptor).opacity(0.18), radius: 1, x: 0, y: 1)
+                } else {
+                    content
+                        .background {
+                            ThemeSkinOptionalResizableAsset(
+                                ThemeSkinAssetName.cardWardrobeItem,
+                                namespace: descriptor?.assetNamespace,
+                                allowShortNameFallback: !SkyConcertThemeSkin.shouldAvoidShortAssetFallback(for: descriptor),
+                                capInsets: ThemeSkinAssetName.capInsets(for: ThemeSkinAssetName.cardWardrobeItem)
                             ) {
-                                WardrobeThemeDoodle(icon: "star.fill")
+                                shellBackground(cornerRadius: 22, descriptor: descriptor)
                             }
-                            .frame(width: 58, height: 40)
-                            .padding(.top, 10)
-                            .padding(.leading, 8)
                         }
-                    }
-                    .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
-                    .shadow(color: SkyConcertThemeSkin.shadowColor(for: descriptor).opacity(0.65), radius: 10, x: 0, y: 5)
+                        .overlay {
+                            if !ThemeSkinAssetAvailability.hasImage(
+                                named: ThemeSkinAssetName.cardWardrobeItem,
+                                namespace: descriptor?.assetNamespace,
+                                allowShortNameFallback: !SkyConcertThemeSkin.shouldAvoidShortAssetFallback(for: descriptor)
+                            ) {
+                                shellOutline(cornerRadius: 22, descriptor: descriptor)
+                            }
+                        }
+                        .overlay {
+                            if SkyConcertThemeSkin.isSkyConcert(descriptor) {
+                                SkyConcertDecorationLayer(placements: SkyConcertThemeSkin.wardrobeCardPlacements)
+                            } else if SwanDreamThemeSkin.isSwanDream(descriptor) {
+                                SkyConcertDecorationLayer(
+                                    placements: SwanDreamThemeSkin.wardrobeCardPlacements,
+                                    namespace: SwanDreamThemeSkin.namespace
+                                )
+                            }
+                        }
+                        .overlay(alignment: .topLeading) {
+                            if !SkyConcertThemeSkin.hasDedicatedVisualProfile(descriptor) {
+                                ThemeSkinOptionalFittedAsset(
+                                    ThemeSkinAssetName.cardWardrobeRibbonTopLeft,
+                                    namespace: descriptor?.assetNamespace
+                                ) {
+                                    WardrobeThemeDoodle(icon: "star.fill")
+                                }
+                                .frame(width: 58, height: 40)
+                                .padding(.top, 10)
+                                .padding(.leading, 8)
+                            }
+                        }
+                        .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+                        .shadow(color: SkyConcertThemeSkin.shadowColor(for: descriptor).opacity(0.65), radius: 10, x: 0, y: 5)
+                }
             } else {
                 content
                     .background {
-                        CardBackgroundView(cornerRadius: cornerRadius)
+                        WardrobeListCellBackground(cornerRadius: cornerRadius)
                     }
                     .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
             }
@@ -192,11 +207,11 @@ struct WardrobeThemeClothingCardContainer<Content: View>: View {
 
 struct WardrobeThemeCardTitle: View {
     let title: String
+    let descriptor: ThemeSkinDescriptor?
 
-    @ObservedObject private var themeSkinManager = ThemeSkinManager.shared
-
-    private var descriptor: ThemeSkinDescriptor? {
-        themeSkinManager.descriptor(for: .wardrobeItemCard)
+    init(title: String, descriptor: ThemeSkinDescriptor? = ThemeSkinManager.shared.descriptor(for: .wardrobeItemCard)) {
+        self.title = title
+        self.descriptor = descriptor
     }
 
     private var isGirlClosetEnabled: Bool {
@@ -251,11 +266,18 @@ struct WardrobeThemeCornerBadge: View {
     let text: String
     let tint: Color
     var icon: String? = nil
+    let descriptor: ThemeSkinDescriptor?
 
-    @ObservedObject private var themeSkinManager = ThemeSkinManager.shared
-
-    private var descriptor: ThemeSkinDescriptor? {
-        themeSkinManager.descriptor(for: .wardrobeItemCard)
+    init(
+        text: String,
+        tint: Color,
+        icon: String? = nil,
+        descriptor: ThemeSkinDescriptor? = ThemeSkinManager.shared.descriptor(for: .wardrobeItemCard)
+    ) {
+        self.text = text
+        self.tint = tint
+        self.icon = icon
+        self.descriptor = descriptor
     }
 
     private var isGirlClosetEnabled: Bool {

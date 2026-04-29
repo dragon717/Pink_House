@@ -247,6 +247,10 @@ struct MainContentView: View {
             modelContainer: SharedPersistence.shared.sharedModelContainer
         )
 
+        #if DEBUG
+        _ = await WardrobePerfSeedService.seedIfRequested(modelContext: modelContext)
+        #endif
+
         // 0.10 并行预加载每日打卡数据（问候语 + 穿搭色）
         // 使用 TaskGroup 实现并行加载，减少开屏等待时间
         await withTaskGroup(of: Void.self) { group in

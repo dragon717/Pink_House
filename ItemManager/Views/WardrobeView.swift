@@ -9,6 +9,322 @@ import SwiftUI
 import SwiftData
 import UniformTypeIdentifiers
 
+private struct WardrobeClothingRevision: Hashable {
+    let id: UUID
+    let updatedAt: Date
+    let lastModified: Date
+    let deletedAt: Date?
+    let sortIndex: Int
+}
+
+private struct WardrobeFilterSignature: Hashable {
+    let searchText: String
+    let selectedTagIDs: [UUID]
+    let selectedBrandIDs: [UUID]
+    let selectedTypes: [String]
+    let selectedColors: [String]
+    let selectedSizes: [String]
+    let selectedLengths: [String]
+    let selectedConditions: [String]
+    let selectedAccessories: [String]
+    let depositStatusFilterRawValue: String
+    let sortOptionRawValue: String
+    let privacyShowPrice: Bool
+    let privacyShowOriginalPrice: Bool
+    let clothingRevisions: [WardrobeClothingRevision]
+
+    init(
+        searchText: String,
+        selectedTagIDs: Set<UUID>,
+        selectedBrandIDs: Set<UUID>,
+        selectedTypes: Set<String>,
+        selectedColors: Set<String>,
+        selectedSizes: Set<String>,
+        selectedLengths: Set<String>,
+        selectedConditions: Set<String>,
+        selectedAccessories: Set<String>,
+        depositStatusFilterRawValue: String,
+        sortOptionRawValue: String,
+        privacyShowPrice: Bool,
+        privacyShowOriginalPrice: Bool,
+        clothingRevisions: [WardrobeClothingRevision]
+    ) {
+        self.searchText = searchText
+        self.selectedTagIDs = selectedTagIDs.sorted { $0.uuidString < $1.uuidString }
+        self.selectedBrandIDs = selectedBrandIDs.sorted { $0.uuidString < $1.uuidString }
+        self.selectedTypes = selectedTypes.sorted()
+        self.selectedColors = selectedColors.sorted()
+        self.selectedSizes = selectedSizes.sorted()
+        self.selectedLengths = selectedLengths.sorted()
+        self.selectedConditions = selectedConditions.sorted()
+        self.selectedAccessories = selectedAccessories.sorted()
+        self.depositStatusFilterRawValue = depositStatusFilterRawValue
+        self.sortOptionRawValue = sortOptionRawValue
+        self.privacyShowPrice = privacyShowPrice
+        self.privacyShowOriginalPrice = privacyShowOriginalPrice
+        self.clothingRevisions = clothingRevisions
+    }
+}
+
+private struct WardrobeClothingSnapshot: Sendable {
+    let id: UUID
+    let name: String
+    let brandID: UUID?
+    let brandName: String?
+    let tagIDs: Set<UUID>
+    let tagNames: [String]
+    let types: String
+    let colors: String
+    let sizes: String
+    let length: String
+    let condition: String
+    let accessories: String
+    let note: String
+    let price: Decimal
+    let inventoryTotalPrice: Decimal
+    let stock: Int
+    let isDepositPlan: Bool
+    let sortIndex: Int
+    let purchaseDate: Date
+    let createdAt: Date
+    let deletedAt: Date?
+
+    @MainActor
+    init(clothing: Clothing) {
+        self.id = clothing.id
+        self.name = clothing.name
+        self.brandID = clothing.brand?.id
+        self.brandName = clothing.brand?.name
+        self.tagIDs = Set(clothing.tags?.map { $0.id } ?? [])
+        self.tagNames = clothing.tags?.map { $0.name } ?? []
+        self.types = clothing.types
+        self.colors = clothing.colors
+        self.sizes = clothing.sizes
+        self.length = clothing.length
+        self.condition = clothing.condition
+        self.accessories = clothing.accessories
+        self.note = clothing.note
+        self.price = clothing.price
+        self.inventoryTotalPrice = clothing.inventoryTotalPrice
+        self.stock = clothing.stock
+        self.isDepositPlan = clothing.isDepositPlan
+        self.sortIndex = clothing.sortIndex
+        self.purchaseDate = clothing.purchaseDate
+        self.createdAt = clothing.createdAt
+        self.deletedAt = clothing.deletedAt
+    }
+}
+
+private struct WardrobeFilterInput: Sendable {
+    let snapshots: [WardrobeClothingSnapshot]
+    let searchText: String
+    let selectedTagIDs: Set<UUID>
+    let selectedBrandIDs: Set<UUID>
+    let selectedTypes: Set<String>
+    let selectedColors: Set<String>
+    let selectedSizes: Set<String>
+    let selectedLengths: Set<String>
+    let selectedConditions: Set<String>
+    let selectedAccessories: Set<String>
+    let depositStatusFilterRawValue: String
+    let sortOptionRawValue: String
+}
+
+struct WardrobeStatsSummary: Equatable, Sendable {
+    var styleCount: Int
+    var totalCount: Int
+    var dressValue: Decimal
+    var totalValue: Decimal
+
+    nonisolated static let empty = WardrobeStatsSummary(
+        styleCount: 0,
+        totalCount: 0,
+        dressValue: Decimal(0),
+        totalValue: Decimal(0)
+    )
+}
+
+private struct WardrobeFilterResult: Sendable {
+    let ids: [UUID]
+    let stats: WardrobeStatsSummary
+    let conditionOptions: [String]
+}
+
+private enum WardrobeFilterEngine {
+    nonisolated static func evaluate(_ input: WardrobeFilterInput) -> WardrobeFilterResult {
+        if Task.isCancelled {
+            return WardrobeFilterResult(ids: [], stats: .empty, conditionOptions: ["全新"])
+        }
+
+        var result = input.snapshots.filter { $0.deletedAt == nil }
+        let query = input.searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        if !query.isEmpty {
+            result = result.filter { matchesSearch($0, query: query) }
+        }
+
+        result = result.filter { snapshot in
+            matchesTag(snapshot, selectedTagIDs: input.selectedTagIDs) &&
+            matchesBrand(snapshot, selectedBrandIDs: input.selectedBrandIDs) &&
+            matchesStringField(snapshot.types, selectedValues: input.selectedTypes, emptyMarker: "__NO_TYPE__") &&
+            matchesStringField(snapshot.colors, selectedValues: input.selectedColors, emptyMarker: "__NO_COLOR__") &&
+            matchesStringField(snapshot.sizes, selectedValues: input.selectedSizes, emptyMarker: "__NO_SIZE__") &&
+            matchesStringField(snapshot.length, selectedValues: input.selectedLengths, emptyMarker: "__NO_LENGTH__") &&
+            matchesStringField(snapshot.condition, selectedValues: input.selectedConditions, emptyMarker: "__NO_CONDITION__") &&
+            matchesStringField(snapshot.accessories, selectedValues: input.selectedAccessories, emptyMarker: "__NO_ACCESSORY__") &&
+            matchesDepositStatus(snapshot, rawValue: input.depositStatusFilterRawValue)
+        }
+
+        result = sorted(result, sortOptionRawValue: input.sortOptionRawValue)
+        let stats = statsSummary(for: result)
+        let conditionOptions = conditionOptions(from: input.snapshots)
+
+        return WardrobeFilterResult(
+            ids: result.map(\.id),
+            stats: stats,
+            conditionOptions: conditionOptions
+        )
+    }
+
+    private nonisolated static func matchesSearch(_ snapshot: WardrobeClothingSnapshot, query: String) -> Bool {
+        if let (minPrice, maxPrice) = parsePriceRange(from: query) {
+            let clothingPrice = NSDecimalNumber(decimal: snapshot.price).doubleValue
+            return clothingPrice >= minPrice && clothingPrice <= maxPrice
+        }
+
+        let stockMatch: Bool
+        if let searchStock = Int(query.trimmingCharacters(in: .whitespaces)), searchStock > 0 {
+            stockMatch = snapshot.stock == searchStock
+        } else {
+            stockMatch = false
+        }
+
+        return snapshot.name.localizedCaseInsensitiveContains(query) ||
+            (snapshot.brandName?.localizedCaseInsensitiveContains(query) ?? false) ||
+            snapshot.tagNames.contains { $0.localizedCaseInsensitiveContains(query) } ||
+            snapshot.types.localizedCaseInsensitiveContains(query) ||
+            snapshot.colors.localizedCaseInsensitiveContains(query) ||
+            snapshot.sizes.localizedCaseInsensitiveContains(query) ||
+            snapshot.length.localizedCaseInsensitiveContains(query) ||
+            snapshot.condition.localizedCaseInsensitiveContains(query) ||
+            snapshot.accessories.localizedCaseInsensitiveContains(query) ||
+            snapshot.note.localizedCaseInsensitiveContains(query) ||
+            stockMatch
+    }
+
+    private nonisolated static func parsePriceRange(from searchText: String) -> (min: Double, max: Double)? {
+        let trimmed = searchText.trimmingCharacters(in: .whitespaces)
+        let separators = ["-", "~", "到", " "]
+
+        for separator in separators {
+            let components = trimmed.components(separatedBy: separator)
+            if components.count == 2,
+               let min = Double(components[0].trimmingCharacters(in: .whitespaces)),
+               let max = Double(components[1].trimmingCharacters(in: .whitespaces)) {
+                return (min, max)
+            }
+        }
+
+        return nil
+    }
+
+    private nonisolated static func matchesTag(_ snapshot: WardrobeClothingSnapshot, selectedTagIDs: Set<UUID>) -> Bool {
+        let noTagUUID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
+        if selectedTagIDs.isEmpty {
+            return true
+        } else if selectedTagIDs.contains(noTagUUID) {
+            return snapshot.tagIDs.isEmpty
+        } else {
+            return !selectedTagIDs.isDisjoint(with: snapshot.tagIDs)
+        }
+    }
+
+    private nonisolated static func matchesBrand(_ snapshot: WardrobeClothingSnapshot, selectedBrandIDs: Set<UUID>) -> Bool {
+        let noBrandUUID = UUID(uuidString: "00000000-0000-0000-0000-000000000002")!
+        if selectedBrandIDs.isEmpty {
+            return true
+        } else if selectedBrandIDs.contains(noBrandUUID) {
+            return snapshot.brandID == nil
+        } else if let brandID = snapshot.brandID {
+            return selectedBrandIDs.contains(brandID)
+        } else {
+            return false
+        }
+    }
+
+    private nonisolated static func matchesStringField(_ value: String, selectedValues: Set<String>, emptyMarker: String) -> Bool {
+        if selectedValues.isEmpty {
+            return true
+        } else if selectedValues.contains(emptyMarker) {
+            return value.isEmpty
+        } else {
+            return !selectedValues.isDisjoint(with: splitValues(value))
+        }
+    }
+
+    private nonisolated static func matchesDepositStatus(_ snapshot: WardrobeClothingSnapshot, rawValue: String) -> Bool {
+        switch rawValue {
+        case "owned":
+            return !snapshot.isDepositPlan
+        case "depositPlan":
+            return snapshot.isDepositPlan
+        default:
+            return true
+        }
+    }
+
+    private nonisolated static func sorted(_ snapshots: [WardrobeClothingSnapshot], sortOptionRawValue: String) -> [WardrobeClothingSnapshot] {
+        switch sortOptionRawValue {
+        case "自定义顺序":
+            return snapshots.sorted { $0.sortIndex < $1.sortIndex }
+        case "价格从低到高":
+            return snapshots.sorted { $0.price < $1.price }
+        case "价格从高到低":
+            return snapshots.sorted { $0.price > $1.price }
+        case "名称从A到Z":
+            return snapshots.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+        case "名称从Z到A":
+            return snapshots.sorted { $0.name.localizedStandardCompare($1.name) == .orderedDescending }
+        case "购买时间从早到晚":
+            return snapshots.sorted { $0.purchaseDate < $1.purchaseDate }
+        case "购买时间从晚到早":
+            return snapshots.sorted { $0.purchaseDate > $1.purchaseDate }
+        default:
+            return snapshots.sorted { $0.createdAt > $1.createdAt }
+        }
+    }
+
+    private nonisolated static func statsSummary(for snapshots: [WardrobeClothingSnapshot]) -> WardrobeStatsSummary {
+        snapshots.reduce(into: WardrobeStatsSummary.empty) { partial, snapshot in
+            partial.styleCount += 1
+            partial.totalCount += snapshot.stock
+            partial.dressValue += snapshot.price * Decimal(snapshot.stock)
+            partial.totalValue += snapshot.inventoryTotalPrice
+        }
+    }
+
+    private nonisolated static func conditionOptions(from snapshots: [WardrobeClothingSnapshot]) -> [String] {
+        let values = snapshots
+            .flatMap { splitValues($0.condition) }
+            .filter { !$0.isEmpty }
+        let options = Array(Set(values)).sorted()
+        return options.isEmpty ? ["全新"] : options
+    }
+
+    private nonisolated static func splitValues(_ string: String) -> Set<String> {
+        let normalized = string.replacingOccurrences(of: "，", with: ",")
+        return Set(normalized.split(separator: ",").map { $0.trimmingCharacters(in: .whitespacesAndNewlines) })
+    }
+}
+
+private struct WardrobeVisibleItemFramePreferenceKey: PreferenceKey {
+    static var defaultValue: [UUID: CGRect] = [:]
+
+    static func reduce(value: inout [UUID: CGRect], nextValue: () -> [UUID: CGRect]) {
+        value.merge(nextValue(), uniquingKeysWith: { _, new in new })
+    }
+}
+
 struct WardrobeView: View {
     @Binding var searchText: String
     @Binding var isSelectionMode: Bool
@@ -16,6 +332,13 @@ struct WardrobeView: View {
     @Environment(\.modelContext) private var modelContext
     @Query private var clothings: [Clothing]
     @State private var showStats = true
+    @State private var filteredClothings: [Clothing] = []
+    @State private var cellSnapshotCache: [UUID: WardrobeCellSnapshot] = [:]
+    @State private var filteredStatsSummary: WardrobeStatsSummary = .empty
+    @State private var conditionBatchOptionsCache: [String] = ["全新"]
+    @ObservedObject private var themeSkinManager = ThemeSkinManager.shared
+    @AppStorage("privacyShowPrice") private var showPrice = true
+    @AppStorage("privacyShowOriginalPrice") private var showOriginalPrice = true
     
     // Edit Mode States
     @State private var selectedItemIDs: Set<UUID> = []
@@ -56,10 +379,13 @@ struct WardrobeView: View {
     @State private var showingDeleteSingleAlert = false
     @State private var itemToCopy: Clothing?
     @State private var showingCopyAlert = false
+    @State private var detailNavigationTarget: Clothing?
+    @State private var isShowingDetailNavigation = false
     
     // Auto-scroll
     @State private var visibleItemIDs: Set<UUID> = []
     @State private var autoScrollTask: Task<Void, Never>?
+    @State private var visibleItemFrameUpdateTask: Task<Void, Never>?
     
     // Layout
     let viewLayout: HomeView.ViewLayout
@@ -140,13 +466,33 @@ struct WardrobeView: View {
     
     @ViewBuilder
     private func clothingItemView(clothing: Clothing, firstFilteredID: UUID?) -> some View {
+        let snapshot = cellSnapshot(for: clothing)
         if viewLayout == .grid6 {
             guideSelectionAnchor(for: clothing, firstFilteredID: firstFilteredID) {
-                ClothingThumbnail(clothing: clothing)
+                ClothingThumbnail(snapshot: snapshot)
             }
+            .background(visibleItemFrameReporter(for: clothing))
         } else {
             guideSelectionAnchor(for: clothing, firstFilteredID: firstFilteredID) {
-                ClothingCard(clothing: clothing)
+                ClothingCard(
+                    snapshot: snapshot,
+                    showPrice: showPrice,
+                    showOriginalPrice: showOriginalPrice,
+                    wardrobeThemeDescriptor: wardrobeThemeDescriptor
+                )
+            }
+            .background(visibleItemFrameReporter(for: clothing))
+        }
+    }
+
+    @ViewBuilder
+    private func visibleItemFrameReporter(for clothing: Clothing) -> some View {
+        if isReorderTrackingEnabled {
+            GeometryReader { proxy in
+                Color.clear.preference(
+                    key: WardrobeVisibleItemFramePreferenceKey.self,
+                    value: [clothing.id: proxy.frame(in: .global)]
+                )
             }
         }
     }
@@ -163,23 +509,34 @@ struct WardrobeView: View {
     
     @ViewBuilder
     private func clothingRowView(clothing: Clothing) -> some View {
+        let snapshot = cellSnapshot(for: clothing)
         if viewLayout == .listBrief {
-            ClothingRowBrief(clothing: clothing)
+            ClothingRowBrief(
+                snapshot: snapshot,
+                showPrice: showPrice,
+                showOriginalPrice: showOriginalPrice
+            )
         } else {
-            ClothingRow(clothing: clothing)
+            ClothingRow(
+                snapshot: snapshot,
+                showPrice: showPrice,
+                showOriginalPrice: showOriginalPrice
+            )
         }
     }
+
+    @MainActor
+    private func cellSnapshot(for clothing: Clothing) -> WardrobeCellSnapshot {
+        cellSnapshotCache[clothing.id] ?? WardrobeCellSnapshot(clothing: clothing)
+    }
     
-    var filteredClothings: [Clothing] {
-        // 使用 ClothingSearchService 进行搜索
-        let searchService = ClothingSearchService(clothings: clothings)
-        let searchResults = searchService.search(query: searchText)
-        
-        // 如果没有搜索词，返回所有衣物
-        let baseResults = searchText.isEmpty ? clothings : searchResults
-        
-        // 使用统一的筛选服务
-        let config = ClothingFilterService.FilterConfig(
+    private var wardrobeThemeDescriptor: ThemeSkinDescriptor? {
+        themeSkinManager.descriptor(for: .wardrobeItemCard)
+    }
+
+    private var filterSignature: WardrobeFilterSignature {
+        WardrobeFilterSignature(
+            searchText: searchText,
             selectedTagIDs: selectedTagIDs,
             selectedBrandIDs: selectedBrandIDs,
             selectedTypes: selectedTypes,
@@ -188,53 +545,34 @@ struct WardrobeView: View {
             selectedLengths: selectedLengths,
             selectedConditions: selectedConditions,
             selectedAccessories: selectedAccessories,
-            depositStatusFilter: depositStatusFilter
+            depositStatusFilterRawValue: depositStatusFilter.rawValue,
+            sortOptionRawValue: sortOption.rawValue,
+            privacyShowPrice: showPrice,
+            privacyShowOriginalPrice: showOriginalPrice,
+            clothingRevisions: clothings.map { clothing in
+                WardrobeClothingRevision(
+                    id: clothing.id,
+                    updatedAt: clothing.updatedAt,
+                    lastModified: clothing.lastModified,
+                    deletedAt: clothing.deletedAt,
+                    sortIndex: clothing.sortIndex
+                )
+            }
         )
-        
-        let result = ClothingFilterService.filter(baseResults, config: config)
-        
-        // Apply sorting based on sortOption
-        // Note: @Query doesn't update dynamically when sortOption changes,
-        // so we need to sort here explicitly
-        switch sortOption {
-        case .custom:
-            return result.sorted { $0.sortIndex < $1.sortIndex }
-        case .priceAsc:
-            return result.sorted { $0.price < $1.price }
-        case .priceDesc:
-            return result.sorted { $0.price > $1.price }
-        case .nameAsc:
-            return result.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
-        case .nameDesc:
-            return result.sorted { $0.name.localizedStandardCompare($1.name) == .orderedDescending }
-        case .purchaseDateAsc:
-            return result.sorted { $0.purchaseDate < $1.purchaseDate }
-        case .purchaseDateDesc:
-            return result.sorted { $0.purchaseDate > $1.purchaseDate }
-        case .createdAtDesc:
-            return result.sorted { $0.createdAt > $1.createdAt }
-        }
     }
 
     private var conditionBatchOptions: [String] {
-        let values = clothings
-            .flatMap {
-                $0.condition
-                    .replacingOccurrences(of: "，", with: ",")
-                    .split(separator: ",")
-                    .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-            }
-            .filter { !$0.isEmpty }
-        let options = Array(Set(values)).sorted()
-        return options.isEmpty ? ["全新"] : options
+        conditionBatchOptionsCache
     }
     
     var body: some View {
-        let base = AnyView(baseWardrobeView)
-        let withStateChanges = AnyView(applyStateChangeHandlers(to: base))
-        let withBottomBar = AnyView(applyBottomSelectionBar(to: withStateChanges))
-        let withSheets = AnyView(applySheets(to: withBottomBar))
-        return AnyView(applyAlerts(to: withSheets))
+        applyAlerts(to:
+            applySheets(to:
+                applyBottomSelectionBar(to:
+                    applyStateChangeHandlers(to: baseWardrobeView)
+                )
+            )
+        )
     }
 
     private var baseWardrobeView: some View {
@@ -249,6 +587,11 @@ struct WardrobeView: View {
         .toolbar {
         }
         .containerAdaptiveColors(background: .ultraThinMaterial)
+        .navigationDestination(isPresented: $isShowingDetailNavigation) {
+            if let detailNavigationTarget {
+                ClothingDetailView(clothing: detailNavigationTarget)
+            }
+        }
     }
 
     private func applyStateChangeHandlers<Content: View>(to content: Content) -> some View {
@@ -288,6 +631,13 @@ struct WardrobeView: View {
                     object: nil,
                     userInfo: ["selectedCount": newValue.count]
                 )
+            }
+            .task(id: filterSignature) {
+                await rebuildFilteredClothings()
+            }
+            .onDisappear {
+                visibleItemFrameUpdateTask?.cancel()
+                visibleItemFrameUpdateTask = nil
             }
     }
 
@@ -625,25 +975,7 @@ struct WardrobeView: View {
             let displayed = isReorderTrackingEnabled ? editableClothings : filtered
             let firstFilteredID = filtered.first?.id
             ZStack {
-                ScrollView {
-                    VStack(spacing: 8) {
-                        statsSection
-                            .padding(.horizontal, viewLayout == .grid6 ? 2 : 16)
-
-                        LazyVGrid(columns: gridColumns, spacing: viewLayout == .grid6 ? 2 : 16) {
-                            ForEach(displayed) { clothing in
-                                wardrobeGridCell(for: clothing, firstFilteredID: firstFilteredID)
-                            }
-                        }
-                        .animation(isEditing ? .default : nil, value: editableClothings)
-                        .padding(.horizontal, viewLayout == .grid6 ? 2 : 16)
-                        .padding(.bottom, 100)
-                    }
-                }
-                .onDrop(of: [UTType.text], isTargeted: nil) { _ in
-                    self.draggingItem = nil
-                    return true
-                }
+                gridScrollContent(displayed: displayed, firstFilteredID: firstFilteredID)
 
                 if isEditing {
                     VStack {
@@ -668,60 +1000,57 @@ struct WardrobeView: View {
     }
 
     @ViewBuilder
+    private func gridScrollContent(displayed: [Clothing], firstFilteredID: UUID?) -> some View {
+        if isReorderTrackingEnabled {
+            gridScrollBody(displayed: displayed, firstFilteredID: firstFilteredID)
+                .onDrop(of: [UTType.text], isTargeted: nil) { _ in
+                    self.draggingItem = nil
+                    return true
+                }
+                .onPreferenceChange(WardrobeVisibleItemFramePreferenceKey.self) { frames in
+                    scheduleVisibleItemFrameUpdate(frames)
+                }
+        } else {
+            gridScrollBody(displayed: displayed, firstFilteredID: firstFilteredID)
+        }
+    }
+
+    private func gridScrollBody(displayed: [Clothing], firstFilteredID: UUID?) -> some View {
+        ScrollView {
+            VStack(spacing: 8) {
+                statsSection
+                    .padding(.horizontal, viewLayout == .grid6 ? 2 : 16)
+
+                LazyVGrid(columns: gridColumns, spacing: viewLayout == .grid6 ? 2 : 16) {
+                    ForEach(displayed) { clothing in
+                        wardrobeGridCell(for: clothing, firstFilteredID: firstFilteredID)
+                    }
+                }
+                .animation(isEditing ? .default : nil, value: editableClothings)
+                .padding(.horizontal, viewLayout == .grid6 ? 2 : 16)
+                .padding(.bottom, 100)
+            }
+        }
+    }
+
+    @ViewBuilder
     private func wardrobeGridCell(for clothing: Clothing, firstFilteredID: UUID?) -> some View {
         if isSelectionMode {
-            ZStack(alignment: .topTrailing) {
-                clothingItemView(clothing: clothing, firstFilteredID: firstFilteredID)
-
-                Image(systemName: selectedItemIDs.contains(clothing.id) ? "checkmark.circle.fill" : "circle")
-                    .font(.title3)
-                    .foregroundStyle(selectedItemIDs.contains(clothing.id) ? .pink : .secondary)
-                    .background(Circle().fill(.white).padding(2))
-                    .shadow(radius: 1)
-                    .padding(8)
-            }
-            .contentShape(Rectangle())
-            .onTapGesture {
-                toggleSelection(clothing.id)
-            }
-            .onAppear {
-                if isReorderTrackingEnabled {
-                    visibleItemIDs.insert(clothing.id)
-                }
-            }
-            .onDisappear {
-                if isReorderTrackingEnabled {
-                    visibleItemIDs.remove(clothing.id)
-                }
-            }
-            .onDrag {
-                guard sortOption == .custom || isEditing else { return NSItemProvider() }
-                self.draggingItem = clothing
-                return NSItemProvider(object: clothing.id.uuidString as NSString)
-            }
-            .onDrop(of: [UTType.text], delegate: DropViewDelegate(item: clothing, items: $editableClothings, draggingItem: $draggingItem, isEditing: sortOption == .custom || isEditing, selectedItemIDs: selectedItemIDs))
+            selectionGridCell(for: clothing, firstFilteredID: firstFilteredID)
         } else if isEditing {
             ZStack(alignment: .topTrailing) {
                 clothingItemView(clothing: clothing, firstFilteredID: firstFilteredID)
             }
             .contentShape(Rectangle())
-            .onAppear {
-                if isReorderTrackingEnabled {
-                    visibleItemIDs.insert(clothing.id)
-                }
-            }
-            .onDisappear {
-                if isReorderTrackingEnabled {
-                    visibleItemIDs.remove(clothing.id)
-                }
-            }
             .onDrag {
                 self.draggingItem = clothing
                 return NSItemProvider(object: clothing.id.uuidString as NSString)
             }
             .onDrop(of: [UTType.text], delegate: DropViewDelegate(item: clothing, items: $editableClothings, draggingItem: $draggingItem, isEditing: true, selectedItemIDs: selectedItemIDs))
         } else {
-            NavigationLink(destination: ClothingDetailView(clothing: clothing)) {
+            Button {
+                openDetail(clothing)
+            } label: {
                 ZStack(alignment: .topTrailing) {
                     clothingItemView(clothing: clothing, firstFilteredID: firstFilteredID)
                 }
@@ -735,7 +1064,9 @@ struct WardrobeView: View {
                     Label("选择", systemImage: "checkmark.circle")
                 }
 
-                NavigationLink(destination: ClothingDetailView(clothing: clothing)) {
+                Button {
+                    openDetail(clothing)
+                } label: {
                     Label("查看详情", systemImage: "info.circle")
                 }
 
@@ -755,16 +1086,35 @@ struct WardrobeView: View {
                     Label("删除", systemImage: "trash")
                 }
             }
-            .onAppear {
-                if isReorderTrackingEnabled {
-                    visibleItemIDs.insert(clothing.id)
+        }
+    }
+
+    @ViewBuilder
+    private func selectionGridCell(for clothing: Clothing, firstFilteredID: UUID?) -> some View {
+        let cell = ZStack(alignment: .topTrailing) {
+            clothingItemView(clothing: clothing, firstFilteredID: firstFilteredID)
+
+            Image(systemName: selectedItemIDs.contains(clothing.id) ? "checkmark.circle.fill" : "circle")
+                .font(.title3)
+                .foregroundStyle(selectedItemIDs.contains(clothing.id) ? .pink : .secondary)
+                .background(Circle().fill(.white).padding(2))
+                .shadow(radius: 1)
+                .padding(8)
+        }
+        .contentShape(Rectangle())
+        .onTapGesture {
+            toggleSelection(clothing.id)
+        }
+
+        if isReorderTrackingEnabled {
+            cell
+                .onDrag {
+                    self.draggingItem = clothing
+                    return NSItemProvider(object: clothing.id.uuidString as NSString)
                 }
-            }
-            .onDisappear {
-                if isReorderTrackingEnabled {
-                    visibleItemIDs.remove(clothing.id)
-                }
-            }
+                .onDrop(of: [UTType.text], delegate: DropViewDelegate(item: clothing, items: $editableClothings, draggingItem: $draggingItem, isEditing: true, selectedItemIDs: selectedItemIDs))
+        } else {
+            cell
         }
     }
     
@@ -791,6 +1141,11 @@ struct WardrobeView: View {
         } else {
             selectedItemIDs.insert(id)
         }
+    }
+
+    private func openDetail(_ clothing: Clothing) {
+        detailNavigationTarget = clothing
+        isShowingDetailNavigation = true
     }
     
     private func deleteSelectedItems() {
@@ -1222,6 +1577,7 @@ struct WardrobeView: View {
 
             if showStats {
                 WardrobeStatsView(clothings: filteredClothings,
+                                  statsSummary: filteredStatsSummary,
                                   filterDescription: filterDescription,
                                   onClearFilter: onClearFilter)
                     .transition(.move(edge: .top).combined(with: .opacity))
@@ -1230,6 +1586,16 @@ struct WardrobeView: View {
     }
 
     private var listView: some View {
+        Group {
+            if isEditing {
+                editableListView
+            } else {
+                lazyListView
+            }
+        }
+    }
+
+    private var editableListView: some View {
         List {
             Section {
                 listContent
@@ -1242,6 +1608,24 @@ struct WardrobeView: View {
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
         .environment(\.editMode, .constant(isEditing ? .active : .inactive))
+    }
+
+    private var lazyListView: some View {
+        ScrollView {
+            LazyVStack(spacing: 0) {
+                statsSection
+                    .padding(.horizontal, viewLayout == .grid6 ? 2 : 16)
+                    .padding(.vertical, 8)
+
+                ForEach(filteredClothings) { clothing in
+                    listRow(for: clothing)
+                        .padding(.horizontal, 16)
+                }
+            }
+            .padding(.top, 8)
+            .padding(.bottom, 100)
+        }
+        .scrollIndicators(.hidden)
     }
 
     private var listContent: some View {
@@ -1297,23 +1681,18 @@ struct WardrobeView: View {
     }
 
     private func normalRow(for clothing: Clothing) -> some View {
-        ZStack {
+        Button {
+            openDetail(clothing)
+        } label: {
             VStack(spacing: 0) {
                 clothingRowView(clothing: clothing)
                 Divider()
                     .padding(.leading)
             }
-
-            NavigationLink(destination: ClothingDetailView(clothing: clothing)) {
-                EmptyView()
-            }
-            .opacity(0)
         }
+        .buttonStyle(.plain)
         .contextMenu {
             contextMenuItems(for: clothing)
-        }
-        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-            swipeActions(for: clothing)
         }
     }
 
@@ -1326,7 +1705,9 @@ struct WardrobeView: View {
                 Label("选择", systemImage: "checkmark.circle")
             }
 
-            NavigationLink(destination: ClothingDetailView(clothing: clothing)) {
+            Button {
+                openDetail(clothing)
+            } label: {
                 Label("查看详情", systemImage: "info.circle")
             }
 
@@ -1366,10 +1747,71 @@ struct WardrobeView: View {
             .tint(.blue)
         }
     }
+
+    @MainActor
+    private func rebuildFilteredClothings() async {
+        let snapshots = clothings.map(WardrobeClothingSnapshot.init(clothing:))
+        let cellSnapshots = Dictionary(uniqueKeysWithValues: clothings.map { clothing in
+            (clothing.id, WardrobeCellSnapshot(clothing: clothing))
+        })
+        let input = WardrobeFilterInput(
+            snapshots: snapshots,
+            searchText: searchText,
+            selectedTagIDs: selectedTagIDs,
+            selectedBrandIDs: selectedBrandIDs,
+            selectedTypes: selectedTypes,
+            selectedColors: selectedColors,
+            selectedSizes: selectedSizes,
+            selectedLengths: selectedLengths,
+            selectedConditions: selectedConditions,
+            selectedAccessories: selectedAccessories,
+            depositStatusFilterRawValue: depositStatusFilter.rawValue,
+            sortOptionRawValue: sortOption.rawValue
+        )
+
+        let result = await Task.detached(priority: .userInitiated) {
+            WardrobeFilterEngine.evaluate(input)
+        }.value
+
+        guard !Task.isCancelled else { return }
+
+        let clothingByID = Dictionary(uniqueKeysWithValues: clothings.map { ($0.id, $0) })
+        let resolvedClothings = result.ids.compactMap { clothingByID[$0] }
+
+        filteredClothings = resolvedClothings
+        cellSnapshotCache = cellSnapshots
+        filteredStatsSummary = result.stats
+        conditionBatchOptionsCache = result.conditionOptions
+
+        if isReorderTrackingEnabled && editableClothings.isEmpty {
+            editableClothings = resolvedClothings
+        }
+    }
+
+    private func scheduleVisibleItemFrameUpdate(_ frames: [UUID: CGRect]) {
+        guard isReorderTrackingEnabled else {
+            visibleItemFrameUpdateTask?.cancel()
+            visibleItemFrameUpdateTask = nil
+            return
+        }
+
+        visibleItemFrameUpdateTask?.cancel()
+        visibleItemFrameUpdateTask = Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 2_000_000_000)
+            guard !Task.isCancelled, isReorderTrackingEnabled else { return }
+
+            let expandedScreenBounds = UIScreen.main.bounds.insetBy(dx: -32, dy: -160)
+            let visibleIDs = frames.compactMap { id, frame in
+                expandedScreenBounds.intersects(frame) ? id : nil
+            }
+            visibleItemIDs = Set(visibleIDs)
+        }
+    }
 }
 
 struct WardrobeStatsView: View {
     let clothings: [Clothing]
+    let statsSummary: WardrobeStatsSummary
     var filterDescription: String? = nil
     var onClearFilter: (() -> Void)? = nil
     
@@ -1387,19 +1829,19 @@ struct WardrobeStatsView: View {
     @State private var showDailyCheckIn = false
     
     var styleCount: Int {
-        clothings.count
+        statsSummary.styleCount
     }
     
     var totalCount: Int {
-        clothings.reduce(0) { $0 + $1.stock }
+        statsSummary.totalCount
     }
     
     var dressValue: Decimal {
-        clothings.reduce(0) { $0 + ($1.price * Decimal($1.stock)) }
+        statsSummary.dressValue
     }
 
     var totalValue: Decimal {
-        clothings.reduce(Decimal(0)) { $0 + $1.inventoryTotalPrice }
+        statsSummary.totalValue
     }
 
     // 将Decimal格式化为整数（个位精度）的字符串
@@ -1597,7 +2039,7 @@ struct DropViewDelegate: DropDelegate {
         // 如果目标项也是选中项之一，则不进行重排（因为它们是一体的）
         if selectedItemIDs.contains(targetItem.id) { return }
         
-        guard let targetIndex = items.firstIndex(where: { $0.id == targetItem.id }) else { return }
+        guard items.contains(where: { $0.id == targetItem.id }) else { return }
         
         // 1. 提取所有选中的项目，并保持它们在原数组中的相对顺序（如果需要保持相对顺序）
         // 或者简单地按当前 items 中的顺序提取

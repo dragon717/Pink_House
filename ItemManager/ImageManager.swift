@@ -61,26 +61,26 @@ class ImageManager {
         var limitInMB: Int
         
         if useAggressiveMemoryOptimization {
-            // 积极模式：大幅降低缓存上限，优先保证不崩溃
+            // 积极模式仍需保证衣橱 300+ 条滚动命中率；缩略图单张成本很低，过小 countLimit 会反复解码导致明显卡顿。
             if totalMemory <= 2 * 1024 * 1024 * 1024 { // <= 2GB (iPhone 8, X, XR, SE2 etc)
-                limitInMB = 20 // 极小缓存，防止OOM
-                memoryCache.countLimit = 20
+                limitInMB = 40
+                memoryCache.countLimit = 60
             } else if totalMemory <= 4 * 1024 * 1024 * 1024 { // <= 4GB (iPhone 11, 12, 13 non-pro)
-                limitInMB = 50
-                memoryCache.countLimit = 40
-            } else {
-                limitInMB = 100
+                limitInMB = 80
                 memoryCache.countLimit = 80
+            } else {
+                limitInMB = 160
+                memoryCache.countLimit = 160
             }
             AppLogger.info("Memory Optimization: Aggressive Mode Enabled (Limit: \(limitInMB)MB)")
         } else {
             // 标准模式：利用更多内存换取流畅度
             if totalMemory <= 2 * 1024 * 1024 * 1024 { // <= 2GB
-                limitInMB = 50
-                memoryCache.countLimit = 50
+                limitInMB = 60
+                memoryCache.countLimit = 80
             } else if totalMemory <= 4 * 1024 * 1024 * 1024 { // <= 4GB
                 limitInMB = 150
-                memoryCache.countLimit = 100
+                memoryCache.countLimit = 160
             } else {
                 limitInMB = 300
                 memoryCache.countLimit = 200
@@ -655,6 +655,8 @@ class ImageManager {
         if let cachedImage = memoryCache.object(forKey: cacheKey) {
             return cachedImage
         }
+
+        if Task.isCancelled { return nil }
         
         // Capture URL on MainActor
         let fileURL = imagesDirectory.appendingPathComponent(fileName)
@@ -673,20 +675,29 @@ class ImageManager {
         
         // Load in background
         let scale = UIScreen.main.scale
-        let image = await Task.detached(priority: .userInitiated) {
+        let image = await Task.detached(priority: .userInitiated) { () -> UIImage? in
+            if Task.isCancelled { return nil }
+
             if let targetSize = targetSize {
                 // Downsampling path
-                return self.downsample(imageAt: fileURL, to: targetSize, scale: scale)
+                guard let downsampled = self.downsample(imageAt: fileURL, to: targetSize, scale: scale) else {
+                    return nil
+                }
+                if Task.isCancelled { return nil }
+                return self.forceDecode(downsampled, targetSize: targetSize)
             } else {
                 // Normal load path
                 guard let data = try? Data(contentsOf: fileURL),
                       let loadedImage = UIImage(data: data) else {
                     return nil
                 }
+                if Task.isCancelled { return nil }
                 // Force decode
-                return self.forceDecode(loadedImage)
+                return self.forceDecode(loadedImage, targetSize: nil)
             }
         }.value
+
+        if Task.isCancelled { return nil }
         
         // Cache back on MainActor
         if let image = image {
@@ -749,19 +760,22 @@ class ImageManager {
     }
     
     /// Force decode image on background thread
-    private nonisolated func forceDecode(_ image: UIImage) -> UIImage? {
-        // Optimization: Skip force decode on low memory devices to save RAM
-        // Force decoding decompresses the entire image into memory (bitmap), which can be huge.
-        // On modern iOS, UIKit handles lazy decoding reasonably well, so skipping this on
-        // constrained devices is a good trade-off.
+    private nonisolated func forceDecode(_ image: UIImage, targetSize: CGSize?) -> UIImage? {
+        // 列表缩略图（≤200×200pt）即使在低内存设备上也提前解码，避免首显时把解码成本甩回主线程。
+        // 大图仍在 ≤2GB 设备上保持懒解码，避免详情页/图表瞬时展开过大的 bitmap。
         let totalMemory = ProcessInfo.processInfo.physicalMemory
-        if totalMemory <= 2 * 1024 * 1024 * 1024 { // <= 2GB
-             return image // Just return the image, let UIKit decode it when displaying
+        if totalMemory <= 2 * 1024 * 1024 * 1024, !shouldForceDecodeOnLowMemoryDevice(targetSize: targetSize) {
+            return image
         }
         
         // Use normalized(forceCopy: true) to fix orientation AND force decode (render to bitmap)
         // This ensures the image is loaded into memory and orientation is applied correctly
         return image.normalized(forceCopy: true)
+    }
+
+    private nonisolated func shouldForceDecodeOnLowMemoryDevice(targetSize: CGSize?) -> Bool {
+        guard let targetSize else { return false }
+        return targetSize.width * targetSize.height <= 200 * 200
     }
     
     private func convertImage(_ image: UIImage, format: ImageFormat) -> Data? {
