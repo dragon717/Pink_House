@@ -328,7 +328,9 @@ struct ClothingCard: View, Equatable {
                             return
                         }
                         if Task.isCancelled { return }
-                        self.image = await ImageManager.shared.loadImageAsync(fileName: imagePath, targetSize: size)
+                        let loadedImage = await ImageManager.shared.loadImageAsync(fileName: imagePath, targetSize: size, priority: .userInitiated)
+                        if Task.isCancelled { return }
+                        self.image = loadedImage
                     } else {
                         // 当图片被全部删除时，清空 image 以显示占位图
                         self.image = nil
@@ -440,7 +442,9 @@ struct ClothingThumbnail: View, Equatable {
                     return
                 }
                 if Task.isCancelled { return }
-                self.image = await ImageManager.shared.loadImageAsync(fileName: imagePath, targetSize: size)
+                let loadedImage = await ImageManager.shared.loadImageAsync(fileName: imagePath, targetSize: size, priority: .userInitiated)
+                if Task.isCancelled { return }
+                self.image = loadedImage
             } else {
                 // 当图片被全部删除时，清空 image 以显示占位图
                 self.image = nil
@@ -543,11 +547,25 @@ struct ClothingRow: View, Equatable {
     @Environment(\.containerPalette) private var palette
     @State private var image: UIImage?
 
+    @MainActor
     init(
         snapshot: WardrobeCellSnapshot,
         showPrice: Bool = UserDefaults.standard.object(forKey: "privacyShowPrice") as? Bool ?? true,
-        showOriginalPrice: Bool = UserDefaults.standard.object(forKey: "privacyShowOriginalPrice") as? Bool ?? true,
-        wardrobeThemeDescriptor: ThemeSkinDescriptor? = ThemeSkinManager.shared.descriptor(for: .wardrobeItemCard)
+        showOriginalPrice: Bool = UserDefaults.standard.object(forKey: "privacyShowOriginalPrice") as? Bool ?? true
+    ) {
+        self.init(
+            snapshot: snapshot,
+            showPrice: showPrice,
+            showOriginalPrice: showOriginalPrice,
+            wardrobeThemeDescriptor: ThemeSkinManager.shared.descriptor(for: .wardrobeItemCard)
+        )
+    }
+
+    init(
+        snapshot: WardrobeCellSnapshot,
+        showPrice: Bool,
+        showOriginalPrice: Bool,
+        wardrobeThemeDescriptor: ThemeSkinDescriptor?
     ) {
         self.snapshot = snapshot
         self.showPrice = showPrice
@@ -559,8 +577,21 @@ struct ClothingRow: View, Equatable {
     init(
         clothing: Clothing,
         showPrice: Bool = UserDefaults.standard.object(forKey: "privacyShowPrice") as? Bool ?? true,
-        showOriginalPrice: Bool = UserDefaults.standard.object(forKey: "privacyShowOriginalPrice") as? Bool ?? true,
-        wardrobeThemeDescriptor: ThemeSkinDescriptor? = ThemeSkinManager.shared.descriptor(for: .wardrobeItemCard)
+        showOriginalPrice: Bool = UserDefaults.standard.object(forKey: "privacyShowOriginalPrice") as? Bool ?? true
+    ) {
+        self.init(
+            snapshot: WardrobeCellSnapshot(clothing: clothing),
+            showPrice: showPrice,
+            showOriginalPrice: showOriginalPrice
+        )
+    }
+
+    @MainActor
+    init(
+        clothing: Clothing,
+        showPrice: Bool,
+        showOriginalPrice: Bool,
+        wardrobeThemeDescriptor: ThemeSkinDescriptor?
     ) {
         self.init(
             snapshot: WardrobeCellSnapshot(clothing: clothing),
@@ -618,7 +649,9 @@ struct ClothingRow: View, Equatable {
                             return
                         }
                         if Task.isCancelled { return }
-                        self.image = await ImageManager.shared.loadImageAsync(fileName: firstPath, targetSize: size)
+                        let loadedImage = await ImageManager.shared.loadImageAsync(fileName: firstPath, targetSize: size, priority: .userInitiated)
+                        if Task.isCancelled { return }
+                        self.image = loadedImage
                     } else {
                         // 当图片被全部删除时，清空 image 以显示占位图
                         self.image = nil
@@ -732,11 +765,25 @@ struct ClothingRowBrief: View, Equatable {
     @Environment(\.containerPalette) private var palette
     @State private var image: UIImage?
 
+    @MainActor
     init(
         snapshot: WardrobeCellSnapshot,
         showPrice: Bool = UserDefaults.standard.object(forKey: "privacyShowPrice") as? Bool ?? true,
-        showOriginalPrice: Bool = UserDefaults.standard.object(forKey: "privacyShowOriginalPrice") as? Bool ?? true,
-        wardrobeThemeDescriptor: ThemeSkinDescriptor? = ThemeSkinManager.shared.descriptor(for: .wardrobeItemCard)
+        showOriginalPrice: Bool = UserDefaults.standard.object(forKey: "privacyShowOriginalPrice") as? Bool ?? true
+    ) {
+        self.init(
+            snapshot: snapshot,
+            showPrice: showPrice,
+            showOriginalPrice: showOriginalPrice,
+            wardrobeThemeDescriptor: ThemeSkinManager.shared.descriptor(for: .wardrobeItemCard)
+        )
+    }
+
+    init(
+        snapshot: WardrobeCellSnapshot,
+        showPrice: Bool,
+        showOriginalPrice: Bool,
+        wardrobeThemeDescriptor: ThemeSkinDescriptor?
     ) {
         self.snapshot = snapshot
         self.showPrice = showPrice
@@ -748,8 +795,21 @@ struct ClothingRowBrief: View, Equatable {
     init(
         clothing: Clothing,
         showPrice: Bool = UserDefaults.standard.object(forKey: "privacyShowPrice") as? Bool ?? true,
-        showOriginalPrice: Bool = UserDefaults.standard.object(forKey: "privacyShowOriginalPrice") as? Bool ?? true,
-        wardrobeThemeDescriptor: ThemeSkinDescriptor? = ThemeSkinManager.shared.descriptor(for: .wardrobeItemCard)
+        showOriginalPrice: Bool = UserDefaults.standard.object(forKey: "privacyShowOriginalPrice") as? Bool ?? true
+    ) {
+        self.init(
+            snapshot: WardrobeCellSnapshot(clothing: clothing),
+            showPrice: showPrice,
+            showOriginalPrice: showOriginalPrice
+        )
+    }
+
+    @MainActor
+    init(
+        clothing: Clothing,
+        showPrice: Bool,
+        showOriginalPrice: Bool,
+        wardrobeThemeDescriptor: ThemeSkinDescriptor?
     ) {
         self.init(
             snapshot: WardrobeCellSnapshot(clothing: clothing),
@@ -811,7 +871,9 @@ struct ClothingRowBrief: View, Equatable {
                         return
                     }
                     if Task.isCancelled { return }
-                    self.image = await ImageManager.shared.loadImageAsync(fileName: firstPath, targetSize: size)
+                    let loadedImage = await ImageManager.shared.loadImageAsync(fileName: firstPath, targetSize: size, priority: .userInitiated)
+                    if Task.isCancelled { return }
+                    self.image = loadedImage
                 }
                 
                 Text(snapshot.name)

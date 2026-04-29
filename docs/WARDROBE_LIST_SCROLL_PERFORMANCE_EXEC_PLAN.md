@@ -3,6 +3,7 @@
 > 状态：**2026-04-29 已执行 P0 + P0.5 首轮落地**。后续每一阶段（P0/P1/P2）仍需对照本文档的"硬约束"和"验收门槛"逐条勾选。
 > 已落地点：DEBUG 压测入口、cell 热路径清理、过滤/统计缓存、轻量 `WardrobeCellSnapshot`、list 模式 `ScrollView + LazyVStack`、衣橱主题 cell 滚动优化容器。
 > 2026-04-29 追加：300 条真实数据仍卡时，继续移除滚动 cell 内 `ClothingDetailView` 导航图、常态 grid drop/preference 监听、非自定义排序选择态 drag/drop，并降低 cell 阴影/主题标题/主题角标成本；缩略图 NSCache aggressive 档上调。
+> 2026-04-30 追加：图片管线增加 `ImageDecodeSemaphore` 限制缩略图并发解码、按 cacheKey 去重 in-flight 请求，并在衣橱过滤结果/布局变化后后台预热首屏图片。
 > 范围：`ItemManager/Views/WardrobeView.swift`、`ItemManager/Views/ClothingCard.swift`、`ItemManager/ImageManager.swift`、以及衣橱主题 cell 容器 `ItemManager/Views/ThemeSkin/WardrobeThemeSkinComponents.swift`。
 > 不动：SwiftData schema、`Clothing` / `StoredImage` / `BookGroup` 模型字段、iCloud 同步链路、主题皮肤资产清单、引导锚点 API（`captureGuideTarget`）。
 

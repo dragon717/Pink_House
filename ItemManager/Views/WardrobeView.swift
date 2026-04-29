@@ -651,6 +651,9 @@ struct WardrobeView: View {
             .task(id: filterSignature) {
                 await rebuildFilteredClothings()
             }
+            .onChange(of: viewLayout) { _, _ in
+                prefetchInitialWardrobeImages(filteredClothings)
+            }
             .onDisappear {
                 visibleItemFrameUpdateTask?.cancel()
                 visibleItemFrameUpdateTask = nil
@@ -1781,10 +1784,57 @@ struct WardrobeView: View {
         cellSnapshotCache = cellSnapshots
         filteredStatsSummary = result.stats
         conditionBatchOptionsCache = result.conditionOptions
+        prefetchInitialWardrobeImages(resolvedClothings, snapshots: cellSnapshots)
 
         if isReorderTrackingEnabled && editableClothings.isEmpty {
             editableClothings = resolvedClothings
         }
+    }
+
+    private var wardrobeCellImageTargetSize: CGSize {
+        switch viewLayout {
+        case .grid2, .grid3:
+            return CGSize(width: 200, height: 200)
+        case .grid6:
+            return CGSize(width: 80, height: 80)
+        case .listDetailed:
+            return CGSize(width: 60, height: 60)
+        case .listBrief:
+            return CGSize(width: 50, height: 50)
+        }
+    }
+
+    private var initialImagePrefetchLimit: Int {
+        switch viewLayout {
+        case .grid2:
+            return 12
+        case .grid3:
+            return 18
+        case .grid6:
+            return 48
+        case .listBrief, .listDetailed:
+            return 18
+        }
+    }
+
+    private func prefetchInitialWardrobeImages(
+        _ clothings: [Clothing],
+        snapshots: [UUID: WardrobeCellSnapshot]? = nil
+    ) {
+        guard !clothings.isEmpty else { return }
+
+        let limit = initialImagePrefetchLimit
+        let snapshotSource = snapshots ?? cellSnapshotCache
+        let fileNames = clothings
+            .prefix(limit * 2)
+            .compactMap { snapshotSource[$0.id]?.firstImagePath }
+
+        ImageManager.shared.prefetchImages(
+            fileNames: fileNames,
+            targetSize: wardrobeCellImageTargetSize,
+            limit: limit,
+            priority: .background
+        )
     }
 
     private func scheduleVisibleItemFrameUpdate(_ frames: [UUID: CGRect]) {
