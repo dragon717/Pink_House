@@ -196,31 +196,48 @@ final class ClothingEditDraftManager: ObservableObject {
         print("DraftManager: Active editor unregistered, count: \(activeEditorTokens.count)")
     }
 
-    func saveDraft(_ draft: ClothingEditDraft) {
+    func saveDraft(_ draft: ClothingEditDraft, reason: String = "direct") {
         print("DraftManager: Saving draft with ID: \(draft.id), images: \(draft.imagePaths.count)")
         currentDraft = draft
-        if let data = try? JSONEncoder().encode(draft) {
+        do {
+            let data = try JSONEncoder().encode(draft)
             userDefaults.set(data, forKey: draftKey)
             userDefaults.set(draft.id.uuidString, forKey: draftIDKey)
             userDefaults.synchronize()
             hasPersistedDraft = true
+            DraftReliabilitySignpost.draftSave(
+                scope: "create",
+                draftID: draft.id,
+                imageCount: draft.imagePaths.count,
+                tagCount: draft.selectedTags.count,
+                byteSize: data.count,
+                reason: reason
+            )
             print("DraftManager: Draft saved successfully")
-        } else {
-            print("DraftManager: Failed to encode draft")
+        } catch {
+            DraftReliabilitySignpost.draftSaveFailed(scope: "create", error: error)
+            AppLogger.error("DraftReliability: Failed to encode create draft: \(error)")
+            print("DraftManager: Failed to encode draft: \(error)")
         }
     }
 
     func loadDraft() -> ClothingEditDraft? {
         guard let data = userDefaults.data(forKey: draftKey) else {
             print("DraftManager: No draft data found in UserDefaults")
+            DraftReliabilitySignpost.draftLoad(scope: "create", source: "none", draftID: nil, imageCount: 0)
             return nil
         }
-        guard let draft = try? JSONDecoder().decode(ClothingEditDraft.self, from: data) else {
-            print("DraftManager: Failed to decode draft data")
+        do {
+            let draft = try JSONDecoder().decode(ClothingEditDraft.self, from: data)
+            DraftReliabilitySignpost.draftLoad(scope: "create", source: "userdefaults_persisted", draftID: draft.id, imageCount: draft.imagePaths.count)
+            print("DraftManager: Loaded draft with ID: \(draft.id), images: \(draft.imagePaths.count)")
+            return draft
+        } catch {
+            DraftReliabilitySignpost.draftLoad(scope: "create", source: "decode_failed", draftID: nil, imageCount: 0)
+            AppLogger.error("DraftReliability: Failed to decode create draft: \(error)")
+            print("DraftManager: Failed to decode draft data: \(error)")
             return nil
         }
-        print("DraftManager: Loaded draft with ID: \(draft.id), images: \(draft.imagePaths.count)")
-        return draft
     }
 
     func loadDraftID() -> UUID? {
@@ -243,6 +260,7 @@ final class ClothingEditDraftManager: ObservableObject {
         userDefaults.removeObject(forKey: draftIDKey)
         userDefaults.synchronize()
         hasPersistedDraft = false
+        DraftReliabilitySignpost.draftClear(scope: "create", reason: "clearDraft")
         print("DraftManager: Draft cleared")
     }
 
@@ -259,35 +277,53 @@ final class ClothingEditDraftManager: ObservableObject {
         print("DraftManager: Updated editing draft for clothing: \(clothingID), images: \(draft.imagePaths.count)")
     }
 
-    func saveEditingDraft(_ draft: ClothingEditDraft, for clothingID: UUID) {
+    func saveEditingDraft(_ draft: ClothingEditDraft, for clothingID: UUID, reason: String = "direct") {
         currentEditingDrafts[clothingID] = draft
         print("DraftManager: Saving editing draft for clothing: \(clothingID), images: \(draft.imagePaths.count)")
-        if let data = try? JSONEncoder().encode(draft) {
+        do {
+            let data = try JSONEncoder().encode(draft)
             userDefaults.set(data, forKey: editingDraftKey(for: clothingID))
             userDefaults.synchronize()
+            DraftReliabilitySignpost.draftSave(
+                scope: "edit",
+                draftID: draft.id,
+                imageCount: draft.imagePaths.count,
+                tagCount: draft.selectedTags.count,
+                byteSize: data.count,
+                reason: "\(reason):\(clothingID.uuidString)"
+            )
             print("DraftManager: Editing draft saved successfully")
-        } else {
-            print("DraftManager: Failed to encode editing draft")
+        } catch {
+            DraftReliabilitySignpost.draftSaveFailed(scope: "edit:\(clothingID.uuidString)", error: error)
+            AppLogger.error("DraftReliability: Failed to encode editing draft for \(clothingID): \(error)")
+            print("DraftManager: Failed to encode editing draft: \(error)")
         }
     }
 
     func loadEditingDraft(for clothingID: UUID) -> ClothingEditDraft? {
         if let draft = currentEditingDrafts[clothingID] {
             print("DraftManager: Loaded in-memory editing draft for clothing: \(clothingID), images: \(draft.imagePaths.count)")
+            DraftReliabilitySignpost.draftLoad(scope: "edit", source: "memory_currentDraft", draftID: draft.id, imageCount: draft.imagePaths.count)
             return draft
         }
 
         guard let data = userDefaults.data(forKey: editingDraftKey(for: clothingID)) else {
             print("DraftManager: No editing draft found for clothing: \(clothingID)")
+            DraftReliabilitySignpost.draftLoad(scope: "edit", source: "none", draftID: nil, imageCount: 0)
             return nil
         }
-        guard let draft = try? JSONDecoder().decode(ClothingEditDraft.self, from: data) else {
-            print("DraftManager: Failed to decode editing draft for clothing: \(clothingID)")
+        do {
+            let draft = try JSONDecoder().decode(ClothingEditDraft.self, from: data)
+            currentEditingDrafts[clothingID] = draft
+            DraftReliabilitySignpost.draftLoad(scope: "edit", source: "userdefaults_editing", draftID: draft.id, imageCount: draft.imagePaths.count)
+            print("DraftManager: Loaded persisted editing draft for clothing: \(clothingID), images: \(draft.imagePaths.count)")
+            return draft
+        } catch {
+            DraftReliabilitySignpost.draftLoad(scope: "edit", source: "decode_failed", draftID: nil, imageCount: 0)
+            AppLogger.error("DraftReliability: Failed to decode editing draft for \(clothingID): \(error)")
+            print("DraftManager: Failed to decode editing draft for clothing: \(clothingID): \(error)")
             return nil
         }
-        currentEditingDrafts[clothingID] = draft
-        print("DraftManager: Loaded persisted editing draft for clothing: \(clothingID), images: \(draft.imagePaths.count)")
-        return draft
     }
 
     func clearEditingDraft(for clothingID: UUID) {
@@ -295,6 +331,7 @@ final class ClothingEditDraftManager: ObservableObject {
         currentEditingDrafts.removeValue(forKey: clothingID)
         userDefaults.removeObject(forKey: editingDraftKey(for: clothingID))
         userDefaults.synchronize()
+        DraftReliabilitySignpost.draftClear(scope: "edit", reason: clothingID.uuidString)
         print("DraftManager: Editing draft cleared")
     }
 
@@ -302,7 +339,7 @@ final class ClothingEditDraftManager: ObservableObject {
         if let draft = currentDraft {
             if draft.hasMeaningfulData {
                 print("DraftManager: Persisting current new draft, reason: \(reason), images: \(draft.imagePaths.count)")
-                saveDraft(draft)
+                saveDraft(draft, reason: reason)
             } else {
                 print("DraftManager: Skip empty current new draft, reason: \(reason)")
             }
@@ -313,7 +350,7 @@ final class ClothingEditDraftManager: ObservableObject {
         let editingDraftsToPersist = currentEditingDrafts
         for (clothingID, draft) in editingDraftsToPersist {
             print("DraftManager: Persisting editing draft, reason: \(reason), clothing: \(clothingID)")
-            saveEditingDraft(draft, for: clothingID)
+            saveEditingDraft(draft, for: clothingID, reason: reason)
         }
     }
 
@@ -331,7 +368,7 @@ struct ClothingEditView: View {
     // 统一使用 deletedAt == nil 作为未删除的判断条件，与其他视图保持一致
     @Query(filter: #Predicate<Clothing> { $0.deletedAt == nil }) private var allClothings: [Clothing]
     @ObservedObject private var visibilityManager = FieldVisibilityManager.shared
-    @State private var draftManager = ClothingEditDraftManager.shared
+    @ObservedObject private var draftManager = ClothingEditDraftManager.shared
 
     @State private var clothing: Clothing?
     @State private var draftID: UUID = UUID()
@@ -402,6 +439,11 @@ struct ClothingEditView: View {
     // 标记是否已经因前后台/失活持久化过（避免onDisappear重复保存草稿）
     @State private var didPersistForLifecycle = false
     @State private var editorSessionID = UUID()
+    @State private var hasUserTouchedAnyField = false
+    @State private var isReadyForUserDraftChanges = false
+    @State private var pendingDraftSaveTask: Task<Void, Never>?
+    @State private var suppressNextDraftObservationAsSystemChange = false
+    @State private var programmaticDraftObservationKey: DraftObservationKey?
 
     // Toast 提示状态
     @State private var showToast = false
@@ -627,20 +669,17 @@ struct ClothingEditView: View {
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
                 Button("取消") {
+                    cancelPendingDraftSave()
                     isCancelling = true
-                    // 取消时如果有有效信息则保存草稿，方便用户下次恢复
-                    // 注意：保存草稿后不能删除图片文件，否则恢复草稿时图片会丢失
-                    if !isEditing && hasMeaningfulData() {
-                        print("ClothingEditView: Cancel with meaningful data, saving draft")
-                        saveCurrentStateAsDraft()
-                        // 草稿已保存，图片文件需要保留以便恢复时使用
-                    } else if !isEditing {
-                        // 只有在没有保存草稿的情况下，才清理已上传的图片
-                        print("ClothingEditView: Cancel without saving draft, deleting images")
-                        for path in imagePaths {
-                            ImageManager.shared.deleteImage(fileName: path, context: modelContext)
+                    // 取消时如果有有效信息或用户碰过任一字段，则保存草稿，方便用户下次恢复。
+                    // 注意：创建模式取消不再清理 UserDefaults 草稿；只有“手动创建”入口负责清旧草稿。
+                    if !isEditing {
+                        if shouldKeepCreateDraft {
+                            print("ClothingEditView: Cancel create with draft-worthy data, saving draft")
+                            saveCurrentStateAsDraft(reason: "cancel-create")
+                        } else {
+                            print("ClothingEditView: Cancel empty untouched create form, keeping existing draft state unchanged")
                         }
-                        draftManager.clearDraft()
                     } else if let clothingID = clothing?.id {
                         draftManager.clearEditingDraft(for: clothingID)
                     }
@@ -650,6 +689,7 @@ struct ClothingEditView: View {
 
             ToolbarItem(placement: .confirmationAction) {
                 Button("保存") {
+                    cancelPendingDraftSave()
                     // 标记为保存操作
                     isSaving = true
                     // 保存前清除草稿
@@ -681,6 +721,7 @@ struct ClothingEditView: View {
             }
         }
         .onAppear {
+            DraftReliabilitySignpost.editorInit(isEditing: isEditing, continueFromDraft: continueFromDraft, sessionID: editorSessionID)
             draftManager.registerActiveEditor(editorSessionID)
             initializeEditorIfNeeded()
             Task { await refreshJPYRateForEditor() }
@@ -688,28 +729,59 @@ struct ClothingEditView: View {
         .onChange(of: imagePaths) { oldValue, newValue in
             print("ClothingEditView: imagePaths changed from \(oldValue.count) to \(newValue.count) images")
             didPersistForLifecycle = false
+            if isReadyForUserDraftChanges {
+                hasUserTouchedAnyField = true
+            }
             // 更新当前草稿到管理器
             updateCurrentDraft()
             // 图片变化后立即保存草稿到磁盘，防止丢失
             if !isEditing {
                 print("ClothingEditView: Image paths changed, immediately saving draft to disk")
-                saveCurrentStateAsDraft()
+                saveCurrentStateAsDraft(reason: "imagePaths")
             } else {
-                saveCurrentStateAsDraft()
+                saveCurrentStateAsDraft(reason: "imagePaths")
             }
         }
         .onChange(of: draftObservationKey) { oldValue, newValue in
             didPersistForLifecycle = false
             updateCurrentDraft()
+            if let programmaticKey = programmaticDraftObservationKey {
+                programmaticDraftObservationKey = nil
+                if newValue == programmaticKey {
+                    print("ClothingEditView: Draft observation changed from initial restore, not marking as user touch")
+                    return
+                }
+            }
+            if suppressNextDraftObservationAsSystemChange {
+                suppressNextDraftObservationAsSystemChange = false
+                print("ClothingEditView: Draft observation changed from system sync, not marking as user touch")
+                return
+            }
+            guard isReadyForUserDraftChanges else {
+                print("ClothingEditView: Draft observation changed during initialization, not marking as user touch")
+                return
+            }
+            hasUserTouchedAnyField = true
             let chartChanged =
                 oldValue.sizeChartImagePath != newValue.sizeChartImagePath ||
                 oldValue.priceChartImagePath != newValue.priceChartImagePath
-            if chartChanged { saveCurrentStateAsDraft() }
+            if chartChanged {
+                cancelPendingDraftSave()
+                saveCurrentStateAsDraft(reason: "chart-change")
+            } else {
+                scheduleDebouncedDraftSave(reason: "field-change")
+            }
         }
         .onChange(of: jpyExchangeRate) { _, _ in
+            let previousObservationKey = draftObservationKey
+            suppressNextDraftObservationAsSystemChange = true
             syncCurrencyAmountsFromPreferredCurrency()
+            if previousObservationKey == draftObservationKey {
+                suppressNextDraftObservationAsSystemChange = false
+            }
         }
         .onChange(of: scenePhase) { _, newPhase in
+            DraftReliabilitySignpost.scenePhase("\(newPhase)", reason: "scenePhase-change")
             if newPhase == .active {
                 didPersistForLifecycle = false
                 return
@@ -721,16 +793,18 @@ struct ClothingEditView: View {
         // 监听应用进入后台通知，设置标记避免重复保存
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.didEnterBackgroundNotification)) { _ in
             print("ClothingEditView: App did enter background")
+            DraftReliabilitySignpost.scenePhase("didEnterBackgroundNotification", reason: "notification")
             persistCurrentStateForLifecycle(reason: "didEnterBackgroundNotification")
         }
         .onDisappear {
             print("ClothingEditView: onDisappear")
             draftManager.unregisterActiveEditor(editorSessionID)
+            cancelPendingDraftSave()
             // 如果不是保存/明确取消，且没有因前后台/失活保存过，则保留当前快照。
-            let shouldSaveDraft = !isSaving && !isCancelling && !didPersistForLifecycle
+            let shouldSaveDraft = !isSaving && !isCancelling && !didPersistForLifecycle && (isEditing || shouldKeepCreateDraft)
             if shouldSaveDraft {
                 print("ClothingEditView: Saving draft on disappear")
-                saveCurrentStateAsDraft()
+                saveCurrentStateAsDraft(reason: "onDisappear")
             } else {
                 print("ClothingEditView: Not saving draft on disappear")
             }
@@ -745,14 +819,39 @@ struct ClothingEditView: View {
 
     // MARK: - Helpers
 
+    private var shouldKeepCreateDraft: Bool {
+        hasMeaningfulData() || hasUserTouchedAnyField
+    }
+
+    private func scheduleDebouncedDraftSave(reason: String) {
+        cancelPendingDraftSave()
+        pendingDraftSaveTask = Task { @MainActor in
+            do {
+                try await Task.sleep(nanoseconds: 500_000_000)
+            } catch {
+                return
+            }
+            guard !Task.isCancelled else { return }
+            saveCurrentStateAsDraft(reason: reason)
+            pendingDraftSaveTask = nil
+        }
+    }
+
+    private func cancelPendingDraftSave() {
+        pendingDraftSaveTask?.cancel()
+        pendingDraftSaveTask = nil
+    }
+
     private func initializeEditorIfNeeded() {
         print("ClothingEditView: onAppear triggered, isEditing: \(isEditing), draftID: \(draftID), continueFromDraft: \(continueFromDraft), hasProcessedDraft: \(hasProcessedDraft)")
 
         // 防止多次处理草稿逻辑
         guard !hasProcessedDraft else {
             print("ClothingEditView: Draft already processed, skipping")
+            isReadyForUserDraftChanges = true
             return
         }
+        isReadyForUserDraftChanges = false
         hasProcessedDraft = true
 
         // 加载自动补全数据
@@ -782,6 +881,12 @@ struct ClothingEditView: View {
 
         // 更新当前草稿到管理器（用于失活/后台保存）
         updateCurrentDraft()
+        hasUserTouchedAnyField = false
+        programmaticDraftObservationKey = draftObservationKey
+        Task { @MainActor in
+            await Task.yield()
+            isReadyForUserDraftChanges = true
+        }
     }
 
     private func loadFromClothing(_ c: Clothing) {
@@ -904,12 +1009,13 @@ struct ClothingEditView: View {
     }
 
     private func persistCurrentStateForLifecycle(reason: String) {
+        cancelPendingDraftSave()
         guard !isSaving, !isCancelling else { return }
-        guard isEditing || hasMeaningfulData() else {
-            print("ClothingEditView: Skip lifecycle draft save, no meaningful data, reason: \(reason)")
+        guard isEditing || shouldKeepCreateDraft else {
+            print("ClothingEditView: Skip lifecycle draft save, no meaningful data or user touch, reason: \(reason)")
             return
         }
-        saveCurrentStateAsDraft()
+        saveCurrentStateAsDraft(reason: reason)
         didPersistForLifecycle = true
     }
 
@@ -922,13 +1028,13 @@ struct ClothingEditView: View {
     }
 
     // 保存当前状态为草稿
-    private func saveCurrentStateAsDraft() {
-        print("ClothingEditView: saveCurrentStateAsDraft called, draftID: \(draftID), imagePaths count: \(imagePaths.count), name: \(name)")
+    private func saveCurrentStateAsDraft(reason: String = "direct") {
+        print("ClothingEditView: saveCurrentStateAsDraft called, reason: \(reason), draftID: \(draftID), imagePaths count: \(imagePaths.count), name: \(name)")
         let draft = makeCurrentDraft()
         if let clothingID = clothing?.id {
-            draftManager.saveEditingDraft(draft, for: clothingID)
+            draftManager.saveEditingDraft(draft, for: clothingID, reason: reason)
         } else {
-            draftManager.saveDraft(draft)
+            draftManager.saveDraft(draft, reason: reason)
         }
         print("ClothingEditView: Draft saved successfully with \(draft.imagePaths.count) images, \(draft.selectedTags.count) tags")
     }
