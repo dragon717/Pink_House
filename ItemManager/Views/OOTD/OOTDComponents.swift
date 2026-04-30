@@ -15,7 +15,6 @@ struct OOTDMannequinBackground: Identifiable, Hashable {
     let id: String
     let displayName: String
     let assetName: String
-    let sourcePath: String
 
     static let defaultID = "ootd_mannequin_default"
     static let legacyAssetName = "ootd"
@@ -24,8 +23,7 @@ struct OOTDMannequinBackground: Identifiable, Hashable {
         OOTDMannequinBackground(
             id: defaultID,
             displayName: "基础线稿人台",
-            assetName: "ootd_mannequin_default",
-            sourcePath: "temp/人台.png"
+            assetName: "ootd_mannequin_default"
         )
     ]
 
@@ -96,7 +94,7 @@ struct OOTDBackgroundSelectionSheet: View {
                             ContentUnavailableView(
                                 "暂无可用人台",
                                 systemImage: "tshirt",
-                                description: Text("请先通过 harness 入库真实 PNG，避免透明占位图泄漏。")
+                                description: Text("当前版本暂未提供可选择的人台底图。")
                             )
                         } else {
                             ForEach(mannequins) { mannequin in
@@ -111,7 +109,7 @@ struct OOTDBackgroundSelectionSheet: View {
                                             Text(mannequin.displayName)
                                                 .font(.system(size: 16, weight: .semibold))
                                                 .foregroundStyle(.primary)
-                                            Text(mannequin.sourcePath)
+                                            Text("适合快速开始搭配拼贴。")
                                                 .font(.caption)
                                                 .foregroundStyle(.secondary)
                                         }

@@ -173,20 +173,7 @@ class ShareCardManager {
         cardFrontImage = UIImage(named: "card_front")
         cardBackImage = UIImage(named: "card_back")
         
-        // 如果没有在Assets中找到，尝试从temp目录加载
-        if cardFrontImage == nil {
-            let frontPath = "/Users/muniao/Library/Mobile Documents/com~apple~CloudDocs/游戏/github/Pink_House/temp/processed/正面.png"
-            if FileManager.default.fileExists(atPath: frontPath) {
-                cardFrontImage = UIImage(contentsOfFile: frontPath)
-            }
-        }
-        
-        if cardBackImage == nil {
-            let backPath = "/Users/muniao/Library/Mobile Documents/com~apple~CloudDocs/游戏/github/Pink_House/temp/processed/背面.png"
-            if FileManager.default.fileExists(atPath: backPath) {
-                cardBackImage = UIImage(contentsOfFile: backPath)
-            }
-        }
+        // 用户侧只读取已打包进 Assets.xcassets 的资源，避免开发机 temp 路径泄漏。
     }
     
     // MARK: - 获取卡牌图片
