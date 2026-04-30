@@ -533,6 +533,50 @@ enum DraftReliabilityFeatureFlags {
     }
 }
 
+struct ClothingEditUserActivityPayload: Codable {
+    let draft: ClothingEditDraft
+    let isEditing: Bool
+    let clothingID: UUID?
+    let updatedAt: Date
+}
+
+enum ClothingEditUserActivity {
+    static let activityType = "com.itemmanager.clothing.editing"
+    private static let payloadKey = "clothingEditDraftPayload"
+
+    static func configure(_ activity: NSUserActivity, payload: ClothingEditUserActivityPayload) {
+        activity.title = payload.isEditing ? "继续编辑衣物" : "继续手动创建"
+        activity.isEligibleForHandoff = true
+        activity.isEligibleForSearch = false
+        activity.isEligibleForPrediction = true
+        activity.needsSave = true
+
+        do {
+            let data = try JSONEncoder().encode(payload)
+            activity.addUserInfoEntries(from: [payloadKey: data])
+        } catch {
+            DraftReliabilitySignpost.draftSaveFailed(scope: "userActivity", error: error)
+            AppLogger.error("DraftReliability: Failed to encode user activity payload: \(error)")
+        }
+    }
+
+    static func payload(from activity: NSUserActivity) -> ClothingEditUserActivityPayload? {
+        guard activity.activityType == activityType,
+              let data = activity.userInfo?[payloadKey] as? Data
+        else {
+            return nil
+        }
+
+        do {
+            return try JSONDecoder().decode(ClothingEditUserActivityPayload.self, from: data)
+        } catch {
+            DraftReliabilitySignpost.draftLoad(scope: "userActivity", source: "decode_failed", draftID: nil, imageCount: 0)
+            AppLogger.error("DraftReliability: Failed to decode user activity payload: \(error)")
+            return nil
+        }
+    }
+}
+
 // MARK: - 草稿管理器
 final class ClothingEditDraftManager: ObservableObject {
     static let shared = ClothingEditDraftManager()
@@ -1040,6 +1084,7 @@ struct ClothingEditView: View {
 
     // 标记是否从草稿继续（false表示新建，清除草稿）
     private var continueFromDraft: Bool
+    private var activityDraft: ClothingEditDraft?
 
     // 标记是否已经处理过草稿逻辑（防止onAppear多次执行）
     @State private var hasProcessedDraft = false
@@ -1081,11 +1126,18 @@ struct ClothingEditView: View {
     private var initialBrandID: UUID?
     private var initialTypes: Set<String>?
 
-    init(clothing: Clothing?, initialBrandID: UUID? = nil, initialTypes: Set<String>? = nil, continueFromDraft: Bool = true) {
+    init(
+        clothing: Clothing?,
+        initialBrandID: UUID? = nil,
+        initialTypes: Set<String>? = nil,
+        continueFromDraft: Bool = true,
+        activityDraft: ClothingEditDraft? = nil
+    ) {
         _clothing = State(initialValue: clothing)
         self.initialBrandID = initialBrandID
         self.initialTypes = initialTypes
         self.continueFromDraft = continueFromDraft
+        self.activityDraft = activityDraft
         print("ClothingEditView: INIT called, isEditing: \(clothing != nil), continueFromDraft: \(continueFromDraft)")
     }
 
@@ -1273,6 +1325,17 @@ struct ClothingEditView: View {
         }
         .navigationTitle(isEditing ? "编辑" : "手动创建")
         .navigationBarTitleDisplayMode(.inline)
+        .userActivity(ClothingEditUserActivity.activityType) { activity in
+            ClothingEditUserActivity.configure(
+                activity,
+                payload: ClothingEditUserActivityPayload(
+                    draft: makeCurrentDraft(),
+                    isEditing: isEditing,
+                    clothingID: clothing?.id,
+                    updatedAt: Date()
+                )
+            )
+        }
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
                 Button("取消") {
@@ -1461,12 +1524,18 @@ struct ClothingEditView: View {
         if let c = clothing {
             // 编辑模式：先从数据库加载，再覆盖未保存的编辑草稿。
             loadFromClothing(c)
-            if let editDraft = draftManager.loadEditingDraft(for: c.id) {
+            if let activityDraft {
+                print("ClothingEditView: Restoring editing draft from NSUserActivity for clothing: \(c.id)")
+                restoreFromDraft(activityDraft)
+            } else if let editDraft = draftManager.loadEditingDraft(for: c.id) {
                 print("ClothingEditView: Restoring editing draft for clothing: \(c.id)")
                 restoreFromDraft(editDraft)
             }
         } else {
-            if continueFromDraft, let persistedDraft = draftManager.loadDraft() {
+            if let activityDraft {
+                print("ClothingEditView: Restoring create draft from NSUserActivity with \(activityDraft.imagePaths.count) images")
+                restoreFromDraft(activityDraft)
+            } else if continueFromDraft, let persistedDraft = draftManager.loadDraft() {
                 print("ClothingEditView: Found persisted draft with \(persistedDraft.imagePaths.count) images")
                 restoreFromDraft(persistedDraft)
             } else if let inMemoryDraft = draftManager.currentDraft {

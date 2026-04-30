@@ -589,14 +589,20 @@ struct HomeView: View {
                         clothing: nil,
                         initialBrandID: selectedBrandIDs.first,
                         initialTypes: selectedTypes,
-                        continueFromDraft: continueFromDraft
+                        continueFromDraft: continueFromDraft,
+                        activityDraft: pendingActivityDraft
                     )
                 }
             }
             .onChange(of: showingAddSheet) { _, newValue in
                 if newValue {
                     NotificationCenter.default.post(name: .wardrobeManualCreateOpened, object: nil)
+                } else {
+                    pendingActivityDraft = nil
                 }
+            }
+            .onContinueUserActivity(ClothingEditUserActivity.activityType) { activity in
+                continueClothingEditUserActivity(activity)
             }
             .onChange(of: isSelectionMode) { _, newValue in
                 NotificationCenter.default.post(
@@ -1392,6 +1398,7 @@ struct HomeView: View {
 
     // 标记是否从草稿继续
     @State private var continueFromDraft = false
+    @State private var pendingActivityDraft: ClothingEditDraft?
 
     private func notifyWardrobeAddMenuOpened() {
         NotificationCenter.default.post(name: .wardrobeAddMenuOpened, object: nil)
@@ -1514,6 +1521,7 @@ struct HomeView: View {
     }
 
     private func continueWardrobeDraft() {
+        pendingActivityDraft = nil
         continueFromDraft = true
         showingAddSheet = true
     }
@@ -1522,7 +1530,29 @@ struct HomeView: View {
         // 手动创建是一次“重新开始”动作，只在入口点击时清理旧草稿；
         // 前后台切换导致的编辑页重建不应再次清空。
         draftManager.clearDraft()
+        pendingActivityDraft = nil
         continueFromDraft = false
+        showingAddSheet = true
+    }
+
+    private func continueClothingEditUserActivity(_ activity: NSUserActivity) {
+        guard let payload = ClothingEditUserActivity.payload(from: activity) else {
+            AppLogger.error("DraftReliability: Missing clothing edit user activity payload")
+            return
+        }
+
+        selectedTab = .wardrobe
+        if payload.isEditing, let clothingID = payload.clothingID {
+            draftManager.saveEditingDraft(payload.draft, for: clothingID, reason: "userActivity-continue")
+            pendingActivityDraft = nil
+            continueFromDraft = false
+            showingAddSheet = false
+            return
+        }
+
+        draftManager.saveDraft(payload.draft, reason: "userActivity-continue")
+        pendingActivityDraft = payload.draft
+        continueFromDraft = true
         showingAddSheet = true
     }
 
