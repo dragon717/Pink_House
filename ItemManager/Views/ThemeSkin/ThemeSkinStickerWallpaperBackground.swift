@@ -132,11 +132,27 @@ enum ThemeSkinWallpaperContext: String, CaseIterable, Identifiable, Hashable {
     }
 }
 
+enum ThemeSkinWallpaperRenderMode {
+    case page
+    case preview
+
+    func baseLength(for size: CGSize) -> CGFloat {
+        let shortestSide = min(size.width, size.height)
+        switch self {
+        case .page:
+            return min(max(shortestSide, 320), 460)
+        case .preview:
+            return max(shortestSide, 1)
+        }
+    }
+}
+
 struct ThemeSkinStickerWallpaperBackground: View {
     let product: ThemeSkinProduct
     let heroAssetName: String?
     var layoutPreset: ThemeSkinWallpaperLayoutPreset = .mixedFocus
     var context: ThemeSkinWallpaperContext = .general
+    var renderMode: ThemeSkinWallpaperRenderMode = .page
     var includeBaseFill: Bool = true
 
     private var stickerOptions: [ThemeSkinBackgroundStickerOption] {
@@ -146,8 +162,8 @@ struct ThemeSkinStickerWallpaperBackground: View {
     var body: some View {
         GeometryReader { proxy in
             let size = proxy.size
-            let base = min(max(min(size.width, size.height), 320), 460)
-            let placements = Self.patternPlacements(for: layoutPreset, context: context)
+            let base = renderMode.baseLength(for: size)
+            let placements = Self.patternPlacements(for: layoutPreset, context: context, renderMode: renderMode)
 
             ZStack {
                 if includeBaseFill {
@@ -268,18 +284,33 @@ struct ThemeSkinStickerWallpaperBackground: View {
 
     private static func patternPlacements(
         for preset: ThemeSkinWallpaperLayoutPreset,
-        context: ThemeSkinWallpaperContext
+        context: ThemeSkinWallpaperContext,
+        renderMode: ThemeSkinWallpaperRenderMode
     ) -> [ThemeSkinWallpaperStickerPlacement] {
         let base: [ThemeSkinWallpaperStickerPlacement]
-        switch preset {
-        case .mixedFocus:
-            base = mixedFocusPlacements
-        case .heroStatement:
-            base = heroStatementPlacements
-        case .balancedScatter:
-            base = balancedScatterPlacements
-        case .miniPattern:
-            base = miniPatternPlacements
+        switch renderMode {
+        case .page:
+            switch preset {
+            case .mixedFocus:
+                base = mixedFocusPlacements
+            case .heroStatement:
+                base = heroStatementPlacements
+            case .balancedScatter:
+                base = balancedScatterPlacements
+            case .miniPattern:
+                base = miniPatternPlacements
+            }
+        case .preview:
+            switch preset {
+            case .mixedFocus:
+                base = previewMixedFocusPlacements
+            case .heroStatement:
+                base = previewHeroStatementPlacements
+            case .balancedScatter:
+                base = previewBalancedScatterPlacements
+            case .miniPattern:
+                base = previewMiniPatternPlacements
+            }
         }
 
         return base.map { $0.adjusted(for: context) }
@@ -379,6 +410,46 @@ struct ThemeSkinStickerWallpaperBackground: View {
         .init(id: 329, x: 0.61, y: 0.99, width: 0.14, assetIndex: 5, rotationDegrees: 6, opacity: 0.44),
         .init(id: 330, x: 0.93, y: 1.00, width: 0.16, assetIndex: 0, rotationDegrees: -6, opacity: 0.42)
     ]
+
+    private static let previewMixedFocusPlacements: [ThemeSkinWallpaperStickerPlacement] = [
+        .init(id: 400, x: 0.32, y: 0.36, width: 0.34, assetIndex: 0, rotationDegrees: -6, isHero: true, opacity: 0.48),
+        .init(id: 401, x: 0.10, y: 0.12, width: 0.16, assetIndex: 4, rotationDegrees: -8, opacity: 0.52),
+        .init(id: 402, x: 0.78, y: 0.16, width: 0.17, assetIndex: 1, rotationDegrees: 7, opacity: 0.56, flipped: true),
+        .init(id: 403, x: 0.88, y: 0.48, width: 0.15, assetIndex: 2, rotationDegrees: -5, opacity: 0.52),
+        .init(id: 404, x: 0.18, y: 0.70, width: 0.16, assetIndex: 3, rotationDegrees: 8, opacity: 0.50),
+        .init(id: 405, x: 0.55, y: 0.76, width: 0.14, assetIndex: 5, rotationDegrees: -7, opacity: 0.54),
+        .init(id: 406, x: 0.72, y: 0.62, width: 0.13, assetIndex: 4, rotationDegrees: 5, opacity: 0.46)
+    ]
+
+    private static let previewHeroStatementPlacements: [ThemeSkinWallpaperStickerPlacement] = [
+        .init(id: 500, x: 0.50, y: 0.42, width: 0.38, assetIndex: 0, rotationDegrees: -4, isHero: true, opacity: 0.50),
+        .init(id: 501, x: 0.12, y: 0.15, width: 0.15, assetIndex: 1, rotationDegrees: -8, opacity: 0.48),
+        .init(id: 502, x: 0.86, y: 0.16, width: 0.16, assetIndex: 2, rotationDegrees: 8, opacity: 0.46, flipped: true),
+        .init(id: 503, x: 0.18, y: 0.74, width: 0.16, assetIndex: 3, rotationDegrees: 7, opacity: 0.46),
+        .init(id: 504, x: 0.84, y: 0.72, width: 0.15, assetIndex: 4, rotationDegrees: -6, opacity: 0.44)
+    ]
+
+    private static let previewBalancedScatterPlacements: [ThemeSkinWallpaperStickerPlacement] = [
+        .init(id: 600, x: 0.12, y: 0.14, width: 0.17, assetIndex: 0, rotationDegrees: -7, opacity: 0.52),
+        .init(id: 601, x: 0.43, y: 0.16, width: 0.15, assetIndex: 1, rotationDegrees: 6, opacity: 0.54),
+        .init(id: 602, x: 0.78, y: 0.18, width: 0.17, assetIndex: 2, rotationDegrees: -5, opacity: 0.50, flipped: true),
+        .init(id: 603, x: 0.24, y: 0.42, width: 0.18, assetIndex: 3, rotationDegrees: 8, opacity: 0.52),
+        .init(id: 604, x: 0.62, y: 0.46, width: 0.17, assetIndex: 4, rotationDegrees: -8, opacity: 0.52),
+        .init(id: 605, x: 0.88, y: 0.55, width: 0.15, assetIndex: 5, rotationDegrees: 7, opacity: 0.46),
+        .init(id: 606, x: 0.22, y: 0.75, width: 0.16, assetIndex: 1, rotationDegrees: -5, opacity: 0.48),
+        .init(id: 607, x: 0.66, y: 0.76, width: 0.18, assetIndex: 0, rotationDegrees: 6, opacity: 0.50)
+    ]
+
+    private static let previewMiniPatternPlacements: [ThemeSkinWallpaperStickerPlacement] = [
+        .init(id: 700, x: 0.10, y: 0.13, width: 0.13, assetIndex: 0, rotationDegrees: -6, opacity: 0.48),
+        .init(id: 701, x: 0.36, y: 0.15, width: 0.12, assetIndex: 1, rotationDegrees: 5, opacity: 0.50),
+        .init(id: 702, x: 0.64, y: 0.13, width: 0.13, assetIndex: 2, rotationDegrees: -5, opacity: 0.48),
+        .init(id: 703, x: 0.88, y: 0.18, width: 0.12, assetIndex: 3, rotationDegrees: 6, opacity: 0.46),
+        .init(id: 704, x: 0.22, y: 0.42, width: 0.14, assetIndex: 4, rotationDegrees: -8, opacity: 0.50),
+        .init(id: 705, x: 0.52, y: 0.44, width: 0.13, assetIndex: 5, rotationDegrees: 7, opacity: 0.50),
+        .init(id: 706, x: 0.80, y: 0.54, width: 0.14, assetIndex: 0, rotationDegrees: -6, opacity: 0.48),
+        .init(id: 707, x: 0.36, y: 0.74, width: 0.13, assetIndex: 2, rotationDegrees: 6, opacity: 0.46)
+    ]
 }
 
 private struct ThemeSkinWallpaperStickerPlacement: Identifiable {
@@ -473,6 +544,7 @@ struct ThemeSkinBackgroundStickerSelectionCard: View {
             heroAssetName: selectedHeroAssetName,
             layoutPreset: selectedLayoutPreset,
             context: .themeDetail,
+            renderMode: .preview,
             includeBaseFill: true
         )
         .frame(height: 210)
