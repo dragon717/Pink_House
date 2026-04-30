@@ -337,6 +337,9 @@ class ImageManager {
                     usedFileNames.insert(cutout.imagePath)
                 }
             }
+
+            // 2.2 收集草稿引用的图片文件名，避免“清理孤儿图片”误删未保存草稿中的图片。
+            usedFileNames.formUnion(ClothingDraftFileStore.shared.referencedImageFileNames())
             
             // 3. 遍历图片目录
             let fileManager = FileManager.default

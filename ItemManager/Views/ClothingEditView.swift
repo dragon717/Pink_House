@@ -182,7 +182,12 @@ private struct ClothingDraftIndex: Codable {
     var editingModifiedAtByID: [String: Date] = [:]
 }
 
-private final class ClothingDraftFileStore {
+private struct ClothingDraftGCReport {
+    let draftCount: Int
+    let missingImageReferencesByDraftKey: [String: [String]]
+}
+
+final class ClothingDraftFileStore {
     static let shared = ClothingDraftFileStore()
 
     private let fileManager: FileManager
@@ -215,6 +220,49 @@ private final class ClothingDraftFileStore {
 
     func hasCreateDraft() -> Bool {
         fileManager.fileExists(atPath: createDraftURL.path)
+    }
+
+    func referencedImageFileNames() -> Set<String> {
+        var result: Set<String> = []
+        for entry in loadAllPersistedDraftEntries() {
+            result.formUnion(Self.referencedImageFileNames(in: entry.draft))
+        }
+        return result
+    }
+
+    @discardableResult
+    func rebuildIndexAndValidateImageReferences() -> ClothingDraftGCReport {
+        do {
+            try ensureDirectories()
+            var index = ClothingDraftIndex()
+            var missingByDraftKey: [String: [String]] = [:]
+            let entries = loadAllPersistedDraftEntries()
+
+            for entry in entries {
+                switch entry.scope {
+                case .create:
+                    index.createModifiedAt = modificationDate(for: entry.url)
+                case .edit(let clothingID):
+                    index.editingModifiedAtByID[clothingID.uuidString] = modificationDate(for: entry.url)
+                }
+
+                let missingRefs = Self.referencedImageFileNames(in: entry.draft)
+                    .filter { !ImageManager.shared.isFileDownloaded(fileName: $0) }
+                    .sorted()
+                if !missingRefs.isEmpty {
+                    missingByDraftKey[entry.scope.key] = missingRefs
+                }
+            }
+
+            try saveIndex(index)
+            return ClothingDraftGCReport(
+                draftCount: entries.count,
+                missingImageReferencesByDraftKey: missingByDraftKey
+            )
+        } catch {
+            AppLogger.error("DraftReliability: Failed to rebuild draft index: \(error)")
+            return ClothingDraftGCReport(draftCount: 0, missingImageReferencesByDraftKey: [:])
+        }
     }
 
     func loadCreateDraft() throws -> ClothingEditDraft? {
@@ -260,6 +308,28 @@ private final class ClothingDraftFileStore {
         return try decoder.decode(ClothingEditDraft.self, from: data)
     }
 
+    private func loadAllPersistedDraftEntries() -> [(scope: ClothingDraftScope, url: URL, draft: ClothingEditDraft)] {
+        var entries: [(scope: ClothingDraftScope, url: URL, draft: ClothingEditDraft)] = []
+        if let draft = try? loadCreateDraft() {
+            entries.append((scope: .create, url: createDraftURL, draft: draft))
+        }
+
+        let editURLs = (try? fileManager.contentsOfDirectory(
+            at: editDirectory,
+            includingPropertiesForKeys: [.contentModificationDateKey],
+            options: [.skipsHiddenFiles]
+        )) ?? []
+
+        for url in editURLs where url.pathExtension.lowercased() == "json" {
+            let idString = url.deletingPathExtension().lastPathComponent
+            guard let clothingID = UUID(uuidString: idString),
+                  let draft = try? loadDraft(from: url)
+            else { continue }
+            entries.append((scope: .edit(clothingID), url: url, draft: draft))
+        }
+        return entries
+    }
+
     @discardableResult
     private func saveDraft(_ draft: ClothingEditDraft, scope: ClothingDraftScope) throws -> Int {
         try ensureDirectories()
@@ -294,6 +364,32 @@ private final class ClothingDraftFileStore {
     private func ensureDirectories() throws {
         try fileManager.createDirectory(at: draftsDirectory, withIntermediateDirectories: true)
         try fileManager.createDirectory(at: editDirectory, withIntermediateDirectories: true)
+    }
+
+    private func modificationDate(for url: URL) -> Date {
+        (try? url.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? Date()
+    }
+
+    private static func referencedImageFileNames(in draft: ClothingEditDraft) -> Set<String> {
+        var refs: Set<String> = []
+        refs.formUnion(draft.imagePaths.map(normalizedImageFileName).filter { !$0.isEmpty })
+        if let sizeChartImagePath = draft.sizeChartImagePath {
+            let fileName = normalizedImageFileName(sizeChartImagePath)
+            if !fileName.isEmpty { refs.insert(fileName) }
+        }
+        if let priceChartImagePath = draft.priceChartImagePath {
+            let fileName = normalizedImageFileName(priceChartImagePath)
+            if !fileName.isEmpty { refs.insert(fileName) }
+        }
+        for accessory in draft.accessoryList {
+            refs.formUnion((accessory.imagePaths ?? []).map(normalizedImageFileName).filter { !$0.isEmpty })
+        }
+        return refs
+    }
+
+    private static func normalizedImageFileName(_ path: String) -> String {
+        path.trimmingCharacters(in: .whitespacesAndNewlines) as NSString
+            .lastPathComponent
     }
 
     private func loadIndex() -> ClothingDraftIndex {
@@ -448,6 +544,7 @@ final class ClothingEditDraftManager: ObservableObject {
     private init() {
         hasPersistedDraft = false
         migrateLegacyUserDefaultsDraftsIfNeeded()
+        rebuildDraftIndexAndValidateImages()
         hasPersistedDraft = fileStore.hasCreateDraft()
         // 监听应用进入后台通知
         NotificationCenter.default.addObserver(
@@ -647,6 +744,16 @@ final class ClothingEditDraftManager: ObservableObject {
     private func migrateLegacyUserDefaultsDraftsIfNeeded() {
         migrateLegacyCreateDraftIfNeeded()
         migrateLegacyEditingDraftsIfNeeded()
+    }
+
+    private func rebuildDraftIndexAndValidateImages() {
+        let report = fileStore.rebuildIndexAndValidateImageReferences()
+        if report.missingImageReferencesByDraftKey.isEmpty {
+            print("DraftManager: Draft index rebuilt, draftCount: \(report.draftCount), missing images: 0")
+        } else {
+            AppLogger.error("DraftReliability: Draft index rebuilt with missing image refs: \(report.missingImageReferencesByDraftKey)")
+            print("DraftManager: Draft index rebuilt, missing image refs: \(report.missingImageReferencesByDraftKey)")
+        }
     }
 
     private func migrateLegacyCreateDraftIfNeeded() {
