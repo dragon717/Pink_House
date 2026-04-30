@@ -1,5 +1,5 @@
+import Foundation
 import SwiftUI
-import SwiftData
 
 // MARK: - 筛选模式枚举
 enum FilterMode: String, CaseIterable, Identifiable {
@@ -31,6 +31,68 @@ enum DepositStatusFilter: String, CaseIterable, Identifiable, Hashable, Sendable
         case .depositPlan: return "心愿尾款"
         }
     }
+
+    var iconName: String {
+        switch self {
+        case .all: return "heart"
+        case .owned: return "checkmark.seal"
+        case .depositPlan: return "heart.fill"
+        }
+    }
+}
+
+// MARK: - 多维筛选候选快照
+struct WardrobeFilterNamedOption: Identifiable, Equatable, Hashable, Sendable {
+    let id: UUID
+    let name: String
+}
+
+struct WardrobeFilterFacetSnapshot: Equatable, Sendable {
+    let tags: [WardrobeFilterNamedOption]
+    let brands: [WardrobeFilterNamedOption]
+    let types: [String]
+    let colors: [String]
+    let sizes: [String]
+    let lengths: [String]
+    let conditions: [String]
+    let accessories: [String]
+    let tagNameByID: [UUID: String]
+    let brandNameByID: [UUID: String]
+
+    init(
+        tags: [WardrobeFilterNamedOption] = [],
+        brands: [WardrobeFilterNamedOption] = [],
+        types: [String] = [],
+        colors: [String] = [],
+        sizes: [String] = [],
+        lengths: [String] = [],
+        conditions: [String] = [],
+        accessories: [String] = [],
+        tagNameByID: [UUID: String]? = nil,
+        brandNameByID: [UUID: String]? = nil
+    ) {
+        self.tags = tags
+        self.brands = brands
+        self.types = types
+        self.colors = colors
+        self.sizes = sizes
+        self.lengths = lengths
+        self.conditions = conditions
+        self.accessories = accessories
+        self.tagNameByID = tagNameByID ?? Dictionary(uniqueKeysWithValues: tags.map { ($0.id, $0.name) })
+        self.brandNameByID = brandNameByID ?? Dictionary(uniqueKeysWithValues: brands.map { ($0.id, $0.name) })
+    }
+
+    func options(for field: ClothingField) -> [String] {
+        switch field {
+        case .types: return types
+        case .colors: return colors
+        case .sizes: return sizes
+        case .length: return lengths
+        case .condition: return conditions
+        case .accessories: return accessories
+        }
+    }
 }
 
 // MARK: - 多维筛选Sheet
@@ -39,10 +101,7 @@ struct MultiDimensionalFilterSheet: View {
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.dismiss) private var dismiss
 
-    // 数据
-    let clothings: [Clothing]
-    let tags: [Tag]
-    let brands: [Brand]
+    let facetSnapshot: WardrobeFilterFacetSnapshot
 
     // 筛选状态绑定
     @Binding var selectedTagIDs: Set<UUID>
@@ -76,6 +135,10 @@ struct MultiDimensionalFilterSheet: View {
         MagicThemeDesignSystem.palette(themeManager: themeManager, colorScheme: colorScheme)
     }
 
+    private var panelFallbackColor: Color {
+        magicPalette.cardBackground.opacity(colorScheme == .dark ? 0.52 : 0.82)
+    }
+
     // 计算所有筛选条件的数量
     private var totalFilterCount: Int {
         selectedTagIDs.count +
@@ -88,53 +151,14 @@ struct MultiDimensionalFilterSheet: View {
         selectedAccessories.count +
         (depositStatusFilter != .all ? 1 : 0)
     }
-    
+
     var body: some View {
         NavigationStack {
             ZStack {
-                // 背景
                 LiquidBackground(themeSkinWallpaperContext: .wardrobe)
                     .ignoresSafeArea()
-                
-                VStack(spacing: 0) {
-                    // 已选条件摘要
-                    if totalFilterCount > 0 {
-                        selectedFiltersSummary
-                            .padding(.horizontal)
-                            .padding(.top, 8)
-                    }
-                    
-                    // 筛选列表
-                    ScrollView {
-                        VStack(spacing: 12) {
-                            // 标签筛选行
-                            filterRow(
-                                section: .tags,
-                                title: "标签",
-                                icon: "tag",
-                                selectedCount: selectedTagIDs.count,
-                                options: tagOptions
-                            )
-                            
-                            // 品牌筛选行
-                            filterRow(
-                                section: .brands,
-                                title: "品牌",
-                                icon: "bag",
-                                selectedCount: selectedBrandIDs.count,
-                                options: brandOptions
-                            )
-                            
-                            // 动态字段筛选行
-                            ForEach(visibilityManager.fieldOrder, id: \.self) { field in
-                                if visibilityManager.isVisible(field) {
-                                    dynamicFilterRow(for: field)
-                                }
-                            }
-                        }
-                        .padding()
-                    }
-                }
+
+                contentPanel
             }
             .navigationTitle("多维筛选")
             .navigationBarTitleDisplayMode(.inline)
@@ -150,53 +174,150 @@ struct MultiDimensionalFilterSheet: View {
                 }
 
                 ToolbarItem(placement: .topBarTrailing) {
-                    HStack(spacing: 12) {
-                        // 心愿尾款筛选
-                        // menu-perf: multi-dimensional deposit status menu
-                        Menu {
-                            let _ = MenuPerfSignpost.menuContent("wardrobe.multi_filter.deposit_status")
-                            ForEach(DepositStatusFilter.allCases) { filter in
-                                Button {
-                                    depositStatusFilter = filter
-                                } label: {
-                                    HStack {
-                                        Text(filter.displayName)
-                                        if depositStatusFilter == filter {
-                                            Image(systemName: "checkmark")
-                                        }
-                                    }
-                                }
-                            }
+                    if totalFilterCount > 0 {
+                        Button {
+                            clearAllFilters()
                         } label: {
-                            HStack(spacing: 4) {
-                                Image(systemName: depositStatusFilter == .all ? "heart" : "heart.fill")
-                                if depositStatusFilter != .all {
-                                    Text("\(depositStatusFilter == .owned ? "已拥有" : "心愿")")
-                                        .font(.caption)
-                                }
-                            }
-                            .font(.subheadline)
-                            .foregroundStyle(depositStatusFilter == .all ? magicPalette.secondaryText : magicPalette.accent)
-                        }
-
-                        if totalFilterCount > 0 {
-                            Button {
-                                clearAllFilters()
-                            } label: {
-                                Text("清除")
-                                    .font(.subheadline)
-                                    .foregroundStyle(.red)
-                            }
+                            Text("清除")
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(.red)
                         }
                     }
                 }
             }
             .tint(magicPalette.accent)
+            .onAppear {
+                _ = MenuPerfSignpost.menuOpen("wardrobe.multi_filter.sheet_presented")
+            }
         }
-        .presentationDetents([.fraction(0.7)])
+        .presentationDetents([.fraction(0.82), .large])
         .presentationDragIndicator(.visible)
     }
-    
+
+    private var contentPanel: some View {
+        VStack(spacing: 0) {
+            VStack(spacing: 12) {
+                if totalFilterCount > 0 {
+                    selectedFiltersSummary
+                }
+
+                depositStatusSelector
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, 14)
+
+            ScrollView {
+                VStack(spacing: 12) {
+                    filterRow(
+                        section: .tags,
+                        title: "标签",
+                        icon: "tag",
+                        selectedCount: selectedTagIDs.count,
+                        options: tagOptions
+                    )
+
+                    filterRow(
+                        section: .brands,
+                        title: "品牌",
+                        icon: "bag",
+                        selectedCount: selectedBrandIDs.count,
+                        options: brandOptions
+                    )
+
+                    ForEach(visibleFields, id: \.self) { field in
+                        dynamicFilterRow(for: field)
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 12)
+                .padding(.bottom, 18)
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .themeSkinAdaptiveSectionCard(slot: .filterSheet, cornerRadius: 28, showsDecoration: true) {
+            RoundedRectangle(cornerRadius: 28, style: .continuous)
+                .fill(panelFallbackColor)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+    }
+
+    private var visibleFields: [ClothingField] {
+        visibilityManager.fieldOrder.filter { visibilityManager.isVisible($0) }
+    }
+
+    // MARK: - 心愿尾款筛选
+    private var depositStatusSelector: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                Image(systemName: depositStatusFilter.iconName)
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(depositStatusFilter == .all ? magicPalette.secondaryText : magicPalette.accent)
+
+                Text("心愿尾款")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(magicPalette.primaryText)
+
+                Spacer()
+
+                Text(depositStatusFilter.displayName)
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(depositStatusFilter == .all ? magicPalette.secondaryText : magicPalette.accent)
+            }
+
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 92), spacing: 8)], spacing: 8) {
+                ForEach(DepositStatusFilter.allCases) { filter in
+                    depositStatusChip(filter)
+                }
+            }
+        }
+        .padding(12)
+        .themeSkinAdaptiveSectionCard(slot: .filterSheet, cornerRadius: 18, showsDecoration: false) {
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(magicPalette.cardBackground)
+        }
+        .overlay {
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .stroke(magicPalette.secondaryText.opacity(0.18), lineWidth: 0.6)
+        }
+    }
+
+    private func depositStatusChip(_ filter: DepositStatusFilter) -> some View {
+        let isSelected = depositStatusFilter == filter
+
+        return Button {
+            depositStatusFilter = filter
+        } label: {
+            HStack(spacing: 5) {
+                Image(systemName: filter.iconName)
+                    .font(.system(size: 12, weight: .semibold))
+
+                Text(filter.displayName)
+                    .font(.caption.weight(isSelected ? .semibold : .medium))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.82)
+
+                if isSelected {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 10, weight: .bold))
+                }
+            }
+            .foregroundStyle(isSelected ? magicPalette.accent : magicPalette.secondaryText)
+            .frame(maxWidth: .infinity)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
+            .themeSkinAdaptiveSectionCard(slot: .filterChip, cornerRadius: 14, showsDecoration: false) {
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(isSelected ? magicPalette.accent.opacity(0.15) : magicPalette.cardBackground.opacity(0.55))
+            }
+            .overlay {
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .stroke(isSelected ? magicPalette.accent.opacity(0.72) : magicPalette.secondaryText.opacity(0.22), lineWidth: isSelected ? 1.4 : 0.6)
+            }
+        }
+        .buttonStyle(.plain)
+    }
+
     // MARK: - 已选条件摘要
     private var selectedFiltersSummary: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -205,112 +326,117 @@ struct MultiDimensionalFilterSheet: View {
                     .font(.subheadline)
                     .fontWeight(.medium)
                     .foregroundStyle(magicPalette.primaryText)
-                
+
                 Spacer()
             }
-            
-            // 横向滚动的已选标签
+
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
-                    ForEach(selectedFilterItems, id: \.id) { item in
+                    ForEach(selectedFilterItems) { item in
                         selectedFilterChip(item: item)
                     }
                 }
             }
         }
         .padding(12)
-        .background(magicPalette.cardBackground)
-        .cornerRadius(12)
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(magicPalette.secondaryText.opacity(0.3), lineWidth: 0.5)
-        )
+        .themeSkinAdaptiveSectionCard(slot: .sectionCard, cornerRadius: 18, showsDecoration: false) {
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(magicPalette.cardBackground)
+        }
+        .overlay {
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .stroke(magicPalette.secondaryText.opacity(0.18), lineWidth: 0.6)
+        }
     }
-    
+
     // 已选条件数据结构
-    private struct SelectedFilterItem: Identifiable {
-        let id = UUID()
+    private struct SelectedFilterItem: Identifiable, Equatable {
         let section: FilterSection
         let value: String
         let rawValue: String // 用于删除时识别
+
+        var id: String { "\(section.id):\(rawValue)" }
     }
-    
+
     // 获取所有已选条件
     private var selectedFilterItems: [SelectedFilterItem] {
         var items: [SelectedFilterItem] = []
-        
-        // 标签
-        for id in selectedTagIDs {
-            let name = id == MultiDimensionalFilterSheet.noTagUUID ? "无标签" : tags.first(where: { $0.id == id })?.name ?? ""
+
+        for id in selectedTagIDs.sorted(by: { $0.uuidString < $1.uuidString }) {
+            let name = id == MultiDimensionalFilterSheet.noTagUUID ? "无标签" : facetSnapshot.tagNameByID[id] ?? "未知标签"
             items.append(SelectedFilterItem(section: .tags, value: name, rawValue: id.uuidString))
         }
-        
-        // 品牌
-        for id in selectedBrandIDs {
-            let name = id == MultiDimensionalFilterSheet.noBrandUUID ? "无品牌" : brands.first(where: { $0.id == id })?.name ?? ""
+
+        for id in selectedBrandIDs.sorted(by: { $0.uuidString < $1.uuidString }) {
+            let name = id == MultiDimensionalFilterSheet.noBrandUUID ? "无品牌" : facetSnapshot.brandNameByID[id] ?? "未知品牌"
             items.append(SelectedFilterItem(section: .brands, value: name, rawValue: id.uuidString))
         }
-        
-        // 类型
-        for type in selectedTypes {
+
+        for type in selectedTypes.sorted() {
             let name = type == MultiDimensionalFilterSheet.noTypeMarker ? "无类型" : type
             items.append(SelectedFilterItem(section: .types, value: name, rawValue: type))
         }
-        
-        // 颜色
-        for color in selectedColors {
+
+        for color in selectedColors.sorted() {
             let name = color == MultiDimensionalFilterSheet.noColorMarker ? "无颜色" : color
             items.append(SelectedFilterItem(section: .colors, value: name, rawValue: color))
         }
-        
-        // 尺码
-        for size in selectedSizes {
+
+        for size in selectedSizes.sorted() {
             let name = size == MultiDimensionalFilterSheet.noSizeMarker ? "无尺码" : size
             items.append(SelectedFilterItem(section: .sizes, value: name, rawValue: size))
         }
-        
-        // 衣长
-        for length in selectedLengths {
+
+        for length in selectedLengths.sorted() {
             let name = length == MultiDimensionalFilterSheet.noLengthMarker ? "无衣长" : length
             items.append(SelectedFilterItem(section: .length, value: name, rawValue: length))
         }
-        
-        // 状态
-        for condition in selectedConditions {
+
+        for condition in selectedConditions.sorted() {
             let name = condition == MultiDimensionalFilterSheet.noConditionMarker ? "无状态" : condition
             items.append(SelectedFilterItem(section: .condition, value: name, rawValue: condition))
         }
-        
-        // 小物
-        for accessory in selectedAccessories {
+
+        for accessory in selectedAccessories.sorted() {
             let name = accessory == MultiDimensionalFilterSheet.noAccessoryMarker ? "无小物" : accessory
             items.append(SelectedFilterItem(section: .accessories, value: name, rawValue: accessory))
         }
-        
+
+        if depositStatusFilter != .all {
+            items.append(SelectedFilterItem(section: .depositStatus, value: depositStatusFilter.displayName, rawValue: depositStatusFilter.rawValue))
+        }
+
         return items
     }
-    
+
     // 已选条件标签
     private func selectedFilterChip(item: SelectedFilterItem) -> some View {
         HStack(spacing: 4) {
             Text(item.value)
                 .font(.caption)
                 .fontWeight(.medium)
-            
+
             Button {
                 removeFilterItem(item)
             } label: {
                 Image(systemName: "xmark.circle.fill")
                     .font(.system(size: 12))
             }
+            .buttonStyle(.plain)
         }
         .foregroundStyle(magicPalette.accent)
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
-        .background(magicPalette.accent.opacity(0.15))
-        .cornerRadius(16)
+        .themeSkinAdaptiveSectionCard(slot: .filterChip, cornerRadius: 16, showsDecoration: false) {
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(magicPalette.accent.opacity(0.15))
+        }
+        .overlay {
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .stroke(magicPalette.accent.opacity(0.48), lineWidth: 0.8)
+        }
     }
-    
+
     // 移除单个筛选条件
     private func removeFilterItem(_ item: SelectedFilterItem) {
         switch item.section {
@@ -334,9 +460,11 @@ struct MultiDimensionalFilterSheet: View {
             selectedConditions.remove(item.rawValue)
         case .accessories:
             selectedAccessories.remove(item.rawValue)
+        case .depositStatus:
+            depositStatusFilter = .all
         }
     }
-    
+
     // MARK: - 筛选行
     private func filterRow(
         section: FilterSection,
@@ -346,14 +474,13 @@ struct MultiDimensionalFilterSheet: View {
         options: [FilterOption]
     ) -> some View {
         VStack(spacing: 0) {
-            // 标题行（可点击展开）
             Button {
+                let nextSection: FilterSection? = expandedSection == section ? nil : section
+                if nextSection != nil {
+                    _ = MenuPerfSignpost.menuOpen("wardrobe.multi_filter.section.\(section.id)")
+                }
                 withAnimation(.easeInOut(duration: 0.2)) {
-                    if expandedSection == section {
-                        expandedSection = nil
-                    } else {
-                        expandedSection = section
-                    }
+                    expandedSection = nextSection
                 }
             } label: {
                 HStack {
@@ -361,13 +488,13 @@ struct MultiDimensionalFilterSheet: View {
                         .font(.system(size: 18))
                         .foregroundStyle(selectedCount > 0 ? magicPalette.accent : magicPalette.secondaryText)
                         .frame(width: 28)
-                    
+
                     Text(title)
-                        .font(.body)
+                        .font(.body.weight(.medium))
                         .foregroundStyle(magicPalette.primaryText)
-                    
+
                     Spacer()
-                    
+
                     if selectedCount > 0 {
                         Text("\(selectedCount)")
                             .font(.caption)
@@ -378,33 +505,39 @@ struct MultiDimensionalFilterSheet: View {
                             .background(magicPalette.accent)
                             .cornerRadius(10)
                     }
-                    
+
                     Image(systemName: expandedSection == section ? "chevron.up" : "chevron.down")
                         .font(.system(size: 14))
                         .foregroundStyle(magicPalette.secondaryText)
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 14)
-                .background(magicPalette.cardBackground)
             }
             .buttonStyle(.plain)
-            
-            // 展开的选项区域
+
             if expandedSection == section {
+                Divider()
+                    .opacity(0.22)
+                    .padding(.horizontal, 16)
+
                 filterOptionsGrid(options: options, section: section)
                     .padding(.horizontal, 16)
-                    .padding(.bottom, 12)
-                    .background(magicPalette.cardBackground)
+                    .padding(.vertical, 12)
             }
         }
-        .background(magicPalette.cardBackground)
-        .cornerRadius(12)
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(selectedCount > 0 ? magicPalette.accent.opacity(0.5) : magicPalette.secondaryText.opacity(0.3), lineWidth: selectedCount > 0 ? 1.5 : 0.5)
-        )
+        .themeSkinAdaptiveSectionCard(slot: .sectionCard, cornerRadius: 18, showsDecoration: false) {
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(magicPalette.cardBackground)
+        }
+        .overlay {
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .stroke(
+                    selectedCount > 0 ? magicPalette.accent.opacity(0.55) : magicPalette.secondaryText.opacity(0.22),
+                    lineWidth: selectedCount > 0 ? 1.4 : 0.6
+                )
+        }
     }
-    
+
     // MARK: - 动态字段筛选行
     private func dynamicFilterRow(for field: ClothingField) -> some View {
         let (title, icon, selectedCount, options) = fieldConfig(for: field)
@@ -416,7 +549,7 @@ struct MultiDimensionalFilterSheet: View {
             options: options
         )
     }
-    
+
     // 字段配置
     private func fieldConfig(for field: ClothingField) -> (title: String, icon: String, count: Int, options: [FilterOption]) {
         switch field {
@@ -434,7 +567,7 @@ struct MultiDimensionalFilterSheet: View {
             return ("小物", "sparkles", selectedAccessories.count, accessoryOptions)
         }
     }
-    
+
     // 字段转区块
     private func filterSection(for field: ClothingField) -> FilterSection {
         switch field {
@@ -446,20 +579,20 @@ struct MultiDimensionalFilterSheet: View {
         case .accessories: return .accessories
         }
     }
-    
+
     // MARK: - 选项网格
     private func filterOptionsGrid(options: [FilterOption], section: FilterSection) -> some View {
-        LazyVGrid(columns: [GridItem(.adaptive(minimum: 80), spacing: 8)], spacing: 8) {
+        LazyVGrid(columns: [GridItem(.adaptive(minimum: 86), spacing: 8)], spacing: 8) {
             ForEach(options) { option in
                 filterOptionButton(option: option, section: section)
             }
         }
     }
-    
+
     // 单个选项按钮
     private func filterOptionButton(option: FilterOption, section: FilterSection) -> some View {
         let isSelected = isOptionSelected(option: option, section: section)
-        
+
         return Button {
             toggleOption(option: option, section: section)
         } label: {
@@ -472,98 +605,82 @@ struct MultiDimensionalFilterSheet: View {
                 .frame(maxWidth: .infinity)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
-                .background(
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(isSelected ? magicPalette.accent.opacity(0.15) : magicPalette.cardBackground.opacity(0.5))
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 8)
-                        .stroke(isSelected ? magicPalette.accent : magicPalette.secondaryText.opacity(0.3), lineWidth: isSelected ? 1.5 : 0.5)
-                )
+                .themeSkinAdaptiveSectionCard(slot: .filterChip, cornerRadius: 10, showsDecoration: false) {
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .fill(isSelected ? magicPalette.accent.opacity(0.15) : magicPalette.cardBackground.opacity(0.55))
+                }
+                .overlay {
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .stroke(isSelected ? magicPalette.accent : magicPalette.secondaryText.opacity(0.28), lineWidth: isSelected ? 1.4 : 0.6)
+                }
         }
         .buttonStyle(.plain)
     }
-    
+
     // MARK: - 选项数据
-    private struct FilterOption: Identifiable {
-        let id = UUID()
+    private struct FilterOption: Identifiable, Equatable {
+        let section: FilterSection
         let value: String
         let displayName: String
-        let isSpecial: Bool // 标记是否是"无XXX"选项
+        let isSpecial: Bool // 标记是否是“无XXX”选项
+
+        var id: String { "\(section.id):\(value)" }
     }
-    
+
+    private func specialOption(section: FilterSection, value: String, displayName: String) -> FilterOption {
+        FilterOption(section: section, value: value, displayName: displayName, isSpecial: true)
+    }
+
     // 标签选项
     private var tagOptions: [FilterOption] {
-        var options: [FilterOption] = []
-        options.append(FilterOption(value: MultiDimensionalFilterSheet.noTagUUID.uuidString, displayName: "无标签", isSpecial: true))
-        options.append(contentsOf: tags.map { FilterOption(value: $0.id.uuidString, displayName: $0.name, isSpecial: false) })
-        return options
+        [specialOption(section: .tags, value: MultiDimensionalFilterSheet.noTagUUID.uuidString, displayName: "无标签")] +
+        facetSnapshot.tags.map { FilterOption(section: .tags, value: $0.id.uuidString, displayName: $0.name, isSpecial: false) }
     }
-    
+
     // 品牌选项
     private var brandOptions: [FilterOption] {
-        var options: [FilterOption] = []
-        options.append(FilterOption(value: MultiDimensionalFilterSheet.noBrandUUID.uuidString, displayName: "无品牌", isSpecial: true))
-        options.append(contentsOf: brands.map { FilterOption(value: $0.id.uuidString, displayName: $0.name, isSpecial: false) })
-        return options
+        [specialOption(section: .brands, value: MultiDimensionalFilterSheet.noBrandUUID.uuidString, displayName: "无品牌")] +
+        facetSnapshot.brands.map { FilterOption(section: .brands, value: $0.id.uuidString, displayName: $0.name, isSpecial: false) }
     }
-    
+
     // 类型选项
     private var typeOptions: [FilterOption] {
-        var options: [FilterOption] = []
-        options.append(FilterOption(value: MultiDimensionalFilterSheet.noTypeMarker, displayName: "无类型", isSpecial: true))
-        let values = getAllValues(for: \.types)
-        options.append(contentsOf: values.map { FilterOption(value: $0, displayName: $0, isSpecial: false) })
-        return options
+        [specialOption(section: .types, value: MultiDimensionalFilterSheet.noTypeMarker, displayName: "无类型")] +
+        facetSnapshot.types.map { FilterOption(section: .types, value: $0, displayName: $0, isSpecial: false) }
     }
-    
+
     // 颜色选项
     private var colorOptions: [FilterOption] {
-        var options: [FilterOption] = []
-        options.append(FilterOption(value: MultiDimensionalFilterSheet.noColorMarker, displayName: "无颜色", isSpecial: true))
-        let values = getAllValues(for: \.colors)
-        options.append(contentsOf: values.map { FilterOption(value: $0, displayName: $0, isSpecial: false) })
-        return options
+        [specialOption(section: .colors, value: MultiDimensionalFilterSheet.noColorMarker, displayName: "无颜色")] +
+        facetSnapshot.colors.map { FilterOption(section: .colors, value: $0, displayName: $0, isSpecial: false) }
     }
-    
+
     // 尺码选项
     private var sizeOptions: [FilterOption] {
-        var options: [FilterOption] = []
-        options.append(FilterOption(value: MultiDimensionalFilterSheet.noSizeMarker, displayName: "无尺码", isSpecial: true))
-        let values = getAllValues(for: \.sizes)
-        options.append(contentsOf: values.map { FilterOption(value: $0, displayName: $0, isSpecial: false) })
-        return options
+        [specialOption(section: .sizes, value: MultiDimensionalFilterSheet.noSizeMarker, displayName: "无尺码")] +
+        facetSnapshot.sizes.map { FilterOption(section: .sizes, value: $0, displayName: $0, isSpecial: false) }
     }
-    
+
     // 衣长选项
     private var lengthOptions: [FilterOption] {
-        var options: [FilterOption] = []
-        options.append(FilterOption(value: MultiDimensionalFilterSheet.noLengthMarker, displayName: "无衣长", isSpecial: true))
-        let values = getAllValues(for: \.length)
-        options.append(contentsOf: values.map { FilterOption(value: $0, displayName: $0, isSpecial: false) })
-        return options
+        [specialOption(section: .length, value: MultiDimensionalFilterSheet.noLengthMarker, displayName: "无衣长")] +
+        facetSnapshot.lengths.map { FilterOption(section: .length, value: $0, displayName: $0, isSpecial: false) }
     }
-    
+
     // 状态选项
     private var conditionOptions: [FilterOption] {
-        var options: [FilterOption] = []
-        options.append(FilterOption(value: MultiDimensionalFilterSheet.noConditionMarker, displayName: "无状态", isSpecial: true))
-        let values = getAllValues(for: \.condition)
-        options.append(contentsOf: values.map { FilterOption(value: $0, displayName: $0, isSpecial: false) })
-        return options
+        [specialOption(section: .condition, value: MultiDimensionalFilterSheet.noConditionMarker, displayName: "无状态")] +
+        facetSnapshot.conditions.map { FilterOption(section: .condition, value: $0, displayName: $0, isSpecial: false) }
     }
-    
+
     // 小物选项
     private var accessoryOptions: [FilterOption] {
-        var options: [FilterOption] = []
-        options.append(FilterOption(value: MultiDimensionalFilterSheet.noAccessoryMarker, displayName: "无小物", isSpecial: true))
-        let values = getAllValues(for: \.accessories)
-        options.append(contentsOf: values.map { FilterOption(value: $0, displayName: $0, isSpecial: false) })
-        return options
+        [specialOption(section: .accessories, value: MultiDimensionalFilterSheet.noAccessoryMarker, displayName: "无小物")] +
+        facetSnapshot.accessories.map { FilterOption(section: .accessories, value: $0, displayName: $0, isSpecial: false) }
     }
-    
+
     // MARK: - 辅助方法
-    
+
     // 检查选项是否被选中
     private func isOptionSelected(option: FilterOption, section: FilterSection) -> Bool {
         switch section {
@@ -589,9 +706,11 @@ struct MultiDimensionalFilterSheet: View {
             return selectedConditions.contains(option.value)
         case .accessories:
             return selectedAccessories.contains(option.value)
+        case .depositStatus:
+            return depositStatusFilter.rawValue == option.value
         }
     }
-    
+
     // 切换选项选中状态
     private func toggleOption(option: FilterOption, section: FilterSection) {
         switch section {
@@ -647,9 +766,11 @@ struct MultiDimensionalFilterSheet: View {
             } else {
                 selectedAccessories.insert(option.value)
             }
+        case .depositStatus:
+            depositStatusFilter = DepositStatusFilter(rawValue: option.value) ?? .all
         }
     }
-    
+
     // 清除所有筛选
     private func clearAllFilters() {
         selectedTagIDs.removeAll()
@@ -662,16 +783,19 @@ struct MultiDimensionalFilterSheet: View {
         selectedAccessories.removeAll()
         depositStatusFilter = .all
     }
-    
-    // Helper to extract unique values from comma-separated strings
-    private func getAllValues(for keyPath: KeyPath<Clothing, String>) -> [String] {
-        let allString = clothings.map { $0[keyPath: keyPath] }.joined(separator: ",")
-        let normalizedString = allString.replacingOccurrences(of: "，", with: ",")
-        return Array(Set(normalizedString.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty })).sorted()
-    }
 }
 
 // MARK: - 筛选区块枚举
-enum FilterSection {
-    case tags, brands, types, colors, sizes, length, condition, accessories
+enum FilterSection: String, Identifiable, Hashable {
+    case tags
+    case brands
+    case types
+    case colors
+    case sizes
+    case length
+    case condition
+    case accessories
+    case depositStatus
+
+    var id: String { rawValue }
 }

@@ -195,6 +195,21 @@ private final class WardrobeMenuFacetCache: ObservableObject {
         }
     }
 
+    var filterFacetSnapshot: WardrobeFilterFacetSnapshot {
+        WardrobeFilterFacetSnapshot(
+            tags: tagOptions.map { WardrobeFilterNamedOption(id: $0.id, name: $0.name) },
+            brands: brandOptions.map { WardrobeFilterNamedOption(id: $0.id, name: $0.name) },
+            types: types,
+            colors: colors,
+            sizes: sizes,
+            lengths: lengths,
+            conditions: conditions,
+            accessories: accessories,
+            tagNameByID: tagNameByID,
+            brandNameByID: brandNameByID
+        )
+    }
+
     private func apply(_ snapshot: WardrobeMenuFacetSnapshot) {
         guard snapshot != lastSnapshot else { return }
         lastSnapshot = snapshot
@@ -1146,15 +1161,15 @@ struct HomeView: View {
             if filterMode == .multiDimensional {
                 // 多维筛选模式 - 使用Sheet
                 Button {
+                    refreshMenuFacetCache()
+                    _ = MenuPerfSignpost.menuOpen("wardrobe.multi_filter.sheet_open")
                     showingMultiDimensionalFilterSheet = true
                 } label: {
                     filterButtonLabel
                 }
                 .sheet(isPresented: $showingMultiDimensionalFilterSheet) {
                     MultiDimensionalFilterSheet(
-                        clothings: allClothings,
-                        tags: tags,
-                        brands: brands,
+                        facetSnapshot: menuFacetCache.filterFacetSnapshot,
                         selectedTagIDs: $selectedTagIDs,
                         selectedBrandIDs: $selectedBrandIDs,
                         selectedTypes: $selectedTypes,
