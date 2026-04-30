@@ -333,6 +333,11 @@ class SwiftDataMigrationManager: ObservableObject {
             // 10. 迁移 StoredImage
             try await migrateStoredImages(from: localContext, to: cloudContext)
             migrationProgress = 0.98
+
+            // 11. 重建 OOTD/手帐关系。前面的复制步骤按实体去重插入，关系对象必须在目标
+            // context 全部存在后再统一补链，避免平面书页在 iCloud 迁移后变成孤儿。
+            try rebuildOOTDRelationships(from: localContext, to: cloudContext)
+            migrationProgress = 0.99
             
             // 保存云端数据
             try cloudContext.save()
@@ -624,6 +629,117 @@ class SwiftDataMigrationManager: ObservableObject {
         
         try cloudContext.save()
         print("  - 迁移了 \(items.count) 条 StoredImage 记录")
+    }
+
+    private func rebuildOOTDRelationships(from localContext: ModelContext, to cloudContext: ModelContext) throws {
+        let localOutfits = try localContext.fetch(FetchDescriptor<Outfit>())
+        let localOutfitItems = try localContext.fetch(FetchDescriptor<OutfitItem>())
+        let localSpaceOutfits = try localContext.fetch(FetchDescriptor<SpaceOutfit>())
+        let localSceneObjects = try localContext.fetch(FetchDescriptor<SceneObjectData>())
+
+        let cloudBooks = try cloudContext.fetch(FetchDescriptor<BookGroup>())
+        let cloudOutfits = try cloudContext.fetch(FetchDescriptor<Outfit>())
+        let cloudOutfitItems = try cloudContext.fetch(FetchDescriptor<OutfitItem>())
+        let cloudCutouts = try cloudContext.fetch(FetchDescriptor<CutoutItem>())
+        let cloudSpaceBooks = try cloudContext.fetch(FetchDescriptor<SpaceBookGroup>())
+        let cloudSpaceOutfits = try cloudContext.fetch(FetchDescriptor<SpaceOutfit>())
+        let cloudSceneObjects = try cloudContext.fetch(FetchDescriptor<SceneObjectData>())
+        let cloudModel3Ds = try cloudContext.fetch(FetchDescriptor<Model3D>())
+
+        let bookMap = mapByID(cloudBooks, id: \.id)
+        let outfitMap = mapByID(cloudOutfits, id: \.id)
+        let outfitItemMap = mapByID(cloudOutfitItems, id: \.id)
+        let cutoutMap = mapByID(cloudCutouts, id: \.id)
+        let spaceBookMap = mapByID(cloudSpaceBooks, id: \.id)
+        let spaceOutfitMap = mapByID(cloudSpaceOutfits, id: \.id)
+        let sceneObjectMap = mapByID(cloudSceneObjects, id: \.id)
+        let model3DMap = mapByID(cloudModel3Ds, id: \.id)
+
+        var relinkedOutfits = 0
+        for localOutfit in localOutfits {
+            guard let cloudOutfit = outfitMap[localOutfit.id],
+                  let localBookID = localOutfit.book?.id else {
+                continue
+            }
+            if cloudOutfit.book?.id != localBookID,
+               let cloudBook = bookMap[localBookID] {
+                cloudOutfit.book = cloudBook
+                relinkedOutfits += 1
+            }
+        }
+
+        var relinkedItems = 0
+        for localItem in localOutfitItems {
+            guard let cloudItem = outfitItemMap[localItem.id] else { continue }
+            var didRelink = false
+            if let localCutoutID = localItem.cutout?.id,
+               cloudItem.cutout?.id != localCutoutID,
+               let cloudCutout = cutoutMap[localCutoutID] {
+                cloudItem.cutout = cloudCutout
+                didRelink = true
+            }
+            if let localOutfitID = localItem.outfit?.id,
+               cloudItem.outfit?.id != localOutfitID,
+               let cloudOutfit = outfitMap[localOutfitID] {
+                cloudItem.outfit = cloudOutfit
+                if cloudOutfit.items == nil {
+                    cloudOutfit.items = []
+                }
+                if !(cloudOutfit.items?.contains(where: { $0.id == cloudItem.id }) ?? false) {
+                    cloudOutfit.items?.append(cloudItem)
+                }
+                didRelink = true
+            }
+            if didRelink {
+                relinkedItems += 1
+            }
+        }
+
+        var relinkedSpaceOutfits = 0
+        for localSpaceOutfit in localSpaceOutfits {
+            guard let cloudSpaceOutfit = spaceOutfitMap[localSpaceOutfit.id],
+                  let localBookID = localSpaceOutfit.book?.id else {
+                continue
+            }
+            if cloudSpaceOutfit.book?.id != localBookID,
+               let cloudBook = spaceBookMap[localBookID] {
+                cloudSpaceOutfit.book = cloudBook
+                relinkedSpaceOutfits += 1
+            }
+        }
+
+        var relinkedSceneObjects = 0
+        for localSceneObject in localSceneObjects {
+            guard let cloudSceneObject = sceneObjectMap[localSceneObject.id] else { continue }
+            var didRelink = false
+            if cloudSceneObject.spaceOutfitID != localSceneObject.spaceOutfitID {
+                cloudSceneObject.spaceOutfitID = localSceneObject.spaceOutfitID
+                didRelink = true
+            }
+            if let localModel3DID = localSceneObject.model3D?.id,
+               cloudSceneObject.model3D?.id != localModel3DID,
+               let cloudModel3D = model3DMap[localModel3DID] {
+                cloudSceneObject.model3D = cloudModel3D
+                didRelink = true
+            }
+            if didRelink {
+                relinkedSceneObjects += 1
+            }
+        }
+
+        try cloudContext.save()
+        print("  - 重建 OOTD 关系：Outfit.book \(relinkedOutfits)，OutfitItem \(relinkedItems)，SpaceOutfit.book \(relinkedSpaceOutfits)，SceneObjectData \(relinkedSceneObjects)")
+    }
+
+    private func mapByID<T>(_ items: [T], id keyPath: KeyPath<T, UUID>) -> [UUID: T] {
+        var result: [UUID: T] = [:]
+        for item in items {
+            let id = item[keyPath: keyPath]
+            if result[id] == nil {
+                result[id] = item
+            }
+        }
+        return result
     }
     
     // MARK: - Entity Copy Methods

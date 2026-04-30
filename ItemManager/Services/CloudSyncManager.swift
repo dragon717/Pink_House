@@ -451,6 +451,35 @@ class CloudSyncManager: ObservableObject {
             let imagesDir = await ImageManager.shared.imagesDirectory
             let fileManager = FileManager.default
             let documentsDir = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first!
+            let themeFiles = Set(manifest.themeFiles ?? [])
+            let wealthFiles = Set(manifest.wealthFiles ?? [])
+
+            func localURLForRestoredFile(fileName: String) -> URL? {
+                let widgetFiles: Set<String> = [
+                    "widget_background.jpg",
+                    "widget_background_small.jpg",
+                    "widget_background_medium.jpg",
+                    "widget_background_large.jpg"
+                ]
+                let isThemeFileByName = fileName == "theme_background_image.png" ||
+                    fileName == "theme_background_image_original.png"
+
+                if widgetFiles.contains(fileName) {
+                    guard let containerURL = fileManager.containerURL(
+                        forSecurityApplicationGroupIdentifier: WidgetDataManager.appGroupIdentifier
+                    ) else {
+                        return nil
+                    }
+                    return containerURL.appendingPathComponent(fileName)
+                }
+
+                if themeFiles.contains(fileName) || wealthFiles.contains(fileName) || isThemeFileByName {
+                    return documentsDir.appendingPathComponent(fileName)
+                }
+
+                // StoredImage / Cutout / OOTD snapshot / background files are restored through ImageManager.
+                return imagesDir.appendingPathComponent(fileName)
+            }
             
             // Map [FileName: LocalURL]
             // For existing files, we point to them. For missing, we download to temp.
@@ -470,17 +499,8 @@ class CloudSyncManager: ObservableObject {
             // B. External Files (Theme, Wealth, Widget)
             if let extHashes = manifest.externalFileHashes {
                 for (fileName, hash) in extHashes {
-                    // Determine where this file lives locally to check existence
-                    var localURL: URL
-                    if fileName == "widget_background.jpg" {
-                        if let containerURL = fileManager.containerURL(forSecurityApplicationGroupIdentifier: WidgetDataManager.appGroupIdentifier) {
-                            localURL = containerURL.appendingPathComponent(fileName)
-                        } else {
-                            continue // Skip if no app group
-                        }
-                    } else {
-                        // Theme/Wealth files are in Documents
-                        localURL = documentsDir.appendingPathComponent(fileName)
+                    guard let localURL = localURLForRestoredFile(fileName: fileName) else {
+                        continue
                     }
                     
                     if fileManager.fileExists(atPath: localURL.path) {

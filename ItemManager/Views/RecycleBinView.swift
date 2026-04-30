@@ -534,6 +534,7 @@ struct RecycleBinView: View {
         }
         // 从 DeleteTracker 中移除手帐本的删除记录
         DeleteTracker.shared.removeDeletedBookGroup(id: book.id)
+        saveRestoreState("平面手帐「\(book.title)」")
     }
     
     private func permanentlyDeleteBook(_ book: BookGroup) {
@@ -560,6 +561,7 @@ struct RecycleBinView: View {
         }
         // 从 DeleteTracker 中移除删除记录，防止被再次删除
         DeleteTracker.shared.removeDeletedOutfit(id: outfit.id)
+        saveRestoreState("平面书页「\(outfit.note)」")
     }
     
     private func permanentlyDeleteOutfit(_ outfit: Outfit) {
@@ -585,6 +587,7 @@ struct RecycleBinView: View {
                 page.lastModified = Date()
             }
         }
+        saveRestoreState("空间手帐「\(book.title)」")
     }
 
     private func permanentlyDeleteSpaceBook(_ book: SpaceBookGroup) {
@@ -607,6 +610,7 @@ struct RecycleBinView: View {
             outfit.deletedAt = nil
             outfit.lastModified = Date()
         }
+        saveRestoreState("空间书页「\(outfit.note)」")
     }
     
     private func permanentlyDeleteSpaceOutfit(_ outfit: SpaceOutfit) {
@@ -628,6 +632,7 @@ struct RecycleBinView: View {
         }
         // 从 DeleteTracker 中移除删除记录，防止被再次删除
         DeleteTracker.shared.removeDeletedModel3D(id: model.id)
+        saveRestoreState("3D模型「\(model.name)」")
     }
     
     private func permanentlyDeleteModel3D(_ model: Model3D) {
@@ -657,6 +662,17 @@ struct RecycleBinView: View {
         }
         // 从 DeleteTracker 中移除删除记录，防止被再次删除
         DeleteTracker.shared.removeDeletedPerlerPattern(id: pattern.id)
+        saveRestoreState("拼豆图案「\(pattern.name)」")
+    }
+
+    private func saveRestoreState(_ label: String) {
+        do {
+            modelContext.processPendingChanges()
+            try modelContext.save()
+            print("RecycleBinView: 恢复\(label)成功，状态已保存")
+        } catch {
+            print("RecycleBinView: 恢复\(label)保存失败: \(error)")
+        }
     }
     
     private func permanentlyDeletePerlerPattern(_ pattern: PerlerBeadPattern) {

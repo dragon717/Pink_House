@@ -56,6 +56,118 @@ struct OOTDDataRepairReport {
     }
 }
 
+struct OOTDOrphanPageRepairReport {
+    var source: String
+    var scannedOrphans = 0
+    var movedToDefaultBook = 0
+    var createdDefaultBook = false
+    var deferredAmbiguousOrphans = 0
+    var saved = false
+    var error: String?
+
+    var summary: String {
+        var parts = [
+            "source=\(source)",
+            "orphans=\(scannedOrphans)",
+            "movedToDefault=\(movedToDefaultBook)",
+            "deferred=\(deferredAmbiguousOrphans)"
+        ]
+        if createdDefaultBook {
+            parts.append("createdDefaultBook=true")
+        }
+        if saved {
+            parts.append("saved=true")
+        }
+        if let error {
+            parts.append("error=\(error)")
+        }
+        return parts.joined(separator: ", ")
+    }
+}
+
+@MainActor
+enum OOTDOrphanPageRepairService {
+    static let defaultBookTitle = "默认手帐"
+    static let magicStickerPageTitle = "少女魔法贴"
+
+    @discardableResult
+    static func repairPlanarOrphans(
+        context: ModelContext,
+        activeBooks: [BookGroup],
+        allOutfits: [Outfit],
+        source: String
+    ) -> OOTDOrphanPageRepairReport {
+        var report = OOTDOrphanPageRepairReport(source: source)
+        let orphanOutfits = allOutfits.filter { outfit in
+            outfit.book == nil && !outfit.isDeleted && outfit.deletedAt == nil
+        }
+        report.scannedOrphans = orphanOutfits.count
+
+        guard !orphanOutfits.isEmpty else {
+            print("[OOTDOrphanRepair] \(report.summary)")
+            return report
+        }
+
+        var defaultBook = activeBooks.first { $0.title == defaultBookTitle && !$0.isDeleted && $0.deletedAt == nil }
+        let activeNonDefaultBooks = activeBooks.filter {
+            $0.title != defaultBookTitle && !$0.isDeleted && $0.deletedAt == nil
+        }
+        var didChange = false
+
+        func ensureDefaultBook() -> BookGroup {
+            if let defaultBook {
+                return defaultBook
+            }
+            let maxSortIndex = activeBooks.map(\.sortIndex).max() ?? -1
+            let book = BookGroup(title: defaultBookTitle, sortIndex: maxSortIndex + 1)
+            context.insert(book)
+            defaultBook = book
+            report.createdDefaultBook = true
+            didChange = true
+            return book
+        }
+
+        for outfit in orphanOutfits {
+            let shouldMoveToDefault: Bool
+            if outfit.note == magicStickerPageTitle {
+                shouldMoveToDefault = true
+            } else {
+                // Legacy safety gate:
+                // Only auto-migrate non-magic orphan pages when there are no user-created books.
+                // In multi-book restore scenarios, keep ambiguous orphans unmoved so they are not
+                // silently misattributed to the default journal.
+                shouldMoveToDefault = activeNonDefaultBooks.isEmpty
+            }
+
+            guard shouldMoveToDefault else {
+                report.deferredAmbiguousOrphans += 1
+                print("[OOTDOrphanRepair] Deferred ambiguous orphan page '\(outfit.note)' (\(outfit.id))")
+                continue
+            }
+
+            let targetBook = ensureDefaultBook()
+            outfit.book = targetBook
+            outfit.lastModified = Date()
+            report.movedToDefaultBook += 1
+            didChange = true
+        }
+
+        if didChange {
+            do {
+                context.processPendingChanges()
+                try context.save()
+                report.saved = true
+            } catch {
+                report.error = error.localizedDescription
+                print("[OOTDOrphanRepair] Failed to save: \(error)")
+            }
+        }
+
+        print("[OOTDOrphanRepair] \(report.summary)")
+        return report
+    }
+}
+
 @MainActor
 final class OOTDDataRepairService {
     static let shared = OOTDDataRepairService()

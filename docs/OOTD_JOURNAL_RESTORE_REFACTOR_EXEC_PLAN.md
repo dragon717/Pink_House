@@ -1,6 +1,15 @@
 # 穿搭手帐恢复与 iCloud 及时恢复 · 重构执行计划（harness）
 
-> 状态：2026-05-01 调研首版。本文只落计划与验收口径，未改业务代码。iOS 阶段默认不主动跑 `xcodebuild`；Codex 可做静态检查、`git diff --check`、脚本/单测计划，用户本地编译后再按报错继续修。
+> 状态：2026-05-01 调研首版；同日已按 M1-M5 完成首轮代码落地。iOS 阶段默认不主动跑 `xcodebuild`；Codex 做静态检查、`git diff --check`、parse-only 校验和脚本/单测计划，用户本地编译后再按报错继续修。
+
+## 实施记录（2026-05-01）
+
+- M1：`BackupService.restoreFromManifest()` 已先恢复平面 `BookGroup`，再恢复 `OOTDSnapshotDTO` 到 `Outfit`，并以 `bookID` 二次 relink，避免空库恢复时书页先变孤儿。
+- M2：`BookShelfView.performMigration()` 已改为调用 `OOTDOrphanPageRepairService`；多手帐场景下无归属证据的孤儿页会被延后处理，不再批量塞入“默认手帐”。
+- M3：恢复完成后已统一 `processPendingChanges()` + `save()`，并发送 `dataRestoreCompleted` / `ootdRestoreCompleted`；书架与书页详情监听通知刷新。`CloudSyncManager` 已按 widget/theme/wealth/OOTD 图片角色判断本地目标目录。
+- M4：`SwiftDataMigrationManager` 已在实体迁移后统一重建 `Outfit.book`、`OutfitItem.outfit/cutout`、`SpaceOutfit.book` 与 `SceneObjectData` 关系。
+- M5：`RecycleBinView` 已统一恢复后的保存口径，平面/空间手帐、书页、3D 模型与拼豆恢复后会立即持久化。
+- Harness：静态验收结果写入 `temp/_ootd_restore_harness/accept/20260501-025533/RESULT.md`（`temp/*` 默认不提交）；`git diff --check`、修改 Swift 文件 `swiftc -parse`、静态 harness 7/7 均通过。
 
 ## 0. 启动协议
 
@@ -177,7 +186,7 @@ if let bookID = dto.bookID {
 
 目标文件：
 - `ItemManager/Views/OOTD/BookShelfView.swift`
-- 新增 `ItemManager/Services/OOTDOrphanPageRepairService.swift`（命名可调整）
+- 新增或并入 `OOTDOrphanPageRepairService`（当前可落在既有 OOTD 服务文件内，避免漏加 Xcode target membership）
 - `ItemManagerTests/...`
 
 任务：
@@ -229,7 +238,7 @@ if let bookID = dto.bookID {
 
 建议 commit：`[M5] 统一手帐回收站恢复的保存与同步口径`
 
-### M6 — 验收脚本与回归夹具
+### M6 — 验收脚本与回归夹具（可选增强）
 
 建议新增：
 - `scripts/ootd_restore_harness/audit_ootd_restore_manifest.py`

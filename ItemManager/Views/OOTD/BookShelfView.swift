@@ -183,6 +183,10 @@ struct BookShelfView: View {
                 isBookSelected = selectedBook != nil
                 notifyOotdShelfGuideState()
             }
+            .onReceive(NotificationCenter.default.publisher(for: .ootdRestoreCompleted)) { _ in
+                performMigration(source: "restoreCompleted")
+                notifyOotdShelfGuideState()
+            }
             .onChange(of: showingNewBookAlert) { _, isVisible in
                 NotificationCenter.default.post(
                     name: .ootdBookCreationPromptVisibilityChanged,
@@ -347,32 +351,13 @@ struct BookShelfView: View {
         }
     }
     
-    private func performMigration() {
-        // 只迁移未删除的孤儿书页，避免已删除的书页被复活
-        let orphanOutfits = allOutfits.filter { $0.book == nil && !$0.isDeleted }
-
-        if !orphanOutfits.isEmpty {
-            let defaultBook: BookGroup
-            if let existingDefault = books.first(where: { $0.title == "默认手帐" }) {
-                defaultBook = existingDefault
-            } else if let anyBook = books.first {
-                defaultBook = anyBook
-            } else {
-                defaultBook = BookGroup(title: "默认手帐")
-                modelContext.insert(defaultBook)
-            }
-
-            for outfit in orphanOutfits {
-                outfit.book = defaultBook
-            }
-
-            do {
-                try modelContext.save()
-                print("BookShelfView: Migrated \(orphanOutfits.count) orphan outfits to default book")
-            } catch {
-                print("BookShelfView: Failed to save migration: \(error)")
-            }
-        }
+    private func performMigration(source: String = "onAppear") {
+        _ = OOTDOrphanPageRepairService.repairPlanarOrphans(
+            context: modelContext,
+            activeBooks: books,
+            allOutfits: allOutfits,
+            source: source
+        )
 
         // 打印默认手帐的书页状态
         printDefaultBookPagesStatus()

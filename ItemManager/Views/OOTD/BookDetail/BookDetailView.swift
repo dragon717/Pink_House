@@ -291,6 +291,11 @@ struct BookDetailView: View {
                 let hasPages = sortedPages.contains { $0.deletedAt == nil }
                 NotificationCenter.default.post(name: .ootdBookDetailOpened, object: nil, userInfo: ["hasPages": hasPages])
             }
+            .onReceive(NotificationCenter.default.publisher(for: .ootdRestoreCompleted)) { _ in
+                loadPages()
+                refreshTrigger.toggle()
+                print("BookDetailView: Reloaded pages after OOTD restore notification")
+            }
     }
 
     // 打印当前手帐的书页状态

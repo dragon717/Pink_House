@@ -18,7 +18,26 @@ final class BackupRestoreIntegrationTests: XCTestCase {
         // 使用内存数据库
         let config = ModelConfiguration(isStoredInMemoryOnly: true)
         container = try ModelContainer(for: Schema([
-            Clothing.self, WealthSavingEntry.self, Brand.self, Tag.self, StoredImage.self, CutoutItem.self, Outfit.self, OutfitItem.self, AccessoryItem.self
+            Clothing.self,
+            WealthSavingEntry.self,
+            Item.self,
+            Tag.self,
+            Brand.self,
+            AccessoryItem.self,
+            StoredImage.self,
+            CutoutItem.self,
+            Outfit.self,
+            OutfitItem.self,
+            BookGroup.self,
+            SpaceBookGroup.self,
+            SpaceOutfit.self,
+            SceneObjectData.self,
+            Model3D.self,
+            PerlerBeadPattern.self,
+            Notice.self,
+            ClothingImageSyncRecord.self,
+            DepositNotificationRecord.self,
+            DepositNotificationSettings.self
         ]), configurations: config)
         context = container.mainContext
     }
@@ -156,6 +175,82 @@ final class BackupRestoreIntegrationTests: XCTestCase {
         try? FileManager.default.removeItem(at: exportURL)
     }
 
+    func testOOTDRestoreKeepsFlatPagesInOriginalBooks() throws {
+        let date = Date(timeIntervalSince1970: 1_700_100_000)
+        let defaultBookID = UUID()
+        let bookAID = UUID()
+        let bookBID = UUID()
+
+        let bookGroups = [
+            BookGroupDTO(id: defaultBookID, title: "默认手帐", coverImage: nil, createdAt: date, isDeleted: false, deletedAt: nil, sortIndex: 0, lastModified: date),
+            BookGroupDTO(id: bookAID, title: "旅行手帐", coverImage: nil, createdAt: date, isDeleted: false, deletedAt: nil, sortIndex: 1, lastModified: date),
+            BookGroupDTO(id: bookBID, title: "茶会手帐", coverImage: nil, createdAt: date, isDeleted: false, deletedAt: nil, sortIndex: 2, lastModified: date)
+        ]
+
+        let snapshots = [
+            makeSnapshot(note: "少女魔法贴", bookID: defaultBookID, sortSeed: 0, date: date),
+            makeSnapshot(note: "旅行第一页", bookID: bookAID, sortSeed: 1, date: date),
+            makeSnapshot(note: "旅行第二页", bookID: bookAID, sortSeed: 2, date: date),
+            makeSnapshot(note: "茶会第一页", bookID: bookBID, sortSeed: 3, date: date)
+        ]
+
+        let manifest = makeOOTDManifest(bookGroups: bookGroups, snapshots: snapshots, date: date)
+
+        try BackupService.shared.restoreFromManifest(manifest: manifest, imageFiles: [:], context: context)
+
+        var restoredBooks = try context.fetch(FetchDescriptor<BookGroup>())
+        var restoredOutfits = try context.fetch(FetchDescriptor<Outfit>())
+        XCTAssertEqual(restoredBooks.count, 3)
+        XCTAssertEqual(restoredOutfits.count, 4)
+        XCTAssertEqual(bookTitle(for: "旅行第一页", in: restoredOutfits), "旅行手帐")
+        XCTAssertEqual(bookTitle(for: "旅行第二页", in: restoredOutfits), "旅行手帐")
+        XCTAssertEqual(bookTitle(for: "茶会第一页", in: restoredOutfits), "茶会手帐")
+        XCTAssertEqual(bookTitle(for: "少女魔法贴", in: restoredOutfits), "默认手帐")
+        XCTAssertTrue(restoredOutfits.allSatisfy { $0.book != nil }, "新格式 snapshot 带 bookID 时不应产生孤儿书页")
+
+        let report = OOTDOrphanPageRepairService.repairPlanarOrphans(
+            context: context,
+            activeBooks: restoredBooks,
+            allOutfits: restoredOutfits,
+            source: "unit-test"
+        )
+        XCTAssertEqual(report.scannedOrphans, 0)
+        XCTAssertEqual(report.movedToDefaultBook, 0)
+
+        try BackupService.shared.restoreFromManifest(manifest: manifest, imageFiles: [:], context: context)
+        restoredBooks = try context.fetch(FetchDescriptor<BookGroup>())
+        restoredOutfits = try context.fetch(FetchDescriptor<Outfit>())
+        XCTAssertEqual(restoredBooks.count, 3, "重复恢复同一备份不应重复创建手帐")
+        XCTAssertEqual(restoredOutfits.count, 4, "重复恢复同一备份不应重复创建书页")
+        XCTAssertEqual(bookTitle(for: "茶会第一页", in: restoredOutfits), "茶会手帐")
+    }
+
+    func testOOTDOrphanRepairDoesNotMoveAmbiguousPagesWhenUserBooksExist() throws {
+        let defaultBook = BookGroup(title: "默认手帐", sortIndex: 0)
+        let userBook = BookGroup(title: "旅行手帐", sortIndex: 1)
+        let ambiguousPage = Outfit(note: "未归属旅行页", canvasType: "blank", book: nil)
+        let magicPage = Outfit(note: "少女魔法贴", canvasType: "blank", book: nil)
+
+        context.insert(defaultBook)
+        context.insert(userBook)
+        context.insert(ambiguousPage)
+        context.insert(magicPage)
+        try context.save()
+
+        let report = OOTDOrphanPageRepairService.repairPlanarOrphans(
+            context: context,
+            activeBooks: [defaultBook, userBook],
+            allOutfits: [ambiguousPage, magicPage],
+            source: "unit-test"
+        )
+
+        XCTAssertEqual(report.scannedOrphans, 2)
+        XCTAssertEqual(report.movedToDefaultBook, 1)
+        XCTAssertEqual(report.deferredAmbiguousOrphans, 1)
+        XCTAssertNil(ambiguousPage.book, "多手帐场景中无归属证据的孤儿页不应自动塞进默认手帐")
+        XCTAssertEqual(magicPage.book?.id, defaultBook.id, "魔法贴纸专用页仍允许回默认手帐")
+    }
+
     func testOOTDSnapshotDTOMannequinAssetIDIsBackwardCompatible() throws {
         let oldSnapshotJSON = """
         {
@@ -196,5 +291,77 @@ final class BackupRestoreIntegrationTests: XCTestCase {
 
         let newDTO = try JSONDecoder().decode(OOTDSnapshotDTO.self, from: Data(newSnapshotJSON.utf8))
         XCTAssertEqual(newDTO.mannequinAssetID, "ootd_mannequin_default")
+    }
+
+    private func makeSnapshot(note: String, bookID: UUID, sortSeed: Int, date: Date) -> OOTDSnapshotDTO {
+        OOTDSnapshotDTO(
+            id: UUID(),
+            createdAt: date.addingTimeInterval(TimeInterval(sortSeed)),
+            note: note,
+            snapshotPath: nil,
+            canvasType: "blank",
+            backgroundImagePath: nil,
+            mannequinAssetID: nil,
+            bookID: bookID,
+            items: [],
+            lastModified: date,
+            isDeleted: false,
+            deletedAt: nil
+        )
+    }
+
+    private func makeOOTDManifest(
+        bookGroups: [BookGroupDTO],
+        snapshots: [OOTDSnapshotDTO],
+        date: Date
+    ) -> BackupManifest {
+        BackupManifest(
+            formatVersion: BackupFormatVersion.current.rawValue,
+            timestamp: date,
+            deviceName: "Unit Test",
+            brands: [],
+            tags: [],
+            clothings: [],
+            wealthSavingEntries: [],
+            storedImages: [],
+            cutouts: [],
+            outfits: nil,
+            snapshots: snapshots,
+            appSettings: nil,
+            themeFiles: nil,
+            wealthFiles: nil,
+            hasWidgetBackground: false,
+            hasSmallWidgetBackground: false,
+            hasMediumWidgetBackground: false,
+            hasLargeWidgetBackground: false,
+            externalFileHashes: nil,
+            petStatusData: nil,
+            chatHistoryData: nil,
+            appVersion: "test",
+            bookGroups: bookGroups,
+            spaceBookGroups: [],
+            spaceOutfits: [],
+            model3Ds: [],
+            userProfile: nil,
+            userAvatarFile: nil,
+            perlerBeadPatterns: [],
+            featureStatuses: nil,
+            unlockConditions: nil,
+            checkInRecords: nil,
+            checkInStats: nil,
+            themeColorConfig: nil,
+            clothingCount: 0,
+            imageCount: 0,
+            outfitCount: snapshots.count,
+            bookGroupCount: bookGroups.count,
+            spaceBookGroupCount: 0,
+            spaceOutfitCount: 0,
+            model3DCount: 0,
+            perlerBeadPatternCount: 0
+        )
+    }
+
+    private func bookTitle(for note: String, in outfits: [Outfit]) -> String? {
+        outfits.first { $0.note == note }?.book?.title
     }
 }

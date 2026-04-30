@@ -11,6 +11,11 @@ import UIKit
 import WidgetKit
 import CryptoKit
 
+extension Notification.Name {
+    static let dataRestoreCompleted = Notification.Name("dataRestoreCompleted")
+    static let ootdRestoreCompleted = Notification.Name("ootdRestoreCompleted")
+}
+
 // MARK: - Backup Service
 
 @MainActor
@@ -962,6 +967,7 @@ class BackupService {
         var bookGroupMap: [UUID: BookGroup] = [:]
         var spaceBookGroupMap: [UUID: SpaceBookGroup] = [:]
         var perlerBeadPatternMap: [UUID: PerlerBeadPattern] = [:]
+        var snapshotBookIDs: [UUID: UUID] = [:]
 
         init(manifest: BackupManifest, imageFiles: [String: URL], context: ModelContext) throws {
             self.manifest = manifest
@@ -973,6 +979,12 @@ class BackupService {
                 throw BackupError.fileCreateFailed
             }
             self.documentsDir = documentsDir
+            var snapshotBookIDs: [UUID: UUID] = [:]
+            for snapshot in manifest.snapshots ?? [] {
+                guard let bookID = snapshot.bookID else { continue }
+                snapshotBookIDs[snapshot.id] = bookID
+            }
+            self.snapshotBookIDs = snapshotBookIDs
         }
     }
 
@@ -1104,6 +1116,17 @@ class BackupService {
         }
 
         // --- 阶段 3: 恢复复杂模型与关系 ---
+        // 3a0. 先恢复平面手帐本，确保随后恢复 OOTDSnapshot 时 bookID 能命中。
+        // 这是防止“其它手帐书页被恢复为默认手帐”的关键顺序约束。
+        do {
+            try restoreFlatBookGroups(context: &ctx)
+            print("✅ Stage 3a0 (Flat BookGroups): Success")
+        } catch {
+            result.bookGroupsSuccess = false
+            result.bookGroupsError = error.localizedDescription
+            print("❌ Stage 3a0 (Flat BookGroups): Failed - \(error)")
+        }
+
         // 3a. Clothing 和 CutoutItem
         do {
             try restoreClothingAndOutfits(context: &ctx)
@@ -1153,6 +1176,33 @@ class BackupService {
             result.settingsSuccess = false
             result.settingsError = error.localizedDescription
             print("❌ Stage 4 (Settings): Failed - \(error)")
+        }
+
+        // --- 阶段 5: 统一提交并通知 UI 刷新 ---
+        do {
+            context.processPendingChanges()
+            try context.save()
+            NotificationCenter.default.post(
+                name: .dataRestoreCompleted,
+                object: nil,
+                userInfo: ["timestamp": Date()]
+            )
+            NotificationCenter.default.post(
+                name: .ootdRestoreCompleted,
+                object: nil,
+                userInfo: [
+                    "timestamp": Date(),
+                    "snapshotCount": manifest.snapshots?.count ?? 0,
+                    "bookGroupCount": manifest.bookGroups?.count ?? 0
+                ]
+            )
+            print("✅ Stage 5 (Final Save & Notifications): Success")
+        } catch {
+            result.settingsSuccess = false
+            result.settingsError = [result.settingsError, "最终保存失败: \(error.localizedDescription)"]
+                .compactMap { $0 }
+                .joined(separator: "\n")
+            print("❌ Stage 5 (Final Save & Notifications): Failed - \(error)")
         }
 
         // --- 最终报告 ---
@@ -1837,12 +1887,14 @@ class BackupService {
         
         // Pre-fetch BookGroups for Outfit relationship restoration
         let existingBookGroups = try modelContext.fetch(FetchDescriptor<BookGroup>())
-        var bookGroupMap: [UUID: BookGroup] = [:]
+        var bookGroupMap = context.bookGroupMap
         var duplicateBookGroups: [BookGroup] = []
         for bookGroup in existingBookGroups {
-            if bookGroupMap[bookGroup.id] != nil {
-                print("### Restore: Warning - Duplicate BookGroup ID detected: \(bookGroup.id), will merge and delete duplicate")
-                duplicateBookGroups.append(bookGroup)
+            if let mapped = bookGroupMap[bookGroup.id] {
+                if mapped !== bookGroup {
+                    print("### Restore: Warning - Duplicate BookGroup ID detected: \(bookGroup.id), will merge and delete duplicate")
+                    duplicateBookGroups.append(bookGroup)
+                }
             } else {
                 bookGroupMap[bookGroup.id] = bookGroup
             }
@@ -1863,7 +1915,9 @@ class BackupService {
             modelContext.delete(duplicate)
             print("### Restore: Deleted duplicate BookGroup with ID: \(duplicate.id)")
         }
-        
+        context.bookGroupMap = bookGroupMap
+        print("### Restore: Prepared \(bookGroupMap.count) BookGroups for Outfit relationship restoration.")
+
         // 1. 优先尝试恢复 Snapshots (新版备份格式)
         if let snapshots = manifest.snapshots {
             print("### Restore: Found \(snapshots.count) snapshots. Restoring as Outfits...")
@@ -2148,6 +2202,124 @@ class BackupService {
         // 保存映射表到上下文
         context.model3DMap = model3DMap
     }
+
+    @discardableResult
+    private func restoreFlatBookGroups(context: inout RestoreContext) throws -> [UUID: BookGroup] {
+        let modelContext = context.context
+        let manifest = context.manifest
+
+        let existingBookGroups = try modelContext.fetch(FetchDescriptor<BookGroup>())
+        var localBookGroupMap: [UUID: BookGroup] = [:]
+        var duplicateLocalBookGroups: [BookGroup] = []
+
+        for bookGroup in existingBookGroups {
+            if localBookGroupMap[bookGroup.id] != nil {
+                print("### Restore: Warning - Duplicate BookGroup ID detected: \(bookGroup.id), will merge and delete duplicate")
+                duplicateLocalBookGroups.append(bookGroup)
+            } else {
+                localBookGroupMap[bookGroup.id] = bookGroup
+            }
+        }
+
+        for duplicate in duplicateLocalBookGroups {
+            if let keeper = localBookGroupMap[duplicate.id] {
+                if keeper.title.isEmpty && !duplicate.title.isEmpty {
+                    keeper.title = duplicate.title
+                }
+                if keeper.coverImage == nil && duplicate.coverImage != nil {
+                    keeper.coverImage = duplicate.coverImage
+                }
+
+                let existingPageIDs = Set(keeper.pages?.map { $0.id } ?? [])
+                for page in duplicate.pages ?? [] where !existingPageIDs.contains(page.id) {
+                    keeper.pages?.append(page)
+                }
+            }
+            modelContext.delete(duplicate)
+            print("### Restore: Deleted duplicate BookGroup with ID: \(duplicate.id)")
+        }
+
+        guard let bookGroupDTOs = manifest.bookGroups else {
+            context.bookGroupMap = localBookGroupMap
+            return localBookGroupMap
+        }
+
+        print("### Restore: Found \(bookGroupDTOs.count) book groups.")
+
+        for dto in bookGroupDTOs {
+            // Skip deleted book groups in backup, preserving current product behavior.
+            if dto.isDeleted ?? false { continue }
+
+            let bookGroup: BookGroup
+            if let existing = localBookGroupMap[dto.id] {
+                bookGroup = existing
+                bookGroup.title = dto.title
+                bookGroup.coverImage = dto.coverImage
+                bookGroup.sortIndex = dto.sortIndex
+            } else {
+                bookGroup = BookGroup(title: dto.title, coverImage: dto.coverImage, sortIndex: dto.sortIndex)
+                bookGroup.id = dto.id
+                bookGroup.createdAt = dto.createdAt
+                modelContext.insert(bookGroup)
+                localBookGroupMap[dto.id] = bookGroup
+            }
+
+            bookGroup.isDeleted = dto.isDeleted ?? false
+            bookGroup.deletedAt = dto.deletedAt
+
+            if let lastModified = dto.lastModified {
+                bookGroup.lastModified = lastModified
+            }
+        }
+
+        context.bookGroupMap = localBookGroupMap
+        return localBookGroupMap
+    }
+
+    private func relinkFlatOutfitsToBooks(
+        context: inout RestoreContext,
+        bookGroupMap: [UUID: BookGroup]
+    ) throws {
+        guard !context.snapshotBookIDs.isEmpty else { return }
+
+        let modelContext = context.context
+        var outfitMap = context.outfitMap
+        if outfitMap.isEmpty {
+            let outfits = try modelContext.fetch(FetchDescriptor<Outfit>())
+            for outfit in outfits where outfitMap[outfit.id] == nil {
+                outfitMap[outfit.id] = outfit
+            }
+        }
+
+        var relinkedCount = 0
+        var missingBookCount = 0
+        var missingOutfitCount = 0
+
+        for (outfitID, bookID) in context.snapshotBookIDs {
+            guard let book = bookGroupMap[bookID] else {
+                missingBookCount += 1
+                print("### Restore: WARNING - BookGroup \(bookID) missing for Outfit \(outfitID), keeping current relationship")
+                continue
+            }
+            guard let outfit = outfitMap[outfitID] else {
+                missingOutfitCount += 1
+                print("### Restore: WARNING - Outfit \(outfitID) missing while relinking to BookGroup \(bookID)")
+                continue
+            }
+
+            if outfit.book?.id != bookID {
+                outfit.book = book
+                outfit.lastModified = max(outfit.lastModified, book.lastModified)
+                relinkedCount += 1
+            }
+        }
+
+        if relinkedCount > 0 || missingBookCount > 0 || missingOutfitCount > 0 {
+            print("### Restore: Flat OOTD relink summary - relinked: \(relinkedCount), missingBooks: \(missingBookCount), missingOutfits: \(missingOutfitCount)")
+        }
+
+        context.outfitMap = outfitMap
+    }
     
     private func restoreBookGroups(context: inout RestoreContext) throws {
         let modelContext = context.context
@@ -2165,72 +2337,8 @@ class BackupService {
         print("--- Stage 3c: Restoring Book Groups ---")
         
         // 1. 恢复平面手帐 (BookGroup)
-        if let bookGroupDTOs = manifest.bookGroups {
-            print("### Restore: Found \(bookGroupDTOs.count) book groups.")
-            
-            let existingBookGroups = try modelContext.fetch(FetchDescriptor<BookGroup>())
-            localBookGroupMap = [:]
-            var duplicateLocalBookGroups: [BookGroup] = []
-            for bookGroup in existingBookGroups {
-                if localBookGroupMap[bookGroup.id] != nil {
-                    print("### Restore: Warning - Duplicate BookGroup ID detected: \(bookGroup.id), will merge and delete duplicate")
-                    duplicateLocalBookGroups.append(bookGroup)
-                } else {
-                    localBookGroupMap[bookGroup.id] = bookGroup
-                }
-            }
-            // Merge duplicate book groups
-            for duplicate in duplicateLocalBookGroups {
-                if let keeper = localBookGroupMap[duplicate.id] {
-                    if keeper.title.isEmpty && !duplicate.title.isEmpty {
-                        keeper.title = duplicate.title
-                    }
-                    if keeper.coverImage == nil && duplicate.coverImage != nil {
-                        keeper.coverImage = duplicate.coverImage
-                    }
-                }
-                modelContext.delete(duplicate)
-                print("### Restore: Deleted duplicate BookGroup with ID: \(duplicate.id)")
-            }
-            
-            for dto in bookGroupDTOs {
-                // Skip deleted book groups in backup
-                if dto.isDeleted ?? false { continue }
-
-                let bookGroup: BookGroup
-                if let existing = localBookGroupMap[dto.id] {
-                    bookGroup = existing
-                    bookGroup.title = dto.title
-                    bookGroup.coverImage = dto.coverImage
-                    bookGroup.sortIndex = dto.sortIndex
-                } else {
-                    bookGroup = BookGroup(title: dto.title, coverImage: dto.coverImage, sortIndex: dto.sortIndex)
-                    bookGroup.id = dto.id
-                    bookGroup.createdAt = dto.createdAt
-                    modelContext.insert(bookGroup)
-                    localBookGroupMap[dto.id] = bookGroup
-                }
-                
-                // 恢复删除状态（兼容老版本备份）
-                bookGroup.isDeleted = dto.isDeleted ?? false
-                bookGroup.deletedAt = dto.deletedAt
-                
-                // 恢复 lastModified
-                if let lastModified = dto.lastModified {
-                    bookGroup.lastModified = lastModified
-                }
-            }
-            
-            // 2. 恢复平面书页与手帐的关联
-            // Re-fetch outfits to establish book relationships
-            let allOutfits = try modelContext.fetch(FetchDescriptor<Outfit>())
-            for outfit in allOutfits {
-                // Find if this outfit should belong to a book
-                // Note: In current data model, Outfit doesn't have a direct book reference
-                // This relationship is established via BookGroup.pages
-                // We need to check if the backup had this relationship
-            }
-        }
+        localBookGroupMap = try restoreFlatBookGroups(context: &context)
+        try relinkFlatOutfitsToBooks(context: &context, bookGroupMap: localBookGroupMap)
         
         // 3. 恢复空间手帐 (SpaceBookGroup)
         if let spaceBookGroupDTOs = manifest.spaceBookGroups {
