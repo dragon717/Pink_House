@@ -36,3 +36,5 @@ harmony_next/entry/build/*
 harmony_next/.hvigor/*
 
 android/.codex-ide-cache-backup-*/*
+ItemManager/.DS_Store
+.env
