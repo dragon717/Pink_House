@@ -62,7 +62,7 @@ struct MoneyCountingView: View {
     var body: some View {
         ZStack {
             // 应用全局背景
-            LiquidBackground()
+            LiquidBackground(themeSkinWallpaperContext: .wealth)
                 .ignoresSafeArea()
             
             // 背景遮罩（稍微降低透明度以便透出背景，同时保持点击交互）

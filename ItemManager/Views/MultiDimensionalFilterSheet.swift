@@ -93,7 +93,7 @@ struct MultiDimensionalFilterSheet: View {
         NavigationStack {
             ZStack {
                 // 背景
-                LiquidBackground()
+                LiquidBackground(themeSkinWallpaperContext: .wardrobe)
                     .ignoresSafeArea()
                 
                 VStack(spacing: 0) {

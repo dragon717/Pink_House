@@ -38,6 +38,8 @@ struct SmartBackgroundImage: View {
 
 // MARK: - Liquid Background
 struct LiquidBackground: View {
+    var themeSkinWallpaperContext: ThemeSkinWallpaperContext = .general
+
     @Environment(ThemeManager.self) private var themeManager
     @Environment(\.colorScheme) private var colorScheme
     @ObservedObject private var themeSkinManager = ThemeSkinManager.shared
@@ -51,7 +53,9 @@ struct LiquidBackground: View {
             if let activeProduct = themeSkinManager.activeProduct {
                 ThemeSkinStickerWallpaperBackground(
                     product: activeProduct,
-                    heroAssetName: themeSkinManager.backgroundHeroAssetName(for: activeProduct.themeId)
+                    heroAssetName: themeSkinManager.backgroundHeroAssetName(for: activeProduct.themeId),
+                    layoutPreset: themeSkinManager.backgroundLayoutPreset(for: activeProduct.themeId),
+                    context: themeSkinWallpaperContext
                 )
             } else if themeManager.effectiveBackgroundStyle == .image, let image = themeManager.backgroundImage {
                 SmartBackgroundImage(image: image, opacity: themeManager.backgroundOpacity)

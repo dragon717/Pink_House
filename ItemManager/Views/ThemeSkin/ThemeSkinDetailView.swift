@@ -65,7 +65,7 @@ struct ThemeSkinDetailView: View {
                 }
                 .padding()
             }
-            .background(LiquidBackground())
+            .background(LiquidBackground(themeSkinWallpaperContext: .themeDetail))
         }
         .navigationTitle(product?.name ?? "主题详情")
         .navigationBarTitleDisplayMode(.inline)

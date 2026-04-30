@@ -17,7 +17,7 @@ private enum ThemeSkinSharedSurfaceTokens {
         case .compact, .scrollOptimized:
             return ThemeSkinEdgeStickerAssets.assetName(for: descriptor, role: .scrollPrimary)
         case .standard:
-            return ThemeSkinEdgeStickerAssets.assetName(for: descriptor, role: .cardPrimary)
+            return ThemeSkinEdgeStickerAssets.assetName(for: descriptor, role: .cardCornerTopTrailing)
         case .hero:
             return ThemeSkinEdgeStickerAssets.assetName(for: descriptor, role: .heroPrimary)
         }
@@ -28,7 +28,7 @@ private enum ThemeSkinSharedSurfaceTokens {
         case .compact, .scrollOptimized:
             return ThemeSkinEdgeStickerAssets.assetName(for: descriptor, role: .scrollSecondary)
         case .standard:
-            return ThemeSkinEdgeStickerAssets.assetName(for: descriptor, role: .cardSecondary)
+            return ThemeSkinEdgeStickerAssets.assetName(for: descriptor, role: .cardCornerBottomLeading)
         case .hero:
             return ThemeSkinEdgeStickerAssets.assetName(for: descriptor, role: .heroSecondary)
         }
@@ -38,6 +38,11 @@ private enum ThemeSkinSharedSurfaceTokens {
 enum ThemeSkinEdgeStickerRole {
     case cardPrimary
     case cardSecondary
+    case cardCornerTopLeading
+    case cardCornerTopTrailing
+    case cardCornerBottomLeading
+    case cardCornerBottomTrailing
+    case cardCenterEmblem
     case heroPrimary
     case heroSecondary
     case scrollPrimary
@@ -52,10 +57,16 @@ enum ThemeSkinEdgeStickerAssets {
     static func assetName(for descriptor: ThemeSkinDescriptor?, role: ThemeSkinEdgeStickerRole) -> String {
         if SwanDreamThemeSkin.isSwanDream(descriptor) {
             switch role {
-            case .cardPrimary, .titleLeading:
-                return SwanDreamThemeSkin.decorPinkRibbonBow
-            case .cardSecondary, .scrollSecondary:
-                return SwanDreamThemeSkin.decorSwanFeatherBow
+            case .cardPrimary, .cardCornerTopTrailing, .titleLeading:
+                return SwanDreamThemeSkin.decorCrownedSwanClouds
+            case .cardSecondary, .cardCornerBottomLeading, .scrollSecondary:
+                return SwanDreamThemeSkin.decorCrystalStars
+            case .cardCornerTopLeading:
+                return SwanDreamThemeSkin.decorMoonBowBottle
+            case .cardCornerBottomTrailing:
+                return SwanDreamThemeSkin.decorDreamCastleClouds
+            case .cardCenterEmblem:
+                return SwanDreamThemeSkin.decorCrescentPlanetSparkle
             case .heroPrimary:
                 return SwanDreamThemeSkin.decorRibbonSwanClouds
             case .heroSecondary, .tabBarLeading:
@@ -68,10 +79,16 @@ enum ThemeSkinEdgeStickerAssets {
         }
 
         switch role {
-        case .cardPrimary, .scrollSecondary:
+        case .cardPrimary, .cardCornerTopTrailing, .scrollSecondary:
             return SkyConcertThemeSkin.decorMusicScrollClouds
-        case .cardSecondary, .scrollPrimary, .titleLeading:
+        case .cardSecondary, .cardCornerBottomLeading, .scrollPrimary, .titleLeading:
             return SkyConcertThemeSkin.decorViolinCloud
+        case .cardCornerTopLeading:
+            return SkyConcertThemeSkin.decorPastelPlanets
+        case .cardCornerBottomTrailing:
+            return SkyConcertThemeSkin.decorShootingStar
+        case .cardCenterEmblem:
+            return SkyConcertThemeSkin.decorWhaleCloudStars
         case .heroPrimary:
             return SkyConcertThemeSkin.decorBunnyAccordionStage
         case .heroSecondary:

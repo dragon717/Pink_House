@@ -45,7 +45,7 @@ struct ClothingDetailView: View {
         GeometryReader { geometry in
             ZStack(alignment: .top) {
                 // Background
-                LiquidBackground()
+                LiquidBackground(themeSkinWallpaperContext: .wardrobe)
                     .ignoresSafeArea()
                     .environment(\.containerPalette, containerPalette)
                 

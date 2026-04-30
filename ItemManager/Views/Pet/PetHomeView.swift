@@ -79,7 +79,7 @@ struct PetHomeView: View {
                             
                             ZStack {
                                 // 背景
-                                LiquidBackground()
+                                LiquidBackground(themeSkinWallpaperContext: .petChat)
                                     .ignoresSafeArea()
                                 
                                 // 通用布局逻辑：

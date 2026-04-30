@@ -269,7 +269,7 @@ struct MeView: View {
             .padding(.top, 10)
         }
         .background {
-            LiquidBackground()
+            LiquidBackground(themeSkinWallpaperContext: .me)
         }
         .navigationTitle("我")
         .navigationDestination(for: String.self) { destination in

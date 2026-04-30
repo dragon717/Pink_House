@@ -34,7 +34,7 @@ struct DreamDressCalendarView: View {
         NavigationStack {
             ZStack {
                 // Background
-                LiquidBackground()
+                LiquidBackground(themeSkinWallpaperContext: .journal)
                     .ignoresSafeArea()
 
                 VStack(spacing: 0) {
@@ -679,7 +679,7 @@ struct CalendarThemeSelectorView: View {
                 }
                 .padding()
             }
-            .background(LiquidBackground())
+            .background(LiquidBackground(themeSkinWallpaperContext: .journal))
             .navigationTitle("选择主题")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

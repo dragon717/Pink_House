@@ -291,7 +291,7 @@ enum SwanDreamThemeSkin {
         case .group:
             return [
                 SkyConcertDecorationPlacement(
-                    assetName: decorPinkRibbonBow,
+                    assetName: decorCrownedSwanClouds,
                     width: 50,
                     opacity: 0.56,
                     alignment: .topTrailing,
@@ -310,7 +310,7 @@ enum SwanDreamThemeSkin {
         case .segment:
             return [
                 SkyConcertDecorationPlacement(
-                    assetName: decorSwanFeatherBow,
+                    assetName: decorCrescentPlanetSparkle,
                     width: 52,
                     opacity: 0.3,
                     alignment: .topLeading,
@@ -385,7 +385,7 @@ enum SwanDreamThemeSkin {
             rotationDegrees: -4
         ),
         SkyConcertDecorationPlacement(
-            assetName: decorSwanFeatherBow,
+            assetName: decorCrystalStars,
             width: 42,
             opacity: 0.66,
             alignment: .topLeading,
@@ -396,7 +396,7 @@ enum SwanDreamThemeSkin {
 
     static let wardrobeCardPlacements: [SkyConcertDecorationPlacement] = [
         SkyConcertDecorationPlacement(
-            assetName: decorPinkRibbonBow,
+            assetName: decorCrownedSwanClouds,
             width: 44,
             opacity: 0.72,
             alignment: .topTrailing,
@@ -412,7 +412,7 @@ enum SwanDreamThemeSkin {
             rotationDegrees: -4
         ),
         SkyConcertDecorationPlacement(
-            assetName: decorSwanFeatherBow,
+            assetName: decorCrystalStars,
             width: 30,
             opacity: 0.34,
             alignment: .bottomTrailing,

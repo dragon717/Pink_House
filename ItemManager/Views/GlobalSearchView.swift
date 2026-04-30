@@ -24,7 +24,7 @@ struct GlobalSearchView: View {
         NavigationStack {
             ZStack {
                 // 背景
-                LiquidBackground()
+                LiquidBackground(themeSkinWallpaperContext: .wardrobe)
                     .ignoresSafeArea()
                 
                 content

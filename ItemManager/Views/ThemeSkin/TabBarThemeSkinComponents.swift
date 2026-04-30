@@ -61,7 +61,7 @@ private enum TabBarThemeSkinTokens {
         case SwanDreamThemeSkin.namespace:
             switch role {
             case .wardrobe:
-                return SwanDreamThemeSkin.decorPinkRibbonBow
+                return SwanDreamThemeSkin.decorMoonBowBottle
             case .house:
                 return SwanDreamThemeSkin.decorDreamCastleClouds
             case .me:

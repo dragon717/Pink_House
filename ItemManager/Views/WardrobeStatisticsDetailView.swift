@@ -16,7 +16,7 @@ struct WardrobeStatisticsDetailView: View {
     var body: some View {
         ZStack {
             // 背景
-            LiquidBackground()
+            LiquidBackground(themeSkinWallpaperContext: .wardrobe)
                 .ignoresSafeArea()
             
             // 内容

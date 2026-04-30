@@ -185,7 +185,7 @@ struct RococoSmallWorldView: View {
             
             ZStack(alignment: .topLeading) {
                 // App Global Background
-                LiquidBackground()
+                LiquidBackground(themeSkinWallpaperContext: .house)
                 
                 Group {
                     switch viewMode {

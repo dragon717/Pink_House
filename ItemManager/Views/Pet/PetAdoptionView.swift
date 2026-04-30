@@ -24,7 +24,7 @@ struct PetAdoptionView: View {
             let layout = PetAdoptionContainerLayout(size: geo.size, safeAreaInsets: geo.safeAreaInsets)
 
             ZStack {
-                LiquidBackground()
+                LiquidBackground(themeSkinWallpaperContext: .petChat)
                     .ignoresSafeArea()
                 
                 VStack(spacing: 0) {

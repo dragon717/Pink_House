@@ -78,7 +78,7 @@ struct WealthView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                LiquidBackground()
+                LiquidBackground(themeSkinWallpaperContext: .wealth)
                     .ignoresSafeArea()
                 
                 VStack(spacing: 0) {

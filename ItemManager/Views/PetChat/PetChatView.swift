@@ -286,7 +286,7 @@ struct PetChatView: View {
         NavigationStack {
             ZStack {
                 // 背景 - 使用 LiquidBackground，不使用魔法配色/客制化配色的背景色
-                LiquidBackground()
+                LiquidBackground(themeSkinWallpaperContext: .petChat)
                     .ignoresSafeArea()
 
                 // 聊天记录 - 使用 overlay 放置悬浮按钮

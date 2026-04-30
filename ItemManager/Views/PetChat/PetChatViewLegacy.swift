@@ -211,7 +211,7 @@ struct PetChatViewLegacy: View {
         NavigationStack {
             ZStack {
                 // 背景 - 使用 LiquidBackground，不使用魔法配色/客制化配色的背景色
-                LiquidBackground()
+                LiquidBackground(themeSkinWallpaperContext: .petChat)
                     .ignoresSafeArea()
 
                 VStack(spacing: 0) {

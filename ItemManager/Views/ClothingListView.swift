@@ -106,7 +106,7 @@ struct ClothingListView: View {
                         .environment(\.containerPalette, containerPalette)
                 } detail: {
                     ZStack {
-                        LiquidBackground()
+                        LiquidBackground(themeSkinWallpaperContext: .wardrobe)
                         Text("请选择一件裙装")
                             .foregroundStyle(.secondary)
                             .font(.title2)
@@ -152,7 +152,7 @@ struct ClothingListView: View {
     
     private var content: some View {
         ZStack {
-            LiquidBackground()
+            LiquidBackground(themeSkinWallpaperContext: .wardrobe)
             
             Group {
                 switch viewLayout {

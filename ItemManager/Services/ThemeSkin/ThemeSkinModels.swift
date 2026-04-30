@@ -107,6 +107,55 @@ enum ThemeSkinState: String, Codable, CaseIterable, Identifiable {
     var id: String { rawValue }
 }
 
+enum ThemeSkinWallpaperLayoutPreset: String, Codable, CaseIterable, Identifiable {
+    case mixedFocus
+    case heroStatement
+    case balancedScatter
+    case miniPattern
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .mixedFocus: return "大小混合"
+        case .heroStatement: return "大主图"
+        case .balancedScatter: return "均匀散点"
+        case .miniPattern: return "小图满铺"
+        }
+    }
+
+    var shortLabel: String {
+        switch self {
+        case .mixedFocus: return "混合"
+        case .heroStatement: return "大"
+        case .balancedScatter: return "散点"
+        case .miniPattern: return "小图"
+        }
+    }
+
+    var summary: String {
+        switch self {
+        case .mixedFocus:
+            return "大主图压住焦点，小贴纸按墙纸节奏补满。"
+        case .heroStatement:
+            return "减少小图数量，让大主图成为主要视觉。"
+        case .balancedScatter:
+            return "所有贴纸均匀散开，适合清爽背景。"
+        case .miniPattern:
+            return "取消大主图，使用小贴纸密铺。"
+        }
+    }
+
+    var systemImageName: String {
+        switch self {
+        case .mixedFocus: return "square.grid.3x3.middle.filled"
+        case .heroStatement: return "rectangle.inset.filled"
+        case .balancedScatter: return "circle.grid.cross"
+        case .miniPattern: return "circle.grid.3x3.fill"
+        }
+    }
+}
+
 struct ThemeSkinProduct: Identifiable, Codable, Equatable {
     let id: String
     let themeId: String
@@ -233,6 +282,7 @@ struct ThemeSkinBackgroundStickerOption: Identifiable, Codable, Equatable, Hasha
 
 struct ThemeSkinBackgroundSelection: Codable, Equatable {
     var heroAssetName: String?
+    var layoutPreset: ThemeSkinWallpaperLayoutPreset?
 }
 
 struct OwnedThemeSkin: Identifiable, Codable, Equatable {

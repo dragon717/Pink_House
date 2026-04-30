@@ -135,7 +135,7 @@ struct DepositNotificationView: View {
             }
             .padding(.vertical, 16)
         }
-        .background(LiquidBackground())
+        .background(LiquidBackground(themeSkinWallpaperContext: .depositPlan))
         .navigationTitle("尾款提醒")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {

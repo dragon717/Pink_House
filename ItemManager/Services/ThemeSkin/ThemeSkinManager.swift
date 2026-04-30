@@ -240,6 +240,11 @@ final class ThemeSkinManager: ObservableObject, ThemeSkinProviding {
         return product.defaultBackgroundHeroAssetName
     }
 
+    func backgroundLayoutPreset(for idOrThemeId: String) -> ThemeSkinWallpaperLayoutPreset {
+        guard let product = product(for: idOrThemeId) else { return .mixedFocus }
+        return backgroundStickerSelections[product.themeId]?.layoutPreset ?? .mixedFocus
+    }
+
     func setBackgroundHeroAssetName(_ assetName: String?, for idOrThemeId: String) {
         guard let product = product(for: idOrThemeId) else { return }
 
@@ -251,7 +256,23 @@ final class ThemeSkinManager: ObservableObject, ThemeSkinProviding {
         }
 
         var nextSelections = backgroundStickerSelections
-        nextSelections[product.themeId] = ThemeSkinBackgroundSelection(heroAssetName: sanitizedAssetName)
+        nextSelections[product.themeId] = ThemeSkinBackgroundSelection(
+            heroAssetName: sanitizedAssetName,
+            layoutPreset: backgroundLayoutPreset(for: product.themeId)
+        )
+        backgroundStickerSelections = nextSelections
+        saveBackgroundStickerSelections()
+        broadcastChange()
+    }
+
+    func setBackgroundLayoutPreset(_ preset: ThemeSkinWallpaperLayoutPreset, for idOrThemeId: String) {
+        guard let product = product(for: idOrThemeId) else { return }
+
+        var nextSelections = backgroundStickerSelections
+        nextSelections[product.themeId] = ThemeSkinBackgroundSelection(
+            heroAssetName: backgroundHeroAssetName(for: product.themeId),
+            layoutPreset: preset
+        )
         backgroundStickerSelections = nextSelections
         saveBackgroundStickerSelections()
         broadcastChange()
@@ -273,10 +294,17 @@ final class ThemeSkinManager: ObservableObject, ThemeSkinProviding {
         selections.reduce(into: [String: ThemeSkinBackgroundSelection]()) { result, entry in
             guard let product = product(for: entry.key) else { return }
             let heroAssetName = entry.value.heroAssetName
+            let layoutPreset = entry.value.layoutPreset
             if let heroAssetName, product.backgroundStickerOptions.contains(where: { $0.assetName == heroAssetName }) {
-                result[product.themeId] = ThemeSkinBackgroundSelection(heroAssetName: heroAssetName)
-            } else if heroAssetName == nil {
-                result[product.themeId] = ThemeSkinBackgroundSelection(heroAssetName: nil)
+                result[product.themeId] = ThemeSkinBackgroundSelection(
+                    heroAssetName: heroAssetName,
+                    layoutPreset: layoutPreset
+                )
+            } else if heroAssetName == nil || layoutPreset != nil {
+                result[product.themeId] = ThemeSkinBackgroundSelection(
+                    heroAssetName: nil,
+                    layoutPreset: layoutPreset
+                )
             }
         }
     }

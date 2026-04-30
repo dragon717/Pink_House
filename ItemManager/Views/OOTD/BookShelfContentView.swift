@@ -55,7 +55,7 @@ struct BookShelfContentView: View {
     private var planarContent: some View {
         ZStack {
             // Global Background
-            LiquidBackground()
+            LiquidBackground(themeSkinWallpaperContext: .journal)
                 .ignoresSafeArea()
             
             if let selectedBook = selectedBook {

@@ -1472,7 +1472,7 @@ struct ClothingEditView: View {
     var body: some View {
         ZStack {
             // Background
-            LiquidBackground()
+            LiquidBackground(themeSkinWallpaperContext: .wardrobe)
                 .ignoresSafeArea()
                 .environment(\.containerPalette, containerPalette)
 

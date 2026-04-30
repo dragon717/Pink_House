@@ -473,7 +473,7 @@ struct HomeView: View {
         NavigationStack {
             ZStack(alignment: .top) {
                 // Background
-                LiquidBackground()
+                LiquidBackground(themeSkinWallpaperContext: selectedTab == .wardrobe ? .wardrobe : .depositPlan)
                     .ignoresSafeArea()
 
                 if selectedTab == .wardrobe {
