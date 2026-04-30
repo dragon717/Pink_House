@@ -91,6 +91,13 @@ struct PetChatViewLegacy: View {
         128
     }
 
+    private var inputTokens: PetDialogueInputThemeTokens {
+        themeManager.petChatSkinTheme.resolvedDialogueInputTokens(
+            themeManager: themeManager,
+            colorScheme: colorScheme
+        )
+    }
+
     private var petDialogueResolvedVideoName: String? {
         resolvedPetDialogueVideoName(for: petDialogueAction)
     }
@@ -406,26 +413,30 @@ struct PetChatViewLegacy: View {
                 Menu {
                     petDialogueMenuContent
                 } label: {
-                    ThemeSkinIconBadge(systemName: "plus", fallbackColor: .pink, size: 40, symbolSize: 20)
+                    ThemeSkinIconBadge(systemName: "plus", fallbackColor: inputTokens.menuAccent, size: 40, symbolSize: 20)
                 }
                 
                 // 中间输入框（萌宠对话框样式）
                 ZStack(alignment: .leading) {
                     if inputText.isEmpty {
                         Text(inputPlaceholder)
-                            .foregroundStyle(.gray.opacity(0.6))
+                            .foregroundStyle(inputTokens.placeholderText)
                             .padding(.horizontal, 16)
                     }
                     
                     TextField("", text: $inputText)
                         .font(.system(size: 17))
-                        .foregroundStyle(.primary)
+                        .foregroundStyle(inputTokens.fieldText)
                         .padding(.horizontal, 16)
                         .padding(.vertical, 12)
                 }
                 .themeSkinAdaptiveSectionCard(slot: .searchBar, cornerRadius: 22, showsDecoration: false) {
-                    Capsule().fill(Color(.systemBackground))
+                    Capsule().fill(inputTokens.fieldFill)
                 }
+                .overlay(
+                    Capsule()
+                        .stroke(inputTokens.fieldStroke, lineWidth: 1)
+                )
                 
                 // 右侧发送按钮（猫爪样式）
                 Button {
@@ -433,7 +444,7 @@ struct PetChatViewLegacy: View {
                         sendMessageFromInput()
                     }
                 } label: {
-                    ThemeSkinIconBadge(systemName: "pawprint.fill", fallbackColor: .pink, size: 44, symbolSize: 20)
+                    ThemeSkinIconBadge(systemName: "pawprint.fill", fallbackColor: inputTokens.menuAccent, size: 44, symbolSize: 20)
                 }
                 .disabled(inputText.isEmpty)
                 .opacity(inputText.isEmpty ? 0.5 : 1.0)
@@ -447,12 +458,12 @@ struct PetChatViewLegacy: View {
                 RoundedRectangle(cornerRadius: 30)
                     .fill(
                         LinearGradient(
-                            colors: [Color(hex: "FFD1DC"), Color(hex: "FFC0CB")],
+                            colors: inputTokens.containerGradientColors,
                             startPoint: .top,
                             endPoint: .bottom
                         )
                     )
-                    .shadow(color: Color.black.opacity(0.1), radius: 10, x: 0, y: -5)
+                    .shadow(color: inputTokens.containerShadow, radius: 10, x: 0, y: -5)
                 
                 // 气泡尾巴（左下角）
                 GeometryReader { geo in
@@ -462,13 +473,13 @@ struct PetChatViewLegacy: View {
                         path.addLine(to: CGPoint(x: 50, y: geo.size.height - 15))
                         path.closeSubpath()
                     }
-                    .fill(Color(hex: "FFC0CB"))
+                    .fill(inputTokens.containerTailFill)
                 }
             }
         )
         .overlay(
             RoundedRectangle(cornerRadius: 30)
-                .stroke(Color.white.opacity(0.4), lineWidth: 1)
+                .stroke(inputTokens.containerStroke, lineWidth: 1)
         )
         // 添加底部安全区域间距，避免与底部导航栏重叠
         .padding(.bottom, 80)

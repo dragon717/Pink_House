@@ -556,7 +556,7 @@ struct ThemeSkinBackgroundStickerSelectionCard: View {
                 .themeSkinLegibleText(level: .chip, slot: .sectionCard, descriptor: descriptor)
                 .padding(.horizontal, 10)
                 .padding(.vertical, 6)
-                .themeSkinLegibilityBackdrop(level: .chip, slot: .sectionCard, cornerRadius: 14, descriptor: descriptor)
+                .themeSkinLegibilityBackdrop(level: .preview, slot: .sectionCard, cornerRadius: 14, descriptor: descriptor)
                 .padding(10)
         }
         .overlay(

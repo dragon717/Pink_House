@@ -86,6 +86,11 @@ struct ThemeSkinDetailPreviewPanel: View {
                     Text(previewScene.title)
                         .font(.caption.weight(.bold))
                         .foregroundStyle(scene == previewScene ? .white : themeManager.accentTextColor)
+                        .themeSkinLegibleText(
+                            level: scene == previewScene ? .chip : .inline,
+                            slot: .topBarSegment,
+                            descriptor: context.representativeDescriptor
+                        )
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 8)
                         .background(
@@ -343,12 +348,14 @@ private struct ThemeSkinPreviewTopBar: View {
             Text(title)
                 .font(.system(size: 13, weight: .heavy, design: .rounded))
                 .foregroundStyle(SkyConcertThemeSkin.labelColor(for: descriptor))
+                .themeSkinLegibleText(level: .inline, slot: .topBarMain, descriptor: descriptor)
             Spacer(minLength: 0)
             ThemeSkinPreviewRoundButton(context: context, label: "＋", size: 28, slot: .topBarAddButton)
             ThemeSkinPreviewRoundButton(context: context, label: "⋯", size: 28, slot: .topBarIconButton)
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 9)
+        .themeSkinLegibilityBackdrop(level: .preview, slot: .topBarMain, cornerRadius: 13, descriptor: descriptor)
         .background(previewAsset(ThemeSkinAssetName.topBarMain, context: context, slot: .topBarMain, cornerRadius: 18))
     }
 }
@@ -363,10 +370,12 @@ private struct ThemeSkinPreviewSearchBar: View {
             Text("搜索衣物 / 主题")
                 .font(.system(size: 11, weight: .semibold, design: .rounded))
                 .foregroundStyle(SkyConcertThemeSkin.labelColor(for: descriptor).opacity(0.72))
+                .themeSkinLegibleText(level: .inline, slot: .searchBar, descriptor: descriptor)
             Spacer(minLength: 0)
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
+        .themeSkinLegibilityBackdrop(level: .preview, slot: .searchBar, cornerRadius: 12, descriptor: descriptor)
         .background(previewAsset(ThemeSkinAssetName.searchBarCompact, context: context, slot: .searchBar, cornerRadius: 16))
     }
 }
@@ -383,6 +392,7 @@ private struct ThemeSkinPreviewTabBar: View {
         }
         .padding(.horizontal, 18)
         .padding(.vertical, 12)
+        .themeSkinLegibilityBackdrop(level: .preview, slot: .tabBarMain, cornerRadius: 18, descriptor: descriptor)
         .background(previewAsset(ThemeSkinAssetName.tabBarMain, context: context, slot: .tabBarMain, cornerRadius: 24))
     }
 
@@ -394,6 +404,7 @@ private struct ThemeSkinPreviewTabBar: View {
             Text(title)
                 .font(.system(size: 9, weight: selected ? .bold : .medium, design: .rounded))
                 .foregroundStyle(selected ? SkyConcertThemeSkin.accent(for: descriptor) : SkyConcertThemeSkin.labelColor(for: descriptor).opacity(0.72))
+                .themeSkinLegibleText(level: selected ? .chip : .inline, slot: .tabBarMain, descriptor: descriptor)
         }
         .frame(maxWidth: .infinity)
     }

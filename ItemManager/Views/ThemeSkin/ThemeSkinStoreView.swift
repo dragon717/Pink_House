@@ -508,6 +508,10 @@ private struct ThemeSkinGalleryPreviewTile: View {
         product.previewAssetNames.first ?? ThemeSkinAssetName.previewStoreHero
     }
 
+    private var descriptor: ThemeSkinDescriptor? {
+        ThemeSkinManager.shared.descriptor(forThemeId: product.themeId, slot: .sectionCard)
+    }
+
     var body: some View {
         ZStack(alignment: .bottomLeading) {
             ThemeSkinOptionalFittedAsset(
@@ -530,6 +534,8 @@ private struct ThemeSkinGalleryPreviewTile: View {
             Text(product.name)
                 .font(.caption.weight(.bold))
                 .foregroundStyle(.white)
+                .themeSkinLegibleText(level: .badge, slot: .sectionCard, descriptor: descriptor)
+                .themeSkinLegibilityBackdrop(level: .preview, slot: .sectionCard, cornerRadius: 8, descriptor: descriptor)
                 .lineLimit(1)
                 .padding(.horizontal, 9)
                 .padding(.vertical, 6)
@@ -635,6 +641,10 @@ private struct ThemeSkinBulletRow: View {
 private struct ThemeSkinProductPreviewFallback: View {
     let product: ThemeSkinProduct
 
+    private var descriptor: ThemeSkinDescriptor? {
+        ThemeSkinManager.shared.descriptor(forThemeId: product.themeId, slot: .sectionCard)
+    }
+
     private var isSwanDream: Bool {
         product.assetNamespace == SwanDreamThemeSkin.namespace
     }
@@ -686,6 +696,7 @@ private struct ThemeSkinProductPreviewFallback: View {
                 Text(product.name)
                     .font(.caption.weight(.bold))
                     .foregroundStyle(isSwanDream ? SwanDreamThemeSkin.text : SkyConcertThemeSkin.text)
+                    .themeSkinLegibleText(level: .chip, slot: .sectionCard, descriptor: descriptor)
                     .lineLimit(1)
                     .padding(.horizontal, 9)
                     .padding(.vertical, 5)

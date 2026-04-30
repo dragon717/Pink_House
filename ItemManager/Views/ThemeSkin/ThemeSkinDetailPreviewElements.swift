@@ -12,6 +12,7 @@ struct ThemeSkinPreviewRoundButton: View {
         Text(label)
             .font(.system(size: size * 0.42, weight: .heavy, design: .rounded))
             .foregroundStyle(SkyConcertThemeSkin.accent(for: descriptor))
+            .themeSkinLegibleSymbol(level: .badge, slot: slot, descriptor: descriptor)
             .frame(width: size, height: size)
             .background(Circle().fill(SkyConcertThemeSkin.shellFillTop(for: descriptor).opacity(0.96)))
             .overlay(Circle().stroke(SkyConcertThemeSkin.shellStroke(for: descriptor).opacity(0.86), lineWidth: 1))
@@ -33,6 +34,7 @@ struct ThemeSkinPreviewSettingsGrid: View {
                     Text(title)
                         .font(.system(size: 10, weight: .bold, design: .rounded))
                         .foregroundStyle(SkyConcertThemeSkin.labelColor(for: descriptor))
+                        .themeSkinLegibleText(level: .inline, slot: .settingsGridCard, descriptor: descriptor)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(10)
@@ -53,11 +55,14 @@ struct ThemeSkinPreviewSectionCard: View {
             Text(title)
                 .font(.system(size: 12, weight: .heavy, design: .rounded))
                 .foregroundStyle(SkyConcertThemeSkin.labelColor(for: descriptor))
+                .themeSkinLegibleText(level: .inline, slot: .sectionCard, descriptor: descriptor)
             Text(subtitle)
                 .font(.system(size: 10, weight: .semibold, design: .rounded))
                 .foregroundStyle(SkyConcertThemeSkin.labelColor(for: descriptor).opacity(0.66))
+                .themeSkinLegibleText(level: .inline, slot: .sectionCard, descriptor: descriptor)
                 .lineLimit(2)
         }
+        .themeSkinLegibilityBackdrop(level: .preview, slot: .sectionCard, cornerRadius: 12, descriptor: descriptor)
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(12)
         .background(previewFallbackSurface(context: context, slot: .sectionCard, cornerRadius: 18))
@@ -74,10 +79,13 @@ struct ThemeSkinPreviewStatsCard: View {
                 Text("衣橱统计")
                     .font(.system(size: 12, weight: .heavy, design: .rounded))
                     .foregroundStyle(SkyConcertThemeSkin.labelColor(for: descriptor))
+                    .themeSkinLegibleText(level: .inline, slot: .statsCard, descriptor: descriptor)
                 Text("128 件 · 24 套穿搭")
                     .font(.system(size: 10, weight: .semibold, design: .rounded))
                     .foregroundStyle(SkyConcertThemeSkin.labelColor(for: descriptor).opacity(0.65))
+                    .themeSkinLegibleText(level: .inline, slot: .statsCard, descriptor: descriptor)
             }
+            .themeSkinLegibilityBackdrop(level: .preview, slot: .statsCard, cornerRadius: 12, descriptor: descriptor)
             Spacer(minLength: 0)
             HStack(alignment: .bottom, spacing: 4) {
                 bar(height: 20, opacity: 0.94)
@@ -110,9 +118,11 @@ struct ThemeSkinPreviewWardrobeCard: View {
             Text(title)
                 .font(.system(size: 11, weight: .bold, design: .rounded))
                 .foregroundStyle(SkyConcertThemeSkin.labelColor(for: descriptor))
+                .themeSkinLegibleText(level: .inline, slot: .wardrobeItemCard, descriptor: descriptor)
             Text("今日推荐")
                 .font(.system(size: 9, weight: .medium, design: .rounded))
                 .foregroundStyle(SkyConcertThemeSkin.labelColor(for: descriptor).opacity(0.58))
+                .themeSkinLegibleText(level: .inline, slot: .wardrobeItemCard, descriptor: descriptor)
         }
         .padding(10)
         .background(previewAsset(ThemeSkinAssetName.cardWardrobeItem, context: context, slot: .wardrobeItemCard, cornerRadius: 18))
@@ -148,6 +158,7 @@ struct ThemeSkinPreviewPrimaryButton: View {
         Text(title)
             .font(.system(size: 12, weight: .heavy, design: .rounded))
             .foregroundStyle(.white)
+            .themeSkinLegibleText(level: .badge, slot: .primaryButton, descriptor: descriptor)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 11)
             .background(
@@ -183,6 +194,7 @@ struct ThemeSkinPreviewSegmentedControl: View {
         Text(title)
             .font(.system(size: 10, weight: .bold, design: .rounded))
             .foregroundStyle(selected ? .white : SkyConcertThemeSkin.labelColor(for: descriptor).opacity(0.78))
+            .themeSkinLegibleText(level: selected ? .chip : .inline, slot: .segmentedControl, descriptor: descriptor)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 6)
             .background(Capsule().fill(selected ? SkyConcertThemeSkin.accent(for: descriptor).opacity(0.9) : Color.white.opacity(0.42)))
@@ -198,6 +210,7 @@ struct ThemeSkinPreviewFilterChip: View {
         Text(title)
             .font(.system(size: 10, weight: .bold, design: .rounded))
             .foregroundStyle(SkyConcertThemeSkin.labelColor(for: descriptor))
+            .themeSkinLegibleText(level: .chip, slot: .filterChip, descriptor: descriptor)
             .padding(.horizontal, 10)
             .padding(.vertical, 7)
             .background(Capsule().fill(SkyConcertThemeSkin.shellFillTop(for: descriptor).opacity(0.88)))
@@ -217,6 +230,7 @@ struct ThemeSkinPreviewDiscountBadge: View {
                 .font(.system(size: 13, weight: .black, design: .rounded))
         }
         .foregroundStyle(.white)
+        .themeSkinLegibleText(level: .badge, slot: .discountBadge, descriptor: descriptor)
         .padding(.horizontal, 11)
         .padding(.vertical, 9)
         .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(SkyConcertThemeSkin.accent(for: descriptor).opacity(0.92)))
@@ -234,12 +248,14 @@ struct ThemeSkinPreviewFilterSheet: View {
             Text("筛选面板")
                 .font(.system(size: 12, weight: .heavy, design: .rounded))
                 .foregroundStyle(SkyConcertThemeSkin.labelColor(for: descriptor))
+                .themeSkinLegibleText(level: .inline, slot: .filterSheet, descriptor: descriptor)
             HStack(spacing: 7) {
                 ThemeSkinPreviewFilterChip(context: context, title: "上衣")
                 ThemeSkinPreviewFilterChip(context: context, title: "裙子")
                 Spacer(minLength: 0)
             }
         }
+        .themeSkinLegibilityBackdrop(level: .preview, slot: .filterSheet, cornerRadius: 12, descriptor: descriptor)
         .padding(12)
         .background(previewFallbackSurface(context: context, slot: .filterSheet, cornerRadius: 20))
     }
@@ -258,10 +274,13 @@ struct ThemeSkinPreviewEmptyState: View {
             Text("这里还没有内容")
                 .font(.system(size: 12, weight: .heavy, design: .rounded))
                 .foregroundStyle(SkyConcertThemeSkin.labelColor(for: descriptor))
+                .themeSkinLegibleText(level: .inline, slot: .emptyState, descriptor: descriptor)
             Text("主题空状态会保持温柔提示")
                 .font(.system(size: 10, weight: .medium, design: .rounded))
                 .foregroundStyle(SkyConcertThemeSkin.labelColor(for: descriptor).opacity(0.62))
+                .themeSkinLegibleText(level: .inline, slot: .emptyState, descriptor: descriptor)
         }
+        .themeSkinLegibilityBackdrop(level: .preview, slot: .emptyState, cornerRadius: 14, descriptor: descriptor)
         .frame(maxWidth: .infinity)
         .padding(14)
         .background(previewFallbackSurface(context: context, slot: .emptyState, cornerRadius: 22))

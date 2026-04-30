@@ -2,6 +2,9 @@ import SwiftUI
 
 struct PetDialogueInputView: View {
     @Binding var text: String
+    @Environment(ThemeManager.self) private var themeManager
+    @Environment(\.colorScheme) private var colorScheme
+
     var placeholder: String = "请输入的文字"
     var onSend: () -> Void
     var onQuickMenuAction: (() -> Void)? = nil
@@ -9,6 +12,13 @@ struct PetDialogueInputView: View {
     var onFocusChange: ((Bool) -> Void)? = nil
     
     @FocusState private var isFocused: Bool
+
+    private var inputTokens: PetDialogueInputThemeTokens {
+        themeManager.petChatSkinTheme.resolvedDialogueInputTokens(
+            themeManager: themeManager,
+            colorScheme: colorScheme
+        )
+    }
     
     var body: some View {
         VStack(spacing: 0) {
@@ -17,21 +27,21 @@ struct PetDialogueInputView: View {
                     Button(action: onQuickMenuAction) {
                         Image(systemName: "plus.circle.fill")
                             .font(.system(size: 28))
-                            .foregroundStyle(.pink)
+                            .foregroundStyle(inputTokens.menuAccent)
                     }
                 }
                 
                 ZStack(alignment: .leading) {
                     if text.isEmpty {
                         Text(placeholder)
-                            .foregroundStyle(.gray.opacity(0.6))
+                            .foregroundStyle(inputTokens.placeholderText)
                             .padding(.horizontal, 16)
                     }
                     
                     TextField("", text: $text)
                         .focused($isFocused)
                         .font(.system(size: 17))
-                        .foregroundStyle(.primary)
+                        .foregroundStyle(inputTokens.fieldText)
                         .submitLabel(.send)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
@@ -39,11 +49,11 @@ struct PetDialogueInputView: View {
                         .padding(.horizontal, 16)
                         .padding(.vertical, 12)
                 }
-                .background(Color(.systemBackground))
+                .background(inputTokens.fieldFill)
                 .clipShape(Capsule())
                 .overlay(
                     Capsule()
-                        .stroke(Color.gray.opacity(0.1), lineWidth: 1)
+                        .stroke(inputTokens.fieldStroke, lineWidth: 1)
                 )
                 
                 Button {
@@ -55,16 +65,16 @@ struct PetDialogueInputView: View {
                         Circle()
                             .fill(
                                 LinearGradient(
-                                    colors: [Color(hex: "FFC0CB"), Color(hex: "FFB6C1")],
+                                    colors: inputTokens.actionButtonGradientColors,
                                     startPoint: .topLeading,
                                     endPoint: .bottomTrailing
                                 )
                             )
-                            .shadow(color: Color(hex: "FF69B4").opacity(0.3), radius: 2, x: 0, y: 2)
+                            .shadow(color: inputTokens.actionButtonShadow, radius: 2, x: 0, y: 2)
                         
                         Image(systemName: "pawprint.fill")
                             .font(.system(size: 20))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(inputTokens.actionButtonForeground)
                             .shadow(color: .black.opacity(0.1), radius: 1, x: 0, y: 1)
                     }
                     .frame(width: 44, height: 44)
@@ -80,12 +90,12 @@ struct PetDialogueInputView: View {
                 RoundedRectangle(cornerRadius: 30)
                     .fill(
                         LinearGradient(
-                            colors: [Color(hex: "FFD1DC"), Color(hex: "FFC0CB")],
+                            colors: inputTokens.containerGradientColors,
                             startPoint: .top,
                             endPoint: .bottom
                         )
                     )
-                    .shadow(color: Color.black.opacity(0.1), radius: 10, x: 0, y: -5)
+                    .shadow(color: inputTokens.containerShadow, radius: 10, x: 0, y: -5)
                 
                 GeometryReader { geo in
                     Path { path in
@@ -94,13 +104,13 @@ struct PetDialogueInputView: View {
                         path.addLine(to: CGPoint(x: 50, y: geo.size.height - 15))
                         path.closeSubpath()
                     }
-                    .fill(Color(hex: "FFC0CB"))
+                    .fill(inputTokens.containerTailFill)
                 }
             }
         )
         .overlay(
             RoundedRectangle(cornerRadius: 30)
-                .stroke(Color.white.opacity(0.4), lineWidth: 1)
+                .stroke(inputTokens.containerStroke, lineWidth: 1)
         )
         .onChange(of: isFocused) { _, newValue in
             onFocusChange?(newValue)
@@ -123,4 +133,5 @@ struct PetDialogueInputView: View {
                 .padding()
         }
     }
+    .environment(ThemeManager.shared)
 }

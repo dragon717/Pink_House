@@ -1,3 +1,4 @@
+import Foundation
 import SwiftUI
 
 /// Shared theme-skin surfaces used by detail pages, settings cards, journals and book/page lists.
@@ -32,6 +33,119 @@ private enum ThemeSkinSharedSurfaceTokens {
         case .hero:
             return ThemeSkinEdgeStickerAssets.assetName(for: descriptor, role: .heroSecondary)
         }
+    }
+}
+
+enum ThemeSkinLegibilityLevel: Equatable {
+    case inline
+    case chip
+    case badge
+    case preview
+    case hero
+
+    var outlineOffset: CGFloat {
+        switch self {
+        case .inline:
+            return 0.72
+        case .chip:
+            return 0.86
+        case .badge:
+            return 0.96
+        case .preview:
+            return 0.92
+        case .hero:
+            return 1.08
+        }
+    }
+
+    var innerGlowRadius: CGFloat {
+        switch self {
+        case .inline:
+            return 1.15
+        case .chip, .badge:
+            return 1.55
+        case .preview:
+            return 1.8
+        case .hero:
+            return 2.2
+        }
+    }
+
+    var outerGlowRadius: CGFloat {
+        switch self {
+        case .inline:
+            return 3.2
+        case .chip:
+            return 5.5
+        case .badge:
+            return 7
+        case .preview:
+            return 9
+        case .hero:
+            return 12
+        }
+    }
+
+    var backdropOutset: CGFloat {
+        switch self {
+        case .inline:
+            return 0
+        case .chip:
+            return 4
+        case .badge:
+            return 5
+        case .preview:
+            return 8
+        case .hero:
+            return 12
+        }
+    }
+
+    var usesBlurredBackdrop: Bool {
+        switch self {
+        case .preview, .hero:
+            return true
+        case .inline, .chip, .badge:
+            return false
+        }
+    }
+
+    var backdropBlurRadius: CGFloat {
+        switch self {
+        case .preview:
+            return 7
+        case .hero:
+            return 13
+        case .inline, .chip, .badge:
+            return 0
+        }
+    }
+}
+
+private enum ThemeSkinDarkLegibilityFeature {
+    static let key = "THEMESKIN_DARK_LEGIBILITY_V2"
+    static let disabledKey = "THEMESKIN_DARK_LEGIBILITY_V2_DISABLED"
+
+    static var isEnabled: Bool {
+        if UserDefaults.standard.bool(forKey: disabledKey) {
+            return false
+        }
+
+        if let explicitValue = UserDefaults.standard.object(forKey: key) as? Bool {
+            return explicitValue
+        }
+
+        #if DEBUG
+        let arguments = ProcessInfo.processInfo.arguments
+        if arguments.contains(disabledKey) || arguments.contains("-\(disabledKey)") {
+            return false
+        }
+        if arguments.contains(key) || arguments.contains("-\(key)") {
+            return true
+        }
+        #endif
+
+        return true
     }
 }
 
@@ -589,6 +703,164 @@ struct ThemeSkinEdgeSticker: View {
 
 private typealias ThemeSkinCornerSticker = ThemeSkinEdgeSticker
 
+private struct ThemeSkinLegibleTextModifier: ViewModifier {
+    @Environment(\.colorScheme) private var colorScheme
+    @ObservedObject private var themeSkinManager = ThemeSkinManager.shared
+
+    let level: ThemeSkinLegibilityLevel
+    let slot: ThemeSkinSlot
+    let descriptor: ThemeSkinDescriptor?
+
+    private var resolvedDescriptor: ThemeSkinDescriptor? {
+        descriptor ?? themeSkinManager.activeThemeDescriptor(for: slot, state: .default)
+    }
+
+    private var shouldApply: Bool {
+        colorScheme == .dark
+            && ThemeSkinDarkLegibilityFeature.isEnabled
+            && ThemeSkinSharedSurfaceTokens.isSupported(resolvedDescriptor)
+    }
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if shouldApply {
+            if level == .inline {
+                content
+                    .shadow(color: outlineColor, radius: 0, x: level.outlineOffset, y: 0)
+                    .shadow(color: outlineColor, radius: 0, x: -level.outlineOffset, y: 0)
+                    .shadow(color: outlineColor, radius: 0, x: 0, y: level.outlineOffset)
+                    .shadow(color: outlineColor, radius: 0, x: 0, y: -level.outlineOffset)
+                    .shadow(color: Color.white.opacity(0.42), radius: level.innerGlowRadius, x: 0, y: 0)
+                    .shadow(color: accentGlowColor, radius: level.outerGlowRadius, x: 0, y: 0)
+            } else {
+                content
+                    .shadow(color: outlineColor, radius: 0, x: level.outlineOffset, y: 0)
+                    .shadow(color: outlineColor, radius: 0, x: -level.outlineOffset, y: 0)
+                    .shadow(color: outlineColor, radius: 0, x: 0, y: level.outlineOffset)
+                    .shadow(color: outlineColor, radius: 0, x: 0, y: -level.outlineOffset)
+                    .shadow(color: outlineColor.opacity(0.74), radius: 0, x: level.outlineOffset * 0.72, y: level.outlineOffset * 0.72)
+                    .shadow(color: outlineColor.opacity(0.74), radius: 0, x: -level.outlineOffset * 0.72, y: level.outlineOffset * 0.72)
+                    .shadow(color: outlineColor.opacity(0.74), radius: 0, x: level.outlineOffset * 0.72, y: -level.outlineOffset * 0.72)
+                    .shadow(color: outlineColor.opacity(0.74), radius: 0, x: -level.outlineOffset * 0.72, y: -level.outlineOffset * 0.72)
+                    .shadow(color: Color.white.opacity(0.48), radius: level.innerGlowRadius, x: 0, y: 0)
+                    .shadow(color: accentGlowColor, radius: level.outerGlowRadius, x: 0, y: 0)
+            }
+        } else {
+            content
+        }
+    }
+
+    private var outlineColor: Color {
+        let base = SkyConcertThemeSkin.labelColor(for: resolvedDescriptor)
+        return base.mixed(with: .black, amount: 0.58).opacity(level == .inline ? 0.88 : 0.94)
+    }
+
+    private var accentGlowColor: Color {
+        SkyConcertThemeSkin.accent(for: resolvedDescriptor)
+            .mixed(with: .white, amount: 0.18)
+            .opacity(level == .inline ? 0.34 : 0.52)
+    }
+}
+
+private struct ThemeSkinLegibilityBackdropModifier: ViewModifier {
+    @Environment(\.colorScheme) private var colorScheme
+    @ObservedObject private var themeSkinManager = ThemeSkinManager.shared
+
+    let level: ThemeSkinLegibilityLevel
+    let slot: ThemeSkinSlot
+    let cornerRadius: CGFloat
+    let descriptor: ThemeSkinDescriptor?
+
+    private var resolvedDescriptor: ThemeSkinDescriptor? {
+        descriptor ?? themeSkinManager.activeThemeDescriptor(for: slot, state: .default)
+    }
+
+    private var shouldApply: Bool {
+        colorScheme == .dark
+            && ThemeSkinDarkLegibilityFeature.isEnabled
+            && ThemeSkinSharedSurfaceTokens.isSupported(resolvedDescriptor)
+            && level != .inline
+    }
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if shouldApply {
+            content
+                .background {
+                    ThemeSkinLegibilityBackdrop(
+                        level: level,
+                        descriptor: resolvedDescriptor,
+                        cornerRadius: cornerRadius
+                    )
+                }
+        } else {
+            content
+        }
+    }
+}
+
+private struct ThemeSkinLegibilityBackdrop: View {
+    let level: ThemeSkinLegibilityLevel
+    let descriptor: ThemeSkinDescriptor?
+    let cornerRadius: CGFloat
+
+    private var shape: RoundedRectangle {
+        RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+    }
+
+    var body: some View {
+        ZStack {
+            if level.usesBlurredBackdrop {
+                shape
+                    .fill(SkyConcertThemeSkin.labelColor(for: descriptor).opacity(level == .hero ? 0.24 : 0.18))
+                    .padding(-(level.backdropOutset + 3))
+                    .blur(radius: max(6, level.backdropBlurRadius - 1))
+
+                shape
+                    .fill(SkyConcertThemeSkin.shellFillTop(for: descriptor).opacity(level == .hero ? 0.40 : 0.30))
+                    .padding(-level.backdropOutset)
+                    .blur(radius: level.backdropBlurRadius)
+
+                shape
+                    .fill(SkyConcertThemeSkin.accentSoft(for: descriptor).opacity(level == .hero ? 0.34 : 0.24))
+                    .padding(-(level.backdropOutset + 6))
+                    .blur(radius: level.backdropBlurRadius + 3)
+            }
+
+            shape
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            SkyConcertThemeSkin.labelColor(for: descriptor).opacity(level == .badge ? 0.18 : 0.14),
+                            SkyConcertThemeSkin.shellFillTop(for: descriptor).opacity(level == .hero ? 0.48 : 0.38),
+                            Color.white.opacity(level == .hero ? 0.32 : 0.24),
+                            SkyConcertThemeSkin.accentSoft(for: descriptor).opacity(level == .badge ? 0.24 : 0.18)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .padding(-max(2, level.backdropOutset * 0.45))
+
+            shape
+                .stroke(
+                    LinearGradient(
+                        colors: [
+                            Color.white.opacity(0.46),
+                            SkyConcertThemeSkin.shellStroke(for: descriptor).opacity(0.36)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 0.8
+                )
+                .padding(-max(2, level.backdropOutset * 0.45))
+        }
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+}
+
 private struct ThemeSkinSectionCardModifier: ViewModifier {
     let slot: ThemeSkinSlot
     let cornerRadius: CGFloat
@@ -635,6 +907,50 @@ extension View {
             self
         }
     }
+
+    func themeSkinLegibleText(
+        level: ThemeSkinLegibilityLevel = .inline,
+        slot: ThemeSkinSlot = .sectionCard,
+        descriptor: ThemeSkinDescriptor? = nil
+    ) -> some View {
+        modifier(
+            ThemeSkinLegibleTextModifier(
+                level: level,
+                slot: slot,
+                descriptor: descriptor
+            )
+        )
+    }
+
+    func themeSkinLegibleSymbol(
+        level: ThemeSkinLegibilityLevel = .chip,
+        slot: ThemeSkinSlot = .iconCircleButton,
+        descriptor: ThemeSkinDescriptor? = nil
+    ) -> some View {
+        modifier(
+            ThemeSkinLegibleTextModifier(
+                level: level,
+                slot: slot,
+                descriptor: descriptor
+            )
+        )
+    }
+
+    func themeSkinLegibilityBackdrop(
+        level: ThemeSkinLegibilityLevel = .preview,
+        slot: ThemeSkinSlot = .sectionCard,
+        cornerRadius: CGFloat = 10,
+        descriptor: ThemeSkinDescriptor? = nil
+    ) -> some View {
+        modifier(
+            ThemeSkinLegibilityBackdropModifier(
+                level: level,
+                slot: slot,
+                cornerRadius: cornerRadius,
+                descriptor: descriptor
+            )
+        )
+    }
 }
 
 struct ThemeSkinPrimaryButtonStyle: ButtonStyle {
@@ -669,6 +985,7 @@ struct ThemeSkinPrimaryButtonStyle: ButtonStyle {
         configuration.label
             .font(.subheadline.weight(.bold))
             .foregroundStyle(.white)
+            .themeSkinLegibleText(level: .badge, slot: slot, descriptor: descriptor)
             .frame(maxWidth: .infinity)
             .padding(.vertical, verticalPadding)
             .background(backgroundLayer(isPressed: configuration.isPressed))
@@ -746,6 +1063,7 @@ struct ThemeSkinIconBadge: View {
         Image(systemName: systemName)
             .font(.system(size: symbolSize, weight: .semibold))
             .foregroundStyle(isThemed ? SkyConcertThemeSkin.accent(for: descriptor) : fallbackColor)
+            .themeSkinLegibleSymbol(level: .badge, slot: slot, descriptor: descriptor)
             .frame(width: size, height: size)
             .background {
                 if isThemed {
@@ -857,6 +1175,7 @@ struct ThemeSkinSelectionBadge: View {
                 Image(systemName: "checkmark")
                     .font(.system(size: 12, weight: .bold))
                     .foregroundStyle(.white)
+                    .themeSkinLegibleSymbol(level: .inline, slot: .iconCircleButton, descriptor: descriptor)
             } else {
                 Circle()
                     .stroke(strokeColor, lineWidth: 2)

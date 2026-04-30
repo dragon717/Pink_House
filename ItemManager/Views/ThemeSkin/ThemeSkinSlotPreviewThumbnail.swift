@@ -206,6 +206,7 @@ struct ThemeSkinSlotPreviewThumbnail: View {
         Text("9")
             .font(.system(size: 14, weight: .black, design: .rounded))
             .foregroundStyle(.white)
+            .themeSkinLegibleText(level: .inline, slot: .discountBadge, descriptor: descriptor)
             .frame(width: 24, height: 18)
             .background(RoundedRectangle(cornerRadius: 7, style: .continuous).fill(accentColor.opacity(0.92)))
             .rotationEffect(.degrees(-7))

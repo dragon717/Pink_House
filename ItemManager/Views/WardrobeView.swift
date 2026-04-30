@@ -414,6 +414,7 @@ private struct WardrobeStatsScrollObserver: UIViewRepresentable {
         var onScroll: (CGFloat) -> Void
         private weak var scrollView: UIScrollView?
         private var observation: NSKeyValueObservation?
+        private var lastEmittedDistance: CGFloat?
 
         init(onScroll: @escaping (CGFloat) -> Void) {
             self.onScroll = onScroll
@@ -431,9 +432,13 @@ private struct WardrobeStatsScrollObserver: UIViewRepresentable {
             detach()
             scrollView = discoveredScrollView
             observation = discoveredScrollView.observe(\.contentOffset, options: [.new]) { [weak self, weak discoveredScrollView] _, _ in
-                DispatchQueue.main.async {
-                    guard let self, let discoveredScrollView else { return }
+                guard let self, let discoveredScrollView else { return }
+                if Thread.isMainThread {
                     self.emitScrollDistance(from: discoveredScrollView)
+                } else {
+                    DispatchQueue.main.async {
+                        self.emitScrollDistance(from: discoveredScrollView)
+                    }
                 }
             }
             emitScrollDistance(from: discoveredScrollView)
@@ -447,7 +452,17 @@ private struct WardrobeStatsScrollObserver: UIViewRepresentable {
 
         private func emitScrollDistance(from scrollView: UIScrollView) {
             let distance = scrollView.contentOffset.y + scrollView.adjustedContentInset.top
+            guard shouldEmit(distance) else { return }
+            lastEmittedDistance = distance
             onScroll(distance)
+        }
+
+        private func shouldEmit(_ distance: CGFloat) -> Bool {
+            guard let lastEmittedDistance else { return true }
+            if abs(distance - lastEmittedDistance) >= 6 { return true }
+            if lastEmittedDistance > 12, distance <= 12 { return true }
+            if lastEmittedDistance < 44, distance >= 44 { return true }
+            return false
         }
 
         private func findScrollView(from view: UIView) -> UIScrollView? {
@@ -460,119 +475,6 @@ private struct WardrobeStatsScrollObserver: UIViewRepresentable {
             }
             return nil
         }
-    }
-}
-
-private enum WardrobeStatsVisibilityPrompt: String, Identifiable {
-    case collapsed
-    case expanded
-
-    var id: String { rawValue }
-
-    var icon: String {
-        switch self {
-        case .collapsed: return "rectangle.compress.vertical"
-        case .expanded: return "rectangle.expand.vertical"
-        }
-    }
-
-    var title: String {
-        switch self {
-        case .collapsed: return "统计卡已收起"
-        case .expanded: return "统计卡已展开"
-        }
-    }
-
-    var message: String {
-        switch self {
-        case .collapsed: return "点击顶部「显示」可随时恢复统计卡。"
-        case .expanded: return "本次浏览会保持展开，回到顶部后恢复自动规则。"
-        }
-    }
-}
-
-private struct WardrobeStatsVisibilityPromptView: View {
-    @Environment(ThemeManager.self) private var themeManager
-    @Environment(\.colorScheme) private var colorScheme
-
-    let prompt: WardrobeStatsVisibilityPrompt
-
-    private var palette: MagicThemePalette {
-        MagicThemeDesignSystem.palette(themeManager: themeManager, colorScheme: colorScheme)
-    }
-
-    var body: some View {
-        HStack(spacing: 12) {
-            ZStack {
-                Circle()
-                    .fill(
-                        LinearGradient(
-                            colors: [
-                                palette.accent.opacity(colorScheme == .dark ? 0.34 : 0.22),
-                                palette.cardAccent.opacity(colorScheme == .dark ? 0.30 : 0.18)
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-                    .frame(width: 34, height: 34)
-
-                Image(systemName: prompt.icon)
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(palette.accent)
-            }
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text(prompt.title)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(palette.primaryText)
-
-                Text(prompt.message)
-                    .font(.caption)
-                    .foregroundStyle(palette.secondaryText)
-                    .lineLimit(2)
-            }
-
-            Spacer(minLength: 0)
-        }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 12)
-        .frame(maxWidth: 380)
-        .background {
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .fill(.ultraThinMaterial)
-
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .fill(palette.cardBackground.opacity(colorScheme == .dark ? 0.72 : 0.88))
-
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .fill(
-                    LinearGradient(
-                        colors: [
-                            palette.accent.opacity(colorScheme == .dark ? 0.16 : 0.10),
-                            palette.cardAccent.opacity(colorScheme == .dark ? 0.14 : 0.08)
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
-        }
-        .overlay {
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .stroke(
-                    LinearGradient(
-                        colors: [
-                            palette.accent.opacity(colorScheme == .dark ? 0.46 : 0.34),
-                            palette.cardAccent.opacity(colorScheme == .dark ? 0.36 : 0.24)
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ),
-                    lineWidth: 1
-                )
-        }
-        .shadow(color: palette.accent.opacity(colorScheme == .dark ? 0.22 : 0.16), radius: 18, x: 0, y: 10)
-        .accessibilityElement(children: .combine)
     }
 }
 
@@ -605,6 +507,9 @@ struct WardrobeView: View {
     @Environment(\.colorScheme) private var colorScheme
     @Query private var clothings: [Clothing]
     @State private var showStats = true
+    @State private var hasShownStatsRulePrompt = false
+    @State private var isShowingStatsRuleHint = false
+    @State private var statsRuleHintTask: Task<Void, Never>?
     @State private var filteredClothings: [Clothing] = []
     @State private var cellSnapshotCache: [UUID: WardrobeCellSnapshot] = [:]
     @State private var filteredStatsSummary: WardrobeStatsSummary = .empty
@@ -969,6 +874,9 @@ struct WardrobeView: View {
                 visibleItemFrameUpdateTask = nil
                 layoutPrefetchTask?.cancel()
                 layoutPrefetchTask = nil
+                statsRuleHintTask?.cancel()
+                statsRuleHintTask = nil
+                isShowingStatsRuleHint = false
             }
     }
 
@@ -1363,13 +1271,12 @@ struct WardrobeView: View {
                 }
                 .animation(isEditing ? .default : nil, value: editableClothings)
                 .padding(.horizontal, gridHorizontalPadding)
-                .padding(.top, gridStatsReservedHeight + 8)
+                .padding(.top, statsContentReservedHeight + 8)
                 .padding(.bottom, 100)
             }
 
             statsSection
                 .frame(height: gridStatsReservedHeight, alignment: .top)
-                .clipped()
                 .padding(.horizontal, gridHorizontalPadding)
                 .zIndex(1)
         }
@@ -1379,16 +1286,28 @@ struct WardrobeView: View {
         viewLayout == .grid6 ? 2 : 16
     }
 
-    private var statsReservedHeight: CGFloat {
-        showStats ? 172 : 28
+    private var statsExpandedReservedHeight: CGFloat {
+        172
+    }
+
+    private var statsVisibleHeight: CGFloat {
+        showStats ? statsExpandedReservedHeight : collapsedStatsVisibleHeight
+    }
+
+    private var collapsedStatsVisibleHeight: CGFloat {
+        60
     }
 
     private var gridStatsReservedHeight: CGFloat {
-        statsReservedHeight
+        statsVisibleHeight
     }
 
     private var listStatsReservedHeight: CGFloat {
-        statsReservedHeight
+        statsVisibleHeight
+    }
+
+    private var statsContentReservedHeight: CGFloat {
+        statsExpandedReservedHeight
     }
 
     @ViewBuilder
@@ -1903,6 +1822,13 @@ struct WardrobeView: View {
                 }
             }
 
+            if !showStats {
+                statsCollapsedRuleHint
+                    .opacity(isShowingStatsRuleHint ? 1 : 0)
+                    .allowsHitTesting(false)
+                    .accessibilityHidden(!isShowingStatsRuleHint)
+            }
+
             WardrobeStatsView(clothings: filteredClothings,
                               statsSummary: filteredStatsSummary,
                               filterDescription: filterDescription,
@@ -1919,6 +1845,32 @@ struct WardrobeView: View {
         }
     }
 
+    private var statsCollapsedRuleHint: some View {
+        let palette = MagicThemeDesignSystem.palette(themeManager: themeManager, colorScheme: colorScheme)
+        return HStack(spacing: 5) {
+            Image(systemName: "sparkles")
+                .font(.system(size: 10, weight: .semibold))
+            Text("下滑收起，点「显示」临时展开，回到顶部恢复。")
+                .lineLimit(1)
+                .minimumScaleFactor(0.72)
+            Spacer(minLength: 0)
+        }
+        .font(.caption2)
+        .foregroundStyle(palette.secondaryText)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(
+            Capsule()
+                .fill(palette.cardBackground.opacity(colorScheme == .dark ? 0.72 : 0.86))
+        )
+        .overlay {
+            Capsule()
+                .stroke(palette.accent.opacity(colorScheme == .dark ? 0.32 : 0.22), lineWidth: 0.5)
+        }
+        .accessibilityLabel("下滑收起，点显示临时展开，回到顶部恢复")
+    }
+
     private func statsScrollObserver() -> some View {
         WardrobeStatsScrollObserver { scrollDistance in
             handleStatsScrollDistance(scrollDistance)
@@ -1932,7 +1884,7 @@ struct WardrobeView: View {
         VStack(spacing: 0) {
             statsScrollObserver()
             Color.clear
-                .frame(height: listStatsReservedHeight + 8)
+                .frame(height: statsContentReservedHeight + 8)
         }
         .listRowInsets(EdgeInsets())
         .listRowBackground(Color.clear)
@@ -1944,7 +1896,10 @@ struct WardrobeView: View {
             scrollDistance,
             isExpanded: showStats
         ) { isExpanded in
-            setStatsVisibility(isExpanded)
+            setStatsVisibility(
+                isExpanded,
+                marksRuleHintSeen: !isExpanded && !hasShownStatsRulePrompt
+            )
         }
     }
 
@@ -1960,17 +1915,48 @@ struct WardrobeView: View {
 
     private func resetStatsScrollState(expand: Bool) {
         statsAutoCollapseCoordinator.reset()
+        dismissStatsRuleHint()
         if expand {
             setStatsVisibility(true)
         }
     }
 
-    private func setStatsVisibility(_ isVisible: Bool) {
-        guard showStats != isVisible else { return }
+    private func setStatsVisibility(_ isVisible: Bool, marksRuleHintSeen: Bool = false) {
+        guard showStats != isVisible || (marksRuleHintSeen && !hasShownStatsRulePrompt) else { return }
         var transaction = Transaction(animation: nil)
         transaction.disablesAnimations = true
         withTransaction(transaction) {
             showStats = isVisible
+            if marksRuleHintSeen {
+                hasShownStatsRulePrompt = true
+                presentStatsRuleHint()
+            } else if isVisible {
+                dismissStatsRuleHint()
+            }
+        }
+    }
+
+    private func presentStatsRuleHint() {
+        statsRuleHintTask?.cancel()
+        var transaction = Transaction(animation: nil)
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            isShowingStatsRuleHint = true
+        }
+        statsRuleHintTask = Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 3_000_000_000)
+            guard !Task.isCancelled else { return }
+            dismissStatsRuleHint()
+        }
+    }
+
+    private func dismissStatsRuleHint() {
+        statsRuleHintTask?.cancel()
+        statsRuleHintTask = nil
+        var transaction = Transaction(animation: nil)
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            isShowingStatsRuleHint = false
         }
     }
 
@@ -1996,7 +1982,6 @@ struct WardrobeView: View {
 
             statsSection
                 .frame(height: listStatsReservedHeight, alignment: .top)
-                .clipped()
                 .padding(.horizontal, gridHorizontalPadding)
                 .zIndex(1)
         }
@@ -2013,14 +1998,13 @@ struct WardrobeView: View {
                             .padding(.horizontal, 16)
                     }
                 }
-                .padding(.top, listStatsReservedHeight + 8)
+                .padding(.top, statsContentReservedHeight + 8)
                 .padding(.bottom, 100)
             }
             .scrollIndicators(.hidden)
 
             statsSection
                 .frame(height: listStatsReservedHeight, alignment: .top)
-                .clipped()
                 .padding(.horizontal, gridHorizontalPadding)
                 .zIndex(1)
         }

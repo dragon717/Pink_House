@@ -245,6 +245,7 @@ struct WardrobeThemeCardTitle: View {
                     Text(title)
                         .font(.system(size: 13, weight: .semibold, design: .rounded))
                         .foregroundStyle(SkyConcertThemeSkin.labelColor(for: descriptor))
+                        .themeSkinLegibleText(level: .inline, slot: .wardrobeItemCard, descriptor: descriptor)
                         .lineLimit(1)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
@@ -314,6 +315,7 @@ struct WardrobeThemeCornerBadge: View {
                         .lineLimit(1)
                 }
                 .foregroundStyle(tint)
+                .themeSkinLegibleText(level: .chip, slot: .discountBadge, descriptor: descriptor)
                 .padding(.horizontal, 8)
                 .padding(.vertical, 5)
                 .background(

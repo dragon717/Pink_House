@@ -260,6 +260,7 @@ struct ThemeSkinModernTabLabel: View {
                             ? TabBarThemeSkinTokens.accent(for: descriptor)
                             : TabBarThemeSkinTokens.text(for: descriptor).opacity(0.88)
                     )
+                    .themeSkinLegibleText(level: isSelected ? .chip : .inline, slot: .tabBarMain, descriptor: descriptor)
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 5)
@@ -299,6 +300,7 @@ struct ThemeSkinLegacyTabLabel: View {
                             ? TabBarThemeSkinTokens.accent(for: descriptor)
                             : TabBarThemeSkinTokens.text(for: descriptor).opacity(0.88)
                     )
+                    .themeSkinLegibleText(level: isSelected ? .chip : .inline, slot: .tabBarMain, descriptor: descriptor)
             }
             .padding(.horizontal, 8)
             .padding(.vertical, 5)

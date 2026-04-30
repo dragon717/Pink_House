@@ -1,6 +1,21 @@
 import SwiftUI
 import UIKit
 
+struct PetDialogueInputThemeTokens {
+    let containerGradientColors: [Color]
+    let containerTailFill: Color
+    let containerStroke: Color
+    let containerShadow: Color
+    let fieldFill: Color
+    let fieldStroke: Color
+    let fieldText: Color
+    let placeholderText: Color
+    let menuAccent: Color
+    let actionButtonGradientColors: [Color]
+    let actionButtonForeground: Color
+    let actionButtonShadow: Color
+}
+
 enum PetChatSkinTheme: String, CaseIterable, Codable, Identifiable, Equatable {
     case classic
     case magic
@@ -181,6 +196,18 @@ enum PetChatSkinTheme: String, CaseIterable, Codable, Identifiable, Equatable {
         ]
     }
 
+    func resolvedDialogueInputTokens(themeManager: ThemeManager, colorScheme: ColorScheme) -> PetDialogueInputThemeTokens {
+        if let themeSkinTokens = Self.themeSkinDialogueInputTokens() {
+            return themeSkinTokens
+        }
+
+        if self == .magic || themeManager.colorSchemeMode == .custom {
+            return Self.adaptiveDialogueInputTokens(themeManager: themeManager, colorScheme: colorScheme)
+        }
+
+        return Self.classicDialogueInputTokens(colorScheme: colorScheme)
+    }
+
     func resolvedQuickOptionFill(themeManager: ThemeManager, colorScheme: ColorScheme) -> Color {
         if self == .magic || themeManager.colorSchemeMode == .custom {
             let colors = Self.currentThemeColors(themeManager: themeManager, colorScheme: colorScheme)
@@ -247,5 +274,126 @@ enum PetChatSkinTheme: String, CaseIterable, Codable, Identifiable, Equatable {
             return colors.accent
         }
         return .pink
+    }
+
+    private static func classicDialogueInputTokens(colorScheme: ColorScheme) -> PetDialogueInputThemeTokens {
+        let fieldFill = Color.white.opacity(colorScheme == .dark ? 0.88 : 0.94)
+        let accent = Color(hex: "E88AA6")
+        return PetDialogueInputThemeTokens(
+            containerGradientColors: [
+                Color(hex: "FFDDE8"),
+                Color(hex: "FFC6D7")
+            ],
+            containerTailFill: Color(hex: "FFC6D7"),
+            containerStroke: Color.white.opacity(0.46),
+            containerShadow: Color(hex: "E7A2B8").opacity(colorScheme == .dark ? 0.20 : 0.16),
+            fieldFill: fieldFill,
+            fieldStroke: Color(hex: "F1B7C9").opacity(0.45),
+            fieldText: Color(hex: "3E3441"),
+            placeholderText: Color(hex: "8A7D86").opacity(0.68),
+            menuAccent: accent,
+            actionButtonGradientColors: [
+                Color(hex: "FFC9DA"),
+                Color(hex: "F2A9C1")
+            ],
+            actionButtonForeground: .white,
+            actionButtonShadow: accent.opacity(0.26)
+        )
+    }
+
+    private static func adaptiveDialogueInputTokens(themeManager: ThemeManager, colorScheme: ColorScheme) -> PetDialogueInputThemeTokens {
+        let colors = Self.currentThemeColors(themeManager: themeManager, colorScheme: colorScheme)
+        let isDark = colorScheme == .dark
+        let containerTop = colors.cardBackground
+            .mixed(with: .white, amount: isDark ? 0.14 : 0.30)
+            .mixed(with: colors.accent, amount: isDark ? 0.16 : 0.08)
+        let containerBottom = colors.cardBackground
+            .mixed(with: colors.cardAccent, amount: isDark ? 0.28 : 0.18)
+            .mixed(with: .white, amount: isDark ? 0.10 : 0.20)
+        let fieldFill = colors.cardBackground
+            .mixed(with: .white, amount: isDark ? 0.26 : 0.58)
+            .opacity(isDark ? 0.86 : 0.92)
+        let actionGradient = [
+            colors.accent.mixed(with: .white, amount: isDark ? 0.14 : 0.18),
+            colors.cardAccent.mixed(with: colors.accent, amount: isDark ? 0.42 : 0.34)
+        ]
+
+        return PetDialogueInputThemeTokens(
+            containerGradientColors: [
+                containerTop.opacity(isDark ? 0.88 : 0.94),
+                containerBottom.opacity(isDark ? 0.84 : 0.90)
+            ],
+            containerTailFill: containerBottom.opacity(isDark ? 0.84 : 0.90),
+            containerStroke: colors.accent.opacity(isDark ? 0.30 : 0.22),
+            containerShadow: colors.accent.opacity(isDark ? 0.20 : 0.16),
+            fieldFill: fieldFill,
+            fieldStroke: colors.accent.opacity(isDark ? 0.34 : 0.24),
+            fieldText: colors.primary,
+            placeholderText: colors.secondary.opacity(isDark ? 0.74 : 0.62),
+            menuAccent: colors.accent,
+            actionButtonGradientColors: actionGradient,
+            actionButtonForeground: Self.adaptiveUserBubbleTextColor(for: actionGradient),
+            actionButtonShadow: colors.accent.opacity(isDark ? 0.26 : 0.22)
+        )
+    }
+
+    private static func themeSkinDialogueInputTokens() -> PetDialogueInputThemeTokens? {
+        guard let activeThemeId = ThemeSkinManager.shared.activeThemeId,
+              let descriptor = ThemeSkinManager.shared.descriptor(forThemeId: activeThemeId, slot: .searchBar) else {
+            return nil
+        }
+
+        if SkyConcertThemeSkin.isSkyConcert(descriptor) {
+            let actionGradient = [
+                SkyConcertThemeSkin.creamTop,
+                SkyConcertThemeSkin.cloudBlue.opacity(0.92)
+            ]
+            return PetDialogueInputThemeTokens(
+                containerGradientColors: [
+                    SkyConcertThemeSkin.creamTop.opacity(0.96),
+                    SkyConcertThemeSkin.cloudBlue.opacity(0.88),
+                    SkyConcertThemeSkin.blush.opacity(0.58)
+                ],
+                containerTailFill: SkyConcertThemeSkin.cloudBlue.opacity(0.88),
+                containerStroke: SkyConcertThemeSkin.cloudBlueDeep.opacity(0.34),
+                containerShadow: SkyConcertThemeSkin.shadowColor(for: descriptor).opacity(0.50),
+                fieldFill: Color.white.opacity(0.76),
+                fieldStroke: SkyConcertThemeSkin.cloudBlueDeep.opacity(0.34),
+                fieldText: SkyConcertThemeSkin.labelColor(for: descriptor),
+                placeholderText: SkyConcertThemeSkin.labelColor(for: descriptor).opacity(0.58),
+                menuAccent: SkyConcertThemeSkin.accent(for: descriptor),
+                actionButtonGradientColors: actionGradient,
+                actionButtonForeground: SkyConcertThemeSkin.labelColor(for: descriptor),
+                actionButtonShadow: SkyConcertThemeSkin.shadowColor(for: descriptor).opacity(0.44)
+            )
+        }
+
+        if SwanDreamThemeSkin.isSwanDream(descriptor) {
+            let actionGradient = [
+                SwanDreamThemeSkin.creamTop,
+                SwanDreamThemeSkin.ribbonPink.opacity(0.86),
+                SwanDreamThemeSkin.moonLavender.opacity(0.92)
+            ]
+            return PetDialogueInputThemeTokens(
+                containerGradientColors: [
+                    SwanDreamThemeSkin.creamTop.opacity(0.97),
+                    SwanDreamThemeSkin.ribbonPink.opacity(0.76),
+                    SwanDreamThemeSkin.moonLavender.opacity(0.92)
+                ],
+                containerTailFill: SwanDreamThemeSkin.moonLavender.opacity(0.92),
+                containerStroke: SwanDreamThemeSkin.roseLine.opacity(0.32),
+                containerShadow: SwanDreamThemeSkin.shadow.opacity(0.58),
+                fieldFill: Color.white.opacity(0.74),
+                fieldStroke: SwanDreamThemeSkin.roseLine.opacity(0.30),
+                fieldText: SwanDreamThemeSkin.text,
+                placeholderText: SwanDreamThemeSkin.text.opacity(0.56),
+                menuAccent: SwanDreamThemeSkin.moonGold,
+                actionButtonGradientColors: actionGradient,
+                actionButtonForeground: SwanDreamThemeSkin.text,
+                actionButtonShadow: SwanDreamThemeSkin.shadow.opacity(0.46)
+            )
+        }
+
+        return nil
     }
 }

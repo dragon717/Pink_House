@@ -153,6 +153,7 @@ struct HomeThemeSkinToolbarIconShell<Content: View>: View {
         if isActive {
             content
                 .font(.system(size: effectiveIconSize, weight: .semibold))
+                .themeSkinLegibleSymbol(level: .badge, slot: descriptor?.slot ?? .topBarIconButton, descriptor: descriptor)
                 .frame(minWidth: effectiveMinWidth, minHeight: effectiveMinHeight)
         } else {
             content
@@ -187,10 +188,12 @@ struct HomeThemeSkinSearchMenuLabel: View {
                 Image(systemName: systemImage)
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(HomeThemeSkinTokens.accent(for: descriptor))
+                    .themeSkinLegibleSymbol(level: .chip, slot: descriptor?.slot ?? .searchBar, descriptor: descriptor)
 
                 Text(title)
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(Color.primary.opacity(0.85))
+                    .themeSkinLegibleText(level: .inline, slot: descriptor?.slot ?? .searchBar, descriptor: descriptor)
 
                 Spacer(minLength: 0)
             }
