@@ -92,6 +92,12 @@ enum DraftReliabilitySignpost {
     }
 
     @discardableResult
+    static func editorModelInit() -> Bool {
+        signposter.emitEvent("editor_model_init")
+        return true
+    }
+
+    @discardableResult
     static func draftSave(scope: String, draftID: UUID, imageCount: Int, tagCount: Int, byteSize: Int, reason: String = "") -> Bool {
         signposter.emitEvent(
             "draft_save",
@@ -139,6 +145,9 @@ enum DraftReliabilitySignpost {
     #else
     @discardableResult
     static func editorInit(isEditing: Bool, continueFromDraft: Bool, sessionID: UUID) -> Bool { true }
+
+    @discardableResult
+    static func editorModelInit() -> Bool { true }
 
     @discardableResult
     static func draftSave(scope: String, draftID: UUID, imageCount: Int, tagCount: Int, byteSize: Int, reason: String = "") -> Bool { true }

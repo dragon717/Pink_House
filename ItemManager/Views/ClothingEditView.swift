@@ -9,6 +9,7 @@ import SwiftUI
 import SwiftData
 import Foundation
 import Combine
+import Observation
 
 // MARK: - 标签数据（用于草稿保存）
 struct TagData: Codable {
@@ -540,6 +541,48 @@ struct ClothingEditUserActivityPayload: Codable {
     let updatedAt: Date
 }
 
+@Observable
+final class ClothingEditModel {
+    var name: String = ""
+    var brandName: String = ""
+    var types: String = ""
+    var colors: String = ""
+    var sizes: String = ""
+    var length: String = ""
+    var condition: String = "全新"
+    var accessories: String = ""
+    var imagePaths: [String] = []
+    var isShared: Bool = false
+    var sizeChartImagePath: String? = nil
+    var priceChartImagePath: String? = nil
+    var selectedTags: [Tag] = []
+    var originalPrice: Double = 0.0
+    var originalPriceJPY: Double = 0.0
+    var originalPriceCurrency: ClothingPriceCurrency = .cny
+    var originalPriceRateUpdatedAt: Date? = nil
+    var priceTotal: Double = 0.0
+    var deposit: Double = 0.0
+    var balance: Double = 0.0
+    var accessoriesPrice: Double = 0.0
+    var shippingFee: Double = 0.0
+    var shippingFeeJPY: Double = 0.0
+    var shippingFeeCurrency: ClothingPriceCurrency = .cny
+    var shippingRateUpdatedAt: Date? = nil
+    var jpyExchangeRate: Double = CurrencyExchangeRateService.defaultJPYRate
+    var stock: Int = 1
+    var accessoryList: [AccessoryItemData] = []
+    var purchaseDate: Date = Date()
+    var depositDate: Date = Date()
+    var isDepositPlan: Bool = false
+    var finalPaymentDate: Date = Date()
+    var finalPaymentEndDate: Date = Date()
+    var note: String = ""
+
+    init() {
+        DraftReliabilitySignpost.editorModelInit()
+    }
+}
+
 enum ClothingEditUserActivity {
     static let activityType = "com.itemmanager.clothing.editing"
     private static let payloadKey = "clothingEditDraftPayload"
@@ -1024,59 +1067,16 @@ struct ClothingEditView: View {
 
     @State private var clothing: Clothing?
     @State private var draftID: UUID = UUID()
-
-    // Form States
-    @State private var name: String = ""
-    @State private var brandName: String = ""
-    @State private var types: String = ""
-    @State private var colors: String = ""
-    @State private var sizes: String = ""
-    @State private var length: String = ""
-    @State private var condition: String = "全新"
-    @State private var accessories: String = ""
-    @State private var imagePaths: [String] = []
-    @State private var isShared: Bool = false
-
-    // 表图字段
-    @State private var sizeChartImagePath: String? = nil
-    @State private var priceChartImagePath: String? = nil
+    @State private var editModel = ClothingEditModel()
 
     // Tag States
     @State private var showingAddTagSheet = false
-    @State private var selectedTags: [Tag] = []
-
-    // Price States
-    @State private var originalPrice: Double = 0.0
-    @State private var originalPriceJPY: Double = 0.0
-    @State private var originalPriceCurrency: ClothingPriceCurrency = .cny
-    @State private var originalPriceRateUpdatedAt: Date? = nil
-    @State private var priceTotal: Double = 0.0
-    @State private var deposit: Double = 0.0
-    @State private var balance: Double = 0.0
-    @State private var accessoriesPrice: Double = 0.0
-    @State private var shippingFee: Double = 0.0
-    @State private var shippingFeeJPY: Double = 0.0
-    @State private var shippingFeeCurrency: ClothingPriceCurrency = .cny
-    @State private var shippingRateUpdatedAt: Date? = nil
-    @State private var jpyExchangeRate: Double = CurrencyExchangeRateService.defaultJPYRate
-    @State private var stock: Int = 1
 
     // Selection Sheets
     @State private var showingBrandSelection = false
     @State private var tempSelectedBrand: Brand?
     @State private var activeSelectionField: ClothingField?
     @State private var showingGenericSelection = false
-
-    // Custom Accessories
-    @State private var accessoryList: [AccessoryItemData] = []
-
-    // Purchase States
-    @State private var purchaseDate: Date = Date()
-    @State private var depositDate: Date = Date()
-    @State private var isDepositPlan: Bool = false
-    @State private var finalPaymentDate: Date = Date()
-    @State private var finalPaymentEndDate: Date = Date()
-    @State private var note: String = ""
 
     // 标记是否是通过"保存"按钮离开的
     @State private var isSaving = false
@@ -1143,6 +1143,183 @@ struct ClothingEditView: View {
 
     var isEditing: Bool { clothing != nil }
 
+    private func modelBinding<Value>(_ keyPath: ReferenceWritableKeyPath<ClothingEditModel, Value>) -> Binding<Value> {
+        Binding(
+            get: { editModel[keyPath: keyPath] },
+            set: { editModel[keyPath: keyPath] = $0 }
+        )
+    }
+
+    private var name: String {
+        get { editModel.name }
+        nonmutating set { editModel.name = newValue }
+    }
+
+    private var brandName: String {
+        get { editModel.brandName }
+        nonmutating set { editModel.brandName = newValue }
+    }
+
+    private var types: String {
+        get { editModel.types }
+        nonmutating set { editModel.types = newValue }
+    }
+
+    private var colors: String {
+        get { editModel.colors }
+        nonmutating set { editModel.colors = newValue }
+    }
+
+    private var sizes: String {
+        get { editModel.sizes }
+        nonmutating set { editModel.sizes = newValue }
+    }
+
+    private var length: String {
+        get { editModel.length }
+        nonmutating set { editModel.length = newValue }
+    }
+
+    private var condition: String {
+        get { editModel.condition }
+        nonmutating set { editModel.condition = newValue }
+    }
+
+    private var accessories: String {
+        get { editModel.accessories }
+        nonmutating set { editModel.accessories = newValue }
+    }
+
+    private var imagePaths: [String] {
+        get { editModel.imagePaths }
+        nonmutating set { editModel.imagePaths = newValue }
+    }
+
+    private var isShared: Bool {
+        get { editModel.isShared }
+        nonmutating set { editModel.isShared = newValue }
+    }
+
+    private var sizeChartImagePath: String? {
+        get { editModel.sizeChartImagePath }
+        nonmutating set { editModel.sizeChartImagePath = newValue }
+    }
+
+    private var priceChartImagePath: String? {
+        get { editModel.priceChartImagePath }
+        nonmutating set { editModel.priceChartImagePath = newValue }
+    }
+
+    private var selectedTags: [Tag] {
+        get { editModel.selectedTags }
+        nonmutating set { editModel.selectedTags = newValue }
+    }
+
+    private var originalPrice: Double {
+        get { editModel.originalPrice }
+        nonmutating set { editModel.originalPrice = newValue }
+    }
+
+    private var originalPriceJPY: Double {
+        get { editModel.originalPriceJPY }
+        nonmutating set { editModel.originalPriceJPY = newValue }
+    }
+
+    private var originalPriceCurrency: ClothingPriceCurrency {
+        get { editModel.originalPriceCurrency }
+        nonmutating set { editModel.originalPriceCurrency = newValue }
+    }
+
+    private var originalPriceRateUpdatedAt: Date? {
+        get { editModel.originalPriceRateUpdatedAt }
+        nonmutating set { editModel.originalPriceRateUpdatedAt = newValue }
+    }
+
+    private var priceTotal: Double {
+        get { editModel.priceTotal }
+        nonmutating set { editModel.priceTotal = newValue }
+    }
+
+    private var deposit: Double {
+        get { editModel.deposit }
+        nonmutating set { editModel.deposit = newValue }
+    }
+
+    private var balance: Double {
+        get { editModel.balance }
+        nonmutating set { editModel.balance = newValue }
+    }
+
+    private var accessoriesPrice: Double {
+        get { editModel.accessoriesPrice }
+        nonmutating set { editModel.accessoriesPrice = newValue }
+    }
+
+    private var shippingFee: Double {
+        get { editModel.shippingFee }
+        nonmutating set { editModel.shippingFee = newValue }
+    }
+
+    private var shippingFeeJPY: Double {
+        get { editModel.shippingFeeJPY }
+        nonmutating set { editModel.shippingFeeJPY = newValue }
+    }
+
+    private var shippingFeeCurrency: ClothingPriceCurrency {
+        get { editModel.shippingFeeCurrency }
+        nonmutating set { editModel.shippingFeeCurrency = newValue }
+    }
+
+    private var shippingRateUpdatedAt: Date? {
+        get { editModel.shippingRateUpdatedAt }
+        nonmutating set { editModel.shippingRateUpdatedAt = newValue }
+    }
+
+    private var jpyExchangeRate: Double {
+        get { editModel.jpyExchangeRate }
+        nonmutating set { editModel.jpyExchangeRate = newValue }
+    }
+
+    private var stock: Int {
+        get { editModel.stock }
+        nonmutating set { editModel.stock = newValue }
+    }
+
+    private var accessoryList: [AccessoryItemData] {
+        get { editModel.accessoryList }
+        nonmutating set { editModel.accessoryList = newValue }
+    }
+
+    private var purchaseDate: Date {
+        get { editModel.purchaseDate }
+        nonmutating set { editModel.purchaseDate = newValue }
+    }
+
+    private var depositDate: Date {
+        get { editModel.depositDate }
+        nonmutating set { editModel.depositDate = newValue }
+    }
+
+    private var isDepositPlan: Bool {
+        get { editModel.isDepositPlan }
+        nonmutating set { editModel.isDepositPlan = newValue }
+    }
+
+    private var finalPaymentDate: Date {
+        get { editModel.finalPaymentDate }
+        nonmutating set { editModel.finalPaymentDate = newValue }
+    }
+
+    private var finalPaymentEndDate: Date {
+        get { editModel.finalPaymentEndDate }
+        nonmutating set { editModel.finalPaymentEndDate = newValue }
+    }
+
+    private var note: String {
+        get { editModel.note }
+        nonmutating set { editModel.note = newValue }
+    }
+
     private var containerPalette: AdaptivePaletteV2 {
         themeManager.getPaletteForContainer(
             containerBackground: .ultraThinMaterial,
@@ -1153,17 +1330,17 @@ struct ClothingEditView: View {
     // 提取基础信息视图，避免 body 中表达式过于复杂
     private var basicInfoSection: some View {
         ClothingBasicInfoView(
-            imagePaths: $imagePaths,
-            name: $name,
-            brandName: $brandName,
-            isShared: $isShared,
-            types: $types,
-            colors: $colors,
-            sizes: $sizes,
-            length: $length,
-            condition: $condition,
-            accessories: $accessories,
-            sizeChartImagePath: $sizeChartImagePath,
+            imagePaths: modelBinding(\.imagePaths),
+            name: modelBinding(\.name),
+            brandName: modelBinding(\.brandName),
+            isShared: modelBinding(\.isShared),
+            types: modelBinding(\.types),
+            colors: modelBinding(\.colors),
+            sizes: modelBinding(\.sizes),
+            length: modelBinding(\.length),
+            condition: modelBinding(\.condition),
+            accessories: modelBinding(\.accessories),
+            sizeChartImagePath: modelBinding(\.sizeChartImagePath),
             deleteChartFileImmediately: !isEditing,
             showingBrandSelection: $showingBrandSelection,
             showingGenericSelection: $showingGenericSelection,
@@ -1174,7 +1351,7 @@ struct ClothingEditView: View {
     // 提取标签视图
     private var tagsSection: some View {
         ClothingTagsView(
-            selectedTags: $selectedTags,
+            selectedTags: modelBinding(\.selectedTags),
             showingAddTagSheet: $showingAddTagSheet
         )
     }
@@ -1182,20 +1359,20 @@ struct ClothingEditView: View {
     // 提取价格视图
     private var priceSection: some View {
         ClothingPriceView(
-            originalPrice: $originalPrice,
-            originalPriceJPY: $originalPriceJPY,
-            originalPriceCurrency: $originalPriceCurrency,
-            priceTotal: $priceTotal,
-            deposit: $deposit,
-            balance: $balance,
-            accessoriesPrice: $accessoriesPrice,
-            shippingFee: $shippingFee,
-            shippingFeeJPY: $shippingFeeJPY,
-            shippingFeeCurrency: $shippingFeeCurrency,
-            stock: $stock,
-            accessoryList: $accessoryList,
+            originalPrice: modelBinding(\.originalPrice),
+            originalPriceJPY: modelBinding(\.originalPriceJPY),
+            originalPriceCurrency: modelBinding(\.originalPriceCurrency),
+            priceTotal: modelBinding(\.priceTotal),
+            deposit: modelBinding(\.deposit),
+            balance: modelBinding(\.balance),
+            accessoriesPrice: modelBinding(\.accessoriesPrice),
+            shippingFee: modelBinding(\.shippingFee),
+            shippingFeeJPY: modelBinding(\.shippingFeeJPY),
+            shippingFeeCurrency: modelBinding(\.shippingFeeCurrency),
+            stock: modelBinding(\.stock),
+            accessoryList: modelBinding(\.accessoryList),
             jpyExchangeRate: jpyExchangeRate,
-            priceChartImagePath: $priceChartImagePath,
+            priceChartImagePath: modelBinding(\.priceChartImagePath),
             deleteChartFileImmediately: !isEditing,
             onShowToast: handleShowToast
         )
@@ -1276,12 +1453,12 @@ struct ClothingEditView: View {
     // 提取购买信息视图
     private var purchaseInfoSection: some View {
         ClothingPurchaseInfoView(
-            purchaseDate: $purchaseDate,
-            depositDate: $depositDate,
-            isDepositPlan: $isDepositPlan,
-            finalPaymentDate: $finalPaymentDate,
-            finalPaymentEndDate: $finalPaymentEndDate,
-            note: $note
+            purchaseDate: modelBinding(\.purchaseDate),
+            depositDate: modelBinding(\.depositDate),
+            isDepositPlan: modelBinding(\.isDepositPlan),
+            finalPaymentDate: modelBinding(\.finalPaymentDate),
+            finalPaymentEndDate: modelBinding(\.finalPaymentEndDate),
+            note: modelBinding(\.note)
         )
     }
 
@@ -1378,7 +1555,7 @@ struct ClothingEditView: View {
             }
         }
         .sheet(isPresented: $showingAddTagSheet) {
-            TagSelectionView(selectedTags: $selectedTags)
+            TagSelectionView(selectedTags: modelBinding(\.selectedTags))
         }
         .sheet(isPresented: $showingGenericSelection) {
             if let field = activeSelectionField {
@@ -2010,12 +2187,12 @@ struct ClothingEditView: View {
 
     private func binding(for field: ClothingField) -> Binding<String> {
         switch field {
-        case .types: return $types
-        case .colors: return $colors
-        case .sizes: return $sizes
-        case .length: return $length
-        case .condition: return $condition
-        case .accessories: return $accessories
+        case .types: return modelBinding(\.types)
+        case .colors: return modelBinding(\.colors)
+        case .sizes: return modelBinding(\.sizes)
+        case .length: return modelBinding(\.length)
+        case .condition: return modelBinding(\.condition)
+        case .accessories: return modelBinding(\.accessories)
         }
     }
 
