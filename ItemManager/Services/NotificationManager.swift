@@ -662,21 +662,20 @@ class NotificationManager: NSObject, UNUserNotificationCenterDelegate {
         let content = UNMutableNotificationContent()
         content.title = title
 
-        var body = "您的 \"\(clothing.name)\" 需要支付尾款了"
+        let paymentWindowText = reminderPaymentWindowText(
+            finalDate: finalDate,
+            finalPaymentEndDate: clothing.finalPaymentEndDate
+        )
+        let amountText = reminderAmountText(for: clothing)
+        let body: String
         if isTest {
-            body = "测试通知：点击后将打开「\(clothing.name)」详情页"
+            body = "测试通知：点击后会打开「\(clothing.name)」详情页。\(paymentWindowText)。"
         } else if isCatchUpDuringPaymentWindow {
-            body = "您的 \"\(clothing.name)\" 已进入尾款支付期，若尚未支付尾款请尽快处理"
+            body = "「\(clothing.name)」已进入尾款支付期：\(paymentWindowText)。\(amountText)，若尚未处理请尽快确认。"
         } else if daysBefore > 0 {
-            body += " (还有 \(daysBefore) 天)"
+            body = "「\(clothing.name)」还有 \(daysBefore) 天开始付尾款：\(paymentWindowText)。\(amountText)，点击查看详情。"
         } else {
-            body += " (今天开始支付尾款)"
-        }
-        if let finalPaymentEndDate = clothing.finalPaymentEndDate,
-           Calendar.current.startOfDay(for: finalPaymentEndDate) > Calendar.current.startOfDay(for: finalDate) {
-            body += "\n补款范围: \(formatDate(finalDate)) - \(formatDate(finalPaymentEndDate))"
-        } else {
-            body += "\n预估时间: \(formatDate(finalDate))"
+            body = "「\(clothing.name)」今天开始付尾款：\(paymentWindowText)。\(amountText)，请确认是否已处理。"
         }
 
         content.body = body
@@ -1222,6 +1221,23 @@ class NotificationManager: NSObject, UNUserNotificationCenterDelegate {
         ].joined(separator: "#")
     }
     
+    private func reminderPaymentWindowText(finalDate: Date, finalPaymentEndDate: Date?) -> String {
+        if let finalPaymentEndDate,
+           Calendar.current.startOfDay(for: finalPaymentEndDate) > Calendar.current.startOfDay(for: finalDate) {
+            return "支付期 \(formatDate(finalDate)) 至 \(formatDate(finalPaymentEndDate))"
+        }
+
+        return "尾款日 \(formatDate(finalDate))"
+    }
+
+    private func reminderAmountText(for clothing: Clothing) -> String {
+        guard clothing.totalBalance > 0 else {
+            return "尾款金额待确认"
+        }
+
+        return "待付尾款 ¥\(NSDecimalNumber(decimal: clothing.totalBalance).stringValue)"
+    }
+
     private func formatDate(_ date: Date) -> String {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd"
