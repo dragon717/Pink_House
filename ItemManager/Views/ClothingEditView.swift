@@ -577,6 +577,8 @@ final class ClothingEditModel {
     var finalPaymentDate: Date = Date()
     var finalPaymentEndDate: Date = Date()
     var note: String = ""
+    var hasInitializedEditor = false
+    var didPersistForLifecycle = false
 
     init() {
         DraftReliabilitySignpost.editorModelInit()
@@ -1086,11 +1088,6 @@ struct ClothingEditView: View {
     private var continueFromDraft: Bool
     private var activityDraft: ClothingEditDraft?
 
-    // 标记是否已经处理过草稿逻辑（防止onAppear多次执行）
-    @State private var hasProcessedDraft = false
-
-    // 标记是否已经因前后台/失活持久化过（避免onDisappear重复保存草稿）
-    @State private var didPersistForLifecycle = false
     @State private var editorSessionID = UUID()
     @State private var hasUserTouchedAnyField = false
     @State private var isReadyForUserDraftChanges = false
@@ -1575,7 +1572,7 @@ struct ClothingEditView: View {
         }
         .onChange(of: imagePaths) { oldValue, newValue in
             print("ClothingEditView: imagePaths changed from \(oldValue.count) to \(newValue.count) images")
-            didPersistForLifecycle = false
+            editModel.didPersistForLifecycle = false
             if isReadyForUserDraftChanges {
                 hasUserTouchedAnyField = true
             }
@@ -1590,7 +1587,7 @@ struct ClothingEditView: View {
             }
         }
         .onChange(of: draftObservationKey) { oldValue, newValue in
-            didPersistForLifecycle = false
+            editModel.didPersistForLifecycle = false
             updateCurrentDraft()
             if let programmaticKey = programmaticDraftObservationKey {
                 programmaticDraftObservationKey = nil
@@ -1630,7 +1627,7 @@ struct ClothingEditView: View {
         .onChange(of: scenePhase) { _, newPhase in
             DraftReliabilitySignpost.scenePhase("\(newPhase)", reason: "scenePhase-change")
             if newPhase == .active {
-                didPersistForLifecycle = false
+                editModel.didPersistForLifecycle = false
                 return
             }
             guard newPhase == .inactive || newPhase == .background else { return }
@@ -1648,7 +1645,7 @@ struct ClothingEditView: View {
             draftManager.unregisterActiveEditor(editorSessionID)
             cancelPendingDraftPersistence()
             // 如果不是保存/明确取消，且没有因前后台/失活保存过，则保留当前快照。
-            let shouldSaveDraft = !isSaving && !isCancelling && !didPersistForLifecycle && (isEditing || shouldKeepCreateDraft)
+            let shouldSaveDraft = !isSaving && !isCancelling && !editModel.didPersistForLifecycle && (isEditing || shouldKeepCreateDraft)
             if shouldSaveDraft {
                 print("ClothingEditView: Saving draft on disappear")
                 saveCurrentStateAsDraft(reason: "onDisappear")
@@ -1684,16 +1681,16 @@ struct ClothingEditView: View {
     }
 
     private func initializeEditorIfNeeded() {
-        print("ClothingEditView: onAppear triggered, isEditing: \(isEditing), draftID: \(draftID), continueFromDraft: \(continueFromDraft), hasProcessedDraft: \(hasProcessedDraft)")
+        print("ClothingEditView: onAppear triggered, isEditing: \(isEditing), draftID: \(draftID), continueFromDraft: \(continueFromDraft), hasInitializedEditor: \(editModel.hasInitializedEditor)")
 
         // 防止多次处理草稿逻辑
-        guard !hasProcessedDraft else {
+        guard !editModel.hasInitializedEditor else {
             print("ClothingEditView: Draft already processed, skipping")
             isReadyForUserDraftChanges = true
             return
         }
         isReadyForUserDraftChanges = false
-        hasProcessedDraft = true
+        editModel.hasInitializedEditor = true
 
         // 加载自动补全数据
         SuggestionManager.shared.loadDataAndBuildIndex(modelContext: modelContext)
@@ -1863,7 +1860,7 @@ struct ClothingEditView: View {
             return
         }
         saveCurrentStateAsDraft(reason: reason)
-        didPersistForLifecycle = true
+        editModel.didPersistForLifecycle = true
     }
 
     private func clearCurrentDraftStorage() {
