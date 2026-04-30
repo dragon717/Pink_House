@@ -232,7 +232,7 @@ final class ClothingDraftFileStore {
     }
 
     @discardableResult
-    func rebuildIndexAndValidateImageReferences() -> ClothingDraftGCReport {
+    fileprivate func rebuildIndexAndValidateImageReferences() -> ClothingDraftGCReport {
         do {
             try ensureDirectories()
             var index = ClothingDraftIndex()
@@ -389,8 +389,7 @@ final class ClothingDraftFileStore {
     }
 
     private static func normalizedImageFileName(_ path: String) -> String {
-        path.trimmingCharacters(in: .whitespacesAndNewlines) as NSString
-            .lastPathComponent
+        (path.trimmingCharacters(in: .whitespacesAndNewlines) as NSString).lastPathComponent
     }
 
     private func loadIndex() -> ClothingDraftIndex {
