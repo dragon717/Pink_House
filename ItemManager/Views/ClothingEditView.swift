@@ -345,6 +345,13 @@ private actor DraftPersistor {
         }
     }
 
+    func cancel(scope: ClothingDraftScope) {
+        let key = scope.key
+        pendingTasks[key]?.cancel()
+        pendingTasks[key] = nil
+        pendingRequests[key] = nil
+    }
+
     func flushNow(_ draft: ClothingEditDraft, scope: ClothingDraftScope, reason: String) {
         let key = scope.key
         pendingTasks[key]?.cancel()
@@ -354,10 +361,7 @@ private actor DraftPersistor {
     }
 
     func clear(scope: ClothingDraftScope) {
-        let key = scope.key
-        pendingTasks[key]?.cancel()
-        pendingTasks[key] = nil
-        pendingRequests[key] = nil
+        cancel(scope: scope)
 
         do {
             switch scope {
@@ -379,6 +383,10 @@ private actor DraftPersistor {
 
     private func persist(_ request: ClothingDraftSaveRequest) {
         do {
+            if shouldSkipStaleRequest(request) {
+                print("DraftPersistor: Skip stale pending draft for \(request.scope.key), reason: \(request.reason)")
+                return
+            }
             let byteSize: Int
             switch request.scope {
             case .create:
@@ -397,6 +405,22 @@ private actor DraftPersistor {
         } catch {
             DraftReliabilitySignpost.draftSaveFailed(scope: request.scope.signpostScope, error: error)
             AppLogger.error("DraftReliability: Failed to persist file draft for \(request.scope.key): \(error)")
+        }
+    }
+
+    private func shouldSkipStaleRequest(_ request: ClothingDraftSaveRequest) -> Bool {
+        do {
+            let existingDraft: ClothingEditDraft?
+            switch request.scope {
+            case .create:
+                existingDraft = try fileStore.loadCreateDraft()
+            case .edit(let clothingID):
+                existingDraft = try fileStore.loadEditingDraft(for: clothingID)
+            }
+            guard let existingDraft else { return false }
+            return existingDraft.timestamp > request.draft.timestamp
+        } catch {
+            return false
         }
     }
 }
@@ -449,6 +473,7 @@ final class ClothingEditDraftManager: ObservableObject {
     func saveDraft(_ draft: ClothingEditDraft, reason: String = "direct") {
         print("DraftManager: Saving draft with ID: \(draft.id), images: \(draft.imagePaths.count)")
         currentDraft = draft
+        Task { await DraftPersistor.shared.cancel(scope: .create) }
         do {
             let byteSize = try fileStore.saveCreateDraft(draft)
             hasPersistedDraft = true
@@ -498,6 +523,7 @@ final class ClothingEditDraftManager: ObservableObject {
     func clearDraft() {
         print("DraftManager: Clearing draft")
         currentDraft = nil
+        Task { await DraftPersistor.shared.clear(scope: .create) }
         do {
             try fileStore.clearCreateDraft()
             hasPersistedDraft = false
@@ -522,8 +548,25 @@ final class ClothingEditDraftManager: ObservableObject {
         print("DraftManager: Updated editing draft for clothing: \(clothingID), images: \(draft.imagePaths.count)")
     }
 
+    func enqueueDraftSave(_ draft: ClothingEditDraft, reason: String) {
+        currentDraft = draft
+        hasPersistedDraft = true
+        Task { await DraftPersistor.shared.enqueueSave(draft, scope: .create, reason: reason) }
+    }
+
+    func enqueueEditingDraftSave(_ draft: ClothingEditDraft, for clothingID: UUID, reason: String) {
+        currentEditingDrafts[clothingID] = draft
+        Task { await DraftPersistor.shared.enqueueSave(draft, scope: .edit(clothingID), reason: reason) }
+    }
+
+    func cancelPendingDraftPersistence(for clothingID: UUID?) {
+        let scope: ClothingDraftScope = clothingID.map { .edit($0) } ?? .create
+        Task { await DraftPersistor.shared.cancel(scope: scope) }
+    }
+
     func saveEditingDraft(_ draft: ClothingEditDraft, for clothingID: UUID, reason: String = "direct") {
         currentEditingDrafts[clothingID] = draft
+        Task { await DraftPersistor.shared.cancel(scope: .edit(clothingID)) }
         print("DraftManager: Saving editing draft for clothing: \(clothingID), images: \(draft.imagePaths.count)")
         do {
             let byteSize = try fileStore.saveEditingDraft(draft, for: clothingID)
@@ -571,6 +614,7 @@ final class ClothingEditDraftManager: ObservableObject {
     func clearEditingDraft(for clothingID: UUID) {
         print("DraftManager: Clearing editing draft for clothing: \(clothingID)")
         currentEditingDrafts.removeValue(forKey: clothingID)
+        Task { await DraftPersistor.shared.clear(scope: .edit(clothingID)) }
         do {
             try fileStore.clearEditingDraft(for: clothingID)
             DraftReliabilitySignpost.draftClear(scope: "edit", reason: clothingID.uuidString)
@@ -748,7 +792,6 @@ struct ClothingEditView: View {
     @State private var editorSessionID = UUID()
     @State private var hasUserTouchedAnyField = false
     @State private var isReadyForUserDraftChanges = false
-    @State private var pendingDraftSaveTask: Task<Void, Never>?
     @State private var suppressNextDraftObservationAsSystemChange = false
     @State private var programmaticDraftObservationKey: DraftObservationKey?
 
@@ -976,7 +1019,7 @@ struct ClothingEditView: View {
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
                 Button("取消") {
-                    cancelPendingDraftSave()
+                    cancelPendingDraftPersistence()
                     isCancelling = true
                     // 取消时如果有有效信息或用户碰过任一字段，则保存草稿，方便用户下次恢复。
                     // 注意：创建模式取消不再清理 UserDefaults 草稿；只有“手动创建”入口负责清旧草稿。
@@ -996,7 +1039,7 @@ struct ClothingEditView: View {
 
             ToolbarItem(placement: .confirmationAction) {
                 Button("保存") {
-                    cancelPendingDraftSave()
+                    cancelPendingDraftPersistence()
                     // 标记为保存操作
                     isSaving = true
                     // 保存前清除草稿
@@ -1073,10 +1116,10 @@ struct ClothingEditView: View {
                 oldValue.sizeChartImagePath != newValue.sizeChartImagePath ||
                 oldValue.priceChartImagePath != newValue.priceChartImagePath
             if chartChanged {
-                cancelPendingDraftSave()
+                cancelPendingDraftPersistence()
                 saveCurrentStateAsDraft(reason: "chart-change")
             } else {
-                scheduleDebouncedDraftSave(reason: "field-change")
+                enqueueCurrentStateAsDraft(reason: "field-change")
             }
         }
         .onChange(of: jpyExchangeRate) { _, _ in
@@ -1106,7 +1149,7 @@ struct ClothingEditView: View {
         .onDisappear {
             print("ClothingEditView: onDisappear")
             draftManager.unregisterActiveEditor(editorSessionID)
-            cancelPendingDraftSave()
+            cancelPendingDraftPersistence()
             // 如果不是保存/明确取消，且没有因前后台/失活保存过，则保留当前快照。
             let shouldSaveDraft = !isSaving && !isCancelling && !didPersistForLifecycle && (isEditing || shouldKeepCreateDraft)
             if shouldSaveDraft {
@@ -1130,23 +1173,17 @@ struct ClothingEditView: View {
         hasMeaningfulData() || hasUserTouchedAnyField
     }
 
-    private func scheduleDebouncedDraftSave(reason: String) {
-        cancelPendingDraftSave()
-        pendingDraftSaveTask = Task { @MainActor in
-            do {
-                try await Task.sleep(nanoseconds: 500_000_000)
-            } catch {
-                return
-            }
-            guard !Task.isCancelled else { return }
-            saveCurrentStateAsDraft(reason: reason)
-            pendingDraftSaveTask = nil
+    private func enqueueCurrentStateAsDraft(reason: String) {
+        let draft = makeCurrentDraft()
+        if let clothingID = clothing?.id {
+            draftManager.enqueueEditingDraftSave(draft, for: clothingID, reason: reason)
+        } else {
+            draftManager.enqueueDraftSave(draft, reason: reason)
         }
     }
 
-    private func cancelPendingDraftSave() {
-        pendingDraftSaveTask?.cancel()
-        pendingDraftSaveTask = nil
+    private func cancelPendingDraftPersistence() {
+        draftManager.cancelPendingDraftPersistence(for: clothing?.id)
     }
 
     private func initializeEditorIfNeeded() {
@@ -1316,7 +1353,7 @@ struct ClothingEditView: View {
     }
 
     private func persistCurrentStateForLifecycle(reason: String) {
-        cancelPendingDraftSave()
+        cancelPendingDraftPersistence()
         guard !isSaving, !isCancelling else { return }
         guard isEditing || shouldKeepCreateDraft else {
             print("ClothingEditView: Skip lifecycle draft save, no meaningful data or user touch, reason: \(reason)")
