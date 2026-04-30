@@ -1,0 +1,40 @@
+feature_id: deposit_reminder_readability
+name: 尾款提醒可读化
+project_root: /Users/muniao/Library/Mobile Documents/com~apple~CloudDocs/游戏/github/Pink_House
+artifact_root: temp/尾款提醒体验/_artifacts
+source_files:
+  - ItemManager/Views/DepositPlan/DepositNotificationView.swift
+  - ItemManager/Services/NotificationManager.swift
+reference_files:
+  - ItemManager/Views/ThemeSkin/ThemeSkinSharedComponents.swift
+  - ItemManager/Views/DepositPlanView.swift
+  - ItemManager/Views/DepositItemRow.swift
+invariants:
+  - 不新增 SwiftData 字段
+  - 不改 DepositNotificationRecord schema
+  - 不改 NotificationManager identifier / UserDefaults key / 调度候选规则
+  - 不改尾款金额计算和提醒天数默认值
+  - 不 stage 无关 WardrobeView.swift 改动
+acceptance:
+  static:
+    - git diff --check
+    - rg 检查提醒页是否仍有日志式主信息
+    - rg 检查提醒页核心卡片是否走 ThemeSkinSectionCardContainer
+  manual_scenarios:
+    - 未开启提醒
+    - 无通知权限
+    - 无尾款记录
+    - 未来尾款
+    - 当天尾款
+    - 支付期范围
+    - 已过期
+    - 系统通知 / 仅站内
+    - 已读 / 未读
+    - 衣物被删除后的历史记录
+screenshots:
+  suggested:
+    - A_overview_card.png
+    - B_pending_list.png
+    - C_history_list.png
+    - D_settings_expanded.png
+    - E_dark_mode.png
