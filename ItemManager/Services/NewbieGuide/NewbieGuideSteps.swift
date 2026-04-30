@@ -796,11 +796,11 @@ enum WealthGuideStep: Int, CaseIterable, GuideStepDescribable {
         case .step2_clickWealthEntry:
             return "在 House 场景里点击「马上来财」入口，进入来财功能。"
         case .step3_divination:
-            return "「请签」可查看今日运势与建议，适合每日打卡。"
+            return "「请签」会给出今日心愿提醒，适合像茶会开场一样轻轻打卡。"
         case .step4_moneyCounting:
-            return "「数钱」是沉浸式数钞体验，能快速放松心情。"
+            return "「数钱」会把衣橱总值、心愿定金和小匣储蓄变成沉浸式账本。"
         case .step5_wealthStorage:
-            return "「安财」可管理财富展示与资产状态。"
+            return "「安财」可查看黄金、白银、萌宠货币和尾款心愿小匣。"
         }
     }
 

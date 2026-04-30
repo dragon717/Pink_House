@@ -70,18 +70,19 @@ struct PageThumbnailView: View {
     @ViewBuilder
     private var placeholderView: some View {
         switch page.canvasType {
-        case "mannequin":
+        case OOTDCanvasType.mannequin:
             ZStack {
                 colorScheme == .dark ? Color(uiColor: .systemGray6) : Color.white
-                Image(systemName: "tshirt")
-                    .font(.system(size: 40))
-                    .foregroundStyle(.gray.opacity(0.3))
+                Image(OOTDMannequinBackground.resolvedAssetName(for: page.mannequinAssetID))
+                    .resizable()
+                    .scaledToFill()
+                    .opacity(0.86)
                 Text("人台")
                     .font(.caption2)
                     .foregroundStyle(.gray)
                     .offset(y: 24)
             }
-        case "blank":
+        case OOTDCanvasType.blank:
             ZStack {
                 colorScheme == .dark ? Color(uiColor: .systemGray6) : Color.white
                 RoundedRectangle(cornerRadius: 4)
@@ -92,7 +93,7 @@ struct PageThumbnailView: View {
                     .font(.caption2)
                     .foregroundStyle(.gray)
             }
-        case "custom":
+        case OOTDCanvasType.custom:
             ZStack {
                 colorScheme == .dark ? Color(uiColor: .systemGray6) : Color.white
                 Image(systemName: "photo")

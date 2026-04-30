@@ -949,7 +949,7 @@ private struct PetMoneyCounterWidget: View {
                     )
 
                 if remainingBills == 0 {
-                    Text("数钱数到手抽筋")
+                    Text(WealthExperienceCopy.Counting.finishedInline)
                         .font(.headline)
                         .foregroundStyle(.white.opacity(0.9))
                 } else {
@@ -1146,14 +1146,14 @@ private struct PetDivinationPanelWidget: View {
         case finished
     }
 
-    private let fortunes: [Fortune] = [
-        Fortune(level: .supreme, text: "上上签", description: "财运亨通，福星高照", detail: "今日财运极佳，适合投资理财，可能会有意外之财降临。"),
-        Fortune(level: .supreme, text: "上上签", description: "财源广进，日进斗金", detail: "财神眷顾，正财偏财皆旺，把握机会必有所获。"),
-        Fortune(level: .supreme, text: "上上签", description: "富贵吉祥，万事顺遂", detail: "财星高照，事业财运双丰收，好运连连。"),
-        Fortune(level: .good, text: "上签", description: "财运平稳，小有收获", detail: "今日财运不错，适合稳健理财，会有小惊喜。"),
-        Fortune(level: .good, text: "上签", description: "积少成多，稳步前行", detail: "财运渐入佳境，坚持储蓄必有回报。"),
-        Fortune(level: .good, text: "上签", description: "贵人相助，财运可期", detail: "有望得到贵人提携，财运有所提升。")
-    ]
+    private let fortunes: [Fortune] = WealthExperienceCopy.Fortune.cards.map { card in
+        Fortune(
+            level: card.isPrime ? .supreme : .good,
+            text: card.text,
+            description: card.description,
+            detail: card.detail
+        )
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -1255,12 +1255,12 @@ private struct PetDivinationPanelWidget: View {
 
                     ZStack {
                         if videoState == .initial {
-                            divinationButton(title: "请签求好运", icon: "wand.and.stars") {
+                            divinationButton(title: WealthExperienceCopy.Fortune.petPanelPrimaryAction, icon: "wand.and.stars") {
                                 startDivination()
                             }
                             .transition(.opacity)
                         } else if videoState == .finished && showFortuneText {
-                            divinationButton(title: "再请一签", icon: "arrow.counterclockwise") {
+                            divinationButton(title: WealthExperienceCopy.Fortune.replayAction, icon: "arrow.counterclockwise") {
                                 replayDivination()
                             }
                             .transition(.opacity)

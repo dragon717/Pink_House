@@ -227,7 +227,7 @@ struct PetChatHistorySearchSheet: View {
         case .moneyCounter:
             return ("banknote", "数钱")
         case .divinationPanel:
-            return ("wand.and.stars", "求签")
+            return ("wand.and.stars", "心愿签")
         case .unknown:
             return ("questionmark.circle", "其他")
         }

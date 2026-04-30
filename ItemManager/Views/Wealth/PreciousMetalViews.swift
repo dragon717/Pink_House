@@ -17,7 +17,7 @@ struct GoldStorageView: View {
             
             // 金价信息
             HStack(spacing: 4) {
-                Text("金价: \(String(format: "%.0f", viewModel.goldPriceCNYPerGram)) CNY/g")
+                Text("\(WealthExperienceCopy.Storage.goldPrice): \(String(format: "%.0f", viewModel.goldPriceCNYPerGram)) CNY/g")
                 Text(viewModel.goldPriceSource)
                     .font(.caption2)
                     .foregroundStyle(.secondary)
@@ -50,7 +50,7 @@ struct GoldStorageView: View {
                     VStack {
                         ProgressView()
                             .controlSize(.large)
-                        Text("正在计算金克重...")
+                        Text(WealthExperienceCopy.Storage.calculatingGold)
                             .font(.caption)
                             .foregroundStyle(.secondary)
                             .padding(.top, 8)
@@ -122,7 +122,7 @@ struct SilverStorageView: View {
             
             // 银价信息
             HStack(spacing: 4) {
-                Text("银价: \(String(format: "%.1f", viewModel.silverPriceCNYPerGram)) CNY/g")
+                Text("\(WealthExperienceCopy.Storage.silverPrice): \(String(format: "%.1f", viewModel.silverPriceCNYPerGram)) CNY/g")
                 Text(viewModel.silverPriceSource)
                     .font(.caption2)
                     .foregroundStyle(.secondary)
@@ -155,7 +155,7 @@ struct SilverStorageView: View {
                     VStack {
                         ProgressView()
                             .controlSize(.large)
-                        Text("正在计算白银重量...")
+                        Text(WealthExperienceCopy.Storage.calculatingSilver)
                             .font(.caption)
                             .foregroundStyle(.secondary)
                             .padding(.top, 8)

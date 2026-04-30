@@ -392,6 +392,7 @@ class BackupService {
                     snapshotPath: safeSnapshotPath,
                     canvasType: o.canvasType,
                     backgroundImagePath: safeBackgroundImagePath,
+                    mannequinAssetID: o.mannequinAssetID,
                     bookID: o.book?.id,
                     items: items,
                     lastModified: o.lastModified,
@@ -1875,8 +1876,15 @@ class BackupService {
                     outfit.snapshotPath = dto.snapshotPath
                     outfit.canvasType = dto.canvasType ?? "mannequin"
                     outfit.backgroundImagePath = dto.backgroundImagePath
+                    outfit.mannequinAssetID = dto.mannequinAssetID
                 } else {
-                    outfit = Outfit(note: dto.note, snapshotPath: dto.snapshotPath, canvasType: dto.canvasType ?? "mannequin", backgroundImagePath: dto.backgroundImagePath)
+                    outfit = Outfit(
+                        note: dto.note,
+                        snapshotPath: dto.snapshotPath,
+                        canvasType: dto.canvasType ?? "mannequin",
+                        backgroundImagePath: dto.backgroundImagePath,
+                        mannequinAssetID: dto.mannequinAssetID
+                    )
                     outfit.id = dto.id
                     outfit.createdAt = dto.createdAt
                     modelContext.insert(outfit)
@@ -1969,9 +1977,15 @@ class BackupService {
                         outfit.note = dto.note
                         outfit.snapshotPath = dto.snapshotPath
                         outfit.canvasType = dto.canvasType ?? "mannequin"
+                        outfit.mannequinAssetID = dto.mannequinAssetID
                     }
                 } else {
-                    outfit = Outfit(note: dto.note, snapshotPath: dto.snapshotPath, canvasType: dto.canvasType ?? "mannequin")
+                    outfit = Outfit(
+                        note: dto.note,
+                        snapshotPath: dto.snapshotPath,
+                        canvasType: dto.canvasType ?? "mannequin",
+                        mannequinAssetID: dto.mannequinAssetID
+                    )
                     outfit.id = dto.id
                     outfit.createdAt = dto.createdAt
                     modelContext.insert(outfit)

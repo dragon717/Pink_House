@@ -734,6 +734,7 @@ class SwiftDataMigrationManager: ObservableObject {
             snapshotPath: source.snapshotPath,
             canvasType: source.canvasType,
             backgroundImagePath: source.backgroundImagePath,
+            mannequinAssetID: source.mannequinAssetID,
             book: nil // 关系需要单独处理
         )
         new.id = source.id

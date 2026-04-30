@@ -50,6 +50,7 @@ struct BookDetailView: View {
     @State var selectedBackgroundItem: PhotosPickerItem?
     @State var tempBackgroundImage: UIImage?
     @State var showingBackgroundCropper = false
+    @State var showingNewPageBackgroundSheet = false
 
     @State var showingTrash = false
 
@@ -159,6 +160,21 @@ struct BookDetailView: View {
                 showingMoveSheet: $showingMoveSheet,
                 movePageSheet: { movePageSheet }
             )
+            .sheet(isPresented: $showingNewPageBackgroundSheet) {
+                OOTDBackgroundSelectionSheet(
+                    currentCanvasType: OOTDCanvasType.blank,
+                    currentMannequinAssetID: nil,
+                    onSelectBlank: {
+                        addNewPage(canvasType: OOTDCanvasType.blank)
+                    },
+                    onSelectMannequin: { mannequin in
+                        addNewPage(canvasType: OOTDCanvasType.mannequin, mannequinAssetID: mannequin.id)
+                    },
+                    onSelectCustomImage: {
+                        showingBackgroundPicker = true
+                    }
+                )
+            }
             .alert("确认删除", isPresented: $showingDeleteConfirmation, actions: {
                 Button("取消", role: .cancel) {
                     pageToDelete = nil
@@ -330,7 +346,7 @@ struct BookDetailView: View {
                     await MainActor.run {
                         let newPage = Outfit(
                             note: "图片书页 \(Date().formatted(date: .numeric, time: .shortened))",
-                            canvasType: "custom",
+                            canvasType: OOTDCanvasType.custom,
                             book: book
                         )
                         newPage.sortIndex = startSortIndex + index
@@ -393,7 +409,7 @@ struct BookDetailView: View {
                     aspectRatio: 0.75,
                     targetWidth: 1080
                 ) { croppedImage in
-                    addNewPage(canvasType: "custom", customImage: croppedImage)
+                    addNewPage(canvasType: OOTDCanvasType.custom, customImage: croppedImage)
                     showingBackgroundCropper = false
                     tempBackgroundImage = nil
                 } onCancel: {
@@ -444,11 +460,16 @@ struct BookDetailView: View {
         }
     }
 
-    func addNewPage(canvasType: String = "mannequin", customImage: UIImage? = nil) {
-        let newPage = Outfit(note: "新书页 \(Date().formatted(date: .numeric, time: .shortened))", canvasType: canvasType, book: book)
+    func addNewPage(canvasType: String = OOTDCanvasType.mannequin, customImage: UIImage? = nil, mannequinAssetID: String? = nil) {
+        let newPage = Outfit(
+            note: "新书页 \(Date().formatted(date: .numeric, time: .shortened))",
+            canvasType: canvasType,
+            mannequinAssetID: canvasType == OOTDCanvasType.mannequin ? (mannequinAssetID ?? OOTDMannequinBackground.defaultID) : nil,
+            book: book
+        )
         newPage.sortIndex = (sortedPages.last?.sortIndex ?? 0) + 1
 
-        if canvasType == "custom", let image = customImage {
+        if canvasType == OOTDCanvasType.custom, let image = customImage {
             if let path = ImageManager.shared.saveImage(image, context: modelContext) {
                 newPage.backgroundImagePath = path
                 newPage.snapshotPath = path
@@ -494,7 +515,13 @@ struct BookDetailView: View {
     }
 
     func duplicatePage(_ page: Outfit) {
-        let newPage = Outfit(note: page.note + " 副本", canvasType: page.canvasType, backgroundImagePath: page.backgroundImagePath, book: book)
+        let newPage = Outfit(
+            note: page.note + " 副本",
+            canvasType: page.canvasType,
+            backgroundImagePath: page.backgroundImagePath,
+            mannequinAssetID: page.mannequinAssetID,
+            book: book
+        )
 
         let localPages = sortedPages
         if let index = localPages.firstIndex(of: page) {
@@ -762,6 +789,7 @@ struct BookDetailView: View {
                     note: page.note + " 副本",
                     canvasType: page.canvasType,
                     backgroundImagePath: page.backgroundImagePath,
+                    mannequinAssetID: page.mannequinAssetID,
                     book: book
                 )
                 newPage.sortIndex = currentMaxSortIndex

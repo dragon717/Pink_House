@@ -14,14 +14,14 @@ struct DivinationView: View {
         case finished     // 显示尾帧+签文
     }
     
-    private let fortunes: [Fortune] = [
-        Fortune(level: .supreme, text: "上上签", description: "财运亨通，福星高照", detail: "今日财运极佳，适合投资理财，可能会有意外之财降临。"),
-        Fortune(level: .supreme, text: "上上签", description: "财源广进，日进斗金", detail: "财神眷顾，正财偏财皆旺，把握机会必有所获。"),
-        Fortune(level: .supreme, text: "上上签", description: "富贵吉祥，万事顺遂", detail: "财星高照，事业财运双丰收，好运连连。"),
-        Fortune(level: .good, text: "上签", description: "财运平稳，小有收获", detail: "今日财运不错，适合稳健理财，会有小惊喜。"),
-        Fortune(level: .good, text: "上签", description: "积少成多，稳步前行", detail: "财运渐入佳境，坚持储蓄必有回报。"),
-        Fortune(level: .good, text: "上签", description: "贵人相助，财运可期", detail: "有望得到贵人提携，财运有所提升。"),
-    ]
+    private let fortunes: [Fortune] = WealthExperienceCopy.Fortune.cards.map { card in
+        Fortune(
+            level: card.isPrime ? .supreme : .good,
+            text: card.text,
+            description: card.description,
+            detail: card.detail
+        )
+    }
     
     // 圆角大小
     private let cornerRadius: CGFloat = 20
@@ -140,14 +140,14 @@ struct DivinationView: View {
                     
                     // 按钮区域 - 固定高度占位，保持布局稳定
                     ZStack {
-                        // 开始求签按钮
+                        // 开始请签按钮
                         if videoState == .initial {
                             Button {
                                 startDivination()
                             } label: {
                                 HStack(spacing: 8) {
                                     Image(systemName: "wand.and.stars")
-                                    Text("开始求签")
+                                    Text(WealthExperienceCopy.Fortune.startAction)
                                 }
                                 .font(.headline)
                                 .fontWeight(.semibold)
@@ -156,7 +156,7 @@ struct DivinationView: View {
                                 .padding(.vertical, 16)
                                 .themeSkinAdaptiveSectionCard(slot: .primaryButton, cornerRadius: 26, showsDecoration: false) {
                                     LinearGradient(
-                                        colors: [Color(red: 0.8, green: 0.3, blue: 0.3), Color(red: 0.6, green: 0.2, blue: 0.2)],
+                                        colors: [WealthExperienceStyle.rose, WealthExperienceStyle.tea],
                                         startPoint: .leading,
                                         endPoint: .trailing
                                     )
@@ -166,7 +166,7 @@ struct DivinationView: View {
                             .transition(.opacity)
                         }
                         
-                        // 再求一签按钮
+                        // 再请一签按钮
                         if videoState == .finished && showFortuneText {
                             Button {
                                 withAnimation(.easeInOut(duration: 0.3)) {
@@ -178,7 +178,7 @@ struct DivinationView: View {
                             } label: {
                                 HStack(spacing: 8) {
                                     Image(systemName: "arrow.counterclockwise")
-                                    Text("再求一签")
+                                    Text(WealthExperienceCopy.Fortune.replayAction)
                                 }
                                 .font(.headline)
                                 .fontWeight(.semibold)
@@ -187,7 +187,7 @@ struct DivinationView: View {
                                 .padding(.vertical, 16)
                                 .themeSkinAdaptiveSectionCard(slot: .primaryButton, cornerRadius: 26, showsDecoration: false) {
                                     LinearGradient(
-                                        colors: [Color(red: 0.8, green: 0.3, blue: 0.3), Color(red: 0.6, green: 0.2, blue: 0.2)],
+                                        colors: [WealthExperienceStyle.rose, WealthExperienceStyle.tea],
                                         startPoint: .leading,
                                         endPoint: .trailing
                                     )

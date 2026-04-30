@@ -130,7 +130,7 @@ struct OOTDDefaultBookView: View {
         // 同时创建第一页（空白画布），让用户可以直接进入编辑器
         let firstPage = Outfit(
             note: MagicStickerDefaults.pageTitle,
-            canvasType: "blank",
+            canvasType: OOTDCanvasType.blank,
             book: book
         )
         firstPage.sortIndex = 0
@@ -242,7 +242,7 @@ private struct EmptyPageView: View {
 
         let newPage = Outfit(
             note: MagicStickerDefaults.pageTitle,
-            canvasType: "blank",
+            canvasType: OOTDCanvasType.blank,
             book: book
         )
         newPage.sortIndex = maxSortIndex + 1

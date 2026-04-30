@@ -485,6 +485,7 @@ struct OutfitDTO: Codable {
     let note: String
     let snapshotPath: String?
     var canvasType: String? = "mannequin"
+    var mannequinAssetID: String? = nil // v1.9+ static mannequin background identifier
     let items: [OutfitItemDTO]
 }
 
@@ -513,6 +514,7 @@ struct OOTDSnapshotDTO: Codable {
     let snapshotPath: String?
     var canvasType: String? = "mannequin"
     var backgroundImagePath: String?
+    var mannequinAssetID: String? = nil // v1.9+ static mannequin background identifier
     let bookID: UUID? // Reference to parent BookGroup (v1.5)
     let items: [OOTDSnapshotItemDTO]
     let lastModified: Date?

@@ -48,6 +48,7 @@ struct OOTDEditorView: View {
     @State private var selectedBackgroundItem: PhotosPickerItem?
     @State private var tempBackgroundImage: UIImage?
     @State private var showingBackgroundCropper = false
+    @State private var showingBackgroundSelectionSheet = false
     
     // 工具栏和贴纸库显示状态
     @State private var isToolbarVisible: Bool
@@ -135,22 +136,10 @@ struct OOTDEditorView: View {
                         
                      
                         
-                        Menu {
-                            Button {
-                                showingBackgroundPicker = true
-                            } label: {
-                                Label("更换底图", systemImage: "photo")
-                            }
-                            
-                            if outfit.canvasType == "custom" {
-                                Button(role: .destructive) {
-                                    resetBackgroundToDefault()
-                                } label: {
-                                    Label("恢复默认", systemImage: "arrow.counterclockwise")
-                                }
-                            }
+                        Button {
+                            showingBackgroundSelectionSheet = true
                         } label: {
-                            Label("编辑底图", systemImage: "photo")
+                            Label("更换底图", systemImage: "photo")
                         }
                         
                         Button {
@@ -268,6 +257,17 @@ struct OOTDEditorView: View {
             Text("确定要删除这张书页吗？")
         }
         // MARK: - 编辑底图相关 Sheets
+        .sheet(isPresented: $showingBackgroundSelectionSheet) {
+            OOTDBackgroundSelectionSheet(
+                currentCanvasType: outfit.canvasType,
+                currentMannequinAssetID: outfit.mannequinAssetID,
+                onSelectBlank: applyBlankBackground,
+                onSelectMannequin: applyMannequinBackground,
+                onSelectCustomImage: {
+                    showingBackgroundPicker = true
+                }
+            )
+        }
         .photosPicker(isPresented: $showingBackgroundPicker, selection: $selectedBackgroundItem, matching: .images)
         .onChange(of: selectedBackgroundItem) { _, newItem in
             if let newItem {
@@ -330,34 +330,64 @@ struct OOTDEditorView: View {
     
     // MARK: - 更新底图
     private func updateBackgroundImage(_ image: UIImage) {
-        // 删除旧底图
-        if let oldPath = outfit.backgroundImagePath {
-            ImageManager.shared.deleteImage(fileName: oldPath, context: modelContext)
-        }
-        
+        deleteCurrentBackgroundFiles()
+
         // 保存新底图
         if let path = ImageManager.shared.saveImage(image, context: modelContext) {
             outfit.backgroundImagePath = path
-            outfit.canvasType = "custom"
-            outfit.snapshotPath = path // 同时更新快照
+            outfit.canvasType = OOTDCanvasType.custom
+            outfit.mannequinAssetID = nil
+            outfit.snapshotPath = nil
+            outfit.lastModified = Date()
             try? modelContext.save()
+
+            // 统一通过 OOTDPreviewView 生成快照，确保贴纸、图库底图、人台底图一致。
+            saveSnapshot()
         }
     }
     
-    // MARK: - 恢复默认底图
-    private func resetBackgroundToDefault() {
-        // 删除旧底图
-        if let oldPath = outfit.backgroundImagePath {
-            ImageManager.shared.deleteImage(fileName: oldPath, context: modelContext)
-        }
-        
+    // MARK: - 更换为空白底图
+    private func applyBlankBackground() {
+        deleteCurrentBackgroundFiles()
+
         outfit.backgroundImagePath = nil
-        outfit.canvasType = "blank"
+        outfit.canvasType = OOTDCanvasType.blank
+        outfit.mannequinAssetID = nil
         outfit.snapshotPath = nil
+        outfit.lastModified = Date()
         try? modelContext.save()
         
         // 重新生成快照
         saveSnapshot()
+    }
+
+    // MARK: - 更换为静态人台底图
+    private func applyMannequinBackground(_ mannequin: OOTDMannequinBackground) {
+        deleteCurrentBackgroundFiles()
+
+        outfit.backgroundImagePath = nil
+        outfit.canvasType = OOTDCanvasType.mannequin
+        outfit.mannequinAssetID = mannequin.id
+        outfit.snapshotPath = nil
+        outfit.lastModified = Date()
+        try? modelContext.save()
+
+        // 重新生成快照
+        saveSnapshot()
+    }
+
+    private func deleteCurrentBackgroundFiles() {
+        let oldBackgroundPath = outfit.backgroundImagePath
+        let oldSnapshotPath = outfit.snapshotPath
+
+        if let oldBackgroundPath {
+            ImageManager.shared.deleteImage(fileName: oldBackgroundPath, context: modelContext)
+        }
+
+        if let oldSnapshotPath,
+           oldSnapshotPath != oldBackgroundPath {
+            ImageManager.shared.deleteImage(fileName: oldSnapshotPath, context: modelContext)
+        }
     }
     
     // MARK: - Helper Methods
@@ -381,6 +411,7 @@ struct OOTDEditorView: View {
                     ImageManager.shared.deleteImage(fileName: oldPath, context: modelContext)
                 }
                 outfit.snapshotPath = path
+                outfit.lastModified = Date()
                 try? modelContext.save()
             }
         }

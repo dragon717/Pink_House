@@ -668,6 +668,7 @@ final class Outfit {
     var snapshotPath: String? // Path to the saved OOTD image
     var canvasType: String = "mannequin" // "mannequin" or "blank"
     var backgroundImagePath: String? // Custom background image path
+    var mannequinAssetID: String? // Static mannequin background identifier; nil falls back to default mannequin
     var sortIndex: Int = 0 // Custom order index
 
     // Trash Bin Logic
@@ -683,11 +684,12 @@ final class Outfit {
     @Relationship(deleteRule: .cascade)
     var items: [OutfitItem]? = []
 
-    init(note: String = "", snapshotPath: String? = nil, canvasType: String = "mannequin", backgroundImagePath: String? = nil, book: BookGroup? = nil) {
+    init(note: String = "", snapshotPath: String? = nil, canvasType: String = "mannequin", backgroundImagePath: String? = nil, mannequinAssetID: String? = nil, book: BookGroup? = nil) {
         self.note = note
         self.snapshotPath = snapshotPath
         self.canvasType = canvasType
         self.backgroundImagePath = backgroundImagePath
+        self.mannequinAssetID = mannequinAssetID
         self.book = book
     }
 }

@@ -155,4 +155,46 @@ final class BackupRestoreIntegrationTests: XCTestCase {
         // 清理临时备份文件
         try? FileManager.default.removeItem(at: exportURL)
     }
+
+    func testOOTDSnapshotDTOMannequinAssetIDIsBackwardCompatible() throws {
+        let oldSnapshotJSON = """
+        {
+          "id": "00000000-0000-0000-0000-000000000001",
+          "createdAt": 0,
+          "note": "旧人台书页",
+          "snapshotPath": null,
+          "canvasType": "mannequin",
+          "backgroundImagePath": null,
+          "bookID": null,
+          "items": [],
+          "lastModified": null,
+          "isDeleted": null,
+          "deletedAt": null
+        }
+        """
+
+        let oldDTO = try JSONDecoder().decode(OOTDSnapshotDTO.self, from: Data(oldSnapshotJSON.utf8))
+        XCTAssertNil(oldDTO.mannequinAssetID)
+        XCTAssertEqual(oldDTO.canvasType, "mannequin")
+
+        let newSnapshotJSON = """
+        {
+          "id": "00000000-0000-0000-0000-000000000002",
+          "createdAt": 0,
+          "note": "新人台书页",
+          "snapshotPath": null,
+          "canvasType": "mannequin",
+          "backgroundImagePath": null,
+          "mannequinAssetID": "ootd_mannequin_default",
+          "bookID": null,
+          "items": [],
+          "lastModified": null,
+          "isDeleted": null,
+          "deletedAt": null
+        }
+        """
+
+        let newDTO = try JSONDecoder().decode(OOTDSnapshotDTO.self, from: Data(newSnapshotJSON.utf8))
+        XCTAssertEqual(newDTO.mannequinAssetID, "ootd_mannequin_default")
+    }
 }

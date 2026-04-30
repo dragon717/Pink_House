@@ -60,9 +60,9 @@ struct OOTDSidebarView: View {
                     LazyVStack(spacing: 16) {
                         // New Outfit Menu (Create in current book)
                         Menu {
-                            Button { onAdd("mannequin") } label: { Label("人台画布", systemImage: "tshirt") }
-                            Button { onAdd("blank") } label: { Label("空白画布", systemImage: "square.dashed") }
-                            Button { onAdd("custom") } label: { Label("自定义图片", systemImage: "photo") }
+                            Button { onAdd(OOTDCanvasType.mannequin) } label: { Label("人台画布", systemImage: "tshirt") }
+                            Button { onAdd(OOTDCanvasType.blank) } label: { Label("空白画布", systemImage: "square.dashed") }
+                            Button { onAdd(OOTDCanvasType.custom) } label: { Label("自定义图片", systemImage: "photo") }
                         } label: {
                             HStack(spacing: 12) {
                                 ZStack {

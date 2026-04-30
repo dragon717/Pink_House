@@ -14,9 +14,9 @@ struct OOTDPreviewView: View {
             Color.white
                 .frame(width: canvasWidth, height: canvasHeight)
             
-            if outfit.canvasType == "blank" {
+            if outfit.canvasType == OOTDCanvasType.blank {
                 // Already white
-            } else if outfit.canvasType == "custom",
+            } else if outfit.canvasType == OOTDCanvasType.custom,
                       let path = outfit.backgroundImagePath,
                       let uiImage = ImageManager.shared.loadImage(fileName: path) {
                 Image(uiImage: uiImage)
@@ -26,7 +26,7 @@ struct OOTDPreviewView: View {
                     .clipped()
             } else {
                 // Mannequin or fallback
-                Image("ootd_background")
+                Image(OOTDMannequinBackground.resolvedAssetName(for: outfit.mannequinAssetID))
                     .resizable()
                     .scaledToFill()
                     .frame(width: canvasWidth, height: canvasHeight)

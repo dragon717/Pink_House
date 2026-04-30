@@ -142,7 +142,7 @@ struct VIPCenterView: View {
             VIPBenefit(
                 id: "wealthPersonalization",
                 title: "来财个性化",
-                subtitle: "小金库形象 · 纸币背景",
+                subtitle: WealthExperienceCopy.VIP.benefitSubtitle,
                 icon: "cat.fill",
                 preferredGlassStyle: .sageMint
             ),
@@ -1159,8 +1159,8 @@ struct VIPCenterView: View {
             presentInfoAlert(
                 title: benefit.title,
                 message: vipManager.isVIP
-                    ? "你已拥有来财个性化权益。可在「我 → 马上来财设置」中切换尾款小金库形象，并继续自定义纸币与背景样式。"
-                    : "开通 VIP 后即可解锁尾款小金库形象切换，支持小金库、招财猫、存钱罐、金币猪，并享受更多来财个性化装扮能力。"
+                    ? WealthExperienceCopy.VIP.ownedMessage
+                    : WealthExperienceCopy.VIP.lockedMessage
             )
         case "icons":
             if vipManager.isVIP {

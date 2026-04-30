@@ -457,7 +457,7 @@ enum PetChatTranscriptStore {
             "智能搭配", "快速搭配", "甜美约会", "优雅茶会", "日常出门",
             "统计裙子", "查看萌宠状态", "切换萌宠", "改名",
             "看看我的背包", "带我逛逛商店", "查看天气穿搭",
-            "尾款提醒", "去来财数钞票", "今日求签", "今日运势",
+            "尾款提醒", WealthExperienceCopy.PetChat.quickMoneyLabel, WealthExperienceCopy.PetChat.quickFortuneLabel, "今日心愿提醒",
             "查找衣柜", "历史消息查询", "帮我搭配一套"
         ]
         return !blockedCommands.contains(trimmed)

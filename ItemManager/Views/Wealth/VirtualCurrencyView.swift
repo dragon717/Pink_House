@@ -263,7 +263,7 @@ struct VirtualCurrencyView: View {
                 // 底层内容
                 VStack(spacing: 0) {
                     // 标题
-                    Text("萌宠世界货币")
+                    Text(WealthExperienceCopy.Storage.virtualTitle)
                         .font(.system(size: 18, weight: .semibold, design: .rounded))
                         .foregroundStyle(.secondary)
                         .padding(.top, 16)
@@ -274,7 +274,7 @@ struct VirtualCurrencyView: View {
                             coinType: .meowCoin,
                             name: "喵币",
                             amount: petDataManager.status.meowCoin,
-                            actionTitle: "点按充值"
+                            actionTitle: WealthExperienceCopy.Storage.rechargeAction
                         ) {
                             presentedDestination = .meowCoinStore
                         }
@@ -283,7 +283,7 @@ struct VirtualCurrencyView: View {
                             coinType: .fishCoin,
                             name: "鱼币",
                             amount: petDataManager.status.fishCoin,
-                            actionTitle: "点按兑换"
+                            actionTitle: WealthExperienceCopy.Storage.exchangeAction
                         ) {
                             presentedDestination = .currencyExchange(.meowToFish)
                         }
@@ -292,7 +292,7 @@ struct VirtualCurrencyView: View {
                             coinType: .boneCoin,
                             name: "骨头币",
                             amount: petDataManager.status.boneCoin,
-                            actionTitle: "点按兑换"
+                            actionTitle: WealthExperienceCopy.Storage.exchangeAction
                         ) {
                             presentedDestination = .currencyExchange(.meowToBone)
                         }

@@ -8,6 +8,7 @@
 import SwiftUI
 import SwiftData
 import UniformTypeIdentifiers
+import UIKit
 
 private struct WardrobeClothingRevision: Hashable {
     let id: UUID
@@ -325,6 +326,151 @@ private struct WardrobeVisibleItemFramePreferenceKey: PreferenceKey {
     }
 }
 
+private final class WardrobeStatsAutoCollapseCoordinator {
+    private let topThreshold: CGFloat = 12
+    private let collapseThreshold: CGFloat = 44
+    private let directionHysteresis: CGFloat = 8
+    private var lastScrollDistance: CGFloat = 0
+    private var hasReceivedScrollOffset = false
+    private var manualExpansionLockedUntilTop = false
+
+    var isAwayFromTop: Bool {
+        hasReceivedScrollOffset && lastScrollDistance > topThreshold
+    }
+
+    var canAutoCollapse: Bool {
+        !manualExpansionLockedUntilTop
+    }
+
+    func reset() {
+        lastScrollDistance = 0
+        hasReceivedScrollOffset = false
+        manualExpansionLockedUntilTop = false
+    }
+
+    func noteManualExpand() {
+        if isAwayFromTop {
+            manualExpansionLockedUntilTop = true
+        }
+    }
+
+    func noteManualCollapse() {
+        manualExpansionLockedUntilTop = false
+    }
+
+    func handleScrollDistance(
+        _ rawScrollDistance: CGFloat,
+        isExpanded: Bool,
+        setExpanded: (Bool) -> Void
+    ) {
+        let scrollDistance = max(CGFloat(0), rawScrollDistance)
+        let previousDistance = hasReceivedScrollOffset ? lastScrollDistance : 0
+        hasReceivedScrollOffset = true
+        lastScrollDistance = scrollDistance
+
+        if scrollDistance <= topThreshold {
+            manualExpansionLockedUntilTop = false
+            guard !isExpanded else { return }
+            withAnimation(.easeInOut(duration: 0.2)) {
+                setExpanded(true)
+            }
+            return
+        }
+
+        guard !manualExpansionLockedUntilTop,
+              isExpanded,
+              scrollDistance >= collapseThreshold else {
+            return
+        }
+
+        let crossedCollapseThreshold = previousDistance < collapseThreshold
+        let movedDownEnough = scrollDistance - previousDistance >= directionHysteresis
+        if crossedCollapseThreshold || movedDownEnough {
+            withAnimation(.easeInOut(duration: 0.2)) {
+                setExpanded(false)
+            }
+        }
+    }
+}
+
+private struct WardrobeStatsScrollObserver: UIViewRepresentable {
+    var onScroll: (CGFloat) -> Void
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(onScroll: onScroll)
+    }
+
+    func makeUIView(context: Context) -> UIView {
+        let view = UIView()
+        view.backgroundColor = .clear
+        view.isUserInteractionEnabled = false
+        return view
+    }
+
+    func updateUIView(_ uiView: UIView, context: Context) {
+        context.coordinator.onScroll = onScroll
+        DispatchQueue.main.async {
+            context.coordinator.attachIfNeeded(from: uiView)
+        }
+    }
+
+    static func dismantleUIView(_ uiView: UIView, coordinator: Coordinator) {
+        coordinator.detach()
+    }
+
+    final class Coordinator: NSObject {
+        var onScroll: (CGFloat) -> Void
+        private weak var scrollView: UIScrollView?
+        private var observation: NSKeyValueObservation?
+
+        init(onScroll: @escaping (CGFloat) -> Void) {
+            self.onScroll = onScroll
+        }
+
+        func attachIfNeeded(from view: UIView) {
+            guard let discoveredScrollView = findScrollView(from: view),
+                  discoveredScrollView !== scrollView else {
+                if let scrollView {
+                    emitScrollDistance(from: scrollView)
+                }
+                return
+            }
+
+            detach()
+            scrollView = discoveredScrollView
+            observation = discoveredScrollView.observe(\.contentOffset, options: [.new]) { [weak self, weak discoveredScrollView] _, _ in
+                DispatchQueue.main.async {
+                    guard let self, let discoveredScrollView else { return }
+                    self.emitScrollDistance(from: discoveredScrollView)
+                }
+            }
+            emitScrollDistance(from: discoveredScrollView)
+        }
+
+        func detach() {
+            observation?.invalidate()
+            observation = nil
+            scrollView = nil
+        }
+
+        private func emitScrollDistance(from scrollView: UIScrollView) {
+            let distance = scrollView.contentOffset.y + scrollView.adjustedContentInset.top
+            onScroll(distance)
+        }
+
+        private func findScrollView(from view: UIView) -> UIScrollView? {
+            var current: UIView? = view
+            while let candidate = current {
+                if let scrollView = candidate as? UIScrollView {
+                    return scrollView
+                }
+                current = candidate.superview
+            }
+            return nil
+        }
+    }
+}
+
 private struct BatchEditDraft: Equatable {
     var selectedTags: [Tag] = []
     var selectedBrand: Brand?
@@ -406,6 +552,7 @@ struct WardrobeView: View {
     @State private var autoScrollTask: Task<Void, Never>?
     @State private var visibleItemFrameUpdateTask: Task<Void, Never>?
     @State private var layoutPrefetchTask: Task<Void, Never>?
+    @State private var statsAutoCollapseCoordinator = WardrobeStatsAutoCollapseCoordinator()
     
     // Layout
     let viewLayout: HomeView.ViewLayout
@@ -695,6 +842,7 @@ struct WardrobeView: View {
             .onAppear {
                 cachedGridColumns = Self.makeGridColumns(for: viewLayout)
                 refreshWardrobeThemeCaches()
+                resetStatsScrollState(expand: true)
             }
             .task(id: filterSignature) {
                 await rebuildFilteredClothings()
@@ -709,6 +857,7 @@ struct WardrobeView: View {
                 cachedGridColumns = Self.makeGridColumns(for: viewLayout)
                 ImageManager.shared.evictCachedImages(targetSize: wardrobeCellImageTargetSize(for: oldLayout))
                 scheduleLayoutPrefetch()
+                resetStatsScrollState(expand: true)
             }
             .onDisappear {
                 visibleItemFrameUpdateTask?.cancel()
@@ -1100,6 +1249,8 @@ struct WardrobeView: View {
     private func gridScrollBody(displayed: [Clothing], firstFilteredID: UUID?) -> some View {
         ZStack(alignment: .top) {
             ScrollView {
+                statsScrollObserver()
+
                 LazyVGrid(columns: gridColumns, spacing: viewLayout == .grid6 ? 2 : 16) {
                     ForEach(displayed) { clothing in
                         wardrobeGridCell(for: clothing, firstFilteredID: firstFilteredID)
@@ -1116,14 +1267,23 @@ struct WardrobeView: View {
                 .padding(.horizontal, gridHorizontalPadding)
                 .zIndex(1)
         }
+        .simultaneousGesture(statsAutoCollapseDragGesture)
     }
 
     private var gridHorizontalPadding: CGFloat {
         viewLayout == .grid6 ? 2 : 16
     }
 
-    private var gridStatsReservedHeight: CGFloat {
+    private var statsReservedHeight: CGFloat {
         showStats ? 172 : 28
+    }
+
+    private var gridStatsReservedHeight: CGFloat {
+        statsReservedHeight
+    }
+
+    private var listStatsReservedHeight: CGFloat {
+        statsReservedHeight
     }
 
     @ViewBuilder
@@ -1627,7 +1787,7 @@ struct WardrobeView: View {
             HStack {
                 Spacer()
                 Button {
-                    showStats.toggle()
+                    toggleStatsVisibility()
                 } label: {
                     HStack(spacing: 4) {
                         Text(showStats ? "隐藏" : "显示")
@@ -1650,6 +1810,74 @@ struct WardrobeView: View {
         .fixedSize(horizontal: false, vertical: true)
     }
 
+    private func statsScrollObserver() -> some View {
+        WardrobeStatsScrollObserver { scrollDistance in
+            handleStatsScrollDistance(scrollDistance)
+        }
+        .frame(width: 1, height: 1)
+        .opacity(0)
+        .accessibilityHidden(true)
+    }
+
+    private var editableListStatsSpacer: some View {
+        VStack(spacing: 0) {
+            statsScrollObserver()
+            Color.clear
+                .frame(height: listStatsReservedHeight + 8)
+        }
+        .listRowInsets(EdgeInsets())
+        .listRowBackground(Color.clear)
+        .listRowSeparator(.hidden)
+    }
+
+    private func handleStatsScrollDistance(_ scrollDistance: CGFloat) {
+        statsAutoCollapseCoordinator.handleScrollDistance(
+            scrollDistance,
+            isExpanded: showStats
+        ) { isExpanded in
+            showStats = isExpanded
+        }
+    }
+
+    private func toggleStatsVisibility() {
+        if showStats {
+            statsAutoCollapseCoordinator.noteManualCollapse()
+            withAnimation(.easeInOut(duration: 0.2)) {
+                showStats = false
+            }
+        } else {
+            statsAutoCollapseCoordinator.noteManualExpand()
+            withAnimation(.easeInOut(duration: 0.2)) {
+                showStats = true
+            }
+        }
+    }
+
+    private func resetStatsScrollState(expand: Bool) {
+        statsAutoCollapseCoordinator.reset()
+        if expand {
+            showStats = true
+        }
+    }
+
+    private var statsAutoCollapseDragGesture: some Gesture {
+        DragGesture(minimumDistance: 12)
+            .onChanged { value in
+                guard value.translation.height < -12 else { return }
+                collapseStatsForUserScrollIntent()
+            }
+    }
+
+    private func collapseStatsForUserScrollIntent() {
+        guard showStats,
+              statsAutoCollapseCoordinator.canAutoCollapse else {
+            return
+        }
+        withAnimation(.easeInOut(duration: 0.2)) {
+            showStats = false
+        }
+    }
+
     private var listView: some View {
         Group {
             if isEditing {
@@ -1661,36 +1889,45 @@ struct WardrobeView: View {
     }
 
     private var editableListView: some View {
-        List {
-            Section {
+        ZStack(alignment: .top) {
+            List {
+                editableListStatsSpacer
                 listContent
-            } header: {
-                statsSection
-                    .padding(.horizontal, viewLayout == .grid6 ? 2 : 16)
-                    .padding(.vertical, 8)
             }
+            .listStyle(.plain)
+            .scrollContentBackground(.hidden)
+            .environment(\.editMode, .constant(isEditing ? .active : .inactive))
+
+            statsSection
+                .frame(height: listStatsReservedHeight, alignment: .top)
+                .padding(.horizontal, gridHorizontalPadding)
+                .zIndex(1)
         }
-        .listStyle(.plain)
-        .scrollContentBackground(.hidden)
-        .environment(\.editMode, .constant(isEditing ? .active : .inactive))
+        .simultaneousGesture(statsAutoCollapseDragGesture)
     }
 
     private var lazyListView: some View {
-        ScrollView {
-            LazyVStack(spacing: 0) {
-                statsSection
-                    .padding(.horizontal, viewLayout == .grid6 ? 2 : 16)
-                    .padding(.vertical, 8)
+        ZStack(alignment: .top) {
+            ScrollView {
+                statsScrollObserver()
 
-                ForEach(filteredClothings) { clothing in
-                    listRow(for: clothing)
-                        .padding(.horizontal, 16)
+                LazyVStack(spacing: 0) {
+                    ForEach(filteredClothings) { clothing in
+                        listRow(for: clothing)
+                            .padding(.horizontal, 16)
+                    }
                 }
+                .padding(.top, listStatsReservedHeight + 8)
+                .padding(.bottom, 100)
             }
-            .padding(.top, 8)
-            .padding(.bottom, 100)
+            .scrollIndicators(.hidden)
+
+            statsSection
+                .frame(height: listStatsReservedHeight, alignment: .top)
+                .padding(.horizontal, gridHorizontalPadding)
+                .zIndex(1)
         }
-        .scrollIndicators(.hidden)
+        .simultaneousGesture(statsAutoCollapseDragGesture)
     }
 
     private var listContent: some View {

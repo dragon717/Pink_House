@@ -158,25 +158,13 @@ extension BookDetailView {
     private var addPageMenu: some View {
         Menu {
             Button {
-                addNewPage(canvasType: "mannequin")
+                showingNewPageBackgroundSheet = true
             } label: {
-                Label("人台画布", systemImage: "tshirt")
+                Label("选择底图新建", systemImage: "square.on.square")
             }
 
-            Button {
-                addNewPage(canvasType: "blank")
-            } label: {
-                Label("空白画布", systemImage: "square.dashed")
-            }
-
-            Button {
-                showingBackgroundPicker = true
-            } label: {
-                Label("自定义图片", systemImage: "photo")
-            }
-            
             Divider()
-            
+
             Button {
                 showingBatchPhotoPicker = true
             } label: {
@@ -270,13 +258,13 @@ extension BookDetailView {
                     .action(
                         title: "人台画布",
                         systemImage: "tshirt",
-                        action: { addNewPage(canvasType: "mannequin") }
+                        action: { addNewPage(canvasType: OOTDCanvasType.mannequin, mannequinAssetID: OOTDMannequinBackground.defaultID) }
                     ),
                     .action(
                         title: "空白画布",
                         systemImage: "square.dashed",
                         isHighlighted: true,
-                        action: { addNewPage(canvasType: "blank") }
+                        action: { addNewPage(canvasType: OOTDCanvasType.blank) }
                     ),
                     .action(
                         title: "自定义图片",

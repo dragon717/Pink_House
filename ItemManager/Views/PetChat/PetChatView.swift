@@ -1350,7 +1350,7 @@ struct PetChatView: View {
         let widget = makeCurrencyPanelWidget(status: status, kind: kind)
         messages.append(
             PetChatMessage(
-                text: kind == .all ? "我的小金库都在这儿啦～" : "这是我的\(kind.title)，给你看看呀～",
+                text: kind == .all ? WealthExperienceCopy.PetChat.currencyAllMessage : WealthExperienceCopy.PetChat.currencySingleMessage(kind.title),
                 isUser: false,
                 isAIGenerated: true,
                 widgets: [widget]
@@ -1416,7 +1416,7 @@ struct PetChatView: View {
         let widget = makeMoneyCounterWidget(totalValue: totalValue, currency: currency)
         messages.append(
             PetChatMessage(
-                text: "来，我们就在这儿盘盘今天的小金库～",
+                text: WealthExperienceCopy.Counting.petIntroMessage,
                 isUser: false,
                 isAIGenerated: true,
                 widgets: [widget]
@@ -1454,7 +1454,7 @@ struct PetChatView: View {
         let widget = makeDivinationWidget()
         messages.append(
             PetChatMessage(
-                text: "请签求好运～我把签筒抱来啦！",
+                text: WealthExperienceCopy.Fortune.petIntroMessage,
                 isUser: false,
                 isAIGenerated: true,
                 widgets: [widget]
@@ -2770,16 +2770,16 @@ struct PetChatView: View {
     private func promptWealthCountingNavigation() {
         let widget = PetWidgetData(
             type: .quickOptions,
-            title: "要跳转到「来财」数钱页吗？",
+            title: WealthExperienceCopy.Counting.navigationQuestion,
             options: [
-                PetWidgetOption(title: "现在去数钞票", command: "open_money_counting", icon: "yensign.circle.fill"),
+                PetWidgetOption(title: WealthExperienceCopy.Counting.navigationAction, command: "open_money_counting", icon: "yensign.circle.fill"),
                 PetWidgetOption(title: "先留在聊天里", command: "mood_support", icon: "bubble.left.and.bubble.right.fill"),
                 PetWidgetOption(title: "先看看我的货币", command: "pet_currency_panel", icon: "wallet.pass.fill")
             ]
         )
         messages.append(
             PetChatMessage(
-                text: "这个场景需要跳转，我先征求你确认～",
+                text: WealthExperienceCopy.Counting.navigationMessage,
                 isUser: false,
                 isAIGenerated: true,
                 widgets: [widget]
@@ -2789,7 +2789,7 @@ struct PetChatView: View {
 
     private func navigateToWealthCounting() {
         let message = PetChatMessage(
-            text: "走吧，我们去「来财」数钞票放松一下～",
+            text: WealthExperienceCopy.Counting.navigationConfirm,
             isUser: false
         )
         messages.append(message)

@@ -3,6 +3,246 @@ import SwiftUI
 import SwiftData
 import PhotosUI
 
+// MARK: - OOTD / 魔法贴纸底图配置
+
+enum OOTDCanvasType {
+    static let blank = "blank"
+    static let mannequin = "mannequin"
+    static let custom = "custom"
+}
+
+struct OOTDMannequinBackground: Identifiable, Hashable {
+    let id: String
+    let displayName: String
+    let assetName: String
+    let sourcePath: String
+
+    static let defaultID = "ootd_mannequin_default"
+    static let legacyAssetName = "ootd"
+
+    static let all: [OOTDMannequinBackground] = [
+        OOTDMannequinBackground(
+            id: defaultID,
+            displayName: "基础线稿人台",
+            assetName: "ootd_mannequin_default",
+            sourcePath: "temp/人台.png"
+        )
+    ]
+
+    static var defaultBackground: OOTDMannequinBackground {
+        all[0]
+    }
+
+    /// Manifest-gated exposure: only list mannequin choices whose image asset is actually bundled.
+    static var available: [OOTDMannequinBackground] {
+        all.filter { UIImage(named: $0.assetName) != nil }
+    }
+
+    static func resolve(_ id: String?) -> OOTDMannequinBackground {
+        guard let id,
+              let match = all.first(where: { $0.id == id }) else {
+            return defaultBackground
+        }
+        return match
+    }
+
+    static func resolvedAssetName(for id: String?) -> String {
+        let candidate = resolve(id)
+        if UIImage(named: candidate.assetName) != nil {
+            return candidate.assetName
+        }
+        // Compatibility fallback for older builds/data if the new catalog asset is missing.
+        if UIImage(named: legacyAssetName) != nil {
+            return legacyAssetName
+        }
+        return candidate.assetName
+    }
+}
+
+struct OOTDBackgroundSelectionSheet: View {
+    let currentCanvasType: String
+    let currentMannequinAssetID: String?
+    let onSelectBlank: () -> Void
+    let onSelectMannequin: (OOTDMannequinBackground) -> Void
+    let onSelectCustomImage: () -> Void
+
+    @Environment(\.dismiss) private var dismiss
+
+    private var selectedMannequinID: String {
+        OOTDMannequinBackground.resolve(currentMannequinAssetID).id
+    }
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 18) {
+                    optionButton(
+                        title: "空白书页",
+                        subtitle: "使用纯白底图，适合自由拼贴。",
+                        systemImage: "square.dashed",
+                        isSelected: currentCanvasType == OOTDCanvasType.blank
+                    ) {
+                        onSelectBlank()
+                        dismiss()
+                    }
+
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("人台")
+                            .font(.headline)
+                            .foregroundStyle(.primary)
+
+                        let mannequins = OOTDMannequinBackground.available
+                        if mannequins.isEmpty {
+                            ContentUnavailableView(
+                                "暂无可用人台",
+                                systemImage: "tshirt",
+                                description: Text("请先通过 harness 入库真实 PNG，避免透明占位图泄漏。")
+                            )
+                        } else {
+                            ForEach(mannequins) { mannequin in
+                                Button {
+                                    onSelectMannequin(mannequin)
+                                    dismiss()
+                                } label: {
+                                    HStack(spacing: 14) {
+                                        mannequinThumbnail(mannequin)
+
+                                        VStack(alignment: .leading, spacing: 4) {
+                                            Text(mannequin.displayName)
+                                                .font(.system(size: 16, weight: .semibold))
+                                                .foregroundStyle(.primary)
+                                            Text(mannequin.sourcePath)
+                                                .font(.caption)
+                                                .foregroundStyle(.secondary)
+                                        }
+
+                                        Spacer()
+
+                                        if currentCanvasType == OOTDCanvasType.mannequin,
+                                           selectedMannequinID == mannequin.id {
+                                            Image(systemName: "checkmark.circle.fill")
+                                                .font(.title3)
+                                                .foregroundStyle(.pink)
+                                        }
+                                    }
+                                    .padding(14)
+                                    .background(
+                                        RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                            .fill(Color(uiColor: .secondarySystemBackground))
+                                    )
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                            .strokeBorder(
+                                                currentCanvasType == OOTDCanvasType.mannequin && selectedMannequinID == mannequin.id
+                                                ? Color.pink.opacity(0.55)
+                                                : Color.primary.opacity(0.08),
+                                                lineWidth: 1
+                                            )
+                                    )
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                    }
+
+                    optionButton(
+                        title: "图库自定义图片",
+                        subtitle: "从图库选择图片，并继续使用 3:4 裁剪。",
+                        systemImage: "photo.on.rectangle.angled",
+                        isSelected: currentCanvasType == OOTDCanvasType.custom
+                    ) {
+                        dismiss()
+                        DispatchQueue.main.async {
+                            onSelectCustomImage()
+                        }
+                    }
+                }
+                .padding(20)
+            }
+            .navigationTitle("更换底图")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("完成") {
+                        dismiss()
+                    }
+                }
+            }
+        }
+        .presentationDetents([.medium, .large])
+    }
+
+    private func optionButton(
+        title: String,
+        subtitle: String,
+        systemImage: String,
+        isSelected: Bool,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            HStack(spacing: 14) {
+                Image(systemName: systemImage)
+                    .font(.system(size: 22, weight: .semibold))
+                    .foregroundStyle(isSelected ? .white : .pink)
+                    .frame(width: 46, height: 46)
+                    .background(
+                        Circle()
+                            .fill(isSelected ? Color.pink : Color.pink.opacity(0.12))
+                    )
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(title)
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(.primary)
+                    Text(subtitle)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer()
+
+                if isSelected {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.title3)
+                        .foregroundStyle(.pink)
+                }
+            }
+            .padding(14)
+            .background(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .fill(Color(uiColor: .secondarySystemBackground))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .strokeBorder(isSelected ? Color.pink.opacity(0.55) : Color.primary.opacity(0.08), lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
+    @ViewBuilder
+    private func mannequinThumbnail(_ mannequin: OOTDMannequinBackground) -> some View {
+        if UIImage(named: mannequin.assetName) != nil {
+            Image(mannequin.assetName)
+                .resizable()
+                .scaledToFill()
+                .frame(width: 52, height: 70)
+                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
+                )
+        } else {
+            Image(systemName: "tshirt")
+                .font(.system(size: 22, weight: .medium))
+                .foregroundStyle(.secondary)
+                .frame(width: 52, height: 70)
+                .background(Color(uiColor: .tertiarySystemBackground))
+                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        }
+    }
+}
+
 // MARK: - OOTD Content Area (Canvas + Cutout List)
 struct OOTDContentArea: View {
     @Binding var currentOutfit: Outfit?

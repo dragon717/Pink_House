@@ -74,7 +74,7 @@ struct PetChatMenuContent: View {
                 Button {
                     callbacks.handleDivinationPanel()
                 } label: {
-                    Label("今日运势", systemImage: "star.fill")
+                    Label(WealthExperienceCopy.PetChat.quickFortuneLabel, systemImage: "star.fill")
                 }
             }
         }
@@ -203,13 +203,13 @@ struct PetChatMenuContent: View {
             Button {
                 callbacks.handleMoneyCounterPanel()
             } label: {
-                Label("去来财数钞票", systemImage: "yensign.circle.fill")
+                Label(WealthExperienceCopy.PetChat.quickMoneyLabel, systemImage: "yensign.circle.fill")
             }
             
             Button {
                 callbacks.handleDivinationPanel()
             } label: {
-                Label("今日求签", systemImage: "wand.and.stars")
+                Label(WealthExperienceCopy.PetChat.quickFortuneLabel, systemImage: "wand.and.stars")
             }
         }
     }

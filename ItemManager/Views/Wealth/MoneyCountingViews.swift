@@ -11,9 +11,9 @@ struct MoneyCountingContainerView: View {
         VStack(spacing: 0) {
             // 子页签选择器
             Picker("货币", selection: $viewModel.selectedCurrency) {
-                Text("人民币").tag(CurrencyType.rmb)
-                Text("日元").tag(CurrencyType.jpy)
-                Text("美刀").tag(CurrencyType.usd)
+                Text(CurrencyType.rmb.displayTitle).tag(CurrencyType.rmb)
+                Text(CurrencyType.jpy.displayTitle).tag(CurrencyType.jpy)
+                Text(CurrencyType.usd.displayTitle).tag(CurrencyType.usd)
             }
             .pickerStyle(.segmented)
             .padding(.horizontal)
@@ -79,7 +79,7 @@ struct MoneyCountingHeaderView: View {
             .minimumScaleFactor(0.5)
             
             VStack(spacing: 4) {
-                Text("已购入小裙装总价 + 心愿尾款定金 + 小金库存款")
+                Text(WealthExperienceCopy.Counting.sourceLine)
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
@@ -130,9 +130,9 @@ struct MoneyVisualizationView: View {
             
             if stacks.isEmpty {
                 ContentUnavailableView(
-                    "暂无资产",
+                    WealthExperienceCopy.Counting.emptyTitle,
                     systemImage: "banknote",
-                    description: Text("衣橱空空如也，快去添加吧")
+                    description: Text(WealthExperienceCopy.Counting.emptyDescription)
                 )
                 .padding(.top, 50)
                 .frame(maxWidth: .infinity)

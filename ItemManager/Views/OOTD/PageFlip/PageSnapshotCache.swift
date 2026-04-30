@@ -107,12 +107,12 @@ private struct PagePlaceholderView: View {
     var body: some View {
         ZStack {
             // 背景
-            if outfit.canvasType == "blank" {
+            if outfit.canvasType == OOTDCanvasType.blank {
                 Color.white
-            } else if outfit.canvasType == "custom" {
+            } else if outfit.canvasType == OOTDCanvasType.custom {
                 Color.gray.opacity(0.2)
             } else {
-                Image("ootd")
+                Image(OOTDMannequinBackground.resolvedAssetName(for: outfit.mannequinAssetID))
                     .resizable()
                     .scaledToFill()
                     .opacity(0.3)

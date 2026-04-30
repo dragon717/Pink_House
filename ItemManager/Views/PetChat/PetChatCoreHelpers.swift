@@ -520,7 +520,7 @@ private func currencyAmount(for type: PetCurrency, status: PetStatus) -> Int {
 private func currencySubtitle(for status: PetStatus, kind: PetCurrencyPanelKind) -> String {
     switch kind {
     case .all:
-        return "这是我现在的小金库，喵币、鱼币和骨头币都在这儿。"
+        return WealthExperienceCopy.PetChat.currencyAllSubtitle
     case .meowCoin:
         return "这是我的喵币，领养二宝和充值时会先看它。"
     case .fishCoin:
@@ -755,8 +755,8 @@ func makeMoneyCounterWidget(totalValue: Decimal, currency: CurrencyType = .rmb) 
 
     return PetWidgetData(
         type: .moneyCounter,
-        title: "我的裙装小金库（\(currency.rawValue)）",
-        subtitle: "来陪我一起数数今天的小金库～",
+        title: "\(WealthExperienceCopy.Counting.petTitlePrefix)（\(currency.displayTitle)）",
+        subtitle: WealthExperienceCopy.Counting.petSubtitle,
         options: [
             PetWidgetOption(title: "看看我的全部状态", command: "pet_status_all", icon: "heart.text.square.fill"),
             PetWidgetOption(title: "打开我的背包", command: "pet_inventory_panel", icon: "shippingbox.fill")
@@ -764,7 +764,7 @@ func makeMoneyCounterWidget(totalValue: Decimal, currency: CurrencyType = .rmb) 
         metrics: [
             PetWidgetMetric(name: PetMoneyCounterMetricKey.currency, value: currency.rawValue),
             PetWidgetMetric(name: PetMoneyCounterMetricKey.amount, value: "\(displayAmount)"),
-            PetWidgetMetric(name: "裙装总价值", value: "\(symbol)\(displayAmount)")
+            PetWidgetMetric(name: "衣橱总值", value: "\(symbol)\(displayAmount)")
         ]
     )
 }
@@ -772,11 +772,11 @@ func makeMoneyCounterWidget(totalValue: Decimal, currency: CurrencyType = .rmb) 
 func makeDivinationWidget() -> PetWidgetData {
     PetWidgetData(
         type: .divinationPanel,
-        title: "今日求签",
-        subtitle: "请签求好运，福气就在这条对话里～",
+        title: WealthExperienceCopy.Fortune.petPanelTitle,
+        subtitle: WealthExperienceCopy.Fortune.petPanelSubtitle,
         options: [
-            PetWidgetOption(title: "请签求好运", command: "pet_divination_panel", icon: "wand.and.stars"),
-            PetWidgetOption(title: "去数数小金库", command: "pet_money_counter", icon: "yensign.circle.fill")
+            PetWidgetOption(title: WealthExperienceCopy.Fortune.petPanelPrimaryAction, command: "pet_divination_panel", icon: "wand.and.stars"),
+            PetWidgetOption(title: WealthExperienceCopy.PetChat.quickMoneyLabel, command: "pet_money_counter", icon: "yensign.circle.fill")
         ]
     )
 }

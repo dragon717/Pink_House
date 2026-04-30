@@ -136,6 +136,7 @@ struct OOTDCanvasView: View {
             CanvasBackgroundView(
                 canvasType: outfit.canvasType,
                 backgroundImagePath: outfit.backgroundImagePath,
+                mannequinAssetID: outfit.mannequinAssetID,
                 canvasWidth: canvasWidth,
                 canvasHeight: canvasHeight
             )
@@ -664,6 +665,7 @@ struct CanvasItemView: View {
 struct CanvasBackgroundView: View {
     let canvasType: String
     let backgroundImagePath: String?
+    let mannequinAssetID: String?
     let canvasWidth: CGFloat
     let canvasHeight: CGFloat
     
@@ -671,10 +673,10 @@ struct CanvasBackgroundView: View {
     
     var body: some View {
         Group {
-            if canvasType == "blank" {
+            if canvasType == OOTDCanvasType.blank {
                 Color.white
                     .frame(width: canvasWidth, height: canvasHeight)
-            } else if canvasType == "custom",
+            } else if canvasType == OOTDCanvasType.custom,
                       let path = backgroundImagePath {
                 if let uiImage = loadedImage {
                     Image(uiImage: uiImage)
@@ -690,20 +692,20 @@ struct CanvasBackgroundView: View {
                         )
                 }
             } else {
-                Image("ootd")
+                Image(OOTDMannequinBackground.resolvedAssetName(for: mannequinAssetID))
                     .resizable()
                     .scaledToFill()
                     .frame(width: canvasWidth, height: canvasHeight)
                     .clipped()
             }
         }
-        .task(id: backgroundImagePath) {
+        .task(id: "\(canvasType)|\(backgroundImagePath ?? "")") {
             await loadBackgroundImage()
         }
     }
     
     private func loadBackgroundImage() async {
-        guard canvasType == "custom",
+        guard canvasType == OOTDCanvasType.custom,
               let path = backgroundImagePath else {
             loadedImage = nil
             return

@@ -9,7 +9,7 @@ struct WealthHapticsSettingsView: View {
     @State private var showVIPCenter = false
     
     var body: some View {
-        AdaptiveSettingsView(title: "马上来财设置") {
+        AdaptiveSettingsView(title: WealthExperienceCopy.Settings.pageTitle) {
             // 0. 个性化设置
             AdaptiveSection(header: "个性化") {
                 NavigationLink(destination: WealthCustomizationView()) {
@@ -19,9 +19,9 @@ struct WealthHapticsSettingsView: View {
                             .frame(width: 24)
                         
                         VStack(alignment: .leading) {
-                            Text("纸币与背景样式")
+                            Text(WealthExperienceCopy.Settings.paperStyleTitle)
                                 .foregroundStyle(.primary)
-                            Text("自定义不同面额纸币的显示图片")
+                            Text(WealthExperienceCopy.Settings.paperStyleDescription)
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
@@ -90,7 +90,7 @@ struct WealthHapticsSettingsView: View {
                 showVIPCenter = true
             }
         } message: {
-            Text("尾款小金库形象是 VIP 专属个性化能力。开通 VIP 后可切换小金库、招财猫、存钱罐、金币猪。")
+            Text(WealthExperienceCopy.Settings.mascotLockedMessage)
         }
         .sheet(isPresented: $showVIPCenter) {
             NavigationStack {
@@ -107,7 +107,7 @@ struct WealthHapticsSettingsView: View {
 
             VStack(alignment: .leading) {
                 HStack(spacing: 6) {
-                    Text("尾款小金库形象")
+                    Text(WealthExperienceCopy.Settings.mascotTitle)
                         .foregroundStyle(.primary)
                     if showLock {
                         Image(systemName: "crown.fill")
@@ -129,10 +129,10 @@ struct FinalPaymentVaultMascotSettingsView: View {
     @State private var appearanceManager = WealthAppearanceManager.shared
 
     var body: some View {
-        AdaptiveSettingsView(title: "尾款小金库形象") {
+        AdaptiveSettingsView(title: WealthExperienceCopy.Settings.mascotTitle) {
             AdaptiveSection(
                 header: "VIP 专属形象",
-                footer: "选择后会应用到马上来财「安财 → 尾款」里的小金库主形象。"
+                footer: WealthExperienceCopy.Settings.mascotFooter
             ) {
                 ForEach(FinalPaymentVaultMascot.allCases) { mascot in
                     Button {

@@ -120,7 +120,7 @@ struct DivinationVideoView: View {
                     
                     // 按钮区域
                     if videoState == .initial {
-                        // 开始求签按钮
+                        // 开始请签按钮
                         Button {
                             withAnimation(.easeInOut(duration: 0.3)) {
                                 videoState = .playing
@@ -128,7 +128,7 @@ struct DivinationVideoView: View {
                         } label: {
                             HStack(spacing: 8) {
                                 Image(systemName: "wand.and.stars")
-                                Text("开始求签")
+                                Text(WealthExperienceCopy.Fortune.startAction)
                             }
                             .font(.headline)
                             .fontWeight(.semibold)
@@ -148,7 +148,7 @@ struct DivinationVideoView: View {
                         .padding(.bottom, 40)
                         .transition(.opacity)
                     } else if videoState == .finished && showFortuneText {
-                        // 再求一签按钮
+                        // 再请一签按钮
                         Button {
                             withAnimation(.easeInOut(duration: 0.3)) {
                                 showFortuneText = false
@@ -158,7 +158,7 @@ struct DivinationVideoView: View {
                         } label: {
                             HStack(spacing: 8) {
                                 Image(systemName: "arrow.counterclockwise")
-                                Text("再求一签")
+                                Text(WealthExperienceCopy.Fortune.replayAction)
                             }
                             .font(.headline)
                             .fontWeight(.semibold)
@@ -340,9 +340,9 @@ struct DivinationVideoPlayer: UIViewControllerRepresentable {
     DivinationVideoView(
         fortune: Fortune(
             level: .supreme,
-            text: "上上签",
-            description: "财运亨通",
-            detail: "今日财运极佳，适合投资理财"
+            text: WealthExperienceCopy.Fortune.cards[0].text,
+            description: WealthExperienceCopy.Fortune.cards[0].description,
+            detail: WealthExperienceCopy.Fortune.cards[0].detail
         ),
         onFinished: {},
         onReplay: {}

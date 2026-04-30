@@ -225,10 +225,10 @@ struct WealthView: View {
     private var leadingToolbarContent: some ToolbarContent {
         ToolbarItem(placement: .topBarLeading) {
             Menu {
-                Text("马上来财")
+                Text(WealthExperienceCopy.pageTitle)
                     .font(.headline)
                     .foregroundStyle(themeManager.primaryTextColor)
-                Text("财运亨通，日进斗金")
+                Text(WealthExperienceCopy.pageSubtitle)
                     .font(.caption)
                     .foregroundStyle(themeManager.secondaryTextColor)
             } label: {
@@ -374,7 +374,7 @@ struct WealthStorageContainerView: View {
                     VirtualCurrencyView(viewModel: viewModel, isActive: selectedStorageTab == .virtual)
                         .tag(StorageTab.virtual)
 
-                    // 尾款招财猫
+                    // 尾款心愿小匣
                     FinalPaymentVaultView(
                         clothings: clothings,
                         wealthSavingEntries: wealthSavingEntries
@@ -425,7 +425,7 @@ enum StorageTab: String, CaseIterable, Identifiable {
     var id: String { rawValue }
 }
 
-// MARK: - 尾款招财猫小金库
+// MARK: - 尾款心愿小匣
 
 struct FinalPaymentVaultView: View {
     let clothings: [Clothing]
@@ -478,6 +478,14 @@ struct FinalPaymentVaultView: View {
 
     private var palette: MagicThemePalette {
         MagicThemeDesignSystem.palette(themeManager: themeManager, colorScheme: colorScheme)
+    }
+
+    private var vaultHeroTitle: String {
+        let displayName = appearanceManager.finalPaymentVaultMascot.displayName
+        if displayName == WealthExperienceCopy.Vault.heroSuffix {
+            return displayName
+        }
+        return "\(displayName) · \(WealthExperienceCopy.Vault.heroSuffix)"
     }
 
     var body: some View {
@@ -543,11 +551,11 @@ struct FinalPaymentVaultView: View {
                 .frame(width: 150, height: 150)
                 .shadow(color: Color.orange.opacity(0.25), radius: 16, x: 0, y: 8)
 
-            Text("\(appearanceManager.finalPaymentVaultMascot.displayName)小金库")
+            Text(vaultHeroTitle)
                 .font(.title3.weight(.heavy))
                 .foregroundStyle(themeManager.primaryTextColor)
 
-            Text("为裙装一笔笔存钱，或先放进不指定小金库；都会计入马上来财统计。")
+            Text(WealthExperienceCopy.Vault.heroDescription)
                 .font(.caption)
                 .multilineTextAlignment(.center)
                 .foregroundStyle(themeManager.secondaryTextColor)
@@ -556,9 +564,10 @@ struct FinalPaymentVaultView: View {
         .padding(20)
         .themeSkinAdaptiveSectionCard(slot: .sectionCard, cornerRadius: 28) {
             RoundedRectangle(cornerRadius: 28)
-                .fill(Color(uiColor: .secondarySystemBackground).opacity(0.58))
+                .fill(WealthExperienceStyle.softPanelGradient)
                 .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 28))
         }
+        .wealthTeaPartyOrnaments(cornerRadius: 28)
     }
 
     private var statsCard: some View {
@@ -566,25 +575,19 @@ struct FinalPaymentVaultView: View {
             HStack(alignment: .firstTextBaseline, spacing: 6) {
                 Text("¥")
                     .font(.title3.weight(.bold))
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(WealthExperienceStyle.rose)
                 Text(NSDecimalNumber(decimal: savedTotal).stringValue)
                     .font(.system(size: 42, weight: .heavy, design: .rounded))
                     .monospacedDigit()
-                    .foregroundStyle(
-                        LinearGradient(
-                            colors: [Color.orange, Color.yellow, Color(hex: "C94C72")],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
+                    .foregroundStyle(WealthExperienceStyle.roseGoldGradient)
                     .lineLimit(1)
                     .minimumScaleFactor(0.45)
             }
 
             HStack(spacing: 0) {
-                vaultStat(title: "已存入", value: "¥\(NSDecimalNumber(decimal: savedTotal).stringValue)", color: .orange)
+                vaultStat(title: WealthExperienceCopy.Vault.savedTitle, value: "¥\(NSDecimalNumber(decimal: savedTotal).stringValue)", color: WealthExperienceStyle.rose)
                 Divider().frame(height: 34)
-                vaultStat(title: "指定裙装", value: "¥\(NSDecimalNumber(decimal: linkedSavedTotal).stringValue)", color: palette.accent)
+                vaultStat(title: WealthExperienceCopy.Vault.linkedTitle, value: "¥\(NSDecimalNumber(decimal: linkedSavedTotal).stringValue)", color: palette.accent)
                 Divider().frame(height: 34)
                 unassignedVaultStatButton
             }
@@ -592,9 +595,10 @@ struct FinalPaymentVaultView: View {
         .padding(18)
         .themeSkinAdaptiveSectionCard(slot: .statsCard, cornerRadius: 24) {
             RoundedRectangle(cornerRadius: 24)
-                .fill(Color(uiColor: .secondarySystemBackground).opacity(0.62))
+                .fill(WealthExperienceStyle.softPanelGradient)
                 .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 24))
         }
+        .wealthTeaPartyOrnaments(cornerRadius: 24)
     }
 
     private func vaultStat(title: String, value: String, color: Color) -> some View {
@@ -617,7 +621,7 @@ struct FinalPaymentVaultView: View {
             showingUnassignedManager = true
         } label: {
             VStack(spacing: 6) {
-                Text("未指定")
+                Text(WealthExperienceCopy.Vault.unassignedTitle)
                     .font(.caption2)
                     .foregroundStyle(themeManager.secondaryTextColor)
                 HStack(spacing: 3) {
@@ -636,17 +640,17 @@ struct FinalPaymentVaultView: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("管理未指定存款")
+        .accessibilityLabel(WealthExperienceCopy.Vault.manageUnassigned)
     }
 
     private var quickSaveCard: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("存一笔到小金库")
+                    Text(WealthExperienceCopy.Vault.quickSaveTitle)
                         .font(.headline)
                         .foregroundStyle(themeManager.primaryTextColor)
-                    Text("不指定裙装也可以先存，之后来财统计会一起计算。")
+                    Text(WealthExperienceCopy.Vault.quickSaveDescription)
                         .font(.caption)
                         .foregroundStyle(themeManager.secondaryTextColor)
                 }
@@ -655,13 +659,13 @@ struct FinalPaymentVaultView: View {
                     savingTargetClothingID = nil
                     showingSavingSheet = true
                 } label: {
-                    Label("不指定存钱", systemImage: "plus.circle.fill")
+                    Label(WealthExperienceCopy.Vault.quickSaveAction, systemImage: "plus.circle.fill")
                         .font(.caption.weight(.bold))
                         .padding(.horizontal, 12)
                         .padding(.vertical, 8)
-                        .foregroundStyle(.orange)
+                        .foregroundStyle(WealthExperienceStyle.rose)
                         .themeSkinAdaptiveSectionCard(slot: .primaryButton, cornerRadius: 18, showsDecoration: false) {
-                            Capsule().fill(Color.orange.opacity(0.16))
+                            Capsule().fill(WealthExperienceStyle.blush.opacity(0.45))
                         }
                 }
                 .buttonStyle(.plain)
@@ -670,20 +674,21 @@ struct FinalPaymentVaultView: View {
         .padding(16)
         .themeSkinAdaptiveSectionCard(slot: .sectionCard, cornerRadius: 22) {
             RoundedRectangle(cornerRadius: 22)
-                .fill(Color(uiColor: .secondarySystemBackground).opacity(0.55))
+                .fill(WealthExperienceStyle.softPanelGradient)
                 .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 22))
         }
+        .wealthTeaPartyOrnaments(cornerRadius: 22)
     }
 
     private var emptyState: some View {
         VStack(spacing: 14) {
             Image(systemName: "tray")
                 .font(.system(size: 34))
-                .foregroundStyle(.orange.opacity(0.8))
-            Text("还没有小金库存款")
+                .foregroundStyle(WealthExperienceStyle.rose.opacity(0.8))
+            Text(WealthExperienceCopy.Vault.emptyTitle)
                 .font(.headline)
                 .foregroundStyle(themeManager.primaryTextColor)
-            Text("可以先不指定裙装存一笔，也可以去心愿尾款列表为目标裙装存钱。")
+            Text(WealthExperienceCopy.Vault.emptyDescription)
                 .font(.caption)
                 .multilineTextAlignment(.center)
                 .foregroundStyle(themeManager.secondaryTextColor)
@@ -696,9 +701,9 @@ struct FinalPaymentVaultView: View {
                         .font(.subheadline.weight(.bold))
                         .padding(.horizontal, 16)
                         .padding(.vertical, 10)
-                        .foregroundStyle(.orange)
+                        .foregroundStyle(WealthExperienceStyle.rose)
                         .themeSkinAdaptiveSectionCard(slot: .primaryButton, cornerRadius: 20, showsDecoration: false) {
-                            Capsule().fill(Color.orange.opacity(0.16))
+                            Capsule().fill(WealthExperienceStyle.blush.opacity(0.45))
                         }
                 }
                 .buttonStyle(.plain)
@@ -725,7 +730,7 @@ struct FinalPaymentVaultView: View {
 
     private var savedList: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("裙装存钱进度")
+            Text(WealthExperienceCopy.Vault.listTitle)
                 .font(.headline)
                 .foregroundStyle(themeManager.primaryTextColor)
 
@@ -746,9 +751,9 @@ struct FinalPaymentVaultView: View {
                             HStack(spacing: 10) {
                                 Image(systemName: clothing.isDepositPlan ? "heart.text.square.fill" : "tshirt.fill")
                                     .font(.headline)
-                                    .foregroundStyle(.orange)
+                                    .foregroundStyle(WealthExperienceStyle.rose)
                                     .frame(width: 34, height: 34)
-                                    .background(Color.orange.opacity(0.12))
+                                    .background(WealthExperienceStyle.blush.opacity(0.45))
                                     .clipShape(Circle())
 
                                 VStack(alignment: .leading, spacing: 3) {
@@ -756,7 +761,7 @@ struct FinalPaymentVaultView: View {
                                         .font(.subheadline.weight(.semibold))
                                         .foregroundStyle(themeManager.primaryTextColor)
                                         .lineLimit(1)
-                                    Text(clothing.isDepositPlan ? "定金 + 小金库存款 / 当前总价" : "小金库存款 / 当前总价")
+                                    Text(clothing.isDepositPlan ? WealthExperienceCopy.Vault.depositProgressLabel : WealthExperienceCopy.Vault.normalProgressLabel)
                                         .font(.caption2)
                                         .foregroundStyle(themeManager.tertiaryTextColor)
                                 }
@@ -775,9 +780,9 @@ struct FinalPaymentVaultView: View {
                                 .font(.caption.weight(.bold))
                                 .padding(.horizontal, 10)
                                 .padding(.vertical, 7)
-                                .foregroundStyle(.orange)
+                                .foregroundStyle(WealthExperienceStyle.rose)
                                 .themeSkinAdaptiveSectionCard(slot: .primaryButton, cornerRadius: 16, showsDecoration: false) {
-                                    Capsule().fill(Color.orange.opacity(0.14))
+                                    Capsule().fill(WealthExperienceStyle.blush.opacity(0.42))
                                 }
                         }
                         .buttonStyle(.plain)
@@ -792,13 +797,13 @@ struct FinalPaymentVaultView: View {
                                 Text("已存 ¥\(NSDecimalNumber(decimal: saved).stringValue)")
                                 Spacer()
                                 Text("\(Int((ratio * 100).rounded()))%")
-                                    .foregroundStyle(ratio > 1 ? Color(hex: "C94C72") : .orange)
+                                    .foregroundStyle(ratio > 1 ? WealthExperienceStyle.rose : WealthExperienceStyle.gold)
                             }
                             .font(.caption.weight(.semibold))
                             .foregroundStyle(themeManager.secondaryTextColor)
 
                             ProgressView(value: min(ratio, 1.0))
-                                .tint(ratio > 1 ? Color(hex: "C94C72") : .orange)
+                                .tint(ratio > 1 ? WealthExperienceStyle.rose : WealthExperienceStyle.gold)
 
                             Text("进度 ¥\(NSDecimalNumber(decimal: numerator).stringValue) / ¥\(NSDecimalNumber(decimal: target).stringValue)")
                                 .font(.caption2)
@@ -909,10 +914,10 @@ struct UnassignedSavingManagerSheet: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     VStack(alignment: .leading, spacing: 8) {
-                        Label("管理未指定存款", systemImage: "tray.full.fill")
+                            Label(WealthExperienceCopy.Vault.manageUnassigned, systemImage: "tray.full.fill")
                             .font(.headline)
                             .foregroundStyle(Color(hex: "C94C72"))
-                        Text("当前未指定 ¥\(NSDecimalNumber(decimal: unassignedSavedTotal).stringValue)，可填充到心愿尾款裙装，且只会存到上限。")
+                        Text("\(WealthExperienceCopy.Vault.unassignedSheetDescriptionPrefix)¥\(NSDecimalNumber(decimal: unassignedSavedTotal).stringValue)\(WealthExperienceCopy.Vault.unassignedSheetDescriptionSuffix)")
                             .font(.caption)
                             .foregroundStyle(themeManager.secondaryTextColor)
                     }
@@ -937,10 +942,10 @@ struct UnassignedSavingManagerSheet: View {
                             Image(systemName: "heart.slash")
                                 .font(.title2)
                                 .foregroundStyle(themeManager.tertiaryTextColor)
-                            Text("还没有可填充的心愿尾款裙装")
+                            Text(WealthExperienceCopy.Vault.unassignedEmptyTitle)
                                 .font(.subheadline.weight(.semibold))
                                 .foregroundStyle(themeManager.primaryTextColor)
-                            Text("未指定存款会继续留在小金库，不会自动绑定。")
+                            Text(WealthExperienceCopy.Vault.unassignedEmptyDescription)
                                 .font(.caption)
                                 .foregroundStyle(themeManager.secondaryTextColor)
                         }
@@ -955,7 +960,7 @@ struct UnassignedSavingManagerSheet: View {
                 }
                 .padding()
             }
-            .navigationTitle("未指定存款")
+            .navigationTitle(WealthExperienceCopy.Vault.unassignedSheetTitle)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -1128,16 +1133,16 @@ struct VaultSavingSheet: View {
         NavigationStack {
             VStack(alignment: .leading, spacing: 18) {
                 VStack(alignment: .leading, spacing: 8) {
-                    Label(targetClothing == nil ? "不指定裙装存钱" : "为裙装存一笔", systemImage: "tray.and.arrow.down.fill")
+                    Label(targetClothing == nil ? WealthExperienceCopy.Vault.sheetUnassignedTitle : WealthExperienceCopy.Vault.sheetTargetTitle, systemImage: "tray.and.arrow.down.fill")
                         .font(.headline)
                         .foregroundStyle(.orange)
-                    Text(targetClothing?.name ?? "先存进自由小金库，暂不绑定具体裙装。")
+                    Text(targetClothing?.name ?? WealthExperienceCopy.Vault.sheetUnassignedDescription)
                         .font(.subheadline)
                         .foregroundStyle(themeManager.secondaryTextColor)
                 }
 
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("存入金额")
+                    Text(WealthExperienceCopy.Vault.amountTitle)
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(themeManager.secondaryTextColor)
                     HStack {
@@ -1156,21 +1161,21 @@ struct VaultSavingSheet: View {
                     }
                 }
 
-                Text("当前已存 ¥\(NSDecimalNumber(decimal: currentSavedAmount).stringValue)")
+                Text("\(WealthExperienceCopy.Vault.currentSaved) ¥\(NSDecimalNumber(decimal: currentSavedAmount).stringValue)")
                     .font(.caption)
                     .foregroundStyle(themeManager.tertiaryTextColor)
 
                 if let assignableCap, let remainingAmount {
                     VStack(alignment: .leading, spacing: 6) {
                         HStack {
-                            Text("指定存款上限")
+                            Text(WealthExperienceCopy.Vault.capTitle)
                             Spacer()
                             Text("¥\(NSDecimalNumber(decimal: assignableCap).stringValue)")
                                 .fontWeight(.semibold)
                         }
 
                         HStack {
-                            Text("还能存入")
+                            Text(WealthExperienceCopy.Vault.remainingTitle)
                             Spacer()
                             Text("¥\(NSDecimalNumber(decimal: remainingAmount).stringValue)")
                                 .fontWeight(.semibold)
@@ -1178,15 +1183,15 @@ struct VaultSavingSheet: View {
                         }
 
                         if remainingAmount <= 0 {
-                            Text("这条裙装已达上限，后续可在安财里把超额转回未指定。")
+                            Text(WealthExperienceCopy.Vault.fullHint)
                                 .font(.caption2)
                                 .foregroundStyle(themeManager.tertiaryTextColor)
                         } else if isAmountClamped, let effectiveSaveAmount {
-                            Text("超过上限的部分不会存入，本次将存入 ¥\(NSDecimalNumber(decimal: effectiveSaveAmount).stringValue)。")
+                            Text("\(WealthExperienceCopy.Vault.clampHintPrefix)¥\(NSDecimalNumber(decimal: effectiveSaveAmount).stringValue)\(WealthExperienceCopy.Vault.clampHintSuffix)")
                                 .font(.caption2)
                                 .foregroundStyle(.orange)
                         } else {
-                            Text("若输入超过剩余额度，会自动只存到上限。")
+                            Text(WealthExperienceCopy.Vault.capHint)
                                 .font(.caption2)
                                 .foregroundStyle(themeManager.tertiaryTextColor)
                         }
@@ -1198,7 +1203,7 @@ struct VaultSavingSheet: View {
                             .fill(Color.orange.opacity(0.08))
                     }
                 } else {
-                    Text("未指定小金库不设单条上限，之后可在安财里填充到心愿尾款裙装。")
+                    Text(WealthExperienceCopy.Vault.unassignedNoCapHint)
                         .font(.caption2)
                         .foregroundStyle(themeManager.tertiaryTextColor)
                         .padding(12)
@@ -1212,7 +1217,7 @@ struct VaultSavingSheet: View {
                 Spacer()
             }
             .padding()
-            .navigationTitle("存一笔到小金库")
+            .navigationTitle(WealthExperienceCopy.Vault.sheetNavigationTitle)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -1229,6 +1234,47 @@ struct VaultSavingSheet: View {
             }
         }
         .presentationDetents([.medium])
+    }
+}
+
+private extension View {
+    func wealthTeaPartyOrnaments(cornerRadius: CGFloat) -> some View {
+        self
+            .overlay {
+                RoundedRectangle(cornerRadius: cornerRadius)
+                    .stroke(
+                        LinearGradient(
+                            colors: [
+                                WealthExperienceStyle.pearl.opacity(0.9),
+                                WealthExperienceStyle.rose.opacity(0.28),
+                                WealthExperienceStyle.gold.opacity(0.35)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        lineWidth: 1
+                    )
+                    .allowsHitTesting(false)
+            }
+            .overlay(alignment: .topLeading) {
+                HStack(spacing: 4) {
+                    Circle().fill(WealthExperienceStyle.pearl)
+                    Circle().fill(WealthExperienceStyle.blush)
+                    Circle().fill(WealthExperienceStyle.rose.opacity(0.72))
+                }
+                .frame(width: 38, height: 8)
+                .padding(.leading, 18)
+                .padding(.top, 12)
+                .allowsHitTesting(false)
+            }
+            .overlay(alignment: .bottomTrailing) {
+                Image(systemName: "ribbon")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(WealthExperienceStyle.rose.opacity(0.55))
+                    .padding(.trailing, 16)
+                    .padding(.bottom, 12)
+                    .allowsHitTesting(false)
+            }
     }
 }
 
@@ -1265,7 +1311,7 @@ struct VaultSavingCelebrationOverlay: View {
                 }
                 .frame(width: 170, height: 130)
 
-                Text("已存入 ¥\(NSDecimalNumber(decimal: amount).stringValue)")
+                Text("\(WealthExperienceCopy.Vault.celebrationPrefix)¥\(NSDecimalNumber(decimal: amount).stringValue)")
                     .font(.headline.weight(.heavy))
                     .foregroundStyle(.white)
                     .padding(.horizontal, 18)
@@ -1307,7 +1353,7 @@ private struct FortuneCatVaultIcon: View {
                 }
             }
         }
-        .accessibilityLabel("\(mascot.displayName)尾款小金库")
+        .accessibilityLabel("\(mascot.displayName)\(WealthExperienceCopy.Vault.accessibilitySuffix)")
     }
 }
 
