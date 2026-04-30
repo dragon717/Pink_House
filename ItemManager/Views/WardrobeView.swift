@@ -338,10 +338,6 @@ private final class WardrobeStatsAutoCollapseCoordinator {
         hasReceivedScrollOffset && lastScrollDistance > topThreshold
     }
 
-    var canAutoCollapse: Bool {
-        !manualExpansionLockedUntilTop
-    }
-
     func reset() {
         lastScrollDistance = 0
         hasReceivedScrollOffset = false
@@ -371,9 +367,7 @@ private final class WardrobeStatsAutoCollapseCoordinator {
         if scrollDistance <= topThreshold {
             manualExpansionLockedUntilTop = false
             guard !isExpanded else { return }
-            withAnimation(.easeInOut(duration: 0.2)) {
-                setExpanded(true)
-            }
+            setExpanded(true)
             return
         }
 
@@ -386,9 +380,7 @@ private final class WardrobeStatsAutoCollapseCoordinator {
         let crossedCollapseThreshold = previousDistance < collapseThreshold
         let movedDownEnough = scrollDistance - previousDistance >= directionHysteresis
         if crossedCollapseThreshold || movedDownEnough {
-            withAnimation(.easeInOut(duration: 0.2)) {
-                setExpanded(false)
-            }
+            setExpanded(false)
         }
     }
 }
@@ -468,6 +460,119 @@ private struct WardrobeStatsScrollObserver: UIViewRepresentable {
             }
             return nil
         }
+    }
+}
+
+private enum WardrobeStatsVisibilityPrompt: String, Identifiable {
+    case collapsed
+    case expanded
+
+    var id: String { rawValue }
+
+    var icon: String {
+        switch self {
+        case .collapsed: return "rectangle.compress.vertical"
+        case .expanded: return "rectangle.expand.vertical"
+        }
+    }
+
+    var title: String {
+        switch self {
+        case .collapsed: return "统计卡已收起"
+        case .expanded: return "统计卡已展开"
+        }
+    }
+
+    var message: String {
+        switch self {
+        case .collapsed: return "点击顶部「显示」可随时恢复统计卡。"
+        case .expanded: return "本次浏览会保持展开，回到顶部后恢复自动规则。"
+        }
+    }
+}
+
+private struct WardrobeStatsVisibilityPromptView: View {
+    @Environment(ThemeManager.self) private var themeManager
+    @Environment(\.colorScheme) private var colorScheme
+
+    let prompt: WardrobeStatsVisibilityPrompt
+
+    private var palette: MagicThemePalette {
+        MagicThemeDesignSystem.palette(themeManager: themeManager, colorScheme: colorScheme)
+    }
+
+    var body: some View {
+        HStack(spacing: 12) {
+            ZStack {
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                palette.accent.opacity(colorScheme == .dark ? 0.34 : 0.22),
+                                palette.cardAccent.opacity(colorScheme == .dark ? 0.30 : 0.18)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: 34, height: 34)
+
+                Image(systemName: prompt.icon)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(palette.accent)
+            }
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(prompt.title)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(palette.primaryText)
+
+                Text(prompt.message)
+                    .font(.caption)
+                    .foregroundStyle(palette.secondaryText)
+                    .lineLimit(2)
+            }
+
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+        .frame(maxWidth: 380)
+        .background {
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .fill(.ultraThinMaterial)
+
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .fill(palette.cardBackground.opacity(colorScheme == .dark ? 0.72 : 0.88))
+
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            palette.accent.opacity(colorScheme == .dark ? 0.16 : 0.10),
+                            palette.cardAccent.opacity(colorScheme == .dark ? 0.14 : 0.08)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+        }
+        .overlay {
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .stroke(
+                    LinearGradient(
+                        colors: [
+                            palette.accent.opacity(colorScheme == .dark ? 0.46 : 0.34),
+                            palette.cardAccent.opacity(colorScheme == .dark ? 0.36 : 0.24)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 1
+                )
+        }
+        .shadow(color: palette.accent.opacity(colorScheme == .dark ? 0.22 : 0.16), radius: 18, x: 0, y: 10)
+        .accessibilityElement(children: .combine)
     }
 }
 
@@ -1264,10 +1369,10 @@ struct WardrobeView: View {
 
             statsSection
                 .frame(height: gridStatsReservedHeight, alignment: .top)
+                .clipped()
                 .padding(.horizontal, gridHorizontalPadding)
                 .zIndex(1)
         }
-        .simultaneousGesture(statsAutoCollapseDragGesture)
     }
 
     private var gridHorizontalPadding: CGFloat {
@@ -1798,16 +1903,20 @@ struct WardrobeView: View {
                 }
             }
 
-            if showStats {
-                WardrobeStatsView(clothings: filteredClothings,
-                                  statsSummary: filteredStatsSummary,
-                                  filterDescription: filterDescription,
-                                  onClearFilter: onClearFilter)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .transition(.opacity)
-            }
+            WardrobeStatsView(clothings: filteredClothings,
+                              statsSummary: filteredStatsSummary,
+                              filterDescription: filterDescription,
+                              onClearFilter: onClearFilter)
+                .fixedSize(horizontal: false, vertical: true)
+                .opacity(showStats ? 1 : 0)
+                .allowsHitTesting(showStats)
+                .accessibilityHidden(!showStats)
         }
         .fixedSize(horizontal: false, vertical: true)
+        .transaction { transaction in
+            transaction.animation = nil
+            transaction.disablesAnimations = true
+        }
     }
 
     private func statsScrollObserver() -> some View {
@@ -1835,46 +1944,33 @@ struct WardrobeView: View {
             scrollDistance,
             isExpanded: showStats
         ) { isExpanded in
-            showStats = isExpanded
+            setStatsVisibility(isExpanded)
         }
     }
 
     private func toggleStatsVisibility() {
         if showStats {
             statsAutoCollapseCoordinator.noteManualCollapse()
-            withAnimation(.easeInOut(duration: 0.2)) {
-                showStats = false
-            }
+            setStatsVisibility(false)
         } else {
             statsAutoCollapseCoordinator.noteManualExpand()
-            withAnimation(.easeInOut(duration: 0.2)) {
-                showStats = true
-            }
+            setStatsVisibility(true)
         }
     }
 
     private func resetStatsScrollState(expand: Bool) {
         statsAutoCollapseCoordinator.reset()
         if expand {
-            showStats = true
+            setStatsVisibility(true)
         }
     }
 
-    private var statsAutoCollapseDragGesture: some Gesture {
-        DragGesture(minimumDistance: 12)
-            .onChanged { value in
-                guard value.translation.height < -12 else { return }
-                collapseStatsForUserScrollIntent()
-            }
-    }
-
-    private func collapseStatsForUserScrollIntent() {
-        guard showStats,
-              statsAutoCollapseCoordinator.canAutoCollapse else {
-            return
-        }
-        withAnimation(.easeInOut(duration: 0.2)) {
-            showStats = false
+    private func setStatsVisibility(_ isVisible: Bool) {
+        guard showStats != isVisible else { return }
+        var transaction = Transaction(animation: nil)
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            showStats = isVisible
         }
     }
 
@@ -1900,10 +1996,10 @@ struct WardrobeView: View {
 
             statsSection
                 .frame(height: listStatsReservedHeight, alignment: .top)
+                .clipped()
                 .padding(.horizontal, gridHorizontalPadding)
                 .zIndex(1)
         }
-        .simultaneousGesture(statsAutoCollapseDragGesture)
     }
 
     private var lazyListView: some View {
@@ -1924,10 +2020,10 @@ struct WardrobeView: View {
 
             statsSection
                 .frame(height: listStatsReservedHeight, alignment: .top)
+                .clipped()
                 .padding(.horizontal, gridHorizontalPadding)
                 .zIndex(1)
         }
-        .simultaneousGesture(statsAutoCollapseDragGesture)
     }
 
     private var listContent: some View {

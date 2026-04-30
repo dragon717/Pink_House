@@ -749,12 +749,11 @@ struct FinalPaymentVaultView: View {
                             detailTargetClothing = clothing
                         } label: {
                             HStack(spacing: 10) {
-                                Image(systemName: clothing.isDepositPlan ? "heart.text.square.fill" : "tshirt.fill")
-                                    .font(.headline)
-                                    .foregroundStyle(WealthExperienceStyle.rose)
-                                    .frame(width: 34, height: 34)
-                                    .background(WealthExperienceStyle.blush.opacity(0.45))
-                                    .clipShape(Circle())
+                                WealthClothingThumbnailView(
+                                    clothing: clothing,
+                                    size: CGSize(width: 52, height: 52),
+                                    cornerRadius: 14
+                                )
 
                                 VStack(alignment: .leading, spacing: 3) {
                                     Text(clothing.name)
@@ -981,12 +980,11 @@ struct UnassignedSavingManagerSheet: View {
 
         return VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .top, spacing: 10) {
-                Image(systemName: "heart.text.square.fill")
-                    .font(.headline)
-                    .foregroundStyle(.orange)
-                    .frame(width: 34, height: 34)
-                    .background(Color.orange.opacity(0.12))
-                    .clipShape(Circle())
+                WealthClothingThumbnailView(
+                    clothing: clothing,
+                    size: CGSize(width: 52, height: 52),
+                    cornerRadius: 14
+                )
 
                 VStack(alignment: .leading, spacing: 4) {
                     Text(clothing.name)
@@ -1133,12 +1131,32 @@ struct VaultSavingSheet: View {
         NavigationStack {
             VStack(alignment: .leading, spacing: 18) {
                 VStack(alignment: .leading, spacing: 8) {
-                    Label(targetClothing == nil ? WealthExperienceCopy.Vault.sheetUnassignedTitle : WealthExperienceCopy.Vault.sheetTargetTitle, systemImage: "tray.and.arrow.down.fill")
-                        .font(.headline)
-                        .foregroundStyle(.orange)
-                    Text(targetClothing?.name ?? WealthExperienceCopy.Vault.sheetUnassignedDescription)
-                        .font(.subheadline)
-                        .foregroundStyle(themeManager.secondaryTextColor)
+                    if let targetClothing {
+                        HStack(alignment: .center, spacing: 12) {
+                            WealthClothingThumbnailView(
+                                clothing: targetClothing,
+                                size: CGSize(width: 56, height: 56),
+                                cornerRadius: 16
+                            )
+
+                            VStack(alignment: .leading, spacing: 6) {
+                                Label(WealthExperienceCopy.Vault.sheetTargetTitle, systemImage: "tray.and.arrow.down.fill")
+                                    .font(.headline)
+                                    .foregroundStyle(.orange)
+                                Text(targetClothing.name)
+                                    .font(.subheadline)
+                                    .foregroundStyle(themeManager.secondaryTextColor)
+                                    .lineLimit(2)
+                            }
+                        }
+                    } else {
+                        Label(WealthExperienceCopy.Vault.sheetUnassignedTitle, systemImage: "tray.and.arrow.down.fill")
+                            .font(.headline)
+                            .foregroundStyle(.orange)
+                        Text(WealthExperienceCopy.Vault.sheetUnassignedDescription)
+                            .font(.subheadline)
+                            .foregroundStyle(themeManager.secondaryTextColor)
+                    }
                 }
 
                 VStack(alignment: .leading, spacing: 8) {
@@ -1234,6 +1252,42 @@ struct VaultSavingSheet: View {
             }
         }
         .presentationDetents([.medium])
+    }
+}
+
+private struct WealthClothingThumbnailView: View {
+    let clothing: Clothing
+    let size: CGSize
+    let cornerRadius: CGFloat
+
+    var body: some View {
+        Group {
+            if let imagePath = clothing.imagePaths.first, !imagePath.isEmpty {
+                AsyncDownsampledImage(
+                    fileName: imagePath,
+                    targetSize: size
+                ) { image in
+                    Image(uiImage: image)
+                        .resizable()
+                        .scaledToFill()
+                } placeholder: {
+                    placeholder
+                }
+            } else {
+                placeholder
+            }
+        }
+        .frame(width: size.width, height: size.height)
+        .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                .stroke(Color.white.opacity(0.35), lineWidth: 1)
+        }
+        .shadow(color: Color.black.opacity(0.06), radius: 6, x: 0, y: 3)
+    }
+
+    private var placeholder: some View {
+        CutePlaceholderView(iconSize: min(size.width, size.height) * 0.34)
     }
 }
 
