@@ -154,6 +154,253 @@ struct ClothingEditDraft: Codable {
     }
 }
 
+private enum ClothingDraftScope: Hashable, Sendable {
+    case create
+    case edit(UUID)
+
+    var key: String {
+        switch self {
+        case .create:
+            return "create"
+        case .edit(let clothingID):
+            return "edit.\(clothingID.uuidString)"
+        }
+    }
+
+    var signpostScope: String {
+        switch self {
+        case .create:
+            return "create"
+        case .edit:
+            return "edit"
+        }
+    }
+}
+
+private struct ClothingDraftIndex: Codable {
+    var createModifiedAt: Date?
+    var editingModifiedAtByID: [String: Date] = [:]
+}
+
+private final class ClothingDraftFileStore {
+    static let shared = ClothingDraftFileStore()
+
+    private let fileManager: FileManager
+    private let encoder = JSONEncoder()
+    private let decoder = JSONDecoder()
+
+    private init(fileManager: FileManager = .default) {
+        self.fileManager = fileManager
+    }
+
+    private var draftsDirectory: URL {
+        let base = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
+            ?? fileManager.temporaryDirectory
+        return base
+            .appendingPathComponent("ItemManager", isDirectory: true)
+            .appendingPathComponent("Drafts", isDirectory: true)
+    }
+
+    private var editDirectory: URL {
+        draftsDirectory.appendingPathComponent("edit", isDirectory: true)
+    }
+
+    private var indexURL: URL {
+        draftsDirectory.appendingPathComponent("_index.json", isDirectory: false)
+    }
+
+    private var createDraftURL: URL {
+        draftsDirectory.appendingPathComponent("create.json", isDirectory: false)
+    }
+
+    func hasCreateDraft() -> Bool {
+        fileManager.fileExists(atPath: createDraftURL.path)
+    }
+
+    func loadCreateDraft() throws -> ClothingEditDraft? {
+        try loadDraft(from: createDraftURL)
+    }
+
+    func loadEditingDraft(for clothingID: UUID) throws -> ClothingEditDraft? {
+        try loadDraft(from: editDraftURL(for: clothingID))
+    }
+
+    @discardableResult
+    func saveCreateDraft(_ draft: ClothingEditDraft) throws -> Int {
+        try saveDraft(draft, scope: .create)
+    }
+
+    @discardableResult
+    func saveEditingDraft(_ draft: ClothingEditDraft, for clothingID: UUID) throws -> Int {
+        try saveDraft(draft, scope: .edit(clothingID))
+    }
+
+    func clearCreateDraft() throws {
+        if fileManager.fileExists(atPath: createDraftURL.path) {
+            try fileManager.removeItem(at: createDraftURL)
+        }
+        var index = loadIndex()
+        index.createModifiedAt = nil
+        try saveIndex(index)
+    }
+
+    func clearEditingDraft(for clothingID: UUID) throws {
+        let url = editDraftURL(for: clothingID)
+        if fileManager.fileExists(atPath: url.path) {
+            try fileManager.removeItem(at: url)
+        }
+        var index = loadIndex()
+        index.editingModifiedAtByID.removeValue(forKey: clothingID.uuidString)
+        try saveIndex(index)
+    }
+
+    private func loadDraft(from url: URL) throws -> ClothingEditDraft? {
+        guard fileManager.fileExists(atPath: url.path) else { return nil }
+        let data = try Data(contentsOf: url)
+        return try decoder.decode(ClothingEditDraft.self, from: data)
+    }
+
+    @discardableResult
+    private func saveDraft(_ draft: ClothingEditDraft, scope: ClothingDraftScope) throws -> Int {
+        try ensureDirectories()
+        let data = try encoder.encode(draft)
+        let targetURL = draftURL(for: scope)
+        try data.write(to: targetURL, options: [.atomic])
+
+        var index = loadIndex()
+        switch scope {
+        case .create:
+            index.createModifiedAt = Date()
+        case .edit(let clothingID):
+            index.editingModifiedAtByID[clothingID.uuidString] = Date()
+        }
+        try saveIndex(index)
+        return data.count
+    }
+
+    private func draftURL(for scope: ClothingDraftScope) -> URL {
+        switch scope {
+        case .create:
+            return createDraftURL
+        case .edit(let clothingID):
+            return editDraftURL(for: clothingID)
+        }
+    }
+
+    private func editDraftURL(for clothingID: UUID) -> URL {
+        editDirectory.appendingPathComponent("\(clothingID.uuidString).json", isDirectory: false)
+    }
+
+    private func ensureDirectories() throws {
+        try fileManager.createDirectory(at: draftsDirectory, withIntermediateDirectories: true)
+        try fileManager.createDirectory(at: editDirectory, withIntermediateDirectories: true)
+    }
+
+    private func loadIndex() -> ClothingDraftIndex {
+        guard fileManager.fileExists(atPath: indexURL.path),
+              let data = try? Data(contentsOf: indexURL),
+              let index = try? decoder.decode(ClothingDraftIndex.self, from: data)
+        else {
+            return ClothingDraftIndex()
+        }
+        return index
+    }
+
+    private func saveIndex(_ index: ClothingDraftIndex) throws {
+        try ensureDirectories()
+        let data = try encoder.encode(index)
+        try data.write(to: indexURL, options: [.atomic])
+    }
+}
+
+private struct ClothingDraftSaveRequest: Sendable {
+    let draft: ClothingEditDraft
+    let scope: ClothingDraftScope
+    let reason: String
+}
+
+private actor DraftPersistor {
+    static let shared = DraftPersistor(fileStore: .shared)
+
+    private let fileStore: ClothingDraftFileStore
+    private var pendingRequests: [String: ClothingDraftSaveRequest] = [:]
+    private var pendingTasks: [String: Task<Void, Never>] = [:]
+
+    init(fileStore: ClothingDraftFileStore) {
+        self.fileStore = fileStore
+    }
+
+    func enqueueSave(_ draft: ClothingEditDraft, scope: ClothingDraftScope, reason: String) {
+        let request = ClothingDraftSaveRequest(draft: draft, scope: scope, reason: reason)
+        let key = scope.key
+        pendingRequests[key] = request
+        pendingTasks[key]?.cancel()
+        pendingTasks[key] = Task {
+            do {
+                try await Task.sleep(nanoseconds: 500_000_000)
+            } catch {
+                return
+            }
+            await self.flushPendingSave(for: key)
+        }
+    }
+
+    func flushNow(_ draft: ClothingEditDraft, scope: ClothingDraftScope, reason: String) {
+        let key = scope.key
+        pendingTasks[key]?.cancel()
+        pendingTasks[key] = nil
+        pendingRequests[key] = nil
+        persist(ClothingDraftSaveRequest(draft: draft, scope: scope, reason: reason))
+    }
+
+    func clear(scope: ClothingDraftScope) {
+        let key = scope.key
+        pendingTasks[key]?.cancel()
+        pendingTasks[key] = nil
+        pendingRequests[key] = nil
+
+        do {
+            switch scope {
+            case .create:
+                try fileStore.clearCreateDraft()
+            case .edit(let clothingID):
+                try fileStore.clearEditingDraft(for: clothingID)
+            }
+        } catch {
+            AppLogger.error("DraftReliability: Failed to clear file draft for \(scope.key): \(error)")
+        }
+    }
+
+    private func flushPendingSave(for key: String) {
+        pendingTasks[key] = nil
+        guard let request = pendingRequests.removeValue(forKey: key) else { return }
+        persist(request)
+    }
+
+    private func persist(_ request: ClothingDraftSaveRequest) {
+        do {
+            let byteSize: Int
+            switch request.scope {
+            case .create:
+                byteSize = try fileStore.saveCreateDraft(request.draft)
+            case .edit(let clothingID):
+                byteSize = try fileStore.saveEditingDraft(request.draft, for: clothingID)
+            }
+            DraftReliabilitySignpost.draftSave(
+                scope: request.scope.signpostScope,
+                draftID: request.draft.id,
+                imageCount: request.draft.imagePaths.count,
+                tagCount: request.draft.selectedTags.count,
+                byteSize: byteSize,
+                reason: "file:\(request.reason)"
+            )
+        } catch {
+            DraftReliabilitySignpost.draftSaveFailed(scope: request.scope.signpostScope, error: error)
+            AppLogger.error("DraftReliability: Failed to persist file draft for \(request.scope.key): \(error)")
+        }
+    }
+}
+
 // MARK: - 草稿管理器
 final class ClothingEditDraftManager: ObservableObject {
     static let shared = ClothingEditDraftManager()
