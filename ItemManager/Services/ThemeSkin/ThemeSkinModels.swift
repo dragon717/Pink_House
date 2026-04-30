@@ -122,6 +122,52 @@ struct ThemeSkinProduct: Identifiable, Codable, Equatable {
         themeId.replacingOccurrences(of: "theme_skin.", with: "")
     }
 
+    var backgroundStickerOptions: [ThemeSkinBackgroundStickerOption] {
+        switch assetNamespace {
+        case "sky_concert":
+            return [
+                ThemeSkinBackgroundStickerOption(assetName: "sky_concert_decor_winged_unicorn_prince", displayName: "独角琴王子"),
+                ThemeSkinBackgroundStickerOption(assetName: "sky_concert_decor_sky_balloon_doves", displayName: "云端热气球"),
+                ThemeSkinBackgroundStickerOption(assetName: "sky_concert_decor_bunny_accordion_stage", displayName: "手风琴小兔"),
+                ThemeSkinBackgroundStickerOption(assetName: "sky_concert_decor_whale_cloud_stars", displayName: "星云鲸鱼"),
+                ThemeSkinBackgroundStickerOption(assetName: "sky_concert_decor_moon_star_clouds", displayName: "月亮云朵"),
+                ThemeSkinBackgroundStickerOption(assetName: "sky_concert_decor_music_scroll_clouds", displayName: "云端乐谱")
+            ]
+        case "swan_dream":
+            return [
+                ThemeSkinBackgroundStickerOption(assetName: "swan_dream_decor_crowned_swan_clouds", displayName: "皇冠天鹅"),
+                ThemeSkinBackgroundStickerOption(assetName: "swan_dream_decor_flying_swan_stars", displayName: "飞翔天鹅"),
+                ThemeSkinBackgroundStickerOption(assetName: "swan_dream_decor_dream_castle_clouds", displayName: "梦境城堡"),
+                ThemeSkinBackgroundStickerOption(assetName: "swan_dream_decor_ribbon_swan_clouds", displayName: "丝带天鹅"),
+                ThemeSkinBackgroundStickerOption(assetName: "swan_dream_decor_moon_bow_bottle", displayName: "月亮瓶"),
+                ThemeSkinBackgroundStickerOption(assetName: "swan_dream_decor_crystal_stars", displayName: "水晶星光")
+            ]
+        default:
+            return []
+        }
+    }
+
+    var defaultBackgroundHeroAssetName: String? {
+        backgroundStickerOptions.first?.assetName
+    }
+
+    private static let allThemeSurfaceSlots = ThemeSkinSlot.allCases
+    private static let coreDefaultEnabledSlots: [ThemeSkinSlot] = [
+        .topBarMain,
+        .topBarSegment,
+        .topBarIconButton,
+        .topBarAddButton,
+        .tabBarMain,
+        .tabBarItem,
+        .statsCard,
+        .wardrobeItemCard,
+        .settingsGridCard,
+        .sectionCard,
+        .primaryButton,
+        .iconCircleButton,
+        .emptyState
+    ]
+
     static let girlCloset = ThemeSkinProduct(
         id: "theme_skin.girl_closet",
         themeId: "theme_skin.girl_closet",
@@ -129,7 +175,7 @@ struct ThemeSkinProduct: Identifiable, Codable, Equatable {
         subtitle: "旋转木马 · 奶白蕾丝 · 贴纸感装饰",
         basePrice: 99,
         vipPrice: 89,
-        previewAssetNames: ["temp/主题-旋转木马/少女衣橱.png"],
+        previewAssetNames: ["preview_store_hero"],
         supportedSlots: [
             .topBarMain,
             .topBarIconButton,
@@ -151,6 +197,42 @@ struct ThemeSkinProduct: Identifiable, Codable, Equatable {
             .wardrobeItemCard
         ]
     )
+
+    static let skyConcert = ThemeSkinProduct(
+        id: "theme_skin.sky_concert",
+        themeId: "theme_skin.sky_concert",
+        name: "天空音乐会",
+        subtitle: "云端管弦 · 星河谱表 · 鎏金五线谱",
+        basePrice: 99,
+        vipPrice: 89,
+        previewAssetNames: ["preview_store_hero"],
+        supportedSlots: allThemeSurfaceSlots,
+        defaultEnabledSlots: coreDefaultEnabledSlots
+    )
+
+    static let swanDream = ThemeSkinProduct(
+        id: "theme_skin.swan_dream",
+        themeId: "theme_skin.swan_dream",
+        name: "天鹅入梦",
+        subtitle: "月色湖面 · 天鹅羽翼 · 蕾丝纱裙",
+        basePrice: 99,
+        vipPrice: 89,
+        previewAssetNames: ["preview_store_hero"],
+        supportedSlots: allThemeSurfaceSlots,
+        defaultEnabledSlots: coreDefaultEnabledSlots
+    )
+
+}
+
+struct ThemeSkinBackgroundStickerOption: Identifiable, Codable, Equatable, Hashable {
+    let assetName: String
+    let displayName: String
+
+    var id: String { assetName }
+}
+
+struct ThemeSkinBackgroundSelection: Codable, Equatable {
+    var heroAssetName: String?
 }
 
 struct OwnedThemeSkin: Identifiable, Codable, Equatable {

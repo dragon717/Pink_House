@@ -1,6 +1,7 @@
 import SwiftUI
 import AVKit
 import Combine
+import UIKit
 
 struct PetVideoPlayer: UIViewControllerRepresentable {
     var videoName: String
@@ -25,6 +26,7 @@ struct PetVideoPlayer: UIViewControllerRepresentable {
         
         // 保存到 coordinator 以便后续操作
         context.coordinator.queuePlayer = player
+        context.coordinator.installFallbackImageView(in: controller.view)
         
         return controller
     }
@@ -40,6 +42,19 @@ struct PetVideoPlayer: UIViewControllerRepresentable {
             }
         }
 
+        if TransparentVideoSupport.shouldSuppress(videoName: videoName) {
+            if let player = uiViewController.player {
+                player.pause()
+                player.replaceCurrentItem(with: nil)
+            }
+            context.coordinator.cleanupOldState()
+            context.coordinator.currentUrl = nil
+            context.coordinator.showFallbackImage(for: videoName)
+            return
+        }
+
+        context.coordinator.hideFallbackImage()
+
         // 使用 VideoResourceManager 查找视频
         var url = VideoResourceManager.shared.findVideoURL(name: videoName)
 
@@ -52,25 +67,13 @@ struct PetVideoPlayer: UIViewControllerRepresentable {
                 let prefix = videoName.prefix(upTo: underscoreIndex)
                 let fallbackName = "\(prefix)_idle"
                 if fallbackName != videoName {
-                    // 优先尝试 mov 透明视频
-                    if fallbackName.hasPrefix("naicha_") {
-                        url = Bundle.main.url(forResource: fallbackName, withExtension: "mov", subdirectory: "asserts/naicha")
-                    } else if fallbackName.hasPrefix("maomao_") {
-                        url = Bundle.main.url(forResource: fallbackName, withExtension: "mov", subdirectory: "asserts/maomao")
-                    }
-                    // 回退到 mp4
-                    if url == nil {
-                        url = Bundle.main.url(forResource: fallbackName, withExtension: "mp4", subdirectory: "asserts")
-                    }
+                    url = VideoResourceManager.shared.findVideoURL(name: fallbackName)
                 }
             }
             
             // 2. 尝试默认角色 (奶茶) 的 idle
             if url == nil {
-                url = Bundle.main.url(forResource: "naicha_idle", withExtension: "mov", subdirectory: "asserts/naicha")
-            }
-            if url == nil {
-                url = Bundle.main.url(forResource: "naicha_idle", withExtension: "mp4", subdirectory: "asserts")
+                url = VideoResourceManager.shared.findVideoURL(name: "naicha_idle")
             }
             
             // 3. 尝试旧版 idle (兼容)
@@ -168,6 +171,31 @@ struct PetVideoPlayer: UIViewControllerRepresentable {
         var onFinished: (() -> Void)?
         var observer: Any?
         var playbackRate: Float = 1.0
+        private weak var fallbackImageView: UIImageView?
+
+        func installFallbackImageView(in container: UIView) {
+            guard fallbackImageView == nil else { return }
+            let imageView = UIImageView(frame: container.bounds)
+            imageView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+            imageView.contentMode = .scaleAspectFit
+            imageView.backgroundColor = .clear
+            imageView.isHidden = true
+            container.addSubview(imageView)
+            fallbackImageView = imageView
+        }
+
+        func showFallbackImage(for videoName: String) {
+            let image = TransparentVideoSupport
+                .fallbackImageName(for: videoName)
+                .flatMap { UIImage(named: $0) }
+            fallbackImageView?.image = image
+            fallbackImageView?.isHidden = image == nil
+        }
+
+        func hideFallbackImage() {
+            fallbackImageView?.isHidden = true
+            fallbackImageView?.image = nil
+        }
         
         func setupObserver(item: AVPlayerItem, onFinished: (() -> Void)?, isLooping: Bool) {
             self.onFinished = onFinished

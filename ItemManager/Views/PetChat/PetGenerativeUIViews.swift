@@ -152,12 +152,13 @@ private struct PetQuickOptionsWidget: View {
                 }
             }
             .foregroundStyle(optionText)
-            .background(optionFill)
+            .themeSkinAdaptiveSectionCard(slot: .filterChip, cornerRadius: 10, showsDecoration: false) {
+                optionFill
+            }
             .overlay(
                 RoundedRectangle(cornerRadius: 10)
                     .stroke(optionStroke, lineWidth: 1)
             )
-            .clipShape(RoundedRectangle(cornerRadius: 10))
         }
         .buttonStyle(.plain)
         .captureGuideTarget(guideTarget(for: option))
@@ -245,20 +246,22 @@ private struct PetWeatherWidget: View {
                         }
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 8)
-                        .background(palette.quickOptionFill)
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                        .themeSkinAdaptiveSectionCard(slot: .statsCard, cornerRadius: 8, showsDecoration: false) {
+                            palette.quickOptionFill
+                        }
                     }
                 }
                 .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
         .padding(10)
-        .background(palette.cardBackground.opacity(colorScheme == .dark ? 0.5 : 0.7))
+        .themeSkinAdaptiveSectionCard(slot: .sectionCard, cornerRadius: 12, showsDecoration: false) {
+            palette.cardBackground.opacity(colorScheme == .dark ? 0.5 : 0.7)
+        }
         .overlay(
             RoundedRectangle(cornerRadius: 12)
                 .stroke(palette.quickOptionStroke, lineWidth: 1)
         )
-        .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 }
 
@@ -285,12 +288,13 @@ private struct PetInsightCardWidget: View {
         }
         .padding(10)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(palette.cardBackground.opacity(colorScheme == .dark ? 0.45 : 0.65))
+        .themeSkinAdaptiveSectionCard(slot: .sectionCard, cornerRadius: 10, showsDecoration: false) {
+            palette.cardBackground.opacity(colorScheme == .dark ? 0.45 : 0.65)
+        }
         .overlay(
             RoundedRectangle(cornerRadius: 10)
                 .stroke(palette.quickOptionStroke.opacity(0.8), lineWidth: 1)
         )
-        .clipShape(RoundedRectangle(cornerRadius: 10))
     }
 }
 
@@ -321,12 +325,13 @@ private struct PetContainerWidget: View {
         }
         .padding(10)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.ultraThinMaterial)
+        .themeSkinAdaptiveSectionCard(slot: .sectionCard, cornerRadius: 12, showsDecoration: false) {
+            RoundedRectangle(cornerRadius: 12).fill(.ultraThinMaterial)
+        }
         .overlay(
             RoundedRectangle(cornerRadius: 12)
                 .stroke(palette.quickOptionStroke.opacity(0.8), lineWidth: 1)
         )
-        .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 }
 
@@ -361,8 +366,9 @@ private struct PetStatusPanelWidget: View {
             }
         }
         .padding(12)
-        .background(.regularMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .themeSkinAdaptiveSectionCard(slot: .sectionCard, cornerRadius: 16, showsDecoration: false) {
+            RoundedRectangle(cornerRadius: 16).fill(.regularMaterial)
+        }
         .overlay(
             RoundedRectangle(cornerRadius: 16)
                 .stroke(Color.white.opacity(0.45), lineWidth: 1)
@@ -431,8 +437,9 @@ private struct PetCurrencyPanelWidget: View {
             currencyContent
         }
         .padding(12)
-        .background(.regularMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .themeSkinAdaptiveSectionCard(slot: .sectionCard, cornerRadius: 16, showsDecoration: false) {
+            RoundedRectangle(cornerRadius: 16).fill(.regularMaterial)
+        }
         .overlay(
             RoundedRectangle(cornerRadius: 16)
                 .stroke(Color.white.opacity(0.45), lineWidth: 1)
@@ -549,8 +556,9 @@ private struct PetInventoryPanelWidget: View {
             currencyRow
         }
         .padding(12)
-        .background(.regularMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .themeSkinAdaptiveSectionCard(slot: .sectionCard, cornerRadius: 16, showsDecoration: false) {
+            RoundedRectangle(cornerRadius: 16).fill(.regularMaterial)
+        }
         .overlay(
             RoundedRectangle(cornerRadius: 16)
                 .stroke(Color.white.opacity(0.45), lineWidth: 1)
@@ -602,8 +610,9 @@ private struct PetInventoryPanelWidget: View {
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
         .frame(maxWidth: .infinity, alignment: .center)
-        .background(isDropTargeted ? Color.blue.opacity(0.16) : Color.blue.opacity(0.08))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .themeSkinAdaptiveSectionCard(slot: .filterChip, cornerRadius: 12, showsDecoration: false) {
+            isDropTargeted ? Color.blue.opacity(0.16) : Color.blue.opacity(0.08)
+        }
         .contentShape(RoundedRectangle(cornerRadius: 12))
         .onDrop(of: PetEmbeddedPanelDragDrop.supportedTypeIdentifiers, isTargeted: $isDropTargeted) { providers in
             PetEmbeddedPanelDragDrop.handleDrop(from: providers) { payload in
@@ -681,8 +690,9 @@ private struct PetShopPanelWidget: View {
             currencyRow
         }
         .padding(12)
-        .background(.regularMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .themeSkinAdaptiveSectionCard(slot: .sectionCard, cornerRadius: 16, showsDecoration: false) {
+            RoundedRectangle(cornerRadius: 16).fill(.regularMaterial)
+        }
         .overlay(
             RoundedRectangle(cornerRadius: 16)
                 .stroke(Color.white.opacity(0.45), lineWidth: 1)
@@ -736,8 +746,9 @@ private struct PetShopPanelWidget: View {
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
         .frame(maxWidth: .infinity, alignment: .center)
-        .background(isDropTargeted ? Color.orange.opacity(0.16) : Color.orange.opacity(0.08))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .themeSkinAdaptiveSectionCard(slot: .filterChip, cornerRadius: 12, showsDecoration: false) {
+            isDropTargeted ? Color.orange.opacity(0.16) : Color.orange.opacity(0.08)
+        }
         .contentShape(RoundedRectangle(cornerRadius: 12))
         .onDrop(of: PetEmbeddedPanelDragDrop.supportedTypeIdentifiers, isTargeted: $isDropTargeted) { providers in
             PetEmbeddedPanelDragDrop.handleDrop(from: providers) { payload in
@@ -970,8 +981,9 @@ private struct PetMoneyCounterWidget: View {
             }
         }
         .padding(12)
-        .background(Color.clear)
-        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .themeSkinAdaptiveSectionCard(slot: .sectionCard, cornerRadius: 16, showsDecoration: false) {
+            Color.clear
+        }
         .overlay(
             RoundedRectangle(cornerRadius: 16)
                 .stroke(Color.white.opacity(0.45), lineWidth: 1)
@@ -1270,8 +1282,9 @@ private struct PetDivinationPanelWidget: View {
             }
         }
         .padding(12)
-        .background(.regularMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .themeSkinAdaptiveSectionCard(slot: .sectionCard, cornerRadius: 16, showsDecoration: false) {
+            RoundedRectangle(cornerRadius: 16).fill(.regularMaterial)
+        }
         .overlay(
             RoundedRectangle(cornerRadius: 16)
                 .stroke(Color.white.opacity(0.45), lineWidth: 1)
@@ -1330,14 +1343,13 @@ private struct PetDivinationPanelWidget: View {
             .foregroundStyle(.white)
             .padding(.horizontal, 24)
             .padding(.vertical, 12)
-            .background(
+            .themeSkinAdaptiveSectionCard(slot: .primaryButton, cornerRadius: 22, showsDecoration: false) {
                 LinearGradient(
                     colors: [Color(red: 0.8, green: 0.3, blue: 0.3), Color(red: 0.6, green: 0.2, blue: 0.2)],
                     startPoint: .leading,
                     endPoint: .trailing
                 )
-            )
-            .clipShape(Capsule())
+            }
         }
         .buttonStyle(.plain)
     }
@@ -1363,8 +1375,9 @@ private struct PetPanelEmptyState: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 18)
-        .background(Color.secondary.opacity(0.08))
-        .clipShape(RoundedRectangle(cornerRadius: 14))
+        .themeSkinAdaptiveSectionCard(slot: .emptyState, cornerRadius: 14, showsDecoration: false) {
+            Color.secondary.opacity(0.08)
+        }
     }
 }
 
@@ -1440,8 +1453,9 @@ private struct PetIntimacyStatusRow: View {
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 8)
-        .background(.regularMaterial)
-        .cornerRadius(12)
+        .themeSkinAdaptiveSectionCard(slot: .statsCard, cornerRadius: 12, showsDecoration: false) {
+            RoundedRectangle(cornerRadius: 12).fill(.regularMaterial)
+        }
     }
 
     private var heartText: String {

@@ -856,11 +856,11 @@ struct VirtualCoinCard: View {
             }
             .padding(.horizontal, 20)
             .padding(.vertical, 16)
-            .background(
+            .themeSkinAdaptiveSectionCard(slot: .sectionCard, cornerRadius: 20) {
                 RoundedRectangle(cornerRadius: 20)
                     .fill(Color(uiColor: .secondarySystemBackground).opacity(0.6))
                     .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 20))
-            )
+            }
             .overlay(
                 RoundedRectangle(cornerRadius: 20)
                     .stroke(

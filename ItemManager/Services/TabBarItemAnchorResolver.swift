@@ -18,8 +18,8 @@ enum TabBarItemAnchorResolver {
         let isHidden: Bool
     }
 
-    /// 主 tab 数量（不含 search tab）
-    static let mainTabCount = 3
+    /// LegacyTabView 自绘底栏 tab 数量。
+    static let mainTabCount = 4
 
     static func resolvedFrame(
         for guideTargetKey: GuideTargetKey,
@@ -48,6 +48,7 @@ enum TabBarItemAnchorResolver {
     }
 
     #if canImport(UIKit)
+    @available(*, deprecated, message: "旧原生底栏已退役；仅保留原生 TabBar 调试兜底，下个 cycle 删")
     static func tabBarDebugSnapshots() -> [TabBarSubviewSnapshot] {
         guard let window = activeWindow(),
               let tabBar = findTabBar(in: window) else {
@@ -84,6 +85,7 @@ enum TabBarItemAnchorResolver {
         return snapshots
     }
 
+    @available(*, deprecated, message: "旧原生底栏已退役；仅保留原生 TabBar 调试兜底，下个 cycle 删")
     static func compactCenterPlatterState() -> CompactCenterPlatterState? {
         guard let window = activeWindow(),
               let tabBar = findTabBar(in: window),
@@ -116,14 +118,14 @@ enum TabBarItemAnchorResolver {
                 return buttons[tabIndex].convert(buttons[tabIndex].bounds, to: nil)
             }
 
-            // 优先级 2: iOS 26 iPhone — UITabBar 存在但无 UITabBarButton
+            // 优先级 2: 原生浮动 TabBar — UITabBar 存在但无 UITabBarButton
             // 使用 _UITabBarPlatterView 等分计算
             if let frame = platterBasedFrame(at: tabIndex, in: tabBar) {
                 return frame
             }
         }
 
-        // 优先级 3: iOS 26 iPad — UITabBar 不在 hierarchy
+        // 优先级 3: 原生浮动 TabBar 不在 hierarchy
         // 深度搜索 window 中的 PlatterView
         if let frame = deepSearchPlatterFrame(at: tabIndex, in: window) {
             return frame
@@ -132,7 +134,7 @@ enum TabBarItemAnchorResolver {
         return nil
     }
 
-    // MARK: - iOS 26: PlatterView 等分定位
+    // MARK: - Retired native platter probe
 
     /// 在 UITabBar 内部找到主 PlatterView，按 tab 数量等分
     private static func platterBasedFrame(at tabIndex: Int, in tabBar: UITabBar) -> CGRect? {
@@ -142,7 +144,7 @@ enum TabBarItemAnchorResolver {
         return dividePlatter(platter, at: tabIndex, relativeTo: nil)
     }
 
-    /// iPad iOS 26: UITabBar 不存在，直接在 window 中搜索 PlatterView
+    /// 原生浮动 TabBar 不在 hierarchy 时，直接在 window 中搜索 PlatterView
     private static func deepSearchPlatterFrame(at tabIndex: Int, in window: UIWindow) -> CGRect? {
         guard let platter = findMainPlatterDeep(in: window) else {
             return nil
@@ -249,10 +251,12 @@ enum TabBarItemAnchorResolver {
         return nil
     }
     #else
+    @available(*, deprecated, message: "旧原生底栏已退役；仅保留原生 TabBar 调试兜底，下个 cycle 删")
     static func tabBarDebugSnapshots() -> [TabBarSubviewSnapshot] {
         []
     }
 
+    @available(*, deprecated, message: "旧原生底栏已退役；仅保留原生 TabBar 调试兜底，下个 cycle 删")
     static func compactCenterPlatterState() -> CompactCenterPlatterState? {
         nil
     }

@@ -215,7 +215,7 @@ struct AdaptiveColorModifier: ViewModifier {
         }
         
         // 根据 ThemeManager 自动判断
-        switch themeManager.backgroundStyle {
+        switch themeManager.effectiveBackgroundStyle {
         case .color:
             return AdaptivePalette.generate(from: themeManager.backgroundColor, accentColor: customAccentColor)
         case .image:
@@ -359,7 +359,7 @@ struct AdaptiveContainer<Content: View>: View {
             return AdaptivePalette.generate(from: bgType.referenceColor, accentColor: accentColor)
         }
         
-        switch themeManager.backgroundStyle {
+        switch themeManager.effectiveBackgroundStyle {
         case .color:
             return AdaptivePalette.generate(from: themeManager.backgroundColor, accentColor: accentColor)
         case .image:

@@ -8,7 +8,7 @@
 import SwiftUI
 import Combine
 
-enum ClothingField: String, CaseIterable, Identifiable {
+enum ClothingField: String, CaseIterable, Identifiable, Hashable, Sendable {
     case types = "types"
     case colors = "colors"
     case sizes = "sizes"

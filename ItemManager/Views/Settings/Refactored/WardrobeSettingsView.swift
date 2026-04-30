@@ -4,6 +4,7 @@ import PhotosUI
 struct WardrobeSettingsView: View {
     @Environment(ThemeManager.self) private var themeManager
     @Environment(\.colorScheme) private var colorScheme
+    @ObservedObject private var themeSkinManager = ThemeSkinManager.shared
     @ObservedObject private var visibilityManager = FieldVisibilityManager.shared
     
     // Privacy
@@ -15,6 +16,7 @@ struct WardrobeSettingsView: View {
     @State private var cropRequest: CropRequest?
     @State private var isLoadingImage = false
     @State private var showingMissingOriginalAlert = false
+    @State private var showingThemeBackgroundLockAlert = false
     
     // Wardrobe Style
     @AppStorage("UserPreference_WardrobeNavigationStyle") private var wardrobeNavigationStyle: WardrobeNavigationStyle = .classic
@@ -102,7 +104,11 @@ struct WardrobeSettingsView: View {
         }
         .onAppear {
             wardrobeNavigationStyle = WardrobeNavigationStyle.normalizeStoredPreference()
+            enforceThemeBackgroundHarmonyIfNeeded()
             NotificationCenter.default.post(name: .wardrobeSettingsOpened, object: nil)
+        }
+        .onChange(of: themeSkinManager.activeThemeId) { _, _ in
+            enforceThemeBackgroundHarmonyIfNeeded()
         }
         // Image Picker Logic
         .onChange(of: selectedItem) { _, newItem in
@@ -116,15 +122,45 @@ struct WardrobeSettingsView: View {
         } message: {
             Text("请重新选择一张图片以进行裁剪和移动。")
         }
+        .alert(ThemeManager.themeSkinBackgroundLockAlertTitle, isPresented: $showingThemeBackgroundLockAlert) {
+            Button("知道啦", role: .cancel) { }
+        } message: {
+            Text(ThemeManager.themeSkinBackgroundLockAlertMessage(activeThemeName: activeThemeName))
+        }
     }
     
     // MARK: - Subviews & Actions
+
+    private var activeThemeName: String? {
+        guard let activeThemeId = themeSkinManager.activeThemeId else { return nil }
+        return themeSkinManager.product(for: activeThemeId)?.name
+    }
+
+    private var backgroundStyleBinding: Binding<BackgroundStyle> {
+        Binding(
+            get: { themeManager.effectiveBackgroundStyle },
+            set: { newStyle in
+                guard newStyle != .image ||
+                        !themeManager.isThemeSkinBackgroundImageLocked(activeThemeId: themeSkinManager.activeThemeId) else {
+                    enforceThemeBackgroundHarmonyIfNeeded()
+                    showingThemeBackgroundLockAlert = true
+                    return
+                }
+
+                themeManager.backgroundStyle = newStyle
+            }
+        )
+    }
+
+    private func enforceThemeBackgroundHarmonyIfNeeded() {
+        _ = themeManager.enforceThemeSkinBackgroundHarmonyIfNeeded(activeThemeId: themeSkinManager.activeThemeId)
+    }
     
     @ViewBuilder
     private func appAppearanceSection(theme: ThemeManager) -> some View {
         @Bindable var theme = theme
         AdaptiveSection(header: "应用外观") {
-            Picker("背景类型", selection: $theme.backgroundStyle) {
+            Picker("背景类型", selection: backgroundStyleBinding) {
                 ForEach(BackgroundStyle.allCases) { style in
                     Text(style.displayName).tag(style)
                 }
@@ -133,7 +169,7 @@ struct WardrobeSettingsView: View {
             .adaptiveRow()
             .captureGuideTarget(.wardrobeAppAppearanceSection)
             
-            if theme.backgroundStyle == .color {
+            if theme.effectiveBackgroundStyle == .color {
                 ColorPicker("背景颜色", selection: Binding(
                     get: { theme.backgroundColor },
                     set: { theme.backgroundColorHex = $0.toHex() }

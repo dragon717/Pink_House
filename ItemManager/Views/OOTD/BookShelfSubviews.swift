@@ -324,6 +324,7 @@ struct BookCoverVisuals: View {
         .frame(width: 160, height: 220)
         .background(colorScheme == .dark ? Color(uiColor: .systemGray6) : Color.white)
         .cornerRadius(4, corners: [.topRight, .bottomRight])
+        .overlay(ThemeSkinBookCoverFrame(cornerRadius: 4))
         .shadow(color: .black.opacity(colorScheme == .dark ? 0.4 : 0.2), radius: 5, x: 5, y: 5)
     }
 }

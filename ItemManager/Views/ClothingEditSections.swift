@@ -107,8 +107,9 @@ struct ClothingBasicInfoView: View {
             }
         }
         .padding()
-        .background(Color(uiColor: .secondarySystemGroupedBackground))
-        .cornerRadius(16)
+        .themeSkinAdaptiveSectionCard(slot: .sectionCard, cornerRadius: 16) {
+            Color(uiColor: .secondarySystemGroupedBackground)
+        }
     }
     
     @ViewBuilder
@@ -220,8 +221,9 @@ struct ClothingTagsView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding()
-        .background(Color(uiColor: .secondarySystemGroupedBackground))
-        .cornerRadius(16)
+        .themeSkinAdaptiveSectionCard(slot: .sectionCard, cornerRadius: 16) {
+            Color(uiColor: .secondarySystemGroupedBackground)
+        }
     }
 }
 
@@ -229,12 +231,18 @@ struct ClothingTagsView: View {
 
 struct ClothingPriceView: View {
     @Binding var originalPrice: Double
+    @Binding var originalPriceJPY: Double
+    @Binding var originalPriceCurrency: ClothingPriceCurrency
     @Binding var priceTotal: Double
     @Binding var deposit: Double
     @Binding var balance: Double
     @Binding var accessoriesPrice: Double
+    @Binding var shippingFee: Double
+    @Binding var shippingFeeJPY: Double
+    @Binding var shippingFeeCurrency: ClothingPriceCurrency
     @Binding var stock: Int
     @Binding var accessoryList: [AccessoryItemData]
+    var jpyExchangeRate: Double = CurrencyExchangeRateService.defaultJPYRate
     
     // 价格表图片
     @Binding var priceChartImagePath: String?
@@ -280,9 +288,23 @@ struct ClothingPriceView: View {
             
             // 原价和总价
             VStack(spacing: 12) {
-                PriceRow(title: "原价", value: $originalPrice)
+                CurrencyPriceRow(
+                    title: "原价",
+                    cnyValue: $originalPrice,
+                    jpyValue: $originalPriceJPY,
+                    currency: $originalPriceCurrency,
+                    exchangeRateJPY: jpyExchangeRate
+                )
                 Divider()
                 PriceRow(title: "裙装总价合计", value: $priceTotal)
+                Divider()
+                CurrencyPriceRow(
+                    title: "邮费",
+                    cnyValue: $shippingFee,
+                    jpyValue: $shippingFeeJPY,
+                    currency: $shippingFeeCurrency,
+                    exchangeRateJPY: jpyExchangeRate
+                )
             }
             
             // 定金和尾款
@@ -315,6 +337,7 @@ struct ClothingPriceView: View {
             let totalDeposit = deposit + accessoryList.reduce(0) { $0 + $1.deposit }
             let totalBalance = balance + accessoryList.reduce(0) { $0 + $1.balance }
             let grandTotal = priceTotal + accessoriesPrice
+            let grandTotalWithShipping = grandTotal + shippingFee
             
             VStack(spacing: 12) {
                 Divider()
@@ -337,6 +360,14 @@ struct ClothingPriceView: View {
                         .foregroundStyle(.primary)
                     Spacer()
                     Text("¥ \(grandTotal, specifier: "%.2f")")
+                        .font(.subheadline.bold())
+                        .foregroundStyle(.pink)
+                }
+                HStack {
+                    Text("含邮订单总价")
+                        .foregroundStyle(.primary)
+                    Spacer()
+                    Text("¥ \(grandTotalWithShipping, specifier: "%.2f")")
                         .font(.headline)
                         .foregroundStyle(.pink)
                 }
@@ -484,8 +515,9 @@ struct ClothingPriceView: View {
             }
         }
         .padding()
-        .background(Color(uiColor: .secondarySystemGroupedBackground))
-        .cornerRadius(16)
+        .themeSkinAdaptiveSectionCard(slot: .sectionCard, cornerRadius: 16) {
+            Color(uiColor: .secondarySystemGroupedBackground)
+        }
     }
     
     // MARK: - Helpers for Accessories
@@ -758,8 +790,9 @@ struct ClothingPurchaseInfoView: View {
             }
         }
         .padding()
-        .background(Color(uiColor: .secondarySystemGroupedBackground))
-        .cornerRadius(16)
+        .themeSkinAdaptiveSectionCard(slot: .sectionCard, cornerRadius: 16) {
+            Color(uiColor: .secondarySystemGroupedBackground)
+        }
         .onAppear {
             // 初始化时根据当前finalPaymentEndDate反推滑块值
             initializeDurationSlider()

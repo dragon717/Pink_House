@@ -9,6 +9,7 @@ class SeamlessVideoPlayerView: UIView {
     // 双播放器系统
     private var playerLayerA: AVPlayerLayer = AVPlayerLayer()
     private var playerLayerB: AVPlayerLayer = AVPlayerLayer()
+    private let fallbackImageView = UIImageView()
     
     // 移除长期持有的 playerA/B，改为动态创建
     // private var playerA: AVQueuePlayer = AVQueuePlayer()
@@ -167,6 +168,11 @@ class SeamlessVideoPlayerView: UIView {
         activeLayer = playerLayerA
         // activePlayer = playerA // 初始没有 Player
         activePlayer = nil
+
+        fallbackImageView.contentMode = .scaleAspectFit
+        fallbackImageView.backgroundColor = .clear
+        fallbackImageView.isHidden = true
+        addSubview(fallbackImageView)
     }
     
     override func layoutSubviews() {
@@ -183,6 +189,8 @@ class SeamlessVideoPlayerView: UIView {
         playerLayerA.frame = bounds
         playerLayerB.frame = bounds
         CATransaction.commit()
+
+        fallbackImageView.frame = bounds
     }
     
     // MARK: - Public Interface
@@ -198,6 +206,17 @@ class SeamlessVideoPlayerView: UIView {
         self.playbackRate = max(0.1, playbackRate)
         
         updateVolumeAndMute()
+
+        if TransparentVideoSupport.shouldSuppress(videoName: videoName) {
+            currentVideoName = videoName
+            currentVideoURL = nil
+            self.isLooping = isLooping
+            activePlayer?.pause()
+            showStaticFallback(for: videoName, mirrored: isMirrored)
+            return
+        }
+
+        hideStaticFallback()
         
         // 处理暂停状态
         if isPaused {
@@ -268,6 +287,28 @@ class SeamlessVideoPlayerView: UIView {
         // playerB.volume = volume
         activePlayer?.isMuted = isMuted
         activePlayer?.volume = volume
+    }
+
+    private func showStaticFallback(for videoName: String, mirrored: Bool) {
+        removeFinishObserver()
+        statusObserver?.invalidate()
+        fallbackImageView.image = TransparentVideoSupport
+            .fallbackImageName(for: videoName)
+            .flatMap { UIImage(named: $0) }
+        fallbackImageView.isHidden = fallbackImageView.image == nil
+        fallbackImageView.transform = CGAffineTransform(scaleX: mirrored ? -1 : 1, y: 1)
+
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        playerLayerA.opacity = 0
+        playerLayerB.opacity = 0
+        CATransaction.commit()
+    }
+
+    private func hideStaticFallback() {
+        fallbackImageView.isHidden = true
+        fallbackImageView.image = nil
+        fallbackImageView.transform = .identity
     }
     
     private func createPlayer() -> AVQueuePlayer {

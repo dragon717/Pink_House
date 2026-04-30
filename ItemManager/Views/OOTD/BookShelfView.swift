@@ -152,14 +152,18 @@ struct BookShelfView: View {
                     .navigationBarBackButtonHidden(true) // 隐藏系统返回按钮，使用自定义的返回按钮
             }
             .navigationDestination(for: SpaceOutfit.self) { outfit in
-                SpatialCanvasEditorView(
-                    spaceOutfit: outfit,
-                    currentBook: outfit.book,  // 传递当前书
-                    onSave: { updatedOutfit in
-                        // 保存后确保数据持久化到磁盘
-                        print("[BookShelf] 编辑器保存回调，outfit.id: \(updatedOutfit.id)")
-                    }
-                )
+                if #available(iOS 18.0, *) {
+                    SpatialCanvasEditorView(
+                        spaceOutfit: outfit,
+                        currentBook: outfit.book,  // 传递当前书
+                        onSave: { updatedOutfit in
+                            // 保存后确保数据持久化到磁盘
+                            print("[BookShelf] 编辑器保存回调，outfit.id: \(updatedOutfit.id)")
+                        }
+                    )
+                } else {
+                    SpatialCanvasUnsupportedView()
+                }
             }
             .sheet(isPresented: $showingTrash) {
                 RecycleBinView(initialTab: 1)
@@ -385,5 +389,15 @@ struct BookShelfView: View {
             }
             print("========================")
         }
+    }
+}
+
+private struct SpatialCanvasUnsupportedView: View {
+    var body: some View {
+        ContentUnavailableView(
+            "空间手帐需要 iOS 18 或更高版本",
+            systemImage: "cube.transparent",
+            description: Text("当前系统暂不支持 3D 空间画布，请升级系统后再使用。")
+        )
     }
 }

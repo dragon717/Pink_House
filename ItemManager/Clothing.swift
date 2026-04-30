@@ -10,6 +10,36 @@ import Foundation
 import SwiftData
 import SwiftUI
 
+
+
+enum ClothingPriceCurrency: String, Codable, CaseIterable, Identifiable {
+    case cny = "CNY"
+    case jpy = "JPY"
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .cny: return "人民币"
+        case .jpy: return "日元"
+        }
+    }
+
+    var shortName: String {
+        switch self {
+        case .cny: return "人民币"
+        case .jpy: return "日元"
+        }
+    }
+
+    var symbol: String {
+        switch self {
+        case .cny: return "¥"
+        case .jpy: return "JP¥"
+        }
+    }
+}
+
 enum ClothingStatus: String, Codable, CaseIterable, Identifiable {
     case onShelf = "上架"
     case offShelf = "下架"
@@ -38,11 +68,20 @@ final class Clothing {
     var priceChartImagePath: String? = nil // 价格表图片路径
     
     // 价格信息
-    var originalPrice: Decimal = 0.0 // 原价
+    var originalPrice: Decimal = 0.0 // 原价（人民币，统计 source of truth）
+    var originalPriceJPY: Decimal = 0.0 // 原价（日元，保留历史显示习惯）
+    var originalPriceCurrencyCode: String = ClothingPriceCurrency.cny.rawValue // 原价显示币种
+    var originalPriceExchangeRateJPY: Decimal = 21.0 // 保存时 CNY -> JPY 汇率
+    var originalPriceRateUpdatedAt: Date? = nil // 原价汇率更新时间
     var price: Decimal = 0.0 // 裙装总价
     var deposit: Decimal = 0.0 // 定金
     var balance: Decimal = 0.0 // 尾款
     var accessoriesPrice: Decimal = 0.0 // 小物总价
+    var shippingFee: Decimal = 0.0 // 邮费（人民币，合计 source of truth）
+    var shippingFeeJPY: Decimal = 0.0 // 邮费（日元）
+    var shippingFeeCurrencyCode: String = ClothingPriceCurrency.cny.rawValue // 邮费显示币种
+    var shippingExchangeRateJPY: Decimal = 21.0 // 保存时 CNY -> JPY 汇率
+    var shippingRateUpdatedAt: Date? = nil // 邮费汇率更新时间
     var sortIndex: Int = 0 // 自定义排序索引
     
     // 购买信息
@@ -51,6 +90,8 @@ final class Clothing {
     var isDepositPlan: Bool = false // 是否加入心愿尾款
     var finalPaymentDate: Date? = nil // 预估尾款时间（开始）
     var finalPaymentEndDate: Date? = nil // 预估尾款时间（结束）
+    var isFinalPaymentSavedToWealth: Bool = false // 是否已将尾款存入马上来财招财猫
+    var finalPaymentSavedAt: Date? = nil // 尾款存入招财猫时间
     var note: String = ""
     
     // 系统信息
@@ -107,10 +148,19 @@ final class Clothing {
          imagePaths: [String] = [],
          isShared: Bool = false,
          originalPrice: Decimal = 0.0,
+         originalPriceJPY: Decimal = 0.0,
+         originalPriceCurrencyCode: String = ClothingPriceCurrency.cny.rawValue,
+         originalPriceExchangeRateJPY: Decimal = 21.0,
+         originalPriceRateUpdatedAt: Date? = nil,
          price: Decimal = 0.0,
          deposit: Decimal = 0.0,
          balance: Decimal = 0.0,
          accessoriesPrice: Decimal = 0.0,
+         shippingFee: Decimal = 0.0,
+         shippingFeeJPY: Decimal = 0.0,
+         shippingFeeCurrencyCode: String = ClothingPriceCurrency.cny.rawValue,
+         shippingExchangeRateJPY: Decimal = 21.0,
+         shippingRateUpdatedAt: Date? = nil,
          purchaseDate: Date = Date(),
          depositDate: Date? = nil,
          isDepositPlan: Bool = false,
@@ -131,10 +181,19 @@ final class Clothing {
         self.imagePaths = imagePaths
         self.isShared = isShared
         self.originalPrice = originalPrice
+        self.originalPriceJPY = originalPriceJPY
+        self.originalPriceCurrencyCode = originalPriceCurrencyCode
+        self.originalPriceExchangeRateJPY = originalPriceExchangeRateJPY
+        self.originalPriceRateUpdatedAt = originalPriceRateUpdatedAt
         self.price = price
         self.deposit = deposit
         self.balance = balance
         self.accessoriesPrice = accessoriesPrice
+        self.shippingFee = shippingFee
+        self.shippingFeeJPY = shippingFeeJPY
+        self.shippingFeeCurrencyCode = shippingFeeCurrencyCode
+        self.shippingExchangeRateJPY = shippingExchangeRateJPY
+        self.shippingRateUpdatedAt = shippingRateUpdatedAt
         self.purchaseDate = purchaseDate
         self.depositDate = depositDate
         self.isDepositPlan = isDepositPlan
@@ -155,14 +214,28 @@ final class Clothing {
         return items.reduce(Decimal(0)) { $0 + $1.price }
     }
 
-    // 单套总价（含自定义小物）
+    var originalPriceCurrency: ClothingPriceCurrency {
+        get { ClothingPriceCurrency(rawValue: originalPriceCurrencyCode) ?? .cny }
+        set { originalPriceCurrencyCode = newValue.rawValue }
+    }
+
+    var shippingFeeCurrency: ClothingPriceCurrency {
+        get { ClothingPriceCurrency(rawValue: shippingFeeCurrencyCode) ?? .cny }
+        set { shippingFeeCurrencyCode = newValue.rawValue }
+    }
+
+    var resolvedShippingFee: Decimal {
+        shippingFee
+    }
+
+    // 单套总价（含自定义小物，不含一次性邮费）
     var unitTotalPrice: Decimal {
         price + resolvedAccessoriesPrice
     }
 
-    // 全部持有总价：裙装价格按库存累加，自定义小物总价只计算一次
+    // 全部持有总价：裙装价格按库存累加，自定义小物总价只计算一次，邮费不随库存倍增
     var inventoryTotalPrice: Decimal {
-        (price * Decimal(stock)) + resolvedAccessoriesPrice
+        (price * Decimal(stock)) + resolvedAccessoriesPrice + resolvedShippingFee
     }
 
     // 总定金 = (裙装定金 + 小物定金总和) * 库存数量
@@ -175,6 +248,18 @@ final class Clothing {
     var totalBalance: Decimal {
         let accBalance = accessoryItems?.reduce(Decimal(0)) { $0 + $1.balance } ?? 0
         return (balance + accBalance) * Decimal(stock)
+    }
+
+    func copyCurrencyAndShippingMetadata(from source: Clothing) {
+        originalPriceJPY = source.originalPriceJPY
+        originalPriceCurrencyCode = source.originalPriceCurrencyCode
+        originalPriceExchangeRateJPY = source.originalPriceExchangeRateJPY
+        originalPriceRateUpdatedAt = source.originalPriceRateUpdatedAt
+        shippingFee = source.shippingFee
+        shippingFeeJPY = source.shippingFeeJPY
+        shippingFeeCurrencyCode = source.shippingFeeCurrencyCode
+        shippingExchangeRateJPY = source.shippingExchangeRateJPY
+        shippingRateUpdatedAt = source.shippingRateUpdatedAt
     }
 }
 
@@ -198,6 +283,314 @@ final class AccessoryItem {
         self.balance = balance
         self.sortIndex = sortIndex
         self.imagePaths = imagePaths
+    }
+}
+
+@Model
+final class WealthSavingEntry {
+    var id: UUID = UUID()
+    var amount: Decimal = 0.0
+    var clothingID: UUID? = nil
+    var note: String = ""
+    var migrationSource: String? = nil
+    var createdAt: Date = Date()
+    var updatedAt: Date = Date()
+    var usedAt: Date? = nil
+    var voidedAt: Date? = nil
+    var lastModified: Date = Date()
+
+    init(
+        amount: Decimal,
+        clothingID: UUID? = nil,
+        note: String = "",
+        migrationSource: String? = nil,
+        createdAt: Date = Date()
+    ) {
+        self.id = UUID()
+        self.amount = amount
+        self.clothingID = clothingID
+        self.note = note
+        self.migrationSource = migrationSource
+        self.createdAt = createdAt
+        self.updatedAt = createdAt
+        self.lastModified = createdAt
+    }
+}
+
+enum WealthSavingLedger {
+    static let legacyFinalPaymentMigrationSource = "legacy.finalPaymentSavedToWealth"
+
+    static func isActive(_ entry: WealthSavingEntry) -> Bool {
+        entry.amount > 0 && entry.usedAt == nil && entry.voidedAt == nil
+    }
+
+    static func activeTotal(in entries: [WealthSavingEntry]) -> Decimal {
+        entries.reduce(Decimal(0)) { partial, entry in
+            isActive(entry) ? partial + entry.amount : partial
+        }
+    }
+
+    static func activeTotal(for clothingID: UUID, in entries: [WealthSavingEntry]) -> Decimal {
+        entries.reduce(Decimal(0)) { partial, entry in
+            isActive(entry) && entry.clothingID == clothingID ? partial + entry.amount : partial
+        }
+    }
+
+    static func activeUnassignedTotal(in entries: [WealthSavingEntry]) -> Decimal {
+        entries.reduce(Decimal(0)) { partial, entry in
+            isActive(entry) && entry.clothingID == nil ? partial + entry.amount : partial
+        }
+    }
+
+    static func assignableSavingCap(for clothing: Clothing) -> Decimal {
+        let target = purchaseTarget(for: clothing)
+        let cap: Decimal
+        if clothing.isDepositPlan {
+            cap = target - clothing.totalDeposit
+        } else {
+            cap = target
+        }
+        return max(cap, Decimal(0))
+    }
+
+    static func remainingAssignableAmount(for clothing: Clothing, entries: [WealthSavingEntry]) -> Decimal {
+        let remaining = assignableSavingCap(for: clothing) - activeTotal(for: clothing.id, in: entries)
+        return max(remaining, Decimal(0))
+    }
+
+    static func overflowAmount(for clothing: Clothing, entries: [WealthSavingEntry]) -> Decimal {
+        let overflow = activeTotal(for: clothing.id, in: entries) - assignableSavingCap(for: clothing)
+        return max(overflow, Decimal(0))
+    }
+
+    static func clampedSavingAmount(
+        _ amount: Decimal,
+        for clothing: Clothing,
+        entries: [WealthSavingEntry]
+    ) -> Decimal {
+        guard amount > 0 else { return 0 }
+        return min(amount, remainingAssignableAmount(for: clothing, entries: entries))
+    }
+
+    static func purchaseTarget(for clothing: Clothing) -> Decimal {
+        let target: Decimal
+        if clothing.isDepositPlan {
+            target = clothing.totalDeposit + clothing.totalBalance + clothing.resolvedShippingFee
+        } else {
+            target = clothing.inventoryTotalPrice
+        }
+
+        if target > 0 {
+            return target
+        }
+
+        let fallback = clothing.price + clothing.resolvedAccessoriesPrice + clothing.resolvedShippingFee
+        return max(fallback, clothing.totalBalance)
+    }
+
+    static func progressNumerator(for clothing: Clothing, entries: [WealthSavingEntry]) -> Decimal {
+        let saved = activeTotal(for: clothing.id, in: entries)
+        if clothing.isDepositPlan {
+            return clothing.totalDeposit + saved
+        } else {
+            return saved
+        }
+    }
+
+    static func progressRatio(for clothing: Clothing, entries: [WealthSavingEntry]) -> Double {
+        let target = purchaseTarget(for: clothing)
+        guard target > 0 else { return 0 }
+        let numerator = progressNumerator(for: clothing, entries: entries)
+        return NSDecimalNumber(decimal: numerator / target).doubleValue
+    }
+
+    @discardableResult
+    @MainActor
+    static func addSaving(
+        amount: Decimal,
+        clothingID: UUID?,
+        note: String = "",
+        context: ModelContext
+    ) throws -> WealthSavingEntry? {
+        guard amount > 0 else { return nil }
+        let now = Date()
+        let entry = WealthSavingEntry(
+            amount: amount,
+            clothingID: clothingID,
+            note: note,
+            createdAt: now
+        )
+        context.insert(entry)
+        try context.save()
+        return entry
+    }
+
+    @discardableResult
+    @MainActor
+    static func addSaving(
+        amount: Decimal,
+        for clothing: Clothing,
+        entries: [WealthSavingEntry],
+        note: String = "",
+        context: ModelContext
+    ) throws -> WealthSavingEntry? {
+        let actualAmount = clampedSavingAmount(amount, for: clothing, entries: entries)
+        guard actualAmount > 0 else { return nil }
+        return try addSaving(
+            amount: actualAmount,
+            clothingID: clothing.id,
+            note: note,
+            context: context
+        )
+    }
+
+    @discardableResult
+    @MainActor
+    static func transferUnassignedSavings(
+        to clothing: Clothing,
+        entries: [WealthSavingEntry],
+        context: ModelContext,
+        note: String? = nil
+    ) throws -> Decimal {
+        let transferAmount = min(
+            activeUnassignedTotal(in: entries),
+            remainingAssignableAmount(for: clothing, entries: entries)
+        )
+        guard transferAmount > 0 else { return 0 }
+
+        let now = Date()
+        let unassignedEntries = entries
+            .filter { isActive($0) && $0.clothingID == nil }
+            .sorted { $0.createdAt < $1.createdAt }
+        let movedAmount = consumeActiveAmount(transferAmount, from: unassignedEntries, at: now)
+        guard movedAmount > 0 else { return 0 }
+
+        let entry = WealthSavingEntry(
+            amount: movedAmount,
+            clothingID: clothing.id,
+            note: note ?? "从未指定小金库填充「\(clothing.name)」",
+            createdAt: now
+        )
+        context.insert(entry)
+        try context.save()
+        return movedAmount
+    }
+
+    @discardableResult
+    @MainActor
+    static func moveOverflowToUnassigned(
+        for clothing: Clothing,
+        entries: [WealthSavingEntry],
+        context: ModelContext,
+        note: String? = nil
+    ) throws -> Decimal {
+        let overflow = overflowAmount(for: clothing, entries: entries)
+        guard overflow > 0 else { return 0 }
+
+        let now = Date()
+        let targetEntries = entries
+            .filter { isActive($0) && $0.clothingID == clothing.id }
+            .sorted { $0.createdAt > $1.createdAt }
+        let movedAmount = consumeActiveAmount(overflow, from: targetEntries, at: now)
+        guard movedAmount > 0 else { return 0 }
+
+        let entry = WealthSavingEntry(
+            amount: movedAmount,
+            clothingID: nil,
+            note: note ?? "从「\(clothing.name)」超额转回未指定",
+            createdAt: now
+        )
+        context.insert(entry)
+        try context.save()
+        return movedAmount
+    }
+
+    @MainActor
+    static func markActiveSavingsUsed(for clothingID: UUID, context: ModelContext, usedAt: Date = Date()) throws {
+        let entries = try context.fetch(FetchDescriptor<WealthSavingEntry>())
+        markActiveSavingsUsed(for: clothingID, entries: entries, usedAt: usedAt)
+        try context.save()
+    }
+
+    @MainActor
+    static func markActiveSavingsUsed(
+        for clothingID: UUID,
+        entries: [WealthSavingEntry],
+        usedAt: Date = Date()
+    ) {
+        for entry in entries where isActive(entry) && entry.clothingID == clothingID {
+            entry.usedAt = usedAt
+            entry.updatedAt = usedAt
+            entry.lastModified = usedAt
+        }
+    }
+
+    @MainActor
+    static func migrateLegacySavedFinalPayments(
+        clothings: [Clothing],
+        entries: [WealthSavingEntry],
+        context: ModelContext
+    ) {
+        var didInsert = false
+        for clothing in clothings {
+            guard clothing.isDepositPlan,
+                  !clothing.isDeleted,
+                  clothing.deletedAt == nil,
+                  clothing.isFinalPaymentSavedToWealth,
+                  clothing.totalBalance > 0 else {
+                continue
+            }
+
+            let alreadyMigrated = entries.contains { entry in
+                entry.clothingID == clothing.id &&
+                entry.migrationSource == legacyFinalPaymentMigrationSource
+            }
+            guard !alreadyMigrated else { continue }
+
+            let date = clothing.finalPaymentSavedAt ?? Date()
+            let entry = WealthSavingEntry(
+                amount: clothing.totalBalance,
+                clothingID: clothing.id,
+                note: "旧版整笔尾款小金库迁移",
+                migrationSource: legacyFinalPaymentMigrationSource,
+                createdAt: date
+            )
+            context.insert(entry)
+            didInsert = true
+        }
+
+        if didInsert {
+            try? context.save()
+        }
+    }
+
+    @MainActor
+    private static func consumeActiveAmount(
+        _ amount: Decimal,
+        from entries: [WealthSavingEntry],
+        at date: Date
+    ) -> Decimal {
+        var remaining = amount
+        var consumed = Decimal(0)
+
+        for entry in entries where remaining > 0 && isActive(entry) {
+            let entryAmount = entry.amount
+            if entryAmount <= remaining {
+                entry.voidedAt = date
+                entry.updatedAt = date
+                entry.lastModified = date
+                remaining -= entryAmount
+                consumed += entryAmount
+            } else {
+                entry.amount = entryAmount - remaining
+                entry.updatedAt = date
+                entry.lastModified = date
+                consumed += remaining
+                remaining = 0
+            }
+        }
+
+        return consumed
     }
 }
 

@@ -69,17 +69,17 @@ struct MoneyCountingHeaderView: View {
             }
             .padding(.horizontal, 24)
             .padding(.vertical, 12)
-            .background(
+            .themeSkinAdaptiveSectionCard(slot: .statsCard, cornerRadius: 24) {
                 RoundedRectangle(cornerRadius: 24)
                     .fill(Color(uiColor: .secondarySystemBackground).opacity(0.6))
                     .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 24))
-            )
+            }
             .padding(.horizontal)
             .lineLimit(1)
             .minimumScaleFactor(0.5)
             
             VStack(spacing: 4) {
-                Text("已购入小裙装总价 + 心愿尾款已付总定金")
+                Text("已购入小裙装总价 + 心愿尾款定金 + 小金库存款")
                     .font(.caption)
                     .foregroundStyle(.secondary)
 

@@ -72,3 +72,70 @@ struct PriceRow: View {
         }
     }
 }
+
+struct CurrencyPriceRow: View {
+    var title: String
+    @Binding var cnyValue: Double
+    @Binding var jpyValue: Double
+    @Binding var currency: ClothingPriceCurrency
+    var exchangeRateJPY: Double
+
+    private var activeValue: Binding<Double> {
+        Binding(
+            get: {
+                switch currency {
+                case .cny: return cnyValue
+                case .jpy: return jpyValue
+                }
+            },
+            set: { newValue in
+                let safeRate = exchangeRateJPY > 0 ? exchangeRateJPY : CurrencyExchangeRateService.defaultJPYRate
+                switch currency {
+                case .cny:
+                    cnyValue = newValue
+                    jpyValue = newValue * safeRate
+                case .jpy:
+                    jpyValue = newValue
+                    cnyValue = newValue / safeRate
+                }
+            }
+        )
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .center) {
+                Text(title)
+                Spacer()
+                Picker(title, selection: $currency) {
+                    Text("人民币").tag(ClothingPriceCurrency.cny)
+                    Text("日元").tag(ClothingPriceCurrency.jpy)
+                }
+                .pickerStyle(.segmented)
+                .controlSize(.mini)
+                .frame(width: 132)
+            }
+
+            HStack(spacing: 8) {
+                Spacer()
+                TextField("0", value: Binding<Double?>(
+                    get: { activeValue.wrappedValue == 0 ? nil : activeValue.wrappedValue },
+                    set: { activeValue.wrappedValue = $0 ?? 0 }
+                ), format: .number.precision(.fractionLength(0...2)))
+                    .keyboardType(.decimalPad)
+                    .multilineTextAlignment(.trailing)
+                Text(currency.symbol)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .onChange(of: currency) { _, newValue in
+            let safeRate = exchangeRateJPY > 0 ? exchangeRateJPY : CurrencyExchangeRateService.defaultJPYRate
+            switch newValue {
+            case .cny:
+                if cnyValue == 0, jpyValue > 0 { cnyValue = jpyValue / safeRate }
+            case .jpy:
+                if jpyValue == 0, cnyValue > 0 { jpyValue = cnyValue * safeRate }
+            }
+        }
+    }
+}

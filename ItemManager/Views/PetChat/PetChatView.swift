@@ -592,15 +592,12 @@ struct PetChatView: View {
                 useSectionLayout: true
             )
         } label: {
-            Image(systemName: "plus")
-                .font(.system(size: 24))
-                .foregroundStyle(.pink)
-                .frame(width: 50, height: 50)
-                .background(
+            ThemeSkinIconBadge(systemName: "plus", fallbackColor: .pink, size: 50, symbolSize: 24)
+                .themeSkinAdaptiveSectionCard(slot: .iconCircleButton, cornerRadius: 25, showsDecoration: false) {
                     Circle()
                         .fill(.ultraThinMaterial)
                         .shadow(color: .black.opacity(0.15), radius: 8, x: 0, y: 4)
-                )
+                }
         }
     }
     
@@ -653,11 +650,11 @@ struct PetChatView: View {
                 .font(.system(size: 16, weight: .medium))
                 .foregroundStyle(searchText.isEmpty ? .gray.opacity(0.5) : .pink)
                 .frame(width: 50, height: 50)
-                .background(
+                .themeSkinAdaptiveSectionCard(slot: .primaryButton, cornerRadius: 25, showsDecoration: false) {
                     Circle()
                         .fill(.ultraThinMaterial)
                         .shadow(color: .black.opacity(0.15), radius: 8, x: 0, y: 4)
-                )
+                }
         }
         .disabled(searchText.isEmpty)
     }
@@ -837,8 +834,9 @@ struct PetChatView: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
-        .background(Color.white.opacity(0.92))
-        .clipShape(Capsule())
+        .themeSkinAdaptiveSectionCard(slot: .filterChip, cornerRadius: 24, showsDecoration: false) {
+            Capsule().fill(Color.white.opacity(0.92))
+        }
         .shadow(color: .black.opacity(0.08), radius: 8, x: 0, y: 3)
     }
 
@@ -853,8 +851,10 @@ struct PetChatView: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
-        .background(MagicThemeDesignSystem.palette(themeManager: themeManager, colorScheme: colorScheme).cardBackground.opacity(colorScheme == .dark ? 0.9 : 0.85))
-        .clipShape(Capsule())
+        .themeSkinAdaptiveSectionCard(slot: .filterChip, cornerRadius: 22, showsDecoration: false) {
+            Capsule()
+                .fill(MagicThemeDesignSystem.palette(themeManager: themeManager, colorScheme: colorScheme).cardBackground.opacity(colorScheme == .dark ? 0.9 : 0.85))
+        }
         .shadow(color: .black.opacity(0.06), radius: 6, x: 0, y: 2)
     }
 

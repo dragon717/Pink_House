@@ -8,12 +8,17 @@
 import SwiftUI
 import SwiftData
 import Combine
-#if canImport(UIKit)
-import UIKit
-#endif
 
 private struct IsSimulationActiveKey: EnvironmentKey {
     static let defaultValue: Bool = true
+}
+
+enum LegacyCustomTabBarLayout {
+    static let floatingElementLift: CGFloat = 20
+}
+
+private struct CustomBottomFloatingLiftKey: EnvironmentKey {
+    static let defaultValue: CGFloat = 0
 }
 
 extension EnvironmentValues {
@@ -21,481 +26,14 @@ extension EnvironmentValues {
         get { self[IsSimulationActiveKey.self] }
         set { self[IsSimulationActiveKey.self] = newValue }
     }
-}
 
-// MARK: - View 扩展：条件应用 searchToolbarBehavior
-extension View {
-    @ViewBuilder
-    func applySearchToolbarBehavior() -> some View {
-        if #available(iOS 26.0, *) {
-            self.searchToolbarBehavior(.automatic)
-        } else {
-            self
-        }
-    }
-    
-    @ViewBuilder
-    func applyTabBarMinimizeBehavior() -> some View {
-        if #available(iOS 26.0, *) {
-            self.tabBarMinimizeBehavior(.onScrollDown)
-        } else {
-            self
-        }
-    }
-
-}
-
-// MARK: - iOS 18+ 现代 TabView
-@available(iOS 18.0, *)
-struct ModernTabView: View {
-    @Binding var selectedTab: Int
-    @Binding var homeTabSelection: HomeTab
-    @Binding var smallWorldDestination: SmallWorldDestination
-    @Binding var isPlayingOpeningAnimation: Bool
-    @Environment(ThemeManager.self) private var themeManager
-    @Environment(\.colorScheme) private var colorScheme
-    @ObservedObject private var themeSkinManager = ThemeSkinManager.shared
-    @ObservedObject private var petDataManager = PetDataManager.shared
-    @StateObject private var mediaStateManager = MediaStateManager.shared
-    @StateObject private var tabNavigationManager = TabNavigationManager.shared
-    
-    @State private var searchText = ""
-    @State private var isBottomBarCompact = false
-    @State private var compactCenterPlatterFrame: CGRect?
-    @State private var lastLoggedCompactSignature: String?
-    @State private var lastLoggedTabBarLayoutSignature: String?
-    @State private var lastLoggedOrbitLayoutSignature: String?
-
-    private let bottomAccessoryCatConfig = BottomAccessoryCatDiamondOrbitConfig()
-    // Reduce probe frequency to lower main-thread pressure during fast list scrolling.
-    private let tabBarStateTicker = Timer.publish(every: 0.35, on: .main, in: .common).autoconnect()
-    private var isBottomCatProbeLoggingEnabled: Bool {
-#if DEBUG
-        UserDefaults.standard.bool(forKey: "debug.bottom_cat.probe_logging")
-#else
-        false
-#endif
-    }
-    
-    // MARK: - 动态 Tab 标题和图标
-    private var smallWorldTabTitle: String {
-        switch smallWorldDestination {
-        case .bigWorld:
-            return "世界书"
-        case .calendar:
-            return "梦裙日历"
-        case .wealth(_):
-            return "来财"
-        case .pet:
-            return petDataManager.status.displayName
-        case .ootd:
-            return "穿搭手帐"
-        case .ootdDefaultBook:
-            return "魔法贴纸"
-        case .menu:
-            return "House"
-        case .perler:
-            return "拼豆工坊"
-        case .wardrobe:
-            return "衣橱"
-        case .depositPlan:
-            return "心愿尾款"
-        case .recycleBin:
-            return "回收站"
-        case .dressStock:
-            return "裙子股市"
-        }
-    }
-
-    private var smallWorldTabIcon: String {
-        switch smallWorldDestination {
-        case .bigWorld:
-            return "globe.asia.australia"
-        case .calendar:
-            return "calendar"
-        case .wealth(_):
-            return "yensign.circle"
-        case .pet:
-            return "pawprint"
-        case .ootd:
-            return "book.pages"
-        case .ootdDefaultBook:
-            return "book.pages"
-        case .menu:
-            return "house.fill"
-        case .perler:
-            return "circle.grid.2x2"
-        case .wardrobe:
-            return "cabinet.fill"
-        case .depositPlan:
-            return "tag.fill"
-        case .recycleBin:
-            return "trash.fill"
-        case .dressStock:
-            return "chart.line.uptrend.xyaxis"
-        }
-    }
-
-    private var isOnMenu: Bool {
-        if case .menu = smallWorldDestination {
-            return true
-        }
-        return false
-    }
-
-    private var magicPalette: MagicThemePalette {
-        MagicThemeDesignSystem.palette(themeManager: themeManager, colorScheme: colorScheme)
-    }
-
-    private var themedTabBarDescriptor: ThemeSkinDescriptor? {
-        resolveTabBarDescriptor(for: .tabBarMain)
-    }
-
-    private var themedTabItemDescriptor: ThemeSkinDescriptor? {
-        resolveTabBarDescriptor(for: .tabBarItem)
-    }
-
-    private var supportsBottomAccessoryCat: Bool {
-        if #available(iOS 26.0, *), UIDevice.current.userInterfaceIdiom == .phone {
-            return true
-        }
-        return false
-    }
-
-    private var shouldShowDiamondOrbitCat: Bool {
-        selectedTab != 1 && selectedTab != 3 && supportsBottomAccessoryCat && isBottomBarCompact && compactCenterPlatterFrame != nil
-    }
-
-    private var shouldShowFloatingOverlayCat: Bool {
-        selectedTab != 1 && selectedTab != 3 && !shouldShowDiamondOrbitCat
-    }
-
-    private var bottomAccessoryPetId: String {
-        petDataManager.status.selectedPetId ?? "naicha"
-    }
-
-    var body: some View {
-        TabView(selection: $selectedTab) {
-            Tab(value: 0) {
-                WardrobeTabContent(homeTabSelection: $homeTabSelection)
-            } label: {
-                ThemeSkinModernTabLabel(
-                    descriptor: themedTabItemDescriptor,
-                    title: "衣橱",
-                    systemImage: "cabinet.fill",
-                    isSelected: selectedTab == 0
-                )
-            }
-
-            Tab(value: 1) {
-                SmallWorldTabContent(
-                    selectedTab: $selectedTab,
-                    homeTab: $homeTabSelection,
-                    destination: $smallWorldDestination,
-                    isPlayingOpeningAnimation: $isPlayingOpeningAnimation
-                )
-            } label: {
-                ThemeSkinModernTabLabel(
-                    descriptor: themedTabItemDescriptor,
-                    title: smallWorldTabTitle,
-                    systemImage: smallWorldTabIcon,
-                    isSelected: selectedTab == 1
-                )
-                    .background {
-                        Color.clear
-                            .captureGuideTarget(.homeHouseTab)
-                            .allowsHitTesting(false)
-                    }
-            }
-
-            Tab(value: 2) {
-                MeTabContent()
-            } label: {
-                ThemeSkinModernTabLabel(
-                    descriptor: themedTabItemDescriptor,
-                    title: "我",
-                    systemImage: "face.smiling",
-                    isSelected: selectedTab == 2
-                )
-            }
-
-            Tab(value: 3, role: .search) {
-                PetChatView(searchText: $searchText)
-            } label: {
-                ThemeSkinModernTabLabel(
-                    descriptor: themedTabItemDescriptor,
-                    title: "萌宠对话",
-                    systemImage: "bubble.left.and.bubble.right.fill",
-                    isSelected: selectedTab == 3
-                )
-                    .background {
-                        Color.clear
-                            .captureGuideTarget(.homePetChatTab)
-                            .allowsHitTesting(false)
-                    }
-            }
-        }
-        // iOS 26+ 原生 API：向下滑动时自动最小化 TabBar
-        .applyTabBarMinimizeBehavior()
-        .applySearchToolbarBehavior()
-        .toolbarBackground(.clear, for: .tabBar)
-        .toolbarBackground(.hidden, for: .tabBar)
-        .tint(magicPalette.accent)
-        .environment(\.isSimulationActive, isSimulationActive)
-        .onReceive(tabBarStateTicker) { _ in
-            refreshCompactTabBarState()
-        }
-        .overlay {
-            GeometryReader { proxy in
-                ThemeSkinTabBarBackdrop(
-                    descriptor: themedTabBarDescriptor,
-                    safeAreaBottom: proxy.safeAreaInsets.bottom
-                )
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
-                .allowsHitTesting(false)
-            }
-            RewardBubbleView()
-            if #available(iOS 26.0, *) {
-                if shouldShowDiamondOrbitCat, let compactCenterPlatterFrame {
-                    let orbitLayout = diamondOrbitLayout(frame: compactCenterPlatterFrame)
-                    diamondOrbitOverlay(layout: orbitLayout)
-                        .position(x: orbitLayout.center.x, y: orbitLayout.center.y)
-                }
-            }
-            // 进入 House / 萌宠对话页后不再显示全局悬浮宠物，避免挡住房间热区或搜索/输入交互
-            if shouldShowFloatingOverlayCat {
-                PetOverlayView(action: {
-                    // 点击悬浮小猫：切换到萌宠对话 Tab
-                    withAnimation {
-                        selectedTab = 3
-                    }
-                }, petName: petDataManager.status.displayName)
-            }
-            // 修复：使用正确的 Binding 传递 selectedTab
-            SmallWorldMenuOverlay(
-                selectedTab: $selectedTab,
-                smallWorldDestination: $smallWorldDestination,
-                homeTab: $homeTabSelection
-            )
-        }
-        .onReceive(tabNavigationManager.$navigateToTab) { tab in
-            if let tab = tab {
-                withAnimation {
-                    // 如果是要跳转到HouseTab(1)，记录是从Tab 0进入的
-                    if tab == 1 && selectedTab != 1 {
-                        tabNavigationManager.recordEnteringSmallWorldFromHomeTab(homeTabSelection)
-                    }
-                    selectedTab = tab
-                }
-            }
-        }
-        .onReceive(tabNavigationManager.$navigateToHomeTab) { homeTab in
-            if let homeTab = homeTab {
-                withAnimation {
-                    homeTabSelection = homeTab
-                }
-                tabNavigationManager.navigateToHomeTab = nil
-            }
-        }
-        .onReceive(tabNavigationManager.$navigateToSmallWorld) { destination in
-            if let destination = destination {
-                withAnimation {
-                    // 注意：此时 selectedTab 可能已经被 navigateToTab 的处理器设置为 1
-                    // 所以不能依赖 selectedTab 来判断是否是House内部导航
-                    // 而是应该依赖 TabNavigationManager 中的 isNavigatingInsideSmallWorld 标记
-                    // 如果 isNavigatingInsideSmallWorld 为 false，说明是从外部进入
-                    if !tabNavigationManager.isNavigatingInsideSmallWorld {
-                        // 从其他Tab进入House，记录来源
-                        tabNavigationManager.recordEnteringSmallWorldFromHomeTab(homeTabSelection)
-                    }
-                    // 如果 isNavigatingInsideSmallWorld 为 true，保持标记不变（内部导航）
-                    smallWorldDestination = destination
-                }
-                tabNavigationManager.navigateToSmallWorld = nil
-            }
-        }
-        .onChange(of: selectedTab) { newTab in
-            if newTab == 3 {
-                isBottomBarCompact = false
-            }
-            // 发送Tab切换通知，用于新手引导
-            let tabName: String
-            switch newTab {
-            case 0: tabName = "wardrobe"
-            case 1: tabName = "smallWorld"
-            case 2: tabName = "me"
-            case 3: tabName = "petChat"
-            default: tabName = "unknown"
-            }
-            NotificationCenter.default.post(
-                name: .homeTabChanged,
-                object: nil,
-                userInfo: ["tab": tabName]
-            )
-        }
-    }
-
-    private func resolveTabBarDescriptor(for slot: ThemeSkinSlot) -> ThemeSkinDescriptor? {
-        guard let descriptor = themeSkinManager.activeThemeDescriptor(for: slot, state: .default),
-              descriptor.assetNamespace == "girl_closet" else {
-            return nil
-        }
-        return descriptor
-    }
-    
-    private var isSimulationActive: Bool {
-        if case .wealth(_) = smallWorldDestination {
-            return true
-        }
-        return false
-    }
-
-    private func refreshCompactTabBarState() {
-        let probeStart = CFAbsoluteTimeGetCurrent()
-
-        guard supportsBottomAccessoryCat, selectedTab != 1, selectedTab != 3 else {
-            let signature = "disabled-tab-\(selectedTab)"
-            if isBottomCatProbeLoggingEnabled, lastLoggedCompactSignature != signature {
-                print("[BottomCat] probe disabled, selectedTab=\(selectedTab), supportsBottomAccessoryCat=\(supportsBottomAccessoryCat)")
-                lastLoggedCompactSignature = signature
-            }
-            compactCenterPlatterFrame = nil
-            isBottomBarCompact = false
-            return
-        }
-
-        let state = TabBarItemAnchorResolver.compactCenterPlatterState()
-        compactCenterPlatterFrame = state?.frame
-        isBottomBarCompact = state?.isCompact == true
-
-        let frameText: String
-        if let frame = state?.frame {
-            frameText = String(
-                format: "(x:%.1f y:%.1f w:%.1f h:%.1f)",
-                frame.minX, frame.minY, frame.width, frame.height
-            )
-        } else {
-            frameText = "nil"
-        }
-        let signature = "compact=\(isBottomBarCompact)-frame=\(frameText)"
-        if isBottomCatProbeLoggingEnabled, lastLoggedCompactSignature != signature {
-            print("[BottomCat] compactState changed -> compact=\(isBottomBarCompact), frame=\(frameText), showDiamond=\(shouldShowDiamondOrbitCat)")
-            lastLoggedCompactSignature = signature
-        }
-
-        if isBottomCatProbeLoggingEnabled {
-            let snapshots = TabBarItemAnchorResolver.tabBarDebugSnapshots()
-            let layoutSignature = snapshots
-                .map {
-                    String(
-                        format: "d%ld %@:(%.1f,%.1f,%.1f,%.1f) a=%.2f h=%@",
-                        $0.depth,
-                        $0.className,
-                        $0.frame.minX,
-                        $0.frame.minY,
-                        $0.frame.width,
-                        $0.frame.height,
-                        $0.alpha,
-                        $0.isHidden ? "Y" : "N"
-                    )
-                }
-                .joined(separator: " | ")
-            if !layoutSignature.isEmpty, layoutSignature != lastLoggedTabBarLayoutSignature {
-                print("[BottomCat] tabBar subviews -> \(layoutSignature)")
-                lastLoggedTabBarLayoutSignature = layoutSignature
-            }
-        }
-
-        if isBottomCatProbeLoggingEnabled, isBottomBarCompact, let frame = compactCenterPlatterFrame {
-            let orbitLayout = diamondOrbitLayout(frame: frame)
-            let orbitSignature = String(
-                format: "anchor=(%.1f,%.1f) center=(%.1f,%.1f) size=(%.1f,%.1f) normalizedCenter=(%.3f,%.3f)",
-                orbitLayout.anchor.x,
-                orbitLayout.anchor.y,
-                orbitLayout.center.x,
-                orbitLayout.center.y,
-                orbitLayout.size.width,
-                orbitLayout.size.height,
-                orbitLayout.config.normalizedCenterPoint?.x ?? 0.5,
-                orbitLayout.config.normalizedCenterPoint?.y ?? 0.5
-            )
-            if lastLoggedOrbitLayoutSignature != orbitSignature {
-                print("[BottomCat] orbitLayout -> \(orbitSignature)")
-                lastLoggedOrbitLayoutSignature = orbitSignature
-            }
-        }
-
-        let elapsedMs = (CFAbsoluteTimeGetCurrent() - probeStart) * 1000
-        if isBottomCatProbeLoggingEnabled, elapsedMs >= 6 {
-            print(
-                String(
-                    format: "[BottomCat] slow probe %.2fms, selectedTab=%d, compact=%@",
-                    elapsedMs,
-                    selectedTab,
-                    isBottomBarCompact ? "true" : "false"
-                )
-            )
-        }
-    }
-
-    private func diamondOrbitLayout(
-        frame: CGRect
-    ) -> (config: BottomAccessoryCatDiamondOrbitConfig, size: CGSize, center: CGPoint, anchor: CGPoint) {
-        let overlayWidth = max(frame.width + 40, 236)
-        let overlayHeight = max(frame.height + 92, 156)
-        let overlaySize = CGSize(width: overlayWidth, height: overlayHeight)
-        let floatingCatAnchor = CGPoint(
-            x: UIScreen.main.bounds.midX,
-            y: frame.maxY - 49
-        )
-        let overlayCenter = CGPoint(
-            x: floatingCatAnchor.x,
-            y: floatingCatAnchor.y - max(overlayHeight * 0.26, 30)
-        )
-        let overlayOrigin = CGPoint(
-            x: overlayCenter.x - overlayWidth / 2,
-            y: overlayCenter.y - overlayHeight / 2
-        )
-
-        var config = bottomAccessoryCatConfig
-        config.startAnchor = .top
-        config.contentHeight = overlayHeight
-        config.diamondWidthRatio = 0.5
-        config.diamondHeightRatio = 0.54
-        config.centerYOffset = -0.08
-        config.speedScale = 0.5
-
-        let bottomAnchorNormalizedY = (floatingCatAnchor.y - overlayOrigin.y) / overlayHeight
-        let halfHeight = config.diamondHeightRatio / 2
-        let normalizedCenterY = max(
-            halfHeight + 0.02,
-            min(1 - halfHeight - 0.02, bottomAnchorNormalizedY - halfHeight)
-        )
-        config.normalizedCenterPoint = CGPoint(x: 0.5, y: normalizedCenterY)
-
-        return (config: config, size: overlaySize, center: overlayCenter, anchor: floatingCatAnchor)
-    }
-
-    @available(iOS 26.0, *)
-    private func diamondOrbitOverlay(
-        layout: (config: BottomAccessoryCatDiamondOrbitConfig, size: CGSize, center: CGPoint, anchor: CGPoint)
-    ) -> some View {
-        return BottomAccessoryCatDiamondOrbitView(
-            config: layout.config,
-            petName: bottomAccessoryPetId,
-            action: {
-                withAnimation {
-                    selectedTab = 3
-                }
-            }
-        )
-        .frame(width: layout.size.width, height: layout.size.height)
-        .allowsHitTesting(true)
+    var customBottomFloatingLift: CGFloat {
+        get { self[CustomBottomFloatingLiftKey.self] }
+        set { self[CustomBottomFloatingLiftKey.self] = newValue }
     }
 }
 
 // MARK: - 衣橱 Tab 内容
-@available(iOS 18.0, *)
 struct WardrobeTabContent: View {
     @Binding var homeTabSelection: HomeTab
     
@@ -507,7 +45,6 @@ struct WardrobeTabContent: View {
 }
 
 // MARK: - House Tab 内容
-@available(iOS 18.0, *)
 struct SmallWorldTabContent: View {
     @Binding var selectedTab: Int
     @Binding var homeTab: HomeTab
@@ -528,7 +65,6 @@ struct SmallWorldTabContent: View {
 }
 
 // MARK: - 我 Tab 内容
-@available(iOS 18.0, *)
 struct MeTabContent: View {
     var body: some View {
         NavigationStack {
@@ -538,105 +74,7 @@ struct MeTabContent: View {
     }
 }
 
-// MARK: - 搜索容器视图
-@available(iOS 18.0, *)
-struct SearchContainerView: View {
-    @Binding var searchText: String
-    @Environment(\.modelContext) private var modelContext
-    @Query(filter: #Predicate<Clothing> { $0.deletedAt == nil }) var clothings: [Clothing]
-    
-    var filteredClothings: [Clothing] {
-        if searchText.isEmpty {
-            return []
-        }
-        return clothings.filter { clothing in
-            let nameMatch = clothing.name.localizedCaseInsensitiveContains(searchText)
-            let brandMatch = clothing.brand?.name.localizedCaseInsensitiveContains(searchText) ?? false
-            let tagMatch = clothing.tags?.contains { $0.name.localizedCaseInsensitiveContains(searchText) } ?? false
-            return nameMatch || brandMatch || tagMatch
-        }
-    }
-    
-    var body: some View {
-        NavigationStack {
-            ZStack {
-                // 背景
-                LiquidBackground()
-                    .ignoresSafeArea()
-                
-                List {
-                    if searchText.isEmpty {
-                        Section("搜索建议") {
-                            Label("裙装/小物名称", systemImage: "tshirt")
-                            Label("品牌/标签tag", systemImage: "tag")
-                        }
-                    } else if filteredClothings.isEmpty {
-                        ContentUnavailableView {
-                            Label("未找到结果", systemImage: "magnifyingglass")
-                        } description: {
-                            Text("尝试其他关键词搜索")
-                        }
-                    } else {
-                        Section("找到 \(filteredClothings.count) 件衣物") {
-                            ForEach(filteredClothings) { clothing in
-                                NavigationLink(destination: ClothingDetailView(clothing: clothing)) {
-                                    HStack {
-                                        clothingThumbnail(clothing)
-                                        VStack(alignment: .leading, spacing: 4) {
-                                            Text(clothing.name)
-                                                .font(.headline)
-                                            if let brand = clothing.brand {
-                                                Text(brand.name)
-                                                    .font(.caption)
-                                                    .foregroundStyle(.secondary)
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-                .scrollContentBackground(.hidden)
-            }
-            .navigationTitle("全局搜索")
-            .searchable(
-                text: $searchText,
-                placement: .navigationBarDrawer(displayMode: .always),
-                prompt: "全局搜索裙子、品牌、标签..."
-            )
-        }
-    }
-    
-    @ViewBuilder
-    private func clothingThumbnail(_ clothing: Clothing) -> some View {
-        if let firstImagePath = clothing.imagePaths.first {
-            AsyncLocalImageView(
-                fileName: firstImagePath,
-                displaySize: CGSize(width: 50, height: 50),
-                contentMode: .fill,
-                cornerRadius: 8,
-                placeholderColor: Color.gray.opacity(0.2)
-            )
-            .overlay(
-                Image(systemName: "tshirt")
-                    .foregroundStyle(.secondary)
-                    .opacity(0.5)
-            )
-        } else {
-            RoundedRectangle(cornerRadius: 8)
-                .fill(Color.gray.opacity(0.2))
-                .frame(width: 50, height: 50)
-                .overlay(
-                    Image(systemName: "tshirt")
-                        .foregroundStyle(.secondary)
-                )
-        }
-    }
-}
-
 // MARK: - House容器视图
-@available(iOS 18.0, *)
 struct SmallWorldContainerView: View {
     @Binding var selectedTab: Int
     @Binding var homeTab: HomeTab
@@ -658,60 +96,133 @@ struct SmallWorldContainerView: View {
                 isPlayingOpeningAnimation: $isPlayingOpeningAnimation
             )
         case .ootd:
-            OOTDViewWithBackButton(
-                selectedTab: $selectedTab,
-                homeTab: $homeTab,
-                destination: $destination
-            )
+            if #available(iOS 18.0, *) {
+                OOTDViewWithBackButton(
+                    selectedTab: $selectedTab,
+                    homeTab: $homeTab,
+                    destination: $destination
+                )
+            } else {
+                OOTDViewWithBackButtonLegacy(
+                    selectedTab: $selectedTab,
+                    homeTab: $homeTab,
+                    destination: $destination
+                )
+            }
         case .ootdDefaultBook:
-            OOTDDefaultBookViewWithBackButton(
-                selectedTab: $selectedTab,
-                homeTab: $homeTab,
-                destination: $destination
-            )
+            if #available(iOS 18.0, *) {
+                OOTDDefaultBookViewWithBackButton(
+                    selectedTab: $selectedTab,
+                    homeTab: $homeTab,
+                    destination: $destination
+                )
+            } else {
+                OOTDDefaultBookViewWithBackButtonLegacy(
+                    selectedTab: $selectedTab,
+                    homeTab: $homeTab,
+                    destination: $destination
+                )
+            }
         case .pet:
-            PetHomeViewWithBackButton(
-                selectedTab: $selectedTab,
-                homeTab: $homeTab,
-                destination: $destination
-            )
+            if #available(iOS 18.0, *) {
+                PetHomeViewWithBackButton(
+                    selectedTab: $selectedTab,
+                    homeTab: $homeTab,
+                    destination: $destination
+                )
+            } else {
+                PetHomeViewWithBackButtonLegacy(
+                    selectedTab: $selectedTab,
+                    homeTab: $homeTab,
+                    destination: $destination
+                )
+            }
         case .wealth(let initialTab):
-            WealthViewWithBackButton(
-                selectedTab: $selectedTab,
-                homeTab: $homeTab,
-                destination: $destination,
-                initialTab: initialTab
-            )
+            if #available(iOS 18.0, *) {
+                WealthViewWithBackButton(
+                    selectedTab: $selectedTab,
+                    homeTab: $homeTab,
+                    destination: $destination,
+                    initialTab: initialTab
+                )
+            } else {
+                WealthViewWithBackButtonLegacy(
+                    selectedTab: $selectedTab,
+                    homeTab: $homeTab,
+                    destination: $destination,
+                    initialTab: initialTab
+                )
+            }
         case .calendar:
-            DreamDressCalendarViewWithBackButton(
-                selectedTab: $selectedTab,
-                homeTab: $homeTab,
-                destination: $destination
-            )
+            if #available(iOS 18.0, *) {
+                DreamDressCalendarViewWithBackButton(
+                    selectedTab: $selectedTab,
+                    homeTab: $homeTab,
+                    destination: $destination
+                )
+            } else {
+                DreamDressCalendarViewWithBackButtonLegacy(
+                    selectedTab: $selectedTab,
+                    homeTab: $homeTab,
+                    destination: $destination
+                )
+            }
         case .bigWorld:
-            BigWorldViewWithBackButton(
-                selectedTab: $selectedTab,
-                homeTab: $homeTab,
-                destination: $destination
-            )
+            if #available(iOS 18.0, *) {
+                BigWorldViewWithBackButton(
+                    selectedTab: $selectedTab,
+                    homeTab: $homeTab,
+                    destination: $destination
+                )
+            } else {
+                BigWorldViewWithBackButtonLegacy(
+                    selectedTab: $selectedTab,
+                    homeTab: $homeTab,
+                    destination: $destination
+                )
+            }
         case .perler:
-            PerlerBeadPatternListViewWithBackButton(
-                selectedTab: $selectedTab,
-                homeTab: $homeTab,
-                destination: $destination
-            )
+            if #available(iOS 18.0, *) {
+                PerlerBeadPatternListViewWithBackButton(
+                    selectedTab: $selectedTab,
+                    homeTab: $homeTab,
+                    destination: $destination
+                )
+            } else {
+                PerlerBeadPatternListViewWithBackButtonLegacy(
+                    selectedTab: $selectedTab,
+                    homeTab: $homeTab,
+                    destination: $destination
+                )
+            }
         case .recycleBin:
-            RecycleBinViewWithBackButton(
-                selectedTab: $selectedTab,
-                homeTab: $homeTab,
-                destination: $destination
-            )
+            if #available(iOS 18.0, *) {
+                RecycleBinViewWithBackButton(
+                    selectedTab: $selectedTab,
+                    homeTab: $homeTab,
+                    destination: $destination
+                )
+            } else {
+                RecycleBinViewWithBackButtonLegacy(
+                    selectedTab: $selectedTab,
+                    homeTab: $homeTab,
+                    destination: $destination
+                )
+            }
         case .dressStock:
-            DressStockMarketViewWithBackButton(
-                selectedTab: $selectedTab,
-                homeTab: $homeTab,
-                destination: $destination
-            )
+            if #available(iOS 18.0, *) {
+                DressStockMarketViewWithBackButton(
+                    selectedTab: $selectedTab,
+                    homeTab: $homeTab,
+                    destination: $destination
+                )
+            } else {
+                DressStockMarketViewWithBackButtonLegacy(
+                    selectedTab: $selectedTab,
+                    homeTab: $homeTab,
+                    destination: $destination
+                )
+            }
         case .wardrobe, .depositPlan:
             // 这些功能直接跳转到 Tab 0，不会在这里显示
             EmptyView()
@@ -768,7 +279,9 @@ struct LegacyTabView: View {
                     withAnimation {
                         selectedTab = 3
                     }
-                }, petName: petDataManager.status.displayName)
+                },
+                petName: petDataManager.status.displayName,
+                bottomAvoidanceLift: LegacyCustomTabBarLayout.floatingElementLift)
             }
             SmallWorldMenuOverlay(
                 selectedTab: $selectedTab,
@@ -827,10 +340,7 @@ struct LegacyTabView: View {
     private var contentView: some View {
         switch selectedTab {
         case 0:
-            NavigationStack {
-                HomeView(selectedTab: $homeTabSelection)
-                    .toolbarBackground(.hidden, for: .navigationBar)
-            }
+            HomeView(selectedTab: $homeTabSelection)
         case 1:
             NavigationStack {
                 SmallWorldContainerViewLegacy(
@@ -849,10 +359,7 @@ struct LegacyTabView: View {
         case 3:
             PetChatViewLegacy(searchText: $searchText)
         default:
-            NavigationStack {
-                HomeView(selectedTab: $homeTabSelection)
-                    .toolbarBackground(.hidden, for: .navigationBar)
-            }
+            HomeView(selectedTab: $homeTabSelection)
         }
     }
 
@@ -869,28 +376,32 @@ struct LegacyTabView: View {
                     tabButton(
                         index: 0,
                         title: "衣橱",
-                        icon: "cabinet.fill"
+                        icon: "cabinet.fill",
+                        tabRole: .wardrobe
                     )
 
                     // House Tab
                     tabButton(
                         index: 1,
                         title: smallWorldTabTitle,
-                        icon: smallWorldTabIcon
+                        icon: smallWorldTabIcon,
+                        tabRole: .house
                     )
 
                     // 我 Tab
                     tabButton(
                         index: 2,
                         title: "我",
-                        icon: "face.smiling"
+                        icon: "face.smiling",
+                        tabRole: .me
                     )
 
                     // 萌宠对话 Tab
                     tabButton(
                         index: 3,
                         title: "萌宠对话",
-                        icon: "bubble.left.and.bubble.right.fill"
+                        icon: "bubble.left.and.bubble.right.fill",
+                        tabRole: .petChat
                     )
                 }
                 .frame(height: 56)
@@ -923,7 +434,7 @@ struct LegacyTabView: View {
         }
     }
 
-    private func tabButton(index: Int, title: String, icon: String) -> some View {
+    private func tabButton(index: Int, title: String, icon: String, tabRole: ThemeSkinTabRole) -> some View {
         let isSelected = selectedTab == index
         let isNotOnMenu: Bool = {
             if case .menu = smallWorldDestination { return false }
@@ -946,7 +457,8 @@ struct LegacyTabView: View {
                 systemImage: icon,
                 isSelected: isSelected,
                 selectedColor: magicPalette.accent,
-                inactiveColor: magicPalette.secondaryText
+                inactiveColor: magicPalette.secondaryText,
+                tabRole: tabRole
             )
             .captureGuideTarget(index == 1 ? .homeHouseTab : nil)
             .overlay {
@@ -960,7 +472,7 @@ struct LegacyTabView: View {
 
     private func resolveTabBarDescriptor(for slot: ThemeSkinSlot) -> ThemeSkinDescriptor? {
         guard let descriptor = themeSkinManager.activeThemeDescriptor(for: slot, state: .default),
-              descriptor.assetNamespace == "girl_closet" else {
+              WardrobeThemeSkinSupport.isThemeSkinDescriptor(descriptor) else {
             return nil
         }
         return descriptor
@@ -1074,99 +586,6 @@ struct SmallWorldContainerViewLegacy: View {
             )
         case .wardrobe, .depositPlan:
             EmptyView()
-        }
-    }
-}
-
-// MARK: - iOS 18以下 全局搜索视图
-struct GlobalSearchViewLegacy: View {
-    @Environment(\.modelContext) private var modelContext
-    @Query(filter: #Predicate<Clothing> { $0.deletedAt == nil }) var clothings: [Clothing]
-    @State private var searchText = ""
-
-    var filteredClothings: [Clothing] {
-        if searchText.isEmpty { return [] }
-        return clothings.filter { clothing in
-            let nameMatch = clothing.name.localizedCaseInsensitiveContains(searchText)
-            let brandMatch = clothing.brand?.name.localizedCaseInsensitiveContains(searchText) ?? false
-            let tagMatch = clothing.tags?.contains { $0.name.localizedCaseInsensitiveContains(searchText) } ?? false
-            return nameMatch || brandMatch || tagMatch
-        }
-    }
-
-    var body: some View {
-        NavigationStack {
-            ZStack {
-                LiquidBackground()
-                    .ignoresSafeArea()
-
-                List {
-                    if searchText.isEmpty {
-                        Section("搜索建议") {
-                            Label("裙装/小物名称", systemImage: "tshirt")
-                            Label("品牌/标签tag", systemImage: "tag")
-                        }
-                    } else if filteredClothings.isEmpty {
-                        ContentUnavailableView {
-                            Label("未找到结果", systemImage: "magnifyingglass")
-                        } description: {
-                            Text("尝试其他关键词搜索")
-                        }
-                    } else {
-                        Section("找到 \(filteredClothings.count) 件衣物") {
-                            ForEach(filteredClothings) { clothing in
-                                NavigationLink(destination: ClothingDetailView(clothing: clothing)) {
-                                    HStack {
-                                        clothingThumbnail(clothing)
-                                        VStack(alignment: .leading, spacing: 4) {
-                                            Text(clothing.name)
-                                                .font(.headline)
-                                            if let brand = clothing.brand {
-                                                Text(brand.name)
-                                                    .font(.caption)
-                                                    .foregroundStyle(.secondary)
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-                .scrollContentBackground(.hidden)
-            }
-            .navigationTitle("全局搜索")
-            .searchable(
-                text: $searchText,
-                placement: .navigationBarDrawer(displayMode: .always),
-                prompt: "全局搜索裙子、品牌、标签..."
-            )
-        }
-    }
-
-    @ViewBuilder
-    private func clothingThumbnail(_ clothing: Clothing) -> some View {
-        if let firstImagePath = clothing.imagePaths.first {
-            AsyncLocalImageView(
-                fileName: firstImagePath,
-                displaySize: CGSize(width: 50, height: 50),
-                contentMode: .fill,
-                cornerRadius: 8,
-                placeholderColor: Color.gray.opacity(0.2)
-            )
-            .overlay(
-                Image(systemName: "tshirt")
-                    .foregroundStyle(.secondary)
-                    .opacity(0.5)
-            )
-        } else {
-            RoundedRectangle(cornerRadius: 8)
-                .fill(Color.gray.opacity(0.2))
-                .frame(width: 50, height: 50)
-                .overlay(
-                    Image(systemName: "tshirt")
-                        .foregroundStyle(.secondary)
-                )
         }
     }
 }
@@ -1530,56 +949,28 @@ struct MainTabView: View {
     @State private var homeTabSelection: HomeTab = .wardrobe
     @State private var smallWorldDestination: SmallWorldDestination = .menu
     @State private var isPlayingOpeningAnimation = false
-    @ObservedObject private var petDataManager = PetDataManager.shared
-    @StateObject private var mediaStateManager = MediaStateManager.shared
-    @StateObject private var tabNavigationManager = TabNavigationManager.shared
 
     var body: some View {
-        Group {
-            if #available(iOS 26.0, *) {
-                // iOS 26+ 使用系统原生TabBar
-                ModernTabView(
-                    selectedTab: $selectedTab,
-                    homeTabSelection: $homeTabSelection,
-                    smallWorldDestination: $smallWorldDestination,
-                    isPlayingOpeningAnimation: $isPlayingOpeningAnimation
-                )
-                .overlay {
-                    if isPlayingOpeningAnimation {
-                        OpeningVideoOverlay(
-                            isPlaying: $isPlayingOpeningAnimation,
-                            onComplete: {
-                                homeTabSelection = .wardrobe
-                                selectedTab = 0
-                            }
-                        )
+        LegacyTabView(
+            selectedTab: $selectedTab,
+            homeTabSelection: $homeTabSelection,
+            smallWorldDestination: $smallWorldDestination,
+            isPlayingOpeningAnimation: $isPlayingOpeningAnimation
+        )
+        .environment(\.customBottomFloatingLift, LegacyCustomTabBarLayout.floatingElementLift)
+        .overlay {
+            if isPlayingOpeningAnimation {
+                OpeningVideoOverlay(
+                    isPlaying: $isPlayingOpeningAnimation,
+                    onComplete: {
+                        homeTabSelection = .wardrobe
+                        selectedTab = 0
                     }
-                }
-                .noticePopup()
-                .withMagicTaskCompletions()
-            } else {
-                // iOS 18-25 使用自定义红色背景底部导航栏
-                LegacyTabView(
-                    selectedTab: $selectedTab,
-                    homeTabSelection: $homeTabSelection,
-                    smallWorldDestination: $smallWorldDestination,
-                    isPlayingOpeningAnimation: $isPlayingOpeningAnimation
                 )
-                .overlay {
-                    if isPlayingOpeningAnimation {
-                        OpeningVideoOverlay(
-                            isPlaying: $isPlayingOpeningAnimation,
-                            onComplete: {
-                                homeTabSelection = .wardrobe
-                                selectedTab = 0
-                            }
-                        )
-                    }
-                }
-                .noticePopup()
-                .withMagicTaskCompletions()
             }
         }
+        .noticePopup()
+        .withMagicTaskCompletions()
         // 监听解锁后的跳转通知
         .onReceive(NotificationCenter.default.publisher(for: .navigateToSmallWorldDestination)) { notification in
             if let destination = notification.userInfo?["destination"] as? SmallWorldDestination {

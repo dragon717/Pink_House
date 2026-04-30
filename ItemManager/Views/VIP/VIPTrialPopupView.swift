@@ -6,7 +6,43 @@ struct VIPTrialPopupView: View {
     var onConfirm: () -> Void
     var onDismiss: () -> Void
 
+    @ObservedObject private var themeSkinManager = ThemeSkinManager.shared
     @State private var showContent = false
+
+    private var themeSkinDescriptor: ThemeSkinDescriptor? {
+        if let descriptor = themeSkinManager.activeThemeDescriptor(for: .sectionCard, state: .default),
+           VIPThemeSkinSupport.isSupported(descriptor) {
+            return descriptor
+        }
+        return nil
+    }
+
+    private var isThemeSkinActive: Bool {
+        VIPThemeSkinSupport.isSupported(themeSkinDescriptor)
+    }
+
+    private var primaryTextColor: Color {
+        themeSkinDescriptor.map { SkyConcertThemeSkin.labelColor(for: $0) } ?? .white
+    }
+
+    private var secondaryTextColor: Color {
+        themeSkinDescriptor.map { SkyConcertThemeSkin.labelColor(for: $0).opacity(0.72) }
+            ?? visualTheme.secondaryTextColor
+    }
+
+    private var accentColor: Color {
+        themeSkinDescriptor.map { SkyConcertThemeSkin.accent(for: $0) } ?? visualTheme.accentColor
+    }
+
+    private var popupStrokeColor: Color {
+        themeSkinDescriptor.map { SkyConcertThemeSkin.shellStroke(for: $0).opacity(0.88) }
+            ?? visualTheme.primaryGlassStyle.strokeColor.opacity(0.85)
+    }
+
+    private var popupShadowColor: Color {
+        themeSkinDescriptor.map { SkyConcertThemeSkin.shadowColor(for: $0).opacity(0.78) }
+            ?? visualTheme.primaryGlassStyle.glowColor
+    }
 
     init(
         visualTheme: VIPVisualTheme = VIPManager.shared.preferredVisualTheme,
@@ -106,9 +142,9 @@ struct VIPTrialPopupView: View {
         .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 28, style: .continuous)
-                .stroke(visualTheme.primaryGlassStyle.strokeColor.opacity(0.85), lineWidth: 1)
+                .stroke(popupStrokeColor, lineWidth: isThemeSkinActive ? 1.2 : 1)
         )
-        .shadow(color: visualTheme.primaryGlassStyle.glowColor, radius: 24, x: 0, y: 12)
+        .shadow(color: popupShadowColor, radius: 24, x: 0, y: 12)
     }
 
     private func popupContent(
@@ -121,15 +157,15 @@ struct VIPTrialPopupView: View {
             VStack(spacing: sectionSpacing) {
                 Image(systemName: "sparkles")
                     .font(.system(size: isCompactHeight ? 22 : 24, weight: .bold))
-                    .foregroundStyle(visualTheme.accentColor)
+                    .foregroundStyle(accentColor)
 
                 Text("先体验 3 天 VIP")
                     .font(.system(size: isCompactHeight ? 22 : 24, weight: .bold))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(primaryTextColor)
 
                 Text("解锁智能能力、尊贵身份与会员优惠")
                     .font(.system(size: 14, weight: .medium))
-                    .foregroundStyle(visualTheme.secondaryTextColor)
+                    .foregroundStyle(secondaryTextColor)
                     .multilineTextAlignment(.center)
             }
 
@@ -141,7 +177,7 @@ struct VIPTrialPopupView: View {
 
             Text("体验结束后可继续兑换 1个月 / 3个月 会员时长")
                 .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(Color.white.opacity(0.54))
+                .foregroundStyle(secondaryTextColor.opacity(0.76))
                 .multilineTextAlignment(.center)
 
             VStack(spacing: 10) {
@@ -156,25 +192,16 @@ struct VIPTrialPopupView: View {
                         Text("确认体验")
                     }
                     .font(.system(size: 17, weight: .bold))
-                    .foregroundStyle(Color.black.opacity(0.92))
+                    .foregroundStyle(isThemeSkinActive ? primaryTextColor : Color.black.opacity(0.92))
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 16)
-                    .background(
-                        LinearGradient(
-                            colors: [
-                                visualTheme.accentColor,
-                                visualTheme.accentColor.opacity(0.82)
-                            ],
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        )
-                    )
+                    .background(confirmButtonBackground)
                     .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
                     .overlay(
                         RoundedRectangle(cornerRadius: 18, style: .continuous)
-                            .stroke(Color.white.opacity(0.18), lineWidth: 1)
+                            .stroke(isThemeSkinActive ? popupStrokeColor : Color.white.opacity(0.18), lineWidth: 1)
                     )
-                    .shadow(color: visualTheme.glowColor, radius: 18, x: 0, y: 8)
+                    .shadow(color: popupShadowColor, radius: 18, x: 0, y: 8)
                 }
                 .captureGuideTarget(.aiAnalysisVIPTrialConfirmButton)
 
@@ -183,7 +210,7 @@ struct VIPTrialPopupView: View {
                 } label: {
                     Text("稍后")
                         .font(.system(size: 15, weight: .medium))
-                        .foregroundStyle(Color.white.opacity(0.72))
+                        .foregroundStyle(secondaryTextColor)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 12)
                 }
@@ -192,21 +219,74 @@ struct VIPTrialPopupView: View {
         .frame(maxWidth: .infinity)
     }
 
+    @ViewBuilder
     private var popupBackground: some View {
-        ZStack {
+        if let descriptor = themeSkinDescriptor {
+            ZStack {
+                LinearGradient(
+                    colors: [
+                        SkyConcertThemeSkin.shellFillTop(for: descriptor).opacity(0.98),
+                        SkyConcertThemeSkin.accentSoft(for: descriptor).opacity(SwanDreamThemeSkin.isSwanDream(descriptor) ? 0.72 : 0.52),
+                        SkyConcertThemeSkin.shellFillBottom(for: descriptor).opacity(0.94)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+
+                if SkyConcertThemeSkin.isSkyConcert(descriptor) {
+                    SkyConcertDecorationLayer(placements: SkyConcertThemeSkin.statsCardPlacements)
+                        .opacity(0.48)
+                } else if SwanDreamThemeSkin.isSwanDream(descriptor) {
+                    SkyConcertDecorationLayer(
+                        placements: SwanDreamThemeSkin.statsCardPlacements,
+                        namespace: SwanDreamThemeSkin.namespace
+                    )
+                    .opacity(0.5)
+                }
+
+                RoundedRectangle(cornerRadius: 28, style: .continuous)
+                    .fill(Color.white.opacity(0.12))
+                    .blendMode(.softLight)
+            }
+        } else {
+            ZStack {
+                LinearGradient(
+                    colors: visualTheme.backgroundGradientColors,
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+
+                Circle()
+                    .fill(visualTheme.glowColor)
+                    .frame(width: 180, height: 180)
+                    .blur(radius: 42)
+                    .offset(x: -76, y: -120)
+
+                VIPGlassCardBackground(glassStyle: visualTheme.primaryGlassStyle, cornerRadius: 28)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var confirmButtonBackground: some View {
+        if let descriptor = themeSkinDescriptor {
             LinearGradient(
-                colors: visualTheme.backgroundGradientColors,
+                colors: [
+                    SkyConcertThemeSkin.accent(for: descriptor).opacity(0.94),
+                    SkyConcertThemeSkin.shellStroke(for: descriptor).opacity(0.82)
+                ],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
-
-            Circle()
-                .fill(visualTheme.glowColor)
-                .frame(width: 180, height: 180)
-                .blur(radius: 42)
-                .offset(x: -76, y: -120)
-
-            VIPGlassCardBackground(glassStyle: visualTheme.primaryGlassStyle, cornerRadius: 28)
+        } else {
+            LinearGradient(
+                colors: [
+                    visualTheme.accentColor,
+                    visualTheme.accentColor.opacity(0.82)
+                ],
+                startPoint: .leading,
+                endPoint: .trailing
+            )
         }
     }
 
@@ -214,20 +294,20 @@ struct VIPTrialPopupView: View {
         HStack(spacing: 12) {
             Image(systemName: icon)
                 .font(.system(size: 16, weight: .bold))
-                .foregroundStyle(visualTheme.primaryGlassStyle.iconTint)
+                .foregroundStyle(isThemeSkinActive ? accentColor : visualTheme.primaryGlassStyle.iconTint)
                 .frame(width: 26, height: 26)
 
             Text(text)
                 .font(.system(size: 14, weight: .medium))
-                .foregroundStyle(.white)
+                .foregroundStyle(primaryTextColor)
 
             Spacer()
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 12)
-        .background(
+        .themeSkinAdaptiveSectionCard(slot: .sectionCard, cornerRadius: 18, showsDecoration: false) {
             VIPGlassCardBackground(glassStyle: .glossBlack, cornerRadius: 18)
-        )
+        }
     }
 
     private func dismissPopup() {

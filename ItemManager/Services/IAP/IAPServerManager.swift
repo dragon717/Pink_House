@@ -51,10 +51,7 @@ class IAPServerManager: ObservableObject {
             return false
         }
 
-        switch productType {
-        case .meowCoin60, .meowCoin120, .meowCoin300, .meowCoin500, .meowCoin1280, .meowCoin3280:
-            return await deliverMeowCoins(for: transaction, productType: productType)
-        }
+        return await deliverMeowCoins(for: transaction, productType: productType)
     }
 
     // MARK: - 发放喵币

@@ -12,6 +12,190 @@ import Foundation
 import UIKit
 #endif
 
+struct WardrobeCellSnapshot: Identifiable, Equatable, Sendable {
+    let id: UUID
+    let name: String
+    let brandName: String?
+    let originalPrice: Decimal
+    let price: Decimal
+    let imagePaths: [String]
+    let stock: Int
+    let isDepositPlan: Bool
+    let totalDeposit: Decimal
+    let totalBalance: Decimal
+    let inventoryTotalPrice: Decimal
+    let is3DModel: Bool
+    let model3DTypeDescription: String?
+    let types: String
+    let colors: String
+    let sizes: String
+    let tagNames: [String]
+
+    var firstImagePath: String? {
+        imagePaths.first
+    }
+
+    @MainActor
+    init(clothing: Clothing) {
+        self.id = clothing.id
+        self.name = clothing.name
+        self.brandName = clothing.brand?.name
+        self.originalPrice = clothing.originalPrice
+        self.price = clothing.price
+        self.imagePaths = clothing.imagePaths
+        self.stock = clothing.stock
+        self.isDepositPlan = clothing.isDepositPlan
+        self.totalDeposit = clothing.totalDeposit
+        self.totalBalance = clothing.totalBalance
+        self.inventoryTotalPrice = clothing.inventoryTotalPrice
+        self.is3DModel = clothing.is3DModel
+        self.model3DTypeDescription = clothing.model3DTypeDescription
+        self.types = clothing.types
+        self.colors = clothing.colors
+        self.sizes = clothing.sizes
+        self.tagNames = clothing.tags?.map(\.name) ?? []
+    }
+}
+
+struct WardrobeCellThemeInputs: Hashable, Sendable {
+    let cardStyleRawValue: String
+    let skirtFillModeRawValue: String
+    let isDarkMode: Bool
+    let cardBackgroundHex: String
+    let cardTintHex: String
+    let transparentOpacity: Double
+    let tintOpacity: Double
+
+    nonisolated static let fallback = WardrobeCellThemeInputs(
+        cardStyleRawValue: "solid",
+        skirtFillModeRawValue: "transparent",
+        isDarkMode: false,
+        cardBackgroundHex: "#FFFFFF",
+        cardTintHex: "#FFB6C1",
+        transparentOpacity: 1.0,
+        tintOpacity: 0.2
+    )
+
+    @MainActor
+    static func current(themeManager: ThemeManager, colorScheme: ColorScheme) -> WardrobeCellThemeInputs {
+        WardrobeCellThemeInputs(
+            cardStyleRawValue: themeManager.cardStyle.rawValue,
+            skirtFillModeRawValue: themeManager.skirtFillMode.rawValue,
+            isDarkMode: colorScheme == .dark,
+            cardBackgroundHex: themeManager.cardBackgroundColor.toHex(),
+            cardTintHex: themeManager.cardTintColor.toHex(),
+            transparentOpacity: themeManager.transparentOpacity,
+            tintOpacity: themeManager.tintOpacity
+        )
+    }
+
+    private var cardStyle: CardStyle {
+        CardStyle(rawValue: cardStyleRawValue) ?? .solid
+    }
+
+    private var skirtFillMode: SkirtFillMode {
+        SkirtFillMode(rawValue: skirtFillModeRawValue) ?? .transparent
+    }
+
+    private var cardBackgroundColor: Color {
+        Color(hex: cardBackgroundHex)
+    }
+
+    private var cardTintColor: Color {
+        Color(hex: cardTintHex)
+    }
+
+    var listCardFillColor: Color {
+        switch cardStyle {
+        case .fullyTransparent:
+            return Color.clear
+        case .transparent:
+            return cardBackgroundColor.opacity(max(transparentOpacity, 0.18))
+        case .tinted:
+            return cardBackgroundColor.opacity(max(tintOpacity, 0.18))
+        case .solid:
+            return cardBackgroundColor
+        }
+    }
+
+    var listCardStrokeColor: Color {
+        cardTintColor.opacity(listCardStrokeOpacity)
+    }
+
+    private var listCardStrokeOpacity: Double {
+        switch cardStyle {
+        case .fullyTransparent:
+            return 0.18
+        case .transparent, .tinted:
+            return 0.24
+        case .solid:
+            return 0.12
+        }
+    }
+
+    var imageBackgroundColor: Color {
+        switch skirtFillMode {
+        case .transparent:
+            return isDarkMode ? Color.black.opacity(0.2) : Color.white.opacity(0.4)
+        case .fullyTransparent:
+            return Color.clear
+        case .tinted:
+            return cardTintColor.opacity(isDarkMode ? 0.15 : 0.3)
+        case .solid:
+            return isDarkMode ? Color.black.opacity(0.6) : Color.white.opacity(0.8)
+        }
+    }
+}
+
+private struct WardrobeListCellContainer<Content: View>: View {
+    let cornerRadius: CGFloat
+    let padding: CGFloat
+    let themeInputs: WardrobeCellThemeInputs
+    let content: Content
+
+    init(
+        cornerRadius: CGFloat,
+        padding: CGFloat,
+        themeInputs: WardrobeCellThemeInputs = .fallback,
+        @ViewBuilder content: () -> Content
+    ) {
+        self.cornerRadius = cornerRadius
+        self.padding = padding
+        self.themeInputs = themeInputs
+        self.content = content()
+    }
+
+    var body: some View {
+        ZStack {
+            WardrobeListCellBackground(cornerRadius: cornerRadius, themeInputs: themeInputs)
+
+            content
+                .padding(padding)
+        }
+        .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+        .shadow(color: .black.opacity(0.02), radius: 1, x: 0, y: 1)
+    }
+}
+
+struct WardrobeListCellBackground: View {
+    let cornerRadius: CGFloat
+    let themeInputs: WardrobeCellThemeInputs
+
+    init(cornerRadius: CGFloat, themeInputs: WardrobeCellThemeInputs = .fallback) {
+        self.cornerRadius = cornerRadius
+        self.themeInputs = themeInputs
+    }
+
+    var body: some View {
+        RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+            .fill(themeInputs.listCardFillColor)
+            .overlay(
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .strokeBorder(themeInputs.listCardStrokeColor, lineWidth: 1)
+            )
+    }
+}
+
 // 修复 Linter 错误：确保 Clothing 类型可见
 // 注意：Clothing 类型定义在其他文件中，这里需要确保模块访问正确
 // 如果是同一个 Target，通常不需要 import ItemManager，但有时编译器会抽风
@@ -23,69 +207,144 @@ import UIKit
 
 struct ClothingCard: View, Equatable {
     static func == (lhs: ClothingCard, rhs: ClothingCard) -> Bool {
-        guard lhs.clothing.id == rhs.clothing.id else { return false }
-        guard lhs.clothing.name == rhs.clothing.name else { return false }
-        guard lhs.clothing.originalPrice == rhs.clothing.originalPrice else { return false }
-        guard lhs.clothing.price == rhs.clothing.price else { return false }
-        guard lhs.clothing.imagePaths == rhs.clothing.imagePaths else { return false }
-        return lhs.clothing.stock == rhs.clothing.stock
+        lhs.snapshot == rhs.snapshot &&
+        lhs.showPrice == rhs.showPrice &&
+        lhs.showOriginalPrice == rhs.showOriginalPrice &&
+        lhs.wardrobeThemeDescriptor == rhs.wardrobeThemeDescriptor &&
+        lhs.imageTargetSize == rhs.imageTargetSize &&
+        lhs.themeInputs == rhs.themeInputs
     }
     
-    let clothing: Clothing
+    let snapshot: WardrobeCellSnapshot
+    let showPrice: Bool
+    let showOriginalPrice: Bool
+    let wardrobeThemeDescriptor: ThemeSkinDescriptor?
+    let imageTargetSize: CGSize
+    let themeInputs: WardrobeCellThemeInputs
     
-    @ObservedObject private var themeSkinManager = ThemeSkinManager.shared
-    @Environment(ThemeManager.self) private var themeManager
-    @Environment(\.colorScheme) private var colorScheme
     @Environment(\.containerPalette) private var palette
-    
-    // 调试：打印容器配色
-    private var debugPalette: String {
-        print("📦 ClothingCard palette: primary=\(palette.primary)")
-        return ""
-    }
-    @AppStorage("privacyShowPrice") private var showPrice = true
-    @AppStorage("privacyShowOriginalPrice") private var showOriginalPrice = true
     @State private var image: UIImage?
-    @State private var isHovering = false
 
-    private var wardrobeThemeDescriptor: ThemeSkinDescriptor? {
-        themeSkinManager.descriptor(for: .wardrobeItemCard)
+    @MainActor
+    init(
+        snapshot: WardrobeCellSnapshot,
+        showPrice: Bool = UserDefaults.standard.object(forKey: "privacyShowPrice") as? Bool ?? true,
+        showOriginalPrice: Bool = UserDefaults.standard.object(forKey: "privacyShowOriginalPrice") as? Bool ?? true,
+        imageTargetSize: CGSize = CGSize(width: 160, height: 160),
+        themeInputs: WardrobeCellThemeInputs = .fallback
+    ) {
+        self.init(
+            snapshot: snapshot,
+            showPrice: showPrice,
+            showOriginalPrice: showOriginalPrice,
+            wardrobeThemeDescriptor: ThemeSkinManager.shared.descriptor(for: .wardrobeItemCard),
+            imageTargetSize: imageTargetSize,
+            themeInputs: themeInputs
+        )
     }
 
-    private var isGirlClosetThemed: Bool {
-        WardrobeThemeSkinSupport.isGirlClosetDescriptor(wardrobeThemeDescriptor)
+    @MainActor
+    init(
+        snapshot: WardrobeCellSnapshot,
+        showPrice: Bool,
+        showOriginalPrice: Bool,
+        wardrobeThemeDescriptor: ThemeSkinDescriptor?,
+        imageTargetSize: CGSize = CGSize(width: 160, height: 160),
+        themeInputs: WardrobeCellThemeInputs = .fallback
+    ) {
+        self.snapshot = snapshot
+        self.showPrice = showPrice
+        self.showOriginalPrice = showOriginalPrice
+        self.wardrobeThemeDescriptor = wardrobeThemeDescriptor
+        self.imageTargetSize = imageTargetSize
+        self.themeInputs = themeInputs
+    }
+
+    @MainActor
+    init(
+        clothing: Clothing,
+        showPrice: Bool = UserDefaults.standard.object(forKey: "privacyShowPrice") as? Bool ?? true,
+        showOriginalPrice: Bool = UserDefaults.standard.object(forKey: "privacyShowOriginalPrice") as? Bool ?? true,
+        imageTargetSize: CGSize = CGSize(width: 160, height: 160),
+        themeInputs: WardrobeCellThemeInputs = .fallback
+    ) {
+        self.init(
+            snapshot: WardrobeCellSnapshot(clothing: clothing),
+            showPrice: showPrice,
+            showOriginalPrice: showOriginalPrice,
+            imageTargetSize: imageTargetSize,
+            themeInputs: themeInputs
+        )
+    }
+
+    @MainActor
+    init(
+        clothing: Clothing,
+        showPrice: Bool,
+        showOriginalPrice: Bool,
+        wardrobeThemeDescriptor: ThemeSkinDescriptor?,
+        imageTargetSize: CGSize = CGSize(width: 160, height: 160),
+        themeInputs: WardrobeCellThemeInputs = .fallback
+    ) {
+        self.init(
+            snapshot: WardrobeCellSnapshot(clothing: clothing),
+            showPrice: showPrice,
+            showOriginalPrice: showOriginalPrice,
+            wardrobeThemeDescriptor: wardrobeThemeDescriptor,
+            imageTargetSize: imageTargetSize,
+            themeInputs: themeInputs
+        )
+    }
+
+    private var isThemeSkinThemed: Bool {
+        WardrobeThemeSkinSupport.isThemeSkinDescriptor(wardrobeThemeDescriptor)
+    }
+
+    private var imageTaskKey: String {
+        "\(snapshot.firstImagePath ?? "nil")_\(Int(imageTargetSize.width))x\(Int(imageTargetSize.height))"
+    }
+
+    private var titleColor: Color {
+        isThemeSkinThemed ? SkyConcertThemeSkin.labelColor(for: wardrobeThemeDescriptor) : palette.primary
+    }
+
+    private func badgeFillColor(for tint: Color) -> Color {
+        isThemeSkinThemed ? tint.opacity(0.18) : tint.opacity(0.88)
+    }
+
+    private func badgeForegroundColor(for tint: Color) -> Color {
+        isThemeSkinThemed ? tint : .white
+    }
+
+    @ViewBuilder
+    private func wardrobeCellBadge(text: String, tint: Color, icon: String? = nil) -> some View {
+        HStack(spacing: 3) {
+            if let icon {
+                Image(systemName: icon)
+                    .font(.system(size: 8, weight: .bold))
+            }
+            Text(text)
+                .font(.system(size: 10, weight: .bold))
+                .lineLimit(1)
+        }
+        .padding(.horizontal, 6)
+        .padding(.vertical, 4)
+        .foregroundStyle(badgeForegroundColor(for: tint))
+        .background(badgeFillColor(for: tint))
+        .clipShape(Capsule())
     }
     
     var body: some View {
-        WardrobeThemeClothingCardContainer {
+        WardrobeThemeClothingCardContainer(
+            descriptor: wardrobeThemeDescriptor,
+            scrollOptimized: true,
+            themeInputs: themeInputs
+        ) {
             VStack(alignment: .leading, spacing: 0) {
                 // Image Area
                 ZStack(alignment: .topTrailing) {
                     // Background Fill
-                    Group {
-                        switch themeManager.skirtFillMode {
-                        case .transparent:
-                            if colorScheme == .dark {
-                                Color.black.opacity(0.2)
-                            } else {
-                                Color.white.opacity(0.4)
-                            }
-                        case .fullyTransparent:
-                            Color.clear
-                        case .tinted:
-                            if colorScheme == .dark {
-                                themeManager.cardTintColor.opacity(0.15)
-                            } else {
-                                themeManager.cardTintColor.opacity(0.3)
-                            }
-                        case .solid:
-                            if colorScheme == .dark {
-                                Color.black.opacity(0.6)
-                            } else {
-                                Color.white.opacity(0.8)
-                            }
-                        }
-                    }
+                    themeInputs.imageBackgroundColor
                     
                     if let uiImage = image {
                         Color.clear
@@ -93,98 +352,64 @@ struct ClothingCard: View, Equatable {
                             .overlay(
                                 Image(uiImage: uiImage)
                                     .resizable()
+                                    .interpolation(.medium)
                                     .scaledToFit()
                             )
                             .clipped()
                     } else {
                         // 使用支持主题配色的占位图
-                        ThemedPlaceholderView()
+                        ThemedPlaceholderView(themeInputs: themeInputs)
                             .aspectRatio(1, contentMode: .fit)
                     }
                     
                     // 3D模型标签
-                    if clothing.is3DModel, let typeDesc = clothing.model3DTypeDescription {
-                        if isGirlClosetThemed {
-                            WardrobeThemeCornerBadge(
-                                text: typeDesc,
-                                tint: Color(hex: "9E86B8"),
-                                icon: "cube.transparent"
-                            )
-                            .padding(8)
-                        } else {
-                            Text(typeDesc)
-                                .font(.system(size: 10, weight: .bold))
-                                .padding(.horizontal, 6)
-                                .padding(.vertical, 4)
-                                .background(Color.purple.opacity(0.9))
-                                .foregroundStyle(.white)
-                                .clipShape(RoundedRectangle(cornerRadius: 4))
-                                .padding(8)
-                        }
+                    if snapshot.is3DModel, let typeDesc = snapshot.model3DTypeDescription {
+                        wardrobeCellBadge(
+                            text: typeDesc,
+                            tint: Color(hex: "9E86B8"),
+                            icon: "cube.transparent"
+                        )
+                        .padding(8)
                     }
                     
-                    if clothing.isDepositPlan {
-                        if isGirlClosetThemed {
-                            WardrobeThemeCornerBadge(
-                                text: "心愿尾款",
-                                tint: Color(hex: "7A5A54"),
-                                icon: "heart.fill"
-                            )
-                            .padding(8)
-                        } else {
-                            Text("心愿尾款")
-                                .font(.system(size: 10, weight: .medium))
-                                .padding(.horizontal, 6)
-                                .padding(.vertical, 4)
-                                .background(Color(hex: "5D4037").opacity(0.8))
-                                .foregroundStyle(.white)
-                                .clipShape(RoundedRectangle(cornerRadius: 4))
-                                .padding(8)
-                        }
+                    if snapshot.isDepositPlan {
+                        wardrobeCellBadge(
+                            text: "心愿尾款",
+                            tint: Color(hex: "7A5A54"),
+                            icon: "heart.fill"
+                        )
+                        .padding(8)
                     }
                     
-                    if clothing.stock > 1 {
+                    if snapshot.stock > 1 {
                         VStack {
                             Spacer()
                             HStack {
                                 Spacer()
-                                if isGirlClosetThemed {
-                                    WardrobeThemeCornerBadge(
-                                        text: "x\(clothing.stock)",
-                                        tint: Color(hex: "8A5C6F"),
-                                        icon: "shippingbox.fill"
-                                    )
-                                    .padding(8)
-                                } else {
-                                    Text("x\(clothing.stock)")
-                                        .font(.system(size: 10, weight: .bold))
-                                        .padding(.horizontal, 6)
-                                        .padding(.vertical, 4)
-                                        .background(Color.black.opacity(0.6))
-                                        .foregroundStyle(.white)
-                                        .clipShape(RoundedRectangle(cornerRadius: 4))
-                                        .padding(8)
-                                }
+                                wardrobeCellBadge(
+                                    text: "x\(snapshot.stock)",
+                                    tint: Color(hex: "8A5C6F"),
+                                    icon: "shippingbox.fill"
+                                )
+                                .padding(8)
                             }
                         }
                     }
                 }
                 // 图片区域圆角和阴影 - 增强层次感
                 .clipShape(RoundedRectangle(cornerRadius: 12))
-                .shadow(color: .black.opacity(0.08), radius: 4, x: 0, y: 4)
                 .padding(8)
-                .task {
-                    if let imagePath = clothing.imagePaths.first {
-                        // Grid 2 (卡片): 文档建议 200x200 (Points)
-                        // 之前是 500x500，内存优化降级
-                        let size = CGSize(width: 200, height: 200)
+                .task(id: imageTaskKey) {
+                    if let imagePath = snapshot.firstImagePath {
+                        let size = imageTargetSize
                         if let cached = ImageManager.shared.cachedImage(fileName: imagePath, targetSize: size) {
                             self.image = cached
                             return
                         }
-                        try? await Task.sleep(nanoseconds: 50_000_000)
                         if Task.isCancelled { return }
-                        self.image = await ImageManager.shared.loadImageAsync(fileName: imagePath, targetSize: size)
+                        let loadedImage = await ImageManager.shared.loadImageAsync(fileName: imagePath, targetSize: size, priority: .userInitiated)
+                        if Task.isCancelled { return }
+                        self.image = loadedImage
                     } else {
                         // 当图片被全部删除时，清空 image 以显示占位图
                         self.image = nil
@@ -193,30 +418,32 @@ struct ClothingCard: View, Equatable {
                 
                 // Info Area
                 VStack(alignment: .leading, spacing: 0) {
-                    if isGirlClosetThemed {
-                        WardrobeThemeCardTitle(title: clothing.name)
-                    } else {
-                        Text(clothing.name)
-                            .font(.system(size: 13, weight: .medium))
+                    HStack(spacing: 4) {
+                        if isThemeSkinThemed {
+                            Image(systemName: "sparkles")
+                                .font(.system(size: 9, weight: .bold))
+                        }
+                        Text(snapshot.name)
                             .lineLimit(1)
-                            .foregroundStyle(palette.primary)
-                            .frame(maxWidth: .infinity, alignment: .leading)
                     }
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(titleColor)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                     
                     Spacer(minLength: 4)
                     
                     VStack(alignment: .leading, spacing: 2) {
-                        if showOriginalPrice && clothing.originalPrice > 0 && !clothing.isDepositPlan {
-                            Text("原价¥\(clothing.originalPrice, format: .number.precision(.fractionLength(0)))")
+                        if showOriginalPrice && snapshot.originalPrice > 0 && !snapshot.isDepositPlan {
+                            Text("原价¥\(snapshot.originalPrice, format: .number.precision(.fractionLength(0)))")
                                 .font(.system(size: 10))
                                 .strikethrough()
                                 .foregroundStyle(palette.secondary)
                         }
                         
                         if showPrice {
-                            if clothing.isDepositPlan {
-                                let totalDeposit = clothing.totalDeposit
-                                let totalBalance = clothing.totalBalance
+                            if snapshot.isDepositPlan {
+                                let totalDeposit = snapshot.totalDeposit
+                                let totalBalance = snapshot.totalBalance
                                 HStack(spacing: 4) {
                                     Text("定金¥\(totalDeposit, format: .number.precision(.fractionLength(0)))")
                                     Text("尾款¥\(totalBalance, format: .number.precision(.fractionLength(0)))")
@@ -226,7 +453,7 @@ struct ClothingCard: View, Equatable {
                                 .lineLimit(1)
                                 .minimumScaleFactor(0.8)
                             } else {
-                                let totalWithAccessories = clothing.inventoryTotalPrice
+                                let totalWithAccessories = snapshot.inventoryTotalPrice
                                 Text("¥\(totalWithAccessories, format: .number.precision(.fractionLength(2)))")
                                     .font(.system(size: 15, weight: .semibold))
                                     .foregroundStyle(palette.primary)
@@ -239,33 +466,47 @@ struct ClothingCard: View, Equatable {
                 .frame(height: 60)
             }
         }
-        // 应用容器就近配色
-        .containerAdaptiveColors(background: .ultraThinMaterial)
-        // 卡片整体阴影和悬浮动画 - 针对低端设备优化阴影
-        .shadow(
-            color: .black.opacity(isHovering ? 0.12 : 0.06),
-            radius: ProcessInfo.processInfo.physicalMemory <= 2 * 1024 * 1024 * 1024 ? (isHovering ? 4 : 2) : (isHovering ? 12 : 8),
-            x: 0,
-            y: isHovering ? 6 : 3
-        )
-        .scaleEffect(isHovering ? 1.02 : 1.0)
-        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isHovering)
-        .onHover { hovering in
-            isHovering = hovering
-        }
     }
 }
 
 struct ClothingThumbnail: View, Equatable {
     static func == (lhs: ClothingThumbnail, rhs: ClothingThumbnail) -> Bool {
-        return lhs.clothing.id == rhs.clothing.id &&
-               lhs.clothing.imagePaths == rhs.clothing.imagePaths
+        lhs.snapshot == rhs.snapshot &&
+        lhs.imageTargetSize == rhs.imageTargetSize &&
+        lhs.themeInputs == rhs.themeInputs
     }
     
-    let clothing: Clothing
-    @Environment(ThemeManager.self) private var themeManager
-    @Environment(\.containerPalette) private var palette
+    let snapshot: WardrobeCellSnapshot
+    let imageTargetSize: CGSize
+    let themeInputs: WardrobeCellThemeInputs
     @State private var image: UIImage?
+
+    init(
+        snapshot: WardrobeCellSnapshot,
+        imageTargetSize: CGSize = CGSize(width: 64, height: 64),
+        themeInputs: WardrobeCellThemeInputs = .fallback
+    ) {
+        self.snapshot = snapshot
+        self.imageTargetSize = imageTargetSize
+        self.themeInputs = themeInputs
+    }
+
+    @MainActor
+    init(
+        clothing: Clothing,
+        imageTargetSize: CGSize = CGSize(width: 64, height: 64),
+        themeInputs: WardrobeCellThemeInputs = .fallback
+    ) {
+        self.init(
+            snapshot: WardrobeCellSnapshot(clothing: clothing),
+            imageTargetSize: imageTargetSize,
+            themeInputs: themeInputs
+        )
+    }
+
+    private var imageTaskKey: String {
+        "\(snapshot.firstImagePath ?? "nil")_\(Int(imageTargetSize.width))x\(Int(imageTargetSize.height))"
+    }
     
     var body: some View {
         ZStack(alignment: .bottomTrailing) {
@@ -275,28 +516,28 @@ struct ClothingThumbnail: View, Equatable {
                     .overlay(
                         Image(uiImage: uiImage)
                             .resizable()
+                            .interpolation(.low)
                             .scaledToFit()
                     )
                     .clipShape(RoundedRectangle(cornerRadius: 4))
             } else {
                 // 使用主题色的占位图，保持配色统一
-                ThemedPlaceholderView(iconSize: 14)
+                ThemedPlaceholderView(iconSize: 14, themeInputs: themeInputs)
                     .aspectRatio(1, contentMode: .fit)
                     .clipShape(RoundedRectangle(cornerRadius: 4))
             }
         }
-        .task {
-            if let imagePath = clothing.imagePaths.first {
-                // Grid 6: 文档建议 80x80 (Points)
-                // 之前是 200x200
-                let size = CGSize(width: 80, height: 80)
+        .task(id: imageTaskKey) {
+            if let imagePath = snapshot.firstImagePath {
+                let size = imageTargetSize
                 if let cached = ImageManager.shared.cachedImage(fileName: imagePath, targetSize: size) {
                     self.image = cached
                     return
                 }
-                try? await Task.sleep(nanoseconds: 50_000_000)
                 if Task.isCancelled { return }
-                self.image = await ImageManager.shared.loadImageAsync(fileName: imagePath, targetSize: size)
+                let loadedImage = await ImageManager.shared.loadImageAsync(fileName: imagePath, targetSize: size, priority: .userInitiated)
+                if Task.isCancelled { return }
+                self.image = loadedImage
             } else {
                 // 当图片被全部删除时，清空 image 以显示占位图
                 self.image = nil
@@ -308,38 +549,19 @@ struct ClothingThumbnail: View, Equatable {
 /// 支持主题配色的占位图视图
 struct ThemedPlaceholderView: View {
     var iconSize: CGFloat = 30
+    let themeInputs: WardrobeCellThemeInputs
     
-    @Environment(ThemeManager.self) private var themeManager
     @Environment(\.containerPalette) private var palette
-    @Environment(\.colorScheme) private var colorScheme
+
+    init(iconSize: CGFloat = 30, themeInputs: WardrobeCellThemeInputs = .fallback) {
+        self.iconSize = iconSize
+        self.themeInputs = themeInputs
+    }
     
     var body: some View {
         ZStack {
             // 背景根据当前配色模式调整
-            Group {
-                switch themeManager.skirtFillMode {
-                case .transparent:
-                    if colorScheme == .dark {
-                        Color.black.opacity(0.2)
-                    } else {
-                        Color.white.opacity(0.4)
-                    }
-                case .fullyTransparent:
-                    Color.clear
-                case .tinted:
-                    if colorScheme == .dark {
-                        themeManager.cardTintColor.opacity(0.15)
-                    } else {
-                        themeManager.cardTintColor.opacity(0.3)
-                    }
-                case .solid:
-                    if colorScheme == .dark {
-                        Color.black.opacity(0.6)
-                    } else {
-                        Color.white.opacity(0.8)
-                    }
-                }
-            }
+            themeInputs.imageBackgroundColor
             
             // 使用主题强调色的渐变
             LinearGradient(
@@ -383,35 +605,128 @@ struct CutePlaceholderView: View {
     }
 }
 
-struct ClothingRow: View {
-    let clothing: Clothing
-    // 直接使用 AppStorage
-    @AppStorage("privacyShowPrice") private var showPrice = true
-    @AppStorage("privacyShowOriginalPrice") private var showOriginalPrice = true
-    @Environment(ThemeManager.self) private var themeManager
+struct ClothingRow: View, Equatable {
+    static func == (lhs: ClothingRow, rhs: ClothingRow) -> Bool {
+        lhs.snapshot == rhs.snapshot &&
+        lhs.showPrice == rhs.showPrice &&
+        lhs.showOriginalPrice == rhs.showOriginalPrice &&
+        lhs.wardrobeThemeDescriptor == rhs.wardrobeThemeDescriptor &&
+        lhs.themeInputs == rhs.themeInputs
+    }
+
+    let snapshot: WardrobeCellSnapshot
+    let showPrice: Bool
+    let showOriginalPrice: Bool
+    let wardrobeThemeDescriptor: ThemeSkinDescriptor?
+    let themeInputs: WardrobeCellThemeInputs
+
     @Environment(\.containerPalette) private var palette
     @State private var image: UIImage?
+
+    @MainActor
+    init(
+        snapshot: WardrobeCellSnapshot,
+        showPrice: Bool = UserDefaults.standard.object(forKey: "privacyShowPrice") as? Bool ?? true,
+        showOriginalPrice: Bool = UserDefaults.standard.object(forKey: "privacyShowOriginalPrice") as? Bool ?? true,
+        themeInputs: WardrobeCellThemeInputs = .fallback
+    ) {
+        self.init(
+            snapshot: snapshot,
+            showPrice: showPrice,
+            showOriginalPrice: showOriginalPrice,
+            wardrobeThemeDescriptor: ThemeSkinManager.shared.descriptor(for: .wardrobeItemCard),
+            themeInputs: themeInputs
+        )
+    }
+
+    init(
+        snapshot: WardrobeCellSnapshot,
+        showPrice: Bool,
+        showOriginalPrice: Bool,
+        wardrobeThemeDescriptor: ThemeSkinDescriptor?,
+        themeInputs: WardrobeCellThemeInputs = .fallback
+    ) {
+        self.snapshot = snapshot
+        self.showPrice = showPrice
+        self.showOriginalPrice = showOriginalPrice
+        self.wardrobeThemeDescriptor = wardrobeThemeDescriptor
+        self.themeInputs = themeInputs
+    }
+
+    @MainActor
+    init(
+        clothing: Clothing,
+        showPrice: Bool = UserDefaults.standard.object(forKey: "privacyShowPrice") as? Bool ?? true,
+        showOriginalPrice: Bool = UserDefaults.standard.object(forKey: "privacyShowOriginalPrice") as? Bool ?? true,
+        themeInputs: WardrobeCellThemeInputs = .fallback
+    ) {
+        self.init(
+            snapshot: WardrobeCellSnapshot(clothing: clothing),
+            showPrice: showPrice,
+            showOriginalPrice: showOriginalPrice,
+            themeInputs: themeInputs
+        )
+    }
+
+    @MainActor
+    init(
+        clothing: Clothing,
+        showPrice: Bool,
+        showOriginalPrice: Bool,
+        wardrobeThemeDescriptor: ThemeSkinDescriptor?,
+        themeInputs: WardrobeCellThemeInputs = .fallback
+    ) {
+        self.init(
+            snapshot: WardrobeCellSnapshot(clothing: clothing),
+            showPrice: showPrice,
+            showOriginalPrice: showOriginalPrice,
+            wardrobeThemeDescriptor: wardrobeThemeDescriptor,
+            themeInputs: themeInputs
+        )
+    }
+
+    private var isThemeSkinThemed: Bool {
+        WardrobeThemeSkinSupport.isThemeSkinDescriptor(wardrobeThemeDescriptor)
+    }
+
+    private var rowPrimaryColor: Color {
+        isThemeSkinThemed ? SkyConcertThemeSkin.labelColor(for: wardrobeThemeDescriptor) : palette.primary
+    }
+
+    private var rowSecondaryColor: Color {
+        isThemeSkinThemed ? SkyConcertThemeSkin.labelColor(for: wardrobeThemeDescriptor).opacity(0.72) : palette.secondary
+    }
+
+    private var rowAccentColor: Color {
+        isThemeSkinThemed ? SkyConcertThemeSkin.accent(for: wardrobeThemeDescriptor) : palette.accent
+    }
     
     var body: some View {
-        GlassCard {
+        WardrobeThemeClothingCardContainer(
+            cornerRadius: 24,
+            descriptor: wardrobeThemeDescriptor,
+            scrollOptimized: true,
+            themeInputs: themeInputs
+        ) {
             HStack(spacing: 16) {
                 // Thumbnail
                 ZStack {
                     if let uiImage = image {
                         Image(uiImage: uiImage)
                             .resizable()
+                            .interpolation(.medium)
                             .scaledToFit()
                             .frame(width: 60, height: 60)
                             .clipShape(RoundedRectangle(cornerRadius: 12))
                     } else {
                         // 使用支持主题配色的占位图
-                        ThemedPlaceholderView(iconSize: 24)
+                        ThemedPlaceholderView(iconSize: 24, themeInputs: themeInputs)
                             .frame(width: 60, height: 60)
                             .clipShape(RoundedRectangle(cornerRadius: 12))
                     }
                 }
-                .task {
-                    if let firstPath = clothing.imagePaths.first {
+                .task(id: snapshot.firstImagePath) {
+                    if let firstPath = snapshot.firstImagePath {
                         // List Detailed: 文档建议 60x60
                         // 之前是 120x120
                         let size = CGSize(width: 60, height: 60)
@@ -419,56 +734,57 @@ struct ClothingRow: View {
                             self.image = cached
                             return
                         }
-                        try? await Task.sleep(nanoseconds: 50_000_000)
                         if Task.isCancelled { return }
-                        self.image = await ImageManager.shared.loadImageAsync(fileName: firstPath, targetSize: size)
+                        let loadedImage = await ImageManager.shared.loadImageAsync(fileName: firstPath, targetSize: size, priority: .userInitiated)
+                        if Task.isCancelled { return }
+                        self.image = loadedImage
                     } else {
                         // 当图片被全部删除时，清空 image 以显示占位图
                         self.image = nil
                     }
                 }
                 .overlay(alignment: .topTrailing) {
-                    if clothing.isDepositPlan {
+                    if snapshot.isDepositPlan {
                         Text("尾款")
                             .font(.system(size: 10, weight: .bold))
                             .foregroundStyle(.white)
                             .padding(.horizontal, 4)
                             .padding(.vertical, 2)
-                            .background(Color.pink)
+                            .background(isThemeSkinThemed ? rowAccentColor : Color.pink)
                             .clipShape(RoundedRectangle(cornerRadius: 4))
                             .offset(x: 4, y: -4)
                     }
                 }
                 
                 VStack(alignment: .leading, spacing: 6) {
-                    Text(clothing.name)
+                    Text(snapshot.name)
                         .font(.headline)
-                        .foregroundStyle(palette.primary)
+                        .foregroundStyle(rowPrimaryColor)
                     
                     // Attribute Display: Type, Color, Size
                     HStack(spacing: 6) {
-                        if !clothing.types.isEmpty {
-                            AttributePill(text: clothing.types, icon: "tshirt", color: palette.accent)
+                        if !snapshot.types.isEmpty {
+                            AttributePill(text: snapshot.types, icon: "tshirt", color: rowAccentColor)
                         }
-                        if !clothing.colors.isEmpty {
-                            AttributePill(text: clothing.colors, icon: "paintpalette", color: palette.secondary)
+                        if !snapshot.colors.isEmpty {
+                            AttributePill(text: snapshot.colors, icon: "paintpalette", color: rowSecondaryColor)
                         }
-                        if !clothing.sizes.isEmpty {
-                            AttributePill(text: clothing.sizes, icon: "ruler", color: palette.tertiary)
+                        if !snapshot.sizes.isEmpty {
+                            AttributePill(text: snapshot.sizes, icon: "ruler", color: isThemeSkinThemed ? rowAccentColor.opacity(0.82) : palette.tertiary)
                         }
                     }
                     
-                    if let tags = clothing.tags, !tags.isEmpty {
+                    if !snapshot.tagNames.isEmpty {
                         HStack(spacing: 4) {
-                            ForEach(tags.prefix(3)) { tag in
-                                Text("#\(tag.name)")
+                            ForEach(Array(snapshot.tagNames.prefix(3).enumerated()), id: \.offset) { _, tagName in
+                                Text("#\(tagName)")
                                     .font(.caption2)
-                                    .foregroundStyle(palette.tertiary)
+                                    .foregroundStyle(isThemeSkinThemed ? rowSecondaryColor : palette.tertiary)
                             }
-                            if tags.count > 3 {
+                            if snapshot.tagNames.count > 3 {
                                 Text("...")
                                     .font(.caption2)
-                                    .foregroundStyle(palette.tertiary)
+                                    .foregroundStyle(isThemeSkinThemed ? rowSecondaryColor : palette.tertiary)
                             }
                         }
                     }
@@ -477,88 +793,170 @@ struct ClothingRow: View {
                 Spacer()
                 
                 VStack(alignment: .trailing, spacing: 4) {
-                    if showOriginalPrice && clothing.originalPrice > 0 {
-                        Text("原价: ¥\(clothing.originalPrice, format: .number.precision(.fractionLength(0)))")
+                    if showOriginalPrice && snapshot.originalPrice > 0 {
+                        Text("原价: ¥\(snapshot.originalPrice, format: .number.precision(.fractionLength(0)))")
                             .font(.caption2)
-                            .foregroundStyle(palette.secondary)
+                            .foregroundStyle(rowSecondaryColor)
                     }
                     
                     if showPrice {
-                        if clothing.isDepositPlan {
+                        if snapshot.isDepositPlan {
                             // 注意：totalDeposit 和 totalBalance 已经包含了 stock 的乘法，所以这里直接使用
-                            let totalDeposit = clothing.totalDeposit
-                            let totalBalance = clothing.totalBalance
+                            let totalDeposit = snapshot.totalDeposit
+                            let totalBalance = snapshot.totalBalance
 
                             Text("定金: ¥\(totalDeposit, format: .number.precision(.fractionLength(0)))")
                                 .font(.caption)
-                                .foregroundStyle(palette.accent)
+                                .foregroundStyle(rowAccentColor)
                             Text("尾款: ¥\(totalBalance, format: .number.precision(.fractionLength(0)))")
                                 .font(.caption)
                                 .bold()
-                                .foregroundStyle(palette.accent)
+                                .foregroundStyle(rowAccentColor)
                         } else {
-                            let totalWithAccessories = clothing.inventoryTotalPrice
+                            let totalWithAccessories = snapshot.inventoryTotalPrice
                             
                             Text("合计: ¥\(totalWithAccessories, format: .number.precision(.fractionLength(0)))")
                                 .font(.subheadline)
                                 .bold()
-                                .foregroundStyle(palette.primary)
+                                .foregroundStyle(rowPrimaryColor)
                         }
                     }
                     
-                    if clothing.stock > 1 {
-                        Text("库存: \(clothing.stock)")
+                    if snapshot.stock > 1 {
+                        Text("库存: \(snapshot.stock)")
                             .font(.caption)
-                            .foregroundStyle(palette.tertiary)
+                            .foregroundStyle(isThemeSkinThemed ? rowSecondaryColor : palette.tertiary)
                     }
                 }
             }
+            .padding(16)
         }
-        .containerAdaptiveColors(background: .ultraThinMaterial)
         .padding(.vertical, 4)
     }
 }
 
-struct ClothingRowBrief: View {
-    let clothing: Clothing
-    // 直接使用 AppStorage
-    @AppStorage("privacyShowPrice") private var showPrice = true
-    @AppStorage("privacyShowOriginalPrice") private var showOriginalPrice = true
-    @Environment(ThemeManager.self) private var themeManager
+struct ClothingRowBrief: View, Equatable {
+    static func == (lhs: ClothingRowBrief, rhs: ClothingRowBrief) -> Bool {
+        lhs.snapshot == rhs.snapshot &&
+        lhs.showPrice == rhs.showPrice &&
+        lhs.showOriginalPrice == rhs.showOriginalPrice &&
+        lhs.wardrobeThemeDescriptor == rhs.wardrobeThemeDescriptor &&
+        lhs.themeInputs == rhs.themeInputs
+    }
+
+    let snapshot: WardrobeCellSnapshot
+    let showPrice: Bool
+    let showOriginalPrice: Bool
+    let wardrobeThemeDescriptor: ThemeSkinDescriptor?
+    let themeInputs: WardrobeCellThemeInputs
+
     @Environment(\.containerPalette) private var palette
     @State private var image: UIImage?
-    
-    /// 安全获取 Clothing 的属性，处理 iCloud 同步期间对象可能失效的情况
-    private func safeGetProperty<T>(_ getter: () throws -> T) -> T? {
-        do {
-            return try getter()
-        } catch {
-            print("ClothingRowBrief: 访问 Clothing 属性失败 - \(error)")
-            return nil
-        }
+
+    @MainActor
+    init(
+        snapshot: WardrobeCellSnapshot,
+        showPrice: Bool = UserDefaults.standard.object(forKey: "privacyShowPrice") as? Bool ?? true,
+        showOriginalPrice: Bool = UserDefaults.standard.object(forKey: "privacyShowOriginalPrice") as? Bool ?? true,
+        themeInputs: WardrobeCellThemeInputs = .fallback
+    ) {
+        self.init(
+            snapshot: snapshot,
+            showPrice: showPrice,
+            showOriginalPrice: showOriginalPrice,
+            wardrobeThemeDescriptor: ThemeSkinManager.shared.descriptor(for: .wardrobeItemCard),
+            themeInputs: themeInputs
+        )
+    }
+
+    init(
+        snapshot: WardrobeCellSnapshot,
+        showPrice: Bool,
+        showOriginalPrice: Bool,
+        wardrobeThemeDescriptor: ThemeSkinDescriptor?,
+        themeInputs: WardrobeCellThemeInputs = .fallback
+    ) {
+        self.snapshot = snapshot
+        self.showPrice = showPrice
+        self.showOriginalPrice = showOriginalPrice
+        self.wardrobeThemeDescriptor = wardrobeThemeDescriptor
+        self.themeInputs = themeInputs
+    }
+
+    @MainActor
+    init(
+        clothing: Clothing,
+        showPrice: Bool = UserDefaults.standard.object(forKey: "privacyShowPrice") as? Bool ?? true,
+        showOriginalPrice: Bool = UserDefaults.standard.object(forKey: "privacyShowOriginalPrice") as? Bool ?? true,
+        themeInputs: WardrobeCellThemeInputs = .fallback
+    ) {
+        self.init(
+            snapshot: WardrobeCellSnapshot(clothing: clothing),
+            showPrice: showPrice,
+            showOriginalPrice: showOriginalPrice,
+            themeInputs: themeInputs
+        )
+    }
+
+    @MainActor
+    init(
+        clothing: Clothing,
+        showPrice: Bool,
+        showOriginalPrice: Bool,
+        wardrobeThemeDescriptor: ThemeSkinDescriptor?,
+        themeInputs: WardrobeCellThemeInputs = .fallback
+    ) {
+        self.init(
+            snapshot: WardrobeCellSnapshot(clothing: clothing),
+            showPrice: showPrice,
+            showOriginalPrice: showOriginalPrice,
+            wardrobeThemeDescriptor: wardrobeThemeDescriptor,
+            themeInputs: themeInputs
+        )
+    }
+
+    private var isThemeSkinThemed: Bool {
+        WardrobeThemeSkinSupport.isThemeSkinDescriptor(wardrobeThemeDescriptor)
+    }
+
+    private var rowPrimaryColor: Color {
+        isThemeSkinThemed ? SkyConcertThemeSkin.labelColor(for: wardrobeThemeDescriptor) : palette.primary
+    }
+
+    private var rowSecondaryColor: Color {
+        isThemeSkinThemed ? SkyConcertThemeSkin.labelColor(for: wardrobeThemeDescriptor).opacity(0.72) : palette.secondary
+    }
+
+    private var rowAccentColor: Color {
+        isThemeSkinThemed ? SkyConcertThemeSkin.accent(for: wardrobeThemeDescriptor) : palette.accent
     }
     
     var body: some View {
-        GlassCard {
+        WardrobeThemeClothingCardContainer(
+            cornerRadius: 24,
+            descriptor: wardrobeThemeDescriptor,
+            scrollOptimized: true,
+            themeInputs: themeInputs
+        ) {
             HStack(spacing: 12) {
                 // Thumbnail (Smaller)
                 ZStack {
                     if let uiImage = image {
                         Image(uiImage: uiImage)
                             .resizable()
+                            .interpolation(.medium)
                             .scaledToFit()
                             .frame(width: 40, height: 40)
                             .clipShape(RoundedRectangle(cornerRadius: 8))
                     } else {
                         // 使用支持主题配色的占位图
-                        ThemedPlaceholderView(iconSize: 16)
+                        ThemedPlaceholderView(iconSize: 16, themeInputs: themeInputs)
                             .frame(width: 40, height: 40)
                             .clipShape(RoundedRectangle(cornerRadius: 8))
                     }
                 }
-                .task {
-                    // 安全访问 imagePaths，防止 iCloud 同步期间对象失效导致崩溃
-                    guard let firstPath = safeGetProperty({ clothing.imagePaths.first })?.flatMap({ $0 }) else {
+                .task(id: snapshot.firstImagePath) {
+                    guard let firstPath = snapshot.firstImagePath else {
                         self.image = nil
                         return
                     }
@@ -570,61 +968,51 @@ struct ClothingRowBrief: View {
                         self.image = cached
                         return
                     }
-                    try? await Task.sleep(nanoseconds: 50_000_000)
                     if Task.isCancelled { return }
-                    self.image = await ImageManager.shared.loadImageAsync(fileName: firstPath, targetSize: size)
+                    let loadedImage = await ImageManager.shared.loadImageAsync(fileName: firstPath, targetSize: size, priority: .userInitiated)
+                    if Task.isCancelled { return }
+                    self.image = loadedImage
                 }
                 
-                // 安全显示名称
-                if let name = safeGetProperty({ clothing.name }) {
-                    Text(name)
-                        .font(.body)
-                        .foregroundStyle(palette.primary)
-                        .lineLimit(1)
-                }
+                Text(snapshot.name)
+                    .font(.body)
+                    .foregroundStyle(rowPrimaryColor)
+                    .lineLimit(1)
 
                 Spacer()
 
-                // 安全访问 brand
-                if let brand = safeGetProperty({ clothing.brand })?.flatMap({ $0 }),
-                   let brandName = safeGetProperty({ brand.name }) {
+                if let brandName = snapshot.brandName {
                     Text(brandName)
                         .font(.caption)
-                        .foregroundStyle(palette.secondary)
+                        .foregroundStyle(rowSecondaryColor)
                         .lineLimit(1)
                 }
 
-                // 安全访问价格信息
                 if showOriginalPrice {
-                    if let originalPrice = safeGetProperty({ clothing.originalPrice }), originalPrice > 0 {
-                        Text("原价¥\(originalPrice, format: .number.precision(.fractionLength(0)))")
+                    if snapshot.originalPrice > 0 {
+                        Text("原价¥\(snapshot.originalPrice, format: .number.precision(.fractionLength(0)))")
                             .font(.caption)
-                            .foregroundStyle(palette.secondary)
+                            .foregroundStyle(rowSecondaryColor)
                     }
                 }
 
                 if showPrice {
-                    if let isDepositPlan = safeGetProperty({ clothing.isDepositPlan }), isDepositPlan {
-                        if let totalDeposit = safeGetProperty({ clothing.totalDeposit }),
-                           let totalBalance = safeGetProperty({ clothing.totalBalance }) {
-                            // 注意：totalDeposit 和 totalBalance 已经包含了 stock 的乘法，所以这里直接使用
-                            Text("定金¥\(totalDeposit, format: .number.precision(.fractionLength(0)))+尾款¥\(totalBalance, format: .number.precision(.fractionLength(0)))")
-                                .font(.caption)
-                                .bold()
-                                .foregroundStyle(palette.accent)
-                        }
+                    if snapshot.isDepositPlan {
+                        // 注意：totalDeposit 和 totalBalance 已经包含了 stock 的乘法，所以这里直接使用
+                        Text("定金¥\(snapshot.totalDeposit, format: .number.precision(.fractionLength(0)))+尾款¥\(snapshot.totalBalance, format: .number.precision(.fractionLength(0)))")
+                            .font(.caption)
+                            .bold()
+                            .foregroundStyle(rowAccentColor)
                     } else {
-                        if let inventoryTotalPrice = safeGetProperty({ clothing.inventoryTotalPrice }) {
-                            Text("¥\(inventoryTotalPrice, format: .number.precision(.fractionLength(0)))")
-                                .font(.subheadline)
-                                .bold()
-                                .foregroundStyle(palette.primary)
-                        }
+                        Text("¥\(snapshot.inventoryTotalPrice, format: .number.precision(.fractionLength(0)))")
+                            .font(.subheadline)
+                            .bold()
+                            .foregroundStyle(rowPrimaryColor)
                     }
                 }
             }
+            .padding(16)
         }
-        .containerAdaptiveColors(background: .ultraThinMaterial)
         .padding(.vertical, 2)
     }
 }

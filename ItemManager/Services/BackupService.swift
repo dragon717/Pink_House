@@ -75,6 +75,7 @@ class BackupService {
         "UserPreference_DepositDisplayMode",
         "UserPreference_WardrobeNavigationStyle",
         "shouldShowWealthContainerBackground",
+        "wealth.finalPaymentVaultMascot",
         "visualModelPriority",
         "textModelPriority",
         "voiceModelId",
@@ -265,15 +266,27 @@ class BackupService {
                     sizeChartImagePath: safeSizeChartImagePath,
                     priceChartImagePath: safePriceChartImagePath,
                     isShared: c.isShared,
+                    originalPrice: c.originalPrice,
+                    originalPriceJPY: c.originalPriceJPY,
+                    originalPriceCurrencyCode: c.originalPriceCurrencyCode,
+                    originalPriceExchangeRateJPY: c.originalPriceExchangeRateJPY,
+                    originalPriceRateUpdatedAt: c.originalPriceRateUpdatedAt,
                     price: c.price,
                     deposit: c.deposit,
                     balance: c.balance,
                     accessoriesPrice: c.accessoriesPrice,
+                    shippingFee: c.shippingFee,
+                    shippingFeeJPY: c.shippingFeeJPY,
+                    shippingFeeCurrencyCode: c.shippingFeeCurrencyCode,
+                    shippingExchangeRateJPY: c.shippingExchangeRateJPY,
+                    shippingRateUpdatedAt: c.shippingRateUpdatedAt,
                     purchaseDate: c.purchaseDate,
                     depositDate: c.depositDate,
                     isDepositPlan: c.isDepositPlan,
                     finalPaymentDate: c.finalPaymentDate,
                     finalPaymentEndDate: c.finalPaymentEndDate,
+                    isFinalPaymentSavedToWealth: c.isFinalPaymentSavedToWealth,
+                    finalPaymentSavedAt: c.finalPaymentSavedAt,
                     note: c.note,
                     stock: c.stock,
                     status: c.status.rawValue,
@@ -285,6 +298,25 @@ class BackupService {
                     lastModified: c.lastModified,
                     replacedCutoutID: c.replacedCutoutID,
                     accessoryItems: accItems
+                )
+            }
+
+            let wealthSavingEntryDTOs: [WealthSavingEntryDTO] = try self.processByIDs(
+                context: context,
+                descriptor: FetchDescriptor<WealthSavingEntry>(),
+                entityName: "WealthSavingEntries"
+            ) { entry in
+                WealthSavingEntryDTO(
+                    id: entry.id,
+                    amount: entry.amount,
+                    clothingID: entry.clothingID,
+                    note: entry.note,
+                    migrationSource: entry.migrationSource,
+                    createdAt: entry.createdAt,
+                    updatedAt: entry.updatedAt,
+                    usedAt: entry.usedAt,
+                    voidedAt: entry.voidedAt,
+                    lastModified: entry.lastModified
                 )
             }
             
@@ -820,6 +852,7 @@ class BackupService {
                 brands: brandDTOs,
                 tags: tagDTOs,
                 clothings: clothingDTOs,
+                wealthSavingEntries: wealthSavingEntryDTOs,
                 storedImages: storedImageDTOs,
                 cutouts: cutoutDTOs,
                 outfits: nil,
@@ -1573,10 +1606,20 @@ class BackupService {
             clothingBack.isShared = dto.isShared ?? false
 
             // Prices: backup data overwrites (user may have updated prices)
+            clothingBack.originalPrice = dto.originalPrice ?? 0
+            clothingBack.originalPriceJPY = dto.originalPriceJPY ?? 0
+            clothingBack.originalPriceCurrencyCode = dto.originalPriceCurrencyCode ?? ClothingPriceCurrency.cny.rawValue
+            clothingBack.originalPriceExchangeRateJPY = dto.originalPriceExchangeRateJPY ?? 21.0
+            clothingBack.originalPriceRateUpdatedAt = dto.originalPriceRateUpdatedAt
             clothingBack.price = dto.price
             clothingBack.deposit = dto.deposit
             clothingBack.balance = dto.balance
             clothingBack.accessoriesPrice = dto.accessoriesPrice ?? 0
+            clothingBack.shippingFee = dto.shippingFee ?? 0
+            clothingBack.shippingFeeJPY = dto.shippingFeeJPY ?? 0
+            clothingBack.shippingFeeCurrencyCode = dto.shippingFeeCurrencyCode ?? ClothingPriceCurrency.cny.rawValue
+            clothingBack.shippingExchangeRateJPY = dto.shippingExchangeRateJPY ?? 21.0
+            clothingBack.shippingRateUpdatedAt = dto.shippingRateUpdatedAt
             
             // Dates: backup data overwrites
             clothingBack.purchaseDate = dto.purchaseDate
@@ -1584,6 +1627,8 @@ class BackupService {
             clothingBack.isDepositPlan = dto.isDepositPlan
             clothingBack.finalPaymentDate = dto.finalPaymentDate
             clothingBack.finalPaymentEndDate = dto.finalPaymentEndDate
+            clothingBack.isFinalPaymentSavedToWealth = dto.isDepositPlan && (dto.isFinalPaymentSavedToWealth ?? false)
+            clothingBack.finalPaymentSavedAt = clothingBack.isFinalPaymentSavedToWealth ? dto.finalPaymentSavedAt : nil
             
             clothingBack.note = dto.note
             
@@ -1646,6 +1691,8 @@ class BackupService {
             }
             clothingBack.tags = dto.tagIDs.compactMap { tagMap[$0] }
         }
+
+        try restoreWealthSavingEntries(context: modelContext, manifest: manifest, restoredClothings: Array(clothingMap.values))
         
         // Cutouts
         let existingCutouts = try modelContext.fetch(FetchDescriptor<CutoutItem>())
@@ -2456,6 +2503,57 @@ class BackupService {
             
             // 保存映射表到上下文
             context.perlerBeadPatternMap = patternMap
+        }
+    }
+
+    private func restoreWealthSavingEntries(
+        context modelContext: ModelContext,
+        manifest: BackupManifest,
+        restoredClothings: [Clothing]
+    ) throws {
+        let existingEntries = try modelContext.fetch(FetchDescriptor<WealthSavingEntry>())
+        var entryMap: [UUID: WealthSavingEntry] = [:]
+        var duplicates: [WealthSavingEntry] = []
+
+        for entry in existingEntries {
+            if entryMap[entry.id] != nil {
+                duplicates.append(entry)
+            } else {
+                entryMap[entry.id] = entry
+            }
+        }
+
+        for duplicate in duplicates {
+            modelContext.delete(duplicate)
+            print("### Restore: Deleted duplicate WealthSavingEntry with ID: \(duplicate.id)")
+        }
+
+        if let dtoEntries = manifest.wealthSavingEntries, !dtoEntries.isEmpty {
+            for dto in dtoEntries {
+                let entry = entryMap[dto.id] ?? {
+                    let newEntry = WealthSavingEntry(amount: dto.amount, clothingID: dto.clothingID, createdAt: dto.createdAt)
+                    newEntry.id = dto.id
+                    modelContext.insert(newEntry)
+                    entryMap[dto.id] = newEntry
+                    return newEntry
+                }()
+
+                entry.amount = dto.amount
+                entry.clothingID = dto.clothingID
+                entry.note = dto.note ?? ""
+                entry.migrationSource = dto.migrationSource
+                entry.createdAt = dto.createdAt
+                entry.updatedAt = dto.updatedAt ?? dto.createdAt
+                entry.usedAt = dto.usedAt
+                entry.voidedAt = dto.voidedAt
+                entry.lastModified = dto.lastModified ?? entry.updatedAt
+            }
+        } else {
+            WealthSavingLedger.migrateLegacySavedFinalPayments(
+                clothings: restoredClothings,
+                entries: Array(entryMap.values),
+                context: modelContext
+            )
         }
     }
     

@@ -1,7 +1,7 @@
 import SwiftUI
 
 private enum HomeThemeSkinTokens {
-    static let girlClosetNamespace = "girl_closet"
+    static let supportedNamespaces: Set<String> = ["sky_concert", "swan_dream"]
 
     static let creamTop = Color(red: 1.0, green: 0.977, blue: 0.965)
     static let creamBottom = Color(red: 1.0, green: 0.938, blue: 0.95)
@@ -9,6 +9,30 @@ private enum HomeThemeSkinTokens {
     static let pinkShadow = Color(red: 0.89, green: 0.6, blue: 0.72)
     static let blush = Color(red: 0.996, green: 0.852, blue: 0.9)
     static let rose = Color(red: 0.878, green: 0.518, blue: 0.675)
+
+    static func creamTop(for descriptor: ThemeSkinDescriptor?) -> Color {
+        SkyConcertThemeSkin.hasDedicatedVisualProfile(descriptor) ? SkyConcertThemeSkin.shellFillTop(for: descriptor) : creamTop
+    }
+
+    static func creamBottom(for descriptor: ThemeSkinDescriptor?) -> Color {
+        SkyConcertThemeSkin.hasDedicatedVisualProfile(descriptor) ? SkyConcertThemeSkin.shellFillBottom(for: descriptor) : creamBottom
+    }
+
+    static func border(for descriptor: ThemeSkinDescriptor?) -> Color {
+        SkyConcertThemeSkin.hasDedicatedVisualProfile(descriptor) ? SkyConcertThemeSkin.shellStroke(for: descriptor) : pinkBorder
+    }
+
+    static func shadow(for descriptor: ThemeSkinDescriptor?) -> Color {
+        SkyConcertThemeSkin.hasDedicatedVisualProfile(descriptor) ? SkyConcertThemeSkin.shadowColor(for: descriptor) : pinkShadow
+    }
+
+    static func accent(for descriptor: ThemeSkinDescriptor?) -> Color {
+        SkyConcertThemeSkin.hasDedicatedVisualProfile(descriptor) ? SkyConcertThemeSkin.accent(for: descriptor) : rose
+    }
+
+    static func softAccent(for descriptor: ThemeSkinDescriptor?) -> Color {
+        SkyConcertThemeSkin.hasDedicatedVisualProfile(descriptor) ? SkyConcertThemeSkin.accentSoft(for: descriptor) : blush
+    }
 }
 
 enum HomeThemeSkinChromeStyle {
@@ -19,29 +43,29 @@ enum HomeThemeSkinChromeStyle {
     var cornerRadius: CGFloat {
         switch self {
         case .group:
-            return 19
+            return 16
         case .segment:
-            return 21
+            return 17
         case .searchEntry:
-            return 15
+            return 13
         }
     }
 
     var shadowRadius: CGFloat {
         switch self {
         case .group:
-            return 14
+            return 7
         case .segment:
-            return 12
+            return 6
         case .searchEntry:
-            return 10
+            return 5
         }
     }
 }
 
 private extension ThemeSkinDescriptor {
-    var usesGirlClosetChrome: Bool {
-        assetNamespace == HomeThemeSkinTokens.girlClosetNamespace
+    var usesThemeSkinChrome: Bool {
+        HomeThemeSkinTokens.supportedNamespaces.contains(assetNamespace)
     }
 }
 
@@ -55,8 +79,8 @@ struct HomeThemeSkinToolbarShell<Content: View>: View {
     init(
         descriptor: ThemeSkinDescriptor?,
         style: HomeThemeSkinChromeStyle = .group,
-        horizontalPadding: CGFloat = 12,
-        verticalPadding: CGFloat = 8,
+        horizontalPadding: CGFloat = 8,
+        verticalPadding: CGFloat = 5,
         @ViewBuilder content: () -> Content
     ) {
         self.descriptor = descriptor
@@ -69,18 +93,41 @@ struct HomeThemeSkinToolbarShell<Content: View>: View {
     var body: some View {
         if isActive {
             content
-                .padding(.horizontal, horizontalPadding)
-                .padding(.vertical, verticalPadding)
+                .padding(.horizontal, effectiveHorizontalPadding)
+                .padding(.vertical, effectiveVerticalPadding)
                 .background {
-                    HomeThemeSkinChromeBackground(style: style)
+                    HomeThemeSkinChromeBackground(descriptor: descriptor, style: style)
                 }
         } else {
             content
+                .padding(.horizontal, effectiveHorizontalPadding)
+                .padding(.vertical, effectiveVerticalPadding)
+                .background {
+                    defaultLiquidGlassBackground
+                }
         }
     }
 
     private var isActive: Bool {
-        descriptor?.usesGirlClosetChrome == true
+        descriptor?.usesThemeSkinChrome == true
+    }
+
+    private var effectiveHorizontalPadding: CGFloat {
+        horizontalPadding
+    }
+
+    private var effectiveVerticalPadding: CGFloat {
+        verticalPadding
+    }
+
+    private var defaultLiquidGlassBackground: some View {
+        Capsule()
+            .fill(.ultraThinMaterial)
+            .overlay {
+                Capsule()
+                    .stroke(Color.white.opacity(0.46), lineWidth: 0.8)
+            }
+            .shadow(color: Color.black.opacity(0.06), radius: 8, x: 0, y: 3)
     }
 }
 
@@ -92,8 +139,8 @@ struct HomeThemeSkinToolbarIconShell<Content: View>: View {
 
     init(
         descriptor: ThemeSkinDescriptor?,
-        minWidth: CGFloat = 30,
-        minHeight: CGFloat = 30,
+        minWidth: CGFloat = 24,
+        minHeight: CGFloat = 24,
         @ViewBuilder content: () -> Content
     ) {
         self.descriptor = descriptor
@@ -105,43 +152,27 @@ struct HomeThemeSkinToolbarIconShell<Content: View>: View {
     var body: some View {
         if isActive {
             content
-                .frame(minWidth: minWidth, minHeight: minHeight)
-                .padding(6)
-                .background {
-                    RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .fill(
-                            LinearGradient(
-                                colors: [
-                                    HomeThemeSkinTokens.creamTop.opacity(0.98),
-                                    HomeThemeSkinTokens.blush.opacity(0.9)
-                                ],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                        .overlay {
-                            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                .stroke(
-                                    LinearGradient(
-                                        colors: [
-                                            .white.opacity(0.95),
-                                            HomeThemeSkinTokens.pinkBorder.opacity(0.82)
-                                        ],
-                                        startPoint: .topLeading,
-                                        endPoint: .bottomTrailing
-                                    ),
-                                    lineWidth: 1
-                                )
-                        }
-                }
-                .shadow(color: HomeThemeSkinTokens.pinkShadow.opacity(0.16), radius: 8, x: 0, y: 4)
+                .font(.system(size: effectiveIconSize, weight: .semibold))
+                .frame(minWidth: effectiveMinWidth, minHeight: effectiveMinHeight)
         } else {
             content
         }
     }
 
     private var isActive: Bool {
-        descriptor?.usesGirlClosetChrome == true
+        descriptor?.usesThemeSkinChrome == true
+    }
+
+    private var effectiveMinWidth: CGFloat {
+        minWidth
+    }
+
+    private var effectiveMinHeight: CGFloat {
+        minHeight
+    }
+
+    private var effectiveIconSize: CGFloat {
+        12
     }
 }
 
@@ -155,7 +186,7 @@ struct HomeThemeSkinSearchMenuLabel: View {
             HStack(spacing: 10) {
                 Image(systemName: systemImage)
                     .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(HomeThemeSkinTokens.rose)
+                    .foregroundStyle(HomeThemeSkinTokens.accent(for: descriptor))
 
                 Text(title)
                     .font(.system(size: 14, weight: .semibold))
@@ -167,7 +198,7 @@ struct HomeThemeSkinSearchMenuLabel: View {
             .padding(.vertical, 8)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background {
-                HomeThemeSkinChromeBackground(style: .searchEntry)
+                HomeThemeSkinChromeBackground(descriptor: descriptor, style: .searchEntry)
             }
         } else {
             Label(title, systemImage: systemImage)
@@ -175,21 +206,63 @@ struct HomeThemeSkinSearchMenuLabel: View {
     }
 
     private var isActive: Bool {
-        descriptor?.usesGirlClosetChrome == true
+        descriptor?.usesThemeSkinChrome == true
     }
 }
 
 private struct HomeThemeSkinChromeBackground: View {
+    let descriptor: ThemeSkinDescriptor?
     let style: HomeThemeSkinChromeStyle
 
+    private var assetName: String {
+        switch style {
+        case .group:
+            return ThemeSkinAssetName.topBarMain
+        case .segment:
+            return ThemeSkinAssetName.topBarSegment
+        case .searchEntry:
+            return ThemeSkinAssetName.searchBarCompact
+        }
+    }
+
     var body: some View {
+        ThemeSkinOptionalResizableAsset(
+            assetName,
+            namespace: descriptor?.assetNamespace,
+            allowShortNameFallback: !SkyConcertThemeSkin.shouldAvoidShortAssetFallback(for: descriptor),
+            capInsets: ThemeSkinAssetName.capInsets(for: assetName)
+        ) {
+            fallbackBackground
+        }
+        .overlay {
+            toolbarDecorationLayer
+                .allowsHitTesting(false)
+                .accessibilityHidden(true)
+        }
+        .shadow(color: HomeThemeSkinTokens.shadow(for: descriptor).opacity(0.18), radius: style.shadowRadius, x: 0, y: 6)
+    }
+
+    @ViewBuilder
+    private var toolbarDecorationLayer: some View {
+        // 主题顶部装饰属于背景纹理层：保留菜单/顶栏图案，但始终位于文字与按钮内容下方。
+        if SkyConcertThemeSkin.isSkyConcert(descriptor) {
+            SkyConcertDecorationLayer(placements: SkyConcertThemeSkin.toolbarPlacements(for: style))
+        } else if SwanDreamThemeSkin.isSwanDream(descriptor) {
+            SkyConcertDecorationLayer(
+                placements: SwanDreamThemeSkin.toolbarPlacements(for: style),
+                namespace: SwanDreamThemeSkin.namespace
+            )
+        }
+    }
+
+    private var fallbackBackground: some View {
         ZStack {
             RoundedRectangle(cornerRadius: style.cornerRadius, style: .continuous)
                 .fill(
                     LinearGradient(
                         colors: [
-                            HomeThemeSkinTokens.creamTop.opacity(0.98),
-                            HomeThemeSkinTokens.creamBottom.opacity(0.96)
+                            HomeThemeSkinTokens.creamTop(for: descriptor).opacity(0.98),
+                            HomeThemeSkinTokens.creamBottom(for: descriptor).opacity(0.96)
                         ],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
@@ -201,36 +274,36 @@ private struct HomeThemeSkinChromeBackground: View {
                     LinearGradient(
                         colors: [
                             .white.opacity(0.95),
-                            HomeThemeSkinTokens.pinkBorder.opacity(0.9)
+                            HomeThemeSkinTokens.border(for: descriptor).opacity(0.95),
+                            HomeThemeSkinTokens.accent(for: descriptor).opacity(0.5)
                         ],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     ),
-                    lineWidth: 1.1
+                    lineWidth: 1.35
                 )
 
             RoundedRectangle(cornerRadius: style.cornerRadius - 3, style: .continuous)
-                .stroke(HomeThemeSkinTokens.blush.opacity(0.45), lineWidth: 0.6)
-                .padding(3)
+                .stroke(HomeThemeSkinTokens.softAccent(for: descriptor).opacity(0.62), lineWidth: 0.75)
+                .padding(3.5)
 
             Circle()
-                .fill(HomeThemeSkinTokens.blush.opacity(0.95))
+                .fill(HomeThemeSkinTokens.softAccent(for: descriptor).opacity(0.95))
                 .frame(width: 8, height: 8)
                 .overlay {
                     Circle()
                         .stroke(.white.opacity(0.8), lineWidth: 1)
                 }
-                .offset(x: -26, y: -11)
+                .offset(x: -23, y: -13)
 
             Circle()
-                .fill(HomeThemeSkinTokens.creamTop.opacity(0.98))
-                .frame(width: 7, height: 7)
+                .fill(HomeThemeSkinTokens.creamTop(for: descriptor).opacity(0.98))
+                .frame(width: 6, height: 6)
                 .overlay {
                     Circle()
-                        .stroke(HomeThemeSkinTokens.pinkBorder.opacity(0.65), lineWidth: 1)
+                        .stroke(HomeThemeSkinTokens.border(for: descriptor).opacity(0.65), lineWidth: 1)
                 }
-                .offset(x: 28, y: 12)
+                .offset(x: 25, y: 14)
         }
-        .shadow(color: HomeThemeSkinTokens.pinkShadow.opacity(0.18), radius: style.shadowRadius, x: 0, y: 6)
     }
 }

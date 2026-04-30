@@ -24,12 +24,12 @@ struct AccountCard: View {
                             )
                         } else {
                             // 未登录：显示占位图标
-                            Image(systemName: "person.crop.circle.badge.plus")
-                                .font(.title2)
-                                .foregroundStyle(themeManager.primaryTextColor)
-                                .frame(width: 40, height: 40)
-                                .background(Color.gray.opacity(0.1))
-                                .clipShape(Circle())
+                            ThemeSkinIconBadge(
+                                systemName: "person.crop.circle.badge.plus",
+                                fallbackColor: .gray,
+                                size: 40,
+                                symbolSize: 19
+                            )
                         }
                     }
                     
@@ -79,8 +79,7 @@ struct AccountCard: View {
             .padding(16)
             .frame(maxWidth: .infinity, alignment: .leading)
             .aspectRatio(1.0, contentMode: .fill)
-            .background(cardBackground)
-            .overlay(cardOverlay)
+            .themeSkinSectionCard(slot: .settingsGridCard, cornerRadius: 20)
         }
         .buttonStyle(PlainButtonStyle())
         .sheet(isPresented: $showingProfileEdit) {

@@ -29,12 +29,21 @@ project.xcworkspace/
 *.dSYM
 .build/
 
-.DS_Store
-
 harmony_next/entry/.preview/*
 harmony_next/entry/build/*
 harmony_next/.hvigor/*
 
 android/.codex-ide-cache-backup-*/*
-ItemManager/.DS_Store
+android/.gradle/*
+android/app/build/*
+android/local.properties
+android/.idea/*
+android/build/*
+
+# Local secrets
 .env
+.env.*
+!.env.example
+
+ItemManager/.DS_Store
+code/*

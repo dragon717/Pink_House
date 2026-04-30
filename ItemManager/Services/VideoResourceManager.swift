@@ -1,4 +1,60 @@
 import Foundation
+import UIKit
+
+enum TransparentVideoSupport {
+    static var isEnabled: Bool {
+        if #available(iOS 18.0, *) {
+            return true
+        }
+        return false
+    }
+
+    static func shouldSuppress(videoName: String) -> Bool {
+        isTransparentVideoResource(videoName) && !isEnabled
+    }
+
+    static func isTransparentVideoResource(_ videoName: String) -> Bool {
+        let normalized = normalizedResourceName(videoName)
+        return normalized.hasPrefix("naicha_") ||
+               normalized.hasPrefix("maomao_") ||
+               normalized.hasPrefix("pet_feed_")
+    }
+
+    static func fallbackImageName(for videoName: String) -> String? {
+        let normalized = normalizedResourceName(videoName)
+        let candidates: [String]
+
+        if normalized.hasPrefix("maomao_") {
+            candidates = directionalFallbackCandidates(prefix: "maomao", normalized: normalized)
+        } else if normalized.hasPrefix("naicha_") {
+            candidates = directionalFallbackCandidates(prefix: "naicha", normalized: normalized)
+        } else {
+            candidates = ["naicha_peeking", "naicha_portrait"]
+        }
+
+        return candidates.first { UIImage(named: $0) != nil }
+    }
+
+    private static func normalizedResourceName(_ videoName: String) -> String {
+        let lastComponent = (videoName as NSString).lastPathComponent
+        return (lastComponent as NSString).deletingPathExtension
+    }
+
+    private static func directionalFallbackCandidates(prefix: String, normalized: String) -> [String] {
+        var candidates: [String] = []
+        if normalized.contains("dragging") {
+            candidates.append("\(prefix)_dragging")
+        }
+        if normalized.contains("left_front") || normalized.contains("left") {
+            candidates.append("\(prefix)_left_front")
+        }
+        if normalized.contains("right_back") || normalized.contains("right") {
+            candidates.append("\(prefix)_right_back")
+        }
+        candidates.append(contentsOf: ["\(prefix)_peeking", "\(prefix)_portrait"])
+        return candidates
+    }
+}
 
 /// 视频资源管理器
 /// 负责管理视频资源的加载，支持 DEBUG 和 RELEASE 模式
@@ -19,6 +75,10 @@ class VideoResourceManager {
     /// - Parameter videoName: 视频名称（不含扩展名）
     /// - Returns: 视频文件的 URL，如果找不到则返回 nil
     func findVideoURL(name videoName: String) -> URL? {
+        if TransparentVideoSupport.shouldSuppress(videoName: videoName) {
+            return nil
+        }
+
         // 1. 如果是绝对路径，直接使用
         if videoName.hasPrefix("/") {
             let url = URL(fileURLWithPath: videoName)

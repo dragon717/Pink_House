@@ -41,6 +41,7 @@ struct PetChatBubble: View {
 
     @Environment(ThemeManager.self) private var themeManager
     @Environment(\.colorScheme) private var colorScheme
+    @ObservedObject private var themeSkinManager = ThemeSkinManager.shared
     @State private var showingReportButton = false
 
     private var screenWidth: CGFloat {
@@ -248,7 +249,23 @@ struct PetChatBubble: View {
     }
 
     private var userBubbleTextColor: Color {
-        skinTheme.resolvedUserBubbleTextColor(themeManager: themeManager, colorScheme: colorScheme)
+        if isSupportedThemeSkin(primaryButtonDescriptor) {
+            return .white
+        }
+        return skinTheme.resolvedUserBubbleTextColor(themeManager: themeManager, colorScheme: colorScheme)
+    }
+
+    private var sectionCardDescriptor: ThemeSkinDescriptor? {
+        themeSkinManager.activeThemeDescriptor(for: .sectionCard, state: .default)
+    }
+
+    private var primaryButtonDescriptor: ThemeSkinDescriptor? {
+        themeSkinManager.activeThemeDescriptor(for: .primaryButton, state: .default)
+    }
+
+    private func isSupportedThemeSkin(_ descriptor: ThemeSkinDescriptor?) -> Bool {
+        guard let namespace = descriptor?.assetNamespace else { return false }
+        return namespace == SkyConcertThemeSkin.namespace || namespace == SwanDreamThemeSkin.namespace
     }
 
     private var embeddedQuickOptionWidgets: [PetWidgetData] {
@@ -373,7 +390,53 @@ struct PetChatBubble: View {
 
     @ViewBuilder
     private func bubbleBackground(isUser: Bool) -> some View {
-        if skinTheme == .classic {
+        if isUser, isSupportedThemeSkin(primaryButtonDescriptor) {
+            RoundedRectangle(cornerRadius: bubbleCornerRadius)
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            SkyConcertThemeSkin.accent(for: primaryButtonDescriptor).opacity(0.94),
+                            SkyConcertThemeSkin.labelColor(for: primaryButtonDescriptor).opacity(0.82)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: bubbleCornerRadius)
+                        .stroke(Color.white.opacity(0.38), lineWidth: 1)
+                )
+                .shadow(color: SkyConcertThemeSkin.shadowColor(for: primaryButtonDescriptor).opacity(0.42), radius: 6, x: 0, y: 3)
+        } else if !isUser, isSupportedThemeSkin(sectionCardDescriptor) {
+            RoundedRectangle(cornerRadius: bubbleCornerRadius)
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            SkyConcertThemeSkin.shellFillTop(for: sectionCardDescriptor).opacity(0.98),
+                            SkyConcertThemeSkin.accentSoft(for: sectionCardDescriptor).opacity(SwanDreamThemeSkin.isSwanDream(sectionCardDescriptor) ? 0.64 : 0.46),
+                            SkyConcertThemeSkin.shellFillBottom(for: sectionCardDescriptor).opacity(0.92)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: bubbleCornerRadius)
+                        .stroke(
+                            LinearGradient(
+                                colors: [
+                                    Color.white.opacity(0.92),
+                                    SkyConcertThemeSkin.shellStroke(for: sectionCardDescriptor).opacity(0.76),
+                                    SkyConcertThemeSkin.accent(for: sectionCardDescriptor).opacity(0.28)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                            lineWidth: 1
+                        )
+                )
+                .shadow(color: SkyConcertThemeSkin.shadowColor(for: sectionCardDescriptor).opacity(0.58), radius: 7, x: 0, y: 3)
+        } else if skinTheme == .classic {
             RoundedRectangle(cornerRadius: bubbleCornerRadius)
                 .fill(skinTheme.resolvedAssistantBubbleBackground(themeManager: themeManager, colorScheme: colorScheme))
                 .shadow(color: .black.opacity(0.05), radius: 4, x: 0, y: 2)
@@ -564,8 +627,9 @@ struct PetChatBubble: View {
                         .foregroundStyle(themeManager.tertiaryTextColor)
                 }
                 .padding(12)
-                .background(skinTheme.resolvedAssistantCardBackground(themeManager: themeManager, colorScheme: colorScheme))
-                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .themeSkinAdaptiveSectionCard(slot: .sectionCard, cornerRadius: 12, showsDecoration: false) {
+                    skinTheme.resolvedAssistantCardBackground(themeManager: themeManager, colorScheme: colorScheme)
+                }
             }
             .buttonStyle(PlainButtonStyle())
         }
@@ -602,8 +666,9 @@ struct PetChatBubble: View {
                 }
             }
             .padding(12)
-            .background(skinTheme.resolvedAssistantCardBackground(themeManager: themeManager, colorScheme: colorScheme))
-            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .themeSkinAdaptiveSectionCard(slot: .sectionCard, cornerRadius: 12, showsDecoration: false) {
+                skinTheme.resolvedAssistantCardBackground(themeManager: themeManager, colorScheme: colorScheme)
+            }
         }
     }
 
@@ -761,7 +826,7 @@ struct PetChatBubble: View {
                 .foregroundStyle(.white)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 10)
-                .background(
+                .themeSkinAdaptiveSectionCard(slot: .primaryButton, cornerRadius: 12, showsDecoration: false) {
                     LinearGradient(
                         colors: [
                             skinTheme.resolvedAssistantAccentColor(themeManager: themeManager, colorScheme: colorScheme),
@@ -770,8 +835,7 @@ struct PetChatBubble: View {
                         startPoint: .leading,
                         endPoint: .trailing
                     )
-                )
-                .clipShape(RoundedRectangle(cornerRadius: 12))
+                }
             }
             .buttonStyle(PlainButtonStyle())
         }
@@ -852,8 +916,9 @@ struct PetChatBubble: View {
                         }
                         .padding(8)
                         .frame(width: 128, alignment: .topLeading)
-                        .background(skinTheme.resolvedAssistantCardBackground(themeManager: themeManager, colorScheme: colorScheme))
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                        .themeSkinAdaptiveSectionCard(slot: .sectionCard, cornerRadius: 12, showsDecoration: false) {
+                            skinTheme.resolvedAssistantCardBackground(themeManager: themeManager, colorScheme: colorScheme)
+                        }
                     }
                     .buttonStyle(.plain)
                 }

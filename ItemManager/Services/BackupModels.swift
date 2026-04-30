@@ -45,6 +45,7 @@ struct BackupManifest: Codable {
     let brands: [BrandDTO]
     let tags: [TagDTO]
     let clothings: [ClothingDTO]
+    let wealthSavingEntries: [WealthSavingEntryDTO]? // v1.12+ 小金库隐藏存款记录，老版本备份可能不存在
     let storedImages: [StoredImageDTO]
     let cutouts: [CutoutItemDTO]
     // Deprecated: outfits are now handled as snapshots
@@ -119,6 +120,7 @@ struct BackupManifest: Codable {
         case brands
         case tags
         case clothings
+        case wealthSavingEntries
         case storedImages
         case cutouts
         case outfits
@@ -163,6 +165,7 @@ struct BackupManifest: Codable {
         brands: [BrandDTO],
         tags: [TagDTO],
         clothings: [ClothingDTO],
+        wealthSavingEntries: [WealthSavingEntryDTO]?,
         storedImages: [StoredImageDTO],
         cutouts: [CutoutItemDTO],
         outfits: [OutfitDTO]?,
@@ -205,6 +208,7 @@ struct BackupManifest: Codable {
         self.brands = brands
         self.tags = tags
         self.clothings = clothings
+        self.wealthSavingEntries = wealthSavingEntries
         self.storedImages = storedImages
         self.cutouts = cutouts
         self.outfits = outfits
@@ -260,6 +264,7 @@ struct BackupManifest: Codable {
         self.brands = try container.decode([BrandDTO].self, forKey: .brands)
         self.tags = try container.decode([TagDTO].self, forKey: .tags)
         self.clothings = try container.decode([ClothingDTO].self, forKey: .clothings)
+        self.wealthSavingEntries = try container.decodeIfPresent([WealthSavingEntryDTO].self, forKey: .wealthSavingEntries)
         self.storedImages = try container.decode([StoredImageDTO].self, forKey: .storedImages)
         self.cutouts = try container.decode([CutoutItemDTO].self, forKey: .cutouts)
         self.outfits = try container.decodeIfPresent([OutfitDTO].self, forKey: .outfits)
@@ -305,6 +310,7 @@ struct BackupManifest: Codable {
         try container.encode(brands, forKey: .brands)
         try container.encode(tags, forKey: .tags)
         try container.encode(clothings, forKey: .clothings)
+        try container.encodeIfPresent(wealthSavingEntries, forKey: .wealthSavingEntries)
         try container.encode(storedImages, forKey: .storedImages)
         try container.encode(cutouts, forKey: .cutouts)
         try container.encodeIfPresent(outfits, forKey: .outfits)
@@ -390,15 +396,27 @@ struct ClothingDTO: Codable {
     let sizeChartImagePath: String? // v1.9+ 尺码表图片路径，老版本备份可能不存在
     let priceChartImagePath: String? // v1.9+ 价格表图片路径，老版本备份可能不存在
     let isShared: Bool? // v1.2+ 共享到广场标记，老版本备份可能不存在
+    let originalPrice: Decimal? // v1.11+ 原价人民币，老版本备份可能不存在
+    let originalPriceJPY: Decimal? // v1.11+ 原价日元，老版本备份可能不存在
+    let originalPriceCurrencyCode: String? // v1.11+ 原价显示币种，老版本备份可能不存在
+    let originalPriceExchangeRateJPY: Decimal? // v1.11+ 保存时 CNY->JPY 汇率，老版本备份可能不存在
+    let originalPriceRateUpdatedAt: Date? // v1.11+ 原价汇率更新时间，老版本备份可能不存在
     let price: Decimal
     let deposit: Decimal
     let balance: Decimal
     let accessoriesPrice: Decimal? // v1.3+ 小物总价，老版本备份可能不存在
+    let shippingFee: Decimal? // v1.11+ 邮费人民币，老版本备份可能不存在
+    let shippingFeeJPY: Decimal? // v1.11+ 邮费日元，老版本备份可能不存在
+    let shippingFeeCurrencyCode: String? // v1.11+ 邮费显示币种，老版本备份可能不存在
+    let shippingExchangeRateJPY: Decimal? // v1.11+ 保存时 CNY->JPY 汇率，老版本备份可能不存在
+    let shippingRateUpdatedAt: Date? // v1.11+ 邮费汇率更新时间，老版本备份可能不存在
     let purchaseDate: Date
     let depositDate: Date?
     let isDepositPlan: Bool
     let finalPaymentDate: Date?
     let finalPaymentEndDate: Date?
+    let isFinalPaymentSavedToWealth: Bool? // v1.10+ 尾款是否已存入马上来财招财猫，老版本备份可能不存在
+    let finalPaymentSavedAt: Date? // v1.10+ 尾款存入招财猫时间，老版本备份可能不存在
     let note: String
     let stock: Int
     let status: String? // v1.2+ 上架状态，老版本备份可能不存在
@@ -425,6 +443,19 @@ struct AccessoryItemDTO: Codable {
     let sortIndex: Int
     // v1.5+ 小物图片路径支持
     let imagePaths: [String]?
+}
+
+struct WealthSavingEntryDTO: Codable {
+    let id: UUID
+    let amount: Decimal
+    let clothingID: UUID?
+    let note: String?
+    let migrationSource: String?
+    let createdAt: Date
+    let updatedAt: Date?
+    let usedAt: Date?
+    let voidedAt: Date?
+    let lastModified: Date?
 }
 
 

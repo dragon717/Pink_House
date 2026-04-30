@@ -14,6 +14,53 @@ import PhotosUI
 import UniformTypeIdentifiers
 import Accelerate
 
+private enum ImageDecodePerformanceConfig {
+    nonisolated static var maxConcurrentDecodes: Int {
+        let memory = ProcessInfo.processInfo.physicalMemory
+        let cores = ProcessInfo.processInfo.processorCount
+
+        if memory <= 2 * 1024 * 1024 * 1024 {
+            return 1
+        } else if memory <= 4 * 1024 * 1024 * 1024 {
+            return min(2, max(1, cores / 2))
+        } else {
+            return min(3, max(2, cores / 2))
+        }
+    }
+}
+
+private actor ImageDecodeSemaphore {
+    static let shared = ImageDecodeSemaphore(maxConcurrent: ImageDecodePerformanceConfig.maxConcurrentDecodes)
+
+    private let maxConcurrent: Int
+    private var availablePermits: Int
+    private var waiters: [CheckedContinuation<Void, Never>] = []
+
+    init(maxConcurrent: Int) {
+        self.maxConcurrent = max(1, maxConcurrent)
+        self.availablePermits = max(1, maxConcurrent)
+    }
+
+    func acquire() async {
+        if availablePermits > 0 {
+            availablePermits -= 1
+            return
+        }
+
+        await withCheckedContinuation { continuation in
+            waiters.append(continuation)
+        }
+    }
+
+    func release() {
+        if waiters.isEmpty {
+            availablePermits = min(maxConcurrent, availablePermits + 1)
+        } else {
+            waiters.removeFirst().resume()
+        }
+    }
+}
+
 @MainActor
 class ImageManager {
     @MainActor
@@ -21,6 +68,8 @@ class ImageManager {
     
     // Cache
     private let memoryCache = NSCache<NSString, UIImage>()
+    private var cacheKeysByTargetBucket: [String: Set<String>] = [:]
+    private var inFlightImageLoads: [String: Task<UIImage?, Never>] = [:]
     private var cachedImagesDirectory: URL?
     private var cachedICloudAvailability: Bool?
     private var hasLoggedICloudUnavailable = false
@@ -61,26 +110,26 @@ class ImageManager {
         var limitInMB: Int
         
         if useAggressiveMemoryOptimization {
-            // 积极模式：大幅降低缓存上限，优先保证不崩溃
+            // 积极模式仍需保证衣橱 300+ 条滚动命中率；缩略图单张成本很低，过小 countLimit 会反复解码导致明显卡顿。
             if totalMemory <= 2 * 1024 * 1024 * 1024 { // <= 2GB (iPhone 8, X, XR, SE2 etc)
-                limitInMB = 20 // 极小缓存，防止OOM
-                memoryCache.countLimit = 20
+                limitInMB = 40
+                memoryCache.countLimit = 60
             } else if totalMemory <= 4 * 1024 * 1024 * 1024 { // <= 4GB (iPhone 11, 12, 13 non-pro)
-                limitInMB = 50
-                memoryCache.countLimit = 40
-            } else {
-                limitInMB = 100
+                limitInMB = 80
                 memoryCache.countLimit = 80
+            } else {
+                limitInMB = 160
+                memoryCache.countLimit = 160
             }
             AppLogger.info("Memory Optimization: Aggressive Mode Enabled (Limit: \(limitInMB)MB)")
         } else {
             // 标准模式：利用更多内存换取流畅度
             if totalMemory <= 2 * 1024 * 1024 * 1024 { // <= 2GB
-                limitInMB = 50
-                memoryCache.countLimit = 50
+                limitInMB = 60
+                memoryCache.countLimit = 80
             } else if totalMemory <= 4 * 1024 * 1024 * 1024 { // <= 4GB
                 limitInMB = 150
-                memoryCache.countLimit = 100
+                memoryCache.countLimit = 160
             } else {
                 limitInMB = 300
                 memoryCache.countLimit = 200
@@ -97,6 +146,8 @@ class ImageManager {
     func clearCache() {
         AppLogger.info("Memory warning received, clearing image cache")
         memoryCache.removeAllObjects()
+        cacheKeysByTargetBucket.removeAll()
+        inFlightImageLoads.removeAll()
     }
     
     // MARK: - Directory Management
@@ -640,20 +691,46 @@ class ImageManager {
     
     /// 检查内存缓存
     func cachedImage(fileName: String, targetSize: CGSize? = nil) -> UIImage? {
-        let cacheKey = (fileName + (targetSize != nil ? "_\(Int(targetSize!.width))x\(Int(targetSize!.height))" : "")) as NSString
+        let cacheKey = Self.cacheKey(fileName: fileName, targetSize: targetSize) as NSString
         return memoryCache.object(forKey: cacheKey)
+    }
+
+    /// 清理某个缩略图尺寸桶，避免 grid6 → grid3 这类切换后同时保留两套已解码 bitmap。
+    func evictCachedImages(targetSize: CGSize) {
+        let bucket = Self.targetBucket(targetSize)
+        guard let keys = cacheKeysByTargetBucket[bucket], !keys.isEmpty else { return }
+
+        for key in keys {
+            memoryCache.removeObject(forKey: key as NSString)
+            inFlightImageLoads[key]?.cancel()
+            inFlightImageLoads[key] = nil
+        }
+        cacheKeysByTargetBucket[bucket] = nil
     }
 
     /// 异步获取图片 (用于列表滚动优化，自动处理 iCloud 下载)
     /// - Parameters:
     ///   - fileName: 文件名
     ///   - targetSize: 目标尺寸 (可选，如果提供则会进行降采样)
-    func loadImageAsync(fileName: String, targetSize: CGSize? = nil) async -> UIImage? {
-        let cacheKey = (fileName + (targetSize != nil ? "_\(Int(targetSize!.width))x\(Int(targetSize!.height))" : "")) as NSString
+    func loadImageAsync(
+        fileName: String,
+        targetSize: CGSize? = nil,
+        priority: TaskPriority = .userInitiated
+    ) async -> UIImage? {
+        let cacheKeyString = Self.cacheKey(fileName: fileName, targetSize: targetSize)
+        let cacheKey = cacheKeyString as NSString
         
         // Check cache first (fast path)
         if let cachedImage = memoryCache.object(forKey: cacheKey) {
             return cachedImage
+        }
+
+        if Task.isCancelled { return nil }
+
+        if let inFlight = inFlightImageLoads[cacheKeyString] {
+            let image = await inFlight.value
+            if Task.isCancelled { return nil }
+            return image
         }
         
         // Capture URL on MainActor
@@ -673,34 +750,106 @@ class ImageManager {
         
         // Load in background
         let scale = UIScreen.main.scale
-        let image = await Task.detached(priority: .userInitiated) {
-            if let targetSize = targetSize {
-                // Downsampling path
-                return self.downsample(imageAt: fileURL, to: targetSize, scale: scale)
-            } else {
-                // Normal load path
-                guard let data = try? Data(contentsOf: fileURL),
-                      let loadedImage = UIImage(data: data) else {
-                    return nil
-                }
-                // Force decode
-                return self.forceDecode(loadedImage)
-            }
-        }.value
+        let loadTask = Task.detached(priority: priority) { () -> UIImage? in
+            await Self.decodeImageFile(fileURL: fileURL, targetSize: targetSize, scale: scale)
+        }
+        inFlightImageLoads[cacheKeyString] = loadTask
+        let image = await loadTask.value
+        inFlightImageLoads[cacheKeyString] = nil
+
+        if Task.isCancelled { return nil }
         
         // Cache back on MainActor
         if let image = image {
             let cost = Int(image.size.width * image.size.height * 4)
             memoryCache.setObject(image, forKey: cacheKey, cost: cost)
+            registerCacheKey(cacheKeyString, targetSize: targetSize)
         }
         
         return image
     }
+
+    func prefetchImages(
+        fileNames: [String],
+        targetSize: CGSize,
+        limit: Int,
+        priority: TaskPriority = .background
+    ) {
+        guard limit > 0 else { return }
+
+        var started = 0
+        var seen: Set<String> = []
+
+        for fileName in fileNames where started < limit {
+            guard !fileName.isEmpty, seen.insert(fileName).inserted else { continue }
+
+            let cacheKeyString = Self.cacheKey(fileName: fileName, targetSize: targetSize)
+            if memoryCache.object(forKey: cacheKeyString as NSString) != nil { continue }
+            if inFlightImageLoads[cacheKeyString] != nil { continue }
+
+            started += 1
+            Task { [weak self] in
+                _ = await self?.loadImageAsync(fileName: fileName, targetSize: targetSize, priority: priority)
+            }
+        }
+    }
     
     // MARK: - Helpers
+
+    private nonisolated static func cacheKey(fileName: String, targetSize: CGSize?) -> String {
+        guard let targetSize else { return fileName }
+        return "\(fileName)_\(targetBucket(targetSize))"
+    }
+
+    private nonisolated static func targetBucket(_ targetSize: CGSize) -> String {
+        "\(Int(targetSize.width))x\(Int(targetSize.height))"
+    }
+
+    private func registerCacheKey(_ cacheKey: String, targetSize: CGSize?) {
+        guard let targetSize else { return }
+        let bucket = Self.targetBucket(targetSize)
+        cacheKeysByTargetBucket[bucket, default: []].insert(cacheKey)
+    }
+
+    private nonisolated static func decodeImageFile(fileURL: URL, targetSize: CGSize?, scale: CGFloat) async -> UIImage? {
+        await ImageDecodeSemaphore.shared.acquire()
+        if Task.isCancelled {
+            await ImageDecodeSemaphore.shared.release()
+            return nil
+        }
+
+        let decoded: UIImage?
+        if let targetSize {
+            guard let downsampled = downsample(imageAt: fileURL, to: targetSize, scale: scale) else {
+                await ImageDecodeSemaphore.shared.release()
+                return nil
+            }
+
+            if Task.isCancelled {
+                await ImageDecodeSemaphore.shared.release()
+                return nil
+            }
+            decoded = forceDecode(downsampled, targetSize: targetSize)
+        } else {
+            guard let data = try? Data(contentsOf: fileURL),
+                  let loadedImage = UIImage(data: data) else {
+                await ImageDecodeSemaphore.shared.release()
+                return nil
+            }
+
+            if Task.isCancelled {
+                await ImageDecodeSemaphore.shared.release()
+                return nil
+            }
+            decoded = forceDecode(loadedImage, targetSize: nil)
+        }
+
+        await ImageDecodeSemaphore.shared.release()
+        return decoded
+    }
     
     /// Downsample image to save memory and improve performance
-    private nonisolated func downsample(imageAt imageURL: URL, to pointSize: CGSize, scale: CGFloat) -> UIImage? {
+    private nonisolated static func downsample(imageAt imageURL: URL, to pointSize: CGSize, scale: CGFloat) -> UIImage? {
         let imageSourceOptions = [kCGImageSourceShouldCache: false] as CFDictionary
         guard let imageSource = CGImageSourceCreateWithURL(imageURL as CFURL, imageSourceOptions) else {
             // 如果无法创建 imageSource，尝试回退到正常加载
@@ -740,7 +889,7 @@ class ImageManager {
     }
     
     /// 降采样失败时的回退加载方式
-    private nonisolated func fallbackLoadImage(at imageURL: URL) -> UIImage? {
+    private nonisolated static func fallbackLoadImage(at imageURL: URL) -> UIImage? {
         guard let data = try? Data(contentsOf: imageURL),
               let loadedImage = UIImage(data: data) else {
             return nil
@@ -749,19 +898,22 @@ class ImageManager {
     }
     
     /// Force decode image on background thread
-    private nonisolated func forceDecode(_ image: UIImage) -> UIImage? {
-        // Optimization: Skip force decode on low memory devices to save RAM
-        // Force decoding decompresses the entire image into memory (bitmap), which can be huge.
-        // On modern iOS, UIKit handles lazy decoding reasonably well, so skipping this on
-        // constrained devices is a good trade-off.
+    private nonisolated static func forceDecode(_ image: UIImage, targetSize: CGSize?) -> UIImage? {
+        // 列表缩略图（≤200×200pt）即使在低内存设备上也提前解码，避免首显时把解码成本甩回主线程。
+        // 大图仍在 ≤2GB 设备上保持懒解码，避免详情页/图表瞬时展开过大的 bitmap。
         let totalMemory = ProcessInfo.processInfo.physicalMemory
-        if totalMemory <= 2 * 1024 * 1024 * 1024 { // <= 2GB
-             return image // Just return the image, let UIKit decode it when displaying
+        if totalMemory <= 2 * 1024 * 1024 * 1024, !shouldForceDecodeOnLowMemoryDevice(targetSize: targetSize) {
+            return image
         }
         
         // Use normalized(forceCopy: true) to fix orientation AND force decode (render to bitmap)
         // This ensures the image is loaded into memory and orientation is applied correctly
         return image.normalized(forceCopy: true)
+    }
+
+    private nonisolated static func shouldForceDecodeOnLowMemoryDevice(targetSize: CGSize?) -> Bool {
+        guard let targetSize else { return false }
+        return targetSize.width * targetSize.height <= 200 * 200
     }
     
     private func convertImage(_ image: UIImage, format: ImageFormat) -> Data? {

@@ -49,6 +49,7 @@ public struct SceneObject: Identifiable, Equatable {
     }
 }
 
+@available(iOS 18.0, *)
 public struct RealityKitSceneView: View {
     @Binding var selectedObject: SceneObject?
     @Binding var objects: [SceneObject]

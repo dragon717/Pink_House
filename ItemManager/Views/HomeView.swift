@@ -7,8 +7,10 @@
 
 import SwiftUI
 import SwiftData
+import Combine
+import UIKit
 
-enum SortOption: String, CaseIterable, Identifiable {
+enum SortOption: String, CaseIterable, Identifiable, Hashable, Sendable {
     case createdAtDesc = "添加时间从晚到早"
     case priceAsc = "价格从低到高"
     case priceDesc = "价格从高到低"
@@ -60,6 +62,283 @@ struct CalendarDayIcon: View {
     }
 }
 
+enum WardrobeTopBarMetrics {
+    static let shellHorizontalPadding: CGFloat = 8
+    static let shellVerticalPadding: CGFloat = 4
+    static let segmentVisualHeight: CGFloat = 32
+    static let segmentInterItemSpacing: CGFloat = 8
+    static let segmentStackSpacing: CGFloat = 1
+    static let segmentIconSize: CGFloat = 13
+    static let segmentCalendarIconSize: CGFloat = 15
+    static let segmentCalendarFrame: CGFloat = 20
+    static let segmentTextSize: CGFloat = 9
+    static let segmentItemHorizontalPadding: CGFloat = 8
+    static let segmentItemVerticalPadding: CGFloat = 4
+    // 时尚导航左右操作区的透明占位宽度；背景本身通过 fixedSize 贴合内部按钮组。
+    static let fashionSideGroupWidth: CGFloat = 98
+
+    // 主题态经典导航左侧双标签专用尺寸：背景宽度稳定，避免右侧菜单组或系统 Menu 打开时挤占。
+    static let classicSegmentShellWidth: CGFloat = 116
+    static let classicSegmentShellHorizontalPadding: CGFloat = 6
+    static let classicSegmentShellVerticalPadding: CGFloat = 3
+    static let classicSegmentInterItemSpacing: CGFloat = 4
+    static let classicSegmentItemHorizontalPadding: CGFloat = 5
+    static let classicSegmentItemVerticalPadding: CGFloat = 3
+
+    static var classicSegmentContentWidth: CGFloat {
+        classicSegmentShellWidth - classicSegmentShellHorizontalPadding * 2
+    }
+}
+
+private struct WardrobeMenuFacetClothingRow: Equatable, Sendable {
+    let id: UUID
+    let updatedAt: Date
+    let lastModified: Date
+    let deletedAt: Date?
+    let types: String
+    let colors: String
+    let sizes: String
+    let length: String
+    let condition: String
+    let accessories: String
+
+    init(_ clothing: Clothing) {
+        id = clothing.id
+        updatedAt = clothing.updatedAt
+        lastModified = clothing.lastModified
+        deletedAt = clothing.deletedAt
+        types = clothing.types
+        colors = clothing.colors
+        sizes = clothing.sizes
+        length = clothing.length
+        condition = clothing.condition
+        accessories = clothing.accessories
+    }
+}
+
+private struct WardrobeMenuFacetNamedRow: Equatable, Sendable {
+    let id: UUID
+    let name: String
+    let lastModified: Date
+}
+
+private struct WardrobeMenuFacetSourceKey: Equatable, Sendable {
+    let clothings: [WardrobeMenuFacetClothingRow]
+    let tags: [WardrobeMenuFacetNamedRow]
+    let brands: [WardrobeMenuFacetNamedRow]
+}
+
+private struct WardrobeMenuNamedOption: Identifiable, Equatable {
+    let id: UUID
+    let name: String
+}
+
+private struct WardrobeMenuFacetSnapshot: Equatable, Sendable {
+    let types: [String]
+    let colors: [String]
+    let sizes: [String]
+    let lengths: [String]
+    let conditions: [String]
+    let accessories: [String]
+    let tagNameByID: [UUID: String]
+    let brandNameByID: [UUID: String]
+    let tagOptions: [WardrobeMenuFacetNamedRow]
+    let brandOptions: [WardrobeMenuFacetNamedRow]
+
+    var optionCount: Int {
+        types.count + colors.count + sizes.count + lengths.count + conditions.count + accessories.count + tagOptions.count + brandOptions.count
+    }
+}
+
+private final class WardrobeMenuFacetCache: ObservableObject {
+    @Published private(set) var types: [String] = []
+    @Published private(set) var colors: [String] = []
+    @Published private(set) var sizes: [String] = []
+    @Published private(set) var lengths: [String] = []
+    @Published private(set) var conditions: [String] = []
+    @Published private(set) var accessories: [String] = []
+    @Published private(set) var tagNameByID: [UUID: String] = [:]
+    @Published private(set) var brandNameByID: [UUID: String] = [:]
+    @Published private(set) var tagOptions: [WardrobeMenuNamedOption] = []
+    @Published private(set) var brandOptions: [WardrobeMenuNamedOption] = []
+
+    private var lastSourceKey: WardrobeMenuFacetSourceKey?
+    private var lastSnapshot: WardrobeMenuFacetSnapshot?
+    private var refreshTask: Task<Void, Never>?
+
+    deinit {
+        refreshTask?.cancel()
+    }
+
+    func refresh(from sourceKey: WardrobeMenuFacetSourceKey) {
+        guard sourceKey != lastSourceKey else { return }
+        lastSourceKey = sourceKey
+        refreshTask?.cancel()
+
+        refreshTask = Task.detached(priority: .utility) {
+            let snapshot = WardrobeMenuFacetCache.buildSnapshot(from: sourceKey)
+            await MainActor.run {
+                guard !Task.isCancelled else { return }
+                self.apply(snapshot)
+            }
+        }
+    }
+
+    func options(for field: ClothingField) -> [String] {
+        switch field {
+        case .types: return types
+        case .colors: return colors
+        case .sizes: return sizes
+        case .length: return lengths
+        case .condition: return conditions
+        case .accessories: return accessories
+        }
+    }
+
+    private func apply(_ snapshot: WardrobeMenuFacetSnapshot) {
+        guard snapshot != lastSnapshot else { return }
+        lastSnapshot = snapshot
+        types = snapshot.types
+        colors = snapshot.colors
+        sizes = snapshot.sizes
+        lengths = snapshot.lengths
+        conditions = snapshot.conditions
+        accessories = snapshot.accessories
+        tagNameByID = snapshot.tagNameByID
+        brandNameByID = snapshot.brandNameByID
+        tagOptions = snapshot.tagOptions.map { WardrobeMenuNamedOption(id: $0.id, name: $0.name) }
+        brandOptions = snapshot.brandOptions.map { WardrobeMenuNamedOption(id: $0.id, name: $0.name) }
+        _ = MenuPerfSignpost.facetCacheRefresh(inputCount: snapshot.tagOptions.count + snapshot.brandOptions.count, outputCount: snapshot.optionCount)
+    }
+
+    nonisolated private static func buildSnapshot(from sourceKey: WardrobeMenuFacetSourceKey) -> WardrobeMenuFacetSnapshot {
+        WardrobeMenuFacetSnapshot(
+            types: distinctValues(sourceKey.clothings.map(\.types)),
+            colors: distinctValues(sourceKey.clothings.map(\.colors)),
+            sizes: distinctValues(sourceKey.clothings.map(\.sizes)),
+            lengths: distinctValues(sourceKey.clothings.map(\.length)),
+            conditions: distinctValues(sourceKey.clothings.map(\.condition)),
+            accessories: distinctValues(sourceKey.clothings.map(\.accessories)),
+            tagNameByID: Dictionary(uniqueKeysWithValues: sourceKey.tags.map { ($0.id, $0.name) }),
+            brandNameByID: Dictionary(uniqueKeysWithValues: sourceKey.brands.map { ($0.id, $0.name) }),
+            tagOptions: sourceKey.tags,
+            brandOptions: sourceKey.brands
+        )
+    }
+
+    nonisolated private static func distinctValues(_ values: [String]) -> [String] {
+        let normalized = values
+            .joined(separator: ",")
+            .replacingOccurrences(of: "，", with: ",")
+        return Array(Set(
+            normalized
+                .split(separator: ",")
+                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                .filter { !$0.isEmpty }
+        )).sorted()
+    }
+}
+
+private struct FilterSubmenuView: View, Equatable {
+    let field: ClothingField
+    let options: [String]
+    let noValueMarker: String
+    @Binding var selection: Set<String>
+
+    static func == (lhs: FilterSubmenuView, rhs: FilterSubmenuView) -> Bool {
+        lhs.field == rhs.field &&
+            lhs.options == rhs.options &&
+            lhs.noValueMarker == rhs.noValueMarker &&
+            lhs.selection == rhs.selection
+    }
+
+    var body: some View {
+        // menu-perf: wardrobe reusable string filter submenu
+        Menu {
+            let _ = MenuPerfSignpost.menuContent("wardrobe.filter.\(field.rawValue)")
+            Button(role: .destructive) {
+                selection.removeAll()
+            } label: {
+                Label("清除筛选", systemImage: "xmark.circle")
+            }
+
+            Button {
+                if selection.contains(noValueMarker) {
+                    selection.remove(noValueMarker)
+                } else {
+                    selection.removeAll()
+                    selection.insert(noValueMarker)
+                }
+            } label: {
+                HStack {
+                    Text(emptyDisplayName)
+                    if selection.contains(noValueMarker) {
+                        Image(systemName: "checkmark")
+                    }
+                }
+            }
+
+            ForEach(options, id: \.self) { value in
+                Button {
+                    if selection.contains(value) {
+                        selection.remove(value)
+                    } else {
+                        selection.removeAll()
+                        selection.insert(value)
+                    }
+                } label: {
+                    HStack {
+                        Text(value)
+                        if selection.contains(value) {
+                            Image(systemName: "checkmark")
+                        }
+                    }
+                }
+            }
+        } label: {
+            Label(selectedDisplayName ?? field.displayName, systemImage: selection.isEmpty ? iconName : selectedIconName)
+        }
+    }
+
+    private var selectedDisplayName: String? {
+        guard let value = selection.first else { return nil }
+        return value == noValueMarker ? emptyDisplayName : value
+    }
+
+    private var emptyDisplayName: String {
+        switch field {
+        case .types: return "无类型"
+        case .colors: return "无颜色"
+        case .sizes: return "无尺码"
+        case .length: return "无衣长"
+        case .condition: return "无状态"
+        case .accessories: return "无小物"
+        }
+    }
+
+    private var iconName: String {
+        switch field {
+        case .types: return "tshirt"
+        case .colors: return "paintpalette"
+        case .sizes: return "ruler"
+        case .length: return "arrow.up.and.down"
+        case .condition: return "sparkles"
+        case .accessories: return "crown"
+        }
+    }
+
+    private var selectedIconName: String {
+        switch field {
+        case .types: return "tshirt.fill"
+        case .colors: return "paintpalette.fill"
+        case .sizes: return "ruler.fill"
+        case .length: return "arrow.up.and.down.circle.fill"
+        case .condition: return "sparkles"
+        case .accessories: return "crown.fill"
+        }
+    }
+}
+
 struct HomeView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(ThemeManager.self) private var themeManager
@@ -67,6 +346,8 @@ struct HomeView: View {
     @ObservedObject private var themeSkinManager = ThemeSkinManager.shared
     @StateObject private var guideManager = AppFirstLaunchGuideManager.shared
     @StateObject private var tabNavigationManager = TabNavigationManager.shared
+    @StateObject private var menuFacetCache = WardrobeMenuFacetCache()
+    @StateObject private var draftManager = ClothingEditDraftManager.shared
     @Query(filter: #Predicate<Clothing> { $0.deletedAt == nil }) private var allClothings: [Clothing]
     @Query(sort: \Tag.name) private var tags: [Tag]
     @Query(sort: \Brand.name) private var brands: [Brand]
@@ -84,6 +365,7 @@ struct HomeView: View {
     @State private var isSelectionMode = false
     @State private var isEditing = false
     @State private var isSearchActive = false
+    @FocusState private var isWardrobeSearchFocused: Bool
     @AppStorage("UserPreference_SortOption") private var sortOption: SortOption = .createdAtDesc
     @AppStorage("UserPreference_WardrobeNavigationStyle") private var wardrobeNavigationStyle: WardrobeNavigationStyle = .classic
     @AppStorage("UserPreference_FilterMode") private var filterMode: FilterMode = .classic
@@ -155,6 +437,18 @@ struct HomeView: View {
         MagicThemeDesignSystem.palette(themeManager: themeManager, colorScheme: colorScheme)
     }
 
+    private var menuFacetSourceKey: WardrobeMenuFacetSourceKey {
+        WardrobeMenuFacetSourceKey(
+            clothings: allClothings.map(WardrobeMenuFacetClothingRow.init),
+            tags: tags.map { WardrobeMenuFacetNamedRow(id: $0.id, name: $0.name, lastModified: $0.lastModified) },
+            brands: brands.map { WardrobeMenuFacetNamedRow(id: $0.id, name: $0.name, lastModified: $0.lastModified) }
+        )
+    }
+
+    private func refreshMenuFacetCache() {
+        menuFacetCache.refresh(from: menuFacetSourceKey)
+    }
+
     private var themedTopBarGroupDescriptor: ThemeSkinDescriptor? {
         themeDescriptor(for: .topBarMain)
     }
@@ -181,6 +475,12 @@ struct HomeView: View {
                 // Background
                 LiquidBackground()
                     .ignoresSafeArea()
+
+                if selectedTab == .wardrobe {
+                    SkyConcertWardrobeBackdrop(descriptor: themedTopBarGroupDescriptor)
+                        .ignoresSafeArea()
+                        .allowsHitTesting(false)
+                }
                 
                 // Content
                 if selectedTab == .wardrobe {
@@ -238,13 +538,17 @@ struct HomeView: View {
                 }
             }
             .toolbar {
-                if effectiveWardrobeNavigationStyle == .classic {
+                if isSearchActive {
+                    ToolbarItem(placement: .principal) {
+                        wardrobeTopSearchBar
+                    }
+                } else if effectiveWardrobeNavigationStyle == .classic {
                     ToolbarItem(placement: .topBarLeading) {
                         HomeThemeSkinToolbarShell(
                             descriptor: themedTopBarSegmentDescriptor,
                             style: .segment,
-                            horizontalPadding: 10,
-                            verticalPadding: 7
+                            horizontalPadding: classicSegmentShellHorizontalPadding,
+                            verticalPadding: classicSegmentShellVerticalPadding
                         ) {
                             tabSwitcher
                         }
@@ -253,42 +557,15 @@ struct HomeView: View {
                     ToolbarItem(placement: .topBarTrailing) {
                         HomeThemeSkinToolbarShell(
                             descriptor: themedTopBarGroupDescriptor,
-                            horizontalPadding: 10,
-                            verticalPadding: 7
+                            horizontalPadding: WardrobeTopBarMetrics.shellHorizontalPadding,
+                            verticalPadding: WardrobeTopBarMetrics.shellVerticalPadding
                         ) {
                             classicActionButtons
                         }
                     }
                 } else {
-                    ToolbarItem(placement: .topBarLeading) {
-                        HomeThemeSkinToolbarShell(
-                            descriptor: themedTopBarGroupDescriptor,
-                            horizontalPadding: 10,
-                            verticalPadding: 7
-                        ) {
-                            fashionLeadingButtons
-                        }
-                    }
-
                     ToolbarItem(placement: .principal) {
-                        HomeThemeSkinToolbarShell(
-                            descriptor: themedTopBarSegmentDescriptor,
-                            style: .segment,
-                            horizontalPadding: 10,
-                            verticalPadding: 7
-                        ) {
-                            fashionTabSwitcher
-                        }
-                    }
-
-                    ToolbarItem(placement: .topBarTrailing) {
-                        HomeThemeSkinToolbarShell(
-                            descriptor: themedTopBarGroupDescriptor,
-                            horizontalPadding: 10,
-                            verticalPadding: 7
-                        ) {
-                            fashionTrailingButtons
-                        }
+                        fashionToolbar
                     }
                 }
             }
@@ -296,25 +573,15 @@ struct HomeView: View {
             .toolbarColorScheme(magicPalette.navigationBackground.isDark ? .dark : .light, for: .navigationBar)
             .navigationBarTitleDisplayMode(.inline)
             .tint(magicPalette.accent)
-            // 只在搜索激活时显示搜索栏，默认隐藏常驻搜索框
-            .applySearchableIfNeeded(
-                text: Binding(
-                    get: { selectedTab == .wardrobe ? wardrobeSearchText : depositSearchText },
-                    set: { newValue in
-                        if selectedTab == .wardrobe {
-                            wardrobeSearchText = newValue
-                        } else {
-                            depositSearchText = newValue
-                        }
-                    }
-                ),
-                isPresented: $isSearchActive,
-                prompt: "搜索名称、品牌、标签、类型、颜色、尺码、价格范围等..."
-            )
             .onAppear {
                 // 确保初始状态下搜索栏不显示
                 isSearchActive = false
                 wardrobeNavigationStyle = WardrobeNavigationStyle.normalizeStoredPreference()
+                draftManager.refreshDraftPresence()
+                refreshMenuFacetCache()
+            }
+            .onChange(of: menuFacetSourceKey) { _, _ in
+                refreshMenuFacetCache()
             }
             .sheet(isPresented: $showingAddSheet) {
                 NavigationStack {
@@ -404,13 +671,13 @@ struct HomeView: View {
     }
     
     private var tabSwitcher: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: classicSegmentInterItemSpacing) {
             Button {
                 withAnimation {
                     selectedTab = .wardrobe
                 }
             } label: {
-                VStack(spacing: 2) {
+                VStack(spacing: WardrobeTopBarMetrics.segmentStackSpacing) {
                     Group {
                         if #available(iOS 18.0, *) {
                             Image(systemName: selectedTab == .wardrobe ? "cabinet" : "cabinet.fill")
@@ -418,12 +685,20 @@ struct HomeView: View {
                             Image(systemName: selectedTab == .wardrobe ? "tshirt" : "tshirt.fill")
                         }
                     }
-                    .font(.system(size: 16))
+                    .font(.system(size: WardrobeTopBarMetrics.segmentIconSize))
                     Text("少女衣橱")
-                        .font(.system(size: 10, weight: selectedTab == .wardrobe ? .bold : .medium))
+                        .font(.system(size: WardrobeTopBarMetrics.segmentTextSize, weight: selectedTab == .wardrobe ? .bold : .medium))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.88)
                 }
-                .foregroundStyle(selectedTab == .wardrobe ? magicPalette.accent : magicPalette.secondaryText)
-                .frame(height: 44) // Ensure touch target meets guidelines
+                .foregroundStyle(classicNavigationTabForeground(isSelected: selectedTab == .wardrobe, fallbackActiveColor: magicPalette.accent))
+                .padding(.horizontal, classicSegmentItemHorizontalPadding)
+                .padding(.vertical, classicSegmentItemVerticalPadding)
+                .background {
+                    classicNavigationTabSelectionBackground(isSelected: selectedTab == .wardrobe)
+                }
+                .frame(height: WardrobeTopBarMetrics.segmentVisualHeight)
+                .contentShape(Rectangle())
             }
             
             Button {
@@ -431,40 +706,252 @@ struct HomeView: View {
                     selectedTab = .depositPlan
                 }
             } label: {
-                VStack(spacing: 2) {
+                VStack(spacing: WardrobeTopBarMetrics.segmentStackSpacing) {
                     if selectedTab == .wardrobe {
                         if let indicator = depositMonthIndicator {
                             switch indicator {
                             case .current(let day):
                                 CalendarDayIcon(day: day)
-                                    .font(.system(size: 18))
-                                    .foregroundStyle(magicPalette.accent)
-                                    .frame(width: 24, height: 24)
+                                    .font(.system(size: WardrobeTopBarMetrics.segmentCalendarIconSize))
+                                    .foregroundStyle(classicNavigationTabForeground(isSelected: selectedTab == .depositPlan, fallbackActiveColor: magicPalette.accent))
+                                    .frame(width: WardrobeTopBarMetrics.segmentCalendarFrame, height: WardrobeTopBarMetrics.segmentCalendarFrame)
                             case .next(let day):
                                 CalendarDayIcon(day: day)
-                                    .font(.system(size: 18))
-                                    .foregroundStyle(magicPalette.cardAccent)
-                                .frame(width: 24, height: 24)
+                                    .font(.system(size: WardrobeTopBarMetrics.segmentCalendarIconSize))
+                                    .foregroundStyle(classicNavigationTabForeground(isSelected: selectedTab == .depositPlan, fallbackActiveColor: magicPalette.cardAccent))
+                                    .frame(width: WardrobeTopBarMetrics.segmentCalendarFrame, height: WardrobeTopBarMetrics.segmentCalendarFrame)
                             }
                         } else {
                             Image(systemName: "calendar.badge.clock")
-                                .font(.system(size: 16))
+                                .font(.system(size: WardrobeTopBarMetrics.segmentIconSize))
                         }
                     } else {
                         Image(systemName: selectedTab == .depositPlan ? "calendar.badge.clock" : "calendar")
-                            .font(.system(size: 16))
+                            .font(.system(size: WardrobeTopBarMetrics.segmentIconSize))
                     }
                     Text("心愿尾款")
-                        .font(.system(size: 10, weight: selectedTab == .depositPlan ? .bold : .medium))
+                        .font(.system(size: WardrobeTopBarMetrics.segmentTextSize, weight: selectedTab == .depositPlan ? .bold : .medium))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.88)
                 }
-                .foregroundStyle(selectedTab == .depositPlan ? magicPalette.cardAccent : magicPalette.secondaryText)
-                .frame(height: 44) // Ensure touch target meets guidelines
+                .foregroundStyle(classicNavigationTabForeground(isSelected: selectedTab == .depositPlan, fallbackActiveColor: magicPalette.cardAccent))
+                .padding(.horizontal, classicSegmentItemHorizontalPadding)
+                .padding(.vertical, classicSegmentItemVerticalPadding)
+                .background {
+                    classicNavigationTabSelectionBackground(isSelected: selectedTab == .depositPlan)
+                }
+                .frame(height: WardrobeTopBarMetrics.segmentVisualHeight)
+                .contentShape(Rectangle())
             }
         }
+        .frame(width: classicSegmentContentWidth)
+    }
+
+    private var classicSegmentShellHorizontalPadding: CGFloat {
+        themedTopBarSegmentDescriptor == nil
+            ? WardrobeTopBarMetrics.shellHorizontalPadding
+            : WardrobeTopBarMetrics.classicSegmentShellHorizontalPadding
+    }
+
+    private var classicSegmentShellVerticalPadding: CGFloat {
+        themedTopBarSegmentDescriptor == nil
+            ? WardrobeTopBarMetrics.shellVerticalPadding
+            : WardrobeTopBarMetrics.classicSegmentShellVerticalPadding
+    }
+
+    private var classicSegmentInterItemSpacing: CGFloat {
+        themedTopBarSegmentDescriptor == nil
+            ? WardrobeTopBarMetrics.segmentInterItemSpacing
+            : WardrobeTopBarMetrics.classicSegmentInterItemSpacing
+    }
+
+    private var classicSegmentItemHorizontalPadding: CGFloat {
+        themedTopBarSegmentDescriptor == nil
+            ? 0
+            : WardrobeTopBarMetrics.classicSegmentItemHorizontalPadding
+    }
+
+    private var classicSegmentItemVerticalPadding: CGFloat {
+        themedTopBarSegmentDescriptor == nil
+            ? 0
+            : WardrobeTopBarMetrics.classicSegmentItemVerticalPadding
+    }
+
+    private var classicSegmentContentWidth: CGFloat? {
+        themedTopBarSegmentDescriptor == nil
+            ? nil
+            : WardrobeTopBarMetrics.classicSegmentContentWidth
     }
     
     private var fashionTabSwitcher: some View {
-        WardrobeFashionTabSwitcher(selectedTab: $selectedTab, monthIndicator: depositMonthIndicator)
+        WardrobeFashionTabSwitcher(
+            selectedTab: $selectedTab,
+            monthIndicator: depositMonthIndicator,
+            themeSkinDescriptor: themedTopBarSegmentDescriptor
+        )
+    }
+
+    private var fashionToolbar: some View {
+        ZStack {
+            HStack {
+                fashionSideToolbarGroup(alignment: .leading) {
+                    fashionLeadingButtons
+                }
+
+                Spacer(minLength: 0)
+
+                fashionSideToolbarGroup(alignment: .trailing) {
+                    fashionTrailingButtons
+                }
+            }
+
+            HomeThemeSkinToolbarShell(
+                descriptor: themedTopBarSegmentDescriptor,
+                style: .segment,
+                horizontalPadding: WardrobeTopBarMetrics.shellHorizontalPadding,
+                verticalPadding: WardrobeTopBarMetrics.shellVerticalPadding
+            ) {
+                fashionTabSwitcher
+            }
+            .fixedSize(horizontal: true, vertical: false)
+        }
+        .frame(width: topBarContentWidth)
+    }
+
+    private func fashionSideToolbarGroup<Content: View>(
+        alignment: Alignment,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        HomeThemeSkinToolbarShell(
+            descriptor: themedTopBarGroupDescriptor,
+            horizontalPadding: WardrobeTopBarMetrics.shellHorizontalPadding,
+            verticalPadding: WardrobeTopBarMetrics.shellVerticalPadding
+        ) {
+            content()
+        }
+        .fixedSize(horizontal: true, vertical: false)
+        .frame(width: WardrobeTopBarMetrics.fashionSideGroupWidth, alignment: alignment)
+    }
+
+    private var topBarContentWidth: CGFloat {
+        min(max(UIScreen.main.bounds.width - 32, 320), 620)
+    }
+
+    private var activeSearchText: Binding<String> {
+        Binding(
+            get: { selectedTab == .wardrobe ? wardrobeSearchText : depositSearchText },
+            set: { newValue in
+                if selectedTab == .wardrobe {
+                    wardrobeSearchText = newValue
+                } else {
+                    depositSearchText = newValue
+                }
+            }
+        )
+    }
+
+    private var activeSearchPrompt: String {
+        selectedTab == .wardrobe
+            ? "搜索名称、品牌、标签、类型、颜色、尺码、价格范围等..."
+            : "搜索心愿尾款名称、品牌、标签、价格..."
+    }
+
+    private var wardrobeTopSearchBar: some View {
+        HStack(spacing: 8) {
+            if themedSearchEntryDescriptor != nil {
+                HomeThemeSkinToolbarShell(
+                    descriptor: themedSearchEntryDescriptor,
+                    style: .searchEntry,
+                    horizontalPadding: 10,
+                    verticalPadding: 7
+                ) {
+                    wardrobeSearchFieldContent
+                }
+            } else {
+                wardrobeSearchFieldContent
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 7)
+                    .background(.ultraThinMaterial, in: Capsule())
+                    .overlay {
+                        Capsule()
+                            .stroke(magicPalette.cardAccent.opacity(0.16), lineWidth: 0.8)
+                    }
+            }
+
+            Button("取消") {
+                activeSearchText.wrappedValue = ""
+                isWardrobeSearchFocused = false
+                isSearchActive = false
+            }
+            .font(.system(size: 13, weight: .semibold))
+            .foregroundStyle(magicPalette.accent)
+        }
+        .frame(width: topBarContentWidth)
+        .onAppear {
+            DispatchQueue.main.async {
+                isWardrobeSearchFocused = true
+            }
+        }
+    }
+
+    private var wardrobeSearchFieldContent: some View {
+        HStack(spacing: 7) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(magicPalette.secondaryText)
+
+            TextField(activeSearchPrompt, text: activeSearchText)
+                .font(.system(size: 13, weight: .medium))
+                .textInputAutocapitalization(.never)
+                .disableAutocorrection(true)
+                .focused($isWardrobeSearchFocused)
+                .submitLabel(.search)
+
+            if !activeSearchText.wrappedValue.isEmpty {
+                Button {
+                    activeSearchText.wrappedValue = ""
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(magicPalette.secondaryText.opacity(0.72))
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    private func classicNavigationTabForeground(isSelected: Bool, fallbackActiveColor: Color) -> Color {
+        guard let descriptor = themedTopBarSegmentDescriptor else {
+            return isSelected ? fallbackActiveColor : magicPalette.secondaryText
+        }
+
+        return isSelected
+            ? SkyConcertThemeSkin.accent(for: descriptor)
+            : SkyConcertThemeSkin.labelColor(for: descriptor).opacity(0.68)
+    }
+
+    @ViewBuilder
+    private func classicNavigationTabSelectionBackground(isSelected: Bool) -> some View {
+        if let descriptor = themedTopBarSegmentDescriptor, isSelected {
+            Capsule()
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            SkyConcertThemeSkin.shellFillTop(for: descriptor).opacity(0.98),
+                            SkyConcertThemeSkin.accentSoft(for: descriptor).opacity(0.72)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .overlay {
+                    Capsule()
+                        .stroke(SkyConcertThemeSkin.shellStroke(for: descriptor).opacity(0.72), lineWidth: 0.8)
+                }
+                .shadow(color: SkyConcertThemeSkin.shadowColor(for: descriptor).opacity(0.22), radius: 3, x: 0, y: 1)
+        } else {
+            Color.clear
+        }
     }
     
     private var isInWardrobeEditMode: Bool {
@@ -500,6 +987,7 @@ struct HomeView: View {
             
             addButton
         }
+        .fixedSize(horizontal: true, vertical: false)
     }
     
     private var fashionLeadingButtons: some View {
@@ -517,6 +1005,7 @@ struct HomeView: View {
                 displayButton
             }
         }
+        .fixedSize(horizontal: true, vertical: false)
     }
 
     private var fashionTrailingButtons: some View {
@@ -537,6 +1026,7 @@ struct HomeView: View {
                 addButton
             }
         }
+        .fixedSize(horizontal: true, vertical: false)
     }
     
     private var doneEditButton: some View {
@@ -547,7 +1037,7 @@ struct HomeView: View {
         } label: {
             HomeThemeSkinToolbarIconShell(descriptor: themedTopBarButtonDescriptor) {
                 Image(systemName: "checkmark.circle.fill")
-                    .font(.system(size: 18))
+                    .font(.system(size: 15))
                     .foregroundStyle(magicPalette.accent)
             }
         }
@@ -563,11 +1053,11 @@ struct HomeView: View {
             HomeThemeSkinToolbarIconShell(descriptor: themedTopBarButtonDescriptor) {
                 if #available(iOS 26.0, *) {
                     Image(systemName: "list.number.badge.ellipsis")
-                        .font(.system(size: 18))
+                        .font(.system(size: 15))
                         .foregroundStyle(magicPalette.accent)
                 } else {
                     Image(systemName: "checkmark.circle")
-                        .font(.system(size: 18))
+                        .font(.system(size: 15))
                         .foregroundStyle(magicPalette.accent)
                 }
             }
@@ -581,18 +1071,18 @@ struct HomeView: View {
             HomeThemeSkinToolbarIconShell(descriptor: themedTopBarButtonDescriptor) {
                 ZStack {
                     Image(systemName: unreadNotificationCount > 0 ? "bell.badge" : "bell")
-                        .font(.system(size: 14))
+                        .font(.system(size: 12))
                         .foregroundStyle(magicPalette.navigationForeground)
 
                     if unreadNotificationCount > 0 {
                         Text("\(min(unreadNotificationCount, 99))")
-                            .font(.system(size: 8, weight: .bold))
+                            .font(.system(size: 7, weight: .bold))
                             .foregroundColor(.white)
                             .padding(.horizontal, 3)
                             .padding(.vertical, 1)
                             .background(magicPalette.cardAccent)
                             .clipShape(Capsule())
-                            .offset(x: 8, y: -6)
+                            .offset(x: 6, y: -5)
                     }
                 }
             }
@@ -608,25 +1098,25 @@ struct HomeView: View {
                     moreMenuIcon
                 }
             } else {
+                // menu-perf: wardrobe more menu
                 Menu {
+                    let _ = MenuPerfSignpost.menuContent("wardrobe.more")
                     wardrobeMoreMenuContent
                 } label: {
                     moreMenuIcon
                         .onTapGesture {
+                            _ = MenuPerfSignpost.menuOpen("wardrobe.more")
                             notifyWardrobeMoreMenuOpened()
                         }
                 }
-                .simultaneousGesture(
-                    TapGesture().onEnded {
-                        notifyWardrobeMoreMenuOpened()
-                    }
-                )
             }
         }
     }
 
     private var sortButton: some View {
+        // menu-perf: wardrobe sort menu
         Menu {
+            let _ = MenuPerfSignpost.menuContent("wardrobe.sort")
             Picker("排序", selection: $sortOption) {
                 ForEach(SortOption.allCases) { option in
                     Text(option.rawValue)
@@ -636,8 +1126,11 @@ struct HomeView: View {
         } label: {
             HomeThemeSkinToolbarIconShell(descriptor: themedTopBarButtonDescriptor) {
                 Image(systemName: "arrow.up.arrow.down")
-                    .font(.system(size: 14))
+                    .font(.system(size: 12))
                     .foregroundStyle(magicPalette.navigationForeground)
+            }
+            .onTapGesture {
+                _ = MenuPerfSignpost.menuOpen("wardrobe.sort")
             }
         }
     }
@@ -678,7 +1171,7 @@ struct HomeView: View {
     private var filterButtonLabel: some View {
         HomeThemeSkinToolbarIconShell(descriptor: themedTopBarButtonDescriptor) {
             Image(systemName: "line.3.horizontal.decrease.circle")
-                .font(.system(size: 14))
+                .font(.system(size: 12))
                 .foregroundStyle(magicPalette.navigationForeground)
                 .symbolVariant(selectedTagIDs.isEmpty && selectedBrandIDs.isEmpty && selectedTypes.isEmpty && selectedColors.isEmpty && selectedSizes.isEmpty && selectedLengths.isEmpty && selectedConditions.isEmpty && selectedAccessories.isEmpty ? .none : .fill)
         }
@@ -686,9 +1179,13 @@ struct HomeView: View {
     
     // 经典筛选菜单
     private var classicFilterMenu: some View {
+        // menu-perf: wardrobe classic filter menu
         Menu {
+            let _ = MenuPerfSignpost.menuContent("wardrobe.filter")
             // Tags Filter
+            // menu-perf: wardrobe tag filter submenu
             Menu {
+                let _ = MenuPerfSignpost.menuContent("wardrobe.filter.tags")
                 Button(role: .destructive) {
                     selectedTagIDs.removeAll()
                 } label: {
@@ -712,7 +1209,7 @@ struct HomeView: View {
                     }
                 }
                 
-                ForEach(tags) { tag in
+                ForEach(menuFacetCache.tagOptions) { tag in
                     Button {
                         if selectedTagIDs.contains(tag.id) {
                             selectedTagIDs.remove(tag.id)
@@ -734,13 +1231,15 @@ struct HomeView: View {
                     if id == HomeView.noTagUUID {
                         return "无标签"
                     }
-                    return tags.first(where: { $0.id == id })?.name
+                    return menuFacetCache.tagNameByID[id]
                 }
                 Label(selectedTagName ?? "标签", systemImage: selectedTagIDs.isEmpty ? "tag" : "tag.fill")
             }
             
             // Brands Filter
+            // menu-perf: wardrobe brand filter submenu
             Menu {
+                let _ = MenuPerfSignpost.menuContent("wardrobe.filter.brands")
                 Button(role: .destructive) {
                     selectedBrandIDs.removeAll()
                 } label: {
@@ -764,7 +1263,7 @@ struct HomeView: View {
                     }
                 }
                 
-                ForEach(brands) { brand in
+                ForEach(menuFacetCache.brandOptions) { brand in
                     Button {
                         if selectedBrandIDs.contains(brand.id) {
                             selectedBrandIDs.remove(brand.id)
@@ -786,7 +1285,7 @@ struct HomeView: View {
                     if id == HomeView.noBrandUUID {
                         return "无品牌"
                     }
-                    return brands.first(where: { $0.id == id })?.name
+                    return menuFacetCache.brandNameByID[id]
                 }
                 Label(selectedBrandName ?? "品牌", systemImage: selectedBrandIDs.isEmpty ? "bag" : "bag.fill")
             }
@@ -800,6 +1299,9 @@ struct HomeView: View {
             
         } label: {
             filterButtonLabel
+                .onTapGesture {
+                    _ = MenuPerfSignpost.menuOpen("wardrobe.filter")
+                }
         }
     }
     
@@ -807,311 +1309,60 @@ struct HomeView: View {
     private func buildFilterSection(for field: ClothingField) -> some View {
         switch field {
         case .types:
-            Menu {
-                Button(role: .destructive) {
-                    selectedTypes.removeAll()
-                } label: {
-                    Label("清除筛选", systemImage: "xmark.circle")
-                }
-                
-                // 无类型选项
-                Button {
-                    if selectedTypes.contains(HomeView.noTypeMarker) {
-                        selectedTypes.remove(HomeView.noTypeMarker)
-                    } else {
-                        selectedTypes.removeAll()
-                        selectedTypes.insert(HomeView.noTypeMarker)
-                    }
-                } label: {
-                    HStack {
-                        Text("无类型")
-                        if selectedTypes.contains(HomeView.noTypeMarker) {
-                            Image(systemName: "checkmark")
-                        }
-                    }
-                }
-                
-                ForEach(getAllValues(for: \.types), id: \.self) { type in
-                    Button {
-                        if selectedTypes.contains(type) {
-                            selectedTypes.remove(type)
-                        } else {
-                            selectedTypes.removeAll()
-                            selectedTypes.insert(type)
-                        }
-                    } label: {
-                        HStack {
-                            Text(type)
-                            if selectedTypes.contains(type) {
-                                Image(systemName: "checkmark")
-                            }
-                        }
-                    }
-                }
-            } label: {
-                let selectedTypeName: String? = selectedTypes.first.flatMap { type in
-                    type == HomeView.noTypeMarker ? "无类型" : type
-                }
-                Label(selectedTypeName ?? "类型", systemImage: selectedTypes.isEmpty ? "tshirt" : "tshirt.fill")
-            }
-            
+            // menu-perf: wardrobe type filter submenu
+            FilterSubmenuView(
+                field: field,
+                options: menuFacetCache.options(for: field),
+                noValueMarker: HomeView.noTypeMarker,
+                selection: $selectedTypes
+            )
         case .colors:
-            Menu {
-                Button(role: .destructive) {
-                    selectedColors.removeAll()
-                } label: {
-                    Label("清除筛选", systemImage: "xmark.circle")
-                }
-                
-                // 无颜色选项
-                Button {
-                    if selectedColors.contains(HomeView.noColorMarker) {
-                        selectedColors.remove(HomeView.noColorMarker)
-                    } else {
-                        selectedColors.removeAll()
-                        selectedColors.insert(HomeView.noColorMarker)
-                    }
-                } label: {
-                    HStack {
-                        Text("无颜色")
-                        if selectedColors.contains(HomeView.noColorMarker) {
-                            Image(systemName: "checkmark")
-                        }
-                    }
-                }
-                
-                ForEach(getAllValues(for: \.colors), id: \.self) { color in
-                    Button {
-                        if selectedColors.contains(color) {
-                            selectedColors.remove(color)
-                        } else {
-                            selectedColors.removeAll()
-                            selectedColors.insert(color)
-                        }
-                    } label: {
-                        HStack {
-                            Text(color)
-                            if selectedColors.contains(color) {
-                                Image(systemName: "checkmark")
-                            }
-                        }
-                    }
-                }
-            } label: {
-                let selectedColorName: String? = selectedColors.first.flatMap { color in
-                    color == HomeView.noColorMarker ? "无颜色" : color
-                }
-                Label(selectedColorName ?? "颜色", systemImage: selectedColors.isEmpty ? "paintpalette" : "paintpalette.fill")
-            }
-            
+            // menu-perf: wardrobe color filter submenu
+            FilterSubmenuView(
+                field: field,
+                options: menuFacetCache.options(for: field),
+                noValueMarker: HomeView.noColorMarker,
+                selection: $selectedColors
+            )
         case .sizes:
-            Menu {
-                Button(role: .destructive) {
-                    selectedSizes.removeAll()
-                } label: {
-                    Label("清除筛选", systemImage: "xmark.circle")
-                }
-                
-                // 无尺码选项
-                Button {
-                    if selectedSizes.contains(HomeView.noSizeMarker) {
-                        selectedSizes.remove(HomeView.noSizeMarker)
-                    } else {
-                        selectedSizes.removeAll()
-                        selectedSizes.insert(HomeView.noSizeMarker)
-                    }
-                } label: {
-                    HStack {
-                        Text("无尺码")
-                        if selectedSizes.contains(HomeView.noSizeMarker) {
-                            Image(systemName: "checkmark")
-                        }
-                    }
-                }
-                
-                ForEach(getAllValues(for: \.sizes), id: \.self) { size in
-                    Button {
-                        if selectedSizes.contains(size) {
-                            selectedSizes.remove(size)
-                        } else {
-                            selectedSizes.removeAll()
-                            selectedSizes.insert(size)
-                        }
-                    } label: {
-                        HStack {
-                            Text(size)
-                            if selectedSizes.contains(size) {
-                                Image(systemName: "checkmark")
-                            }
-                        }
-                    }
-                }
-            } label: {
-                let selectedSizeName: String? = selectedSizes.first.flatMap { size in
-                    size == HomeView.noSizeMarker ? "无尺码" : size
-                }
-                Label(selectedSizeName ?? "尺码", systemImage: selectedSizes.isEmpty ? "ruler" : "ruler.fill")
-            }
-            
+            // menu-perf: wardrobe size filter submenu
+            FilterSubmenuView(
+                field: field,
+                options: menuFacetCache.options(for: field),
+                noValueMarker: HomeView.noSizeMarker,
+                selection: $selectedSizes
+            )
         case .length:
-            Menu {
-                Button(role: .destructive) {
-                    selectedLengths.removeAll()
-                } label: {
-                    Label("清除筛选", systemImage: "xmark.circle")
-                }
-                
-                // 无衣长选项
-                Button {
-                    if selectedLengths.contains(HomeView.noLengthMarker) {
-                        selectedLengths.remove(HomeView.noLengthMarker)
-                    } else {
-                        selectedLengths.removeAll()
-                        selectedLengths.insert(HomeView.noLengthMarker)
-                    }
-                } label: {
-                    HStack {
-                        Text("无衣长")
-                        if selectedLengths.contains(HomeView.noLengthMarker) {
-                            Image(systemName: "checkmark")
-                        }
-                    }
-                }
-                
-                ForEach(getAllValues(for: \.length), id: \.self) { length in
-                    Button {
-                        if selectedLengths.contains(length) {
-                            selectedLengths.remove(length)
-                        } else {
-                            selectedLengths.removeAll()
-                            selectedLengths.insert(length)
-                        }
-                    } label: {
-                        HStack {
-                            Text(length)
-                            if selectedLengths.contains(length) {
-                                Image(systemName: "checkmark")
-                            }
-                        }
-                    }
-                }
-            } label: {
-                let selectedLengthName: String? = selectedLengths.first.flatMap { length in
-                    length == HomeView.noLengthMarker ? "无衣长" : length
-                }
-                Label(selectedLengthName ?? "衣长", systemImage: selectedLengths.isEmpty ? "arrow.up.and.down" : "arrow.up.and.down.circle.fill")
-            }
-            
+            // menu-perf: wardrobe length filter submenu
+            FilterSubmenuView(
+                field: field,
+                options: menuFacetCache.options(for: field),
+                noValueMarker: HomeView.noLengthMarker,
+                selection: $selectedLengths
+            )
         case .condition:
-            Menu {
-                Button(role: .destructive) {
-                    selectedConditions.removeAll()
-                } label: {
-                    Label("清除筛选", systemImage: "xmark.circle")
-                }
-                
-                // 无状态选项
-                Button {
-                    if selectedConditions.contains(HomeView.noConditionMarker) {
-                        selectedConditions.remove(HomeView.noConditionMarker)
-                    } else {
-                        selectedConditions.removeAll()
-                        selectedConditions.insert(HomeView.noConditionMarker)
-                    }
-                } label: {
-                    HStack {
-                        Text("无状态")
-                        if selectedConditions.contains(HomeView.noConditionMarker) {
-                            Image(systemName: "checkmark")
-                        }
-                    }
-                }
-                
-                ForEach(getAllValues(for: \.condition), id: \.self) { condition in
-                    Button {
-                        if selectedConditions.contains(condition) {
-                            selectedConditions.remove(condition)
-                        } else {
-                            selectedConditions.removeAll()
-                            selectedConditions.insert(condition)
-                        }
-                    } label: {
-                        HStack {
-                            Text(condition)
-                            if selectedConditions.contains(condition) {
-                                Image(systemName: "checkmark")
-                            }
-                        }
-                    }
-                }
-            } label: {
-                let selectedConditionName: String? = selectedConditions.first.flatMap { condition in
-                    condition == HomeView.noConditionMarker ? "无状态" : condition
-                }
-                Label(selectedConditionName ?? "状态", systemImage: selectedConditions.isEmpty ? "star" : "star.fill")
-            }
-            
+            // menu-perf: wardrobe condition filter submenu
+            FilterSubmenuView(
+                field: field,
+                options: menuFacetCache.options(for: field),
+                noValueMarker: HomeView.noConditionMarker,
+                selection: $selectedConditions
+            )
         case .accessories:
-            Menu {
-                Button(role: .destructive) {
-                    selectedAccessories.removeAll()
-                } label: {
-                    Label("清除筛选", systemImage: "xmark.circle")
-                }
-                
-                // 无小物选项
-                Button {
-                    if selectedAccessories.contains("__NO_ACCESSORY__") {
-                        selectedAccessories.remove("__NO_ACCESSORY__")
-                    } else {
-                        selectedAccessories.removeAll()
-                        selectedAccessories.insert("__NO_ACCESSORY__")
-                    }
-                } label: {
-                    HStack {
-                        Text("无小物")
-                        if selectedAccessories.contains("__NO_ACCESSORY__") {
-                            Image(systemName: "checkmark")
-                        }
-                    }
-                }
-                
-                ForEach(getAllValues(for: \.accessories), id: \.self) { accessory in
-                    Button {
-                        if selectedAccessories.contains(accessory) {
-                            selectedAccessories.remove(accessory)
-                        } else {
-                            selectedAccessories.removeAll()
-                            selectedAccessories.insert(accessory)
-                        }
-                    } label: {
-                        HStack {
-                            Text(accessory)
-                            if selectedAccessories.contains(accessory) {
-                                Image(systemName: "checkmark")
-                            }
-                        }
-                    }
-                }
-            } label: {
-                let selectedAccessoryName: String? = selectedAccessories.first.flatMap { accessory in
-                    accessory == "__NO_ACCESSORY__" ? "无小物" : accessory
-                }
-                Label(selectedAccessoryName ?? "小物", systemImage: selectedAccessories.isEmpty ? "crown" : "crown.fill")
-            }
+            // menu-perf: wardrobe accessory filter submenu
+            FilterSubmenuView(
+                field: field,
+                options: menuFacetCache.options(for: field),
+                noValueMarker: HomeView.noAccessoryMarker,
+                selection: $selectedAccessories
+            )
         }
     }
     
-    // Helper to extract unique values from comma-separated strings
-    private func getAllValues(for keyPath: KeyPath<Clothing, String>) -> [String] {
-        let allString = allClothings.map { $0[keyPath: keyPath] }.joined(separator: ",")
-        // Replace Chinese comma with English comma before splitting
-        let normalizedString = allString.replacingOccurrences(of: "，", with: ",")
-        return Array(Set(normalizedString.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty })).sorted()
-    }
-    
     private var displayButton: some View {
+        // menu-perf: wardrobe display menu
         Menu {
+            let _ = MenuPerfSignpost.menuContent("wardrobe.display")
             if selectedTab == .wardrobe {
                 Picker("布局", selection: $viewLayout) {
                     ForEach(ViewLayout.allCases) { layout in
@@ -1130,15 +1381,15 @@ struct HomeView: View {
         } label: {
             HomeThemeSkinToolbarIconShell(descriptor: themedTopBarButtonDescriptor) {
                 Image(systemName: selectedTab == .wardrobe ? viewLayout.icon : depositDisplayMode.icon)
-                    .font(.system(size: 14))
+                    .font(.system(size: 12))
                     .foregroundStyle(magicPalette.navigationForeground)
+            }
+            .onTapGesture {
+                _ = MenuPerfSignpost.menuOpen("wardrobe.display")
             }
         }
     }
 
-    // 草稿管理器
-    private var draftManager: ClothingEditDraftManager { ClothingEditDraftManager.shared }
-    
     // 标记是否从草稿继续
     @State private var continueFromDraft = false
 
@@ -1153,7 +1404,7 @@ struct HomeView: View {
     private var moreMenuIcon: some View {
         HomeThemeSkinToolbarIconShell(descriptor: themedTopBarButtonDescriptor) {
             Image(systemName: "ellipsis.circle")
-                .font(.system(size: 14))
+                .font(.system(size: 12))
                 .foregroundStyle(magicPalette.navigationForeground)
                 .captureGuideToolbarIconTarget(.wardrobeMoreMenuButton)
         }
@@ -1194,7 +1445,10 @@ struct HomeView: View {
     }
 
     private func openWardrobeSearch() {
-        isSearchActive = true
+        DispatchQueue.main.async {
+            isSearchActive = true
+            isWardrobeSearchFocused = true
+        }
     }
 
     private func enterWardrobeSelectionMode() {
@@ -1260,13 +1514,11 @@ struct HomeView: View {
     }
 
     private func continueWardrobeDraft() {
-        notifyWardrobeAddMenuOpened()
         continueFromDraft = true
         showingAddSheet = true
     }
 
     private func presentWardrobeManualCreate() {
-        notifyWardrobeAddMenuOpened()
         // 手动创建是一次“重新开始”动作，只在入口点击时清理旧草稿；
         // 前后台切换导致的编辑页重建不应再次清空。
         draftManager.clearDraft()
@@ -1275,13 +1527,12 @@ struct HomeView: View {
     }
 
     private func presentCommunityImportAlert() {
-        notifyWardrobeAddMenuOpened()
         showingCommunityImportAlert = true
     }
 
     @ViewBuilder
     private var wardrobeAddMenuContent: some View {
-        if draftManager.hasDraft() {
+        if draftManager.hasPersistedDraft {
             Button {
                 continueWardrobeDraft()
             } label: {
@@ -1299,7 +1550,6 @@ struct HomeView: View {
         .captureGuideTarget(.wardrobeManualCreateEntry)
 
         Button {
-            notifyWardrobeAddMenuOpened()
             presentBatchImport()
         } label: {
             Label("批量导入", systemImage: "square.and.arrow.down.on.square")
@@ -1334,7 +1584,7 @@ struct HomeView: View {
         let highlightBatchImport = feature == .batchImport && FeatureUnlockManager.shared.isUnlocked(.batchImport)
         let highlightManualCreate = feature == .batchImport && !highlightBatchImport
 
-        if draftManager.hasDraft() {
+        if draftManager.hasPersistedDraft {
             items.append(
                 .action(
                     title: "从上次未保存继续",
@@ -1384,19 +1634,17 @@ struct HomeView: View {
                     addButtonIcon
                 }
             } else {
+                // menu-perf: wardrobe add menu
                 Menu {
+                    let _ = MenuPerfSignpost.menuContent("wardrobe.add")
                     wardrobeAddMenuContent
                 } label: {
                     addButtonIcon
                         .onTapGesture {
+                            _ = MenuPerfSignpost.menuOpen("wardrobe.add")
                             notifyWardrobeAddMenuOpened()
                         }
                 }
-                .simultaneousGesture(
-                    TapGesture().onEnded {
-                        notifyWardrobeAddMenuOpened()
-                    }
-                )
             }
         }
         .alert("该功能敬请期待，联网版本激情开拓中～！", isPresented: $showingCommunityImportAlert) {
@@ -1407,7 +1655,7 @@ struct HomeView: View {
     private var addButtonIcon: some View {
         HomeThemeSkinToolbarIconShell(descriptor: themedTopBarAddButtonDescriptor) {
             Image(systemName: "plus")
-                .font(.system(size: 14))
+                .font(.system(size: 12))
                 .foregroundStyle(magicPalette.navigationForeground)
                 .captureGuideToolbarIconTarget(.wardrobeAddButton)
         }
@@ -1430,7 +1678,7 @@ struct HomeView: View {
 
     private func resolveThemeDescriptor(for slot: ThemeSkinSlot) -> ThemeSkinDescriptor? {
         guard let descriptor = themeSkinManager.activeThemeDescriptor(for: slot, state: .default),
-              descriptor.assetNamespace == "girl_closet" else {
+              WardrobeThemeSkinSupport.isThemeSkinDescriptor(descriptor) else {
             return nil
         }
         return descriptor
@@ -1472,8 +1720,8 @@ struct HomeView: View {
             for id in selectedTagIDs {
                 if id == HomeView.noTagUUID {
                     names.append("无标签")
-                } else if let tag = tags.first(where: { $0.id == id }) {
-                    names.append(tag.name)
+                } else if let tagName = menuFacetCache.tagNameByID[id] {
+                    names.append(tagName)
                 }
             }
             if !names.isEmpty { descriptions.append(names.joined(separator: "/")) }
@@ -1485,8 +1733,8 @@ struct HomeView: View {
             for id in selectedBrandIDs {
                 if id == HomeView.noBrandUUID {
                     names.append("无品牌")
-                } else if let brand = brands.first(where: { $0.id == id }) {
-                    names.append(brand.name)
+                } else if let brandName = menuFacetCache.brandNameByID[id] {
+                    names.append(brandName)
                 }
             }
             if !names.isEmpty { descriptions.append(names.joined(separator: "/")) }
@@ -1579,27 +1827,5 @@ extension HomeView {
         if let day = pickDay(in: currentInterval) { return .current(day) }
         if let day = pickDay(in: nextInterval) { return .next(day) }
         return nil
-    }
-}
-
-// MARK: - View 扩展：条件应用 searchable
-extension View {
-    /// 只在 isPresented 为 true 时应用 searchable，实现默认隐藏搜索栏的效果
-    @ViewBuilder
-    func applySearchableIfNeeded(
-        text: Binding<String>,
-        isPresented: Binding<Bool>,
-        prompt: String
-    ) -> some View {
-        if isPresented.wrappedValue {
-            self.searchable(
-                text: text,
-                isPresented: isPresented,
-                placement: .navigationBarDrawer(displayMode: .always),
-                prompt: prompt
-            )
-        } else {
-            self
-        }
     }
 }

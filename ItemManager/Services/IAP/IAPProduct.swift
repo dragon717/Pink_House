@@ -33,6 +33,42 @@ enum IAPProductType: String, CaseIterable {
     }
 }
 
+// MARK: - App Store 优惠码兑换配置
+// 优惠码不再绑定隐藏礼包商品，统一绑定现有 6 个喵币档位。
+// 通过 App Store Offer Codes 免费兑换时只发放对应档位基础喵币，不消耗首充双倍资格。
+enum IAPOfferCodeRedemption {
+    static let eligibleProductIDs = IAPProductType.coinProductIDs
+    static let source = "offer_code_redemption"
+    static let pendingStartedAtKey = "iap_offer_code_redemption_pending_started_at"
+    static let pendingSessionTTL: TimeInterval = 15 * 60
+
+    static func baseCoinAmount(for productID: String) -> Int? {
+        guard let productType = IAPProductType(rawValue: productID) else { return nil }
+        return baseCoinAmount(for: productType)
+    }
+
+    static func baseCoinAmount(for productType: IAPProductType) -> Int {
+        switch productType {
+        case .meowCoin60:
+            return 60
+        case .meowCoin120:
+            return 120
+        case .meowCoin300:
+            return 300
+        case .meowCoin500:
+            return 500
+        case .meowCoin1280:
+            return 1280
+        case .meowCoin3280:
+            return 3280
+        }
+    }
+
+    static func successMessage(for amount: Int) -> String {
+        "兑换成功！获得 \(amount) 喵币"
+    }
+}
+
 // MARK: - 喵币商品信息
 struct MeowCoinProduct: Identifiable, Equatable {
     let id: String

@@ -30,9 +30,14 @@ struct iCloudSyncStatusView: View {
             Image(systemName: "icloud")
                 .foregroundStyle(.secondary)
         case .migrating:
-            Image(systemName: "icloud.and.arrow.up")
-                .foregroundStyle(.blue)
-                .symbolEffect(.bounce)
+            if #available(iOS 18.0, *) {
+                Image(systemName: "icloud.and.arrow.up")
+                    .foregroundStyle(.blue)
+                    .symbolEffect(.bounce)
+            } else {
+                Image(systemName: "icloud.and.arrow.up")
+                    .foregroundStyle(.blue)
+            }
         case .syncing:
             if #available(iOS 18.0, *) {
                 Image(systemName: "arrow.clockwise.icloud")

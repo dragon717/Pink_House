@@ -351,12 +351,14 @@ struct SpaceBookDetailView: View {
     }
 
     private var emptyStateView: some View {
-        ContentUnavailableView {
-            Label("暂无空间书页", systemImage: "doc.text.image")
-        } description: {
-            Text("点击 + 创建新的空间书页")
+        ThemeSkinEmptyStateSurface {
+            ContentUnavailableView {
+                Label("暂无空间书页", systemImage: "doc.text.image")
+            } description: {
+                Text("点击 + 创建新的空间书页")
+            }
+            .foregroundStyle(emptyStateForegroundColor)
         }
-        .foregroundStyle(emptyStateForegroundColor)
         .padding(.top, 100)
     }
     
@@ -417,34 +419,19 @@ struct SpaceBookDetailView: View {
     }
 
     private func selectionIndicator(isSelected: Bool) -> some View {
-        ZStack {
-            Circle()
-                .fill(isSelected ? Color.pink : Color.white.opacity(0.8))
-                .frame(width: 24, height: 24)
-
-            if isSelected {
-                Image(systemName: "checkmark")
-                    .font(.system(size: 12, weight: .bold))
-                    .foregroundStyle(.white)
-            } else {
-                Circle()
-                    .stroke(Color.gray.opacity(0.5), lineWidth: 2)
-                    .frame(width: 24, height: 24)
-            }
-        }
-        .padding(8)
+        ThemeSkinSelectionBadge(isSelected: isSelected)
     }
 
     private func editingPageCell(for page: SpaceOutfit, itemWidth: CGFloat, itemHeight: CGFloat) -> some View {
         SpaceOutfitCard(page: page, width: itemWidth, height: itemHeight)
             .overlay(alignment: .topTrailing) {
-                Image(systemName: "line.3.horizontal")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .padding(4)
-                    .background(.ultraThinMaterial)
-                    .clipShape(Circle())
-                    .padding(4)
+                ThemeSkinIconBadge(
+                    systemName: "line.3.horizontal",
+                    fallbackColor: .gray,
+                    size: 24,
+                    symbolSize: 10
+                )
+                .padding(4)
             }
             .onDrag {
                 return NSItemProvider(object: page.id.uuidString as NSString)

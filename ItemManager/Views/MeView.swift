@@ -92,12 +92,12 @@ struct MeView: View {
                     // 2. 魔法任务入口
                     NavigationLink(destination: MagicTasksView(), isActive: $showMagicTasks) {
                         HStack(spacing: 16) {
-                            Image(systemName: "sparkles")
-                                .font(.title2)
-                                .foregroundColor(.pink)
-                                .frame(width: 44, height: 44)
-                                .background(Color.pink.opacity(0.1))
-                                .clipShape(RoundedRectangle(cornerRadius: 12))
+                            ThemeSkinIconBadge(
+                                systemName: "sparkles",
+                                fallbackColor: .pink,
+                                size: 44,
+                                symbolSize: 20
+                            )
 
                             VStack(alignment: .leading, spacing: 4) {
                                 Text("魔法任务")
@@ -115,8 +115,7 @@ struct MeView: View {
                                 .foregroundStyle(themeManager.secondaryTextColor)
                         }
                         .padding()
-                        .background(magicTaskCardBackground)
-                        .overlay(magicTaskCardOverlay)
+                        .themeSkinSectionCard(cornerRadius: 16)
                     }
                     .buttonStyle(PlainButtonStyle())
                     .padding(.horizontal)
@@ -391,9 +390,12 @@ struct MeView: View {
                 HStack {
                     VStack(alignment: .leading, spacing: 8) {
                         HStack {
-                            Image(systemName: "crown.fill")
-                                .foregroundStyle(Color(hex: "FFD700"))
-                                .font(.title2)
+                            ThemeSkinIconBadge(
+                                systemName: "crown.fill",
+                                fallbackColor: Color(hex: "FFD700"),
+                                size: 40,
+                                symbolSize: 18
+                            )
                             Text("开通 VIP 会员")
                                 .font(.title3)
                                 .bold()
@@ -411,14 +413,7 @@ struct MeView: View {
                 .padding(20)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .frame(height: 100) // 稍微矮一点
-                .background(
-                    RoundedRectangle(cornerRadius: 20)
-                        .fill(.ultraThinMaterial)
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 20)
-                        .stroke(Color(hex: "FFD700").opacity(0.3), lineWidth: 1)
-                )
+                .themeSkinSectionCard(cornerRadius: 20)
             }
             .buttonStyle(PlainButtonStyle())
             .captureGuideTarget(.aiAnalysisVIPCard)

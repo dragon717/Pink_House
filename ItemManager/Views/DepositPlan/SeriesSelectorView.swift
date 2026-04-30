@@ -162,15 +162,17 @@ struct SeriesSelectorView: View {
                                             .minimumScaleFactor(0.8)
                                     }
                                     .padding(8)
-                                    .background {
+                                    .themeSkinAdaptiveSectionCard(
+                                        slot: .filterChip,
+                                        cornerRadius: 8,
+                                        showsDecoration: false
+                                    ) {
                                         if isSelected {
                                             Color.brown
                                         } else {
                                             CardBackgroundView(cornerRadius: 8)
                                         }
                                     }
-                                    .clipShape(RoundedRectangle(cornerRadius: 8))
-                                    .shadow(color: .black.opacity(0.05), radius: 2, x: 0, y: 1)
                                     .overlay(
                                         RoundedRectangle(cornerRadius: 8)
                                             .stroke(Color.primary.opacity(0.1), lineWidth: isSelected ? 0 : 1)
@@ -244,8 +246,6 @@ struct RecentAddedCard: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 12)
-        .background(CardBackgroundView(cornerRadius: 16))
-        .clipShape(RoundedRectangle(cornerRadius: 16))
-        .shadow(color: .black.opacity(0.05), radius: 3, x: 0, y: 1)
+        .themeSkinSectionCard(slot: .statsCard, cornerRadius: 16, showsDecoration: false)
     }
 }

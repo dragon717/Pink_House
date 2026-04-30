@@ -17,7 +17,7 @@ enum FilterMode: String, CaseIterable, Identifiable {
 }
 
 // MARK: - 心愿尾款筛选状态
-enum DepositStatusFilter: String, CaseIterable, Identifiable {
+enum DepositStatusFilter: String, CaseIterable, Identifiable, Hashable, Sendable {
     case all = "all"
     case owned = "owned"
     case depositPlan = "depositPlan"
@@ -152,7 +152,9 @@ struct MultiDimensionalFilterSheet: View {
                 ToolbarItem(placement: .topBarTrailing) {
                     HStack(spacing: 12) {
                         // 心愿尾款筛选
+                        // menu-perf: multi-dimensional deposit status menu
                         Menu {
+                            let _ = MenuPerfSignpost.menuContent("wardrobe.multi_filter.deposit_status")
                             ForEach(DepositStatusFilter.allCases) { filter in
                                 Button {
                                     depositStatusFilter = filter

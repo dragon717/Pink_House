@@ -20,11 +20,13 @@ extension EnvironmentValues {
 struct WealthView: View {
     @State private var viewModel = WealthViewModel()
     @Query(filter: #Predicate<Clothing> { $0.deletedAt == nil }) private var allClothings: [Clothing]
+    @Query private var wealthSavingEntries: [WealthSavingEntry]
     @ObservedObject private var hapticManager = HapticEngineManager.shared
     @ObservedObject private var soundManager = SoundManager.shared
     @StateObject private var mediaStateManager = MediaStateManager.shared
     @Environment(ThemeManager.self) private var themeManager
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.modelContext) private var modelContext
 
     // 初始页签（从外部传入）
     var initialTab: WealthMainTab? = nil
@@ -50,17 +52,27 @@ struct WealthView: View {
     @State private var moneyCountingState: MoneyCountingState?
     
     private var calculatedTotalAmount: Decimal {
-        allClothings.reduce(Decimal(0)) { partialResult, clothing in
+        let wardrobeTotal = allClothings.reduce(Decimal(0)) { partialResult, clothing in
+            guard !clothing.isDeleted && clothing.deletedAt == nil else { return partialResult }
             if clothing.isDepositPlan {
-                return partialResult + (clothing.totalDeposit * Decimal(clothing.stock))
+                return partialResult + clothing.totalDeposit + clothing.resolvedShippingFee
             } else {
                 return partialResult + clothing.inventoryTotalPrice
             }
         }
+        return wardrobeTotal + WealthSavingLedger.activeTotal(in: wealthSavingEntries)
     }
 
     private var magicPalette: MagicThemePalette {
         MagicThemeDesignSystem.palette(themeManager: themeManager, colorScheme: colorScheme)
+    }
+
+    private var wealthSavingChangeToken: String {
+        wealthSavingEntries
+            .map {
+                "\($0.id.uuidString)|\($0.amount)|\($0.updatedAt.timeIntervalSince1970)|\($0.usedAt?.timeIntervalSince1970 ?? 0)|\($0.voidedAt?.timeIntervalSince1970 ?? 0)"
+            }
+            .joined(separator: "#")
     }
     
     var body: some View {
@@ -86,7 +98,11 @@ struct WealthView: View {
                         // 安财 - 只在选中时创建，避免物理模拟提前启动
                         Group {
                             if selectedMainTab == .wealthStorage {
-                                WealthStorageContainerView(viewModel: viewModel)
+                                WealthStorageContainerView(
+                                    viewModel: viewModel,
+                                    clothings: allClothings,
+                                    wealthSavingEntries: wealthSavingEntries
+                                )
                             } else {
                                 Color.clear
                             }
@@ -197,6 +213,9 @@ struct WealthView: View {
             .onChange(of: allClothings) { _, _ in
                 updateAmount()
             }
+            .onChange(of: wealthSavingChangeToken) { _, _ in
+                updateAmount()
+            }
         }
     }
     
@@ -265,6 +284,11 @@ struct WealthView: View {
     }
     
     private func handleOnAppear() {
+        WealthSavingLedger.migrateLegacySavedFinalPayments(
+            clothings: allClothings,
+            entries: wealthSavingEntries,
+            context: modelContext
+        )
         updateAmount()
         Task {
             await viewModel.fetchExchangeRate()
@@ -318,6 +342,8 @@ enum WealthMainTab: String, CaseIterable, Identifiable {
 
 struct WealthStorageContainerView: View {
     @Bindable var viewModel: WealthViewModel
+    let clothings: [Clothing]
+    let wealthSavingEntries: [WealthSavingEntry]
     
     @State private var selectedStorageTab: StorageTab = .gold
     
@@ -347,6 +373,13 @@ struct WealthStorageContainerView: View {
                     // 虚拟币
                     VirtualCurrencyView(viewModel: viewModel, isActive: selectedStorageTab == .virtual)
                         .tag(StorageTab.virtual)
+
+                    // 尾款招财猫
+                    FinalPaymentVaultView(
+                        clothings: clothings,
+                        wealthSavingEntries: wealthSavingEntries
+                    )
+                        .tag(StorageTab.finalPayment)
                 }
                 .tabViewStyle(.page(indexDisplayMode: .never))
             }
@@ -362,6 +395,8 @@ struct WealthStorageContainerView: View {
             case .virtual:
                 // 虚拟币不需要设置货币类型
                 break
+            case .finalPayment:
+                viewModel.selectedCurrency = .rmb
             }
         }
     }
@@ -385,8 +420,1081 @@ enum StorageTab: String, CaseIterable, Identifiable {
     case gold = "黄金"
     case silver = "白银"
     case virtual = "虚拟"
+    case finalPayment = "尾款"
     
     var id: String { rawValue }
+}
+
+// MARK: - 尾款招财猫小金库
+
+struct FinalPaymentVaultView: View {
+    let clothings: [Clothing]
+    let wealthSavingEntries: [WealthSavingEntry]
+
+    @StateObject private var tabNavigationManager = TabNavigationManager.shared
+    @State private var appearanceManager = WealthAppearanceManager.shared
+    @State private var showingSavingSheet = false
+    @State private var showingUnassignedManager = false
+    @State private var savingTargetClothingID: UUID?
+    @State private var detailTargetClothing: Clothing?
+    @State private var celebrationAmount: Decimal?
+    @Environment(\.modelContext) private var modelContext
+    @Environment(ThemeManager.self) private var themeManager
+    @Environment(\.colorScheme) private var colorScheme
+
+    private var activeDepositClothings: [Clothing] {
+        clothings.filter { $0.isDepositPlan && !$0.isDeleted && $0.deletedAt == nil }
+    }
+
+    private var activeClothings: [Clothing] {
+        clothings.filter { !$0.isDeleted && $0.deletedAt == nil }
+    }
+
+    private var clothingsWithSavingsOrDepositPlans: [Clothing] {
+        let savedIDs = Set(wealthSavingEntries.compactMap { entry -> UUID? in
+            WealthSavingLedger.isActive(entry) ? entry.clothingID : nil
+        })
+        return activeClothings
+            .filter { $0.isDepositPlan || savedIDs.contains($0.id) }
+            .sorted {
+                let left = WealthSavingLedger.activeTotal(for: $0.id, in: wealthSavingEntries)
+                let right = WealthSavingLedger.activeTotal(for: $1.id, in: wealthSavingEntries)
+                if left != right { return left > right }
+                return $0.updatedAt > $1.updatedAt
+            }
+    }
+
+    private var savedTotal: Decimal {
+        WealthSavingLedger.activeTotal(in: wealthSavingEntries)
+    }
+
+    private var unassignedSavedTotal: Decimal {
+        WealthSavingLedger.activeUnassignedTotal(in: wealthSavingEntries)
+    }
+
+    private var linkedSavedTotal: Decimal {
+        savedTotal - unassignedSavedTotal
+    }
+
+    private var palette: MagicThemePalette {
+        MagicThemeDesignSystem.palette(themeManager: themeManager, colorScheme: colorScheme)
+    }
+
+    var body: some View {
+        ScrollView {
+            VStack(spacing: 18) {
+                fortuneCatHeader
+                    .padding(.top, 18)
+
+                statsCard
+
+                quickSaveCard
+
+                if clothingsWithSavingsOrDepositPlans.isEmpty {
+                    emptyState
+                } else {
+                    savedList
+                }
+            }
+            .padding(.horizontal)
+            .padding(.bottom, 120)
+        }
+        .sheet(isPresented: $showingSavingSheet) {
+            VaultSavingSheet(
+                targetClothing: savingTargetClothing,
+                currentSavedAmount: savingTargetClothing.map {
+                    WealthSavingLedger.activeTotal(for: $0.id, in: wealthSavingEntries)
+                } ?? unassignedSavedTotal,
+                onSave: saveAmount
+            )
+        }
+        .sheet(isPresented: $showingUnassignedManager) {
+            UnassignedSavingManagerSheet(
+                depositClothings: activeDepositClothings,
+                onFillComplete: { amount in
+                    if amount > 0 {
+                        celebrationAmount = amount
+                    }
+                }
+            )
+        }
+        .navigationDestination(item: $detailTargetClothing) { clothing in
+            ClothingDetailView(clothing: clothing)
+        }
+        .overlay {
+            if let celebrationAmount {
+                VaultSavingCelebrationOverlay(
+                    amount: celebrationAmount,
+                    onComplete: { self.celebrationAmount = nil }
+                )
+                .allowsHitTesting(false)
+            }
+        }
+    }
+
+    private var savingTargetClothing: Clothing? {
+        guard let savingTargetClothingID else { return nil }
+        return activeClothings.first { $0.id == savingTargetClothingID }
+    }
+
+    private var fortuneCatHeader: some View {
+        VStack(spacing: 12) {
+            FortuneCatVaultIcon(mascot: appearanceManager.finalPaymentVaultMascot)
+                .frame(width: 150, height: 150)
+                .shadow(color: Color.orange.opacity(0.25), radius: 16, x: 0, y: 8)
+
+            Text("\(appearanceManager.finalPaymentVaultMascot.displayName)小金库")
+                .font(.title3.weight(.heavy))
+                .foregroundStyle(themeManager.primaryTextColor)
+
+            Text("为裙装一笔笔存钱，或先放进不指定小金库；都会计入马上来财统计。")
+                .font(.caption)
+                .multilineTextAlignment(.center)
+                .foregroundStyle(themeManager.secondaryTextColor)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(20)
+        .themeSkinAdaptiveSectionCard(slot: .sectionCard, cornerRadius: 28) {
+            RoundedRectangle(cornerRadius: 28)
+                .fill(Color(uiColor: .secondarySystemBackground).opacity(0.58))
+                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 28))
+        }
+    }
+
+    private var statsCard: some View {
+        VStack(spacing: 14) {
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Text("¥")
+                    .font(.title3.weight(.bold))
+                    .foregroundStyle(.orange)
+                Text(NSDecimalNumber(decimal: savedTotal).stringValue)
+                    .font(.system(size: 42, weight: .heavy, design: .rounded))
+                    .monospacedDigit()
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [Color.orange, Color.yellow, Color(hex: "C94C72")],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.45)
+            }
+
+            HStack(spacing: 0) {
+                vaultStat(title: "已存入", value: "¥\(NSDecimalNumber(decimal: savedTotal).stringValue)", color: .orange)
+                Divider().frame(height: 34)
+                vaultStat(title: "指定裙装", value: "¥\(NSDecimalNumber(decimal: linkedSavedTotal).stringValue)", color: palette.accent)
+                Divider().frame(height: 34)
+                unassignedVaultStatButton
+            }
+        }
+        .padding(18)
+        .themeSkinAdaptiveSectionCard(slot: .statsCard, cornerRadius: 24) {
+            RoundedRectangle(cornerRadius: 24)
+                .fill(Color(uiColor: .secondarySystemBackground).opacity(0.62))
+                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 24))
+        }
+    }
+
+    private func vaultStat(title: String, value: String, color: Color) -> some View {
+        VStack(spacing: 6) {
+            Text(title)
+                .font(.caption2)
+                .foregroundStyle(themeManager.secondaryTextColor)
+            Text(value)
+                .font(.caption.weight(.bold))
+                .foregroundStyle(color)
+                .monospacedDigit()
+                .lineLimit(1)
+                .minimumScaleFactor(0.65)
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    private var unassignedVaultStatButton: some View {
+        Button {
+            showingUnassignedManager = true
+        } label: {
+            VStack(spacing: 6) {
+                Text("未指定")
+                    .font(.caption2)
+                    .foregroundStyle(themeManager.secondaryTextColor)
+                HStack(spacing: 3) {
+                    Text("¥\(NSDecimalNumber(decimal: unassignedSavedTotal).stringValue)")
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(Color(hex: "C94C72"))
+                        .monospacedDigit()
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.65)
+                    Image(systemName: "chevron.right")
+                        .font(.caption2.weight(.bold))
+                        .foregroundStyle(Color(hex: "C94C72").opacity(0.75))
+                }
+            }
+            .frame(maxWidth: .infinity)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("管理未指定存款")
+    }
+
+    private var quickSaveCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("存一笔到小金库")
+                        .font(.headline)
+                        .foregroundStyle(themeManager.primaryTextColor)
+                    Text("不指定裙装也可以先存，之后来财统计会一起计算。")
+                        .font(.caption)
+                        .foregroundStyle(themeManager.secondaryTextColor)
+                }
+                Spacer()
+                Button {
+                    savingTargetClothingID = nil
+                    showingSavingSheet = true
+                } label: {
+                    Label("不指定存钱", systemImage: "plus.circle.fill")
+                        .font(.caption.weight(.bold))
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .foregroundStyle(.orange)
+                        .themeSkinAdaptiveSectionCard(slot: .primaryButton, cornerRadius: 18, showsDecoration: false) {
+                            Capsule().fill(Color.orange.opacity(0.16))
+                        }
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(16)
+        .themeSkinAdaptiveSectionCard(slot: .sectionCard, cornerRadius: 22) {
+            RoundedRectangle(cornerRadius: 22)
+                .fill(Color(uiColor: .secondarySystemBackground).opacity(0.55))
+                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 22))
+        }
+    }
+
+    private var emptyState: some View {
+        VStack(spacing: 14) {
+            Image(systemName: "tray")
+                .font(.system(size: 34))
+                .foregroundStyle(.orange.opacity(0.8))
+            Text("还没有小金库存款")
+                .font(.headline)
+                .foregroundStyle(themeManager.primaryTextColor)
+            Text("可以先不指定裙装存一笔，也可以去心愿尾款列表为目标裙装存钱。")
+                .font(.caption)
+                .multilineTextAlignment(.center)
+                .foregroundStyle(themeManager.secondaryTextColor)
+            HStack(spacing: 10) {
+                Button {
+                    savingTargetClothingID = nil
+                    showingSavingSheet = true
+                } label: {
+                    Label("存一笔", systemImage: "plus.circle.fill")
+                        .font(.subheadline.weight(.bold))
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 10)
+                        .foregroundStyle(.orange)
+                        .themeSkinAdaptiveSectionCard(slot: .primaryButton, cornerRadius: 20, showsDecoration: false) {
+                            Capsule().fill(Color.orange.opacity(0.16))
+                        }
+                }
+                .buttonStyle(.plain)
+
+                Button {
+                    tabNavigationManager.navigate(to: .wardrobe(.depositPlan))
+                } label: {
+                    Label("去心愿尾款", systemImage: "heart.text.square.fill")
+                        .font(.subheadline.weight(.bold))
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 10)
+                        .foregroundStyle(palette.accent)
+                        .themeSkinAdaptiveSectionCard(slot: .primaryButton, cornerRadius: 20, showsDecoration: false) {
+                            Capsule().fill(palette.accent.opacity(0.14))
+                        }
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .padding(24)
+        .themeSkinSectionCard(slot: .emptyState, cornerRadius: 24)
+    }
+
+    private var savedList: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("裙装存钱进度")
+                .font(.headline)
+                .foregroundStyle(themeManager.primaryTextColor)
+
+            ForEach(clothingsWithSavingsOrDepositPlans) { clothing in
+                let saved = WealthSavingLedger.activeTotal(for: clothing.id, in: wealthSavingEntries)
+                let numerator = WealthSavingLedger.progressNumerator(for: clothing, entries: wealthSavingEntries)
+                let target = WealthSavingLedger.purchaseTarget(for: clothing)
+                let cap = WealthSavingLedger.assignableSavingCap(for: clothing)
+                let remaining = WealthSavingLedger.remainingAssignableAmount(for: clothing, entries: wealthSavingEntries)
+                let overflow = WealthSavingLedger.overflowAmount(for: clothing, entries: wealthSavingEntries)
+                let ratio = WealthSavingLedger.progressRatio(for: clothing, entries: wealthSavingEntries)
+
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack(spacing: 10) {
+                        Button {
+                            detailTargetClothing = clothing
+                        } label: {
+                            HStack(spacing: 10) {
+                                Image(systemName: clothing.isDepositPlan ? "heart.text.square.fill" : "tshirt.fill")
+                                    .font(.headline)
+                                    .foregroundStyle(.orange)
+                                    .frame(width: 34, height: 34)
+                                    .background(Color.orange.opacity(0.12))
+                                    .clipShape(Circle())
+
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text(clothing.name)
+                                        .font(.subheadline.weight(.semibold))
+                                        .foregroundStyle(themeManager.primaryTextColor)
+                                        .lineLimit(1)
+                                    Text(clothing.isDepositPlan ? "定金 + 小金库存款 / 当前总价" : "小金库存款 / 当前总价")
+                                        .font(.caption2)
+                                        .foregroundStyle(themeManager.tertiaryTextColor)
+                                }
+                            }
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+
+                        Spacer()
+
+                        Button {
+                            savingTargetClothingID = clothing.id
+                            showingSavingSheet = true
+                        } label: {
+                            Label(remaining > 0 ? "存一笔" : "已满", systemImage: remaining > 0 ? "plus" : "checkmark")
+                                .font(.caption.weight(.bold))
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 7)
+                                .foregroundStyle(.orange)
+                                .themeSkinAdaptiveSectionCard(slot: .primaryButton, cornerRadius: 16, showsDecoration: false) {
+                                    Capsule().fill(Color.orange.opacity(0.14))
+                                }
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(remaining <= 0)
+                    }
+
+                    Button {
+                        detailTargetClothing = clothing
+                    } label: {
+                        VStack(alignment: .leading, spacing: 6) {
+                            HStack {
+                                Text("已存 ¥\(NSDecimalNumber(decimal: saved).stringValue)")
+                                Spacer()
+                                Text("\(Int((ratio * 100).rounded()))%")
+                                    .foregroundStyle(ratio > 1 ? Color(hex: "C94C72") : .orange)
+                            }
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(themeManager.secondaryTextColor)
+
+                            ProgressView(value: min(ratio, 1.0))
+                                .tint(ratio > 1 ? Color(hex: "C94C72") : .orange)
+
+                            Text("进度 ¥\(NSDecimalNumber(decimal: numerator).stringValue) / ¥\(NSDecimalNumber(decimal: target).stringValue)")
+                                .font(.caption2)
+                                .foregroundStyle(themeManager.tertiaryTextColor)
+                            Text("指定上限 ¥\(NSDecimalNumber(decimal: cap).stringValue) · 还能存 ¥\(NSDecimalNumber(decimal: remaining).stringValue)")
+                                .font(.caption2)
+                                .foregroundStyle(remaining > 0 ? themeManager.tertiaryTextColor : Color(hex: "C94C72"))
+                        }
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+
+                    if overflow > 0 {
+                        Button {
+                            moveOverflowSavingToUnassigned(for: clothing)
+                        } label: {
+                            Label("转出超额 ¥\(NSDecimalNumber(decimal: overflow).stringValue) 到未指定", systemImage: "arrow.uturn.left.circle.fill")
+                                .font(.caption.weight(.bold))
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 8)
+                                .frame(maxWidth: .infinity)
+                                .foregroundStyle(Color(hex: "C94C72"))
+                                .themeSkinAdaptiveSectionCard(slot: .primaryButton, cornerRadius: 14, showsDecoration: false) {
+                                    RoundedRectangle(cornerRadius: 14)
+                                        .fill(Color(hex: "C94C72").opacity(0.10))
+                                }
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(12)
+                .themeSkinSectionCard(slot: .sectionCard, cornerRadius: 18, showsDecoration: false)
+            }
+        }
+    }
+
+    private func saveAmount(_ amount: Decimal) {
+        let target = savingTargetClothing
+        do {
+            let savedEntry: WealthSavingEntry?
+            if let target {
+                savedEntry = try WealthSavingLedger.addSaving(
+                    amount: amount,
+                    for: target,
+                    entries: wealthSavingEntries,
+                    note: "为「\(target.name)」存钱",
+                    context: modelContext
+                )
+            } else {
+                savedEntry = try WealthSavingLedger.addSaving(
+                    amount: amount,
+                    clothingID: nil,
+                    note: "不指定裙装存钱",
+                    context: modelContext
+                )
+            }
+            guard let savedEntry else { return }
+            Task { await SharedPersistence.shared.syncWidgetData() }
+            celebrationAmount = savedEntry.amount
+        } catch {
+            print("FinalPaymentVaultView: Failed to save wealth saving entry: \(error)")
+        }
+    }
+
+    private func moveOverflowSavingToUnassigned(for clothing: Clothing) {
+        do {
+            let movedAmount = try WealthSavingLedger.moveOverflowToUnassigned(
+                for: clothing,
+                entries: wealthSavingEntries,
+                context: modelContext
+            )
+            if movedAmount > 0 {
+                Task { await SharedPersistence.shared.syncWidgetData() }
+            }
+        } catch {
+            print("FinalPaymentVaultView: Failed to move overflow wealth saving: \(error)")
+        }
+    }
+}
+
+struct UnassignedSavingManagerSheet: View {
+    let depositClothings: [Clothing]
+    let onFillComplete: (Decimal) -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.modelContext) private var modelContext
+    @Environment(ThemeManager.self) private var themeManager
+    @Query private var wealthSavingEntries: [WealthSavingEntry]
+    @State private var statusMessage: String?
+
+    private var unassignedSavedTotal: Decimal {
+        WealthSavingLedger.activeUnassignedTotal(in: wealthSavingEntries)
+    }
+
+    private var sortedDepositClothings: [Clothing] {
+        depositClothings
+            .filter { !$0.isDeleted && $0.deletedAt == nil && $0.isDepositPlan }
+            .sorted {
+                let leftRemaining = WealthSavingLedger.remainingAssignableAmount(for: $0, entries: wealthSavingEntries)
+                let rightRemaining = WealthSavingLedger.remainingAssignableAmount(for: $1, entries: wealthSavingEntries)
+                if leftRemaining != rightRemaining { return leftRemaining > rightRemaining }
+                return $0.updatedAt > $1.updatedAt
+            }
+    }
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Label("管理未指定存款", systemImage: "tray.full.fill")
+                            .font(.headline)
+                            .foregroundStyle(Color(hex: "C94C72"))
+                        Text("当前未指定 ¥\(NSDecimalNumber(decimal: unassignedSavedTotal).stringValue)，可填充到心愿尾款裙装，且只会存到上限。")
+                            .font(.caption)
+                            .foregroundStyle(themeManager.secondaryTextColor)
+                    }
+                    .padding(16)
+                    .themeSkinSectionCard(slot: .statsCard, cornerRadius: 22)
+
+                    if let statusMessage {
+                        Text(statusMessage)
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.orange)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 8)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .themeSkinAdaptiveSectionCard(slot: .filterChip, cornerRadius: 14, showsDecoration: false) {
+                                RoundedRectangle(cornerRadius: 14)
+                                    .fill(Color.orange.opacity(0.10))
+                            }
+                    }
+
+                    if sortedDepositClothings.isEmpty {
+                        VStack(spacing: 12) {
+                            Image(systemName: "heart.slash")
+                                .font(.title2)
+                                .foregroundStyle(themeManager.tertiaryTextColor)
+                            Text("还没有可填充的心愿尾款裙装")
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(themeManager.primaryTextColor)
+                            Text("未指定存款会继续留在小金库，不会自动绑定。")
+                                .font(.caption)
+                                .foregroundStyle(themeManager.secondaryTextColor)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(24)
+                        .themeSkinSectionCard(slot: .emptyState, cornerRadius: 22)
+                    } else {
+                        ForEach(sortedDepositClothings) { clothing in
+                            managerRow(for: clothing)
+                        }
+                    }
+                }
+                .padding()
+            }
+            .navigationTitle("未指定存款")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("完成") { dismiss() }
+                }
+            }
+        }
+        .presentationDetents([.large])
+    }
+
+    private func managerRow(for clothing: Clothing) -> some View {
+        let saved = WealthSavingLedger.activeTotal(for: clothing.id, in: wealthSavingEntries)
+        let cap = WealthSavingLedger.assignableSavingCap(for: clothing)
+        let remaining = WealthSavingLedger.remainingAssignableAmount(for: clothing, entries: wealthSavingEntries)
+        let fillAmount = min(unassignedSavedTotal, remaining)
+        let overflow = WealthSavingLedger.overflowAmount(for: clothing, entries: wealthSavingEntries)
+        let progress = cap > 0 ? NSDecimalNumber(decimal: min(saved, cap) / cap).doubleValue : 0
+
+        return VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .top, spacing: 10) {
+                Image(systemName: "heart.text.square.fill")
+                    .font(.headline)
+                    .foregroundStyle(.orange)
+                    .frame(width: 34, height: 34)
+                    .background(Color.orange.opacity(0.12))
+                    .clipShape(Circle())
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(clothing.name)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(themeManager.primaryTextColor)
+                        .lineLimit(1)
+                    Text("已存 ¥\(NSDecimalNumber(decimal: saved).stringValue) / 上限 ¥\(NSDecimalNumber(decimal: cap).stringValue)")
+                        .font(.caption2)
+                        .foregroundStyle(themeManager.secondaryTextColor)
+                }
+            }
+
+            ProgressView(value: progress)
+                .tint(overflow > 0 ? Color(hex: "C94C72") : .orange)
+
+            HStack {
+                Text("还能填充 ¥\(NSDecimalNumber(decimal: remaining).stringValue)")
+                Spacer()
+                Text("本次最多 ¥\(NSDecimalNumber(decimal: fillAmount).stringValue)")
+            }
+            .font(.caption2)
+            .foregroundStyle(themeManager.tertiaryTextColor)
+
+            HStack(spacing: 10) {
+                Button {
+                    fillUnassignedSavings(to: clothing)
+                } label: {
+                    Label(fillAmount > 0 ? "填充到上限" : "不可填充", systemImage: "arrow.down.to.line.compact")
+                        .font(.caption.weight(.bold))
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .frame(maxWidth: .infinity)
+                        .foregroundStyle(.orange)
+                        .themeSkinAdaptiveSectionCard(slot: .primaryButton, cornerRadius: 14, showsDecoration: false) {
+                            RoundedRectangle(cornerRadius: 14)
+                                .fill(Color.orange.opacity(0.12))
+                        }
+                }
+                .buttonStyle(.plain)
+                .disabled(fillAmount <= 0)
+
+                if overflow > 0 {
+                    Button {
+                        moveOverflowSavingToUnassigned(for: clothing)
+                    } label: {
+                        Label("转出超额", systemImage: "arrow.uturn.left.circle.fill")
+                            .font(.caption.weight(.bold))
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 8)
+                            .frame(maxWidth: .infinity)
+                            .foregroundStyle(Color(hex: "C94C72"))
+                            .themeSkinAdaptiveSectionCard(slot: .primaryButton, cornerRadius: 14, showsDecoration: false) {
+                                RoundedRectangle(cornerRadius: 14)
+                                    .fill(Color(hex: "C94C72").opacity(0.10))
+                            }
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+        .padding(14)
+        .themeSkinSectionCard(slot: .sectionCard, cornerRadius: 18, showsDecoration: false)
+    }
+
+    private func fillUnassignedSavings(to clothing: Clothing) {
+        do {
+            let movedAmount = try WealthSavingLedger.transferUnassignedSavings(
+                to: clothing,
+                entries: wealthSavingEntries,
+                context: modelContext
+            )
+            if movedAmount > 0 {
+                statusMessage = "已为「\(clothing.name)」填充 ¥\(NSDecimalNumber(decimal: movedAmount).stringValue)"
+                onFillComplete(movedAmount)
+                Task { await SharedPersistence.shared.syncWidgetData() }
+            } else {
+                statusMessage = "「\(clothing.name)」已达上限，未发生转移"
+            }
+        } catch {
+            statusMessage = "填充失败，请稍后再试"
+            print("UnassignedSavingManagerSheet: Failed to fill unassigned saving: \(error)")
+        }
+    }
+
+    private func moveOverflowSavingToUnassigned(for clothing: Clothing) {
+        do {
+            let movedAmount = try WealthSavingLedger.moveOverflowToUnassigned(
+                for: clothing,
+                entries: wealthSavingEntries,
+                context: modelContext
+            )
+            if movedAmount > 0 {
+                statusMessage = "已从「\(clothing.name)」转出超额 ¥\(NSDecimalNumber(decimal: movedAmount).stringValue)"
+                Task { await SharedPersistence.shared.syncWidgetData() }
+            } else {
+                statusMessage = "「\(clothing.name)」没有需要转出的超额"
+            }
+        } catch {
+            statusMessage = "转出失败，请稍后再试"
+            print("UnassignedSavingManagerSheet: Failed to move overflow saving: \(error)")
+        }
+    }
+}
+
+struct VaultSavingSheet: View {
+    let targetClothing: Clothing?
+    let currentSavedAmount: Decimal
+    let onSave: (Decimal) -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @Environment(ThemeManager.self) private var themeManager
+    @State private var amountText: String = ""
+
+    private var parsedAmount: Decimal? {
+        Decimal(string: amountText.replacingOccurrences(of: ",", with: "."))
+    }
+
+    private var assignableCap: Decimal? {
+        targetClothing.map { WealthSavingLedger.assignableSavingCap(for: $0) }
+    }
+
+    private var remainingAmount: Decimal? {
+        guard let assignableCap else { return nil }
+        return max(assignableCap - currentSavedAmount, Decimal(0))
+    }
+
+    private var effectiveSaveAmount: Decimal? {
+        guard let parsedAmount, parsedAmount > 0 else { return nil }
+        guard let remainingAmount else { return parsedAmount }
+        let effectiveAmount = min(parsedAmount, remainingAmount)
+        return effectiveAmount > 0 ? effectiveAmount : nil
+    }
+
+    private var isAmountClamped: Bool {
+        guard let parsedAmount, let effectiveSaveAmount else { return false }
+        return parsedAmount > effectiveSaveAmount
+    }
+
+    private var canSave: Bool {
+        effectiveSaveAmount != nil
+    }
+
+    var body: some View {
+        NavigationStack {
+            VStack(alignment: .leading, spacing: 18) {
+                VStack(alignment: .leading, spacing: 8) {
+                    Label(targetClothing == nil ? "不指定裙装存钱" : "为裙装存一笔", systemImage: "tray.and.arrow.down.fill")
+                        .font(.headline)
+                        .foregroundStyle(.orange)
+                    Text(targetClothing?.name ?? "先存进自由小金库，暂不绑定具体裙装。")
+                        .font(.subheadline)
+                        .foregroundStyle(themeManager.secondaryTextColor)
+                }
+
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("存入金额")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(themeManager.secondaryTextColor)
+                    HStack {
+                        Text("¥")
+                            .font(.title2.weight(.bold))
+                            .foregroundStyle(.orange)
+                        TextField("例如 100", text: $amountText)
+                            .keyboardType(.decimalPad)
+                            .font(.system(size: 32, weight: .heavy, design: .rounded))
+                            .monospacedDigit()
+                    }
+                    .padding()
+                    .themeSkinAdaptiveSectionCard(slot: .sectionCard, cornerRadius: 20, showsDecoration: false) {
+                        RoundedRectangle(cornerRadius: 20)
+                            .fill(Color(uiColor: .secondarySystemBackground).opacity(0.72))
+                    }
+                }
+
+                Text("当前已存 ¥\(NSDecimalNumber(decimal: currentSavedAmount).stringValue)")
+                    .font(.caption)
+                    .foregroundStyle(themeManager.tertiaryTextColor)
+
+                if let assignableCap, let remainingAmount {
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack {
+                            Text("指定存款上限")
+                            Spacer()
+                            Text("¥\(NSDecimalNumber(decimal: assignableCap).stringValue)")
+                                .fontWeight(.semibold)
+                        }
+
+                        HStack {
+                            Text("还能存入")
+                            Spacer()
+                            Text("¥\(NSDecimalNumber(decimal: remainingAmount).stringValue)")
+                                .fontWeight(.semibold)
+                                .foregroundStyle(remainingAmount > 0 ? .orange : Color(hex: "C94C72"))
+                        }
+
+                        if remainingAmount <= 0 {
+                            Text("这条裙装已达上限，后续可在安财里把超额转回未指定。")
+                                .font(.caption2)
+                                .foregroundStyle(themeManager.tertiaryTextColor)
+                        } else if isAmountClamped, let effectiveSaveAmount {
+                            Text("超过上限的部分不会存入，本次将存入 ¥\(NSDecimalNumber(decimal: effectiveSaveAmount).stringValue)。")
+                                .font(.caption2)
+                                .foregroundStyle(.orange)
+                        } else {
+                            Text("若输入超过剩余额度，会自动只存到上限。")
+                                .font(.caption2)
+                                .foregroundStyle(themeManager.tertiaryTextColor)
+                        }
+                    }
+                    .font(.caption)
+                    .padding(12)
+                    .themeSkinAdaptiveSectionCard(slot: .statsCard, cornerRadius: 16, showsDecoration: false) {
+                        RoundedRectangle(cornerRadius: 16)
+                            .fill(Color.orange.opacity(0.08))
+                    }
+                } else {
+                    Text("未指定小金库不设单条上限，之后可在安财里填充到心愿尾款裙装。")
+                        .font(.caption2)
+                        .foregroundStyle(themeManager.tertiaryTextColor)
+                        .padding(12)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .themeSkinAdaptiveSectionCard(slot: .statsCard, cornerRadius: 16, showsDecoration: false) {
+                            RoundedRectangle(cornerRadius: 16)
+                                .fill(Color.orange.opacity(0.08))
+                        }
+                }
+
+                Spacer()
+            }
+            .padding()
+            .navigationTitle("存一笔到小金库")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("取消") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("存入") {
+                        guard let amount = effectiveSaveAmount else { return }
+                        onSave(amount)
+                        dismiss()
+                    }
+                    .disabled(!canSave)
+                }
+            }
+        }
+        .presentationDetents([.medium])
+    }
+}
+
+struct VaultSavingCelebrationOverlay: View {
+    let amount: Decimal
+    let onComplete: () -> Void
+
+    @State private var animate = false
+
+    var body: some View {
+        ZStack {
+            Color.black.opacity(animate ? 0.18 : 0)
+                .ignoresSafeArea()
+
+            VStack(spacing: 12) {
+                ZStack {
+                    ForEach(0..<14, id: \.self) { index in
+                        Image(systemName: index.isMultiple(of: 3) ? "yensign.circle.fill" : "banknote.fill")
+                            .font(.system(size: index.isMultiple(of: 3) ? 30 : 26, weight: .bold))
+                            .foregroundStyle(index.isMultiple(of: 3) ? .yellow : .green)
+                            .rotationEffect(.degrees(animate ? Double(index * 23 - 130) : 0))
+                            .offset(
+                                x: animate ? CGFloat((index % 7) - 3) * 28 : 0,
+                                y: animate ? CGFloat(index % 5 - 2) * 24 - 34 : 0
+                            )
+                            .opacity(animate ? 0.0 : 1.0)
+                    }
+                    Circle()
+                        .fill(Color.orange.opacity(0.18))
+                        .frame(width: animate ? 130 : 50, height: animate ? 130 : 50)
+                    Image(systemName: "tray.and.arrow.down.fill")
+                        .font(.system(size: 44, weight: .heavy))
+                        .foregroundStyle(.orange)
+                }
+                .frame(width: 170, height: 130)
+
+                Text("已存入 ¥\(NSDecimalNumber(decimal: amount).stringValue)")
+                    .font(.headline.weight(.heavy))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 18)
+                    .padding(.vertical, 10)
+                    .background(.black.opacity(0.58), in: Capsule())
+            }
+            .scaleEffect(animate ? 1.05 : 0.82)
+        }
+        .onAppear {
+            withAnimation(.spring(response: 0.45, dampingFraction: 0.72)) {
+                animate = true
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.05) {
+                onComplete()
+            }
+        }
+    }
+}
+
+private struct FortuneCatVaultIcon: View {
+    let mascot: FinalPaymentVaultMascot
+
+    var body: some View {
+        Group {
+            if let uiImage = UIImage(named: mascot.assetName) {
+                Image(uiImage: uiImage)
+                    .resizable()
+                    .scaledToFit()
+            } else {
+                switch mascot {
+                case .miniVault:
+                    MiniVaultIcon()
+                case .fortuneCat:
+                    FortuneCatFallbackIcon()
+                case .piggyBank:
+                    PiggyBankIcon()
+                case .goldPig:
+                    GoldPigIcon()
+                }
+            }
+        }
+        .accessibilityLabel("\(mascot.displayName)尾款小金库")
+    }
+}
+
+private struct MiniVaultIcon: View {
+    var body: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 30)
+                .fill(
+                    LinearGradient(
+                        colors: [Color.orange.opacity(0.22), Color.yellow.opacity(0.18), Color.brown.opacity(0.16)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+
+            RoundedRectangle(cornerRadius: 22)
+                .fill(
+                    LinearGradient(
+                        colors: [Color(hex: "FFD36A"), Color(hex: "C78B2B")],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .frame(width: 104, height: 82)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 22)
+                        .stroke(Color.white.opacity(0.55), lineWidth: 2)
+                )
+
+            Circle()
+                .stroke(Color.white.opacity(0.85), lineWidth: 8)
+                .frame(width: 42, height: 42)
+            Circle()
+                .fill(Color(hex: "8B5A18"))
+                .frame(width: 12, height: 12)
+            Image(systemName: "lock.fill")
+                .font(.caption.weight(.bold))
+                .foregroundStyle(.white)
+                .offset(y: 36)
+        }
+    }
+}
+
+private struct PiggyBankIcon: View {
+    var body: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 30)
+                .fill(
+                    LinearGradient(
+                        colors: [Color.pink.opacity(0.20), Color.orange.opacity(0.14), Color.yellow.opacity(0.12)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+
+            ZStack {
+                Ellipse()
+                    .fill(Color.pink.opacity(0.92))
+                    .frame(width: 110, height: 74)
+                Circle()
+                    .fill(Color.pink.opacity(0.96))
+                    .frame(width: 48, height: 46)
+                    .offset(x: 42, y: -6)
+                Triangle()
+                    .fill(Color.pink.opacity(0.86))
+                    .frame(width: 18, height: 18)
+                    .rotationEffect(.degrees(18))
+                    .offset(x: 32, y: -36)
+                Circle()
+                    .fill(Color.black.opacity(0.75))
+                    .frame(width: 7, height: 7)
+                    .offset(x: 52, y: -14)
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(Color.pink.opacity(0.65))
+                    .frame(width: 23, height: 14)
+                    .offset(x: 65, y: 0)
+                RoundedRectangle(cornerRadius: 2)
+                    .fill(Color.white.opacity(0.86))
+                    .frame(width: 34, height: 5)
+                    .offset(y: -28)
+                HStack(spacing: 46) {
+                    Capsule().fill(Color.pink.opacity(0.75)).frame(width: 14, height: 20)
+                    Capsule().fill(Color.pink.opacity(0.75)).frame(width: 14, height: 20)
+                }
+                .offset(y: 38)
+            }
+        }
+    }
+}
+
+private struct GoldPigIcon: View {
+    var body: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 30)
+                .fill(
+                    LinearGradient(
+                        colors: [Color.yellow.opacity(0.24), Color.orange.opacity(0.18), Color.pink.opacity(0.10)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+
+            PiggyBankIcon()
+                .scaleEffect(0.78)
+                .offset(y: 8)
+
+            HStack(spacing: -6) {
+                Image(systemName: "yensign.circle.fill")
+                Image(systemName: "yensign.circle.fill")
+                Image(systemName: "yensign.circle.fill")
+            }
+            .font(.system(size: 28, weight: .bold))
+            .foregroundStyle(.yellow)
+            .shadow(color: .orange.opacity(0.35), radius: 5, x: 0, y: 3)
+            .offset(y: -42)
+        }
+    }
+}
+
+private struct FortuneCatFallbackIcon: View {
+    var body: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 30)
+                .fill(
+                    LinearGradient(
+                        colors: [Color.orange.opacity(0.22), Color.yellow.opacity(0.18), Color.pink.opacity(0.12)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+
+            VStack(spacing: -4) {
+                ZStack {
+                    Circle()
+                        .fill(Color.white)
+                        .frame(width: 86, height: 78)
+                    HStack(spacing: 42) {
+                        Triangle()
+                            .fill(Color.orange.opacity(0.82))
+                            .frame(width: 24, height: 24)
+                            .rotationEffect(.degrees(-18))
+                        Triangle()
+                            .fill(Color.orange.opacity(0.82))
+                            .frame(width: 24, height: 24)
+                            .rotationEffect(.degrees(18))
+                    }
+                    .offset(y: -34)
+                    HStack(spacing: 22) {
+                        Circle().fill(Color.black.opacity(0.78)).frame(width: 8, height: 8)
+                        Circle().fill(Color.black.opacity(0.78)).frame(width: 8, height: 8)
+                    }
+                    .offset(y: -6)
+                    Text("₍˄·͈༝·͈˄₎")
+                        .font(.system(size: 22, weight: .bold, design: .rounded))
+                        .foregroundStyle(Color.orange)
+                        .offset(y: 14)
+                }
+
+                ZStack {
+                    RoundedRectangle(cornerRadius: 28)
+                        .fill(Color.white)
+                        .frame(width: 104, height: 72)
+                    RoundedRectangle(cornerRadius: 14)
+                        .fill(Color.red.opacity(0.92))
+                        .frame(width: 44, height: 52)
+                    Text("财")
+                        .font(.system(size: 28, weight: .heavy, design: .rounded))
+                        .foregroundStyle(.yellow)
+                    Image(systemName: "yensign.circle.fill")
+                        .font(.system(size: 22))
+                        .foregroundStyle(.yellow)
+                        .offset(x: 42, y: 14)
+                }
+            }
+        }
+    }
+}
+
+private struct Triangle: Shape {
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        path.move(to: CGPoint(x: rect.midX, y: rect.minY))
+        path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY))
+        path.addLine(to: CGPoint(x: rect.minX, y: rect.maxY))
+        path.closeSubpath()
+        return path
+    }
 }
 
 #Preview {

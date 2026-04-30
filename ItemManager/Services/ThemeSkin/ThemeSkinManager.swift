@@ -4,23 +4,31 @@ import Combine
 final class ThemeSkinManager: ObservableObject, ThemeSkinProviding {
     static let shared = ThemeSkinManager()
 
-    @Published private(set) var products: [ThemeSkinProduct] = [ThemeSkinProduct.girlCloset]
+    @Published private(set) var products: [ThemeSkinProduct] = [
+        ThemeSkinProduct.skyConcert,
+        ThemeSkinProduct.swanDream
+    ]
     @Published private(set) var ownedThemeSkins: [OwnedThemeSkin] = []
     @Published private(set) var activeSelection: ActiveThemeSkinSelection = .inactive
+    @Published private(set) var backgroundStickerSelections: [String: ThemeSkinBackgroundSelection] = [:]
 
     private let ownedKey = "theme_skin.owned"
     private let activeSelectionKey = "theme_skin.active_selection"
+    private let backgroundStickerSelectionKey = "theme_skin.background_sticker_selection_v1"
+    private let coreSurfaceMigrationKeyPrefix = "theme_skin.core_surface_defaults_migrated_v1"
+    private let topNavigationMigrationKeyPrefix = "theme_skin.top_navigation_defaults_migrated_v1"
 
     private init() {
-        reloadFromDisk()
+        reloadFromDisk(applyBackgroundHarmony: false)
     }
 
     var allOwnedThemeSkins: [OwnedThemeSkin] { ownedThemeSkins }
     var activeThemeId: String? { activeSelection.activeThemeId }
+    var activeProduct: ThemeSkinProduct? { activeThemeId.flatMap { product(for: $0) } }
     var currentEnabledSlots: Set<ThemeSkinSlot> { activeSelection.enabledSlots }
     var currentMeowCoinBalance: Int { StoreManager.getCurrentBalance() }
 
-    func reloadFromDisk() {
+    func reloadFromDisk(applyBackgroundHarmony: Bool = true) {
         let defaults = UserDefaults.standard
 
         if let data = defaults.data(forKey: ownedKey),
@@ -35,6 +43,20 @@ final class ThemeSkinManager: ObservableObject, ThemeSkinProviding {
             activeSelection = sanitize(selection: decoded)
         } else {
             activeSelection = .inactive
+        }
+
+        if let data = defaults.data(forKey: backgroundStickerSelectionKey),
+           let decoded = try? JSONDecoder().decode([String: ThemeSkinBackgroundSelection].self, from: data) {
+            backgroundStickerSelections = sanitize(backgroundSelections: decoded)
+        } else {
+            backgroundStickerSelections = [:]
+        }
+
+        migrateCoreSurfaceDefaultsIfNeeded(defaults: defaults)
+        migrateTopNavigationDefaultsIfNeeded(defaults: defaults)
+
+        if applyBackgroundHarmony {
+            _ = ThemeManager.shared.enforceThemeSkinBackgroundHarmonyIfNeeded(activeThemeId: activeSelection.activeThemeId)
         }
     }
 
@@ -105,8 +127,8 @@ final class ThemeSkinManager: ObservableObject, ThemeSkinProviding {
 
         let purchaseMessage = "已购买「\(product.name)」，消费 \(quote.finalPrice) 喵币。"
         if autoActivateIfNeeded {
-            _ = activateTheme(product.themeId)
-            return .success("\(purchaseMessage) 已自动应用。")
+            let didAdjustBackground = applyThemeSelection(product)
+            return .success("\(purchaseMessage) 已自动应用。\(themeBackgroundHarmonySuffix(didAdjustBackground))")
         }
 
         broadcastChange()
@@ -122,13 +144,8 @@ final class ThemeSkinManager: ObservableObject, ThemeSkinProviding {
             return .failure("请先购买这个主题。")
         }
 
-        activeSelection = ActiveThemeSkinSelection(
-            activeThemeId: product.themeId,
-            enabledSlots: Set(product.defaultEnabledSlots.filter { product.supportedSlots.contains($0) })
-        )
-        saveActiveSelection()
-        broadcastChange()
-        return .success("已应用「\(product.name)」。")
+        let didAdjustBackground = applyThemeSelection(product)
+        return .success("已应用「\(product.name)」。\(themeBackgroundHarmonySuffix(didAdjustBackground))")
     }
 
     func deactivateCurrentTheme() -> ThemeSkinActionResult {
@@ -210,6 +227,36 @@ final class ThemeSkinManager: ObservableObject, ThemeSkinProviding {
         descriptor(for: slot, state: state)
     }
 
+    func backgroundHeroAssetName(for idOrThemeId: String) -> String? {
+        guard let product = product(for: idOrThemeId) else { return nil }
+
+        if let selection = backgroundStickerSelections[product.themeId] {
+            guard let heroAssetName = selection.heroAssetName else { return nil }
+            return product.backgroundStickerOptions.contains { $0.assetName == heroAssetName }
+                ? heroAssetName
+                : product.defaultBackgroundHeroAssetName
+        }
+
+        return product.defaultBackgroundHeroAssetName
+    }
+
+    func setBackgroundHeroAssetName(_ assetName: String?, for idOrThemeId: String) {
+        guard let product = product(for: idOrThemeId) else { return }
+
+        let sanitizedAssetName: String?
+        if let assetName, product.backgroundStickerOptions.contains(where: { $0.assetName == assetName }) {
+            sanitizedAssetName = assetName
+        } else {
+            sanitizedAssetName = nil
+        }
+
+        var nextSelections = backgroundStickerSelections
+        nextSelections[product.themeId] = ThemeSkinBackgroundSelection(heroAssetName: sanitizedAssetName)
+        backgroundStickerSelections = nextSelections
+        saveBackgroundStickerSelections()
+        broadcastChange()
+    }
+
     private func sanitize(selection: ActiveThemeSkinSelection) -> ActiveThemeSkinSelection {
         guard let activeThemeId = selection.activeThemeId,
               let product = product(for: activeThemeId),
@@ -222,6 +269,88 @@ final class ThemeSkinManager: ObservableObject, ThemeSkinProviding {
         return ActiveThemeSkinSelection(activeThemeId: product.themeId, enabledSlots: enabledSlots)
     }
 
+    private func sanitize(backgroundSelections selections: [String: ThemeSkinBackgroundSelection]) -> [String: ThemeSkinBackgroundSelection] {
+        selections.reduce(into: [String: ThemeSkinBackgroundSelection]()) { result, entry in
+            guard let product = product(for: entry.key) else { return }
+            let heroAssetName = entry.value.heroAssetName
+            if let heroAssetName, product.backgroundStickerOptions.contains(where: { $0.assetName == heroAssetName }) {
+                result[product.themeId] = ThemeSkinBackgroundSelection(heroAssetName: heroAssetName)
+            } else if heroAssetName == nil {
+                result[product.themeId] = ThemeSkinBackgroundSelection(heroAssetName: nil)
+            }
+        }
+    }
+
+    private func migrateCoreSurfaceDefaultsIfNeeded(defaults: UserDefaults) {
+        guard let activeThemeId = activeSelection.activeThemeId,
+              let product = product(for: activeThemeId),
+              isPurchased(activeThemeId) else {
+            return
+        }
+
+        let migrationKey = "\(coreSurfaceMigrationKeyPrefix).\(product.themeId)"
+        guard !defaults.bool(forKey: migrationKey) else { return }
+
+        let newCoreSlots: Set<ThemeSkinSlot> = [
+            .settingsGridCard,
+            .sectionCard,
+            .primaryButton,
+            .iconCircleButton,
+            .emptyState
+        ]
+        let slotsToEnable = newCoreSlots.filter { product.supportedSlots.contains($0) }
+
+        if !slotsToEnable.isEmpty {
+            activeSelection.enabledSlots.formUnion(slotsToEnable)
+            activeSelection = sanitize(selection: activeSelection)
+            saveActiveSelection()
+        }
+
+        defaults.set(true, forKey: migrationKey)
+    }
+
+    private func migrateTopNavigationDefaultsIfNeeded(defaults: UserDefaults) {
+        guard let activeThemeId = activeSelection.activeThemeId,
+              let product = product(for: activeThemeId),
+              isPurchased(activeThemeId) else {
+            return
+        }
+
+        let migrationKey = "\(topNavigationMigrationKeyPrefix).\(product.themeId)"
+        guard !defaults.bool(forKey: migrationKey) else { return }
+
+        let navigationSlots: Set<ThemeSkinSlot> = [
+            .topBarSegment,
+            .topBarAddButton
+        ]
+        let slotsToEnable = navigationSlots.filter { product.supportedSlots.contains($0) }
+
+        if !slotsToEnable.isEmpty {
+            activeSelection.enabledSlots.formUnion(slotsToEnable)
+            activeSelection = sanitize(selection: activeSelection)
+            saveActiveSelection()
+        }
+
+        defaults.set(true, forKey: migrationKey)
+    }
+
+    @discardableResult
+    private func applyThemeSelection(_ product: ThemeSkinProduct) -> Bool {
+        activeSelection = ActiveThemeSkinSelection(
+            activeThemeId: product.themeId,
+            enabledSlots: Set(product.defaultEnabledSlots.filter { product.supportedSlots.contains($0) })
+        )
+        saveActiveSelection()
+        let wasUsingImageBackground = UserDefaults.standard.string(forKey: "theme_background_style") == BackgroundStyle.image.rawValue
+        let didAdjustBackground = ThemeManager.shared.enforceThemeSkinBackgroundHarmonyIfNeeded(activeThemeId: product.themeId)
+        broadcastChange()
+        return wasUsingImageBackground || didAdjustBackground
+    }
+
+    private func themeBackgroundHarmonySuffix(_ didAdjustBackground: Bool) -> String {
+        didAdjustBackground ? " \(ThemeManager.themeSkinBackgroundHarmonyAppendix)" : ""
+    }
+
     private func saveOwnedThemeSkins() {
         if let encoded = try? JSONEncoder().encode(ownedThemeSkins) {
             UserDefaults.standard.set(encoded, forKey: ownedKey)
@@ -231,6 +360,12 @@ final class ThemeSkinManager: ObservableObject, ThemeSkinProviding {
     private func saveActiveSelection() {
         if let encoded = try? JSONEncoder().encode(activeSelection) {
             UserDefaults.standard.set(encoded, forKey: activeSelectionKey)
+        }
+    }
+
+    private func saveBackgroundStickerSelections() {
+        if let encoded = try? JSONEncoder().encode(backgroundStickerSelections) {
+            UserDefaults.standard.set(encoded, forKey: backgroundStickerSelectionKey)
         }
     }
 

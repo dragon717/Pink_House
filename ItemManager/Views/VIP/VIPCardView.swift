@@ -6,13 +6,59 @@ struct VIPCardView: View {
     let expireDate: Date?
     let isVIP: Bool
     var cardStyle: VIPCardStyle = .blackGold
+    var allowsLockedThemePreview = false
     
+    @ObservedObject private var themeSkinManager = ThemeSkinManager.shared
     @State private var shimmerOffset: CGFloat = -300
     @State private var isAnimatingChange = false
+
+    private var fallbackCardStyle: VIPCardStyle {
+        switch cardStyle {
+        case .blackGold, .monicaPink:
+            return cardStyle
+        case .themeSkinAdaptive, .skyConcertTheme, .swanDreamTheme:
+            return .monicaPink
+        }
+    }
+
+    private var themeCardDescriptor: ThemeSkinDescriptor? {
+        switch cardStyle {
+        case .themeSkinAdaptive:
+            if let descriptor = themeSkinManager.activeThemeDescriptor(for: .wardrobeItemCard, state: .default),
+               VIPThemeSkinSupport.isSupported(descriptor) {
+                return descriptor
+            }
+            if let descriptor = themeSkinManager.activeThemeDescriptor(for: .sectionCard, state: .default),
+               VIPThemeSkinSupport.isSupported(descriptor) {
+                return descriptor
+            }
+            return nil
+        case .skyConcertTheme:
+            guard allowsLockedThemePreview || themeSkinManager.isPurchased(VIPThemeSkinSupport.skyConcertThemeId) else {
+                return nil
+            }
+            return VIPThemeSkinSupport.fixedDescriptor(for: VIPThemeSkinSupport.skyConcertThemeId, slot: .wardrobeItemCard)
+        case .swanDreamTheme:
+            guard allowsLockedThemePreview || themeSkinManager.isPurchased(VIPThemeSkinSupport.swanDreamThemeId) else {
+                return nil
+            }
+            return VIPThemeSkinSupport.fixedDescriptor(for: VIPThemeSkinSupport.swanDreamThemeId, slot: .wardrobeItemCard)
+        case .blackGold, .monicaPink:
+            return nil
+        }
+    }
     
     // MARK: - Style Helpers
     private var backgroundColors: [Color] {
-        switch cardStyle {
+        if let descriptor = themeCardDescriptor {
+            return [
+                SkyConcertThemeSkin.shellFillTop(for: descriptor),
+                SkyConcertThemeSkin.accentSoft(for: descriptor).opacity(SwanDreamThemeSkin.isSwanDream(descriptor) ? 0.76 : 0.58),
+                SkyConcertThemeSkin.shellFillBottom(for: descriptor)
+            ]
+        }
+
+        switch fallbackCardStyle {
         case .blackGold:
             return [
                 Color(hex: "2C2C2C"), // Charcoal
@@ -25,11 +71,23 @@ struct VIPCardView: View {
                 Color(hex: "FFC0CB"), // Pink
                 Color(hex: "FF69B4")  // Hot Pink
             ]
+        case .themeSkinAdaptive, .skyConcertTheme, .swanDreamTheme:
+            return [Color(hex: "FFB6C1"), Color(hex: "FFC0CB"), Color(hex: "FF69B4")]
         }
     }
     
     private var shimmerColors: [Color] {
-        switch cardStyle {
+        if let descriptor = themeCardDescriptor {
+            return [
+                .clear,
+                SkyConcertThemeSkin.accent(for: descriptor).opacity(0.18),
+                Color.white.opacity(0.46),
+                SkyConcertThemeSkin.accentSoft(for: descriptor).opacity(0.24),
+                .clear
+            ]
+        }
+
+        switch fallbackCardStyle {
         case .blackGold:
             return [
                 .clear,
@@ -46,57 +104,138 @@ struct VIPCardView: View {
                 Color.white.opacity(0.2),
                 .clear
             ]
+        case .themeSkinAdaptive, .skyConcertTheme, .swanDreamTheme:
+            return [.clear, Color.white.opacity(0.2), Color.white.opacity(0.6), Color.white.opacity(0.2), .clear]
         }
     }
     
     private var borderColors: [Color] {
-        switch cardStyle {
+        if let descriptor = themeCardDescriptor {
+            return [
+                Color.white.opacity(0.96),
+                SkyConcertThemeSkin.shellStroke(for: descriptor),
+                SkyConcertThemeSkin.accent(for: descriptor).opacity(0.78)
+            ]
+        }
+
+        switch fallbackCardStyle {
         case .blackGold:
             return [Color(hex: "B8860B"), Color(hex: "FFD700"), Color(hex: "B8860B")]
         case .monicaPink:
+            return [Color.white.opacity(0.5), Color.white, Color.white.opacity(0.5)]
+        case .themeSkinAdaptive, .skyConcertTheme, .swanDreamTheme:
             return [Color.white.opacity(0.5), Color.white, Color.white.opacity(0.5)]
         }
     }
     
     private var textGradientColors: [Color] {
-        switch cardStyle {
+        if let descriptor = themeCardDescriptor {
+            return [
+                SkyConcertThemeSkin.labelColor(for: descriptor),
+                SkyConcertThemeSkin.accent(for: descriptor),
+                SkyConcertThemeSkin.labelColor(for: descriptor).opacity(0.82)
+            ]
+        }
+
+        switch fallbackCardStyle {
         case .blackGold:
             return [Color(hex: "FFD700"), Color(hex: "FFFACD"), Color(hex: "B8860B")]
         case .monicaPink:
+            return [Color.white, Color(hex: "FFF0F5"), Color(hex: "FFE4E1")]
+        case .themeSkinAdaptive, .skyConcertTheme, .swanDreamTheme:
             return [Color.white, Color(hex: "FFF0F5"), Color(hex: "FFE4E1")]
         }
     }
     
     private var tagText: String {
-        switch cardStyle {
+        if let descriptor = themeCardDescriptor {
+            return SkyConcertThemeSkin.title(for: descriptor)
+        }
+
+        switch fallbackCardStyle {
         case .blackGold: return "黑金尊享"
         case .monicaPink: return "梦幻限定"
+        case .themeSkinAdaptive: return "跟随主题"
+        case .skyConcertTheme: return "天空音乐会"
+        case .swanDreamTheme: return "天鹅入梦"
         }
     }
     
     private var tagColors: (bg: Color, border: Color, text: Color) {
-        switch cardStyle {
+        if let descriptor = themeCardDescriptor {
+            return (
+                SkyConcertThemeSkin.shellFillTop(for: descriptor).opacity(0.82),
+                SkyConcertThemeSkin.shellStroke(for: descriptor),
+                SkyConcertThemeSkin.labelColor(for: descriptor)
+            )
+        }
+
+        switch fallbackCardStyle {
         case .blackGold:
             return (Color.black.opacity(0.6), Color(hex: "FFD700"), Color(hex: "FFD700"))
         case .monicaPink:
+            return (Color.pink.opacity(0.3), Color.white, Color.white)
+        case .themeSkinAdaptive, .skyConcertTheme, .swanDreamTheme:
             return (Color.pink.opacity(0.3), Color.white, Color.white)
         }
     }
     
     private var numberColors: [Color] {
-        switch cardStyle {
+        if let descriptor = themeCardDescriptor {
+            return [
+                SkyConcertThemeSkin.labelColor(for: descriptor),
+                SkyConcertThemeSkin.accent(for: descriptor),
+                SkyConcertThemeSkin.labelColor(for: descriptor).opacity(0.86)
+            ]
+        }
+
+        switch fallbackCardStyle {
         case .blackGold:
             return [Color(hex: "FFFACD"), Color(hex: "FFD700"), Color(hex: "B8860B")]
         case .monicaPink:
+            return [Color.white, Color.white.opacity(0.8), Color.white]
+        case .themeSkinAdaptive, .skyConcertTheme, .swanDreamTheme:
             return [Color.white, Color.white.opacity(0.8), Color.white]
         }
     }
     
     private var validThruColor: Color {
-        switch cardStyle {
+        if let descriptor = themeCardDescriptor {
+            return SkyConcertThemeSkin.accent(for: descriptor)
+        }
+
+        switch fallbackCardStyle {
         case .blackGold: return Color(hex: "B8860B")
         case .monicaPink: return Color.white.opacity(0.8)
+        case .themeSkinAdaptive, .skyConcertTheme, .swanDreamTheme:
+            return Color.white.opacity(0.8)
         }
+    }
+
+    private var bodyTextColor: Color {
+        themeCardDescriptor.map { SkyConcertThemeSkin.labelColor(for: $0) } ?? .white
+    }
+
+    private var secondaryBodyTextColor: Color {
+        themeCardDescriptor.map { SkyConcertThemeSkin.labelColor(for: $0).opacity(0.66) }
+            ?? (fallbackCardStyle == .monicaPink ? .white.opacity(0.72) : .gray)
+    }
+
+    private var cardShadowColor: Color {
+        if let descriptor = themeCardDescriptor {
+            return SkyConcertThemeSkin.shadowColor(for: descriptor).opacity(0.72)
+        }
+        return fallbackCardStyle == .monicaPink ? Color.pink.opacity(0.3) : .black.opacity(0.4)
+    }
+
+    private var chipGradientColors: [Color] {
+        if let descriptor = themeCardDescriptor {
+            return [
+                SkyConcertThemeSkin.accent(for: descriptor).opacity(0.88),
+                SkyConcertThemeSkin.shellStroke(for: descriptor).opacity(0.82)
+            ]
+        }
+        return [Color(hex: "FFD700"), Color(hex: "B8860B")]
     }
     
     var body: some View {
@@ -110,7 +249,7 @@ struct VIPCardView: View {
                         endPoint: .bottomTrailing
                     )
                 )
-                .shadow(color: cardStyle == .monicaPink ? Color.pink.opacity(0.3) : .black.opacity(0.4), radius: 10, x: 0, y: 5)
+                .shadow(color: cardShadowColor, radius: 10, x: 0, y: 5)
             
             // 2. Subtle Texture (Optional)
             
@@ -166,6 +305,10 @@ struct VIPCardView: View {
                     ),
                     lineWidth: 1
                 )
+
+            if let descriptor = themeCardDescriptor {
+                themeDecorationLayer(descriptor: descriptor)
+            }
             
             VStack(alignment: .leading, spacing: 0) {
                 // Header
@@ -232,7 +375,7 @@ struct VIPCardView: View {
                 } else {
                     Text("加入尊贵会员，解锁专属特权")
                         .font(.subheadline)
-                        .foregroundStyle(cardStyle == .monicaPink ? .white.opacity(0.8) : .gray)
+                        .foregroundStyle(secondaryBodyTextColor)
                         .padding(.horizontal, 24)
                 }
                 
@@ -249,11 +392,11 @@ struct VIPCardView: View {
                             Text(date.formatted(date: .numeric, time: .omitted))
                                 .font(.caption)
                                 .fontWeight(.medium)
-                                .foregroundStyle(.white)
+                                .foregroundStyle(bodyTextColor)
                         } else {
                             Text("--/--")
                                 .font(.caption)
-                                .foregroundStyle(cardStyle == .monicaPink ? .white.opacity(0.6) : .gray)
+                                .foregroundStyle(secondaryBodyTextColor)
                         }
                     }
                     
@@ -262,7 +405,7 @@ struct VIPCardView: View {
                     // Chip
                     RoundedRectangle(cornerRadius: 6)
                         .fill(
-                            LinearGradient(colors: [Color(hex: "FFD700"), Color(hex: "B8860B")], startPoint: .topLeading, endPoint: .bottomTrailing)
+                            LinearGradient(colors: chipGradientColors, startPoint: .topLeading, endPoint: .bottomTrailing)
                         )
                         .frame(width: 44, height: 32)
                         .overlay(
@@ -297,6 +440,38 @@ struct VIPCardView: View {
                 }
             }
         }
+    }
+
+    private func themeDecorationLayer(descriptor: ThemeSkinDescriptor) -> some View {
+        ZStack {
+            ThemeSkinOptionalFittedAsset(
+                SwanDreamThemeSkin.isSwanDream(descriptor) ? SwanDreamThemeSkin.decorSwanFeatherBow : SkyConcertThemeSkin.decorMusicScrollClouds,
+                namespace: descriptor.assetNamespace,
+                allowShortNameFallback: false
+            ) {
+                Image(systemName: "sparkles")
+                    .font(.system(size: 20, weight: .bold))
+                    .foregroundStyle(SkyConcertThemeSkin.accent(for: descriptor))
+            }
+            .frame(width: 82, height: 58)
+            .opacity(0.34)
+            .offset(x: 118, y: -70)
+
+            ThemeSkinOptionalFittedAsset(
+                SwanDreamThemeSkin.isSwanDream(descriptor) ? SwanDreamThemeSkin.decorCrystalStars : SkyConcertThemeSkin.decorShootingStar,
+                namespace: descriptor.assetNamespace,
+                allowShortNameFallback: false
+            ) {
+                Image(systemName: "sparkles")
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundStyle(SkyConcertThemeSkin.accent(for: descriptor))
+            }
+            .frame(width: 46, height: 34)
+            .opacity(0.45)
+            .offset(x: -118, y: 68)
+        }
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
     }
     
     private func formatVIPNumber(_ number: String) -> String {

@@ -19,19 +19,6 @@ class AppDelegate: NSObject, UIApplicationDelegate {
     }
     
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
-        // iOS 26+ 设置 TabBar 全局样式
-        if #available(iOS 26.0, *) {
-            let appearance = UITabBarAppearance()
-            appearance.configureWithTransparentBackground()
-
-            // 设置未选中项的颜色（黑色，适配暗黑模式）
-            appearance.stackedLayoutAppearance.normal.iconColor = UIColor.label
-            appearance.stackedLayoutAppearance.normal.titleTextAttributes = [.foregroundColor: UIColor.label]
-
-            UITabBar.appearance().standardAppearance = appearance
-            UITabBar.appearance().scrollEdgeAppearance = appearance
-        }
-
         // 注册裙装股市后台任务
         registerSkirtMarketBackgroundTask()
         
@@ -230,6 +217,9 @@ struct MainContentView: View {
     private func runStartupInitialization() async {
         let startedAt = Date()
         PetHistoryResetManager.shared.applyForcedResetIfNeeded()
+        #if DEBUG
+        DebugMeowCoinGrantManager.grantIfNeeded()
+        #endif
         
         // 0.5 Migrate 3D models from Clothing to Model3D
         await Model3DMigrationService.shared.migrateIfNeeded(modelContainer: SharedPersistence.shared.sharedModelContainer)
@@ -246,8 +236,8 @@ struct MainContentView: View {
             print("❌ 裙装股市初始化失败: \(error)")
         }
         
-        // 0.8 刷新魔法任务进度（在开屏期间完成）
-        FeatureUnlockManager.shared.refreshMagicTaskProgress(modelContext: modelContext)
+        // 0.8 刷新魔法任务进度（开屏关键路径仅使用缓存，避免 iOS 17.x SwiftData fetchCount/CoreData 崩溃）
+        FeatureUnlockManager.shared.refreshMagicTaskProgress(modelContext: nil, refreshClothingCount: false)
 
         // 0.9 OOTD 坐标版本迁移（将老数据的绝对坐标转换为相对坐标）
         await OOTDCoordinateMigrationService.shared.migrateIfNeeded(modelContext: modelContext)
@@ -256,6 +246,10 @@ struct MainContentView: View {
         await ClothingAccessoryPriceValidationService.shared.validateIfNeeded(
             modelContainer: SharedPersistence.shared.sharedModelContainer
         )
+
+        #if DEBUG
+        _ = await WardrobePerfSeedService.seedIfRequested(modelContext: modelContext)
+        #endif
 
         // 0.10 并行预加载每日打卡数据（问候语 + 穿搭色）
         // 使用 TaskGroup 实现并行加载，减少开屏等待时间
@@ -340,6 +334,11 @@ struct MainContentView: View {
         let notificationDurationMs = Int(Date().timeIntervalSince(notificationStartedAt) * 1000)
         launchLogger.info("deferred_notification_finish trigger=\(trigger, privacy: .public) duration_ms=\(notificationDurationMs)")
 
+        let magicTaskStartedAt = Date()
+        FeatureUnlockManager.shared.refreshMagicTaskProgress(modelContext: modelContext)
+        let magicTaskDurationMs = Int(Date().timeIntervalSince(magicTaskStartedAt) * 1000)
+        launchLogger.info("deferred_magic_task_finish trigger=\(trigger, privacy: .public) duration_ms=\(magicTaskDurationMs)")
+
         Task(priority: .background) {
             await SharedPersistence.shared.syncWidgetData(reason: "launch-deferred")
         }
@@ -373,6 +372,8 @@ struct MainContentView: View {
     private func checkAndShowDailyCheckIn() {
         guard !showDailyCheckIn else { return }
         guard !hasAutoShownDailyCheckInToday() else { return }
+        // 服装创建/编辑 sheet 正在展示时，不自动弹每日打卡，避免抢占 sheet 导致草稿视图重建。
+        guard !ClothingEditDraftManager.shared.hasActiveEditor else { return }
 
         // 检查今天是否已经打卡
         if !DailyCheckInManager.shared.hasCheckedInToday {
@@ -380,6 +381,7 @@ struct MainContentView: View {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                 guard !showDailyCheckIn, !DailyCheckInManager.shared.hasCheckedInToday else { return }
                 guard !hasAutoShownDailyCheckInToday() else { return }
+                guard !ClothingEditDraftManager.shared.hasActiveEditor else { return }
                 markDailyCheckInAutoShownToday()
                 showDailyCheckIn = true
             }

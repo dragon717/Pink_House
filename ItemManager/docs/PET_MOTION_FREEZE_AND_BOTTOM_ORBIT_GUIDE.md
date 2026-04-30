@@ -219,6 +219,7 @@
 
 - `ItemManager/Views/MainTabView.swift`
 - `diamondOrbitLayout(frame:)`
+- `LegacyCustomTabBarLayout.floatingElementLift`：自定义底部导航栏场景下，旧 `PetOverlayView` 与共享底部悬浮控件避让底栏的上移量；默认环境值为 `0`，避免非自定义底栏容器误上移。
 
 建议优先调这些参数：
 

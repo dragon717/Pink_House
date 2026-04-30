@@ -54,6 +54,13 @@ enum SkirtFillMode: String, CaseIterable, Identifiable {
 @Observable
 class ThemeManager {
     static let shared = ThemeManager()
+    static let themeSkinBackgroundHarmonyAppendix = "为了让这套主题更完整，已帮你切回纯色背景；停用主题后可再使用图片背景。"
+    static let themeSkinBackgroundLockAlertTitle = "先让主题保持成套吧"
+
+    static func themeSkinBackgroundLockAlertMessage(activeThemeName: String?) -> String {
+        let name = activeThemeName ?? "当前主题"
+        return "当前正在使用「\(name)」。图片背景会和主题装饰抢风格，已帮你保持纯色背景；停用主题后就可以继续换回自己的照片啦。"
+    }
     
     // MARK: - V2 Color System (New)
     /// 主题配色配置（支持备份恢复）
@@ -225,10 +232,17 @@ class ThemeManager {
     // MARK: - Image Settings
     var backgroundStyle: BackgroundStyle = .color {
         didSet {
-            UserDefaults.standard.set(backgroundStyle.rawValue, forKey: "theme_background_style")
-            updateAdaptivePalette()
+            if backgroundStyle == .image,
+               !isApplyingThemeBackgroundHarmony,
+               isThemeSkinBackgroundImageLocked() {
+                enforceThemeSkinBackgroundHarmonyIfNeeded()
+                return
+            }
+
+            persistBackgroundStyle()
         }
     }
+    private var isApplyingThemeBackgroundHarmony = false
     
     var backgroundOpacity: Double = 1.0 {
         didSet {
@@ -321,7 +335,7 @@ class ThemeManager {
         }
         
         // 智能模式: 根据背景自动判断
-        switch backgroundStyle {
+        switch effectiveBackgroundStyle {
         case .color:
             adaptivePalette = AdaptivePalette.generate(from: backgroundColor, accentColor: cardTintColor)
         case .image:
@@ -444,6 +458,8 @@ class ThemeManager {
 
         // 根据版本号强制设置默认预设方案（新版本时重置为莫妮卡主题）
         checkAndApplyVersionBasedDefaultTheme()
+
+        enforceThemeSkinBackgroundHarmonyIfNeeded()
 
         // 初始化自适应调色板
         updateAdaptivePalette()
@@ -668,10 +684,40 @@ class ThemeManager {
         if UserDefaults.standard.object(forKey: "dbg_mica_border_dark_start") != nil { self.dbg_mica_border_dark_start = UserDefaults.standard.double(forKey: "dbg_mica_border_dark_start") }
         if UserDefaults.standard.object(forKey: "dbg_mica_border_dark_end") != nil { self.dbg_mica_border_dark_end = UserDefaults.standard.double(forKey: "dbg_mica_border_dark_end") }
         #endif
+
+        enforceThemeSkinBackgroundHarmonyIfNeeded()
     }
     
     private func loadBackgroundImage() {
         reloadBackgroundImage()
+    }
+
+    var effectiveBackgroundStyle: BackgroundStyle {
+        isThemeSkinBackgroundImageLocked() ? .color : backgroundStyle
+    }
+
+    func isThemeSkinBackgroundImageLocked(activeThemeId: String? = ThemeSkinManager.shared.activeThemeId) -> Bool {
+        activeThemeId != nil
+    }
+
+    @discardableResult
+    func enforceThemeSkinBackgroundHarmonyIfNeeded(activeThemeId: String? = ThemeSkinManager.shared.activeThemeId) -> Bool {
+        guard isThemeSkinBackgroundImageLocked(activeThemeId: activeThemeId) else { return false }
+
+        let savedStyle = UserDefaults.standard.string(forKey: "theme_background_style")
+        let needsSwitch = backgroundStyle == .image || savedStyle == BackgroundStyle.image.rawValue
+        guard needsSwitch else { return false }
+
+        isApplyingThemeBackgroundHarmony = true
+        backgroundStyle = .color
+        isApplyingThemeBackgroundHarmony = false
+        persistBackgroundStyle()
+        return true
+    }
+
+    private func persistBackgroundStyle() {
+        UserDefaults.standard.set(backgroundStyle.rawValue, forKey: "theme_background_style")
+        updateAdaptivePalette()
     }
     
     // MARK: - V2 Color System Methods

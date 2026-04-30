@@ -214,6 +214,92 @@ enum VIPGlassStyle: String, CaseIterable, Identifiable {
     }
 }
 
+enum VIPThemeSkinSupport {
+    static let skyConcertThemeId = "theme_skin.sky_concert"
+    static let swanDreamThemeId = "theme_skin.swan_dream"
+    static let supportedNamespaces: Set<String> = [
+        SkyConcertThemeSkin.namespace,
+        SwanDreamThemeSkin.namespace
+    ]
+
+    static func isSupported(_ descriptor: ThemeSkinDescriptor?) -> Bool {
+        guard let namespace = descriptor?.assetNamespace else { return false }
+        return supportedNamespaces.contains(namespace)
+    }
+
+    static func activeDescriptor(slot: ThemeSkinSlot = .sectionCard) -> ThemeSkinDescriptor? {
+        if let descriptor = ThemeSkinManager.shared.activeThemeDescriptor(for: slot, state: .default),
+           isSupported(descriptor) {
+            return descriptor
+        }
+
+        guard slot != .sectionCard,
+              let fallback = ThemeSkinManager.shared.activeThemeDescriptor(for: .sectionCard, state: .default),
+              isSupported(fallback) else {
+            return nil
+        }
+        return fallback
+    }
+
+    static func fixedDescriptor(for themeId: String, slot: ThemeSkinSlot = .sectionCard) -> ThemeSkinDescriptor? {
+        if let descriptor = ThemeSkinManager.shared.descriptor(forThemeId: themeId, slot: slot, state: .default),
+           isSupported(descriptor) {
+            return descriptor
+        }
+
+        guard slot != .sectionCard,
+              let fallback = ThemeSkinManager.shared.descriptor(forThemeId: themeId, slot: .sectionCard, state: .default),
+              isSupported(fallback) else {
+            return nil
+        }
+        return fallback
+    }
+
+    static func descriptor(for cardStyle: VIPCardStyle, slot: ThemeSkinSlot = .sectionCard) -> ThemeSkinDescriptor? {
+        switch cardStyle {
+        case .themeSkinAdaptive:
+            return activeDescriptor(slot: slot)
+        case .skyConcertTheme:
+            return fixedDescriptor(for: skyConcertThemeId, slot: slot)
+        case .swanDreamTheme:
+            return fixedDescriptor(for: swanDreamThemeId, slot: slot)
+        case .blackGold, .monicaPink:
+            return nil
+        }
+    }
+
+    static func requiredThemeId(for cardStyle: VIPCardStyle) -> String? {
+        switch cardStyle {
+        case .skyConcertTheme:
+            return skyConcertThemeId
+        case .swanDreamTheme:
+            return swanDreamThemeId
+        case .blackGold, .monicaPink, .themeSkinAdaptive:
+            return nil
+        }
+    }
+
+    static func isSelectable(_ cardStyle: VIPCardStyle) -> Bool {
+        guard let themeId = requiredThemeId(for: cardStyle) else { return true }
+        return ThemeSkinManager.shared.isPurchased(themeId)
+    }
+
+    static func displayHint(for cardStyle: VIPCardStyle) -> String {
+        switch cardStyle {
+        case .blackGold:
+            return "经典尊享 · 深色金边"
+        case .monicaPink:
+            return "默认梦幻粉 · 无主题时回退"
+        case .themeSkinAdaptive:
+            return "随当前启用的天空/天鹅主题自动变化"
+        case .skyConcertTheme:
+            return "需拥有天空音乐会主题"
+        case .swanDreamTheme:
+            return "需拥有天鹅入梦主题"
+        }
+    }
+}
+
 struct VIPPlan: Identifiable, Equatable {
     let id: String
     let title: String

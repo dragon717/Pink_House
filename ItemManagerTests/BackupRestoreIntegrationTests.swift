@@ -18,7 +18,7 @@ final class BackupRestoreIntegrationTests: XCTestCase {
         // 使用内存数据库
         let config = ModelConfiguration(isStoredInMemoryOnly: true)
         container = try ModelContainer(for: Schema([
-            Clothing.self, Brand.self, Tag.self, StoredImage.self, CutoutItem.self, Outfit.self, OutfitItem.self, AccessoryItem.self
+            Clothing.self, WealthSavingEntry.self, Brand.self, Tag.self, StoredImage.self, CutoutItem.self, Outfit.self, OutfitItem.self, AccessoryItem.self
         ]), configurations: config)
         context = container.mainContext
     }
@@ -49,6 +49,9 @@ final class BackupRestoreIntegrationTests: XCTestCase {
         let expectedLastModified = Date(timeIntervalSince1970: 1_700_000_123)
         clothing.updatedAt = expectedUpdatedAt
         clothing.lastModified = expectedLastModified
+        clothing.isDepositPlan = true
+        clothing.deposit = 100
+        clothing.balance = 400
         
         // Add Accessory Items
         let acc1 = AccessoryItem(name: "Test Acc 1", price: 100.0, deposit: 30.0, balance: 70.0, sortIndex: 0)
@@ -56,6 +59,10 @@ final class BackupRestoreIntegrationTests: XCTestCase {
         clothing.accessoryItems = [acc1, acc2]
         
         context.insert(clothing)
+
+        let savingAmount = Decimal(string: "123.45")!
+        let savingEntry = WealthSavingEntry(amount: savingAmount, clothingID: clothing.id, note: "备份测试小金库")
+        context.insert(savingEntry)
         
         // 创建裁剪图
         let cutout = CutoutItem(originalImageHash: "hash123", category: "Skirt", imagePath: "cutout.png", width: 100, height: 100)
@@ -75,6 +82,7 @@ final class BackupRestoreIntegrationTests: XCTestCase {
         
         // 3. 清空上下文 (模拟删除应用或切换环境)
         try context.delete(model: Clothing.self)
+        try context.delete(model: WealthSavingEntry.self)
         try context.delete(model: Brand.self)
         try context.delete(model: Tag.self)
         try context.delete(model: CutoutItem.self)
@@ -83,6 +91,7 @@ final class BackupRestoreIntegrationTests: XCTestCase {
         try context.save()
         
         XCTAssertEqual(try context.fetch(FetchDescriptor<Clothing>()).count, 0)
+        XCTAssertEqual(try context.fetch(FetchDescriptor<WealthSavingEntry>()).count, 0)
         print("Test: Environment cleared.")
         
         // 4. 执行恢复
@@ -97,6 +106,17 @@ final class BackupRestoreIntegrationTests: XCTestCase {
         XCTAssertEqual(restoredClothing.note, "这是用于备份恢复验证的备注")
         XCTAssertEqual(restoredClothing.updatedAt, expectedUpdatedAt)
         XCTAssertEqual(restoredClothing.lastModified, expectedLastModified)
+        XCTAssertTrue(restoredClothing.isDepositPlan)
+
+        let restoredSavingEntries = try context.fetch(FetchDescriptor<WealthSavingEntry>())
+        XCTAssertEqual(restoredSavingEntries.count, 1)
+        XCTAssertEqual(restoredSavingEntries.first?.id, savingEntry.id)
+        XCTAssertEqual(restoredSavingEntries.first?.clothingID, restoredClothing.id)
+        XCTAssertEqual(restoredSavingEntries.first?.amount, savingAmount)
+
+        try await BackupService.shared.importBackup(from: exportURL, context: context)
+        let restoredSavingEntriesAfterSecondImport = try context.fetch(FetchDescriptor<WealthSavingEntry>())
+        XCTAssertEqual(restoredSavingEntriesAfterSecondImport.count, 1, "重复恢复同一备份不应重复累加小金库存款")
         
         // 6. 验证关系恢复
         XCTAssertEqual(restoredClothing.brand?.name, "Test Brand")

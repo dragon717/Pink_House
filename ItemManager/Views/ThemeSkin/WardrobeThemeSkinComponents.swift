@@ -1,10 +1,11 @@
 import SwiftUI
 
 enum WardrobeThemeSkinSupport {
-    static let girlClosetNamespace = "girl_closet"
+    static let supportedNamespaces: Set<String> = ["sky_concert", "swan_dream"]
 
-    static func isGirlClosetDescriptor(_ descriptor: ThemeSkinDescriptor?) -> Bool {
-        descriptor?.assetNamespace == girlClosetNamespace
+    static func isThemeSkinDescriptor(_ descriptor: ThemeSkinDescriptor?) -> Bool {
+        guard let namespace = descriptor?.assetNamespace else { return false }
+        return supportedNamespaces.contains(namespace)
     }
 }
 
@@ -16,7 +17,6 @@ private enum WardrobeGirlClosetTokens {
     static let accent = Color(hex: "D793AA")
     static let accentSoft = Color(hex: "F4D5DF")
     static let label = Color(hex: "8A5C6F")
-    static let chocolate = Color(hex: "7A5A54")
     static let lavender = Color(hex: "9E86B8")
     static let shadow = Color(hex: "DFAEBF").opacity(0.28)
 }
@@ -37,7 +37,7 @@ struct WardrobeThemeStatsCardContainer<Content: View>: View {
     }
 
     private var isGirlClosetEnabled: Bool {
-        WardrobeThemeSkinSupport.isGirlClosetDescriptor(descriptor)
+        WardrobeThemeSkinSupport.isThemeSkinDescriptor(descriptor)
     }
 
     var body: some View {
@@ -61,125 +61,190 @@ struct WardrobeThemeStatsCardContainer<Content: View>: View {
 
     private var themedContent: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 6) {
-                Image(systemName: "sparkles")
-                    .font(.system(size: 10, weight: .bold))
-                Text("少女衣橱")
-                    .font(.system(size: 12, weight: .semibold, design: .rounded))
-                    .tracking(0.4)
-            }
-            .foregroundStyle(WardrobeGirlClosetTokens.label)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
-            .background(
-                Capsule()
-                    .fill(
-                        LinearGradient(
-                            colors: [
-                                Color.white.opacity(0.96),
-                                WardrobeGirlClosetTokens.accentSoft.opacity(0.96)
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-            )
-            .overlay(
-                Capsule()
-                    .stroke(WardrobeGirlClosetTokens.shellStroke.opacity(0.95), lineWidth: 1)
-            )
-
             content
         }
         .padding(.horizontal, 16)
-        .padding(.top, 14)
-        .padding(.bottom, 12)
-        .background(shellBackground(cornerRadius: 24))
-        .overlay(shellOutline(cornerRadius: 24))
+        .padding(.vertical, 14)
+        .background {
+            ThemeSkinOptionalResizableAsset(
+                ThemeSkinAssetName.cardStatsDefault,
+                namespace: descriptor?.assetNamespace,
+                allowShortNameFallback: !SkyConcertThemeSkin.shouldAvoidShortAssetFallback(for: descriptor),
+                capInsets: ThemeSkinAssetName.capInsets(for: ThemeSkinAssetName.cardStatsDefault)
+            ) {
+                ThemeSkinOrnateFrameSurface(
+                    descriptor: descriptor,
+                    cornerRadius: 24,
+                    style: .hero,
+                    showsDecoration: false
+                )
+            }
+        }
+        .overlay {
+            ThemeSkinOrnateFrameBorder(
+                descriptor: descriptor,
+                cornerRadius: 24,
+                style: .hero,
+                showsDecoration: false
+            )
+        }
+        .overlay {
+            if SkyConcertThemeSkin.isSkyConcert(descriptor) {
+                SkyConcertDecorationLayer(placements: SkyConcertThemeSkin.statsCardPlacements)
+            } else if SwanDreamThemeSkin.isSwanDream(descriptor) {
+                SkyConcertDecorationLayer(
+                    placements: SwanDreamThemeSkin.statsCardPlacements,
+                    namespace: SwanDreamThemeSkin.namespace
+                )
+            }
+        }
         .overlay(alignment: .topTrailing) {
-            WardrobeThemeDoodle(icon: "star.fill")
-                .offset(x: 10, y: -10)
+            if !SkyConcertThemeSkin.hasDedicatedVisualProfile(descriptor),
+               !ThemeSkinAssetAvailability.hasImage(named: ThemeSkinAssetName.cardStatsDefault) {
+                WardrobeThemeDoodle(icon: "star.fill")
+                    .offset(x: 10, y: -10)
+            }
         }
         .overlay(alignment: .bottomLeading) {
-            WardrobeThemeDoodle(icon: "sparkles", tint: WardrobeGirlClosetTokens.accent)
-                .offset(x: -6, y: 8)
+            if !SkyConcertThemeSkin.hasDedicatedVisualProfile(descriptor),
+               !ThemeSkinAssetAvailability.hasImage(named: ThemeSkinAssetName.cardStatsDefault) {
+                WardrobeThemeDoodle(icon: "sparkles", tint: WardrobeGirlClosetTokens.accent)
+                    .offset(x: -6, y: 8)
+            }
         }
-        .shadow(color: WardrobeGirlClosetTokens.shadow, radius: 12, x: 0, y: 6)
+        .shadow(color: SkyConcertThemeSkin.shadowColor(for: descriptor), radius: 12, x: 0, y: 6)
     }
 }
 
 struct WardrobeThemeClothingCardContainer<Content: View>: View {
-    @ObservedObject private var themeSkinManager = ThemeSkinManager.shared
-
     private let content: Content
     private let cornerRadius: CGFloat
+    private let descriptor: ThemeSkinDescriptor?
+    private let scrollOptimized: Bool
+    private let themeInputs: WardrobeCellThemeInputs
 
-    init(cornerRadius: CGFloat = 16, @ViewBuilder content: () -> Content) {
+    init(
+        cornerRadius: CGFloat = 16,
+        descriptor: ThemeSkinDescriptor? = ThemeSkinManager.shared.descriptor(for: .wardrobeItemCard),
+        scrollOptimized: Bool = false,
+        themeInputs: WardrobeCellThemeInputs = .fallback,
+        @ViewBuilder content: () -> Content
+    ) {
         self.cornerRadius = cornerRadius
+        self.descriptor = descriptor
+        self.scrollOptimized = scrollOptimized
+        self.themeInputs = themeInputs
         self.content = content()
     }
 
-    private var descriptor: ThemeSkinDescriptor? {
-        themeSkinManager.descriptor(for: .wardrobeItemCard)
-    }
-
     private var isGirlClosetEnabled: Bool {
-        WardrobeThemeSkinSupport.isGirlClosetDescriptor(descriptor)
+        WardrobeThemeSkinSupport.isThemeSkinDescriptor(descriptor)
     }
 
     var body: some View {
         Group {
             if isGirlClosetEnabled {
-                content
-                    .background(shellBackground(cornerRadius: 22))
-                    .overlay(shellOutline(cornerRadius: 22))
-                    .overlay(alignment: .topLeading) {
-                        WardrobeThemeDoodle(icon: "star.fill")
-                            .padding(.top, 10)
-                            .padding(.leading, 8)
-                    }
-                    .overlay(alignment: .bottomTrailing) {
-                        WardrobeThemeDoodle(icon: "sparkles", tint: WardrobeGirlClosetTokens.accent)
-                            .padding(.bottom, 10)
-                            .padding(.trailing, 8)
-                    }
-                    .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
-                    .shadow(color: WardrobeGirlClosetTokens.shadow.opacity(0.65), radius: 10, x: 0, y: 5)
-            } else {
-                content
-                    .background {
-                        CardBackgroundView(cornerRadius: cornerRadius)
-                    }
-                    .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
-            }
+                if scrollOptimized {
+                    content
+                        .background {
+                            ThemeSkinOrnateFrameSurface(
+                                descriptor: descriptor,
+                                cornerRadius: 22,
+                                style: .scrollOptimized,
+                                showsDecoration: true
+                            )
+                        }
+                        .shadow(color: SkyConcertThemeSkin.shadowColor(for: descriptor).opacity(0.2), radius: 2, x: 0, y: 1)
+                } else {
+                    content
+                        .background {
+                            ThemeSkinOptionalResizableAsset(
+                                ThemeSkinAssetName.cardWardrobeItem,
+                                namespace: descriptor?.assetNamespace,
+                                allowShortNameFallback: !SkyConcertThemeSkin.shouldAvoidShortAssetFallback(for: descriptor),
+                                capInsets: ThemeSkinAssetName.capInsets(for: ThemeSkinAssetName.cardWardrobeItem)
+                            ) {
+                                ThemeSkinOrnateFrameSurface(
+                                    descriptor: descriptor,
+                                    cornerRadius: 22,
+                                    style: .standard,
+                                    showsDecoration: false
+                                )
+                            }
+                        }
+                        .overlay {
+                            ThemeSkinOrnateFrameBorder(
+                                descriptor: descriptor,
+                                cornerRadius: 22,
+                                style: .standard,
+                                showsDecoration: false
+                            )
+                        }
+                        .overlay {
+                            if SkyConcertThemeSkin.isSkyConcert(descriptor) {
+                                SkyConcertDecorationLayer(placements: SkyConcertThemeSkin.wardrobeCardPlacements)
+                            } else if SwanDreamThemeSkin.isSwanDream(descriptor) {
+                                SkyConcertDecorationLayer(
+                                    placements: SwanDreamThemeSkin.wardrobeCardPlacements,
+                                    namespace: SwanDreamThemeSkin.namespace
+                                )
+                            }
+                        }
+                        .overlay(alignment: .topLeading) {
+                            if !SkyConcertThemeSkin.hasDedicatedVisualProfile(descriptor) {
+                                ThemeSkinOptionalFittedAsset(
+                                    ThemeSkinAssetName.cardWardrobeRibbonTopLeft,
+                                    namespace: descriptor?.assetNamespace
+                                ) {
+                                    WardrobeThemeDoodle(icon: "star.fill")
+                                }
+                                .frame(width: 58, height: 40)
+                                .padding(.top, 10)
+                                .padding(.leading, 8)
+                            }
+                        }
+                        .shadow(color: SkyConcertThemeSkin.shadowColor(for: descriptor).opacity(0.65), radius: 10, x: 0, y: 5)
+                }
+                } else {
+                    content
+                        .background {
+                            WardrobeListCellBackground(cornerRadius: cornerRadius, themeInputs: themeInputs)
+                        }
+                        .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
+                }
         }
     }
 }
 
 struct WardrobeThemeCardTitle: View {
     let title: String
+    let descriptor: ThemeSkinDescriptor?
 
-    @ObservedObject private var themeSkinManager = ThemeSkinManager.shared
-
-    private var descriptor: ThemeSkinDescriptor? {
-        themeSkinManager.descriptor(for: .wardrobeItemCard)
+    init(title: String, descriptor: ThemeSkinDescriptor? = ThemeSkinManager.shared.descriptor(for: .wardrobeItemCard)) {
+        self.title = title
+        self.descriptor = descriptor
     }
 
     private var isGirlClosetEnabled: Bool {
-        WardrobeThemeSkinSupport.isGirlClosetDescriptor(descriptor)
+        WardrobeThemeSkinSupport.isThemeSkinDescriptor(descriptor)
     }
 
     var body: some View {
         Group {
             if isGirlClosetEnabled {
                 HStack(spacing: 6) {
-                    Image(systemName: "sparkles")
-                        .font(.system(size: 9, weight: .bold))
-                        .foregroundStyle(WardrobeGirlClosetTokens.accent)
+                    ThemeSkinEdgeSticker(
+                        descriptor: descriptor,
+                        assetName: ThemeSkinEdgeStickerAssets.assetName(for: descriptor, role: .titleLeading),
+                        size: 18,
+                        opacity: 0.72,
+                        offset: .zero,
+                        fallbackSystemName: "sparkles"
+                    )
 
                     Text(title)
                         .font(.system(size: 13, weight: .semibold, design: .rounded))
-                        .foregroundStyle(WardrobeGirlClosetTokens.label)
+                        .foregroundStyle(SkyConcertThemeSkin.labelColor(for: descriptor))
                         .lineLimit(1)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
@@ -191,7 +256,7 @@ struct WardrobeThemeCardTitle: View {
                             LinearGradient(
                                 colors: [
                                     Color.white.opacity(0.96),
-                                    WardrobeGirlClosetTokens.accentSoft.opacity(0.92)
+                                    SkyConcertThemeSkin.accentSoft(for: descriptor).opacity(0.92)
                                 ],
                                 startPoint: .topLeading,
                                 endPoint: .bottomTrailing
@@ -200,7 +265,7 @@ struct WardrobeThemeCardTitle: View {
                 )
                 .overlay(
                     RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .stroke(WardrobeGirlClosetTokens.shellStroke.opacity(0.9), lineWidth: 1)
+                        .stroke(SkyConcertThemeSkin.shellStroke(for: descriptor).opacity(0.9), lineWidth: 1)
                 )
             } else {
                 Text(title)
@@ -217,15 +282,22 @@ struct WardrobeThemeCornerBadge: View {
     let text: String
     let tint: Color
     var icon: String? = nil
+    let descriptor: ThemeSkinDescriptor?
 
-    @ObservedObject private var themeSkinManager = ThemeSkinManager.shared
-
-    private var descriptor: ThemeSkinDescriptor? {
-        themeSkinManager.descriptor(for: .wardrobeItemCard)
+    init(
+        text: String,
+        tint: Color,
+        icon: String? = nil,
+        descriptor: ThemeSkinDescriptor? = ThemeSkinManager.shared.descriptor(for: .wardrobeItemCard)
+    ) {
+        self.text = text
+        self.tint = tint
+        self.icon = icon
+        self.descriptor = descriptor
     }
 
     private var isGirlClosetEnabled: Bool {
-        WardrobeThemeSkinSupport.isGirlClosetDescriptor(descriptor)
+        WardrobeThemeSkinSupport.isThemeSkinDescriptor(descriptor)
     }
 
     var body: some View {
@@ -246,11 +318,11 @@ struct WardrobeThemeCornerBadge: View {
                 .padding(.vertical, 5)
                 .background(
                     Capsule()
-                        .fill(Color.white.opacity(0.95))
+                        .fill(SkyConcertThemeSkin.hasDedicatedVisualProfile(descriptor) ? SkyConcertThemeSkin.shellFillTop(for: descriptor).opacity(0.95) : Color.white.opacity(0.95))
                 )
                 .overlay(
                     Capsule()
-                        .stroke(tint.opacity(0.45), lineWidth: 1)
+                        .stroke((SkyConcertThemeSkin.hasDedicatedVisualProfile(descriptor) ? SkyConcertThemeSkin.shellStroke(for: descriptor) : tint).opacity(0.45), lineWidth: 1)
                 )
                 .shadow(color: tint.opacity(0.16), radius: 6, x: 0, y: 2)
             } else {
@@ -286,13 +358,13 @@ private struct WardrobeThemeDoodle: View {
     }
 }
 
-private func shellBackground(cornerRadius: CGFloat) -> some View {
+private func shellBackground(cornerRadius: CGFloat, descriptor: ThemeSkinDescriptor?) -> some View {
     RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
         .fill(
             LinearGradient(
                 colors: [
-                    WardrobeGirlClosetTokens.shellFillTop,
-                    WardrobeGirlClosetTokens.shellFillBottom
+                    SkyConcertThemeSkin.shellFillTop(for: descriptor),
+                    SkyConcertThemeSkin.shellFillBottom(for: descriptor)
                 ],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
@@ -300,14 +372,14 @@ private func shellBackground(cornerRadius: CGFloat) -> some View {
         )
 }
 
-private func shellOutline(cornerRadius: CGFloat) -> some View {
+private func shellOutline(cornerRadius: CGFloat, descriptor: ThemeSkinDescriptor?) -> some View {
     RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
         .strokeBorder(
             LinearGradient(
                 colors: [
                     WardrobeGirlClosetTokens.shellStrokeSoft,
-                    WardrobeGirlClosetTokens.shellStroke,
-                    WardrobeGirlClosetTokens.shellStroke.opacity(0.88)
+                    SkyConcertThemeSkin.shellStroke(for: descriptor),
+                    SkyConcertThemeSkin.shellStroke(for: descriptor).opacity(0.88)
                 ],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing

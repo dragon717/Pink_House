@@ -1,10 +1,13 @@
 import Foundation
 import Combine
 import SwiftUI
+#if OBJECT_CAPTURE_ENABLED
 import RealityKit
+#endif
 
-#if !targetEnvironment(simulator)
-
+// iOS 17.x 热修：Object Capture session 类型默认不编译，避免启动时绑定 iOS 18+ RealityKit 符号。
+#if os(iOS) && OBJECT_CAPTURE_ENABLED
+@available(iOS 18.0, *)
 @MainActor
 class ObjectCaptureSessionManager: ObservableObject {
 
@@ -32,18 +35,11 @@ class ObjectCaptureSessionManager: ObservableObject {
 
     private init() {}
 
-    private static var canUseOnDeviceObjectCapture: Bool {
-        guard #available(iOS 18.0, *) else { return false }
-#if targetEnvironment(simulator)
-        return false
-#else
-        return true
-#endif
-    }
-
     var isSupported: Bool {
-        guard Self.canUseOnDeviceObjectCapture else { return false }
-        return ObjectCaptureSession.isSupported
+        // 不直接访问 ObjectCaptureSession.isSupported，避免 iOS 17.x 启动时
+        // 绑定较新 RealityKit/ObjectCapture 符号导致 dyld 崩溃。本类型整体只在
+        // iOS 18+ UI 中使用，实际创建 session 失败会在 prepareSession 中处理。
+        true
     }
 
     /// 准备 Object Capture Session
@@ -321,6 +317,31 @@ class ObjectCaptureSessionManager: ObservableObject {
         isInitializing = false
         print("[ObjectCapture] 已重置")
     }
+}
+
+#elseif os(iOS)
+
+@available(iOS 18.0, *)
+@MainActor
+class ObjectCaptureSessionManager: ObservableObject {
+    static let shared = ObjectCaptureSessionManager()
+    @Published var isInitializing: Bool = false
+    @Published var initializationError: Error?
+    @Published var isCapturing: Bool = false
+    @Published var capturedImageCount: Int = 0
+    @Published var userCompletedScanPass: Bool = false
+    @Published var numberOfShotsTaken: Int = 0
+    @Published var maximumNumberOfInputImages: Int = 0
+    @Published var currentOrbit: Int = 1
+    @Published var isObjectFlippable: Bool = true
+
+    private init() {}
+
+    var isSupported: Bool { false }
+    var currentImageDirectory: URL? { nil }
+
+    func reset() {}
+    func cancelSession() {}
 }
 
 #endif

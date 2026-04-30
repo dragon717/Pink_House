@@ -649,7 +649,7 @@ struct ShareCardBackground: View {
                 .ignoresSafeArea()
             
             // 背景图片（如果有）
-            if themeManager.backgroundStyle == .image, let image = themeManager.backgroundImage {
+            if themeManager.effectiveBackgroundStyle == .image, let image = themeManager.backgroundImage {
                 Image(uiImage: image)
                     .resizable()
                     .aspectRatio(contentMode: .fill)

@@ -82,13 +82,28 @@ struct WardrobeFashionTabSwitcher: View {
 
     @Binding var selectedTab: HomeTab
     let monthIndicator: WardrobeMonthIndicator?
+    let themeSkinDescriptor: ThemeSkinDescriptor?
+
+    init(
+        selectedTab: Binding<HomeTab>,
+        monthIndicator: WardrobeMonthIndicator?,
+        themeSkinDescriptor: ThemeSkinDescriptor? = nil
+    ) {
+        self._selectedTab = selectedTab
+        self.monthIndicator = monthIndicator
+        self.themeSkinDescriptor = themeSkinDescriptor
+    }
 
     private var palette: MagicThemePalette {
         MagicThemeDesignSystem.palette(themeManager: themeManager, colorScheme: colorScheme)
     }
+
+    private var isThemeSkinActive: Bool {
+        WardrobeThemeSkinSupport.isThemeSkinDescriptor(themeSkinDescriptor)
+    }
     
     var body: some View {
-        HStack(spacing: 2) {
+        HStack(spacing: WardrobeTopBarMetrics.segmentInterItemSpacing) {
             tabButton(
                 title: "少女衣橱",
                 icon: "cabinet.fill",
@@ -105,14 +120,19 @@ struct WardrobeFashionTabSwitcher: View {
         }
         .padding(.horizontal, 2)
         .padding(.vertical, 2)
-        .background(
+        .background(fashionSwitcherBackground)
+        .frame(width: 132, height: WardrobeTopBarMetrics.segmentVisualHeight)
+    }
+
+    @ViewBuilder
+    private var fashionSwitcherBackground: some View {
+        if isThemeSkinActive {
+            Capsule()
+                .fill(Color.clear)
+        } else {
             Capsule()
                 .fill(palette.segmentedBackground)
-        )
-        // 修复：减小固定高度，使导航栏更紧凑
-        .frame(height: 32)
-        // 修复：确保在 principal 位置居中显示
-        .frame(maxWidth: .infinity, alignment: .center)
+        }
     }
 
     @ViewBuilder
@@ -129,21 +149,59 @@ struct WardrobeFashionTabSwitcher: View {
                 selectedTab = targetTab
             }
         } label: {
-            VStack(spacing: 1) {
+            VStack(spacing: WardrobeTopBarMetrics.segmentStackSpacing) {
                 Image(systemName: icon)
-                    .font(.system(size: 11, weight: isSelected ? .semibold : .regular))
+                    .font(.system(size: WardrobeTopBarMetrics.segmentIconSize, weight: isSelected ? .semibold : .regular))
                 Text(title)
-                    .font(.system(size: 8, weight: isSelected ? .semibold : .medium))
+                    .font(.system(size: WardrobeTopBarMetrics.segmentTextSize, weight: isSelected ? .semibold : .medium))
             }
-            .foregroundStyle(isSelected ? activeColor : .secondary)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 3)
-            .background(
-                Capsule()
-                    .fill(isSelected ? palette.segmentedSelectedBackground : Color.clear)
-                    .shadow(color: isSelected ? Color.black.opacity(0.08) : Color.clear, radius: 1, x: 0, y: 1)
-            )
+            .foregroundStyle(tabForeground(isSelected: isSelected, fallbackActiveColor: activeColor))
+            .padding(.horizontal, WardrobeTopBarMetrics.segmentItemHorizontalPadding)
+            .padding(.vertical, WardrobeTopBarMetrics.segmentItemVerticalPadding)
+            .background {
+                tabSelectionBackground(isSelected: isSelected)
+            }
+            .frame(height: WardrobeTopBarMetrics.segmentVisualHeight)
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+    }
+
+    private func tabForeground(isSelected: Bool, fallbackActiveColor: Color) -> Color {
+        guard isThemeSkinActive else {
+            return isSelected ? fallbackActiveColor : .secondary
+        }
+
+        return isSelected
+            ? SkyConcertThemeSkin.accent(for: themeSkinDescriptor)
+            : SkyConcertThemeSkin.labelColor(for: themeSkinDescriptor).opacity(0.68)
+    }
+
+    @ViewBuilder
+    private func tabSelectionBackground(isSelected: Bool) -> some View {
+        if isThemeSkinActive && isSelected {
+            Capsule()
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            SkyConcertThemeSkin.shellFillTop(for: themeSkinDescriptor).opacity(0.98),
+                            SkyConcertThemeSkin.accentSoft(for: themeSkinDescriptor).opacity(0.72)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .overlay {
+                    Capsule()
+                        .stroke(SkyConcertThemeSkin.shellStroke(for: themeSkinDescriptor).opacity(0.72), lineWidth: 0.8)
+                }
+                .shadow(color: SkyConcertThemeSkin.shadowColor(for: themeSkinDescriptor).opacity(0.22), radius: 3, x: 0, y: 1)
+        } else if isSelected {
+            Capsule()
+                .fill(palette.segmentedSelectedBackground)
+                .shadow(color: Color.black.opacity(0.08), radius: 1, x: 0, y: 1)
+        } else {
+            Color.clear
+        }
     }
 }

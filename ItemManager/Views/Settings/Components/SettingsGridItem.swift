@@ -11,11 +11,12 @@ struct SettingsGridItem: View {
     let iconColor: Color
     var iconSystemName: Bool = true // 是否是 SF Symbol
 
-    private var isGirlClosetThemed: Bool {
-        guard let descriptor = themeSkinManager.activeThemeDescriptor(for: .settingsGridCard, state: .default) else {
-            return false
-        }
-        return descriptor.assetNamespace == "girl_closet"
+    private var themeSkinDescriptor: ThemeSkinDescriptor? {
+        themeSkinManager.activeThemeDescriptor(for: .settingsGridCard, state: .default)
+    }
+
+    private var isThemeSkinThemed: Bool {
+        WardrobeThemeSkinSupport.isThemeSkinDescriptor(themeSkinDescriptor)
     }
     
     var body: some View {
@@ -57,24 +58,28 @@ struct SettingsGridItem: View {
         .background(cardBackground)
         .overlay(cardOverlay)
         .overlay(alignment: .topTrailing) {
-            if isGirlClosetThemed {
+            if isThemeSkinThemed && !ThemeSkinAssetAvailability.hasImage(
+                named: ThemeSkinAssetName.cardSettingsGrid,
+                namespace: themeSkinDescriptor?.assetNamespace,
+                allowShortNameFallback: !SkyConcertThemeSkin.shouldAvoidShortAssetFallback(for: themeSkinDescriptor)
+            ) {
                 Image(systemName: "sparkles")
                     .font(.system(size: 10, weight: .bold))
-                    .foregroundStyle(Color(hex: "D17A9A"))
+                    .foregroundStyle(SkyConcertThemeSkin.accent(for: themeSkinDescriptor))
                     .padding(8)
             }
         }
-        .shadow(color: isGirlClosetThemed ? Color(hex: "E5B5C7").opacity(0.22) : .clear, radius: 12, x: 0, y: 6)
+        .shadow(color: isThemeSkinThemed ? SkyConcertThemeSkin.shadowColor(for: themeSkinDescriptor).opacity(0.78) : .clear, radius: 12, x: 0, y: 6)
     }
 
     private var iconCircleBackground: some View {
         Group {
-            if isGirlClosetThemed {
+            if isThemeSkinThemed {
                 Circle()
                     .fill(Color.white.opacity(0.92))
                     .overlay(
                         Circle()
-                            .stroke(Color(hex: "E7C7D3").opacity(0.95), lineWidth: 1)
+                            .stroke(SkyConcertThemeSkin.shellStroke(for: themeSkinDescriptor).opacity(0.95), lineWidth: 1)
                     )
             } else if iconSystemName {
                 iconColor.opacity(0.1)
@@ -90,19 +95,26 @@ struct SettingsGridItem: View {
         let cardColors = themeManager.themeColorConfig.currentTheme(forDarkMode: isDark).cardColors(forDarkMode: isDark)
         
         return Group {
-            if isGirlClosetThemed {
-                RoundedRectangle(cornerRadius: 20)
-                    .fill(
-                        LinearGradient(
-                            colors: [
-                                Color(hex: "FFFDF8"),
-                                Color(hex: "FCEEF3")
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
+            if isThemeSkinThemed {
+                ThemeSkinOptionalResizableAsset(
+                    ThemeSkinAssetName.cardSettingsGrid,
+                    namespace: themeSkinDescriptor?.assetNamespace,
+                    allowShortNameFallback: !SkyConcertThemeSkin.shouldAvoidShortAssetFallback(for: themeSkinDescriptor),
+                    capInsets: ThemeSkinAssetName.capInsets(for: ThemeSkinAssetName.cardSettingsGrid)
+                ) {
+                    RoundedRectangle(cornerRadius: 20)
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    SkyConcertThemeSkin.shellFillTop(for: themeSkinDescriptor),
+                                    SkyConcertThemeSkin.shellFillBottom(for: themeSkinDescriptor)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
                         )
-                    )
-                    .shadow(color: Color(hex: "E5B5C7").opacity(0.18), radius: 10, x: 0, y: 5)
+                        .shadow(color: SkyConcertThemeSkin.shadowColor(for: themeSkinDescriptor).opacity(0.56), radius: 10, x: 0, y: 5)
+                }
             } else {
                 switch themeManager.cardStyle {
                 case .solid:
@@ -138,24 +150,35 @@ struct SettingsGridItem: View {
         let isDark = colorScheme == .dark
         let cardColors = themeManager.themeColorConfig.currentTheme(forDarkMode: isDark).cardColors(forDarkMode: isDark)
         
-        return RoundedRectangle(cornerRadius: 20)
-            .stroke(
-                isGirlClosetThemed
-                    ? LinearGradient(
-                        colors: [
-                            Color.white.opacity(0.95),
-                            Color(hex: "E7C7D3").opacity(0.95)
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
+        return Group {
+            if isThemeSkinThemed && ThemeSkinAssetAvailability.hasImage(
+                named: ThemeSkinAssetName.cardSettingsGrid,
+                namespace: themeSkinDescriptor?.assetNamespace,
+                allowShortNameFallback: !SkyConcertThemeSkin.shouldAvoidShortAssetFallback(for: themeSkinDescriptor)
+            ) {
+                RoundedRectangle(cornerRadius: 20)
+                    .stroke(Color.clear, lineWidth: 0)
+            } else {
+                RoundedRectangle(cornerRadius: 20)
+                    .stroke(
+                        isThemeSkinThemed
+                            ? LinearGradient(
+                                colors: [
+                                    Color.white.opacity(0.95),
+                                    SkyConcertThemeSkin.shellStroke(for: themeSkinDescriptor).opacity(0.95)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                            : LinearGradient(
+                                colors: [cardColors.accentRGBA.color.opacity(isDark ? 0.3 : 0.2)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                        lineWidth: 1
                     )
-                    : LinearGradient(
-                        colors: [cardColors.accentRGBA.color.opacity(isDark ? 0.3 : 0.2)],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ),
-                lineWidth: 1
-            )
+            }
+        }
     }
 }
 

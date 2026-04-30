@@ -8,6 +8,9 @@ struct ThemeSkinDetailView: View {
 
     @State private var actionMessage = ""
     @State private var showActionAlert = false
+    @State private var previewMode: ThemeSkinPreviewMode = .theme
+    @State private var previewScene: ThemeSkinPreviewScene = .wardrobe
+    @State private var focusedSlot: ThemeSkinSlot?
 
     private var product: ThemeSkinProduct? {
         themeSkinManager.product(for: themeId)
@@ -21,16 +24,49 @@ struct ThemeSkinDetailView: View {
         themeSkinManager.isActiveTheme(themeId)
     }
 
+    private var previewEnabledSlots: Set<ThemeSkinSlot> {
+        guard let product else { return [] }
+        let sourceSlots = isActive ? themeSkinManager.currentEnabledSlots : Set(product.defaultEnabledSlots)
+        return sourceSlots.intersection(Set(product.supportedSlots))
+    }
+
     var body: some View {
-        ScrollView {
-            VStack(spacing: 20) {
-                previewCard
-                purchaseCard
-                ThemeSkinSlotToggleSection(themeId: themeId)
+        ScrollViewReader { proxy in
+            ScrollView {
+                VStack(spacing: 20) {
+                    if let product {
+                        ThemeSkinDetailPreviewPanel(
+                            product: product,
+                            isPurchased: isPurchased,
+                            isActive: isActive,
+                            enabledSlots: previewEnabledSlots,
+                            mode: $previewMode,
+                            scene: $previewScene,
+                            focusedSlot: focusedSlot,
+                            onPreviewSlotTap: { slot in
+                                focus(slot, proxy: proxy, scrollToRow: true)
+                            }
+                        )
+                    }
+
+                    purchaseCard
+                    if let product {
+                        ThemeSkinBackgroundStickerSelectionCard(product: product)
+                    }
+
+                    ThemeSkinSlotToggleSection(
+                        themeId: themeId,
+                        previewEnabledSlots: previewEnabledSlots,
+                        focusedSlot: focusedSlot,
+                        onFocusSlot: { slot in
+                            focus(slot, proxy: proxy, scrollToRow: false)
+                        }
+                    )
+                }
+                .padding()
             }
-            .padding()
+            .background(LiquidBackground())
         }
-        .background(LiquidBackground())
         .navigationTitle(product?.name ?? "主题详情")
         .navigationBarTitleDisplayMode(.inline)
         .alert("主题操作", isPresented: $showActionAlert) {
@@ -40,69 +76,35 @@ struct ThemeSkinDetailView: View {
         }
     }
 
-    private var previewCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text(product?.name ?? "主题")
-                .font(.title3.bold())
-                .foregroundStyle(themeManager.primaryTextColor)
-
-            Text(product?.subtitle ?? "主题预览")
-                .font(.subheadline)
-                .foregroundStyle(themeManager.secondaryTextColor)
-
-            RoundedRectangle(cornerRadius: 20)
-                .fill(themeManager.cardBackgroundColor.opacity(0.85))
-                .frame(height: 220)
-                .overlay(
-                    VStack(spacing: 10) {
-                        Image(systemName: "sparkles")
-                            .font(.system(size: 36))
-                            .foregroundStyle(themeManager.accentTextColor)
-                        Text("少女衣橱主题预览")
-                            .font(.headline)
-                            .foregroundStyle(themeManager.primaryTextColor)
-                        Text("顶部栏 / 卡片 / TabBar 会从同一主题包里解析，不允许和其他主题混用。")
-                            .font(.footnote)
-                            .multilineTextAlignment(.center)
-                            .foregroundStyle(themeManager.secondaryTextColor)
-                            .padding(.horizontal)
-                    }
-                )
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(18)
-        .background {
-            CardBackgroundView(cornerRadius: 24)
-        }
-    }
-
     private var purchaseCard: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            Text("购买与应用")
-                .font(.headline)
-                .foregroundStyle(themeManager.primaryTextColor)
+        ThemeSkinSectionCardContainer(cornerRadius: 24) {
+            VStack(alignment: .leading, spacing: 14) {
+                Text("购买与应用")
+                    .font(.headline)
+                    .foregroundStyle(themeManager.primaryTextColor)
 
-            if let product, let quote = themeSkinManager.priceQuote(for: themeId) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("原价 \(product.basePrice) 喵币")
-                        .font(.caption)
-                        .foregroundStyle(themeManager.secondaryTextColor)
-                    Text("当前价 \(quote.finalPrice) 喵币")
-                        .font(.title3.bold())
-                        .foregroundStyle(themeManager.primaryTextColor)
+                if let product, let quote = themeSkinManager.priceQuote(for: themeId) {
+                    HStack(alignment: .lastTextBaseline, spacing: 8) {
+                        Text("\(quote.finalPrice)")
+                            .font(.system(size: 30, weight: .heavy, design: .rounded))
+                            .foregroundStyle(themeManager.primaryTextColor)
+                        Text("喵币")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(themeManager.secondaryTextColor)
+                        Text("原价 \(product.basePrice)")
+                            .font(.footnote.weight(.medium))
+                            .foregroundStyle(themeManager.secondaryTextColor)
+                            .strikethrough()
+                    }
                 }
-            }
 
-            HStack(spacing: 10) {
                 if !isPurchased {
                     Button {
                         present(themeSkinManager.purchaseTheme(themeId, autoActivateIfNeeded: true).message)
                     } label: {
-                        Text("购买并应用")
-                            .frame(maxWidth: .infinity)
+                        Label("购买并应用", systemImage: "bag.fill")
                     }
-                    .buttonStyle(.borderedProminent)
-                    .tint(themeManager.accentTextColor)
+                    .buttonStyle(ThemeSkinPrimaryButtonStyle(fallbackTint: themeManager.accentTextColor))
                 } else {
                     Button {
                         let result = isActive
@@ -110,18 +112,42 @@ struct ThemeSkinDetailView: View {
                             : themeSkinManager.activateTheme(themeId)
                         present(result.message)
                     } label: {
-                        Text(isActive ? "停用主题" : "应用主题")
-                            .frame(maxWidth: .infinity)
+                        Label(isActive ? "停用主题" : "应用主题", systemImage: isActive ? "power.circle.fill" : "wand.and.stars")
                     }
-                    .buttonStyle(.borderedProminent)
-                    .tint(isActive ? .gray : themeManager.accentTextColor)
+                    .buttonStyle(ThemeSkinPrimaryButtonStyle(fallbackTint: isActive ? .gray : themeManager.accentTextColor))
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(18)
+        }
+    }
+
+    private func focus(_ slot: ThemeSkinSlot, proxy: ScrollViewProxy, scrollToRow: Bool) {
+        withAnimation(.spring(response: 0.28, dampingFraction: 0.86)) {
+            focusedSlot = slot
+            previewMode = .theme
+            previewScene = scene(for: slot)
+        }
+
+        DispatchQueue.main.async {
+            withAnimation(.spring(response: 0.34, dampingFraction: 0.88)) {
+                if scrollToRow {
+                    proxy.scrollTo(ThemeSkinSlotRowID.slot(slot), anchor: .center)
+                } else {
+                    proxy.scrollTo(ThemeSkinSlotRowID.previewCard, anchor: .top)
                 }
             }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(18)
-        .background {
-            CardBackgroundView(cornerRadius: 24)
+    }
+
+    private func scene(for slot: ThemeSkinSlot) -> ThemeSkinPreviewScene {
+        switch ThemeSkinPreviewAnchor.anchor(for: slot) {
+        case .searchBar, .tabBar, .statsCard, .wardrobeCard, .segmentedControl, .filterChip, .discountBadge:
+            return .wardrobe
+        case .filterSheet, .emptyState:
+            return .settings
+        case .topBar, .settingsGrid, .sectionCard, .primaryButton, .iconButton:
+            return .me
         }
     }
 
