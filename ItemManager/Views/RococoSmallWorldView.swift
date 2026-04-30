@@ -27,6 +27,7 @@ struct RococoSmallWorldView: View {
     @AppStorage("rococoViewMode") private var viewMode: ViewMode = .both
     @AppStorage("isSpatialSceneEnabled") private var isSpatialSceneEnabled = false
     @State private var showDebugHotspots: Bool = false
+    @State private var isViewModeMenuOpen: Bool = false
     @StateObject private var petViewModel = SmallWorldPetViewModel()
     @Environment(\.scenePhase) private var scenePhase
     
@@ -253,57 +254,32 @@ struct RococoSmallWorldView: View {
                     }
                 }
                 .transition(.opacity)
-                
-                // View Mode Menu Button (Top Left)
-                Menu {
-                    Picker("视图模式", selection: $viewMode) {
-                        ForEach(ViewMode.allCases) { mode in
-                            Label(mode.rawValue, systemImage: iconForMode(mode)).tag(mode)
+                .allowsHitTesting(!isViewModeMenuOpen)
+
+                if isViewModeMenuOpen {
+                    Color.black.opacity(0.001)
+                        .ignoresSafeArea()
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            closeViewModeMenu()
                         }
-                    }
-                    
-                    Divider()
-                    
-                    #if DEBUG
-                    Button(action: {
-                        showDebugHotspots.toggle()
-                    }) {
-                        Label("显示热区调试", systemImage: showDebugHotspots ? "checkmark.rectangle.stack" : "rectangle.dashed")
-                    }
-                    
-                    Button(action: {
-                        petViewModel.isDebugMode.toggle()
-                        if petViewModel.isDebugMode, petViewModel.activePathId == nil {
-                            petViewModel.startMovement()
-                        }
-                    }) {
-                        Label("显示路径调试", systemImage: petViewModel.isDebugMode ? "checkmark.circle" : "arrow.triangle.swap")
-                    }
-                    #endif
-                } label: {
-                    if #available(iOS 26.0, *) {
-                        Image(systemName: "arrow.up.left.and.down.right.and.arrow.up.right.and.down.left")
-                            .font(.title2)
-                            .foregroundStyle(.white)
-                            .shadow(radius: 2)
-                            .padding(12)
-                            .background(Material.thin)
-                            .clipShape(Circle())
-                    } else {
-                        Image(systemName: "line.3.horizontal.circle")
-                            .font(.title2)
-                            .foregroundStyle(.white)
-                            .shadow(radius: 2)
-                            .padding(12)
-                            .background(Material.thin)
-                            .clipShape(Circle())
-                    }
+                        .accessibilityHidden(true)
+                        .zIndex(10)
                 }
+
+                RococoViewModeFloatingMenu(
+                    viewMode: $viewMode,
+                    isPresented: $isViewModeMenuOpen,
+                    showDebugHotspots: $showDebugHotspots,
+                    petViewModel: petViewModel
+                )
                 .padding(.leading, 16)
                 .padding(.top, 50) // Adjust for safe area
+                .zIndex(20)
             }
             .animation(.spring(response: 0.6, dampingFraction: 0.8), value: isLandscape)
             .animation(.easeInOut, value: viewMode)
+            .animation(.easeInOut(duration: 0.18), value: isViewModeMenuOpen)
         }
         .ignoresSafeArea()
         .onAppear {
@@ -377,6 +353,8 @@ struct RococoSmallWorldView: View {
     }
     
     private func resetState() {
+        isViewModeMenuOpen = false
+
         // 修复：当从视频播放返回时，强制重置缩放和动画状态，防止交互锁死
         // 使用 withAnimation 确保平滑过渡，但在某些情况下可能需要立即重置
         withAnimation {
@@ -395,11 +373,9 @@ struct RococoSmallWorldView: View {
         }
     }
     
-    private func iconForMode(_ mode: ViewMode) -> String {
-        switch mode {
-        case .both: return "rectangle.split.1x2"
-        case .upper: return "rectangle.topthird.inset.filled"
-        case .lower: return "rectangle.bottomthird.inset.filled"
+    private func closeViewModeMenu() {
+        withAnimation(.easeInOut(duration: 0.18)) {
+            isViewModeMenuOpen = false
         }
     }
     
@@ -500,6 +476,180 @@ struct RococoSmallWorldView: View {
             return CGSize(width: 1, height: 1)
         }
         return image.size
+    }
+}
+
+private struct RococoViewModeFloatingMenu: View {
+    @Binding var viewMode: RococoSmallWorldView.ViewMode
+    @Binding var isPresented: Bool
+    @Binding var showDebugHotspots: Bool
+    @ObservedObject var petViewModel: SmallWorldPetViewModel
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            menuButton
+
+            if isPresented {
+                menuPanel
+                    .transition(
+                        .opacity.combined(
+                            with: .scale(scale: 0.96, anchor: .topLeading)
+                        )
+                    )
+            }
+        }
+        .accessibilityElement(children: .contain)
+    }
+
+    private var menuButton: some View {
+        Button {
+            withAnimation(.easeInOut(duration: 0.18)) {
+                isPresented.toggle()
+            }
+        } label: {
+            ZStack {
+                Circle()
+                    .fill(.thinMaterial)
+                    .frame(width: 52, height: 52)
+                    .overlay(
+                        Circle()
+                            .stroke(Color.white.opacity(isPresented ? 0.95 : 0.58), lineWidth: 1.2)
+                    )
+                    .shadow(color: .black.opacity(0.18), radius: 12, x: 0, y: 6)
+                    .shadow(color: Color(red: 1.0, green: 0.54, blue: 0.75).opacity(isPresented ? 0.45 : 0.22), radius: isPresented ? 14 : 6)
+
+                Image(systemName: buttonIconName)
+                    .font(.system(size: 22, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .shadow(radius: 2)
+            }
+            .frame(width: 56, height: 56)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("洛可可视图菜单")
+        .accessibilityValue(isPresented ? "已展开" : "已收起")
+        .accessibilityIdentifier("smallworld.rococo.viewModeMenu.button")
+    }
+
+    private var menuPanel: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("视图模式")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 12)
+                .padding(.top, 4)
+
+            ForEach(RococoSmallWorldView.ViewMode.allCases) { mode in
+                menuRow(
+                    title: mode.rawValue,
+                    systemImage: iconForMode(mode),
+                    isSelected: viewMode == mode,
+                    accessibilityIdentifier: "smallworld.rococo.viewModeMenu.option.\(mode.id)"
+                ) {
+                    viewMode = mode
+                    closeMenu()
+                }
+            }
+
+            #if DEBUG
+            Divider()
+                .padding(.vertical, 2)
+
+            menuRow(
+                title: "显示热区调试",
+                systemImage: showDebugHotspots ? "checkmark.rectangle.stack" : "rectangle.dashed",
+                isSelected: showDebugHotspots,
+                accessibilityIdentifier: "smallworld.rococo.viewModeMenu.debug.hotspots"
+            ) {
+                showDebugHotspots.toggle()
+                closeMenu()
+            }
+
+            menuRow(
+                title: "显示路径调试",
+                systemImage: petViewModel.isDebugMode ? "checkmark.circle" : "arrow.triangle.swap",
+                isSelected: petViewModel.isDebugMode,
+                accessibilityIdentifier: "smallworld.rococo.viewModeMenu.debug.petPath"
+            ) {
+                petViewModel.isDebugMode.toggle()
+                if petViewModel.isDebugMode, petViewModel.activePathId == nil {
+                    petViewModel.startMovement()
+                }
+                closeMenu()
+            }
+            #endif
+        }
+        .padding(8)
+        .frame(width: 224, alignment: .leading)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .stroke(Color.white.opacity(0.48), lineWidth: 1)
+        )
+        .shadow(color: .black.opacity(0.18), radius: 18, x: 0, y: 10)
+        .accessibilityIdentifier("smallworld.rococo.viewModeMenu.panel")
+    }
+
+    private func menuRow(
+        title: String,
+        systemImage: String,
+        isSelected: Bool,
+        accessibilityIdentifier: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            HStack(spacing: 10) {
+                Image(systemName: systemImage)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(isSelected ? Color(red: 1.0, green: 0.36, blue: 0.67) : Color.secondary)
+                    .frame(width: 22)
+
+                Text(title)
+                    .font(.subheadline.weight(isSelected ? .semibold : .regular))
+                    .foregroundStyle(.primary)
+
+                Spacer(minLength: 8)
+
+                if isSelected {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundStyle(Color(red: 1.0, green: 0.36, blue: 0.67))
+                }
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .frame(minHeight: 44)
+            .contentShape(Rectangle())
+            .background(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(isSelected ? Color.white.opacity(0.34) : Color.white.opacity(0.001))
+            )
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier(accessibilityIdentifier)
+    }
+
+    private var buttonIconName: String {
+        if #available(iOS 26.0, *) {
+            return "arrow.up.left.and.down.right.and.arrow.up.right.and.down.left"
+        } else {
+            return "line.3.horizontal.circle"
+        }
+    }
+
+    private func closeMenu() {
+        withAnimation(.easeInOut(duration: 0.18)) {
+            isPresented = false
+        }
+    }
+
+    private func iconForMode(_ mode: RococoSmallWorldView.ViewMode) -> String {
+        switch mode {
+        case .both: return "rectangle.split.1x2"
+        case .upper: return "rectangle.topthird.inset.filled"
+        case .lower: return "rectangle.bottomthird.inset.filled"
+        }
     }
 }
 
