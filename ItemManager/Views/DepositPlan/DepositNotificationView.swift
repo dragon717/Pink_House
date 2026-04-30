@@ -37,6 +37,41 @@ struct DepositNotificationView: View {
         MagicThemeDesignSystem.palette(themeManager: themeManager, colorScheme: colorScheme)
     }
 
+    private var totalPendingBalance: Decimal {
+        depositPlans.reduce(Decimal(0)) { $0 + $1.totalBalance }
+    }
+
+    private var nextPendingRecord: DepositNotificationRecord? {
+        pendingRecords.min { $0.scheduledDate < $1.scheduledDate }
+    }
+
+    private var nearestPaymentClothing: Clothing? {
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        let datedPlans = depositPlans.filter { $0.finalPaymentDate != nil }
+        let activeOrUpcoming = datedPlans
+            .filter { clothing in
+                guard let start = clothing.finalPaymentDate else { return false }
+                let end = clothing.finalPaymentEndDate ?? start
+                return calendar.startOfDay(for: end) >= today
+            }
+            .sorted { lhs, rhs in
+                (lhs.finalPaymentDate ?? .distantFuture) < (rhs.finalPaymentDate ?? .distantFuture)
+            }
+
+        if let first = activeOrUpcoming.first {
+            return first
+        }
+
+        return datedPlans.sorted { lhs, rhs in
+            (lhs.finalPaymentDate ?? .distantPast) > (rhs.finalPaymentDate ?? .distantPast)
+        }.first
+    }
+
+    private func clothing(for clothingID: UUID) -> Clothing? {
+        depositPlans.first { $0.id == clothingID }
+    }
+
     /// 未读记录数量
     private var unreadCount: Int {
         triggeredRecords.filter { !$0.isRead }.count
@@ -89,6 +124,9 @@ struct DepositNotificationView: View {
                 settingsSummarySection
                     .padding(.horizontal, 16)
 
+                timelineOverviewSection
+                    .padding(.horizontal, 16)
+
                 historySection
                     .padding(.horizontal, 16)
 
@@ -98,7 +136,7 @@ struct DepositNotificationView: View {
             .padding(.vertical, 16)
         }
         .background(LiquidBackground())
-        .navigationTitle("补款提醒")
+        .navigationTitle("尾款提醒")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
@@ -132,7 +170,7 @@ struct DepositNotificationView: View {
             }
             Button("取消", role: .cancel) { }
         } message: {
-            Text("请在设置中允许 App 发送通知，以便接收补款提醒。")
+            Text("请在设置中允许 App 发送通知，以便接收尾款提醒。")
         }
         .alert("清除已读通知", isPresented: $showClearReadConfirmation) {
             Button("清除", role: .destructive) {
@@ -162,39 +200,216 @@ struct DepositNotificationView: View {
     // MARK: - 设置情况概览（默认折叠）
 
     private var settingsSummarySection: some View {
-        VStack(spacing: 8) {
-            // 标题栏：总开关 + 小齿轮
-            HStack {
-                Toggle("开启补款提醒", isOn: $isEnabled)
-                    .onChange(of: isEnabled) { _, newValue in
-                        handleSettingsChange(enabled: newValue)
+        ThemeSkinSectionCardContainer(cornerRadius: 12, showsDecoration: false) {
+            VStack(spacing: 8) {
+                // 标题栏：总开关 + 小齿轮
+                HStack {
+                    Toggle("开启尾款提醒", isOn: $isEnabled)
+                        .onChange(of: isEnabled) { _, newValue in
+                            handleSettingsChange(enabled: newValue)
+                        }
+
+                    Spacer()
+
+                    Button {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                            isExpanded.toggle()
+                        }
+                    } label: {
+                        Image(systemName: "gearshape.fill")
+                            .font(.system(size: 16))
+                            .foregroundStyle(isExpanded ? palette.accent : palette.secondaryText)
+                            .rotationEffect(.degrees(isExpanded ? 90 : 0))
+                    }
+                }
+
+                // 展开的设置面板
+                if isExpanded {
+                    expandedSettingsPanel
+                } else {
+                    // 折叠时显示设置摘要
+                    collapsedSettingsSummary
+                }
+            }
+            .padding(12)
+        }
+    }
+
+    // MARK: - 尾款时间线概览
+
+    private var timelineOverviewSection: some View {
+        ThemeSkinSectionCardContainer(cornerRadius: 18) {
+            VStack(alignment: .leading, spacing: 14) {
+                HStack(alignment: .center, spacing: 10) {
+                    ZStack {
+                        Circle()
+                            .fill(palette.accent.opacity(0.14))
+                            .frame(width: 36, height: 36)
+
+                        Image(systemName: "calendar.badge.clock")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundStyle(palette.accent)
                     }
 
-                Spacer()
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("尾款时间线")
+                            .font(.headline)
+                            .foregroundStyle(palette.primaryText)
 
-                Button {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                        isExpanded.toggle()
+                        Text(reminderRuleSummary)
+                            .font(.caption)
+                            .foregroundStyle(palette.secondaryText)
+                            .lineLimit(2)
                     }
-                } label: {
-                    Image(systemName: "gearshape.fill")
-                        .font(.system(size: 16))
-                        .foregroundStyle(isExpanded ? palette.accent : palette.secondaryText)
-                        .rotationEffect(.degrees(isExpanded ? 90 : 0))
+
+                    Spacer()
+
+                    Text(isEnabled ? "提醒已开启" : "提醒未开启")
+                        .font(.caption.weight(.semibold))
+                        .padding(.horizontal, 9)
+                        .padding(.vertical, 5)
+                        .background((isEnabled ? palette.accent : palette.secondaryText).opacity(0.14))
+                        .foregroundStyle(isEnabled ? palette.accent : palette.secondaryText)
+                        .clipShape(Capsule())
+                }
+
+                Divider().opacity(0.45)
+
+                if let record = nextPendingRecord {
+                    overviewFocusRow(
+                        icon: record.source == "scheduled" ? "bell.badge.fill" : "tray.full.fill",
+                        title: "下次提醒",
+                        primary: DepositReminderDisplayFormatter.clothingName(for: record, clothing: clothing(for: record.clothingID)),
+                        secondary: DepositReminderDisplayFormatter.pendingReminderText(for: record),
+                        footnote: DepositReminderDisplayFormatter.paymentWindowText(clothing: clothing(for: record.clothingID), fallbackDate: record.scheduledDate),
+                        amount: DepositReminderDisplayFormatter.amountText(for: clothing(for: record.clothingID)),
+                        badge: DepositReminderDisplayFormatter.sourceText(for: record)
+                    )
+                } else if let clothing = nearestPaymentClothing {
+                    overviewFocusRow(
+                        icon: "heart.text.square.fill",
+                        title: "最近尾款",
+                        primary: clothing.name,
+                        secondary: DepositReminderDisplayFormatter.paymentStatusText(clothing: clothing, fallbackDate: clothing.finalPaymentDate),
+                        footnote: DepositReminderDisplayFormatter.paymentWindowText(clothing: clothing, fallbackDate: clothing.finalPaymentDate),
+                        amount: DepositReminderDisplayFormatter.amountText(for: clothing),
+                        badge: isEnabled ? "暂无待提醒" : "未开启"
+                    )
+                } else {
+                    overviewFocusRow(
+                        icon: "sparkles",
+                        title: "暂无尾款计划",
+                        primary: "还没有需要提醒的心愿尾款",
+                        secondary: "创建心愿尾款并填写尾款日后，这里会显示下一次提醒。",
+                        footnote: nil,
+                        amount: nil,
+                        badge: nil
+                    )
+                }
+
+                HStack(spacing: 8) {
+                    overviewMetric(title: "待付总额", value: DepositReminderDisplayFormatter.amountText(totalPendingBalance), systemImage: "yensign.circle.fill")
+                    overviewMetric(title: "待提醒", value: "\(pendingRecords.count) 条", systemImage: "bell.fill")
+                    overviewMetric(title: "未读", value: "\(unreadCount) 条", systemImage: "envelope.badge.fill")
+                }
+            }
+            .padding(16)
+        }
+    }
+
+    private var reminderRuleSummary: String {
+        guard isEnabled else {
+            return "开启后会按尾款日自动排队提醒，站内也会保留待提醒记录。"
+        }
+
+        let daysText = selectedDays.sorted().map(dayText(for:)).joined(separator: "、")
+        return "\(daysText) · 每天 \(formatTime(notificationTime)) 提醒"
+    }
+
+    @ViewBuilder
+    private func overviewFocusRow(
+        icon: String,
+        title: String,
+        primary: String,
+        secondary: String,
+        footnote: String?,
+        amount: String?,
+        badge: String?
+    ) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: icon)
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundStyle(palette.accent)
+                .frame(width: 30, height: 30)
+                .background(palette.accent.opacity(0.12))
+                .clipShape(Circle())
+
+            VStack(alignment: .leading, spacing: 5) {
+                Text(title)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(palette.secondaryText)
+
+                Text(primary)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(palette.primaryText)
+                    .lineLimit(2)
+
+                Text(secondary)
+                    .font(.caption)
+                    .foregroundStyle(palette.primaryText.opacity(0.82))
+                    .lineLimit(2)
+
+                if let footnote {
+                    Text(footnote)
+                        .font(.caption2)
+                        .foregroundStyle(palette.secondaryText)
+                        .lineLimit(2)
                 }
             }
 
-            // 展开的设置面板
-            if isExpanded {
-                expandedSettingsPanel
-            } else {
-                // 折叠时显示设置摘要
-                collapsedSettingsSummary
+            Spacer(minLength: 8)
+
+            VStack(alignment: .trailing, spacing: 6) {
+                if let amount {
+                    Text(amount)
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(palette.accent)
+                }
+
+                if let badge {
+                    Text(badge)
+                        .font(.caption2.weight(.semibold))
+                        .padding(.horizontal, 7)
+                        .padding(.vertical, 4)
+                        .background(palette.accent.opacity(0.12))
+                        .foregroundStyle(palette.accent)
+                        .clipShape(Capsule())
+                }
             }
         }
-        .padding(12)
-        .background(Color(uiColor: .secondarySystemGroupedBackground))
-        .cornerRadius(12)
+    }
+
+    private func overviewMetric(title: String, value: String, systemImage: String) -> some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Image(systemName: systemImage)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(palette.accent)
+
+            Text(value)
+                .font(.caption.weight(.bold))
+                .foregroundStyle(palette.primaryText)
+                .lineLimit(1)
+                .minimumScaleFactor(0.72)
+
+            Text(title)
+                .font(.caption2)
+                .foregroundStyle(palette.secondaryText)
+                .lineLimit(1)
+        }
+        .padding(10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(palette.cardAccent.opacity(0.08))
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 
     // MARK: - 折叠时显示的设置摘要
@@ -390,7 +605,7 @@ struct DepositNotificationView: View {
                 } else {
                     VStack(spacing: 8) {
                         ForEach(pendingDisplayRecords) { record in
-                            PendingNotificationRecordRow(record: record) {
+                            PendingNotificationRecordRow(record: record, clothing: clothing(for: record.clothingID)) {
                                 openClothingDetail(record.clothingID)
                             }
                         }
@@ -446,6 +661,7 @@ struct DepositNotificationView: View {
                         TriggeredNotificationCard(
                             clothingName: groupedRecord.record.clothingName,
                             clothingID: groupedRecord.record.clothingID,
+                            clothing: clothing(for: groupedRecord.record.clothingID),
                             records: groupedRecord.records,
                             onOpenDetail: {
                                 openClothingDetail(groupedRecord.record.clothingID)
@@ -467,7 +683,7 @@ struct DepositNotificationView: View {
                 .font(.headline)
                 .foregroundStyle(palette.secondaryText)
 
-            Text("当补款提醒通过 Apple 通知发送后，将显示在这里")
+            Text("当尾款提醒被系统送达或在站内记录后，将显示在这里")
                 .font(.caption)
                 .foregroundStyle(palette.secondaryText.opacity(0.7))
                 .multilineTextAlignment(.center)
@@ -673,6 +889,7 @@ struct DepositNotificationView: View {
 struct TriggeredNotificationCard: View {
     let clothingName: String
     let clothingID: UUID
+    let clothing: Clothing?
     let records: [DepositNotificationRecord]
     let onOpenDetail: () -> Void
 
@@ -683,36 +900,56 @@ struct TriggeredNotificationCard: View {
         MagicThemeDesignSystem.palette(themeManager: themeManager, colorScheme: colorScheme)
     }
 
+    private var displayName: String {
+        clothing?.name ?? clothingName
+    }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            // 裙装名称
-            HStack {
-                Button(action: onOpenDetail) {
-                    Text(clothingName)
-                        .font(.subheadline)
-                        .fontWeight(.medium)
-                        .foregroundStyle(.primary)
-                        .multilineTextAlignment(.leading)
+        ThemeSkinSectionCardContainer(cornerRadius: 14, showsDecoration: false) {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(alignment: .top, spacing: 10) {
+                    Button(action: onOpenDetail) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(displayName)
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(palette.primaryText)
+                                .multilineTextAlignment(.leading)
+
+                            Text(DepositReminderDisplayFormatter.paymentWindowText(clothing: clothing, fallbackDate: records.first?.scheduledDate))
+                                .font(.caption)
+                                .foregroundStyle(palette.secondaryText)
+                                .multilineTextAlignment(.leading)
+                        }
+                    }
+                    .buttonStyle(.plain)
+
+                    Spacer()
+
+                    VStack(alignment: .trailing, spacing: 6) {
+                        if let amount = DepositReminderDisplayFormatter.amountText(for: clothing) {
+                            Text(amount)
+                                .font(.caption.weight(.bold))
+                                .foregroundStyle(palette.accent)
+                        }
+
+                        Text("\(records.count) 次提醒")
+                            .font(.caption2.weight(.semibold))
+                            .padding(.horizontal, 7)
+                            .padding(.vertical, 4)
+                            .background(palette.accent.opacity(0.12))
+                            .foregroundStyle(palette.accent)
+                            .clipShape(Capsule())
+                    }
                 }
-                .buttonStyle(.plain)
 
-                Spacer()
-
-                Text("\(records.count) 次提醒")
-                    .font(.caption)
-                    .foregroundStyle(palette.secondaryText)
-            }
-
-            // 已发送的提醒列表
-            VStack(alignment: .leading, spacing: 8) {
-                ForEach(records) { record in
-                    NotificationRecordRow(record: record, onOpenDetail: onOpenDetail)
+                VStack(alignment: .leading, spacing: 8) {
+                    ForEach(records) { record in
+                        NotificationRecordRow(record: record, clothing: clothing, onOpenDetail: onOpenDetail)
+                    }
                 }
             }
+            .padding(12)
         }
-        .padding(12)
-        .background(Color(uiColor: .secondarySystemGroupedBackground))
-        .cornerRadius(12)
     }
 }
 
@@ -720,6 +957,7 @@ struct TriggeredNotificationCard: View {
 
 struct NotificationRecordRow: View {
     let record: DepositNotificationRecord
+    let clothing: Clothing?
     let onOpenDetail: () -> Void
 
     @Environment(ThemeManager.self) private var themeManager
@@ -743,78 +981,63 @@ struct NotificationRecordRow: View {
             onDelete: {
                 NotificationManager.shared.deleteRecord(record, modelContext: modelContext)
             }
-) {
-            HStack(spacing: 8) {
-                if !record.isRead {
+        ) {
+            ThemeSkinSectionCardContainer(cornerRadius: 10, showsDecoration: false) {
+                HStack(alignment: .top, spacing: 10) {
                     Circle()
-                        .fill(palette.cardAccent)
-                        .frame(width: 6, height: 6)
-                } else {
-                    Circle()
-                        .fill(Color.clear)
-                        .frame(width: 6, height: 6)
-                }
+                        .fill(record.isRead ? palette.secondaryText.opacity(0.16) : palette.cardAccent)
+                        .frame(width: 7, height: 7)
+                        .padding(.top, 6)
 
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(formatDate(record.scheduledDate))
-                        .font(.subheadline)
-                        .fontWeight(record.isRead ? .regular : .medium)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(DepositReminderDisplayFormatter.triggeredReminderText(for: record))
+                            .font(.subheadline.weight(record.isRead ? .regular : .semibold))
+                            .foregroundStyle(palette.primaryText)
+                            .lineLimit(2)
 
-                    HStack(spacing: 4) {
-                        if record.source == "apple" {
-                            Image(systemName: "apple.logo")
-                                .font(.system(size: 8))
-                        }
-                        Text(formatActualTime(record.actualDate))
+                        Text(DepositReminderDisplayFormatter.paymentStatusText(clothing: clothing, fallbackDate: record.scheduledDate))
                             .font(.caption)
                             .foregroundStyle(palette.secondaryText)
+                            .lineLimit(2)
+
+                        HStack(spacing: 5) {
+                            if record.source == "apple" {
+                                Image(systemName: "apple.logo")
+                                    .font(.system(size: 8))
+                            }
+
+                            Text(DepositReminderDisplayFormatter.originalPlanText(for: record))
+                                .lineLimit(1)
+                        }
+                        .font(.caption2)
+                        .foregroundStyle(palette.secondaryText.opacity(0.82))
+                    }
+
+                    Spacer(minLength: 8)
+
+                    VStack(alignment: .trailing, spacing: 6) {
+                        Text(DepositReminderDisplayFormatter.dayText(for: record.daysBefore))
+                            .font(.caption2.weight(.semibold))
+                            .padding(.horizontal, 7)
+                            .padding(.vertical, 4)
+                            .background((record.isRead ? palette.secondaryText : palette.accent).opacity(0.12))
+                            .foregroundStyle(record.isRead ? palette.secondaryText : palette.accent)
+                            .clipShape(Capsule())
+
+                        Text(record.isRead ? "已读" : "未读")
+                            .font(.caption2)
+                            .foregroundStyle(record.isRead ? palette.secondaryText : palette.accent)
                     }
                 }
-
-                Spacer()
-
-                Text(dayText(for: record.daysBefore))
-                    .font(.caption)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(record.isRead ? palette.secondaryText.opacity(0.1) : palette.accent.opacity(0.15))
-                    .foregroundStyle(record.isRead ? palette.secondaryText : palette.accent)
-                    .clipShape(Capsule())
+                .padding(10)
             }
-            .padding(8)
-            .background(Color(uiColor: .tertiarySystemGroupedBackground))
-            .cornerRadius(8)
-        }
-    }
-
-    private func formatDate(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "MM/dd HH:mm"
-        return formatter.string(from: date)
-    }
-
-    private func formatActualTime(_ date: Date?) -> String {
-        guard let date = date else { return "未触发" }
-        let formatter = DateFormatter()
-        formatter.dateFormat = "HH:mm 发送"
-        return formatter.string(from: date)
-    }
-
-    private func dayText(for day: Int) -> String {
-        switch day {
-        case 0: return "当天"
-        case 1: return "提前 1 天"
-        case 3: return "3 天"
-        case 7: return "7 天"
-        case 15: return "15 天"
-        case 30: return "30 天"
-        default: return "提前\(day)天"
         }
     }
 }
 
 struct PendingNotificationRecordRow: View {
     let record: DepositNotificationRecord
+    let clothing: Clothing?
     let onOpenDetail: () -> Void
 
     @Environment(ThemeManager.self) private var themeManager
@@ -830,43 +1053,198 @@ struct PendingNotificationRecordRow: View {
 
     var body: some View {
         Button(action: onOpenDetail) {
-            HStack(spacing: 10) {
-                Circle()
-                    .fill(isCapturedOnly ? palette.secondaryText.opacity(0.45) : palette.cardAccent)
-                    .frame(width: 6, height: 6)
+            ThemeSkinSectionCardContainer(cornerRadius: 12, showsDecoration: false) {
+                HStack(alignment: .top, spacing: 10) {
+                    Circle()
+                        .fill(isCapturedOnly ? palette.secondaryText.opacity(0.45) : palette.cardAccent)
+                        .frame(width: 7, height: 7)
+                        .padding(.top, 6)
 
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(record.clothingName)
-                        .font(.subheadline)
-                        .fontWeight(.medium)
-                        .multilineTextAlignment(.leading)
+                    VStack(alignment: .leading, spacing: 5) {
+                        Text(DepositReminderDisplayFormatter.clothingName(for: record, clothing: clothing))
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(palette.primaryText)
+                            .multilineTextAlignment(.leading)
+                            .lineLimit(2)
 
-                    Text(formatDate(record.scheduledDate))
-                        .font(.caption)
-                        .foregroundStyle(palette.secondaryText)
+                        Text(DepositReminderDisplayFormatter.paymentWindowText(clothing: clothing, fallbackDate: record.scheduledDate))
+                            .font(.caption)
+                            .foregroundStyle(palette.secondaryText)
+                            .lineLimit(2)
+
+                        Text(DepositReminderDisplayFormatter.pendingReminderText(for: record))
+                            .font(.caption2)
+                            .foregroundStyle(palette.secondaryText.opacity(0.86))
+                            .lineLimit(1)
+                    }
+
+                    Spacer(minLength: 8)
+
+                    VStack(alignment: .trailing, spacing: 6) {
+                        if let amount = DepositReminderDisplayFormatter.amountText(for: clothing) {
+                            Text(amount)
+                                .font(.caption.weight(.bold))
+                                .foregroundStyle(palette.accent)
+                                .lineLimit(1)
+                        }
+
+                        Text(DepositReminderDisplayFormatter.sourceText(for: record))
+                            .font(.caption2.weight(.semibold))
+                            .padding(.horizontal, 7)
+                            .padding(.vertical, 4)
+                            .background((isCapturedOnly ? palette.secondaryText : palette.accent).opacity(0.14))
+                            .foregroundStyle(isCapturedOnly ? palette.secondaryText : palette.accent)
+                            .clipShape(Capsule())
+
+                        Text(DepositReminderDisplayFormatter.paymentStatusText(clothing: clothing, fallbackDate: record.scheduledDate))
+                            .font(.caption2)
+                            .foregroundStyle(palette.secondaryText)
+                            .multilineTextAlignment(.trailing)
+                    }
                 }
-
-                Spacer()
-
-                Text(isCapturedOnly ? "仅站内" : "系统通知")
-                    .font(.caption)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background((isCapturedOnly ? palette.secondaryText : palette.accent).opacity(0.14))
-                    .foregroundStyle(isCapturedOnly ? palette.secondaryText : palette.accent)
-                    .clipShape(Capsule())
+                .padding(10)
             }
-            .padding(10)
-            .background(Color(uiColor: .secondarySystemGroupedBackground))
-            .cornerRadius(10)
         }
         .buttonStyle(.plain)
     }
+}
 
-    private func formatDate(_ date: Date) -> String {
+private enum DepositReminderDisplayFormatter {
+    static func clothingName(for record: DepositNotificationRecord, clothing: Clothing?) -> String {
+        let name = clothing?.name ?? record.clothingName
+        return name.isEmpty ? "这件心愿尾款" : name
+    }
+
+    static func amountText(for clothing: Clothing?) -> String? {
+        guard let clothing, clothing.totalBalance > 0 else { return nil }
+        return "待付 \(amountText(clothing.totalBalance))"
+    }
+
+    static func amountText(_ amount: Decimal) -> String {
+        "¥\(NSDecimalNumber(decimal: amount).stringValue)"
+    }
+
+    static func paymentWindowText(clothing: Clothing?, fallbackDate: Date?) -> String {
+        guard let start = clothing?.finalPaymentDate else {
+            if let fallbackDate {
+                return "提醒记录：\(dateText(fallbackDate))"
+            }
+            return "尾款时间待确认"
+        }
+
+        let calendar = Calendar.current
+        let startDay = calendar.startOfDay(for: start)
+        let end = clothing?.finalPaymentEndDate ?? start
+        let endDay = calendar.startOfDay(for: end)
+
+        if endDay > startDay {
+            return "支付期 \(dateText(start)) - \(dateText(end))"
+        }
+
+        return "\(dateText(start)) 开始付尾款"
+    }
+
+    static func paymentStatusText(clothing: Clothing?, fallbackDate: Date?) -> String {
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+
+        guard let start = clothing?.finalPaymentDate else {
+            if let fallbackDate {
+                return "按 \(dateText(fallbackDate)) 的提醒记录显示"
+            }
+            return "尾款日待确认"
+        }
+
+        let startDay = calendar.startOfDay(for: start)
+        let end = clothing?.finalPaymentEndDate ?? start
+        let endDay = calendar.startOfDay(for: end)
+
+        if today < startDay {
+            let days = calendar.dateComponents([.day], from: today, to: startDay).day ?? 0
+            return days == 0 ? "今天进入支付期" : "还有 \(days) 天进入支付期"
+        }
+
+        if today <= endDay {
+            return "正在支付期内"
+        }
+
+        return "支付期已过，请确认处理"
+    }
+
+    static func pendingReminderText(for record: DepositNotificationRecord) -> String {
+        "将于 \(dateTimeText(record.scheduledDate)) \(dayText(for: record.daysBefore))"
+    }
+
+    static func triggeredReminderText(for record: DepositNotificationRecord) -> String {
+        guard let actualDate = record.actualDate else {
+            return "已发送提醒"
+        }
+        return "已在 \(dateTimeText(actualDate)) 提醒"
+    }
+
+    static func originalPlanText(for record: DepositNotificationRecord) -> String {
+        "原计划 \(dateTimeText(record.scheduledDate))"
+    }
+
+    static func sourceText(for record: DepositNotificationRecord) -> String {
+        switch record.source {
+        case "apple", "scheduled":
+            return "系统通知"
+        case "captured", "local":
+            return "仅站内"
+        default:
+            return "站内记录"
+        }
+    }
+
+    static func dayText(for day: Int) -> String {
+        switch day {
+        case 0: return "当天提醒"
+        case 1: return "提前 1 天"
+        case 3: return "提前 3 天"
+        case 7: return "提前 7 天"
+        case 15: return "提前 15 天"
+        case 30: return "提前 30 天"
+        default: return "提前 \(day) 天"
+        }
+    }
+
+    private static func dateText(_ date: Date) -> String {
         let formatter = DateFormatter()
-        formatter.dateFormat = "MM/dd HH:mm"
+        formatter.locale = Locale(identifier: "zh_Hans_CN")
+        if Calendar.current.component(.year, from: date) == Calendar.current.component(.year, from: Date()) {
+            formatter.dateFormat = "M月d日"
+        } else {
+            formatter.dateFormat = "yyyy年M月d日"
+        }
         return formatter.string(from: date)
+    }
+
+    private static func dateTimeText(_ date: Date) -> String {
+        let timeFormatter = DateFormatter()
+        timeFormatter.locale = Locale(identifier: "zh_Hans_CN")
+        timeFormatter.dateFormat = "HH:mm"
+        let time = timeFormatter.string(from: date)
+
+        let calendar = Calendar.current
+        if calendar.isDateInToday(date) {
+            return "今天 \(time)"
+        }
+        if calendar.isDateInTomorrow(date) {
+            return "明天 \(time)"
+        }
+        if calendar.isDateInYesterday(date) {
+            return "昨天 \(time)"
+        }
+
+        let dateFormatter = DateFormatter()
+        dateFormatter.locale = Locale(identifier: "zh_Hans_CN")
+        if calendar.component(.year, from: date) == calendar.component(.year, from: Date()) {
+            dateFormatter.dateFormat = "M月d日 HH:mm"
+        } else {
+            dateFormatter.dateFormat = "yyyy年M月d日 HH:mm"
+        }
+        return dateFormatter.string(from: date)
     }
 }
 
