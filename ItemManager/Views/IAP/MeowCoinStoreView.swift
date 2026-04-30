@@ -92,7 +92,7 @@ struct MeowCoinStoreView: View {
                     }
                 }
             } message: {
-                Text("请输入官方 App Store 优惠码。沙盒账号只能测试 Sandbox Codes；App Store Connect 列表里的“代码 10”表示已生成 10 个码，不是兑换码本身，请点“下载”使用 CSV 里的具体字母数字码。当前测试码绑定 60 喵币档，免费兑换不会消耗首充双倍资格。")
+                Text("请输入官方 App Store 优惠码。")
             }
             .alert("App Store 兑换码", isPresented: $showingOfferCodeErrorAlert) {
                 Button("知道了", role: .cancel) { }
@@ -117,9 +117,35 @@ struct MeowCoinStoreView: View {
             }
             .offerCodeRedemption(isPresented: $showingOfferCodeRedemption) { result in
                 if case .failure(let error) = result {
+                    Task {
+                        await IAPDiagnosticStore.shared.record(
+                            category: .flow,
+                            name: "redemption_sheet_callback",
+                            level: .error,
+                            fields: [
+                                "source": "meow_coin_store",
+                                "result": "failure",
+                                "error": error.localizedDescription,
+                                "eligibleProductIDs": IAPOfferCodeRedemption.eligibleProductIDs.joined(separator: ",")
+                            ]
+                        )
+                    }
                     StoreManager.shared.cancelOfferCodeRedemptionSession(reason: "meow_coin_store_redemption_failed: \(error.localizedDescription)")
                     offerCodeErrorMessage = "无法打开 App Store 优惠码兑换界面：\(error.localizedDescription)"
                     showingOfferCodeErrorAlert = true
+                } else {
+                    Task {
+                        await IAPDiagnosticStore.shared.record(
+                            category: .flow,
+                            name: "redemption_sheet_callback",
+                            level: .notice,
+                            fields: [
+                                "source": "meow_coin_store",
+                                "result": "success_or_dismissed",
+                                "eligibleProductIDs": IAPOfferCodeRedemption.eligibleProductIDs.joined(separator: ",")
+                            ]
+                        )
+                    }
                 }
             }
         }
@@ -245,7 +271,7 @@ struct MeowCoinStoreView: View {
                             .font(.headline)
                             .foregroundStyle(.primary)
 
-                        Text("当前绑定：60 喵币档，不影响首充双倍")
+                        Text("支持 6 个喵币档优惠码，不影响首充双倍")
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                     }
@@ -361,9 +387,18 @@ struct MeowCoinStoreView: View {
     private func prepareAndShowOfferCodeRedemption() async {
         let isReady = await StoreManager.shared.prepareOfferCodeRedemptionSession(source: "meow_coin_store")
         if isReady {
+            await IAPDiagnosticStore.shared.record(
+                category: .flow,
+                name: "redemption_sheet_presenting",
+                level: .notice,
+                fields: [
+                    "source": "meow_coin_store",
+                    "eligibleProductIDs": IAPOfferCodeRedemption.eligibleProductIDs.joined(separator: ",")
+                ]
+            )
             showingOfferCodeRedemption = true
         } else {
-            offerCodeErrorMessage = "当前 App Store 环境没有返回 60 喵币商品，优惠码无法兑换。请检查 60 喵币档是否可用、Free Offer 是否绑定该商品；沙盒账号只能测试 Sandbox Codes，不能兑换生产环境 URL / Custom / One-Time Use Codes。"
+            offerCodeErrorMessage = "当前 App Store 环境没有返回任何可兑换的喵币商品，优惠码无法兑换。请检查 6 个喵币档是否可用、每个 Free Offer 是否绑定对应商品；沙盒账号只能测试 Sandbox Codes，不能兑换生产环境 URL / Custom / One-Time Use Codes。"
             showingOfferCodeErrorAlert = true
         }
     }

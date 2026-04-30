@@ -1,5 +1,9 @@
 # 衣橱列表滚动性能 · 执行计划与验收标准
 
+> 关联文档：
+> - 网格视图（grid2/grid3/grid6）专项 → [`docs/WARDROBE_GRID_PERFORMANCE_EXEC_PLAN.md`](./WARDROBE_GRID_PERFORMANCE_EXEC_PLAN.md)
+> - iOS 26 顶栏 / cell 菜单专项 → [`docs/iOS26_WARDROBE_MENU_PERFORMANCE_EXEC_PLAN.md`](./iOS26_WARDROBE_MENU_PERFORMANCE_EXEC_PLAN.md)
+>
 > 状态：**2026-04-29 已执行 P0 + P0.5 首轮落地**。后续每一阶段（P0/P1/P2）仍需对照本文档的"硬约束"和"验收门槛"逐条勾选。
 > 已落地点：DEBUG 压测入口、cell 热路径清理、过滤/统计缓存、轻量 `WardrobeCellSnapshot`、list 模式 `ScrollView + LazyVStack`、衣橱主题 cell 滚动优化容器。
 > 2026-04-29 追加：300 条真实数据仍卡时，继续移除滚动 cell 内 `ClothingDetailView` 导航图、常态 grid drop/preference 监听、非自定义排序选择态 drag/drop，并降低 cell 阴影/主题标题/主题角标成本；缩略图 NSCache aggressive 档上调。

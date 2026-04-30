@@ -10,6 +10,7 @@ struct PetOverlayView: View {
     
     var action: () -> Void
     var petName: String = "小伙伴"
+    var bottomAvoidanceLift: CGFloat = 0
     
     // MARK: - 依赖管理器
     
@@ -325,7 +326,10 @@ struct PetOverlayView: View {
     
     private func getIdlePosition(geometry: GeometryProxy) -> CGPoint {
         let x = idleX ?? (geometry.size.width / 2)
-        let y = geometry.size.height - geometry.safeAreaInsets.bottom - (catWidth / 2)
+        let y = geometry.size.height
+            - geometry.safeAreaInsets.bottom
+            - (catWidth / 2)
+            - max(0, bottomAvoidanceLift)
         return CGPoint(x: x, y: y)
     }
     

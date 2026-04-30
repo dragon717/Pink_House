@@ -13,10 +13,23 @@ private struct IsSimulationActiveKey: EnvironmentKey {
     static let defaultValue: Bool = true
 }
 
+enum LegacyCustomTabBarLayout {
+    static let floatingElementLift: CGFloat = 20
+}
+
+private struct CustomBottomFloatingLiftKey: EnvironmentKey {
+    static let defaultValue: CGFloat = 0
+}
+
 extension EnvironmentValues {
     var isSimulationActive: Bool {
         get { self[IsSimulationActiveKey.self] }
         set { self[IsSimulationActiveKey.self] = newValue }
+    }
+
+    var customBottomFloatingLift: CGFloat {
+        get { self[CustomBottomFloatingLiftKey.self] }
+        set { self[CustomBottomFloatingLiftKey.self] = newValue }
     }
 }
 
@@ -266,7 +279,9 @@ struct LegacyTabView: View {
                     withAnimation {
                         selectedTab = 3
                     }
-                }, petName: petDataManager.status.displayName)
+                },
+                petName: petDataManager.status.displayName,
+                bottomAvoidanceLift: LegacyCustomTabBarLayout.floatingElementLift)
             }
             SmallWorldMenuOverlay(
                 selectedTab: $selectedTab,
@@ -942,6 +957,7 @@ struct MainTabView: View {
             smallWorldDestination: $smallWorldDestination,
             isPlayingOpeningAnimation: $isPlayingOpeningAnimation
         )
+        .environment(\.customBottomFloatingLift, LegacyCustomTabBarLayout.floatingElementLift)
         .overlay {
             if isPlayingOpeningAnimation {
                 OpeningVideoOverlay(

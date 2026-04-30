@@ -350,12 +350,17 @@ struct WardrobeView: View {
     @Binding var isSelectionMode: Bool
     @Binding var isEditing: Bool
     @Environment(\.modelContext) private var modelContext
+    @Environment(ThemeManager.self) private var themeManager
+    @Environment(\.colorScheme) private var colorScheme
     @Query private var clothings: [Clothing]
     @State private var showStats = true
     @State private var filteredClothings: [Clothing] = []
     @State private var cellSnapshotCache: [UUID: WardrobeCellSnapshot] = [:]
     @State private var filteredStatsSummary: WardrobeStatsSummary = .empty
     @State private var conditionBatchOptionsCache: [String] = ["全新"]
+    @State private var cachedGridColumns: [GridItem]
+    @State private var cachedWardrobeThemeDescriptor: ThemeSkinDescriptor?
+    @State private var wardrobeCellThemeInputs: WardrobeCellThemeInputs
     @ObservedObject private var themeSkinManager = ThemeSkinManager.shared
     @AppStorage("privacyShowPrice") private var showPrice = true
     @AppStorage("privacyShowOriginalPrice") private var showOriginalPrice = true
@@ -400,6 +405,7 @@ struct WardrobeView: View {
     @State private var visibleItemIDs: Set<UUID> = []
     @State private var autoScrollTask: Task<Void, Never>?
     @State private var visibleItemFrameUpdateTask: Task<Void, Never>?
+    @State private var layoutPrefetchTask: Task<Void, Never>?
     
     // Layout
     let viewLayout: HomeView.ViewLayout
@@ -442,6 +448,9 @@ struct WardrobeView: View {
         self.sortOption = sortOption
         _clothings = Query(filter: #Predicate<Clothing> { $0.deletedAt == nil }, sort: sortOption.sortDescriptors)
         self.viewLayout = viewLayout
+        _cachedGridColumns = State(initialValue: Self.makeGridColumns(for: viewLayout))
+        _cachedWardrobeThemeDescriptor = State(initialValue: ThemeSkinManager.shared.descriptor(for: .wardrobeItemCard))
+        _wardrobeCellThemeInputs = State(initialValue: .fallback)
 
         self.selectedTagIDs = selectedTagIDs
         self.selectedBrandIDs = selectedBrandIDs
@@ -459,9 +468,13 @@ struct WardrobeView: View {
     
     // Grid layout
     private var gridColumns: [GridItem] {
+        cachedGridColumns
+    }
+
+    private static func makeGridColumns(for layout: HomeView.ViewLayout) -> [GridItem] {
         let count: Int
         let spacing: CGFloat
-        switch viewLayout {
+        switch layout {
         case .grid2: 
             count = 2
             spacing = 16
@@ -475,43 +488,59 @@ struct WardrobeView: View {
             count = 1
             spacing = 16
         }
-        return Array(repeating: GridItem(.flexible(), spacing: spacing, alignment: .top), count: count)
+        return (0..<count).map { _ in
+            GridItem(.flexible(), spacing: spacing, alignment: .top)
+        }
     }
     
     @ViewBuilder
     private func clothingItemView(clothing: Clothing, firstFilteredID: UUID?) -> some View {
         let snapshot = cellSnapshot(for: clothing)
         if viewLayout == .grid6 {
-            guideSelectionAnchor(for: clothing, firstFilteredID: firstFilteredID) {
-                ClothingThumbnail(
-                    snapshot: snapshot,
-                    imageTargetSize: wardrobeCellImageTargetSize
-                )
+            attachVisibleItemFrameReporter(for: clothing) {
+                guideSelectionAnchor(for: clothing, firstFilteredID: firstFilteredID) {
+                    ClothingThumbnail(
+                        snapshot: snapshot,
+                        imageTargetSize: wardrobeCellImageTargetSize,
+                        themeInputs: wardrobeCellThemeInputs
+                    )
+                }
             }
-            .background(visibleItemFrameReporter(for: clothing))
         } else {
-            guideSelectionAnchor(for: clothing, firstFilteredID: firstFilteredID) {
-                ClothingCard(
-                    snapshot: snapshot,
-                    showPrice: showPrice,
-                    showOriginalPrice: showOriginalPrice,
-                    wardrobeThemeDescriptor: wardrobeThemeDescriptor,
-                    imageTargetSize: wardrobeCellImageTargetSize
-                )
+            attachVisibleItemFrameReporter(for: clothing) {
+                guideSelectionAnchor(for: clothing, firstFilteredID: firstFilteredID) {
+                    ClothingCard(
+                        snapshot: snapshot,
+                        showPrice: showPrice,
+                        showOriginalPrice: showOriginalPrice,
+                        wardrobeThemeDescriptor: wardrobeThemeDescriptor,
+                        imageTargetSize: wardrobeCellImageTargetSize,
+                        themeInputs: wardrobeCellThemeInputs
+                    )
+                }
             }
-            .background(visibleItemFrameReporter(for: clothing))
         }
     }
 
     @ViewBuilder
-    private func visibleItemFrameReporter(for clothing: Clothing) -> some View {
+    private func attachVisibleItemFrameReporter<Content: View>(
+        for clothing: Clothing,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
         if isReorderTrackingEnabled {
-            GeometryReader { proxy in
-                Color.clear.preference(
-                    key: WardrobeVisibleItemFramePreferenceKey.self,
-                    value: [clothing.id: proxy.frame(in: .global)]
-                )
-            }
+            content()
+                .background(visibleItemFrameReporter(for: clothing))
+        } else {
+            content()
+        }
+    }
+
+    private func visibleItemFrameReporter(for clothing: Clothing) -> some View {
+        GeometryReader { proxy in
+            Color.clear.preference(
+                key: WardrobeVisibleItemFramePreferenceKey.self,
+                value: [clothing.id: proxy.frame(in: .global)]
+            )
         }
     }
 
@@ -533,14 +562,16 @@ struct WardrobeView: View {
                 snapshot: snapshot,
                 showPrice: showPrice,
                 showOriginalPrice: showOriginalPrice,
-                wardrobeThemeDescriptor: wardrobeThemeDescriptor
+                wardrobeThemeDescriptor: wardrobeThemeDescriptor,
+                themeInputs: wardrobeCellThemeInputs
             )
         } else {
             ClothingRow(
                 snapshot: snapshot,
                 showPrice: showPrice,
                 showOriginalPrice: showOriginalPrice,
-                wardrobeThemeDescriptor: wardrobeThemeDescriptor
+                wardrobeThemeDescriptor: wardrobeThemeDescriptor,
+                themeInputs: wardrobeCellThemeInputs
             )
         }
     }
@@ -551,7 +582,16 @@ struct WardrobeView: View {
     }
     
     private var wardrobeThemeDescriptor: ThemeSkinDescriptor? {
-        themeSkinManager.descriptor(for: .wardrobeItemCard)
+        cachedWardrobeThemeDescriptor
+    }
+
+    private var currentWardrobeCellThemeInputs: WardrobeCellThemeInputs {
+        WardrobeCellThemeInputs.current(themeManager: themeManager, colorScheme: colorScheme)
+    }
+
+    private func refreshWardrobeThemeCaches() {
+        cachedWardrobeThemeDescriptor = themeSkinManager.descriptor(for: .wardrobeItemCard)
+        wardrobeCellThemeInputs = currentWardrobeCellThemeInputs
     }
 
     private var filterSignature: WardrobeFilterSignature {
@@ -652,16 +692,29 @@ struct WardrobeView: View {
                     userInfo: ["selectedCount": newValue.count]
                 )
             }
+            .onAppear {
+                cachedGridColumns = Self.makeGridColumns(for: viewLayout)
+                refreshWardrobeThemeCaches()
+            }
             .task(id: filterSignature) {
                 await rebuildFilteredClothings()
             }
+            .onChange(of: currentWardrobeCellThemeInputs) { _, newValue in
+                wardrobeCellThemeInputs = newValue
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .themeSkinDidChange)) { _ in
+                refreshWardrobeThemeCaches()
+            }
             .onChange(of: viewLayout) { oldLayout, _ in
+                cachedGridColumns = Self.makeGridColumns(for: viewLayout)
                 ImageManager.shared.evictCachedImages(targetSize: wardrobeCellImageTargetSize(for: oldLayout))
-                prefetchInitialWardrobeImages(filteredClothings)
+                scheduleLayoutPrefetch()
             }
             .onDisappear {
                 visibleItemFrameUpdateTask?.cancel()
                 visibleItemFrameUpdateTask = nil
+                layoutPrefetchTask?.cancel()
+                layoutPrefetchTask = nil
             }
     }
 
@@ -1045,80 +1098,78 @@ struct WardrobeView: View {
     }
 
     private func gridScrollBody(displayed: [Clothing], firstFilteredID: UUID?) -> some View {
-        ScrollView {
-            VStack(spacing: 8) {
-                statsSection
-                    .padding(.horizontal, viewLayout == .grid6 ? 2 : 16)
-
+        ZStack(alignment: .top) {
+            ScrollView {
                 LazyVGrid(columns: gridColumns, spacing: viewLayout == .grid6 ? 2 : 16) {
                     ForEach(displayed) { clothing in
                         wardrobeGridCell(for: clothing, firstFilteredID: firstFilteredID)
                     }
                 }
                 .animation(isEditing ? .default : nil, value: editableClothings)
-                .padding(.horizontal, viewLayout == .grid6 ? 2 : 16)
+                .padding(.horizontal, gridHorizontalPadding)
+                .padding(.top, gridStatsReservedHeight + 8)
                 .padding(.bottom, 100)
             }
+
+            statsSection
+                .frame(height: gridStatsReservedHeight, alignment: .top)
+                .padding(.horizontal, gridHorizontalPadding)
+                .zIndex(1)
         }
+    }
+
+    private var gridHorizontalPadding: CGFloat {
+        viewLayout == .grid6 ? 2 : 16
+    }
+
+    private var gridStatsReservedHeight: CGFloat {
+        showStats ? 172 : 28
     }
 
     @ViewBuilder
     private func wardrobeGridCell(for clothing: Clothing, firstFilteredID: UUID?) -> some View {
-        if isSelectionMode {
-            selectionGridCell(for: clothing, firstFilteredID: firstFilteredID)
-        } else if isEditing {
-            ZStack(alignment: .topTrailing) {
-                clothingItemView(clothing: clothing, firstFilteredID: firstFilteredID)
-            }
-            .contentShape(Rectangle())
-            .onDrag {
-                self.draggingItem = clothing
-                return NSItemProvider(object: clothing.id.uuidString as NSString)
-            }
-            .onDrop(of: [UTType.text], delegate: DropViewDelegate(item: clothing, items: $editableClothings, draggingItem: $draggingItem, isEditing: true, selectedItemIDs: selectedItemIDs))
-        } else {
-            Button {
-                openDetail(clothing)
-            } label: {
-                ZStack(alignment: .topTrailing) {
-                    clothingItemView(clothing: clothing, firstFilteredID: firstFilteredID)
-                }
-            }
-            .buttonStyle(.plain)
-            // menu-perf: wardrobe grid cell context menu
-            .contextMenu {
-                let _ = MenuPerfSignpost.contextMenuOpen("wardrobe.grid_cell")
-                contextMenuItems(for: clothing)
-            }
-        }
-    }
-
-    @ViewBuilder
-    private func selectionGridCell(for clothing: Clothing, firstFilteredID: UUID?) -> some View {
+        let snapshot = cellSnapshot(for: clothing)
         let cell = ZStack(alignment: .topTrailing) {
             clothingItemView(clothing: clothing, firstFilteredID: firstFilteredID)
 
-            Image(systemName: selectedItemIDs.contains(clothing.id) ? "checkmark.circle.fill" : "circle")
-                .font(.title3)
-                .foregroundStyle(selectedItemIDs.contains(clothing.id) ? .pink : .secondary)
-                .background(Circle().fill(.white).padding(2))
-                .shadow(radius: 1)
-                .padding(8)
-        }
-        .contentShape(Rectangle())
-        .onTapGesture {
-            toggleSelection(clothing.id)
+            if isSelectionMode {
+                Image(systemName: selectedItemIDs.contains(clothing.id) ? "checkmark.circle.fill" : "circle")
+                    .font(.title3)
+                    .foregroundStyle(selectedItemIDs.contains(clothing.id) ? .pink : .secondary)
+                    .background(Circle().fill(.white).padding(2))
+                    .shadow(radius: 1)
+                    .padding(8)
+            }
         }
 
-        if isReorderTrackingEnabled {
+        let button = Button {
+            if isSelectionMode {
+                toggleSelection(clothing.id)
+            } else if !isEditing {
+                openDetail(clothing)
+            }
+        } label: {
             cell
+        }
+        .buttonStyle(.plain)
+        .contentShape(Rectangle())
+
+        if isReorderTrackingEnabled {
+            button
                 .onDrag {
                     self.draggingItem = clothing
                     return NSItemProvider(object: clothing.id.uuidString as NSString)
                 }
                 .onDrop(of: [UTType.text], delegate: DropViewDelegate(item: clothing, items: $editableClothings, draggingItem: $draggingItem, isEditing: true, selectedItemIDs: selectedItemIDs))
+        } else if isSelectionMode {
+            button
         } else {
-            cell
+            button
+                // menu-perf: wardrobe grid cell context menu
+                .contextMenu {
+                    let _ = MenuPerfSignpost.contextMenuOpen("wardrobe.grid_cell")
+                    contextMenuItems(for: snapshot)
+                }
         }
     }
     
@@ -1150,6 +1201,16 @@ struct WardrobeView: View {
     private func openDetail(_ clothing: Clothing) {
         detailNavigationTarget = clothing
         isShowingDetailNavigation = true
+    }
+
+    private func clothing(with id: UUID) -> Clothing? {
+        clothings.first { $0.id == id }
+    }
+
+    private func openDetailIfPresent(_ id: UUID) {
+        if let clothing = clothing(with: id) {
+            openDetail(clothing)
+        }
     }
     
     private func deleteSelectedItems() {
@@ -1566,9 +1627,7 @@ struct WardrobeView: View {
             HStack {
                 Spacer()
                 Button {
-                    withAnimation {
-                        showStats.toggle()
-                    }
+                    showStats.toggle()
                 } label: {
                     HStack(spacing: 4) {
                         Text(showStats ? "隐藏" : "显示")
@@ -1584,9 +1643,11 @@ struct WardrobeView: View {
                                   statsSummary: filteredStatsSummary,
                                   filterDescription: filterDescription,
                                   onClearFilter: onClearFilter)
-                    .transition(.move(edge: .top).combined(with: .opacity))
+                    .fixedSize(horizontal: false, vertical: true)
+                    .transition(.opacity)
             }
         }
+        .fixedSize(horizontal: false, vertical: true)
     }
 
     private var listView: some View {
@@ -1698,22 +1759,24 @@ struct WardrobeView: View {
         // menu-perf: wardrobe list cell context menu
         .contextMenu {
             let _ = MenuPerfSignpost.contextMenuOpen("wardrobe.list_cell")
-            contextMenuItems(for: clothing)
+            contextMenuItems(for: cellSnapshot(for: clothing))
         }
     }
 
     // MARK: keep this closure dependency-free for menu-perf
-    private func contextMenuItems(for clothing: Clothing) -> some View {
+    @ViewBuilder
+    private func contextMenuItems(for snapshot: WardrobeCellSnapshot) -> some View {
+        let clothingID = snapshot.id
         Group {
             Button {
                 isSelectionMode = true
-                selectedItemIDs.insert(clothing.id)
+                selectedItemIDs.insert(clothingID)
             } label: {
                 Label("选择", systemImage: "checkmark.circle")
             }
 
             Button {
-                openDetail(clothing)
+                openDetailIfPresent(clothingID)
             } label: {
                 Label("查看详情", systemImage: "info.circle")
             }
@@ -1721,14 +1784,14 @@ struct WardrobeView: View {
             Divider()
 
             Button {
-                itemToCopy = clothing
+                itemToCopy = clothing(with: clothingID)
                 showingCopyAlert = true
             } label: {
                 Label("复制", systemImage: "doc.on.doc")
             }
 
             Button(role: .destructive) {
-                itemToDelete = clothing
+                itemToDelete = clothing(with: clothingID)
                 showingDeleteSingleAlert = true
             } label: {
                 Label("删除", systemImage: "trash")
@@ -1816,15 +1879,29 @@ struct WardrobeView: View {
     }
 
     private var initialImagePrefetchLimit: Int {
+        let isLowMemoryDevice = ProcessInfo.processInfo.physicalMemory <= 2 * 1024 * 1024 * 1024
         switch viewLayout {
         case .grid2:
-            return 8
+            return isLowMemoryDevice ? 6 : 8
         case .grid3:
-            return 12
+            return isLowMemoryDevice ? 8 : 12
         case .grid6:
-            return 30
+            return isLowMemoryDevice ? 18 : 30
         case .listBrief, .listDetailed:
             return 18
+        }
+    }
+
+    private func scheduleLayoutPrefetch() {
+        layoutPrefetchTask?.cancel()
+        let targetLayout = viewLayout
+        let targetClothings = filteredClothings
+        let targetSnapshots = cellSnapshotCache
+
+        layoutPrefetchTask = Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 200_000_000)
+            guard !Task.isCancelled, viewLayout == targetLayout else { return }
+            prefetchInitialWardrobeImages(targetClothings, snapshots: targetSnapshots)
         }
     }
 
@@ -1950,6 +2027,7 @@ struct WardrobeStatsView: View {
 
                     statItem(title: "总价值", value: "¥\(formatValue(totalValue))", isVisible: $showTotalValue)
                 }
+                .frame(height: 52)
 
                 // Bottom Actions - 三个功能入口
                 HStack(spacing: 8) {
@@ -2010,8 +2088,10 @@ struct WardrobeStatsView: View {
                     }
                     .buttonStyle(.plain)
                 }
+                .frame(height: 54)
             }
         }
+        .fixedSize(horizontal: false, vertical: true)
         .sheet(isPresented: $showDailyCheckIn) {
             DailyCheckInView()
         }

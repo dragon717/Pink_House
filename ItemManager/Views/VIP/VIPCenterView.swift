@@ -7,6 +7,7 @@ struct VIPCenterView: View {
     @ObservedObject private var themeSkinManager = ThemeSkinManager.shared
     @Environment(\.dismiss) private var dismiss
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(\.customBottomFloatingLift) private var customBottomFloatingLift
 
     @State private var showingPurchaseAlert = false
     @State private var alertMessage = ""
@@ -28,6 +29,12 @@ struct VIPCenterView: View {
 
     private var visualTheme: VIPVisualTheme {
         vipManager.preferredVisualTheme
+    }
+
+    private var floatingPurchaseBarBottomLift: CGFloat {
+        let sharedLift = max(0, customBottomFloatingLift)
+        let vipExtraLift: CGFloat = sharedLift > 0 ? 12 : 0
+        return sharedLift + vipExtraLift
     }
 
     private var themeSkinDescriptor: ThemeSkinDescriptor? {
@@ -230,7 +237,7 @@ struct VIPCenterView: View {
                 }
             }
         } message: {
-            Text("优惠码仅适用于本 App 在 App Store 中提供的内购项目。沙盒账号只能测试 Sandbox Codes；App Store Connect 列表里的“代码 10”表示已生成 10 个码，不是兑换码本身，请点“下载”使用 CSV 里的具体字母数字码。当前测试码绑定 60 喵币档。")
+            Text("优惠码仅适用于本 App 在 App Store 中提供的内购项目。")
         }
         .overlay {
             if showTrialPopup {
@@ -273,11 +280,37 @@ struct VIPCenterView: View {
         }
         .offerCodeRedemption(isPresented: $showingOfferCodeRedemption) { result in
             if case .failure(let error) = result {
+                Task {
+                    await IAPDiagnosticStore.shared.record(
+                        category: .flow,
+                        name: "redemption_sheet_callback",
+                        level: .error,
+                        fields: [
+                            "source": "vip_center",
+                            "result": "failure",
+                            "error": error.localizedDescription,
+                            "eligibleProductIDs": IAPOfferCodeRedemption.eligibleProductIDs.joined(separator: ",")
+                        ]
+                    )
+                }
                 StoreManager.shared.cancelOfferCodeRedemptionSession(reason: "vip_center_redemption_failed: \(error.localizedDescription)")
                 presentInfoAlert(
                     title: "暂时无法打开",
                     message: "无法打开 App Store 优惠码兑换界面：\(error.localizedDescription)"
                 )
+            } else {
+                Task {
+                    await IAPDiagnosticStore.shared.record(
+                        category: .flow,
+                        name: "redemption_sheet_callback",
+                        level: .notice,
+                        fields: [
+                            "source": "vip_center",
+                            "result": "success_or_dismissed",
+                            "eligibleProductIDs": IAPOfferCodeRedemption.eligibleProductIDs.joined(separator: ",")
+                        ]
+                    )
+                }
             }
         }
     }
@@ -285,11 +318,20 @@ struct VIPCenterView: View {
     private func prepareAndShowOfferCodeRedemption() async {
         let isReady = await StoreManager.shared.prepareOfferCodeRedemptionSession(source: "vip_center")
         if isReady {
+            await IAPDiagnosticStore.shared.record(
+                category: .flow,
+                name: "redemption_sheet_presenting",
+                level: .notice,
+                fields: [
+                    "source": "vip_center",
+                    "eligibleProductIDs": IAPOfferCodeRedemption.eligibleProductIDs.joined(separator: ",")
+                ]
+            )
             showingOfferCodeRedemption = true
         } else {
             presentInfoAlert(
                 title: "暂时无法兑换",
-                message: "当前 App Store 环境没有返回 60 喵币商品，优惠码无法兑换。请检查 60 喵币档是否可用、Free Offer 是否绑定该商品；沙盒账号只能测试 Sandbox Codes，不能兑换生产环境 URL / Custom / One-Time Use Codes。"
+                message: "当前 App Store 环境没有返回任何可兑换的喵币商品，优惠码无法兑换。请检查 6 个喵币档是否可用、每个 Free Offer 是否绑定对应商品；沙盒账号只能测试 Sandbox Codes，不能兑换生产环境 URL / Custom / One-Time Use Codes。"
             )
         }
     }
@@ -316,7 +358,7 @@ struct VIPCenterView: View {
             .background(purchasePanelBackground)
             .padding(.horizontal, 18)
             .padding(.top, 4)
-            .padding(.bottom, 8)
+            .padding(.bottom, 8 + floatingPurchaseBarBottomLift)
         }
         .frame(maxWidth: 560)
         .frame(maxWidth: .infinity)

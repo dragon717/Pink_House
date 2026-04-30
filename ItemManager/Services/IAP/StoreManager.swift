@@ -487,12 +487,12 @@ class StoreManager: ObservableObject {
             attemptID: attemptID,
             productID: transaction.productID,
             transactionID: String(transaction.id),
-            fields: [
+            fields: transactionDiagnosticFields(for: transaction, source: source).merging([
                 "source": source,
                 "purchaseDate": transaction.purchaseDate.ISO8601Format(),
                 "offerType": transaction.offerType.map { String(describing: $0) } ?? "nil",
                 "offerID": transaction.offerID ?? "nil"
-            ]
+            ]) { _, new in new }
         )
 
         // 标记为已处理
@@ -508,6 +508,15 @@ class StoreManager: ObservableObject {
             }
 
             if shouldHandleAsOfferCodeRedemption {
+                await IAPDiagnosticStore.shared.record(
+                    category: .flow,
+                    name: "offer_code_transaction_detected",
+                    level: .notice,
+                    attemptID: attemptID,
+                    productID: transaction.productID,
+                    transactionID: String(transaction.id),
+                    fields: transactionDiagnosticFields(for: transaction, source: source)
+                )
                 await deliverOfferCodeMeowCoins(for: transaction, attemptID: attemptID, source: IAPOfferCodeRedemption.source)
             } else {
                 await deliverMeowCoins(for: transaction, productType: productType, attemptID: attemptID, source: source)
@@ -539,11 +548,11 @@ class StoreManager: ObservableObject {
                         level: .notice,
                         productID: transaction.productID,
                         transactionID: String(transaction.id),
-                        fields: [
+                        fields: transactionDiagnosticFields(for: transaction, source: "unfinished_transactions").merging([
                             "purchaseDate": transaction.purchaseDate.ISO8601Format(),
                             "offerType": transaction.offerType.map { String(describing: $0) } ?? "nil",
                             "offerID": transaction.offerID ?? "nil"
-                        ]
+                        ]) { _, new in new }
                     )
 
                     if await self.isTransactionProcessed(transaction.id) {
@@ -575,15 +584,16 @@ class StoreManager: ObservableObject {
 
     func prepareOfferCodeRedemptionSession(source: String) async -> Bool {
         let canMakePurchases = canMakePurchases()
+        let eligibleProductIDs = IAPOfferCodeRedemption.eligibleProductIDs
         await IAPDiagnosticStore.shared.record(
             category: .flow,
             name: "offer_code_redemption_prepare_started",
             level: .notice,
-            productID: IAPOfferCodeRedemption.productID,
             fields: [
                 "source": source,
-                "canMakePurchases": String(canMakePurchases)
-            ]
+                "canMakePurchases": String(canMakePurchases),
+                "eligibleProductIDs": eligibleProductIDs.joined(separator: ",")
+            ].merging(await currentStorefrontFields()) { _, new in new }
         )
 
         guard canMakePurchases else {
@@ -591,27 +601,33 @@ class StoreManager: ObservableObject {
                 category: .flow,
                 name: "offer_code_redemption_prepare_blocked_cannot_make_payments",
                 level: .notice,
-                productID: IAPOfferCodeRedemption.productID,
-                fields: ["source": source]
+                fields: [
+                    "source": source,
+                    "eligibleProductIDs": eligibleProductIDs.joined(separator: ",")
+                ]
             )
             return false
         }
 
         await fetchProducts()
 
-        let productIsAvailable = coinProducts.contains { $0.id == IAPOfferCodeRedemption.productID }
+        let availableProductIDs = coinProducts.map(\.id)
+        let availableProductIDSet = Set(availableProductIDs)
+        let missingProductIDs = eligibleProductIDs.filter { !availableProductIDSet.contains($0) }
+        let hasAnyEligibleProductAvailable = eligibleProductIDs.contains { availableProductIDSet.contains($0) }
         await IAPDiagnosticStore.shared.record(
             category: .flow,
-            name: productIsAvailable ? "offer_code_redemption_prepare_product_available" : "offer_code_redemption_prepare_product_missing",
-            level: productIsAvailable ? .notice : .error,
-            productID: IAPOfferCodeRedemption.productID,
+            name: hasAnyEligibleProductAvailable ? "offer_code_redemption_prepare_products_available" : "offer_code_redemption_prepare_products_missing",
+            level: hasAnyEligibleProductAvailable ? .notice : .error,
             fields: [
                 "source": source,
-                "availableProductIDs": coinProducts.map(\.id).joined(separator: ",")
-            ]
+                "eligibleProductIDs": eligibleProductIDs.joined(separator: ","),
+                "availableProductIDs": availableProductIDs.joined(separator: ","),
+                "missingProductIDs": missingProductIDs.isEmpty ? "none" : missingProductIDs.joined(separator: ",")
+            ].merging(await currentStorefrontFields()) { _, new in new }
         )
 
-        guard productIsAvailable else {
+        guard hasAnyEligibleProductAvailable else {
             clearOfferCodeRedemptionSession()
             return false
         }
@@ -622,20 +638,25 @@ class StoreManager: ObservableObject {
 
     func beginOfferCodeRedemptionSession(source: String) {
         let defaults = UserDefaults.standard
-        defaults.set(IAPOfferCodeRedemption.productID, forKey: IAPOfferCodeRedemption.pendingProductIDKey)
-        defaults.set(Date().timeIntervalSince1970, forKey: IAPOfferCodeRedemption.pendingStartedAtKey)
+        let startedAt = Date().timeIntervalSince1970
+        defaults.set(startedAt, forKey: IAPOfferCodeRedemption.pendingStartedAtKey)
 
         Task {
             await IAPDiagnosticStore.shared.record(
                 category: .flow,
                 name: "offer_code_redemption_session_started",
                 level: .notice,
-                productID: IAPOfferCodeRedemption.productID,
                 fields: [
                     "source": source,
-                    "ttlSeconds": String(Int(IAPOfferCodeRedemption.pendingSessionTTL))
-                ]
+                    "ttlSeconds": String(Int(IAPOfferCodeRedemption.pendingSessionTTL)),
+                    "eligibleProductIDs": IAPOfferCodeRedemption.eligibleProductIDs.joined(separator: ",")
+                ].merging(await currentStorefrontFields()) { _, new in new }
             )
+        }
+
+        Task { [weak self] in
+            try? await Task.sleep(nanoseconds: UInt64(IAPOfferCodeRedemption.pendingSessionTTL * 1_000_000_000))
+            await self?.recordOfferCodeRedemptionSessionTimeoutIfNeeded(startedAt: startedAt, source: source)
         }
     }
 
@@ -647,8 +668,10 @@ class StoreManager: ObservableObject {
                 category: .flow,
                 name: "offer_code_redemption_session_cancelled",
                 level: .notice,
-                productID: IAPOfferCodeRedemption.productID,
-                fields: ["reason": reason]
+                fields: [
+                    "reason": reason,
+                    "eligibleProductIDs": IAPOfferCodeRedemption.eligibleProductIDs.joined(separator: ",")
+                ]
             )
         }
     }
@@ -659,16 +682,12 @@ class StoreManager: ObservableObject {
         attemptID: String?
     ) async -> Bool {
         guard attemptID == nil,
-              source == "transaction_updates",
-              transaction.productID == IAPOfferCodeRedemption.productID else {
+              ["transaction_updates", "unfinished_transactions"].contains(source),
+              IAPOfferCodeRedemption.baseCoinAmount(for: transaction.productID) != nil else {
             return false
         }
 
         let defaults = UserDefaults.standard
-        guard defaults.string(forKey: IAPOfferCodeRedemption.pendingProductIDKey) == transaction.productID else {
-            return false
-        }
-
         let startedAt = defaults.double(forKey: IAPOfferCodeRedemption.pendingStartedAtKey)
         guard startedAt > 0 else {
             clearOfferCodeRedemptionSession()
@@ -684,7 +703,9 @@ class StoreManager: ObservableObject {
                 level: .notice,
                 productID: transaction.productID,
                 transactionID: String(transaction.id),
-                fields: ["elapsedSeconds": String(Int(elapsed))]
+                fields: transactionDiagnosticFields(for: transaction, source: source).merging([
+                    "elapsedSeconds": String(Int(elapsed))
+                ]) { _, new in new }
             )
             return false
         }
@@ -697,10 +718,10 @@ class StoreManager: ObservableObject {
                 level: .notice,
                 productID: transaction.productID,
                 transactionID: String(transaction.id),
-                fields: [
+                fields: transactionDiagnosticFields(for: transaction, source: source).merging([
                     "sessionStartedAt": String(Int(startedAt)),
                     "transactionPurchaseDate": String(Int(transactionTime))
-                ]
+                ]) { _, new in new }
             )
             return false
         }
@@ -712,22 +733,38 @@ class StoreManager: ObservableObject {
             level: .notice,
             productID: transaction.productID,
             transactionID: String(transaction.id),
-            fields: [
+            fields: transactionDiagnosticFields(for: transaction, source: source).merging([
                 "source": source,
                 "elapsedSeconds": String(Int(elapsed))
-            ]
+            ]) { _, new in new }
         )
         return true
     }
 
     private func isOfferCodeRedemptionTransaction(_ transaction: Transaction) -> Bool {
-        transaction.productID == IAPOfferCodeRedemption.productID && transaction.offerType == .code
+        transaction.offerType == .code && IAPOfferCodeRedemption.baseCoinAmount(for: transaction.productID) != nil
     }
 
     private func clearOfferCodeRedemptionSession() {
         let defaults = UserDefaults.standard
-        defaults.removeObject(forKey: IAPOfferCodeRedemption.pendingProductIDKey)
         defaults.removeObject(forKey: IAPOfferCodeRedemption.pendingStartedAtKey)
+    }
+
+    private func recordOfferCodeRedemptionSessionTimeoutIfNeeded(startedAt: TimeInterval, source: String) async {
+        let currentStartedAt = UserDefaults.standard.double(forKey: IAPOfferCodeRedemption.pendingStartedAtKey)
+        guard currentStartedAt == startedAt else { return }
+
+        clearOfferCodeRedemptionSession()
+        await IAPDiagnosticStore.shared.record(
+            category: .flow,
+            name: "redemption_session_timed_out_no_transaction",
+            level: .notice,
+            fields: [
+                "source": source,
+                "ttlSeconds": String(Int(IAPOfferCodeRedemption.pendingSessionTTL)),
+                "eligibleProductIDs": IAPOfferCodeRedemption.eligibleProductIDs.joined(separator: ",")
+            ].merging(await currentStorefrontFields()) { _, new in new }
+        )
     }
 
     // MARK: - 发放喵币
@@ -842,9 +879,20 @@ class StoreManager: ObservableObject {
     }
 
     // MARK: - 发放 App Store 优惠码喵币
-    // 优惠码绑定现有 60 喵币档位；免费兑换只发基础 60 喵币，不消耗首充双倍资格。
+    // 优惠码绑定现有喵币档位；免费兑换只发对应档位基础喵币，不消耗首充双倍资格。
     private func deliverOfferCodeMeowCoins(for transaction: Transaction, attemptID: String?, source: String) async {
-        let meowCoinAmount = IAPOfferCodeRedemption.meowCoinAmount
+        guard let meowCoinAmount = IAPOfferCodeRedemption.baseCoinAmount(for: transaction.productID) else {
+            await IAPDiagnosticStore.shared.record(
+                category: .flow,
+                name: "offer_code_delivery_failed_unknown_product",
+                level: .error,
+                attemptID: attemptID,
+                productID: transaction.productID,
+                transactionID: String(transaction.id),
+                fields: transactionDiagnosticFields(for: transaction, source: source)
+            )
+            return
+        }
 
         await MainActor.run {
             let previousAccountBalance = Self.loadMeowCoinAccount().balance
@@ -862,11 +910,11 @@ class StoreManager: ObservableObject {
             Task {
                 await IAPDiagnosticStore.shared.record(
                     category: .balance,
-                    name: "offer_code_redemption_delivery_pre_save",
+                    name: "offer_code_delivery_pre_save",
                     attemptID: attemptID,
                     productID: transaction.productID,
                     transactionID: String(transaction.id),
-                    fields: [
+                    fields: transactionDiagnosticFields(for: transaction, source: source).merging([
                         "source": source,
                         "previousAccountBalance": String(previousAccountBalance),
                         "previousStatusMeowCoin": String(previousStatusMeowCoin),
@@ -874,7 +922,7 @@ class StoreManager: ObservableObject {
                         "newStatusMeowCoin": String(status.meowCoin),
                         "deliveredMeowCoin": String(meowCoinAmount),
                         "firstDoubleConsumed": "false"
-                    ]
+                    ]) { _, new in new }
                 )
             }
 
@@ -884,21 +932,21 @@ class StoreManager: ObservableObject {
             Task {
                 await IAPDiagnosticStore.shared.record(
                     category: .balance,
-                    name: "offer_code_redemption_delivery_post_save",
+                    name: "offer_code_delivery_post_save",
                     attemptID: attemptID,
                     productID: transaction.productID,
                     transactionID: String(transaction.id),
-                    fields: [
+                    fields: transactionDiagnosticFields(for: transaction, source: source).merging([
                         "source": source,
                         "storedAccountBalance": String(Self.loadMeowCoinAccount().balance),
                         "storedStatusMeowCoin": String(PetDataManager.shared.status.meowCoin)
-                    ]
+                    ]) { _, new in new }
                 )
             }
         }
 
         await publishPurchaseSuccess(
-            IAPOfferCodeRedemption.successMessage,
+            IAPOfferCodeRedemption.successMessage(for: meowCoinAmount),
             attemptID: attemptID,
             source: source
         )
@@ -917,15 +965,15 @@ class StoreManager: ObservableObject {
         print("[StoreManager] 发放 App Store 优惠码喵币: \(meowCoinAmount) 喵币")
         await IAPDiagnosticStore.shared.record(
             category: .flow,
-            name: "offer_code_redemption_delivery_completed",
+            name: "offer_code_delivery_completed",
             attemptID: attemptID,
             productID: transaction.productID,
             transactionID: String(transaction.id),
-            fields: [
+            fields: transactionDiagnosticFields(for: transaction, source: source).merging([
                 "source": source,
                 "meowCoinAmount": String(meowCoinAmount),
                 "firstDoubleConsumed": "false"
-            ]
+            ]) { _, new in new }
         )
     }
 
@@ -1139,6 +1187,19 @@ class StoreManager: ObservableObject {
     private func currentStorefrontFields() async -> [String: String] {
         let storefront = await Storefront.current
         return storefrontFields(from: storefront)
+    }
+
+    private func transactionDiagnosticFields(for transaction: Transaction, source: String) -> [String: String] {
+        [
+            "source": source,
+            "transactionEnvironment": String(describing: transaction.environment),
+            "transactionStorefrontCountryCode": transaction.storefront.countryCode,
+            "transactionStorefrontCurrency": transaction.storefront.currency?.identifier ?? "nil",
+            "transactionStorefrontID": transaction.storefront.id,
+            "purchaseDate": transaction.purchaseDate.ISO8601Format(),
+            "offerType": transaction.offerType.map { String(describing: $0) } ?? "nil",
+            "offerID": transaction.offerID ?? "nil"
+        ]
     }
 
     private func storefrontFields(from storefront: Storefront?) -> [String: String] {

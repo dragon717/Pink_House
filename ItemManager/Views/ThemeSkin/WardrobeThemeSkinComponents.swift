@@ -121,16 +121,19 @@ struct WardrobeThemeClothingCardContainer<Content: View>: View {
     private let cornerRadius: CGFloat
     private let descriptor: ThemeSkinDescriptor?
     private let scrollOptimized: Bool
+    private let themeInputs: WardrobeCellThemeInputs
 
     init(
         cornerRadius: CGFloat = 16,
         descriptor: ThemeSkinDescriptor? = ThemeSkinManager.shared.descriptor(for: .wardrobeItemCard),
         scrollOptimized: Bool = false,
+        themeInputs: WardrobeCellThemeInputs = .fallback,
         @ViewBuilder content: () -> Content
     ) {
         self.cornerRadius = cornerRadius
         self.descriptor = descriptor
         self.scrollOptimized = scrollOptimized
+        self.themeInputs = themeInputs
         self.content = content()
     }
 
@@ -202,13 +205,13 @@ struct WardrobeThemeClothingCardContainer<Content: View>: View {
                         }
                         .shadow(color: SkyConcertThemeSkin.shadowColor(for: descriptor).opacity(0.65), radius: 10, x: 0, y: 5)
                 }
-            } else {
-                content
-                    .background {
-                        WardrobeListCellBackground(cornerRadius: cornerRadius)
-                    }
-                    .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
-            }
+                } else {
+                    content
+                        .background {
+                            WardrobeListCellBackground(cornerRadius: cornerRadius, themeInputs: themeInputs)
+                        }
+                        .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
+                }
         }
     }
 }

@@ -1,6 +1,7 @@
 import SwiftUI
 import UIKit
 import Combine
+import AVFoundation
 
 struct GuideCatVideoPlayer: View {
     let videoName: String
@@ -9,24 +10,289 @@ struct GuideCatVideoPlayer: View {
     let isFlipped: Bool
     let onFinished: (() -> Void)?
 
+    @State private var shouldShowMissingResourceFallback = false
+
     var body: some View {
         Group {
-            if TransparentVideoSupport.shouldSuppress(videoName: videoName) {
-                Image("naicha_right_back")
-                    .resizable()
-                    .scaledToFit()
+            if shouldUseStaticFallback {
+                fallbackImage
             } else {
-                PetVideoPlayer(
+                FirstLaunchTransparentVideoPlayer(
                     videoName: videoName,
                     isLooping: isLooping,
+                    isMirrored: isFlipped,
                     playbackRate: playbackRate,
-                    isMuted: true,
-                    onFinished: onFinished
+                    onFinished: onFinished,
+                    onMissingResource: {
+                        #if DEBUG
+                        print("FirstLaunchGuide: Missing \(videoName), falling back to static image")
+                        #endif
+                        DispatchQueue.main.async {
+                            shouldShowMissingResourceFallback = true
+                        }
+                    }
                 )
             }
         }
         .frame(width: 100, height: 100)
-        .scaleEffect(x: isFlipped ? -1 : 1, y: 1)
+        .onChange(of: videoName) { _, _ in
+            shouldShowMissingResourceFallback = false
+        }
+    }
+
+    private var shouldUseStaticFallback: Bool {
+        shouldShowMissingResourceFallback || TransparentVideoSupport.shouldSuppress(videoName: videoName)
+    }
+
+    private var fallbackImage: some View {
+        Image("naicha_right_back")
+            .resizable()
+            .scaledToFit()
+            .frame(width: 72, height: 72)
+            .scaleEffect(x: isFlipped ? -1 : 1, y: 1)
+    }
+}
+
+private struct FirstLaunchTransparentVideoPlayer: UIViewRepresentable {
+    let videoName: String
+    let isLooping: Bool
+    let isMirrored: Bool
+    let playbackRate: Float
+    let onFinished: (() -> Void)?
+    let onMissingResource: (() -> Void)?
+
+    func makeUIView(context: Context) -> FirstLaunchTransparentVideoPlayerView {
+        let view = FirstLaunchTransparentVideoPlayerView()
+        view.isUserInteractionEnabled = false
+        return view
+    }
+
+    func updateUIView(_ uiView: FirstLaunchTransparentVideoPlayerView, context: Context) {
+        uiView.update(
+            videoName: videoName,
+            isLooping: isLooping,
+            isMirrored: isMirrored,
+            playbackRate: playbackRate,
+            onFinished: onFinished,
+            onMissingResource: onMissingResource
+        )
+    }
+
+    static func dismantleUIView(_ uiView: FirstLaunchTransparentVideoPlayerView, coordinator: ()) {
+        uiView.cleanup()
+    }
+}
+
+private final class FirstLaunchTransparentVideoPlayerView: UIView {
+    private let playerLayer = AVPlayerLayer()
+    private var player: AVQueuePlayer?
+    private var currentVideoName: String?
+    private var currentURL: URL?
+    private var isLooping: Bool = false
+    private var playbackRate: Float = 1
+    private var onFinished: (() -> Void)?
+    private var onMissingResource: (() -> Void)?
+    private var finishObserver: Any?
+    private var statusObserver: NSKeyValueObservation?
+    private var didFinishCurrentItem = false
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        setupLayer()
+    }
+
+    required init?(coder: NSCoder) {
+        super.init(coder: coder)
+        setupLayer()
+    }
+
+    private func setupLayer() {
+        isOpaque = false
+        backgroundColor = .clear
+        layer.isOpaque = false
+        layer.backgroundColor = UIColor.clear.cgColor
+
+        playerLayer.videoGravity = .resizeAspectFill
+        playerLayer.backgroundColor = UIColor.clear.cgColor
+        playerLayer.isOpaque = false
+        playerLayer.frame = bounds
+        layer.addSublayer(playerLayer)
+    }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        playerLayer.frame = bounds
+        CATransaction.commit()
+    }
+
+    func update(
+        videoName: String,
+        isLooping: Bool,
+        isMirrored: Bool,
+        playbackRate: Float,
+        onFinished: (() -> Void)?,
+        onMissingResource: (() -> Void)?
+    ) {
+        self.isLooping = isLooping
+        self.playbackRate = max(0.1, playbackRate)
+        self.onFinished = onFinished
+        self.onMissingResource = onMissingResource
+        applyMirror(isMirrored)
+
+        if currentVideoName == videoName {
+            resumeIfNeeded()
+            return
+        }
+
+        guard let url = findFirstLaunchVideoURL(name: videoName) else {
+            #if DEBUG
+            print("FirstLaunchGuide: Missing transparent guide video \(videoName)")
+            #endif
+            fallbackForMissingResource()
+            return
+        }
+
+        load(videoName: videoName, url: url)
+    }
+
+    private func findFirstLaunchVideoURL(name videoName: String) -> URL? {
+        // 首启引导视频位于 asserts 根目录。DEBUG 下 VideoResourceManager 会优先返回
+        // iCloud 源码目录的绝对路径，AVPlayer 在 App/模拟器沙盒内可能因权限 257 打不开。
+        // 这里优先使用 App Bundle 里的资源，保证 iOS 18+ 透明 MOV 走可访问路径。
+        if let url = Bundle.main.url(forResource: videoName, withExtension: "mov", subdirectory: "asserts") {
+            return url
+        }
+        if let url = Bundle.main.url(forResource: videoName, withExtension: "mp4", subdirectory: "asserts") {
+            return url
+        }
+        return VideoResourceManager.shared.findVideoURL(name: videoName)
+    }
+
+    private func load(videoName: String, url: URL) {
+        cleanupCurrentItem()
+        didFinishCurrentItem = false
+        currentVideoName = videoName
+        currentURL = url
+
+        let item = AVPlayerItem(url: url)
+        let queuePlayer = AVQueuePlayer()
+        queuePlayer.isMuted = true
+        queuePlayer.volume = 0
+        queuePlayer.actionAtItemEnd = .pause
+        queuePlayer.replaceCurrentItem(with: item)
+        player = queuePlayer
+        playerLayer.player = queuePlayer
+
+        statusObserver = item.observe(\.status, options: [.new, .initial]) { [weak self] item, _ in
+            DispatchQueue.main.async {
+                guard let self = self else { return }
+                guard self.currentVideoName == videoName else { return }
+                switch item.status {
+                case .readyToPlay:
+                    self.play()
+                case .failed:
+                    #if DEBUG
+                    print("FirstLaunchGuide: Failed to load transparent guide video \(videoName): \(String(describing: item.error))")
+                    #endif
+                default:
+                    break
+                }
+            }
+        }
+
+        finishObserver = NotificationCenter.default.addObserver(
+            forName: .AVPlayerItemDidPlayToEndTime,
+            object: item,
+            queue: .main
+        ) { [weak self] _ in
+            self?.handlePlaybackFinished(item: item)
+        }
+
+        play()
+    }
+
+    private func handlePlaybackFinished(item: AVPlayerItem) {
+        guard !didFinishCurrentItem else { return }
+
+        if isLooping {
+            player?.seek(to: .zero, toleranceBefore: .zero, toleranceAfter: .zero) { [weak self] _ in
+                self?.play()
+            }
+            return
+        }
+
+        didFinishCurrentItem = true
+        player?.pause()
+        seekToLastFrameIfPossible(item: item)
+        onFinished?()
+    }
+
+    private func seekToLastFrameIfPossible(item: AVPlayerItem) {
+        let duration = item.duration
+        guard duration.isValid, duration.isNumeric, duration.seconds.isFinite, duration.seconds > 0 else {
+            return
+        }
+        player?.seek(to: duration, toleranceBefore: .zero, toleranceAfter: .zero)
+    }
+
+    private func resumeIfNeeded() {
+        guard player?.currentItem != nil else {
+            if let name = currentVideoName, let url = currentURL {
+                load(videoName: name, url: url)
+            }
+            return
+        }
+
+        if player?.timeControlStatus != .playing, !didFinishCurrentItem {
+            play()
+        }
+    }
+
+    private func play() {
+        guard let player = player, !didFinishCurrentItem else { return }
+        if abs(playbackRate - 1) < 0.01 {
+            player.play()
+        } else {
+            player.playImmediately(atRate: playbackRate)
+        }
+    }
+
+    private func applyMirror(_ isMirrored: Bool) {
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        playerLayer.transform = CATransform3DMakeScale(isMirrored ? -1 : 1, 1, 1)
+        CATransaction.commit()
+    }
+
+    private func fallbackForMissingResource() {
+        cleanup()
+        onMissingResource?()
+    }
+
+    private func cleanupCurrentItem() {
+        statusObserver?.invalidate()
+        statusObserver = nil
+        if let finishObserver {
+            NotificationCenter.default.removeObserver(finishObserver)
+            self.finishObserver = nil
+        }
+        player?.pause()
+        player?.replaceCurrentItem(with: nil)
+    }
+
+    func cleanup() {
+        cleanupCurrentItem()
+        playerLayer.player = nil
+        player = nil
+        currentVideoName = nil
+        currentURL = nil
+        didFinishCurrentItem = false
+    }
+
+    deinit {
+        cleanup()
     }
 }
 

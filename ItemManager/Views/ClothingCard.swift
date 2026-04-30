@@ -57,20 +57,117 @@ struct WardrobeCellSnapshot: Identifiable, Equatable, Sendable {
     }
 }
 
+struct WardrobeCellThemeInputs: Hashable, Sendable {
+    let cardStyleRawValue: String
+    let skirtFillModeRawValue: String
+    let isDarkMode: Bool
+    let cardBackgroundHex: String
+    let cardTintHex: String
+    let transparentOpacity: Double
+    let tintOpacity: Double
+
+    nonisolated static let fallback = WardrobeCellThemeInputs(
+        cardStyleRawValue: "solid",
+        skirtFillModeRawValue: "transparent",
+        isDarkMode: false,
+        cardBackgroundHex: "#FFFFFF",
+        cardTintHex: "#FFB6C1",
+        transparentOpacity: 1.0,
+        tintOpacity: 0.2
+    )
+
+    @MainActor
+    static func current(themeManager: ThemeManager, colorScheme: ColorScheme) -> WardrobeCellThemeInputs {
+        WardrobeCellThemeInputs(
+            cardStyleRawValue: themeManager.cardStyle.rawValue,
+            skirtFillModeRawValue: themeManager.skirtFillMode.rawValue,
+            isDarkMode: colorScheme == .dark,
+            cardBackgroundHex: themeManager.cardBackgroundColor.toHex(),
+            cardTintHex: themeManager.cardTintColor.toHex(),
+            transparentOpacity: themeManager.transparentOpacity,
+            tintOpacity: themeManager.tintOpacity
+        )
+    }
+
+    private var cardStyle: CardStyle {
+        CardStyle(rawValue: cardStyleRawValue) ?? .solid
+    }
+
+    private var skirtFillMode: SkirtFillMode {
+        SkirtFillMode(rawValue: skirtFillModeRawValue) ?? .transparent
+    }
+
+    private var cardBackgroundColor: Color {
+        Color(hex: cardBackgroundHex)
+    }
+
+    private var cardTintColor: Color {
+        Color(hex: cardTintHex)
+    }
+
+    var listCardFillColor: Color {
+        switch cardStyle {
+        case .fullyTransparent:
+            return Color.clear
+        case .transparent:
+            return cardBackgroundColor.opacity(max(transparentOpacity, 0.18))
+        case .tinted:
+            return cardBackgroundColor.opacity(max(tintOpacity, 0.18))
+        case .solid:
+            return cardBackgroundColor
+        }
+    }
+
+    var listCardStrokeColor: Color {
+        cardTintColor.opacity(listCardStrokeOpacity)
+    }
+
+    private var listCardStrokeOpacity: Double {
+        switch cardStyle {
+        case .fullyTransparent:
+            return 0.18
+        case .transparent, .tinted:
+            return 0.24
+        case .solid:
+            return 0.12
+        }
+    }
+
+    var imageBackgroundColor: Color {
+        switch skirtFillMode {
+        case .transparent:
+            return isDarkMode ? Color.black.opacity(0.2) : Color.white.opacity(0.4)
+        case .fullyTransparent:
+            return Color.clear
+        case .tinted:
+            return cardTintColor.opacity(isDarkMode ? 0.15 : 0.3)
+        case .solid:
+            return isDarkMode ? Color.black.opacity(0.6) : Color.white.opacity(0.8)
+        }
+    }
+}
+
 private struct WardrobeListCellContainer<Content: View>: View {
     let cornerRadius: CGFloat
     let padding: CGFloat
+    let themeInputs: WardrobeCellThemeInputs
     let content: Content
 
-    init(cornerRadius: CGFloat, padding: CGFloat, @ViewBuilder content: () -> Content) {
+    init(
+        cornerRadius: CGFloat,
+        padding: CGFloat,
+        themeInputs: WardrobeCellThemeInputs = .fallback,
+        @ViewBuilder content: () -> Content
+    ) {
         self.cornerRadius = cornerRadius
         self.padding = padding
+        self.themeInputs = themeInputs
         self.content = content()
     }
 
     var body: some View {
         ZStack {
-            WardrobeListCellBackground(cornerRadius: cornerRadius)
+            WardrobeListCellBackground(cornerRadius: cornerRadius, themeInputs: themeInputs)
 
             content
                 .padding(padding)
@@ -81,41 +178,21 @@ private struct WardrobeListCellContainer<Content: View>: View {
 }
 
 struct WardrobeListCellBackground: View {
-    @Environment(ThemeManager.self) private var themeManager
-
     let cornerRadius: CGFloat
+    let themeInputs: WardrobeCellThemeInputs
+
+    init(cornerRadius: CGFloat, themeInputs: WardrobeCellThemeInputs = .fallback) {
+        self.cornerRadius = cornerRadius
+        self.themeInputs = themeInputs
+    }
 
     var body: some View {
         RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-            .fill(fillColor)
+            .fill(themeInputs.listCardFillColor)
             .overlay(
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .strokeBorder(themeManager.cardTintColor.opacity(strokeOpacity), lineWidth: 1)
+                    .strokeBorder(themeInputs.listCardStrokeColor, lineWidth: 1)
             )
-    }
-
-    private var fillColor: Color {
-        switch themeManager.cardStyle {
-        case .fullyTransparent:
-            return Color.clear
-        case .transparent:
-            return themeManager.cardBackgroundColor.opacity(max(themeManager.transparentOpacity, 0.18))
-        case .tinted:
-            return themeManager.cardBackgroundColor.opacity(max(themeManager.tintOpacity, 0.18))
-        case .solid:
-            return themeManager.cardBackgroundColor
-        }
-    }
-
-    private var strokeOpacity: Double {
-        switch themeManager.cardStyle {
-        case .fullyTransparent:
-            return 0.18
-        case .transparent, .tinted:
-            return 0.24
-        case .solid:
-            return 0.12
-        }
     }
 }
 
@@ -134,7 +211,8 @@ struct ClothingCard: View, Equatable {
         lhs.showPrice == rhs.showPrice &&
         lhs.showOriginalPrice == rhs.showOriginalPrice &&
         lhs.wardrobeThemeDescriptor == rhs.wardrobeThemeDescriptor &&
-        lhs.imageTargetSize == rhs.imageTargetSize
+        lhs.imageTargetSize == rhs.imageTargetSize &&
+        lhs.themeInputs == rhs.themeInputs
     }
     
     let snapshot: WardrobeCellSnapshot
@@ -142,9 +220,8 @@ struct ClothingCard: View, Equatable {
     let showOriginalPrice: Bool
     let wardrobeThemeDescriptor: ThemeSkinDescriptor?
     let imageTargetSize: CGSize
+    let themeInputs: WardrobeCellThemeInputs
     
-    @Environment(ThemeManager.self) private var themeManager
-    @Environment(\.colorScheme) private var colorScheme
     @Environment(\.containerPalette) private var palette
     @State private var image: UIImage?
 
@@ -153,14 +230,16 @@ struct ClothingCard: View, Equatable {
         snapshot: WardrobeCellSnapshot,
         showPrice: Bool = UserDefaults.standard.object(forKey: "privacyShowPrice") as? Bool ?? true,
         showOriginalPrice: Bool = UserDefaults.standard.object(forKey: "privacyShowOriginalPrice") as? Bool ?? true,
-        imageTargetSize: CGSize = CGSize(width: 160, height: 160)
+        imageTargetSize: CGSize = CGSize(width: 160, height: 160),
+        themeInputs: WardrobeCellThemeInputs = .fallback
     ) {
         self.init(
             snapshot: snapshot,
             showPrice: showPrice,
             showOriginalPrice: showOriginalPrice,
             wardrobeThemeDescriptor: ThemeSkinManager.shared.descriptor(for: .wardrobeItemCard),
-            imageTargetSize: imageTargetSize
+            imageTargetSize: imageTargetSize,
+            themeInputs: themeInputs
         )
     }
 
@@ -170,13 +249,15 @@ struct ClothingCard: View, Equatable {
         showPrice: Bool,
         showOriginalPrice: Bool,
         wardrobeThemeDescriptor: ThemeSkinDescriptor?,
-        imageTargetSize: CGSize = CGSize(width: 160, height: 160)
+        imageTargetSize: CGSize = CGSize(width: 160, height: 160),
+        themeInputs: WardrobeCellThemeInputs = .fallback
     ) {
         self.snapshot = snapshot
         self.showPrice = showPrice
         self.showOriginalPrice = showOriginalPrice
         self.wardrobeThemeDescriptor = wardrobeThemeDescriptor
         self.imageTargetSize = imageTargetSize
+        self.themeInputs = themeInputs
     }
 
     @MainActor
@@ -184,13 +265,15 @@ struct ClothingCard: View, Equatable {
         clothing: Clothing,
         showPrice: Bool = UserDefaults.standard.object(forKey: "privacyShowPrice") as? Bool ?? true,
         showOriginalPrice: Bool = UserDefaults.standard.object(forKey: "privacyShowOriginalPrice") as? Bool ?? true,
-        imageTargetSize: CGSize = CGSize(width: 160, height: 160)
+        imageTargetSize: CGSize = CGSize(width: 160, height: 160),
+        themeInputs: WardrobeCellThemeInputs = .fallback
     ) {
         self.init(
             snapshot: WardrobeCellSnapshot(clothing: clothing),
             showPrice: showPrice,
             showOriginalPrice: showOriginalPrice,
-            imageTargetSize: imageTargetSize
+            imageTargetSize: imageTargetSize,
+            themeInputs: themeInputs
         )
     }
 
@@ -200,14 +283,16 @@ struct ClothingCard: View, Equatable {
         showPrice: Bool,
         showOriginalPrice: Bool,
         wardrobeThemeDescriptor: ThemeSkinDescriptor?,
-        imageTargetSize: CGSize = CGSize(width: 160, height: 160)
+        imageTargetSize: CGSize = CGSize(width: 160, height: 160),
+        themeInputs: WardrobeCellThemeInputs = .fallback
     ) {
         self.init(
             snapshot: WardrobeCellSnapshot(clothing: clothing),
             showPrice: showPrice,
             showOriginalPrice: showOriginalPrice,
             wardrobeThemeDescriptor: wardrobeThemeDescriptor,
-            imageTargetSize: imageTargetSize
+            imageTargetSize: imageTargetSize,
+            themeInputs: themeInputs
         )
     }
 
@@ -250,35 +335,16 @@ struct ClothingCard: View, Equatable {
     }
     
     var body: some View {
-        WardrobeThemeClothingCardContainer(descriptor: wardrobeThemeDescriptor, scrollOptimized: true) {
+        WardrobeThemeClothingCardContainer(
+            descriptor: wardrobeThemeDescriptor,
+            scrollOptimized: true,
+            themeInputs: themeInputs
+        ) {
             VStack(alignment: .leading, spacing: 0) {
                 // Image Area
                 ZStack(alignment: .topTrailing) {
                     // Background Fill
-                    Group {
-                        switch themeManager.skirtFillMode {
-                        case .transparent:
-                            if colorScheme == .dark {
-                                Color.black.opacity(0.2)
-                            } else {
-                                Color.white.opacity(0.4)
-                            }
-                        case .fullyTransparent:
-                            Color.clear
-                        case .tinted:
-                            if colorScheme == .dark {
-                                themeManager.cardTintColor.opacity(0.15)
-                            } else {
-                                themeManager.cardTintColor.opacity(0.3)
-                            }
-                        case .solid:
-                            if colorScheme == .dark {
-                                Color.black.opacity(0.6)
-                            } else {
-                                Color.white.opacity(0.8)
-                            }
-                        }
-                    }
+                    themeInputs.imageBackgroundColor
                     
                     if let uiImage = image {
                         Color.clear
@@ -292,7 +358,7 @@ struct ClothingCard: View, Equatable {
                             .clipped()
                     } else {
                         // 使用支持主题配色的占位图
-                        ThemedPlaceholderView()
+                        ThemedPlaceholderView(themeInputs: themeInputs)
                             .aspectRatio(1, contentMode: .fit)
                     }
                     
@@ -406,21 +472,36 @@ struct ClothingCard: View, Equatable {
 struct ClothingThumbnail: View, Equatable {
     static func == (lhs: ClothingThumbnail, rhs: ClothingThumbnail) -> Bool {
         lhs.snapshot == rhs.snapshot &&
-        lhs.imageTargetSize == rhs.imageTargetSize
+        lhs.imageTargetSize == rhs.imageTargetSize &&
+        lhs.themeInputs == rhs.themeInputs
     }
     
     let snapshot: WardrobeCellSnapshot
     let imageTargetSize: CGSize
+    let themeInputs: WardrobeCellThemeInputs
     @State private var image: UIImage?
 
-    init(snapshot: WardrobeCellSnapshot, imageTargetSize: CGSize = CGSize(width: 64, height: 64)) {
+    init(
+        snapshot: WardrobeCellSnapshot,
+        imageTargetSize: CGSize = CGSize(width: 64, height: 64),
+        themeInputs: WardrobeCellThemeInputs = .fallback
+    ) {
         self.snapshot = snapshot
         self.imageTargetSize = imageTargetSize
+        self.themeInputs = themeInputs
     }
 
     @MainActor
-    init(clothing: Clothing, imageTargetSize: CGSize = CGSize(width: 64, height: 64)) {
-        self.init(snapshot: WardrobeCellSnapshot(clothing: clothing), imageTargetSize: imageTargetSize)
+    init(
+        clothing: Clothing,
+        imageTargetSize: CGSize = CGSize(width: 64, height: 64),
+        themeInputs: WardrobeCellThemeInputs = .fallback
+    ) {
+        self.init(
+            snapshot: WardrobeCellSnapshot(clothing: clothing),
+            imageTargetSize: imageTargetSize,
+            themeInputs: themeInputs
+        )
     }
 
     private var imageTaskKey: String {
@@ -441,7 +522,7 @@ struct ClothingThumbnail: View, Equatable {
                     .clipShape(RoundedRectangle(cornerRadius: 4))
             } else {
                 // 使用主题色的占位图，保持配色统一
-                ThemedPlaceholderView(iconSize: 14)
+                ThemedPlaceholderView(iconSize: 14, themeInputs: themeInputs)
                     .aspectRatio(1, contentMode: .fit)
                     .clipShape(RoundedRectangle(cornerRadius: 4))
             }
@@ -468,38 +549,19 @@ struct ClothingThumbnail: View, Equatable {
 /// 支持主题配色的占位图视图
 struct ThemedPlaceholderView: View {
     var iconSize: CGFloat = 30
+    let themeInputs: WardrobeCellThemeInputs
     
-    @Environment(ThemeManager.self) private var themeManager
     @Environment(\.containerPalette) private var palette
-    @Environment(\.colorScheme) private var colorScheme
+
+    init(iconSize: CGFloat = 30, themeInputs: WardrobeCellThemeInputs = .fallback) {
+        self.iconSize = iconSize
+        self.themeInputs = themeInputs
+    }
     
     var body: some View {
         ZStack {
             // 背景根据当前配色模式调整
-            Group {
-                switch themeManager.skirtFillMode {
-                case .transparent:
-                    if colorScheme == .dark {
-                        Color.black.opacity(0.2)
-                    } else {
-                        Color.white.opacity(0.4)
-                    }
-                case .fullyTransparent:
-                    Color.clear
-                case .tinted:
-                    if colorScheme == .dark {
-                        themeManager.cardTintColor.opacity(0.15)
-                    } else {
-                        themeManager.cardTintColor.opacity(0.3)
-                    }
-                case .solid:
-                    if colorScheme == .dark {
-                        Color.black.opacity(0.6)
-                    } else {
-                        Color.white.opacity(0.8)
-                    }
-                }
-            }
+            themeInputs.imageBackgroundColor
             
             // 使用主题强调色的渐变
             LinearGradient(
@@ -548,13 +610,15 @@ struct ClothingRow: View, Equatable {
         lhs.snapshot == rhs.snapshot &&
         lhs.showPrice == rhs.showPrice &&
         lhs.showOriginalPrice == rhs.showOriginalPrice &&
-        lhs.wardrobeThemeDescriptor == rhs.wardrobeThemeDescriptor
+        lhs.wardrobeThemeDescriptor == rhs.wardrobeThemeDescriptor &&
+        lhs.themeInputs == rhs.themeInputs
     }
 
     let snapshot: WardrobeCellSnapshot
     let showPrice: Bool
     let showOriginalPrice: Bool
     let wardrobeThemeDescriptor: ThemeSkinDescriptor?
+    let themeInputs: WardrobeCellThemeInputs
 
     @Environment(\.containerPalette) private var palette
     @State private var image: UIImage?
@@ -563,13 +627,15 @@ struct ClothingRow: View, Equatable {
     init(
         snapshot: WardrobeCellSnapshot,
         showPrice: Bool = UserDefaults.standard.object(forKey: "privacyShowPrice") as? Bool ?? true,
-        showOriginalPrice: Bool = UserDefaults.standard.object(forKey: "privacyShowOriginalPrice") as? Bool ?? true
+        showOriginalPrice: Bool = UserDefaults.standard.object(forKey: "privacyShowOriginalPrice") as? Bool ?? true,
+        themeInputs: WardrobeCellThemeInputs = .fallback
     ) {
         self.init(
             snapshot: snapshot,
             showPrice: showPrice,
             showOriginalPrice: showOriginalPrice,
-            wardrobeThemeDescriptor: ThemeSkinManager.shared.descriptor(for: .wardrobeItemCard)
+            wardrobeThemeDescriptor: ThemeSkinManager.shared.descriptor(for: .wardrobeItemCard),
+            themeInputs: themeInputs
         )
     }
 
@@ -577,24 +643,28 @@ struct ClothingRow: View, Equatable {
         snapshot: WardrobeCellSnapshot,
         showPrice: Bool,
         showOriginalPrice: Bool,
-        wardrobeThemeDescriptor: ThemeSkinDescriptor?
+        wardrobeThemeDescriptor: ThemeSkinDescriptor?,
+        themeInputs: WardrobeCellThemeInputs = .fallback
     ) {
         self.snapshot = snapshot
         self.showPrice = showPrice
         self.showOriginalPrice = showOriginalPrice
         self.wardrobeThemeDescriptor = wardrobeThemeDescriptor
+        self.themeInputs = themeInputs
     }
 
     @MainActor
     init(
         clothing: Clothing,
         showPrice: Bool = UserDefaults.standard.object(forKey: "privacyShowPrice") as? Bool ?? true,
-        showOriginalPrice: Bool = UserDefaults.standard.object(forKey: "privacyShowOriginalPrice") as? Bool ?? true
+        showOriginalPrice: Bool = UserDefaults.standard.object(forKey: "privacyShowOriginalPrice") as? Bool ?? true,
+        themeInputs: WardrobeCellThemeInputs = .fallback
     ) {
         self.init(
             snapshot: WardrobeCellSnapshot(clothing: clothing),
             showPrice: showPrice,
-            showOriginalPrice: showOriginalPrice
+            showOriginalPrice: showOriginalPrice,
+            themeInputs: themeInputs
         )
     }
 
@@ -603,13 +673,15 @@ struct ClothingRow: View, Equatable {
         clothing: Clothing,
         showPrice: Bool,
         showOriginalPrice: Bool,
-        wardrobeThemeDescriptor: ThemeSkinDescriptor?
+        wardrobeThemeDescriptor: ThemeSkinDescriptor?,
+        themeInputs: WardrobeCellThemeInputs = .fallback
     ) {
         self.init(
             snapshot: WardrobeCellSnapshot(clothing: clothing),
             showPrice: showPrice,
             showOriginalPrice: showOriginalPrice,
-            wardrobeThemeDescriptor: wardrobeThemeDescriptor
+            wardrobeThemeDescriptor: wardrobeThemeDescriptor,
+            themeInputs: themeInputs
         )
     }
 
@@ -633,7 +705,8 @@ struct ClothingRow: View, Equatable {
         WardrobeThemeClothingCardContainer(
             cornerRadius: 24,
             descriptor: wardrobeThemeDescriptor,
-            scrollOptimized: true
+            scrollOptimized: true,
+            themeInputs: themeInputs
         ) {
             HStack(spacing: 16) {
                 // Thumbnail
@@ -647,7 +720,7 @@ struct ClothingRow: View, Equatable {
                             .clipShape(RoundedRectangle(cornerRadius: 12))
                     } else {
                         // 使用支持主题配色的占位图
-                        ThemedPlaceholderView(iconSize: 24)
+                        ThemedPlaceholderView(iconSize: 24, themeInputs: themeInputs)
                             .frame(width: 60, height: 60)
                             .clipShape(RoundedRectangle(cornerRadius: 12))
                     }
@@ -767,13 +840,15 @@ struct ClothingRowBrief: View, Equatable {
         lhs.snapshot == rhs.snapshot &&
         lhs.showPrice == rhs.showPrice &&
         lhs.showOriginalPrice == rhs.showOriginalPrice &&
-        lhs.wardrobeThemeDescriptor == rhs.wardrobeThemeDescriptor
+        lhs.wardrobeThemeDescriptor == rhs.wardrobeThemeDescriptor &&
+        lhs.themeInputs == rhs.themeInputs
     }
 
     let snapshot: WardrobeCellSnapshot
     let showPrice: Bool
     let showOriginalPrice: Bool
     let wardrobeThemeDescriptor: ThemeSkinDescriptor?
+    let themeInputs: WardrobeCellThemeInputs
 
     @Environment(\.containerPalette) private var palette
     @State private var image: UIImage?
@@ -782,13 +857,15 @@ struct ClothingRowBrief: View, Equatable {
     init(
         snapshot: WardrobeCellSnapshot,
         showPrice: Bool = UserDefaults.standard.object(forKey: "privacyShowPrice") as? Bool ?? true,
-        showOriginalPrice: Bool = UserDefaults.standard.object(forKey: "privacyShowOriginalPrice") as? Bool ?? true
+        showOriginalPrice: Bool = UserDefaults.standard.object(forKey: "privacyShowOriginalPrice") as? Bool ?? true,
+        themeInputs: WardrobeCellThemeInputs = .fallback
     ) {
         self.init(
             snapshot: snapshot,
             showPrice: showPrice,
             showOriginalPrice: showOriginalPrice,
-            wardrobeThemeDescriptor: ThemeSkinManager.shared.descriptor(for: .wardrobeItemCard)
+            wardrobeThemeDescriptor: ThemeSkinManager.shared.descriptor(for: .wardrobeItemCard),
+            themeInputs: themeInputs
         )
     }
 
@@ -796,24 +873,28 @@ struct ClothingRowBrief: View, Equatable {
         snapshot: WardrobeCellSnapshot,
         showPrice: Bool,
         showOriginalPrice: Bool,
-        wardrobeThemeDescriptor: ThemeSkinDescriptor?
+        wardrobeThemeDescriptor: ThemeSkinDescriptor?,
+        themeInputs: WardrobeCellThemeInputs = .fallback
     ) {
         self.snapshot = snapshot
         self.showPrice = showPrice
         self.showOriginalPrice = showOriginalPrice
         self.wardrobeThemeDescriptor = wardrobeThemeDescriptor
+        self.themeInputs = themeInputs
     }
 
     @MainActor
     init(
         clothing: Clothing,
         showPrice: Bool = UserDefaults.standard.object(forKey: "privacyShowPrice") as? Bool ?? true,
-        showOriginalPrice: Bool = UserDefaults.standard.object(forKey: "privacyShowOriginalPrice") as? Bool ?? true
+        showOriginalPrice: Bool = UserDefaults.standard.object(forKey: "privacyShowOriginalPrice") as? Bool ?? true,
+        themeInputs: WardrobeCellThemeInputs = .fallback
     ) {
         self.init(
             snapshot: WardrobeCellSnapshot(clothing: clothing),
             showPrice: showPrice,
-            showOriginalPrice: showOriginalPrice
+            showOriginalPrice: showOriginalPrice,
+            themeInputs: themeInputs
         )
     }
 
@@ -822,13 +903,15 @@ struct ClothingRowBrief: View, Equatable {
         clothing: Clothing,
         showPrice: Bool,
         showOriginalPrice: Bool,
-        wardrobeThemeDescriptor: ThemeSkinDescriptor?
+        wardrobeThemeDescriptor: ThemeSkinDescriptor?,
+        themeInputs: WardrobeCellThemeInputs = .fallback
     ) {
         self.init(
             snapshot: WardrobeCellSnapshot(clothing: clothing),
             showPrice: showPrice,
             showOriginalPrice: showOriginalPrice,
-            wardrobeThemeDescriptor: wardrobeThemeDescriptor
+            wardrobeThemeDescriptor: wardrobeThemeDescriptor,
+            themeInputs: themeInputs
         )
     }
 
@@ -852,7 +935,8 @@ struct ClothingRowBrief: View, Equatable {
         WardrobeThemeClothingCardContainer(
             cornerRadius: 24,
             descriptor: wardrobeThemeDescriptor,
-            scrollOptimized: true
+            scrollOptimized: true,
+            themeInputs: themeInputs
         ) {
             HStack(spacing: 12) {
                 // Thumbnail (Smaller)
@@ -866,7 +950,7 @@ struct ClothingRowBrief: View, Equatable {
                             .clipShape(RoundedRectangle(cornerRadius: 8))
                     } else {
                         // 使用支持主题配色的占位图
-                        ThemedPlaceholderView(iconSize: 16)
+                        ThemedPlaceholderView(iconSize: 16, themeInputs: themeInputs)
                             .frame(width: 40, height: 40)
                             .clipShape(RoundedRectangle(cornerRadius: 8))
                     }
