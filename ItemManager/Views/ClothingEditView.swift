@@ -406,6 +406,7 @@ final class ClothingEditDraftManager: ObservableObject {
     static let shared = ClothingEditDraftManager()
 
     private let userDefaults = UserDefaults.standard
+    private let fileStore = ClothingDraftFileStore.shared
     private let draftKey = "ClothingEditDraft"
     private let draftIDKey = "ClothingEditDraftID"
     private let editingDraftKeyPrefix = "ClothingEditDraft.edit."
@@ -421,7 +422,9 @@ final class ClothingEditDraftManager: ObservableObject {
     }
 
     private init() {
-        hasPersistedDraft = userDefaults.data(forKey: draftKey) != nil
+        hasPersistedDraft = false
+        migrateLegacyUserDefaultsDraftsIfNeeded()
+        hasPersistedDraft = fileStore.hasCreateDraft()
         // 监听应用进入后台通知
         NotificationCenter.default.addObserver(
             forName: UIApplication.didEnterBackgroundNotification,
@@ -447,40 +450,36 @@ final class ClothingEditDraftManager: ObservableObject {
         print("DraftManager: Saving draft with ID: \(draft.id), images: \(draft.imagePaths.count)")
         currentDraft = draft
         do {
-            let data = try JSONEncoder().encode(draft)
-            userDefaults.set(data, forKey: draftKey)
-            userDefaults.set(draft.id.uuidString, forKey: draftIDKey)
-            userDefaults.synchronize()
+            let byteSize = try fileStore.saveCreateDraft(draft)
             hasPersistedDraft = true
             DraftReliabilitySignpost.draftSave(
                 scope: "create",
                 draftID: draft.id,
                 imageCount: draft.imagePaths.count,
                 tagCount: draft.selectedTags.count,
-                byteSize: data.count,
+                byteSize: byteSize,
                 reason: reason
             )
             print("DraftManager: Draft saved successfully")
         } catch {
-            DraftReliabilitySignpost.draftSaveFailed(scope: "create", error: error)
+            DraftReliabilitySignpost.draftSaveFailed(scope: "create:file", error: error)
             AppLogger.error("DraftReliability: Failed to encode create draft: \(error)")
             print("DraftManager: Failed to encode draft: \(error)")
         }
     }
 
     func loadDraft() -> ClothingEditDraft? {
-        guard let data = userDefaults.data(forKey: draftKey) else {
-            print("DraftManager: No draft data found in UserDefaults")
-            DraftReliabilitySignpost.draftLoad(scope: "create", source: "none", draftID: nil, imageCount: 0)
-            return nil
-        }
         do {
-            let draft = try JSONDecoder().decode(ClothingEditDraft.self, from: data)
-            DraftReliabilitySignpost.draftLoad(scope: "create", source: "userdefaults_persisted", draftID: draft.id, imageCount: draft.imagePaths.count)
+            guard let draft = try fileStore.loadCreateDraft() else {
+                print("DraftManager: No draft data found in file store")
+                DraftReliabilitySignpost.draftLoad(scope: "create", source: "none", draftID: nil, imageCount: 0)
+                return nil
+            }
+            DraftReliabilitySignpost.draftLoad(scope: "create", source: "file_create", draftID: draft.id, imageCount: draft.imagePaths.count)
             print("DraftManager: Loaded draft with ID: \(draft.id), images: \(draft.imagePaths.count)")
             return draft
         } catch {
-            DraftReliabilitySignpost.draftLoad(scope: "create", source: "decode_failed", draftID: nil, imageCount: 0)
+            DraftReliabilitySignpost.draftLoad(scope: "create", source: "file_decode_failed", draftID: nil, imageCount: 0)
             AppLogger.error("DraftReliability: Failed to decode create draft: \(error)")
             print("DraftManager: Failed to decode draft data: \(error)")
             return nil
@@ -488,26 +487,25 @@ final class ClothingEditDraftManager: ObservableObject {
     }
 
     func loadDraftID() -> UUID? {
-        guard let idString = userDefaults.string(forKey: draftIDKey) else {
-            print("DraftManager: No draftID found in UserDefaults")
+        guard let draft = loadDraft() else {
+            print("DraftManager: No draftID found in file store")
             return nil
         }
-        guard let uuid = UUID(uuidString: idString) else {
-            print("DraftManager: Failed to parse draftID: \(idString)")
-            return nil
-        }
-        print("DraftManager: Loaded draftID: \(uuid)")
-        return uuid
+        print("DraftManager: Loaded draftID: \(draft.id)")
+        return draft.id
     }
 
     func clearDraft() {
         print("DraftManager: Clearing draft")
         currentDraft = nil
-        userDefaults.removeObject(forKey: draftKey)
-        userDefaults.removeObject(forKey: draftIDKey)
-        userDefaults.synchronize()
-        hasPersistedDraft = false
-        DraftReliabilitySignpost.draftClear(scope: "create", reason: "clearDraft")
+        do {
+            try fileStore.clearCreateDraft()
+            hasPersistedDraft = false
+            DraftReliabilitySignpost.draftClear(scope: "create", reason: "clearDraft")
+        } catch {
+            DraftReliabilitySignpost.draftSaveFailed(scope: "create:clear", error: error)
+            AppLogger.error("DraftReliability: Failed to clear create draft file: \(error)")
+        }
         print("DraftManager: Draft cleared")
     }
 
@@ -516,7 +514,7 @@ final class ClothingEditDraftManager: ObservableObject {
     }
 
     func refreshDraftPresence() {
-        hasPersistedDraft = userDefaults.data(forKey: draftKey) != nil
+        hasPersistedDraft = fileStore.hasCreateDraft()
     }
 
     func updateEditingDraft(_ draft: ClothingEditDraft, for clothingID: UUID) {
@@ -528,20 +526,18 @@ final class ClothingEditDraftManager: ObservableObject {
         currentEditingDrafts[clothingID] = draft
         print("DraftManager: Saving editing draft for clothing: \(clothingID), images: \(draft.imagePaths.count)")
         do {
-            let data = try JSONEncoder().encode(draft)
-            userDefaults.set(data, forKey: editingDraftKey(for: clothingID))
-            userDefaults.synchronize()
+            let byteSize = try fileStore.saveEditingDraft(draft, for: clothingID)
             DraftReliabilitySignpost.draftSave(
                 scope: "edit",
                 draftID: draft.id,
                 imageCount: draft.imagePaths.count,
                 tagCount: draft.selectedTags.count,
-                byteSize: data.count,
+                byteSize: byteSize,
                 reason: "\(reason):\(clothingID.uuidString)"
             )
             print("DraftManager: Editing draft saved successfully")
         } catch {
-            DraftReliabilitySignpost.draftSaveFailed(scope: "edit:\(clothingID.uuidString)", error: error)
+            DraftReliabilitySignpost.draftSaveFailed(scope: "edit:file:\(clothingID.uuidString)", error: error)
             AppLogger.error("DraftReliability: Failed to encode editing draft for \(clothingID): \(error)")
             print("DraftManager: Failed to encode editing draft: \(error)")
         }
@@ -554,19 +550,18 @@ final class ClothingEditDraftManager: ObservableObject {
             return draft
         }
 
-        guard let data = userDefaults.data(forKey: editingDraftKey(for: clothingID)) else {
-            print("DraftManager: No editing draft found for clothing: \(clothingID)")
-            DraftReliabilitySignpost.draftLoad(scope: "edit", source: "none", draftID: nil, imageCount: 0)
-            return nil
-        }
         do {
-            let draft = try JSONDecoder().decode(ClothingEditDraft.self, from: data)
+            guard let draft = try fileStore.loadEditingDraft(for: clothingID) else {
+                print("DraftManager: No editing draft found for clothing: \(clothingID)")
+                DraftReliabilitySignpost.draftLoad(scope: "edit", source: "none", draftID: nil, imageCount: 0)
+                return nil
+            }
             currentEditingDrafts[clothingID] = draft
-            DraftReliabilitySignpost.draftLoad(scope: "edit", source: "userdefaults_editing", draftID: draft.id, imageCount: draft.imagePaths.count)
+            DraftReliabilitySignpost.draftLoad(scope: "edit", source: "file_editing", draftID: draft.id, imageCount: draft.imagePaths.count)
             print("DraftManager: Loaded persisted editing draft for clothing: \(clothingID), images: \(draft.imagePaths.count)")
             return draft
         } catch {
-            DraftReliabilitySignpost.draftLoad(scope: "edit", source: "decode_failed", draftID: nil, imageCount: 0)
+            DraftReliabilitySignpost.draftLoad(scope: "edit", source: "file_decode_failed", draftID: nil, imageCount: 0)
             AppLogger.error("DraftReliability: Failed to decode editing draft for \(clothingID): \(error)")
             print("DraftManager: Failed to decode editing draft for clothing: \(clothingID): \(error)")
             return nil
@@ -576,9 +571,13 @@ final class ClothingEditDraftManager: ObservableObject {
     func clearEditingDraft(for clothingID: UUID) {
         print("DraftManager: Clearing editing draft for clothing: \(clothingID)")
         currentEditingDrafts.removeValue(forKey: clothingID)
-        userDefaults.removeObject(forKey: editingDraftKey(for: clothingID))
-        userDefaults.synchronize()
-        DraftReliabilitySignpost.draftClear(scope: "edit", reason: clothingID.uuidString)
+        do {
+            try fileStore.clearEditingDraft(for: clothingID)
+            DraftReliabilitySignpost.draftClear(scope: "edit", reason: clothingID.uuidString)
+        } catch {
+            DraftReliabilitySignpost.draftSaveFailed(scope: "edit:clear:\(clothingID.uuidString)", error: error)
+            AppLogger.error("DraftReliability: Failed to clear editing draft file for \(clothingID): \(error)")
+        }
         print("DraftManager: Editing draft cleared")
     }
 
@@ -601,8 +600,69 @@ final class ClothingEditDraftManager: ObservableObject {
         }
     }
 
-    private func editingDraftKey(for clothingID: UUID) -> String {
-        "\(editingDraftKeyPrefix)\(clothingID.uuidString)"
+    private func migrateLegacyUserDefaultsDraftsIfNeeded() {
+        migrateLegacyCreateDraftIfNeeded()
+        migrateLegacyEditingDraftsIfNeeded()
+    }
+
+    private func migrateLegacyCreateDraftIfNeeded() {
+        guard let data = userDefaults.data(forKey: draftKey) else {
+            if userDefaults.string(forKey: draftIDKey) != nil {
+                userDefaults.removeObject(forKey: draftIDKey)
+            }
+            return
+        }
+
+        do {
+            let draft = try JSONDecoder().decode(ClothingEditDraft.self, from: data)
+            let byteSize = try fileStore.saveCreateDraft(draft)
+            userDefaults.removeObject(forKey: draftKey)
+            userDefaults.removeObject(forKey: draftIDKey)
+            DraftReliabilitySignpost.draftSave(
+                scope: "create",
+                draftID: draft.id,
+                imageCount: draft.imagePaths.count,
+                tagCount: draft.selectedTags.count,
+                byteSize: byteSize,
+                reason: "migration-userdefaults"
+            )
+            print("DraftManager: Migrated legacy create draft to file store")
+        } catch {
+            DraftReliabilitySignpost.draftSaveFailed(scope: "create:migration", error: error)
+            AppLogger.error("DraftReliability: Failed to migrate legacy create draft: \(error)")
+        }
+    }
+
+    private func migrateLegacyEditingDraftsIfNeeded() {
+        let legacyKeys = userDefaults.dictionaryRepresentation().keys
+            .filter { $0.hasPrefix(editingDraftKeyPrefix) }
+
+        for key in legacyKeys {
+            guard let data = userDefaults.data(forKey: key) else { continue }
+            let suffix = String(key.dropFirst(editingDraftKeyPrefix.count))
+            guard let clothingID = UUID(uuidString: suffix) else {
+                AppLogger.error("DraftReliability: Invalid legacy editing draft key: \(key)")
+                continue
+            }
+
+            do {
+                let draft = try JSONDecoder().decode(ClothingEditDraft.self, from: data)
+                let byteSize = try fileStore.saveEditingDraft(draft, for: clothingID)
+                userDefaults.removeObject(forKey: key)
+                DraftReliabilitySignpost.draftSave(
+                    scope: "edit",
+                    draftID: draft.id,
+                    imageCount: draft.imagePaths.count,
+                    tagCount: draft.selectedTags.count,
+                    byteSize: byteSize,
+                    reason: "migration-userdefaults:\(clothingID.uuidString)"
+                )
+                print("DraftManager: Migrated legacy editing draft to file store for clothing: \(clothingID)")
+            } catch {
+                DraftReliabilitySignpost.draftSaveFailed(scope: "edit:migration:\(clothingID.uuidString)", error: error)
+                AppLogger.error("DraftReliability: Failed to migrate legacy editing draft for \(clothingID): \(error)")
+            }
+        }
     }
 }
 
