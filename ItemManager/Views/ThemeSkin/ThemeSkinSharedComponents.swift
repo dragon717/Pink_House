@@ -149,6 +149,55 @@ private enum ThemeSkinDarkLegibilityFeature {
     }
 }
 
+struct ThemeSkinLegibilityPalette {
+    let outline: Color
+    let diagonalOutline: Color
+    let innerGlow: Color
+    let outerGlow: Color
+    let backdropBase: Color
+    let backdropSoft: Color
+    let backdropAccent: Color
+    let backdropStroke: Color
+
+    static func resolve(
+        for descriptor: ThemeSkinDescriptor?,
+        colorScheme: ColorScheme
+    ) -> ThemeSkinLegibilityPalette? {
+        guard ThemeSkinSharedSurfaceTokens.isSupported(descriptor) else {
+            return nil
+        }
+
+        let isDark = colorScheme == .dark
+        if SwanDreamThemeSkin.isSwanDream(descriptor) {
+            return ThemeSkinLegibilityPalette(
+                outline: SwanDreamThemeSkin.text.opacity(isDark ? 0.96 : 0.28),
+                diagonalOutline: SwanDreamThemeSkin.roseLine.opacity(isDark ? 0.78 : 0.18),
+                innerGlow: SwanDreamThemeSkin.moonCream.opacity(isDark ? 0.58 : 0.18),
+                outerGlow: SwanDreamThemeSkin.moonGold.opacity(isDark ? 0.56 : 0.16),
+                backdropBase: SwanDreamThemeSkin.text.opacity(isDark ? 0.20 : 0.04),
+                backdropSoft: SwanDreamThemeSkin.moonCream.opacity(isDark ? 0.42 : 0.12),
+                backdropAccent: SwanDreamThemeSkin.ribbonPink.opacity(isDark ? 0.32 : 0.10),
+                backdropStroke: SwanDreamThemeSkin.moonGold.opacity(isDark ? 0.42 : 0.16)
+            )
+        }
+
+        if SkyConcertThemeSkin.isSkyConcert(descriptor) {
+            return ThemeSkinLegibilityPalette(
+                outline: SkyConcertThemeSkin.text.opacity(isDark ? 0.96 : 0.28),
+                diagonalOutline: SkyConcertThemeSkin.cloudBlueDeep.opacity(isDark ? 0.72 : 0.18),
+                innerGlow: SkyConcertThemeSkin.creamTop.opacity(isDark ? 0.58 : 0.18),
+                outerGlow: SkyConcertThemeSkin.softGold.opacity(isDark ? 0.56 : 0.16),
+                backdropBase: SkyConcertThemeSkin.text.opacity(isDark ? 0.18 : 0.04),
+                backdropSoft: SkyConcertThemeSkin.creamTop.opacity(isDark ? 0.42 : 0.12),
+                backdropAccent: SkyConcertThemeSkin.cloudBlue.opacity(isDark ? 0.34 : 0.10),
+                backdropStroke: SkyConcertThemeSkin.softGold.opacity(isDark ? 0.38 : 0.14)
+            )
+        }
+
+        return nil
+    }
+}
+
 enum ThemeSkinEdgeStickerRole {
     case cardPrimary
     case cardSecondary
@@ -715,50 +764,43 @@ private struct ThemeSkinLegibleTextModifier: ViewModifier {
         descriptor ?? themeSkinManager.activeThemeDescriptor(for: slot, state: .default)
     }
 
+    private var palette: ThemeSkinLegibilityPalette? {
+        ThemeSkinLegibilityPalette.resolve(for: resolvedDescriptor, colorScheme: colorScheme)
+    }
+
     private var shouldApply: Bool {
         colorScheme == .dark
             && ThemeSkinDarkLegibilityFeature.isEnabled
-            && ThemeSkinSharedSurfaceTokens.isSupported(resolvedDescriptor)
+            && palette != nil
     }
 
     @ViewBuilder
     func body(content: Content) -> some View {
-        if shouldApply {
+        if shouldApply, let palette {
             if level == .inline {
                 content
-                    .shadow(color: outlineColor, radius: 0, x: level.outlineOffset, y: 0)
-                    .shadow(color: outlineColor, radius: 0, x: -level.outlineOffset, y: 0)
-                    .shadow(color: outlineColor, radius: 0, x: 0, y: level.outlineOffset)
-                    .shadow(color: outlineColor, radius: 0, x: 0, y: -level.outlineOffset)
-                    .shadow(color: Color.white.opacity(0.42), radius: level.innerGlowRadius, x: 0, y: 0)
-                    .shadow(color: accentGlowColor, radius: level.outerGlowRadius, x: 0, y: 0)
+                    .shadow(color: palette.outline, radius: 0, x: level.outlineOffset, y: 0)
+                    .shadow(color: palette.outline, radius: 0, x: -level.outlineOffset, y: 0)
+                    .shadow(color: palette.outline, radius: 0, x: 0, y: level.outlineOffset)
+                    .shadow(color: palette.outline, radius: 0, x: 0, y: -level.outlineOffset)
+                    .shadow(color: palette.innerGlow, radius: level.innerGlowRadius, x: 0, y: 0)
+                    .shadow(color: palette.outerGlow, radius: level.outerGlowRadius, x: 0, y: 0)
             } else {
                 content
-                    .shadow(color: outlineColor, radius: 0, x: level.outlineOffset, y: 0)
-                    .shadow(color: outlineColor, radius: 0, x: -level.outlineOffset, y: 0)
-                    .shadow(color: outlineColor, radius: 0, x: 0, y: level.outlineOffset)
-                    .shadow(color: outlineColor, radius: 0, x: 0, y: -level.outlineOffset)
-                    .shadow(color: outlineColor.opacity(0.74), radius: 0, x: level.outlineOffset * 0.72, y: level.outlineOffset * 0.72)
-                    .shadow(color: outlineColor.opacity(0.74), radius: 0, x: -level.outlineOffset * 0.72, y: level.outlineOffset * 0.72)
-                    .shadow(color: outlineColor.opacity(0.74), radius: 0, x: level.outlineOffset * 0.72, y: -level.outlineOffset * 0.72)
-                    .shadow(color: outlineColor.opacity(0.74), radius: 0, x: -level.outlineOffset * 0.72, y: -level.outlineOffset * 0.72)
-                    .shadow(color: Color.white.opacity(0.48), radius: level.innerGlowRadius, x: 0, y: 0)
-                    .shadow(color: accentGlowColor, radius: level.outerGlowRadius, x: 0, y: 0)
+                    .shadow(color: palette.outline, radius: 0, x: level.outlineOffset, y: 0)
+                    .shadow(color: palette.outline, radius: 0, x: -level.outlineOffset, y: 0)
+                    .shadow(color: palette.outline, radius: 0, x: 0, y: level.outlineOffset)
+                    .shadow(color: palette.outline, radius: 0, x: 0, y: -level.outlineOffset)
+                    .shadow(color: palette.diagonalOutline, radius: 0, x: level.outlineOffset * 0.72, y: level.outlineOffset * 0.72)
+                    .shadow(color: palette.diagonalOutline, radius: 0, x: -level.outlineOffset * 0.72, y: level.outlineOffset * 0.72)
+                    .shadow(color: palette.diagonalOutline, radius: 0, x: level.outlineOffset * 0.72, y: -level.outlineOffset * 0.72)
+                    .shadow(color: palette.diagonalOutline, radius: 0, x: -level.outlineOffset * 0.72, y: -level.outlineOffset * 0.72)
+                    .shadow(color: palette.innerGlow, radius: level.innerGlowRadius, x: 0, y: 0)
+                    .shadow(color: palette.outerGlow, radius: level.outerGlowRadius, x: 0, y: 0)
             }
         } else {
             content
         }
-    }
-
-    private var outlineColor: Color {
-        let base = SkyConcertThemeSkin.labelColor(for: resolvedDescriptor)
-        return base.mixed(with: .black, amount: 0.58).opacity(level == .inline ? 0.88 : 0.94)
-    }
-
-    private var accentGlowColor: Color {
-        SkyConcertThemeSkin.accent(for: resolvedDescriptor)
-            .mixed(with: .white, amount: 0.18)
-            .opacity(level == .inline ? 0.34 : 0.52)
     }
 }
 
@@ -775,21 +817,25 @@ private struct ThemeSkinLegibilityBackdropModifier: ViewModifier {
         descriptor ?? themeSkinManager.activeThemeDescriptor(for: slot, state: .default)
     }
 
+    private var palette: ThemeSkinLegibilityPalette? {
+        ThemeSkinLegibilityPalette.resolve(for: resolvedDescriptor, colorScheme: colorScheme)
+    }
+
     private var shouldApply: Bool {
         colorScheme == .dark
             && ThemeSkinDarkLegibilityFeature.isEnabled
-            && ThemeSkinSharedSurfaceTokens.isSupported(resolvedDescriptor)
+            && palette != nil
             && level != .inline
     }
 
     @ViewBuilder
     func body(content: Content) -> some View {
-        if shouldApply {
+        if shouldApply, let palette {
             content
                 .background {
                     ThemeSkinLegibilityBackdrop(
                         level: level,
-                        descriptor: resolvedDescriptor,
+                        palette: palette,
                         cornerRadius: cornerRadius
                     )
                 }
@@ -801,7 +847,7 @@ private struct ThemeSkinLegibilityBackdropModifier: ViewModifier {
 
 private struct ThemeSkinLegibilityBackdrop: View {
     let level: ThemeSkinLegibilityLevel
-    let descriptor: ThemeSkinDescriptor?
+    let palette: ThemeSkinLegibilityPalette
     let cornerRadius: CGFloat
 
     private var shape: RoundedRectangle {
@@ -812,17 +858,17 @@ private struct ThemeSkinLegibilityBackdrop: View {
         ZStack {
             if level.usesBlurredBackdrop {
                 shape
-                    .fill(SkyConcertThemeSkin.labelColor(for: descriptor).opacity(level == .hero ? 0.24 : 0.18))
+                    .fill(palette.backdropBase)
                     .padding(-(level.backdropOutset + 3))
                     .blur(radius: max(6, level.backdropBlurRadius - 1))
 
                 shape
-                    .fill(SkyConcertThemeSkin.shellFillTop(for: descriptor).opacity(level == .hero ? 0.40 : 0.30))
+                    .fill(palette.backdropSoft)
                     .padding(-level.backdropOutset)
                     .blur(radius: level.backdropBlurRadius)
 
                 shape
-                    .fill(SkyConcertThemeSkin.accentSoft(for: descriptor).opacity(level == .hero ? 0.34 : 0.24))
+                    .fill(palette.backdropAccent)
                     .padding(-(level.backdropOutset + 6))
                     .blur(radius: level.backdropBlurRadius + 3)
             }
@@ -831,10 +877,10 @@ private struct ThemeSkinLegibilityBackdrop: View {
                 .fill(
                     LinearGradient(
                         colors: [
-                            SkyConcertThemeSkin.labelColor(for: descriptor).opacity(level == .badge ? 0.18 : 0.14),
-                            SkyConcertThemeSkin.shellFillTop(for: descriptor).opacity(level == .hero ? 0.48 : 0.38),
-                            Color.white.opacity(level == .hero ? 0.32 : 0.24),
-                            SkyConcertThemeSkin.accentSoft(for: descriptor).opacity(level == .badge ? 0.24 : 0.18)
+                            palette.backdropBase,
+                            palette.backdropSoft,
+                            palette.innerGlow,
+                            palette.backdropAccent
                         ],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
@@ -846,8 +892,8 @@ private struct ThemeSkinLegibilityBackdrop: View {
                 .stroke(
                     LinearGradient(
                         colors: [
-                            Color.white.opacity(0.46),
-                            SkyConcertThemeSkin.shellStroke(for: descriptor).opacity(0.36)
+                            palette.innerGlow,
+                            palette.backdropStroke
                         ],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing

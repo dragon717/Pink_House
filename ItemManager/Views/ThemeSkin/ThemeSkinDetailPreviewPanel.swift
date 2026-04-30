@@ -20,6 +20,11 @@ struct ThemeSkinDetailPreviewPanel: View {
         focusedSlot.map(ThemeSkinPreviewAnchor.anchor(for:))
     }
 
+    private var noticeDescriptor: ThemeSkinDescriptor? {
+        context.representativeDescriptor
+            ?? ThemeSkinManager.shared.descriptor(forThemeId: product.themeId, slot: .sectionCard)
+    }
+
     var body: some View {
         ThemeSkinSectionCardContainer(cornerRadius: 28) {
             VStack(alignment: .leading, spacing: 16) {
@@ -28,6 +33,7 @@ struct ThemeSkinDetailPreviewPanel: View {
                 phonePreview
                 sceneSwitcher
                 helperLine
+                themePriorityNotice
             }
             .padding(18)
         }
@@ -116,6 +122,29 @@ struct ThemeSkinDetailPreviewPanel: View {
         .padding(.horizontal, 12)
         .padding(.vertical, 9)
         .background(Color.white.opacity(0.42), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+
+    private var themePriorityNotice: some View {
+        HStack(alignment: .top, spacing: 8) {
+            Image(systemName: "paintpalette.fill")
+                .font(.caption.weight(.bold))
+                .foregroundStyle(SkyConcertThemeSkin.accent(for: noticeDescriptor))
+                .themeSkinLegibleSymbol(level: .chip, slot: .sectionCard, descriptor: noticeDescriptor)
+
+            Text("启用主题皮肤后，文字与图标光效会跟随当前主题；普通魔法配色与主题皮肤视觉互斥，不叠加。")
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(SkyConcertThemeSkin.labelColor(for: noticeDescriptor).opacity(0.86))
+                .themeSkinLegibleText(level: .inline, slot: .sectionCard, descriptor: noticeDescriptor)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 9)
+        .themeSkinLegibilityBackdrop(level: .preview, slot: .sectionCard, cornerRadius: 14, descriptor: noticeDescriptor)
+        .background(SkyConcertThemeSkin.shellFillTop(for: noticeDescriptor).opacity(0.48), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .stroke(SkyConcertThemeSkin.shellStroke(for: noticeDescriptor).opacity(0.34), lineWidth: 1)
+        )
     }
 }
 
