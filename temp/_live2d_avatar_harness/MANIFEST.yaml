@@ -1,0 +1,60 @@
+schema_version: 1
+avatar_id: girl_v1
+display_name: 少女小人
+render_backends:
+  - staticImage
+  - transparentVideo
+  - live2d
+asset_roots:
+  static_image: ItemManager/Assets.xcassets/AvatarCharacter/girl_v1/avatar_girl_v1_static.imageset/avatar_girl_v1_static.png
+  video: asserts/avatar/girl_v1/video
+  live2d: asserts/avatar/girl_v1/live2d
+required_actions:
+  - idle
+  - greet
+  - wave
+  - thinking
+  - happy
+  - shy
+  - stickerPresent
+  - touchHead
+  - touchBody
+  - sleep
+  - talkLoop
+required_expressions:
+  - neutral
+  - smile
+  - surprised
+  - sad
+  - angry
+  - sleepy
+image2_outputs:
+  - name: avatar_girl_v1_static
+    canvas: 1024x1366
+    destination: ItemManager/Assets.xcassets/AvatarCharacter/girl_v1/avatar_girl_v1_static.imageset/avatar_girl_v1_static.png
+    prompt: >
+      Full-body front-facing anime-inspired wardrobe assistant girl, delicate magic sticker journal style,
+      clean line art with soft pastel accents, transparent PNG, 3:4 canvas, centered full body, neutral pose,
+      suitable as a mannequin-like sticker background in a dress coordination editor.
+  - name: avatar_girl_v1_layered_psd_spec
+    canvas: 2048x2732
+    destination: temp/_live2d_avatar_harness/generated/avatar_girl_v1_layered_psd_spec.psd
+    prompt: >
+      Layered Live2D-ready PSD concept for a front-facing girl character. Separate head, neck, torso,
+      upper arms, forearms, hands, legs, shoes, front hair, back hair, side hair, face base, eye whites,
+      pupils, highlights, eyelids, eyebrows, mouth shapes A I U E O, blush, skirt hem, and accessories.
+      Include hidden joint overdraw at shoulders, elbows, wrists, hips, knees, neck, hair roots, and skirt.
+negative_prompt: >
+  text, letters, watermark, logo, photorealistic, realistic 3D, harsh shadow, dirty background,
+  cropped limbs, fused fingers, missing joints, opaque background
+acceptance:
+  static_image:
+    ratio: 0.75
+    ratio_tolerance: 0.03
+    min_nontransparent_percent: 2.0
+    min_file_bytes: 8192
+  video:
+    extension: mov
+  live2d_required_files:
+    - model3.json
+    - moc3
