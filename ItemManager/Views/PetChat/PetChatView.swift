@@ -2045,12 +2045,9 @@ struct PetChatView: View {
     }
 
     private func shouldLoopPetDialogueAction(_ action: String) -> Bool {
-        switch action {
-        case "idle", "sleeping":
-            return true
-        default:
-            return false
-        }
+        AvatarPetDialogueAdapter.shouldLoop(
+            action: AvatarPetDialogueAdapter.avatarAction(fromLegacyPetAction: action)
+        )
     }
 
     private func idleLikePetDialogueAction() -> String {
@@ -2097,22 +2094,12 @@ struct PetChatView: View {
 
     private func resolvedPetDialogueVideoName(for action: String) -> String? {
         let pet = PetDataManager.shared.getCurrentPetCharacter()
-        let candidate = "\(pet.id)_\(action)"
-        if VideoResourceManager.shared.isVideoAvailable(name: candidate) {
-            return candidate
-        }
-
-        if action.hasPrefix("bathing_") {
-            let happyFallback = "\(pet.id)_bathing_happy"
-            if VideoResourceManager.shared.isVideoAvailable(name: happyFallback) {
-                return happyFallback
+        for candidate in AvatarPetDialogueAdapter.petVideoCandidates(petID: pet.id, legacyAction: action) {
+            if VideoResourceManager.shared.isVideoAvailable(name: candidate) {
+                return candidate
             }
         }
 
-        let petIdle = "\(pet.id)_idle"
-        if VideoResourceManager.shared.isVideoAvailable(name: petIdle) {
-            return petIdle
-        }
         return nil
     }
 
