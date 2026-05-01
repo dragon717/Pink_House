@@ -50,6 +50,13 @@ struct OOTDMannequinBackground: Identifiable, Hashable {
         all[0]
     }
 
+    var selectionSubtitle: String {
+        if avatarCharacterID != nil {
+            return "少女版通用小人，可作为后续动作骨骼的静态预览。"
+        }
+        return "适合快速开始搭配拼贴。"
+    }
+
     /// Manifest-gated exposure: only list mannequin choices whose image asset is actually bundled.
     static var available: [OOTDMannequinBackground] {
         all.filter { UIImage(named: $0.assetName) != nil }
@@ -170,7 +177,7 @@ struct OOTDBackgroundSelectionSheet: View {
                                             Text(mannequin.displayName)
                                                 .font(.system(size: 16, weight: .semibold))
                                                 .foregroundStyle(.primary)
-                                            Text("适合快速开始搭配拼贴。")
+                                            Text(mannequin.selectionSubtitle)
                                                 .font(.caption)
                                                 .foregroundStyle(.secondary)
                                         }
