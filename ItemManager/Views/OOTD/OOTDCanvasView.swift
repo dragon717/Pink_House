@@ -2,6 +2,15 @@
 import SwiftUI
 import SwiftData
 
+private enum OOTDCanvasTransformLimits {
+    static let minStickerScale: Double = 0.3
+    static let maxStickerScale: Double = 2.0
+
+    static func clampedStickerScale(_ value: Double) -> Double {
+        min(max(value, minStickerScale), maxStickerScale)
+    }
+}
+
 struct OOTDCanvasView: View {
     @Bindable var outfit: Outfit
     @Environment(\.modelContext) private var modelContext
@@ -201,15 +210,20 @@ struct OOTDCanvasView: View {
             SimultaneousGesture(
                 MagnificationGesture()
                     .onChanged { value in
-                        guard selectedItemId != nil else { return }
-                        gestureScale = value
+                        guard let id = selectedItemId,
+                              let items = outfit.items,
+                              let index = items.firstIndex(where: { $0.id == id }) else { return }
+                        let currentScale = outfit.items?[index].scale ?? 1.0
+                        let clamped = OOTDCanvasTransformLimits.clampedStickerScale(currentScale * value)
+                        gestureScale = clamped / max(currentScale, 0.001)
                     }
                     .onEnded { value in
                         guard let id = selectedItemId,
                               let items = outfit.items,
                               let index = items.firstIndex(where: { $0.id == id }) else { return }
                         
-                        outfit.items?[index].scale *= value
+                        let nextScale = (outfit.items?[index].scale ?? 1.0) * value
+                        outfit.items?[index].scale = OOTDCanvasTransformLimits.clampedStickerScale(nextScale)
                         gestureScale = 1.0
                         print("[OOTD] Scale updated for item \(id): \(outfit.items?[index].scale ?? 0)")
                         saveContext()
@@ -439,7 +453,7 @@ struct ResizeHandleView: View {
                     // 计算缩放比例（基于距离比例）
                     if startDistance > 0 {
                         let scaleRatio = currentDistance / startDistance
-                        let newScale = max(0.3, min(3.0, initialScale * Double(scaleRatio)))
+                        let newScale = OOTDCanvasTransformLimits.clampedStickerScale(initialScale * Double(scaleRatio))
                         onScaleChange(newScale)
                     }
                 }

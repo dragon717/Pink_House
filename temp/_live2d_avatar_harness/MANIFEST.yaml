@@ -11,6 +11,9 @@ asset_roots:
   live2d: asserts/avatar/girl_v1/live2d
   layer_manifest: asserts/avatar/girl_v1/live2d/rig_manifest.json
   layers: asserts/avatar/girl_v1/live2d/layers
+  default_outfit_manifest: asserts/avatar/girl_v1/live2d/outfits/default/outfit_manifest.json
+  default_outfit_layers: asserts/avatar/girl_v1/live2d/outfits/default/layers
+  clothing_split_rules: asserts/avatar/girl_v1/live2d/clothing_sticker_split_rules.json
 required_actions:
   - idle
   - greet
@@ -35,9 +38,18 @@ image2_outputs:
     canvas: 1086x1448
     destination: ItemManager/Assets.xcassets/AvatarCharacter/girl_v1/avatar_girl_v1_static.imageset/avatar_girl_v1_static.png
     prompt: >
-      Full-body front-facing anime-inspired wardrobe assistant girl, delicate magic sticker journal style,
-      clean line art with soft pastel accents, transparent PNG, 3:4 canvas, centered full body, neutral pose,
-      suitable as a mannequin-like sticker background in a dress coordination editor.
+      Full-body front-facing anime-inspired wardrobe assistant base body, modest inner bodysuit,
+      delicate magic sticker journal style, clean line art with soft pastel accents, transparent PNG,
+      3:4 canvas, centered full body, neutral A-pose, limbs visible and separable, suitable as a
+      Live2D-riggable mannequin-like base in a dress coordination editor.
+  - name: avatar_girl_v1_default_outfit
+    canvas: 1086x1448
+    destination: asserts/avatar/girl_v1/live2d/outfits/default/default_outfit_full.png
+    prompt: >
+      Full-body front-facing anime-inspired wardrobe assistant girl in pastel magical wardrobe dress,
+      matching the base body proportions. The outfit is an embedded avatar outfit package, not a
+      normal user sticker list item. Split later into bodice, sleeves, cuffs, skirt, shoes, neck bow,
+      and hair accessories for bone-bound Live2D movement.
   - name: avatar_girl_v1_layered_psd_spec
     canvas: 2048x2732
     destination: temp/_live2d_avatar_harness/generated/avatar_girl_v1_layered_psd_spec.psd
@@ -48,8 +60,7 @@ image2_outputs:
       Include hidden joint overdraw at shoulders, elbows, wrists, hips, knees, neck, hair roots, and skirt.
 layer_outputs:
   - hair_back
-  - body_torso
-  - skirt_front
+  - body_torso_base
   - head_face
   - hair_front
   - hair_side_left
@@ -60,11 +71,22 @@ layer_outputs:
   - arm_lower_right
   - hand_left
   - hand_right
+  - hip_base
   - leg_left
   - leg_right
   - foot_left
   - foot_right
-  - accessory_bows
+default_outfit_layer_outputs:
+  - dress_bodice
+  - dress_skirt
+  - sleeve_left
+  - sleeve_right
+  - wrist_cuff_left
+  - wrist_cuff_right
+  - hair_bows
+  - neck_bow
+  - shoe_left
+  - shoe_right
 negative_prompt: >
   text, letters, watermark, logo, photorealistic, realistic 3D, harsh shadow, dirty background,
   cropped limbs, fused fingers, missing joints, opaque background

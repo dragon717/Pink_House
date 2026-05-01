@@ -53,7 +53,13 @@ def load_manifest(path: Path) -> dict:
             value = value.strip()
             in_asset_roots = key == "asset_roots"
             in_static_acceptance = False
-            current_list = key if key in {"required_actions", "required_expressions", "render_backends", "layer_outputs"} else None
+            current_list = key if key in {
+                "required_actions",
+                "required_expressions",
+                "render_backends",
+                "layer_outputs",
+                "default_outfit_layer_outputs",
+            } else None
             if current_list:
                 result[current_list] = []
             elif value:
@@ -170,11 +176,41 @@ def main() -> int:
     missing_manifest_layers = sorted(set(expected_layers) - set(manifest_layer_names))
     layers_ok = layer_manifest_ok and not missing_layer_files and not missing_manifest_layers
 
+    outfit_manifest_path = Path(manifest.get("asset_roots", {}).get("default_outfit_manifest", ""))
+    outfit_layer_dir = Path(manifest.get("asset_roots", {}).get("default_outfit_layers", ""))
+    expected_outfit_layers = list(manifest.get("default_outfit_layer_outputs") or [])
+    outfit_manifest_ok = outfit_manifest_path.exists()
+    outfit_manifest_error = None
+    outfit_layer_names = []
+    outfit_show_in_sticker_list = None
+    if outfit_manifest_ok:
+        try:
+            outfit_manifest = json.loads(outfit_manifest_path.read_text(encoding="utf-8"))
+            outfit_layer_names = [row.get("name") for row in outfit_manifest.get("layers", [])]
+            outfit_show_in_sticker_list = outfit_manifest.get("show_in_sticker_list")
+        except Exception as exc:
+            outfit_manifest_ok = False
+            outfit_manifest_error = str(exc)
+    missing_outfit_layer_files = [
+        name for name in expected_outfit_layers
+        if not (outfit_layer_dir / f"{name}.png").exists()
+    ]
+    missing_outfit_manifest_layers = sorted(set(expected_outfit_layers) - set(outfit_layer_names))
+    clothing_rules_path = Path(manifest.get("asset_roots", {}).get("clothing_split_rules", ""))
+    outfit_layers_ok = (
+        outfit_manifest_ok
+        and outfit_show_in_sticker_list is False
+        and not missing_outfit_layer_files
+        and not missing_outfit_manifest_layers
+        and clothing_rules_path.exists()
+    )
+
     report = {
         "ok": static_report["ok"]
         and not missing_actions
         and not missing_expressions
         and layers_ok
+        and outfit_layers_ok
         and video_ok
         and live2d_ok,
         "manifest": str(manifest_path),
@@ -193,6 +229,19 @@ def main() -> int:
             "missing_layer_files": missing_layer_files,
             "missing_manifest_layers": missing_manifest_layers,
             "ok": layers_ok,
+        },
+        "default_outfit_layers": {
+            "dir": str(outfit_layer_dir),
+            "manifest": str(outfit_manifest_path),
+            "manifest_ok": outfit_manifest_ok,
+            "manifest_error": outfit_manifest_error,
+            "expected_count": len(expected_outfit_layers),
+            "missing_layer_files": missing_outfit_layer_files,
+            "missing_manifest_layers": missing_outfit_manifest_layers,
+            "show_in_sticker_list": outfit_show_in_sticker_list,
+            "clothing_split_rules": str(clothing_rules_path),
+            "clothing_split_rules_exists": clothing_rules_path.exists(),
+            "ok": outfit_layers_ok,
         },
         "video": {
             "dir": str(video_dir),

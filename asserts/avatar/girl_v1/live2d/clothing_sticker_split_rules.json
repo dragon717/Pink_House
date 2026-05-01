@@ -1,0 +1,96 @@
+{
+  "schema_version": 1,
+  "avatar_id": "girl_v1",
+  "purpose": "Split future clothing stickers into bone-bound outfit layers instead of adding the avatar's own outfit to the normal sticker list.",
+  "normal_sticker_list_policy": {
+    "embedded_avatar_outfit_layers": "hidden",
+    "user_added_clothing_cutouts": "visible"
+  },
+  "slots": [
+    {
+      "slot": "dress.bodice",
+      "bone": "torso",
+      "recommended_bbox": [
+        0.3,
+        0.25,
+        0.7,
+        0.48
+      ]
+    },
+    {
+      "slot": "dress.skirt",
+      "bone": "skirt",
+      "recommended_bbox": [
+        0.16,
+        0.42,
+        0.84,
+        0.7
+      ]
+    },
+    {
+      "slot": "dress.sleeve.left",
+      "bone": "upperArmLeft",
+      "recommended_bbox": [
+        0.18,
+        0.28,
+        0.4,
+        0.47
+      ]
+    },
+    {
+      "slot": "dress.sleeve.right",
+      "bone": "upperArmRight",
+      "recommended_bbox": [
+        0.6,
+        0.28,
+        0.82,
+        0.47
+      ]
+    },
+    {
+      "slot": "shoe.left",
+      "bone": "footLeft",
+      "recommended_bbox": [
+        0.34,
+        0.82,
+        0.51,
+        0.98
+      ]
+    },
+    {
+      "slot": "shoe.right",
+      "bone": "footRight",
+      "recommended_bbox": [
+        0.49,
+        0.82,
+        0.66,
+        0.98
+      ]
+    },
+    {
+      "slot": "accessory.hair",
+      "bone": "head",
+      "recommended_bbox": [
+        0.23,
+        0.03,
+        0.77,
+        0.25
+      ]
+    },
+    {
+      "slot": "accessory.neck",
+      "bone": "head",
+      "recommended_bbox": [
+        0.38,
+        0.21,
+        0.62,
+        0.33
+      ]
+    }
+  ],
+  "live2d_notes": [
+    "Each clothing slot should keep hidden overdraw near joints and hems.",
+    "Sleeves and wrist cuffs should be separate from arm skin so arm rotation does not smear textures.",
+    "Skirts should be split into front panels if stronger sway is needed."
+  ]
+}

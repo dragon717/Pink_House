@@ -57,6 +57,10 @@ struct OOTDMannequinBackground: Identifiable, Hashable {
         return "适合快速开始搭配拼贴。"
     }
 
+    var canvasScale: CGFloat {
+        avatarCharacterID == nil ? 1.0 : 0.72
+    }
+
     /// Manifest-gated exposure: only list mannequin choices whose image asset is actually bundled.
     static var available: [OOTDMannequinBackground] {
         all.filter { UIImage(named: $0.assetName) != nil }
@@ -104,6 +108,7 @@ struct OOTDMannequinBackgroundView: View {
                     ),
                     contentMode: contentMode
                 )
+                .scaleEffect(background.canvasScale)
             } else {
                 image(OOTDMannequinBackground.resolvedAssetName(for: mannequinAssetID))
             }
