@@ -36,12 +36,12 @@ struct AvatarLayeredMotionView: View {
             )
             let phase = AvatarLayerMotionPhase(
                 seconds: request.isPaused ? 0 : date.timeIntervalSinceReferenceDate,
-                isActive: !request.isPaused && request.action == .wave
+                isActive: !request.isPaused
             )
 
             ZStack(alignment: .topLeading) {
                 ForEach(package.layers) { layer in
-                    let transform = phase.transform(for: layer.bone)
+                    let transform = phase.layerTransform(for: layer.bone)
                     let anchor = package.anchorUnitPoint(for: layer)
 
                     Image(uiImage: layer.image)
@@ -64,6 +64,11 @@ struct AvatarLayeredMotionView: View {
                 }
             }
             .frame(width: renderSize.width, height: renderSize.height, alignment: .topLeading)
+            .scaleEffect(phase.containerScale, anchor: .center)
+            .offset(
+                x: phase.containerOffset.width * scale,
+                y: phase.containerOffset.height * scale
+            )
             .position(x: geometry.size.width / 2, y: geometry.size.height / 2)
         }
     }
@@ -267,54 +272,33 @@ private struct AvatarLayerMotionPhase {
     let seconds: TimeInterval
     let isActive: Bool
 
-    func transform(for bone: String) -> AvatarLayerTransform {
-        let idle = sin(seconds * .pi * 2 / 2.6)
-        guard isActive else {
-            return idleTransform(for: bone, idle: idle)
-        }
-
-        let wave = sin(seconds * .pi * 2 / 1.05)
-        let hairLag = sin(seconds * .pi * 2 / 2.2 + 0.65)
-        let dressLag = sin(seconds * .pi * 2 / 2.0 + 0.35)
-
-        switch bone {
-        case "torso", "hip":
-            return AvatarLayerTransform(rotationDegrees: idle * 1.1, offset: offset(idle * 2, idle * -4))
-        case "head":
-            return AvatarLayerTransform(rotationDegrees: idle * -1.4, offset: offset(idle * 1.5, idle * -2))
-        case "upperArmRight":
-            return AvatarLayerTransform(rotationDegrees: -20 + wave * 7, offset: offset(wave * 3, idle * -2))
-        case "lowerArmRight":
-            return AvatarLayerTransform(rotationDegrees: -42 + wave * 18, offset: offset(wave * 6, idle * -3))
-        case "handRight":
-            return AvatarLayerTransform(rotationDegrees: wave * 22, offset: offset(wave * 7, idle * -2))
-        case "upperArmLeft", "lowerArmLeft", "handLeft":
-            return AvatarLayerTransform(rotationDegrees: idle * 1.6, offset: offset(idle * -1, idle * -1))
-        case "hairBack", "hairBackDetail":
-            return AvatarLayerTransform(rotationDegrees: hairLag * 2.8, offset: offset(hairLag * 4, idle * 2))
-        case "hairFront", "hairFrontDetail":
-            return AvatarLayerTransform(rotationDegrees: hairLag * -1.8, offset: offset(hairLag * 1.5, idle * -1))
-        case "hairSideLeft", "hairSideLeftDetail":
-            return AvatarLayerTransform(rotationDegrees: hairLag * -3.5, offset: offset(hairLag * -4, idle * 2))
-        case "hairSideRight", "hairSideRightDetail":
-            return AvatarLayerTransform(rotationDegrees: hairLag * 3.5, offset: offset(hairLag * 4, idle * 2))
-        case "skirt":
-            return AvatarLayerTransform(rotationDegrees: dressLag * 2.0, offset: offset(dressLag * 2, idle * 3))
-        case "legLeft", "legRight", "footLeft", "footRight":
-            return AvatarLayerTransform(rotationDegrees: idle * 0.7, offset: offset(0, idle * 1.5))
-        default:
-            return idleTransform(for: bone, idle: idle)
-        }
+    private var breath: Double {
+        guard isActive else { return 0 }
+        return sin(seconds * .pi * 2 / 3.4)
     }
 
-    private func idleTransform(for bone: String, idle: Double) -> AvatarLayerTransform {
+    var containerScale: CGFloat {
+        1 + CGFloat(breath * 0.0035)
+    }
+
+    var containerOffset: CGSize {
+        offset(0, breath * -3)
+    }
+
+    func layerTransform(for bone: String) -> AvatarLayerTransform {
+        guard isActive else { return .identity }
+
+        let hairLag = sin(seconds * .pi * 2 / 3.1 + 0.55)
+
         switch bone {
-        case "torso", "hip":
-            return AvatarLayerTransform(rotationDegrees: idle * 0.6, offset: offset(0, idle * -2))
-        case "head":
-            return AvatarLayerTransform(rotationDegrees: idle * -0.7, offset: offset(0, idle * -1))
-        case "hairBack", "hairBackDetail", "hairSideLeft", "hairSideLeftDetail", "hairSideRight", "hairSideRightDetail":
-            return AvatarLayerTransform(rotationDegrees: idle * 1.2, offset: offset(idle * 1.5, idle))
+        case "hairBack", "hairBackDetail":
+            return AvatarLayerTransform(rotationDegrees: hairLag * 0.8, offset: offset(hairLag * 1.2, breath * 0.6))
+        case "hairFront", "hairFrontDetail":
+            return AvatarLayerTransform(rotationDegrees: hairLag * -0.5, offset: offset(hairLag * 0.7, breath * -0.4))
+        case "hairSideLeft", "hairSideLeftDetail":
+            return AvatarLayerTransform(rotationDegrees: hairLag * -1.0, offset: offset(hairLag * -1.5, breath * 0.8))
+        case "hairSideRight", "hairSideRightDetail":
+            return AvatarLayerTransform(rotationDegrees: hairLag * 1.0, offset: offset(hairLag * 1.5, breath * 0.8))
         default:
             return .identity
         }

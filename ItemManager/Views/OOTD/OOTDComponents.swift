@@ -128,7 +128,7 @@ struct OOTDMannequinBackgroundView: View {
                 AvatarCharacterView(
                     request: AvatarRenderRequest(
                         characterID: avatarID,
-                        action: isMotionEnabled ? .wave : .stickerPresent,
+                        action: isMotionEnabled ? .idle : .stickerPresent,
                         expression: .neutral,
                         hairStyleID: background.avatarHairStyleID,
                         preferredBackend: .staticImage,
