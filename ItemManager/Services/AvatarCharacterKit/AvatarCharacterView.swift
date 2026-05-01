@@ -22,7 +22,12 @@ struct AvatarCharacterView: View {
     @ViewBuilder
     private var staticImageView: some View {
         #if canImport(UIKit)
-        if let image = AvatarStaticImageResolver.image(
+        if AvatarLayerAssetResolver.isAvailable(
+            characterID: request.characterID,
+            hairStyleID: request.hairStyleID
+        ) {
+            AvatarLayeredMotionView(request: request, contentMode: contentMode)
+        } else if let image = AvatarStaticImageResolver.image(
             characterID: request.characterID,
             hairStyleID: request.hairStyleID
         ) {

@@ -53,6 +53,7 @@ struct OOTDEditorView: View {
     // 工具栏和贴纸库显示状态
     @State private var isToolbarVisible: Bool
     @State private var isStickerLibraryVisible: Bool
+    @State private var isAvatarMotionEnabled = false
     
     // 初始化时设置默认值
     init(outfit: Outfit, onPageChange: ((Outfit) -> Void)? = nil, initialToolbarVisible: Bool = true, initialStickerLibraryVisible: Bool = false) {
@@ -95,6 +96,11 @@ struct OOTDEditorView: View {
     private var nextPage: Outfit? {
         guard hasNextPage else { return nil }
         return bookPages[currentPageIndex + 1]
+    }
+
+    private var canAnimateAvatar: Bool {
+        outfit.canvasType == OOTDCanvasType.mannequin
+        && OOTDMannequinBackground.resolve(outfit.mannequinAssetID).avatarCharacterID == .girlV1
     }
     
     var body: some View {
@@ -141,6 +147,18 @@ struct OOTDEditorView: View {
                         } label: {
                             Label("更换底图", systemImage: "photo")
                         }
+
+                        Button {
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                isAvatarMotionEnabled.toggle()
+                            }
+                        } label: {
+                            Label(
+                                isAvatarMotionEnabled && canAnimateAvatar ? "停止动作" : "让它能动起来",
+                                systemImage: isAvatarMotionEnabled && canAnimateAvatar ? "pause.circle" : "play.circle"
+                            )
+                        }
+                        .disabled(!canAnimateAvatar)
                         
                         Button {
                             showingSaveToClothingSheet = true
@@ -334,6 +352,7 @@ struct OOTDEditorView: View {
 
         // 保存新底图
         if let path = ImageManager.shared.saveImage(image, context: modelContext) {
+            isAvatarMotionEnabled = false
             outfit.backgroundImagePath = path
             outfit.canvasType = OOTDCanvasType.custom
             outfit.mannequinAssetID = nil
@@ -353,6 +372,7 @@ struct OOTDEditorView: View {
         outfit.backgroundImagePath = nil
         outfit.canvasType = OOTDCanvasType.blank
         outfit.mannequinAssetID = nil
+        isAvatarMotionEnabled = false
         outfit.snapshotPath = nil
         outfit.lastModified = Date()
         try? modelContext.save()
@@ -368,6 +388,9 @@ struct OOTDEditorView: View {
         outfit.backgroundImagePath = nil
         outfit.canvasType = OOTDCanvasType.mannequin
         outfit.mannequinAssetID = mannequin.id
+        if mannequin.avatarCharacterID != .girlV1 {
+            isAvatarMotionEnabled = false
+        }
         outfit.snapshotPath = nil
         outfit.lastModified = Date()
         try? modelContext.save()
@@ -530,6 +553,7 @@ struct OOTDEditorView: View {
                         isToolbarVisible: $isToolbarVisible,
                         isStickerLibraryVisible: $isStickerLibraryVisible,
                         isLandscape: true,
+                        isAvatarMotionEnabled: isAvatarMotionEnabled && canAnimateAvatar,
                         currentPageIndex: currentPageIndex,
                         totalPages: bookPages.count,
                         hasPreviousPage: hasPreviousPage,
@@ -567,6 +591,7 @@ struct OOTDEditorView: View {
                         isToolbarVisible: $isToolbarVisible,
                         isStickerLibraryVisible: $isStickerLibraryVisible,
                         isLandscape: false,
+                        isAvatarMotionEnabled: isAvatarMotionEnabled && canAnimateAvatar,
                         currentPageIndex: currentPageIndex,
                         totalPages: bookPages.count,
                         hasPreviousPage: hasPreviousPage,

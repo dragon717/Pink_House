@@ -135,6 +135,12 @@ def isolate_hair_pixels(image: Image.Image) -> Image.Image:
     out_pixels = output.load()
     for y in range(source.height):
         for x in range(source.width):
+            nx = x / max(source.width, 1)
+            ny = y / max(source.height, 1)
+            # Keep bangs, but remove the face core so eye/mouth colors from the
+            # reference render never become part of a replaceable hairstyle.
+            if 0.37 <= nx <= 0.63 and 0.20 <= ny <= 0.28:
+                continue
             r, g, b, a = source.getpixel((x, y))
             if a == 0:
                 continue

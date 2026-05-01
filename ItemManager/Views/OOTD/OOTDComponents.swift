@@ -63,13 +63,13 @@ struct OOTDMannequinBackground: Identifiable, Hashable {
 
     var selectionSubtitle: String {
         if avatarCharacterID != nil {
-            return "\(avatarHairStyleID.displayName)，可作为后续动作骨骼的静态预览。"
+            return "\(avatarHairStyleID.displayName)，透明发型层，可参与骨骼动作。"
         }
         return "适合快速开始搭配拼贴。"
     }
 
     var canvasScale: CGFloat {
-        avatarCharacterID == nil ? 1.0 : 0.72
+        avatarCharacterID == nil ? 1.0 : 0.55
     }
 
     /// Manifest-gated exposure: only list mannequin choices whose image asset is actually bundled.
@@ -116,6 +116,7 @@ struct OOTDMannequinBackgroundView: View {
     let mannequinAssetID: String?
     var contentMode: ContentMode = .fill
     var opacity: Double = 1
+    var isMotionEnabled: Bool = false
 
     private var background: OOTDMannequinBackground {
         OOTDMannequinBackground.resolve(mannequinAssetID)
@@ -127,10 +128,11 @@ struct OOTDMannequinBackgroundView: View {
                 AvatarCharacterView(
                     request: AvatarRenderRequest(
                         characterID: avatarID,
-                        action: .stickerPresent,
+                        action: isMotionEnabled ? .wave : .stickerPresent,
                         expression: .neutral,
                         hairStyleID: background.avatarHairStyleID,
-                        preferredBackend: .staticImage
+                        preferredBackend: .staticImage,
+                        isPaused: !isMotionEnabled
                     ),
                     contentMode: contentMode
                 )

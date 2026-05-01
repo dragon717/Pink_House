@@ -37,6 +37,8 @@ struct OOTDCanvasView: View {
     @Binding var isStickerLibraryVisible: Bool
     // 横屏状态
     var isLandscape: Bool = false
+    // 少女小人动作状态，仅当前编辑会话生效
+    var isAvatarMotionEnabled: Bool = false
     
     // 翻页相关参数
     let currentPageIndex: Int
@@ -147,7 +149,8 @@ struct OOTDCanvasView: View {
                 backgroundImagePath: outfit.backgroundImagePath,
                 mannequinAssetID: outfit.mannequinAssetID,
                 canvasWidth: canvasWidth,
-                canvasHeight: canvasHeight
+                canvasHeight: canvasHeight,
+                isAvatarMotionEnabled: isAvatarMotionEnabled
             )
             
             // Canvas Content
@@ -155,6 +158,7 @@ struct OOTDCanvasView: View {
                 CanvasItemView(
                     item: item,
                     selectedItemId: $selectedItemId,
+                    isAvatarMotionEnabled: isAvatarMotionEnabled,
                     additionalScale: selectedItemId == item.id ? gestureScale : 1.0,
                     additionalRotation: selectedItemId == item.id ? gestureRotation : .zero,
                     onDelete: {
@@ -470,6 +474,7 @@ struct CanvasItemView: View {
     @Environment(\.modelContext) private var modelContext
     @Bindable var item: OutfitItem
     @Binding var selectedItemId: UUID?
+    var isAvatarMotionEnabled: Bool = false
 
     var isSelected: Bool {
         selectedItemId == item.id
@@ -487,12 +492,15 @@ struct CanvasItemView: View {
     @State private var currentOffset: CGSize = .zero
     @State private var loadedImage: UIImage?
     @State private var isLoading = true // Default true to prevent flash of missing state
+    @State private var motionSeconds: TimeInterval = 0
 
     // 画布尺寸常量（与 OOTDCanvasView 保持一致）
     private let canvasWidth: CGFloat = 1080
     private let canvasHeight: CGFloat = 1440
     
     var body: some View {
+        let motion = stickerMotionTransform(seconds: motionSeconds)
+
         Group {
             if let uiImage = loadedImage {
                 Image(uiImage: uiImage)
@@ -511,12 +519,12 @@ struct CanvasItemView: View {
         }
         .frame(width: 200, height: 200) // Base size, adjusted by scale
         .scaleEffect(item.scale * additionalScale)
-        .rotationEffect(Angle(degrees: item.rotation) + additionalRotation)
+        .rotationEffect(Angle(degrees: item.rotation + motion.rotationDegrees) + additionalRotation)
         // 使用 position，将相对坐标（0-1）转换为绝对坐标（0-1080/1440）
         // 注意：App启动时已通过 OOTDCoordinateMigrationService 将所有数据迁移为相对坐标
         .position(
-            x: item.x * canvasWidth + currentOffset.width,
-            y: item.y * canvasHeight + currentOffset.height
+            x: item.x * canvasWidth + currentOffset.width + motion.offset.width,
+            y: item.y * canvasHeight + currentOffset.height + motion.offset.height
         )
         .overlay(
             ZStack {
@@ -588,12 +596,12 @@ struct CanvasItemView: View {
             }
             .frame(width: 200, height: 200)
             .scaleEffect(item.scale * additionalScale)
-            .rotationEffect(Angle(degrees: item.rotation) + additionalRotation)
+            .rotationEffect(Angle(degrees: item.rotation + motion.rotationDegrees) + additionalRotation)
             // overlay 使用与主视图相同的 position，确保选中框跟随贴纸
             // 注意：App启动时已通过 OOTDCoordinateMigrationService 将所有数据迁移为相对坐标
             .position(
-                x: item.x * canvasWidth + currentOffset.width,
-                y: item.y * canvasHeight + currentOffset.height
+                x: item.x * canvasWidth + currentOffset.width + motion.offset.width,
+                y: item.y * canvasHeight + currentOffset.height + motion.offset.height
             )
         )
         .gesture(
@@ -631,6 +639,72 @@ struct CanvasItemView: View {
         .task(id: item.id) {
             await loadImageOptimized()
         }
+        .onReceive(Timer.publish(every: 1.0 / 30.0, on: .main, in: .common).autoconnect()) { date in
+            if isAvatarMotionEnabled {
+                motionSeconds = date.timeIntervalSinceReferenceDate
+            } else if motionSeconds != 0 {
+                motionSeconds = 0
+            }
+        }
+    }
+
+    private func stickerMotionTransform(seconds: TimeInterval) -> OOTDStickerMotionTransform {
+        guard isAvatarMotionEnabled else { return .identity }
+
+        let idle = sin(seconds * .pi * 2 / 2.6)
+        let wave = sin(seconds * .pi * 2 / 1.05)
+        let dressLag = sin(seconds * .pi * 2 / 2.0 + 0.35)
+
+        switch inferredBinding {
+        case .torso:
+            return OOTDStickerMotionTransform(rotationDegrees: idle * 0.8, offset: CGSize(width: 0, height: CGFloat(idle * -4)))
+        case .skirt:
+            return OOTDStickerMotionTransform(rotationDegrees: dressLag * 1.8, offset: CGSize(width: CGFloat(dressLag * 2), height: CGFloat(idle * 3)))
+        case .rightArm:
+            return OOTDStickerMotionTransform(rotationDegrees: -14 + wave * 10, offset: CGSize(width: CGFloat(wave * 8), height: CGFloat(idle * -4)))
+        case .leftArm:
+            return OOTDStickerMotionTransform(rotationDegrees: idle * 1.2, offset: CGSize(width: CGFloat(idle * -2), height: CGFloat(idle * -2)))
+        case .foot:
+            return OOTDStickerMotionTransform(rotationDegrees: idle * 0.7, offset: CGSize(width: 0, height: CGFloat(idle * 1.5)))
+        case .none:
+            return .identity
+        }
+    }
+
+    private var inferredBinding: OOTDStickerMotionBinding {
+        let category = item.cutout?.category ?? ""
+        let name = item.cutout?.clothingName ?? ""
+        let text = "\(category) \(name)"
+
+        if text.contains("鞋") || text.contains("靴") {
+            return .foot
+        }
+        if text.contains("裙") || text.contains("连衣") || text.contains("半身") {
+            return .skirt
+        }
+        if text.contains("裤") {
+            return .skirt
+        }
+        if text.contains("上衣") || text.contains("外套") || text.contains("衬衫") || text.contains("短袖") || text.contains("长袖") || text.contains("毛衣") || text.contains("背心") {
+            return .torso
+        }
+
+        if item.y > 0.78 {
+            return .foot
+        }
+        if item.y > 0.43 && item.y < 0.68 {
+            return .skirt
+        }
+        if item.y > 0.24 && item.y <= 0.43 {
+            if item.x > 0.62 {
+                return .rightArm
+            }
+            if item.x < 0.38 {
+                return .leftArm
+            }
+            return .torso
+        }
+        return .none
     }
 
     private func loadImageOptimized() async {
@@ -674,6 +748,22 @@ struct CanvasItemView: View {
     }
 }
 
+private enum OOTDStickerMotionBinding {
+    case torso
+    case skirt
+    case rightArm
+    case leftArm
+    case foot
+    case none
+}
+
+private struct OOTDStickerMotionTransform {
+    static let identity = OOTDStickerMotionTransform()
+
+    var rotationDegrees: Double = 0
+    var offset: CGSize = .zero
+}
+
 // MARK: - 画布背景视图
 /// 独立的背景视图，避免在 canvasContent 中直接调用 loadImage 导致反馈循环
 struct CanvasBackgroundView: View {
@@ -682,6 +772,7 @@ struct CanvasBackgroundView: View {
     let mannequinAssetID: String?
     let canvasWidth: CGFloat
     let canvasHeight: CGFloat
+    let isAvatarMotionEnabled: Bool
     
     @State private var loadedImage: UIImage?
     
@@ -708,7 +799,8 @@ struct CanvasBackgroundView: View {
             } else {
                 OOTDMannequinBackgroundView(
                     mannequinAssetID: mannequinAssetID,
-                    contentMode: .fill
+                    contentMode: .fill,
+                    isMotionEnabled: isAvatarMotionEnabled
                 )
                     .frame(width: canvasWidth, height: canvasHeight)
                     .clipped()
