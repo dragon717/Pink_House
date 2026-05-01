@@ -16,9 +16,11 @@ struct OOTDMannequinBackground: Identifiable, Hashable {
     let displayName: String
     let assetName: String
     let avatarCharacterID: AvatarCharacterID?
+    let avatarHairStyleID: AvatarHairStyleID
 
     static let defaultID = "ootd_mannequin_default"
     static let legacyAssetName = "ootd"
+    static let shortBobID = "\(AvatarCharacterID.girlV1.rawValue)_short_bob"
 
     static let all: [OOTDMannequinBackground] = [
         OOTDMannequinBackground(
@@ -31,6 +33,13 @@ struct OOTDMannequinBackground: Identifiable, Hashable {
             displayName: AvatarCharacterID.girlV1.displayName,
             assetName: AvatarCharacterID.girlV1.staticImageName,
             avatarCharacterID: .girlV1
+        ),
+        OOTDMannequinBackground(
+            id: shortBobID,
+            displayName: "少女小人·短发",
+            assetName: AvatarCharacterID.girlV1.staticImageName,
+            avatarCharacterID: .girlV1,
+            avatarHairStyleID: .shortBob
         )
     ]
 
@@ -38,12 +47,14 @@ struct OOTDMannequinBackground: Identifiable, Hashable {
         id: String,
         displayName: String,
         assetName: String,
-        avatarCharacterID: AvatarCharacterID? = nil
+        avatarCharacterID: AvatarCharacterID? = nil,
+        avatarHairStyleID: AvatarHairStyleID = .defaultLongPink
     ) {
         self.id = id
         self.displayName = displayName
         self.assetName = assetName
         self.avatarCharacterID = avatarCharacterID
+        self.avatarHairStyleID = avatarHairStyleID
     }
 
     static var defaultBackground: OOTDMannequinBackground {
@@ -52,7 +63,7 @@ struct OOTDMannequinBackground: Identifiable, Hashable {
 
     var selectionSubtitle: String {
         if avatarCharacterID != nil {
-            return "少女版通用小人，可作为后续动作骨骼的静态预览。"
+            return "\(avatarHairStyleID.displayName)，可作为后续动作骨骼的静态预览。"
         }
         return "适合快速开始搭配拼贴。"
     }
@@ -63,7 +74,21 @@ struct OOTDMannequinBackground: Identifiable, Hashable {
 
     /// Manifest-gated exposure: only list mannequin choices whose image asset is actually bundled.
     static var available: [OOTDMannequinBackground] {
-        all.filter { UIImage(named: $0.assetName) != nil }
+        all.filter(\.isAvailable)
+    }
+
+    private var isAvailable: Bool {
+        #if canImport(UIKit)
+        if let avatarCharacterID {
+            return AvatarStaticImageResolver.isAvailable(
+                characterID: avatarCharacterID,
+                hairStyleID: avatarHairStyleID
+            )
+        }
+        return UIImage(named: assetName) != nil
+        #else
+        return avatarCharacterID != nil
+        #endif
     }
 
     static func resolve(_ id: String?) -> OOTDMannequinBackground {
@@ -104,6 +129,7 @@ struct OOTDMannequinBackgroundView: View {
                         characterID: avatarID,
                         action: .stickerPresent,
                         expression: .neutral,
+                        hairStyleID: background.avatarHairStyleID,
                         preferredBackend: .staticImage
                     ),
                     contentMode: contentMode

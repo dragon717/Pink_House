@@ -21,11 +21,18 @@ struct AvatarCharacterView: View {
 
     @ViewBuilder
     private var staticImageView: some View {
-        if UIImage(named: request.characterID.staticImageName) != nil {
-            image(request.characterID.staticImageName)
+        #if canImport(UIKit)
+        if let image = AvatarStaticImageResolver.image(
+            characterID: request.characterID,
+            hairStyleID: request.hairStyleID
+        ) {
+            avatarImage(image)
         } else {
             fallbackSilhouette
         }
+        #else
+        fallbackSilhouette
+        #endif
     }
 
     @ViewBuilder
@@ -59,6 +66,21 @@ struct AvatarCharacterView: View {
             base.scaledToFit()
         }
     }
+
+    #if canImport(UIKit)
+    @ViewBuilder
+    private func avatarImage(_ image: UIImage) -> some View {
+        let base = Image(uiImage: image).resizable()
+        switch contentMode {
+        case .fill:
+            base.scaledToFill()
+        case .fit:
+            base.scaledToFit()
+        @unknown default:
+            base.scaledToFit()
+        }
+    }
+    #endif
 
     private var fallbackSilhouette: some View {
         ZStack {

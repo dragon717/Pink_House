@@ -10,6 +10,7 @@
 - GPT Image 2 少女小人静态图：PASS
 - Live2D bootstrap 素体分层 PNG：PASS（13 层，头发已迁移到可替换发型包）
 - 可替换发型分层 PNG：PASS（2 个发型，每个 10 层）
+- 魔法贴纸发型入口：PASS（更换底图中可选择长发/短发两种少女小人）
 - 默认衣服内置分层 PNG：PASS（10 层，隐藏于普通贴纸列表）
 - 魔法贴纸小人显示尺寸：PASS（少女小人画布缩放为 0.72）
 - 贴纸最大缩放限制：PASS（上限 2.0，避免最大衣服贴纸覆盖完整小人）
@@ -47,6 +48,7 @@ git diff --check
 - `avatar_girl_v1_static.png` 当前是浅白/淡蓝 unitard 素体，不再包含默认裙装。
 - `asserts/avatar/girl_v1/live2d/layers/` 已生成 13 个身体素体首版分层 PNG。
 - `asserts/avatar/girl_v1/live2d/hairstyles/` 已生成 `default_long_pink` 和 `short_bob` 两个发型包，每个包含前景、后景、侧发、细节、高光 10 层。
+- `OOTDMannequinBackground` 已通过同一个 `girl_v1` 角色接入不同 `AvatarHairStyleID`，静态 renderer 会按发型包加载预览。
 - `asserts/avatar/girl_v1/live2d/outfits/default/layers/` 已生成 10 个默认衣服内置分层 PNG。
 - `asserts/avatar/girl_v1/live2d/clothing_sticker_split_rules.json` 已记录后续衣服贴纸拆分 slot 和隐藏列表策略。
 - `temp/_live2d_avatar_harness/LIVE2D_RESEARCH.md` 已记录 Live2D 官方素材分离、ArtMesh、Motion 与 Native sample 调研结论。

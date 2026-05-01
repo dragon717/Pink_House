@@ -1,5 +1,8 @@
 import Foundation
 import SwiftUI
+#if canImport(UIKit)
+import UIKit
+#endif
 
 enum AvatarCharacterID: String, CaseIterable, Codable, Identifiable, Hashable {
     case girlV1 = "girl_v1"
@@ -106,6 +109,38 @@ enum AvatarHairStyleID: String, CaseIterable, Codable, Identifiable, Hashable {
             return "短波波头"
         }
     }
+}
+
+enum AvatarStaticImageResolver {
+    #if canImport(UIKit)
+    static func isAvailable(characterID: AvatarCharacterID, hairStyleID: AvatarHairStyleID) -> Bool {
+        if hairStyleID == .defaultLongPink {
+            return UIImage(named: characterID.staticImageName) != nil
+        }
+        return hairstyleSourceImage(characterID: characterID, hairStyleID: hairStyleID) != nil
+    }
+
+    static func image(characterID: AvatarCharacterID, hairStyleID: AvatarHairStyleID) -> UIImage? {
+        if hairStyleID == .defaultLongPink,
+           let image = UIImage(named: characterID.staticImageName) {
+            return image
+        }
+
+        if let hairstyleImage = hairstyleSourceImage(characterID: characterID, hairStyleID: hairStyleID) {
+            return hairstyleImage
+        }
+
+        return UIImage(named: characterID.staticImageName)
+    }
+
+    private static func hairstyleSourceImage(characterID: AvatarCharacterID, hairStyleID: AvatarHairStyleID) -> UIImage? {
+        let subdirectory = "asserts/avatar/\(characterID.assetDirectoryName)/live2d/hairstyles/\(hairStyleID.rawValue)"
+        guard let url = Bundle.main.url(forResource: "source_full", withExtension: "png", subdirectory: subdirectory) else {
+            return nil
+        }
+        return UIImage(contentsOfFile: url.path)
+    }
+    #endif
 }
 
 enum AvatarRenderBackend: String, CaseIterable, Codable, Identifiable, Hashable {
