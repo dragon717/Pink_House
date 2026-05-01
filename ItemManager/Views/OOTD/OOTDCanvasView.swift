@@ -1,6 +1,7 @@
 
 import SwiftUI
 import SwiftData
+import Combine
 
 private enum OOTDCanvasTransformLimits {
     static let minStickerScale: Double = 0.3
