@@ -17,6 +17,8 @@ enum TransparentVideoSupport {
         let normalized = normalizedResourceName(videoName)
         return normalized.hasPrefix("naicha_") ||
                normalized.hasPrefix("maomao_") ||
+               videoName.hasPrefix("avatar/") ||
+               normalized.hasPrefix("girl_v1_") ||
                normalized.hasPrefix("pet_feed_")
     }
 
@@ -136,12 +138,26 @@ class VideoResourceManager {
     
     /// 从 App Bundle 查找视频
     private func findInBundle(name videoName: String) -> URL? {
+        if videoName.contains("/") {
+            let path = (videoName as NSString).deletingLastPathComponent
+            let resource = (videoName as NSString).lastPathComponent
+            let nestedSubdirectory = path.isEmpty ? bundleSubdirectory : "\(bundleSubdirectory)/\(path)"
+            if let url = Bundle.main.url(forResource: resource, withExtension: "mov", subdirectory: nestedSubdirectory) {
+                return url
+            }
+            if let url = Bundle.main.url(forResource: resource, withExtension: "mp4", subdirectory: nestedSubdirectory) {
+                return url
+            }
+        }
+
         // 确定子目录
         let subdirectory: String
         if videoName.hasPrefix("naicha_") {
             subdirectory = "\(bundleSubdirectory)/naicha"
         } else if videoName.hasPrefix("maomao_") {
             subdirectory = "\(bundleSubdirectory)/maomao"
+        } else if videoName.hasPrefix("girl_v1_") {
+            subdirectory = "\(bundleSubdirectory)/avatar/girl_v1/video"
         } else {
             subdirectory = bundleSubdirectory
         }
