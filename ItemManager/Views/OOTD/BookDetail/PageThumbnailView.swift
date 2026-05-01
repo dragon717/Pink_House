@@ -73,11 +73,12 @@ struct PageThumbnailView: View {
         case OOTDCanvasType.mannequin:
             ZStack {
                 colorScheme == .dark ? Color(uiColor: .systemGray6) : Color.white
-                Image(OOTDMannequinBackground.resolvedAssetName(for: page.mannequinAssetID))
-                    .resizable()
-                    .scaledToFill()
-                    .opacity(0.86)
-                Text("人台")
+                OOTDMannequinBackgroundView(
+                    mannequinAssetID: page.mannequinAssetID,
+                    contentMode: .fill,
+                    opacity: 0.86
+                )
+                Text(OOTDMannequinBackground.resolve(page.mannequinAssetID).displayName)
                     .font(.caption2)
                     .foregroundStyle(.gray)
                     .offset(y: 24)

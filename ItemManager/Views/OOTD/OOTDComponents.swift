@@ -15,6 +15,7 @@ struct OOTDMannequinBackground: Identifiable, Hashable {
     let id: String
     let displayName: String
     let assetName: String
+    let avatarCharacterID: AvatarCharacterID?
 
     static let defaultID = "ootd_mannequin_default"
     static let legacyAssetName = "ootd"
@@ -24,8 +25,26 @@ struct OOTDMannequinBackground: Identifiable, Hashable {
             id: defaultID,
             displayName: "基础线稿人台",
             assetName: "ootd_mannequin_default"
+        ),
+        OOTDMannequinBackground(
+            id: AvatarCharacterID.girlV1.rawValue,
+            displayName: AvatarCharacterID.girlV1.displayName,
+            assetName: AvatarCharacterID.girlV1.staticImageName,
+            avatarCharacterID: .girlV1
         )
     ]
+
+    init(
+        id: String,
+        displayName: String,
+        assetName: String,
+        avatarCharacterID: AvatarCharacterID? = nil
+    ) {
+        self.id = id
+        self.displayName = displayName
+        self.assetName = assetName
+        self.avatarCharacterID = avatarCharacterID
+    }
 
     static var defaultBackground: OOTDMannequinBackground {
         all[0]
@@ -54,6 +73,48 @@ struct OOTDMannequinBackground: Identifiable, Hashable {
             return legacyAssetName
         }
         return candidate.assetName
+    }
+}
+
+struct OOTDMannequinBackgroundView: View {
+    let mannequinAssetID: String?
+    var contentMode: ContentMode = .fill
+    var opacity: Double = 1
+
+    private var background: OOTDMannequinBackground {
+        OOTDMannequinBackground.resolve(mannequinAssetID)
+    }
+
+    var body: some View {
+        Group {
+            if let avatarID = background.avatarCharacterID {
+                AvatarCharacterView(
+                    request: AvatarRenderRequest(
+                        characterID: avatarID,
+                        action: .stickerPresent,
+                        expression: .neutral,
+                        preferredBackend: .staticImage
+                    ),
+                    contentMode: contentMode
+                )
+            } else {
+                image(OOTDMannequinBackground.resolvedAssetName(for: mannequinAssetID))
+            }
+        }
+        .opacity(opacity)
+    }
+
+    @ViewBuilder
+    private func image(_ name: String) -> some View {
+        let base = Image(name).resizable()
+        switch contentMode {
+        case .fill:
+            base.scaledToFill()
+        case .fit:
+            base.scaledToFit()
+        @unknown default:
+            base.scaledToFit()
+        }
     }
 }
 
@@ -221,9 +282,10 @@ struct OOTDBackgroundSelectionSheet: View {
     @ViewBuilder
     private func mannequinThumbnail(_ mannequin: OOTDMannequinBackground) -> some View {
         if UIImage(named: mannequin.assetName) != nil {
-            Image(mannequin.assetName)
-                .resizable()
-                .scaledToFill()
+            OOTDMannequinBackgroundView(
+                mannequinAssetID: mannequin.id,
+                contentMode: .fill
+            )
                 .frame(width: 52, height: 70)
                 .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                 .overlay(

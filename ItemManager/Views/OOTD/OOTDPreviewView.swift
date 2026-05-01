@@ -26,9 +26,10 @@ struct OOTDPreviewView: View {
                     .clipped()
             } else {
                 // Mannequin or fallback
-                Image(OOTDMannequinBackground.resolvedAssetName(for: outfit.mannequinAssetID))
-                    .resizable()
-                    .scaledToFill()
+                OOTDMannequinBackgroundView(
+                    mannequinAssetID: outfit.mannequinAssetID,
+                    contentMode: .fill
+                )
                     .frame(width: canvasWidth, height: canvasHeight)
                     .clipped()
             }

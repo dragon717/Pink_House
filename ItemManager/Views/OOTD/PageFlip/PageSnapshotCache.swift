@@ -112,10 +112,11 @@ private struct PagePlaceholderView: View {
             } else if outfit.canvasType == OOTDCanvasType.custom {
                 Color.gray.opacity(0.2)
             } else {
-                Image(OOTDMannequinBackground.resolvedAssetName(for: outfit.mannequinAssetID))
-                    .resizable()
-                    .scaledToFill()
-                    .opacity(0.3)
+                OOTDMannequinBackgroundView(
+                    mannequinAssetID: outfit.mannequinAssetID,
+                    contentMode: .fill,
+                    opacity: 0.3
+                )
             }
             
             // 加载指示器

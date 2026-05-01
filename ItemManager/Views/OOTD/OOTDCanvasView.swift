@@ -692,9 +692,10 @@ struct CanvasBackgroundView: View {
                         )
                 }
             } else {
-                Image(OOTDMannequinBackground.resolvedAssetName(for: mannequinAssetID))
-                    .resizable()
-                    .scaledToFill()
+                OOTDMannequinBackgroundView(
+                    mannequinAssetID: mannequinAssetID,
+                    contentMode: .fill
+                )
                     .frame(width: canvasWidth, height: canvasHeight)
                     .clipped()
             }
