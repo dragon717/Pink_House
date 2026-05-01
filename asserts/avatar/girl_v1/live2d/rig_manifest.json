@@ -9,29 +9,6 @@
   "coordinate_space": "normalized_static_image",
   "layers": [
     {
-      "name": "hair_back",
-      "file": "layers/hair_back.png",
-      "source_bbox_normalized": [
-        0.17,
-        0.02,
-        0.84,
-        0.49
-      ],
-      "source_bbox_pixels": [
-        185,
-        29,
-        912,
-        710
-      ],
-      "size": [
-        591,
-        681
-      ],
-      "bone": "hairBack",
-      "z": 10,
-      "notes": "Bootstrap crop from gpt-image-2 full-body source; final Cubism PSD should redraw hidden overdraw behind joints."
-    },
-    {
       "name": "leg_left",
       "file": "layers/leg_left.png",
       "source_bbox_normalized": [
@@ -262,52 +239,6 @@
       "notes": "Bootstrap crop from gpt-image-2 full-body source; final Cubism PSD should redraw hidden overdraw behind joints."
     },
     {
-      "name": "hair_side_left",
-      "file": "layers/hair_side_left.png",
-      "source_bbox_normalized": [
-        0.17,
-        0.15,
-        0.42,
-        0.49
-      ],
-      "source_bbox_pixels": [
-        185,
-        217,
-        456,
-        710
-      ],
-      "size": [
-        209,
-        493
-      ],
-      "bone": "hairSideLeft",
-      "z": 70,
-      "notes": "Bootstrap crop from gpt-image-2 full-body source; final Cubism PSD should redraw hidden overdraw behind joints."
-    },
-    {
-      "name": "hair_side_right",
-      "file": "layers/hair_side_right.png",
-      "source_bbox_normalized": [
-        0.58,
-        0.15,
-        0.84,
-        0.49
-      ],
-      "source_bbox_pixels": [
-        630,
-        217,
-        912,
-        710
-      ],
-      "size": [
-        208,
-        493
-      ],
-      "bone": "hairSideRight",
-      "z": 70,
-      "notes": "Bootstrap crop from gpt-image-2 full-body source; final Cubism PSD should redraw hidden overdraw behind joints."
-    },
-    {
       "name": "hand_left",
       "file": "layers/hand_left.png",
       "source_bbox_normalized": [
@@ -375,29 +306,6 @@
       "bone": "head",
       "z": 80,
       "notes": "Bootstrap crop from gpt-image-2 full-body source; final Cubism PSD should redraw hidden overdraw behind joints."
-    },
-    {
-      "name": "hair_front",
-      "file": "layers/hair_front.png",
-      "source_bbox_normalized": [
-        0.29,
-        0.01,
-        0.72,
-        0.29
-      ],
-      "source_bbox_pixels": [
-        315,
-        14,
-        782,
-        420
-      ],
-      "size": [
-        422,
-        399
-      ],
-      "bone": "hairFront",
-      "z": 90,
-      "notes": "Bootstrap crop from gpt-image-2 full-body source; final Cubism PSD should redraw hidden overdraw behind joints."
     }
   ],
   "bones": {
@@ -429,8 +337,22 @@
         0.16
       ]
     },
+    "hairBackDetail": {
+      "parent": "hairBack",
+      "anchor": [
+        0.5,
+        0.16
+      ]
+    },
     "hairFront": {
       "parent": "head",
+      "anchor": [
+        0.5,
+        0.13
+      ]
+    },
+    "hairFrontDetail": {
+      "parent": "hairFront",
       "anchor": [
         0.5,
         0.13
@@ -448,6 +370,20 @@
       "anchor": [
         0.7,
         0.24
+      ]
+    },
+    "hairSideLeftDetail": {
+      "parent": "hairSideLeft",
+      "anchor": [
+        0.3,
+        0.25
+      ]
+    },
+    "hairSideRightDetail": {
+      "parent": "hairSideRight",
+      "anchor": [
+        0.7,
+        0.25
       ]
     },
     "upperArmLeft": {
@@ -549,6 +485,22 @@
       "show_in_sticker_list": false
     }
   },
+  "replaceable_hairstyles": {
+    "index": "asserts/avatar/girl_v1/live2d/hairstyles/hairstyle_index.json",
+    "default_hairstyle_id": "default_long_pink",
+    "layer_contract": [
+      "hair_back_base",
+      "hair_back_detail",
+      "hair_side_left_base",
+      "hair_side_right_base",
+      "hair_side_left_detail",
+      "hair_side_right_detail",
+      "hair_front_bangs",
+      "hair_front_detail",
+      "hair_highlight_front",
+      "hair_highlight_back"
+    ]
+  },
   "actions": [
     "idle",
     "greet",
@@ -573,6 +525,7 @@
   "live2d_notes": [
     "Use this as an engineering bootstrap layer kit.",
     "Before final Cubism binding, repaint hidden overdraw for shoulders, elbows, wrists, hips, knees, neck, skirt hem, and hair roots.",
+    "Hair is replaceable through hairstyles/<style_id>/hairstyle_manifest.json packages; body layers should not hard-code one hairstyle.",
     "Keep layer filenames stable so Swift and harness checks remain valid."
   ]
 }

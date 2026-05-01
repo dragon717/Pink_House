@@ -58,6 +58,7 @@ def load_manifest(path: Path) -> dict:
                 "required_expressions",
                 "render_backends",
                 "layer_outputs",
+                "hairstyle_layer_outputs",
                 "default_outfit_layer_outputs",
             } else None
             if current_list:
@@ -176,6 +177,66 @@ def main() -> int:
     missing_manifest_layers = sorted(set(expected_layers) - set(manifest_layer_names))
     layers_ok = layer_manifest_ok and not missing_layer_files and not missing_manifest_layers
 
+    hairstyle_index_path = Path(manifest.get("asset_roots", {}).get("hairstyle_index", ""))
+    hairstyle_root = Path(manifest.get("asset_roots", {}).get("hairstyles", ""))
+    expected_hairstyle_layers = list(manifest.get("hairstyle_layer_outputs") or [])
+    hairstyle_index_ok = hairstyle_index_path.exists()
+    hairstyle_index_error = None
+    hairstyle_entries = []
+    hairstyle_reports = []
+    if hairstyle_index_ok:
+        try:
+            hairstyle_index = json.loads(hairstyle_index_path.read_text(encoding="utf-8"))
+            hairstyle_entries = list(hairstyle_index.get("hairstyles", []))
+        except Exception as exc:
+            hairstyle_index_ok = False
+            hairstyle_index_error = str(exc)
+    for style in hairstyle_entries:
+        style_id = style.get("hairstyle_id")
+        style_manifest_path = Path(style.get("manifest", ""))
+        if not style_manifest_path.is_absolute() and not style_manifest_path.exists():
+            style_manifest_path = hairstyle_root / str(style_id) / "hairstyle_manifest.json"
+        style_report = {
+            "hairstyle_id": style_id,
+            "manifest": str(style_manifest_path),
+            "manifest_ok": style_manifest_path.exists(),
+            "missing_layer_files": expected_hairstyle_layers[:],
+            "missing_manifest_layers": expected_hairstyle_layers[:],
+            "show_in_sticker_list": None,
+            "replaceable": None,
+            "ok": False,
+        }
+        if style_manifest_path.exists():
+            try:
+                style_manifest = json.loads(style_manifest_path.read_text(encoding="utf-8"))
+                style_layer_names = [row.get("name") for row in style_manifest.get("layers", [])]
+                style_layer_dir = style_manifest_path.parent / "layers"
+                missing_style_files = [
+                    name for name in expected_hairstyle_layers
+                    if not (style_layer_dir / f"{name}.png").exists()
+                ]
+                missing_style_manifest_layers = sorted(set(expected_hairstyle_layers) - set(style_layer_names))
+                style_report.update({
+                    "missing_layer_files": missing_style_files,
+                    "missing_manifest_layers": missing_style_manifest_layers,
+                    "show_in_sticker_list": style_manifest.get("show_in_sticker_list"),
+                    "replaceable": style_manifest.get("replaceable"),
+                    "ok": (
+                        not missing_style_files
+                        and not missing_style_manifest_layers
+                        and style_manifest.get("show_in_sticker_list") is False
+                        and style_manifest.get("replaceable") is True
+                    ),
+                })
+            except Exception as exc:
+                style_report["manifest_error"] = str(exc)
+        hairstyle_reports.append(style_report)
+    hairstyles_ok = (
+        hairstyle_index_ok
+        and len(hairstyle_reports) >= 2
+        and all(row.get("ok") for row in hairstyle_reports)
+    )
+
     outfit_manifest_path = Path(manifest.get("asset_roots", {}).get("default_outfit_manifest", ""))
     outfit_layer_dir = Path(manifest.get("asset_roots", {}).get("default_outfit_layers", ""))
     expected_outfit_layers = list(manifest.get("default_outfit_layer_outputs") or [])
@@ -210,6 +271,7 @@ def main() -> int:
         and not missing_actions
         and not missing_expressions
         and layers_ok
+        and hairstyles_ok
         and outfit_layers_ok
         and video_ok
         and live2d_ok,
@@ -229,6 +291,15 @@ def main() -> int:
             "missing_layer_files": missing_layer_files,
             "missing_manifest_layers": missing_manifest_layers,
             "ok": layers_ok,
+        },
+        "hairstyles": {
+            "root": str(hairstyle_root),
+            "index": str(hairstyle_index_path),
+            "index_ok": hairstyle_index_ok,
+            "index_error": hairstyle_index_error,
+            "expected_layer_count": len(expected_hairstyle_layers),
+            "styles": hairstyle_reports,
+            "ok": hairstyles_ok,
         },
         "default_outfit_layers": {
             "dir": str(outfit_layer_dir),

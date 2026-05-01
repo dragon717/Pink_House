@@ -1,0 +1,276 @@
+{
+  "schema_version": 1,
+  "avatar_id": "girl_v1",
+  "hairstyle_id": "default_long_pink",
+  "display_name": "粉色长发",
+  "source": "asserts/avatar/girl_v1/live2d/hairstyles/default_long_pink/source_full.png",
+  "is_default": true,
+  "replaceable": true,
+  "show_in_sticker_list": false,
+  "layers": [
+    {
+      "name": "hair_back_base",
+      "file": "hairstyles/default_long_pink/layers/hair_back_base.png",
+      "slot": "hair.back.base",
+      "role": "background",
+      "source_bbox_normalized": [
+        0.17,
+        0.02,
+        0.84,
+        0.5
+      ],
+      "source_bbox_pixels": [
+        185,
+        29,
+        912,
+        724
+      ],
+      "size": [
+        591,
+        695
+      ],
+      "bone": "hairBack",
+      "z": 8,
+      "replaceable": true,
+      "show_in_sticker_list": false
+    },
+    {
+      "name": "hair_back_detail",
+      "file": "hairstyles/default_long_pink/layers/hair_back_detail.png",
+      "slot": "hair.back.detail",
+      "role": "detail",
+      "source_bbox_normalized": [
+        0.2,
+        0.02,
+        0.8,
+        0.5
+      ],
+      "source_bbox_pixels": [
+        217,
+        29,
+        869,
+        724
+      ],
+      "size": [
+        591,
+        695
+      ],
+      "bone": "hairBackDetail",
+      "z": 9,
+      "replaceable": true,
+      "show_in_sticker_list": false
+    },
+    {
+      "name": "hair_highlight_back",
+      "file": "hairstyles/default_long_pink/layers/hair_highlight_back.png",
+      "slot": "hair.highlight.back",
+      "role": "detail",
+      "source_bbox_normalized": [
+        0.22,
+        0.02,
+        0.78,
+        0.48
+      ],
+      "source_bbox_pixels": [
+        239,
+        29,
+        847,
+        695
+      ],
+      "size": [
+        560,
+        666
+      ],
+      "bone": "hairBackDetail",
+      "z": 12,
+      "replaceable": true,
+      "show_in_sticker_list": false
+    },
+    {
+      "name": "hair_side_left_base",
+      "file": "hairstyles/default_long_pink/layers/hair_side_left_base.png",
+      "slot": "hair.side.left.base",
+      "role": "foreground",
+      "source_bbox_normalized": [
+        0.12,
+        0.11,
+        0.43,
+        0.53
+      ],
+      "source_bbox_pixels": [
+        130,
+        159,
+        467,
+        767
+      ],
+      "size": [
+        220,
+        602
+      ],
+      "bone": "hairSideLeft",
+      "z": 66,
+      "replaceable": true,
+      "show_in_sticker_list": false
+    },
+    {
+      "name": "hair_side_right_base",
+      "file": "hairstyles/default_long_pink/layers/hair_side_right_base.png",
+      "slot": "hair.side.right.base",
+      "role": "foreground",
+      "source_bbox_normalized": [
+        0.57,
+        0.11,
+        0.88,
+        0.53
+      ],
+      "source_bbox_pixels": [
+        619,
+        159,
+        956,
+        767
+      ],
+      "size": [
+        219,
+        578
+      ],
+      "bone": "hairSideRight",
+      "z": 66,
+      "replaceable": true,
+      "show_in_sticker_list": false
+    },
+    {
+      "name": "hair_side_left_detail",
+      "file": "hairstyles/default_long_pink/layers/hair_side_left_detail.png",
+      "slot": "hair.side.left.detail",
+      "role": "detail",
+      "source_bbox_normalized": [
+        0.1,
+        0.17,
+        0.44,
+        0.56
+      ],
+      "source_bbox_pixels": [
+        109,
+        246,
+        478,
+        811
+      ],
+      "size": [
+        231,
+        565
+      ],
+      "bone": "hairSideLeftDetail",
+      "z": 69,
+      "replaceable": true,
+      "show_in_sticker_list": false
+    },
+    {
+      "name": "hair_side_right_detail",
+      "file": "hairstyles/default_long_pink/layers/hair_side_right_detail.png",
+      "slot": "hair.side.right.detail",
+      "role": "detail",
+      "source_bbox_normalized": [
+        0.56,
+        0.17,
+        0.9,
+        0.56
+      ],
+      "source_bbox_pixels": [
+        608,
+        246,
+        977,
+        811
+      ],
+      "size": [
+        230,
+        564
+      ],
+      "bone": "hairSideRightDetail",
+      "z": 69,
+      "replaceable": true,
+      "show_in_sticker_list": false
+    },
+    {
+      "name": "hair_front_bangs",
+      "file": "hairstyles/default_long_pink/layers/hair_front_bangs.png",
+      "slot": "hair.front.bangs",
+      "role": "foreground",
+      "source_bbox_normalized": [
+        0.28,
+        0.01,
+        0.72,
+        0.2
+      ],
+      "source_bbox_pixels": [
+        304,
+        14,
+        782,
+        290
+      ],
+      "size": [
+        322,
+        269
+      ],
+      "bone": "hairFront",
+      "z": 91,
+      "replaceable": true,
+      "show_in_sticker_list": false
+    },
+    {
+      "name": "hair_front_detail",
+      "file": "hairstyles/default_long_pink/layers/hair_front_detail.png",
+      "slot": "hair.front.detail",
+      "role": "detail",
+      "source_bbox_normalized": [
+        0.23,
+        0.02,
+        0.77,
+        0.3
+      ],
+      "source_bbox_pixels": [
+        250,
+        29,
+        836,
+        434
+      ],
+      "size": [
+        436,
+        405
+      ],
+      "bone": "hairFrontDetail",
+      "z": 94,
+      "replaceable": true,
+      "show_in_sticker_list": false
+    },
+    {
+      "name": "hair_highlight_front",
+      "file": "hairstyles/default_long_pink/layers/hair_highlight_front.png",
+      "slot": "hair.highlight.front",
+      "role": "detail",
+      "source_bbox_normalized": [
+        0.3,
+        0.01,
+        0.7,
+        0.22
+      ],
+      "source_bbox_pixels": [
+        326,
+        14,
+        760,
+        319
+      ],
+      "size": [
+        327,
+        298
+      ],
+      "bone": "hairFrontDetail",
+      "z": 96,
+      "replaceable": true,
+      "show_in_sticker_list": false
+    }
+  ],
+  "notes": [
+    "Bootstrap hair-only crops from gpt-image-2 full-body sources.",
+    "Final Cubism PSD should redraw clean strand tips, roots, and hidden overdraw."
+  ]
+}

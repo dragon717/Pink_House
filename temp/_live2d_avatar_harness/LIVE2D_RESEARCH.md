@@ -4,10 +4,11 @@
 
 ## 结论
 
-- 魔法贴纸里的小人应按 Live2D 素体来做：头、脸、发、躯干、髋、上臂、前臂、手、腿、脚都独立成层；衣服不是画死在身体上，而是独立 outfit layer。
+- 魔法贴纸里的小人应按 Live2D 素体来做：头、脸、躯干、髋、上臂、前臂、手、腿、脚都独立成层；头发和衣服都不是画死在身体上，而是独立可替换 package。
+- 头发需要独立发型包：后发、前刘海、侧发、细节层、高光层拆开；换发型时替换整个 hairstyle package，不改身体素体。
 - 小人自带的默认衣服属于角色包的一部分，不进普通贴纸列表；普通列表只放用户可以拖拽摆放的贴纸。
 - 用户新增衣服贴纸如果要跟随 Live2D 动作，需要先按 slot 拆分，再绑定到相同骨骼：上衣到 torso，袖子到 upper/lower arm，裙摆到 skirt，鞋到 foot。
-- SwiftUI 侧只消费 `AvatarCharacterID`、`AvatarAction`、`AvatarExpression`，业务页不直接碰 Cubism 参数；以后 Cubism 上线时替换 renderer，不改魔法贴纸和萌宠对话的调用方式。
+- SwiftUI 侧只消费 `AvatarCharacterID`、`AvatarAction`、`AvatarExpression`、`AvatarHairStyleID`，业务页不直接碰 Cubism 参数；以后 Cubism 上线时替换 renderer，不改魔法贴纸和萌宠对话的调用方式。
 
 ## 官方规范摘要
 
@@ -23,9 +24,11 @@
 
 ## 本项目拆分规则
 
-- 素体层：`hair_back`、`body_torso_base`、`head_face`、`hair_front`、`hair_side_left`、`hair_side_right`、`arm_upper_left/right`、`arm_lower_left/right`、`hand_left/right`、`hip_base`、`leg_left/right`、`foot_left/right`。
+- 素体层：`body_torso_base`、`head_face`、`arm_upper_left/right`、`arm_lower_left/right`、`hand_left/right`、`hip_base`、`leg_left/right`、`foot_left/right`。
+- 发型包：`default_long_pink` 和 `short_bob` 都遵守同一层契约：`hair_back_base`、`hair_back_detail`、`hair_side_left/right_base`、`hair_side_left/right_detail`、`hair_front_bangs`、`hair_front_detail`、`hair_highlight_front/back`。
 - 默认衣服内嵌层：`dress_bodice`、`dress_skirt`、`sleeve_left/right`、`wrist_cuff_left/right`、`hair_bows`、`neck_bow`、`shoe_left/right`。
 - 默认衣服 manifest 必须标记 `show_in_sticker_list: false`，普通贴纸列表不读取这些层。
+- 发型 manifest 也必须标记 `replaceable: true` 和 `show_in_sticker_list: false`，它属于人偶配置，不属于普通贴纸列表。
 - 所有衣服 slot 必须记录目标骨骼和推荐 bbox；后续真正接 Cubism 时，这些 slot 映射到同名 Part/Drawable 或约定的 costume layer。
 
 ## 动作落地

@@ -92,6 +92,22 @@ enum AvatarExpression: String, CaseIterable, Codable, Identifiable, Hashable {
     var id: String { rawValue }
 }
 
+enum AvatarHairStyleID: String, CaseIterable, Codable, Identifiable, Hashable {
+    case defaultLongPink = "default_long_pink"
+    case shortBob = "short_bob"
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .defaultLongPink:
+            return "粉色长发"
+        case .shortBob:
+            return "短波波头"
+        }
+    }
+}
+
 enum AvatarRenderBackend: String, CaseIterable, Codable, Identifiable, Hashable {
     case staticImage
     case transparentVideo
@@ -104,6 +120,7 @@ struct AvatarRenderRequest: Equatable, Hashable {
     var characterID: AvatarCharacterID
     var action: AvatarAction
     var expression: AvatarExpression
+    var hairStyleID: AvatarHairStyleID
     var preferredBackend: AvatarRenderBackend
     var isPaused: Bool
 
@@ -111,12 +128,14 @@ struct AvatarRenderRequest: Equatable, Hashable {
         characterID: AvatarCharacterID = .girlV1,
         action: AvatarAction = .idle,
         expression: AvatarExpression = .neutral,
+        hairStyleID: AvatarHairStyleID = .defaultLongPink,
         preferredBackend: AvatarRenderBackend = .staticImage,
         isPaused: Bool = false
     ) {
         self.characterID = characterID
         self.action = action
         self.expression = expression
+        self.hairStyleID = hairStyleID
         self.preferredBackend = preferredBackend
         self.isPaused = isPaused
     }

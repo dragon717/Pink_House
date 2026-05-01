@@ -11,7 +11,7 @@
 - 不提交 `generated/` 中间图；只提交最终 asset catalog 产物和 manifest/spec。
 
 ## A2 角色协议与后端
-- 新增 `AvatarCharacterKit`：角色 ID、动作、表情、渲染后端、SwiftUI 统一视图。
+- 新增 `AvatarCharacterKit`：角色 ID、动作、表情、发型 ID、渲染后端、SwiftUI 统一视图。
 - `.staticImage` 直接渲染 asset catalog；`.transparentVideo` 通过现有 `SeamlessVideoPlayer`；`.live2d` 先提供透明 `MTKView` spike shell。
 - Swift 业务页只传 `AvatarRenderRequest`，不直接碰 Live2D/Cubism 参数。
 

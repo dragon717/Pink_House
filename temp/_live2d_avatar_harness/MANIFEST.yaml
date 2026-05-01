@@ -11,6 +11,8 @@ asset_roots:
   live2d: asserts/avatar/girl_v1/live2d
   layer_manifest: asserts/avatar/girl_v1/live2d/rig_manifest.json
   layers: asserts/avatar/girl_v1/live2d/layers
+  hairstyle_index: asserts/avatar/girl_v1/live2d/hairstyles/hairstyle_index.json
+  hairstyles: asserts/avatar/girl_v1/live2d/hairstyles
   default_outfit_manifest: asserts/avatar/girl_v1/live2d/outfits/default/outfit_manifest.json
   default_outfit_layers: asserts/avatar/girl_v1/live2d/outfits/default/layers
   clothing_split_rules: asserts/avatar/girl_v1/live2d/clothing_sticker_split_rules.json
@@ -50,6 +52,14 @@ image2_outputs:
       matching the base body proportions. The outfit is an embedded avatar outfit package, not a
       normal user sticker list item. Split later into bodice, sleeves, cuffs, skirt, shoes, neck bow,
       and hair accessories for bone-bound Live2D movement.
+  - name: avatar_girl_v1_short_bob_hairstyle
+    canvas: 1086x1448
+    destination: asserts/avatar/girl_v1/live2d/hairstyles/short_bob/source_full.png
+    prompt: >
+      Full-body front-facing anime-inspired wardrobe assistant base avatar matching the base body
+      proportions and unitard. Alternate short bob hairstyle in pastel lavender-pink, with clearly
+      separable back hair mass, front bangs, side locks, loose strand details, and highlight strands.
+      Chroma-key background for transparent hair package extraction.
   - name: avatar_girl_v1_layered_psd_spec
     canvas: 2048x2732
     destination: temp/_live2d_avatar_harness/generated/avatar_girl_v1_layered_psd_spec.psd
@@ -59,12 +69,8 @@ image2_outputs:
       pupils, highlights, eyelids, eyebrows, mouth shapes A I U E O, blush, skirt hem, and accessories.
       Include hidden joint overdraw at shoulders, elbows, wrists, hips, knees, neck, hair roots, and skirt.
 layer_outputs:
-  - hair_back
   - body_torso_base
   - head_face
-  - hair_front
-  - hair_side_left
-  - hair_side_right
   - arm_upper_left
   - arm_upper_right
   - arm_lower_left
@@ -76,6 +82,17 @@ layer_outputs:
   - leg_right
   - foot_left
   - foot_right
+hairstyle_layer_outputs:
+  - hair_back_base
+  - hair_back_detail
+  - hair_side_left_base
+  - hair_side_right_base
+  - hair_side_left_detail
+  - hair_side_right_detail
+  - hair_front_bangs
+  - hair_front_detail
+  - hair_highlight_front
+  - hair_highlight_back
 default_outfit_layer_outputs:
   - dress_bodice
   - dress_skirt
