@@ -1,0 +1,587 @@
+{
+  "schema_version": 1,
+  "avatar_id": "girl_v1",
+  "source": "ItemManager/Assets.xcassets/AvatarCharacter/girl_v1/avatar_girl_v1_static.imageset/avatar_girl_v1_static.png",
+  "source_size": [
+    1086,
+    1448
+  ],
+  "coordinate_space": "normalized_static_image",
+  "layers": [
+    {
+      "name": "hair_back",
+      "file": "layers/hair_back.png",
+      "source_bbox_normalized": [
+        0.16,
+        0.04,
+        0.84,
+        0.47
+      ],
+      "source_bbox_pixels": [
+        174,
+        58,
+        912,
+        681
+      ],
+      "size": [
+        679,
+        623
+      ],
+      "bone": "hairBack",
+      "z": 10,
+      "notes": "Bootstrap crop from gpt-image-2 full-body source; final Cubism PSD should redraw hidden overdraw behind joints."
+    },
+    {
+      "name": "leg_left",
+      "file": "layers/leg_left.png",
+      "source_bbox_normalized": [
+        0.38,
+        0.61,
+        0.5,
+        0.88
+      ],
+      "source_bbox_pixels": [
+        413,
+        883,
+        543,
+        1274
+      ],
+      "size": [
+        81,
+        391
+      ],
+      "bone": "legLeft",
+      "z": 20,
+      "notes": "Bootstrap crop from gpt-image-2 full-body source; final Cubism PSD should redraw hidden overdraw behind joints."
+    },
+    {
+      "name": "leg_right",
+      "file": "layers/leg_right.png",
+      "source_bbox_normalized": [
+        0.5,
+        0.61,
+        0.62,
+        0.88
+      ],
+      "source_bbox_pixels": [
+        543,
+        883,
+        673,
+        1274
+      ],
+      "size": [
+        113,
+        391
+      ],
+      "bone": "legRight",
+      "z": 20,
+      "notes": "Bootstrap crop from gpt-image-2 full-body source; final Cubism PSD should redraw hidden overdraw behind joints."
+    },
+    {
+      "name": "body_torso",
+      "file": "layers/body_torso.png",
+      "source_bbox_normalized": [
+        0.31,
+        0.27,
+        0.69,
+        0.57
+      ],
+      "source_bbox_pixels": [
+        337,
+        391,
+        749,
+        825
+      ],
+      "size": [
+        412,
+        434
+      ],
+      "bone": "torso",
+      "z": 30,
+      "notes": "Bootstrap crop from gpt-image-2 full-body source; final Cubism PSD should redraw hidden overdraw behind joints."
+    },
+    {
+      "name": "foot_left",
+      "file": "layers/foot_left.png",
+      "source_bbox_normalized": [
+        0.34,
+        0.84,
+        0.51,
+        0.98
+      ],
+      "source_bbox_pixels": [
+        369,
+        1216,
+        554,
+        1419
+      ],
+      "size": [
+        92,
+        190
+      ],
+      "bone": "footLeft",
+      "z": 40,
+      "notes": "Bootstrap crop from gpt-image-2 full-body source; final Cubism PSD should redraw hidden overdraw behind joints."
+    },
+    {
+      "name": "foot_right",
+      "file": "layers/foot_right.png",
+      "source_bbox_normalized": [
+        0.49,
+        0.84,
+        0.66,
+        0.98
+      ],
+      "source_bbox_pixels": [
+        532,
+        1216,
+        717,
+        1419
+      ],
+      "size": [
+        125,
+        180
+      ],
+      "bone": "footRight",
+      "z": 40,
+      "notes": "Bootstrap crop from gpt-image-2 full-body source; final Cubism PSD should redraw hidden overdraw behind joints."
+    },
+    {
+      "name": "arm_upper_left",
+      "file": "layers/arm_upper_left.png",
+      "source_bbox_normalized": [
+        0.18,
+        0.31,
+        0.36,
+        0.48
+      ],
+      "source_bbox_pixels": [
+        195,
+        449,
+        391,
+        695
+      ],
+      "size": [
+        196,
+        246
+      ],
+      "bone": "upperArmLeft",
+      "z": 42,
+      "notes": "Bootstrap crop from gpt-image-2 full-body source; final Cubism PSD should redraw hidden overdraw behind joints."
+    },
+    {
+      "name": "arm_upper_right",
+      "file": "layers/arm_upper_right.png",
+      "source_bbox_normalized": [
+        0.64,
+        0.31,
+        0.82,
+        0.48
+      ],
+      "source_bbox_pixels": [
+        695,
+        449,
+        891,
+        695
+      ],
+      "size": [
+        175,
+        246
+      ],
+      "bone": "upperArmRight",
+      "z": 42,
+      "notes": "Bootstrap crop from gpt-image-2 full-body source; final Cubism PSD should redraw hidden overdraw behind joints."
+    },
+    {
+      "name": "skirt_front",
+      "file": "layers/skirt_front.png",
+      "source_bbox_normalized": [
+        0.16,
+        0.44,
+        0.84,
+        0.7
+      ],
+      "source_bbox_pixels": [
+        174,
+        637,
+        912,
+        1014
+      ],
+      "size": [
+        679,
+        377
+      ],
+      "bone": "skirt",
+      "z": 50,
+      "notes": "Bootstrap crop from gpt-image-2 full-body source; final Cubism PSD should redraw hidden overdraw behind joints."
+    },
+    {
+      "name": "arm_lower_left",
+      "file": "layers/arm_lower_left.png",
+      "source_bbox_normalized": [
+        0.09,
+        0.43,
+        0.32,
+        0.62
+      ],
+      "source_bbox_pixels": [
+        98,
+        623,
+        348,
+        898
+      ],
+      "size": [
+        157,
+        275
+      ],
+      "bone": "lowerArmLeft",
+      "z": 62,
+      "notes": "Bootstrap crop from gpt-image-2 full-body source; final Cubism PSD should redraw hidden overdraw behind joints."
+    },
+    {
+      "name": "arm_lower_right",
+      "file": "layers/arm_lower_right.png",
+      "source_bbox_normalized": [
+        0.68,
+        0.43,
+        0.91,
+        0.62
+      ],
+      "source_bbox_pixels": [
+        738,
+        623,
+        988,
+        898
+      ],
+      "size": [
+        132,
+        275
+      ],
+      "bone": "lowerArmRight",
+      "z": 62,
+      "notes": "Bootstrap crop from gpt-image-2 full-body source; final Cubism PSD should redraw hidden overdraw behind joints."
+    },
+    {
+      "name": "hair_side_left",
+      "file": "layers/hair_side_left.png",
+      "source_bbox_normalized": [
+        0.11,
+        0.15,
+        0.4,
+        0.48
+      ],
+      "source_bbox_pixels": [
+        119,
+        217,
+        434,
+        695
+      ],
+      "size": [
+        243,
+        478
+      ],
+      "bone": "hairSideLeft",
+      "z": 70,
+      "notes": "Bootstrap crop from gpt-image-2 full-body source; final Cubism PSD should redraw hidden overdraw behind joints."
+    },
+    {
+      "name": "hair_side_right",
+      "file": "layers/hair_side_right.png",
+      "source_bbox_normalized": [
+        0.6,
+        0.15,
+        0.89,
+        0.48
+      ],
+      "source_bbox_pixels": [
+        652,
+        217,
+        967,
+        695
+      ],
+      "size": [
+        218,
+        478
+      ],
+      "bone": "hairSideRight",
+      "z": 70,
+      "notes": "Bootstrap crop from gpt-image-2 full-body source; final Cubism PSD should redraw hidden overdraw behind joints."
+    },
+    {
+      "name": "hand_left",
+      "file": "layers/hand_left.png",
+      "source_bbox_normalized": [
+        0.07,
+        0.47,
+        0.25,
+        0.58
+      ],
+      "source_bbox_pixels": [
+        76,
+        681,
+        272,
+        840
+      ],
+      "size": [
+        46,
+        153
+      ],
+      "bone": "handLeft",
+      "z": 72,
+      "notes": "Bootstrap crop from gpt-image-2 full-body source; final Cubism PSD should redraw hidden overdraw behind joints."
+    },
+    {
+      "name": "hand_right",
+      "file": "layers/hand_right.png",
+      "source_bbox_normalized": [
+        0.75,
+        0.47,
+        0.93,
+        0.58
+      ],
+      "source_bbox_pixels": [
+        814,
+        681,
+        1010,
+        840
+      ],
+      "size": [
+        24,
+        118
+      ],
+      "bone": "handRight",
+      "z": 72,
+      "notes": "Bootstrap crop from gpt-image-2 full-body source; final Cubism PSD should redraw hidden overdraw behind joints."
+    },
+    {
+      "name": "head_face",
+      "file": "layers/head_face.png",
+      "source_bbox_normalized": [
+        0.34,
+        0.07,
+        0.66,
+        0.34
+      ],
+      "source_bbox_pixels": [
+        369,
+        101,
+        717,
+        492
+      ],
+      "size": [
+        348,
+        391
+      ],
+      "bone": "head",
+      "z": 80,
+      "notes": "Bootstrap crop from gpt-image-2 full-body source; final Cubism PSD should redraw hidden overdraw behind joints."
+    },
+    {
+      "name": "hair_front",
+      "file": "layers/hair_front.png",
+      "source_bbox_normalized": [
+        0.25,
+        0.03,
+        0.75,
+        0.33
+      ],
+      "source_bbox_pixels": [
+        272,
+        43,
+        814,
+        478
+      ],
+      "size": [
+        542,
+        435
+      ],
+      "bone": "hairFront",
+      "z": 90,
+      "notes": "Bootstrap crop from gpt-image-2 full-body source; final Cubism PSD should redraw hidden overdraw behind joints."
+    },
+    {
+      "name": "accessory_bows",
+      "file": "layers/accessory_bows.png",
+      "source_bbox_normalized": [
+        0.23,
+        0.02,
+        0.78,
+        0.55
+      ],
+      "source_bbox_pixels": [
+        250,
+        29,
+        847,
+        796
+      ],
+      "size": [
+        597,
+        767
+      ],
+      "bone": "accessories",
+      "z": 100,
+      "notes": "Bootstrap crop from gpt-image-2 full-body source; final Cubism PSD should redraw hidden overdraw behind joints."
+    }
+  ],
+  "bones": {
+    "root": {
+      "parent": null,
+      "anchor": [
+        0.5,
+        0.53
+      ]
+    },
+    "torso": {
+      "parent": "root",
+      "anchor": [
+        0.5,
+        0.38
+      ]
+    },
+    "head": {
+      "parent": "torso",
+      "anchor": [
+        0.5,
+        0.2
+      ]
+    },
+    "hairBack": {
+      "parent": "head",
+      "anchor": [
+        0.5,
+        0.16
+      ]
+    },
+    "hairFront": {
+      "parent": "head",
+      "anchor": [
+        0.5,
+        0.13
+      ]
+    },
+    "hairSideLeft": {
+      "parent": "head",
+      "anchor": [
+        0.3,
+        0.24
+      ]
+    },
+    "hairSideRight": {
+      "parent": "head",
+      "anchor": [
+        0.7,
+        0.24
+      ]
+    },
+    "upperArmLeft": {
+      "parent": "torso",
+      "anchor": [
+        0.32,
+        0.34
+      ]
+    },
+    "upperArmRight": {
+      "parent": "torso",
+      "anchor": [
+        0.68,
+        0.34
+      ]
+    },
+    "lowerArmLeft": {
+      "parent": "upperArmLeft",
+      "anchor": [
+        0.25,
+        0.47
+      ]
+    },
+    "lowerArmRight": {
+      "parent": "upperArmRight",
+      "anchor": [
+        0.75,
+        0.47
+      ]
+    },
+    "handLeft": {
+      "parent": "lowerArmLeft",
+      "anchor": [
+        0.18,
+        0.54
+      ]
+    },
+    "handRight": {
+      "parent": "lowerArmRight",
+      "anchor": [
+        0.82,
+        0.54
+      ]
+    },
+    "skirt": {
+      "parent": "torso",
+      "anchor": [
+        0.5,
+        0.52
+      ]
+    },
+    "legLeft": {
+      "parent": "root",
+      "anchor": [
+        0.44,
+        0.65
+      ]
+    },
+    "legRight": {
+      "parent": "root",
+      "anchor": [
+        0.56,
+        0.65
+      ]
+    },
+    "footLeft": {
+      "parent": "legLeft",
+      "anchor": [
+        0.43,
+        0.9
+      ]
+    },
+    "footRight": {
+      "parent": "legRight",
+      "anchor": [
+        0.57,
+        0.9
+      ]
+    },
+    "accessories": {
+      "parent": "torso",
+      "anchor": [
+        0.5,
+        0.34
+      ]
+    }
+  },
+  "actions": [
+    "idle",
+    "greet",
+    "wave",
+    "thinking",
+    "happy",
+    "shy",
+    "stickerPresent",
+    "touchHead",
+    "touchBody",
+    "sleep",
+    "talkLoop"
+  ],
+  "expressions": [
+    "neutral",
+    "smile",
+    "surprised",
+    "sad",
+    "angry",
+    "sleepy"
+  ],
+  "live2d_notes": [
+    "Use this as an engineering bootstrap layer kit.",
+    "Before final Cubism binding, repaint hidden overdraw for shoulders, elbows, wrists, hips, knees, neck, skirt hem, and hair roots.",
+    "Keep layer filenames stable so Swift and harness checks remain valid."
+  ]
+}

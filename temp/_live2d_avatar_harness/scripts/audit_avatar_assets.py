@@ -53,7 +53,7 @@ def load_manifest(path: Path) -> dict:
             value = value.strip()
             in_asset_roots = key == "asset_roots"
             in_static_acceptance = False
-            current_list = key if key in {"required_actions", "required_expressions", "render_backends"} else None
+            current_list = key if key in {"required_actions", "required_expressions", "render_backends", "layer_outputs"} else None
             if current_list:
                 result[current_list] = []
             elif value:
@@ -150,10 +150,31 @@ def main() -> int:
     has_moc3 = any(name.endswith(".moc3") for name in live2d_files)
     live2d_ok = (has_model3 and has_moc3) or args.allow_missing_live2d
 
+    layer_manifest_path = Path(manifest.get("asset_roots", {}).get("layer_manifest", ""))
+    layer_dir = Path(manifest.get("asset_roots", {}).get("layers", ""))
+    expected_layers = list(manifest.get("layer_outputs") or [])
+    layer_manifest_ok = layer_manifest_path.exists()
+    layer_manifest_error = None
+    manifest_layer_names = []
+    if layer_manifest_ok:
+        try:
+            layer_manifest = json.loads(layer_manifest_path.read_text(encoding="utf-8"))
+            manifest_layer_names = [row.get("name") for row in layer_manifest.get("layers", [])]
+        except Exception as exc:
+            layer_manifest_ok = False
+            layer_manifest_error = str(exc)
+    missing_layer_files = [
+        name for name in expected_layers
+        if not (layer_dir / f"{name}.png").exists()
+    ]
+    missing_manifest_layers = sorted(set(expected_layers) - set(manifest_layer_names))
+    layers_ok = layer_manifest_ok and not missing_layer_files and not missing_manifest_layers
+
     report = {
         "ok": static_report["ok"]
         and not missing_actions
         and not missing_expressions
+        and layers_ok
         and video_ok
         and live2d_ok,
         "manifest": str(manifest_path),
@@ -163,6 +184,16 @@ def main() -> int:
         "expressions_ok": not missing_expressions,
         "missing_expressions": missing_expressions,
         "static_image": static_report,
+        "layers": {
+            "dir": str(layer_dir),
+            "manifest": str(layer_manifest_path),
+            "manifest_ok": layer_manifest_ok,
+            "manifest_error": layer_manifest_error,
+            "expected_count": len(expected_layers),
+            "missing_layer_files": missing_layer_files,
+            "missing_manifest_layers": missing_manifest_layers,
+            "ok": layers_ok,
+        },
         "video": {
             "dir": str(video_dir),
             "files": video_files,

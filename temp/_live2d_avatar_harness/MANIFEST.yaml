@@ -9,6 +9,8 @@ asset_roots:
   static_image: ItemManager/Assets.xcassets/AvatarCharacter/girl_v1/avatar_girl_v1_static.imageset/avatar_girl_v1_static.png
   video: asserts/avatar/girl_v1/video
   live2d: asserts/avatar/girl_v1/live2d
+  layer_manifest: asserts/avatar/girl_v1/live2d/rig_manifest.json
+  layers: asserts/avatar/girl_v1/live2d/layers
 required_actions:
   - idle
   - greet
@@ -30,7 +32,7 @@ required_expressions:
   - sleepy
 image2_outputs:
   - name: avatar_girl_v1_static
-    canvas: 1024x1366
+    canvas: 1086x1448
     destination: ItemManager/Assets.xcassets/AvatarCharacter/girl_v1/avatar_girl_v1_static.imageset/avatar_girl_v1_static.png
     prompt: >
       Full-body front-facing anime-inspired wardrobe assistant girl, delicate magic sticker journal style,
@@ -44,6 +46,25 @@ image2_outputs:
       upper arms, forearms, hands, legs, shoes, front hair, back hair, side hair, face base, eye whites,
       pupils, highlights, eyelids, eyebrows, mouth shapes A I U E O, blush, skirt hem, and accessories.
       Include hidden joint overdraw at shoulders, elbows, wrists, hips, knees, neck, hair roots, and skirt.
+layer_outputs:
+  - hair_back
+  - body_torso
+  - skirt_front
+  - head_face
+  - hair_front
+  - hair_side_left
+  - hair_side_right
+  - arm_upper_left
+  - arm_upper_right
+  - arm_lower_left
+  - arm_lower_right
+  - hand_left
+  - hand_right
+  - leg_left
+  - leg_right
+  - foot_left
+  - foot_right
+  - accessory_bows
 negative_prompt: >
   text, letters, watermark, logo, photorealistic, realistic 3D, harsh shadow, dirty background,
   cropped limbs, fused fingers, missing joints, opaque background
