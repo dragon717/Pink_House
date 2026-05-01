@@ -26,7 +26,7 @@ struct DepositNotificationView: View {
     @State private var testAlertMessage: String?
     @State private var debugSnapshot: NotificationDebugSnapshot?
     @State private var settingsSyncTask: Task<Void, Never>?
-    @State private var isHistoryExpanded = true
+    @State private var isHistoryExpanded = false
     @State private var isPendingExpanded = false
 
     @Query(filter: #Predicate<Clothing> { $0.isDepositPlan == true && $0.deletedAt == nil }) private var depositPlans: [Clothing]
@@ -35,37 +35,6 @@ struct DepositNotificationView: View {
 
     private var palette: MagicThemePalette {
         MagicThemeDesignSystem.palette(themeManager: themeManager, colorScheme: colorScheme)
-    }
-
-    private var totalPendingBalance: Decimal {
-        depositPlans.reduce(Decimal(0)) { $0 + $1.totalBalance }
-    }
-
-    private var nextPendingRecord: DepositNotificationRecord? {
-        pendingRecords.min { $0.scheduledDate < $1.scheduledDate }
-    }
-
-    private var nearestPaymentClothing: Clothing? {
-        let calendar = Calendar.current
-        let today = calendar.startOfDay(for: Date())
-        let datedPlans = depositPlans.filter { $0.finalPaymentDate != nil }
-        let activeOrUpcoming = datedPlans
-            .filter { clothing in
-                guard let start = clothing.finalPaymentDate else { return false }
-                let end = clothing.finalPaymentEndDate ?? start
-                return calendar.startOfDay(for: end) >= today
-            }
-            .sorted { lhs, rhs in
-                (lhs.finalPaymentDate ?? .distantFuture) < (rhs.finalPaymentDate ?? .distantFuture)
-            }
-
-        if let first = activeOrUpcoming.first {
-            return first
-        }
-
-        return datedPlans.sorted { lhs, rhs in
-            (lhs.finalPaymentDate ?? .distantPast) > (rhs.finalPaymentDate ?? .distantPast)
-        }.first
     }
 
     private func clothing(for clothingID: UUID) -> Clothing? {
@@ -86,14 +55,6 @@ struct DepositNotificationView: View {
         Array(pendingRecords.prefix(NotificationManager.Config.pendingSectionLimit))
     }
 
-    private var capturedPendingCount: Int {
-        pendingRecords.filter { $0.source == "captured" || $0.source == "local" }.count
-    }
-
-    private var scheduledPendingCount: Int {
-        pendingRecords.filter { $0.source == "scheduled" }.count
-    }
-
     private var testTargetClothing: Clothing? {
         depositPlans
             .sorted { lhs, rhs in
@@ -104,37 +65,47 @@ struct DepositNotificationView: View {
             .first
     }
 
-    private var groupedTriggeredRecords: [(record: DepositNotificationRecord, records: [DepositNotificationRecord])] {
-        let grouped = Dictionary(grouping: triggeredRecords) { $0.clothingID }
-        return grouped.values
-            .compactMap { records in
-                guard let leadRecord = records.max(by: { ($0.actualDate ?? $0.scheduledDate) < ($1.actualDate ?? $1.scheduledDate) }) else {
-                    return nil
-                }
-                let sortedRecords = records.sorted { ($0.actualDate ?? $0.scheduledDate) > ($1.actualDate ?? $1.scheduledDate) }
-                return (leadRecord, sortedRecords)
-            }
-            .sorted { ($0.record.actualDate ?? $0.record.scheduledDate) > ($1.record.actualDate ?? $1.record.scheduledDate) }
-    }
-
     var body: some View {
-        ScrollView {
-            VStack(spacing: 16) {
-                // 第一排：设置情况概览（默认折叠时显示）
-                settingsSummarySection
-                    .padding(.horizontal, 16)
+        List {
+            settingsSummarySection
+                .depositReminderListRow(top: 16)
 
-                timelineOverviewSection
-                    .padding(.horizontal, 16)
+            historyHeaderRow
+                .depositReminderListRow(top: 10, bottom: 2)
 
-                historySection
-                    .padding(.horizontal, 16)
-
-                pendingSection
-                    .padding(.horizontal, 16)
+            if isHistoryExpanded {
+                if triggeredRecords.isEmpty {
+                    emptyStateView
+                        .depositReminderListRow(top: 2)
+                } else {
+                    ForEach(triggeredRecords) { record in
+                        NotificationRecordRow(record: record, clothing: clothing(for: record.clothingID)) {
+                            openClothingDetail(record.clothingID)
+                        }
+                        .depositReminderListRow(top: 4, bottom: 4)
+                    }
+                }
             }
-            .padding(.vertical, 16)
+
+            pendingHeaderRow
+                .depositReminderListRow(top: 10, bottom: 2)
+
+            if isPendingExpanded {
+                if pendingDisplayRecords.isEmpty {
+                    pendingEmptyStateView
+                        .depositReminderListRow(top: 2)
+                } else {
+                    ForEach(pendingDisplayRecords) { record in
+                        PendingNotificationRecordRow(record: record, clothing: clothing(for: record.clothingID)) {
+                            openClothingDetail(record.clothingID)
+                        }
+                        .depositReminderListRow(top: 4, bottom: 4)
+                    }
+                }
+            }
         }
+        .listStyle(.plain)
+        .scrollContentBackground(.hidden)
         .background(LiquidBackground(themeSkinWallpaperContext: .depositPlan))
         .navigationTitle("尾款提醒")
         .navigationBarTitleDisplayMode(.inline)
@@ -201,10 +172,10 @@ struct DepositNotificationView: View {
 
     private var settingsSummarySection: some View {
         ThemeSkinSectionCardContainer(cornerRadius: 12, showsDecoration: false) {
-            VStack(spacing: 8) {
-                // 标题栏：总开关 + 小齿轮
-                HStack {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 12) {
                     Toggle("开启尾款提醒", isOn: $isEnabled)
+                        .font(.subheadline.weight(.semibold))
                         .onChange(of: isEnabled) { _, newValue in
                             handleSettingsChange(enabled: newValue)
                         }
@@ -220,14 +191,16 @@ struct DepositNotificationView: View {
                             .font(.system(size: 16))
                             .foregroundStyle(isExpanded ? palette.accent : palette.secondaryText)
                             .rotationEffect(.degrees(isExpanded ? 90 : 0))
+                            .frame(width: 34, height: 34)
+                            .background(palette.secondaryText.opacity(0.10))
+                            .clipShape(Circle())
                     }
+                    .buttonStyle(.plain)
                 }
 
-                // 展开的设置面板
                 if isExpanded {
                     expandedSettingsPanel
                 } else {
-                    // 折叠时显示设置摘要
                     collapsedSettingsSummary
                 }
             }
@@ -235,208 +208,28 @@ struct DepositNotificationView: View {
         }
     }
 
-    // MARK: - 尾款时间线概览
-
-    private var timelineOverviewSection: some View {
-        ThemeSkinSectionCardContainer(cornerRadius: 18) {
-            VStack(alignment: .leading, spacing: 14) {
-                HStack(alignment: .center, spacing: 10) {
-                    ZStack {
-                        Circle()
-                            .fill(palette.accent.opacity(0.14))
-                            .frame(width: 36, height: 36)
-
-                        Image(systemName: "calendar.badge.clock")
-                            .font(.system(size: 16, weight: .semibold))
-                            .foregroundStyle(palette.accent)
-                    }
-
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("尾款时间线")
-                            .font(.headline)
-                            .foregroundStyle(palette.primaryText)
-
-                        Text(reminderRuleSummary)
-                            .font(.caption)
-                            .foregroundStyle(palette.secondaryText)
-                            .lineLimit(2)
-                    }
-
-                    Spacer()
-
-                    Text(isEnabled ? "提醒已开启" : "提醒未开启")
-                        .font(.caption.weight(.semibold))
-                        .padding(.horizontal, 9)
-                        .padding(.vertical, 5)
-                        .background((isEnabled ? palette.accent : palette.secondaryText).opacity(0.14))
-                        .foregroundStyle(isEnabled ? palette.accent : palette.secondaryText)
-                        .clipShape(Capsule())
-                }
-
-                Divider().opacity(0.45)
-
-                if let record = nextPendingRecord {
-                    overviewFocusRow(
-                        icon: record.source == "scheduled" ? "bell.badge.fill" : "tray.full.fill",
-                        title: "下次提醒",
-                        primary: DepositReminderDisplayFormatter.clothingName(for: record, clothing: clothing(for: record.clothingID)),
-                        secondary: DepositReminderDisplayFormatter.pendingReminderText(for: record),
-                        footnote: DepositReminderDisplayFormatter.paymentWindowText(clothing: clothing(for: record.clothingID), fallbackDate: record.scheduledDate),
-                        amount: DepositReminderDisplayFormatter.amountText(for: clothing(for: record.clothingID)),
-                        badge: DepositReminderDisplayFormatter.sourceText(for: record)
-                    )
-                } else if let clothing = nearestPaymentClothing {
-                    overviewFocusRow(
-                        icon: "heart.text.square.fill",
-                        title: "最近尾款",
-                        primary: clothing.name,
-                        secondary: DepositReminderDisplayFormatter.paymentStatusText(clothing: clothing, fallbackDate: clothing.finalPaymentDate),
-                        footnote: DepositReminderDisplayFormatter.paymentWindowText(clothing: clothing, fallbackDate: clothing.finalPaymentDate),
-                        amount: DepositReminderDisplayFormatter.amountText(for: clothing),
-                        badge: isEnabled ? "暂无待提醒" : "未开启"
-                    )
-                } else {
-                    overviewFocusRow(
-                        icon: "sparkles",
-                        title: "暂无尾款计划",
-                        primary: "还没有需要提醒的心愿尾款",
-                        secondary: "创建心愿尾款并填写尾款日后，这里会显示下一次提醒。",
-                        footnote: nil,
-                        amount: nil,
-                        badge: nil
-                    )
-                }
-
-                HStack(spacing: 8) {
-                    overviewMetric(title: "待付总额", value: DepositReminderDisplayFormatter.amountText(totalPendingBalance), systemImage: "yensign.circle.fill")
-                    overviewMetric(title: "待提醒", value: "\(pendingRecords.count) 条", systemImage: "bell.fill")
-                    overviewMetric(title: "未读", value: "\(unreadCount) 条", systemImage: "envelope.badge.fill")
-                }
-            }
-            .padding(16)
-        }
-    }
-
     private var reminderRuleSummary: String {
         guard isEnabled else {
-            return "开启后会按尾款日自动排队提醒，站内也会保留待提醒记录。"
+            return "开启后按尾款日提醒"
         }
 
         let daysText = selectedDays.sorted().map(dayText(for:)).joined(separator: "、")
         return "\(daysText) · 每天 \(formatTime(notificationTime)) 提醒"
     }
 
-    @ViewBuilder
-    private func overviewFocusRow(
-        icon: String,
-        title: String,
-        primary: String,
-        secondary: String,
-        footnote: String?,
-        amount: String?,
-        badge: String?
-    ) -> some View {
-        HStack(alignment: .top, spacing: 12) {
-            Image(systemName: icon)
-                .font(.system(size: 17, weight: .semibold))
-                .foregroundStyle(palette.accent)
-                .frame(width: 30, height: 30)
-                .background(palette.accent.opacity(0.12))
-                .clipShape(Circle())
-
-            VStack(alignment: .leading, spacing: 5) {
-                Text(title)
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(palette.secondaryText)
-
-                Text(primary)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(palette.primaryText)
-                    .lineLimit(2)
-
-                Text(secondary)
-                    .font(.caption)
-                    .foregroundStyle(palette.primaryText.opacity(0.82))
-                    .lineLimit(2)
-
-                if let footnote {
-                    Text(footnote)
-                        .font(.caption2)
-                        .foregroundStyle(palette.secondaryText)
-                        .lineLimit(2)
-                }
-            }
-
-            Spacer(minLength: 8)
-
-            VStack(alignment: .trailing, spacing: 6) {
-                if let amount {
-                    Text(amount)
-                        .font(.caption.weight(.bold))
-                        .foregroundStyle(palette.accent)
-                }
-
-                if let badge {
-                    Text(badge)
-                        .font(.caption2.weight(.semibold))
-                        .padding(.horizontal, 7)
-                        .padding(.vertical, 4)
-                        .background(palette.accent.opacity(0.12))
-                        .foregroundStyle(palette.accent)
-                        .clipShape(Capsule())
-                }
-            }
-        }
-    }
-
-    private func overviewMetric(title: String, value: String, systemImage: String) -> some View {
-        VStack(alignment: .leading, spacing: 5) {
-            Image(systemName: systemImage)
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(palette.accent)
-
-            Text(value)
-                .font(.caption.weight(.bold))
-                .foregroundStyle(palette.primaryText)
-                .lineLimit(1)
-                .minimumScaleFactor(0.72)
-
-            Text(title)
-                .font(.caption2)
-                .foregroundStyle(palette.secondaryText)
-                .lineLimit(1)
-        }
-        .padding(10)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(palette.cardAccent.opacity(0.08))
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-    }
-
     // MARK: - 折叠时显示的设置摘要
 
     private var collapsedSettingsSummary: some View {
-        HStack(spacing: 6) {
-            if isEnabled && !selectedDays.isEmpty {
-                ForEach(selectedDays.sorted(), id: \.self) { day in
-                    Text(dayText(for: day))
-                        .font(.system(size: 11))
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 3)
-                        .background(palette.accent.opacity(0.15))
-                        .foregroundStyle(palette.accent)
-                        .clipShape(Capsule())
-                }
+        HStack(spacing: 8) {
+            Image(systemName: isEnabled ? "clock.badge.checkmark" : "bell.slash")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(isEnabled ? palette.accent : palette.secondaryText)
 
-                Spacer()
-
-                Text(formatTime(notificationTime))
-                    .font(.system(size: 11))
-                    .foregroundStyle(palette.secondaryText)
-            } else {
-                Text("未开启提醒")
-                    .font(.system(size: 11))
-                    .foregroundStyle(palette.secondaryText)
-            }
+            Text(reminderRuleSummary)
+                .font(.caption)
+                .foregroundStyle(palette.secondaryText)
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 
@@ -576,47 +369,10 @@ struct DepositNotificationView: View {
         .buttonStyle(.plain)
     }
 
-    // MARK: - 历史补款记录（已发送的提醒）
+    // MARK: - 提醒记录区
 
-    private var pendingSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            sectionHeader(
-                title: "待提醒",
-                summary: "系统 \(scheduledPendingCount) / 站内 \(capturedPendingCount)",
-                isExpanded: isPendingExpanded
-            ) {
-                withAnimation(.spring(response: 0.28, dampingFraction: 0.82)) {
-                    isPendingExpanded.toggle()
-                }
-            }
-
-            if isPendingExpanded {
-                if pendingDisplayRecords.isEmpty {
-                    VStack(spacing: 8) {
-                        Image(systemName: "calendar.badge.clock")
-                            .font(.system(size: 32))
-                            .foregroundStyle(palette.secondaryText.opacity(0.5))
-                        Text("暂无待提醒记录")
-                            .font(.subheadline)
-                            .foregroundStyle(palette.secondaryText)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 24)
-                } else {
-                    VStack(spacing: 8) {
-                        ForEach(pendingDisplayRecords) { record in
-                            PendingNotificationRecordRow(record: record, clothing: clothing(for: record.clothingID)) {
-                                openClothingDetail(record.clothingID)
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    private var historySection: some View {
-        VStack(alignment: .leading, spacing: 12) {
+    private var historyHeaderRow: some View {
+        VStack(alignment: .leading, spacing: 10) {
             sectionHeader(
                 title: "已发送提醒",
                 summary: unreadCount > 0 ? "\(unreadCount) 未读 / \(triggeredRecords.count) 条" : "\(triggeredRecords.count) 条",
@@ -627,48 +383,42 @@ struct DepositNotificationView: View {
                 }
             }
 
-            if isHistoryExpanded {
-                if unreadCount > 0 || readCount > 0 {
-                    HStack(spacing: 12) {
-                        if unreadCount > 0 {
-                            largeActionButton(
-                                title: "一键已读",
-                                systemImage: "checkmark.circle.fill",
-                                foreground: .white,
-                                background: palette.accent
-                            ) {
-                                NotificationManager.shared.markAllTriggeredAsRead(modelContext: modelContext)
-                            }
+            if isHistoryExpanded && (unreadCount > 0 || readCount > 0) {
+                HStack(spacing: 12) {
+                    if unreadCount > 0 {
+                        largeActionButton(
+                            title: "一键已读",
+                            systemImage: "checkmark.circle.fill",
+                            foreground: .white,
+                            background: palette.accent
+                        ) {
+                            NotificationManager.shared.markAllTriggeredAsRead(modelContext: modelContext)
                         }
+                    }
 
-                        if readCount > 0 {
-                            largeActionButton(
-                                title: "一键清除",
-                                systemImage: "trash.fill",
-                                foreground: palette.secondaryText,
-                                background: palette.secondaryText.opacity(0.16)
-                            ) {
-                                showClearReadConfirmation = true
-                            }
+                    if readCount > 0 {
+                        largeActionButton(
+                            title: "一键清除",
+                            systemImage: "trash.fill",
+                            foreground: palette.secondaryText,
+                            background: palette.secondaryText.opacity(0.16)
+                        ) {
+                            showClearReadConfirmation = true
                         }
                     }
                 }
+            }
+        }
+    }
 
-                if triggeredRecords.isEmpty {
-                    emptyStateView
-                } else {
-                    ForEach(groupedTriggeredRecords, id: \.record.clothingID) { groupedRecord in
-                        TriggeredNotificationCard(
-                            clothingName: groupedRecord.record.clothingName,
-                            clothingID: groupedRecord.record.clothingID,
-                            clothing: clothing(for: groupedRecord.record.clothingID),
-                            records: groupedRecord.records,
-                            onOpenDetail: {
-                                openClothingDetail(groupedRecord.record.clothingID)
-                            }
-                        )
-                    }
-                }
+    private var pendingHeaderRow: some View {
+        sectionHeader(
+            title: "待提醒",
+            summary: "\(pendingRecords.count) 条",
+            isExpanded: isPendingExpanded
+        ) {
+            withAnimation(.spring(response: 0.28, dampingFraction: 0.82)) {
+                isPendingExpanded.toggle()
             }
         }
     }
@@ -689,7 +439,20 @@ struct DepositNotificationView: View {
                 .multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 40)
+        .padding(.vertical, 24)
+    }
+
+    private var pendingEmptyStateView: some View {
+        VStack(spacing: 8) {
+            Image(systemName: "calendar.badge.clock")
+                .font(.system(size: 32))
+                .foregroundStyle(palette.secondaryText.opacity(0.5))
+            Text("暂无待提醒记录")
+                .font(.subheadline)
+                .foregroundStyle(palette.secondaryText)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 24)
     }
 
     // MARK: - Helper Methods
@@ -884,76 +647,53 @@ struct DepositNotificationView: View {
     }
 }
 
-// MARK: - 已发送的提醒卡片
+// MARK: - 单条已发送提醒行
 
-struct TriggeredNotificationCard: View {
-    let clothingName: String
-    let clothingID: UUID
+private struct DepositReminderThumbnailView: View {
     let clothing: Clothing?
-    let records: [DepositNotificationRecord]
-    let onOpenDetail: () -> Void
+    @State private var thumbnailImage: UIImage?
 
-    @Environment(ThemeManager.self) private var themeManager
-    @Environment(\.colorScheme) private var colorScheme
-
-    private var palette: MagicThemePalette {
-        MagicThemeDesignSystem.palette(themeManager: themeManager, colorScheme: colorScheme)
-    }
-
-    private var displayName: String {
-        clothing?.name ?? clothingName
+    private let sideLength: CGFloat = 48
+    private var imagePath: String? {
+        clothing?.imagePaths.first
     }
 
     var body: some View {
-        ThemeSkinSectionCardContainer(cornerRadius: 14, showsDecoration: false) {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack(alignment: .top, spacing: 10) {
-                    Button(action: onOpenDetail) {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(displayName)
-                                .font(.subheadline.weight(.semibold))
-                                .foregroundStyle(palette.primaryText)
-                                .multilineTextAlignment(.leading)
-
-                            Text(DepositReminderDisplayFormatter.paymentWindowText(clothing: clothing, fallbackDate: records.first?.scheduledDate))
-                                .font(.caption)
-                                .foregroundStyle(palette.secondaryText)
-                                .multilineTextAlignment(.leading)
-                        }
-                    }
-                    .buttonStyle(.plain)
-
-                    Spacer()
-
-                    VStack(alignment: .trailing, spacing: 6) {
-                        if let amount = DepositReminderDisplayFormatter.amountText(for: clothing) {
-                            Text(amount)
-                                .font(.caption.weight(.bold))
-                                .foregroundStyle(palette.accent)
-                        }
-
-                        Text("\(records.count) 次提醒")
-                            .font(.caption2.weight(.semibold))
-                            .padding(.horizontal, 7)
-                            .padding(.vertical, 4)
-                            .background(palette.accent.opacity(0.12))
-                            .foregroundStyle(palette.accent)
-                            .clipShape(Capsule())
-                    }
-                }
-
-                VStack(alignment: .leading, spacing: 8) {
-                    ForEach(records) { record in
-                        NotificationRecordRow(record: record, clothing: clothing, onOpenDetail: onOpenDetail)
-                    }
-                }
+        Group {
+            if let thumbnailImage {
+                Image(uiImage: thumbnailImage)
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+            } else {
+                CutePlaceholderView(iconSize: 18)
             }
-            .padding(12)
+        }
+        .frame(width: sideLength, height: sideLength)
+        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .task(id: imagePath) {
+            await loadThumbnail()
         }
     }
-}
 
-// MARK: - 单条通知记录行
+    @MainActor
+    private func loadThumbnail() async {
+        guard let imagePath else {
+            thumbnailImage = nil
+            return
+        }
+
+        let targetSize = CGSize(width: sideLength, height: sideLength)
+        if let cached = ImageManager.shared.cachedImage(fileName: imagePath, targetSize: targetSize) {
+            thumbnailImage = cached
+            return
+        }
+
+        thumbnailImage = nil
+        try? await Task.sleep(nanoseconds: 50_000_000)
+        guard !Task.isCancelled else { return }
+        thumbnailImage = await ImageManager.shared.loadImageAsync(fileName: imagePath, targetSize: targetSize)
+    }
+}
 
 struct NotificationRecordRow: View {
     let record: DepositNotificationRecord
@@ -968,72 +708,83 @@ struct NotificationRecordRow: View {
         MagicThemeDesignSystem.palette(themeManager: themeManager, colorScheme: colorScheme)
     }
 
+    private var displayName: String {
+        DepositReminderDisplayFormatter.clothingName(for: record, clothing: clothing)
+    }
+
     var body: some View {
-        ReminderSwipeRow(
-            onOpen: {
-                if !record.isRead {
-                    record.markAsRead()
-                    try? modelContext.save()
-                    NotificationManager.shared.updateApplicationBadge(modelContext: modelContext)
-                }
-                onOpenDetail()
-            },
-            onDelete: {
-                NotificationManager.shared.deleteRecord(record, modelContext: modelContext)
-            }
-        ) {
-            ThemeSkinSectionCardContainer(cornerRadius: 10, showsDecoration: false) {
-                HStack(alignment: .top, spacing: 10) {
-                    Circle()
-                        .fill(record.isRead ? palette.secondaryText.opacity(0.16) : palette.cardAccent)
-                        .frame(width: 7, height: 7)
-                        .padding(.top, 6)
+        Button(action: openRecord) {
+            ThemeSkinSectionCardContainer(cornerRadius: 12, showsDecoration: false) {
+                HStack(alignment: .center, spacing: 10) {
+                    DepositReminderThumbnailView(clothing: clothing)
 
                     VStack(alignment: .leading, spacing: 4) {
-                        Text(DepositReminderDisplayFormatter.triggeredReminderText(for: record))
-                            .font(.subheadline.weight(record.isRead ? .regular : .semibold))
-                            .foregroundStyle(palette.primaryText)
-                            .lineLimit(2)
+                        HStack(spacing: 6) {
+                            Circle()
+                                .fill(record.isRead ? palette.secondaryText.opacity(0.18) : palette.accent)
+                                .frame(width: 7, height: 7)
 
-                        Text(DepositReminderDisplayFormatter.paymentStatusText(clothing: clothing, fallbackDate: record.scheduledDate))
+                            Text(displayName)
+                                .font(.subheadline.weight(record.isRead ? .regular : .semibold))
+                                .foregroundStyle(palette.primaryText)
+                                .multilineTextAlignment(.leading)
+                                .lineLimit(2)
+                        }
+
+                        Text(DepositReminderDisplayFormatter.triggeredTimeText(for: record))
                             .font(.caption)
                             .foregroundStyle(palette.secondaryText)
-                            .lineLimit(2)
-
-                        HStack(spacing: 5) {
-                            if record.source == "apple" {
-                                Image(systemName: "apple.logo")
-                                    .font(.system(size: 8))
-                            }
-
-                            Text(DepositReminderDisplayFormatter.originalPlanText(for: record))
-                                .lineLimit(1)
-                        }
-                        .font(.caption2)
-                        .foregroundStyle(palette.secondaryText.opacity(0.82))
+                            .lineLimit(1)
                     }
 
                     Spacer(minLength: 8)
 
-                    VStack(alignment: .trailing, spacing: 6) {
-                        Text(DepositReminderDisplayFormatter.dayText(for: record.daysBefore))
-                            .font(.caption2.weight(.semibold))
-                            .padding(.horizontal, 7)
-                            .padding(.vertical, 4)
-                            .background((record.isRead ? palette.secondaryText : palette.accent).opacity(0.12))
-                            .foregroundStyle(record.isRead ? palette.secondaryText : palette.accent)
-                            .clipShape(Capsule())
-
-                        Text(record.isRead ? "已读" : "未读")
-                            .font(.caption2)
-                            .foregroundStyle(record.isRead ? palette.secondaryText : palette.accent)
-                    }
+                    Text(DepositReminderDisplayFormatter.dayText(for: record.daysBefore))
+                        .font(.caption2.weight(.semibold))
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 5)
+                        .background((record.isRead ? palette.secondaryText : palette.accent).opacity(0.12))
+                        .foregroundStyle(record.isRead ? palette.secondaryText : palette.accent)
+                        .clipShape(Capsule())
                 }
-                .padding(10)
+                .padding(12)
+            }
+        }
+        .buttonStyle(.plain)
+        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+            Button(role: .destructive) {
+                NotificationManager.shared.deleteRecord(record, modelContext: modelContext)
+            } label: {
+                Label("删除", systemImage: "trash")
+            }
+
+            if !record.isRead {
+                Button {
+                    markRecordAsRead()
+                } label: {
+                    Label("标为已读", systemImage: "checkmark.circle")
+                }
+                .tint(.blue)
             }
         }
     }
+
+    private func openRecord() {
+        if !record.isRead {
+            markRecordAsRead()
+        }
+        onOpenDetail()
+    }
+
+    private func markRecordAsRead() {
+        guard !record.isRead else { return }
+        record.markAsRead()
+        try? modelContext.save()
+        NotificationManager.shared.updateApplicationBadge(modelContext: modelContext)
+    }
 }
+
+// MARK: - 单条待提醒行
 
 struct PendingNotificationRecordRow: View {
     let record: DepositNotificationRecord
@@ -1042,70 +793,56 @@ struct PendingNotificationRecordRow: View {
 
     @Environment(ThemeManager.self) private var themeManager
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.modelContext) private var modelContext
 
     private var palette: MagicThemePalette {
         MagicThemeDesignSystem.palette(themeManager: themeManager, colorScheme: colorScheme)
     }
 
-    private var isCapturedOnly: Bool {
-        record.source == "captured" || record.source == "local"
+    private var displayName: String {
+        DepositReminderDisplayFormatter.clothingName(for: record, clothing: clothing)
     }
 
     var body: some View {
         Button(action: onOpenDetail) {
             ThemeSkinSectionCardContainer(cornerRadius: 12, showsDecoration: false) {
-                HStack(alignment: .top, spacing: 10) {
-                    Circle()
-                        .fill(isCapturedOnly ? palette.secondaryText.opacity(0.45) : palette.cardAccent)
-                        .frame(width: 7, height: 7)
-                        .padding(.top, 6)
+                HStack(alignment: .center, spacing: 10) {
+                    DepositReminderThumbnailView(clothing: clothing)
 
-                    VStack(alignment: .leading, spacing: 5) {
-                        Text(DepositReminderDisplayFormatter.clothingName(for: record, clothing: clothing))
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(displayName)
                             .font(.subheadline.weight(.semibold))
                             .foregroundStyle(palette.primaryText)
                             .multilineTextAlignment(.leading)
                             .lineLimit(2)
 
-                        Text(DepositReminderDisplayFormatter.paymentWindowText(clothing: clothing, fallbackDate: record.scheduledDate))
+                        Text(DepositReminderDisplayFormatter.pendingTimeText(for: record))
                             .font(.caption)
                             .foregroundStyle(palette.secondaryText)
-                            .lineLimit(2)
-
-                        Text(DepositReminderDisplayFormatter.pendingReminderText(for: record))
-                            .font(.caption2)
-                            .foregroundStyle(palette.secondaryText.opacity(0.86))
                             .lineLimit(1)
                     }
 
                     Spacer(minLength: 8)
 
-                    VStack(alignment: .trailing, spacing: 6) {
-                        if let amount = DepositReminderDisplayFormatter.amountText(for: clothing) {
-                            Text(amount)
-                                .font(.caption.weight(.bold))
-                                .foregroundStyle(palette.accent)
-                                .lineLimit(1)
-                        }
-
-                        Text(DepositReminderDisplayFormatter.sourceText(for: record))
-                            .font(.caption2.weight(.semibold))
-                            .padding(.horizontal, 7)
-                            .padding(.vertical, 4)
-                            .background((isCapturedOnly ? palette.secondaryText : palette.accent).opacity(0.14))
-                            .foregroundStyle(isCapturedOnly ? palette.secondaryText : palette.accent)
-                            .clipShape(Capsule())
-
-                        Text(DepositReminderDisplayFormatter.paymentStatusText(clothing: clothing, fallbackDate: record.scheduledDate))
-                            .font(.caption2)
-                            .foregroundStyle(palette.secondaryText)
-                            .multilineTextAlignment(.trailing)
-                    }
+                    Text(DepositReminderDisplayFormatter.dayText(for: record.daysBefore))
+                        .font(.caption2.weight(.semibold))
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 5)
+                        .background(palette.accent.opacity(0.12))
+                        .foregroundStyle(palette.accent)
+                        .clipShape(Capsule())
                 }
-                .padding(10)
+                .padding(12)
             }
         }
         .buttonStyle(.plain)
+        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+            Button(role: .destructive) {
+                NotificationManager.shared.deleteRecord(record, modelContext: modelContext)
+            } label: {
+                Label("删除", systemImage: "trash")
+            }
+        }
     }
 }
 
@@ -1115,86 +852,12 @@ private enum DepositReminderDisplayFormatter {
         return name.isEmpty ? "这件心愿尾款" : name
     }
 
-    static func amountText(for clothing: Clothing?) -> String? {
-        guard let clothing, clothing.totalBalance > 0 else { return nil }
-        return "待付 \(amountText(clothing.totalBalance))"
+    static func pendingTimeText(for record: DepositNotificationRecord) -> String {
+        "\(dateTimeText(record.scheduledDate)) · \(dayText(for: record.daysBefore))"
     }
 
-    static func amountText(_ amount: Decimal) -> String {
-        "¥\(NSDecimalNumber(decimal: amount).stringValue)"
-    }
-
-    static func paymentWindowText(clothing: Clothing?, fallbackDate: Date?) -> String {
-        guard let start = clothing?.finalPaymentDate else {
-            if let fallbackDate {
-                return "提醒记录：\(dateText(fallbackDate))"
-            }
-            return "尾款时间待确认"
-        }
-
-        let calendar = Calendar.current
-        let startDay = calendar.startOfDay(for: start)
-        let end = clothing?.finalPaymentEndDate ?? start
-        let endDay = calendar.startOfDay(for: end)
-
-        if endDay > startDay {
-            return "支付期 \(dateText(start)) - \(dateText(end))"
-        }
-
-        return "\(dateText(start)) 开始付尾款"
-    }
-
-    static func paymentStatusText(clothing: Clothing?, fallbackDate: Date?) -> String {
-        let calendar = Calendar.current
-        let today = calendar.startOfDay(for: Date())
-
-        guard let start = clothing?.finalPaymentDate else {
-            if let fallbackDate {
-                return "按 \(dateText(fallbackDate)) 的提醒记录显示"
-            }
-            return "尾款日待确认"
-        }
-
-        let startDay = calendar.startOfDay(for: start)
-        let end = clothing?.finalPaymentEndDate ?? start
-        let endDay = calendar.startOfDay(for: end)
-
-        if today < startDay {
-            let days = calendar.dateComponents([.day], from: today, to: startDay).day ?? 0
-            return days == 0 ? "今天进入支付期" : "还有 \(days) 天进入支付期"
-        }
-
-        if today <= endDay {
-            return "正在支付期内"
-        }
-
-        return "支付期已过，请确认处理"
-    }
-
-    static func pendingReminderText(for record: DepositNotificationRecord) -> String {
-        "将于 \(dateTimeText(record.scheduledDate)) \(dayText(for: record.daysBefore))"
-    }
-
-    static func triggeredReminderText(for record: DepositNotificationRecord) -> String {
-        guard let actualDate = record.actualDate else {
-            return "已发送提醒"
-        }
-        return "已在 \(dateTimeText(actualDate)) 提醒"
-    }
-
-    static func originalPlanText(for record: DepositNotificationRecord) -> String {
-        "原计划 \(dateTimeText(record.scheduledDate))"
-    }
-
-    static func sourceText(for record: DepositNotificationRecord) -> String {
-        switch record.source {
-        case "apple", "scheduled":
-            return "系统通知"
-        case "captured", "local":
-            return "仅站内"
-        default:
-            return "站内记录"
-        }
+    static func triggeredTimeText(for record: DepositNotificationRecord) -> String {
+        "\(dateTimeText(record.actualDate ?? record.scheduledDate)) · \(dayText(for: record.daysBefore))"
     }
 
     static func dayText(for day: Int) -> String {
@@ -1207,17 +870,6 @@ private enum DepositReminderDisplayFormatter {
         case 30: return "提前 30 天"
         default: return "提前 \(day) 天"
         }
-    }
-
-    private static func dateText(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "zh_Hans_CN")
-        if Calendar.current.component(.year, from: date) == Calendar.current.component(.year, from: Date()) {
-            formatter.dateFormat = "M月d日"
-        } else {
-            formatter.dateFormat = "yyyy年M月d日"
-        }
-        return formatter.string(from: date)
     }
 
     private static func dateTimeText(_ date: Date) -> String {
@@ -1248,67 +900,11 @@ private enum DepositReminderDisplayFormatter {
     }
 }
 
-private struct ReminderSwipeRow<Content: View>: View {
-    let onOpen: () -> Void
-    let onDelete: () -> Void
-    @ViewBuilder let content: () -> Content
-
-    @State private var settledOffset: CGFloat = 0
-    @GestureState private var dragOffset: CGFloat = 0
-
-    private let deleteWidth: CGFloat = 92
-
-    private var currentOffset: CGFloat {
-        max(-deleteWidth, min(0, settledOffset + dragOffset))
-    }
-
-    var body: some View {
-        ZStack(alignment: .trailing) {
-            Button(role: .destructive) {
-                withAnimation(.spring(response: 0.24, dampingFraction: 0.88)) {
-                    settledOffset = 0
-                }
-                onDelete()
-            } label: {
-                VStack(spacing: 6) {
-                    Image(systemName: "trash.fill")
-                        .font(.system(size: 16, weight: .bold))
-                    Text("删除")
-                        .font(.system(size: 12, weight: .semibold))
-                }
-                .foregroundStyle(.white)
-                .frame(width: deleteWidth)
-                .frame(maxHeight: .infinity)
-                .background(Color.red.opacity(0.88))
-                .clipShape(RoundedRectangle(cornerRadius: 12))
-            }
-            .buttonStyle(.plain)
-
-            content()
-                .offset(x: currentOffset)
-                .gesture(
-                    DragGesture(minimumDistance: 10)
-                        .updating($dragOffset) { value, state, _ in
-                            let proposed = settledOffset + value.translation.width
-                            state = max(-deleteWidth, min(0, proposed)) - settledOffset
-                        }
-                        .onEnded { value in
-                            let proposed = settledOffset + value.translation.width
-                            withAnimation(.spring(response: 0.24, dampingFraction: 0.88)) {
-                                settledOffset = proposed < (-deleteWidth * 0.45) ? -deleteWidth : 0
-                            }
-                        }
-                )
-                .onTapGesture {
-                    if settledOffset != 0 {
-                        withAnimation(.spring(response: 0.24, dampingFraction: 0.88)) {
-                            settledOffset = 0
-                        }
-                    } else {
-                        onOpen()
-                    }
-                }
-        }
+private extension View {
+    func depositReminderListRow(top: CGFloat = 6, bottom: CGFloat = 6) -> some View {
+        listRowSeparator(.hidden)
+            .listRowBackground(Color.clear)
+            .listRowInsets(EdgeInsets(top: top, leading: 16, bottom: bottom, trailing: 16))
     }
 }
 
