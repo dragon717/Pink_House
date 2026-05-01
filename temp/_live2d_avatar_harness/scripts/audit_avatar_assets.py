@@ -200,6 +200,10 @@ def main() -> int:
             "hairstyle_id": style_id,
             "manifest": str(style_manifest_path),
             "manifest_ok": style_manifest_path.exists(),
+            "source": None,
+            "source_exists": False,
+            "source_full_present": False,
+            "source_is_hair_only": False,
             "missing_layer_files": expected_hairstyle_layers[:],
             "missing_manifest_layers": expected_hairstyle_layers[:],
             "show_in_sticker_list": None,
@@ -211,12 +215,21 @@ def main() -> int:
                 style_manifest = json.loads(style_manifest_path.read_text(encoding="utf-8"))
                 style_layer_names = [row.get("name") for row in style_manifest.get("layers", [])]
                 style_layer_dir = style_manifest_path.parent / "layers"
+                source_value = str(style_manifest.get("source") or "")
+                source_path = Path(source_value)
+                if not source_path.is_absolute() and not source_path.exists():
+                    source_path = style_manifest_path.parent / source_path.name
+                source_full_present = (style_manifest_path.parent / "source_full.png").exists() or "source_full" in source_value
                 missing_style_files = [
                     name for name in expected_hairstyle_layers
                     if not (style_layer_dir / f"{name}.png").exists()
                 ]
                 missing_style_manifest_layers = sorted(set(expected_hairstyle_layers) - set(style_layer_names))
                 style_report.update({
+                    "source": source_value,
+                    "source_exists": source_path.exists(),
+                    "source_full_present": source_full_present,
+                    "source_is_hair_only": source_path.name == "source_hair_only.png",
                     "missing_layer_files": missing_style_files,
                     "missing_manifest_layers": missing_style_manifest_layers,
                     "show_in_sticker_list": style_manifest.get("show_in_sticker_list"),
@@ -224,6 +237,9 @@ def main() -> int:
                     "ok": (
                         not missing_style_files
                         and not missing_style_manifest_layers
+                        and source_path.exists()
+                        and source_path.name == "source_hair_only.png"
+                        and not source_full_present
                         and style_manifest.get("show_in_sticker_list") is False
                         and style_manifest.get("replaceable") is True
                     ),

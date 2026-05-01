@@ -23,8 +23,18 @@
         543,
         1274
       ],
+      "placement_bbox_pixels": [
+        413,
+        796,
+        543,
+        1274
+      ],
+      "canvas_size": [
+        1086,
+        1448
+      ],
       "size": [
-        81,
+        130,
         478
       ],
       "bone": "legLeft",
@@ -46,8 +56,18 @@
         673,
         1274
       ],
+      "placement_bbox_pixels": [
+        543,
+        796,
+        673,
+        1274
+      ],
+      "canvas_size": [
+        1086,
+        1448
+      ],
       "size": [
-        80,
+        130,
         478
       ],
       "bone": "legRight",
@@ -69,8 +89,18 @@
         695,
         883
       ],
+      "placement_bbox_pixels": [
+        391,
+        652,
+        695,
+        883
+      ],
+      "canvas_size": [
+        1086,
+        1448
+      ],
       "size": [
-        241,
+        304,
         231
       ],
       "bone": "hip",
@@ -91,6 +121,16 @@
         348,
         717,
         796
+      ],
+      "placement_bbox_pixels": [
+        369,
+        348,
+        717,
+        796
+      ],
+      "canvas_size": [
+        1086,
+        1448
       ],
       "size": [
         348,
@@ -115,9 +155,19 @@
         554,
         1419
       ],
+      "placement_bbox_pixels": [
+        380,
+        1216,
+        554,
+        1419
+      ],
+      "canvas_size": [
+        1086,
+        1448
+      ],
       "size": [
-        64,
-        173
+        174,
+        203
       ],
       "bone": "footLeft",
       "z": 40,
@@ -138,9 +188,19 @@
         706,
         1419
       ],
+      "placement_bbox_pixels": [
+        532,
+        1216,
+        706,
+        1419
+      ],
+      "canvas_size": [
+        1086,
+        1448
+      ],
       "size": [
-        64,
-        173
+        174,
+        203
       ],
       "bone": "footRight",
       "z": 40,
@@ -161,8 +221,18 @@
         434,
         681
       ],
+      "placement_bbox_pixels": [
+        261,
+        391,
+        434,
+        681
+      ],
+      "canvas_size": [
+        1086,
+        1448
+      ],
       "size": [
-        165,
+        173,
         290
       ],
       "bone": "upperArmLeft",
@@ -184,8 +254,18 @@
         825,
         681
       ],
+      "placement_bbox_pixels": [
+        652,
+        391,
+        825,
+        681
+      ],
+      "canvas_size": [
+        1086,
+        1448
+      ],
       "size": [
-        165,
+        173,
         290
       ],
       "bone": "upperArmRight",
@@ -207,9 +287,19 @@
         380,
         840
       ],
+      "placement_bbox_pixels": [
+        163,
+        623,
+        380,
+        840
+      ],
+      "canvas_size": [
+        1086,
+        1448
+      ],
       "size": [
-        101,
-        97
+        217,
+        217
       ],
       "bone": "lowerArmLeft",
       "z": 62,
@@ -230,9 +320,19 @@
         923,
         840
       ],
+      "placement_bbox_pixels": [
+        706,
+        623,
+        923,
+        840
+      ],
+      "canvas_size": [
+        1086,
+        1448
+      ],
       "size": [
-        102,
-        97
+        217,
+        217
       ],
       "bone": "lowerArmRight",
       "z": 62,
@@ -253,9 +353,19 @@
         304,
         840
       ],
+      "placement_bbox_pixels": [
+        130,
+        681,
+        304,
+        840
+      ],
+      "canvas_size": [
+        1086,
+        1448
+      ],
       "size": [
-        52,
-        39
+        174,
+        159
       ],
       "bone": "handLeft",
       "z": 72,
@@ -276,9 +386,19 @@
         956,
         840
       ],
+      "placement_bbox_pixels": [
+        782,
+        681,
+        956,
+        840
+      ],
+      "canvas_size": [
+        1086,
+        1448
+      ],
       "size": [
-        52,
-        39
+        174,
+        159
       ],
       "bone": "handRight",
       "z": 72,
@@ -298,6 +418,16 @@
         43,
         717,
         420
+      ],
+      "placement_bbox_pixels": [
+        369,
+        43,
+        717,
+        420
+      ],
+      "canvas_size": [
+        1086,
+        1448
       ],
       "size": [
         348,

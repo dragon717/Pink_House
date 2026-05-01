@@ -3,7 +3,7 @@
   "avatar_id": "girl_v1",
   "hairstyle_id": "short_bob",
   "display_name": "短波波头",
-  "source": "asserts/avatar/girl_v1/live2d/hairstyles/short_bob/source_full.png",
+  "source": "asserts/avatar/girl_v1/live2d/hairstyles/short_bob/source_hair_only.png",
   "is_default": false,
   "replaceable": true,
   "show_in_sticker_list": false,
@@ -25,9 +25,19 @@
         912,
         724
       ],
+      "placement_bbox_pixels": [
+        185,
+        29,
+        912,
+        724
+      ],
+      "canvas_size": [
+        1086,
+        1448
+      ],
       "size": [
-        567,
-        692
+        727,
+        695
       ],
       "bone": "hairBack",
       "z": 8,
@@ -51,9 +61,19 @@
         869,
         724
       ],
+      "placement_bbox_pixels": [
+        217,
+        29,
+        869,
+        724
+      ],
+      "canvas_size": [
+        1086,
+        1448
+      ],
       "size": [
-        567,
-        692
+        652,
+        695
       ],
       "bone": "hairBackDetail",
       "z": 9,
@@ -77,8 +97,18 @@
         847,
         695
       ],
+      "placement_bbox_pixels": [
+        239,
+        29,
+        847,
+        695
+      ],
+      "canvas_size": [
+        1086,
+        1448
+      ],
       "size": [
-        540,
+        608,
         666
       ],
       "bone": "hairBackDetail",
@@ -103,9 +133,19 @@
         467,
         767
       ],
+      "placement_bbox_pixels": [
+        130,
+        159,
+        467,
+        767
+      ],
+      "canvas_size": [
+        1086,
+        1448
+      ],
       "size": [
-        210,
-        561
+        337,
+        608
       ],
       "bone": "hairSideLeft",
       "z": 66,
@@ -129,9 +169,19 @@
         956,
         767
       ],
+      "placement_bbox_pixels": [
+        619,
+        159,
+        956,
+        767
+      ],
+      "canvas_size": [
+        1086,
+        1448
+      ],
       "size": [
-        205,
-        601
+        337,
+        608
       ],
       "bone": "hairSideRight",
       "z": 66,
@@ -155,9 +205,19 @@
         478,
         811
       ],
+      "placement_bbox_pixels": [
+        109,
+        246,
+        478,
+        811
+      ],
+      "canvas_size": [
+        1086,
+        1448
+      ],
       "size": [
-        221,
-        446
+        369,
+        565
       ],
       "bone": "hairSideLeftDetail",
       "z": 69,
@@ -181,9 +241,19 @@
         977,
         811
       ],
+      "placement_bbox_pixels": [
+        608,
+        246,
+        977,
+        811
+      ],
+      "canvas_size": [
+        1086,
+        1448
+      ],
       "size": [
-        216,
-        484
+        369,
+        565
       ],
       "bone": "hairSideRightDetail",
       "z": 69,
@@ -207,9 +277,19 @@
         782,
         290
       ],
+      "placement_bbox_pixels": [
+        304,
+        14,
+        782,
+        290
+      ],
+      "canvas_size": [
+        1086,
+        1448
+      ],
       "size": [
-        229,
-        265
+        478,
+        276
       ],
       "bone": "hairFront",
       "z": 91,
@@ -233,8 +313,18 @@
         836,
         434
       ],
+      "placement_bbox_pixels": [
+        250,
+        29,
+        836,
+        434
+      ],
+      "canvas_size": [
+        1086,
+        1448
+      ],
       "size": [
-        234,
+        586,
         405
       ],
       "bone": "hairFrontDetail",
@@ -259,9 +349,19 @@
         760,
         319
       ],
+      "placement_bbox_pixels": [
+        326,
+        14,
+        760,
+        319
+      ],
+      "canvas_size": [
+        1086,
+        1448
+      ],
       "size": [
-        229,
-        294
+        434,
+        305
       ],
       "bone": "hairFrontDetail",
       "z": 96,
@@ -270,7 +370,7 @@
     }
   ],
   "notes": [
-    "Bootstrap hair-only crops from gpt-image-2 full-body sources.",
+    "Bootstrap hair-only crops from gpt-image-2 references; runtime package stores transparent hair-only sources only.",
     "Final Cubism PSD should redraw clean strand tips, roots, and hidden overdraw."
   ]
 }

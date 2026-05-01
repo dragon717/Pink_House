@@ -17,7 +17,8 @@ from PIL import Image
 
 SOURCE = Path("ItemManager/Assets.xcassets/AvatarCharacter/girl_v1/avatar_girl_v1_static.imageset/avatar_girl_v1_static.png")
 DEFAULT_OUTFIT_SOURCE = Path("asserts/avatar/girl_v1/live2d/outfits/default/default_outfit_full.png")
-SHORT_BOB_HAIR_SOURCE = Path("asserts/avatar/girl_v1/live2d/hairstyles/short_bob/source_full.png")
+DEFAULT_LONG_HAIR_REFERENCE = Path("temp/_live2d_avatar_harness/generated/gpt-image-2/avatar_girl_v1_default_long_reference_full.png")
+SHORT_BOB_HAIR_REFERENCE = Path("temp/_live2d_avatar_harness/generated/gpt-image-2/avatar_girl_v1_short_bob_reference_full.png")
 OUT_DIR = Path("asserts/avatar/girl_v1/live2d/layers")
 OUTFIT_OUT_DIR = Path("asserts/avatar/girl_v1/live2d/outfits/default/layers")
 HAIRSTYLE_ROOT = Path("asserts/avatar/girl_v1/live2d/hairstyles")
@@ -62,12 +63,12 @@ HAIRSTYLE_LAYERS: Dict[str, Dict[str, object]] = {
 HAIRSTYLES: Dict[str, Dict[str, object]] = {
     "default_long_pink": {
         "display_name": "粉色长发",
-        "source": SOURCE,
+        "source": DEFAULT_LONG_HAIR_REFERENCE,
         "is_default": True,
     },
     "short_bob": {
         "display_name": "短波波头",
-        "source": SHORT_BOB_HAIR_SOURCE,
+        "source": SHORT_BOB_HAIR_REFERENCE,
         "is_default": False,
     },
 }
@@ -123,13 +124,6 @@ def pixel_bbox(norm: Tuple[float, float, float, float], width: int, height: int)
     )
 
 
-def trim_transparent(image: Image.Image) -> Image.Image:
-    bbox = image.getbbox()
-    if bbox is None:
-        return image
-    return image.crop(bbox)
-
-
 def isolate_hair_pixels(image: Image.Image) -> Image.Image:
     """Keep pink/lavender hair pixels for bootstrap hairstyle crops.
 
@@ -144,16 +138,33 @@ def isolate_hair_pixels(image: Image.Image) -> Image.Image:
             r, g, b, a = source.getpixel((x, y))
             if a == 0:
                 continue
+            pink_purple_saturation = ((r + b) / 2) - g
             is_pink_lavender = (
-                r >= 150
-                and b >= 120
-                and g <= 230
-                and (r - g >= 12 or b - g >= 12)
-                and (max(r, g, b) - min(r, g, b) >= 18)
+                r >= 165
+                and b >= 135
+                and pink_purple_saturation >= 28
+                and abs(r - b) <= 95
+                and max(r, b) - g >= 24
             )
             if is_pink_lavender:
                 out_pixels[x, y] = (r, g, b, a)
     return output
+
+
+def hairstyle_source(hairstyle_id: str, reference_path: Path) -> tuple[Path | None, bool]:
+    """Return source path and whether it is already hair-only.
+
+    Full-body references live in ignored harness output and are only used when
+    regenerating the bootstrap package. The committed hairstyle package keeps
+    only a transparent hair-only source so runtime resources never swap in a
+    full character image as a hairstyle.
+    """
+    if reference_path.exists():
+        return reference_path, False
+    committed_hair_only = HAIRSTYLE_ROOT / hairstyle_id / "source_hair_only.png"
+    if committed_hair_only.exists():
+        return committed_hair_only, True
+    return None, True
 
 
 def main() -> int:
@@ -168,7 +179,7 @@ def main() -> int:
     layer_entries = []
     for name, spec in LAYERS.items():
         bbox = pixel_bbox(spec["bbox"], width, height)
-        cropped = trim_transparent(image.crop(bbox))
+        cropped = image.crop(bbox)
         filename = f"{name}.png"
         out_path = OUT_DIR / filename
         harness_path = HARNESS_OUT_DIR / filename
@@ -180,6 +191,8 @@ def main() -> int:
                 "file": f"layers/{filename}",
                 "source_bbox_normalized": spec["bbox"],
                 "source_bbox_pixels": bbox,
+                "placement_bbox_pixels": bbox,
+                "canvas_size": [width, height],
                 "size": cropped.size,
                 "bone": spec["bone"],
                 "z": spec["z"],
@@ -189,21 +202,21 @@ def main() -> int:
 
     hairstyle_manifests = []
     for hairstyle_id, hairstyle in HAIRSTYLES.items():
-        source_path = Path(str(hairstyle["source"]))
-        if not source_path.exists():
+        source_path, is_hair_only_source = hairstyle_source(hairstyle_id, Path(str(hairstyle["source"])))
+        if source_path is None:
             continue
         source_image = Image.open(source_path).convert("RGBA")
-        hair_only_image = isolate_hair_pixels(source_image)
+        hair_only_image = source_image if is_hair_only_source else isolate_hair_pixels(source_image)
         style_dir = HAIRSTYLE_ROOT / hairstyle_id
         style_layer_dir = style_dir / "layers"
         style_layer_dir.mkdir(parents=True, exist_ok=True)
-        if source_path != style_dir / "source_full.png":
-            source_image.save(style_dir / "source_full.png")
+        hair_only_source_path = style_dir / "source_hair_only.png"
+        hair_only_image.save(hair_only_source_path)
 
         style_entries = []
         for name, spec in HAIRSTYLE_LAYERS.items():
             bbox = pixel_bbox(spec["bbox"], source_image.size[0], source_image.size[1])
-            cropped = trim_transparent(hair_only_image.crop(bbox))
+            cropped = hair_only_image.crop(bbox)
             filename = f"{name}.png"
             cropped.save(style_layer_dir / filename)
             style_entries.append(
@@ -214,6 +227,8 @@ def main() -> int:
                     "role": spec["role"],
                     "source_bbox_normalized": spec["bbox"],
                     "source_bbox_pixels": bbox,
+                    "placement_bbox_pixels": bbox,
+                    "canvas_size": [source_image.size[0], source_image.size[1]],
                     "size": cropped.size,
                     "bone": spec["bone"],
                     "z": spec["z"],
@@ -228,13 +243,13 @@ def main() -> int:
             "avatar_id": "girl_v1",
             "hairstyle_id": hairstyle_id,
             "display_name": hairstyle["display_name"],
-            "source": str(style_dir / "source_full.png"),
+            "source": str(hair_only_source_path),
             "is_default": bool(hairstyle["is_default"]),
             "replaceable": True,
             "show_in_sticker_list": False,
             "layers": sorted(style_entries, key=lambda row: int(row["z"])),
             "notes": [
-                "Bootstrap hair-only crops from gpt-image-2 full-body sources.",
+                "Bootstrap hair-only crops from gpt-image-2 references; runtime package stores transparent hair-only sources only.",
                 "Final Cubism PSD should redraw clean strand tips, roots, and hidden overdraw.",
             ],
         }
@@ -244,7 +259,7 @@ def main() -> int:
                 "hairstyle_id": hairstyle_id,
                 "display_name": hairstyle["display_name"],
                 "manifest": str(style_manifest_path),
-                "source": str(style_dir / "source_full.png"),
+                "source": str(hair_only_source_path),
                 "is_default": bool(hairstyle["is_default"]),
                 "show_in_sticker_list": False,
             }
@@ -263,7 +278,7 @@ def main() -> int:
     if outfit_image is not None:
         for name, spec in OUTFIT_LAYERS.items():
             bbox = pixel_bbox(spec["bbox"], outfit_image.size[0], outfit_image.size[1])
-            cropped = trim_transparent(outfit_image.crop(bbox))
+            cropped = outfit_image.crop(bbox)
             filename = f"{name}.png"
             out_path = OUTFIT_OUT_DIR / filename
             cropped.save(out_path)
@@ -274,6 +289,8 @@ def main() -> int:
                     "slot": spec["slot"],
                     "source_bbox_normalized": spec["bbox"],
                     "source_bbox_pixels": bbox,
+                    "placement_bbox_pixels": bbox,
+                    "canvas_size": [outfit_image.size[0], outfit_image.size[1]],
                     "size": cropped.size,
                     "bone": spec["bone"],
                     "z": spec["z"],

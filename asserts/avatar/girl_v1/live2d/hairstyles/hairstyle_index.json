@@ -19,7 +19,7 @@
       "hairstyle_id": "default_long_pink",
       "display_name": "粉色长发",
       "manifest": "asserts/avatar/girl_v1/live2d/hairstyles/default_long_pink/hairstyle_manifest.json",
-      "source": "asserts/avatar/girl_v1/live2d/hairstyles/default_long_pink/source_full.png",
+      "source": "asserts/avatar/girl_v1/live2d/hairstyles/default_long_pink/source_hair_only.png",
       "is_default": true,
       "show_in_sticker_list": false
     },
@@ -27,7 +27,7 @@
       "hairstyle_id": "short_bob",
       "display_name": "短波波头",
       "manifest": "asserts/avatar/girl_v1/live2d/hairstyles/short_bob/hairstyle_manifest.json",
-      "source": "asserts/avatar/girl_v1/live2d/hairstyles/short_bob/source_full.png",
+      "source": "asserts/avatar/girl_v1/live2d/hairstyles/short_bob/source_hair_only.png",
       "is_default": false,
       "show_in_sticker_list": false
     }

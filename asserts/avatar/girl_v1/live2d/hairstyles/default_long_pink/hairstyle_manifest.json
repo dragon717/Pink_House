@@ -3,7 +3,7 @@
   "avatar_id": "girl_v1",
   "hairstyle_id": "default_long_pink",
   "display_name": "粉色长发",
-  "source": "asserts/avatar/girl_v1/live2d/hairstyles/default_long_pink/source_full.png",
+  "source": "asserts/avatar/girl_v1/live2d/hairstyles/default_long_pink/source_hair_only.png",
   "is_default": true,
   "replaceable": true,
   "show_in_sticker_list": false,
@@ -25,8 +25,18 @@
         912,
         724
       ],
+      "placement_bbox_pixels": [
+        185,
+        29,
+        912,
+        724
+      ],
+      "canvas_size": [
+        1086,
+        1448
+      ],
       "size": [
-        591,
+        727,
         695
       ],
       "bone": "hairBack",
@@ -51,8 +61,18 @@
         869,
         724
       ],
+      "placement_bbox_pixels": [
+        217,
+        29,
+        869,
+        724
+      ],
+      "canvas_size": [
+        1086,
+        1448
+      ],
       "size": [
-        591,
+        652,
         695
       ],
       "bone": "hairBackDetail",
@@ -77,8 +97,18 @@
         847,
         695
       ],
+      "placement_bbox_pixels": [
+        239,
+        29,
+        847,
+        695
+      ],
+      "canvas_size": [
+        1086,
+        1448
+      ],
       "size": [
-        560,
+        608,
         666
       ],
       "bone": "hairBackDetail",
@@ -103,9 +133,19 @@
         467,
         767
       ],
+      "placement_bbox_pixels": [
+        130,
+        159,
+        467,
+        767
+      ],
+      "canvas_size": [
+        1086,
+        1448
+      ],
       "size": [
-        220,
-        602
+        337,
+        608
       ],
       "bone": "hairSideLeft",
       "z": 66,
@@ -129,9 +169,19 @@
         956,
         767
       ],
+      "placement_bbox_pixels": [
+        619,
+        159,
+        956,
+        767
+      ],
+      "canvas_size": [
+        1086,
+        1448
+      ],
       "size": [
-        219,
-        578
+        337,
+        608
       ],
       "bone": "hairSideRight",
       "z": 66,
@@ -155,8 +205,18 @@
         478,
         811
       ],
+      "placement_bbox_pixels": [
+        109,
+        246,
+        478,
+        811
+      ],
+      "canvas_size": [
+        1086,
+        1448
+      ],
       "size": [
-        231,
+        369,
         565
       ],
       "bone": "hairSideLeftDetail",
@@ -181,9 +241,19 @@
         977,
         811
       ],
+      "placement_bbox_pixels": [
+        608,
+        246,
+        977,
+        811
+      ],
+      "canvas_size": [
+        1086,
+        1448
+      ],
       "size": [
-        230,
-        564
+        369,
+        565
       ],
       "bone": "hairSideRightDetail",
       "z": 69,
@@ -207,9 +277,19 @@
         782,
         290
       ],
+      "placement_bbox_pixels": [
+        304,
+        14,
+        782,
+        290
+      ],
+      "canvas_size": [
+        1086,
+        1448
+      ],
       "size": [
-        322,
-        269
+        478,
+        276
       ],
       "bone": "hairFront",
       "z": 91,
@@ -233,8 +313,18 @@
         836,
         434
       ],
+      "placement_bbox_pixels": [
+        250,
+        29,
+        836,
+        434
+      ],
+      "canvas_size": [
+        1086,
+        1448
+      ],
       "size": [
-        436,
+        586,
         405
       ],
       "bone": "hairFrontDetail",
@@ -259,9 +349,19 @@
         760,
         319
       ],
+      "placement_bbox_pixels": [
+        326,
+        14,
+        760,
+        319
+      ],
+      "canvas_size": [
+        1086,
+        1448
+      ],
       "size": [
-        327,
-        298
+        434,
+        305
       ],
       "bone": "hairFrontDetail",
       "z": 96,
@@ -270,7 +370,7 @@
     }
   ],
   "notes": [
-    "Bootstrap hair-only crops from gpt-image-2 full-body sources.",
+    "Bootstrap hair-only crops from gpt-image-2 references; runtime package stores transparent hair-only sources only.",
     "Final Cubism PSD should redraw clean strand tips, roots, and hidden overdraw."
   ]
 }
