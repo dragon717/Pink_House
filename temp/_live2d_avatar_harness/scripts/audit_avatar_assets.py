@@ -39,10 +39,12 @@ def load_manifest(path: Path) -> dict:
 
     # Minimal parser for this harness manifest. It keeps the script usable on a
     # clean macOS install where PyYAML is not present.
-    result: dict = {"asset_roots": {}, "acceptance": {"static_image": {}}}
+    result: dict = {"asset_roots": {}, "acceptance": {"static_image": {}, "magic_sticker_v1": {}}}
     current_list: str | None = None
+    current_magic_list: str | None = None
     in_asset_roots = False
     in_static_acceptance = False
+    in_magic_acceptance = False
     for raw_line in text.splitlines():
         line = raw_line.rstrip()
         stripped = line.strip()
@@ -53,6 +55,8 @@ def load_manifest(path: Path) -> dict:
             value = value.strip()
             in_asset_roots = key == "asset_roots"
             in_static_acceptance = False
+            in_magic_acceptance = False
+            current_magic_list = None
             current_list = key if key in {
                 "required_actions",
                 "required_expressions",
@@ -75,6 +79,17 @@ def load_manifest(path: Path) -> dict:
             continue
         if stripped == "static_image:":
             in_static_acceptance = True
+            in_magic_acceptance = False
+            current_magic_list = None
+            continue
+        if stripped == "magic_sticker_v1:":
+            in_static_acceptance = False
+            in_magic_acceptance = True
+            current_magic_list = None
+            continue
+        if in_magic_acceptance and line.startswith("  ") and not line.startswith("    ") and stripped.endswith(":"):
+            in_magic_acceptance = False
+            current_magic_list = None
             continue
         if in_static_acceptance and line.startswith("    ") and ":" in stripped:
             key, value = stripped.split(":", 1)
@@ -85,6 +100,25 @@ def load_manifest(path: Path) -> dict:
                 parsed_value = value
             result["acceptance"]["static_image"][key.strip()] = parsed_value
             continue
+        if in_magic_acceptance and line.startswith("    "):
+            if current_magic_list and stripped.startswith("- "):
+                result["acceptance"]["magic_sticker_v1"][current_magic_list].append(stripped[2:].strip())
+                continue
+            if stripped.endswith(":"):
+                key = stripped[:-1].strip()
+                current_magic_list = key
+                result["acceptance"]["magic_sticker_v1"][key] = []
+                continue
+            if ":" in stripped:
+                key, value = stripped.split(":", 1)
+                value = value.strip()
+                try:
+                    parsed_value: float | int = float(value) if "." in value else int(value)
+                except ValueError:
+                    parsed_value = value
+                result["acceptance"]["magic_sticker_v1"][key.strip()] = parsed_value
+                current_magic_list = None
+                continue
     return result
 
 
@@ -293,6 +327,7 @@ def main() -> int:
         and live2d_ok,
         "manifest": str(manifest_path),
         "avatar_id": manifest.get("avatar_id"),
+        "magic_sticker_v1_acceptance": manifest.get("acceptance", {}).get("magic_sticker_v1", {}),
         "actions_ok": not missing_actions,
         "missing_actions": missing_actions,
         "expressions_ok": not missing_expressions,

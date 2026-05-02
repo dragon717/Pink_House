@@ -65,7 +65,7 @@ image2_outputs:
     destination: temp/_live2d_avatar_harness/generated/avatar_girl_v1_layered_psd_spec.psd
     prompt: >
       Layered Live2D-ready PSD concept for a front-facing girl character. Separate head, neck, torso,
-      upper arms, forearms, hands, legs, shoes, front hair, back hair, side hair, face base, eye whites,
+      upper arms, forearms, hands, thighs, lower legs, feet, front hair, back hair, side hair, face base, eye whites,
       pupils, highlights, eyelids, eyebrows, mouth shapes A I U E O, blush, skirt hem, and accessories.
       Include hidden joint overdraw at shoulders, elbows, wrists, hips, knees, neck, hair roots, and skirt.
 layer_outputs:
@@ -78,8 +78,10 @@ layer_outputs:
   - hand_left
   - hand_right
   - hip_base
-  - leg_left
-  - leg_right
+  - thigh_left
+  - thigh_right
+  - lower_leg_left
+  - lower_leg_right
   - foot_left
   - foot_right
 hairstyle_layer_outputs:
@@ -113,6 +115,17 @@ acceptance:
     ratio_tolerance: 0.03
     min_nontransparent_percent: 2.0
     min_file_bytes: 8192
+  magic_sticker_v1:
+    edge_review_status: bootstrap_pass_with_visual_review_required
+    motion_anchor_version: motion_profile_v1
+    canvas_scale: 0.72
+    target_fps_idle: 24
+    target_fps_gesture: 30
+    static_contexts:
+      - snapshot
+      - thumbnail
+      - low_power
+      - background
   video:
     extension: mov
   live2d_required_files:

@@ -11,8 +11,6 @@
     {
       "name": "hair_back_base",
       "file": "hairstyles/default_long_pink/layers/hair_back_base.png",
-      "slot": "hair.back.base",
-      "role": "background",
       "source_bbox_normalized": [
         0.17,
         0.02,
@@ -20,35 +18,47 @@
         0.5
       ],
       "source_bbox_pixels": [
+        85,
+        0,
+        1012,
+        859
+      ],
+      "placement_bbox_pixels": [
+        85,
+        0,
+        1012,
+        859
+      ],
+      "visible_bbox_pixels": [
         185,
         29,
         912,
         724
       ],
-      "placement_bbox_pixels": [
-        185,
+      "overdraw_insets_pixels": [
+        100,
         29,
-        912,
-        724
+        100,
+        135
       ],
       "canvas_size": [
         1086,
         1448
       ],
       "size": [
-        727,
-        695
+        927,
+        859
       ],
       "bone": "hairBack",
       "z": 8,
+      "slot": "hair.back.base",
+      "role": "background",
       "replaceable": true,
       "show_in_sticker_list": false
     },
     {
       "name": "hair_back_detail",
       "file": "hairstyles/default_long_pink/layers/hair_back_detail.png",
-      "slot": "hair.back.detail",
-      "role": "detail",
       "source_bbox_normalized": [
         0.2,
         0.02,
@@ -56,35 +66,47 @@
         0.5
       ],
       "source_bbox_pixels": [
+        122,
+        0,
+        964,
+        854
+      ],
+      "placement_bbox_pixels": [
+        122,
+        0,
+        964,
+        854
+      ],
+      "visible_bbox_pixels": [
         217,
         29,
         869,
         724
       ],
-      "placement_bbox_pixels": [
-        217,
+      "overdraw_insets_pixels": [
+        95,
         29,
-        869,
-        724
+        95,
+        130
       ],
       "canvas_size": [
         1086,
         1448
       ],
       "size": [
-        652,
-        695
+        842,
+        854
       ],
       "bone": "hairBackDetail",
       "z": 9,
+      "slot": "hair.back.detail",
+      "role": "detail",
       "replaceable": true,
       "show_in_sticker_list": false
     },
     {
       "name": "hair_highlight_back",
       "file": "hairstyles/default_long_pink/layers/hair_highlight_back.png",
-      "slot": "hair.highlight.back",
-      "role": "detail",
       "source_bbox_normalized": [
         0.22,
         0.02,
@@ -92,35 +114,47 @@
         0.48
       ],
       "source_bbox_pixels": [
+        149,
+        0,
+        937,
+        810
+      ],
+      "placement_bbox_pixels": [
+        149,
+        0,
+        937,
+        810
+      ],
+      "visible_bbox_pixels": [
         239,
         29,
         847,
         695
       ],
-      "placement_bbox_pixels": [
-        239,
+      "overdraw_insets_pixels": [
+        90,
         29,
-        847,
-        695
+        90,
+        115
       ],
       "canvas_size": [
         1086,
         1448
       ],
       "size": [
-        608,
-        666
+        788,
+        810
       ],
       "bone": "hairBackDetail",
       "z": 12,
+      "slot": "hair.highlight.back",
+      "role": "detail",
       "replaceable": true,
       "show_in_sticker_list": false
     },
     {
       "name": "hair_side_left_base",
       "file": "hairstyles/default_long_pink/layers/hair_side_left_base.png",
-      "slot": "hair.side.left.base",
-      "role": "foreground",
       "source_bbox_normalized": [
         0.12,
         0.11,
@@ -128,35 +162,47 @@
         0.53
       ],
       "source_bbox_pixels": [
+        60,
+        79,
+        562,
+        862
+      ],
+      "placement_bbox_pixels": [
+        60,
+        79,
+        562,
+        862
+      ],
+      "visible_bbox_pixels": [
         130,
         159,
         467,
         767
       ],
-      "placement_bbox_pixels": [
-        130,
-        159,
-        467,
-        767
+      "overdraw_insets_pixels": [
+        70,
+        80,
+        95,
+        95
       ],
       "canvas_size": [
         1086,
         1448
       ],
       "size": [
-        337,
-        608
+        502,
+        783
       ],
       "bone": "hairSideLeft",
-      "z": 66,
+      "z": 18,
+      "slot": "hair.side.left.base",
+      "role": "background",
       "replaceable": true,
       "show_in_sticker_list": false
     },
     {
       "name": "hair_side_right_base",
       "file": "hairstyles/default_long_pink/layers/hair_side_right_base.png",
-      "slot": "hair.side.right.base",
-      "role": "foreground",
       "source_bbox_normalized": [
         0.57,
         0.11,
@@ -164,35 +210,47 @@
         0.53
       ],
       "source_bbox_pixels": [
+        524,
+        79,
+        1026,
+        862
+      ],
+      "placement_bbox_pixels": [
+        524,
+        79,
+        1026,
+        862
+      ],
+      "visible_bbox_pixels": [
         619,
         159,
         956,
         767
       ],
-      "placement_bbox_pixels": [
-        619,
-        159,
-        956,
-        767
+      "overdraw_insets_pixels": [
+        95,
+        80,
+        70,
+        95
       ],
       "canvas_size": [
         1086,
         1448
       ],
       "size": [
-        337,
-        608
+        502,
+        783
       ],
       "bone": "hairSideRight",
-      "z": 66,
+      "z": 18,
+      "slot": "hair.side.right.base",
+      "role": "background",
       "replaceable": true,
       "show_in_sticker_list": false
     },
     {
       "name": "hair_side_left_detail",
       "file": "hairstyles/default_long_pink/layers/hair_side_left_detail.png",
-      "slot": "hair.side.left.detail",
-      "role": "detail",
       "source_bbox_normalized": [
         0.1,
         0.17,
@@ -200,35 +258,47 @@
         0.56
       ],
       "source_bbox_pixels": [
+        39,
+        166,
+        573,
+        901
+      ],
+      "placement_bbox_pixels": [
+        39,
+        166,
+        573,
+        901
+      ],
+      "visible_bbox_pixels": [
         109,
         246,
         478,
         811
       ],
-      "placement_bbox_pixels": [
-        109,
-        246,
-        478,
-        811
+      "overdraw_insets_pixels": [
+        70,
+        80,
+        95,
+        90
       ],
       "canvas_size": [
         1086,
         1448
       ],
       "size": [
-        369,
-        565
+        534,
+        735
       ],
       "bone": "hairSideLeftDetail",
-      "z": 69,
+      "z": 19,
+      "slot": "hair.side.left.detail",
+      "role": "detail",
       "replaceable": true,
       "show_in_sticker_list": false
     },
     {
       "name": "hair_side_right_detail",
       "file": "hairstyles/default_long_pink/layers/hair_side_right_detail.png",
-      "slot": "hair.side.right.detail",
-      "role": "detail",
       "source_bbox_normalized": [
         0.56,
         0.17,
@@ -236,35 +306,47 @@
         0.56
       ],
       "source_bbox_pixels": [
+        513,
+        166,
+        1047,
+        901
+      ],
+      "placement_bbox_pixels": [
+        513,
+        166,
+        1047,
+        901
+      ],
+      "visible_bbox_pixels": [
         608,
         246,
         977,
         811
       ],
-      "placement_bbox_pixels": [
-        608,
-        246,
-        977,
-        811
+      "overdraw_insets_pixels": [
+        95,
+        80,
+        70,
+        90
       ],
       "canvas_size": [
         1086,
         1448
       ],
       "size": [
-        369,
-        565
+        534,
+        735
       ],
       "bone": "hairSideRightDetail",
-      "z": 69,
+      "z": 19,
+      "slot": "hair.side.right.detail",
+      "role": "detail",
       "replaceable": true,
       "show_in_sticker_list": false
     },
     {
       "name": "hair_front_bangs",
       "file": "hairstyles/default_long_pink/layers/hair_front_bangs.png",
-      "slot": "hair.front.bangs",
-      "role": "foreground",
       "source_bbox_normalized": [
         0.28,
         0.01,
@@ -272,35 +354,47 @@
         0.2
       ],
       "source_bbox_pixels": [
+        234,
+        0,
+        852,
+        375
+      ],
+      "placement_bbox_pixels": [
+        234,
+        0,
+        852,
+        375
+      ],
+      "visible_bbox_pixels": [
         304,
         14,
         782,
         290
       ],
-      "placement_bbox_pixels": [
-        304,
+      "overdraw_insets_pixels": [
+        70,
         14,
-        782,
-        290
+        70,
+        85
       ],
       "canvas_size": [
         1086,
         1448
       ],
       "size": [
-        478,
-        276
+        618,
+        375
       ],
       "bone": "hairFront",
       "z": 91,
+      "slot": "hair.front.bangs",
+      "role": "foreground",
       "replaceable": true,
       "show_in_sticker_list": false
     },
     {
       "name": "hair_front_detail",
       "file": "hairstyles/default_long_pink/layers/hair_front_detail.png",
-      "slot": "hair.front.detail",
-      "role": "detail",
       "source_bbox_normalized": [
         0.23,
         0.02,
@@ -308,35 +402,47 @@
         0.3
       ],
       "source_bbox_pixels": [
+        175,
+        0,
+        911,
+        524
+      ],
+      "placement_bbox_pixels": [
+        175,
+        0,
+        911,
+        524
+      ],
+      "visible_bbox_pixels": [
         250,
         29,
         836,
         434
       ],
-      "placement_bbox_pixels": [
-        250,
+      "overdraw_insets_pixels": [
+        75,
         29,
-        836,
-        434
+        75,
+        90
       ],
       "canvas_size": [
         1086,
         1448
       ],
       "size": [
-        586,
-        405
+        736,
+        524
       ],
       "bone": "hairFrontDetail",
       "z": 94,
+      "slot": "hair.front.detail",
+      "role": "detail",
       "replaceable": true,
       "show_in_sticker_list": false
     },
     {
       "name": "hair_highlight_front",
       "file": "hairstyles/default_long_pink/layers/hair_highlight_front.png",
-      "slot": "hair.highlight.front",
-      "role": "detail",
       "source_bbox_normalized": [
         0.3,
         0.01,
@@ -344,27 +450,41 @@
         0.22
       ],
       "source_bbox_pixels": [
+        256,
+        0,
+        830,
+        399
+      ],
+      "placement_bbox_pixels": [
+        256,
+        0,
+        830,
+        399
+      ],
+      "visible_bbox_pixels": [
         326,
         14,
         760,
         319
       ],
-      "placement_bbox_pixels": [
-        326,
+      "overdraw_insets_pixels": [
+        70,
         14,
-        760,
-        319
+        70,
+        80
       ],
       "canvas_size": [
         1086,
         1448
       ],
       "size": [
-        434,
-        305
+        574,
+        399
       ],
       "bone": "hairFrontDetail",
       "z": 96,
+      "slot": "hair.highlight.front",
+      "role": "detail",
       "replaceable": true,
       "show_in_sticker_list": false
     }

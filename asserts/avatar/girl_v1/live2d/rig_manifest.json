@@ -9,69 +9,183 @@
   "coordinate_space": "normalized_static_image",
   "layers": [
     {
-      "name": "leg_left",
-      "file": "layers/leg_left.png",
+      "name": "thigh_left",
+      "file": "layers/thigh_left.png",
       "source_bbox_normalized": [
-        0.38,
-        0.55,
-        0.5,
-        0.88
+        0.37,
+        0.54,
+        0.51,
+        0.72
       ],
       "source_bbox_pixels": [
-        413,
-        796,
-        543,
-        1274
+        352,
+        707,
+        599,
+        1123
       ],
       "placement_bbox_pixels": [
-        413,
-        796,
-        543,
-        1274
+        352,
+        707,
+        599,
+        1123
+      ],
+      "visible_bbox_pixels": [
+        402,
+        782,
+        554,
+        1043
+      ],
+      "overdraw_insets_pixels": [
+        50,
+        75,
+        45,
+        80
       ],
       "canvas_size": [
         1086,
         1448
       ],
       "size": [
-        130,
-        478
+        247,
+        416
       ],
-      "bone": "legLeft",
+      "bone": "thighLeft",
       "z": 20,
       "notes": "Bootstrap crop from gpt-image-2 full-body source; final Cubism PSD should redraw hidden overdraw behind joints."
     },
     {
-      "name": "leg_right",
-      "file": "layers/leg_right.png",
+      "name": "thigh_right",
+      "file": "layers/thigh_right.png",
       "source_bbox_normalized": [
-        0.5,
-        0.55,
-        0.62,
-        0.88
+        0.49,
+        0.54,
+        0.63,
+        0.72
       ],
       "source_bbox_pixels": [
-        543,
-        796,
-        673,
-        1274
+        487,
+        707,
+        734,
+        1123
       ],
       "placement_bbox_pixels": [
-        543,
-        796,
-        673,
-        1274
+        487,
+        707,
+        734,
+        1123
+      ],
+      "visible_bbox_pixels": [
+        532,
+        782,
+        684,
+        1043
+      ],
+      "overdraw_insets_pixels": [
+        45,
+        75,
+        50,
+        80
       ],
       "canvas_size": [
         1086,
         1448
       ],
       "size": [
-        130,
-        478
+        247,
+        416
       ],
-      "bone": "legRight",
+      "bone": "thighRight",
       "z": 20,
+      "notes": "Bootstrap crop from gpt-image-2 full-body source; final Cubism PSD should redraw hidden overdraw behind joints."
+    },
+    {
+      "name": "lower_leg_left",
+      "file": "layers/lower_leg_left.png",
+      "source_bbox_normalized": [
+        0.37,
+        0.66,
+        0.51,
+        0.89
+      ],
+      "source_bbox_pixels": [
+        352,
+        866,
+        599,
+        1384
+      ],
+      "placement_bbox_pixels": [
+        352,
+        866,
+        599,
+        1384
+      ],
+      "visible_bbox_pixels": [
+        402,
+        956,
+        554,
+        1289
+      ],
+      "overdraw_insets_pixels": [
+        50,
+        90,
+        45,
+        95
+      ],
+      "canvas_size": [
+        1086,
+        1448
+      ],
+      "size": [
+        247,
+        518
+      ],
+      "bone": "lowerLegLeft",
+      "z": 21,
+      "notes": "Bootstrap crop from gpt-image-2 full-body source; final Cubism PSD should redraw hidden overdraw behind joints."
+    },
+    {
+      "name": "lower_leg_right",
+      "file": "layers/lower_leg_right.png",
+      "source_bbox_normalized": [
+        0.49,
+        0.66,
+        0.63,
+        0.89
+      ],
+      "source_bbox_pixels": [
+        487,
+        866,
+        734,
+        1384
+      ],
+      "placement_bbox_pixels": [
+        487,
+        866,
+        734,
+        1384
+      ],
+      "visible_bbox_pixels": [
+        532,
+        956,
+        684,
+        1289
+      ],
+      "overdraw_insets_pixels": [
+        45,
+        90,
+        50,
+        95
+      ],
+      "canvas_size": [
+        1086,
+        1448
+      ],
+      "size": [
+        247,
+        518
+      ],
+      "bone": "lowerLegRight",
+      "z": 21,
       "notes": "Bootstrap crop from gpt-image-2 full-body source; final Cubism PSD should redraw hidden overdraw behind joints."
     },
     {
@@ -84,24 +198,36 @@
         0.61
       ],
       "source_bbox_pixels": [
+        321,
+        577,
+        765,
+        958
+      ],
+      "placement_bbox_pixels": [
+        321,
+        577,
+        765,
+        958
+      ],
+      "visible_bbox_pixels": [
         391,
         652,
         695,
         883
       ],
-      "placement_bbox_pixels": [
-        391,
-        652,
-        695,
-        883
+      "overdraw_insets_pixels": [
+        70,
+        75,
+        70,
+        75
       ],
       "canvas_size": [
         1086,
         1448
       ],
       "size": [
-        304,
-        231
+        444,
+        381
       ],
       "bone": "hip",
       "z": 24,
@@ -117,24 +243,36 @@
         0.55
       ],
       "source_bbox_pixels": [
+        299,
+        253,
+        787,
+        891
+      ],
+      "placement_bbox_pixels": [
+        299,
+        253,
+        787,
+        891
+      ],
+      "visible_bbox_pixels": [
         369,
         348,
         717,
         796
       ],
-      "placement_bbox_pixels": [
-        369,
-        348,
-        717,
-        796
+      "overdraw_insets_pixels": [
+        70,
+        95,
+        70,
+        95
       ],
       "canvas_size": [
         1086,
         1448
       ],
       "size": [
-        348,
-        448
+        488,
+        638
       ],
       "bone": "torso",
       "z": 30,
@@ -150,24 +288,36 @@
         0.98
       ],
       "source_bbox_pixels": [
+        335,
+        1194,
+        599,
+        1448
+      ],
+      "placement_bbox_pixels": [
+        335,
+        1194,
+        599,
+        1448
+      ],
+      "visible_bbox_pixels": [
         380,
         1216,
         554,
         1419
       ],
-      "placement_bbox_pixels": [
-        380,
-        1216,
-        554,
-        1419
+      "overdraw_insets_pixels": [
+        45,
+        22,
+        45,
+        29
       ],
       "canvas_size": [
         1086,
         1448
       ],
       "size": [
-        174,
-        203
+        264,
+        254
       ],
       "bone": "footLeft",
       "z": 40,
@@ -183,24 +333,36 @@
         0.98
       ],
       "source_bbox_pixels": [
+        487,
+        1194,
+        751,
+        1448
+      ],
+      "placement_bbox_pixels": [
+        487,
+        1194,
+        751,
+        1448
+      ],
+      "visible_bbox_pixels": [
         532,
         1216,
         706,
         1419
       ],
-      "placement_bbox_pixels": [
-        532,
-        1216,
-        706,
-        1419
+      "overdraw_insets_pixels": [
+        45,
+        22,
+        45,
+        29
       ],
       "canvas_size": [
         1086,
         1448
       ],
       "size": [
-        174,
-        203
+        264,
+        254
       ],
       "bone": "footRight",
       "z": 40,
@@ -216,24 +378,36 @@
         0.47
       ],
       "source_bbox_pixels": [
+        196,
+        321,
+        504,
+        756
+      ],
+      "placement_bbox_pixels": [
+        196,
+        321,
+        504,
+        756
+      ],
+      "visible_bbox_pixels": [
         261,
         391,
         434,
         681
       ],
-      "placement_bbox_pixels": [
-        261,
-        391,
-        434,
-        681
+      "overdraw_insets_pixels": [
+        65,
+        70,
+        70,
+        75
       ],
       "canvas_size": [
         1086,
         1448
       ],
       "size": [
-        173,
-        290
+        308,
+        435
       ],
       "bone": "upperArmLeft",
       "z": 42,
@@ -249,24 +423,36 @@
         0.47
       ],
       "source_bbox_pixels": [
+        582,
+        321,
+        890,
+        756
+      ],
+      "placement_bbox_pixels": [
+        582,
+        321,
+        890,
+        756
+      ],
+      "visible_bbox_pixels": [
         652,
         391,
         825,
         681
       ],
-      "placement_bbox_pixels": [
-        652,
-        391,
-        825,
-        681
+      "overdraw_insets_pixels": [
+        70,
+        70,
+        65,
+        75
       ],
       "canvas_size": [
         1086,
         1448
       ],
       "size": [
-        173,
-        290
+        308,
+        435
       ],
       "bone": "upperArmRight",
       "z": 42,
@@ -282,24 +468,36 @@
         0.58
       ],
       "source_bbox_pixels": [
+        93,
+        548,
+        445,
+        905
+      ],
+      "placement_bbox_pixels": [
+        93,
+        548,
+        445,
+        905
+      ],
+      "visible_bbox_pixels": [
         163,
         623,
         380,
         840
       ],
-      "placement_bbox_pixels": [
-        163,
-        623,
-        380,
-        840
+      "overdraw_insets_pixels": [
+        70,
+        75,
+        65,
+        65
       ],
       "canvas_size": [
         1086,
         1448
       ],
       "size": [
-        217,
-        217
+        352,
+        357
       ],
       "bone": "lowerArmLeft",
       "z": 62,
@@ -315,24 +513,36 @@
         0.58
       ],
       "source_bbox_pixels": [
+        641,
+        548,
+        993,
+        905
+      ],
+      "placement_bbox_pixels": [
+        641,
+        548,
+        993,
+        905
+      ],
+      "visible_bbox_pixels": [
         706,
         623,
         923,
         840
       ],
-      "placement_bbox_pixels": [
-        706,
-        623,
-        923,
-        840
+      "overdraw_insets_pixels": [
+        65,
+        75,
+        70,
+        65
       ],
       "canvas_size": [
         1086,
         1448
       ],
       "size": [
-        217,
-        217
+        352,
+        357
       ],
       "bone": "lowerArmRight",
       "z": 62,
@@ -348,24 +558,36 @@
         0.58
       ],
       "source_bbox_pixels": [
+        75,
+        636,
+        349,
+        885
+      ],
+      "placement_bbox_pixels": [
+        75,
+        636,
+        349,
+        885
+      ],
+      "visible_bbox_pixels": [
         130,
         681,
         304,
         840
       ],
-      "placement_bbox_pixels": [
-        130,
-        681,
-        304,
-        840
+      "overdraw_insets_pixels": [
+        55,
+        45,
+        45,
+        45
       ],
       "canvas_size": [
         1086,
         1448
       ],
       "size": [
-        174,
-        159
+        274,
+        249
       ],
       "bone": "handLeft",
       "z": 72,
@@ -381,24 +603,36 @@
         0.58
       ],
       "source_bbox_pixels": [
+        737,
+        636,
+        1011,
+        885
+      ],
+      "placement_bbox_pixels": [
+        737,
+        636,
+        1011,
+        885
+      ],
+      "visible_bbox_pixels": [
         782,
         681,
         956,
         840
       ],
-      "placement_bbox_pixels": [
-        782,
-        681,
-        956,
-        840
+      "overdraw_insets_pixels": [
+        45,
+        45,
+        55,
+        45
       ],
       "canvas_size": [
         1086,
         1448
       ],
       "size": [
-        174,
-        159
+        274,
+        249
       ],
       "bone": "handRight",
       "z": 72,
@@ -414,24 +648,36 @@
         0.29
       ],
       "source_bbox_pixels": [
+        299,
+        0,
+        787,
+        515
+      ],
+      "placement_bbox_pixels": [
+        299,
+        0,
+        787,
+        515
+      ],
+      "visible_bbox_pixels": [
         369,
         43,
         717,
         420
       ],
-      "placement_bbox_pixels": [
-        369,
+      "overdraw_insets_pixels": [
+        70,
         43,
-        717,
-        420
+        70,
+        95
       ],
       "canvas_size": [
         1086,
         1448
       ],
       "size": [
-        348,
-        377
+        488,
+        515
       ],
       "bone": "head",
       "z": 80,
@@ -572,6 +818,34 @@
         0.53
       ]
     },
+    "thighLeft": {
+      "parent": "root",
+      "anchor": [
+        0.44,
+        0.61
+      ]
+    },
+    "thighRight": {
+      "parent": "root",
+      "anchor": [
+        0.56,
+        0.61
+      ]
+    },
+    "lowerLegLeft": {
+      "parent": "thighLeft",
+      "anchor": [
+        0.43,
+        0.71
+      ]
+    },
+    "lowerLegRight": {
+      "parent": "thighRight",
+      "anchor": [
+        0.57,
+        0.71
+      ]
+    },
     "legLeft": {
       "parent": "root",
       "anchor": [
@@ -587,14 +861,14 @@
       ]
     },
     "footLeft": {
-      "parent": "legLeft",
+      "parent": "lowerLegLeft",
       "anchor": [
         0.43,
         0.9
       ]
     },
     "footRight": {
-      "parent": "legRight",
+      "parent": "lowerLegRight",
       "anchor": [
         0.57,
         0.9
@@ -612,6 +886,7 @@
     "default": {
       "manifest": "asserts/avatar/girl_v1/live2d/outfits/default/outfit_manifest.json",
       "full_preview": "asserts/avatar/girl_v1/live2d/outfits/default/default_outfit_full.png",
+      "hair_style_scope": "default_long_pink",
       "show_in_sticker_list": false
     }
   },

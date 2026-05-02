@@ -8,7 +8,7 @@ struct PetHomeView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(ThemeManager.self) private var themeManager
     @Query(filter: #Predicate<Clothing> { $0.deletedAt == nil }) private var clothings: [Clothing]
-    
+
     @StateObject private var audioManager = AudioManager.shared
     @ObservedObject private var hapticManager = HapticEngineManager.shared
     @ObservedObject private var soundManager = SoundManager.shared
@@ -18,14 +18,15 @@ struct PetHomeView: View {
     @State private var showRenameAlert = false
     @State private var showNoCardAlert = false
     @State private var showJobSelection = false
+    @State private var showAutoWorkSettings = false
     @State private var newName = ""
     @State private var showAdoptionView = false // 领养界面
-    
+
     @State private var showDebugDialogueInput = false
     @State private var debugInputText = ""
     @State private var showChatView = false // ChatView State
     @State private var showVIPView = false // VIP View State
-    
+
     // 用于监听媒体状态通知
     @State private var cancellables = Set<AnyCancellable>()
 
@@ -42,7 +43,7 @@ struct PetHomeView: View {
                 .foregroundStyle(.orange)
         }
     }
-    
+
     var body: some View {
         Group {
             // 如果没有领养任何宠物，直接显示领养界面
@@ -61,7 +62,7 @@ struct PetHomeView: View {
                             // 竖屏：取屏幕宽度的 90%，但限制最大值（450）和最小值（280），同时考虑到屏幕高度的限制，避免遮挡
                             let screenHeight = geo.size.height
                             let screenWidth = geo.size.width
-                            
+
                             let videoHeight: CGFloat = {
                                 if isLandscape {
                                     return max(100, min(screenWidth, screenHeight) * 0.8)
@@ -76,12 +77,12 @@ struct PetHomeView: View {
                                     return max(100, min(idealSize, availableHeight, 450))
                                 }
                             }()
-                            
+
                             ZStack {
                                 // 背景
                                 LiquidBackground(themeSkinWallpaperContext: .petChat)
                                     .ignoresSafeArea()
-                                
+
                                 // 通用布局逻辑：
                                 // 1. 底层：视频区域 (绝对居中)
                                 PetInteractionAreaView(
@@ -94,7 +95,7 @@ struct PetHomeView: View {
                                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                                 // 动态调整偏移，小屏幕减少偏移
                                 .offset(y: isLandscape ? -20 : -screenHeight * 0.05)
-                                
+
                                 // 2. 上层 UI：Header
                                 if isLandscape {
                                     HStack(spacing: 0) {
@@ -102,21 +103,21 @@ struct PetHomeView: View {
                                         PetStatusHeaderView(viewModel: viewModel, isLandscape: true)
                                             .frame(width: 120)
                                             .padding(.leading, 10)
-                                        
+
                                         Spacer()
                                     }
                                 } else {
                                     VStack(spacing: 0) {
                                         // 顶部状态栏和货币栏
                                         PetStatusHeaderView(viewModel: viewModel, isLandscape: false)
-                                        
+
                                         Spacer()
                                     }
                                 }
-                                
+
                                 // 3. 顶层 UI：底部操作面板 (可展开)
                                 PetBottomPanel(viewModel: viewModel, panelState: $panelState, showRenameAlert: $showRenameAlert, isLandscape: isLandscape)
-                                
+
                                 // 4. 悬浮按钮 (仅在隐藏状态且竖屏显示)
                                 if !isLandscape && panelState == .hidden {
                                     VStack {
@@ -140,9 +141,9 @@ struct PetHomeView: View {
                                         }
                                         .padding(.leading, 20)
                                         .padding(.bottom, 100)
-                                        
+
                                         Spacer()
-                                        
+
                                         Button(action: {
                                             withAnimation(.spring()) {
                                                 panelState = .collapsed
@@ -167,7 +168,7 @@ struct PetHomeView: View {
                                     }
                                     .transition(.opacity)
                                 }
-                                
+
                                 // Debug: 粉色气泡对话输入框
                                 if showDebugDialogueInput {
                                     Color.black.opacity(0.3)
@@ -176,7 +177,7 @@ struct PetHomeView: View {
                                             showDebugDialogueInput = false
                                         }
                                         .transition(.opacity)
-                                    
+
                                     VStack {
                                         Spacer()
                                         PetDialogueInputView(text: $debugInputText, onSend: {
@@ -231,6 +232,10 @@ struct PetHomeView: View {
                     PetJobSelectionView(viewModel: viewModel, isPresented: $showJobSelection)
                         .presentationDetents([.medium])
                 }
+                .sheet(isPresented: $showAutoWorkSettings) {
+                    PetAutoWorkSettingsView(viewModel: viewModel, isPresented: $showAutoWorkSettings)
+                        .presentationDetents([.medium, .large])
+                }
                 .navigationTitle("")
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
@@ -258,7 +263,7 @@ struct PetHomeView: View {
                                     }
                                 }
                             }
-                            
+
                             // 再要x胎
                             if viewModel.status.ownedPetIds.count < PetCharacter.allCases.count {
                                 Button {
@@ -266,10 +271,10 @@ struct PetHomeView: View {
                                 } label: {
                                     Label("再要\(viewModel.nextAdoptionNumberText)胎", systemImage: "plus.circle")
                                 }
-                                
+
                                 Divider()
                             }
-                            
+
                             Button {
                                 if viewModel.hasRenameCard() {
                                     newName = viewModel.status.petName ?? ""
@@ -280,7 +285,7 @@ struct PetHomeView: View {
                             } label: {
                                 Label("修改名字", systemImage: "pencil")
                             }
-                            
+
                             if viewModel.status.currentJob != .none {
                                 Button {
                                     viewModel.stopJob()
@@ -294,19 +299,28 @@ struct PetHomeView: View {
                                     Label("送去打工", systemImage: "briefcase")
                                 }
                             }
+
+                            Button {
+                                showAutoWorkSettings = true
+                            } label: {
+                                Label(
+                                    viewModel.status.isAutoWorkEnabled ? "自动打工设置" : "开启自动打工",
+                                    systemImage: viewModel.status.isAutoWorkEnabled ? "gearshape.fill" : "clock"
+                                )
+                            }
                         } label: {
                             HStack(spacing: 6) {
                                 petShortcutIcon(for: viewModel.currentPet, size: 16)
-                                
+
                                 let displayName = viewModel.status.displayName
-                                
+
                                 VStack(alignment: .leading, spacing: 0) {
                                     Text(displayName)
                                         .font(.headline)
                                         .foregroundStyle(.primary)
-                                    
+
                                     if viewModel.status.currentJob != .none {
-                                        Text(viewModel.status.currentJob.rawValue)
+                                        Text(viewModel.status.currentJobStartedAutomatically ? "\(viewModel.status.currentJob.rawValue) · 自动" : viewModel.status.currentJob.rawValue)
                                             .font(.caption2)
                                             .foregroundStyle(.blue)
                                     }
@@ -316,7 +330,7 @@ struct PetHomeView: View {
                             .contentShape(Rectangle()) // 增大点击热区
                         }
                     }
-                    
+
                     ToolbarItem(placement: .topBarTrailing) {
                         HStack(spacing: 8) {
                             // Chat Button (New)
@@ -326,7 +340,7 @@ struct PetHomeView: View {
                             Image(systemName: "book.closed")
                                 .foregroundStyle(.purple)
                         }
-                            
+
                             // Background Music Toggle (新增)
                             Button {
                                 audioManager.isBackgroundMusicEnabled.toggle()
@@ -342,7 +356,7 @@ struct PetHomeView: View {
                                 Image(systemName: soundManager.isSoundEnabled ? "speaker.wave.2.fill" : "speaker.slash.fill")
                                     .foregroundStyle(soundManager.isSoundEnabled ? .blue : .gray)
                             }
-                            
+
                             // Haptic Toggle
                             Button {
                                 hapticManager.isHapticsEnabled.toggle()
@@ -350,7 +364,7 @@ struct PetHomeView: View {
                                 Image(systemName: hapticManager.isHapticsEnabled ? "iphone.radiowaves.left.and.right" : "iphone.slash")
                                     .foregroundStyle(hapticManager.isHapticsEnabled ? .yellow : .gray)
                             }
-                            
+
                         }
                         .font(.system(size: 14)) // Smaller icons
                     }
@@ -384,12 +398,12 @@ struct PetHomeView: View {
         .onAppear {
             viewModel.onViewAppear()
             viewModel.updateWardrobeContext(clothings: clothings)
-            
+
             // 通知媒体状态管理器切换到萌宠页面
                 print("🐱 PetHomeView.onAppear: 准备切换到萌宠页面")
                 mediaStateManager.switchToPage(.pet)
                 print("🐱 PetHomeView.onAppear: 已切换到萌宠页面")
-            
+
             // 监听媒体停止通知（当切换到其他页面时）
             // 注意：背景音乐的状态保存和停止已经在 MediaStateManager.stopAllMedia() 中处理
             // 这里使用不保存的方法停止，避免覆盖用户的持久化设置
@@ -402,7 +416,7 @@ struct PetHomeView: View {
                     hapticManager?.stopHaptics()
                 }
                 .store(in: &cancellables)
-            
+
             // 监听媒体启动通知（当切换回萌宠页面时）
             // 注意：背景音乐的状态恢复已经在 MediaStateManager.startPetMedia() 中处理
             // 这里不需要再设置，避免覆盖用户的持久化设置
@@ -415,10 +429,10 @@ struct PetHomeView: View {
         }
         .onDisappear {
             viewModel.onViewDisappear()
-            
+
             // 清理通知监听
             cancellables.removeAll()
-            
+
             // 如果当前页面是萌宠页面，切换到其他页面
                 print("🐱 PetHomeView.onDisappear: 准备切换到其他页面")
                 if mediaStateManager.currentPage == .pet {
@@ -437,6 +451,113 @@ struct PetHomeView: View {
             }
         }
         .animation(.spring(response: 0.32, dampingFraction: 0.86), value: viewModel.presentedFundingPrompt?.id)
+    }
+}
+
+private struct PetAutoWorkSettingsView: View {
+    @ObservedObject var viewModel: PetViewModel
+    @Binding var isPresented: Bool
+
+    private var isEnabledBinding: Binding<Bool> {
+        Binding(
+            get: { viewModel.status.isAutoWorkEnabled },
+            set: { viewModel.updateAutoWorkEnabled($0) }
+        )
+    }
+
+    private var strategyBinding: Binding<PetAutoWorkStrategy> {
+        Binding(
+            get: { viewModel.status.autoWorkStrategy },
+            set: { viewModel.updateAutoWorkStrategy($0) }
+        )
+    }
+
+    private var rewardModeBinding: Binding<PetAutoWorkRewardMode> {
+        Binding(
+            get: { viewModel.status.autoWorkRewardMode },
+            set: { viewModel.updateAutoWorkRewardMode($0) }
+        )
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    Toggle(isOn: isEnabledBinding) {
+                        Label("闲时自动打工", systemImage: "briefcase.fill")
+                    }
+
+                    LabeledContent("当前状态", value: viewModel.autoWorkStatusSummary)
+                } footer: {
+                    Text("开启后，萌宠只有在空闲、状态达标、未到每日收益上限时才会自动接活。手动互动、睡觉、喂食和洗澡不会被自动打断。")
+                }
+
+                Section("打工策略") {
+                    Picker("策略", selection: strategyBinding) {
+                        ForEach(PetAutoWorkStrategy.allCases) { strategy in
+                            Text(strategy.title).tag(strategy)
+                        }
+                    }
+
+                    Text(viewModel.status.autoWorkStrategy.description)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                Section("收益币种") {
+                    Picker("币种", selection: rewardModeBinding) {
+                        ForEach(PetAutoWorkRewardMode.allCases) { mode in
+                            Text(mode.title).tag(mode)
+                        }
+                    }
+
+                    Text(viewModel.status.autoWorkRewardMode.description)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                Section {
+                    let start = viewModel.status.autoWorkStrategy.startThresholds
+                    let stop = viewModel.status.autoWorkStrategy.stopThresholds
+                    thresholdRow(title: "饱食", current: viewModel.status.hunger, start: start.hunger, stop: stop.hunger)
+                    thresholdRow(title: "清洁", current: viewModel.status.hygiene, start: start.hygiene, stop: stop.hygiene)
+                    thresholdRow(title: "精力", current: viewModel.status.energy, start: start.energy, stop: stop.energy)
+                    thresholdRow(title: "心情", current: viewModel.status.mood, start: start.mood, stop: stop.mood)
+                } header: {
+                    Text("状态保护线")
+                } footer: {
+                    Text("达到开始线才会自动出门，跌到停工线会自动下班。")
+                }
+            }
+            .navigationTitle("自动打工")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("完成") {
+                        isPresented = false
+                    }
+                }
+            }
+        }
+    }
+
+    private func thresholdRow(title: String, current: Double, start: Double, stop: Double) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text(title)
+                Spacer()
+                Text("\(Int(current))/100")
+                    .foregroundStyle(.secondary)
+            }
+            HStack(spacing: 12) {
+                Label("开始 \(Int(start))+", systemImage: "arrow.up.circle.fill")
+                    .foregroundStyle(.green)
+                Label("停工 \(Int(stop))", systemImage: "pause.circle.fill")
+                    .foregroundStyle(.orange)
+            }
+            .font(.caption)
+        }
+        .padding(.vertical, 2)
     }
 }
 

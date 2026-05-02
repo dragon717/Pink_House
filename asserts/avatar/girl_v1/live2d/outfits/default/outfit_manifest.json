@@ -3,13 +3,13 @@
   "avatar_id": "girl_v1",
   "outfit_id": "default",
   "source": "asserts/avatar/girl_v1/live2d/outfits/default/default_outfit_full.png",
+  "hair_style_scope": "default_long_pink",
   "show_in_sticker_list": false,
   "embedded_in_avatar_outfit": true,
   "layers": [
     {
       "name": "dress_bodice",
       "file": "outfits/default/layers/dress_bodice.png",
-      "slot": "dress.bodice",
       "source_bbox_normalized": [
         0.3,
         0.26,
@@ -17,34 +17,46 @@
         0.49
       ],
       "source_bbox_pixels": [
+        271,
+        306,
+        815,
+        770
+      ],
+      "placement_bbox_pixels": [
+        271,
+        306,
+        815,
+        770
+      ],
+      "visible_bbox_pixels": [
         326,
         376,
         760,
         710
       ],
-      "placement_bbox_pixels": [
-        326,
-        376,
-        760,
-        710
+      "overdraw_insets_pixels": [
+        55,
+        70,
+        55,
+        60
       ],
       "canvas_size": [
         1086,
         1448
       ],
       "size": [
-        434,
-        334
+        544,
+        464
       ],
       "bone": "torso",
       "z": 110,
+      "slot": "dress.bodice",
       "embedded_in_avatar_outfit": true,
       "show_in_sticker_list": false
     },
     {
       "name": "sleeve_left",
       "file": "outfits/default/layers/sleeve_left.png",
-      "slot": "dress.sleeve.left",
       "source_bbox_normalized": [
         0.19,
         0.28,
@@ -52,34 +64,46 @@
         0.46
       ],
       "source_bbox_pixels": [
+        141,
+        350,
+        484,
+        721
+      ],
+      "placement_bbox_pixels": [
+        141,
+        350,
+        484,
+        721
+      ],
+      "visible_bbox_pixels": [
         206,
         405,
         424,
         666
       ],
-      "placement_bbox_pixels": [
-        206,
-        405,
-        424,
-        666
+      "overdraw_insets_pixels": [
+        65,
+        55,
+        60,
+        55
       ],
       "canvas_size": [
         1086,
         1448
       ],
       "size": [
-        218,
-        261
+        343,
+        371
       ],
       "bone": "upperArmLeft",
       "z": 112,
+      "slot": "dress.sleeve.left",
       "embedded_in_avatar_outfit": true,
       "show_in_sticker_list": false
     },
     {
       "name": "sleeve_right",
       "file": "outfits/default/layers/sleeve_right.png",
-      "slot": "dress.sleeve.right",
       "source_bbox_normalized": [
         0.61,
         0.28,
@@ -87,34 +111,46 @@
         0.46
       ],
       "source_bbox_pixels": [
+        602,
+        350,
+        945,
+        721
+      ],
+      "placement_bbox_pixels": [
+        602,
+        350,
+        945,
+        721
+      ],
+      "visible_bbox_pixels": [
         662,
         405,
         880,
         666
       ],
-      "placement_bbox_pixels": [
-        662,
-        405,
-        880,
-        666
+      "overdraw_insets_pixels": [
+        60,
+        55,
+        65,
+        55
       ],
       "canvas_size": [
         1086,
         1448
       ],
       "size": [
-        218,
-        261
+        343,
+        371
       ],
       "bone": "upperArmRight",
       "z": 112,
+      "slot": "dress.sleeve.right",
       "embedded_in_avatar_outfit": true,
       "show_in_sticker_list": false
     },
     {
       "name": "dress_skirt",
       "file": "outfits/default/layers/dress_skirt.png",
-      "slot": "dress.skirt",
       "source_bbox_normalized": [
         0.16,
         0.43,
@@ -122,34 +158,46 @@
         0.68
       ],
       "source_bbox_pixels": [
+        89,
+        543,
+        997,
+        1055
+      ],
+      "placement_bbox_pixels": [
+        89,
+        543,
+        997,
+        1055
+      ],
+      "visible_bbox_pixels": [
         174,
         623,
         912,
         985
       ],
-      "placement_bbox_pixels": [
-        174,
-        623,
-        912,
-        985
+      "overdraw_insets_pixels": [
+        85,
+        80,
+        85,
+        70
       ],
       "canvas_size": [
         1086,
         1448
       ],
       "size": [
-        738,
-        362
+        908,
+        512
       ],
       "bone": "skirt",
       "z": 115,
+      "slot": "dress.skirt",
       "embedded_in_avatar_outfit": true,
       "show_in_sticker_list": false
     },
     {
       "name": "wrist_cuff_left",
       "file": "outfits/default/layers/wrist_cuff_left.png",
-      "slot": "dress.wrist.left",
       "source_bbox_normalized": [
         0.19,
         0.41,
@@ -157,34 +205,46 @@
         0.52
       ],
       "source_bbox_pixels": [
+        161,
+        549,
+        425,
+        798
+      ],
+      "placement_bbox_pixels": [
+        161,
+        549,
+        425,
+        798
+      ],
+      "visible_bbox_pixels": [
         206,
         594,
         380,
         753
       ],
-      "placement_bbox_pixels": [
-        206,
-        594,
-        380,
-        753
+      "overdraw_insets_pixels": [
+        45,
+        45,
+        45,
+        45
       ],
       "canvas_size": [
         1086,
         1448
       ],
       "size": [
-        174,
-        159
+        264,
+        249
       ],
       "bone": "lowerArmLeft",
       "z": 118,
+      "slot": "dress.wrist.left",
       "embedded_in_avatar_outfit": true,
       "show_in_sticker_list": false
     },
     {
       "name": "wrist_cuff_right",
       "file": "outfits/default/layers/wrist_cuff_right.png",
-      "slot": "dress.wrist.right",
       "source_bbox_normalized": [
         0.65,
         0.41,
@@ -192,34 +252,46 @@
         0.52
       ],
       "source_bbox_pixels": [
+        661,
+        549,
+        925,
+        798
+      ],
+      "placement_bbox_pixels": [
+        661,
+        549,
+        925,
+        798
+      ],
+      "visible_bbox_pixels": [
         706,
         594,
         880,
         753
       ],
-      "placement_bbox_pixels": [
-        706,
-        594,
-        880,
-        753
+      "overdraw_insets_pixels": [
+        45,
+        45,
+        45,
+        45
       ],
       "canvas_size": [
         1086,
         1448
       ],
       "size": [
-        174,
-        159
+        264,
+        249
       ],
       "bone": "lowerArmRight",
       "z": 118,
+      "slot": "dress.wrist.right",
       "embedded_in_avatar_outfit": true,
       "show_in_sticker_list": false
     },
     {
       "name": "shoe_left",
       "file": "outfits/default/layers/shoe_left.png",
-      "slot": "shoe.left",
       "source_bbox_normalized": [
         0.34,
         0.82,
@@ -227,34 +299,46 @@
         0.98
       ],
       "source_bbox_pixels": [
+        324,
+        1165,
+        599,
+        1448
+      ],
+      "placement_bbox_pixels": [
+        324,
+        1165,
+        599,
+        1448
+      ],
+      "visible_bbox_pixels": [
         369,
         1187,
         554,
         1419
       ],
-      "placement_bbox_pixels": [
-        369,
-        1187,
-        554,
-        1419
+      "overdraw_insets_pixels": [
+        45,
+        22,
+        45,
+        29
       ],
       "canvas_size": [
         1086,
         1448
       ],
       "size": [
-        185,
-        232
+        275,
+        283
       ],
       "bone": "footLeft",
       "z": 118,
+      "slot": "shoe.left",
       "embedded_in_avatar_outfit": true,
       "show_in_sticker_list": false
     },
     {
       "name": "shoe_right",
       "file": "outfits/default/layers/shoe_right.png",
-      "slot": "shoe.right",
       "source_bbox_normalized": [
         0.49,
         0.82,
@@ -262,34 +346,46 @@
         0.98
       ],
       "source_bbox_pixels": [
+        487,
+        1165,
+        762,
+        1448
+      ],
+      "placement_bbox_pixels": [
+        487,
+        1165,
+        762,
+        1448
+      ],
+      "visible_bbox_pixels": [
         532,
         1187,
         717,
         1419
       ],
-      "placement_bbox_pixels": [
-        532,
-        1187,
-        717,
-        1419
+      "overdraw_insets_pixels": [
+        45,
+        22,
+        45,
+        29
       ],
       "canvas_size": [
         1086,
         1448
       ],
       "size": [
-        185,
-        232
+        275,
+        283
       ],
       "bone": "footRight",
       "z": 118,
+      "slot": "shoe.right",
       "embedded_in_avatar_outfit": true,
       "show_in_sticker_list": false
     },
     {
       "name": "neck_bow",
       "file": "outfits/default/layers/neck_bow.png",
-      "slot": "accessory.neck",
       "source_bbox_normalized": [
         0.38,
         0.21,
@@ -297,34 +393,46 @@
         0.33
       ],
       "source_bbox_pixels": [
+        368,
+        259,
+        718,
+        523
+      ],
+      "placement_bbox_pixels": [
+        368,
+        259,
+        718,
+        523
+      ],
+      "visible_bbox_pixels": [
         413,
         304,
         673,
         478
       ],
-      "placement_bbox_pixels": [
-        413,
-        304,
-        673,
-        478
+      "overdraw_insets_pixels": [
+        45,
+        45,
+        45,
+        45
       ],
       "canvas_size": [
         1086,
         1448
       ],
       "size": [
-        260,
-        174
+        350,
+        264
       ],
       "bone": "head",
       "z": 125,
+      "slot": "accessory.neck",
       "embedded_in_avatar_outfit": true,
       "show_in_sticker_list": false
     },
     {
       "name": "hair_bows",
       "file": "outfits/default/layers/hair_bows.png",
-      "slot": "accessory.hair",
       "source_bbox_normalized": [
         0.23,
         0.03,
@@ -332,29 +440,43 @@
         0.25
       ],
       "source_bbox_pixels": [
+        180,
+        0,
+        906,
+        422
+      ],
+      "placement_bbox_pixels": [
+        180,
+        0,
+        906,
+        422
+      ],
+      "visible_bbox_pixels": [
         250,
         43,
         836,
         362
       ],
-      "placement_bbox_pixels": [
-        250,
+      "overdraw_insets_pixels": [
+        70,
         43,
-        836,
-        362
+        70,
+        60
       ],
       "canvas_size": [
         1086,
         1448
       ],
       "size": [
-        586,
-        319
+        726,
+        422
       ],
       "bone": "head",
       "z": 130,
+      "slot": "accessory.hair",
       "embedded_in_avatar_outfit": true,
-      "show_in_sticker_list": false
+      "show_in_sticker_list": false,
+      "hair_style_scope": "default_long_pink"
     }
   ]
 }

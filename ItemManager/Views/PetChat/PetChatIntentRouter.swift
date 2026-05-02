@@ -9,6 +9,7 @@ enum PetChatIntent: Equatable {
     case depositPlan
     case currencyOverview
     case petStatusOverview
+    case petWork
     case secondPetAdoption
     case switchPetCompanion
     case meowCoinTopUp
@@ -29,7 +30,7 @@ enum PetChatIntent: Equatable {
             return .wardrobe
         case .depositPlan:
             return .wardrobe
-        case .currencyOverview, .petStatusOverview, .secondPetAdoption, .switchPetCompanion, .meowCoinTopUp:
+        case .currencyOverview, .petStatusOverview, .petWork, .secondPetAdoption, .switchPetCompanion, .meowCoinTopUp:
             return .general
         case .moodSupport:
             return .mood
@@ -45,7 +46,7 @@ enum PetChatIntent: Equatable {
             return 1
         case .switchPetCompanion:
             return 2
-        case .petStatusOverview, .currencyOverview:
+        case .petWork, .petStatusOverview, .currencyOverview:
             return 3
         case .weatherGuidance, .outfitSuggestion, .search, .wardrobeStats, .lastOutfitPrice:
             return 4
@@ -74,6 +75,8 @@ enum PetChatIntent: Equatable {
             return "我想看三种货币余额"
         case .petStatusOverview:
             return "我想看萌宠状态"
+        case .petWork:
+            return "我想让萌宠打工"
         case .secondPetAdoption:
             return "我想领养二胎"
         case .switchPetCompanion:
@@ -101,6 +104,8 @@ enum PetChatIntent: Equatable {
             return "pet_currency_panel"
         case .petStatusOverview:
             return "pet_status_panel"
+        case .petWork:
+            return "pet_work_panel"
         case .secondPetAdoption:
             return "pet_second_adopt"
         case .switchPetCompanion:
@@ -136,6 +141,8 @@ enum PetChatIntent: Equatable {
             return "wallet.pass.fill"
         case .petStatusOverview:
             return "heart.text.square.fill"
+        case .petWork:
+            return "briefcase.fill"
         case .secondPetAdoption:
             return "pawprint.circle.fill"
         case .switchPetCompanion:
@@ -183,6 +190,10 @@ enum PetChatIntentRouter {
         "状态", "状态怎么样", "状态如何", "饱食", "饮水", "清洁", "心情",
         "亲密度", "桃心", "它现在怎么样", "现在怎么样", "还好吗"
     ]
+    private static let workKeywords = [
+        "打工", "上班", "下班", "工作状态", "工作面板", "赚钱", "去赚", "赚", "挣币",
+        "赚鱼币", "赚骨头币", "鱼币打工", "骨头币打工", "自动打工", "结束打工", "停止打工"
+    ]
     private static let secondPetKeywords = ["领养", "收养", "二胎", "再养一只", "领养第二只", "再来一只", "再养个", "养一只", "领个宠物"]
     private static let switchPetKeywords = ["切换", "换一只", "换一个宠物", "换个宠物", "换只宠物", "换宠物", "切换宠物", "换奶茶", "换毛毛"]
     private static let switchVerbPrefixes = ["我要", "我想要", "我要换", "我想换", "我要切", "我想切", "换成", "切到", "切换到", "换到", "用", "给我", "来个"]
@@ -208,6 +219,7 @@ enum PetChatIntentRouter {
         scored.append(.init(intent: .depositPlan, score: score(normalized, keywords: depositKeywords)))
         scored.append(.init(intent: .currencyOverview, score: score(normalized, keywords: currencyKeywords)))
         scored.append(.init(intent: .petStatusOverview, score: score(normalized, keywords: statusKeywords)))
+        scored.append(.init(intent: .petWork, score: score(normalized, keywords: workKeywords)))
         scored.append(.init(intent: .secondPetAdoption, score: score(normalized, keywords: secondPetKeywords)))
         scored.append(.init(intent: .switchPetCompanion, score: score(normalized, keywords: switchPetKeywords)))
         scored.append(.init(intent: .meowCoinTopUp, score: score(normalized, keywords: topUpKeywords)))

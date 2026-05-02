@@ -6,7 +6,7 @@
 
 - 魔法贴纸与穿搭手帐书页统一为三类底图：空白、人台、图库自定义图片。
 - 静态人台首批素材来自 `temp/人台.png`，入库为 `ootd_mannequin_default`。
-- Live2D 可动人台仅保留 TODO，不接 SDK、不新增运行时依赖。
+- Live2D/Cubism SDK 仍不接入；当前先用 `AvatarCharacterKit` 的分层 PNG 轻动效作为魔法贴纸 v1 小人。
 
 ## Harness 约定
 
@@ -24,8 +24,10 @@
 6. 接入共享“更换底图” sheet：空白、人台列表、图库自定义图片。
 7. 输出验收报告；不通过项继续小版本修复。
 
-## Live2D TODO
+## Live2D / 分层动效 TODO
 
-- 后续新增 `mannequinBackend = staticImage/live2d`，静态 PNG 与 Live2D 模型共用同一人台 ID 层。
-- Live2D 渲染层独立于 OOTD 贴纸坐标；提供骨骼挂点/贴纸绑定 API 给搭配系统调用。
-- 快照导出需支持静态帧渲染；页面离开、进入后台和低电量时暂停动画。
+- 当前 `live2d` 后端优先走分层 PNG 轻动效；无分层资源时才进入透明 `MTKView` spike shell。
+- 少女小人运行时默认显示素体 + 发型，不自动挂默认裙装；身体分层需覆盖大臂、小臂、手、大腿、小腿、脚。
+- 分层渲染层独立于 OOTD 贴纸坐标；后续提供骨骼挂点/贴纸绑定 API 给搭配系统调用。
+- 快照、缩略图、后台和低电量都固定静态帧；编辑页可手动开启动效。
+- 后续拿到官方 Cubism Core、`.model3.json`、`.moc3` 后再替换 renderer，不改魔法贴纸业务层。

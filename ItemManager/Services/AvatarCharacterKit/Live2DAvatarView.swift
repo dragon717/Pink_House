@@ -15,6 +15,7 @@ struct Live2DAvatarView: UIViewRepresentable {
         view.backgroundColor = .clear
         view.clearColor = MTLClearColor(red: 0, green: 0, blue: 0, alpha: 0)
         view.framebufferOnly = true
+        view.preferredFramesPerSecond = AvatarMotionQualityProfile.live2DSpikeFramesPerSecond
         view.enableSetNeedsDisplay = false
         view.delegate = context.coordinator
         context.coordinator.attach(view: view)

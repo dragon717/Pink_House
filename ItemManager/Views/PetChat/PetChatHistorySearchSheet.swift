@@ -220,6 +220,8 @@ struct PetChatHistorySearchSheet: View {
             return ("chart.bar", "状态")
         case .currencyPanel:
             return ("dollarsign.circle", "货币")
+        case .workPanel:
+            return ("briefcase", "打工")
         case .inventoryPanel:
             return ("backpack", "背包")
         case .shopPanel:

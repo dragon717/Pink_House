@@ -4,7 +4,7 @@ import SwiftData
 
 private enum OOTDCanvasTransformLimits {
     static let minStickerScale: Double = 0.3
-    static let maxStickerScale: Double = 2.0
+    static let maxStickerScale: Double = 3.0
 
     static func clampedStickerScale(_ value: Double) -> Double {
         min(max(value, minStickerScale), maxStickerScale)

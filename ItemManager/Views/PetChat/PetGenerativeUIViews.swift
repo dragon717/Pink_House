@@ -31,6 +31,8 @@ enum PetWidgetRegistry {
             PetStatusPanelWidget(widget: widget, onAction: onAction)
         case .currencyPanel:
             PetCurrencyPanelWidget(widget: widget, onAction: onAction)
+        case .workPanel:
+            PetWorkPanelWidget(widget: widget, onAction: onAction)
         case .inventoryPanel:
             PetInventoryPanelWidget(widget: widget, onAction: onAction)
         case .shopPanel:
@@ -533,6 +535,77 @@ private struct PetCurrencyPanelWidget: View {
         case .boneCoin:
             return PetWidgetOption(title: "兑换", command: "pet_currency_action_bone")
         }
+    }
+}
+
+private struct PetWorkPanelWidget: View {
+    let widget: PetWidgetData
+    let onAction: (PetWidgetOption) -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            PetPanelHeader(title: widget.title, subtitle: widget.subtitle)
+            workMetrics
+            if !widget.options.isEmpty {
+                PetQuickOptionsWidget(
+                    widget: PetWidgetData(type: .quickOptions, options: widget.options),
+                    onAction: onAction
+                )
+            }
+        }
+        .padding(12)
+        .themeSkinAdaptiveSectionCard(slot: .sectionCard, cornerRadius: 16, showsDecoration: false) {
+            RoundedRectangle(cornerRadius: 16).fill(.regularMaterial)
+        }
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(Color.white.opacity(0.45), lineWidth: 1)
+        )
+    }
+
+    private var workMetrics: some View {
+        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
+            ForEach(widget.metrics) { metric in
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 6) {
+                        Image(systemName: iconName(for: metric.name))
+                            .font(.caption)
+                            .foregroundStyle(color(for: metric.name))
+                        Text(metric.name)
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
+                    Text(metric.value)
+                        .font(.caption)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(.primary)
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.82)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(8)
+                .background(
+                    RoundedRectangle(cornerRadius: 10)
+                        .fill(color(for: metric.name).opacity(0.12))
+                )
+            }
+        }
+    }
+
+    private func iconName(for name: String) -> String {
+        if name.contains("工作") { return "briefcase.fill" }
+        if name.contains("收益") { return "creditcard.fill" }
+        if name.contains("鱼币") { return "fish.fill" }
+        if name.contains("骨头") { return "bone.fill" }
+        return "clock.badge.checkmark"
+    }
+
+    private func color(for name: String) -> Color {
+        if name.contains("鱼币") { return .orange }
+        if name.contains("骨头") { return .brown }
+        if name.contains("自动") { return .blue }
+        return .pink
     }
 }
 

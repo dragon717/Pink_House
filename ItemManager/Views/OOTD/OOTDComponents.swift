@@ -30,13 +30,13 @@ struct OOTDMannequinBackground: Identifiable, Hashable {
         ),
         OOTDMannequinBackground(
             id: AvatarCharacterID.girlV1.rawValue,
-            displayName: AvatarCharacterID.girlV1.displayName,
+            displayName: "少女素体·基础发",
             assetName: AvatarCharacterID.girlV1.staticImageName,
             avatarCharacterID: .girlV1
         ),
         OOTDMannequinBackground(
             id: shortBobID,
-            displayName: "少女小人·短发",
+            displayName: "少女素体·短发",
             assetName: AvatarCharacterID.girlV1.staticImageName,
             avatarCharacterID: .girlV1,
             avatarHairStyleID: .shortBob
@@ -63,13 +63,16 @@ struct OOTDMannequinBackground: Identifiable, Hashable {
 
     var selectionSubtitle: String {
         if avatarCharacterID != nil {
-            return "\(avatarHairStyleID.displayName)，透明发型层，可参与骨骼动作。"
+            if avatarHairStyleID == .defaultLongPink {
+                return "不含默认裙装，已清理侧发碎片，适合直接叠衣服贴纸。"
+            }
+            return "不含默认裙装，可叠衣服贴纸；\(avatarHairStyleID.displayName)透明发型层。"
         }
         return "适合快速开始搭配拼贴。"
     }
 
     var canvasScale: CGFloat {
-        avatarCharacterID == nil ? 1.0 : 0.55
+        avatarCharacterID == nil ? 1.0 : AvatarMotionQualityProfile.magicStickerCanvasScale
     }
 
     /// Manifest-gated exposure: only list mannequin choices whose image asset is actually bundled.
@@ -131,7 +134,7 @@ struct OOTDMannequinBackgroundView: View {
                         action: isMotionEnabled ? .idle : .stickerPresent,
                         expression: .neutral,
                         hairStyleID: background.avatarHairStyleID,
-                        preferredBackend: .staticImage,
+                        preferredBackend: isMotionEnabled ? .live2d : .staticImage,
                         isPaused: !isMotionEnabled
                     ),
                     contentMode: contentMode

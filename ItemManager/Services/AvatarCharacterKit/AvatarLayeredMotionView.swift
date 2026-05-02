@@ -7,13 +7,40 @@ struct AvatarLayeredMotionView: View {
     let request: AvatarRenderRequest
     var contentMode: ContentMode = .fit
 
+    @Environment(\.scenePhase) private var scenePhase
     @State private var package: AvatarLayerPackage?
 
     var body: some View {
+        let isLowPowerModeEnabled = ProcessInfo.processInfo.isLowPowerModeEnabled
+        let profile = AvatarMotionQualityProfile.profile(
+            for: request.action,
+            isLowPowerModeEnabled: isLowPowerModeEnabled
+        )
+        let isMotionActive = !request.isPaused
+            && scenePhase == .active
+            && !(profile.pausesInLowPowerMode && isLowPowerModeEnabled)
+
         Group {
             if let package {
-                TimelineView(.animation) { timeline in
-                    render(package: package, date: timeline.date)
+                if isMotionActive {
+                    TimelineView(.periodic(
+                        from: Date(timeIntervalSinceReferenceDate: 0),
+                        by: profile.frameInterval
+                    )) { timeline in
+                        render(
+                            package: package,
+                            date: timeline.date,
+                            isActive: true,
+                            profile: profile
+                        )
+                    }
+                } else {
+                    render(
+                        package: package,
+                        date: Date(timeIntervalSinceReferenceDate: profile.staticPhaseSeconds),
+                        isActive: false,
+                        profile: profile
+                    )
                 }
             } else {
                 fallbackImage
@@ -27,7 +54,12 @@ struct AvatarLayeredMotionView: View {
         }
     }
 
-    private func render(package: AvatarLayerPackage, date: Date) -> some View {
+    private func render(
+        package: AvatarLayerPackage,
+        date: Date,
+        isActive: Bool,
+        profile: AvatarMotionQualityProfile
+    ) -> some View {
         GeometryReader { geometry in
             let scale = renderScale(container: geometry.size, source: package.sourceSize)
             let renderSize = CGSize(
@@ -35,13 +67,15 @@ struct AvatarLayeredMotionView: View {
                 height: package.sourceSize.height * scale
             )
             let phase = AvatarLayerMotionPhase(
-                seconds: request.isPaused ? 0 : date.timeIntervalSinceReferenceDate,
-                isActive: !request.isPaused
+                seconds: isActive ? date.timeIntervalSinceReferenceDate : profile.staticPhaseSeconds,
+                isActive: isActive,
+                action: request.action,
+                profile: profile
             )
 
             ZStack(alignment: .topLeading) {
                 ForEach(package.layers) { layer in
-                    let transform = phase.layerTransform(for: layer.bone)
+                    let transform = phase.layerTransform(for: layer.bone, bones: package.bones)
                     let anchor = package.anchorUnitPoint(for: layer)
 
                     Image(uiImage: layer.image)
@@ -71,6 +105,7 @@ struct AvatarLayeredMotionView: View {
             )
             .position(x: geometry.size.width / 2, y: geometry.size.height / 2)
         }
+        .allowsHitTesting(false)
     }
 
     private func renderScale(container: CGSize, source: CGSize) -> CGFloat {
@@ -95,11 +130,35 @@ struct AvatarLayeredMotionView: View {
 }
 
 enum AvatarLayerAssetResolver {
+    private static let packageCache: NSCache<NSString, AvatarLayerPackageBox> = {
+        let cache = NSCache<NSString, AvatarLayerPackageBox>()
+        cache.countLimit = 8
+        cache.totalCostLimit = 64 * 1024 * 1024
+        return cache
+    }()
+
     static func isAvailable(characterID: AvatarCharacterID, hairStyleID: AvatarHairStyleID) -> Bool {
         package(characterID: characterID, hairStyleID: hairStyleID) != nil
     }
 
     static func package(characterID: AvatarCharacterID, hairStyleID: AvatarHairStyleID) -> AvatarLayerPackage? {
+        let cacheKey = "\(characterID.rawValue)|\(hairStyleID.rawValue)" as NSString
+        if let cached = packageCache.object(forKey: cacheKey) {
+            return cached.package
+        }
+
+        guard let package = makePackage(characterID: characterID, hairStyleID: hairStyleID) else {
+            return nil
+        }
+        packageCache.setObject(
+            AvatarLayerPackageBox(package),
+            forKey: cacheKey,
+            cost: package.estimatedPixelCost
+        )
+        return package
+    }
+
+    private static func makePackage(characterID: AvatarCharacterID, hairStyleID: AvatarHairStyleID) -> AvatarLayerPackage? {
         let baseDirectory = "asserts/avatar/\(characterID.assetDirectoryName)/live2d"
         guard let rootURL = Bundle.main.resourceURL?.appendingPathComponent(baseDirectory),
               let rig = decode(AvatarRigManifest.self, from: rootURL.appendingPathComponent("rig_manifest.json")) else {
@@ -125,6 +184,8 @@ enum AvatarLayerAssetResolver {
             fallbackCanvasSize: rig.sourceSize.cgSize
         )
 
+        // Magic-sticker mannequins render the safe base body plus hair only.
+        // The hidden default outfit package remains for harness previews and future binding.
         let layers = (bodyLayers + hairLayers)
             .sorted { lhs, rhs in
                 if lhs.z == rhs.z {
@@ -143,14 +204,29 @@ enum AvatarLayerAssetResolver {
         return try? decoder.decode(type, from: data)
     }
 
+    private static func resourceURL(for path: String, rootURL: URL) -> URL {
+        if path.hasPrefix("/") {
+            return URL(fileURLWithPath: path)
+        }
+        if path.hasPrefix("asserts/"), let resourceURL = Bundle.main.resourceURL {
+            return resourceURL.appendingPathComponent(path)
+        }
+        return rootURL.appendingPathComponent(path)
+    }
+
     private static func loadLayers(
         _ specs: [AvatarLayerSpec],
         rootURL: URL,
         sourceSize: CGSize,
-        fallbackCanvasSize: CGSize
+        fallbackCanvasSize: CGSize,
+        hairStyleID: AvatarHairStyleID? = nil
     ) -> [AvatarLayer] {
         specs.compactMap { spec in
-            let imageURL = rootURL.appendingPathComponent(spec.file)
+            if let hairStyleScope = spec.hairStyleScope,
+               hairStyleScope != hairStyleID?.rawValue {
+                return nil
+            }
+            let imageURL = resourceURL(for: spec.file, rootURL: rootURL)
             guard let image = UIImage(contentsOfFile: imageURL.path) else { return nil }
             let canvasSize = spec.canvasSize?.cgSize ?? fallbackCanvasSize
             let placement = spec.placementRect(sourceSize: sourceSize, canvasSize: canvasSize)
@@ -167,10 +243,24 @@ enum AvatarLayerAssetResolver {
     }
 }
 
+private final class AvatarLayerPackageBox: NSObject {
+    let package: AvatarLayerPackage
+
+    init(_ package: AvatarLayerPackage) {
+        self.package = package
+    }
+}
+
 struct AvatarLayerPackage {
     let sourceSize: CGSize
     let bones: [String: AvatarBoneSpec]
     let layers: [AvatarLayer]
+
+    var estimatedPixelCost: Int {
+        layers.reduce(0) { total, layer in
+            total + Int(layer.image.size.width * layer.image.size.height * layer.image.scale * layer.image.scale * 4)
+        }
+    }
 
     func anchorUnitPoint(for layer: AvatarLayer) -> UnitPoint {
         let normalizedAnchor = bones[layer.bone]?.anchor ?? [
@@ -204,16 +294,34 @@ private struct AvatarRigManifest: Decodable {
     let sourceSize: AvatarSize
     let layers: [AvatarLayerSpec]
     let bones: [String: AvatarBoneSpec]
+    let embeddedOutfits: [String: AvatarEmbeddedOutfitSpec]?
 
     enum CodingKeys: String, CodingKey {
         case sourceSize = "source_size"
         case layers
         case bones
+        case embeddedOutfits = "embedded_outfits"
     }
 }
 
 private struct AvatarLayerGroupManifest: Decodable {
     let layers: [AvatarLayerSpec]
+}
+
+private struct AvatarEmbeddedOutfitSpec: Decodable {
+    let manifest: String
+    let showInStickerList: Bool?
+    let hairStyleScope: String?
+
+    enum CodingKeys: String, CodingKey {
+        case manifest
+        case showInStickerList = "show_in_sticker_list"
+        case hairStyleScope = "hair_style_scope"
+    }
+
+    func isCompatible(with hairStyleID: AvatarHairStyleID) -> Bool {
+        hairStyleScope == nil || hairStyleScope == hairStyleID.rawValue
+    }
 }
 
 private struct AvatarLayerSpec: Decodable {
@@ -224,6 +332,7 @@ private struct AvatarLayerSpec: Decodable {
     let canvasSize: AvatarSize?
     let bone: String
     let z: Int
+    let hairStyleScope: String?
 
     enum CodingKeys: String, CodingKey {
         case name
@@ -233,6 +342,7 @@ private struct AvatarLayerSpec: Decodable {
         case canvasSize = "canvas_size"
         case bone
         case z
+        case hairStyleScope = "hair_style_scope"
     }
 
     func placementRect(sourceSize: CGSize, canvasSize: CGSize) -> CGRect {
@@ -271,34 +381,184 @@ private struct AvatarSize: Decodable {
 private struct AvatarLayerMotionPhase {
     let seconds: TimeInterval
     let isActive: Bool
+    let action: AvatarAction
+    let profile: AvatarMotionQualityProfile
 
     private var breath: Double {
         guard isActive else { return 0 }
         return sin(seconds * .pi * 2 / 3.4)
     }
 
+    private var bodySway: Double {
+        guard isActive else { return 0 }
+        return sin(seconds * .pi * 2 / 4.8 + 0.2)
+    }
+
+    private var softPulse: Double {
+        guard isActive else { return 0 }
+        return sin(seconds * .pi * 2 / 2.6 + 1.4)
+    }
+
     var containerScale: CGFloat {
-        1 + CGFloat(breath * 0.0035)
+        1 + CGFloat(breath * profile.containerScaleAmplitude)
     }
 
     var containerOffset: CGSize {
-        offset(0, breath * -3)
+        offset(0, breath * profile.containerLiftAmplitude)
     }
 
-    func layerTransform(for bone: String) -> AvatarLayerTransform {
+    func layerTransform(for bone: String, bones: [String: AvatarBoneSpec]) -> AvatarLayerTransform {
         guard isActive else { return .identity }
+        return accumulatedTransform(for: bone, bones: bones, visited: [])
+    }
 
+    private func accumulatedTransform(
+        for bone: String,
+        bones: [String: AvatarBoneSpec],
+        visited: Set<String>
+    ) -> AvatarLayerTransform {
+        guard !visited.contains(bone) else { return .identity }
+
+        var nextVisited = visited
+        nextVisited.insert(bone)
+
+        let parentTransform: AvatarLayerTransform
+        if let parent = bones[bone]?.parent {
+            parentTransform = accumulatedTransform(for: parent, bones: bones, visited: nextVisited)
+        } else {
+            parentTransform = .identity
+        }
+
+        return parentTransform.combined(with: localTransform(for: bone))
+    }
+
+    private func localTransform(for bone: String) -> AvatarLayerTransform {
+        let amplitude = profile.amplitudeScale
         let hairLag = sin(seconds * .pi * 2 / 3.1 + 0.55)
+        let hairFloat = sin(seconds * .pi * 2 / 2.7 + 1.15)
+        let skirtLag = sin(seconds * .pi * 2 / 3.8 + 0.85)
+        let armLag = sin(seconds * .pi * 2 / 4.2 + 0.35)
+        let wave = sin(seconds * .pi * 2 / 1.1)
+        let happyBounce = action == .happy ? sin(seconds * .pi * 2 / 1.6) : 0
+        let talkNod = action == .talkLoop ? sin(seconds * .pi * 2 / 1.25) : 0
 
         switch bone {
+        case "root":
+            return AvatarLayerTransform(offset: offset(
+                (bodySway * 0.7) * amplitude,
+                (breath * -0.8 + happyBounce * -1.4) * amplitude
+            ))
+        case "torso":
+            return AvatarLayerTransform(
+                rotationDegrees: bodySway * 0.28 * amplitude,
+                offset: offset(bodySway * 0.6 * amplitude, breath * -0.6 * amplitude),
+                scale: 1 + CGFloat(breath * 0.0012 * amplitude)
+            )
+        case "hip":
+            return AvatarLayerTransform(
+                rotationDegrees: bodySway * -0.18 * amplitude,
+                offset: offset(bodySway * -0.35 * amplitude, breath * 0.35 * amplitude)
+            )
+        case "head":
+            return AvatarLayerTransform(
+                rotationDegrees: (bodySway * -0.55 + talkNod * 0.45) * amplitude,
+                offset: offset(
+                    bodySway * -0.9 * amplitude,
+                    (breath * -1.0 + talkNod * -0.8) * amplitude
+                )
+            )
         case "hairBack", "hairBackDetail":
-            return AvatarLayerTransform(rotationDegrees: hairLag * 0.8, offset: offset(hairLag * 1.2, breath * 0.6))
+            return AvatarLayerTransform(
+                rotationDegrees: hairLag * 1.25 * amplitude,
+                offset: offset(
+                    hairLag * 1.8 * amplitude,
+                    (hairFloat * 1.1 + breath * 0.6) * amplitude
+                )
+            )
         case "hairFront", "hairFrontDetail":
-            return AvatarLayerTransform(rotationDegrees: hairLag * -0.5, offset: offset(hairLag * 0.7, breath * -0.4))
+            return AvatarLayerTransform(
+                rotationDegrees: hairLag * -0.65 * amplitude,
+                offset: offset(hairLag * 0.8 * amplitude, breath * -0.45 * amplitude)
+            )
         case "hairSideLeft", "hairSideLeftDetail":
-            return AvatarLayerTransform(rotationDegrees: hairLag * -1.0, offset: offset(hairLag * -1.5, breath * 0.8))
+            return AvatarLayerTransform(
+                rotationDegrees: hairLag * -1.7 * amplitude,
+                offset: offset(
+                    hairLag * -2.1 * amplitude,
+                    (hairFloat * 1.5 + breath * 0.8) * amplitude
+                )
+            )
         case "hairSideRight", "hairSideRightDetail":
-            return AvatarLayerTransform(rotationDegrees: hairLag * 1.0, offset: offset(hairLag * 1.5, breath * 0.8))
+            return AvatarLayerTransform(
+                rotationDegrees: hairLag * 1.7 * amplitude,
+                offset: offset(
+                    hairLag * 2.1 * amplitude,
+                    (hairFloat * 1.5 + breath * 0.8) * amplitude
+                )
+            )
+        case "upperArmLeft":
+            return AvatarLayerTransform(
+                rotationDegrees: armLag * -0.38 * amplitude,
+                offset: offset(softPulse * -0.25 * amplitude, breath * 0.25 * amplitude)
+            )
+        case "upperArmRight":
+            let actionLift = action == .wave ? -10 + wave * 3.8 : armLag * 0.38
+            return AvatarLayerTransform(
+                rotationDegrees: actionLift * amplitude,
+                offset: offset(softPulse * 0.25 * amplitude, breath * 0.25 * amplitude)
+            )
+        case "lowerArmLeft":
+            return AvatarLayerTransform(
+                rotationDegrees: armLag * -0.55 * amplitude,
+                offset: offset(softPulse * -0.3 * amplitude, breath * 0.35 * amplitude)
+            )
+        case "lowerArmRight":
+            let actionBend = action == .wave ? -8 + wave * 6 : armLag * 0.55
+            return AvatarLayerTransform(
+                rotationDegrees: actionBend * amplitude,
+                offset: offset(softPulse * 0.3 * amplitude, breath * 0.35 * amplitude)
+            )
+        case "handLeft":
+            return AvatarLayerTransform(
+                rotationDegrees: armLag * -0.75 * amplitude,
+                offset: offset(softPulse * -0.25 * amplitude, breath * 0.25 * amplitude)
+            )
+        case "handRight":
+            let handWave = action == .wave ? wave * 9 : armLag * 0.75
+            return AvatarLayerTransform(
+                rotationDegrees: handWave * amplitude,
+                offset: offset(softPulse * 0.25 * amplitude, breath * 0.25 * amplitude)
+            )
+        case "skirt":
+            return AvatarLayerTransform(
+                rotationDegrees: skirtLag * 0.55 * amplitude,
+                offset: offset(skirtLag * 1.1 * amplitude, breath * 0.65 * amplitude),
+                scale: 1 + CGFloat(breath * 0.0018 * amplitude)
+            )
+        case "thighLeft", "legLeft":
+            return AvatarLayerTransform(
+                rotationDegrees: bodySway * 0.10 * amplitude,
+                offset: offset(bodySway * 0.18 * amplitude, breath * 0.18 * amplitude)
+            )
+        case "thighRight", "legRight":
+            return AvatarLayerTransform(
+                rotationDegrees: bodySway * -0.10 * amplitude,
+                offset: offset(bodySway * -0.18 * amplitude, breath * 0.18 * amplitude)
+            )
+        case "lowerLegLeft":
+            return AvatarLayerTransform(
+                rotationDegrees: bodySway * 0.08 * amplitude,
+                offset: offset(bodySway * 0.12 * amplitude, breath * 0.14 * amplitude)
+            )
+        case "lowerLegRight":
+            return AvatarLayerTransform(
+                rotationDegrees: bodySway * -0.08 * amplitude,
+                offset: offset(bodySway * -0.12 * amplitude, breath * 0.14 * amplitude)
+            )
+        case "footLeft":
+            return AvatarLayerTransform(rotationDegrees: bodySway * 0.12 * amplitude)
+        case "footRight":
+            return AvatarLayerTransform(rotationDegrees: bodySway * -0.12 * amplitude)
         default:
             return .identity
         }
@@ -315,6 +575,17 @@ private struct AvatarLayerTransform {
     var rotationDegrees: Double = 0
     var offset: CGSize = .zero
     var scale: CGFloat = 1
+
+    func combined(with other: AvatarLayerTransform) -> AvatarLayerTransform {
+        AvatarLayerTransform(
+            rotationDegrees: rotationDegrees + other.rotationDegrees,
+            offset: CGSize(
+                width: offset.width + other.offset.width,
+                height: offset.height + other.offset.height
+            ),
+            scale: scale * other.scale
+        )
+    }
 }
 
 private extension CGFloat {

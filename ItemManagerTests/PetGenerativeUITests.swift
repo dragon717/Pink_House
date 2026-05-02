@@ -203,6 +203,13 @@ final class PetGenerativeUITests: XCTestCase {
         XCTAssertEqual(PetChatIntentRouter.detect(from: "刚推荐的清单总价是多少"), .lastOutfitPrice)
     }
 
+    func testIntentRouterDetectsPetWorkPhrases() {
+        XCTAssertEqual(PetChatIntentRouter.detect(from: "让奶茶去打工赚鱼币"), .petWork)
+        XCTAssertEqual(PetChatIntentRouter.detect(from: "让毛毛去赚骨头币"), .petWork)
+        XCTAssertEqual(PetChatIntentRouter.detect(from: "下班，结束打工"), .petWork)
+        XCTAssertEqual(PetChatIntentRouter.detect(from: "自动打工状态怎么样"), .petWork)
+    }
+
     func testIntentRouterDetectsFuzzyAdoptionPhrases() {
         XCTAssertEqual(PetChatIntentRouter.detect(from: "领养毛毛"), .secondPetAdoption)
         XCTAssertEqual(PetChatIntentRouter.detect(from: "我想领养一个新宠物"), .secondPetAdoption)
@@ -536,6 +543,29 @@ final class PetGenerativeUITests: XCTestCase {
         guard case .divination? = detectEmbeddedPanelIntent(from: "今天帮我抽一签", petName: "奶茶") else {
             return XCTFail("Expected divination intent")
         }
+    }
+
+    func testEmbeddedIntentRoutesPetWorkPanel() {
+        guard case .work? = detectEmbeddedPanelIntent(from: "让奶茶去打工赚鱼币", petName: "奶茶") else {
+            return XCTFail("Expected work intent")
+        }
+        guard case .work? = detectEmbeddedPanelIntent(from: "自动打工状态怎么样", petName: "奶茶") else {
+            return XCTFail("Expected auto work intent")
+        }
+    }
+
+    func testWorkPanelWidgetShowsStatusAndCommands() {
+        var status = PetStatus()
+        status.selectedPetId = PetCharacter.naicha.rawValue
+        status.currentJob = .waiter
+        status.currentJobRewardCurrency = .fishCoin
+        status.currentJobEarnedAmount = 15
+
+        let widget = makePetWorkPanelWidget(status: status)
+
+        XCTAssertEqual(widget.type, .workPanel)
+        XCTAssertTrue(widget.metrics.contains(where: { $0.name == "本次收益" && $0.value.contains("15") }))
+        XCTAssertTrue(widget.options.contains(where: { $0.command == "pet_work_stop" }))
     }
 
     func testOutfitPriceFollowUpContextSuppressesCurrencyPanelAutoTrigger() {

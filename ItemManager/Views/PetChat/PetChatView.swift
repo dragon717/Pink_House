@@ -1284,6 +1284,8 @@ struct PetChatView: View {
             handleCurrencyOverview()
         case .petStatusOverview:
             handlePetStatusOverview()
+        case .petWork:
+            handlePetWorkPanel()
         case .secondPetAdoption:
             handleSecondPetAdoptionIntent()
         case .switchPetCompanion:
@@ -1385,6 +1387,19 @@ struct PetChatView: View {
         )
     }
 
+    private func handlePetWorkPanel() {
+        let status = PetDataManager.shared.status
+        let widget = makePetWorkPanelWidget(status: status)
+        messages.append(
+            PetChatMessage(
+                text: petWorkPanelIntroMessage(status: status),
+                isUser: false,
+                isAIGenerated: true,
+                widgets: [widget]
+            )
+        )
+    }
+
     private func handleInventoryPanel() {
         let status = PetDataManager.shared.status
         let widget = makeInventoryPanelWidget(status: status)
@@ -1446,6 +1461,8 @@ struct PetChatView: View {
             handleDivinationPanel()
         case .status(let kind):
             handlePetStatusPanel(kind, sourceText: text)
+        case .work:
+            handlePetWorkPanel()
         }
         return true
     }
@@ -1515,6 +1532,10 @@ struct PetChatView: View {
         }
         if command == "pet_divination_panel" {
             replaceWidgets(in: messageID, with: [makeDivinationWidget()])
+            return
+        }
+        if isPetWorkCommand(command) {
+            replaceWidgets(in: messageID, with: [makePetWorkPanelWidget(status: status, feedback: feedback)])
             return
         }
 
@@ -1779,6 +1800,12 @@ struct PetChatView: View {
         }
 
         if handleThemeQuickAction(option.command) {
+            return
+        }
+
+        if isPetWorkCommand(option.command) {
+            let result = applyPetWorkCommand(option.command)
+            refreshPanel(for: "pet_work_panel", messageID: messageID, feedback: result.feedback)
             return
         }
 

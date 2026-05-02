@@ -39,7 +39,7 @@ func wardrobeContextBudget(for intent: PetChatIntent) -> Int {
         return 10
     case .wardrobeStats, .search, .depositPlan, .lastOutfitPrice:
         return 8
-    case .currencyOverview, .petStatusOverview, .secondPetAdoption, .switchPetCompanion, .meowCoinTopUp, .moodSupport, .generalChat:
+    case .currencyOverview, .petStatusOverview, .petWork, .secondPetAdoption, .switchPetCompanion, .meowCoinTopUp, .moodSupport, .generalChat:
         return 6
     }
 }
@@ -127,6 +127,7 @@ enum PetEmbeddedPanelIntent {
     case moneyCounter(CurrencyType)
     case divination
     case status(PetStatusPanelKind)
+    case work
 }
 
 enum PetCurrencyExchangeDirection: String, CaseIterable, Identifiable {
@@ -198,6 +199,19 @@ private func isCurrencyInquiry(_ text: String) -> Bool {
     containsAnyKeyword(text, keywords: [
         "查看", "看看", "看", "显示", "余额", "财务", "货币", "钱包", "资产", "多少", "剩多少", "还有多少", "存款", "查查"
     ])
+}
+
+private func hasPetWorkPanelIntent(_ text: String) -> Bool {
+    if containsAnyKeyword(text, keywords: [
+        "打工", "自动打工", "工作状态", "工作面板", "下班", "结束打工", "停止打工",
+        "赚鱼币", "赚骨头币", "鱼币打工", "骨头币打工"
+    ]) {
+        return true
+    }
+
+    let hasWorkVerb = containsAnyKeyword(text, keywords: ["上班", "赚钱", "挣币", "赚币", "接活"])
+    let hasPetOrCurrency = containsAnyKeyword(text, keywords: ["萌宠", "宠物", "奶茶", "毛毛", "鱼币", "骨头币"])
+    return hasWorkVerb && hasPetOrCurrency
 }
 
 private func isAddressingPet(in text: String, petName: String) -> Bool {
@@ -411,6 +425,10 @@ func detectEmbeddedPanelIntent(
         return nil
     }
 
+    if hasPetWorkPanelIntent(normalized) {
+        return .work
+    }
+
     if let fuzzyStatusKind = detectFuzzyStatusPanelKind(from: normalized, petName: petName) {
         return .status(fuzzyStatusKind)
     }
@@ -543,6 +561,181 @@ func makeCurrencyPanelWidget(status: PetStatus, kind: PetCurrencyPanelKind, feed
         subtitle: feedback ?? currencySubtitle(for: status, kind: kind),
         metrics: currencyMetrics(for: status, kind: kind)
     )
+}
+
+struct PetChatWorkActionResult: Equatable {
+    let feedback: String?
+    let didChangeStatus: Bool
+}
+
+func isPetWorkCommand(_ command: String) -> Bool {
+    command == "pet_work_panel"
+        || command == "pet_work_stop"
+        || command.hasPrefix("pet_work_start:")
+        || command.hasPrefix("pet_work_auto:")
+        || command.hasPrefix("pet_work_strategy:")
+        || command.hasPrefix("pet_work_reward:")
+}
+
+private func workRuntimeLabel(for status: PetStatus) -> String {
+    switch PetWorkStateMachine.runtimeState(for: status) {
+    case .idle:
+        return "闲置"
+    case .manualWorking(let job):
+        return "\(job.rawValue) · 手动"
+    case .autoWorking(let job):
+        return "\(job.rawValue) · 自动"
+    case .sleepSuspendedWorking(let job, isAutomatic: let isAutomatic):
+        return "\(job.rawValue) · \(isAutomatic ? "自动" : "手动")休息中"
+    case .interrupted:
+        return "被迫中断"
+    }
+}
+
+private func workQuotaText(status: PetStatus, currency: PetCurrency) -> String {
+    switch PetWorkStateMachine.normalizedRewardCurrency(currency) {
+    case .fishCoin:
+        return "\(status.dailyFishCoinEarned)/\(PetStatus.dailyFishCoinLimit)"
+    case .boneCoin:
+        return "\(status.dailyBoneCoinEarned)/\(PetStatus.dailyBoneCoinLimit)"
+    case .meowCoin:
+        return "不支持"
+    }
+}
+
+private func petWorkPanelSubtitle(status: PetStatus, feedback: String?) -> String {
+    if let feedback, !feedback.isEmpty { return feedback }
+    if status.currentJob != .none {
+        let mode = status.currentJobStartedAutomatically ? "自动打工" : "手动打工"
+        return "\(status.displayName)正在\(status.currentJob.rawValue)，\(mode)本次已赚 \(status.currentJobEarnedAmount) \(status.currentJobRewardCurrency.rawValue)。"
+    }
+    if status.isAutoWorkEnabled {
+        return PetWorkStateMachine.autoWorkStatusSummary(for: status)
+    }
+    return "现在空闲。可以点按钮让\(status.displayName)去打工，或开启闲时自动打工。"
+}
+
+private func petWorkOptions(for status: PetStatus) -> [PetWidgetOption] {
+    if status.currentJob != .none {
+        return [
+            PetWidgetOption(title: "下班结算", command: "pet_work_stop", icon: "checkmark.circle.fill"),
+            PetWidgetOption(title: "刷新打工状态", command: "pet_work_panel", icon: "arrow.clockwise"),
+            PetWidgetOption(title: "看看货币余额", command: "pet_currency_panel", icon: "wallet.pass.fill")
+        ]
+    }
+
+    let autoToggle = status.isAutoWorkEnabled
+        ? PetWidgetOption(title: "关闭自动打工", command: "pet_work_auto:off", icon: "pause.circle.fill")
+        : PetWidgetOption(title: "开启自动打工", command: "pet_work_auto:on", icon: "clock.badge.checkmark")
+
+    var options: [PetWidgetOption] = [
+        PetWidgetOption(title: "猫咖喵赚鱼币", command: "pet_work_start:waiter:fishCoin", icon: PetJob.waiter.icon),
+        PetWidgetOption(title: "喵警长赚骨头币", command: "pet_work_start:security:boneCoin", icon: PetJob.security.icon),
+        PetWidgetOption(title: "直播喵赚鱼币", command: "pet_work_start:streamer:fishCoin", icon: PetJob.streamer.icon),
+        autoToggle
+    ]
+
+    if status.isAutoWorkEnabled {
+        options.append(contentsOf: [
+            PetWidgetOption(title: "策略: 稳妥", command: "pet_work_strategy:conservative", icon: "leaf.fill"),
+            PetWidgetOption(title: "策略: 平衡", command: "pet_work_strategy:balanced", icon: "scale.3d"),
+            PetWidgetOption(title: "策略: 拼一把", command: "pet_work_strategy:ambitious", icon: "bolt.fill"),
+            PetWidgetOption(title: "收益跟随萌宠", command: "pet_work_reward:followPet", icon: "pawprint.fill"),
+            PetWidgetOption(title: "收益鱼币", command: "pet_work_reward:fishCoin", icon: "fish.fill"),
+            PetWidgetOption(title: "收益骨头币", command: "pet_work_reward:boneCoin", icon: "bone.fill")
+        ])
+    }
+
+    return options
+}
+
+func makePetWorkPanelWidget(status: PetStatus, feedback: String? = nil) -> PetWidgetData {
+    PetWidgetData(
+        type: .workPanel,
+        title: "\(status.displayName)的打工状态",
+        subtitle: petWorkPanelSubtitle(status: status, feedback: feedback),
+        options: petWorkOptions(for: status),
+        metrics: [
+            PetWidgetMetric(name: "工作状态", value: workRuntimeLabel(for: status)),
+            PetWidgetMetric(name: "本次收益", value: "\(status.currentJobEarnedAmount) \(status.currentJobRewardCurrency.rawValue)"),
+            PetWidgetMetric(name: "今日鱼币", value: workQuotaText(status: status, currency: .fishCoin)),
+            PetWidgetMetric(name: "今日骨头币", value: workQuotaText(status: status, currency: .boneCoin)),
+            PetWidgetMetric(name: "自动打工", value: status.isAutoWorkEnabled ? "\(status.autoWorkStrategy.title) · \(status.autoWorkRewardMode.title)" : "未开启")
+        ]
+    )
+}
+
+func petWorkPanelIntroMessage(status: PetStatus) -> String {
+    if status.currentJob != .none {
+        return "\(status.displayName)正在打工，我把状态和下班按钮放这里啦。"
+    }
+    return "可以安排\(status.displayName)去打工，也可以让它状态好、闲下来的时候自动去赚鱼币或骨头币。"
+}
+
+func applyPetWorkCommand(_ command: String) -> PetChatWorkActionResult {
+    guard command != "pet_work_panel" else {
+        return PetChatWorkActionResult(feedback: nil, didChangeStatus: false)
+    }
+
+    var status = PetDataManager.shared.status
+    let parts = command.split(separator: ":").map(String.init)
+    let saveSource = "petChatWork"
+
+    if command == "pet_work_stop" {
+        guard let result = PetWorkStateMachine.stopJob(in: &status) else {
+            return PetChatWorkActionResult(feedback: "\(status.displayName)现在没有在打工。", didChangeStatus: false)
+        }
+        PetDataManager.shared.saveStatusAndNotify(status, fullReload: true, source: saveSource)
+        return PetChatWorkActionResult(feedback: result.message, didChangeStatus: true)
+    }
+
+    if parts.first == "pet_work_start" {
+        guard parts.count >= 2, let job = PetWorkStateMachine.job(forToken: parts[1]) else {
+            return PetChatWorkActionResult(feedback: "我还没认出这份工作，换个按钮试试。", didChangeStatus: false)
+        }
+        let currency = parts.count >= 3
+            ? PetWorkStateMachine.currency(forToken: parts[2])
+            : PetWorkStateMachine.resolvedAutoWorkRewardCurrency(for: status)
+        let result = PetWorkStateMachine.startJob(
+            job,
+            in: &status,
+            isAutomatic: false,
+            rewardCurrency: currency,
+            allowReplacingExistingJob: false
+        )
+        guard result.didStart else {
+            return PetChatWorkActionResult(feedback: result.message, didChangeStatus: false)
+        }
+        PetDataManager.shared.saveStatusAndNotify(status, fullReload: true, source: saveSource)
+        return PetChatWorkActionResult(feedback: result.message, didChangeStatus: true)
+    }
+
+    if parts.first == "pet_work_auto", parts.count >= 2 {
+        let enabled = parts[1] == "on"
+        let stopResult = PetWorkStateMachine.updateAutoWorkEnabled(enabled, in: &status)
+        PetDataManager.shared.saveStatusAndNotify(status, fullReload: true, source: saveSource)
+        let feedback: String
+        if let stopResult {
+            feedback = "自动打工已关闭。\(stopResult.message)"
+        } else {
+            feedback = enabled ? "自动打工已开启，状态好、闲下来就会去赚币。" : "自动打工已关闭。"
+        }
+        return PetChatWorkActionResult(feedback: feedback, didChangeStatus: true)
+    }
+
+    if parts.first == "pet_work_strategy", parts.count >= 2, let strategy = PetAutoWorkStrategy(rawValue: parts[1]) {
+        PetWorkStateMachine.updateAutoWorkStrategy(strategy, in: &status)
+        PetDataManager.shared.saveStatusAndNotify(status, fullReload: true, source: saveSource)
+        return PetChatWorkActionResult(feedback: "自动打工策略已切到\(strategy.title)。\(strategy.description)", didChangeStatus: true)
+    }
+
+    if parts.first == "pet_work_reward", parts.count >= 2, let rewardMode = PetWorkStateMachine.rewardMode(forToken: parts[1]) {
+        PetWorkStateMachine.updateAutoWorkRewardMode(rewardMode, in: &status)
+        PetDataManager.shared.saveStatusAndNotify(status, fullReload: true, source: saveSource)
+        return PetChatWorkActionResult(feedback: "自动打工收益已切到\(rewardMode.title)。\(rewardMode.description)", didChangeStatus: true)
+    }
+
+    return PetChatWorkActionResult(feedback: "这个打工指令我还没学会，先帮你刷新状态面板。", didChangeStatus: false)
 }
 
 private func inventoryOptions(status: PetStatus, limit: Int? = nil) -> [PetWidgetOption] {

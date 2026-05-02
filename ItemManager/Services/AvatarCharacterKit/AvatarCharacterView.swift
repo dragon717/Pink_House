@@ -13,7 +13,7 @@ struct AvatarCharacterView: View {
             case .transparentVideo:
                 transparentVideoView
             case .live2d:
-                Live2DAvatarView(request: request)
+                live2DView
             }
         }
         .accessibilityLabel(request.characterID.displayName)
@@ -57,6 +57,22 @@ struct AvatarCharacterView: View {
         } else {
             staticImageView
         }
+    }
+
+    @ViewBuilder
+    private var live2DView: some View {
+        #if canImport(UIKit)
+        if AvatarLayerAssetResolver.isAvailable(
+            characterID: request.characterID,
+            hairStyleID: request.hairStyleID
+        ) {
+            AvatarLayeredMotionView(request: request, contentMode: contentMode)
+        } else {
+            Live2DAvatarView(request: request)
+        }
+        #else
+        fallbackSilhouette
+        #endif
     }
 
     @ViewBuilder

@@ -112,6 +112,17 @@ struct OOTDEditorView: View {
         }
         .navigationTitle(outfit.note.isEmpty ? "编辑书页" : outfit.note)
         .navigationBarTitleDisplayMode(.inline)
+        .onDisappear {
+            isAvatarMotionEnabled = false
+        }
+        .onChange(of: outfit.id) { _, _ in
+            isAvatarMotionEnabled = false
+        }
+        .onChange(of: canAnimateAvatar) { _, canAnimate in
+            if !canAnimate {
+                isAvatarMotionEnabled = false
+            }
+        }
         .toolbar {
             // 左侧：显示/隐藏工具栏按钮
             ToolbarItem(placement: .topBarLeading) {

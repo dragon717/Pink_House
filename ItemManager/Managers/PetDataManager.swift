@@ -95,6 +95,11 @@ class PetDataManager: ObservableObject {
 
         writeSnapshot(encoded, modifiedAt: modifiedAt, mirrorToCloud: true)
     }
+
+    func saveStatusAndNotify(_ newStatus: PetStatus, fullReload: Bool, source: String) {
+        saveStatus(newStatus)
+        postExternalUpdate(fullReload: fullReload, source: source)
+    }
     
     // MARK: - Backup & Restore
     
@@ -433,7 +438,19 @@ class PetDataManager: ObservableObject {
         sanitized.fishCoin = max(0, sanitized.fishCoin)
         sanitized.boneCoin = max(0, sanitized.boneCoin)
         sanitized.dailyFishCoinEarned = max(0, min(PetStatus.dailyFishCoinLimit, sanitized.dailyFishCoinEarned))
+        sanitized.dailyBoneCoinEarned = max(0, min(PetStatus.dailyBoneCoinLimit, sanitized.dailyBoneCoinEarned))
         sanitized.currentJobEarnedFishCoin = max(0, sanitized.currentJobEarnedFishCoin)
+        sanitized.currentJobEarnedAmount = max(0, sanitized.currentJobEarnedAmount)
+        if sanitized.currentJobEarnedAmount == 0, sanitized.currentJobEarnedFishCoin > 0 {
+            sanitized.currentJobEarnedAmount = sanitized.currentJobEarnedFishCoin
+        }
+        if sanitized.currentJobRewardCurrency == .meowCoin {
+            sanitized.currentJobRewardCurrency = .fishCoin
+        }
+        if sanitized.currentJob == .none {
+            sanitized.jobStartTime = nil
+            sanitized.currentJobStartedAutomatically = false
+        }
 
         var validInv: [String: Int] = [:]
         for (key, count) in sanitized.inventory where count > 0 {

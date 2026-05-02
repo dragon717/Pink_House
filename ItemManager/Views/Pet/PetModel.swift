@@ -10,7 +10,7 @@ enum PetState: String, CaseIterable {
     case sleeping = "sleeping" // 睡觉状态
     case working = "working" // 工作状态
     case interacting = "interacting" // 互动状态 (点击反馈)
-    
+
     // 对应的视频文件名（不含扩展名）
     func videoFileName(for job: PetJob = .none) -> String {
         switch self {
@@ -31,12 +31,12 @@ enum PetState: String, CaseIterable {
             }
         }
     }
-    
+
     // 兼容旧属性，默认不传 job
     var videoFileName: String {
         return videoFileName()
     }
-    
+
     // 是否是循环动画
     var isLooping: Bool {
         switch self {
@@ -44,18 +44,18 @@ enum PetState: String, CaseIterable {
         default: return false
         }
     }
-    
+
     var id: String { rawValue }
 }
 
 // 萌宠货币类型
-enum PetCurrency: String, CaseIterable, Identifiable {
+enum PetCurrency: String, Codable, CaseIterable, Identifiable, Hashable {
     case meowCoin = "喵币"
     case fishCoin = "鱼币"
     case boneCoin = "骨头币"
-    
+
     var id: String { rawValue }
-    
+
     var iconName: String {
         switch self {
         case .meowCoin: return "pawprint.circle.fill"
@@ -70,20 +70,20 @@ enum PetCurrency: String, CaseIterable, Identifiable {
         // 或者，我们可以使用 "circle.circle.fill" 这种？
         // 让我们看看 UI 代码。
         // UI 代码是 Image(systemName: type.iconName)
-        
+
         // 如果我们想简单点，可以用 "dog.circle.fill" ? 不太对。
         // 鉴于系统限制，我们这里返回 "bone.fill"，然后在 UI 层检测如果是 boneCoin 就加个圈背景。
         // 或者，我们可以尝试 "dog.circle" ?
-        
+
         // 既然用户明确说“圈里面是骨头icon”，最直接的办法是：
         // 1. 找一个近似的 symbol。
         // 2. 如果没有，就得改 UI 代码支持组合图标。
-        
+
         // 让我们先试试直接返回 "bone.fill"，然后在 PetComponents.swift 里修改 UI。
         return "bone.fill"
         }
     }
-    
+
     var color: String {
         switch self {
         case .meowCoin: return "yellow" // SwiftUI Color name or hex
@@ -103,7 +103,7 @@ enum PetItemType: String, Codable, CaseIterable, Identifiable {
     case chickenBreast = "鸡胸肉"
     case rawMeat = "生骨肉"
     case catFood = "猫粮"
-    
+
     // 水
     case warmWater = "温水"
     case boiledWater = "白开水"
@@ -112,9 +112,9 @@ enum PetItemType: String, Codable, CaseIterable, Identifiable {
     // 特殊道具
     case renameCard = "改名项圈"
     case energyPill = "精力药丸"
-    
+
     var id: String { rawValue }
-    
+
     // 映射到新的配置 ID
     var configId: String {
         switch self {
@@ -132,23 +132,23 @@ enum PetItemType: String, Codable, CaseIterable, Identifiable {
         case .energyPill: return "energyPill"
         }
     }
-    
+
     var price: Int {
         return PetConfigManager.shared.getItem(byId: configId)?.price ?? 0
     }
-    
+
     var currency: PetCurrency {
         return PetConfigManager.shared.getItem(byId: configId)?.petCurrency ?? .fishCoin
     }
-    
+
     var icon: String {
         return PetConfigManager.shared.getItem(byId: configId)?.icon ?? "questionmark"
     }
-    
+
     var recoveryValue: Double {
         return PetConfigManager.shared.getItem(byId: configId)?.recoveryValue ?? 0
     }
-    
+
     var isDrink: Bool {
         return PetConfigManager.shared.getItem(byId: configId)?.category == "water"
     }
@@ -173,7 +173,7 @@ struct PetItemDefinition: Codable, Identifiable, Hashable {
     let icon: String
     let description: String
     let sortIndex: Int
-    
+
     var petCurrency: PetCurrency {
         switch currency {
         case "meowCoin": return .meowCoin
@@ -181,11 +181,11 @@ struct PetItemDefinition: Codable, Identifiable, Hashable {
         default: return .fishCoin
         }
     }
-    
+
     var isDrink: Bool {
         return category == "water"
     }
-    
+
     var isToy: Bool {
         return category == "toy"
     }
@@ -198,9 +198,9 @@ enum PetJob: String, Codable, CaseIterable, Identifiable {
     case waiter = "猫咖喵"
     case security = "喵警长"
     case streamer = "直播喵"
-    
+
     var id: String { rawValue }
-    
+
     var description: String {
         switch self {
         case .none: return "宠物正在啃老，状态消耗正常。"
@@ -209,7 +209,7 @@ enum PetJob: String, Codable, CaseIterable, Identifiable {
         case .streamer: return "在线卖萌直播，赚取巨量鱼币，非常累！"
         }
     }
-    
+
     // 鱼币收益 (每分钟)
     var incomeRate: Int {
         switch self {
@@ -219,7 +219,7 @@ enum PetJob: String, Codable, CaseIterable, Identifiable {
         case .streamer: return 15
         }
     }
-    
+
     // 饱食度/清洁度/精力/心情消耗倍率 (基于基础消耗)
     var consumptionMultiplier: Double {
         switch self {
@@ -229,13 +229,144 @@ enum PetJob: String, Codable, CaseIterable, Identifiable {
         case .streamer: return 3.0
         }
     }
-    
+
     var icon: String {
         switch self {
         case .none: return "zzz"
         case .waiter: return "cup.and.saucer.fill"
         case .security: return "shield.fill"
         case .streamer: return "video.fill"
+        }
+    }
+}
+
+struct PetAutoWorkThresholds {
+    let hunger: Double
+    let hygiene: Double
+    let energy: Double
+    let mood: Double
+
+    func isSatisfied(by status: PetStatus) -> Bool {
+        status.hunger >= hunger &&
+        status.hygiene >= hygiene &&
+        status.energy >= energy &&
+        status.mood >= mood
+    }
+
+    func blockerDescription(for status: PetStatus) -> String? {
+        let candidates: [(String, Double, Double)] = [
+            ("饱食", status.hunger, hunger),
+            ("清洁", status.hygiene, hygiene),
+            ("精力", status.energy, energy),
+            ("心情", status.mood, mood)
+        ]
+
+        guard let weakest = candidates
+            .filter({ $0.1 < $0.2 })
+            .min(by: { ($0.1 / max($0.2, 1)) < ($1.1 / max($1.2, 1)) })
+        else {
+            return nil
+        }
+
+        return "\(weakest.0)需要 \(Int(weakest.2))+，当前 \(Int(weakest.1))"
+    }
+}
+
+enum PetAutoWorkStrategy: String, Codable, CaseIterable, Identifiable, Hashable {
+    case conservative
+    case balanced
+    case ambitious
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .conservative: return "稳妥"
+        case .balanced: return "平衡"
+        case .ambitious: return "拼一把"
+        }
+    }
+
+    var description: String {
+        switch self {
+        case .conservative:
+            return "只接轻松活，状态保护更严格。"
+        case .balanced:
+            return "收益和消耗都适中，适合日常挂机。"
+        case .ambitious:
+            return "状态很好时才上强度，收益更高也更累。"
+        }
+    }
+
+    var startThresholds: PetAutoWorkThresholds {
+        switch self {
+        case .conservative:
+            return PetAutoWorkThresholds(hunger: 72, hygiene: 60, energy: 72, mood: 65)
+        case .balanced:
+            return PetAutoWorkThresholds(hunger: 78, hygiene: 65, energy: 78, mood: 70)
+        case .ambitious:
+            return PetAutoWorkThresholds(hunger: 86, hygiene: 72, energy: 88, mood: 78)
+        }
+    }
+
+    var stopThresholds: PetAutoWorkThresholds {
+        switch self {
+        case .conservative:
+            return PetAutoWorkThresholds(hunger: 52, hygiene: 42, energy: 52, mood: 45)
+        case .balanced:
+            return PetAutoWorkThresholds(hunger: 45, hygiene: 36, energy: 45, mood: 38)
+        case .ambitious:
+            return PetAutoWorkThresholds(hunger: 38, hygiene: 30, energy: 38, mood: 32)
+        }
+    }
+
+    func preferredJob(for status: PetStatus) -> PetJob {
+        let averageStatus = (status.hunger + status.hygiene + status.energy + status.mood) / 4.0
+        switch self {
+        case .conservative:
+            return .waiter
+        case .balanced:
+            return averageStatus >= 88 ? .security : .waiter
+        case .ambitious:
+            return averageStatus >= 92 ? .streamer : .security
+        }
+    }
+}
+
+enum PetAutoWorkRewardMode: String, Codable, CaseIterable, Identifiable, Hashable {
+    case followPet
+    case fishCoin
+    case boneCoin
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .followPet: return "跟随萌宠"
+        case .fishCoin: return "鱼币"
+        case .boneCoin: return "骨头币"
+        }
+    }
+
+    var description: String {
+        switch self {
+        case .followPet:
+            return "奶茶优先赚鱼币，毛毛优先赚骨头币。"
+        case .fishCoin:
+            return "自动打工收益固定为鱼币。"
+        case .boneCoin:
+            return "自动打工收益固定为骨头币。"
+        }
+    }
+
+    func resolvedCurrency(for pet: PetCharacter) -> PetCurrency {
+        switch self {
+        case .followPet:
+            return pet == .maomao ? .boneCoin : .fishCoin
+        case .fishCoin:
+            return .fishCoin
+        case .boneCoin:
+            return .boneCoin
         }
     }
 }
@@ -249,23 +380,23 @@ struct PetItem: Codable, Identifiable {
 enum PetCharacter: String, Codable, CaseIterable, Identifiable {
     case naicha = "naicha"
     case maomao = "maomao"
-    
+
     var id: String { rawValue }
-    
+
     var displayName: String {
         switch self {
         case .naicha: return "奶茶"
         case .maomao: return "毛毛"
         }
     }
-    
+
     var description: String {
         switch self {
         case .naicha: return "一只喜欢喝奶茶的橘猫，\n性格温顺，最爱撒娇。"
         case .maomao: return "活泼可爱的金毛犬，\n精力充沛，忠诚粘人。"
         }
     }
-    
+
     var portraitImageName: String {
         return "\(rawValue)_portrait"
     }
@@ -298,7 +429,7 @@ enum PetCharacter: String, Codable, CaseIterable, Identifiable {
             .replacingOccurrences(of: "喵，", with: "汪，")
             .replacingOccurrences(of: "喵。", with: "汪。")
     }
-    
+
     // 萌宠对话中使用的happy表情图片名
     var happyImageName: String {
         switch self {
@@ -306,7 +437,7 @@ enum PetCharacter: String, Codable, CaseIterable, Identifiable {
         case .maomao: return "happy_dog"
         }
     }
-    
+
     // 各种表情图片名称映射
     var angryImageName: String {
         switch self {
@@ -314,21 +445,21 @@ enum PetCharacter: String, Codable, CaseIterable, Identifiable {
         case .maomao: return "angry_dog"
         }
     }
-    
+
     var curiousImageName: String {
         switch self {
         case .naicha: return "curious_cat"
         case .maomao: return "curious_dog"
         }
     }
-    
+
     var sleepyImageName: String {
         switch self {
         case .naicha: return "sleepy_cat"
         case .maomao: return "sleepy_dog"
         }
     }
-    
+
     var thinkingImageName: String {
         switch self {
         case .naicha: return "thinking_cat"
@@ -340,16 +471,16 @@ enum PetCharacter: String, Codable, CaseIterable, Identifiable {
 // MARK: - Pet Behavior Protocol
 protocol PetBehavior {
     var character: PetCharacter { get }
-    
+
     // 工作结束结果
     func getWorkFinishResult(job: PetJob, status: PetStatus) -> (video: String, message: String, success: Bool)
-    
+
     // 工作强制中断视频
     func getWorkInterruptedVideo() -> String
-    
+
     // 回音彩蛋 (返回视频路径)
     func getEchoEgg(text: String) -> String?
-    
+
     // 喂食彩蛋 (返回视频路径)
     func getFeedingEgg(item: PetItemDefinition) -> String?
 }
@@ -357,20 +488,20 @@ protocol PetBehavior {
 // 默认行为 (兼容旧逻辑/通用逻辑)
 struct DefaultPetBehavior: PetBehavior {
     let character: PetCharacter
-    
+
     func getWorkFinishResult(job: PetJob, status: PetStatus) -> (video: String, message: String, success: Bool) {
         // 默认逻辑：没有特殊视频，只返回文案
-        return ("idle", "打工结束", true)
+        return ("idle", "打工结束，赚了 \(status.currentJobEarnedAmount) \(status.currentJobRewardCurrency.rawValue)", true)
     }
-    
+
     func getWorkInterruptedVideo() -> String {
         return "idle"
     }
-    
+
     func getEchoEgg(text: String) -> String? {
         return nil
     }
-    
+
     func getFeedingEgg(item: PetItemDefinition) -> String? {
         return nil
     }
@@ -379,14 +510,14 @@ struct DefaultPetBehavior: PetBehavior {
 // Naicha 专属行为
 struct NaichaBehavior: PetBehavior {
     let character: PetCharacter = .naicha
-    
+
     func getWorkFinishResult(job: PetJob, status: PetStatus) -> (video: String, message: String, success: Bool) {
-        if status.energy > 50 {
-            // 直接读取累积的打工收益
-            let earned = status.currentJobEarnedFishCoin
+        // 直接读取累积的打工收益
+        let earned = status.currentJobEarnedAmount
+        if earned > 0 || status.energy > 50 {
             return (
                 "work_success",
-                "打工赚了 \(earned) 鱼币!",
+                "打工赚了 \(earned) \(status.currentJobRewardCurrency.rawValue)!",
                 true
             )
         } else {
@@ -397,11 +528,11 @@ struct NaichaBehavior: PetBehavior {
             )
         }
     }
-    
+
     func getWorkInterruptedVideo() -> String {
         return "work_exhausted"
     }
-    
+
     func getEchoEgg(text: String) -> String? {
         // 关键词匹配（包含谐音）
         let keywords = ["登基", "登记", "等级", "登机", "灯基"]
@@ -413,7 +544,7 @@ struct NaichaBehavior: PetBehavior {
         }
         return nil
     }
-    
+
     func getFeedingEgg(item: PetItemDefinition) -> String? {
         // 5% 概率触发
         if Int.random(in: 1...100) <= 5 {
@@ -430,9 +561,9 @@ enum VIPCardStyle: String, Codable, CaseIterable, Identifiable {
     case themeSkinAdaptive = "themeSkinAdaptive"
     case skyConcertTheme = "skyConcertTheme"
     case swanDreamTheme = "swanDreamTheme"
-    
+
     var id: String { rawValue }
-    
+
     var displayName: String {
         switch self {
         case .blackGold: return "黑金尊享"
@@ -449,23 +580,23 @@ struct VIPStatus: Codable {
     var expireDate: Date? = nil
     var vipNumber: String? = nil // 特殊编号
     var cardStyle: VIPCardStyle = .monicaPink // Default style
-    
+
     // VIP试用期相关字段
     var trialUsed: Bool = false // 是否已使用过试用期
     var trialStartDate: Date? = nil // 试用期开始时间
     var trialExpireDate: Date? = nil // 试用期结束时间
-    
+
     var isExpired: Bool {
         guard let date = expireDate else { return true }
         return date < Date()
     }
-    
+
     // 是否正在试用期中
     var isInTrialPeriod: Bool {
         guard let trialExpire = trialExpireDate else { return false }
         return trialExpire > Date()
     }
-    
+
     // 是否可以显示试用期弹窗（未使用试用期且当前不是VIP）
     var canShowTrialOffer: Bool {
         return !trialUsed && !isActive
@@ -475,10 +606,10 @@ struct VIPStatus: Codable {
 struct PetStatus: Codable {
     var petNames: [String: String] = [:] // 萌宠名字集合 (Key: PetID, Value: Name)
     var selectedPetId: String? = nil // 当前选择的宠物角色 ID
-    
+
     // VIP Status
     var vipStatus: VIPStatus = VIPStatus()
-    
+
     // 兼容旧属性，计算属性
     var petName: String? {
         get {
@@ -490,7 +621,7 @@ struct PetStatus: Codable {
             petNames[id] = newValue
         }
     }
-    
+
     // 供 UI 显示用的名字（经过清洗）
     // 如果用户没有给宠物起名，则使用宠物类型名（如"奶茶"、"毛毛"）作为默认显示名
     var displayName: String {
@@ -510,7 +641,7 @@ struct PetStatus: Codable {
         }
         return clean
     }
-    
+
     var ownedPetIds: [String] = [] // 已拥有的宠物列表，默认为空，进入领养流程
     var hunger: Double = 100.0 // 饱食度 0-100
     var hygiene: Double = 100.0 // 清洁度 0-100
@@ -518,51 +649,63 @@ struct PetStatus: Codable {
     var mood: Double = 100.0 // 心情 0-100
     var intimacy: Double = 0.0 // 亲密度 0-100（对话/互动成长）
     var lastUpdateTime: Date = Date()
-    
+
     // 货币系统
     var meowCoin: Int = 0 // 喵币 (通用高级货币)
     var fishCoin: Int = 1000 // 鱼币 (猫专用/通用基础货币)
     var boneCoin: Int = 0 // 骨头币 (狗专用基础货币)
-    
+
     // 每日限制
     var dailyFishCoinEarned: Int = 0
+    var dailyBoneCoinEarned: Int = 0
     var lastDailyResetDate: Date = Date()
-    
+
     // 背包系统
     var inventory: [String: Int] = [:] // 存储物品数量 (Key: Config ID)
-    
+
     // 工作系统
     var currentJob: PetJob = .none
     var jobStartTime: Date?
     var currentJobEarnedFishCoin: Int = 0 // 本次打工累计赚取的鱼币（需要持久化，避免备份/恢复或跨端同步后丢失）
-    
+    var currentJobEarnedAmount: Int = 0
+    var currentJobRewardCurrency: PetCurrency = .fishCoin
+    var currentJobStartedAutomatically: Bool = false
+
+    // 自动打工设置
+    var isAutoWorkEnabled: Bool = false
+    var autoWorkStrategy: PetAutoWorkStrategy = .balanced
+    var autoWorkRewardMode: PetAutoWorkRewardMode = .followPet
+
     // 衰减速率 (每秒减少多少)
     static let hungerDecayRate: Double = 10.0 / 3600.0 // 每小时减少10点
     static let hygieneDecayRate: Double = 5.0 / 3600.0 // 每小时减少5点
     static let energyDecayRate: Double = 8.0 / 3600.0 // 每小时减少8点
     static let moodDecayRate: Double = 12.0 / 3600.0 // 每小时减少12点
-    
+
     static let dailyFishCoinLimit: Int = 10000
-    
+    static let dailyBoneCoinLimit: Int = 10000
+
     // MARK: - Initialization
     init() {
         // Default init (new user)
     }
-    
+
     // MARK: - Codable Implementation for Backward Compatibility
     enum CodingKeys: String, CodingKey {
         case petName, petNames, selectedPetId, ownedPetIds
         case hunger, hygiene, energy, mood, intimacy, lastUpdateTime
         case meowCoin, fishCoin, boneCoin
-        case dailyFishCoinEarned, lastDailyResetDate
+        case dailyFishCoinEarned, dailyBoneCoinEarned, lastDailyResetDate
         case inventory
         case currentJob, jobStartTime, currentJobEarnedFishCoin
+        case currentJobEarnedAmount, currentJobRewardCurrency, currentJobStartedAutomatically
+        case isAutoWorkEnabled, autoWorkStrategy, autoWorkRewardMode
         case vipStatus
     }
-    
+
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        
+
         // Basic properties (some might be missing in very old versions, provide defaults)
         let legacyPetName = try container.decodeIfPresent(String.self, forKey: .petName)
         hunger = try container.decodeIfPresent(Double.self, forKey: .hunger) ?? 100.0
@@ -571,23 +714,32 @@ struct PetStatus: Codable {
         mood = try container.decodeIfPresent(Double.self, forKey: .mood) ?? 100.0
         intimacy = try container.decodeIfPresent(Double.self, forKey: .intimacy) ?? 0.0
         lastUpdateTime = try container.decodeIfPresent(Date.self, forKey: .lastUpdateTime) ?? Date()
-        
+
         // Currency & Inventory
         meowCoin = try container.decodeIfPresent(Int.self, forKey: .meowCoin) ?? 0
         fishCoin = try container.decodeIfPresent(Int.self, forKey: .fishCoin) ?? 1000
         boneCoin = try container.decodeIfPresent(Int.self, forKey: .boneCoin) ?? 0
         dailyFishCoinEarned = try container.decodeIfPresent(Int.self, forKey: .dailyFishCoinEarned) ?? 0
+        dailyBoneCoinEarned = try container.decodeIfPresent(Int.self, forKey: .dailyBoneCoinEarned) ?? 0
         lastDailyResetDate = try container.decodeIfPresent(Date.self, forKey: .lastDailyResetDate) ?? Date()
         inventory = try container.decodeIfPresent([String: Int].self, forKey: .inventory) ?? [:]
-        
+
         // Job
         currentJob = try container.decodeIfPresent(PetJob.self, forKey: .currentJob) ?? .none
         jobStartTime = try container.decodeIfPresent(Date.self, forKey: .jobStartTime)
         currentJobEarnedFishCoin = try container.decodeIfPresent(Int.self, forKey: .currentJobEarnedFishCoin) ?? 0
-        
+        currentJobEarnedAmount = try container.decodeIfPresent(Int.self, forKey: .currentJobEarnedAmount) ?? currentJobEarnedFishCoin
+        currentJobRewardCurrency = try container.decodeIfPresent(PetCurrency.self, forKey: .currentJobRewardCurrency) ?? .fishCoin
+        currentJobStartedAutomatically = try container.decodeIfPresent(Bool.self, forKey: .currentJobStartedAutomatically) ?? false
+
+        // Auto Work
+        isAutoWorkEnabled = try container.decodeIfPresent(Bool.self, forKey: .isAutoWorkEnabled) ?? false
+        autoWorkStrategy = try container.decodeIfPresent(PetAutoWorkStrategy.self, forKey: .autoWorkStrategy) ?? .balanced
+        autoWorkRewardMode = try container.decodeIfPresent(PetAutoWorkRewardMode.self, forKey: .autoWorkRewardMode) ?? .followPet
+
         // VIP
         vipStatus = try container.decodeIfPresent(VIPStatus.self, forKey: .vipStatus) ?? VIPStatus()
-        
+
         // Compatibility Logic for Pet IDs
         // 旧版本没有 ownedPetIds，默认只有一只奶茶
         if let ids = try container.decodeIfPresent([String].self, forKey: .ownedPetIds) {
@@ -599,7 +751,7 @@ struct PetStatus: Codable {
             // 如果旧版本有 selectedPetId 就用，没有就默认奶茶
             selectedPetId = try container.decodeIfPresent(String.self, forKey: .selectedPetId) ?? PetCharacter.naicha.rawValue
         }
-        
+
         // Decode petNames or migrate
         if let names = try container.decodeIfPresent([String: String].self, forKey: .petNames) {
             petNames = names
@@ -611,7 +763,7 @@ struct PetStatus: Codable {
             }
         }
     }
-    
+
     func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encodeIfPresent(petName, forKey: .petName) // Store current name for legacy compat
@@ -628,11 +780,18 @@ struct PetStatus: Codable {
         try container.encode(fishCoin, forKey: .fishCoin)
         try container.encode(boneCoin, forKey: .boneCoin)
         try container.encode(dailyFishCoinEarned, forKey: .dailyFishCoinEarned)
+        try container.encode(dailyBoneCoinEarned, forKey: .dailyBoneCoinEarned)
         try container.encode(lastDailyResetDate, forKey: .lastDailyResetDate)
         try container.encode(inventory, forKey: .inventory)
         try container.encode(currentJob, forKey: .currentJob)
         try container.encodeIfPresent(jobStartTime, forKey: .jobStartTime)
         try container.encode(currentJobEarnedFishCoin, forKey: .currentJobEarnedFishCoin)
+        try container.encode(currentJobEarnedAmount, forKey: .currentJobEarnedAmount)
+        try container.encode(currentJobRewardCurrency, forKey: .currentJobRewardCurrency)
+        try container.encode(currentJobStartedAutomatically, forKey: .currentJobStartedAutomatically)
+        try container.encode(isAutoWorkEnabled, forKey: .isAutoWorkEnabled)
+        try container.encode(autoWorkStrategy, forKey: .autoWorkStrategy)
+        try container.encode(autoWorkRewardMode, forKey: .autoWorkRewardMode)
         try container.encode(vipStatus, forKey: .vipStatus)
     }
 }

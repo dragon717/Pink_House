@@ -6,6 +6,11 @@ ItemManager/asserts/*.mp3
 .DS_Store
 ItemManager/asserts/*.ttf
 temp/*
+!temp/_live2d_avatar_harness/
+temp/_live2d_avatar_harness/*
+!temp/_live2d_avatar_harness/scripts/
+temp/_live2d_avatar_harness/scripts/*
+!temp/_live2d_avatar_harness/scripts/audit_avatar_layer_edges.py
 ItemManager/GenerativeAI-Info.plist
 ItemManager/asserts/*.mov
 ItemManager/asserts*.zip

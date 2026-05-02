@@ -12,6 +12,7 @@ enum PetWidgetType: String, Codable {
     case container = "container"
     case statusPanel = "status_panel"
     case currencyPanel = "currency_panel"
+    case workPanel = "work_panel"
     case inventoryPanel = "inventory_panel"
     case shopPanel = "shop_panel"
     case moneyCounter = "money_counter"
