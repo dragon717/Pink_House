@@ -245,4 +245,91 @@ final class ClothingAccessoryTests: XCTestCase {
         XCTAssertEqual(WealthSavingLedger.activeTotal(for: clothing.id, in: secondEntries), clothing.totalBalance)
     }
 
+    func testOneTimeFinalPaymentConsumesVaultAndCompletesDepositPlan() throws {
+        let clothing = Clothing(name: "One Time OP", price: 1000, deposit: 200, balance: 800, isDepositPlan: true)
+        context.insert(clothing)
+        try WealthSavingLedger.addSaving(amount: 300, clothingID: clothing.id, context: context)
+
+        let beforeEntries = try context.fetch(FetchDescriptor<WealthSavingEntry>())
+        let result = try WealthSavingLedger.recordFinalPayment(
+            amount: 800,
+            for: clothing,
+            entries: beforeEntries,
+            mode: .oneTime,
+            context: context
+        )
+
+        let entries = try context.fetch(FetchDescriptor<WealthSavingEntry>())
+        XCTAssertEqual(result?.paidAmount, 800)
+        XCTAssertEqual(result?.deductedFromVault, 300)
+        XCTAssertEqual(result?.externalPaymentAmount, 500)
+        XCTAssertEqual(result?.paidOff, true)
+        XCTAssertFalse(clothing.isDepositPlan)
+        XCTAssertEqual(WealthSavingLedger.activeTotal(for: clothing.id, in: entries), 0)
+        XCTAssertEqual(WealthSavingLedger.paidFinalPaymentTotal(for: clothing.id, in: entries), 800)
+        XCTAssertEqual(WealthSavingLedger.finalPaymentRecords(for: clothing.id, in: entries).count, 1)
+    }
+
+    func testInstallmentFinalPaymentDoesNotCompleteUntilCumulativePaidOff() throws {
+        let clothing = Clothing(name: "Installment OP", price: 1000, deposit: 200, balance: 800, isDepositPlan: true)
+        context.insert(clothing)
+
+        let beforeEntries = try context.fetch(FetchDescriptor<WealthSavingEntry>())
+        let first = try WealthSavingLedger.recordFinalPayment(
+            amount: 300,
+            for: clothing,
+            entries: beforeEntries,
+            mode: .installment,
+            installmentCount: 3,
+            context: context
+        )
+
+        var entries = try context.fetch(FetchDescriptor<WealthSavingEntry>())
+        XCTAssertEqual(first?.paidOff, false)
+        XCTAssertTrue(clothing.isDepositPlan)
+        XCTAssertEqual(clothing.finalPaymentInstallmentCount, 3)
+        XCTAssertEqual(WealthSavingLedger.paidFinalPaymentTotal(for: clothing.id, in: entries), 300)
+        XCTAssertEqual(WealthSavingLedger.remainingFinalPaymentAmount(for: clothing, entries: entries), 500)
+
+        _ = try WealthSavingLedger.recordFinalPayment(
+            amount: 500,
+            for: clothing,
+            entries: entries,
+            mode: .installment,
+            installmentCount: 3,
+            context: context
+        )
+
+        entries = try context.fetch(FetchDescriptor<WealthSavingEntry>())
+        XCTAssertFalse(clothing.isDepositPlan)
+        XCTAssertEqual(WealthSavingLedger.paidFinalPaymentTotal(for: clothing.id, in: entries), 800)
+        XCTAssertEqual(WealthSavingLedger.remainingFinalPaymentAmount(for: clothing, entries: entries), 0)
+    }
+
+    func testExistingVaultSavingIsDeductibleButNotHistoricalPayment() throws {
+        let clothing = Clothing(name: "Deductible OP", price: 1000, deposit: 200, balance: 800, isDepositPlan: true)
+        context.insert(clothing)
+        try WealthSavingLedger.addSaving(amount: 200, clothingID: clothing.id, context: context)
+
+        var entries = try context.fetch(FetchDescriptor<WealthSavingEntry>())
+        XCTAssertEqual(WealthSavingLedger.activeTotal(for: clothing.id, in: entries), 200)
+        XCTAssertEqual(WealthSavingLedger.paidFinalPaymentTotal(for: clothing.id, in: entries), 0)
+
+        _ = try WealthSavingLedger.recordFinalPayment(
+            amount: 500,
+            for: clothing,
+            entries: entries,
+            mode: .installment,
+            installmentCount: 2,
+            context: context
+        )
+
+        entries = try context.fetch(FetchDescriptor<WealthSavingEntry>())
+        let payment = WealthSavingLedger.finalPaymentRecords(for: clothing.id, in: entries).first
+        XCTAssertEqual(payment?.vaultDeductionAmount, 200)
+        XCTAssertEqual(payment?.externalPaymentAmount, 300)
+        XCTAssertEqual(WealthSavingLedger.activeTotal(for: clothing.id, in: entries), 0)
+        XCTAssertEqual(WealthSavingLedger.paidFinalPaymentTotal(for: clothing.id, in: entries), 500)
+    }
+
 }

@@ -290,6 +290,7 @@ class BackupService {
                     isDepositPlan: c.isDepositPlan,
                     finalPaymentDate: c.finalPaymentDate,
                     finalPaymentEndDate: c.finalPaymentEndDate,
+                    finalPaymentInstallmentCount: c.finalPaymentInstallmentCount,
                     isFinalPaymentSavedToWealth: c.isFinalPaymentSavedToWealth,
                     finalPaymentSavedAt: c.finalPaymentSavedAt,
                     note: c.note,
@@ -317,6 +318,13 @@ class BackupService {
                     clothingID: entry.clothingID,
                     note: entry.note,
                     migrationSource: entry.migrationSource,
+                    entryKind: entry.entryKind,
+                    finalPaymentMode: entry.finalPaymentMode,
+                    installmentIndex: entry.installmentIndex,
+                    installmentCount: entry.installmentCount,
+                    paidAt: entry.paidAt,
+                    vaultDeductionAmount: entry.vaultDeductionAmount,
+                    externalPaymentAmount: entry.externalPaymentAmount,
                     createdAt: entry.createdAt,
                     updatedAt: entry.updatedAt,
                     usedAt: entry.usedAt,
@@ -1678,6 +1686,7 @@ class BackupService {
             clothingBack.isDepositPlan = dto.isDepositPlan
             clothingBack.finalPaymentDate = dto.finalPaymentDate
             clothingBack.finalPaymentEndDate = dto.finalPaymentEndDate
+            clothingBack.finalPaymentInstallmentCount = dto.finalPaymentInstallmentCount ?? 0
             clothingBack.isFinalPaymentSavedToWealth = dto.isDepositPlan && (dto.isFinalPaymentSavedToWealth ?? false)
             clothingBack.finalPaymentSavedAt = clothingBack.isFinalPaymentSavedToWealth ? dto.finalPaymentSavedAt : nil
             
@@ -2664,6 +2673,13 @@ class BackupService {
                 entry.clothingID = dto.clothingID
                 entry.note = dto.note ?? ""
                 entry.migrationSource = dto.migrationSource
+                entry.entryKind = dto.entryKind ?? WealthSavingEntryKind.saving.rawValue
+                entry.finalPaymentMode = dto.finalPaymentMode
+                entry.installmentIndex = dto.installmentIndex ?? 0
+                entry.installmentCount = dto.installmentCount ?? 0
+                entry.paidAt = dto.paidAt
+                entry.vaultDeductionAmount = dto.vaultDeductionAmount ?? 0
+                entry.externalPaymentAmount = dto.externalPaymentAmount ?? 0
                 entry.createdAt = dto.createdAt
                 entry.updatedAt = dto.updatedAt ?? dto.createdAt
                 entry.usedAt = dto.usedAt

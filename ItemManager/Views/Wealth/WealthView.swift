@@ -443,7 +443,7 @@ struct FinalPaymentVaultView: View {
     @Environment(\.colorScheme) private var colorScheme
 
     private var activeDepositClothings: [Clothing] {
-        clothings.filter { $0.isDepositPlan && !$0.isDeleted && $0.deletedAt == nil }
+        clothings.filter { $0.reservationKind == .depositPlan && !$0.isDeleted && $0.deletedAt == nil }
     }
 
     private var activeClothings: [Clothing] {
@@ -455,7 +455,7 @@ struct FinalPaymentVaultView: View {
             WealthSavingLedger.isActive(entry) ? entry.clothingID : nil
         })
         return activeClothings
-            .filter { $0.isDepositPlan || savedIDs.contains($0.id) }
+            .filter { $0.reservationKind == .depositPlan || (!$0.isFullPaymentReservation && savedIDs.contains($0.id)) }
             .sorted {
                 let left = WealthSavingLedger.activeTotal(for: $0.id, in: wealthSavingEntries)
                 let right = WealthSavingLedger.activeTotal(for: $1.id, in: wealthSavingEntries)
@@ -736,6 +736,9 @@ struct FinalPaymentVaultView: View {
 
             ForEach(clothingsWithSavingsOrDepositPlans) { clothing in
                 let saved = WealthSavingLedger.activeTotal(for: clothing.id, in: wealthSavingEntries)
+                let paid = WealthSavingLedger.paidFinalPaymentTotal(for: clothing.id, in: wealthSavingEntries)
+                let remainingPayment = WealthSavingLedger.remainingFinalPaymentAmount(for: clothing, entries: wealthSavingEntries)
+                let paymentRecords = WealthSavingLedger.finalPaymentRecords(for: clothing.id, in: wealthSavingEntries)
                 let numerator = WealthSavingLedger.progressNumerator(for: clothing, entries: wealthSavingEntries)
                 let target = WealthSavingLedger.purchaseTarget(for: clothing)
                 let cap = WealthSavingLedger.assignableSavingCap(for: clothing)
@@ -793,7 +796,7 @@ struct FinalPaymentVaultView: View {
                     } label: {
                         VStack(alignment: .leading, spacing: 6) {
                             HStack {
-                                Text("已存 ¥\(NSDecimalNumber(decimal: saved).stringValue)")
+                                Text("已付 ¥\(NSDecimalNumber(decimal: paid).stringValue) · 可抵扣 ¥\(NSDecimalNumber(decimal: saved).stringValue)")
                                 Spacer()
                                 Text("\(Int((ratio * 100).rounded()))%")
                                     .foregroundStyle(ratio > 1 ? WealthExperienceStyle.rose : WealthExperienceStyle.gold)
@@ -810,6 +813,19 @@ struct FinalPaymentVaultView: View {
                             Text("指定上限 ¥\(NSDecimalNumber(decimal: cap).stringValue) · 还能存 ¥\(NSDecimalNumber(decimal: remaining).stringValue)")
                                 .font(.caption2)
                                 .foregroundStyle(remaining > 0 ? themeManager.tertiaryTextColor : Color(hex: "C94C72"))
+                            Text("剩余尾款 ¥\(NSDecimalNumber(decimal: remainingPayment).stringValue) · 账单 \(paymentRecords.count) 笔")
+                                .font(.caption2)
+                                .foregroundStyle(themeManager.tertiaryTextColor)
+                            if clothing.finalPaymentInstallmentCount > 1 || paymentRecords.contains(where: { $0.paymentMode == .installment }) {
+                                FinalPaymentSegmentedProgressView(
+                                    total: max(clothing.finalPaymentInstallmentCount, paymentRecords.map(\.installmentCount).max() ?? 0),
+                                    completed: paymentRecords.count,
+                                    activeIndex: WealthSavingLedger.nextInstallmentIndex(for: clothing, entries: wealthSavingEntries),
+                                    accent: WealthExperienceStyle.rose,
+                                    completedColor: .green,
+                                    height: 6
+                                )
+                            }
                         }
                         .contentShape(Rectangle())
                     }
@@ -899,7 +915,7 @@ struct UnassignedSavingManagerSheet: View {
 
     private var sortedDepositClothings: [Clothing] {
         depositClothings
-            .filter { !$0.isDeleted && $0.deletedAt == nil && $0.isDepositPlan }
+            .filter { !$0.isDeleted && $0.deletedAt == nil && $0.reservationKind == .depositPlan }
             .sorted {
                 let leftRemaining = WealthSavingLedger.remainingAssignableAmount(for: $0, entries: wealthSavingEntries)
                 let rightRemaining = WealthSavingLedger.remainingAssignableAmount(for: $1, entries: wealthSavingEntries)

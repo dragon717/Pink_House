@@ -415,6 +415,7 @@ struct ClothingDTO: Codable {
     let isDepositPlan: Bool
     let finalPaymentDate: Date?
     let finalPaymentEndDate: Date?
+    let finalPaymentInstallmentCount: Int? // v1.13+ 尾款分期期数，老版本备份可能不存在
     let isFinalPaymentSavedToWealth: Bool? // v1.10+ 尾款是否已存入马上来财招财猫，老版本备份可能不存在
     let finalPaymentSavedAt: Date? // v1.10+ 尾款存入招财猫时间，老版本备份可能不存在
     let note: String
@@ -451,6 +452,13 @@ struct WealthSavingEntryDTO: Codable {
     let clothingID: UUID?
     let note: String?
     let migrationSource: String?
+    let entryKind: String? // v1.13+ saving / final_payment，老版本备份默认 saving
+    let finalPaymentMode: String? // v1.13+ one_time / installment
+    let installmentIndex: Int? // v1.13+ 第几期
+    let installmentCount: Int? // v1.13+ 共几期
+    let paidAt: Date? // v1.13+ 尾款实付时间
+    let vaultDeductionAmount: Decimal? // v1.13+ 小金库自动抵扣金额
+    let externalPaymentAmount: Decimal? // v1.13+ 外部实付补差金额
     let createdAt: Date
     let updatedAt: Date?
     let usedAt: Date?

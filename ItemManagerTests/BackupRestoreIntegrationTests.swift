@@ -71,6 +71,7 @@ final class BackupRestoreIntegrationTests: XCTestCase {
         clothing.isDepositPlan = true
         clothing.deposit = 100
         clothing.balance = 400
+        clothing.finalPaymentInstallmentCount = 3
         
         // Add Accessory Items
         let acc1 = AccessoryItem(name: "Test Acc 1", price: 100.0, deposit: 30.0, balance: 70.0, sortIndex: 0)
@@ -82,6 +83,20 @@ final class BackupRestoreIntegrationTests: XCTestCase {
         let savingAmount = Decimal(string: "123.45")!
         let savingEntry = WealthSavingEntry(amount: savingAmount, clothingID: clothing.id, note: "备份测试小金库")
         context.insert(savingEntry)
+
+        let paymentEntry = WealthSavingEntry(
+            amount: 120,
+            clothingID: clothing.id,
+            note: "备份测试第1期",
+            entryKind: .finalPayment,
+            finalPaymentMode: .installment,
+            installmentIndex: 1,
+            installmentCount: 3,
+            paidAt: Date(timeIntervalSince1970: 1_700_000_222),
+            vaultDeductionAmount: 20,
+            externalPaymentAmount: 100
+        )
+        context.insert(paymentEntry)
         
         // 创建裁剪图
         let cutout = CutoutItem(originalImageHash: "hash123", category: "Skirt", imagePath: "cutout.png", width: 100, height: 100)
@@ -126,16 +141,24 @@ final class BackupRestoreIntegrationTests: XCTestCase {
         XCTAssertEqual(restoredClothing.updatedAt, expectedUpdatedAt)
         XCTAssertEqual(restoredClothing.lastModified, expectedLastModified)
         XCTAssertTrue(restoredClothing.isDepositPlan)
+        XCTAssertEqual(restoredClothing.finalPaymentInstallmentCount, 3)
 
         let restoredSavingEntries = try context.fetch(FetchDescriptor<WealthSavingEntry>())
-        XCTAssertEqual(restoredSavingEntries.count, 1)
-        XCTAssertEqual(restoredSavingEntries.first?.id, savingEntry.id)
-        XCTAssertEqual(restoredSavingEntries.first?.clothingID, restoredClothing.id)
-        XCTAssertEqual(restoredSavingEntries.first?.amount, savingAmount)
+        XCTAssertEqual(restoredSavingEntries.count, 2)
+        let restoredSavingEntry = restoredSavingEntries.first { $0.id == savingEntry.id }
+        XCTAssertEqual(restoredSavingEntry?.clothingID, restoredClothing.id)
+        XCTAssertEqual(restoredSavingEntry?.amount, savingAmount)
+        let restoredPaymentEntry = restoredSavingEntries.first { $0.id == paymentEntry.id }
+        XCTAssertEqual(restoredPaymentEntry?.kind, .finalPayment)
+        XCTAssertEqual(restoredPaymentEntry?.paymentMode, .installment)
+        XCTAssertEqual(restoredPaymentEntry?.installmentIndex, 1)
+        XCTAssertEqual(restoredPaymentEntry?.installmentCount, 3)
+        XCTAssertEqual(restoredPaymentEntry?.vaultDeductionAmount, 20)
+        XCTAssertEqual(restoredPaymentEntry?.externalPaymentAmount, 100)
 
         try await BackupService.shared.importBackup(from: exportURL, context: context)
         let restoredSavingEntriesAfterSecondImport = try context.fetch(FetchDescriptor<WealthSavingEntry>())
-        XCTAssertEqual(restoredSavingEntriesAfterSecondImport.count, 1, "重复恢复同一备份不应重复累加小金库存款")
+        XCTAssertEqual(restoredSavingEntriesAfterSecondImport.count, 2, "重复恢复同一备份不应重复累加小金库/尾款账单")
         
         // 6. 验证关系恢复
         XCTAssertEqual(restoredClothing.brand?.name, "Test Brand")

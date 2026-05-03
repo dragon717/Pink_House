@@ -1149,7 +1149,7 @@ struct PetChatViewLegacy: View {
     }
 
     private func handlePetWorkPanel() {
-        let status = PetDataManager.shared.status
+        let status = petWorkStatusForChatPanel()
         let widget = makePetWorkPanelWidget(status: status)
         messages.append(
             PetChatMessage(
@@ -1252,6 +1252,11 @@ struct PetChatViewLegacy: View {
 
     private func refreshPanel(for command: String, messageID: UUID, feedback: String? = nil) {
         let status = PetDataManager.shared.status
+        if isPetWorkCommand(command) {
+            let workStatus = petWorkStatusForChatPanel()
+            replaceWidgets(in: messageID, with: [makePetWorkPanelWidget(status: workStatus, feedback: feedback)])
+            return
+        }
         if command.hasPrefix("use_item:") || command == "pet_inventory_panel" || command.hasPrefix("inventory:") {
             replaceWidgets(in: messageID, with: [makeInventoryPanelWidget(status: status, feedback: feedback)])
             return
@@ -1293,10 +1298,6 @@ struct PetChatViewLegacy: View {
         }
         if command == "pet_divination_panel" {
             replaceWidgets(in: messageID, with: [makeDivinationWidget()])
-            return
-        }
-        if isPetWorkCommand(command) {
-            replaceWidgets(in: messageID, with: [makePetWorkPanelWidget(status: status, feedback: feedback)])
             return
         }
 

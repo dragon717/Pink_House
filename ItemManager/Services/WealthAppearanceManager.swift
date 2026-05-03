@@ -105,7 +105,7 @@ enum WealthExperienceCopy {
         static let emptyTitle = "还没有小匣存款"
         static let emptyDescription = "可以先不指定裙装存一笔，也可以去心愿尾款列表为目标裙装存钱。"
         static let listTitle = "裙装备款进度"
-        static let depositProgressLabel = "定金 + 小匣存款 / 当前总价"
+        static let depositProgressLabel = "定金 + 已付尾款 + 小匣存款 / 当前总价"
         static let normalProgressLabel = "小匣存款 / 当前总价"
         static let unassignedSheetTitle = "未指定小匣"
         static let unassignedSheetDescriptionPrefix = "当前未指定 "

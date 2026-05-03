@@ -672,17 +672,40 @@ func petWorkPanelIntroMessage(status: PetStatus) -> String {
     return "可以安排\(status.displayName)去打工，也可以让它状态好、闲下来的时候自动去赚鱼币或骨头币。"
 }
 
-func applyPetWorkCommand(_ command: String) -> PetChatWorkActionResult {
-    guard command != "pet_work_panel" else {
-        return PetChatWorkActionResult(feedback: nil, didChangeStatus: false)
-    }
-
+@discardableResult
+func settlePetWorkIncomeForChatIfNeeded(now: Date = Date()) -> PetWorkSettlementResult {
     var status = PetDataManager.shared.status
+    let settlement = PetWorkStateMachine.settleJobIncomeUntil(now, in: &status)
+    if settlement.didMutateStatus {
+        PetDataManager.shared.saveStatusAndNotify(status, fullReload: true, source: "petChatWorkSettlement")
+    }
+    return settlement
+}
+
+func petWorkStatusForChatPanel(now: Date = Date()) -> PetStatus {
+    _ = settlePetWorkIncomeForChatIfNeeded(now: now)
+    return PetDataManager.shared.status
+}
+
+func applyPetWorkCommand(_ command: String) -> PetChatWorkActionResult {
+    var status = PetDataManager.shared.status
+    let settlement = PetWorkStateMachine.settleJobIncomeUntil(Date(), in: &status)
     let parts = command.split(separator: ":").map(String.init)
     let saveSource = "petChatWork"
 
+    if command == "pet_work_panel" {
+        if settlement.didMutateStatus {
+            PetDataManager.shared.saveStatusAndNotify(status, fullReload: true, source: "\(saveSource):panel")
+        }
+        let feedback = settlement.earnedAmount > 0 ? "刚刚结算了 \(settlement.earnedAmount) \(status.currentJobRewardCurrency.rawValue)，面板已更新。" : nil
+        return PetChatWorkActionResult(feedback: feedback, didChangeStatus: settlement.didMutateStatus)
+    }
+
     if command == "pet_work_stop" {
         guard let result = PetWorkStateMachine.stopJob(in: &status) else {
+            if settlement.didMutateStatus {
+                PetDataManager.shared.saveStatusAndNotify(status, fullReload: true, source: "\(saveSource):settlement")
+            }
             return PetChatWorkActionResult(feedback: "\(status.displayName)现在没有在打工。", didChangeStatus: false)
         }
         PetDataManager.shared.saveStatusAndNotify(status, fullReload: true, source: saveSource)
@@ -704,6 +727,9 @@ func applyPetWorkCommand(_ command: String) -> PetChatWorkActionResult {
             allowReplacingExistingJob: false
         )
         guard result.didStart else {
+            if settlement.didMutateStatus {
+                PetDataManager.shared.saveStatusAndNotify(status, fullReload: true, source: "\(saveSource):settlement")
+            }
             return PetChatWorkActionResult(feedback: result.message, didChangeStatus: false)
         }
         PetDataManager.shared.saveStatusAndNotify(status, fullReload: true, source: saveSource)

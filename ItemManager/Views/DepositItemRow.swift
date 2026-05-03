@@ -91,31 +91,46 @@ struct DepositItemRow: View {
 
                     Spacer()
 
-                    // 注意：totalDeposit 和 totalBalance 已经包含了 stock 的乘法，所以这里直接使用
                     VStack(alignment: .trailing, spacing: 2) {
-                        Text("定金¥\(clothing.totalDeposit.formatted(.number.precision(.fractionLength(0))))")
-                            .font(.caption)
-                            .bold()
-                            .foregroundStyle(themeManager.accentTextColor)
-                        Text("尾款¥\(clothing.totalBalance.formatted(.number.precision(.fractionLength(0))))")
-                            .font(.caption)
-                            .bold()
-                            .foregroundStyle(themeManager.accentTextColor)
+                        if clothing.isFullPaymentReservation {
+                            Text("全款预约")
+                                .font(.caption2)
+                                .bold()
+                                .foregroundStyle(themeManager.accentTextColor)
+                            Text("¥\(clothing.fullPaymentReservationTotalAmount.formatted(.number.precision(.fractionLength(0))))")
+                                .font(.caption)
+                                .bold()
+                                .foregroundStyle(themeManager.accentTextColor)
+                        } else {
+                            Text("定金¥\(clothing.totalDeposit.formatted(.number.precision(.fractionLength(0))))")
+                                .font(.caption)
+                                .bold()
+                                .foregroundStyle(themeManager.accentTextColor)
+                            Text("尾款¥\(clothing.totalBalance.formatted(.number.precision(.fractionLength(0))))")
+                                .font(.caption)
+                                .bold()
+                                .foregroundStyle(themeManager.accentTextColor)
+                        }
                     }
                 }
 
                 Divider()
 
-                // Timeline Section - 只显示两个阶段：定金和尾款
                 VStack(spacing: 12) {
-                    // Phase 1: Deposit (Always shown)
-                    TimelineRow(title: "定金", date: clothing.depositDate, trailing: getDepositStatus())
+                    if clothing.isFullPaymentReservation {
+                        TimelineRow(title: "全款预约", date: clothing.depositDate, trailing: getFullPaymentReservationStatus())
+                    } else {
+                        // Phase 1: Deposit (Always shown)
+                        TimelineRow(title: "定金", date: clothing.depositDate, trailing: getDepositStatus())
 
-                    // Phase 2: Final Payment
-                    TimelineRow(title: "尾款", date: clothing.finalPaymentDate, trailing: getFinalPaymentStatus())
+                        // Phase 2: Final Payment
+                        TimelineRow(title: "尾款", date: clothing.finalPaymentDate, trailing: getFinalPaymentStatus())
+                    }
                 }
 
-                FinalPaymentWealthButton(clothing: clothing, compact: false)
+                if !clothing.isFullPaymentReservation {
+                    FinalPaymentWealthButton(clothing: clothing, compact: false)
+                }
 
                 // Note Section
                 if !clothing.note.isEmpty {
@@ -131,7 +146,7 @@ struct DepositItemRow: View {
                 HStack {
                     Image(systemName: "calendar")
                         .foregroundStyle(.orange)
-                    Text("预估尾款时间: \(formatDate(clothing.finalPaymentDate))")
+                    Text(clothing.isFullPaymentReservation ? "全款预约日期: \(formatDate(clothing.depositDate))" : "预估尾款时间: \(formatDate(clothing.finalPaymentDate))")
                         .font(.caption)
                         .foregroundStyle(.orange)
 
@@ -183,6 +198,22 @@ struct DepositItemRow: View {
             return "定金日"
         } else {
             return "定金已结束"
+        }
+    }
+
+    private func getFullPaymentReservationStatus() -> String? {
+        guard let date = clothing.depositDate else { return nil }
+        let now = Date()
+        let calendar = Calendar.current
+
+        let days = calendar.dateComponents([.day], from: calendar.startOfDay(for: now), to: calendar.startOfDay(for: date)).day ?? 0
+
+        if days > 0 {
+            return "距预约: \(days)天"
+        } else if days == 0 {
+            return "预约日"
+        } else {
+            return "已预约"
         }
     }
 
@@ -284,8 +315,8 @@ struct SimpleDepositItemRow: View {
                             .foregroundStyle(themeManager.primaryTextColor)
 
                         HStack(spacing: 6) {
-                            if let date = clothing.finalPaymentDate {
-                                Text("尾款: \(Self.monthFormatter.string(from: date))")
+                            if let date = clothing.reservationGroupingDate {
+                                Text("\(clothing.isFullPaymentReservation ? "全款" : "尾款"): \(Self.monthFormatter.string(from: date))")
                                     .font(.caption2)
                                     .foregroundStyle(themeManager.accentTextColor)
                                     .padding(.horizontal, 4)
@@ -293,7 +324,7 @@ struct SimpleDepositItemRow: View {
                                     .background(themeManager.accentTextColor.opacity(0.1))
                                     .clipShape(RoundedRectangle(cornerRadius: 4))
                             } else {
-                                Text("尾款待定")
+                                Text(clothing.isFullPaymentReservation ? "预约待定" : "尾款待定")
                                     .font(.caption2)
                                     .foregroundStyle(themeManager.tertiaryTextColor)
                             }
@@ -318,13 +349,20 @@ struct SimpleDepositItemRow: View {
 
                     // 3. Prices
                     VStack(alignment: .trailing, spacing: 2) {
-                        Text("定金¥\(clothing.totalDeposit.formatted(.number.precision(.fractionLength(0))))")
-                            .font(.caption)
-                            .foregroundStyle(themeManager.accentTextColor)
-                        Text("尾款¥\(clothing.totalBalance.formatted(.number.precision(.fractionLength(0))))")
-                            .font(.caption)
-                            .bold()
-                            .foregroundStyle(themeManager.accentTextColor)
+                        if clothing.isFullPaymentReservation {
+                            Text("全款¥\(clothing.fullPaymentReservationTotalAmount.formatted(.number.precision(.fractionLength(0))))")
+                                .font(.caption)
+                                .bold()
+                                .foregroundStyle(themeManager.accentTextColor)
+                        } else {
+                            Text("定金¥\(clothing.totalDeposit.formatted(.number.precision(.fractionLength(0))))")
+                                .font(.caption)
+                                .foregroundStyle(themeManager.accentTextColor)
+                            Text("尾款¥\(clothing.totalBalance.formatted(.number.precision(.fractionLength(0))))")
+                                .font(.caption)
+                                .bold()
+                                .foregroundStyle(themeManager.accentTextColor)
+                        }
                     }
 
                     // 4. Note Icon
@@ -348,7 +386,9 @@ struct SimpleDepositItemRow: View {
                     }
                 }
 
-                FinalPaymentWealthButton(clothing: clothing, compact: true)
+                if !clothing.isFullPaymentReservation {
+                    FinalPaymentWealthButton(clothing: clothing, compact: true)
+                }
             }
             .padding(16)
             .themeSkinSectionCard(cornerRadius: 24)
@@ -383,6 +423,14 @@ struct FinalPaymentWealthButton: View {
         WealthSavingLedger.activeTotal(for: clothing.id, in: wealthSavingEntries)
     }
 
+    private var paidAmount: Decimal {
+        WealthSavingLedger.paidFinalPaymentTotal(for: clothing.id, in: wealthSavingEntries)
+    }
+
+    private var finalPaymentRemainingAmount: Decimal {
+        WealthSavingLedger.remainingFinalPaymentAmount(for: clothing, entries: wealthSavingEntries)
+    }
+
     private var remainingAmount: Decimal {
         WealthSavingLedger.remainingAssignableAmount(for: clothing, entries: wealthSavingEntries)
     }
@@ -392,33 +440,37 @@ struct FinalPaymentWealthButton: View {
     }
 
     var body: some View {
-        Button {
-            showingSavingSheet = true
-        } label: {
-            statusLabel(
-                icon: overflowAmount > 0 ? "exclamationmark.triangle.fill" : (savedAmount > 0 ? "tray.full.fill" : "tray.and.arrow.down"),
-                title: overflowAmount > 0 ? "小金库超额" : (remainingAmount <= 0 ? "已存到上限" : (savedAmount > 0 ? "小金库进度" : "存一笔到小金库")),
-                detail: overflowAmount > 0 ? "超额¥\(NSDecimalNumber(decimal: overflowAmount).stringValue)" : (savedAmount > 0 ? "已存¥\(NSDecimalNumber(decimal: savedAmount).stringValue)" : "剩余可存¥\(NSDecimalNumber(decimal: remainingAmount).stringValue)"),
-                foreground: overflowAmount > 0 ? Color(hex: "C94C72") : .orange,
-                background: Color.orange.opacity(0.10)
-            )
-        }
-        .buttonStyle(.plain)
-        .disabled(remainingAmount <= 0)
-        .sheet(isPresented: $showingSavingSheet) {
-            VaultSavingSheet(
-                targetClothing: clothing,
-                currentSavedAmount: savedAmount,
-                onSave: saveWealthSavingAmount
-            )
-        }
-        .overlay {
-            if let celebrationAmount {
-                VaultSavingCelebrationOverlay(
-                    amount: celebrationAmount,
-                    onComplete: { self.celebrationAmount = nil }
-                )
-                .allowsHitTesting(false)
+        Group {
+            if !clothing.isFullPaymentReservation {
+                Button {
+                    showingSavingSheet = true
+                } label: {
+                    statusLabel(
+                        icon: overflowAmount > 0 ? "exclamationmark.triangle.fill" : (savedAmount > 0 ? "tray.full.fill" : "tray.and.arrow.down"),
+                        title: overflowAmount > 0 ? "小金库超额" : (paidAmount > 0 ? "尾款支付进度" : (remainingAmount <= 0 ? "已存到上限" : (savedAmount > 0 ? "小金库进度" : "存一笔到小金库"))),
+                        detail: overflowAmount > 0 ? "超额¥\(NSDecimalNumber(decimal: overflowAmount).stringValue)" : "已付¥\(NSDecimalNumber(decimal: paidAmount).stringValue) · 剩余¥\(NSDecimalNumber(decimal: finalPaymentRemainingAmount).stringValue) · 可抵扣¥\(NSDecimalNumber(decimal: savedAmount).stringValue)",
+                        foreground: overflowAmount > 0 ? Color(hex: "C94C72") : .orange,
+                        background: Color.orange.opacity(0.10)
+                    )
+                }
+                .buttonStyle(.plain)
+                .disabled(remainingAmount <= 0)
+                .sheet(isPresented: $showingSavingSheet) {
+                    VaultSavingSheet(
+                        targetClothing: clothing,
+                        currentSavedAmount: savedAmount,
+                        onSave: saveWealthSavingAmount
+                    )
+                }
+                .overlay {
+                    if let celebrationAmount {
+                        VaultSavingCelebrationOverlay(
+                            amount: celebrationAmount,
+                            onComplete: { self.celebrationAmount = nil }
+                        )
+                        .allowsHitTesting(false)
+                    }
+                }
             }
         }
     }

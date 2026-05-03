@@ -780,6 +780,7 @@ class SwiftDataMigrationManager: ObservableObject {
         new.lastModified = source.lastModified
         new.isFinalPaymentSavedToWealth = source.isFinalPaymentSavedToWealth
         new.finalPaymentSavedAt = source.finalPaymentSavedAt
+        new.finalPaymentInstallmentCount = source.finalPaymentInstallmentCount
         new.model3DPath = source.model3DPath
         new.model3DType = source.model3DType
         new.model3DThumbnailPath = source.model3DThumbnailPath
@@ -793,6 +794,13 @@ class SwiftDataMigrationManager: ObservableObject {
             clothingID: source.clothingID,
             note: source.note,
             migrationSource: source.migrationSource,
+            entryKind: source.kind,
+            finalPaymentMode: source.paymentMode,
+            installmentIndex: source.installmentIndex,
+            installmentCount: source.installmentCount,
+            paidAt: source.paidAt,
+            vaultDeductionAmount: source.vaultDeductionAmount,
+            externalPaymentAmount: source.externalPaymentAmount,
             createdAt: source.createdAt
         )
         new.id = source.id

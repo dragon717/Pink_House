@@ -21,18 +21,15 @@ struct MonthSelectorView: View {
     private func statsForMonth(_ month: Int) -> (count: Int, amount: Decimal) {
         let calendar = Calendar.current
         let monthlyClothings = clothings.filter { clothing in
-            guard let date = clothing.finalPaymentDate else { return false }
+            guard let date = clothing.reservationGroupingDate else { return false }
             // Year is already filtered in baseClothings, but double check doesn't hurt
             // Actually baseClothings already filtered by year, so we just check month
             let m = calendar.component(.month, from: date)
             return m == month
         }
         
-        // Count Items (Stock Sum) and Total Amount (Balance Sum)
-        // No deduplication for totals
-        // 注意：totalBalance 已经包含了 stock 的乘法，所以这里直接使用 totalBalance，不要再乘 stock
         let itemCount = monthlyClothings.reduce(0) { $0 + $1.stock }
-        let amount = monthlyClothings.reduce(0) { $0 + $1.totalBalance }
+        let amount = monthlyClothings.reduce(0) { $0 + $1.reservationListAmount }
         return (itemCount, amount)
     }
     
@@ -45,7 +42,7 @@ struct MonthSelectorView: View {
         } else {
             let calendar = Calendar.current
             filteredClothings = clothings.filter { clothing in
-                guard let date = clothing.finalPaymentDate else { return false }
+                guard let date = clothing.reservationGroupingDate else { return false }
                 let month = calendar.component(.month, from: date)
                 return selectedMonths.contains(month)
             }
@@ -65,9 +62,8 @@ struct MonthSelectorView: View {
         
         let totalCount = filteredClothings.reduce(0) { $0 + $1.stock }
         let styleCount = uniqueStyles.count
-        // 注意：totalDeposit 和 totalBalance 已经包含了 stock 的乘法，所以这里直接使用，不要再乘 stock
-        let paidDeposit = filteredClothings.reduce(0) { $0 + $1.totalDeposit }
-        let pendingBalance = filteredClothings.reduce(0) { $0 + $1.totalBalance }
+        let paidDeposit = filteredClothings.reduce(0) { $0 + $1.reservationPaidAmount }
+        let pendingBalance = filteredClothings.reduce(0) { $0 + $1.reservationListAmount }
         
         return (totalCount, styleCount, paidDeposit, pendingBalance)
     }
@@ -79,7 +75,7 @@ struct MonthSelectorView: View {
 
         // 收集所有有数据的月份
         let monthsWithData = clothings.compactMap { clothing -> Int? in
-            guard let date = clothing.finalPaymentDate else { return nil }
+            guard let date = clothing.reservationGroupingDate else { return nil }
             return calendar.component(.month, from: date)
         }
 
@@ -106,14 +102,13 @@ struct MonthSelectorView: View {
 
         // 使用最近月份而不是当前月份
         let monthClothings = clothings.filter { clothing in
-            guard let start = clothing.finalPaymentDate else { return false }
+            guard let start = clothing.reservationGroupingDate else { return false }
             let m = calendar.component(.month, from: start)
             return m == recentMonth
         }
 
         let count = monthClothings.reduce(0) { $0 + $1.stock }
-        // 注意：totalBalance 已经包含了 stock 的乘法，所以这里直接使用，不要再乘 stock
-        let amount = monthClothings.reduce(0) { $0 + $1.totalBalance }
+        let amount = monthClothings.reduce(0) { $0 + $1.reservationListAmount }
 
         return (recentMonth, count, amount, count > 0)
     }
@@ -127,7 +122,7 @@ struct MonthSelectorView: View {
                 }
             } label: {
                 HStack {
-                    Text(isExpanded ? "年度预估尾款 (点我折叠)" : "年度预估尾款 (点我展开)")
+                    Text(isExpanded ? "年度预约 (点我折叠)" : "年度预约 (点我展开)")
                         .font(.subheadline)
                         .foregroundStyle(.primary)
                     Spacer()
@@ -252,7 +247,7 @@ struct RecentMonthCard: View {
             if stats.hasData {
                 HStack(spacing: 0) {
                     DepositStatItem(
-                        title: "待付件数",
+                        title: "预约件数",
                         value: "\(stats.count)",
                         valueColor: .primary
                     )
@@ -261,7 +256,7 @@ struct RecentMonthCard: View {
                         .frame(height: 30)
 
                     DepositStatItem(
-                        title: "待付尾款",
+                        title: "预约金额",
                         value: "¥\(NSDecimalNumber(decimal: stats.amount).stringValue)",
                         valueColor: Color(hex: "C94C72")
                     )
@@ -269,7 +264,7 @@ struct RecentMonthCard: View {
                 .padding(.horizontal, 8)
                 .padding(.vertical, 8)
             } else {
-                Text("暂无尾款数据")
+                Text("暂无预约数据")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .padding(.vertical, 12)

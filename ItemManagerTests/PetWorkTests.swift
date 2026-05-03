@@ -175,6 +175,52 @@ class PetWorkTests: XCTestCase {
         XCTAssertEqual(status.autoWorkRewardMode, .boneCoin)
     }
 
+    func testChatWorkSettlementProducesFishCoinWithoutViewModelTimer() {
+        let previous = PetDataManager.shared.status
+        addTeardownBlock {
+            PetDataManager.shared.saveStatus(previous)
+        }
+        let start = safeWorkStartDate()
+        var status = healthyStatus()
+        status.currentJob = .waiter
+        status.currentJobRewardCurrency = .fishCoin
+        status.jobStartTime = start
+        status.lastUpdateTime = start
+        status.lastDailyResetDate = start
+        PetDataManager.shared.saveStatus(status)
+
+        let settlement = settlePetWorkIncomeForChatIfNeeded(now: start.addingTimeInterval(60))
+        let saved = PetDataManager.shared.status
+
+        XCTAssertEqual(settlement.earnedAmount, 5)
+        XCTAssertEqual(saved.fishCoin, 5)
+        XCTAssertEqual(saved.dailyFishCoinEarned, 5)
+        XCTAssertEqual(saved.currentJobEarnedAmount, 5)
+    }
+
+    func testChatWorkSettlementProducesBoneCoinWithoutViewModelTimer() {
+        let previous = PetDataManager.shared.status
+        addTeardownBlock {
+            PetDataManager.shared.saveStatus(previous)
+        }
+        let start = safeWorkStartDate()
+        var status = healthyStatus()
+        status.currentJob = .security
+        status.currentJobRewardCurrency = .boneCoin
+        status.jobStartTime = start
+        status.lastUpdateTime = start
+        status.lastDailyResetDate = start
+        PetDataManager.shared.saveStatus(status)
+
+        let settlement = settlePetWorkIncomeForChatIfNeeded(now: start.addingTimeInterval(60))
+        let saved = PetDataManager.shared.status
+
+        XCTAssertEqual(settlement.earnedAmount, 10)
+        XCTAssertEqual(saved.boneCoin, 10)
+        XCTAssertEqual(saved.dailyBoneCoinEarned, 10)
+        XCTAssertEqual(saved.currentJobEarnedAmount, 10)
+    }
+
     func testFixedSleepSuspendsWorkWithoutCancellingJob() {
         viewModel.status.currentJob = .waiter
         viewModel.status.currentJobRewardCurrency = .fishCoin

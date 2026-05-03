@@ -25,6 +25,11 @@ struct PetWorkStopResult: Equatable {
     let message: String
 }
 
+struct PetWorkSettlementResult: Equatable {
+    let earnedAmount: Int
+    let didMutateStatus: Bool
+}
+
 enum PetWorkStateMachine {
     static func runtimeState(
         for status: PetStatus,
@@ -102,6 +107,7 @@ enum PetWorkStateMachine {
         )
         status.currentJob = job
         status.jobStartTime = now
+        status.lastUpdateTime = now
         status.currentJobStartedAutomatically = isAutomatic
         status.currentJobRewardCurrency = resolvedCurrency
         status.currentJobEarnedAmount = 0
@@ -204,6 +210,72 @@ enum PetWorkStateMachine {
 
         status.currentJobEarnedAmount += actualEarned
         return actualEarned
+    }
+
+    static func settleJobIncomeUntil(
+        _ now: Date,
+        in status: inout PetStatus,
+        forceSleepMinuteStart: Int = 45,
+        calendar: Calendar = .current
+    ) -> PetWorkSettlementResult {
+        var didMutateStatus = resetDailyQuotaIfNeeded(in: &status, at: now, calendar: calendar)
+
+        guard status.currentJob != .none else {
+            return PetWorkSettlementResult(earnedAmount: 0, didMutateStatus: didMutateStatus)
+        }
+
+        let settlementStart = max(status.lastUpdateTime, status.jobStartTime ?? status.lastUpdateTime)
+        guard settlementStart < now else {
+            return PetWorkSettlementResult(earnedAmount: 0, didMutateStatus: didMutateStatus)
+        }
+
+        let payableSeconds = payableWorkSeconds(
+            from: settlementStart,
+            to: now,
+            forceSleepMinuteStart: forceSleepMinuteStart,
+            calendar: calendar
+        )
+        let rawIncome = Int((payableSeconds * Double(status.currentJob.incomeRate) / 60.0).rounded(.down))
+        let earned = addJobIncome(rawIncome, currency: status.currentJobRewardCurrency, to: &status)
+        if earned > 0 {
+            status.lastUpdateTime = now
+            didMutateStatus = true
+        }
+
+        return PetWorkSettlementResult(earnedAmount: earned, didMutateStatus: didMutateStatus)
+    }
+
+    private static func resetDailyQuotaIfNeeded(
+        in status: inout PetStatus,
+        at now: Date,
+        calendar: Calendar
+    ) -> Bool {
+        guard !calendar.isDate(now, inSameDayAs: status.lastDailyResetDate) else { return false }
+        status.dailyFishCoinEarned = 0
+        status.dailyBoneCoinEarned = 0
+        status.lastDailyResetDate = now
+        return true
+    }
+
+    private static func payableWorkSeconds(
+        from start: Date,
+        to end: Date,
+        forceSleepMinuteStart: Int,
+        calendar: Calendar
+    ) -> TimeInterval {
+        guard start < end else { return 0 }
+
+        var cursor = start
+        var seconds: TimeInterval = 0
+        while cursor < end {
+            let next = min(cursor.addingTimeInterval(60), end)
+            let minute = calendar.component(.minute, from: next)
+            if minute < forceSleepMinuteStart {
+                seconds += next.timeIntervalSince(cursor)
+            }
+            cursor = next
+        }
+        return seconds
     }
 
     static func shouldStartAutoWork(

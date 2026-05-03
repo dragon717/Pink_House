@@ -214,15 +214,11 @@ struct DepositStatsView: View {
     }
     
     var paidDeposit: Decimal {
-        // Sum of totalDeposit for ALL clothings (Include accessories)
-        // 注意：totalDeposit 已经包含了 stock 的乘法，所以这里直接使用，不要再乘 stock
-        clothings.reduce(0) { $0 + $1.totalDeposit }
+        clothings.reduce(0) { $0 + $1.reservationPaidAmount }
     }
 
     var pendingBalance: Decimal {
-        // Sum of totalBalance for ALL clothings (Include accessories)
-        // 注意：totalBalance 已经包含了 stock 的乘法，所以这里直接使用，不要再乘 stock
-        clothings.reduce(0) { $0 + $1.totalBalance }
+        clothings.reduce(0) { $0 + $1.reservationListAmount }
     }
     
     var body: some View {
@@ -241,7 +237,7 @@ struct DepositStatsView: View {
                 Button {
                     onCountMoney?(pendingBalance)
                 } label: {
-                    statItem(title: "待付尾款", value: "¥\(NSDecimalNumber(decimal: pendingBalance).stringValue)", showIcon: true)
+                    statItem(title: "预约金额", value: "¥\(NSDecimalNumber(decimal: pendingBalance).stringValue)", showIcon: true)
                 }
                 .buttonStyle(.plain)
             }
@@ -356,7 +352,7 @@ struct YearStatsCard: View {
                     Divider()
                         .frame(height: 30)
                     
-                    DepositStatItem(title: "待付尾款", value: "¥\(NSDecimalNumber(decimal: stats.pendingBalance).stringValue)", valueColor: Color(hex: "C94C72"))
+                    DepositStatItem(title: "预约金额", value: "¥\(NSDecimalNumber(decimal: stats.pendingBalance).stringValue)", valueColor: Color(hex: "C94C72"))
                 }
                 .padding(.horizontal, 8)
                 .padding(.vertical, 12)

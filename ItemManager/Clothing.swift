@@ -47,6 +47,51 @@ enum ClothingStatus: String, Codable, CaseIterable, Identifiable {
     var id: Self { self }
 }
 
+enum ClothingReservationKind: String, Codable, CaseIterable, Identifiable {
+    case owned = "owned"
+    case fullPaymentReservation = "full_payment_reservation"
+    case depositPlan = "deposit_plan"
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .owned: return "已拥有"
+        case .fullPaymentReservation: return "全款预约"
+        case .depositPlan: return "定金尾款"
+        }
+    }
+}
+
+enum WealthSavingEntryKind: String, Codable {
+    case saving = "saving"
+    case finalPayment = "final_payment"
+}
+
+enum FinalPaymentMode: String, Codable, CaseIterable, Identifiable {
+    case oneTime = "one_time"
+    case installment = "installment"
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .oneTime: return "一次性付清"
+        case .installment: return "分期支付"
+        }
+    }
+}
+
+struct FinalPaymentRecordResult {
+    let paymentEntry: WealthSavingEntry
+    let paidOff: Bool
+    let paidAmount: Decimal
+    let deductedFromVault: Decimal
+    let externalPaymentAmount: Decimal
+    let paidTotal: Decimal
+    let remainingAmount: Decimal
+}
+
 @Model
 final class Clothing {
     var id: UUID = UUID()
@@ -90,6 +135,7 @@ final class Clothing {
     var isDepositPlan: Bool = false // 是否加入心愿尾款
     var finalPaymentDate: Date? = nil // 预估尾款时间（开始）
     var finalPaymentEndDate: Date? = nil // 预估尾款时间（结束）
+    var finalPaymentInstallmentCount: Int = 0 // v1.13+ 尾款分期期数，0 表示尚未选择
     var isFinalPaymentSavedToWealth: Bool = false // 是否已将尾款存入马上来财招财猫
     var finalPaymentSavedAt: Date? = nil // 尾款存入招财猫时间
     var note: String = ""
@@ -250,6 +296,46 @@ final class Clothing {
         return (balance + accBalance) * Decimal(stock)
     }
 
+    var reservationKind: ClothingReservationKind {
+        guard isDepositPlan else { return .owned }
+        return isFullPaymentReservation ? .fullPaymentReservation : .depositPlan
+    }
+
+    var isFullPaymentReservation: Bool {
+        isDepositPlan && deposit > 0 && balance == 0
+    }
+
+    var reservationGroupingDate: Date? {
+        switch reservationKind {
+        case .owned:
+            return nil
+        case .fullPaymentReservation:
+            return depositDate
+        case .depositPlan:
+            return finalPaymentDate
+        }
+    }
+
+    var fullPaymentReservationUnitAmount: Decimal {
+        isFullPaymentReservation ? deposit : 0
+    }
+
+    var fullPaymentReservationTotalAmount: Decimal {
+        isFullPaymentReservation ? totalDeposit : 0
+    }
+
+    var pendingFinalPaymentAmount: Decimal {
+        isFullPaymentReservation ? 0 : totalBalance
+    }
+
+    var reservationPaidAmount: Decimal {
+        isFullPaymentReservation ? 0 : totalDeposit
+    }
+
+    var reservationListAmount: Decimal {
+        isFullPaymentReservation ? fullPaymentReservationTotalAmount : pendingFinalPaymentAmount
+    }
+
     func copyCurrencyAndShippingMetadata(from source: Clothing) {
         originalPriceJPY = source.originalPriceJPY
         originalPriceCurrencyCode = source.originalPriceCurrencyCode
@@ -293,6 +379,13 @@ final class WealthSavingEntry {
     var clothingID: UUID? = nil
     var note: String = ""
     var migrationSource: String? = nil
+    var entryKind: String = WealthSavingEntryKind.saving.rawValue // v1.13+ saving / final_payment
+    var finalPaymentMode: String? = nil // v1.13+ one_time / installment
+    var installmentIndex: Int = 0 // v1.13+ 第几期，0 表示非尾款账单
+    var installmentCount: Int = 0 // v1.13+ 共几期，0 表示非尾款账单
+    var paidAt: Date? = nil // v1.13+ 尾款实付时间
+    var vaultDeductionAmount: Decimal = 0.0 // v1.13+ 本笔从小金库自动抵扣金额
+    var externalPaymentAmount: Decimal = 0.0 // v1.13+ 本笔小金库不足时的外部实付金额
     var createdAt: Date = Date()
     var updatedAt: Date = Date()
     var usedAt: Date? = nil
@@ -304,6 +397,13 @@ final class WealthSavingEntry {
         clothingID: UUID? = nil,
         note: String = "",
         migrationSource: String? = nil,
+        entryKind: WealthSavingEntryKind = .saving,
+        finalPaymentMode: FinalPaymentMode? = nil,
+        installmentIndex: Int = 0,
+        installmentCount: Int = 0,
+        paidAt: Date? = nil,
+        vaultDeductionAmount: Decimal = 0.0,
+        externalPaymentAmount: Decimal = 0.0,
         createdAt: Date = Date()
     ) {
         self.id = UUID()
@@ -311,9 +411,29 @@ final class WealthSavingEntry {
         self.clothingID = clothingID
         self.note = note
         self.migrationSource = migrationSource
+        self.entryKind = entryKind.rawValue
+        self.finalPaymentMode = finalPaymentMode?.rawValue
+        self.installmentIndex = installmentIndex
+        self.installmentCount = installmentCount
+        self.paidAt = paidAt
+        self.vaultDeductionAmount = vaultDeductionAmount
+        self.externalPaymentAmount = externalPaymentAmount
         self.createdAt = createdAt
         self.updatedAt = createdAt
         self.lastModified = createdAt
+    }
+
+    var kind: WealthSavingEntryKind {
+        get { WealthSavingEntryKind(rawValue: entryKind) ?? .saving }
+        set { entryKind = newValue.rawValue }
+    }
+
+    var paymentMode: FinalPaymentMode? {
+        get {
+            guard let finalPaymentMode else { return nil }
+            return FinalPaymentMode(rawValue: finalPaymentMode)
+        }
+        set { finalPaymentMode = newValue?.rawValue }
     }
 }
 
@@ -321,7 +441,11 @@ enum WealthSavingLedger {
     static let legacyFinalPaymentMigrationSource = "legacy.finalPaymentSavedToWealth"
 
     static func isActive(_ entry: WealthSavingEntry) -> Bool {
-        entry.amount > 0 && entry.usedAt == nil && entry.voidedAt == nil
+        entry.kind == .saving && entry.amount > 0 && entry.usedAt == nil && entry.voidedAt == nil
+    }
+
+    static func isFinalPaymentRecord(_ entry: WealthSavingEntry) -> Bool {
+        entry.kind == .finalPayment && entry.amount > 0 && entry.voidedAt == nil
     }
 
     static func activeTotal(in entries: [WealthSavingEntry]) -> Decimal {
@@ -342,7 +466,68 @@ enum WealthSavingLedger {
         }
     }
 
+    static func finalPaymentDueAmount(for clothing: Clothing) -> Decimal {
+        if clothing.isFullPaymentReservation {
+            return 0
+        }
+
+        if clothing.isDepositPlan || clothing.finalPaymentInstallmentCount > 0 || clothing.totalBalance > 0 {
+            let target = clothing.totalDeposit + clothing.totalBalance + clothing.resolvedShippingFee
+            let due = target - clothing.totalDeposit
+            if due > 0 { return due }
+        }
+        return assignableSavingCap(for: clothing)
+    }
+
+    static func finalPaymentRecords(for clothingID: UUID, in entries: [WealthSavingEntry]) -> [WealthSavingEntry] {
+        entries
+            .filter { isFinalPaymentRecord($0) && $0.clothingID == clothingID }
+            .sorted {
+                let leftDate = $0.paidAt ?? $0.createdAt
+                let rightDate = $1.paidAt ?? $1.createdAt
+                if leftDate != rightDate { return leftDate < rightDate }
+                return $0.installmentIndex < $1.installmentIndex
+            }
+    }
+
+    static func paidFinalPaymentTotal(for clothingID: UUID, in entries: [WealthSavingEntry]) -> Decimal {
+        finalPaymentRecords(for: clothingID, in: entries).reduce(Decimal(0)) { $0 + $1.amount }
+    }
+
+    static func remainingFinalPaymentAmount(for clothing: Clothing, entries: [WealthSavingEntry]) -> Decimal {
+        let remaining = finalPaymentDueAmount(for: clothing) - paidFinalPaymentTotal(for: clothing.id, in: entries)
+        return max(remaining, Decimal(0))
+    }
+
+    static func nextInstallmentIndex(for clothing: Clothing, entries: [WealthSavingEntry]) -> Int {
+        finalPaymentRecords(for: clothing.id, in: entries).count + 1
+    }
+
+    static func defaultInstallmentAmount(
+        for clothing: Clothing,
+        entries: [WealthSavingEntry],
+        installmentCount: Int
+    ) -> Decimal {
+        let remaining = remainingFinalPaymentAmount(for: clothing, entries: entries)
+        guard remaining > 0 else { return 0 }
+        let nextIndex = nextInstallmentIndex(for: clothing, entries: entries)
+        let remainingInstallments = max(installmentCount - nextIndex + 1, 1)
+        guard remainingInstallments > 1 else { return remaining }
+        return roundedCurrencyAmount(remaining / Decimal(remainingInstallments))
+    }
+
+    static func roundedCurrencyAmount(_ amount: Decimal) -> Decimal {
+        var value = amount
+        var result = Decimal()
+        NSDecimalRound(&result, &value, 2, .plain)
+        return result
+    }
+
     static func assignableSavingCap(for clothing: Clothing) -> Decimal {
+        if clothing.isFullPaymentReservation {
+            return 0
+        }
+
         let target = purchaseTarget(for: clothing)
         let cap: Decimal
         if clothing.isDepositPlan {
@@ -354,12 +539,16 @@ enum WealthSavingLedger {
     }
 
     static func remainingAssignableAmount(for clothing: Clothing, entries: [WealthSavingEntry]) -> Decimal {
-        let remaining = assignableSavingCap(for: clothing) - activeTotal(for: clothing.id, in: entries)
+        let remaining = assignableSavingCap(for: clothing)
+            - activeTotal(for: clothing.id, in: entries)
+            - paidFinalPaymentTotal(for: clothing.id, in: entries)
         return max(remaining, Decimal(0))
     }
 
     static func overflowAmount(for clothing: Clothing, entries: [WealthSavingEntry]) -> Decimal {
-        let overflow = activeTotal(for: clothing.id, in: entries) - assignableSavingCap(for: clothing)
+        let overflow = activeTotal(for: clothing.id, in: entries)
+            + paidFinalPaymentTotal(for: clothing.id, in: entries)
+            - assignableSavingCap(for: clothing)
         return max(overflow, Decimal(0))
     }
 
@@ -374,7 +563,9 @@ enum WealthSavingLedger {
 
     static func purchaseTarget(for clothing: Clothing) -> Decimal {
         let target: Decimal
-        if clothing.isDepositPlan {
+        if clothing.isFullPaymentReservation {
+            target = clothing.fullPaymentReservationTotalAmount
+        } else if clothing.isDepositPlan {
             target = clothing.totalDeposit + clothing.totalBalance + clothing.resolvedShippingFee
         } else {
             target = clothing.inventoryTotalPrice
@@ -390,8 +581,9 @@ enum WealthSavingLedger {
 
     static func progressNumerator(for clothing: Clothing, entries: [WealthSavingEntry]) -> Decimal {
         let saved = activeTotal(for: clothing.id, in: entries)
-        if clothing.isDepositPlan {
-            return clothing.totalDeposit + saved
+        let paid = paidFinalPaymentTotal(for: clothing.id, in: entries)
+        if clothing.isDepositPlan || paid > 0 || clothing.finalPaymentInstallmentCount > 0 {
+            return clothing.totalDeposit + saved + paid
         } else {
             return saved
         }
@@ -441,6 +633,93 @@ enum WealthSavingLedger {
             clothingID: clothing.id,
             note: note,
             context: context
+        )
+    }
+
+    @discardableResult
+    @MainActor
+    static func recordFinalPayment(
+        amount requestedAmount: Decimal,
+        for clothing: Clothing,
+        entries: [WealthSavingEntry],
+        mode: FinalPaymentMode,
+        installmentCount requestedInstallmentCount: Int? = nil,
+        context: ModelContext
+    ) throws -> FinalPaymentRecordResult? {
+        let remainingBefore = remainingFinalPaymentAmount(for: clothing, entries: entries)
+        guard remainingBefore > 0, requestedAmount > 0 else { return nil }
+
+        let now = Date()
+        let paidRecordsBefore = finalPaymentRecords(for: clothing.id, in: entries)
+        let planCount: Int
+        let installmentIndex: Int
+        switch mode {
+        case .oneTime:
+            planCount = clothing.finalPaymentInstallmentCount > 0 ? clothing.finalPaymentInstallmentCount : 1
+            installmentIndex = max(paidRecordsBefore.count + 1, 1)
+            if clothing.finalPaymentInstallmentCount <= 0 {
+                clothing.finalPaymentInstallmentCount = 1
+            }
+        case .installment:
+            let selectedCount = max(requestedInstallmentCount ?? clothing.finalPaymentInstallmentCount, 1)
+            planCount = selectedCount
+            clothing.finalPaymentInstallmentCount = selectedCount
+            installmentIndex = min(paidRecordsBefore.count + 1, selectedCount)
+        }
+
+        let shouldSettleRemaining = mode == .oneTime || installmentIndex >= planCount
+        let requestedForRecord = shouldSettleRemaining ? remainingBefore : requestedAmount
+        let actualAmount = min(roundedCurrencyAmount(requestedForRecord), remainingBefore)
+        guard actualAmount > 0 else { return nil }
+
+        let targetSavingEntries = entries
+            .filter { isActive($0) && $0.clothingID == clothing.id }
+            .sorted { $0.createdAt < $1.createdAt }
+        let deductedFromVault = consumeActiveSavingsForPayment(actualAmount, from: targetSavingEntries, at: now)
+        let externalAmount = max(actualAmount - deductedFromVault, Decimal(0))
+
+        let entry = WealthSavingEntry(
+            amount: actualAmount,
+            clothingID: clothing.id,
+            note: mode == .oneTime ? "一次性付清尾款" : "第\(installmentIndex)/\(planCount)期尾款支付",
+            entryKind: .finalPayment,
+            finalPaymentMode: mode,
+            installmentIndex: installmentIndex,
+            installmentCount: planCount,
+            paidAt: now,
+            vaultDeductionAmount: deductedFromVault,
+            externalPaymentAmount: externalAmount,
+            createdAt: now
+        )
+        context.insert(entry)
+
+        let paidTotal = paidFinalPaymentTotal(for: clothing.id, in: entries) + actualAmount
+        let remainingAfter = max(finalPaymentDueAmount(for: clothing) - paidTotal, Decimal(0))
+        let paidOff = remainingAfter <= 0
+
+        if paidOff {
+            moveAllActiveSavingsToUnassigned(
+                for: clothing.id,
+                clothingName: clothing.name,
+                entries: entries,
+                context: context,
+                at: now
+            )
+            markClothingFinalPaymentCompleted(clothing, at: now)
+        } else {
+            clothing.updatedAt = now
+            clothing.lastModified = now
+        }
+
+        try context.save()
+        return FinalPaymentRecordResult(
+            paymentEntry: entry,
+            paidOff: paidOff,
+            paidAmount: actualAmount,
+            deductedFromVault: deductedFromVault,
+            externalPaymentAmount: externalAmount,
+            paidTotal: paidTotal,
+            remainingAmount: remainingAfter
         )
     }
 
@@ -562,6 +841,76 @@ enum WealthSavingLedger {
         if didInsert {
             try? context.save()
         }
+    }
+
+    @MainActor
+    private static func markClothingFinalPaymentCompleted(_ clothing: Clothing, at date: Date) {
+        clothing.isDepositPlan = false
+        clothing.isFinalPaymentSavedToWealth = false
+        clothing.finalPaymentSavedAt = nil
+        clothing.depositDate = nil
+        clothing.finalPaymentDate = nil
+        clothing.finalPaymentEndDate = nil
+        clothing.updatedAt = date
+        clothing.lastModified = date
+    }
+
+    @MainActor
+    private static func moveAllActiveSavingsToUnassigned(
+        for clothingID: UUID,
+        clothingName: String,
+        entries: [WealthSavingEntry],
+        context: ModelContext,
+        at date: Date
+    ) {
+        let targetEntries = entries
+            .filter { isActive($0) && $0.clothingID == clothingID }
+            .sorted { $0.createdAt < $1.createdAt }
+        let amount = activeTotal(for: clothingID, in: targetEntries)
+        guard amount > 0 else { return }
+
+        for entry in targetEntries {
+            entry.voidedAt = date
+            entry.updatedAt = date
+            entry.lastModified = date
+        }
+
+        let unassigned = WealthSavingEntry(
+            amount: amount,
+            clothingID: nil,
+            note: "「\(clothingName)」已付清后转回未指定",
+            createdAt: date
+        )
+        context.insert(unassigned)
+    }
+
+    @MainActor
+    private static func consumeActiveSavingsForPayment(
+        _ amount: Decimal,
+        from entries: [WealthSavingEntry],
+        at date: Date
+    ) -> Decimal {
+        var remaining = amount
+        var consumed = Decimal(0)
+
+        for entry in entries where remaining > 0 && isActive(entry) {
+            let entryAmount = entry.amount
+            if entryAmount <= remaining {
+                entry.usedAt = date
+                entry.updatedAt = date
+                entry.lastModified = date
+                remaining -= entryAmount
+                consumed += entryAmount
+            } else {
+                entry.amount = entryAmount - remaining
+                entry.updatedAt = date
+                entry.lastModified = date
+                consumed += remaining
+                remaining = 0
+            }
+        }
+
+        return consumed
     }
 
     @MainActor

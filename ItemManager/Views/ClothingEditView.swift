@@ -57,6 +57,7 @@ struct ClothingEditDraft: Codable {
     let purchaseDate: Date
     let depositDate: Date
     let isDepositPlan: Bool
+    let reservationKindRawValue: String? // v1.14+ 三态预约模式，旧草稿按 isDepositPlan/deposit/balance 推导
     let finalPaymentDate: Date
     let finalPaymentEndDate: Date
     let note: String
@@ -91,6 +92,7 @@ struct ClothingEditDraft: Codable {
          purchaseDate: Date,
          depositDate: Date,
          isDepositPlan: Bool,
+         reservationKindRawValue: String? = nil,
          finalPaymentDate: Date,
          finalPaymentEndDate: Date,
          note: String,
@@ -123,6 +125,7 @@ struct ClothingEditDraft: Codable {
         self.purchaseDate = purchaseDate
         self.depositDate = depositDate
         self.isDepositPlan = isDepositPlan
+        self.reservationKindRawValue = reservationKindRawValue
         self.finalPaymentDate = finalPaymentDate
         self.finalPaymentEndDate = finalPaymentEndDate
         self.note = note
@@ -573,6 +576,7 @@ final class ClothingEditModel {
     var purchaseDate: Date = Date()
     var depositDate: Date = Date()
     var isDepositPlan: Bool = false
+    var reservationKind: ClothingReservationKind = .owned
     var finalPaymentDate: Date = Date()
     var finalPaymentEndDate: Date = Date()
     var note: String = ""
@@ -1301,6 +1305,14 @@ struct ClothingEditView: View {
         nonmutating set { editModel.isDepositPlan = newValue }
     }
 
+    private var reservationKind: ClothingReservationKind {
+        get { editModel.reservationKind }
+        nonmutating set {
+            editModel.reservationKind = newValue
+            editModel.isDepositPlan = newValue != .owned
+        }
+    }
+
     private var finalPaymentDate: Date {
         get { editModel.finalPaymentDate }
         nonmutating set { editModel.finalPaymentDate = newValue }
@@ -1361,6 +1373,7 @@ struct ClothingEditView: View {
             priceTotal: modelBinding(\.priceTotal),
             deposit: modelBinding(\.deposit),
             balance: modelBinding(\.balance),
+            reservationKind: modelBinding(\.reservationKind),
             accessoriesPrice: modelBinding(\.accessoriesPrice),
             shippingFee: modelBinding(\.shippingFee),
             shippingFeeJPY: modelBinding(\.shippingFeeJPY),
@@ -1401,7 +1414,7 @@ struct ClothingEditView: View {
         let stock: Int
         let purchaseDate: Date
         let depositDate: Date
-        let isDepositPlan: Bool
+        let reservationKind: ClothingReservationKind
         let finalPaymentDate: Date
         let finalPaymentEndDate: Date
         let note: String
@@ -1435,7 +1448,7 @@ struct ClothingEditView: View {
             stock: stock,
             purchaseDate: purchaseDate,
             depositDate: depositDate,
-            isDepositPlan: isDepositPlan,
+            reservationKind: reservationKind,
             finalPaymentDate: finalPaymentDate,
             finalPaymentEndDate: finalPaymentEndDate,
             note: note,
@@ -1451,7 +1464,7 @@ struct ClothingEditView: View {
         ClothingPurchaseInfoView(
             purchaseDate: modelBinding(\.purchaseDate),
             depositDate: modelBinding(\.depositDate),
-            isDepositPlan: modelBinding(\.isDepositPlan),
+            reservationKind: modelBinding(\.reservationKind),
             finalPaymentDate: modelBinding(\.finalPaymentDate),
             finalPaymentEndDate: modelBinding(\.finalPaymentEndDate),
             note: modelBinding(\.note)
@@ -1535,9 +1548,11 @@ struct ClothingEditView: View {
                     cancelPendingDraftPersistence()
                     // 标记为保存操作
                     isSaving = true
-                    // 保存前清除草稿
-                    clearCurrentDraftStorage()
-                    save()
+                    if save() {
+                        clearCurrentDraftStorage()
+                    } else {
+                        isSaving = false
+                    }
                 }
                 .disabled(name.isEmpty)
             }
@@ -1657,6 +1672,9 @@ struct ClothingEditView: View {
         }
         .onChange(of: balance) { oldValue, newValue in
             updateTotalPrice()
+        }
+        .onChange(of: reservationKind) { oldValue, newValue in
+            applyReservationKindChange(from: oldValue, to: newValue)
         }
     }
 
@@ -1781,7 +1799,7 @@ struct ClothingEditView: View {
         stock = c.stock
         purchaseDate = c.purchaseDate
         depositDate = c.depositDate ?? Date()
-        isDepositPlan = c.isDepositPlan
+        reservationKind = c.reservationKind
         finalPaymentDate = c.finalPaymentDate ?? Date()
         finalPaymentEndDate = c.finalPaymentEndDate ?? (c.finalPaymentDate ?? Date())
         note = c.note
@@ -1841,6 +1859,7 @@ struct ClothingEditView: View {
             purchaseDate: purchaseDate,
             depositDate: depositDate,
             isDepositPlan: isDepositPlan,
+            reservationKindRawValue: reservationKind.rawValue,
             finalPaymentDate: finalPaymentDate,
             finalPaymentEndDate: finalPaymentEndDate,
             note: note,
@@ -1923,7 +1942,8 @@ struct ClothingEditView: View {
         stock = draft.stock
         purchaseDate = draft.purchaseDate
         depositDate = draft.depositDate
-        isDepositPlan = draft.isDepositPlan
+        reservationKind = draft.reservationKindRawValue.flatMap(ClothingReservationKind.init(rawValue:))
+            ?? derivedReservationKind(isDepositPlan: draft.isDepositPlan, deposit: draft.deposit, balance: draft.balance)
         finalPaymentDate = draft.finalPaymentDate
         finalPaymentEndDate = draft.finalPaymentEndDate
         note = draft.note
@@ -1988,7 +2008,7 @@ struct ClothingEditView: View {
         stock = 1
         purchaseDate = Date()
         depositDate = Date()
-        isDepositPlan = false
+        reservationKind = .owned
         finalPaymentDate = Date()
         finalPaymentEndDate = Date()
         note = ""
@@ -2056,9 +2076,47 @@ struct ClothingEditView: View {
     }
 
     private func updateTotalPrice() {
+        guard reservationKind == .depositPlan else { return }
         // 定金和尾款都为0时，保留用户手动填的总价
         guard deposit > 0 || balance > 0 else { return }
         priceTotal = ClothingPriceHelper.shared.calculateTotal(deposit: deposit, balance: balance)
+    }
+
+    private var fullPaymentReservationUnitAmount: Double {
+        max(priceTotal + accessoriesPrice + shippingFee, 0)
+    }
+
+    private func derivedReservationKind(isDepositPlan: Bool, deposit: Double, balance: Double) -> ClothingReservationKind {
+        guard isDepositPlan else { return .owned }
+        return deposit > 0 && balance == 0 ? .fullPaymentReservation : .depositPlan
+    }
+
+    private func applyReservationKindChange(from oldValue: ClothingReservationKind, to newValue: ClothingReservationKind) {
+        isDepositPlan = newValue != .owned
+        switch newValue {
+        case .owned:
+            deposit = 0
+            balance = 0
+            clearAccessoryReservationAmounts()
+        case .fullPaymentReservation:
+            balance = 0
+            clearAccessoryReservationAmounts()
+        case .depositPlan:
+            if oldValue == .fullPaymentReservation {
+                deposit = 0
+                balance = 0
+            }
+        }
+    }
+
+    private func clearAccessoryReservationAmounts() {
+        guard accessoryList.contains(where: { $0.deposit != 0 || $0.balance != 0 }) else { return }
+        accessoryList = accessoryList.map { item in
+            var copy = item
+            copy.deposit = 0
+            copy.balance = 0
+            return copy
+        }
     }
 
 
@@ -2192,9 +2250,43 @@ struct ClothingEditView: View {
         }
     }
 
-    private func save() {
+    @discardableResult
+    private func save() -> Bool {
         syncCurrencyAmountsFromPreferredCurrency()
         updateTotalPrice()
+
+        let finalReservationKind = reservationKind
+        let finalIsDepositPlan = finalReservationKind != .owned
+        let finalFullPaymentUnitAmount = fullPaymentReservationUnitAmount
+        if finalReservationKind == .fullPaymentReservation, finalFullPaymentUnitAmount <= 0 {
+            showToastMessage("全款预约需要先填写裙装总价、小物或邮费", type: .error)
+            return false
+        }
+
+        let finalDeposit: Double
+        let finalBalance: Double
+        switch finalReservationKind {
+        case .owned:
+            finalDeposit = 0
+            finalBalance = 0
+        case .fullPaymentReservation:
+            finalDeposit = finalFullPaymentUnitAmount
+            finalBalance = 0
+        case .depositPlan:
+            finalDeposit = deposit
+            finalBalance = balance
+        }
+
+        let finalDepositDate: Date? = finalIsDepositPlan ? depositDate : nil
+        let finalPaymentStartDate: Date? = finalReservationKind == .depositPlan ? finalPaymentDate : nil
+        let finalPaymentEndDateValue: Date? = finalReservationKind == .depositPlan ? finalPaymentEndDate : nil
+        let finalAccessoryList = accessoryList.map { data -> AccessoryItemData in
+            guard finalReservationKind != .depositPlan else { return data }
+            var copy = data
+            copy.deposit = 0
+            copy.balance = 0
+            return copy
+        }
 
         let finalBrand = getOrCreateBrand(name: brandName)
         let finalTypes = normalizeTags(types)
@@ -2273,8 +2365,8 @@ struct ClothingEditView: View {
             c.shippingExchangeRateJPY = Decimal(effectiveJPYRate)
             c.shippingRateUpdatedAt = shippingRateUpdatedAt
             c.price = Decimal(priceTotal)
-            c.deposit = Decimal(deposit)
-            c.balance = Decimal(balance)
+            c.deposit = Decimal(finalDeposit)
+            c.balance = Decimal(finalBalance)
             c.accessoriesPrice = Decimal(accessoriesPrice)
 
             // Update accessory items
@@ -2285,7 +2377,7 @@ struct ClothingEditView: View {
                 }
             }
             // Create new items
-            let newItems = accessoryList.enumerated().map { index, data in
+            let newItems = finalAccessoryList.enumerated().map { index, data in
                 AccessoryItem(
                     name: data.name,
                     price: Decimal(data.price),
@@ -2298,16 +2390,19 @@ struct ClothingEditView: View {
             c.accessoryItems = newItems
 
             c.purchaseDate = purchaseDate
-            c.depositDate = depositDate
-            c.isDepositPlan = isDepositPlan
-            c.finalPaymentDate = finalPaymentDate
-            c.finalPaymentEndDate = finalPaymentEndDate
-            if wasDepositPlan && !isDepositPlan {
+            c.depositDate = finalDepositDate
+            c.isDepositPlan = finalIsDepositPlan
+            c.finalPaymentDate = finalPaymentStartDate
+            c.finalPaymentEndDate = finalPaymentEndDateValue
+            if wasDepositPlan && finalReservationKind != .depositPlan {
                 try? WealthSavingLedger.markActiveSavingsUsed(for: c.id, context: modelContext)
             }
-            if !isDepositPlan {
+            if !finalIsDepositPlan {
                 c.isFinalPaymentSavedToWealth = false
                 c.finalPaymentSavedAt = nil
+            }
+            if finalReservationKind != .depositPlan {
+                c.finalPaymentInstallmentCount = 0
             }
             c.note = note
             c.stock = stock
@@ -2349,8 +2444,8 @@ struct ClothingEditView: View {
                 originalPriceExchangeRateJPY: Decimal(effectiveJPYRate),
                 originalPriceRateUpdatedAt: originalPriceRateUpdatedAt,
                 price: Decimal(priceTotal),
-                deposit: Decimal(deposit),
-                balance: Decimal(balance),
+                deposit: Decimal(finalDeposit),
+                balance: Decimal(finalBalance),
                 accessoriesPrice: Decimal(accessoriesPrice),
                 shippingFee: Decimal(shippingFee),
                 shippingFeeJPY: Decimal(shippingFeeJPY),
@@ -2358,10 +2453,10 @@ struct ClothingEditView: View {
                 shippingExchangeRateJPY: Decimal(effectiveJPYRate),
                 shippingRateUpdatedAt: shippingRateUpdatedAt,
                 purchaseDate: purchaseDate,
-                depositDate: depositDate,
-                isDepositPlan: isDepositPlan,
-                finalPaymentDate: finalPaymentDate,
-                finalPaymentEndDate: finalPaymentEndDate,
+                depositDate: finalDepositDate,
+                isDepositPlan: finalIsDepositPlan,
+                finalPaymentDate: finalPaymentStartDate,
+                finalPaymentEndDate: finalPaymentEndDateValue,
                 note: note,
                 stock: stock
             )
@@ -2372,7 +2467,7 @@ struct ClothingEditView: View {
             newClothing.sizeChartImagePath = (newSizeChartPath?.isEmpty == true) ? nil : newSizeChartPath
             newClothing.priceChartImagePath = (newPriceChartPath?.isEmpty == true) ? nil : newPriceChartPath
 
-            let newItems = accessoryList.enumerated().map { index, data in
+            let newItems = finalAccessoryList.enumerated().map { index, data in
                 AccessoryItem(
                     name: data.name,
                     price: Decimal(data.price),
@@ -2407,9 +2502,12 @@ struct ClothingEditView: View {
             updateClothingCountCache()
         } catch {
             AppLogger.error("Failed to save context: \(error)")
+            showToastMessage("保存失败，请稍后重试", type: .error)
+            return false
         }
 
         dismiss()
+        return true
     }
 
     /// 更新衣物数量缓存，用于魔法任务进度实时显示

@@ -21,8 +21,10 @@ struct WardrobeCellSnapshot: Identifiable, Equatable, Sendable {
     let imagePaths: [String]
     let stock: Int
     let isDepositPlan: Bool
+    let isFullPaymentReservation: Bool
     let totalDeposit: Decimal
     let totalBalance: Decimal
+    let fullPaymentReservationTotalAmount: Decimal
     let inventoryTotalPrice: Decimal
     let is3DModel: Bool
     let model3DTypeDescription: String?
@@ -45,8 +47,10 @@ struct WardrobeCellSnapshot: Identifiable, Equatable, Sendable {
         self.imagePaths = clothing.imagePaths
         self.stock = clothing.stock
         self.isDepositPlan = clothing.isDepositPlan
+        self.isFullPaymentReservation = clothing.isFullPaymentReservation
         self.totalDeposit = clothing.totalDeposit
         self.totalBalance = clothing.totalBalance
+        self.fullPaymentReservationTotalAmount = clothing.fullPaymentReservationTotalAmount
         self.inventoryTotalPrice = clothing.inventoryTotalPrice
         self.is3DModel = clothing.is3DModel
         self.model3DTypeDescription = clothing.model3DTypeDescription
@@ -374,7 +378,7 @@ struct ClothingCard: View, Equatable {
                     
                     if snapshot.isDepositPlan {
                         wardrobeCellBadge(
-                            text: "心愿尾款",
+                            text: snapshot.isFullPaymentReservation ? "全款预约" : "心愿尾款",
                             tint: Color(hex: "7A5A54"),
                             icon: "heart.fill"
                         )
@@ -442,16 +446,24 @@ struct ClothingCard: View, Equatable {
                         
                         if showPrice {
                             if snapshot.isDepositPlan {
-                                let totalDeposit = snapshot.totalDeposit
-                                let totalBalance = snapshot.totalBalance
-                                HStack(spacing: 4) {
-                                    Text("定金¥\(totalDeposit, format: .number.precision(.fractionLength(0)))")
-                                    Text("尾款¥\(totalBalance, format: .number.precision(.fractionLength(0)))")
+                                if snapshot.isFullPaymentReservation {
+                                    Text("全款¥\(snapshot.fullPaymentReservationTotalAmount, format: .number.precision(.fractionLength(0)))")
+                                        .font(.system(size: 11, weight: .bold))
+                                        .foregroundStyle(palette.accent)
+                                        .lineLimit(1)
+                                        .minimumScaleFactor(0.8)
+                                } else {
+                                    let totalDeposit = snapshot.totalDeposit
+                                    let totalBalance = snapshot.totalBalance
+                                    HStack(spacing: 4) {
+                                        Text("定金¥\(totalDeposit, format: .number.precision(.fractionLength(0)))")
+                                        Text("尾款¥\(totalBalance, format: .number.precision(.fractionLength(0)))")
+                                    }
+                                    .font(.system(size: 11, weight: .bold))
+                                    .foregroundStyle(palette.accent)
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.8)
                                 }
-                                .font(.system(size: 11, weight: .bold))
-                                .foregroundStyle(palette.accent)
-                                .lineLimit(1)
-                                .minimumScaleFactor(0.8)
                             } else {
                                 let totalWithAccessories = snapshot.inventoryTotalPrice
                                 Text("¥\(totalWithAccessories, format: .number.precision(.fractionLength(2)))")
@@ -745,7 +757,7 @@ struct ClothingRow: View, Equatable {
                 }
                 .overlay(alignment: .topTrailing) {
                     if snapshot.isDepositPlan {
-                        Text("尾款")
+                        Text(snapshot.isFullPaymentReservation ? "全款" : "尾款")
                             .font(.system(size: 10, weight: .bold))
                             .foregroundStyle(.white)
                             .padding(.horizontal, 4)
@@ -801,17 +813,27 @@ struct ClothingRow: View, Equatable {
                     
                     if showPrice {
                         if snapshot.isDepositPlan {
-                            // 注意：totalDeposit 和 totalBalance 已经包含了 stock 的乘法，所以这里直接使用
-                            let totalDeposit = snapshot.totalDeposit
-                            let totalBalance = snapshot.totalBalance
+                            if snapshot.isFullPaymentReservation {
+                                Text("全款预约")
+                                    .font(.caption2)
+                                    .foregroundStyle(rowAccentColor)
+                                Text("¥\(snapshot.fullPaymentReservationTotalAmount, format: .number.precision(.fractionLength(0)))")
+                                    .font(.caption)
+                                    .bold()
+                                    .foregroundStyle(rowAccentColor)
+                            } else {
+                                // 注意：totalDeposit 和 totalBalance 已经包含了 stock 的乘法，所以这里直接使用
+                                let totalDeposit = snapshot.totalDeposit
+                                let totalBalance = snapshot.totalBalance
 
-                            Text("定金: ¥\(totalDeposit, format: .number.precision(.fractionLength(0)))")
-                                .font(.caption)
-                                .foregroundStyle(rowAccentColor)
-                            Text("尾款: ¥\(totalBalance, format: .number.precision(.fractionLength(0)))")
-                                .font(.caption)
-                                .bold()
-                                .foregroundStyle(rowAccentColor)
+                                Text("定金: ¥\(totalDeposit, format: .number.precision(.fractionLength(0)))")
+                                    .font(.caption)
+                                    .foregroundStyle(rowAccentColor)
+                                Text("尾款: ¥\(totalBalance, format: .number.precision(.fractionLength(0)))")
+                                    .font(.caption)
+                                    .bold()
+                                    .foregroundStyle(rowAccentColor)
+                            }
                         } else {
                             let totalWithAccessories = snapshot.inventoryTotalPrice
                             
@@ -998,8 +1020,9 @@ struct ClothingRowBrief: View, Equatable {
 
                 if showPrice {
                     if snapshot.isDepositPlan {
-                        // 注意：totalDeposit 和 totalBalance 已经包含了 stock 的乘法，所以这里直接使用
-                        Text("定金¥\(snapshot.totalDeposit, format: .number.precision(.fractionLength(0)))+尾款¥\(snapshot.totalBalance, format: .number.precision(.fractionLength(0)))")
+                        Text(snapshot.isFullPaymentReservation
+                             ? "全款¥\(snapshot.fullPaymentReservationTotalAmount.formatted(.number.precision(.fractionLength(0))))"
+                             : "定金¥\(snapshot.totalDeposit.formatted(.number.precision(.fractionLength(0))))+尾款¥\(snapshot.totalBalance.formatted(.number.precision(.fractionLength(0))))")
                             .font(.caption)
                             .bold()
                             .foregroundStyle(rowAccentColor)

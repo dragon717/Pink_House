@@ -18,7 +18,7 @@ struct ClothingDetailView: View {
     @State private var showingEditSheet = false
     @State private var showingImageViewer = false
     @State private var showingDeleteAlert = false
-    @State private var showingConfirmPaymentAlert = false
+    @State private var showingFinalPaymentSheet = false
     @State private var showCelebration = false
     @State private var currentImageIndex = 0
     @State private var showingShareSheet = false
@@ -77,16 +77,24 @@ struct ClothingDetailView: View {
                             .padding(.horizontal)
                             .offset(y: -40)
 
-                        finalPaymentWealthCard
-                            .padding(.horizontal)
-                            .offset(y: -40)
+                        if shouldShowFinalPaymentStatusCard {
+                            finalPaymentStatusCard
+                                .padding(.horizontal)
+                                .offset(y: -40)
+                        }
+
+                        if shouldShowFinalPaymentVaultCard {
+                            finalPaymentWealthCard
+                                .padding(.horizontal)
+                                .offset(y: -40)
+                        }
                         
                         // MARK: - Pay Balance Button
-                        if clothing.isDepositPlan {
+                        if clothing.reservationKind == .depositPlan && WealthSavingLedger.finalPaymentDueAmount(for: clothing) > 0 {
                             Button {
-                                showingConfirmPaymentAlert = true
+                                showingFinalPaymentSheet = true
                             } label: {
-                                Text("已付尾款")
+                                Text("记录已付尾款")
                             }
                             .buttonStyle(ThemeSkinPrimaryButtonStyle(fallbackTint: .pink, cornerRadius: 16, verticalPadding: 15))
                             .padding(.horizontal)
@@ -223,6 +231,13 @@ struct ClothingDetailView: View {
                 onSave: saveWealthSavingAmount
             )
         }
+        .sheet(isPresented: $showingFinalPaymentSheet) {
+            FinalPaymentRecordingSheet(
+                clothing: clothing,
+                wealthSavingEntries: wealthSavingEntries,
+                onRecord: recordFinalPayment
+            )
+        }
         .alert("确认删除", isPresented: $showingDeleteAlert) {
             Button("取消", role: .cancel) { }
             Button("删除", role: .destructive) {
@@ -253,14 +268,6 @@ struct ClothingDetailView: View {
         } message: {
             Text("确定要删除这件裙装吗？它将被移动到回收站，你可以随时恢复。")
         }
-        .alert("确认已付尾款", isPresented: $showingConfirmPaymentAlert) {
-            Button("取消", role: .cancel) { }
-            Button("确认", role: .none) {
-                confirmPayment()
-            }
-        } message: {
-            Text("确认后将移除心愿尾款，并清空定金和预估尾款时间信息。")
-        }
         .onAppear {
             WealthSavingLedger.migrateLegacySavedFinalPayments(
                 clothings: [clothing],
@@ -268,7 +275,7 @@ struct ClothingDetailView: View {
                 context: modelContext
             )
             // 进入详情页时，若定金和尾款 存在，自动重算总价并保存
-            if clothing.deposit > 0 || clothing.balance > 0 {
+            if clothing.reservationKind == .depositPlan && (clothing.deposit > 0 || clothing.balance > 0) {
                 let newTotal = clothing.deposit + clothing.balance
                 if clothing.price != newTotal {
                     clothing.price = newTotal
@@ -291,32 +298,42 @@ struct ClothingDetailView: View {
         }
     }
     
-    private func confirmPayment() {
+    private func recordFinalPayment(
+        mode: FinalPaymentMode,
+        amount: Decimal,
+        installmentCount: Int?
+    ) {
+        do {
+            guard let result = try WealthSavingLedger.recordFinalPayment(
+                amount: amount,
+                for: clothing,
+                entries: wealthSavingEntries,
+                mode: mode,
+                installmentCount: installmentCount,
+                context: modelContext
+            ) else { return }
+
+            if clothing.price == 0 {
+                clothing.price = clothing.deposit + clothing.balance
+                try? modelContext.save()
+            }
+
+            if result.paidOff {
+                finalizeFinalPaymentAfterPaidOff()
+            } else {
+                Task { await SharedPersistence.shared.syncWidgetData(reason: "final-payment-partial-recorded") }
+                wealthSavingCelebrationAmount = result.paidAmount
+            }
+        } catch {
+            print("ClothingDetailView: Failed to record final payment: \(error)")
+        }
+    }
+
+    private func finalizeFinalPaymentAfterPaidOff() {
         // Cancel notification since it's no longer a deposit plan
         NotificationManager.shared.cancelNotification(for: clothing)
         NotificationManager.shared.handlePaymentConfirmed(for: clothing.id, modelContext: modelContext)
-        
-        // Calculate total price if currently 0
-        if clothing.price == 0 {
-            clothing.price = clothing.deposit + clothing.balance
-        }
 
-        WealthSavingLedger.markActiveSavingsUsed(
-            for: clothing.id,
-            entries: wealthSavingEntries
-        )
-        
-        clothing.isDepositPlan = false
-        clothing.isFinalPaymentSavedToWealth = false
-        clothing.finalPaymentSavedAt = nil
-        clothing.depositDate = nil
-        clothing.finalPaymentDate = nil
-        clothing.finalPaymentEndDate = nil
-        let now = Date()
-        clothing.updatedAt = now
-        clothing.lastModified = now
-        // Try to save context (though it autosaves usually)
-        try? modelContext.save()
         Task { @MainActor in
             await NotificationManager.shared.refreshAllKnownDepositNotifications(
                 modelContext: modelContext,
@@ -325,14 +342,14 @@ struct ClothingDetailView: View {
             )
         }
         NotificationManager.shared.updateApplicationBadge(modelContext: modelContext)
-        Task { await SharedPersistence.shared.syncWidgetData() }
-        
+        Task { await SharedPersistence.shared.syncWidgetData(reason: "final-payment-paid-off") }
+
         // Trigger Celebration Effect
         if isPayBalanceCelebrationEnabled {
             showCelebration = true
         }
-        
-        // Trigger Reward
+
+        // Trigger Reward only after cumulative payment is fully settled.
         RewardManager.shared.triggerReward(type: .payBalance)
     }
     
@@ -558,7 +575,7 @@ struct ClothingDetailView: View {
                     HStack(spacing: 2) {
                         Image(systemName: "checkmark.circle.fill")
                             .font(.caption2)
-                        Text("心愿尾款")
+                        Text(clothing.isFullPaymentReservation ? "全款预约" : "心愿尾款")
                             .font(.caption)
                             .bold()
                     }
@@ -704,7 +721,12 @@ struct ClothingDetailView: View {
                 }
             }
             
-            if clothing.isDepositPlan {
+            if clothing.isFullPaymentReservation {
+                InfoRow(label: "全款预约金额", value: "¥\(clothing.fullPaymentReservationTotalAmount.formatted(.number.precision(.fractionLength(0))))")
+                if clothing.stock > 1 {
+                    InfoRow(label: "单件预约金额", value: "¥\(clothing.fullPaymentReservationUnitAmount.formatted(.number.precision(.fractionLength(0))))")
+                }
+            } else if clothing.reservationKind == .depositPlan {
                 // Show total deposit/balance including accessories
                 InfoRow(label: "总定金", value: "¥\(clothing.totalDeposit.formatted(.number.precision(.fractionLength(0))))")
                 InfoRow(label: "总尾款", value: "¥\(clothing.totalBalance.formatted(.number.precision(.fractionLength(0))))")
@@ -756,7 +778,7 @@ struct ClothingDetailView: View {
                             }
                             
                             // Show deposit/balance for accessory if it exists
-                            if item.deposit > 0 || item.balance > 0 {
+                            if clothing.reservationKind == .depositPlan && (item.deposit > 0 || item.balance > 0) {
                                 HStack {
                                     if item.deposit > 0 {
                                         Text("定金: ¥\(item.deposit.formatted(.number.precision(.fractionLength(0...2))))")
@@ -777,12 +799,12 @@ struct ClothingDetailView: View {
             }
             
             HStack {
-                Label("合计金额（含邮）", systemImage: "star.circle.fill")
+                Label(clothing.isFullPaymentReservation ? "全款预约总额" : "合计金额（含邮）", systemImage: "star.circle.fill")
                     .font(.subheadline)
                     .unifiedSecondary()
                 Spacer()
                 
-                let totalAll = clothing.inventoryTotalPrice
+                let totalAll = clothing.isFullPaymentReservation ? clothing.fullPaymentReservationTotalAmount : clothing.inventoryTotalPrice
                 
                 Text("¥\(totalAll.formatted(.number.precision(.fractionLength(0))))")
                     .font(.title3)
@@ -793,7 +815,7 @@ struct ClothingDetailView: View {
             .background(themeManager.secondaryTextColor.opacity(0.1))
             .cornerRadius(12)
             
-            if clothing.stock > 1 {
+            if clothing.stock > 1 && !clothing.isFullPaymentReservation {
                 Text("包含 \(clothing.stock) 件库存，单套价值 ¥\(clothing.unitTotalPrice.formatted(.number.precision(.fractionLength(0))))；邮费不随库存倍增")
                     .font(.caption)
                     .unifiedTertiary()
@@ -816,8 +838,124 @@ struct ClothingDetailView: View {
         }
     }
 
+    private var finalPaymentRecords: [WealthSavingEntry] {
+        WealthSavingLedger.finalPaymentRecords(for: clothing.id, in: wealthSavingEntries)
+    }
+
+    private var finalPaymentInstallmentTotal: Int {
+        let recordedTotal = finalPaymentRecords.map(\.installmentCount).max() ?? 0
+        let savedTotal = max(clothing.finalPaymentInstallmentCount, recordedTotal)
+        if savedTotal > 0 { return savedTotal }
+        if finalPaymentRecords.contains(where: { $0.paymentMode == .oneTime }) { return 1 }
+        return max(finalPaymentRecords.count, 1)
+    }
+
+    private var shouldShowFinalPaymentStatusCard: Bool {
+        guard !clothing.isFullPaymentReservation else { return false }
+        return clothing.reservationKind == .depositPlan ||
+            clothing.finalPaymentInstallmentCount > 0 ||
+            !finalPaymentRecords.isEmpty
+    }
+
+    private var shouldShowFinalPaymentVaultCard: Bool {
+        guard clothing.reservationKind == .depositPlan else { return false }
+        return WealthSavingLedger.remainingFinalPaymentAmount(for: clothing, entries: wealthSavingEntries) > 0
+    }
+
+    private var finalPaymentStatusCard: some View {
+        let paid = WealthSavingLedger.paidFinalPaymentTotal(for: clothing.id, in: wealthSavingEntries)
+        let due = WealthSavingLedger.finalPaymentDueAmount(for: clothing)
+        let remaining = WealthSavingLedger.remainingFinalPaymentAmount(for: clothing, entries: wealthSavingEntries)
+        let vaultBalance = WealthSavingLedger.activeTotal(for: clothing.id, in: wealthSavingEntries)
+        let total = finalPaymentInstallmentTotal
+        let nextIndex = min(WealthSavingLedger.nextInstallmentIndex(for: clothing, entries: wealthSavingEntries), total)
+        let isPaidOff = due > 0 && remaining <= 0
+
+        return VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .center, spacing: 10) {
+                Image(systemName: isPaidOff ? "checkmark.seal.fill" : "creditcard.fill")
+                    .font(.title3.weight(.bold))
+                    .foregroundStyle(isPaidOff ? .green : Color(hex: "C94C72"))
+                    .frame(width: 38, height: 38)
+                    .background((isPaidOff ? Color.green : Color(hex: "C94C72")).opacity(0.12))
+                    .clipShape(Circle())
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("尾款支付进度")
+                        .font(.headline)
+                        .foregroundStyle(themeManager.primaryTextColor)
+                    Text(finalPaymentStatusSubtitle(total: total, paidOff: isPaidOff))
+                        .font(.caption)
+                        .foregroundStyle(themeManager.secondaryTextColor)
+                }
+
+                Spacer()
+
+                Text(isPaidOff ? "已付清" : "剩余 ¥\(moneyString(remaining))")
+                    .font(.caption.weight(.bold))
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .foregroundStyle(isPaidOff ? .green : Color(hex: "C94C72"))
+                    .background((isPaidOff ? Color.green : Color(hex: "C94C72")).opacity(0.12), in: Capsule())
+            }
+
+            FinalPaymentSegmentedProgressView(
+                total: total,
+                completed: finalPaymentRecords.count,
+                activeIndex: isPaidOff ? nil : nextIndex,
+                accent: Color(hex: "C94C72"),
+                completedColor: .green
+            )
+
+            HStack(spacing: 0) {
+                finalPaymentMetric(title: "已付", value: "¥\(moneyString(paid))", color: .green)
+                Divider().frame(height: 34)
+                finalPaymentMetric(title: "剩余", value: "¥\(moneyString(remaining))", color: Color(hex: "C94C72"))
+                Divider().frame(height: 34)
+                finalPaymentMetric(title: isPaidOff ? "账单" : "可抵扣", value: isPaidOff ? "\(finalPaymentRecords.count) 笔" : "¥\(moneyString(vaultBalance))", color: .orange)
+            }
+            .padding(12)
+            .background(Color.secondary.opacity(0.06), in: RoundedRectangle(cornerRadius: 16))
+
+            if !finalPaymentRecords.isEmpty {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("最近账单")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(themeManager.secondaryTextColor)
+                    ForEach(Array(finalPaymentRecords.suffix(3).reversed())) { entry in
+                        HStack(spacing: 8) {
+                            Text(entry.paymentMode == .installment ? "第 \(entry.installmentIndex)/\(entry.installmentCount) 期" : "一次性")
+                                .font(.caption.weight(.bold))
+                                .foregroundStyle(Color(hex: "C94C72"))
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                                .background(Color(hex: "C94C72").opacity(0.10), in: Capsule())
+                            Text("¥\(moneyString(entry.amount))")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(themeManager.primaryTextColor)
+                            Spacer()
+                            Text(entry.paidAt?.formatted(date: .numeric, time: .omitted) ?? "已记录")
+                                .font(.caption2)
+                                .foregroundStyle(themeManager.tertiaryTextColor)
+                        }
+                    }
+                }
+            }
+
+            if isPaidOff {
+                Text("尾款已付清，小金库入口已收起；若有剩余备款已转回未指定小匣。")
+                    .font(.caption2)
+                    .foregroundStyle(themeManager.tertiaryTextColor)
+            }
+        }
+        .padding()
+        .themeSkinSectionCard(cornerRadius: 18)
+    }
+
     private var finalPaymentWealthCard: some View {
         let saved = WealthSavingLedger.activeTotal(for: clothing.id, in: wealthSavingEntries)
+        let paid = WealthSavingLedger.paidFinalPaymentTotal(for: clothing.id, in: wealthSavingEntries)
+        let remainingPayment = WealthSavingLedger.remainingFinalPaymentAmount(for: clothing, entries: wealthSavingEntries)
         let numerator = WealthSavingLedger.progressNumerator(for: clothing, entries: wealthSavingEntries)
         let target = WealthSavingLedger.purchaseTarget(for: clothing)
         let cap = WealthSavingLedger.assignableSavingCap(for: clothing)
@@ -826,7 +964,7 @@ struct ClothingDetailView: View {
         let ratio = WealthSavingLedger.progressRatio(for: clothing, entries: wealthSavingEntries)
 
         return VStack(alignment: .leading, spacing: 12) {
-            Label("小金库存钱进度", systemImage: "tray.and.arrow.down.fill")
+            Label("可抵扣小金库", systemImage: "tray.and.arrow.down.fill")
                 .font(.headline)
                 .unifiedPrimary()
 
@@ -839,10 +977,10 @@ struct ClothingDetailView: View {
                     .clipShape(Circle())
 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(saved > 0 ? "已存 ¥\(NSDecimalNumber(decimal: saved).stringValue)" : "为这条裙装存一笔")
+                    Text(paid > 0 ? "已付 ¥\(NSDecimalNumber(decimal: paid).stringValue) · 剩余 ¥\(NSDecimalNumber(decimal: remainingPayment).stringValue)" : (saved > 0 ? "可抵扣 ¥\(NSDecimalNumber(decimal: saved).stringValue)" : "为这条裙装存一笔"))
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(themeManager.primaryTextColor)
-                    Text(clothing.isDepositPlan ? "进度包含已付定金，存款最多补齐剩余应付" : "普通裙装只统计小金库存款进度")
+                    Text("小金库只作为尾款抵扣资金；实付进度见上方分期卡片")
                         .font(.caption)
                         .foregroundStyle(themeManager.secondaryTextColor)
                 }
@@ -864,6 +1002,9 @@ struct ClothingDetailView: View {
                 Text("指定上限 ¥\(NSDecimalNumber(decimal: cap).stringValue) · 还能存 ¥\(NSDecimalNumber(decimal: remaining).stringValue)")
                     .font(.caption2)
                     .foregroundStyle(remaining > 0 ? themeManager.tertiaryTextColor : Color(hex: "C94C72"))
+                Text("已付尾款 ¥\(NSDecimalNumber(decimal: paid).stringValue) · 剩余尾款 ¥\(NSDecimalNumber(decimal: remainingPayment).stringValue) · 可抵扣 ¥\(NSDecimalNumber(decimal: saved).stringValue)")
+                    .font(.caption2)
+                    .foregroundStyle(themeManager.tertiaryTextColor)
             }
 
             Button {
@@ -891,6 +1032,35 @@ struct ClothingDetailView: View {
         }
         .padding()
         .themeSkinSectionCard(cornerRadius: 16)
+    }
+
+    private func finalPaymentStatusSubtitle(total: Int, paidOff: Bool) -> String {
+        if paidOff {
+            return "尾款已完成，分期账单会保留在详情页"
+        }
+        if total > 1 {
+            return "分期 \(finalPaymentRecords.count)/\(total)，每一期是一段短进度"
+        }
+        return "可一次性付清，也可选择分期后逐期记录"
+    }
+
+    private func finalPaymentMetric(title: String, value: String, color: Color) -> some View {
+        VStack(spacing: 5) {
+            Text(title)
+                .font(.caption2)
+                .foregroundStyle(themeManager.secondaryTextColor)
+            Text(value)
+                .font(.caption.weight(.bold))
+                .foregroundStyle(color)
+                .monospacedDigit()
+                .lineLimit(1)
+                .minimumScaleFactor(0.65)
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    private func moneyString(_ value: Decimal) -> String {
+        NSDecimalNumber(decimal: value).stringValue
     }
 
     private var finalPaymentSavedText: String {
@@ -940,7 +1110,11 @@ struct ClothingDetailView: View {
             
             InfoRow(label: "购买日期", value: clothing.purchaseDate.formatted(.dateTime.year().month().day().locale(Locale(identifier: "zh_CN"))))
             
-            if clothing.isDepositPlan {
+            if clothing.isFullPaymentReservation {
+                if let reservationDate = clothing.depositDate {
+                    InfoRow(label: "全款预约日期", value: reservationDate.formatted(.dateTime.year().month().day().locale(Locale(identifier: "zh_CN"))))
+                }
+            } else if clothing.reservationKind == .depositPlan {
                 if let depositDate = clothing.depositDate {
                     InfoRow(label: "定金日期", value: depositDate.formatted(.dateTime.year().month().day().locale(Locale(identifier: "zh_CN"))))
                 }
@@ -998,6 +1172,402 @@ struct ClothingDetailView: View {
     }
 }
 
+struct FinalPaymentSegmentedProgressView: View {
+    let total: Int
+    let completed: Int
+    var activeIndex: Int? = nil
+    var accent: Color = Color(hex: "C94C72")
+    var completedColor: Color = .green
+    var height: CGFloat = 7
+
+    @State private var isAnimated = false
+
+    private var safeTotal: Int { max(total, 1) }
+
+    private var segmentWidth: CGFloat {
+        switch safeTotal {
+        case 1...3: return 44
+        case 4...6: return 34
+        default: return 26
+        }
+    }
+
+    var body: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 7) {
+                ForEach(1...safeTotal, id: \.self) { index in
+                    segment(index: index)
+                }
+            }
+            .padding(.vertical, 2)
+        }
+        .accessibilityLabel("尾款分期进度 \(min(completed, safeTotal)) / \(safeTotal)")
+        .onAppear(perform: restartAnimation)
+        .onChange(of: completed) { _, _ in restartAnimation() }
+        .onChange(of: total) { _, _ in restartAnimation() }
+        .onChange(of: activeIndex) { _, _ in restartAnimation() }
+    }
+
+    private func segment(index: Int) -> some View {
+        let isComplete = index <= completed
+        let isActive = activeIndex == index && !isComplete
+        let fillScale: CGFloat = isComplete ? 1.0 : (isActive ? 0.34 : 0.0)
+        let fillColor = isComplete ? completedColor : accent
+
+        return ZStack(alignment: .leading) {
+            Capsule()
+                .fill(Color.secondary.opacity(isActive ? 0.18 : 0.12))
+            Capsule()
+                .fill(fillColor)
+                .scaleEffect(x: isAnimated ? fillScale : 0.0, y: 1, anchor: .leading)
+                .opacity(fillScale > 0 ? 1 : 0)
+            if isActive {
+                Capsule()
+                    .stroke(accent.opacity(0.58), lineWidth: 1.2)
+            }
+        }
+        .frame(width: segmentWidth, height: height)
+        .animation(
+            .spring(response: 0.42, dampingFraction: 0.82)
+                .delay(Double(index - 1) * 0.045),
+            value: isAnimated
+        )
+    }
+
+    private func restartAnimation() {
+        isAnimated = false
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.04) {
+            isAnimated = true
+        }
+    }
+}
+
+struct FinalPaymentRecordingSheet: View {
+    let clothing: Clothing
+    let wealthSavingEntries: [WealthSavingEntry]
+    let onRecord: (FinalPaymentMode, Decimal, Int?) -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @Environment(ThemeManager.self) private var themeManager
+    @State private var mode: FinalPaymentMode = .oneTime
+    @State private var selectedInstallmentCount: Int?
+    @State private var amountText: String = ""
+
+    private let installmentOptions = [2, 3, 4, 6, 12]
+
+    private var totalDue: Decimal {
+        WealthSavingLedger.finalPaymentDueAmount(for: clothing)
+    }
+
+    private var paidTotal: Decimal {
+        WealthSavingLedger.paidFinalPaymentTotal(for: clothing.id, in: wealthSavingEntries)
+    }
+
+    private var paidRatio: Double {
+        guard totalDue > 0 else { return 0 }
+        return min(NSDecimalNumber(decimal: paidTotal / totalDue).doubleValue, 1.0)
+    }
+
+    private var remainingAmount: Decimal {
+        WealthSavingLedger.remainingFinalPaymentAmount(for: clothing, entries: wealthSavingEntries)
+    }
+
+    private var vaultBalance: Decimal {
+        WealthSavingLedger.activeTotal(for: clothing.id, in: wealthSavingEntries)
+    }
+
+    private var paidRecords: [WealthSavingEntry] {
+        WealthSavingLedger.finalPaymentRecords(for: clothing.id, in: wealthSavingEntries)
+    }
+
+    private var effectiveInstallmentCount: Int? {
+        guard mode == .installment else { return nil }
+        if clothing.finalPaymentInstallmentCount > 0 {
+            return clothing.finalPaymentInstallmentCount
+        }
+        return selectedInstallmentCount
+    }
+
+    private var nextInstallmentIndex: Int {
+        WealthSavingLedger.nextInstallmentIndex(for: clothing, entries: wealthSavingEntries)
+    }
+
+    private var isLastInstallment: Bool {
+        guard let count = effectiveInstallmentCount else { return false }
+        return nextInstallmentIndex >= count
+    }
+
+    private var parsedAmount: Decimal? {
+        Decimal(string: amountText.replacingOccurrences(of: ",", with: "."))
+    }
+
+    private var effectiveAmount: Decimal? {
+        guard remainingAmount > 0 else { return nil }
+        switch mode {
+        case .oneTime:
+            return remainingAmount
+        case .installment:
+            guard effectiveInstallmentCount != nil else { return nil }
+            if isLastInstallment {
+                return remainingAmount
+            }
+            guard let parsedAmount, parsedAmount > 0 else { return nil }
+            return min(parsedAmount, remainingAmount)
+        }
+    }
+
+    private var canRecord: Bool {
+        effectiveAmount != nil
+    }
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 18) {
+                    summaryCard
+                    modePicker
+
+                    if mode == .installment {
+                        installmentSelector
+                        installmentAmountEditor
+                    } else {
+                        oneTimeAmountCard
+                    }
+
+                    ledgerPreview
+                }
+                .padding()
+            }
+            .navigationTitle("记录已付尾款")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("取消") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("记录") {
+                        guard let amount = effectiveAmount else { return }
+                        onRecord(mode, amount, effectiveInstallmentCount)
+                        dismiss()
+                    }
+                    .disabled(!canRecord)
+                }
+            }
+            .onAppear {
+                if clothing.finalPaymentInstallmentCount > 0 {
+                    selectedInstallmentCount = clothing.finalPaymentInstallmentCount
+                    mode = clothing.finalPaymentInstallmentCount == 1 ? .oneTime : .installment
+                }
+                refreshDefaultAmount()
+            }
+            .onChange(of: mode) { _, _ in
+                refreshDefaultAmount()
+            }
+            .onChange(of: selectedInstallmentCount) { _, _ in
+                refreshDefaultAmount()
+            }
+        }
+        .presentationDetents([.medium, .large])
+    }
+
+    private var summaryCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(clothing.name)
+                .font(.headline)
+                .foregroundStyle(themeManager.primaryTextColor)
+                .lineLimit(2)
+
+            HStack(spacing: 0) {
+                paymentStat(title: "应付尾款", value: totalDue, color: Color(hex: "C94C72"))
+                Divider().frame(height: 34)
+                paymentStat(title: "已付", value: paidTotal, color: .green)
+                Divider().frame(height: 34)
+                paymentStat(title: "剩余", value: remainingAmount, color: .orange)
+            }
+
+            ProgressView(value: paidRatio)
+                .tint(Color(hex: "C94C72"))
+
+            Text("可抵扣小金库 ¥\(moneyText(vaultBalance))，记录付款时会自动优先抵扣；不足部分记为外部实付。")
+                .font(.caption)
+                .foregroundStyle(themeManager.secondaryTextColor)
+        }
+        .padding()
+        .themeSkinSectionCard(cornerRadius: 20)
+    }
+
+    private var modePicker: some View {
+        Picker("支付方式", selection: $mode) {
+            Text(FinalPaymentMode.oneTime.displayName).tag(FinalPaymentMode.oneTime)
+            Text(FinalPaymentMode.installment.displayName).tag(FinalPaymentMode.installment)
+        }
+        .pickerStyle(.segmented)
+    }
+
+    private var oneTimeAmountCard: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label("一次性付清", systemImage: "checkmark.seal.fill")
+                .font(.headline)
+                .foregroundStyle(Color(hex: "C94C72"))
+            Text("本次将记录剩余全部尾款 ¥\(moneyText(remainingAmount))。")
+                .font(.subheadline)
+                .foregroundStyle(themeManager.secondaryTextColor)
+        }
+        .padding()
+        .themeSkinSectionCard(cornerRadius: 18)
+    }
+
+    private var installmentSelector: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(clothing.finalPaymentInstallmentCount > 0 ? "已选择 \(clothing.finalPaymentInstallmentCount) 期" : "请选择分期期数")
+                .font(.headline)
+                .foregroundStyle(themeManager.primaryTextColor)
+
+            if clothing.finalPaymentInstallmentCount <= 0 {
+                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 3), spacing: 8) {
+                    ForEach(installmentOptions, id: \.self) { count in
+                        Button {
+                            selectedInstallmentCount = count
+                        } label: {
+                            Text("\(count) 期")
+                                .font(.subheadline.weight(.bold))
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 10)
+                                .foregroundStyle(selectedInstallmentCount == count ? .white : Color(hex: "C94C72"))
+                                .background(
+                                    RoundedRectangle(cornerRadius: 14)
+                                        .fill(selectedInstallmentCount == count ? Color(hex: "C94C72") : Color(hex: "C94C72").opacity(0.10))
+                                )
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+
+            if let count = effectiveInstallmentCount {
+                FinalPaymentSegmentedProgressView(
+                    total: count,
+                    completed: paidRecords.count,
+                    activeIndex: nextInstallmentIndex,
+                    accent: Color(hex: "C94C72"),
+                    completedColor: .green,
+                    height: 7
+                )
+                Text("本次为第 \(min(nextInstallmentIndex, count)) / \(count) 期；默认金额按剩余尾款均分，最后一期自动兜底。")
+                    .font(.caption)
+                    .foregroundStyle(themeManager.secondaryTextColor)
+            }
+        }
+        .padding()
+        .themeSkinSectionCard(cornerRadius: 18)
+    }
+
+    private var installmentAmountEditor: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("本期实付金额")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(themeManager.secondaryTextColor)
+            HStack {
+                Text("¥")
+                    .font(.title2.weight(.bold))
+                    .foregroundStyle(.orange)
+                TextField("请选择期数后自动均分", text: $amountText)
+                    .keyboardType(.decimalPad)
+                    .font(.system(size: 30, weight: .heavy, design: .rounded))
+                    .monospacedDigit()
+            }
+            .padding()
+            .themeSkinSectionCard(cornerRadius: 18)
+
+            if isLastInstallment {
+                Text("最后一期会自动记录剩余尾款 ¥\(moneyText(remainingAmount))，避免分期尾差。")
+                    .font(.caption2)
+                    .foregroundStyle(.orange)
+            } else if let effectiveAmount, let parsedAmount, parsedAmount > effectiveAmount {
+                Text("本期最多记录剩余尾款 ¥\(moneyText(effectiveAmount))。")
+                    .font(.caption2)
+                    .foregroundStyle(.orange)
+            }
+        }
+    }
+
+    private var ledgerPreview: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Label("账单明细", systemImage: "list.bullet.rectangle")
+                .font(.headline)
+                .foregroundStyle(themeManager.primaryTextColor)
+
+            if paidRecords.isEmpty {
+                Text("还没有实付账单。已有小金库存款会作为可抵扣余额保留。")
+                    .font(.caption)
+                    .foregroundStyle(themeManager.secondaryTextColor)
+            } else {
+                ForEach(paidRecords) { entry in
+                    HStack {
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(entry.paymentMode == .installment ? "第 \(entry.installmentIndex)/\(entry.installmentCount) 期" : "一次性付清")
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(themeManager.primaryTextColor)
+                            Text(paymentBreakdownText(entry))
+                                .font(.caption2)
+                                .foregroundStyle(themeManager.secondaryTextColor)
+                        }
+                        Spacer()
+                        Text("¥\(moneyText(entry.amount))")
+                            .font(.subheadline.weight(.bold))
+                            .foregroundStyle(Color(hex: "C94C72"))
+                    }
+                    .padding(10)
+                    .background(Color.secondary.opacity(0.06), in: RoundedRectangle(cornerRadius: 12))
+                }
+            }
+        }
+        .padding()
+        .themeSkinSectionCard(cornerRadius: 18)
+    }
+
+    private func paymentStat(title: String, value: Decimal, color: Color) -> some View {
+        VStack(spacing: 5) {
+            Text(title)
+                .font(.caption2)
+                .foregroundStyle(themeManager.secondaryTextColor)
+            Text("¥\(moneyText(value))")
+                .font(.caption.weight(.bold))
+                .foregroundStyle(color)
+                .lineLimit(1)
+                .minimumScaleFactor(0.65)
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    private func refreshDefaultAmount() {
+        switch mode {
+        case .oneTime:
+            amountText = moneyText(remainingAmount)
+        case .installment:
+            guard let count = effectiveInstallmentCount else {
+                amountText = ""
+                return
+            }
+            let defaultAmount = WealthSavingLedger.defaultInstallmentAmount(
+                for: clothing,
+                entries: wealthSavingEntries,
+                installmentCount: count
+            )
+            amountText = moneyText(defaultAmount)
+        }
+    }
+
+    private func paymentBreakdownText(_ entry: WealthSavingEntry) -> String {
+        let paidDate = entry.paidAt?.formatted(date: .numeric, time: .omitted) ?? "已记录"
+        return "\(paidDate) · 小金库抵扣 ¥\(moneyText(entry.vaultDeductionAmount)) · 外部实付 ¥\(moneyText(entry.externalPaymentAmount))"
+    }
+
+    private func moneyText(_ value: Decimal) -> String {
+        NSDecimalNumber(decimal: value).stringValue
+    }
+}
+
 /// 信息行组件 - 使用统一配色
 struct InfoRow: View {
     @Environment(ThemeManager.self) private var themeManager
@@ -1036,10 +1606,10 @@ struct InfoRow: View {
         case "衣长": return "arrow.up.and.down"
         case "状态": return "star.circle"
         case "小物": return "sparkles"
-        case "裙装总价", "裙装单价", "原价": return "tag"
+        case "裙装总价", "裙装单价", "原价", "全款预约金额", "单件预约金额": return "tag"
         case "库存数量": return "number.circle"
         case "购买日期": return "calendar"
-        case "定金日期": return "calendar.badge.clock"
+        case "定金日期", "全款预约日期": return "calendar.badge.clock"
         case "预估尾款": return "hourglass"
         case "拥有时长": return "clock"
         case "尾款金额": return "creditcard"

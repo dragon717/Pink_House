@@ -21,6 +21,7 @@ struct SeriesInput: Sendable {
     let name: String
     let balance: Decimal
     let deposit: Decimal
+    let reservationAmount: Decimal
     let stock: Int
 }
 
@@ -32,7 +33,14 @@ class SeriesAnalyzer {
     func analyzeSeries(from clothings: [Clothing]) async -> [SeriesInfo] {
         // Convert to Sendable structs to safely pass to detached task
         let inputs = clothings.map { 
-            SeriesInput(id: $0.id, name: $0.name, balance: $0.totalBalance, deposit: $0.totalDeposit, stock: $0.stock) 
+            SeriesInput(
+                id: $0.id,
+                name: $0.name,
+                balance: $0.pendingFinalPaymentAmount,
+                deposit: $0.reservationPaidAmount,
+                reservationAmount: $0.reservationListAmount,
+                stock: $0.stock
+            )
         }
         
         return await Task.detached(priority: .userInitiated) {
@@ -51,7 +59,7 @@ class SeriesAnalyzer {
                 let candidates = self.generateCandidates(from: name)
                 
                 // Style Key: Name + Price info (ignoring stock)
-                let styleKey = "\(clothing.name)|\(clothing.deposit)|\(clothing.balance)"
+                let styleKey = "\(clothing.name)|\(clothing.deposit)|\(clothing.balance)|\(clothing.reservationAmount)"
                 
                 for candidate in candidates {
                     candidateStyleKeys[candidate, default: []].insert(styleKey)
@@ -59,9 +67,7 @@ class SeriesAnalyzer {
                     let stock = clothing.stock
                     candidateItemCounts[candidate, default: 0] += stock
                     
-                    // 注意：clothing.balance 和 clothing.deposit 已经是 totalBalance 和 totalDeposit
-                    // 它们在 Clothing 模型中已经乘以了 stock，所以这里直接使用，不要再乘 stock
-                    candidateBalances[candidate, default: 0] += clothing.balance
+                    candidateBalances[candidate, default: 0] += clothing.reservationAmount
                     candidateDeposits[candidate, default: 0] += clothing.deposit
                     candidateClothingIDs[candidate, default: []].insert(clothing.id)
                 }

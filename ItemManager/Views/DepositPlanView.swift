@@ -126,8 +126,8 @@ struct DepositPlanView: View {
         // 应用年份筛选
         let result = filtered.filter { clothing in
             // Year Filter (Global)
-            // Year logic: Based on finalPaymentDate (Start of final payment period)
-            if let date = clothing.finalPaymentDate {
+            // 定金尾款按尾款开始日期，全款预约按预约日期归组
+            if let date = clothing.reservationGroupingDate {
                 let calendar = Calendar.current
                 let year = calendar.component(.year, from: date)
                 return year == selectedYear
@@ -202,21 +202,21 @@ struct DepositPlanView: View {
     
     // 检查商品是否在当前月份（只判断预计尾款开始时间）
     private func isClothingInCurrentMonth(_ clothing: Clothing) -> Bool {
-        guard let start = clothing.finalPaymentDate else { return false }
+        guard let start = clothing.reservationGroupingDate else { return false }
         let month = Calendar.current.component(.month, from: start)
         return month == currentMonth
     }
 
     // 检查商品是否在最近月份（当面板折叠时使用）
     private func isClothingInRecentMonth(_ clothing: Clothing) -> Bool {
-        guard let start = clothing.finalPaymentDate else { return false }
+        guard let start = clothing.reservationGroupingDate else { return false }
         let month = Calendar.current.component(.month, from: start)
         return month == recentMonth
     }
 
     // 检查商品是否在选中的月份（只判断预计尾款开始时间）
     private func isClothingInSelectedMonths(_ clothing: Clothing) -> Bool {
-        guard let start = clothing.finalPaymentDate else { return false }
+        guard let start = clothing.reservationGroupingDate else { return false }
         let month = Calendar.current.component(.month, from: start)
         return selectedMonths.contains(month)
     }
@@ -233,8 +233,7 @@ struct DepositPlanView: View {
     
     // 计算所有待付尾款（不受年份筛选影响）
     private var totalPendingBalanceAll: Decimal {
-        // 注意：totalBalance 已经包含了 stock 的乘法，所以这里直接使用，不要再乘 stock
-        depositClothings.reduce(0) { $0 + $1.totalBalance }
+        depositClothings.reduce(0) { $0 + $1.pendingFinalPaymentAmount }
     }
     
     // 计算当前月
@@ -249,7 +248,7 @@ struct DepositPlanView: View {
 
         // 收集所有有数据的月份
         let monthsWithData = baseClothings.compactMap { clothing -> Int? in
-            guard let date = clothing.finalPaymentDate else { return nil }
+            guard let date = clothing.reservationGroupingDate else { return nil }
             return calendar.component(.month, from: date)
         }
 

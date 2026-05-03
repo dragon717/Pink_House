@@ -54,8 +54,7 @@ struct SeriesSelectorView: View {
         }
 
         let count = recentClothings.reduce(0) { $0 + $1.stock }
-        // 注意：totalBalance 已经包含了 stock 的乘法，所以这里直接使用，不要再乘 stock
-        let amount = recentClothings.reduce(0) { $0 + $1.totalBalance }
+        let amount = recentClothings.reduce(0) { $0 + $1.reservationListAmount }
 
         return ("最近添加", count, amount, count > 0)
     }
@@ -69,7 +68,7 @@ struct SeriesSelectorView: View {
                 }
             } label: {
                 HStack {
-                    Text(isExpanded ? "按系列预估尾款 (点我折叠)" : "按系列预估尾款 (点我展开)")
+                    Text(isExpanded ? "按系列预约 (点我折叠)" : "按系列预约 (点我展开)")
                         .font(.subheadline)
                         .foregroundStyle(.primary)
                     
@@ -221,7 +220,7 @@ struct RecentAddedCard: View {
             if stats.hasData {
                 HStack(spacing: 0) {
                     DepositStatItem(
-                        title: "待付件数",
+                        title: "预约件数",
                         value: "\(stats.count)",
                         valueColor: .primary
                     )
@@ -230,7 +229,7 @@ struct RecentAddedCard: View {
                         .frame(height: 30)
 
                     DepositStatItem(
-                        title: "待付尾款",
+                        title: "预约金额",
                         value: "¥\(NSDecimalNumber(decimal: stats.amount).stringValue)",
                         valueColor: Color(hex: "C94C72")
                     )

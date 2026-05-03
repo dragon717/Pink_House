@@ -236,6 +236,7 @@ struct ClothingPriceView: View {
     @Binding var priceTotal: Double
     @Binding var deposit: Double
     @Binding var balance: Double
+    @Binding var reservationKind: ClothingReservationKind
     @Binding var accessoriesPrice: Double
     @Binding var shippingFee: Double
     @Binding var shippingFeeJPY: Double
@@ -307,31 +308,33 @@ struct ClothingPriceView: View {
                 )
             }
             
-            // 定金和尾款
-            VStack(spacing: 12) {
-                PriceRow(title: "定金", value: $deposit)
-                Divider()
-                PriceRow(title: "尾款", value: $balance)
-            }
-            
-            // 自动计算按钮
-            Button(action: autoCalculateWithFeedback) {
-                HStack {
-                    Image(systemName: "wand.and.stars")
-                    Text("自动计算")
+            if reservationKind == .depositPlan {
+                // 定金和尾款
+                VStack(spacing: 12) {
+                    PriceRow(title: "定金", value: $deposit)
+                    Divider()
+                    PriceRow(title: "尾款", value: $balance)
                 }
-                .font(.subheadline)
-                .foregroundStyle(.white)
-                .padding(.horizontal, 16)
+
+                // 自动计算按钮
+                Button(action: autoCalculateWithFeedback) {
+                    HStack {
+                        Image(systemName: "wand.and.stars")
+                        Text("自动计算")
+                    }
+                    .font(.subheadline)
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 8)
+                    .background(
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(canAutoCalculate ? Color.pink : Color.gray)
+                    )
+                }
+                .disabled(!canAutoCalculate)
+                .frame(maxWidth: .infinity, alignment: .center)
                 .padding(.vertical, 8)
-                .background(
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(canAutoCalculate ? Color.pink : Color.gray)
-                )
             }
-            .disabled(!canAutoCalculate)
-            .frame(maxWidth: .infinity, alignment: .center)
-            .padding(.vertical, 8)
             
             // 汇总信息 (New Feature: Total Deposit & Balance)
             let totalDeposit = deposit + accessoryList.reduce(0) { $0 + $1.deposit }
@@ -341,19 +344,44 @@ struct ClothingPriceView: View {
             
             VStack(spacing: 12) {
                 Divider()
-                HStack {
-                    Text("合计定金")
+                if reservationKind == .fullPaymentReservation {
+                    HStack {
+                        Text("全款预约金额（单件含邮）")
+                            .foregroundStyle(.primary)
+                        Spacer()
+                        Text("¥ \(grandTotalWithShipping, specifier: "%.2f")")
+                            .font(.headline)
+                            .foregroundStyle(.pink)
+                    }
+                    if stock > 1 {
+                        HStack {
+                            Text("全款预约总额")
+                                .foregroundStyle(.secondary)
+                            Spacer()
+                            Text("¥ \(grandTotalWithShipping * Double(stock), specifier: "%.2f")")
+                                .font(.subheadline.bold())
+                                .foregroundStyle(.pink)
+                        }
+                    }
+                    Text("保存时会自动写入为「全款预约」，不再显示定金、尾款或尾款日期。")
+                        .font(.caption)
                         .foregroundStyle(.secondary)
-                    Spacer()
-                    Text("¥ \(totalDeposit, specifier: "%.2f")")
-                        .font(.subheadline.bold())
-                }
-                HStack {
-                    Text("合计尾款")
-                        .foregroundStyle(.secondary)
-                    Spacer()
-                    Text("¥ \(totalBalance, specifier: "%.2f")")
-                        .font(.subheadline.bold())
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                } else if reservationKind == .depositPlan {
+                    HStack {
+                        Text("合计定金")
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        Text("¥ \(totalDeposit, specifier: "%.2f")")
+                            .font(.subheadline.bold())
+                    }
+                    HStack {
+                        Text("合计尾款")
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        Text("¥ \(totalBalance, specifier: "%.2f")")
+                            .font(.subheadline.bold())
+                    }
                 }
                 HStack {
                     Text("订单总价 (含小物)")
@@ -428,50 +456,52 @@ struct ClothingPriceView: View {
                             }
                             
                             HStack {
-                                // 定金
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text("定金")
-                                        .font(.caption2)
-                                        .foregroundStyle(.secondary)
-                                    TextField("0", value: Binding<Double?>(
-                                        get: { item.deposit == 0 ? nil : item.deposit },
-                                        set: {
-                                            item.deposit = $0 ?? 0
-                                            if item.deposit > 0 && item.balance > 0 {
-                                                item.price = item.deposit + item.balance
+                                if reservationKind == .depositPlan {
+                                    // 定金
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text("定金")
+                                            .font(.caption2)
+                                            .foregroundStyle(.secondary)
+                                        TextField("0", value: Binding<Double?>(
+                                            get: { item.deposit == 0 ? nil : item.deposit },
+                                            set: {
+                                                item.deposit = $0 ?? 0
+                                                if item.deposit > 0 && item.balance > 0 {
+                                                    item.price = item.deposit + item.balance
+                                                }
                                             }
-                                        }
-                                    ), format: .number)
-                                        .keyboardType(.decimalPad)
-                                        .textFieldStyle(.roundedBorder)
-                                        .multilineTextAlignment(.trailing)
-                                }
-                                
-                                Text("+")
-                                    .foregroundStyle(.secondary)
-                                
-                                // 尾款
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text("尾款")
-                                        .font(.caption2)
+                                        ), format: .number)
+                                            .keyboardType(.decimalPad)
+                                            .textFieldStyle(.roundedBorder)
+                                            .multilineTextAlignment(.trailing)
+                                    }
+
+                                    Text("+")
                                         .foregroundStyle(.secondary)
-                                    TextField("0", value: Binding<Double?>(
-                                        get: { item.balance == 0 ? nil : item.balance },
-                                        set: {
-                                            item.balance = $0 ?? 0
-                                            if item.deposit > 0 && item.balance > 0 {
-                                                item.price = item.deposit + item.balance
+
+                                    // 尾款
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text("尾款")
+                                            .font(.caption2)
+                                            .foregroundStyle(.secondary)
+                                        TextField("0", value: Binding<Double?>(
+                                            get: { item.balance == 0 ? nil : item.balance },
+                                            set: {
+                                                item.balance = $0 ?? 0
+                                                if item.deposit > 0 && item.balance > 0 {
+                                                    item.price = item.deposit + item.balance
+                                                }
                                             }
-                                        }
-                                    ), format: .number)
-                                        .keyboardType(.decimalPad)
-                                        .textFieldStyle(.roundedBorder)
-                                        .multilineTextAlignment(.trailing)
+                                        ), format: .number)
+                                            .keyboardType(.decimalPad)
+                                            .textFieldStyle(.roundedBorder)
+                                            .multilineTextAlignment(.trailing)
+                                    }
+
+                                    Text("=")
+                                        .foregroundStyle(.secondary)
                                 }
-                                
-                                Text("=")
-                                    .foregroundStyle(.secondary)
-                                
+
                                 // 总价
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text("单价")
@@ -628,7 +658,7 @@ enum PaymentDurationOption: Int, CaseIterable {
 struct ClothingPurchaseInfoView: View {
     @Binding var purchaseDate: Date
     @Binding var depositDate: Date
-    @Binding var isDepositPlan: Bool
+    @Binding var reservationKind: ClothingReservationKind
     @Binding var finalPaymentDate: Date
     @Binding var finalPaymentEndDate: Date
     @Binding var note: String
@@ -650,6 +680,17 @@ struct ClothingPurchaseInfoView: View {
     private var isCustomMode: Bool {
         selectedDuration == .custom
     }
+
+    private var reservationHint: String {
+        switch reservationKind {
+        case .owned:
+            return "已拥有：按普通入库裙装保存，不进入预约列表。"
+        case .fullPaymentReservation:
+            return "全款预约：进入预约列表，只显示全款预约日期和全款金额。"
+        case .depositPlan:
+            return "定金尾款：进入心愿尾款，可设置定金日期和预计尾款时间。"
+        }
+    }
     
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -662,18 +703,29 @@ struct ClothingPurchaseInfoView: View {
             Divider()
             
             VStack(alignment: .leading, spacing: 8) {
-                Toggle("加入心愿尾款", isOn: $isDepositPlan)
-                    .tint(.green)
-                
-                Text("① 无限量创建心愿尾款")
+                Picker("预约状态", selection: $reservationKind) {
+                    ForEach(ClothingReservationKind.allCases) { kind in
+                        Text(kind.displayName).tag(kind)
+                    }
+                }
+                .pickerStyle(.segmented)
+
+                Text(reservationHint)
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 
-                Text("勾选后，该裙装将显示在心愿尾款中")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                
-                if isDepositPlan {
+                switch reservationKind {
+                case .owned:
+                    EmptyView()
+                case .fullPaymentReservation:
+                    VStack(alignment: .leading, spacing: 12) {
+                        DatePicker("全款预约日期", selection: $depositDate, displayedComponents: .date)
+                            .environment(\.locale, Locale(identifier: "zh_CN"))
+                        Text("全款预约会复用现有预约数据结构：保存时自动将全款金额写入定金字段，尾款为 0。")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                case .depositPlan:
                     VStack(alignment: .leading, spacing: 12) {
                         DatePicker("定金日期", selection: $depositDate, displayedComponents: .date)
                             .environment(\.locale, Locale(identifier: "zh_CN"))
