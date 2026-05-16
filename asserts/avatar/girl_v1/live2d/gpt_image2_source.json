@@ -21,6 +21,13 @@
     "Hair is stored as replaceable transparent hair-only packages with matching layer contracts.",
     "The ornate dress is stored as an embedded default outfit layer package and is hidden from the normal sticker list.",
     "Layer PNGs are first-pass engineering crops from gpt-image-2 full-body sources.",
-    "Final Cubism production should redraw hidden overdraw for joints before binding."
-  ]
+    "Final Cubism production should redraw hidden overdraw for joints before binding.",
+    "Hybrid runtime uses whole-character surface plates plus sparse safe motion overlays to reduce seam artifacts."
+  ],
+  "hybrid_surface_plates": {
+    "base_body": "asserts/avatar/girl_v1/live2d/surface_plates/base_body.png",
+    "default_long_pink": "asserts/avatar/girl_v1/live2d/surface_plates/default_long_pink.png",
+    "short_bob": "asserts/avatar/girl_v1/live2d/surface_plates/short_bob.png",
+    "default_outfit": "asserts/avatar/girl_v1/live2d/outfits/default/default_outfit_full.png"
+  }
 }

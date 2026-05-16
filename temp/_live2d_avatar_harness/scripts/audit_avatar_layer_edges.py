@@ -27,7 +27,11 @@ QUALITY_PROFILE = {
     "snapshot_phase_seconds": 0.0,
     "static_contexts": ["snapshot", "thumbnail", "low_power", "background"],
 }
-EXPECTED_PREVIEW_LABELS = ["default_long_pink", "short_bob", "default_outfit"]
+EXPECTED_PREVIEW_LABELS = [
+    "hybrid_default_long_pink",
+    "hybrid_short_bob",
+    "hybrid_default_outfit",
+]
 DEFAULT_MIN_OVERDRAW = 10
 MIN_OVERDRAW_BY_NAME = {
     "body_torso_base": 28,
@@ -55,7 +59,16 @@ def load_json(path: Path) -> dict[str, Any]:
 
 
 def layer_path(entry: dict[str, Any]) -> Path:
-    return LIVE2D_ROOT / str(entry["file"])
+    raw = Path(str(entry["file"]))
+    if raw.is_absolute() or raw.exists():
+        return raw
+    if str(entry["file"]).startswith("asserts/"):
+        return raw
+    return LIVE2D_ROOT / raw
+
+
+def surface_path(entry: dict[str, Any]) -> Path:
+    return layer_path(entry)
 
 
 def minimum_required(entry: dict[str, Any]) -> int:
@@ -151,13 +164,17 @@ def audit_entries(label: str, entries: list[dict[str, Any]]) -> dict[str, Any]:
 def anchor_unit(entry: dict[str, Any], bones: dict[str, Any]) -> tuple[float, float]:
     placement = [float(value) for value in entry["placement_bbox_pixels"]]
     canvas = [float(value) for value in entry["canvas_size"]]
-    bone = bones.get(str(entry.get("bone")), {})
-    normalized = bone.get("anchor") or [
-        (placement[0] + placement[2]) / max(canvas[0] * 2, 1),
-        (placement[1] + placement[3]) / max(canvas[1] * 2, 1),
-    ]
-    anchor_x = float(normalized[0]) * canvas[0]
-    anchor_y = float(normalized[1]) * canvas[1]
+    if isinstance(entry.get("anchor_pixels"), list) and len(entry["anchor_pixels"]) >= 2:
+        anchor_x = float(entry["anchor_pixels"][0])
+        anchor_y = float(entry["anchor_pixels"][1])
+    else:
+        bone = bones.get(str(entry.get("bone")), {})
+        normalized = bone.get("anchor") or [
+            (placement[0] + placement[2]) / max(canvas[0] * 2, 1),
+            (placement[1] + placement[3]) / max(canvas[1] * 2, 1),
+        ]
+        anchor_x = float(normalized[0]) * canvas[0]
+        anchor_y = float(normalized[1]) * canvas[1]
     width = max(placement[2] - placement[0], 1)
     height = max(placement[3] - placement[1], 1)
     return (
@@ -222,6 +239,16 @@ def accumulated_transform(bone: str, bones: dict[str, Any], seconds: float, seen
     )
 
 
+def apply_opacity(image: Image.Image, opacity: float | None) -> Image.Image:
+    if opacity is None or opacity >= 0.999:
+        return image
+    result = image.copy()
+    alpha = result.getchannel("A")
+    alpha = alpha.point(lambda value: round(value * max(0, min(float(opacity), 1))))
+    result.putalpha(alpha)
+    return result
+
+
 def compose(entries: list[dict[str, Any]], bones: dict[str, Any], out_path: Path, seconds: float) -> None:
     canvas_size = tuple(int(value) for value in entries[0]["canvas_size"])
     canvas = Image.new("RGBA", canvas_size, (0, 0, 0, 0))
@@ -229,7 +256,7 @@ def compose(entries: list[dict[str, Any]], bones: dict[str, Any], out_path: Path
         path = layer_path(entry)
         if not path.exists():
             continue
-        layer = Image.open(path).convert("RGBA")
+        layer = apply_opacity(Image.open(path).convert("RGBA"), entry.get("opacity"))
         placement = [int(value) for value in entry["placement_bbox_pixels"]]
         anchor = anchor_unit(entry, bones)
         angle, dx, dy = accumulated_transform(str(entry.get("bone")), bones, seconds)
@@ -243,6 +270,141 @@ def compose(entries: list[dict[str, Any]], bones: dict[str, Any], out_path: Path
         canvas.alpha_composite(moved, (round(placement[0] + dx), round(placement[1] + dy)))
     out_path.parent.mkdir(parents=True, exist_ok=True)
     canvas.save(out_path)
+
+
+def surface_entry_ok(entry: dict[str, Any]) -> bool:
+    return (
+        isinstance(entry.get("anchor_pixels"), list)
+        and len(entry.get("anchor_pixels")) >= 2
+        and isinstance(entry.get("motion_role"), str)
+        and bool(entry.get("motion_role"))
+        and isinstance(entry.get("overdraw_insets_pixels"), list)
+        and len(entry.get("overdraw_insets_pixels")) == 4
+    )
+
+
+def audit_surface_plate(label: str, entry: dict[str, Any]) -> dict[str, Any]:
+    path = surface_path(entry)
+    exists = path.exists()
+    size = None
+    alpha_extrema = None
+    nontransparent_percent = 0.0
+    if exists:
+        image = Image.open(path).convert("RGBA")
+        size = image.size
+        alpha = image.getchannel("A")
+        alpha_extrema = alpha.getextrema()
+        nontransparent = sum(1 for value in alpha.getdata() if value > 0)
+        nontransparent_percent = nontransparent / max(image.size[0] * image.size[1], 1) * 100
+
+    overlays = list(entry.get("layers") or [])
+    overlay_reports = []
+    for overlay in overlays:
+        overlay_reports.append({
+            "name": overlay.get("name"),
+            "file": str(layer_path(overlay)),
+            "exists": layer_path(overlay).exists(),
+            "metadata_ok": surface_entry_ok(overlay),
+            "opacity": overlay.get("opacity"),
+            "motion_role": overlay.get("motion_role"),
+            "alpha_edge_contacts": alpha_edge_contacts(layer_path(overlay)) if layer_path(overlay).exists() else [],
+        })
+
+    return {
+        "label": label,
+        "file": str(path),
+        "exists": exists,
+        "size": size,
+        "alpha_extrema": alpha_extrema,
+        "nontransparent_percent": round(nontransparent_percent, 4),
+        "metadata_ok": surface_entry_ok(entry),
+        "overlay_count": len(overlays),
+        "overlays": overlay_reports,
+        "ok": (
+            exists
+            and size == tuple(int(value) for value in entry.get("canvas_size", []))
+            and alpha_extrema is not None
+            and alpha_extrema[1] > 0
+            and nontransparent_percent >= 2.0
+            and surface_entry_ok(entry)
+            and all(row["exists"] and row["metadata_ok"] for row in overlay_reports)
+        ),
+    }
+
+
+def compose_hybrid_surface(entry: dict[str, Any], bones: dict[str, Any], out_path: Path, seconds: float) -> None:
+    canvas_size = tuple(int(value) for value in entry["canvas_size"])
+    canvas = Image.new("RGBA", canvas_size, (0, 0, 0, 0))
+
+    base = apply_opacity(Image.open(surface_path(entry)).convert("RGBA"), entry.get("opacity"))
+    placement = [int(value) for value in entry["placement_bbox_pixels"]]
+    _, dx, dy = accumulated_transform(str(entry.get("bone", "root")), bones, seconds)
+    canvas.alpha_composite(base, (round(placement[0] + dx), round(placement[1] + dy)))
+
+    for overlay in sorted(entry.get("layers") or [], key=lambda row: (int(row["z"]), str(row["name"]))):
+        path = layer_path(overlay)
+        if not path.exists():
+            continue
+        layer = apply_opacity(Image.open(path).convert("RGBA"), overlay.get("opacity"))
+        overlay_placement = [int(value) for value in overlay["placement_bbox_pixels"]]
+        anchor = anchor_unit(overlay, bones)
+        angle, odx, ody = accumulated_transform(str(overlay.get("bone")), bones, seconds)
+        center = (anchor[0] * layer.size[0], anchor[1] * layer.size[1])
+        moved = layer.rotate(
+            -angle,
+            resample=Image.Resampling.BICUBIC,
+            center=center,
+            fillcolor=(0, 0, 0, 0),
+        )
+        canvas.alpha_composite(moved, (round(overlay_placement[0] + odx), round(overlay_placement[1] + ody)))
+
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    canvas.save(out_path)
+
+
+def render_hybrid_previews(
+    rig: dict[str, Any],
+    outfit: dict[str, Any],
+    out_dir: Path,
+) -> tuple[list[str], list[dict[str, Any]]]:
+    rendered: list[str] = []
+    reports: list[dict[str, Any]] = []
+    bones = dict(rig.get("bones", {}))
+    surfaces = dict(rig.get("surface_plates") or {})
+    preview_sets = {
+        "hybrid_default_long_pink": surfaces.get("default_long_pink"),
+        "hybrid_short_bob": surfaces.get("short_bob"),
+    }
+
+    outfit_surface = outfit.get("surface_plate")
+    if outfit_surface:
+        canvas_size = list(rig.get("source_size", [1086, 1448]))
+        preview_sets["hybrid_default_outfit"] = {
+            "file": outfit_surface,
+            "source_bbox_pixels": [0, 0, canvas_size[0], canvas_size[1]],
+            "placement_bbox_pixels": [0, 0, canvas_size[0], canvas_size[1]],
+            "visible_bbox_pixels": [0, 0, canvas_size[0], canvas_size[1]],
+            "overdraw_insets_pixels": [0, 0, 0, 0],
+            "canvas_size": canvas_size,
+            "bone": "root",
+            "z": 0,
+            "anchor_pixels": [canvas_size[0] * 0.5, canvas_size[1] * 0.53],
+            "motion_role": "default_outfit_surface",
+            "opacity": 1.0,
+            "layers": list(outfit.get("surface_motion_overlays") or []),
+        }
+
+    for label, entry in preview_sets.items():
+        if not entry:
+            reports.append({"label": label, "ok": False, "error": "missing surface plate"})
+            continue
+        reports.append(audit_surface_plate(label, entry))
+        if reports[-1]["ok"]:
+            for index, seconds in enumerate(PHASE_SECONDS):
+                out_path = out_dir / f"{label}_phase_{index}.png"
+                compose_hybrid_surface(entry, bones, out_path, seconds)
+                rendered.append(str(out_path))
+    return rendered, reports
 
 
 def render_previews(
@@ -313,15 +475,22 @@ def main() -> int:
         list(outfit.get("layers", [])),
         out_dir,
     )
+    hybrid_rendered, hybrid_reports = ([], []) if args.no_previews else render_hybrid_previews(
+        rig,
+        outfit,
+        out_dir,
+    )
 
     report = {
-        "ok": all(row["ok"] for row in reports),
+        "ok": all(row["ok"] for row in reports) and all(row["ok"] for row in hybrid_reports),
         "quality_profile": QUALITY_PROFILE,
         "expected_preview_labels": EXPECTED_PREVIEW_LABELS,
         "rig_manifest": str(RIG_MANIFEST),
         "outfit_manifest": str(OUTFIT_MANIFEST),
         "reports": reports,
+        "hybrid_surface_reports": hybrid_reports,
         "rendered_previews": rendered,
+        "hybrid_rendered_previews": hybrid_rendered,
     }
     out_dir.mkdir(parents=True, exist_ok=True)
     report_path = out_dir / "REPORT.json"

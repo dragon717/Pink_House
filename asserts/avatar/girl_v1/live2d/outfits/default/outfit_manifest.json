@@ -478,5 +478,327 @@
       "show_in_sticker_list": false,
       "hair_style_scope": "default_long_pink"
     }
+  ],
+  "surface_plate": "asserts/avatar/girl_v1/live2d/outfits/default/default_outfit_full.png",
+  "surface_motion_overlays": [
+    {
+      "name": "dress_skirt",
+      "file": "outfits/default/layers/dress_skirt.png",
+      "source_bbox_normalized": [
+        0.16,
+        0.43,
+        0.84,
+        0.68
+      ],
+      "source_bbox_pixels": [
+        89,
+        543,
+        997,
+        1055
+      ],
+      "placement_bbox_pixels": [
+        89,
+        543,
+        997,
+        1055
+      ],
+      "visible_bbox_pixels": [
+        174,
+        623,
+        912,
+        985
+      ],
+      "overdraw_insets_pixels": [
+        85,
+        80,
+        85,
+        70
+      ],
+      "canvas_size": [
+        1086,
+        1448
+      ],
+      "size": [
+        908,
+        512
+      ],
+      "bone": "skirt",
+      "z": 115,
+      "slot": "dress.skirt",
+      "embedded_in_avatar_outfit": true,
+      "show_in_sticker_list": false,
+      "anchor_pixels": [
+        543.0,
+        752.96
+      ],
+      "motion_role": "skirt_lag",
+      "opacity": 0.3
+    },
+    {
+      "name": "sleeve_left",
+      "file": "outfits/default/layers/sleeve_left.png",
+      "source_bbox_normalized": [
+        0.19,
+        0.28,
+        0.39,
+        0.46
+      ],
+      "source_bbox_pixels": [
+        141,
+        350,
+        484,
+        721
+      ],
+      "placement_bbox_pixels": [
+        141,
+        350,
+        484,
+        721
+      ],
+      "visible_bbox_pixels": [
+        206,
+        405,
+        424,
+        666
+      ],
+      "overdraw_insets_pixels": [
+        65,
+        55,
+        60,
+        55
+      ],
+      "canvas_size": [
+        1086,
+        1448
+      ],
+      "size": [
+        343,
+        371
+      ],
+      "bone": "upperArmLeft",
+      "z": 112,
+      "slot": "dress.sleeve.left",
+      "embedded_in_avatar_outfit": true,
+      "show_in_sticker_list": false,
+      "anchor_pixels": [
+        347.52,
+        492.32
+      ],
+      "motion_role": "sleeve_lag_left",
+      "opacity": 0.24
+    },
+    {
+      "name": "sleeve_right",
+      "file": "outfits/default/layers/sleeve_right.png",
+      "source_bbox_normalized": [
+        0.61,
+        0.28,
+        0.81,
+        0.46
+      ],
+      "source_bbox_pixels": [
+        602,
+        350,
+        945,
+        721
+      ],
+      "placement_bbox_pixels": [
+        602,
+        350,
+        945,
+        721
+      ],
+      "visible_bbox_pixels": [
+        662,
+        405,
+        880,
+        666
+      ],
+      "overdraw_insets_pixels": [
+        60,
+        55,
+        65,
+        55
+      ],
+      "canvas_size": [
+        1086,
+        1448
+      ],
+      "size": [
+        343,
+        371
+      ],
+      "bone": "upperArmRight",
+      "z": 112,
+      "slot": "dress.sleeve.right",
+      "embedded_in_avatar_outfit": true,
+      "show_in_sticker_list": false,
+      "anchor_pixels": [
+        738.48,
+        492.32
+      ],
+      "motion_role": "sleeve_lag_right",
+      "opacity": 0.24
+    },
+    {
+      "name": "wrist_cuff_left",
+      "file": "outfits/default/layers/wrist_cuff_left.png",
+      "source_bbox_normalized": [
+        0.19,
+        0.41,
+        0.35,
+        0.52
+      ],
+      "source_bbox_pixels": [
+        161,
+        549,
+        425,
+        798
+      ],
+      "placement_bbox_pixels": [
+        161,
+        549,
+        425,
+        798
+      ],
+      "visible_bbox_pixels": [
+        206,
+        594,
+        380,
+        753
+      ],
+      "overdraw_insets_pixels": [
+        45,
+        45,
+        45,
+        45
+      ],
+      "canvas_size": [
+        1086,
+        1448
+      ],
+      "size": [
+        264,
+        249
+      ],
+      "bone": "lowerArmLeft",
+      "z": 118,
+      "slot": "dress.wrist.left",
+      "embedded_in_avatar_outfit": true,
+      "show_in_sticker_list": false,
+      "anchor_pixels": [
+        271.5,
+        680.56
+      ],
+      "motion_role": "cuff_lag_left",
+      "opacity": 0.28
+    },
+    {
+      "name": "wrist_cuff_right",
+      "file": "outfits/default/layers/wrist_cuff_right.png",
+      "source_bbox_normalized": [
+        0.65,
+        0.41,
+        0.81,
+        0.52
+      ],
+      "source_bbox_pixels": [
+        661,
+        549,
+        925,
+        798
+      ],
+      "placement_bbox_pixels": [
+        661,
+        549,
+        925,
+        798
+      ],
+      "visible_bbox_pixels": [
+        706,
+        594,
+        880,
+        753
+      ],
+      "overdraw_insets_pixels": [
+        45,
+        45,
+        45,
+        45
+      ],
+      "canvas_size": [
+        1086,
+        1448
+      ],
+      "size": [
+        264,
+        249
+      ],
+      "bone": "lowerArmRight",
+      "z": 118,
+      "slot": "dress.wrist.right",
+      "embedded_in_avatar_outfit": true,
+      "show_in_sticker_list": false,
+      "anchor_pixels": [
+        814.5,
+        680.56
+      ],
+      "motion_role": "cuff_lag_right",
+      "opacity": 0.28
+    },
+    {
+      "name": "hair_bows",
+      "file": "outfits/default/layers/hair_bows.png",
+      "source_bbox_normalized": [
+        0.23,
+        0.03,
+        0.77,
+        0.25
+      ],
+      "source_bbox_pixels": [
+        180,
+        0,
+        906,
+        422
+      ],
+      "placement_bbox_pixels": [
+        180,
+        0,
+        906,
+        422
+      ],
+      "visible_bbox_pixels": [
+        250,
+        43,
+        836,
+        362
+      ],
+      "overdraw_insets_pixels": [
+        70,
+        43,
+        70,
+        60
+      ],
+      "canvas_size": [
+        1086,
+        1448
+      ],
+      "size": [
+        726,
+        422
+      ],
+      "bone": "head",
+      "z": 130,
+      "slot": "accessory.hair",
+      "embedded_in_avatar_outfit": true,
+      "show_in_sticker_list": false,
+      "hair_style_scope": "default_long_pink",
+      "anchor_pixels": [
+        543.0,
+        289.6
+      ],
+      "motion_role": "accessory_float",
+      "opacity": 0.22
+    }
   ]
 }

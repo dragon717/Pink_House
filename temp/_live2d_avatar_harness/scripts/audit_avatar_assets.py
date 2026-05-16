@@ -155,6 +155,26 @@ def audit_png(path: Path, expected_ratio: float, tolerance: float, min_visible_p
     }
 
 
+def resolve_repo_path(value: str, fallback_root: Path | None = None) -> Path:
+    path = Path(value)
+    if path.is_absolute() or path.exists():
+        return path
+    if fallback_root is not None and (fallback_root / path.name).exists():
+        return fallback_root / path.name
+    return path
+
+
+def overlay_metadata_ok(entry: dict) -> bool:
+    return (
+        isinstance(entry.get("anchor_pixels"), list)
+        and len(entry.get("anchor_pixels")) >= 2
+        and isinstance(entry.get("motion_role"), str)
+        and bool(entry.get("motion_role"))
+        and isinstance(entry.get("overdraw_insets_pixels"), list)
+        and len(entry.get("overdraw_insets_pixels")) == 4
+    )
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--manifest", default="temp/_live2d_avatar_harness/MANIFEST.yaml")
@@ -316,11 +336,57 @@ def main() -> int:
         and clothing_rules_path.exists()
     )
 
+    surface_root = Path(manifest.get("asset_roots", {}).get("surface_plates", ""))
+    surface_reports = []
+    surface_manifest_ok = False
+    surface_ok = False
+    embedded_default_surface_path = None
+    embedded_default_surface_ok = False
+    if layer_manifest_path.exists():
+        try:
+            layer_manifest = json.loads(layer_manifest_path.read_text(encoding="utf-8"))
+            surfaces = layer_manifest.get("surface_plates") or {}
+            expected_surface_ids = ["base_body", "default_long_pink", "short_bob"]
+            surface_manifest_ok = all(surface_id in surfaces for surface_id in expected_surface_ids)
+            for surface_id in expected_surface_ids:
+                surface = surfaces.get(surface_id) or {}
+                surface_path = resolve_repo_path(str(surface.get("file") or ""), surface_root)
+                overlays = list(surface.get("layers") or [])
+                report = audit_png(
+                    surface_path,
+                    expected_ratio=float(acceptance.get("ratio", 0.75)),
+                    tolerance=float(acceptance.get("ratio_tolerance", 0.03)),
+                    min_visible_percent=float(acceptance.get("min_nontransparent_percent", 2.0)),
+                    min_file_bytes=int(acceptance.get("min_file_bytes", 8192)),
+                )
+                report.update({
+                    "surface_id": surface_id,
+                    "anchor_pixels_present": isinstance(surface.get("anchor_pixels"), list),
+                    "motion_role": surface.get("motion_role"),
+                    "overlay_count": len(overlays),
+                    "overlays_metadata_ok": all(overlay_metadata_ok(row) for row in overlays),
+                })
+                report["ok"] = (
+                    report["ok"]
+                    and report["anchor_pixels_present"]
+                    and bool(report["motion_role"])
+                    and (surface_id == "base_body" or report["overlay_count"] > 0)
+                    and report["overlays_metadata_ok"]
+                )
+                surface_reports.append(report)
+            default_embedded = (layer_manifest.get("embedded_outfits") or {}).get("default") or {}
+            embedded_default_surface_path = default_embedded.get("surface_plate")
+            embedded_default_surface_ok = bool(embedded_default_surface_path) and resolve_repo_path(str(embedded_default_surface_path)).exists()
+            surface_ok = surface_manifest_ok and all(row["ok"] for row in surface_reports) and embedded_default_surface_ok
+        except Exception as exc:
+            surface_reports.append({"ok": False, "error": str(exc)})
+
     report = {
         "ok": static_report["ok"]
         and not missing_actions
         and not missing_expressions
         and layers_ok
+        and surface_ok
         and hairstyles_ok
         and outfit_layers_ok
         and video_ok
@@ -342,6 +408,14 @@ def main() -> int:
             "missing_layer_files": missing_layer_files,
             "missing_manifest_layers": missing_manifest_layers,
             "ok": layers_ok,
+        },
+        "surface_plates": {
+            "dir": str(surface_root),
+            "manifest_ok": surface_manifest_ok,
+            "embedded_default_surface_plate": embedded_default_surface_path,
+            "embedded_default_surface_ok": embedded_default_surface_ok,
+            "plates": surface_reports,
+            "ok": surface_ok,
         },
         "hairstyles": {
             "root": str(hairstyle_root),

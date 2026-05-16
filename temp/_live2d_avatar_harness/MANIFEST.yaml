@@ -11,6 +11,7 @@ asset_roots:
   live2d: asserts/avatar/girl_v1/live2d
   layer_manifest: asserts/avatar/girl_v1/live2d/rig_manifest.json
   layers: asserts/avatar/girl_v1/live2d/layers
+  surface_plates: asserts/avatar/girl_v1/live2d/surface_plates
   hairstyle_index: asserts/avatar/girl_v1/live2d/hairstyles/hairstyle_index.json
   hairstyles: asserts/avatar/girl_v1/live2d/hairstyles
   default_outfit_manifest: asserts/avatar/girl_v1/live2d/outfits/default/outfit_manifest.json
@@ -44,6 +45,28 @@ image2_outputs:
       delicate magic sticker journal style, clean line art with soft pastel accents, transparent PNG,
       3:4 canvas, centered full body, neutral A-pose, limbs visible and separable, suitable as a
       Live2D-riggable mannequin-like base in a dress coordination editor.
+  - name: avatar_girl_v1_hybrid_default_long_surface
+    canvas: 1086x1448
+    destination: asserts/avatar/girl_v1/live2d/surface_plates/default_long_pink.png
+    prompt: >
+      Full-body front-facing anime-inspired wardrobe assistant base avatar, same pose and proportions
+      as girl_v1, default long pink hairstyle, modest pale unitard, transparent PNG. This is the
+      whole-character surface plate for the SwiftUI hybrid motion runtime; only sparse hair detail
+      overlays move on top.
+  - name: avatar_girl_v1_hybrid_short_bob_surface
+    canvas: 1086x1448
+    destination: asserts/avatar/girl_v1/live2d/surface_plates/short_bob.png
+    prompt: >
+      Full-body front-facing anime-inspired wardrobe assistant base avatar, same pose and proportions
+      as girl_v1, short bob hairstyle, modest pale unitard, transparent PNG. This is the whole-character
+      surface plate for the SwiftUI hybrid motion runtime; only sparse hair detail overlays move on top.
+  - name: avatar_girl_v1_hybrid_base_body_surface
+    canvas: 1086x1448
+    destination: asserts/avatar/girl_v1/live2d/surface_plates/base_body.png
+    prompt: >
+      Full-body front-facing anime-inspired wardrobe assistant base body, no fixed hairstyle, modest
+      pale unitard, transparent PNG. This is retained as the fallback body-only surface plate for
+      audit and future bindings.
   - name: avatar_girl_v1_default_outfit
     canvas: 1086x1448
     destination: asserts/avatar/girl_v1/live2d/outfits/default/default_outfit_full.png
