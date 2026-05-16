@@ -183,7 +183,8 @@ class PageFlipController: ObservableObject {
         }
         
         // 尝试从 snapshotPath 加载
-        if let path = outfit.snapshotPath,
+        if outfit.shouldUseStoredSnapshot,
+           let path = outfit.snapshotPath,
            let image = ImageManager.shared.loadImage(fileName: path) {
             // 直接调用 actor 方法
             await PageSnapshotCache.shared.setSnapshot(image, for: outfit.id)

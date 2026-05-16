@@ -913,7 +913,8 @@ struct DeletedBookRow: View {
                         
                         Spacer()
                         
-                        if let snapshotPath = page.snapshotPath,
+                        if page.shouldUseStoredSnapshot,
+                           let snapshotPath = page.snapshotPath,
                            let uiImage = ImageManager.shared.loadImage(fileName: snapshotPath) {
                             Image(uiImage: uiImage)
                                 .resizable()
@@ -1005,7 +1006,8 @@ struct DeletedOutfitRow: View {
     
     var body: some View {
         HStack {
-            if let snapshotPath = outfit.snapshotPath,
+            if outfit.shouldUseStoredSnapshot,
+               let snapshotPath = outfit.snapshotPath,
                let uiImage = ImageManager.shared.loadImage(fileName: snapshotPath) {
                 Image(uiImage: uiImage)
                     .resizable()

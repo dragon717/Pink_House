@@ -30,7 +30,8 @@ struct PageThumbnailView: View {
                 .overlay {
                     GeometryReader { geometry in
                         Group {
-                            if let path = page.snapshotPath {
+                            if page.shouldUseStoredSnapshot,
+                               let path = page.snapshotPath {
                                 AsyncDownsampledImage(
                                     fileName: path,
                                     targetSize: targetSize,

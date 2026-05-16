@@ -547,7 +547,8 @@ struct BookDetailView: View {
             newPage.items?.append(newItem)
         }
 
-        if let path = page.snapshotPath,
+        if page.shouldUseStoredSnapshot,
+           let path = page.snapshotPath,
            let image = ImageManager.shared.loadImage(fileName: path),
            let newPath = ImageManager.shared.saveImage(image, context: modelContext) {
             newPage.snapshotPath = newPath
@@ -821,7 +822,8 @@ struct BookDetailView: View {
                 }
 
                 // 复制缩略图
-                if let path = page.snapshotPath,
+                if page.shouldUseStoredSnapshot,
+                   let path = page.snapshotPath,
                    let image = ImageManager.shared.loadImage(fileName: path),
                    let newPath = ImageManager.shared.saveImage(image, context: modelContext) {
                     newPage.snapshotPath = newPath

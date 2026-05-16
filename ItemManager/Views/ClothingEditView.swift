@@ -46,6 +46,8 @@ struct ClothingEditDraft: Codable {
     let originalPrice: Double
     let originalPriceJPY: Double?      // v1.11+ 原价日元，旧草稿可能不存在
     let originalPriceCurrencyCode: String? // v1.11+ 原价显示币种，旧草稿默认 CNY
+    let originalPriceExchangeRateJPY: Double? // v1.15+ 原价汇率快照，旧草稿默认当前缓存
+    let originalPriceRateUpdatedAt: Date? // v1.15+ 原价汇率记录时间
     let priceTotal: Double
     let deposit: Double
     let balance: Double
@@ -53,6 +55,8 @@ struct ClothingEditDraft: Codable {
     let shippingFee: Double?           // v1.11+ 邮费人民币，旧草稿默认 0
     let shippingFeeJPY: Double?        // v1.11+ 邮费日元，旧草稿默认 0
     let shippingFeeCurrencyCode: String? // v1.11+ 邮费显示币种，旧草稿默认 CNY
+    let shippingExchangeRateJPY: Double? // v1.15+ 邮费汇率快照
+    let shippingRateUpdatedAt: Date? // v1.15+ 邮费汇率记录时间
     let stock: Int
     let purchaseDate: Date
     let depositDate: Date
@@ -81,6 +85,8 @@ struct ClothingEditDraft: Codable {
          originalPrice: Double,
          originalPriceJPY: Double? = nil,
          originalPriceCurrencyCode: String? = nil,
+         originalPriceExchangeRateJPY: Double? = nil,
+         originalPriceRateUpdatedAt: Date? = nil,
          priceTotal: Double,
          deposit: Double,
          balance: Double,
@@ -88,6 +94,8 @@ struct ClothingEditDraft: Codable {
          shippingFee: Double? = nil,
          shippingFeeJPY: Double? = nil,
          shippingFeeCurrencyCode: String? = nil,
+         shippingExchangeRateJPY: Double? = nil,
+         shippingRateUpdatedAt: Date? = nil,
          stock: Int,
          purchaseDate: Date,
          depositDate: Date,
@@ -114,6 +122,8 @@ struct ClothingEditDraft: Codable {
         self.originalPrice = originalPrice
         self.originalPriceJPY = originalPriceJPY
         self.originalPriceCurrencyCode = originalPriceCurrencyCode
+        self.originalPriceExchangeRateJPY = originalPriceExchangeRateJPY
+        self.originalPriceRateUpdatedAt = originalPriceRateUpdatedAt
         self.priceTotal = priceTotal
         self.deposit = deposit
         self.balance = balance
@@ -121,6 +131,8 @@ struct ClothingEditDraft: Codable {
         self.shippingFee = shippingFee
         self.shippingFeeJPY = shippingFeeJPY
         self.shippingFeeCurrencyCode = shippingFeeCurrencyCode
+        self.shippingExchangeRateJPY = shippingExchangeRateJPY
+        self.shippingRateUpdatedAt = shippingRateUpdatedAt
         self.stock = stock
         self.purchaseDate = purchaseDate
         self.depositDate = depositDate
@@ -1370,6 +1382,7 @@ struct ClothingEditView: View {
             originalPrice: modelBinding(\.originalPrice),
             originalPriceJPY: modelBinding(\.originalPriceJPY),
             originalPriceCurrency: modelBinding(\.originalPriceCurrency),
+            originalPriceRateUpdatedAt: modelBinding(\.originalPriceRateUpdatedAt),
             priceTotal: modelBinding(\.priceTotal),
             deposit: modelBinding(\.deposit),
             balance: modelBinding(\.balance),
@@ -1381,6 +1394,7 @@ struct ClothingEditView: View {
             stock: modelBinding(\.stock),
             accessoryList: modelBinding(\.accessoryList),
             jpyExchangeRate: jpyExchangeRate,
+            onRefreshJPYRate: { await refreshJPYRateForEditor(force: true) },
             priceChartImagePath: modelBinding(\.priceChartImagePath),
             deleteChartFileImmediately: !isEditing,
             onShowToast: handleShowToast
@@ -1404,6 +1418,7 @@ struct ClothingEditView: View {
         let originalPrice: Double
         let originalPriceJPY: Double
         let originalPriceCurrency: ClothingPriceCurrency
+        let originalPriceRateUpdatedAt: Date?
         let priceTotal: Double
         let deposit: Double
         let balance: Double
@@ -1411,6 +1426,8 @@ struct ClothingEditView: View {
         let shippingFee: Double
         let shippingFeeJPY: Double
         let shippingFeeCurrency: ClothingPriceCurrency
+        let shippingRateUpdatedAt: Date?
+        let jpyExchangeRate: Double
         let stock: Int
         let purchaseDate: Date
         let depositDate: Date
@@ -1438,6 +1455,7 @@ struct ClothingEditView: View {
             originalPrice: originalPrice,
             originalPriceJPY: originalPriceJPY,
             originalPriceCurrency: originalPriceCurrency,
+            originalPriceRateUpdatedAt: originalPriceRateUpdatedAt,
             priceTotal: priceTotal,
             deposit: deposit,
             balance: balance,
@@ -1445,6 +1463,8 @@ struct ClothingEditView: View {
             shippingFee: shippingFee,
             shippingFeeJPY: shippingFeeJPY,
             shippingFeeCurrency: shippingFeeCurrency,
+            shippingRateUpdatedAt: shippingRateUpdatedAt,
+            jpyExchangeRate: jpyExchangeRate,
             stock: stock,
             purchaseDate: purchaseDate,
             depositDate: depositDate,
@@ -1582,7 +1602,9 @@ struct ClothingEditView: View {
             DraftReliabilitySignpost.editorInit(isEditing: isEditing, continueFromDraft: continueFromDraft, sessionID: editorSessionID)
             draftManager.registerActiveEditor(editorSessionID)
             initializeEditorIfNeeded()
-            Task { await refreshJPYRateForEditor() }
+            if originalPriceRateUpdatedAt == nil {
+                Task { await refreshJPYRateForEditor(force: false) }
+            }
         }
         .onChange(of: imagePaths) { oldValue, newValue in
             print("ClothingEditView: imagePaths changed from \(oldValue.count) to \(newValue.count) images")
@@ -1848,6 +1870,8 @@ struct ClothingEditView: View {
             originalPrice: originalPrice,
             originalPriceJPY: originalPriceJPY,
             originalPriceCurrencyCode: originalPriceCurrency.rawValue,
+            originalPriceExchangeRateJPY: effectiveJPYRate,
+            originalPriceRateUpdatedAt: originalPriceRateUpdatedAt,
             priceTotal: priceTotal,
             deposit: deposit,
             balance: balance,
@@ -1855,6 +1879,8 @@ struct ClothingEditView: View {
             shippingFee: shippingFee,
             shippingFeeJPY: shippingFeeJPY,
             shippingFeeCurrencyCode: shippingFeeCurrency.rawValue,
+            shippingExchangeRateJPY: effectiveJPYRate,
+            shippingRateUpdatedAt: shippingRateUpdatedAt,
             stock: stock,
             purchaseDate: purchaseDate,
             depositDate: depositDate,
@@ -1931,9 +1957,14 @@ struct ClothingEditView: View {
         originalPrice = draft.originalPrice
         originalPriceJPY = draft.originalPriceJPY ?? 0
         originalPriceCurrency = ClothingPriceCurrency(rawValue: draft.originalPriceCurrencyCode ?? "") ?? .cny
+        if let draftRate = draft.originalPriceExchangeRateJPY ?? draft.shippingExchangeRateJPY, draftRate > 0 {
+            jpyExchangeRate = draftRate
+        }
+        originalPriceRateUpdatedAt = draft.originalPriceRateUpdatedAt
         shippingFee = draft.shippingFee ?? 0
         shippingFeeJPY = draft.shippingFeeJPY ?? 0
         shippingFeeCurrency = ClothingPriceCurrency(rawValue: draft.shippingFeeCurrencyCode ?? "") ?? .cny
+        shippingRateUpdatedAt = draft.shippingRateUpdatedAt
         syncCurrencyAmountsFromPreferredCurrency()
         priceTotal = draft.priceTotal
         deposit = draft.deposit
@@ -2149,12 +2180,25 @@ struct ClothingEditView: View {
         }
     }
 
-    private func refreshJPYRateForEditor() async {
+    @discardableResult
+    private func refreshJPYRateForEditor(force: Bool) async -> CurrencyExchangeRateRefreshResult {
         let service = CurrencyExchangeRateService.shared
-        let rate = await service.refreshJPYRateIfAllowed()
-        jpyExchangeRate = rate
-        originalPriceRateUpdatedAt = service.lastUpdatedAt
-        shippingRateUpdatedAt = service.lastUpdatedAt
+        let editorPreviousRate = jpyExchangeRate
+        let editorPreviousOriginalUpdatedAt = originalPriceRateUpdatedAt
+        let editorPreviousShippingUpdatedAt = shippingRateUpdatedAt
+        let result = await service.refreshCNYRates(force: force)
+        if force, result.errorMessage != nil {
+            jpyExchangeRate = editorPreviousRate
+            originalPriceRateUpdatedAt = editorPreviousOriginalUpdatedAt
+            shippingRateUpdatedAt = editorPreviousShippingUpdatedAt
+            return result
+        }
+        jpyExchangeRate = result.snapshot.cnyToJPYRate
+        if result.errorMessage == nil {
+            originalPriceRateUpdatedAt = result.snapshot.updatedAt
+            shippingRateUpdatedAt = result.snapshot.updatedAt
+        }
+        return result
     }
 
     // MARK: - Toast 提示

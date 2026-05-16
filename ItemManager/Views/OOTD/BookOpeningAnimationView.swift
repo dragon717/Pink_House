@@ -95,6 +95,7 @@ struct BookOpeningAnimationView: View {
            let image = ImageManager.shared.loadImage(fileName: coverPath) {
             coverImage = image
         } else if let firstPage = validPages.first,
+                  firstPage.shouldUseStoredSnapshot,
                   let snapshotPath = firstPage.snapshotPath,
                   let image = ImageManager.shared.loadImage(fileName: snapshotPath) {
             coverImage = image
@@ -109,7 +110,8 @@ struct BookOpeningAnimationView: View {
             let pageIndex = i % validPages.count
             let page = validPages[pageIndex]
             
-            if let snapshotPath = page.snapshotPath,
+            if page.shouldUseStoredSnapshot,
+               let snapshotPath = page.snapshotPath,
                let image = ImageManager.shared.loadImage(fileName: snapshotPath) {
                 pageImages[i] = image
             }

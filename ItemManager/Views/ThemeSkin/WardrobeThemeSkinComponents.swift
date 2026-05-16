@@ -66,18 +66,22 @@ struct WardrobeThemeStatsCardContainer<Content: View>: View {
         .padding(.horizontal, 16)
         .padding(.vertical, 14)
         .background {
-            ThemeSkinOptionalResizableAsset(
-                ThemeSkinAssetName.cardStatsDefault,
-                namespace: descriptor?.assetNamespace,
-                allowShortNameFallback: !SkyConcertThemeSkin.shouldAvoidShortAssetFallback(for: descriptor),
-                capInsets: ThemeSkinAssetName.capInsets(for: ThemeSkinAssetName.cardStatsDefault)
-            ) {
-                ThemeSkinOrnateFrameSurface(
-                    descriptor: descriptor,
-                    cornerRadius: 24,
-                    style: .hero,
-                    showsDecoration: false
-                )
+            ZStack {
+                ThemeSkinOptionalResizableAsset(
+                    ThemeSkinAssetName.cardStatsDefault,
+                    namespace: descriptor?.assetNamespace,
+                    allowShortNameFallback: !SkyConcertThemeSkin.shouldAvoidShortAssetFallback(for: descriptor),
+                    capInsets: ThemeSkinAssetName.capInsets(for: ThemeSkinAssetName.cardStatsDefault)
+                ) {
+                    ThemeSkinOrnateFrameSurface(
+                        descriptor: descriptor,
+                        cornerRadius: 24,
+                        style: .hero,
+                        showsDecoration: false
+                    )
+                }
+
+                statsDecorationLayer
             }
         }
         .overlay {
@@ -87,16 +91,6 @@ struct WardrobeThemeStatsCardContainer<Content: View>: View {
                 style: .hero,
                 showsDecoration: false
             )
-        }
-        .overlay {
-            if SkyConcertThemeSkin.isSkyConcert(descriptor) {
-                SkyConcertDecorationLayer(placements: SkyConcertThemeSkin.statsCardPlacements)
-            } else if SwanDreamThemeSkin.isSwanDream(descriptor) {
-                SkyConcertDecorationLayer(
-                    placements: SwanDreamThemeSkin.statsCardPlacements,
-                    namespace: SwanDreamThemeSkin.namespace
-                )
-            }
         }
         .overlay(alignment: .topTrailing) {
             if !SkyConcertThemeSkin.hasDedicatedVisualProfile(descriptor),
@@ -113,6 +107,18 @@ struct WardrobeThemeStatsCardContainer<Content: View>: View {
             }
         }
         .shadow(color: SkyConcertThemeSkin.shadowColor(for: descriptor), radius: 12, x: 0, y: 6)
+    }
+
+    @ViewBuilder
+    private var statsDecorationLayer: some View {
+        if SkyConcertThemeSkin.isSkyConcert(descriptor) {
+            SkyConcertDecorationLayer(placements: SkyConcertThemeSkin.statsCardPlacements)
+        } else if SwanDreamThemeSkin.isSwanDream(descriptor) {
+            SkyConcertDecorationLayer(
+                placements: SwanDreamThemeSkin.statsCardPlacements,
+                namespace: SwanDreamThemeSkin.namespace
+            )
+        }
     }
 }
 

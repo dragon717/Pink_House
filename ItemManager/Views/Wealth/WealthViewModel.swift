@@ -56,6 +56,13 @@ class WealthViewModel {
     var isGoldReady: Bool = false
     var isSilverReady: Bool = false
     var lastUpdatedDate: String? = nil
+
+    init() {
+        let exchangeService = CurrencyExchangeRateService.shared
+        exchangeRateJPY = exchangeService.cnyToJPYRate
+        exchangeRateUSD = exchangeService.cnyToUSDRate
+        lastUpdatedDate = exchangeService.lastProviderDate
+    }
     
     // Gold Configuration
     let goldBeanWeightGrams: Double = 1.0 // 1g per bean
@@ -162,9 +169,16 @@ class WealthViewModel {
     func fetchExchangeRate() async {
         guard !isFetchingRate else { return }
         isFetchingRate = true
-        
-        // Fetch JPY Rate
-        await fetchJPYRate()
+
+        let exchangeResult = await CurrencyExchangeRateService.shared.refreshCNYRates(force: true)
+        if let errorMessage = exchangeResult.errorMessage {
+            print("WealthViewModel: failed to fetch CNY exchange rates: \(errorMessage)")
+        } else {
+            exchangeRateJPY = exchangeResult.snapshot.cnyToJPYRate
+            exchangeRateUSD = exchangeResult.snapshot.cnyToUSDRate
+            lastUpdatedDate = exchangeResult.snapshot.providerDate
+        }
+
         // Fetch Gold Price
         await fetchGoldPrice()
         // Fetch Silver Price
@@ -174,39 +188,6 @@ class WealthViewModel {
             self.isFetchingRate = false
             self.isGoldReady = true
             self.isSilverReady = true
-        }
-    }
-    
-    private func fetchJPYRate() async {
-        guard let url = URL(string: "https://api.exchangerate-api.com/v4/latest/CNY") else { return }
-
-        do {
-            let (data, _) = try await URLSession.shared.data(from: url)
-            if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
-               let rates = json["rates"] as? [String: Double] {
-
-                // 获取日元汇率
-                if let jpyRate = rates["JPY"] {
-                    await MainActor.run {
-                        self.exchangeRateJPY = jpyRate
-                    }
-                }
-
-                // 获取美元汇率
-                if let usdRate = rates["USD"] {
-                    await MainActor.run {
-                        self.exchangeRateUSD = usdRate
-                    }
-                }
-
-                await MainActor.run {
-                    if let dateStr = json["date"] as? String {
-                        self.lastUpdatedDate = dateStr
-                    }
-                }
-            }
-        } catch {
-            print("Failed to fetch exchange rates: \(error)")
         }
     }
     

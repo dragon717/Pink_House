@@ -267,6 +267,7 @@ struct BookCoverVisuals: View {
         }
         // Fallback to first page
         if let firstPage = (book.pages ?? []).filter({ !$0.isDeleted }).sorted(by: { $0.createdAt > $1.createdAt }).first,
+           firstPage.shouldUseStoredSnapshot,
            let snapshotPath = firstPage.snapshotPath,
            let image = ImageManager.shared.loadImage(fileName: snapshotPath) {
             return image

@@ -386,7 +386,8 @@ struct OutfitCard: View {
             HStack(spacing: 12) {
                 // Thumbnail
                 Group {
-                    if let snapshotPath = outfit.snapshotPath,
+                    if outfit.shouldUseStoredSnapshot,
+                       let snapshotPath = outfit.snapshotPath,
                        let uiImage = ImageManager.shared.loadImage(fileName: snapshotPath) {
                         Image(uiImage: uiImage)
                             .resizable()

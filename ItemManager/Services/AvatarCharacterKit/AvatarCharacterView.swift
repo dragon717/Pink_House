@@ -26,7 +26,7 @@ struct AvatarCharacterView: View {
             characterID: request.characterID,
             hairStyleID: request.hairStyleID
         ) {
-            AvatarLayeredMotionView(request: request, contentMode: contentMode)
+            AvatarLayeredMotionView(request: request.staticSnapshotRequest, contentMode: contentMode)
         } else if let image = AvatarStaticImageResolver.image(
             characterID: request.characterID,
             hairStyleID: request.hairStyleID
@@ -111,5 +111,13 @@ struct AvatarCharacterView: View {
                 .font(.system(size: 42, weight: .light))
                 .foregroundStyle(Color.pink.opacity(0.45))
         }
+    }
+}
+
+private extension AvatarRenderRequest {
+    var staticSnapshotRequest: AvatarRenderRequest {
+        var copy = self
+        copy.isPaused = true
+        return copy
     }
 }

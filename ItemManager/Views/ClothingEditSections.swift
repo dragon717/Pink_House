@@ -233,6 +233,7 @@ struct ClothingPriceView: View {
     @Binding var originalPrice: Double
     @Binding var originalPriceJPY: Double
     @Binding var originalPriceCurrency: ClothingPriceCurrency
+    @Binding var originalPriceRateUpdatedAt: Date?
     @Binding var priceTotal: Double
     @Binding var deposit: Double
     @Binding var balance: Double
@@ -244,6 +245,7 @@ struct ClothingPriceView: View {
     @Binding var stock: Int
     @Binding var accessoryList: [AccessoryItemData]
     var jpyExchangeRate: Double = CurrencyExchangeRateService.defaultJPYRate
+    var onRefreshJPYRate: (() async -> CurrencyExchangeRateRefreshResult)?
     
     // 价格表图片
     @Binding var priceChartImagePath: String?
@@ -251,6 +253,9 @@ struct ClothingPriceView: View {
     
     // 回调闭包用于显示 Toast
     var onShowToast: ((String, ToastType) -> Void)?
+
+    @State private var showingRefreshRateConfirmation = false
+    @State private var isRefreshingJPYRate = false
     
     // 提示类型
     enum ToastType {
@@ -296,6 +301,7 @@ struct ClothingPriceView: View {
                     currency: $originalPriceCurrency,
                     exchangeRateJPY: jpyExchangeRate
                 )
+                originalPriceExchangeRateSnapshot
                 Divider()
                 PriceRow(title: "裙装总价合计", value: $priceTotal)
                 Divider()
@@ -548,6 +554,56 @@ struct ClothingPriceView: View {
         .themeSkinAdaptiveSectionCard(slot: .sectionCard, cornerRadius: 16) {
             Color(uiColor: .secondarySystemGroupedBackground)
         }
+        .alert("刷新日元汇率？", isPresented: $showingRefreshRateConfirmation) {
+            Button("取消", role: .cancel) {}
+            Button("刷新汇率") {
+                Task { await refreshJPYRateAfterConfirmation() }
+            }
+        } message: {
+            Text("会联网查询当前 CNY→JPY 汇率，并用新汇率重新折算原价和邮费。保存后，这个汇率会作为这条裙装记录的当时汇率。")
+        }
+    }
+
+    private var originalPriceExchangeRateSnapshot: some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: "clock.badge.checkmark")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .frame(width: 20)
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text("原价日元汇率")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Text("1 CNY = \(jpyExchangeRate, specifier: "%.4f") JPY")
+                    .font(.footnote.monospacedDigit())
+                    .foregroundStyle(.primary)
+                Text(originalPriceRateUpdatedAt.map { "记录时间：\($0.formatted(date: .numeric, time: .shortened))" } ?? "尚未记录实时汇率")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer(minLength: 8)
+
+            Button {
+                showingRefreshRateConfirmation = true
+            } label: {
+                if isRefreshingJPYRate {
+                    ProgressView()
+                        .controlSize(.small)
+                } else {
+                    Label("刷新", systemImage: "arrow.clockwise")
+                        .font(.caption)
+                }
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+            .disabled(isRefreshingJPYRate || onRefreshJPYRate == nil)
+            .accessibilityLabel("刷新日元汇率")
+        }
+        .padding(10)
+        .background(Color(uiColor: .tertiarySystemGroupedBackground).opacity(0.55))
+        .cornerRadius(8)
     }
     
     // MARK: - Helpers for Accessories
@@ -633,6 +689,18 @@ struct ClothingPriceView: View {
     /// 显示提示信息
     private func showToastMessage(_ message: String, type: ToastType) {
         onShowToast?(message, type)
+    }
+
+    private func refreshJPYRateAfterConfirmation() async {
+        guard let onRefreshJPYRate else { return }
+        isRefreshingJPYRate = true
+        let result = await onRefreshJPYRate()
+        isRefreshingJPYRate = false
+        if let errorMessage = result.errorMessage {
+            showToastMessage("刷新失败：\(errorMessage)", type: .error)
+        } else {
+            showToastMessage("已刷新并记录当前日元汇率", type: .success)
+        }
     }
 }
 

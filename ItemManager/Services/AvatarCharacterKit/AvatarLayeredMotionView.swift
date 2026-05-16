@@ -94,6 +94,7 @@ struct AvatarLayeredMotionView: View {
                             x: layer.placement.midX * scale,
                             y: layer.placement.midY * scale
                         )
+                        .opacity(layer.opacity)
                         .allowsHitTesting(false)
                 }
             }
@@ -165,6 +166,14 @@ enum AvatarLayerAssetResolver {
             return nil
         }
 
+        if let hybridPackage = makeHybridPackage(
+            rig: rig,
+            rootURL: rootURL,
+            hairStyleID: hairStyleID
+        ) {
+            return hybridPackage
+        }
+
         let bodyLayers = loadLayers(
             rig.layers,
             rootURL: rootURL,
@@ -198,6 +207,43 @@ enum AvatarLayerAssetResolver {
         return AvatarLayerPackage(sourceSize: rig.sourceSize.cgSize, bones: rig.bones, layers: layers)
     }
 
+    private static func makeHybridPackage(
+        rig: AvatarRigManifest,
+        rootURL: URL,
+        hairStyleID: AvatarHairStyleID
+    ) -> AvatarLayerPackage? {
+        guard let surfacePlates = rig.surfacePlates, !surfacePlates.isEmpty else {
+            return nil
+        }
+
+        let surfaceKey = surfacePlates[hairStyleID.rawValue] != nil ? hairStyleID.rawValue : "base_body"
+        guard let surfaceSpec = surfacePlates[surfaceKey],
+              let surfaceLayer = loadSurfacePlate(
+                surfaceSpec,
+                name: surfaceKey,
+                rootURL: rootURL,
+                sourceSize: rig.sourceSize.cgSize
+              ) else {
+            return nil
+        }
+
+        let overlayLayers = loadLayers(
+            surfaceSpec.layers ?? [],
+            rootURL: rootURL,
+            sourceSize: rig.sourceSize.cgSize,
+            fallbackCanvasSize: rig.sourceSize.cgSize,
+            hairStyleID: hairStyleID
+        )
+        let layers = ([surfaceLayer] + overlayLayers).sorted { lhs, rhs in
+            if lhs.z == rhs.z {
+                return lhs.name < rhs.name
+            }
+            return lhs.z < rhs.z
+        }
+
+        return AvatarLayerPackage(sourceSize: rig.sourceSize.cgSize, bones: rig.bones, layers: layers)
+    }
+
     private static func decode<T: Decodable>(_ type: T.Type, from url: URL) -> T? {
         guard let data = try? Data(contentsOf: url) else { return nil }
         let decoder = JSONDecoder()
@@ -212,6 +258,31 @@ enum AvatarLayerAssetResolver {
             return resourceURL.appendingPathComponent(path)
         }
         return rootURL.appendingPathComponent(path)
+    }
+
+    private static func loadSurfacePlate(
+        _ spec: AvatarSurfacePlateSpec,
+        name: String,
+        rootURL: URL,
+        sourceSize: CGSize
+    ) -> AvatarLayer? {
+        let imageURL = resourceURL(for: spec.file, rootURL: rootURL)
+        guard let image = UIImage(contentsOfFile: imageURL.path) else { return nil }
+
+        let canvasSize = spec.canvasSize?.cgSize ?? sourceSize
+        let placement = spec.placementRect(sourceSize: sourceSize, canvasSize: canvasSize)
+        guard placement.width > 0, placement.height > 0 else { return nil }
+
+        return AvatarLayer(
+            name: "surface_plate_\(name)",
+            image: image,
+            placement: placement,
+            bone: spec.bone ?? "root",
+            z: spec.z ?? 0,
+            anchorPixels: spec.anchorPixels,
+            opacity: spec.opacity ?? 1,
+            motionRole: spec.motionRole
+        )
     }
 
     private static func loadLayers(
@@ -237,7 +308,10 @@ enum AvatarLayerAssetResolver {
                 image: image,
                 placement: placement,
                 bone: spec.bone,
-                z: spec.z
+                z: spec.z,
+                anchorPixels: spec.anchorPixels,
+                opacity: spec.opacity ?? 1,
+                motionRole: spec.motionRole
             )
         }
     }
@@ -267,14 +341,23 @@ struct AvatarLayerPackage {
             Double(layer.placement.midX / max(sourceSize.width, 1)),
             Double(layer.placement.midY / max(sourceSize.height, 1))
         ]
-        guard normalizedAnchor.count >= 2,
-              layer.placement.width > 0,
+        guard layer.placement.width > 0,
               layer.placement.height > 0 else {
             return .center
         }
 
-        let anchorX = CGFloat(normalizedAnchor[0]) * sourceSize.width
-        let anchorY = CGFloat(normalizedAnchor[1]) * sourceSize.height
+        let anchorX: CGFloat
+        let anchorY: CGFloat
+        if let anchorPixels = layer.anchorPixels, anchorPixels.count >= 2 {
+            anchorX = CGFloat(anchorPixels[0])
+            anchorY = CGFloat(anchorPixels[1])
+        } else if normalizedAnchor.count >= 2 {
+            anchorX = CGFloat(normalizedAnchor[0]) * sourceSize.width
+            anchorY = CGFloat(normalizedAnchor[1]) * sourceSize.height
+        } else {
+            anchorX = layer.placement.midX
+            anchorY = layer.placement.midY
+        }
         let unitX = (anchorX - layer.placement.minX) / layer.placement.width
         let unitY = (anchorY - layer.placement.minY) / layer.placement.height
         return UnitPoint(x: unitX.clamped(to: 0...1), y: unitY.clamped(to: 0...1))
@@ -288,18 +371,23 @@ struct AvatarLayer: Identifiable {
     let placement: CGRect
     let bone: String
     let z: Int
+    let anchorPixels: [Double]?
+    let opacity: Double
+    let motionRole: String?
 }
 
 private struct AvatarRigManifest: Decodable {
     let sourceSize: AvatarSize
     let layers: [AvatarLayerSpec]
     let bones: [String: AvatarBoneSpec]
+    let surfacePlates: [String: AvatarSurfacePlateSpec]?
     let embeddedOutfits: [String: AvatarEmbeddedOutfitSpec]?
 
     enum CodingKeys: String, CodingKey {
         case sourceSize = "source_size"
         case layers
         case bones
+        case surfacePlates = "surface_plates"
         case embeddedOutfits = "embedded_outfits"
     }
 }
@@ -310,11 +398,13 @@ private struct AvatarLayerGroupManifest: Decodable {
 
 private struct AvatarEmbeddedOutfitSpec: Decodable {
     let manifest: String
+    let surfacePlate: String?
     let showInStickerList: Bool?
     let hairStyleScope: String?
 
     enum CodingKeys: String, CodingKey {
         case manifest
+        case surfacePlate = "surface_plate"
         case showInStickerList = "show_in_sticker_list"
         case hairStyleScope = "hair_style_scope"
     }
@@ -333,6 +423,9 @@ private struct AvatarLayerSpec: Decodable {
     let bone: String
     let z: Int
     let hairStyleScope: String?
+    let anchorPixels: [Double]?
+    let motionRole: String?
+    let opacity: Double?
 
     enum CodingKeys: String, CodingKey {
         case name
@@ -343,6 +436,9 @@ private struct AvatarLayerSpec: Decodable {
         case bone
         case z
         case hairStyleScope = "hair_style_scope"
+        case anchorPixels = "anchor_pixels"
+        case motionRole = "motion_role"
+        case opacity
     }
 
     func placementRect(sourceSize: CGSize, canvasSize: CGSize) -> CGRect {
@@ -361,6 +457,44 @@ private struct AvatarLayerSpec: Decodable {
 struct AvatarBoneSpec: Decodable {
     let parent: String?
     let anchor: [Double]
+}
+
+private struct AvatarSurfacePlateSpec: Decodable {
+    let file: String
+    let sourceBBoxPixels: [Double]?
+    let placementBBoxPixels: [Double]?
+    let canvasSize: AvatarSize?
+    let bone: String?
+    let z: Int?
+    let anchorPixels: [Double]?
+    let motionRole: String?
+    let opacity: Double?
+    let layers: [AvatarLayerSpec]?
+
+    enum CodingKeys: String, CodingKey {
+        case file
+        case sourceBBoxPixels = "source_bbox_pixels"
+        case placementBBoxPixels = "placement_bbox_pixels"
+        case canvasSize = "canvas_size"
+        case bone
+        case z
+        case anchorPixels = "anchor_pixels"
+        case motionRole = "motion_role"
+        case opacity
+        case layers
+    }
+
+    func placementRect(sourceSize: CGSize, canvasSize: CGSize) -> CGRect {
+        let raw = placementBBoxPixels ?? sourceBBoxPixels ?? [0, 0, Double(canvasSize.width), Double(canvasSize.height)]
+        guard raw.count == 4 else { return .zero }
+        let scaleX = sourceSize.width / max(canvasSize.width, 1)
+        let scaleY = sourceSize.height / max(canvasSize.height, 1)
+        let x0 = CGFloat(raw[0]) * scaleX
+        let y0 = CGFloat(raw[1]) * scaleY
+        let x1 = CGFloat(raw[2]) * scaleX
+        let y1 = CGFloat(raw[3]) * scaleY
+        return CGRect(x: x0, y: y0, width: max(0, x1 - x0), height: max(0, y1 - y0))
+    }
 }
 
 private struct AvatarSize: Decodable {

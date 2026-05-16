@@ -21,6 +21,7 @@ struct OOTDMannequinBackground: Identifiable, Hashable {
     static let defaultID = "ootd_mannequin_default"
     static let legacyAssetName = "ootd"
     static let shortBobID = "\(AvatarCharacterID.girlV1.rawValue)_short_bob"
+    static let temporarilyHideAvatarMannequins = true
 
     static let all: [OOTDMannequinBackground] = [
         OOTDMannequinBackground(
@@ -77,7 +78,24 @@ struct OOTDMannequinBackground: Identifiable, Hashable {
 
     /// Manifest-gated exposure: only list mannequin choices whose image asset is actually bundled.
     static var available: [OOTDMannequinBackground] {
-        all.filter(\.isAvailable)
+        all.filter { $0.isAvailable && !$0.isTemporarilyHidden }
+    }
+
+    static func shouldUseStoredSnapshot(canvasType: String, mannequinAssetID: String?) -> Bool {
+        !(canvasType == OOTDCanvasType.mannequin && isHiddenAvatarMannequinID(mannequinAssetID))
+    }
+
+    private static func isHiddenAvatarMannequinID(_ id: String?) -> Bool {
+        guard temporarilyHideAvatarMannequins,
+              let id,
+              let match = all.first(where: { $0.id == id }) else {
+            return false
+        }
+        return match.avatarCharacterID != nil
+    }
+
+    private var isTemporarilyHidden: Bool {
+        Self.temporarilyHideAvatarMannequins && avatarCharacterID != nil
     }
 
     private var isAvailable: Bool {
@@ -99,6 +117,9 @@ struct OOTDMannequinBackground: Identifiable, Hashable {
               let match = all.first(where: { $0.id == id }) else {
             return defaultBackground
         }
+        if match.isTemporarilyHidden {
+            return defaultBackground
+        }
         return match
     }
 
@@ -112,6 +133,15 @@ struct OOTDMannequinBackground: Identifiable, Hashable {
             return legacyAssetName
         }
         return candidate.assetName
+    }
+}
+
+extension Outfit {
+    var shouldUseStoredSnapshot: Bool {
+        OOTDMannequinBackground.shouldUseStoredSnapshot(
+            canvasType: canvasType,
+            mannequinAssetID: mannequinAssetID
+        )
     }
 }
 

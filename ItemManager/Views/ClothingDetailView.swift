@@ -677,6 +677,17 @@ struct ClothingDetailView: View {
         }
     }
 
+    private var formattedOriginalPriceRateSnapshot: String {
+        let rate = clothing.originalPriceExchangeRateJPY > 0
+            ? clothing.originalPriceExchangeRateJPY
+            : Decimal(CurrencyExchangeRateService.defaultJPYRate)
+        let rateText = rate.formatted(.number.precision(.fractionLength(0...4)))
+        guard let updatedAt = clothing.originalPriceRateUpdatedAt else {
+            return "1 CNY = \(rateText) JPY（未记录时间）"
+        }
+        return "1 CNY = \(rateText) JPY（\(updatedAt.formatted(date: .numeric, time: .shortened))）"
+    }
+
     private var formattedShippingFee: String {
         switch clothing.shippingFeeCurrency {
         case .cny:
@@ -741,6 +752,7 @@ struct ClothingDetailView: View {
             
             if clothing.originalPrice > 0 || clothing.originalPriceJPY > 0 {
                 InfoRow(label: "原价", value: formattedOriginalPrice)
+                InfoRow(label: "原价汇率", value: formattedOriginalPriceRateSnapshot)
             }
 
             if clothing.resolvedShippingFee > 0 || clothing.shippingFeeJPY > 0 {
@@ -1179,12 +1191,14 @@ struct FinalPaymentSegmentedProgressView: View {
     var accent: Color = Color(hex: "C94C72")
     var completedColor: Color = .green
     var height: CGFloat = 7
+    var fillsAvailableWidth: Bool = true
 
     @State private var isAnimated = false
 
     private var safeTotal: Int { max(total, 1) }
+    private let segmentSpacing: CGFloat = 7
 
-    private var segmentWidth: CGFloat {
+    private var baseSegmentWidth: CGFloat {
         switch safeTotal {
         case 1...3: return 44
         case 4...6: return 34
@@ -1193,14 +1207,22 @@ struct FinalPaymentSegmentedProgressView: View {
     }
 
     var body: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 7) {
-                ForEach(1...safeTotal, id: \.self) { index in
-                    segment(index: index)
+        GeometryReader { proxy in
+            let segmentWidth = resolvedSegmentWidth(availableWidth: proxy.size.width)
+            let contentWidth = CGFloat(safeTotal) * segmentWidth + CGFloat(max(safeTotal - 1, 0)) * segmentSpacing
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: segmentSpacing) {
+                    ForEach(1...safeTotal, id: \.self) { index in
+                        segment(index: index, width: segmentWidth)
+                    }
                 }
+                .padding(.vertical, 2)
             }
-            .padding(.vertical, 2)
+            .scrollDisabled(contentWidth <= proxy.size.width + 0.5)
         }
+        .frame(maxWidth: .infinity)
+        .frame(height: height + 4)
         .accessibilityLabel("尾款分期进度 \(min(completed, safeTotal)) / \(safeTotal)")
         .onAppear(perform: restartAnimation)
         .onChange(of: completed) { _, _ in restartAnimation() }
@@ -1208,7 +1230,15 @@ struct FinalPaymentSegmentedProgressView: View {
         .onChange(of: activeIndex) { _, _ in restartAnimation() }
     }
 
-    private func segment(index: Int) -> some View {
+    private func resolvedSegmentWidth(availableWidth: CGFloat) -> CGFloat {
+        guard fillsAvailableWidth, availableWidth > 0 else { return baseSegmentWidth }
+
+        let totalSpacing = CGFloat(max(safeTotal - 1, 0)) * segmentSpacing
+        let fittedWidth = (availableWidth - totalSpacing) / CGFloat(safeTotal)
+        return max(baseSegmentWidth, fittedWidth)
+    }
+
+    private func segment(index: Int, width: CGFloat) -> some View {
         let isComplete = index <= completed
         let isActive = activeIndex == index && !isComplete
         let fillScale: CGFloat = isComplete ? 1.0 : (isActive ? 0.34 : 0.0)
@@ -1226,7 +1256,7 @@ struct FinalPaymentSegmentedProgressView: View {
                     .stroke(accent.opacity(0.58), lineWidth: 1.2)
             }
         }
-        .frame(width: segmentWidth, height: height)
+        .frame(width: width, height: height)
         .animation(
             .spring(response: 0.42, dampingFraction: 0.82)
                 .delay(Double(index - 1) * 0.045),

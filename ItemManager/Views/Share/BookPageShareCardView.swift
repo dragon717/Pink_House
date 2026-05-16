@@ -82,7 +82,8 @@ struct OutfitShareCardView: View {
     let cardBackground: UIImage?
     
     var thumbnailImage: UIImage? {
-        guard let path = outfit.snapshotPath else { return nil }
+        guard outfit.shouldUseStoredSnapshot,
+              let path = outfit.snapshotPath else { return nil }
         return ImageManager.shared.loadImage(fileName: path)
     }
     
