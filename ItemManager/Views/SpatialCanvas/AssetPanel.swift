@@ -566,7 +566,7 @@ struct TemplateAssetList: View {
     
     let templates = [
         ("洛可可风格", "rococo", Color.pink),
-        ("法式复古", "french", Color.brown),
+        ("宫廷洛可可", "palace_rococo", Color.purple),
         ("现代简约", "modern", Color.gray),
         ("梦幻花园", "garden", Color.green),
         ("星空主题", "starry", Color.indigo)
