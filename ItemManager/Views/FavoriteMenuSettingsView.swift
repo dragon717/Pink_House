@@ -2,6 +2,7 @@ import SwiftUI
 
 struct FavoriteMenuSettingsView: View {
     @StateObject private var settingsManager = FavoriteMenuSettingsManager.shared
+    @StateObject private var bottomDockSettingsManager = BottomDockSettingsManager.shared
     @Environment(ThemeManager.self) private var themeManager
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.dismiss) private var dismiss
@@ -20,19 +21,29 @@ struct FavoriteMenuSettingsView: View {
                     .ignoresSafeArea()
 
                 List {
+                    Section {
+                        ForEach(bottomDockSettingsManager.availableFeatures) { feature in
+                            BottomDockFeatureRow(
+                                feature: feature,
+                                isSelected: bottomDockSettingsManager.selectedFeatureID == feature.id
+                            ) {
+                                bottomDockSettingsManager.setSelectedFeature(feature.id)
+                            }
+                            .listRowBackground(settingsRowBackground)
+                        }
+                    } header: {
+                        Text("底部快捷入口")
+                            .foregroundColor(themeManager.secondaryTextColor)
+                    } footer: {
+                        Text("替换底部最右侧入口。固定保留「衣橱」「House」「我」，这里负责你最常用的第四个入口。")
+                            .foregroundColor(themeManager.secondaryTextColor)
+                    }
+
                     // 已选中的常用功能（可排序），只显示已解锁的
                     Section {
                         ForEach(selectedAndUnlockedItems) { item in
                             SelectedItemRow(item: item, isEditing: isEditing)
-                                .listRowBackground(
-                                    RoundedRectangle(cornerRadius: 16)
-                                        .fill(themeManager.cardBackgroundColor.opacity(colorScheme == .dark ? 0.6 : 0.8))
-                                        .overlay(
-                                            RoundedRectangle(cornerRadius: 16)
-                                                .stroke(themeManager.accentTextColor.opacity(0.15), lineWidth: 1)
-                                        )
-                                        .padding(.vertical, 4)
-                                )
+                                .listRowBackground(settingsRowBackground)
                         }
                         .onMove { from, to in
                             settingsManager.reorderItems(from: from, to: to)
@@ -44,10 +55,10 @@ struct FavoriteMenuSettingsView: View {
                             }
                         }
                     } header: {
-                        Text("已选中的常用功能（左滑删除，最多 \(maxItems) 个）")
+                        Text("House 长按菜单（左滑删除，最多 \(maxItems) 个）")
                             .foregroundColor(themeManager.secondaryTextColor)
                     } footer: {
-                        Text("长按House Tab 按钮，常用分类将显示这些功能")
+                        Text("长按 House Tab 时仍会显示这些功能；底部快捷入口与这里互不冲突。")
                             .foregroundColor(themeManager.secondaryTextColor)
                     }
 
@@ -66,26 +77,18 @@ struct FavoriteMenuSettingsView: View {
                                     settingsManager.addItem(item)
                                 }
                             }
-                            .listRowBackground(
-                                RoundedRectangle(cornerRadius: 16)
-                                    .fill(themeManager.cardBackgroundColor.opacity(colorScheme == .dark ? 0.6 : 0.8))
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 16)
-                                            .stroke(themeManager.accentTextColor.opacity(0.15), lineWidth: 1)
-                                    )
-                                    .padding(.vertical, 4)
-                            )
+                            .listRowBackground(settingsRowBackground)
                         }
                     } header: {
-                        Text("可选功能")
+                        Text("House 菜单可选功能")
                             .foregroundColor(themeManager.secondaryTextColor)
                     } footer: {
-                        Text("最多可选择 \(maxItems) 个常用功能")
+                        Text("最多可选择 \(maxItems) 个 House 长按菜单功能")
                             .foregroundColor(themeManager.secondaryTextColor)
                     }
                 }
                 .scrollContentBackground(.hidden)
-                .navigationTitle("常用菜单设置")
+                .navigationTitle("常用入口设置")
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
                     ToolbarItem(placement: .topBarTrailing) {
@@ -125,6 +128,56 @@ struct FavoriteMenuSettingsView: View {
         allItems.filter { item in
             !settingsManager.selectedItems.contains(item) && item.isUnlocked
         }
+    }
+
+    private var settingsRowBackground: some View {
+        RoundedRectangle(cornerRadius: 16)
+            .fill(themeManager.cardBackgroundColor.opacity(colorScheme == .dark ? 0.6 : 0.8))
+            .overlay(
+                RoundedRectangle(cornerRadius: 16)
+                    .stroke(themeManager.accentTextColor.opacity(0.15), lineWidth: 1)
+            )
+            .padding(.vertical, 4)
+    }
+}
+
+// MARK: - 底部快捷入口行
+private struct BottomDockFeatureRow: View {
+    let feature: AppFeatureDescriptor
+    let isSelected: Bool
+    let action: () -> Void
+    @Environment(ThemeManager.self) private var themeManager
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 12) {
+                Image(systemName: feature.systemImage)
+                    .font(.title3)
+                    .foregroundColor(Color(hex: feature.tintHex))
+                    .frame(width: 36, height: 36)
+                    .background(Color(hex: feature.tintHex).opacity(0.15))
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(feature.title)
+                        .font(.body)
+                        .foregroundColor(themeManager.primaryTextColor)
+
+                    Text(feature.subtitle)
+                        .font(.caption)
+                        .foregroundColor(themeManager.secondaryTextColor)
+                }
+
+                Spacer()
+
+                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                    .font(.title3)
+                    .foregroundColor(isSelected ? themeManager.accentTextColor : themeManager.secondaryTextColor)
+            }
+            .padding(.vertical, 12)
+            .padding(.horizontal, 16)
+        }
+        .buttonStyle(PlainButtonStyle())
     }
 }
 

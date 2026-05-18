@@ -243,6 +243,7 @@ struct LegacyTabView: View {
     @ObservedObject private var petDataManager = PetDataManager.shared
     @StateObject private var mediaStateManager = MediaStateManager.shared
     @StateObject private var tabNavigationManager = TabNavigationManager.shared
+    @StateObject private var bottomDockSettingsManager = BottomDockSettingsManager.shared
     
     // 搜索文本状态
     @State private var searchText = ""
@@ -377,7 +378,8 @@ struct LegacyTabView: View {
                         index: 0,
                         title: "衣橱",
                         icon: "cabinet.fill",
-                        tabRole: .wardrobe
+                        tabRole: .wardrobe,
+                        isSelectedOverride: selectedTab == 0 && !isBottomDockFeatureActive
                     )
 
                     // House Tab
@@ -385,7 +387,8 @@ struct LegacyTabView: View {
                         index: 1,
                         title: smallWorldTabTitle,
                         icon: smallWorldTabIcon,
-                        tabRole: .house
+                        tabRole: .house,
+                        isSelectedOverride: selectedTab == 1 && !isBottomDockFeatureActive
                     )
 
                     // 我 Tab
@@ -393,16 +396,12 @@ struct LegacyTabView: View {
                         index: 2,
                         title: "我",
                         icon: "face.smiling",
-                        tabRole: .me
+                        tabRole: .me,
+                        isSelectedOverride: selectedTab == 2
                     )
 
-                    // 萌宠对话 Tab
-                    tabButton(
-                        index: 3,
-                        title: "萌宠对话",
-                        icon: "bubble.left.and.bubble.right.fill",
-                        tabRole: .petChat
-                    )
+                    // 用户自定义底部快捷入口
+                    bottomDockButton
                 }
                 .frame(height: 56)
                 .background {
@@ -434,8 +433,14 @@ struct LegacyTabView: View {
         }
     }
 
-    private func tabButton(index: Int, title: String, icon: String, tabRole: ThemeSkinTabRole) -> some View {
-        let isSelected = selectedTab == index
+    private func tabButton(
+        index: Int,
+        title: String,
+        icon: String,
+        tabRole: ThemeSkinTabRole,
+        isSelectedOverride: Bool? = nil
+    ) -> some View {
+        let isSelected = isSelectedOverride ?? (selectedTab == index)
         let isNotOnMenu: Bool = {
             if case .menu = smallWorldDestination { return false }
             return true
@@ -470,12 +475,89 @@ struct LegacyTabView: View {
         }
     }
 
+    private var bottomDockButton: some View {
+        let feature = bottomDockFeature
+        let isSelected = isFeatureActive(feature)
+
+        return Button {
+            activateBottomDockFeature(feature)
+        } label: {
+            ThemeSkinLegacyTabLabel(
+                descriptor: themedTabItemDescriptor,
+                title: feature.title,
+                systemImage: feature.systemImage,
+                isSelected: isSelected,
+                selectedColor: Color(hex: feature.tintHex),
+                inactiveColor: magicPalette.secondaryText,
+                tabRole: tabRole(for: feature)
+            )
+            .overlay {
+                Color.clear
+                    .frame(width: 68, height: 56)
+                    .allowsHitTesting(false)
+                    .captureGuideTarget(feature.id == .petChat ? .homePetChatTab : nil)
+            }
+        }
+    }
+
     private func resolveTabBarDescriptor(for slot: ThemeSkinSlot) -> ThemeSkinDescriptor? {
         guard let descriptor = themeSkinManager.activeThemeDescriptor(for: slot, state: .default),
               WardrobeThemeSkinSupport.isThemeSkinDescriptor(descriptor) else {
             return nil
         }
         return descriptor
+    }
+
+    private var bottomDockFeature: AppFeatureDescriptor {
+        bottomDockSettingsManager.selectedFeature
+    }
+
+    private var isBottomDockFeatureActive: Bool {
+        isFeatureActive(bottomDockFeature)
+    }
+
+    private func tabRole(for feature: AppFeatureDescriptor) -> ThemeSkinTabRole {
+        switch feature.route {
+        case .tab(let index):
+            return index == 3 ? .petChat : .house
+        case .wardrobe:
+            return .wardrobe
+        case .smallWorld:
+            return .house
+        }
+    }
+
+    private func isFeatureActive(_ feature: AppFeatureDescriptor) -> Bool {
+        switch feature.route {
+        case .tab(let tabIndex):
+            return selectedTab == tabIndex
+        case .wardrobe(let homeTab):
+            return selectedTab == 0 && homeTabSelection == homeTab
+        case .smallWorld(let destination):
+            return selectedTab == 1 && smallWorldDestination == destination
+        }
+    }
+
+    private func activateBottomDockFeature(_ feature: AppFeatureDescriptor) {
+        guard feature.isUnlocked else { return }
+
+        withAnimation(.easeInOut(duration: 0.2)) {
+            switch feature.route {
+            case .tab(let tabIndex):
+                selectedTab = tabIndex
+            case .wardrobe(let homeTab):
+                homeTabSelection = homeTab
+                selectedTab = 0
+            case .smallWorld(let destination):
+                if selectedTab == 1 {
+                    tabNavigationManager.markNavigatingInsideSmallWorld()
+                } else {
+                    tabNavigationManager.recordEnteringSmallWorldFromHomeTab(homeTabSelection)
+                }
+                smallWorldDestination = destination
+                selectedTab = 1
+            }
+        }
     }
 
     private var smallWorldTabTitle: String {

@@ -1860,7 +1860,7 @@ struct FeatureExperienceGuideOverlay: View {
                 }
             }
             .onChange(of: guideManager.guideTargetFrame(for: .favoriteMenuSettingsEntry)) { _, frame in
-                // 魔法贴纸引导：滚动到常用菜单入口可见时，推进到点击步骤
+                // 魔法贴纸引导：滚动到常用入口可见时，推进到点击步骤
                 if guideManager.currentFeatureExperienceFeature == .ootdDefaultBook,
                    magicStickerGuideStep == .step2_scrollToFavoriteMenu,
                    let frame,
@@ -4086,11 +4086,11 @@ struct FeatureExperienceGuideOverlay: View {
                         onReturn: handleMagicStickerGuideReturnAction
                     )
                 case .step2_scrollToFavoriteMenu:
-                    // 滚动引导：提示用户往下滑找到常用菜单
+                    // 滚动引导：提示用户往下滑找到常用入口
                     ZStack {
                         WidgetScrollHintView(
                             title: "请向下滑动",
-                            subtitle: "「常用菜单」入口在更下方"
+                            subtitle: "「常用入口」在更下方"
                         )
                         .allowsHitTesting(false)
 

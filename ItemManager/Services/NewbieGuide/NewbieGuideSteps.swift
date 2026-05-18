@@ -540,7 +540,7 @@ enum MagicStickerGuideStep: Int, CaseIterable, GuideStepDescribable {
         switch self {
         case .step1_returnToMeForMenuSetup: return "先返回「我」界面"
         case .step2_scrollToFavoriteMenu: return "请向下滑动"
-        case .step3_clickFavoriteMenuSettings: return "点击「常用菜单」"
+        case .step3_clickFavoriteMenuSettings: return "点击「常用入口」"
         case .step4_addMagicStickerButton: return "添加「魔法贴纸」"
         case .step5_returnToMeAfterMenuSetup: return "返回「我」界面"
         case .step6_longPressHouseTab: return "长按 House tab"
@@ -551,14 +551,14 @@ enum MagicStickerGuideStep: Int, CaseIterable, GuideStepDescribable {
 
     var message: String {
         switch self {
-        case .step1_returnToMeForMenuSetup: return "你的常用菜单里还没有「魔法贴纸」，先从魔法任务页返回到「我」，我们去补上这个入口。"
-        case .step2_scrollToFavoriteMenu: return "下滑找到「常用菜单」入口"
-        case .step3_clickFavoriteMenuSettings: return "先进入「常用菜单设置」，把「魔法贴纸」加入长按菜单。"
-        case .step4_addMagicStickerButton: return "点击右侧 + 把「魔法贴纸」加进常用菜单。若提示已满，先移除一个旧入口再添加。"
-        case .step5_returnToMeAfterMenuSetup: return "很好！现在从常用菜单设置返回到「我」，我们继续长按 House tab 体验魔法贴纸。"
+        case .step1_returnToMeForMenuSetup: return "你的 House 长按菜单里还没有「魔法贴纸」，先从魔法任务页返回到「我」，我们去补上这个入口。"
+        case .step2_scrollToFavoriteMenu: return "下滑找到「常用入口」"
+        case .step3_clickFavoriteMenuSettings: return "先进入「常用入口设置」，把「魔法贴纸」加入 House 长按菜单。"
+        case .step4_addMagicStickerButton: return "点击右侧 + 把「魔法贴纸」加进 House 长按菜单。若提示已满，先移除一个旧入口再添加。"
+        case .step5_returnToMeAfterMenuSetup: return "很好！现在从常用入口设置返回到「我」，我们继续长按 House tab 体验魔法贴纸。"
         case .step6_longPressHouseTab: return "请长按底部的 House tab，弹出常用菜单后，我们一起找到「魔法贴纸」。"
-        case .step7_clickMagicStickerEntry: return "在长按弹出的常用菜单里点击「魔法贴纸」，进入默认贴纸编辑页。"
-        case .step8_magicStickerExplanation: return "这里会直接进入默认贴纸页。主体区域是贴纸编辑内容，常用菜单能帮你继续跳到别的 House 功能；如果把贴纸加入手帐，还能继续回到对应手帐里编辑。"
+        case .step7_clickMagicStickerEntry: return "在长按弹出的 House 菜单里点击「魔法贴纸」，进入默认贴纸编辑页。"
+        case .step8_magicStickerExplanation: return "这里会直接进入默认贴纸页。主体区域是贴纸编辑内容，House 菜单能帮你继续跳到别的功能；如果把贴纸加入手帐，还能继续回到对应手帐里编辑。"
         }
     }
 

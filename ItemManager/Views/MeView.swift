@@ -192,11 +192,11 @@ struct MeView: View {
                         .buttonStyle(PlainButtonStyle())
                         .captureGuideTarget(.themeCustomizeEntry)
                         
-                        // 常用菜单设置
+                        // 常用入口设置
                         NavigationLink(destination: FavoriteMenuSettingsView()) {
                             SettingsGridItem(
-                                title: "常用菜单",
-                                subtitle: "长按菜单 · 常用设置",
+                                title: "常用入口",
+                                subtitle: "底栏快捷 · House 长按",
                                 icon: "star.fill",
                                 iconColor: .yellow
                             )

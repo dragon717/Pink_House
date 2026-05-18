@@ -54,6 +54,20 @@ class TabNavigationManager: ObservableObject {
         }
     }
 
+    func navigate(to featureID: AppFeatureID) {
+        let feature = AppFeatureRegistry.descriptor(for: featureID)
+        guard feature.isUnlocked else { return }
+
+        switch feature.route {
+        case .tab(let tabIndex):
+            navigateToTab = tabIndex
+        case .wardrobe(let homeTab):
+            navigate(to: .wardrobe(homeTab))
+        case .smallWorld(let destination):
+            navigate(to: .smallWorld(destination))
+        }
+    }
+
     func navigateToDepositNotificationClothing(_ clothingID: UUID) {
         navigateToTab = 0
         navigateToHomeTab = .depositPlan
