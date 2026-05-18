@@ -245,8 +245,6 @@ extension Notification.Name {
     static let petMediaShouldStop = Notification.Name("petMediaShouldStop")
     static let wealthMediaShouldStart = Notification.Name("wealthMediaShouldStart")
     static let wealthMediaShouldStop = Notification.Name("wealthMediaShouldStop")
-    // 萌宠对话搜索栏状态变化通知（用于控制常用菜单长按交互）
-    static let petChatSearchStateChanged = Notification.Name("petChatSearchStateChanged")
     // 自动展开萌宠对话搜索栏通知
     static let autoExpandPetChatSearch = Notification.Name("autoExpandPetChatSearch")
     // 萌宠对话内嵌引导选项点击通知（用于 AI 引导）
@@ -302,10 +300,6 @@ extension Notification.Name {
     static let ootdDefaultBookOpened = Notification.Name("ootdDefaultBookOpened")
     // 穿搭手帐详情页打开通知（用于空间手帐前置任务引导）
     static let ootdBookDetailOpened = Notification.Name("ootdBookDetailOpened")
-    static let smallWorldQuickMenuOpened = Notification.Name("smallWorldQuickMenuOpened")
-    static let favoriteMenuSettingsOpened = Notification.Name("favoriteMenuSettingsOpened")
-    static let dismissFavoriteMenuSettingsView = Notification.Name("dismissFavoriteMenuSettingsView")
-    static let favoriteMenuSettingsViewDismissed = Notification.Name("favoriteMenuSettingsViewDismissed")
     static let ootdShelfMoreMenuOpened = Notification.Name("ootdShelfMoreMenuOpened")
     static let ootdDetailMoreMenuOpened = Notification.Name("ootdDetailMoreMenuOpened")
     static let ootdBookCreated = Notification.Name("ootdBookCreated")

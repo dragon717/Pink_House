@@ -15,7 +15,7 @@ struct GeneralSettingsView: View {
     
     @AppStorage("isSpatialSceneEnabled") private var isSpatialSceneEnabled = false
     @AppStorage("smallWorldSceneMode") private var smallWorldSceneMode = SmallWorldSceneMode.auto.rawValue
-    @AppStorage("smallWorldStyle") private var smallWorldStyle = SmallWorldStyle.rococo.rawValue
+    @AppStorage("smallWorldStyle") private var smallWorldStyle = SmallWorldStyle.journalRoom.rawValue
     
     var body: some View {
         @Bindable var theme = themeManager

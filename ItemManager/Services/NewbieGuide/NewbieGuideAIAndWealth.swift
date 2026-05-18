@@ -25,16 +25,18 @@ extension FeatureExperienceGuideOverlay {
         let safeAreaBottom = geometry.safeAreaInsets.bottom
         let safeAreaTop = geometry.safeAreaInsets.top
         let isIPad = UIDevice.current.userInterfaceIdiom == .pad
+        let houseSlotIndex = BottomDockSettingsManager.shared.houseSlotIndex ?? 1
         let fallbackHouseTabFrame = SmallWorldMenuOverlay.buildFallbackFrame(
             screenSize: screenBounds,
             safeAreaTop: safeAreaTop,
             safeAreaBottom: safeAreaBottom,
-            isIPad: isIPad
+            isIPad: isIPad,
+            houseSlotIndex: houseSlotIndex
         )
 
         let houseTabFrame = TabBarItemAnchorResolver.resolvedFrame(
             for: .homeHouseTab,
-            preferredTabIndex: 1,
+            preferredTabIndex: houseSlotIndex,
             in: geometry,
             expansion: 0,
             fallback: fallbackHouseTabFrame

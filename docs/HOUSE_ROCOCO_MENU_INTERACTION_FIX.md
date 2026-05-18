@@ -25,4 +25,4 @@
 - [x] `xcrun --sdk iphonesimulator swiftc -parse -target arm64-apple-ios17.0-simulator -sdk "$(xcrun --sdk iphonesimulator --show-sdk-path)" ItemManager/Views/RococoSmallWorldView.swift`
 - [x] `RococoSmallWorldView.swift` 中无左上角原生 `Menu { ... }` 路径残留。
 - [x] `rococoViewMode` key 保留。
-- [ ] iOS 模拟器/真机运行验收：遵循项目偏好，本次未主动跑 `xcodebuild`，需用户本地编译后按 RESULT.md 补充。
+- [ ] iOS 模拟器/真机运行验收：当前项目规则允许按需运行 `xcodebuild`；本历史任务当时未运行，后续复验时在 RESULT.md 补充构建/运行命令、结果和验证边界。

@@ -16,16 +16,19 @@ phases:
     done_when:
       - AppFeatureRegistry 能映射衣橱、心愿尾款、House、手帐、萌宠、来财、日历、世界书、拼豆、裙子股市、回收站、萌宠对话。
       - TabNavigationManager 能按 feature id 导航。
-      - 旧 SmallWorldDestination 与现有长按菜单不破坏。
+      - 旧 SmallWorldDestination 路由不破坏，House 长按快捷菜单不再作为入口依赖。
 
   - id: p1_custom_bottom_dock
     name: 自定义底部导航
     priority: P1
-    goal: 底部最右侧入口可由用户替换，降低对 House 长按菜单的依赖。
+    goal: 底部 4 个位置都可由用户调整，替代原 House 长按快捷菜单的高频入口职责。
     done_when:
-      - 默认最右侧仍是萌宠对话。
-      - 用户可在“我 → 常用入口”里改为心愿尾款、来财、穿搭手帐、魔法贴纸、裙子股市等已解锁功能。
-      - 点击底部自定义入口可直达目标功能。
+      - 默认顺序仍是衣橱、House、我、萌宠对话。
+      - 用户可在“我 → 底部导航”里调整 4 个位置，选择心愿尾款、来财、穿搭手帐、魔法贴纸、裙子股市等已解锁功能。
+      - 底部导航候选保留「萌宠对话」，不展示「萌宠」主页入口。
+      - House 和我作为安全入口始终保留但可换位。
+      - 点击任一底部自定义入口可直达目标功能。
+      - House 底栏不再响应长按快捷菜单；相关引导改走底部导航或 House 房间内入口。
 
   - id: p2_isometric_journal_room
     name: 等轴手帐房间 MVP
@@ -72,8 +75,8 @@ acceptance:
     - id: bottom_dock_default
       name: 默认底部入口为萌宠对话
     - id: bottom_dock_change_to_deposit
-      name: 在常用入口设置里把底部入口改为心愿尾款
+      name: 在底部导航设置里把底部入口改为心愿尾款
     - id: bottom_dock_deposit_launch
       name: 点击底部入口进入心愿尾款
-    - id: favorite_menu_still_works
-      name: House 长按常用菜单仍可使用
+    - id: house_long_press_retired
+      name: House 底栏长按快捷菜单已下线

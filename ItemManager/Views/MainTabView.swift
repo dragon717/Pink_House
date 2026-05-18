@@ -274,7 +274,7 @@ struct LegacyTabView: View {
         .overlay {
             RewardBubbleView()
             // 进入 House / 萌宠对话页后不再显示全局悬浮宠物，避免挡住房间热区或搜索/输入交互
-            if selectedTab != 1 && selectedTab != 3 {
+            if !isHouseRouteActive && !isPetChatRouteActive {
                 PetOverlayView(action: {
                     // 点击悬浮小猫：切换到萌宠对话 Tab 并自动展开搜索栏
                     withAnimation {
@@ -284,11 +284,6 @@ struct LegacyTabView: View {
                 petName: petDataManager.status.displayName,
                 bottomAvoidanceLift: LegacyCustomTabBarLayout.floatingElementLift)
             }
-            SmallWorldMenuOverlay(
-                selectedTab: $selectedTab,
-                smallWorldDestination: $smallWorldDestination,
-                homeTab: $homeTabSelection
-            )
         }
         .onReceive(tabNavigationManager.$navigateToTab) { tab in
             if let tab = tab {
@@ -373,35 +368,9 @@ struct LegacyTabView: View {
                 Spacer()
                 // 椭圆胶囊容器
                 HStack(spacing: -8) {
-                    // 衣橱 Tab
-                    tabButton(
-                        index: 0,
-                        title: "衣橱",
-                        icon: "cabinet.fill",
-                        tabRole: .wardrobe,
-                        isSelectedOverride: selectedTab == 0 && !isBottomDockFeatureActive
-                    )
-
-                    // House Tab
-                    tabButton(
-                        index: 1,
-                        title: smallWorldTabTitle,
-                        icon: smallWorldTabIcon,
-                        tabRole: .house,
-                        isSelectedOverride: selectedTab == 1 && !isBottomDockFeatureActive
-                    )
-
-                    // 我 Tab
-                    tabButton(
-                        index: 2,
-                        title: "我",
-                        icon: "face.smiling",
-                        tabRole: .me,
-                        isSelectedOverride: selectedTab == 2
-                    )
-
-                    // 用户自定义底部快捷入口
-                    bottomDockButton
+                    ForEach(bottomDockSettingsManager.slots, id: \.self) { slotIndex in
+                        bottomDockButton(slotIndex: slotIndex)
+                    }
                 }
                 .frame(height: 56)
                 .background {
@@ -433,50 +402,8 @@ struct LegacyTabView: View {
         }
     }
 
-    private func tabButton(
-        index: Int,
-        title: String,
-        icon: String,
-        tabRole: ThemeSkinTabRole,
-        isSelectedOverride: Bool? = nil
-    ) -> some View {
-        let isSelected = isSelectedOverride ?? (selectedTab == index)
-        let isNotOnMenu: Bool = {
-            if case .menu = smallWorldDestination { return false }
-            return true
-        }()
-
-        return Button {
-            withAnimation(.easeInOut(duration: 0.2)) {
-                // 修复：如果已经在 House Tab (index=1) 且当前不在 menu 页面，则返回到 menu
-                if index == 1 && selectedTab == 1 && isNotOnMenu {
-                    smallWorldDestination = .menu
-                } else {
-                    selectedTab = index
-                }
-            }
-        } label: {
-            ThemeSkinLegacyTabLabel(
-                descriptor: themedTabItemDescriptor,
-                title: title,
-                systemImage: icon,
-                isSelected: isSelected,
-                selectedColor: magicPalette.accent,
-                inactiveColor: magicPalette.secondaryText,
-                tabRole: tabRole
-            )
-            .captureGuideTarget(index == 1 ? .homeHouseTab : nil)
-            .overlay {
-                Color.clear
-                    .frame(width: 68, height: 56)
-                    .allowsHitTesting(false)
-                    .captureGuideTarget(index == 3 ? .homePetChatTab : nil)
-            }
-        }
-    }
-
-    private var bottomDockButton: some View {
-        let feature = bottomDockFeature
+    private func bottomDockButton(slotIndex: Int) -> some View {
+        let feature = bottomDockSettingsManager.feature(at: slotIndex)
         let isSelected = isFeatureActive(feature)
 
         return Button {
@@ -484,13 +411,14 @@ struct LegacyTabView: View {
         } label: {
             ThemeSkinLegacyTabLabel(
                 descriptor: themedTabItemDescriptor,
-                title: feature.title,
-                systemImage: feature.systemImage,
+                title: tabTitle(for: feature),
+                systemImage: tabIcon(for: feature),
                 isSelected: isSelected,
                 selectedColor: Color(hex: feature.tintHex),
                 inactiveColor: magicPalette.secondaryText,
                 tabRole: tabRole(for: feature)
             )
+            .captureGuideTarget(feature.id == .house ? GuideTargetKey.homeHouseTab : nil)
             .overlay {
                 Color.clear
                     .frame(width: 68, height: 56)
@@ -508,26 +436,60 @@ struct LegacyTabView: View {
         return descriptor
     }
 
-    private var bottomDockFeature: AppFeatureDescriptor {
-        bottomDockSettingsManager.selectedFeature
+    private var isHouseRouteActive: Bool {
+        selectedTab == 1
     }
 
-    private var isBottomDockFeatureActive: Bool {
-        isFeatureActive(bottomDockFeature)
+    private var isPetChatRouteActive: Bool {
+        selectedTab == 3
+    }
+
+    private func tabTitle(for feature: AppFeatureDescriptor) -> String {
+        if feature.id == .house && shouldUseDynamicHouseLabel {
+            return smallWorldTabTitle
+        }
+        return feature.title
+    }
+
+    private func tabIcon(for feature: AppFeatureDescriptor) -> String {
+        if feature.id == .house && shouldUseDynamicHouseLabel {
+            return smallWorldTabIcon
+        }
+        return feature.systemImage
+    }
+
+    private var shouldUseDynamicHouseLabel: Bool {
+        selectedTab == 1 && !hasActiveSpecificSmallWorldFeature
+    }
+
+    private var hasActiveSpecificSmallWorldFeature: Bool {
+        bottomDockSettingsManager.selectedFeatureIDs.contains { featureID in
+            featureID != .house && routeMatches(AppFeatureRegistry.descriptor(for: featureID))
+        }
     }
 
     private func tabRole(for feature: AppFeatureDescriptor) -> ThemeSkinTabRole {
-        switch feature.route {
-        case .tab(let index):
-            return index == 3 ? .petChat : .house
-        case .wardrobe:
+        switch feature.id {
+        case .wardrobe, .depositPlan:
             return .wardrobe
-        case .smallWorld:
+        case .house, .petHome, .magicSticker, .outfitJournal, .wealth, .calendar, .bigWorld, .perler, .dressStock, .recycleBin:
             return .house
+        case .me:
+            return .me
+        case .petChat:
+            return .petChat
         }
     }
 
     private func isFeatureActive(_ feature: AppFeatureDescriptor) -> Bool {
+        if feature.id == .house {
+            guard selectedTab == 1 else { return false }
+            return !hasActiveSpecificSmallWorldFeature
+        }
+        return routeMatches(feature)
+    }
+
+    private func routeMatches(_ feature: AppFeatureDescriptor) -> Bool {
         switch feature.route {
         case .tab(let tabIndex):
             return selectedTab == tabIndex

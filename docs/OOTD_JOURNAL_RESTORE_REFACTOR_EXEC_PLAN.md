@@ -1,6 +1,6 @@
 # 穿搭手帐恢复与 iCloud 及时恢复 · 重构执行计划（harness）
 
-> 状态：2026-05-01 调研首版；同日已按 M1-M5 完成首轮代码落地。iOS 阶段默认不主动跑 `xcodebuild`；Codex 做静态检查、`git diff --check`、parse-only 校验和脚本/单测计划，用户本地编译后再按报错继续修。
+> 状态：2026-05-01 调研首版；同日已按 M1-M5 完成首轮代码落地。iOS 阶段可按任务需要运行 `xcodebuild` 构建/测试/模拟器验收；Codex 仍需保留静态检查、`git diff --check`、parse-only 校验等轻量验证，并在最终报告中写明实际跑过的命令、结果和验证边界。
 
 ## 实施记录（2026-05-01）
 
@@ -260,7 +260,7 @@ git diff --check
 rg -n "bookID|restoreBookGroups|restoreClothingAndOutfits|performMigration|ootdRestoreCompleted" ItemManager docs ItemManagerTests
 ```
 
-仅在用户明确同意 iOS 构建/测试时再跑：
+按任务需要可追加 iOS 构建/测试验证：
 
 ```bash
 xcodebuild -scheme ItemManager \
@@ -274,4 +274,4 @@ xcodebuild -scheme ItemManager \
 - 不改变 `BookGroup` / `Outfit` 的 SwiftData 模型字段，除非后续确认需要 schema 迁移。
 - 不把所有旧孤儿书页默认塞回“默认手帐”；宁可输出“待整理”报告，也不要误归因。
 - 不把 OOTD 图片迁出 `ImageManager.imagesDirectory`；只修正恢复时的路由和下载触发。
-- 不在未授权时跑 Xcode build。
+- 跑 `xcodebuild` 时必须记录 scheme、destination、测试范围、PASS/FAIL 与未覆盖边界；若用户明确要求本次不跑构建，则遵守该次约束。

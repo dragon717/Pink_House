@@ -743,9 +743,6 @@ final class AppFirstLaunchGuideManager: ObservableObject {
             .wardrobeDoneSelectionButton,
             .ootdEntry,
             .calendarEntry,
-            .favoriteMenuSettingsEntry,
-            .favoriteMenuMagicStickerAddButton,
-            .favoriteMenuMagicStickerEntry,
             .magicTasksOotdTaskRow,
             .magicTasksOotdUnlockButton,
             .themeColorModeTabs,
@@ -815,7 +812,6 @@ final class AppFirstLaunchGuideManager: ObservableObject {
 struct FeatureExperienceGuideOverlay: View {
     @StateObject var guideManager = AppFirstLaunchGuideManager.shared
     @StateObject var authManager = AuthenticationManager.shared
-    @StateObject var favoriteMenuSettingsManager = FavoriteMenuSettingsManager.shared
     @State var showingFullDescription = false
     @Environment(ThemeManager.self) var themeManager
     @Environment(\.colorScheme) var colorScheme
@@ -837,8 +833,7 @@ struct FeatureExperienceGuideOverlay: View {
     @State var tagBrandFieldGuideStep: TagBrandFieldGuideStep = .step1_returnToMe
     @State var ootdGuideStep: OOTDGuideStep = .step1_clickOotdEntry
     @State var calendarGuideStep: CalendarGuideStep = .step1_clickCalendarEntry
-    @State var magicStickerGuideStep: MagicStickerGuideStep = .step6_longPressHouseTab
-    @State var magicStickerGuideRequiresMenuSetup: Bool = false
+    @State var magicStickerGuideStep: MagicStickerGuideStep = .step1_clickMagicStickerEntry
     @State var batchEditGuideStep: BatchEditGuideStep = .step1_clickMoreMenu
     @State var didOpenBatchEditMoreMenu: Bool = false
     @State var spaceBookGuideStep: SpaceBookGuideStep = .preUnlockStep1_clickWardrobeOotdEntry
@@ -987,11 +982,6 @@ struct FeatureExperienceGuideOverlay: View {
                    tab == "me" {
                     advanceWidgetGuideFromReturnStep()
                 }
-                if guideManager.currentFeatureExperienceFeature == .ootdDefaultBook,
-                   magicStickerGuideStep == .step1_returnToMeForMenuSetup,
-                   tab == "me" {
-                    advanceMagicStickerGuideFromReturnStep()
-                }
                 if guideManager.currentFeatureExperienceFeature == .themeCustomize,
                    themeCustomizeGuideStep == .step1_returnToMe,
                    tab == "me" {
@@ -1037,10 +1027,6 @@ struct FeatureExperienceGuideOverlay: View {
                 if guideManager.currentFeatureExperienceFeature == .widgetCustomize,
                    widgetCustomizeStep == .step1_returnToMe {
                     advanceWidgetGuideFromReturnStep()
-                }
-                if guideManager.currentFeatureExperienceFeature == .ootdDefaultBook,
-                   magicStickerGuideStep == .step1_returnToMeForMenuSetup {
-                    advanceMagicStickerGuideFromReturnStep()
                 }
                 if guideManager.currentFeatureExperienceFeature == .themeCustomize,
                    themeCustomizeGuideStep == .step1_returnToMe {
@@ -1415,8 +1401,7 @@ struct FeatureExperienceGuideOverlay: View {
 
     private func bindHouseGuideEvents<Content: View>(_ content: Content) -> some View {
         let houseEntryBound = bindHouseEntryGuideEvents(content)
-        let magicStickerSetupBound = bindMagicStickerSetupGuideEvents(houseEntryBound)
-        let spaceBookStateBound = bindSpaceBookStateGuideEvents(magicStickerSetupBound)
+        let spaceBookStateBound = bindSpaceBookStateGuideEvents(houseEntryBound)
         return bindSpaceBookEditorGuideEvents(spaceBookStateBound)
     }
 
@@ -1461,31 +1446,13 @@ struct FeatureExperienceGuideOverlay: View {
                     }
                 }
             }
-            .onReceive(NotificationCenter.default.publisher(for: .smallWorldQuickMenuOpened)) { _ in
-                if guideManager.currentFeatureExperienceFeature == .ootdDefaultBook,
-                   magicStickerGuideStep == .step6_longPressHouseTab {
-                    withAnimation(.easeInOut(duration: 0.3)) {
-                        magicStickerGuideStep = .step7_clickMagicStickerEntry
-                    }
-                }
-            }
             .onReceive(NotificationCenter.default.publisher(for: .ootdDefaultBookOpened)) { _ in
                 if guideManager.currentFeatureExperienceFeature == .ootdDefaultBook,
-                   magicStickerGuideStep.rawValue < MagicStickerGuideStep.step8_magicStickerExplanation.rawValue {
+                   magicStickerGuideStep == .step1_clickMagicStickerEntry {
                     withAnimation(.easeInOut(duration: 0.3)) {
-                        magicStickerGuideStep = .step8_magicStickerExplanation
+                        magicStickerGuideStep = .step2_magicStickerExplanation
                     }
                 }
-            }
-    }
-
-    private func bindMagicStickerSetupGuideEvents<Content: View>(_ content: Content) -> some View {
-        content
-            .onReceive(NotificationCenter.default.publisher(for: .favoriteMenuSettingsOpened)) { _ in
-                advanceMagicStickerGuideToAddButtonStep()
-            }
-            .onReceive(NotificationCenter.default.publisher(for: .favoriteMenuSettingsViewDismissed)) { _ in
-                advanceMagicStickerGuideToLongPressStep()
             }
     }
 
@@ -1727,28 +1694,6 @@ struct FeatureExperienceGuideOverlay: View {
                     }
                 }
             }
-            .onChange(of: guideManager.guideTargetFrame(for: .favoriteMenuMagicStickerEntry)) { _, frame in
-                if guideManager.currentFeatureExperienceFeature == .ootdDefaultBook,
-                   magicStickerGuideStep == .step6_longPressHouseTab,
-                   frame != nil {
-                    withAnimation(.easeInOut(duration: 0.3)) {
-                        magicStickerGuideStep = .step7_clickMagicStickerEntry
-                    }
-                }
-            }
-            .onChange(of: guideManager.guideTargetFrame(for: .favoriteMenuMagicStickerAddButton)) { _, frame in
-                if guideManager.currentFeatureExperienceFeature == .ootdDefaultBook,
-                   magicStickerGuideRequiresMenuSetup,
-                   magicStickerGuideStep == .step3_clickFavoriteMenuSettings,
-                   frame != nil {
-                    withAnimation(.easeInOut(duration: 0.3)) {
-                        magicStickerGuideStep = .step4_addMagicStickerButton
-                    }
-                }
-            }
-            .onChange(of: favoriteMenuSettingsManager.selectedItems) { _, _ in
-                advanceMagicStickerGuideToReturnAfterSetupStep()
-            }
             .onChange(of: guideManager.guideTargetFrame(for: .wealthMainTabSegment)) { _, segmentFrame in
                 if guideManager.currentFeatureExperienceFeature == .wealth,
                    wealthGuideStep == .step2_clickWealthEntry,
@@ -1857,17 +1802,6 @@ struct FeatureExperienceGuideOverlay: View {
                    ) {
                     logCustomColorGuide("step5 visible on frame change; scheduling minimum dwell before step6")
                     advanceCustomColorGuideToPersonalizationExplanationWithMinimumDwell()
-                }
-            }
-            .onChange(of: guideManager.guideTargetFrame(for: .favoriteMenuSettingsEntry)) { _, frame in
-                // 魔法贴纸引导：滚动到常用入口可见时，推进到点击步骤
-                if guideManager.currentFeatureExperienceFeature == .ootdDefaultBook,
-                   magicStickerGuideStep == .step2_scrollToFavoriteMenu,
-                   let frame,
-                   isGuideTargetVisibleOnScreen(frame) {
-                    withAnimation(.easeInOut(duration: 0.3)) {
-                        magicStickerGuideStep = .step3_clickFavoriteMenuSettings
-                    }
                 }
             }
             .onChange(of: guideManager.guideTargetFrame(for: .wardrobeTagManagementEntry)) { _, frame in
@@ -4075,174 +4009,23 @@ struct FeatureExperienceGuideOverlay: View {
         return AnyView(
             GeometryReader { geometry in
                 switch magicStickerGuideStep {
-                case .step1_returnToMeForMenuSetup:
-                    returnToMeGuideContent(
-                        in: geometry,
-                        title: magicStickerGuideStep.title,
-                        message: magicStickerGuideStep.message,
-                        currentStep: magicStickerGuideDisplayStep(for: .step1_returnToMeForMenuSetup),
-                        totalSteps: magicStickerGuideTotalSteps,
-                        accent: .pink,
-                        onReturn: handleMagicStickerGuideReturnAction
-                    )
-                case .step2_scrollToFavoriteMenu:
-                    // 滚动引导：提示用户往下滑找到常用入口
-                    ZStack {
-                        WidgetScrollHintView(
-                            title: "请向下滑动",
-                            subtitle: "「常用入口」在更下方"
-                        )
-                        .allowsHitTesting(false)
-
-                        VStack {
-                            Spacer()
-                            featureStepBubble(
-                                title: magicStickerGuideStep.title,
-                                message: magicStickerGuideStep.message,
-                                currentStep: magicStickerGuideDisplayStep(for: .step2_scrollToFavoriteMenu),
-                                totalSteps: magicStickerGuideTotalSteps,
-                                accent: .pink,
-                                actionTitle: nil,
-                                onSkip: { guideManager.dismissFeatureExperienceGuide() },
-                                onAction: nil
-                            )
-                            .padding(.bottom, max(geometry.safeAreaInsets.bottom + 80, 100))
-                        }
-                    }
-                case .step3_clickFavoriteMenuSettings:
-                    let fallbackFrame = CGRect(
-                        x: geometry.size.width * 0.5 + 8,
-                        y: geometry.size.height * 0.48,
-                        width: (geometry.size.width - 48) / 2,
-                        height: 92
-                    )
-                    let targetFrame = aiGuideTargetFrame(
-                        globalFrame: guideManager.guideTargetFrame(for: .favoriteMenuSettingsEntry),
-                        in: geometry,
-                        fallback: fallbackFrame
-                    )
-                    highlightedRectGuideContent(
-                        frame: targetFrame,
-                        cornerRadius: 16,
-                        title: magicStickerGuideStep.title,
-                        message: magicStickerGuideStep.message,
-                        currentStep: magicStickerGuideDisplayStep(for: .step3_clickFavoriteMenuSettings),
-                        totalSteps: magicStickerGuideTotalSteps,
-                        accent: .pink,
-                        actionTitle: nil,
-                        onAction: nil,
-                        bubbleOnTop: true
-                    )
-                case .step4_addMagicStickerButton:
-                    let fallbackFrame = CGRect(
-                        x: geometry.size.width - 74,
-                        y: max(geometry.safeAreaInsets.top + 210, geometry.size.height * 0.36),
-                        width: 44,
-                        height: 44
-                    )
-                    let targetFrame = aiGuideTargetFrame(
-                        globalFrame: guideManager.guideTargetFrame(for: .favoriteMenuMagicStickerAddButton),
-                        in: geometry,
-                        fallback: fallbackFrame
-                    )
-                    highlightedRectGuideContent(
-                        frame: targetFrame,
-                        cornerRadius: 22,
-                        title: magicStickerGuideStep.title,
-                        message: magicStickerGuideStep.message,
-                        currentStep: magicStickerGuideDisplayStep(for: .step4_addMagicStickerButton),
-                        totalSteps: magicStickerGuideTotalSteps,
-                        accent: .pink,
-                        actionTitle: nil,
-                        onAction: nil,
-                        bubbleOnTop: true
-                    )
-                case .step5_returnToMeAfterMenuSetup:
-                    returnToMeGuideContent(
-                        in: geometry,
-                        title: magicStickerGuideStep.title,
-                        message: magicStickerGuideStep.message,
-                        currentStep: magicStickerGuideDisplayStep(for: .step5_returnToMeAfterMenuSetup),
-                        totalSteps: magicStickerGuideTotalSteps,
-                        accent: .pink,
-                        onReturn: handleMagicStickerGuideReturnFromMenuSettingsAction
-                    )
-                case .step6_longPressHouseTab:
-                    let safeAreaBottom = geometry.safeAreaInsets.bottom
-                    let safeAreaTop = geometry.safeAreaInsets.top
-                    let isIPad = UIDevice.current.userInterfaceIdiom == .pad
-                    let fallbackHouseTabFrame = SmallWorldMenuOverlay.buildFallbackFrame(
-                        screenSize: geometry.size,
-                        safeAreaTop: safeAreaTop,
-                        safeAreaBottom: safeAreaBottom,
-                        isIPad: isIPad
-                    )
-                    let houseTabFrame = TabBarItemAnchorResolver.resolvedFrame(
-                        for: .homeHouseTab,
-                        preferredTabIndex: 1,
-                        in: geometry,
-                        expansion: 0,
-                        fallback: fallbackHouseTabFrame
-                    )
-                    let houseTabRadius = max(34, max(houseTabFrame.width, houseTabFrame.height) / 2)
-                    ZStack {
-                        HollowMaskView(
-                            highlightFrame: houseTabFrame,
-                            highlightType: .circle,
-                            cornerRadius: houseTabRadius
-                        )
-
-                        HighlightPulseViewNoClick(
-                            center: CGPoint(x: houseTabFrame.midX, y: houseTabFrame.midY),
-                            radius: houseTabRadius
-                        )
-
-                        if !guideManager.isPadGuideLayout {
-                            CatPawTapAnimation(
-                                position: CGPoint(x: houseTabFrame.midX, y: houseTabFrame.midY),
-                                delay: 0.5
-                            )
-                        }
-
-                        VStack {
-                            featureStepBubble(
-                                title: magicStickerGuideStep.title,
-                                message: magicStickerGuideStep.message,
-                                currentStep: magicStickerGuideDisplayStep(for: .step6_longPressHouseTab),
-                                totalSteps: magicStickerGuideTotalSteps,
-                                accent: .pink,
-                                actionTitle: nil,
-                                onSkip: { guideManager.dismissFeatureExperienceGuide() },
-                                onAction: nil
-                            )
-                            .padding(.top, max(geometry.safeAreaInsets.top + 24, 72))
-                            Spacer()
-                        }
-                    }
-                case .step7_clickMagicStickerEntry:
-                    let fallbackFrame = CGRect(x: geometry.size.width * 0.18, y: geometry.size.height * 0.56, width: 96, height: 84)
-                    let targetFrame = aiGuideTargetFrame(
-                        globalFrame: guideManager.guideTargetFrame(for: .favoriteMenuMagicStickerEntry),
-                        in: geometry,
-                        fallback: fallbackFrame
-                    )
-                    highlightedRectGuideContent(
-                        frame: targetFrame,
-                        cornerRadius: 24,
-                        title: magicStickerGuideStep.title,
-                        message: magicStickerGuideStep.message,
-                        currentStep: magicStickerGuideDisplayStep(for: .step7_clickMagicStickerEntry),
-                        totalSteps: magicStickerGuideTotalSteps,
-                        accent: .pink,
-                        actionTitle: nil,
-                        onAction: nil,
-                        bubbleOnTop: true
-                    )
-                case .step8_magicStickerExplanation:
+                case .step1_clickMagicStickerEntry:
                     bottomBubbleGuideContent(
                         title: magicStickerGuideStep.title,
                         message: magicStickerGuideStep.message,
-                        currentStep: magicStickerGuideDisplayStep(for: .step8_magicStickerExplanation),
+                        currentStep: magicStickerGuideDisplayStep(for: .step1_clickMagicStickerEntry),
+                        totalSteps: magicStickerGuideTotalSteps,
+                        accent: .pink,
+                        actionTitle: "打开魔法贴纸",
+                        onAction: {
+                            TabNavigationManager.shared.navigate(to: .magicSticker)
+                        }
+                    )
+                case .step2_magicStickerExplanation:
+                    bottomBubbleGuideContent(
+                        title: magicStickerGuideStep.title,
+                        message: magicStickerGuideStep.message,
+                        currentStep: magicStickerGuideDisplayStep(for: .step2_magicStickerExplanation),
                         totalSteps: magicStickerGuideTotalSteps,
                         accent: .pink,
                         actionTitle: "知道了",

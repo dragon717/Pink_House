@@ -35,7 +35,7 @@ enum LabModule: String, CaseIterable, LabGridDisplayable {
 
 enum AdminLabModule: String, CaseIterable, LabGridDisplayable {
     case iap = "支付测试"
-    case favoriteMenu = "菜单设置"
+    case bottomDock = "底部导航"
     case noticeDiagnostics = "公告诊断"
     case featureUnlock = "功能解锁"
     case magicTasks = "魔法任务"
@@ -48,7 +48,7 @@ enum AdminLabModule: String, CaseIterable, LabGridDisplayable {
     var icon: String {
         switch self {
         case .iap: return "cart.fill"
-        case .favoriteMenu: return "star.fill"
+        case .bottomDock: return "star.fill"
         case .noticeDiagnostics: return "megaphone.fill"
         case .featureUnlock: return "lock.open.fill"
         case .magicTasks: return "wand.and.stars"
@@ -60,7 +60,7 @@ enum AdminLabModule: String, CaseIterable, LabGridDisplayable {
     var subtitle: String {
         switch self {
         case .iap: return "喵币 · 首充 · VIP"
-        case .favoriteMenu: return "常用 · 清除"
+        case .bottomDock: return "布局 · 恢复"
         case .noticeDiagnostics: return "环境 · 同步 · 权限"
         case .featureUnlock: return "解锁 · 显示"
         case .magicTasks: return "状态 · 重置"
@@ -304,8 +304,8 @@ struct AdminLabModuleDetailView: View {
                     switch module {
                     case .iap:
                         IAPTestView()
-                    case .favoriteMenu:
-                        FavoriteMenuTestView()
+                    case .bottomDock:
+                        BottomDockTestView()
                     case .noticeDiagnostics:
                         NoticeTestView()
                     case .featureUnlock:
@@ -407,32 +407,34 @@ struct EffectsTestView: View {
     }
 }
 
-// MARK: - 常用菜单测试子视图
-struct FavoriteMenuTestView: View {
-    @ObservedObject private var favoriteMenuManager = FavoriteMenuSettingsManager.shared
+// MARK: - 底部导航测试子视图
+struct BottomDockTestView: View {
+    @ObservedObject private var bottomDockSettingsManager = BottomDockSettingsManager.shared
     @Environment(ThemeManager.self) private var themeManager
     @State private var showAlert = false
 
     var body: some View {
         ScrollView {
             VStack(spacing: 24) {
-                // 当前设置预览
                 VStack(alignment: .leading, spacing: 16) {
-                    Text("当前常用菜单")
+                    Text("当前底部导航")
                         .font(.headline)
                         .foregroundStyle(themeManager.primaryTextColor)
 
                     FlowLayout(spacing: 8) {
-                        ForEach(Array(favoriteMenuManager.selectedItems.enumerated()), id: \.offset) { index, item in
+                        ForEach(bottomDockSettingsManager.slots, id: \.self) { slotIndex in
+                            let feature = bottomDockSettingsManager.feature(at: slotIndex)
                             HStack(spacing: 4) {
-                                Image(systemName: item.icon)
-                                Text(item.rawValue)
+                                Text("\(slotIndex + 1)")
+                                    .fontWeight(.semibold)
+                                Image(systemName: feature.systemImage)
+                                Text(feature.title)
                             }
                             .font(.caption)
                             .padding(.horizontal, 10)
                             .padding(.vertical, 6)
-                            .background(themeManager.accentTextColor.opacity(0.1))
-                            .foregroundStyle(themeManager.accentTextColor)
+                            .background(Color(hex: feature.tintHex).opacity(0.12))
+                            .foregroundStyle(Color(hex: feature.tintHex))
                             .cornerRadius(12)
                         }
                     }
@@ -456,7 +458,7 @@ struct FavoriteMenuTestView: View {
                     } label: {
                         HStack {
                             Image(systemName: "trash")
-                            Text("清除常用菜单历史")
+                            Text("恢复入口默认")
                         }
                         .font(.headline)
                         .foregroundStyle(themeManager.tertiaryTextColor)
@@ -466,7 +468,7 @@ struct FavoriteMenuTestView: View {
                         .cornerRadius(16)
                     }
 
-                    Text("恢复为默认的常用菜单设置")
+                    Text("恢复底部导航默认设置")
                         .font(.caption)
                         .foregroundStyle(themeManager.secondaryTextColor)
                         .multilineTextAlignment(.center)
@@ -479,12 +481,10 @@ struct FavoriteMenuTestView: View {
         .alert("确认清除", isPresented: $showAlert) {
             Button("取消", role: .cancel) {}
             Button("清除", role: .destructive) {
-                // 恢复到默认常用菜单配置（定义在 FavoriteMenuItem.defaultFavoriteItems）
-                favoriteMenuManager.selectedItems = FavoriteMenuItem.defaultFavoriteItems
-                favoriteMenuManager.saveSettings()
+                bottomDockSettingsManager.resetToDefault()
             }
         } message: {
-            Text("这将清除所有常用菜单设置，恢复为默认状态。确定要继续吗？")
+            Text("这将清除底部导航设置，恢复为默认状态。确定要继续吗？")
         }
     }
 }

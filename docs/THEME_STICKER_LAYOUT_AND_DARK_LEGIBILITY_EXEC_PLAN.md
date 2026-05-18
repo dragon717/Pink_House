@@ -18,7 +18,7 @@ export PYTHONUTF8=1
 
 ### 0.1 执行边界
 
-- iOS 阶段 **Codex 默认不跑 `xcodebuild`**；仅做静态检查、脚本、diff/parse 级验证。用户本地编译后如贴错误，再按错误修复。
+- iOS 阶段 **允许 Codex 按任务需要运行 `xcodebuild`** 构建、测试或模拟器验收；静态检查、脚本、diff/parse 级验证仍需保留，并在最终报告中写明实际命令、PASS/FAIL 和未覆盖边界。若用户明确说本次不跑构建，则遵守该次约束。
 - 模拟器截图只作为 T0/T1 初筛；**T2 暗黑文字最终验收必须有真机截图 + OCR/WCAG 数据**，不能只用 simulator 结论交差。
 - 可提交脚本统一放在 `scripts/theme_skin_harness/`。
 - 运行产物统一放在 `temp/_themeharness/runs/<phase>_<ts>/`；该目录位于 ignored `temp/*` 下，默认不提交。
@@ -114,7 +114,7 @@ export PYTHONUTF8=1
 
 - 可选使用 simulator 截图初筛：`xcrun simctl io booted screenshot ...`。
 - simulator 截图只用于定位明显问题，不作为 T2 最终暗黑可读性结论。
-- Codex 不主动跑 `xcodebuild`；如需要模拟器截图，由用户先完成本地 build/install 或后续明确授权构建。
+- 可按任务需要由 Codex 运行 `xcodebuild` 完成 build/install 后再做模拟器截图；截图归档需记录构建命令、destination 和截图路径。
 
 ### 3.3 T0a 验收
 
@@ -165,7 +165,7 @@ ruby scripts/theme_skin_harness/sticker_density_score.rb
 
 - 静态检查通过。
 - T0a REPORT 中的最明显横屏/预览文字问题有对应 before/after 记录。
-- 未运行 Xcode build 时，最终报告必须明确写“未跑 xcodebuild，等待用户本地编译验证”。
+- 最终报告必须明确写明 `xcodebuild` 状态：未运行 / PASS / FAIL；未运行时写清原因和剩余验证边界。
 
 ---
 
@@ -303,7 +303,7 @@ ruby scripts/theme_skin_harness/coverage_check.rb
 - `THEMESKIN_CONTAINER_CHROME_V2=OFF` 时 P0 页面不得出现新主题贴纸或新容器 chrome。
 - 默认主题截图无主题贴纸泄漏。
 - 列表滚动路径未新增 material / blur / 多贴纸。
-- 若未跑 build，报告明确标注“静态验证通过，未做 Xcode build”。
+- 报告明确标注 `xcodebuild` 验证状态；若未运行，说明仅完成静态验证与剩余运行风险。
 
 ---
 
@@ -399,9 +399,9 @@ git grep -n 'random(in:\|Bool.random' ItemManager/Views/ThemeSkin ItemManager/Se
 git grep -n 'scripts/theme_skin_harness' docs scripts | head
 ```
 
-### 9.4 不跑项说明
+### 9.4 构建与产物说明
 
-- 不自动跑 `xcodebuild`，除非用户明确要求。
+- 可按任务需要运行 `xcodebuild`；运行后必须记录命令、scheme、destination、PASS/FAIL 和未覆盖边界。
 - 不把 `temp/_themeharness/runs/**` 产物提交到 git。
 - 不以 simulator 截图替代 T2 真机验收。
 

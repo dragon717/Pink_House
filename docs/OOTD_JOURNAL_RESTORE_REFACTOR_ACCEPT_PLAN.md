@@ -18,7 +18,7 @@ git status --short --branch > "$ACCEPT_DIR/git-status.txt"
 git diff --check > "$ACCEPT_DIR/diff-check.txt"
 ```
 
-iOS 默认不由 Codex 主动跑 `xcodebuild`。如用户要求跑构建/单测，再把命令和结果贴入 `RESULT.md`。
+iOS 验收允许按任务需要运行 `xcodebuild` 构建/单测/模拟器检查；无论运行与否，都把实际命令、结果和未覆盖边界写入 `RESULT.md`。
 
 ## 1. 静态验收
 
@@ -112,7 +112,7 @@ iOS 默认不由 Codex 主动跑 `xcodebuild`。如用户要求跑构建/单测�
 - 日期：
 - 小版本：M?
 - commit：
-- 是否运行 xcodebuild：否 / 是（命令：...）
+- xcodebuild 验证：未运行 / PASS / FAIL（命令与边界：...）
 
 ## 静态检查
 - git diff --check：PASS/FAIL

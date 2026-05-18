@@ -192,17 +192,16 @@ struct MeView: View {
                         .buttonStyle(PlainButtonStyle())
                         .captureGuideTarget(.themeCustomizeEntry)
                         
-                        // 常用入口设置
+                        // 底部导航设置
                         NavigationLink(destination: FavoriteMenuSettingsView()) {
                             SettingsGridItem(
-                                title: "常用入口",
-                                subtitle: "底栏快捷 · House 长按",
+                                title: "底部导航",
+                                subtitle: "四个位置 · 快捷直达",
                                 icon: "star.fill",
                                 iconColor: .yellow
                             )
                         }
                         .buttonStyle(PlainButtonStyle())
-                        .captureGuideTarget(.favoriteMenuSettingsEntry)
                         
                         // 小组件
                         WidgetSettingsCard()

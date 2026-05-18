@@ -362,11 +362,6 @@ struct PetChatViewLegacy: View {
                     // iOS 18 以下版本不支持 isPresented，使用 searchText 触发搜索模式
                     searchText = " "
                 }
-                NotificationCenter.default.post(
-                    name: .petChatSearchStateChanged,
-                    object: nil,
-                    userInfo: ["isSearching": !searchText.isEmpty]
-                )
                 syncPetDialogueAmbientAction(force: true)
             }
             .onDisappear {
@@ -378,20 +373,8 @@ struct PetChatViewLegacy: View {
                 petDialogueTouchReleaseWorkItem = nil
                 isPetDialogueTouching = false
                 petDialogueTouchStartTime = nil
-                NotificationCenter.default.post(
-                    name: .petChatSearchStateChanged,
-                    object: nil,
-                    userInfo: ["isSearching": false]
-                )
             }
             .animation(.spring(response: 0.32, dampingFraction: 0.86), value: adoptionViewModel.presentedFundingPrompt?.id)
-            .onChange(of: searchText) { _, newValue in
-                NotificationCenter.default.post(
-                    name: .petChatSearchStateChanged,
-                    object: nil,
-                    userInfo: ["isSearching": !newValue.isEmpty]
-                )
-            }
             .onChange(of: guideManager.currentFeatureExperienceFeature?.rawValue) { _, _ in
                 ensureGuideEmbeddedOptionMessageIfNeeded(forceRefreshForCurrentGuideSession: true)
             }

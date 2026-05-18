@@ -5,6 +5,7 @@ enum AppFeatureID: String, CaseIterable, Identifiable, Codable, Hashable {
     case wardrobe
     case depositPlan
     case house
+    case me
     case petHome
     case petChat
     case magicSticker
@@ -23,7 +24,6 @@ enum AppFeatureSurface: String, Codable, Hashable {
     case bottomDock
     case houseRoom
     case petPhone
-    case favoriteMenu
 }
 
 enum AppFeatureRoute {
@@ -58,7 +58,7 @@ enum AppFeatureRegistry {
             tintHex: "#FF69B4",
             route: .wardrobe(.wardrobe),
             unlockFeature: .wardrobe,
-            surfaces: [.houseRoom, .petPhone, .favoriteMenu]
+            surfaces: [.bottomDock, .houseRoom, .petPhone]
         ),
         AppFeatureDescriptor(
             id: .depositPlan,
@@ -68,7 +68,7 @@ enum AppFeatureRegistry {
             tintHex: "#FF1493",
             route: .wardrobe(.depositPlan),
             unlockFeature: .finalPayment,
-            surfaces: [.bottomDock, .houseRoom, .petPhone, .favoriteMenu]
+            surfaces: [.bottomDock, .houseRoom, .petPhone]
         ),
         AppFeatureDescriptor(
             id: .house,
@@ -78,7 +78,17 @@ enum AppFeatureRegistry {
             tintHex: "#87CEEB",
             route: .smallWorld(.menu),
             unlockFeature: nil,
-            surfaces: [.houseRoom, .petPhone, .favoriteMenu]
+            surfaces: [.bottomDock, .houseRoom, .petPhone]
+        ),
+        AppFeatureDescriptor(
+            id: .me,
+            title: "我",
+            subtitle: "设置、VIP 与备份",
+            systemImage: "face.smiling",
+            tintHex: "#F4C542",
+            route: .tab(2),
+            unlockFeature: nil,
+            surfaces: [.bottomDock]
         ),
         AppFeatureDescriptor(
             id: .petHome,
@@ -88,7 +98,7 @@ enum AppFeatureRegistry {
             tintHex: "#FF7F50",
             route: .smallWorld(.pet),
             unlockFeature: .pet,
-            surfaces: [.bottomDock, .houseRoom, .petPhone]
+            surfaces: [.houseRoom, .petPhone]
         ),
         AppFeatureDescriptor(
             id: .petChat,
@@ -108,7 +118,7 @@ enum AppFeatureRegistry {
             tintHex: "#FF69B4",
             route: .smallWorld(.ootdDefaultBook),
             unlockFeature: .ootdDefaultBook,
-            surfaces: [.bottomDock, .houseRoom, .petPhone, .favoriteMenu]
+            surfaces: [.bottomDock, .houseRoom, .petPhone]
         ),
         AppFeatureDescriptor(
             id: .outfitJournal,
@@ -118,7 +128,7 @@ enum AppFeatureRegistry {
             tintHex: "#FF85C1",
             route: .smallWorld(.ootd),
             unlockFeature: .ootd,
-            surfaces: [.bottomDock, .houseRoom, .petPhone, .favoriteMenu]
+            surfaces: [.bottomDock, .houseRoom, .petPhone]
         ),
         AppFeatureDescriptor(
             id: .wealth,
@@ -128,7 +138,7 @@ enum AppFeatureRegistry {
             tintHex: "#FFD700",
             route: .smallWorld(.wealth(nil)),
             unlockFeature: .wealth,
-            surfaces: [.bottomDock, .houseRoom, .petPhone, .favoriteMenu]
+            surfaces: [.bottomDock, .houseRoom, .petPhone]
         ),
         AppFeatureDescriptor(
             id: .calendar,
@@ -138,7 +148,7 @@ enum AppFeatureRegistry {
             tintHex: "#DDA0DD",
             route: .smallWorld(.calendar),
             unlockFeature: .calendar,
-            surfaces: [.bottomDock, .houseRoom, .petPhone, .favoriteMenu]
+            surfaces: [.bottomDock, .houseRoom, .petPhone]
         ),
         AppFeatureDescriptor(
             id: .bigWorld,
@@ -148,7 +158,7 @@ enum AppFeatureRegistry {
             tintHex: "#87CEEB",
             route: .smallWorld(.bigWorld),
             unlockFeature: .bigWorld,
-            surfaces: [.bottomDock, .houseRoom, .petPhone, .favoriteMenu]
+            surfaces: [.bottomDock, .houseRoom, .petPhone]
         ),
         AppFeatureDescriptor(
             id: .perler,
@@ -158,7 +168,7 @@ enum AppFeatureRegistry {
             tintHex: "#FF8C94",
             route: .smallWorld(.perler),
             unlockFeature: .perler,
-            surfaces: [.bottomDock, .houseRoom, .petPhone, .favoriteMenu]
+            surfaces: [.bottomDock, .houseRoom, .petPhone]
         ),
         AppFeatureDescriptor(
             id: .dressStock,
@@ -168,7 +178,7 @@ enum AppFeatureRegistry {
             tintHex: "#FF6B9D",
             route: .smallWorld(.dressStock),
             unlockFeature: .dressStock,
-            surfaces: [.bottomDock, .houseRoom, .petPhone, .favoriteMenu]
+            surfaces: [.bottomDock, .houseRoom, .petPhone]
         ),
         AppFeatureDescriptor(
             id: .recycleBin,
@@ -178,7 +188,7 @@ enum AppFeatureRegistry {
             tintHex: "#808080",
             route: .smallWorld(.recycleBin),
             unlockFeature: .recycleBin,
-            surfaces: [.bottomDock, .houseRoom, .petPhone, .favoriteMenu]
+            surfaces: [.bottomDock, .houseRoom, .petPhone]
         )
     ]
 
@@ -202,43 +212,152 @@ enum AppFeatureRegistry {
 final class BottomDockSettingsManager: ObservableObject {
     static let shared = BottomDockSettingsManager()
 
-    @Published private(set) var selectedFeatureID: AppFeatureID
+    static let slotCount = 4
 
-    private let userDefaultsKey = "bottomDockSelectedFeature.v1"
-    private let defaultFeatureID: AppFeatureID = .petChat
+    @Published private(set) var selectedFeatureIDs: [AppFeatureID]
+
+    private let layoutUserDefaultsKey = "bottomDockLayout.v2"
+    private let legacyUserDefaultsKey = "bottomDockSelectedFeature.v1"
+    private let defaultFeatureIDs: [AppFeatureID] = [.wardrobe, .house, .me, .petChat]
+    private let requiredFeatureIDs: [AppFeatureID] = [.house, .me]
 
     private init() {
-        if let rawValue = UserDefaults.standard.string(forKey: userDefaultsKey),
-           let saved = AppFeatureID(rawValue: rawValue),
-           AppFeatureRegistry.descriptor(for: saved).surfaces.contains(.bottomDock),
-           AppFeatureRegistry.descriptor(for: saved).isUnlocked {
-            selectedFeatureID = saved
+        if let savedIDs = Self.loadLayout(from: layoutUserDefaultsKey) {
+            selectedFeatureIDs = Self.sanitizedLayout(savedIDs, defaultFeatureIDs: defaultFeatureIDs, requiredFeatureIDs: requiredFeatureIDs)
+        } else if let legacyID = Self.loadLegacyFeature(from: legacyUserDefaultsKey) {
+            var migrated = defaultFeatureIDs
+            migrated[Self.slotCount - 1] = legacyID
+            selectedFeatureIDs = Self.sanitizedLayout(migrated, defaultFeatureIDs: defaultFeatureIDs, requiredFeatureIDs: requiredFeatureIDs)
         } else {
-            selectedFeatureID = defaultFeatureID
+            selectedFeatureIDs = Self.sanitizedLayout(defaultFeatureIDs, defaultFeatureIDs: defaultFeatureIDs, requiredFeatureIDs: requiredFeatureIDs)
         }
+        saveLayout()
+    }
+
+    var selectedFeatureID: AppFeatureID {
+        featureID(at: Self.slotCount - 1)
     }
 
     var selectedFeature: AppFeatureDescriptor {
-        let descriptor = AppFeatureRegistry.descriptor(for: selectedFeatureID)
-        guard descriptor.surfaces.contains(.bottomDock), descriptor.isUnlocked else {
-            return AppFeatureRegistry.descriptor(for: defaultFeatureID)
-        }
-        return descriptor
+        feature(at: Self.slotCount - 1)
+    }
+
+    var slots: [Int] {
+        Array(0..<Self.slotCount)
     }
 
     var availableFeatures: [AppFeatureDescriptor] {
         let unlocked = AppFeatureRegistry.unlockedBottomDockFeatures
-        return unlocked.isEmpty ? [AppFeatureRegistry.descriptor(for: defaultFeatureID)] : unlocked
+        return unlocked.isEmpty ? defaultFeatureIDs.map(AppFeatureRegistry.descriptor(for:)) : unlocked
+    }
+
+    var houseSlotIndex: Int? {
+        selectedFeatureIDs.firstIndex(of: .house)
+    }
+
+    func featureID(at slotIndex: Int) -> AppFeatureID {
+        guard selectedFeatureIDs.indices.contains(slotIndex) else {
+            return defaultFeatureIDs[min(slotIndex, defaultFeatureIDs.count - 1)]
+        }
+        return selectedFeatureIDs[slotIndex]
+    }
+
+    func feature(at slotIndex: Int) -> AppFeatureDescriptor {
+        let featureID = featureID(at: slotIndex)
+        let descriptor = AppFeatureRegistry.descriptor(for: featureID)
+        guard descriptor.surfaces.contains(.bottomDock), descriptor.isUnlocked else {
+            return AppFeatureRegistry.descriptor(for: defaultFeatureIDs[min(slotIndex, defaultFeatureIDs.count - 1)])
+        }
+        return descriptor
+    }
+
+    func slotTitle(for slotIndex: Int) -> String {
+        "位置 \(slotIndex + 1)"
     }
 
     func setSelectedFeature(_ featureID: AppFeatureID) {
+        setFeature(featureID, at: Self.slotCount - 1)
+    }
+
+    func setFeature(_ featureID: AppFeatureID, at slotIndex: Int) {
         let descriptor = AppFeatureRegistry.descriptor(for: featureID)
         guard descriptor.surfaces.contains(.bottomDock), descriptor.isUnlocked else { return }
-        selectedFeatureID = featureID
-        UserDefaults.standard.set(featureID.rawValue, forKey: userDefaultsKey)
+        guard selectedFeatureIDs.indices.contains(slotIndex) else { return }
+
+        var nextIDs = selectedFeatureIDs
+        if let existingIndex = nextIDs.firstIndex(of: featureID), existingIndex != slotIndex {
+            nextIDs[existingIndex] = nextIDs[slotIndex]
+        }
+        nextIDs[slotIndex] = featureID
+        selectedFeatureIDs = Self.sanitizedLayout(nextIDs, defaultFeatureIDs: defaultFeatureIDs, requiredFeatureIDs: requiredFeatureIDs)
+        saveLayout()
     }
 
     func resetToDefault() {
-        setSelectedFeature(defaultFeatureID)
+        selectedFeatureIDs = Self.sanitizedLayout(defaultFeatureIDs, defaultFeatureIDs: defaultFeatureIDs, requiredFeatureIDs: requiredFeatureIDs)
+        saveLayout()
+    }
+
+    private func saveLayout() {
+        UserDefaults.standard.set(selectedFeatureIDs.map(\.rawValue), forKey: layoutUserDefaultsKey)
+    }
+
+    private static func loadLayout(from key: String) -> [AppFeatureID]? {
+        guard let rawValues = UserDefaults.standard.stringArray(forKey: key), !rawValues.isEmpty else {
+            return nil
+        }
+        return rawValues.compactMap(AppFeatureID.init(rawValue:))
+    }
+
+    private static func loadLegacyFeature(from key: String) -> AppFeatureID? {
+        guard let rawValue = UserDefaults.standard.string(forKey: key),
+              let featureID = AppFeatureID(rawValue: rawValue),
+              isBottomDockFeature(featureID) else {
+            return nil
+        }
+        return featureID
+    }
+
+    private static func sanitizedLayout(
+        _ featureIDs: [AppFeatureID],
+        defaultFeatureIDs: [AppFeatureID],
+        requiredFeatureIDs: [AppFeatureID]
+    ) -> [AppFeatureID] {
+        var result: [AppFeatureID] = []
+
+        for featureID in featureIDs {
+            guard result.count < slotCount,
+                  isBottomDockFeature(featureID),
+                  !result.contains(featureID) else {
+                continue
+            }
+            result.append(featureID)
+        }
+
+        for featureID in defaultFeatureIDs + AppFeatureRegistry.unlockedBottomDockFeatures.map(\.id) {
+            guard result.count < slotCount,
+                  isBottomDockFeature(featureID),
+                  !result.contains(featureID) else {
+                continue
+            }
+            result.append(featureID)
+        }
+
+        while result.count < slotCount {
+            result.append(.petChat)
+        }
+
+        for requiredFeatureID in requiredFeatureIDs where !result.contains(requiredFeatureID) {
+            if let replacementIndex = result.indices.reversed().first(where: { !requiredFeatureIDs.contains(result[$0]) }) {
+                result[replacementIndex] = requiredFeatureID
+            }
+        }
+
+        return Array(result.prefix(slotCount))
+    }
+
+    private static func isBottomDockFeature(_ featureID: AppFeatureID) -> Bool {
+        let descriptor = AppFeatureRegistry.descriptor(for: featureID)
+        return descriptor.surfaces.contains(.bottomDock) && descriptor.isUnlocked
     }
 }

@@ -45,7 +45,7 @@ struct PetChatView: View {
     @State private var thinkingDelayWorkItem: DispatchWorkItem?
     @State private var selectedClothing: Clothing?
     @State private var navigateToDetail = false
-    // iOS26 搜索栏展开状态（用于控制常用菜单长按交互）
+    // iOS26 搜索栏展开状态（用于控制悬浮萌宠避让搜索栏）
     @State private var isSearchPresented = false
     @State private var hasEnteredOnce = false
     @State private var showingHistorySearch = false
@@ -505,17 +505,10 @@ struct PetChatView: View {
                         }
                     }
                 }
-                DispatchQueue.main.async {
-                    broadcastFloatingPetOverlayState()
-                }
                 syncPetDialogueAmbientAction(force: true)
             }
             .onChange(of: guideManager.currentFeatureExperienceFeature?.rawValue) { _, _ in
                 ensureGuideEmbeddedOptionMessageIfNeeded(forceRefreshForCurrentGuideSession: true)
-            }
-            .onChange(of: isSearchPresented) { oldValue, newValue in
-                // 当 iOS26 搜索栏展开/收起时，通知常用菜单禁用/启用长按交互
-                broadcastFloatingPetOverlayState()
             }
             .onReceive(NotificationCenter.default.publisher(for: .autoExpandPetChatSearch)) { _ in
                 if usesInlinePetSearchInput {
@@ -535,7 +528,6 @@ struct PetChatView: View {
                 petDialogueTouchReleaseWorkItem = nil
                 isPetDialogueTouching = false
                 petDialogueTouchStartTime = nil
-                broadcastFloatingPetOverlayState(false)
             }
             .animation(.spring(response: 0.32, dampingFraction: 0.86), value: adoptionViewModel.presentedFundingPrompt?.id)
             .onChange(of: messages.count) { _, _ in
@@ -546,9 +538,6 @@ struct PetChatView: View {
             }
             .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in
                 keyboardOverlap = 0
-                DispatchQueue.main.async {
-                    broadcastFloatingPetOverlayState()
-                }
             }
             .onReceive(petDialogueAmbientTimer) { _ in
                 syncPetDialogueAmbientAction()
@@ -685,9 +674,6 @@ struct PetChatView: View {
 
         let screenHeight = UIScreen.main.bounds.height
         keyboardOverlap = max(0, screenHeight - endFrame.minY)
-        DispatchQueue.main.async {
-            broadcastFloatingPetOverlayState()
-        }
     }
 
     private func reuseHistoryQuery(_ query: String) {
@@ -702,18 +688,6 @@ struct PetChatView: View {
     private func requestInlineSearchFocus() {
         guard usesInlinePetSearchInput else { return }
         iPadSearchFocusRequestID += 1
-    }
-
-    private var shouldHideFloatingPetOverlay: Bool {
-        keyboardOverlap > 0 || (usesInlinePetSearchInput && isSearchPresented)
-    }
-
-    private func broadcastFloatingPetOverlayState(_ isHidden: Bool? = nil) {
-        NotificationCenter.default.post(
-            name: .petChatSearchStateChanged,
-            object: nil,
-            userInfo: ["isSearching": isHidden ?? shouldHideFloatingPetOverlay]
-        )
     }
 
     private func handleInlineSearchFocusChange(_ isFocused: Bool) {

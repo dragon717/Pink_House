@@ -5,7 +5,7 @@
 - [ ] `python3 scripts/magic_sticker_harness/audit_mannequin_assets.py` 返回 `ok: true`。
 - [ ] `ootd_mannequin_default` imageset 存在且文件名为 ASCII-safe。
 - [ ] 新增备份 DTO 字段均为 optional，旧备份不会因缺 key 解码失败。
-- [ ] 未运行 `xcodebuild`，除非用户明确要求。
+- [ ] 已记录 `xcodebuild` 验证状态：未运行 / PASS / FAIL；如已运行，附命令、scheme、destination 与结果。
 
 ## 功能验收
 

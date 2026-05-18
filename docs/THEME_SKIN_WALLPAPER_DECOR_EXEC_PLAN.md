@@ -82,4 +82,4 @@ THEME_ID="theme_skin.sky_concert" ruby temp/_harness/scripts/materialize_manual_
 THEME_ID="theme_skin.swan_dream" ruby temp/_harness/scripts/materialize_manual_image2_assets.rb --dry-run
 ```
 
-> iOS 阶段不主动跑 `xcodebuild`；如需要模拟器验收，由用户本地编译或明确授权后再跑截图归档。
+> iOS 阶段可按任务需要运行 `xcodebuild` 构建/测试/模拟器验收；如跑截图归档，需同步记录构建命令、模拟器 destination、截图路径和失败边界。
