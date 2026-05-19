@@ -1,5 +1,4 @@
 import Combine
-import MetalKit
 import SwiftUI
 
 struct BookHouseSmallWorldView: View {
@@ -12,59 +11,20 @@ struct BookHouseSmallWorldView: View {
     @StateObject private var featureManager = FeatureUnlockManager.shared
     @StateObject private var layoutStore = BookHouseLayoutStore()
 
-    @State private var selectedBook: HouseBook?
-    @State private var transitionBook: HouseBook?
-    @State private var transitionProgress = 0.0
-    @State private var isBookOpen = false
     @State private var isPlacementMode = false
     @State private var selectedFeatureID: AppFeatureID?
     @State private var lockedFeature: AppFeatureDescriptor?
     @State private var showUnlockAlert = false
 
-    private var activeBook: HouseBook {
-        selectedBook ?? HouseBook.catalog[0]
-    }
-
     var body: some View {
-        ZStack {
-            LiquidBackground(themeSkinWallpaperContext: .house)
-                .ignoresSafeArea()
-
-            if isBookOpen {
-                BookHouseInteriorView(
-                    book: activeBook,
-                    nodes: nodes(for: activeBook),
-                    layoutStore: layoutStore,
-                    isPlacementMode: $isPlacementMode,
-                    selectedFeatureID: $selectedFeatureID,
-                    onBackToBooks: closeBook,
-                    onResetLayout: { layoutStore.reset(bookID: activeBook.id) },
-                    onOpenFeature: openFeature
-                )
-                .transition(.opacity.combined(with: .scale(scale: 0.98)))
-            } else {
-                BookHouseLibraryView(
-                    books: HouseBook.catalog,
-                    onOpenBook: openBook
-                )
-                .transition(.opacity)
-            }
-
-            if let transitionBook {
-                BookOpeningOverlay(
-                    book: transitionBook,
-                    progress: transitionProgress
-                )
-                .transition(.opacity)
-                .zIndex(20)
-            }
-        }
-        .animation(.easeInOut(duration: 0.28), value: isBookOpen)
-        .onDisappear {
-            transitionBook = nil
-            isBookOpen = false
-            isPlacementMode = false
-        }
+        BookHousePrototypeStage(
+            rooms: BookHousePrototypeData.rooms,
+            layoutStore: layoutStore,
+            isPlacementMode: $isPlacementMode,
+            selectedFeatureID: $selectedFeatureID,
+            onResetLayout: resetAllRooms,
+            onOpenFeature: openFeature
+        )
         .sheet(item: $selectedFeatureID) { featureID in
             let feature = AppFeatureRegistry.descriptor(for: featureID)
             BookHouseFeatureSheet(
@@ -90,40 +50,15 @@ struct BookHouseSmallWorldView: View {
                 Text("该功能尚未解锁，请先完成对应任务")
             }
         }
-    }
-
-    private func nodes(for book: HouseBook) -> [BookHouseFeatureNode] {
-        book.featureIDs.enumerated().map { index, featureID in
-            BookHouseFeatureNode(
-                feature: AppFeatureRegistry.descriptor(for: featureID),
-                defaultPosition: book.defaultPositions[index % book.defaultPositions.count]
-            )
-        }
-    }
-
-    private func openBook(_ book: HouseBook) {
-        guard transitionBook == nil else { return }
-        selectedBook = book
-        transitionBook = book
-        transitionProgress = 0
-        isPlacementMode = false
-
-        withAnimation(.easeInOut(duration: 0.95)) {
-            transitionProgress = 1
-        }
-
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.98) {
-            isBookOpen = true
-            transitionBook = nil
-            transitionProgress = 0
-        }
-    }
-
-    private func closeBook() {
-        withAnimation(.easeInOut(duration: 0.24)) {
-            isBookOpen = false
+        .onDisappear {
             isPlacementMode = false
             selectedFeatureID = nil
+        }
+    }
+
+    private func resetAllRooms() {
+        for room in BookHousePrototypeData.rooms {
+            layoutStore.reset(roomID: room.id)
         }
     }
 
@@ -149,394 +84,213 @@ struct BookHouseSmallWorldView: View {
     }
 }
 
-private struct HouseBook: Identifiable, Hashable {
-    let id: String
-    let title: String
-    let subtitle: String
-    let symbol: String
-    let accentHex: String
-    let featureIDs: [AppFeatureID]
-    let defaultPositions: [CGPoint]
-
-    var accent: Color { Color(hex: accentHex) }
-
-    static let catalog: [HouseBook] = [
-        HouseBook(
-            id: "default-house",
-            title: "默认 House",
-            subtitle: "一本打开后可以自由布置的功能书",
-            symbol: "book.closed.fill",
-            accentHex: "EFA4BE",
-            featureIDs: [.wardrobe, .outfitJournal, .magicSticker, .calendar, .wealth, .depositPlan, .bigWorld, .perler, .petHome, .petChat, .dressStock, .recycleBin],
-            defaultPositions: [
-                CGPoint(x: 0.18, y: 0.62), CGPoint(x: 0.34, y: 0.48), CGPoint(x: 0.49, y: 0.64),
-                CGPoint(x: 0.66, y: 0.48), CGPoint(x: 0.82, y: 0.62), CGPoint(x: 0.28, y: 0.76),
-                CGPoint(x: 0.52, y: 0.80), CGPoint(x: 0.74, y: 0.76), CGPoint(x: 0.22, y: 0.34),
-                CGPoint(x: 0.78, y: 0.34), CGPoint(x: 0.42, y: 0.28), CGPoint(x: 0.60, y: 0.28)
-            ]
-        ),
-        HouseBook(
-            id: "creation-book",
-            title: "创作书",
-            subtitle: "手帐、贴纸、拼豆和空间创作",
-            symbol: "paintpalette.fill",
-            accentHex: "C9A7FF",
-            featureIDs: [.outfitJournal, .magicSticker, .perler, .bigWorld],
-            defaultPositions: [
-                CGPoint(x: 0.24, y: 0.62), CGPoint(x: 0.44, y: 0.44),
-                CGPoint(x: 0.60, y: 0.72), CGPoint(x: 0.78, y: 0.50)
-            ]
-        ),
-        HouseBook(
-            id: "daily-book",
-            title: "日常书",
-            subtitle: "衣橱、日历、来财和提醒",
-            symbol: "books.vertical.fill",
-            accentHex: "91C9F7",
-            featureIDs: [.wardrobe, .depositPlan, .calendar, .wealth, .dressStock, .recycleBin],
-            defaultPositions: [
-                CGPoint(x: 0.20, y: 0.62), CGPoint(x: 0.36, y: 0.44), CGPoint(x: 0.52, y: 0.70),
-                CGPoint(x: 0.68, y: 0.44), CGPoint(x: 0.82, y: 0.62), CGPoint(x: 0.50, y: 0.30)
-            ]
-        )
-    ]
-}
-
-private struct BookHouseLibraryView: View {
-    let books: [HouseBook]
-    let onOpenBook: (HouseBook) -> Void
-
-    var body: some View {
-        GeometryReader { geometry in
-            VStack(alignment: .leading, spacing: 18) {
-                Spacer(minLength: geometry.size.height * 0.09)
-
-                VStack(alignment: .leading, spacing: 7) {
-                    Text("House")
-                        .font(.system(size: 38, weight: .bold, design: .rounded))
-                    Text("选择一本书，打开后布置你的功能房间")
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(.secondary)
-                }
-                .padding(.horizontal, 24)
-
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(alignment: .bottom, spacing: 18) {
-                        ForEach(books) { book in
-                            FlatHouseBookButton(book: book) {
-                                onOpenBook(book)
-                            }
-                        }
-                    }
-                    .padding(.horizontal, 24)
-                    .padding(.vertical, 18)
-                }
-
-                Spacer()
-
-                BookShelfBase()
-                    .padding(.horizontal, 22)
-                    .padding(.bottom, 92)
-            }
-            .frame(width: geometry.size.width, height: geometry.size.height)
-        }
-    }
-}
-
-private struct FlatHouseBookButton: View {
-    let book: HouseBook
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            ZStack(alignment: .topLeading) {
-                RoundedRectangle(cornerRadius: 22, style: .continuous)
-                    .fill(
-                        LinearGradient(
-                            colors: [book.accent.opacity(0.9), Color.white.opacity(0.9)],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-                    .frame(width: 188, height: 244)
-                    .rotation3DEffect(.degrees(62), axis: (x: 1, y: 0, z: 0), perspective: 0.68)
-                    .shadow(color: book.accent.opacity(0.28), radius: 22, x: 0, y: 20)
-
-                VStack(alignment: .leading, spacing: 12) {
-                    Image(systemName: book.symbol)
-                        .font(.system(size: 30, weight: .semibold))
-                        .foregroundStyle(.white)
-                        .frame(width: 54, height: 54)
-                        .background(book.accent.opacity(0.85), in: Circle())
-
-                    Spacer()
-
-                    Text(book.title)
-                        .font(.headline.weight(.bold))
-                        .foregroundStyle(.primary)
-                    Text(book.subtitle)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(2)
-                }
-                .padding(18)
-                .frame(width: 188, height: 204, alignment: .topLeading)
-            }
-            .frame(width: 204, height: 250)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel("打开\(book.title)")
-    }
-}
-
-private struct BookShelfBase: View {
-    var body: some View {
-        VStack(spacing: 0) {
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(Color(hex: "9E7058").opacity(0.42))
-                .frame(height: 18)
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .fill(Color(hex: "5E3E35").opacity(0.18))
-                .frame(height: 54)
-        }
-    }
-}
-
-private struct BookOpeningOverlay: View {
-    let book: HouseBook
-    let progress: Double
-
-    var body: some View {
-        ZStack {
-            Color.black.opacity(0.24)
-                .ignoresSafeArea()
-
-            VStack(spacing: 18) {
-                BookOpeningMetalTransitionView(progress: progress, accentHex: book.accentHex)
-                    .frame(height: 360)
-                    .padding(.horizontal, 18)
-
-                Text(book.title)
-                    .font(.headline.weight(.bold))
-                    .foregroundStyle(.white)
-                Text("书脊变成柱子，封面与书背展开成墙")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.white.opacity(0.76))
-            }
-            .padding(.bottom, 32)
-        }
-    }
-}
-
-private struct BookHouseInteriorView: View {
-    let book: HouseBook
-    let nodes: [BookHouseFeatureNode]
+private struct BookHousePrototypeStage: View {
+    let rooms: [BookHousePrototypeRoom]
     @ObservedObject var layoutStore: BookHouseLayoutStore
     @Binding var isPlacementMode: Bool
     @Binding var selectedFeatureID: AppFeatureID?
-    let onBackToBooks: () -> Void
     let onResetLayout: () -> Void
     let onOpenFeature: (AppFeatureDescriptor) -> Void
 
     var body: some View {
         GeometryReader { geometry in
             ZStack {
-                BookRoomBackground(accent: book.accent)
+                Color(hex: "F2D9DD")
+                    .ignoresSafeArea()
 
-                ForEach(nodes) { node in
-                    BookHouseFeatureNodeView(
-                        node: node,
-                        bookID: book.id,
-                        normalizedPosition: layoutStore.position(for: node.feature.id, in: book.id, fallback: node.defaultPosition),
-                        canvasSize: geometry.size,
-                        isPlacementMode: isPlacementMode,
-                        onTap: {
-                            if isPlacementMode {
-                                selectedFeatureID = nil
-                            } else {
-                                selectedFeatureID = node.feature.id
-                            }
-                        },
-                        onMove: { position in
-                            layoutStore.setPosition(position, for: node.feature.id, in: book.id)
-                        }
+                ForEach(rooms) { room in
+                    roomView(room, in: geometry)
+                }
+
+                BookHouseTopChrome(
+                    isPlacementMode: $isPlacementMode,
+                    onResetLayout: onResetLayout,
+                    onOpenFeature: onOpenFeature
+                )
+                .padding(.top, geometry.safeAreaInsets.top + 38)
+                .padding(.horizontal, 22)
+                .frame(maxHeight: .infinity, alignment: .top)
+
+                if isPlacementMode {
+                    placementHint(in: geometry)
+                }
+
+                Image("naicha_peeking")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: min(92, geometry.size.width * 0.23), height: 58)
+                    .position(
+                        x: geometry.size.width * 0.5,
+                        y: geometry.size.height - geometry.safeAreaInsets.bottom - 124
                     )
-                }
-
-                VStack {
-                    HStack(spacing: 10) {
-                        Button(action: onBackToBooks) {
-                            Image(systemName: "books.vertical.fill")
-                                .font(.system(size: 16, weight: .bold))
-                        }
-                        .bookHouseFloatingButtonStyle()
-
-                        Spacer()
-
-                        if isPlacementMode {
-                            Button(action: onResetLayout) {
-                                Image(systemName: "arrow.counterclockwise")
-                                    .font(.system(size: 16, weight: .bold))
-                            }
-                            .bookHouseFloatingButtonStyle()
-                        }
-
-                        Button {
-                            withAnimation(.spring(response: 0.28, dampingFraction: 0.82)) {
-                                isPlacementMode.toggle()
-                            }
-                        } label: {
-                            Image(systemName: isPlacementMode ? "checkmark" : "hand.point.up.left.fill")
-                                .font(.system(size: 16, weight: .bold))
-                        }
-                        .bookHouseFloatingButtonStyle(active: isPlacementMode)
-                        .accessibilityLabel(isPlacementMode ? "完成自由摆放" : "开启自由摆放模式")
-                    }
-                    .padding(.horizontal, 16)
-                    .padding(.top, 48)
-
-                    Spacer()
-                }
-
-                VStack {
-                    Spacer()
-                    Text(isPlacementMode ? "自由摆放中：拖动物件调整入口位置" : "点击物件查看功能，右上角可进入自由摆放")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.primary.opacity(0.72))
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 9)
-                        .background(.ultraThinMaterial, in: Capsule())
-                        .padding(.bottom, 96)
-                }
+                    .allowsHitTesting(false)
             }
-            .frame(width: geometry.size.width, height: geometry.size.height)
         }
         .ignoresSafeArea()
     }
+
+    @ViewBuilder
+    private func roomView(_ room: BookHousePrototypeRoom, in geometry: GeometryProxy) -> some View {
+        let roomWidth = room.slot.width(for: geometry.size.width)
+        let roomHeight = roomWidth * BookHouseRoomSlot.aspectRatio
+
+        PrototypeBookRoomView(
+            room: room,
+            roomSize: CGSize(width: roomWidth, height: roomHeight),
+            layoutStore: layoutStore,
+            isPlacementMode: isPlacementMode,
+            selectedFeatureID: $selectedFeatureID
+        )
+        .frame(width: roomWidth, height: roomHeight)
+        .position(room.slot.position(in: geometry))
+        .zIndex(room.slot.zIndex)
+    }
+
+    private func placementHint(in geometry: GeometryProxy) -> some View {
+        Text("拖动物件调整入口位置")
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(Color(hex: "7B5E61"))
+            .padding(.horizontal, 14)
+            .padding(.vertical, 8)
+            .background(.white.opacity(0.78), in: Capsule())
+            .overlay(Capsule().stroke(Color.white.opacity(0.8), lineWidth: 1))
+            .shadow(color: .black.opacity(0.08), radius: 10, x: 0, y: 5)
+            .position(
+                x: geometry.size.width * 0.5,
+                y: geometry.size.height - geometry.safeAreaInsets.bottom - 158
+            )
+    }
 }
 
-private struct BookRoomBackground: View {
-    let accent: Color
+private struct BookHouseTopChrome: View {
+    @Binding var isPlacementMode: Bool
+    let onResetLayout: () -> Void
+    let onOpenFeature: (AppFeatureDescriptor) -> Void
 
     var body: some View {
-        GeometryReader { geometry in
-            ZStack {
-                LinearGradient(
-                    colors: [Color(hex: "FFF7EF"), Color(hex: "F3DCE6"), Color(hex: "DDEAF4")],
-                    startPoint: .top,
-                    endPoint: .bottom
+        HStack(alignment: .top, spacing: 12) {
+            HStack(spacing: 0) {
+                topTabButton(
+                    title: "少女衣橱",
+                    systemImage: "cabinet.fill",
+                    featureID: .wardrobe
                 )
-                .ignoresSafeArea()
 
-                wallShape(left: true)
-                    .fill(Color(hex: "FFF5E8").opacity(0.94))
-                    .overlay(wallShape(left: true).stroke(accent.opacity(0.26), lineWidth: 1.2))
-                    .shadow(color: .black.opacity(0.07), radius: 16, x: 0, y: 8)
+                topTabButton(
+                    title: "心愿尾款",
+                    systemImage: "calendar.badge.clock",
+                    featureID: .depositPlan
+                )
+            }
+            .padding(5)
+            .background(.white.opacity(0.62), in: Capsule())
+            .overlay(Capsule().stroke(Color.white.opacity(0.58), lineWidth: 1))
+            .shadow(color: .black.opacity(0.05), radius: 10, x: 0, y: 6)
 
-                wallShape(left: false)
-                    .fill(Color(hex: "FFFDF4").opacity(0.94))
-                    .overlay(wallShape(left: false).stroke(accent.opacity(0.26), lineWidth: 1.2))
-                    .shadow(color: .black.opacity(0.07), radius: 16, x: 0, y: 8)
+            Spacer(minLength: 8)
 
-                floorShape
-                    .fill(
-                        LinearGradient(
-                            colors: [Color(hex: "F7D6B7"), Color(hex: "FBE8D5")],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-                    )
-                    .overlay(floorShape.stroke(Color.white.opacity(0.46), lineWidth: 1.2))
-                    .shadow(color: .black.opacity(0.08), radius: 18, x: 0, y: -2)
+            HStack(spacing: 4) {
+                iconButton(
+                    isPlacementMode ? "checkmark" : "arrow.up.and.down.and.arrow.left.and.right",
+                    active: isPlacementMode
+                ) {
+                    withAnimation(.spring(response: 0.28, dampingFraction: 0.84)) {
+                        isPlacementMode.toggle()
+                    }
+                }
 
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(
-                        LinearGradient(
-                            colors: [Color(hex: "C68A54"), Color(hex: "F2C576"), Color(hex: "8E5A35")],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-                    )
-                    .frame(width: max(16, geometry.size.width * 0.035), height: geometry.size.height * 0.58)
-                    .position(x: geometry.size.width * 0.5, y: geometry.size.height * 0.38)
-                    .shadow(color: .black.opacity(0.18), radius: 10, x: 0, y: 6)
+                iconButton("yensign.circle", featureID: .wealth)
+                iconButton("book.pages", featureID: .outfitJournal)
+                iconButton("bell", featureID: .calendar)
+                iconButton("ellipsis.circle", featureID: .petChat)
+
+                iconButton("plus") {
+                    onResetLayout()
+                }
+            }
+            .padding(6)
+            .background(.white.opacity(0.68), in: Capsule())
+            .overlay(Capsule().stroke(Color.white.opacity(0.58), lineWidth: 1))
+            .shadow(color: .black.opacity(0.05), radius: 10, x: 0, y: 6)
+        }
+    }
+
+    private func topTabButton(title: String, systemImage: String, featureID: AppFeatureID) -> some View {
+        Button {
+            onOpenFeature(AppFeatureRegistry.descriptor(for: featureID))
+        } label: {
+            Label(title, systemImage: systemImage)
+                .font(.system(size: 11, weight: .semibold))
+                .labelStyle(.titleAndIcon)
+                .foregroundStyle(Color(hex: featureID == .wardrobe ? "8E8288" : "D79AAD"))
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+                .frame(width: 62, height: 34)
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func iconButton(_ systemImage: String, featureID: AppFeatureID) -> some View {
+        iconButton(systemImage) {
+            onOpenFeature(AppFeatureRegistry.descriptor(for: featureID))
+        }
+    }
+
+    private func iconButton(_ systemImage: String, active: Bool = false, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: systemImage)
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(active ? Color.white : Color(hex: "5F565C"))
+                .frame(width: 28, height: 28)
+                .background(active ? Color(hex: "E59AB0") : Color.clear, in: Circle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(systemImage)
+    }
+}
+
+private struct PrototypeBookRoomView: View {
+    let room: BookHousePrototypeRoom
+    let roomSize: CGSize
+    @ObservedObject var layoutStore: BookHouseLayoutStore
+    let isPlacementMode: Bool
+    @Binding var selectedFeatureID: AppFeatureID?
+
+    var body: some View {
+        ZStack {
+            Image("book_house_room_shell")
+                .resizable()
+                .scaledToFit()
+                .shadow(color: Color(hex: "604A35").opacity(0.18), radius: 10, x: 0, y: 8)
+
+            ForEach(room.items) { item in
+                PrototypeRoomItemView(
+                    item: item,
+                    roomID: room.id,
+                    normalizedPosition: layoutStore.position(for: item.feature.id, in: room.id, fallback: item.defaultPosition),
+                    roomSize: roomSize,
+                    isPlacementMode: isPlacementMode,
+                    onTap: {
+                        guard !isPlacementMode else { return }
+                        selectedFeatureID = item.feature.id
+                    },
+                    onMove: { position in
+                        layoutStore.setPosition(position, for: item.feature.id, in: room.id)
+                    }
+                )
             }
         }
-    }
-
-    private var floorShape: NormalizedPolygon {
-        NormalizedPolygon(points: [
-            CGPoint(x: 0.08, y: 0.58),
-            CGPoint(x: 0.92, y: 0.58),
-            CGPoint(x: 0.74, y: 0.94),
-            CGPoint(x: 0.26, y: 0.94)
-        ])
-    }
-
-    private func wallShape(left: Bool) -> NormalizedPolygon {
-        if left {
-            return NormalizedPolygon(points: [
-                CGPoint(x: 0.08, y: 0.18),
-                CGPoint(x: 0.50, y: 0.08),
-                CGPoint(x: 0.50, y: 0.58),
-                CGPoint(x: 0.08, y: 0.58)
-            ])
-        }
-        return NormalizedPolygon(points: [
-            CGPoint(x: 0.50, y: 0.08),
-            CGPoint(x: 0.92, y: 0.18),
-            CGPoint(x: 0.92, y: 0.58),
-            CGPoint(x: 0.50, y: 0.58)
-        ])
+        .frame(width: roomSize.width, height: roomSize.height)
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(room.title)
     }
 }
 
-private struct BookHouseFeatureNode: Identifiable {
-    let feature: AppFeatureDescriptor
-    let defaultPosition: CGPoint
-
-    var id: AppFeatureID { feature.id }
-
-    var assetName: String {
-        switch feature.id {
-        case .wardrobe:
-            return "book_house_wardrobe"
-        case .depositPlan:
-            return "book_house_deposit_plan"
-        case .house:
-            return "book_house_outfit_journal"
-        case .me:
-            return "book_house_pet_chat"
-        case .petHome:
-            return "book_house_pet_home"
-        case .petChat:
-            return "book_house_pet_chat"
-        case .magicSticker:
-            return "book_house_magic_sticker"
-        case .outfitJournal:
-            return "book_house_outfit_journal"
-        case .wealth:
-            return "book_house_wealth"
-        case .calendar:
-            return "book_house_calendar"
-        case .bigWorld:
-            return "book_house_big_world"
-        case .perler:
-            return "book_house_perler"
-        case .dressStock:
-            return "book_house_dress_stock"
-        case .recycleBin:
-            return "book_house_recycle_bin"
-        }
-    }
-}
-
-private struct BookHouseFeatureNodeView: View {
-    let node: BookHouseFeatureNode
-    let bookID: String
+private struct PrototypeRoomItemView: View {
+    let item: BookHouseRoomItem
+    let roomID: String
     let normalizedPosition: CGPoint
-    let canvasSize: CGSize
+    let roomSize: CGSize
     let isPlacementMode: Bool
     let onTap: () -> Void
     let onMove: (CGPoint) -> Void
@@ -545,54 +299,37 @@ private struct BookHouseFeatureNodeView: View {
 
     var body: some View {
         Button(action: onTap) {
-            VStack(spacing: 5) {
-                ZStack(alignment: .bottomTrailing) {
-                    Image(node.assetName)
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: 70, height: 64)
-                        .saturation(node.feature.isUnlocked ? 1 : 0)
-                        .opacity(node.feature.isUnlocked ? 1 : 0.38)
-                        .shadow(color: Color(hex: node.feature.tintHex).opacity(node.feature.isUnlocked ? 0.22 : 0.05), radius: 8, x: 0, y: 5)
+            ZStack(alignment: .topTrailing) {
+                Image(item.assetName)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: item.size.width, height: item.size.height)
+                    .shadow(color: .black.opacity(0.12), radius: 5, x: 0, y: 4)
 
-                    ZStack {
-                        Circle()
-                            .fill(.ultraThinMaterial)
-                        Circle()
-                            .stroke(Color(hex: node.feature.tintHex).opacity(0.45), lineWidth: 1)
-                        Image(systemName: node.feature.isUnlocked ? node.feature.systemImage : "lock.fill")
-                            .font(.system(size: 12, weight: .bold))
-                            .foregroundStyle(node.feature.isUnlocked ? Color(hex: node.feature.tintHex) : .secondary)
-                    }
-                    .frame(width: 26, height: 26)
-                    .offset(x: 4, y: 2)
+                if isPlacementMode {
+                    Image(systemName: item.feature.systemImage)
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundStyle(Color(hex: item.feature.tintHex))
+                        .frame(width: 20, height: 20)
+                        .background(.white.opacity(0.86), in: Circle())
+                        .overlay(Circle().stroke(Color(hex: item.feature.tintHex).opacity(0.34), lineWidth: 1))
+                        .offset(x: 4, y: -4)
                 }
-                .frame(width: 76, height: 68)
-
-                Text(node.feature.title)
-                    .font(.caption2.weight(.bold))
-                    .foregroundStyle(.primary)
-                    .lineLimit(1)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(.ultraThinMaterial, in: Capsule())
             }
-            .padding(7)
-            .background(
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .fill(Color.white.opacity(isPlacementMode ? 0.70 : 0.42))
-                    .shadow(color: .black.opacity(0.10), radius: 10, x: 0, y: 5)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .stroke(isPlacementMode ? Color.accentColor.opacity(0.7) : Color.white.opacity(0.45), lineWidth: 1)
-            )
+            .frame(width: max(item.size.width, 46), height: max(item.size.height, 46))
+            .overlay {
+                if isPlacementMode {
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .stroke(Color(hex: "E59AB0").opacity(0.75), style: StrokeStyle(lineWidth: 1.4, dash: [4, 3]))
+                }
+            }
+            .contentShape(Rectangle())
         }
-        .captureGuideTarget(guideTarget(for: node.feature.id))
+        .captureGuideTarget(guideTarget(for: item.feature.id))
         .buttonStyle(.plain)
         .position(
-            x: normalizedPosition.x * canvasSize.width,
-            y: normalizedPosition.y * canvasSize.height
+            x: normalizedPosition.x * roomSize.width,
+            y: normalizedPosition.y * roomSize.height
         )
         .simultaneousGesture(
             DragGesture()
@@ -602,14 +339,16 @@ private struct BookHouseFeatureNodeView: View {
                     dragStart = start
                     onMove(
                         CGPoint(
-                            x: clamp(start.x + value.translation.width / max(1, canvasSize.width), 0.08, 0.92),
-                            y: clamp(start.y + value.translation.height / max(1, canvasSize.height), 0.16, 0.88)
+                            x: clamp(start.x + value.translation.width / max(1, roomSize.width), 0.12, 0.88),
+                            y: clamp(start.y + value.translation.height / max(1, roomSize.height), 0.18, 0.88)
                         )
                     )
                 }
-                .onEnded { _ in dragStart = nil }
+                .onEnded { _ in
+                    dragStart = nil
+                }
         )
-        .accessibilityLabel(node.feature.title)
+        .accessibilityLabel(item.feature.title)
     }
 
     private func clamp(_ value: CGFloat, _ minValue: CGFloat, _ maxValue: CGFloat) -> CGFloat {
@@ -628,6 +367,115 @@ private struct BookHouseFeatureNodeView: View {
             return nil
         }
     }
+}
+
+private enum BookHousePrototypeData {
+    static let rooms: [BookHousePrototypeRoom] = [
+        BookHousePrototypeRoom(
+            id: "book-house-main",
+            title: "主书页房间",
+            slot: .top,
+            items: [
+                item(.wardrobe, assetName: "book_house_wardrobe", x: 0.52, y: 0.52, width: 60, height: 88),
+                item(.magicSticker, assetName: "book_house_magic_sticker", x: 0.30, y: 0.66, width: 42, height: 34),
+                item(.depositPlan, assetName: "book_house_deposit_plan", x: 0.74, y: 0.70, width: 48, height: 43),
+                item(.outfitJournal, assetName: "book_house_outfit_journal", x: 0.50, y: 0.82, width: 48, height: 34)
+            ]
+        ),
+        BookHousePrototypeRoom(
+            id: "book-house-daily",
+            title: "日常书页房间",
+            slot: .left,
+            items: [
+                item(.calendar, assetName: "book_house_calendar", x: 0.28, y: 0.64, width: 42, height: 50),
+                item(.wealth, assetName: "book_house_wealth", x: 0.47, y: 0.80, width: 50, height: 48),
+                item(.bigWorld, assetName: "book_house_big_world", x: 0.70, y: 0.69, width: 42, height: 55)
+            ]
+        ),
+        BookHousePrototypeRoom(
+            id: "book-house-comfort",
+            title: "收藏书页房间",
+            slot: .right,
+            items: [
+                item(.dressStock, assetName: "book_house_dress_stock", x: 0.68, y: 0.43, width: 52, height: 50),
+                item(.petHome, assetName: "book_house_phone", x: 0.40, y: 0.78, width: 46, height: 42),
+                item(.petChat, assetName: "book_house_vanity", x: 0.57, y: 0.77, width: 42, height: 40),
+                item(.perler, assetName: "book_house_perler", x: 0.33, y: 0.66, width: 42, height: 34)
+            ]
+        )
+    ]
+
+    private static func item(
+        _ featureID: AppFeatureID,
+        assetName: String,
+        x: CGFloat,
+        y: CGFloat,
+        width: CGFloat,
+        height: CGFloat
+    ) -> BookHouseRoomItem {
+        BookHouseRoomItem(
+            feature: AppFeatureRegistry.descriptor(for: featureID),
+            assetName: assetName,
+            defaultPosition: CGPoint(x: x, y: y),
+            size: CGSize(width: width, height: height)
+        )
+    }
+}
+
+private struct BookHousePrototypeRoom: Identifiable {
+    let id: String
+    let title: String
+    let slot: BookHouseRoomSlot
+    let items: [BookHouseRoomItem]
+}
+
+private enum BookHouseRoomSlot {
+    case top
+    case left
+    case right
+
+    static let aspectRatio: CGFloat = 365.0 / 320.0
+
+    var zIndex: Double {
+        switch self {
+        case .top: return 3
+        case .left: return 2
+        case .right: return 1
+        }
+    }
+
+    func width(for screenWidth: CGFloat) -> CGFloat {
+        switch self {
+        case .top:
+            return min(screenWidth * 0.45, 188)
+        case .left, .right:
+            return min(screenWidth * 0.42, 174)
+        }
+    }
+
+    func position(in geometry: GeometryProxy) -> CGPoint {
+        let size = geometry.size
+        let topY = max(geometry.safeAreaInsets.top + 254, size.height * 0.36)
+        let bottomY = max(topY + min(size.width * 0.39, 156), size.height * 0.58)
+
+        switch self {
+        case .top:
+            return CGPoint(x: size.width * 0.50, y: topY)
+        case .left:
+            return CGPoint(x: size.width * 0.31, y: bottomY)
+        case .right:
+            return CGPoint(x: size.width * 0.69, y: bottomY)
+        }
+    }
+}
+
+private struct BookHouseRoomItem: Identifiable {
+    let feature: AppFeatureDescriptor
+    let assetName: String
+    let defaultPosition: CGPoint
+    let size: CGSize
+
+    var id: AppFeatureID { feature.id }
 }
 
 private struct BookHouseFeatureSheet: View {
@@ -674,28 +522,28 @@ private struct BookHouseFeatureSheet: View {
 private final class BookHouseLayoutStore: ObservableObject {
     @Published private var positions: [String: CGPoint] = [:]
 
-    private let defaultsKey = "bookHouse.itemPositions.v1"
+    private let defaultsKey = "bookHouse.prototypeItemPositions.v2"
 
     init() {
         load()
     }
 
-    func position(for featureID: AppFeatureID, in bookID: String, fallback: CGPoint) -> CGPoint {
-        positions[key(bookID: bookID, featureID: featureID)] ?? fallback
+    func position(for featureID: AppFeatureID, in roomID: String, fallback: CGPoint) -> CGPoint {
+        positions[key(roomID: roomID, featureID: featureID)] ?? fallback
     }
 
-    func setPosition(_ position: CGPoint, for featureID: AppFeatureID, in bookID: String) {
-        positions[key(bookID: bookID, featureID: featureID)] = position
+    func setPosition(_ position: CGPoint, for featureID: AppFeatureID, in roomID: String) {
+        positions[key(roomID: roomID, featureID: featureID)] = position
         save()
     }
 
-    func reset(bookID: String) {
-        positions = positions.filter { !$0.key.hasPrefix("\(bookID)::") }
+    func reset(roomID: String) {
+        positions = positions.filter { !$0.key.hasPrefix("\(roomID)::") }
         save()
     }
 
-    private func key(bookID: String, featureID: AppFeatureID) -> String {
-        "\(bookID)::\(featureID.rawValue)"
+    private func key(roomID: String, featureID: AppFeatureID) -> String {
+        "\(roomID)::\(featureID.rawValue)"
     }
 
     private func load() {
@@ -716,258 +564,5 @@ private final class BookHouseLayoutStore: ObservableObject {
     private struct StoredPoint: Codable {
         let x: CGFloat
         let y: CGFloat
-    }
-}
-
-private extension View {
-    func bookHouseFloatingButtonStyle(active: Bool = false) -> some View {
-        self
-            .foregroundStyle(active ? Color.white : Color.primary)
-            .frame(width: 44, height: 44)
-            .background(active ? Color.accentColor : Color.white.opacity(0.74), in: Circle())
-            .shadow(color: .black.opacity(0.16), radius: 12, x: 0, y: 6)
-    }
-}
-
-private struct BookOpeningMetalTransitionView: UIViewRepresentable {
-    let progress: Double
-    let accentHex: String
-
-    func makeCoordinator() -> Coordinator {
-        Coordinator()
-    }
-
-    func makeUIView(context: Context) -> MTKView {
-        let view = MTKView(frame: .zero, device: MTLCreateSystemDefaultDevice())
-        view.isOpaque = false
-        view.backgroundColor = .clear
-        view.clearColor = MTLClearColor(red: 0, green: 0, blue: 0, alpha: 0)
-        view.framebufferOnly = true
-        view.enableSetNeedsDisplay = false
-        view.isPaused = false
-        view.preferredFramesPerSecond = 60
-        view.delegate = context.coordinator
-        context.coordinator.attach(view: view)
-        context.coordinator.progress = Float(progress)
-        context.coordinator.accent = BookMetalColor(hex: accentHex).simd
-        return view
-    }
-
-    func updateUIView(_ uiView: MTKView, context: Context) {
-        context.coordinator.attach(view: uiView)
-        context.coordinator.progress = Float(progress)
-        context.coordinator.accent = BookMetalColor(hex: accentHex).simd
-    }
-
-    final class Coordinator: NSObject, MTKViewDelegate {
-        var progress: Float = 0
-        var accent = SIMD4<Float>(0.93, 0.64, 0.74, 1)
-
-        private weak var view: MTKView?
-        private var commandQueue: MTLCommandQueue?
-        private var pipelineState: MTLRenderPipelineState?
-
-        func attach(view: MTKView) {
-            self.view = view
-            guard commandQueue == nil, let device = view.device else { return }
-            commandQueue = device.makeCommandQueue()
-            pipelineState = makePipeline(device: device, pixelFormat: view.colorPixelFormat)
-        }
-
-        func mtkView(_ view: MTKView, drawableSizeWillChange size: CGSize) {
-            _ = size
-        }
-
-        func draw(in view: MTKView) {
-            guard
-                let drawable = view.currentDrawable,
-                let descriptor = view.currentRenderPassDescriptor,
-                let commandQueue,
-                let pipelineState,
-                let commandBuffer = commandQueue.makeCommandBuffer()
-            else { return }
-
-            descriptor.colorAttachments[0].loadAction = .clear
-            descriptor.colorAttachments[0].clearColor = MTLClearColor(red: 0, green: 0, blue: 0, alpha: 0)
-            descriptor.colorAttachments[0].storeAction = .store
-
-            let vertices = BookOpeningGeometry.vertices(progress: progress, accent: accent)
-            guard let buffer = view.device?.makeBuffer(
-                bytes: vertices,
-                length: MemoryLayout<BookMetalVertex>.stride * vertices.count
-            ) else { return }
-
-            let encoder = commandBuffer.makeRenderCommandEncoder(descriptor: descriptor)
-            encoder?.setRenderPipelineState(pipelineState)
-            encoder?.setVertexBuffer(buffer, offset: 0, index: 0)
-            encoder?.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: vertices.count)
-            encoder?.endEncoding()
-
-            commandBuffer.present(drawable)
-            commandBuffer.commit()
-        }
-
-        private func makePipeline(device: MTLDevice, pixelFormat: MTLPixelFormat) -> MTLRenderPipelineState? {
-            guard let library = try? device.makeLibrary(source: Self.shaderSource, options: nil) else {
-                return nil
-            }
-
-            let descriptor = MTLRenderPipelineDescriptor()
-            descriptor.vertexFunction = library.makeFunction(name: "book_vertex")
-            descriptor.fragmentFunction = library.makeFunction(name: "book_fragment")
-            descriptor.colorAttachments[0].pixelFormat = pixelFormat
-            descriptor.colorAttachments[0].isBlendingEnabled = true
-            descriptor.colorAttachments[0].sourceRGBBlendFactor = .sourceAlpha
-            descriptor.colorAttachments[0].destinationRGBBlendFactor = .oneMinusSourceAlpha
-            descriptor.colorAttachments[0].sourceAlphaBlendFactor = .sourceAlpha
-            descriptor.colorAttachments[0].destinationAlphaBlendFactor = .oneMinusSourceAlpha
-            return try? device.makeRenderPipelineState(descriptor: descriptor)
-        }
-
-        private static let shaderSource = """
-        #include <metal_stdlib>
-        using namespace metal;
-
-        struct Vertex {
-            float2 position;
-            float4 color;
-        };
-
-        struct VertexOut {
-            float4 position [[position]];
-            float4 color;
-        };
-
-        vertex VertexOut book_vertex(const device Vertex *vertices [[buffer(0)]], uint vid [[vertex_id]]) {
-            VertexOut out;
-            out.position = float4(vertices[vid].position, 0.0, 1.0);
-            out.color = vertices[vid].color;
-            return out;
-        }
-
-        fragment float4 book_fragment(VertexOut in [[stage_in]]) {
-            return in.color;
-        }
-        """
-    }
-}
-
-private struct BookMetalVertex {
-    let position: SIMD2<Float>
-    let color: SIMD4<Float>
-}
-
-private enum BookOpeningGeometry {
-    static func vertices(progress: Float, accent: SIMD4<Float>) -> [BookMetalVertex] {
-        let p = smooth(min(max(progress, 0), 1))
-        var vertices: [BookMetalVertex] = []
-
-        let paper = SIMD4<Float>(1.0, 0.94, 0.84, 0.96)
-        let paperSide = SIMD4<Float>(0.98, 0.80, 0.70, 0.96)
-        let gold = SIMD4<Float>(0.92, 0.64, 0.28, 0.98)
-        let floor = mix(accent, SIMD4<Float>(0.98, 0.82, 0.68, 0.96), 0.72)
-
-        appendQuad(
-            &vertices,
-            points: [
-                interp(SIMD2<Float>(-0.62, -0.50), SIMD2<Float>(-0.62, -0.10), p),
-                interp(SIMD2<Float>(0.00, -0.72), SIMD2<Float>(0.00, 0.08), p),
-                interp(SIMD2<Float>(0.00, -0.18), SIMD2<Float>(0.00, 0.70), p),
-                interp(SIMD2<Float>(-0.62, 0.02), SIMD2<Float>(-0.62, 0.42), p)
-            ],
-            color: paper
-        )
-
-        appendQuad(
-            &vertices,
-            points: [
-                interp(SIMD2<Float>(0.00, -0.72), SIMD2<Float>(0.00, 0.08), p),
-                interp(SIMD2<Float>(0.62, -0.50), SIMD2<Float>(0.62, -0.10), p),
-                interp(SIMD2<Float>(0.62, 0.02), SIMD2<Float>(0.62, 0.42), p),
-                interp(SIMD2<Float>(0.00, -0.18), SIMD2<Float>(0.00, 0.70), p)
-            ],
-            color: paperSide
-        )
-
-        appendQuad(
-            &vertices,
-            points: [
-                interp(SIMD2<Float>(-0.62, -0.50), SIMD2<Float>(-0.62, -0.10), p),
-                interp(SIMD2<Float>(0.62, -0.50), SIMD2<Float>(0.62, -0.10), p),
-                interp(SIMD2<Float>(0.38, -0.78), SIMD2<Float>(0.42, -0.72), p),
-                interp(SIMD2<Float>(-0.38, -0.78), SIMD2<Float>(-0.42, -0.72), p)
-            ],
-            color: floor
-        )
-
-        appendQuad(
-            &vertices,
-            points: [
-                interp(SIMD2<Float>(-0.04, -0.70), SIMD2<Float>(-0.035, 0.02), p),
-                interp(SIMD2<Float>(0.04, -0.70), SIMD2<Float>(0.035, 0.02), p),
-                interp(SIMD2<Float>(0.04, -0.16), SIMD2<Float>(0.035, 0.78), p),
-                interp(SIMD2<Float>(-0.04, -0.16), SIMD2<Float>(-0.035, 0.78), p)
-            ],
-            color: gold
-        )
-
-        return vertices
-    }
-
-    private static func appendQuad(_ vertices: inout [BookMetalVertex], points: [SIMD2<Float>], color: SIMD4<Float>) {
-        guard points.count == 4 else { return }
-        vertices.append(contentsOf: [
-            BookMetalVertex(position: points[0], color: color),
-            BookMetalVertex(position: points[1], color: color),
-            BookMetalVertex(position: points[2], color: color),
-            BookMetalVertex(position: points[0], color: color),
-            BookMetalVertex(position: points[2], color: color),
-            BookMetalVertex(position: points[3], color: color)
-        ])
-    }
-
-    private static func interp(_ a: SIMD2<Float>, _ b: SIMD2<Float>, _ t: Float) -> SIMD2<Float> {
-        a + (b - a) * t
-    }
-
-    private static func smooth(_ t: Float) -> Float {
-        t * t * (3 - 2 * t)
-    }
-
-    private static func mix(_ a: SIMD4<Float>, _ b: SIMD4<Float>, _ t: Float) -> SIMD4<Float> {
-        a + (b - a) * t
-    }
-}
-
-private struct BookMetalColor {
-    let simd: SIMD4<Float>
-
-    init(hex: String) {
-        let sanitized = hex.replacingOccurrences(of: "#", with: "")
-        var value: UInt64 = 0
-        Scanner(string: sanitized).scanHexInt64(&value)
-        let r = Float((value >> 16) & 0xff) / 255
-        let g = Float((value >> 8) & 0xff) / 255
-        let b = Float(value & 0xff) / 255
-        simd = SIMD4<Float>(r, g, b, 1)
-    }
-}
-
-private struct NormalizedPolygon: Shape {
-    let points: [CGPoint]
-
-    func path(in rect: CGRect) -> Path {
-        var path = Path()
-        guard let first = points.first else { return path }
-        path.move(to: scale(first, in: rect))
-        for point in points.dropFirst() {
-            path.addLine(to: scale(point, in: rect))
-        }
-        path.closeSubpath()
-        return path
-    }
-
-    private func scale(_ point: CGPoint, in rect: CGRect) -> CGPoint {
-        CGPoint(x: rect.minX + point.x * rect.width, y: rect.minY + point.y * rect.height)
     }
 }
