@@ -227,12 +227,11 @@ struct DataManagementView: View {
         isLoading = true
         loadingMessage = "正在重建空间场景..."
         Task {
-            SpatialAssetManager.shared.rebuild(imageName: "small_world_rococo_1", extension: "png")
-            SpatialAssetManager.shared.rebuild(imageName: "small_world_rococo_2", extension: "png")
+            SpatialAssetManager.shared.clearAllCache()
             try? await Task.sleep(nanoseconds: 1_200_000_000)
             await MainActor.run {
                 self.isLoading = false
-                self.message = "已触发重建，进入House时自动生效"
+                self.message = "已清理空间缓存，进入 House 时自动生效"
                 self.showingMessage = true
             }
         }

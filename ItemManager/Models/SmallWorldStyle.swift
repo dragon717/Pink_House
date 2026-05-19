@@ -1,13 +1,13 @@
 import Foundation
 
 enum SmallWorldStyle: String, CaseIterable, Identifiable {
-    case rococo = "rococo"
+    case bookHouse = "book_house"
 
     var id: String { rawValue }
 
     var displayName: String {
         switch self {
-        case .rococo: return "洛可可风格（等轴测图）"
+        case .bookHouse: return "书本 House（默认）"
         }
     }
 }

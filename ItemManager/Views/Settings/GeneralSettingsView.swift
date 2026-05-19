@@ -13,8 +13,7 @@ struct GeneralSettingsView: View {
     @State private var cropRequest: CropRequest?
     @State private var isLoadingImage = false // Loading state
     
-    @AppStorage("isSpatialSceneEnabled") private var isSpatialSceneEnabled = false
-    @AppStorage("smallWorldStyle") private var smallWorldStyle = SmallWorldStyle.rococo.rawValue
+    @AppStorage("smallWorldStyle") private var smallWorldStyle = SmallWorldStyle.bookHouse.rawValue
     
     var body: some View {
         @Bindable var theme = themeManager
@@ -323,8 +322,8 @@ struct GeneralSettingsView: View {
             LiquidBackground()
         }
         .onAppear {
-            if smallWorldStyle != SmallWorldStyle.rococo.rawValue {
-                smallWorldStyle = SmallWorldStyle.rococo.rawValue
+            if smallWorldStyle != SmallWorldStyle.bookHouse.rawValue {
+                smallWorldStyle = SmallWorldStyle.bookHouse.rawValue
             }
             enforceThemeBackgroundHarmonyIfNeeded()
         }
@@ -454,26 +453,10 @@ struct GeneralSettingsView: View {
                 .foregroundStyle(.purple)
             Text("House风格")
             Spacer()
-            Text(SmallWorldStyle.rococo.displayName)
+            Text(SmallWorldStyle.bookHouse.displayName)
                 .foregroundStyle(.secondary)
         }
 
-        // 限制 iOS 26 生效
-        if #available(iOS 26.0, *) {
-            Toggle(isOn: $isSpatialSceneEnabled) {
-                VStack(alignment: .leading) {
-                    Text("开启3d景深空间场景")
-                    Text("iOS 26 专属特性")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            }
-        } else {
-            Text("仅支持 iOS 26 及以上版本")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-        }
-        
         HStack {
             Text("文字颜色")
             Spacer()

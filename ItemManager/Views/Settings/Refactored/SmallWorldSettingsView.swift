@@ -1,58 +1,43 @@
 import SwiftUI
 
 struct SmallWorldSettingsView: View {
-    @AppStorage("smallWorldStyle") private var smallWorldStyle = SmallWorldStyle.rococo.rawValue
-    @AppStorage("isSpatialSceneEnabled") private var isSpatialSceneEnabled = false
+    @AppStorage("smallWorldStyle") private var smallWorldStyle = SmallWorldStyle.bookHouse.rawValue
     
     @State private var showingClearCacheAlert = false
     
     var body: some View {
         AdaptiveSettingsView(title: "House设置") {
-            // 预览区域
             AdaptiveSection(header: "预览") {
-                SmallWorldPreview(
-                    isSpatialEnabled: isSpatialSceneEnabled
-                )
-                .frame(height: 200)
-                .clipShape(RoundedRectangle(cornerRadius: 12))
-                .adaptiveRow(showDivider: false)
+                SmallWorldPreview()
+                    .frame(height: 200)
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .adaptiveRow(showDivider: false)
             }
             
             AdaptiveSection(header: "风格选择") {
                 HStack {
-                    Image(systemName: "cube.transparent")
+                    Image(systemName: "book.closed.fill")
                         .foregroundStyle(.purple)
                     Text("House风格")
                     Spacer()
-                    Text(SmallWorldStyle.rococo.displayName)
+                    Text(SmallWorldStyle.bookHouse.displayName)
                         .foregroundStyle(.secondary)
                 }
                 .adaptiveRow(showDivider: false)
             }
             
-            AdaptiveSection(header: "高级特性") {
-                if #available(iOS 26.0, *) {
-                    Toggle(isOn: $isSpatialSceneEnabled) {
-                        VStack(alignment: .leading) {
-                            Text("开启3D景深空间场景")
-                            Text("iOS 26 专属特性")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                    .adaptiveRow(showDivider: false)
-                } else {
-                    HStack {
-                        Text("3D景深空间场景")
-                        Spacer()
-                        Text("仅支持 iOS 26+")
-                            .foregroundStyle(.secondary)
-                    }
-                    .adaptiveRow(showDivider: false)
+            AdaptiveSection(header: "交互") {
+                HStack {
+                    Image(systemName: "hand.point.up.left.fill")
+                        .foregroundStyle(.blue)
+                    Text("自由摆放")
+                    Spacer()
+                    Text("House 右上角")
+                        .foregroundStyle(.secondary)
                 }
+                .adaptiveRow(showDivider: false)
             }
             
-            // 存储管理
             AdaptiveSection(header: "存储管理") {
                 Button(role: .destructive) {
                     SpatialAssetManager.shared.clearAllCache()
@@ -60,7 +45,7 @@ struct SmallWorldSettingsView: View {
                 } label: {
                     HStack {
                         Image(systemName: "trash")
-                        Text("清理 3D 场景缓存")
+                        Text("清理空间缓存")
                     }
                 }
                 .adaptiveRow(showDivider: false)
@@ -69,11 +54,11 @@ struct SmallWorldSettingsView: View {
         .alert("缓存清理完成", isPresented: $showingClearCacheAlert) {
             Button("确定", role: .cancel) { }
         } message: {
-            Text("所有的 3D 场景缓存文件已被清理。下次进入House时将重新生成。")
+            Text("空间缓存已清理。")
         }
         .onAppear {
-            if smallWorldStyle != SmallWorldStyle.rococo.rawValue {
-                smallWorldStyle = SmallWorldStyle.rococo.rawValue
+            if smallWorldStyle != SmallWorldStyle.bookHouse.rawValue {
+                smallWorldStyle = SmallWorldStyle.bookHouse.rawValue
             }
         }
     }
@@ -81,28 +66,24 @@ struct SmallWorldSettingsView: View {
 
 // MARK: - Preview Component
 struct SmallWorldPreview: View {
-    let isSpatialEnabled: Bool
-    
-    private var imageName: String {
-        "small_world_rococo_1"
-    }
-    
     var body: some View {
-        GeometryReader { geo in
-            if #available(iOS 26.0, *), isSpatialEnabled {
-                SpatialBackgroundView(
-                    imageName: imageName,
-                    imageExtension: "png"
-                ) {
-                    EmptyView()
+        ZStack {
+            LinearGradient(
+                colors: [Color(hex: "FFF7EF"), Color(hex: "F3DCE6"), Color(hex: "DDEAF4")],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+            
+            HStack(spacing: 14) {
+                ForEach(0..<3, id: \.self) { index in
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .fill([Color(hex: "EFA4BE"), Color(hex: "C9A7FF"), Color(hex: "91C9F7")][index])
+                        .frame(width: 58, height: 128)
+                        .rotation3DEffect(.degrees(58), axis: (x: 1, y: 0, z: 0), perspective: 0.7)
+                        .shadow(color: .black.opacity(0.14), radius: 10, x: 0, y: 8)
                 }
-            } else {
-                Image(imageName)
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-                    .frame(width: geo.size.width, height: geo.size.height)
-                    .clipped()
             }
+            .padding(.top, 24)
         }
     }
 }

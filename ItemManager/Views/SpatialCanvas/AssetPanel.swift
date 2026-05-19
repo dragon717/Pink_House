@@ -565,8 +565,8 @@ struct TemplateAssetList: View {
     let onSelect: (SpatialAsset) -> Void
     
     let templates = [
-        ("洛可可风格", "rococo", Color.pink),
-        ("宫廷洛可可", "palace_rococo", Color.purple),
+        ("书本 House", "book_house", Color.pink),
+        ("宫廷书房", "palace_book_room", Color.purple),
         ("现代简约", "modern", Color.gray),
         ("梦幻花园", "garden", Color.green),
         ("星空主题", "starry", Color.indigo)

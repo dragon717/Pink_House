@@ -13,18 +13,18 @@ struct SmallWorldView: View {
     @Binding var destination: SmallWorldDestination
     @Binding var isPlayingOpeningAnimation: Bool
 
-    @AppStorage("smallWorldStyle") private var smallWorldStyle = SmallWorldStyle.rococo.rawValue
+    @AppStorage("smallWorldStyle") private var smallWorldStyle = SmallWorldStyle.bookHouse.rawValue
 
     var body: some View {
-        RococoSmallWorldView(
+        BookHouseSmallWorldView(
             selectedTab: $selectedTab,
             homeTab: $homeTab,
             destination: $destination,
             isPlayingOpeningAnimation: $isPlayingOpeningAnimation
         )
         .onAppear {
-            if smallWorldStyle != SmallWorldStyle.rococo.rawValue {
-                smallWorldStyle = SmallWorldStyle.rococo.rawValue
+            if smallWorldStyle != SmallWorldStyle.bookHouse.rawValue {
+                smallWorldStyle = SmallWorldStyle.bookHouse.rawValue
             }
         }
     }

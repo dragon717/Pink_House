@@ -2835,22 +2835,22 @@ struct FeatureExperienceGuideOverlay: View {
 
     func calendarEntryGuideFrame(in geometry: GeometryProxy) -> CGRect {
         let screenBounds = geometry.size
-        let rococoFallback = CGRect(
-            x: screenBounds.width * 0.40,
-            y: screenBounds.height * 0.75,
+        let bookHouseFallback = CGRect(
+            x: screenBounds.width * 0.42,
+            y: screenBounds.height * 0.62,
             width: max(96, screenBounds.width * 0.16),
             height: max(108, screenBounds.height * 0.12)
         )
 
         guard let rawFrame = localGuideTargetFrame(for: .calendarEntry, in: geometry) else {
-            return rococoFallback
+            return bookHouseFallback
         }
 
         if let ootdFrame = localGuideTargetFrame(for: .ootdEntry, in: geometry) {
-            let isLikelyRococoLayout = ootdFrame.height < geometry.size.height * 0.35
+            let isLikelyBookHouseLayout = ootdFrame.height < geometry.size.height * 0.35
             let isSuspiciousUpperFrame = rawFrame.minY < geometry.size.height * 0.52
-            if isLikelyRococoLayout, isSuspiciousUpperFrame {
-                return rococoFallback
+            if isLikelyBookHouseLayout, isSuspiciousUpperFrame {
+                return bookHouseFallback
             }
         }
 

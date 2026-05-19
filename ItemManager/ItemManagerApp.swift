@@ -348,18 +348,6 @@ struct MainContentView: View {
             return
         }
 
-        if #available(iOS 26.0, *) {
-            Task.detached(priority: .background) {
-                let preloadStartedAt = Date()
-                await MainActor.run {
-                    SpatialAssetManager.shared.preload(imageName: "small_world_rococo_1", extension: "png")
-                    SpatialAssetManager.shared.preload(imageName: "small_world_rococo_2", extension: "png")
-                }
-                let preloadDurationMs = Int(Date().timeIntervalSince(preloadStartedAt) * 1000)
-                AppLogger.category("LaunchFlow").info("spatial_preload_finish duration_ms=\(preloadDurationMs)")
-            }
-        }
-
         Task.detached(priority: .background) {
             let warmupStartedAt = Date()
             RealityKitHelper.warmUp()

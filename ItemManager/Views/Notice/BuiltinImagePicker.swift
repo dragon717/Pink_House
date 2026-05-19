@@ -22,8 +22,6 @@ struct BuiltinImagePicker: View {
         "maomao_right_back",
         "naicha_left_front",
         "naicha_right_back",
-        "small_world_rococo_1",
-        "small_world_rococo_2",
         "SplashScreen",
         "maomao_dragging",
         "maomao_peeking",

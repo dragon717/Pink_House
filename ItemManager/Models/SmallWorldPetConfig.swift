@@ -22,7 +22,7 @@ struct SmallWorldPetConfig {
     }
     
     static func createDefaultPaths() -> [PetPath] {
-        // Path 1 in Room 1 (Rococo 1)
+        // Path 1 in the first House room preset.
         let path1 = PetPath(name: "Room 1 Path", roomIndex: 0, nodes: [
             PathNode(x: 0.193, y: 0.495),
             PathNode(x: 0.308, y: 0.657),
@@ -31,7 +31,7 @@ struct SmallWorldPetConfig {
             PathNode(x: 0.772, y: 0.744),
         ], duration: 12.0)
         
-        // Path 2 in Room 2 (Rococo 2)
+        // Path 2 in the second House room preset.
         let path2 = PetPath(name: "Room 2 Path", roomIndex: 1, nodes: [
             PathNode(x: 0.676, y: 0.839),
             PathNode(x: 0.603, y: 0.721),
