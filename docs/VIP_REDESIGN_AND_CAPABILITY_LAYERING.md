@@ -199,18 +199,31 @@ VIP 页面采用以下结构：
 
 ## 10. 个性图标二期前的首版实现
 
-首版已经落地：
+首版已经落地，当前已进入扩容版：
 
 - 主图标：`少女心愿立体`
   - 资源来源：`8b9cf4d`
   - 对应 asset：`少女心愿logo.appiconset`
-- 备选图标：`经典图标`
-  - 对应 asset：`ClassicAppIcon.appiconset`
+- 备选图标：`心愿礼服馆`
+  - 资源来源：`temp/图标/app.png`
+  - 对应 asset：`VIPIconPinkWish.appiconset`
+- 备选图标：`珍珠衣柜`
+  - 资源来源：`temp/图标/icon.icon/Assets/icon-512.png`
+  - 对应 asset：`VIPIconDreamCloset.appiconset`
+- 备选图标：`珍珠礼服柜`
+  - 资源来源：image2 生成
+  - 对应 asset：`VIPIconPearlWardrobe.appiconset`
+- 备选图标：`月光玻璃柜`
+  - 资源来源：image2 生成
+  - 对应 asset：`VIPIconMoonWardrobe.appiconset`
+
+`经典图标` 已从 VIP 图标库和 alternate icon 注册中移除。
 
 接入方式：
 
 - VIP 用户可在 VIP 中心进入“个性图标库”
 - 图标切换使用系统 alternate icon 能力
+- VIP 权益卡上的“个性图标”卡片展示左右循环轮播；点击卡片进入图标库，不单独点击 icon
 - 图标预览和图标资源分开维护，便于后续扩容
 
 ---

@@ -211,7 +211,10 @@ VIP 页最容易失败的地方不是样式，而是信息层级。
 
 1. 图标资源
    - `少女心愿logo.appiconset`
-   - `ClassicAppIcon.appiconset`
+   - `VIPIconPinkWish.appiconset`
+   - `VIPIconDreamCloset.appiconset`
+   - `VIPIconPearlWardrobe.appiconset`
+   - `VIPIconMoonWardrobe.appiconset`
 2. 图标切换服务
    - `VIPAppIconManager`
 3. VIP 图标选择页
@@ -223,6 +226,7 @@ VIP 页最容易失败的地方不是样式，而是信息层级。
 
 - 新增一个 icon asset
 - 在 `VIPAppIconManager.availableIcons` 增一项
+- 在 `ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES` 注册 alternate icon 名称
 
 就能继续扩。
 

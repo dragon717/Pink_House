@@ -185,7 +185,7 @@ struct VIPAppIconSelectionView: View {
                     .foregroundStyle(primaryTextColor)
             }
 
-            Text("图标切换采用和 VIP 页同源的精致卡片视觉。当前已接入「少女心愿立体」与「经典图标」两套方案，后续继续往图标库里扩。")
+            Text("图标切换采用和 VIP 页同源的精致卡片视觉。当前已接入默认图标、temp/图标素材与 image2 探索款，后续继续往图标库里扩。")
                 .font(.system(size: 13, weight: .medium))
                 .foregroundStyle(secondaryTextColor)
                 .fixedSize(horizontal: false, vertical: true)

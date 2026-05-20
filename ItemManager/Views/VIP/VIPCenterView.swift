@@ -1,9 +1,11 @@
 import SwiftUI
+import Combine
 import StoreKit
 import UIKit
 
 struct VIPCenterView: View {
     @ObservedObject private var vipManager = VIPManager.shared
+    @ObservedObject private var iconManager = VIPAppIconManager.shared
     @ObservedObject private var themeSkinManager = ThemeSkinManager.shared
     @Environment(\.dismiss) private var dismiss
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
@@ -26,6 +28,9 @@ struct VIPCenterView: View {
     @State private var showTrialPopup = false
     @State private var hasCheckedTrialOnAppear = false
     @State private var selectedPlanID = "monthly"
+    @State private var iconCarouselIndex = 0
+
+    private let iconCarouselTimer = Timer.publish(every: 2.35, on: .main, in: .common).autoconnect()
 
     private var visualTheme: VIPVisualTheme {
         vipManager.preferredVisualTheme
@@ -265,6 +270,7 @@ struct VIPCenterView: View {
         }
         .onAppear {
             NotificationCenter.default.post(name: .vipCenterOpened, object: nil)
+            iconManager.refreshCurrentIcon()
             if vipManager.availablePlans.contains(where: { $0.id == selectedPlanID }) == false {
                 selectedPlanID = vipManager.availablePlans[0].id
             }
@@ -273,6 +279,12 @@ struct VIPCenterView: View {
                     showTrialPopup = true
                 }
                 hasCheckedTrialOnAppear = true
+            }
+        }
+        .onReceive(iconCarouselTimer) { _ in
+            guard iconManager.availableIcons.isEmpty == false else { return }
+            withAnimation(.easeInOut(duration: 0.48)) {
+                iconCarouselIndex = (iconCarouselIndex + 1) % iconManager.availableIcons.count
             }
         }
         .onDisappear {
@@ -631,7 +643,7 @@ struct VIPCenterView: View {
                     } else {
                         presentInfoAlert(
                             title: "个性图标",
-                            message: "开通 VIP 后即可自主切换应用图标，目前已接入「少女心愿立体」和「经典图标」两套方案。"
+                            message: "开通 VIP 后即可自主切换应用图标，当前已接入 temp/图标素材与 image2 探索款。"
                         )
                     }
                 } label: {
@@ -966,9 +978,14 @@ struct VIPCenterView: View {
             handleBenefitTap(benefit)
         } label: {
             VStack(alignment: .leading, spacing: 10) {
-                Image(systemName: benefit.icon)
-                    .font(.system(size: scaledFont(22), weight: .bold))
-                    .foregroundStyle(isThemeSkinActive ? accentColor : (benefit.preferredGlassStyle ?? visualTheme.secondaryGlassStyle).iconTint)
+                if benefit.id == "icons" {
+                    appIconCarouselView
+                } else {
+                    Image(systemName: benefit.icon)
+                        .font(.system(size: scaledFont(22), weight: .bold))
+                        .foregroundStyle(isThemeSkinActive ? accentColor : (benefit.preferredGlassStyle ?? visualTheme.secondaryGlassStyle).iconTint)
+                        .frame(height: 38, alignment: .leading)
+                }
 
                 Spacer(minLength: 0)
 
@@ -989,6 +1006,67 @@ struct VIPCenterView: View {
             }
         }
         .buttonStyle(.plain)
+    }
+
+    private var appIconCarouselView: some View {
+        let options = iconManager.availableIcons
+        let count = options.count
+        let safeIndex = count == 0 ? 0 : min(iconCarouselIndex, count - 1)
+
+        return HStack(spacing: 7) {
+            if count > 1 {
+                appIconCarouselThumbnail(
+                    assetName: options[(safeIndex + count - 1) % count].previewAssetName,
+                    size: 23,
+                    opacity: 0.52
+                )
+                .offset(x: 2)
+            }
+
+            ZStack {
+                if count > 0 {
+                    appIconCarouselThumbnail(
+                        assetName: options[safeIndex].previewAssetName,
+                        size: 34,
+                        opacity: 1
+                    )
+                    .id(options[safeIndex].id)
+                    .transition(
+                        .asymmetric(
+                            insertion: .move(edge: .trailing).combined(with: .opacity),
+                            removal: .move(edge: .leading).combined(with: .opacity)
+                        )
+                    )
+                }
+            }
+            .frame(width: 36, height: 36)
+            .clipped()
+
+            if count > 1 {
+                appIconCarouselThumbnail(
+                    assetName: options[(safeIndex + 1) % count].previewAssetName,
+                    size: 23,
+                    opacity: 0.52
+                )
+                .offset(x: -2)
+            }
+        }
+        .frame(height: 38, alignment: .leading)
+        .accessibilityHidden(true)
+    }
+
+    private func appIconCarouselThumbnail(assetName: String, size: CGFloat, opacity: Double) -> some View {
+        Image(assetName)
+            .resizable()
+            .scaledToFill()
+            .frame(width: size, height: size)
+            .clipShape(RoundedRectangle(cornerRadius: size * 0.23, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: size * 0.23, style: .continuous)
+                    .stroke(Color.white.opacity(0.72), lineWidth: 0.8)
+            )
+            .shadow(color: accentColor.opacity(0.18), radius: 6, x: 0, y: 3)
+            .opacity(opacity)
     }
 
     private func benefitWideCard(for benefit: VIPBenefit) -> some View {
@@ -1168,7 +1246,7 @@ struct VIPCenterView: View {
             } else {
                 presentInfoAlert(
                     title: benefit.title,
-                    message: "开通 VIP 后即可自主切换应用图标，目前已接入「少女心愿立体」和「经典图标」两套方案。"
+                    message: "开通 VIP 后即可自主切换应用图标，当前已接入 temp/图标素材与 image2 探索款。"
                 )
             }
         case "weekly":

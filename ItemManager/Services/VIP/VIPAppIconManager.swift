@@ -17,8 +17,6 @@ struct VIPAppIconOption: Identifiable, Equatable {
 final class VIPAppIconManager: ObservableObject {
     static let shared = VIPAppIconManager()
 
-    static let classicAlternateIconName = "ClassicAppIcon"
-
     @Published private(set) var currentIconID: String = "primary"
     @Published private(set) var isApplying: Bool = false
 
@@ -26,18 +24,42 @@ final class VIPAppIconManager: ObservableObject {
         VIPAppIconOption(
             id: "primary",
             displayName: "少女心愿立体",
-            subtitle: "来自 2026-03-05 的立体 logo 方案",
+            subtitle: "当前默认图标 · 立体衣橱主视觉",
             previewAssetName: "vip_icon_preview_logo",
             alternateIconName: nil,
-            badgeText: "当前主图标"
+            badgeText: "默认"
         ),
         VIPAppIconOption(
-            id: "classic",
-            displayName: "经典图标",
-            subtitle: "保留旧版经典封面感图标",
-            previewAssetName: "vip_icon_preview_classic",
-            alternateIconName: "ClassicAppIcon",
-            badgeText: "VIP 专属"
+            id: "pink_wish",
+            displayName: "心愿礼服馆",
+            subtitle: "来自 temp/图标 的粉色礼服馆图标",
+            previewAssetName: "vip_icon_preview_pink_wish",
+            alternateIconName: "VIPIconPinkWish",
+            badgeText: "VIP"
+        ),
+        VIPAppIconOption(
+            id: "dream_closet",
+            displayName: "珍珠衣柜",
+            subtitle: "来自 temp/图标 的立体衣柜图标",
+            previewAssetName: "vip_icon_preview_dream_closet",
+            alternateIconName: "VIPIconDreamCloset",
+            badgeText: "VIP"
+        ),
+        VIPAppIconOption(
+            id: "pearl_wardrobe",
+            displayName: "珍珠礼服柜",
+            subtitle: "image2 生成 · 粉金收藏风",
+            previewAssetName: "vip_icon_preview_pearl_wardrobe",
+            alternateIconName: "VIPIconPearlWardrobe",
+            badgeText: "image2"
+        ),
+        VIPAppIconOption(
+            id: "moon_wardrobe",
+            displayName: "月光玻璃柜",
+            subtitle: "image2 生成 · 月光琉璃风",
+            previewAssetName: "vip_icon_preview_moon_wardrobe",
+            alternateIconName: "VIPIconMoonWardrobe",
+            badgeText: "image2"
         )
     ]
 
