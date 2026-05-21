@@ -531,9 +531,11 @@ struct ThemeSkinBackgroundStickerSelectionCard: View {
             Text("背景贴纸排布")
                 .font(.headline)
                 .foregroundStyle(themeManager.primaryTextColor)
+                .themeSkinLegibleText(level: .inline, slot: .sectionCard, descriptor: descriptor)
             Text("先选大主图与小主图的排列方式；需要换大图时，再从弹窗菜单里选择。")
                 .font(.footnote)
                 .foregroundStyle(themeManager.secondaryTextColor)
+                .themeSkinLegibleText(level: .inline, slot: .sectionCard, descriptor: descriptor)
                 .fixedSize(horizontal: false, vertical: true)
         }
     }
@@ -585,8 +587,10 @@ struct ThemeSkinBackgroundStickerSelectionCard: View {
                 VStack(alignment: .leading, spacing: 3) {
                     Text(preset.displayName)
                         .font(.subheadline.weight(.semibold))
+                        .themeSkinLegibleText(level: .inline, slot: .sectionCard, descriptor: descriptor)
                     Text(preset.summary)
                         .font(.caption2)
+                        .themeSkinLegibleText(level: .inline, slot: .sectionCard, descriptor: descriptor)
                         .lineLimit(2)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -619,9 +623,11 @@ struct ThemeSkinBackgroundStickerSelectionCard: View {
                     Text("选择大主图")
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(themeManager.primaryTextColor)
+                        .themeSkinLegibleText(level: .inline, slot: .sectionCard, descriptor: descriptor)
                     Text(selectedHeroTitle)
                         .font(.footnote)
                         .foregroundStyle(themeManager.secondaryTextColor)
+                        .themeSkinLegibleText(level: .inline, slot: .sectionCard, descriptor: descriptor)
                 }
                 Spacer()
                 Image(systemName: "chevron.up.chevron.down")

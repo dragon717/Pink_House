@@ -196,6 +196,7 @@ struct SpaceOutfitCard: View {
                 Text(page.note.isEmpty ? "未命名" : page.note)
                     .font(.caption)
                     .lineLimit(1)
+                    .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
                     .background(.ultraThinMaterial)

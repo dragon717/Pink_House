@@ -95,6 +95,7 @@ struct ClothingDetailView: View {
                                 showingFinalPaymentSheet = true
                             } label: {
                                 Text("记录已付尾款")
+                                    .themeSkinLegibleText(level: .chip, slot: .primaryButton)
                             }
                             .buttonStyle(ThemeSkinPrimaryButtonStyle(fallbackTint: .pink, cornerRadius: 16, verticalPadding: 15))
                             .padding(.horizontal)
@@ -104,7 +105,9 @@ struct ClothingDetailView: View {
                         // MARK: - Metadata Info (Created/Updated)
                         VStack(spacing: 4) {
                             Text("添加时间: \(clothing.createdAt.formatted(date: .numeric, time: .shortened))")
+                                .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                             Text("修改时间: \(clothing.updatedAt.formatted(date: .numeric, time: .shortened))")
+                                .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                         }
                         .font(.caption2)
                         .foregroundStyle(.tertiary)
@@ -132,6 +135,7 @@ struct ClothingDetailView: View {
                                         .font(.title2)
                                     Text("社区")
                                         .font(.caption2)
+                                        .themeSkinLegibleText(level: .chip, slot: .iconCircleButton)
                                 }
                                 .foregroundStyle(.white)
                                 .frame(width: 60, height: 60)
@@ -472,6 +476,7 @@ struct ClothingDetailView: View {
                 }
                 .font(.caption2)
                 .foregroundStyle(.white)
+                .themeSkinLegibleText(level: .badge, slot: .sectionCard)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 6)
                 .background(Capsule().fill(Color.black.opacity(0.5)))
@@ -504,6 +509,7 @@ struct ClothingDetailView: View {
                         HStack(spacing: 4) {
                             Image(systemName: "arrow.right.circle.fill")
                             Text("追根溯源")
+                                .themeSkinLegibleText(level: .chip, slot: .primaryButton)
                         }
                         .font(.caption)
                         .foregroundStyle(.white)
@@ -526,6 +532,7 @@ struct ClothingDetailView: View {
                                 Text(tag.name)
                                     .font(.caption)
                                     .unifiedSecondary()
+                                    .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                             }
                             .padding(.horizontal, 8)
                             .padding(.vertical, 4)
@@ -569,6 +576,7 @@ struct ClothingDetailView: View {
                     Text("暂无品牌信息")
                         .font(.subheadline)
                         .unifiedTertiary()
+                        .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                 }
                 
                 if clothing.isDepositPlan {
@@ -580,6 +588,7 @@ struct ClothingDetailView: View {
                             .bold()
                     }
                     .unifiedAccent()
+                    .themeSkinLegibleText(level: .chip, slot: .discountBadge)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
                     .background(themeManager.accentTextColor.opacity(0.1))
@@ -599,6 +608,7 @@ struct ClothingDetailView: View {
             Label("裙装信息", systemImage: "info.circle.fill")
                 .font(.headline)
                 .unifiedPrimary()
+                .themeSkinLegibleText(level: .inline, slot: .sectionCard)
             
             ForEach(visibilityManager.fieldOrder, id: \.self) { field in
                 if visibilityManager.isVisible(field) {
@@ -628,6 +638,7 @@ struct ClothingDetailView: View {
                 Text("尺码")
                     .font(.subheadline)
                     .foregroundStyle(themeManager.secondaryTextColor)
+                    .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                 
                 Spacer()
                 
@@ -653,6 +664,7 @@ struct ClothingDetailView: View {
                 Text(clothing.sizes.isEmpty ? "未填写" : clothing.sizes)
                     .font(.subheadline)
                     .foregroundStyle(themeManager.primaryTextColor)
+                    .themeSkinLegibleText(level: .inline, slot: .sectionCard)
             }
             .contentShape(Rectangle())
         case .length:
@@ -773,9 +785,11 @@ struct ClothingDetailView: View {
                     HStack {
                         Text("小物明细")
                             .unifiedPrimary()
+                            .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                         Spacer()
                         Text("小物总价: ¥\(items.reduce(Decimal(0)) { $0 + $1.price }.formatted(.number.precision(.fractionLength(0...2))))")
                             .unifiedSecondary()
+                            .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                     }
                     .font(.subheadline)
                     
@@ -784,9 +798,11 @@ struct ClothingDetailView: View {
                             HStack {
                                 Text(item.name.isEmpty ? "未命名小物" : item.name)
                                     .unifiedPrimary()
+                                    .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                                 Spacer()
                                 Text("¥\(NSDecimalNumber(decimal: item.price).doubleValue.formatted(.number.precision(.fractionLength(0...2))))")
                                     .unifiedSecondary()
+                                    .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                             }
                             
                             // Show deposit/balance for accessory if it exists
@@ -795,10 +811,12 @@ struct ClothingDetailView: View {
                                     if item.deposit > 0 {
                                         Text("定金: ¥\(item.deposit.formatted(.number.precision(.fractionLength(0...2))))")
                                             .unifiedTertiary()
+                                            .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                                     }
                                     if item.balance > 0 {
                                         Text("尾款: ¥\(item.balance.formatted(.number.precision(.fractionLength(0...2))))")
                                             .unifiedTertiary()
+                                            .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                                     }
                                     Spacer()
                                 }
@@ -814,6 +832,7 @@ struct ClothingDetailView: View {
                 Label(clothing.isFullPaymentReservation ? "全款预约总额" : "合计金额（含邮）", systemImage: "star.circle.fill")
                     .font(.subheadline)
                     .unifiedSecondary()
+                    .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                 Spacer()
                 
                 let totalAll = clothing.isFullPaymentReservation ? clothing.fullPaymentReservationTotalAmount : clothing.inventoryTotalPrice
@@ -822,6 +841,7 @@ struct ClothingDetailView: View {
                     .font(.title3)
                     .bold()
                     .unifiedAccent()
+                    .themeSkinLegibleText(level: .chip, slot: .sectionCard)
             }
             .padding(12)
             .background(themeManager.secondaryTextColor.opacity(0.1))
@@ -831,6 +851,7 @@ struct ClothingDetailView: View {
                 Text("包含 \(clothing.stock) 件库存，单套价值 ¥\(clothing.unitTotalPrice.formatted(.number.precision(.fractionLength(0))))；邮费不随库存倍增")
                     .font(.caption)
                     .unifiedTertiary()
+                    .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                     .padding(.horizontal, 4)
             }
         }
@@ -896,9 +917,11 @@ struct ClothingDetailView: View {
                     Text("尾款支付进度")
                         .font(.headline)
                         .foregroundStyle(themeManager.primaryTextColor)
+                        .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                     Text(finalPaymentStatusSubtitle(total: total, paidOff: isPaidOff))
                         .font(.caption)
                         .foregroundStyle(themeManager.secondaryTextColor)
+                        .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                 }
 
                 Spacer()
@@ -908,6 +931,7 @@ struct ClothingDetailView: View {
                     .padding(.horizontal, 10)
                     .padding(.vertical, 6)
                     .foregroundStyle(isPaidOff ? .green : Color(hex: "C94C72"))
+                    .themeSkinLegibleText(level: .chip, slot: .discountBadge)
                     .background((isPaidOff ? Color.green : Color(hex: "C94C72")).opacity(0.12), in: Capsule())
             }
 
@@ -934,21 +958,25 @@ struct ClothingDetailView: View {
                     Text("最近账单")
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(themeManager.secondaryTextColor)
+                        .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                     ForEach(Array(finalPaymentRecords.suffix(3).reversed())) { entry in
                         HStack(spacing: 8) {
                             Text(entry.paymentMode == .installment ? "第 \(entry.installmentIndex)/\(entry.installmentCount) 期" : "一次性")
                                 .font(.caption.weight(.bold))
                                 .foregroundStyle(Color(hex: "C94C72"))
+                                .themeSkinLegibleText(level: .chip, slot: .discountBadge)
                                 .padding(.horizontal, 8)
                                 .padding(.vertical, 4)
                                 .background(Color(hex: "C94C72").opacity(0.10), in: Capsule())
                             Text("¥\(moneyString(entry.amount))")
                                 .font(.caption.weight(.semibold))
                                 .foregroundStyle(themeManager.primaryTextColor)
+                                .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                             Spacer()
                             Text(entry.paidAt?.formatted(date: .numeric, time: .omitted) ?? "已记录")
                                 .font(.caption2)
                                 .foregroundStyle(themeManager.tertiaryTextColor)
+                                .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                         }
                     }
                 }
@@ -958,6 +986,7 @@ struct ClothingDetailView: View {
                 Text("尾款已付清，小金库入口已收起；若有剩余备款已转回未指定小匣。")
                     .font(.caption2)
                     .foregroundStyle(themeManager.tertiaryTextColor)
+                    .themeSkinLegibleText(level: .inline, slot: .sectionCard)
             }
         }
         .padding()
@@ -979,6 +1008,7 @@ struct ClothingDetailView: View {
             Label("可抵扣小金库", systemImage: "tray.and.arrow.down.fill")
                 .font(.headline)
                 .unifiedPrimary()
+                .themeSkinLegibleText(level: .inline, slot: .sectionCard)
 
             HStack(spacing: 10) {
                 Image(systemName: saved > 0 ? "checkmark.seal.fill" : "yensign.circle.fill")
@@ -992,9 +1022,11 @@ struct ClothingDetailView: View {
                     Text(paid > 0 ? "已付 ¥\(NSDecimalNumber(decimal: paid).stringValue) · 剩余 ¥\(NSDecimalNumber(decimal: remainingPayment).stringValue)" : (saved > 0 ? "可抵扣 ¥\(NSDecimalNumber(decimal: saved).stringValue)" : "为这条裙装存一笔"))
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(themeManager.primaryTextColor)
+                        .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                     Text("小金库只作为尾款抵扣资金；实付进度见上方分期卡片")
                         .font(.caption)
                         .foregroundStyle(themeManager.secondaryTextColor)
+                        .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                 }
 
                 Spacer()
@@ -1002,6 +1034,7 @@ struct ClothingDetailView: View {
                 Text("\(Int((ratio * 100).rounded()))%")
                     .font(.subheadline.weight(.bold))
                     .foregroundStyle(ratio > 1 ? Color(hex: "C94C72") : .orange)
+                    .themeSkinLegibleText(level: .chip, slot: .sectionCard)
                     .monospacedDigit()
             }
 
@@ -1011,12 +1044,15 @@ struct ClothingDetailView: View {
                 Text("进度 ¥\(NSDecimalNumber(decimal: numerator).stringValue) / ¥\(NSDecimalNumber(decimal: target).stringValue)")
                     .font(.caption2)
                     .foregroundStyle(themeManager.tertiaryTextColor)
+                    .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                 Text("指定上限 ¥\(NSDecimalNumber(decimal: cap).stringValue) · 还能存 ¥\(NSDecimalNumber(decimal: remaining).stringValue)")
                     .font(.caption2)
                     .foregroundStyle(remaining > 0 ? themeManager.tertiaryTextColor : Color(hex: "C94C72"))
+                    .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                 Text("已付尾款 ¥\(NSDecimalNumber(decimal: paid).stringValue) · 剩余尾款 ¥\(NSDecimalNumber(decimal: remainingPayment).stringValue) · 可抵扣 ¥\(NSDecimalNumber(decimal: saved).stringValue)")
                     .font(.caption2)
                     .foregroundStyle(themeManager.tertiaryTextColor)
+                    .themeSkinLegibleText(level: .inline, slot: .sectionCard)
             }
 
             Button {
@@ -1036,6 +1072,7 @@ struct ClothingDetailView: View {
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 10)
                         .foregroundStyle(Color(hex: "C94C72"))
+                        .themeSkinLegibleText(level: .chip, slot: .primaryButton)
                         .background(Color(hex: "C94C72").opacity(0.12))
                         .clipShape(RoundedRectangle(cornerRadius: 14))
                 }
@@ -1061,9 +1098,11 @@ struct ClothingDetailView: View {
             Text(title)
                 .font(.caption2)
                 .foregroundStyle(themeManager.secondaryTextColor)
+                .themeSkinLegibleText(level: .inline, slot: .sectionCard)
             Text(value)
                 .font(.caption.weight(.bold))
                 .foregroundStyle(color)
+                .themeSkinLegibleText(level: .chip, slot: .sectionCard)
                 .monospacedDigit()
                 .lineLimit(1)
                 .minimumScaleFactor(0.65)
@@ -1119,6 +1158,7 @@ struct ClothingDetailView: View {
             Label("购买信息", systemImage: "bag.fill")
                 .font(.headline)
                 .unifiedPrimary()
+                .themeSkinLegibleText(level: .inline, slot: .sectionCard)
             
             InfoRow(label: "购买日期", value: clothing.purchaseDate.formatted(.dateTime.year().month().day().locale(Locale(identifier: "zh_CN"))))
             
@@ -1154,6 +1194,7 @@ struct ClothingDetailView: View {
                     Text("备注")
                         .font(.subheadline)
                         .unifiedSecondary()
+                        .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                     // 备注也支持长按拷贝
                     CopyableText(
                         text: clothing.note,
@@ -1405,6 +1446,7 @@ struct FinalPaymentRecordingSheet: View {
             Text(clothing.name)
                 .font(.headline)
                 .foregroundStyle(themeManager.primaryTextColor)
+                .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                 .lineLimit(2)
 
             HStack(spacing: 0) {
@@ -1421,6 +1463,7 @@ struct FinalPaymentRecordingSheet: View {
             Text("可抵扣小金库 ¥\(moneyText(vaultBalance))，记录付款时会自动优先抵扣；不足部分记为外部实付。")
                 .font(.caption)
                 .foregroundStyle(themeManager.secondaryTextColor)
+                .themeSkinLegibleText(level: .inline, slot: .sectionCard)
         }
         .padding()
         .themeSkinSectionCard(cornerRadius: 20)
@@ -1428,8 +1471,12 @@ struct FinalPaymentRecordingSheet: View {
 
     private var modePicker: some View {
         Picker("支付方式", selection: $mode) {
-            Text(FinalPaymentMode.oneTime.displayName).tag(FinalPaymentMode.oneTime)
-            Text(FinalPaymentMode.installment.displayName).tag(FinalPaymentMode.installment)
+            Text(FinalPaymentMode.oneTime.displayName)
+                .themeSkinLegibleText(level: .inline, slot: .segmentedControl)
+                .tag(FinalPaymentMode.oneTime)
+            Text(FinalPaymentMode.installment.displayName)
+                .themeSkinLegibleText(level: .inline, slot: .segmentedControl)
+                .tag(FinalPaymentMode.installment)
         }
         .pickerStyle(.segmented)
     }
@@ -1439,9 +1486,11 @@ struct FinalPaymentRecordingSheet: View {
             Label("一次性付清", systemImage: "checkmark.seal.fill")
                 .font(.headline)
                 .foregroundStyle(Color(hex: "C94C72"))
+                .themeSkinLegibleText(level: .inline, slot: .sectionCard)
             Text("本次将记录剩余全部尾款 ¥\(moneyText(remainingAmount))。")
                 .font(.subheadline)
                 .foregroundStyle(themeManager.secondaryTextColor)
+                .themeSkinLegibleText(level: .inline, slot: .sectionCard)
         }
         .padding()
         .themeSkinSectionCard(cornerRadius: 18)
@@ -1452,6 +1501,7 @@ struct FinalPaymentRecordingSheet: View {
             Text(clothing.finalPaymentInstallmentCount > 0 ? "已选择 \(clothing.finalPaymentInstallmentCount) 期" : "请选择分期期数")
                 .font(.headline)
                 .foregroundStyle(themeManager.primaryTextColor)
+                .themeSkinLegibleText(level: .inline, slot: .sectionCard)
 
             if clothing.finalPaymentInstallmentCount <= 0 {
                 LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 3), spacing: 8) {
@@ -1464,6 +1514,7 @@ struct FinalPaymentRecordingSheet: View {
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, 10)
                                 .foregroundStyle(selectedInstallmentCount == count ? .white : Color(hex: "C94C72"))
+                                .themeSkinLegibleText(level: .chip, slot: .filterChip)
                                 .background(
                                     RoundedRectangle(cornerRadius: 14)
                                         .fill(selectedInstallmentCount == count ? Color(hex: "C94C72") : Color(hex: "C94C72").opacity(0.10))
@@ -1486,6 +1537,7 @@ struct FinalPaymentRecordingSheet: View {
                 Text("本次为第 \(min(nextInstallmentIndex, count)) / \(count) 期；默认金额按剩余尾款均分，最后一期自动兜底。")
                     .font(.caption)
                     .foregroundStyle(themeManager.secondaryTextColor)
+                    .themeSkinLegibleText(level: .inline, slot: .sectionCard)
             }
         }
         .padding()
@@ -1497,10 +1549,12 @@ struct FinalPaymentRecordingSheet: View {
             Text("本期实付金额")
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(themeManager.secondaryTextColor)
+                .themeSkinLegibleText(level: .inline, slot: .sectionCard)
             HStack {
                 Text("¥")
                     .font(.title2.weight(.bold))
                     .foregroundStyle(.orange)
+                    .themeSkinLegibleText(level: .chip, slot: .sectionCard)
                 TextField("请选择期数后自动均分", text: $amountText)
                     .keyboardType(.decimalPad)
                     .font(.system(size: 30, weight: .heavy, design: .rounded))
@@ -1513,10 +1567,12 @@ struct FinalPaymentRecordingSheet: View {
                 Text("最后一期会自动记录剩余尾款 ¥\(moneyText(remainingAmount))，避免分期尾差。")
                     .font(.caption2)
                     .foregroundStyle(.orange)
+                    .themeSkinLegibleText(level: .inline, slot: .sectionCard)
             } else if let effectiveAmount, let parsedAmount, parsedAmount > effectiveAmount {
                 Text("本期最多记录剩余尾款 ¥\(moneyText(effectiveAmount))。")
                     .font(.caption2)
                     .foregroundStyle(.orange)
+                    .themeSkinLegibleText(level: .inline, slot: .sectionCard)
             }
         }
     }
@@ -1526,11 +1582,13 @@ struct FinalPaymentRecordingSheet: View {
             Label("账单明细", systemImage: "list.bullet.rectangle")
                 .font(.headline)
                 .foregroundStyle(themeManager.primaryTextColor)
+                .themeSkinLegibleText(level: .inline, slot: .sectionCard)
 
             if paidRecords.isEmpty {
                 Text("还没有实付账单。已有小金库存款会作为可抵扣余额保留。")
                     .font(.caption)
                     .foregroundStyle(themeManager.secondaryTextColor)
+                    .themeSkinLegibleText(level: .inline, slot: .sectionCard)
             } else {
                 ForEach(paidRecords) { entry in
                     HStack {
@@ -1538,14 +1596,17 @@ struct FinalPaymentRecordingSheet: View {
                             Text(entry.paymentMode == .installment ? "第 \(entry.installmentIndex)/\(entry.installmentCount) 期" : "一次性付清")
                                 .font(.subheadline.weight(.semibold))
                                 .foregroundStyle(themeManager.primaryTextColor)
+                                .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                             Text(paymentBreakdownText(entry))
                                 .font(.caption2)
                                 .foregroundStyle(themeManager.secondaryTextColor)
+                                .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                         }
                         Spacer()
                         Text("¥\(moneyText(entry.amount))")
                             .font(.subheadline.weight(.bold))
                             .foregroundStyle(Color(hex: "C94C72"))
+                            .themeSkinLegibleText(level: .chip, slot: .sectionCard)
                     }
                     .padding(10)
                     .background(Color.secondary.opacity(0.06), in: RoundedRectangle(cornerRadius: 12))
@@ -1561,9 +1622,11 @@ struct FinalPaymentRecordingSheet: View {
             Text(title)
                 .font(.caption2)
                 .foregroundStyle(themeManager.secondaryTextColor)
+                .themeSkinLegibleText(level: .inline, slot: .sectionCard)
             Text("¥\(moneyText(value))")
                 .font(.caption.weight(.bold))
                 .foregroundStyle(color)
+                .themeSkinLegibleText(level: .chip, slot: .sectionCard)
                 .lineLimit(1)
                 .minimumScaleFactor(0.65)
         }

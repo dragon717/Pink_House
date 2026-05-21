@@ -5,6 +5,7 @@ struct ThemeSkinDetailView: View {
 
     @ObservedObject private var themeSkinManager = ThemeSkinManager.shared
     @Environment(ThemeManager.self) private var themeManager
+    @Environment(\.colorScheme) private var colorScheme
 
     @State private var actionMessage = ""
     @State private var showActionAlert = false
@@ -28,6 +29,16 @@ struct ThemeSkinDetailView: View {
         guard let product else { return [] }
         let sourceSlots = isActive ? themeSkinManager.currentEnabledSlots : Set(product.defaultEnabledSlots)
         return sourceSlots.intersection(Set(product.supportedSlots))
+    }
+
+    private var sectionDescriptor: ThemeSkinDescriptor? {
+        guard let product else { return nil }
+        return themeSkinManager.descriptor(forThemeId: product.themeId, slot: .sectionCard)
+    }
+
+    private var sectionPrimaryTextColor: Color {
+        guard let sectionDescriptor else { return themeManager.primaryTextColor }
+        return SkyConcertThemeSkin.labelColor(for: sectionDescriptor, colorScheme: colorScheme)
     }
 
     var body: some View {
@@ -81,19 +92,23 @@ struct ThemeSkinDetailView: View {
             VStack(alignment: .leading, spacing: 14) {
                 Text("购买与应用")
                     .font(.headline)
-                    .foregroundStyle(themeManager.primaryTextColor)
+                    .foregroundStyle(sectionPrimaryTextColor)
+                    .themeSkinLegibleText(level: .inline, slot: .sectionCard, descriptor: sectionDescriptor)
 
                 if let product, let quote = themeSkinManager.priceQuote(for: themeId) {
                     HStack(alignment: .lastTextBaseline, spacing: 8) {
                         Text("\(quote.finalPrice)")
                             .font(.system(size: 30, weight: .heavy, design: .rounded))
-                            .foregroundStyle(themeManager.primaryTextColor)
+                            .foregroundStyle(sectionPrimaryTextColor)
+                            .themeSkinLegibleText(level: .chip, slot: .sectionCard, descriptor: sectionDescriptor)
                         Text("喵币")
                             .font(.subheadline.weight(.semibold))
                             .foregroundStyle(themeManager.secondaryTextColor)
+                            .themeSkinLegibleText(level: .inline, slot: .sectionCard, descriptor: sectionDescriptor)
                         Text("原价 \(product.basePrice)")
                             .font(.footnote.weight(.medium))
                             .foregroundStyle(themeManager.secondaryTextColor)
+                            .themeSkinLegibleText(level: .inline, slot: .sectionCard, descriptor: sectionDescriptor)
                             .strikethrough()
                     }
                 }

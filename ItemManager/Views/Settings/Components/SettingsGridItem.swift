@@ -32,6 +32,7 @@ struct SettingsGridItem: View {
                 } else {
                     Text(icon)
                         .font(.title)
+                        .themeSkinLegibleSymbol(level: .badge, slot: .settingsGridCard, descriptor: themeSkinDescriptor)
                         .frame(width: 40, height: 40)
                         .background(Color.gray.opacity(0.1))
                         .clipShape(Circle())
@@ -43,11 +44,13 @@ struct SettingsGridItem: View {
                 Text(title)
                     .font(.headline)
                     .foregroundStyle(themeManager.primaryTextColor)
+                    .themeSkinLegibleText(level: .inline, slot: .settingsGridCard, descriptor: themeSkinDescriptor)
                     .lineLimit(1)
                 
                 Text(subtitle)
                     .font(.caption)
                     .foregroundStyle(themeManager.secondaryTextColor)
+                    .themeSkinLegibleText(level: .inline, slot: .settingsGridCard, descriptor: themeSkinDescriptor)
                     .lineLimit(2)
                     .multilineTextAlignment(.leading)
             }

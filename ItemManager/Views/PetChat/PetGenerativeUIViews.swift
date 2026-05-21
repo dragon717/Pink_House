@@ -128,6 +128,7 @@ private struct PetQuickOptionsWidget: View {
                         }
                         Text(option.title)
                             .font(.caption)
+                            .themeSkinLegibleText(level: .inline, slot: .filterChip)
                             .lineLimit(3)
                             .lineSpacing(2)
                             .multilineTextAlignment(.center)
@@ -143,6 +144,7 @@ private struct PetQuickOptionsWidget: View {
                         }
                         Text(option.title)
                             .font(.caption)
+                            .themeSkinLegibleText(level: .inline, slot: .filterChip)
                             .lineLimit(3)
                             .lineSpacing(2)
                             .multilineTextAlignment(.leading)
@@ -172,6 +174,7 @@ private struct PetQuickOptionsWidget: View {
                 Text(title)
                     .font(.caption)
                     .foregroundStyle(themeManager.secondaryTextColor)
+                    .themeSkinLegibleText(level: .inline, slot: .sectionCard)
             }
 
             VStack(spacing: 8) {
@@ -216,11 +219,13 @@ private struct PetWeatherWidget: View {
                                 .font(.caption)
                                 .fontWeight(.semibold)
                                 .foregroundStyle(palette.primaryText)
+                                .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                         }
                         if let subtitle = widget.subtitle, !subtitle.isEmpty {
                             Text(subtitle)
                                 .font(.caption2)
                                 .foregroundStyle(palette.secondaryText)
+                                .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                                 .multilineTextAlignment(.leading)
                                 .lineLimit(isExpanded ? nil : 2)
                         }
@@ -241,10 +246,12 @@ private struct PetWeatherWidget: View {
                             Text(metric.name)
                                 .font(.caption2)
                                 .foregroundStyle(palette.secondaryText)
+                                .themeSkinLegibleText(level: .inline, slot: .statsCard)
                             Text(metric.value)
                                 .font(.caption)
                                 .fontWeight(.medium)
                                 .foregroundStyle(palette.primaryText)
+                                .themeSkinLegibleText(level: .inline, slot: .statsCard)
                         }
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 8)
@@ -281,11 +288,13 @@ private struct PetInsightCardWidget: View {
                     .font(.caption)
                     .fontWeight(.semibold)
                     .foregroundStyle(palette.primaryText)
+                    .themeSkinLegibleText(level: .inline, slot: .sectionCard)
             }
             if let subtitle = widget.subtitle, !subtitle.isEmpty {
                 Text(subtitle)
                     .font(.caption2)
                     .foregroundStyle(palette.secondaryText)
+                    .themeSkinLegibleText(level: .inline, slot: .sectionCard)
             }
         }
         .padding(10)
@@ -315,11 +324,13 @@ private struct PetContainerWidget: View {
                     .font(.caption)
                     .fontWeight(.semibold)
                     .foregroundStyle(palette.primaryText)
+                    .themeSkinLegibleText(level: .inline, slot: .sectionCard)
             }
             if let subtitle = widget.subtitle, !subtitle.isEmpty {
                 Text(subtitle)
                     .font(.caption2)
                     .foregroundStyle(palette.secondaryText)
+                    .themeSkinLegibleText(level: .inline, slot: .sectionCard)
             }
             if !widget.children.isEmpty {
                 PetGenerativeWidgetHost(widgets: widget.children, onAction: onAction)
@@ -574,12 +585,14 @@ private struct PetWorkPanelWidget: View {
                         Text(metric.name)
                             .font(.caption2)
                             .foregroundStyle(.secondary)
+                            .themeSkinLegibleText(level: .inline, slot: .statsCard)
                             .lineLimit(1)
                     }
                     Text(metric.value)
                         .font(.caption)
                         .fontWeight(.semibold)
                         .foregroundStyle(.primary)
+                        .themeSkinLegibleText(level: .inline, slot: .statsCard)
                         .lineLimit(2)
                         .minimumScaleFactor(0.82)
                 }
@@ -678,6 +691,7 @@ private struct PetInventoryPanelWidget: View {
             Image(systemName: "pawprint.circle.fill")
             Text("拖到这里就能直接喂我")
                 .font(.caption2)
+                .themeSkinLegibleText(level: .inline, slot: .filterChip)
         }
         .foregroundStyle(.secondary)
         .padding(.horizontal, 10)
@@ -814,6 +828,7 @@ private struct PetShopPanelWidget: View {
             Image(systemName: "cart.circle.fill")
             Text("拖到这里就能买来马上喂我")
                 .font(.caption2)
+                .themeSkinLegibleText(level: .inline, slot: .filterChip)
         }
         .foregroundStyle(.secondary)
         .padding(.horizontal, 10)
@@ -1002,15 +1017,18 @@ private struct PetMoneyCounterWidget: View {
                     Text("剩余金额")
                         .font(.caption2)
                         .foregroundStyle(.secondary)
+                        .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                     Text("\(currencySymbol)\(remainingBills * denomination.value)")
                         .font(.title3)
                         .fontWeight(.bold)
+                        .themeSkinLegibleText(level: .chip, slot: .sectionCard)
                         .monospacedDigit()
                 }
                 Spacer()
                 Text("已数：\(currencySymbol)\(extractedBills * denomination.value)")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                    .themeSkinLegibleText(level: .inline, slot: .sectionCard)
             }
 
             ZStack {
@@ -1025,6 +1043,7 @@ private struct PetMoneyCounterWidget: View {
                     Text(WealthExperienceCopy.Counting.finishedInline)
                         .font(.headline)
                         .foregroundStyle(.white.opacity(0.9))
+                        .themeSkinLegibleText(level: .chip, slot: .sectionCard)
                 } else {
                     GeometryReader { proxy in
                         moneyPile
@@ -1045,6 +1064,7 @@ private struct PetMoneyCounterWidget: View {
             Text("拖走最上面那张，或者点一下数钞")
                 .font(.caption2)
                 .foregroundStyle(.secondary)
+                .themeSkinLegibleText(level: .inline, slot: .sectionCard)
 
             if !widget.options.isEmpty {
                 PetQuickOptionsWidget(
@@ -1411,6 +1431,7 @@ private struct PetDivinationPanelWidget: View {
             HStack(spacing: 8) {
                 Image(systemName: icon)
                 Text(title)
+                    .themeSkinLegibleText(level: .chip, slot: .primaryButton)
             }
             .font(.headline)
             .foregroundStyle(.white)
@@ -1441,9 +1462,11 @@ private struct PetPanelEmptyState: View {
             Text(title)
                 .font(.subheadline)
                 .fontWeight(.medium)
+                .themeSkinLegibleText(level: .inline, slot: .emptyState)
             Text(subtitle)
                 .font(.caption)
                 .foregroundStyle(.secondary)
+                .themeSkinLegibleText(level: .inline, slot: .emptyState)
                 .multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity)
@@ -1464,11 +1487,13 @@ private struct PetPanelHeader: View {
                 Text(title)
                     .font(.headline)
                     .foregroundStyle(.primary)
+                    .themeSkinLegibleText(level: .inline, slot: .sectionCard)
             }
             if let subtitle, !subtitle.isEmpty {
                 Text(subtitle)
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                    .themeSkinLegibleText(level: .inline, slot: .sectionCard)
             }
         }
     }
@@ -1488,15 +1513,18 @@ private struct PetSegmentTabs: View {
                     .font(.headline)
                     .fontWeight(isPrimarySelected ? .bold : .regular)
                     .foregroundColor(isPrimarySelected ? .primary : .secondary)
+                    .themeSkinLegibleText(level: .inline, slot: .filterChip)
             }
             Text("|")
                 .foregroundColor(.secondary.opacity(0.3))
+                .themeSkinLegibleText(level: .inline, slot: .filterChip)
                 .padding(.horizontal, 8)
             Button(action: secondaryAction) {
                 Text(secondary)
                     .font(.headline)
                     .fontWeight(isPrimarySelected ? .regular : .bold)
                     .foregroundColor(isPrimarySelected ? .secondary : .primary)
+                    .themeSkinLegibleText(level: .inline, slot: .filterChip)
             }
             Spacer()
         }
@@ -1523,6 +1551,7 @@ private struct PetIntimacyStatusRow: View {
             Text(heartText)
                 .font(.caption2)
                 .foregroundStyle(.secondary)
+                .themeSkinLegibleText(level: .inline, slot: .statsCard)
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 8)

@@ -56,6 +56,7 @@ struct DepositItemRow: View {
                         Text(clothing.name)
                             .font(.system(size: 16, weight: .bold))
                             .foregroundStyle(themeManager.primaryTextColor)
+                            .themeSkinLegibleText(level: .inline, slot: .sectionCard)
 
                         if let brand = clothing.brand {
                             HStack(spacing: 4) {
@@ -63,6 +64,7 @@ struct DepositItemRow: View {
                                     .font(.caption2)
                                 Text(brand.name)
                                     .font(.caption)
+                                    .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                             }
                             .foregroundStyle(themeManager.secondaryTextColor)
                         }
@@ -71,6 +73,7 @@ struct DepositItemRow: View {
                             Text("库存: \(clothing.stock)")
                                 .font(.caption)
                                 .foregroundStyle(themeManager.tertiaryTextColor)
+                                .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                         }
 
                         // Tags
@@ -97,19 +100,23 @@ struct DepositItemRow: View {
                                 .font(.caption2)
                                 .bold()
                                 .foregroundStyle(themeManager.accentTextColor)
+                                .themeSkinLegibleText(level: .chip, slot: .discountBadge)
                             Text("¥\(clothing.fullPaymentReservationTotalAmount.formatted(.number.precision(.fractionLength(0))))")
                                 .font(.caption)
                                 .bold()
                                 .foregroundStyle(themeManager.accentTextColor)
+                                .themeSkinLegibleText(level: .chip, slot: .sectionCard)
                         } else {
                             Text("定金¥\(clothing.totalDeposit.formatted(.number.precision(.fractionLength(0))))")
                                 .font(.caption)
                                 .bold()
                                 .foregroundStyle(themeManager.accentTextColor)
+                                .themeSkinLegibleText(level: .chip, slot: .sectionCard)
                             Text("尾款¥\(clothing.totalBalance.formatted(.number.precision(.fractionLength(0))))")
                                 .font(.caption)
                                 .bold()
                                 .foregroundStyle(themeManager.accentTextColor)
+                                .themeSkinLegibleText(level: .chip, slot: .sectionCard)
                         }
                     }
                 }
@@ -137,6 +144,7 @@ struct DepositItemRow: View {
                     Text("备注: \(clothing.note)")
                         .font(.caption)
                         .foregroundStyle(themeManager.tertiaryTextColor)
+                        .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                         .padding(8)
                         .background(Color.secondary.opacity(0.05))
                         .clipShape(RoundedRectangle(cornerRadius: 8))
@@ -149,6 +157,7 @@ struct DepositItemRow: View {
                     Text(clothing.isFullPaymentReservation ? "全款预约日期: \(formatDate(clothing.depositDate))" : "预估尾款时间: \(formatDate(clothing.finalPaymentDate))")
                         .font(.caption)
                         .foregroundStyle(.orange)
+                        .themeSkinLegibleText(level: .inline, slot: .sectionCard)
 
                     Spacer()
 
@@ -159,6 +168,7 @@ struct DepositItemRow: View {
                         HStack(spacing: 4) {
                             Image(systemName: "square.and.pencil")
                             Text("修改备注")
+                                .themeSkinLegibleText(level: .chip, slot: .primaryButton)
                         }
                         .font(.caption)
                         .padding(.horizontal, 12)
@@ -313,12 +323,14 @@ struct SimpleDepositItemRow: View {
                             .font(.system(size: 14, weight: .medium))
                             .lineLimit(1)
                             .foregroundStyle(themeManager.primaryTextColor)
+                            .themeSkinLegibleText(level: .inline, slot: .sectionCard)
 
                         HStack(spacing: 6) {
                             if let date = clothing.reservationGroupingDate {
                                 Text("\(clothing.isFullPaymentReservation ? "全款" : "尾款"): \(Self.monthFormatter.string(from: date))")
                                     .font(.caption2)
                                     .foregroundStyle(themeManager.accentTextColor)
+                                    .themeSkinLegibleText(level: .inline, slot: .filterChip)
                                     .padding(.horizontal, 4)
                                     .padding(.vertical, 2)
                                     .background(themeManager.accentTextColor.opacity(0.1))
@@ -327,6 +339,7 @@ struct SimpleDepositItemRow: View {
                                 Text(clothing.isFullPaymentReservation ? "预约待定" : "尾款待定")
                                     .font(.caption2)
                                     .foregroundStyle(themeManager.tertiaryTextColor)
+                                    .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                             }
 
                             // 显示数量（当库存大于1时）
@@ -335,12 +348,14 @@ struct SimpleDepositItemRow: View {
                                     .font(.caption2)
                                     .fontWeight(.bold)
                                     .foregroundStyle(themeManager.primaryTextColor)
+                                    .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                             }
 
                             if let brand = clothing.brand {
                                 Text(brand.name)
                                     .font(.caption2)
                                     .foregroundStyle(themeManager.secondaryTextColor)
+                                    .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                             }
                         }
                     }
@@ -354,14 +369,17 @@ struct SimpleDepositItemRow: View {
                                 .font(.caption)
                                 .bold()
                                 .foregroundStyle(themeManager.accentTextColor)
+                                .themeSkinLegibleText(level: .chip, slot: .sectionCard)
                         } else {
                             Text("定金¥\(clothing.totalDeposit.formatted(.number.precision(.fractionLength(0))))")
                                 .font(.caption)
                                 .foregroundStyle(themeManager.accentTextColor)
+                                .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                             Text("尾款¥\(clothing.totalBalance.formatted(.number.precision(.fractionLength(0))))")
                                 .font(.caption)
                                 .bold()
                                 .foregroundStyle(themeManager.accentTextColor)
+                                .themeSkinLegibleText(level: .chip, slot: .sectionCard)
                         }
                     }
 
@@ -492,14 +510,17 @@ struct FinalPaymentWealthButton: View {
                 .font(.caption.weight(.bold))
             Text(title)
                 .font(.caption.weight(.bold))
+                .themeSkinLegibleText(level: .chip, slot: .primaryButton)
             if !compact {
                 Text(detail)
                     .font(.caption2)
                     .foregroundStyle(themeManager.secondaryTextColor)
+                    .themeSkinLegibleText(level: .inline, slot: .primaryButton)
             } else {
                 Spacer(minLength: 0)
                 Text(detail)
                     .font(.caption2.weight(.semibold))
+                    .themeSkinLegibleText(level: .chip, slot: .primaryButton)
             }
         }
         .foregroundStyle(foreground)
@@ -537,6 +558,7 @@ struct TagView: View {
         Text(text)
             .font(.caption2)
             .foregroundStyle(themeManager.secondaryTextColor)
+            .themeSkinLegibleText(level: .inline, slot: .filterChip)
             .padding(.horizontal, 6)
             .padding(.vertical, 4)
             .background(themeManager.secondaryTextColor.opacity(0.1))
@@ -563,16 +585,19 @@ struct TimelineRow: View {
                 .font(.caption)
                 .fontWeight(.medium)
                 .foregroundStyle(themeManager.primaryTextColor)
+                .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                 .frame(width: 40, alignment: .leading)
 
             if let date = date {
                 Text(formatDate(date))
                     .font(.caption)
                     .foregroundStyle(themeManager.secondaryTextColor)
+                    .themeSkinLegibleText(level: .inline, slot: .sectionCard)
             } else {
                 Text("待定")
                     .font(.caption)
                     .foregroundStyle(themeManager.tertiaryTextColor)
+                    .themeSkinLegibleText(level: .inline, slot: .sectionCard)
             }
 
             Spacer()
@@ -581,6 +606,7 @@ struct TimelineRow: View {
                 Text(trailing)
                     .font(.caption2)
                     .foregroundStyle(themeManager.secondaryTextColor)
+                    .themeSkinLegibleText(level: .inline, slot: .filterChip)
                     .padding(.horizontal, 6)
                     .padding(.vertical, 2)
                     .background(themeManager.secondaryTextColor.opacity(0.1))

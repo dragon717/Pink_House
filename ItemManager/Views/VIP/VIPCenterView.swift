@@ -597,8 +597,10 @@ struct VIPCenterView: View {
             HStack(spacing: 8) {
                 Text("少女心愿")
                     .font(.system(size: scaledFont(18), weight: .semibold))
+                    .themeSkinLegibleText(level: .inline, slot: .topBarMain, descriptor: themeSkinDescriptor)
                 Text("VIP")
                     .font(.system(size: scaledFont(12), weight: .bold))
+                    .themeSkinLegibleText(level: .chip, slot: .topBarMain, descriptor: themeSkinDescriptor)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 3)
                     .background(Capsule().fill(accentColor.opacity(0.18)))
@@ -672,11 +674,13 @@ struct VIPCenterView: View {
             Text(vipManager.isVIP ? "守护少女每一份美好" : "给你的心愿一份更尊贵的守护")
                 .font(.system(size: scaledFont(26), weight: .bold))
                 .foregroundStyle(primaryTextColor)
+                .themeSkinLegibleText(level: .hero, slot: .sectionCard, descriptor: themeSkinDescriptor)
                 .multilineTextAlignment(.center)
 
             Text(heroSubtitle)
                 .font(.system(size: scaledFont(14), weight: .medium))
                 .foregroundStyle(secondaryTextColor)
+                .themeSkinLegibleText(level: .inline, slot: .sectionCard, descriptor: themeSkinDescriptor)
                 .multilineTextAlignment(.center)
 
             ZStack {
@@ -688,11 +692,13 @@ struct VIPCenterView: View {
                         Text(statusTitle)
                             .font(.system(size: scaledFont(16), weight: .semibold))
                             .foregroundStyle(primaryTextColor)
+                            .themeSkinLegibleText(level: .inline, slot: .sectionCard, descriptor: themeSkinDescriptor)
                     }
 
                     Text(statusDescription)
                         .font(.system(size: scaledFont(13), weight: .medium))
                         .foregroundStyle(secondaryTextColor)
+                        .themeSkinLegibleText(level: .inline, slot: .sectionCard, descriptor: themeSkinDescriptor)
                         .multilineTextAlignment(.center)
 
                     HStack(spacing: 8) {
@@ -711,6 +717,7 @@ struct VIPCenterView: View {
             Text("会员权益")
                 .font(.system(size: scaledFont(16), weight: .semibold))
                 .foregroundStyle(secondaryTextColor)
+                .themeSkinLegibleText(level: .inline, slot: .sectionCard, descriptor: themeSkinDescriptor)
                 .padding(.top, 4)
         }
     }
@@ -754,10 +761,12 @@ struct VIPCenterView: View {
                                 Text(plan.title)
                                     .font(.system(size: scaledFont(17), weight: .bold))
                                     .foregroundStyle(primaryTextColor)
+                                    .themeSkinLegibleText(level: .inline, slot: .sectionCard, descriptor: themeSkinDescriptor)
 
                                 Text(plan.subtitle)
                                     .font(.system(size: scaledFont(12), weight: .medium))
                                     .foregroundStyle(secondaryTextColor)
+                                    .themeSkinLegibleText(level: .inline, slot: .sectionCard, descriptor: themeSkinDescriptor)
                             }
 
                             Spacer(minLength: 8)
@@ -789,15 +798,18 @@ struct VIPCenterView: View {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("兑换\(selectedPlan.title)会员")
                             .font(.system(size: scaledFont(18), weight: .bold))
+                            .themeSkinLegibleText(level: .chip, slot: .primaryButton, descriptor: themeSkinDescriptor)
                         Text("开通后立即生效，可叠加有效期")
                             .font(.system(size: scaledFont(12), weight: .medium))
                             .foregroundStyle(buttonSecondaryLabelColor)
+                            .themeSkinLegibleText(level: .inline, slot: .primaryButton, descriptor: themeSkinDescriptor)
                     }
 
                     Spacer()
 
                     Text("\(selectedPlan.meowCoins)喵币")
                         .font(.system(size: scaledFont(16), weight: .bold))
+                        .themeSkinLegibleText(level: .chip, slot: .primaryButton, descriptor: themeSkinDescriptor)
                 }
                 .foregroundStyle(buttonLabelColor)
                 .padding(.horizontal, 18)
@@ -828,6 +840,7 @@ struct VIPCenterView: View {
                 Text("喵币不足？前往商店获取喵币")
                     .font(.system(size: scaledFont(12), weight: .medium))
                     .foregroundStyle(secondaryTextColor)
+                    .themeSkinLegibleText(level: .inline, slot: .sectionCard, descriptor: themeSkinDescriptor)
                     .underline()
             }
             .buttonStyle(.plain)
@@ -846,6 +859,7 @@ struct VIPCenterView: View {
                             .foregroundStyle(hasAcceptedVIPAgreements ? accentColor : secondaryTextColor)
                         Text("请阅读并同意")
                             .foregroundStyle(secondaryTextColor.opacity(0.86))
+                            .themeSkinLegibleText(level: .inline, slot: .sectionCard, descriptor: themeSkinDescriptor)
                     }
                 }
                 .buttonStyle(.plain)
@@ -859,6 +873,7 @@ struct VIPCenterView: View {
 
                 Text("和")
                     .foregroundStyle(secondaryTextColor.opacity(0.86))
+                    .themeSkinLegibleText(level: .inline, slot: .sectionCard, descriptor: themeSkinDescriptor)
 
                 Button("使用协议") {
                     openExternalURL(LegalLinks.userAgreementURL)
@@ -872,6 +887,7 @@ struct VIPCenterView: View {
             Text("VIP 为喵币兑换型权益，不自动续费。")
                 .font(.system(size: scaledFont(9), weight: .medium))
                 .foregroundStyle(secondaryTextColor.opacity(0.72))
+                .themeSkinLegibleText(level: .inline, slot: .sectionCard, descriptor: themeSkinDescriptor)
                 .multilineTextAlignment(.center)
         }
         .padding(.top, 1)
@@ -992,6 +1008,7 @@ struct VIPCenterView: View {
                 Text(benefit.title)
                     .font(.system(size: scaledFont(16), weight: .bold))
                     .foregroundStyle(benefitPrimaryTextColor)
+                    .themeSkinLegibleText(level: .inline, slot: .sectionCard, descriptor: themeSkinDescriptor)
                     .multilineTextAlignment(.leading)
 
                 benefitSubtitleView(for: benefit, fontSize: scaledFont(11))
@@ -1082,6 +1099,7 @@ struct VIPCenterView: View {
                     Text(benefit.title)
                         .font(.system(size: scaledFont(17), weight: .bold))
                         .foregroundStyle(benefitPrimaryTextColor)
+                        .themeSkinLegibleText(level: .inline, slot: .sectionCard, descriptor: themeSkinDescriptor)
                     benefitSubtitleView(for: benefit, fontSize: scaledFont(12))
                 }
                 Spacer()
@@ -1130,6 +1148,7 @@ struct VIPCenterView: View {
         Text(text)
             .font(.system(size: scaledFont(11), weight: .bold))
             .foregroundStyle(isThemeSkinActive ? primaryTextColor : .white)
+            .themeSkinLegibleText(level: .chip, slot: .sectionCard, descriptor: themeSkinDescriptor)
             .padding(.horizontal, 10)
             .padding(.vertical, 6)
             .background(
@@ -1150,6 +1169,7 @@ struct VIPCenterView: View {
                 Text("萌宠商店")
                     .font(.system(size: fontSize, weight: .medium))
                     .foregroundStyle(benefitSecondaryTextColor)
+                    .themeSkinLegibleText(level: .inline, slot: .sectionCard, descriptor: themeSkinDescriptor)
                 DiscountBadgeView(
                     text: VIPManager.petShopDiscountText,
                     style: .inlineGlow,
@@ -1162,6 +1182,7 @@ struct VIPCenterView: View {
                 Text("主题皮肤商店")
                     .font(.system(size: fontSize, weight: .medium))
                     .foregroundStyle(benefitSecondaryTextColor)
+                    .themeSkinLegibleText(level: .inline, slot: .sectionCard, descriptor: themeSkinDescriptor)
                 DiscountBadgeView(
                     text: VIPManager.themeSkinDiscountText,
                     style: .inlineGlow,
@@ -1170,12 +1191,14 @@ struct VIPCenterView: View {
                 Text("· 更多会员权益正在路上")
                     .font(.system(size: fontSize, weight: .medium))
                     .foregroundStyle(benefitSecondaryTextColor)
+                    .themeSkinLegibleText(level: .inline, slot: .sectionCard, descriptor: themeSkinDescriptor)
             }
             .multilineTextAlignment(.leading)
         default:
             Text(benefit.subtitle)
                 .font(.system(size: fontSize, weight: .medium))
                 .foregroundStyle(benefitSecondaryTextColor)
+                .themeSkinLegibleText(level: .inline, slot: .sectionCard, descriptor: themeSkinDescriptor)
                 .multilineTextAlignment(.leading)
                 .lineLimit(2)
         }

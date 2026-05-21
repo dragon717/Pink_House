@@ -181,6 +181,7 @@ struct MultiDimensionalFilterSheet: View {
                             Text("清除")
                                 .font(.subheadline.weight(.semibold))
                                 .foregroundStyle(.red)
+                                .themeSkinLegibleText(level: .inline, slot: .filterSheet)
                         }
                     }
                 }
@@ -257,12 +258,14 @@ struct MultiDimensionalFilterSheet: View {
                 Text("心愿尾款")
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(magicPalette.primaryText)
+                    .themeSkinLegibleText(level: .inline, slot: .filterSheet)
 
                 Spacer()
 
                 Text(depositStatusFilter.displayName)
                     .font(.caption.weight(.medium))
                     .foregroundStyle(depositStatusFilter == .all ? magicPalette.secondaryText : magicPalette.accent)
+                    .themeSkinLegibleText(level: .inline, slot: .filterSheet)
             }
 
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 92), spacing: 8)], spacing: 8) {
@@ -303,6 +306,7 @@ struct MultiDimensionalFilterSheet: View {
                 }
             }
             .foregroundStyle(isSelected ? magicPalette.accent : magicPalette.secondaryText)
+            .themeSkinLegibleText(level: isSelected ? .chip : .inline, slot: .filterChip)
             .frame(maxWidth: .infinity)
             .padding(.horizontal, 10)
             .padding(.vertical, 8)
@@ -326,6 +330,7 @@ struct MultiDimensionalFilterSheet: View {
                     .font(.subheadline)
                     .fontWeight(.medium)
                     .foregroundStyle(magicPalette.primaryText)
+                    .themeSkinLegibleText(level: .inline, slot: .sectionCard)
 
                 Spacer()
             }
@@ -415,6 +420,7 @@ struct MultiDimensionalFilterSheet: View {
             Text(item.value)
                 .font(.caption)
                 .fontWeight(.medium)
+                .themeSkinLegibleText(level: .chip, slot: .filterChip)
 
             Button {
                 removeFilterItem(item)
@@ -492,6 +498,7 @@ struct MultiDimensionalFilterSheet: View {
                     Text(title)
                         .font(.body.weight(.medium))
                         .foregroundStyle(magicPalette.primaryText)
+                        .themeSkinLegibleText(level: .inline, slot: .sectionCard)
 
                     Spacer()
 
@@ -500,6 +507,7 @@ struct MultiDimensionalFilterSheet: View {
                             .font(.caption)
                             .fontWeight(.medium)
                             .foregroundStyle(.white)
+                            .themeSkinLegibleText(level: .chip, slot: .filterChip)
                             .padding(.horizontal, 8)
                             .padding(.vertical, 2)
                             .background(magicPalette.accent)
@@ -600,6 +608,7 @@ struct MultiDimensionalFilterSheet: View {
                 .font(.subheadline)
                 .fontWeight(isSelected ? .semibold : .regular)
                 .foregroundStyle(isSelected ? magicPalette.accent : magicPalette.secondaryText)
+                .themeSkinLegibleText(level: isSelected ? .chip : .inline, slot: .filterChip)
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
                 .frame(maxWidth: .infinity)

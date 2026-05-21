@@ -103,9 +103,11 @@ struct MeView: View {
                                 Text("魔法任务")
                                     .font(.headline)
                                     .foregroundStyle(themeManager.primaryTextColor)
+                                    .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                                 Text("完成任务解锁更多功能")
                                     .font(.caption)
                                     .foregroundStyle(themeManager.secondaryTextColor)
+                                    .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                             }
 
                             Spacer()
@@ -399,11 +401,13 @@ struct MeView: View {
                                 .font(.title3)
                                 .bold()
                                 .foregroundStyle(.primary)
+                                .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                         }
                         
                         Text("解锁尊享智能对话特权与专属卡片")
                             .font(.caption)
                             .foregroundStyle(.secondary)
+                            .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                     }
                     Spacer()
                     Image(systemName: "chevron.right")
@@ -1016,9 +1020,11 @@ struct SettingsRow: View {
             VStack(alignment: .leading) {
                 Text(title)
                     .font(.body)
+                    .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                 Text(subtitle)
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                    .themeSkinLegibleText(level: .inline, slot: .sectionCard)
             }
         }
         .padding(.vertical, 2)

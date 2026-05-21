@@ -7,11 +7,18 @@ struct CopyableText: View {
     var font: Font = .subheadline
     var foregroundStyle: Color = .primary
     var alignment: TextAlignment = .trailing
+    var themeSkinLegibilitySlot: ThemeSkinSlot = .sectionCard
+    var themeSkinDescriptor: ThemeSkinDescriptor? = nil
     
     var body: some View {
         Text(text)
             .font(font)
             .foregroundStyle(foregroundStyle)
+            .themeSkinLegibleText(
+                level: .inline,
+                slot: themeSkinLegibilitySlot,
+                descriptor: themeSkinDescriptor
+            )
             .multilineTextAlignment(alignment)
             .contentShape(Rectangle())
             // 使用 highPriorityGesture 确保长按手势优先
@@ -52,6 +59,7 @@ struct CopyableInfoRow: View {
             Text(label)
                 .font(.subheadline)
                 .foregroundStyle(themeManager.secondaryTextColor)
+                .themeSkinLegibleText(level: .inline, slot: .sectionCard)
             
             Spacer()
             

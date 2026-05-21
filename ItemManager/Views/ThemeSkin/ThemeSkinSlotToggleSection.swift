@@ -20,6 +20,7 @@ struct ThemeSkinSlotToggleSection: View {
 
     @ObservedObject private var themeSkinManager = ThemeSkinManager.shared
     @Environment(ThemeManager.self) private var themeManager
+    @Environment(\.colorScheme) private var colorScheme
 
     private struct SlotGroup: Identifiable {
         let id: String
@@ -79,6 +80,15 @@ struct ThemeSkinSlotToggleSection: View {
         themeSkinManager.isActiveTheme(themeId)
     }
 
+    private var sectionDescriptor: ThemeSkinDescriptor? {
+        themeSkinManager.descriptor(forThemeId: themeId, slot: .sectionCard)
+    }
+
+    private var primaryTextColor: Color {
+        guard let sectionDescriptor else { return themeManager.primaryTextColor }
+        return SkyConcertThemeSkin.labelColor(for: sectionDescriptor, colorScheme: colorScheme)
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             header
@@ -94,11 +104,13 @@ struct ThemeSkinSlotToggleSection: View {
         VStack(alignment: .leading, spacing: 6) {
             Text("组件开关")
                 .font(.title3.weight(.bold))
-                .foregroundStyle(themeManager.primaryTextColor)
+                .foregroundStyle(primaryTextColor)
+                .themeSkinLegibleText(level: .chip, slot: .sectionCard, descriptor: sectionDescriptor)
 
             Text(isPurchased ? "同一主题内部可以单独启用或停用组件；未启用的组件会回退到应用默认样式。" : "请先购买并应用这个主题，之后才能控制组件开关。")
                 .font(.footnote)
                 .foregroundStyle(themeManager.secondaryTextColor)
+                .themeSkinLegibleText(level: .inline, slot: .sectionCard, descriptor: sectionDescriptor)
                 .fixedSize(horizontal: false, vertical: true)
         }
         .padding(.horizontal, 2)
@@ -151,10 +163,12 @@ struct ThemeSkinSlotToggleSection: View {
             VStack(alignment: .leading, spacing: 3) {
                 Text(slot.displayName)
                     .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(themeManager.primaryTextColor)
+                    .foregroundStyle(primaryTextColor)
+                    .themeSkinLegibleText(level: .inline, slot: .sectionCard, descriptor: sectionDescriptor)
                 Text(slot.rawValue)
                     .font(.caption2)
                     .foregroundStyle(themeManager.secondaryTextColor)
+                    .themeSkinLegibleText(level: .inline, slot: .sectionCard, descriptor: sectionDescriptor)
             }
 
             Spacer(minLength: 8)
@@ -188,10 +202,12 @@ struct ThemeSkinSlotToggleSection: View {
                     VStack(alignment: .leading, spacing: 3) {
                         Text(group.title)
                             .font(.headline)
-                            .foregroundStyle(themeManager.primaryTextColor)
+                            .foregroundStyle(primaryTextColor)
+                            .themeSkinLegibleText(level: .inline, slot: .sectionCard, descriptor: sectionDescriptor)
                         Text(group.subtitle)
                             .font(.caption)
                             .foregroundStyle(themeManager.secondaryTextColor)
+                            .themeSkinLegibleText(level: .inline, slot: .sectionCard, descriptor: sectionDescriptor)
                     }
 
                     Spacer(minLength: 0)

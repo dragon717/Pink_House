@@ -81,6 +81,7 @@ struct PetChatBubble: View {
                             .font(.caption2)
                         Text("AI 生成")
                             .font(.caption2)
+                            .themeSkinLegibleText(level: .inline, slot: .sectionCard, descriptor: sectionCardDescriptor)
                     }
                     .foregroundStyle(skinTheme.resolvedAssistantAccentColor(themeManager: themeManager, colorScheme: colorScheme).opacity(0.8))
                     .padding(.leading, 4)
@@ -181,6 +182,7 @@ struct PetChatBubble: View {
                     Text(formatTimestamp(message.timestamp))
                         .font(.caption2)
                         .foregroundStyle(.gray.opacity(0.8))
+                        .themeSkinLegibleText(level: .inline, slot: .sectionCard, descriptor: sectionCardDescriptor)
                     
                     if !message.isUser && message.isAIGenerated && showingReportButton {
                         Button(action: {
@@ -191,6 +193,7 @@ struct PetChatBubble: View {
                                     .font(.caption2)
                                 Text("举报")
                                     .font(.caption2)
+                                    .themeSkinLegibleText(level: .inline, slot: .sectionCard, descriptor: sectionCardDescriptor)
                             }
                             .foregroundStyle(skinTheme.resolvedAssistantAccentColor(themeManager: themeManager, colorScheme: colorScheme))
                         }
@@ -541,6 +544,11 @@ struct PetChatBubble: View {
         let text = Text(cleanedText)
             .font(.subheadline)
             .foregroundStyle(message.isUser ? userBubbleTextColor : aiBubbleTextColor)
+            .themeSkinLegibleText(
+                level: .inline,
+                slot: message.isUser ? .primaryButton : .sectionCard,
+                descriptor: message.isUser ? primaryButtonDescriptor : sectionCardDescriptor
+            )
             .multilineTextAlignment(message.isUser ? .trailing : .leading)
             .fixedSize(horizontal: false, vertical: true)
 
@@ -572,6 +580,7 @@ struct PetChatBubble: View {
             Text(message.text)
                 .font(.subheadline)
                 .foregroundStyle(aiBubbleTextColor)
+                .themeSkinLegibleText(level: .inline, slot: .sectionCard, descriptor: sectionCardDescriptor)
                 .multilineTextAlignment(.leading)
                 .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -606,6 +615,7 @@ struct PetChatBubble: View {
                             .fontWeight(.medium)
                             .lineLimit(3)
                             .foregroundStyle(aiBubbleTextColor)
+                            .themeSkinLegibleText(level: .inline, slot: .sectionCard, descriptor: sectionCardDescriptor)
                             .fixedSize(horizontal: false, vertical: true)
                             .layoutPriority(1)
                         
@@ -613,11 +623,13 @@ struct PetChatBubble: View {
                             Text(brand.name)
                                 .font(.caption)
                                 .foregroundStyle(themeManager.secondaryTextColor)
+                                .themeSkinLegibleText(level: .inline, slot: .sectionCard, descriptor: sectionCardDescriptor)
                         }
                         
                         Text("¥\(NSDecimalNumber(decimal: clothing.unitTotalPrice).stringValue)")
                             .font(.caption)
                             .foregroundStyle(skinTheme.resolvedAssistantAccentColor(themeManager: themeManager, colorScheme: colorScheme))
+                            .themeSkinLegibleText(level: .inline, slot: .sectionCard, descriptor: sectionCardDescriptor)
                     }
                     
                     Spacer()
@@ -648,6 +660,7 @@ struct PetChatBubble: View {
             Text(message.text)
                 .font(.subheadline)
                 .foregroundStyle(aiBubbleTextColor)
+                .themeSkinLegibleText(level: .inline, slot: .sectionCard, descriptor: sectionCardDescriptor)
                 .multilineTextAlignment(.leading)
                 .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -690,6 +703,7 @@ struct PetChatBubble: View {
             Text(title)
                 .font(.caption)
                 .foregroundStyle(themeManager.secondaryTextColor)
+                .themeSkinLegibleText(level: .inline, slot: .sectionCard, descriptor: sectionCardDescriptor)
             
             Spacer()
             
@@ -697,6 +711,7 @@ struct PetChatBubble: View {
                 .font(.caption)
                 .fontWeight(.medium)
                 .foregroundStyle(aiBubbleTextColor)
+                .themeSkinLegibleText(level: .inline, slot: .sectionCard, descriptor: sectionCardDescriptor)
                 .lineLimit(3)
                 .multilineTextAlignment(.trailing)
                 .fixedSize(horizontal: false, vertical: true)
@@ -708,6 +723,7 @@ struct PetChatBubble: View {
             Text(message.text)
                 .font(.subheadline)
                 .foregroundStyle(aiBubbleTextColor)
+                .themeSkinLegibleText(level: .inline, slot: .sectionCard, descriptor: sectionCardDescriptor)
                 .multilineTextAlignment(.leading)
                 .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -721,6 +737,7 @@ struct PetChatBubble: View {
             Text(colorRec.reasoning)
                 .font(.caption)
                 .foregroundStyle(themeManager.secondaryTextColor)
+                .themeSkinLegibleText(level: .inline, slot: .sectionCard, descriptor: sectionCardDescriptor)
                 .lineLimit(2)
         }
     }
@@ -746,6 +763,7 @@ struct PetChatBubble: View {
             Text(label)
                 .font(.caption2)
                 .foregroundStyle(themeManager.secondaryTextColor)
+                .themeSkinLegibleText(level: .inline, slot: .sectionCard, descriptor: sectionCardDescriptor)
         }
     }
     
@@ -763,6 +781,7 @@ struct PetChatBubble: View {
             Text(message.text)
                 .font(.subheadline)
                 .foregroundStyle(aiBubbleTextColor)
+                .themeSkinLegibleText(level: .inline, slot: .sectionCard, descriptor: sectionCardDescriptor)
                 .multilineTextAlignment(.leading)
                 .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -784,6 +803,7 @@ struct PetChatBubble: View {
             Text(suggestion.description)
                 .font(.subheadline)
                 .foregroundStyle(aiBubbleTextColor)
+                .themeSkinLegibleText(level: .inline, slot: .sectionCard, descriptor: sectionCardDescriptor)
                 .multilineTextAlignment(.leading)
                 .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -792,6 +812,7 @@ struct PetChatBubble: View {
                 Label(suggestion.style, systemImage: "sparkles")
                     .font(.caption)
                     .foregroundStyle(skinTheme.resolvedAssistantAccentColor(themeManager: themeManager, colorScheme: colorScheme))
+                    .themeSkinLegibleText(level: .chip, slot: .filterChip, descriptor: sectionCardDescriptor)
                     .padding(.horizontal, 10)
                     .padding(.vertical, 4)
                     .background(skinTheme.resolvedAssistantAccentColor(themeManager: themeManager, colorScheme: colorScheme).opacity(0.1))
@@ -800,6 +821,7 @@ struct PetChatBubble: View {
                 Label(suggestion.occasion, systemImage: "calendar")
                     .font(.caption)
                     .foregroundStyle(themeManager.secondaryTextColor)
+                    .themeSkinLegibleText(level: .chip, slot: .filterChip, descriptor: sectionCardDescriptor)
                     .padding(.horizontal, 10)
                     .padding(.vertical, 4)
                     .background(themeManager.secondaryTextColor.opacity(0.1))
@@ -810,6 +832,7 @@ struct PetChatBubble: View {
                 Text("推荐单品")
                     .font(.caption)
                     .foregroundStyle(themeManager.secondaryTextColor)
+                    .themeSkinLegibleText(level: .inline, slot: .sectionCard, descriptor: sectionCardDescriptor)
 
                 clothingCarousel(Array(suggestion.clothings.prefix(8)), onTap: onCardTap)
             }
@@ -820,6 +843,7 @@ struct PetChatBubble: View {
                 HStack(spacing: 6) {
                     Image(systemName: "wand.and.stars")
                     Text("魔法贴纸")
+                        .themeSkinLegibleText(level: .chip, slot: .primaryButton, descriptor: primaryButtonDescriptor)
                 }
                 .font(.subheadline)
                 .fontWeight(.medium)
@@ -877,6 +901,7 @@ struct PetChatBubble: View {
 
             if items.count > 4 {
                 Text("+\(items.count - 4)")
+                    .themeSkinLegibleText(level: .chip, slot: .sectionCard, descriptor: sectionCardDescriptor)
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .frame(width: 40, height: 40)
@@ -901,6 +926,7 @@ struct PetChatBubble: View {
                                     .font(.caption)
                                     .fontWeight(.medium)
                                     .foregroundStyle(aiBubbleTextColor)
+                                    .themeSkinLegibleText(level: .inline, slot: .sectionCard, descriptor: sectionCardDescriptor)
                                     .lineLimit(2)
                                     .fixedSize(horizontal: false, vertical: true)
 
@@ -909,6 +935,7 @@ struct PetChatBubble: View {
                                     Text(brandName)
                                         .font(.caption2)
                                         .foregroundStyle(themeManager.secondaryTextColor)
+                                        .themeSkinLegibleText(level: .inline, slot: .sectionCard, descriptor: sectionCardDescriptor)
                                         .lineLimit(1)
                                 }
                             }

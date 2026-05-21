@@ -125,6 +125,7 @@ struct MonthSelectorView: View {
                     Text(isExpanded ? "年度预约 (点我折叠)" : "年度预约 (点我展开)")
                         .font(.subheadline)
                         .foregroundStyle(.primary)
+                        .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                     Spacer()
                     Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
                         .font(.caption)
@@ -166,10 +167,12 @@ struct MonthSelectorView: View {
                                         .font(.caption)
                                         .fontWeight(isSelected ? .bold : .regular)
                                         .foregroundStyle(isSelected ? .white : .primary)
+                                        .themeSkinLegibleText(level: .inline, slot: .filterChip)
                                     
                                     if stats.count > 0 {
                                         Text("\(stats.count)")
                                             .font(.system(size: 8))
+                                            .themeSkinLegibleText(level: .chip, slot: .filterChip)
                                             .padding(3)
                                             .background(isSelected ? Color.white.opacity(0.3) : Color.black.opacity(0.1))
                                             .clipShape(Circle())
@@ -182,12 +185,14 @@ struct MonthSelectorView: View {
                                     Text("¥\(NSDecimalNumber(decimal: stats.amount).stringValue)")
                                         .font(.system(size: 10))
                                         .foregroundStyle(isSelected ? .white.opacity(0.9) : .orange)
+                                        .themeSkinLegibleText(level: .inline, slot: .filterChip)
                                         .lineLimit(1)
                                         .minimumScaleFactor(0.8)
                                 } else {
                                     Text("-")
                                         .font(.system(size: 10))
                                         .foregroundStyle(isSelected ? .white.opacity(0.6) : .secondary.opacity(0.3))
+                                        .themeSkinLegibleText(level: .inline, slot: .filterChip)
                                 }
                             }
                             .frame(maxWidth: .infinity)
@@ -221,22 +226,67 @@ struct MonthSelectorView: View {
 // MARK: - 最近月统计卡片
 struct RecentMonthCard: View {
     let stats: (month: Int, count: Int, amount: Decimal, hasData: Bool)
+    @Environment(\.colorScheme) private var colorScheme
+    @ObservedObject private var themeSkinManager = ThemeSkinManager.shared
+
+    private var activeStatsDescriptor: ThemeSkinDescriptor? {
+        themeSkinManager.activeThemeDescriptor(for: .statsCard, state: .default)
+    }
+
+    private var isSupportedThemeSkin: Bool {
+        let namespace = activeStatsDescriptor?.assetNamespace
+        return namespace == SkyConcertThemeSkin.namespace || namespace == SwanDreamThemeSkin.namespace
+    }
+
+    private var titleColor: Color {
+        guard isSupportedThemeSkin else { return .primary }
+        return Color(hex: "C94C72")
+    }
+
+    private var supportingTextColor: Color {
+        guard isSupportedThemeSkin else { return .secondary }
+        return SwanDreamThemeSkin.isSwanDream(activeStatsDescriptor) ? SwanDreamThemeSkin.text : SkyConcertThemeSkin.text
+    }
+
+    @ViewBuilder
+    private var readableCardBase: some View {
+        if isSupportedThemeSkin && colorScheme == .dark {
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(Color.white.opacity(0.58))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    Color(hex: "FFF7FA").opacity(0.26),
+                                    Color(hex: "EFF8FF").opacity(0.22)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                )
+        }
+    }
 
     var body: some View {
         VStack(spacing: 12) {
             HStack {
                 Image(systemName: "calendar.badge.clock")
-                    .foregroundStyle(.brown)
+                    .foregroundStyle(titleColor)
+                    .themeSkinLegibleSymbol(level: .chip, slot: .statsCard, descriptor: activeStatsDescriptor)
                 Text("最近月统计")
                     .font(.subheadline)
                     .fontWeight(.medium)
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(titleColor)
+                    .themeSkinLegibleText(level: .chip, slot: .statsCard, descriptor: activeStatsDescriptor)
                 Spacer()
                 if stats.hasData {
                     Text("\(stats.month)月")
                         .font(.caption)
                         .fontWeight(.semibold)
                         .foregroundStyle(.white)
+                        .themeSkinLegibleText(level: .chip, slot: .filterChip, descriptor: activeStatsDescriptor)
                         .padding(.horizontal, 10)
                         .padding(.vertical, 4)
                         .background(Color.brown)
@@ -249,7 +299,8 @@ struct RecentMonthCard: View {
                     DepositStatItem(
                         title: "预约件数",
                         value: "\(stats.count)",
-                        valueColor: .primary
+                        valueColor: titleColor,
+                        titleColor: supportingTextColor
                     )
 
                     Divider()
@@ -258,7 +309,8 @@ struct RecentMonthCard: View {
                     DepositStatItem(
                         title: "预约金额",
                         value: "¥\(NSDecimalNumber(decimal: stats.amount).stringValue)",
-                        valueColor: Color(hex: "C94C72")
+                        valueColor: titleColor,
+                        titleColor: supportingTextColor
                     )
                 }
                 .padding(.horizontal, 8)
@@ -266,12 +318,16 @@ struct RecentMonthCard: View {
             } else {
                 Text("暂无预约数据")
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(supportingTextColor)
+                    .themeSkinLegibleText(level: .inline, slot: .statsCard, descriptor: activeStatsDescriptor)
                     .padding(.vertical, 12)
             }
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 12)
+        .background {
+            readableCardBase
+        }
         .themeSkinSectionCard(slot: .statsCard, cornerRadius: 16, showsDecoration: false)
     }
 }

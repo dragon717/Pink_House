@@ -131,6 +131,7 @@ struct PetHomeView: View {
                                                         .font(.system(size: 20))
                                                     Text("对话")
                                                     .font(.system(size: 16, weight: .bold))
+                                                    .themeSkinLegibleText(level: .chip, slot: .primaryButton)
                                             }
                                             .foregroundColor(themeManager.primaryTextColor)
                                             .padding(.horizontal, 16)
@@ -154,6 +155,7 @@ struct PetHomeView: View {
                                                     .font(.system(size: 20))
                                                 Text("背包")
                                                     .font(.system(size: 16, weight: .bold))
+                                                    .themeSkinLegibleText(level: .chip, slot: .primaryButton)
                                             }
                                             .foregroundColor(themeManager.primaryTextColor)
                                             .padding(.horizontal, 16)
@@ -254,6 +256,7 @@ struct PetHomeView: View {
                                                     let pName = viewModel.status.petNames[pet.id] ?? ""
                                                     let nameText = pName.isEmpty ? "" : " - \"\(pName)\""
                                                     Text("\(pet.displayName)\(nameText)")
+                                                        .themeSkinLegibleText(level: .inline, slot: .topBarMain)
                                                     if viewModel.status.selectedPetId == pet.id {
                                                         Image(systemName: "checkmark")
                                                     }
@@ -318,11 +321,13 @@ struct PetHomeView: View {
                                     Text(displayName)
                                         .font(.headline)
                                         .foregroundStyle(.primary)
+                                        .themeSkinLegibleText(level: .inline, slot: .topBarMain)
 
                                     if viewModel.status.currentJob != .none {
                                         Text(viewModel.status.currentJobStartedAutomatically ? "\(viewModel.status.currentJob.rawValue) · 自动" : viewModel.status.currentJob.rawValue)
                                             .font(.caption2)
                                             .foregroundStyle(.blue)
+                                            .themeSkinLegibleText(level: .inline, slot: .topBarMain)
                                     }
                                 }
                             }
@@ -490,30 +495,37 @@ private struct PetAutoWorkSettingsView: View {
                     LabeledContent("当前状态", value: viewModel.autoWorkStatusSummary)
                 } footer: {
                     Text("开启后，萌宠只有在空闲、状态达标、未到每日收益上限时才会自动接活。手动互动、睡觉、喂食和洗澡不会被自动打断。")
+                        .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                 }
 
                 Section("打工策略") {
                     Picker("策略", selection: strategyBinding) {
                         ForEach(PetAutoWorkStrategy.allCases) { strategy in
-                            Text(strategy.title).tag(strategy)
+                            Text(strategy.title)
+                                .themeSkinLegibleText(level: .inline, slot: .segmentedControl)
+                                .tag(strategy)
                         }
                     }
 
                     Text(viewModel.status.autoWorkStrategy.description)
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                        .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                 }
 
                 Section("收益币种") {
                     Picker("币种", selection: rewardModeBinding) {
                         ForEach(PetAutoWorkRewardMode.allCases) { mode in
-                            Text(mode.title).tag(mode)
+                            Text(mode.title)
+                                .themeSkinLegibleText(level: .inline, slot: .segmentedControl)
+                                .tag(mode)
                         }
                     }
 
                     Text(viewModel.status.autoWorkRewardMode.description)
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                        .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                 }
 
                 Section {
@@ -525,8 +537,10 @@ private struct PetAutoWorkSettingsView: View {
                     thresholdRow(title: "心情", current: viewModel.status.mood, start: start.mood, stop: stop.mood)
                 } header: {
                     Text("状态保护线")
+                        .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                 } footer: {
                     Text("达到开始线才会自动出门，跌到停工线会自动下班。")
+                        .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                 }
             }
             .navigationTitle("自动打工")
@@ -545,15 +559,19 @@ private struct PetAutoWorkSettingsView: View {
         VStack(alignment: .leading, spacing: 6) {
             HStack {
                 Text(title)
+                    .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                 Spacer()
                 Text("\(Int(current))/100")
                     .foregroundStyle(.secondary)
+                    .themeSkinLegibleText(level: .inline, slot: .sectionCard)
             }
             HStack(spacing: 12) {
                 Label("开始 \(Int(start))+", systemImage: "arrow.up.circle.fill")
                     .foregroundStyle(.green)
+                    .themeSkinLegibleText(level: .inline, slot: .filterChip)
                 Label("停工 \(Int(stop))", systemImage: "pause.circle.fill")
                     .foregroundStyle(.orange)
+                    .themeSkinLegibleText(level: .inline, slot: .filterChip)
             }
             .font(.caption)
         }
@@ -620,6 +638,7 @@ private struct PetFundingPromptOverlay: View {
                         Text("余额不足")
                             .font(.caption.weight(.semibold))
                             .foregroundStyle(accentTint)
+                            .themeSkinLegibleText(level: .chip, slot: .filterChip)
                             .padding(.horizontal, 10)
                             .padding(.vertical, 5)
                             .background(accentTint.opacity(0.12))
@@ -628,10 +647,12 @@ private struct PetFundingPromptOverlay: View {
                         Text(prompt.title)
                             .font(.system(size: 24, weight: .bold, design: .rounded))
                             .foregroundStyle(.primary)
+                            .themeSkinLegibleText(level: .hero, slot: .sectionCard)
 
                         Text(prompt.message)
                             .font(.system(size: 15, weight: .medium))
                             .foregroundStyle(.secondary)
+                            .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                             .fixedSize(horizontal: false, vertical: true)
                     }
 
@@ -652,6 +673,7 @@ private struct PetFundingPromptOverlay: View {
                         Text("稍后再说")
                             .font(.system(size: 15, weight: .semibold))
                             .foregroundStyle(.secondary)
+                            .themeSkinLegibleText(level: .chip, slot: .primaryButton)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 14)
                             .background(Color.black.opacity(0.05))
@@ -662,6 +684,7 @@ private struct PetFundingPromptOverlay: View {
                         HStack(spacing: 8) {
                             Image(systemName: "arrow.right.circle.fill")
                             Text(prompt.actionTitle)
+                                .themeSkinLegibleText(level: .chip, slot: .primaryButton)
                         }
                         .font(.system(size: 15, weight: .bold))
                         .foregroundStyle(.white)

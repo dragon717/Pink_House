@@ -1815,6 +1815,7 @@ struct WardrobeView: View {
                 } label: {
                     HStack(spacing: 4) {
                         Text(showStats ? "隐藏" : "显示")
+                            .themeSkinLegibleText(level: .inline, slot: .statsCard)
                         Image(systemName: showStats ? "chevron.up" : "chevron.down")
                     }
                     .font(.caption)
@@ -1853,6 +1854,7 @@ struct WardrobeView: View {
             Text("下滑收起，点「显示」临时展开，回到顶部恢复。")
                 .lineLimit(1)
                 .minimumScaleFactor(0.72)
+                .themeSkinLegibleText(level: .inline, slot: .statsCard)
             Spacer(minLength: 0)
         }
         .font(.caption2)
@@ -2357,6 +2359,7 @@ struct WardrobeStatsView: View {
                                 .font(.system(size: 20))
                             Text("今日穿搭色")
                                 .font(.system(size: 11, weight: .medium))
+                                .themeSkinLegibleText(level: .inline, slot: .statsCard)
                         }
                         .padding(.vertical, 8)
                         .frame(maxWidth: .infinity)
@@ -2380,6 +2383,7 @@ struct WardrobeStatsView: View {
                                 .font(.system(size: 20))
                             Text("穿搭手帐")
                                 .font(.system(size: 11, weight: .medium))
+                                .themeSkinLegibleText(level: .inline, slot: .statsCard)
                         }
                         .padding(.vertical, 8)
                         .frame(maxWidth: .infinity)
@@ -2396,6 +2400,7 @@ struct WardrobeStatsView: View {
                                 .font(.system(size: 20))
                             Text("详细统计")
                                 .font(.system(size: 11, weight: .medium))
+                                .themeSkinLegibleText(level: .inline, slot: .statsCard)
                         }
                         .padding(.vertical, 8)
                         .frame(maxWidth: .infinity)
@@ -2421,6 +2426,7 @@ struct WardrobeStatsView: View {
                 Text(title)
                     .font(.caption)
                     .foregroundStyle(palette.secondary)
+                    .themeSkinLegibleText(level: .inline, slot: .statsCard)
 
                 Button {
                     withAnimation {
@@ -2441,6 +2447,7 @@ struct WardrobeStatsView: View {
                 .font(.title3)
                 .fontWeight(.semibold)
                 .foregroundStyle(valueColor ?? palette.primary)
+                .themeSkinLegibleText(level: .chip, slot: .statsCard)
                 .contentTransition(.numericText())
                 .frame(height: 28) // 固定数值行高度
         }
@@ -2817,6 +2824,7 @@ struct MergeToAccessorySheet: View {
                                     .font(.caption2)
                                     .fontWeight(.bold)
                                     .foregroundStyle(.white)
+                                    .themeSkinLegibleText(level: .chip, slot: .filterChip)
                                     .padding(.horizontal, 6)
                                     .padding(.vertical, 2)
                                     .background(magicPalette.accent)
@@ -2859,6 +2867,7 @@ struct MergeToAccessorySheet: View {
                         Text("+\(selectedFilterItems.count - 3)")
                             .font(.caption)
                             .foregroundStyle(magicPalette.secondaryText)
+                            .themeSkinLegibleText(level: .inline, slot: .filterChip)
                     }
                 }
             }
@@ -2899,6 +2908,7 @@ struct MergeToAccessorySheet: View {
         Text(item)
             .font(.caption)
             .foregroundStyle(magicPalette.accent)
+            .themeSkinLegibleText(level: .inline, slot: .filterChip)
             .padding(.horizontal, 8)
             .padding(.vertical, 4)
             .background(magicPalette.accent.opacity(0.15))
@@ -2998,6 +3008,7 @@ struct MergeAccessoryFilterSheet: View {
                                 } label: {
                                     HStack {
                                         Text(filter.displayName)
+                                            .themeSkinLegibleText(level: .inline, slot: .filterChip)
                                         if depositStatusFilter == filter {
                                             Image(systemName: "checkmark")
                                         }
@@ -3010,6 +3021,7 @@ struct MergeAccessoryFilterSheet: View {
                                 if depositStatusFilter != .all {
                                     Text("\(depositStatusFilter == .owned ? "已拥有" : "心愿")")
                                         .font(.caption)
+                                        .themeSkinLegibleText(level: .inline, slot: .filterChip)
                                 }
                             }
                             .font(.subheadline)
@@ -3023,6 +3035,7 @@ struct MergeAccessoryFilterSheet: View {
                                 Text("清除")
                                     .font(.subheadline)
                                     .foregroundStyle(.red)
+                                    .themeSkinLegibleText(level: .inline, slot: .filterChip)
                             }
                         }
                     }
@@ -3041,6 +3054,7 @@ struct MergeAccessoryFilterSheet: View {
                     .font(.subheadline)
                     .fontWeight(.medium)
                     .foregroundStyle(magicPalette.primaryText)
+                    .themeSkinLegibleText(level: .inline, slot: .filterSheet)
                 Spacer()
             }
 
@@ -3119,6 +3133,7 @@ struct MergeAccessoryFilterSheet: View {
             Text(item.value)
                 .font(.caption)
                 .fontWeight(.medium)
+                .themeSkinLegibleText(level: .inline, slot: .filterChip)
 
             Button {
                 removeFilterItem(item)
@@ -3175,6 +3190,7 @@ struct MergeAccessoryFilterSheet: View {
                     Text(title)
                         .font(.body)
                         .foregroundStyle(magicPalette.primaryText)
+                        .themeSkinLegibleText(level: .inline, slot: .filterSheet)
 
                     Spacer()
 
@@ -3183,6 +3199,7 @@ struct MergeAccessoryFilterSheet: View {
                             .font(.caption)
                             .fontWeight(.medium)
                             .foregroundStyle(.white)
+                            .themeSkinLegibleText(level: .chip, slot: .filterChip)
                             .padding(.horizontal, 8)
                             .padding(.vertical, 2)
                             .background(magicPalette.accent)
@@ -3265,6 +3282,7 @@ struct MergeAccessoryFilterSheet: View {
                 .font(.subheadline)
                 .fontWeight(isSelected ? .semibold : .regular)
                 .foregroundStyle(isSelected ? magicPalette.accent : magicPalette.secondaryText)
+                .themeSkinLegibleText(level: .inline, slot: .filterChip)
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
                 .frame(maxWidth: .infinity)

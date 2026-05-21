@@ -4,6 +4,7 @@ struct ThemeSkinStoreView: View {
     @ObservedObject private var themeSkinManager = ThemeSkinManager.shared
     @ObservedObject private var vipManager = VIPManager.shared
     @Environment(ThemeManager.self) private var themeManager
+    @Environment(\.colorScheme) private var colorScheme
 
     @State private var alertTitle = "提示"
     @State private var alertMessage = ""
@@ -69,6 +70,7 @@ struct ThemeSkinStoreView: View {
                     Label("Boutique Gallery", systemImage: "sparkles")
                         .font(.caption.weight(.bold))
                         .foregroundStyle(themeManager.accentTextColor)
+                        .themeSkinLegibleText(level: .chip, slot: .sectionCard)
                         .textCase(.uppercase)
                         .padding(.horizontal, 10)
                         .padding(.vertical, 6)
@@ -77,10 +79,12 @@ struct ThemeSkinStoreView: View {
                     Text("主题皮肤画廊")
                         .font(.system(size: 25, weight: .heavy, design: .rounded))
                         .foregroundStyle(themeManager.primaryTextColor)
+                        .themeSkinLegibleText(level: .chip, slot: .sectionCard)
 
                     Text("挑选一整套视觉语言，顶部、底栏、卡片与按钮只在同主题内成套生效。")
                         .font(.subheadline.weight(.medium))
                         .foregroundStyle(themeManager.secondaryTextColor)
+                        .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                         .fixedSize(horizontal: false, vertical: true)
                 }
 
@@ -196,6 +200,7 @@ struct ThemeSkinStoreView: View {
             Text("购买说明")
                 .font(.headline)
                 .foregroundStyle(themeManager.primaryTextColor)
+                .themeSkinLegibleText(level: .inline, slot: .sectionCard)
 
             ThemeSkinBulletRow(text: "购买后只能启用同一主题包内的组件，不会与其他主题皮肤混用。")
             ThemeSkinBulletRow(text: "每个组件支持单独启用或停用，未启用时回退系统默认样式。")
@@ -248,10 +253,20 @@ private struct ThemeSkinProductStoreCard: View {
     let toggleAction: () -> Void
 
     @Environment(ThemeManager.self) private var themeManager
+    @Environment(\.colorScheme) private var colorScheme
 
     private var displayPrice: Int { quote?.finalPrice ?? product.basePrice }
     private var previewAssetName: String { product.previewAssetNames.first ?? ThemeSkinAssetName.previewStoreHero }
     private var canAfford: Bool { currentBalance >= displayPrice }
+    private var descriptor: ThemeSkinDescriptor? {
+        ThemeSkinManager.shared.descriptor(forThemeId: product.themeId, slot: .sectionCard)
+    }
+    private var primaryTextColor: Color {
+        SkyConcertThemeSkin.labelColor(for: descriptor, colorScheme: colorScheme)
+    }
+    private var secondaryTextColor: Color {
+        primaryTextColor.opacity(0.76)
+    }
 
     private var componentSummaryTags: [String] {
         var tags: [String] = []
@@ -289,17 +304,19 @@ private struct ThemeSkinProductStoreCard: View {
                     HStack(alignment: .firstTextBaseline, spacing: 8) {
                         Text(product.name)
                             .font(.system(size: 22, weight: .heavy, design: .rounded))
-                            .foregroundStyle(themeManager.primaryTextColor)
+                            .foregroundStyle(primaryTextColor)
+                            .themeSkinLegibleText(level: .chip, slot: .sectionCard, descriptor: descriptor)
                             .lineLimit(1)
 
                         Spacer(minLength: 0)
 
-                        ThemeSkinStatusBadge(isPurchased: isPurchased, isActive: isActive)
+                        ThemeSkinStatusBadge(isPurchased: isPurchased, isActive: isActive, descriptor: descriptor)
                     }
 
                     Text(product.subtitle)
                         .font(.footnote.weight(.medium))
-                        .foregroundStyle(themeManager.secondaryTextColor)
+                        .foregroundStyle(secondaryTextColor)
+                        .themeSkinLegibleText(level: .inline, slot: .sectionCard, descriptor: descriptor)
                         .lineLimit(2)
                         .fixedSize(horizontal: false, vertical: true)
 
@@ -341,14 +358,17 @@ private struct ThemeSkinProductStoreCard: View {
         HStack(alignment: .lastTextBaseline, spacing: 6) {
             Text("\(displayPrice)")
                 .font(.system(size: 24, weight: .heavy, design: .rounded))
-                .foregroundStyle(themeManager.primaryTextColor)
+                .foregroundStyle(primaryTextColor)
+                .themeSkinLegibleText(level: .chip, slot: .sectionCard, descriptor: descriptor)
             Text("喵币")
                 .font(.footnote.weight(.semibold))
-                .foregroundStyle(themeManager.secondaryTextColor)
+                .foregroundStyle(secondaryTextColor)
+                .themeSkinLegibleText(level: .inline, slot: .sectionCard, descriptor: descriptor)
             if displayPrice < product.basePrice {
                 Text("原价 \(product.basePrice)")
                     .font(.caption.weight(.medium))
-                    .foregroundStyle(themeManager.secondaryTextColor.opacity(0.76))
+                    .foregroundStyle(secondaryTextColor.opacity(0.82))
+                    .themeSkinLegibleText(level: .inline, slot: .sectionCard, descriptor: descriptor)
                     .strikethrough()
             }
         }
@@ -361,7 +381,8 @@ private struct ThemeSkinProductStoreCard: View {
                 .foregroundStyle(themeManager.accentTextColor.opacity(0.78))
             Text(componentCaption)
                 .font(.caption.weight(.semibold))
-                .foregroundStyle(themeManager.secondaryTextColor)
+                .foregroundStyle(secondaryTextColor)
+                .themeSkinLegibleText(level: .inline, slot: .sectionCard, descriptor: descriptor)
                 .lineLimit(1)
         }
         .padding(.horizontal, 10)
@@ -377,7 +398,8 @@ private struct ThemeSkinProductStoreCard: View {
                 .foregroundStyle(isActive ? Color(hex: "A98654") : Color(hex: "62A871"))
             Text(isActive ? "正在使用 · 可在详情里微调组件" : "已收入皮肤库 · 可随时应用")
                 .font(.caption.weight(.semibold))
-                .foregroundStyle(themeManager.secondaryTextColor)
+                .foregroundStyle(secondaryTextColor)
+                .themeSkinLegibleText(level: .inline, slot: .sectionCard, descriptor: descriptor)
             Spacer(minLength: 0)
         }
         .padding(.horizontal, 12)
@@ -407,7 +429,8 @@ private struct ThemeSkinProductStoreCard: View {
                 ThemeSkinMiniActionLabel(
                     title: isActive ? "停用当前" : "应用这套",
                     systemImage: isActive ? "power.circle.fill" : "wand.and.stars",
-                    tint: themeManager.primaryTextColor
+                    tint: primaryTextColor,
+                    descriptor: descriptor
                 )
             }
             .buttonStyle(.plain)
@@ -434,7 +457,8 @@ private struct ThemeSkinProductStoreCard: View {
             ThemeSkinMiniActionLabel(
                 title: title,
                 systemImage: "arrow.right.circle.fill",
-                tint: themeManager.accentTextColor
+                tint: SkyConcertThemeSkin.accent(for: descriptor, colorScheme: colorScheme),
+                descriptor: descriptor
             )
         }
         .buttonStyle(.plain)
@@ -450,11 +474,13 @@ private struct ThemeSkinProductStoreCard: View {
 private struct ThemeSkinStatusBadge: View {
     let isPurchased: Bool
     let isActive: Bool
+    let descriptor: ThemeSkinDescriptor?
 
     var body: some View {
         Text(isActive ? "使用中" : (isPurchased ? "已购" : "未购"))
             .font(.caption.weight(.bold))
             .foregroundStyle(isActive ? Color(hex: "9C6B4A") : (isPurchased ? Color(hex: "4F9B63") : Color(hex: "A78292")))
+            .themeSkinLegibleText(level: .chip, slot: .sectionCard, descriptor: descriptor)
             .padding(.horizontal, 10)
             .padding(.vertical, 6)
             .background(
@@ -477,14 +503,17 @@ private struct ThemeSkinBalancePill: View {
             Label("余额", systemImage: "pawprint.fill")
                 .font(.caption.weight(.bold))
                 .foregroundStyle(themeManager.accentTextColor)
+                .themeSkinLegibleText(level: .chip, slot: .sectionCard)
 
             Text("\(balance)")
                 .font(.system(size: 27, weight: .heavy, design: .rounded))
                 .foregroundStyle(themeManager.primaryTextColor)
+                .themeSkinLegibleText(level: .chip, slot: .sectionCard)
 
             Text("喵币可用")
                 .font(.caption2.weight(.semibold))
                 .foregroundStyle(themeManager.secondaryTextColor)
+                .themeSkinLegibleText(level: .inline, slot: .sectionCard)
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 12)
@@ -566,6 +595,7 @@ private struct ThemeSkinInfoChip: View {
         Label(title, systemImage: systemImage)
             .font(.caption.weight(.semibold))
             .foregroundStyle(tint)
+            .themeSkinLegibleText(level: .chip, slot: .sectionCard)
             .padding(.horizontal, 10)
             .padding(.vertical, 7)
             .background(
@@ -605,6 +635,7 @@ private struct ThemeSkinMiniActionLabel: View {
     let title: String
     let systemImage: String
     var tint: Color = .primary
+    var descriptor: ThemeSkinDescriptor? = nil
 
     var body: some View {
         HStack(spacing: 8) {
@@ -614,6 +645,7 @@ private struct ThemeSkinMiniActionLabel: View {
                 .font(.subheadline.weight(.semibold))
         }
         .foregroundStyle(tint)
+        .themeSkinLegibleText(level: .chip, slot: .sectionCard, descriptor: descriptor)
         .frame(maxWidth: .infinity)
         .padding(.horizontal, 12)
         .padding(.vertical, 13)
@@ -633,6 +665,7 @@ private struct ThemeSkinBulletRow: View {
             Text(text)
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
+                .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                 .fixedSize(horizontal: false, vertical: true)
         }
     }

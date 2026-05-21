@@ -136,6 +136,7 @@ struct DreamDressCalendarView: View {
                     Text(mode.rawValue)
                         .font(.custom(themeManager.currentTheme.fontName, size: 14))
                         .fontWeight(viewMode == mode ? .bold : .regular)
+                        .themeSkinLegibleText(level: .inline, slot: .segmentedControl)
                         .padding(.vertical, 6)
                         .padding(.horizontal, 16)
                         .background(viewMode == mode ? Color(uiColor: themeManager.currentTheme.accentColor) : Color.clear)
@@ -178,7 +179,9 @@ extension View {
                     ToolbarItem(placement: .principal) {
                         Picker("视图模式", selection: viewMode) {
                             ForEach(CalendarViewMode.allCases) { mode in
-                                Text(mode.rawValue).tag(mode)
+                                Text(mode.rawValue)
+                                    .themeSkinLegibleText(level: .inline, slot: .segmentedControl)
+                                    .tag(mode)
                             }
                         }
                         .pickerStyle(.segmented)
@@ -225,7 +228,9 @@ extension View {
                     ToolbarItem(placement: .principal) {
                         Picker("视图模式", selection: viewMode) {
                             ForEach(CalendarViewMode.allCases) { mode in
-                                Text(mode.rawValue).tag(mode)
+                                Text(mode.rawValue)
+                                    .themeSkinLegibleText(level: .inline, slot: .segmentedControl)
+                                    .tag(mode)
                             }
                         }
                         .pickerStyle(.segmented)
@@ -284,6 +289,7 @@ struct RecentTimelineView: View {
                 Text("未来一周")
                     .font(.headline)
                     .foregroundStyle(.secondary)
+                    .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.top)
                 
@@ -311,10 +317,12 @@ struct RecentTimelineView: View {
                         .font(.title2)
                         .bold()
                         .foregroundStyle(Color(uiColor: themeManager.currentTheme.accentColor))
+                        .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                     
                     Text(date.formatted(date: .abbreviated, time: .omitted))
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
+                        .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                     
                     Spacer()
                 }
@@ -324,6 +332,7 @@ struct RecentTimelineView: View {
                     Text("无特殊安排")
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                        .themeSkinLegibleText(level: .inline, slot: .emptyState)
                         .padding(.vertical, 8)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 } else {
@@ -384,15 +393,18 @@ struct ClothingCardTiny: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(clothing.name)
                     .font(.caption)
+                    .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                     .lineLimit(1)
                 
                 HStack(spacing: 2) {
                     if let depositDate = clothing.depositDate, Calendar.current.isDate(depositDate, inSameDayAs: date) {
                         Circle().fill(Color(uiColor: theme.depositColor)).frame(width: 6, height: 6)
                         Text("定金").font(.caption2).foregroundStyle(.secondary)
+                            .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                     } else if let finalDate = clothing.finalPaymentDate, Calendar.current.isDate(finalDate, inSameDayAs: date) {
                         Circle().fill(Color(uiColor: theme.finalPaymentColor)).frame(width: 6, height: 6)
                         Text("尾款").font(.caption2).foregroundStyle(.secondary)
+                            .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                     }
                 }
             }
@@ -420,6 +432,7 @@ struct CompactDayRow: View {
                 Text(date.formatted(date: .abbreviated, time: .omitted))
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
+                    .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                     .frame(width: 80, alignment: .leading)
                 
                 // Visual indicators
@@ -501,6 +514,7 @@ struct DualMonthScrollView: View {
                 .font(.custom(themeManager.currentTheme.fontName, size: 20))
                 .bold()
                 .foregroundStyle(Color(uiColor: themeManager.currentTheme.accentColor))
+                .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                 .padding(.horizontal)
                 .padding(.top)
             
@@ -588,6 +602,7 @@ struct YearlyHeatmapView: View {
                                 Text("\(month)月")
                                     .font(.headline)
                                     .foregroundStyle(.secondary)
+                                    .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                                 
                                 Spacer()
                                 

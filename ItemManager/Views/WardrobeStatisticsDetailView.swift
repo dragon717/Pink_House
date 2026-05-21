@@ -56,6 +56,7 @@ struct WardrobeStatisticsDetailView: View {
             Text("衣橱统计")
                 .font(.headline)
                 .foregroundStyle(.primary)
+                .themeSkinLegibleText(level: .inline, slot: .statsCard)
         }
     }
     
@@ -67,6 +68,7 @@ struct WardrobeStatisticsDetailView: View {
                     Text("筛选:\(filterDescription)")
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                        .themeSkinLegibleText(level: .inline, slot: .statsCard)
                     
                     Button("清除") {
                         onClearFilter?()
@@ -121,6 +123,7 @@ struct OverviewStatsCard: View {
             Label("总览统计", systemImage: "chart.pie.fill")
                 .font(.headline)
                 .foregroundStyle(.brown)
+                .themeSkinLegibleText(level: .inline, slot: .statsCard)
             
             VStack(spacing: 12) {
                 HStack(spacing: 12) {
@@ -138,15 +141,18 @@ struct OverviewStatsCard: View {
                         Text("总价值")
                             .font(.caption)
                             .foregroundStyle(.secondary)
+                            .themeSkinLegibleText(level: .inline, slot: .statsCard)
                         Text("¥\(formatWholePrice(totalValue))")
                             .font(.title)
                             .fontWeight(.bold)
                             .foregroundStyle(.brown)
+                            .themeSkinLegibleText(level: .chip, slot: .statsCard)
                         
                         if totalOriginalPrice > 0 {
                             Text("总原价(不包含小物和未填写的): ¥\(formatPrice(totalOriginalPrice))")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
+                                .themeSkinLegibleText(level: .inline, slot: .statsCard)
                                 .padding(.top, 2)
                         }
                     }
@@ -189,15 +195,18 @@ struct StatBox: View {
             Text(title)
                 .font(.caption)
                 .foregroundStyle(.secondary)
+                .themeSkinLegibleText(level: .inline, slot: .statsCard)
             HStack(alignment: .lastTextBaseline, spacing: 2) {
                 Text(value)
                     .font(.title2)
                     .fontWeight(.bold)
                     .foregroundStyle(color)
+                    .themeSkinLegibleText(level: .chip, slot: .statsCard)
                 if !unit.isEmpty {
                     Text(unit)
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                        .themeSkinLegibleText(level: .inline, slot: .statsCard)
                 }
             }
         }
@@ -272,11 +281,13 @@ struct TagStatsCard: View {
             Label("标签分类统计", systemImage: "tag.fill")
                 .font(.headline)
                 .foregroundStyle(.brown)
+                .themeSkinLegibleText(level: .inline, slot: .statsCard)
             
             if stats.isEmpty {
                 Text("暂无标签数据")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                    .themeSkinLegibleText(level: .inline, slot: .statsCard)
                     .frame(maxWidth: .infinity, alignment: .center)
                     .padding()
             } else {
@@ -286,6 +297,7 @@ struct TagStatsCard: View {
                         Text("数量统计")
                             .font(.subheadline)
                             .fontWeight(.medium)
+                            .themeSkinLegibleText(level: .inline, slot: .statsCard)
                         
                         HeaderRow(left: "标签", right: "数量", extra: "占比")
                         
@@ -313,6 +325,7 @@ struct TagStatsCard: View {
                         Text("价值统计")
                             .font(.subheadline)
                             .fontWeight(.medium)
+                            .themeSkinLegibleText(level: .inline, slot: .statsCard)
                         
                         HeaderRow(left: "标签", right: "价值", extra: "占比")
                         
@@ -359,6 +372,7 @@ struct HeaderRow: View {
         }
         .font(.caption)
         .foregroundStyle(.secondary)
+        .themeSkinLegibleText(level: .inline, slot: .statsCard)
         .padding(.horizontal, 4)
         .padding(.vertical, 8)
         .themeSkinAdaptiveSectionCard(slot: .statsCard, cornerRadius: 8, showsDecoration: false) {
@@ -383,6 +397,7 @@ struct StatRow: View {
                 Text(label)
                     .font(.subheadline)
                     .lineLimit(1)
+                    .themeSkinLegibleText(level: .inline, slot: .statsCard)
             }
             .frame(width: 80, alignment: .leading)
             
@@ -390,6 +405,7 @@ struct StatRow: View {
             
             Text(value)
                 .font(.subheadline)
+                .themeSkinLegibleText(level: .inline, slot: .statsCard)
             
             // Progress Bar
             GeometryReader { proxy in
@@ -409,6 +425,7 @@ struct StatRow: View {
                 Text(displayPercentage)
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                    .themeSkinLegibleText(level: .inline, slot: .statsCard)
                     .frame(width: 40, alignment: .trailing)
             } else {
                  Text("")
@@ -451,6 +468,7 @@ struct DepositStatsCard: View {
             Label("心愿尾款统计", systemImage: "list.clipboard.fill")
                 .font(.headline)
                 .foregroundStyle(.brown)
+                .themeSkinLegibleText(level: .inline, slot: .statsCard)
             
             VStack(spacing: 12) {
                 HStack(spacing: 12) {
@@ -530,12 +548,14 @@ struct PurchaseTimeStatsCard: View {
             Label("购买时间统计", systemImage: "calendar")
                 .font(.headline)
                 .foregroundStyle(.brown)
+                .themeSkinLegibleText(level: .inline, slot: .statsCard)
             
             // This Month
             VStack(alignment: .leading, spacing: 8) {
                 Text("本月购买")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
+                    .themeSkinLegibleText(level: .inline, slot: .statsCard)
                 
                 HStack(spacing: 12) {
                     StatBox(title: "数量", value: "\(thisMonthStats.count)", unit: "件", color: .brown)
@@ -550,6 +570,7 @@ struct PurchaseTimeStatsCard: View {
                 Text("最近12个月购买数量")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
+                    .themeSkinLegibleText(level: .inline, slot: .statsCard)
                 
                 Chart(last12MonthsStats) { stat in
                     LineMark(
@@ -576,6 +597,7 @@ struct PurchaseTimeStatsCard: View {
                             Text("\(stat.count)")
                                 .font(.caption2)
                                 .foregroundStyle(.secondary)
+                                .themeSkinLegibleText(level: .inline, slot: .statsCard)
                         }
                     }
                 }
@@ -587,6 +609,7 @@ struct PurchaseTimeStatsCard: View {
                     Text("最近12个月金额")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
+                        .themeSkinLegibleText(level: .inline, slot: .statsCard)
                     
                     Spacer()
                     
@@ -596,6 +619,7 @@ struct PurchaseTimeStatsCard: View {
                             .font(.subheadline)
                             .fontWeight(.bold)
                             .foregroundStyle(.orange)
+                            .themeSkinLegibleText(level: .inline, slot: .statsCard)
                             .transition(.opacity)
                     }
                 }
@@ -611,6 +635,7 @@ struct PurchaseTimeStatsCard: View {
                             Text("¥\(NSDecimalNumber(decimal: stat.amount).stringValue)")
                                 .font(.caption2)
                                 .foregroundStyle(.secondary)
+                                .themeSkinLegibleText(level: .inline, slot: .statsCard)
                         }
                     }
                 }

@@ -53,12 +53,15 @@ struct PriceRow: View {
             if let subtitle = subtitle {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(title)
+                        .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                     Text(subtitle)
                         .font(.caption2)
                         .foregroundStyle(.secondary)
+                        .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                 }
             } else {
                 Text(title)
+                    .themeSkinLegibleText(level: .inline, slot: .sectionCard)
             }
             Spacer()
             TextField("0", value: Binding<Double?>(
@@ -69,6 +72,7 @@ struct PriceRow: View {
                 .multilineTextAlignment(.trailing)
             Text("¥")
                 .foregroundStyle(.secondary)
+                .themeSkinLegibleText(level: .inline, slot: .sectionCard)
         }
     }
 }
@@ -106,10 +110,15 @@ struct CurrencyPriceRow: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .center) {
                 Text(title)
+                    .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                 Spacer()
                 Picker(title, selection: $currency) {
-                    Text("人民币").tag(ClothingPriceCurrency.cny)
-                    Text("日元").tag(ClothingPriceCurrency.jpy)
+                    Text("人民币")
+                        .themeSkinLegibleText(level: .inline, slot: .segmentedControl)
+                        .tag(ClothingPriceCurrency.cny)
+                    Text("日元")
+                        .themeSkinLegibleText(level: .inline, slot: .segmentedControl)
+                        .tag(ClothingPriceCurrency.jpy)
                 }
                 .pickerStyle(.segmented)
                 .controlSize(.mini)
@@ -126,6 +135,7 @@ struct CurrencyPriceRow: View {
                     .multilineTextAlignment(.trailing)
                 Text(currency.symbol)
                     .foregroundStyle(.secondary)
+                    .themeSkinLegibleText(level: .inline, slot: .sectionCard)
             }
         }
         .onChange(of: currency) { _, newValue in

@@ -228,6 +228,7 @@ struct DepositNotificationView: View {
             Text(reminderRuleSummary)
                 .font(.caption)
                 .foregroundStyle(palette.secondaryText)
+                .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                 .lineLimit(2)
                 .fixedSize(horizontal: false, vertical: true)
         }
@@ -242,6 +243,7 @@ struct DepositNotificationView: View {
                 Text("提醒天数")
                     .font(.system(size: 13))
                     .foregroundStyle(palette.secondaryText)
+                    .themeSkinLegibleText(level: .inline, slot: .sectionCard)
 
                 FlowLayout(spacing: 6) {
                     ForEach(NotificationManager.Config.supportedReminderDays, id: \.self) { day in
@@ -255,6 +257,7 @@ struct DepositNotificationView: View {
                 Text("提醒时间")
                     .font(.system(size: 13))
                     .foregroundStyle(palette.secondaryText)
+                    .themeSkinLegibleText(level: .inline, slot: .sectionCard)
 
                 Spacer()
 
@@ -271,6 +274,7 @@ struct DepositNotificationView: View {
                 Text("测试工具")
                     .font(.system(size: 13))
                     .foregroundStyle(palette.secondaryText)
+                    .themeSkinLegibleText(level: .inline, slot: .sectionCard)
 
                 Button {
                     sendTestNotification()
@@ -278,6 +282,7 @@ struct DepositNotificationView: View {
                     HStack(spacing: 8) {
                         Image(systemName: "paperplane.fill")
                         Text("发送 5 秒测试通知")
+                            .themeSkinLegibleText(level: .chip, slot: .primaryButton)
                     }
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(.white)
@@ -292,6 +297,7 @@ struct DepositNotificationView: View {
                 Text(testTargetClothing.map { "将使用「\($0.name)」作为测试目标。正式通知发送时间可直接用上方时间选择器修改。" } ?? "请先创建至少一条心愿尾款记录，再发送测试通知。")
                     .font(.system(size: 11))
                     .foregroundStyle(palette.secondaryText)
+                    .themeSkinLegibleText(level: .inline, slot: .sectionCard)
             }
 
             diagnosticsPanel
@@ -306,6 +312,7 @@ struct DepositNotificationView: View {
                 Text("通知诊断")
                     .font(.system(size: 13))
                     .foregroundStyle(palette.secondaryText)
+                    .themeSkinLegibleText(level: .inline, slot: .sectionCard)
 
                 Spacer()
 
@@ -342,10 +349,12 @@ struct DepositNotificationView: View {
                 }
                 .font(.system(size: 11))
                 .foregroundStyle(palette.secondaryText)
+                .themeSkinLegibleText(level: .inline, slot: .sectionCard)
             } else {
                 Text("正在读取系统通知状态…")
                     .font(.system(size: 11))
                     .foregroundStyle(palette.secondaryText)
+                    .themeSkinLegibleText(level: .inline, slot: .sectionCard)
             }
         }
     }
@@ -360,6 +369,7 @@ struct DepositNotificationView: View {
         } label: {
             Text(dayText(for: day))
                 .font(.system(size: 12))
+                .themeSkinLegibleText(level: .chip, slot: .filterChip)
                 .padding(.horizontal, 10)
                 .padding(.vertical, 4)
                 .background(isSelected ? palette.accent : palette.accent.opacity(0.15))
@@ -432,10 +442,12 @@ struct DepositNotificationView: View {
             Text("暂无已发送的提醒")
                 .font(.headline)
                 .foregroundStyle(palette.secondaryText)
+                .themeSkinLegibleText(level: .inline, slot: .emptyState)
 
             Text("当尾款提醒被系统送达或在站内记录后，将显示在这里")
                 .font(.caption)
                 .foregroundStyle(palette.secondaryText.opacity(0.7))
+                .themeSkinLegibleText(level: .inline, slot: .emptyState)
                 .multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity)
@@ -450,6 +462,7 @@ struct DepositNotificationView: View {
             Text("暂无待提醒记录")
                 .font(.subheadline)
                 .foregroundStyle(palette.secondaryText)
+                .themeSkinLegibleText(level: .inline, slot: .emptyState)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 24)
@@ -517,6 +530,7 @@ struct DepositNotificationView: View {
             }
             .font(.system(size: 14, weight: .semibold))
             .foregroundStyle(foreground)
+            .themeSkinLegibleText(level: .chip, slot: .primaryButton)
             .padding(.horizontal, 14)
             .padding(.vertical, 10)
             .frame(maxWidth: .infinity)
@@ -542,12 +556,14 @@ struct DepositNotificationView: View {
                 Text(title)
                     .font(.headline)
                     .foregroundStyle(.primary)
+                    .themeSkinLegibleText(level: .inline, slot: .sectionCard)
 
                 Spacer()
 
                 Text(summary)
                     .font(.caption)
                     .foregroundStyle(palette.secondaryText)
+                    .themeSkinLegibleText(level: .inline, slot: .sectionCard)
             }
             .contentShape(Rectangle())
         }
@@ -727,6 +743,7 @@ struct NotificationRecordRow: View {
                             Text(displayName)
                                 .font(.subheadline.weight(record.isRead ? .regular : .semibold))
                                 .foregroundStyle(palette.primaryText)
+                                .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                                 .multilineTextAlignment(.leading)
                                 .lineLimit(2)
                         }
@@ -734,6 +751,7 @@ struct NotificationRecordRow: View {
                         Text(DepositReminderDisplayFormatter.triggeredTimeText(for: record))
                             .font(.caption)
                             .foregroundStyle(palette.secondaryText)
+                            .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                             .lineLimit(1)
                     }
 
@@ -745,6 +763,7 @@ struct NotificationRecordRow: View {
                         .padding(.vertical, 5)
                         .background((record.isRead ? palette.secondaryText : palette.accent).opacity(0.12))
                         .foregroundStyle(record.isRead ? palette.secondaryText : palette.accent)
+                        .themeSkinLegibleText(level: .chip, slot: .filterChip)
                         .clipShape(Capsule())
                 }
                 .padding(12)
@@ -813,12 +832,14 @@ struct PendingNotificationRecordRow: View {
                         Text(displayName)
                             .font(.subheadline.weight(.semibold))
                             .foregroundStyle(palette.primaryText)
+                            .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                             .multilineTextAlignment(.leading)
                             .lineLimit(2)
 
                         Text(DepositReminderDisplayFormatter.pendingTimeText(for: record))
                             .font(.caption)
                             .foregroundStyle(palette.secondaryText)
+                            .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                             .lineLimit(1)
                     }
 
@@ -830,6 +851,7 @@ struct PendingNotificationRecordRow: View {
                         .padding(.vertical, 5)
                         .background(palette.accent.opacity(0.12))
                         .foregroundStyle(palette.accent)
+                        .themeSkinLegibleText(level: .chip, slot: .filterChip)
                         .clipShape(Capsule())
                 }
                 .padding(12)

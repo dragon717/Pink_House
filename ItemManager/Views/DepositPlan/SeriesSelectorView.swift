@@ -71,6 +71,7 @@ struct SeriesSelectorView: View {
                     Text(isExpanded ? "按系列预约 (点我折叠)" : "按系列预约 (点我展开)")
                         .font(.subheadline)
                         .foregroundStyle(.primary)
+                        .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                     
                     // Tips Icon
                     Button {
@@ -79,6 +80,7 @@ struct SeriesSelectorView: View {
                         Image(systemName: "info.circle")
                             .font(.caption)
                             .foregroundStyle(.secondary)
+                            .themeSkinLegibleSymbol(level: .inline, slot: .sectionCard)
                     }
                     .buttonStyle(.plain)
                     .alert("系列分类规则", isPresented: $showTips) {
@@ -119,10 +121,12 @@ struct SeriesSelectorView: View {
                     if isAnalyzing {
                         Text("正在分析系列...")
                             .foregroundStyle(.secondary)
+                            .themeSkinLegibleText(level: .inline, slot: .emptyState)
                             .padding()
                     } else {
                         Text("暂无系列数据")
                             .foregroundStyle(.secondary)
+                            .themeSkinLegibleText(level: .inline, slot: .emptyState)
                             .padding()
                     }
                 } else {
@@ -144,9 +148,11 @@ struct SeriesSelectorView: View {
                                                 .font(.caption)
                                                 .fontWeight(isSelected ? .bold : .medium)
                                                 .lineLimit(1)
+                                                .themeSkinLegibleText(level: .inline, slot: .filterChip)
                                             Spacer()
                                             Text("\(series.itemCount)")
                                                 .font(.system(size: 9))
+                                                .themeSkinLegibleText(level: .chip, slot: .filterChip)
                                                 .padding(.horizontal, 6)
                                                 .padding(.vertical, 4)
                                                 .background(Color.black.opacity(0.1))
@@ -157,6 +163,7 @@ struct SeriesSelectorView: View {
                                         Text("¥\(NSDecimalNumber(decimal: series.totalBalance).stringValue)")
                                             .font(.system(size: 10))
                                             .foregroundStyle(isSelected ? .white.opacity(0.9) : (series.totalBalance > 0 ? .orange : .secondary.opacity(0.7)))
+                                            .themeSkinLegibleText(level: .inline, slot: .filterChip)
                                             .lineLimit(1)
                                             .minimumScaleFactor(0.8)
                                     }
@@ -194,22 +201,67 @@ struct SeriesSelectorView: View {
 // MARK: - 最近添加统计卡片
 struct RecentAddedCard: View {
     let stats: (title: String, count: Int, amount: Decimal, hasData: Bool)
+    @Environment(\.colorScheme) private var colorScheme
+    @ObservedObject private var themeSkinManager = ThemeSkinManager.shared
+
+    private var activeStatsDescriptor: ThemeSkinDescriptor? {
+        themeSkinManager.activeThemeDescriptor(for: .statsCard, state: .default)
+    }
+
+    private var isSupportedThemeSkin: Bool {
+        let namespace = activeStatsDescriptor?.assetNamespace
+        return namespace == SkyConcertThemeSkin.namespace || namespace == SwanDreamThemeSkin.namespace
+    }
+
+    private var titleColor: Color {
+        guard isSupportedThemeSkin else { return .primary }
+        return Color(hex: "C94C72")
+    }
+
+    private var supportingTextColor: Color {
+        guard isSupportedThemeSkin else { return .secondary }
+        return SwanDreamThemeSkin.isSwanDream(activeStatsDescriptor) ? SwanDreamThemeSkin.text : SkyConcertThemeSkin.text
+    }
+
+    @ViewBuilder
+    private var readableCardBase: some View {
+        if isSupportedThemeSkin && colorScheme == .dark {
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(Color.white.opacity(0.58))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    Color(hex: "FFF7FA").opacity(0.26),
+                                    Color(hex: "EFF8FF").opacity(0.22)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                )
+        }
+    }
 
     var body: some View {
         VStack(spacing: 12) {
             HStack {
                 Image(systemName: "clock.arrow.circlepath")
-                    .foregroundStyle(.brown)
+                    .foregroundStyle(titleColor)
+                    .themeSkinLegibleSymbol(level: .chip, slot: .statsCard, descriptor: activeStatsDescriptor)
                 Text(stats.title)
                     .font(.subheadline)
                     .fontWeight(.medium)
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(titleColor)
+                    .themeSkinLegibleText(level: .chip, slot: .statsCard, descriptor: activeStatsDescriptor)
                 Spacer()
                 if stats.hasData {
                     Text("一个月内")
                         .font(.caption)
                         .fontWeight(.semibold)
                         .foregroundStyle(.white)
+                        .themeSkinLegibleText(level: .chip, slot: .filterChip, descriptor: activeStatsDescriptor)
                         .padding(.horizontal, 10)
                         .padding(.vertical, 4)
                         .background(Color.brown)
@@ -222,7 +274,8 @@ struct RecentAddedCard: View {
                     DepositStatItem(
                         title: "预约件数",
                         value: "\(stats.count)",
-                        valueColor: .primary
+                        valueColor: titleColor,
+                        titleColor: supportingTextColor
                     )
 
                     Divider()
@@ -231,7 +284,8 @@ struct RecentAddedCard: View {
                     DepositStatItem(
                         title: "预约金额",
                         value: "¥\(NSDecimalNumber(decimal: stats.amount).stringValue)",
-                        valueColor: Color(hex: "C94C72")
+                        valueColor: titleColor,
+                        titleColor: supportingTextColor
                     )
                 }
                 .padding(.horizontal, 8)
@@ -239,12 +293,16 @@ struct RecentAddedCard: View {
             } else {
                 Text("暂无最近添加")
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(supportingTextColor)
+                    .themeSkinLegibleText(level: .inline, slot: .statsCard, descriptor: activeStatsDescriptor)
                     .padding(.vertical, 12)
             }
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 12)
+        .background {
+            readableCardBase
+        }
         .themeSkinSectionCard(slot: .statsCard, cornerRadius: 16, showsDecoration: false)
     }
 }

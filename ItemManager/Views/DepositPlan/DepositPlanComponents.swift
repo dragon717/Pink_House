@@ -34,6 +34,7 @@ struct TotalBalanceCard: View {
                         ThemeSkinIconBadge(systemName: "calendar", fallbackColor: .pink, size: 30, symbolSize: 14)
                         Text("梦裙日历")
                             .font(.caption)
+                            .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                     }
                     .foregroundStyle(.pink)
                     .frame(maxWidth: .infinity)
@@ -52,6 +53,7 @@ struct TotalBalanceCard: View {
                         ThemeSkinIconBadge(systemName: "dollarsign.circle", fallbackColor: .orange, size: 30, symbolSize: 14)
                         Text("马上来财")
                             .font(.caption)
+                            .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                     }
                     .foregroundStyle(.orange)
                     .frame(maxWidth: .infinity)
@@ -70,6 +72,7 @@ struct TotalBalanceCard: View {
                         ThemeSkinIconBadge(systemName: "chart.line.uptrend.xyaxis", fallbackColor: .blue, size: 30, symbolSize: 14)
                         Text("裙装股市")
                             .font(.caption)
+                            .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                     }
                     .foregroundStyle(.blue)
                     .frame(maxWidth: .infinity)
@@ -114,6 +117,7 @@ struct TotalBalanceCard: View {
                 Text("总待付尾款")
                     .font(.subheadline)
                     .foregroundStyle(themeManager.secondaryTextColor)
+                    .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                 
                 Spacer()
                 
@@ -144,6 +148,7 @@ struct TotalBalanceCard: View {
                     Text("¥\(NSDecimalNumber(decimal: totalBalance).stringValue)")
                         .font(.system(size: 36, weight: .bold))
                         .foregroundStyle(Color(hex: "C94C72"))
+                        .themeSkinLegibleText(level: .hero, slot: .sectionCard)
                         .monospacedDigit()
                         .frame(maxWidth: .infinity, alignment: .center)
                         .padding(.vertical, 8)
@@ -252,6 +257,7 @@ struct DepositStatsView: View {
                 Text(title)
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                    .themeSkinLegibleText(level: .inline, slot: .statsCard)
                 
                 if showIcon {
                     Image(systemName: "banknote")
@@ -263,6 +269,7 @@ struct DepositStatsView: View {
                 .font(.title3)
                 .fontWeight(.semibold)
                 .foregroundStyle(valueColor)
+                .themeSkinLegibleText(level: .chip, slot: .statsCard)
         }
         .frame(maxWidth: .infinity)
     }
@@ -293,6 +300,7 @@ struct YearSelectorView: View {
                 .font(.title3)
                 .fontWeight(.bold)
                 .foregroundStyle(.primary)
+                .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                 .monospacedDigit()
             
             Spacer()
@@ -367,16 +375,19 @@ struct DepositStatItem: View {
     let title: String
     let value: String
     var valueColor: Color = .primary
+    var titleColor: Color = .secondary
     
     var body: some View {
         VStack(spacing: 6) {
             Text(title)
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(titleColor)
+                .themeSkinLegibleText(level: .inline, slot: .statsCard)
             Text(value)
                 .font(.subheadline)
                 .fontWeight(.semibold)
                 .foregroundStyle(valueColor)
+                .themeSkinLegibleText(level: .chip, slot: .statsCard)
                 .monospacedDigit()
         }
         .frame(maxWidth: .infinity)

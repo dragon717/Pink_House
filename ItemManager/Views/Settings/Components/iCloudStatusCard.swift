@@ -3,9 +3,14 @@ import SwiftUI
 struct iCloudStatusCard: View {
     @Environment(ThemeManager.self) private var themeManager
     @Environment(\.colorScheme) private var colorScheme
+    @ObservedObject private var themeSkinManager = ThemeSkinManager.shared
     @ObservedObject var cloudManager: CloudSyncManager
     @ObservedObject var authManager: AuthenticationManager
     let action: () -> Void
+
+    private var themeSkinDescriptor: ThemeSkinDescriptor? {
+        themeSkinManager.activeThemeDescriptor(for: .settingsGridCard, state: .default)
+    }
     
     var body: some View {
         Button(action: action) {
@@ -41,10 +46,12 @@ struct iCloudStatusCard: View {
                     Text("iCloud 同步")
                         .font(.headline)
                         .foregroundStyle(themeManager.primaryTextColor)
+                        .themeSkinLegibleText(level: .inline, slot: .settingsGridCard, descriptor: themeSkinDescriptor)
                     
                     Text(statusText)
                         .font(.caption)
                         .foregroundStyle(themeManager.secondaryTextColor)
+                        .themeSkinLegibleText(level: .inline, slot: .settingsGridCard, descriptor: themeSkinDescriptor)
                         .lineLimit(2)
                         .multilineTextAlignment(.leading)
                 }

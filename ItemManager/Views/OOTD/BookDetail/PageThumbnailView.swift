@@ -63,6 +63,7 @@ struct PageThumbnailView: View {
                 .font(.caption)
                 .lineLimit(1)
                 .foregroundStyle(.primary)
+                .themeSkinLegibleText(level: .inline, slot: .sectionCard)
         }
         .padding(8)
         .themeSkinPageThumbnailSurface()

@@ -227,6 +227,7 @@ struct ClothingCard: View, Equatable {
     let themeInputs: WardrobeCellThemeInputs
     
     @Environment(\.containerPalette) private var palette
+    @Environment(\.colorScheme) private var colorScheme
     @State private var image: UIImage?
 
     @MainActor
@@ -309,7 +310,15 @@ struct ClothingCard: View, Equatable {
     }
 
     private var titleColor: Color {
-        isThemeSkinThemed ? SkyConcertThemeSkin.labelColor(for: wardrobeThemeDescriptor) : palette.primary
+        isThemeSkinThemed ? SkyConcertThemeSkin.labelColor(for: wardrobeThemeDescriptor, colorScheme: colorScheme) : palette.primary
+    }
+
+    private var themedSecondaryColor: Color {
+        isThemeSkinThemed ? SkyConcertThemeSkin.labelColor(for: wardrobeThemeDescriptor, colorScheme: colorScheme).opacity(0.78) : palette.secondary
+    }
+
+    private var themedAccentColor: Color {
+        isThemeSkinThemed ? SkyConcertThemeSkin.accent(for: wardrobeThemeDescriptor, colorScheme: colorScheme) : palette.accent
     }
 
     private func badgeFillColor(for tint: Color) -> Color {
@@ -334,6 +343,7 @@ struct ClothingCard: View, Equatable {
         .padding(.horizontal, 6)
         .padding(.vertical, 4)
         .foregroundStyle(badgeForegroundColor(for: tint))
+        .themeSkinLegibleText(level: .chip, slot: .discountBadge, descriptor: wardrobeThemeDescriptor)
         .background(badgeFillColor(for: tint))
         .clipShape(Capsule())
     }
@@ -432,6 +442,7 @@ struct ClothingCard: View, Equatable {
                     }
                     .font(.system(size: 13, weight: .medium))
                     .foregroundStyle(titleColor)
+                    .themeSkinLegibleText(level: .inline, slot: .wardrobeItemCard, descriptor: wardrobeThemeDescriptor)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     
                     Spacer(minLength: 4)
@@ -441,7 +452,8 @@ struct ClothingCard: View, Equatable {
                             Text("原价¥\(snapshot.originalPrice, format: .number.precision(.fractionLength(0)))")
                                 .font(.system(size: 10))
                                 .strikethrough()
-                                .foregroundStyle(palette.secondary)
+                                .foregroundStyle(themedSecondaryColor)
+                                .themeSkinLegibleText(level: .inline, slot: .wardrobeItemCard, descriptor: wardrobeThemeDescriptor)
                         }
                         
                         if showPrice {
@@ -449,7 +461,8 @@ struct ClothingCard: View, Equatable {
                                 if snapshot.isFullPaymentReservation {
                                     Text("全款¥\(snapshot.fullPaymentReservationTotalAmount, format: .number.precision(.fractionLength(0)))")
                                         .font(.system(size: 11, weight: .bold))
-                                        .foregroundStyle(palette.accent)
+                                        .foregroundStyle(themedAccentColor)
+                                        .themeSkinLegibleText(level: .inline, slot: .wardrobeItemCard, descriptor: wardrobeThemeDescriptor)
                                         .lineLimit(1)
                                         .minimumScaleFactor(0.8)
                                 } else {
@@ -460,7 +473,8 @@ struct ClothingCard: View, Equatable {
                                         Text("尾款¥\(totalBalance, format: .number.precision(.fractionLength(0)))")
                                     }
                                     .font(.system(size: 11, weight: .bold))
-                                    .foregroundStyle(palette.accent)
+                                    .foregroundStyle(themedAccentColor)
+                                    .themeSkinLegibleText(level: .inline, slot: .wardrobeItemCard, descriptor: wardrobeThemeDescriptor)
                                     .lineLimit(1)
                                     .minimumScaleFactor(0.8)
                                 }
@@ -468,7 +482,8 @@ struct ClothingCard: View, Equatable {
                                 let totalWithAccessories = snapshot.inventoryTotalPrice
                                 Text("¥\(totalWithAccessories, format: .number.precision(.fractionLength(2)))")
                                     .font(.system(size: 15, weight: .semibold))
-                                    .foregroundStyle(palette.primary)
+                                    .foregroundStyle(titleColor)
+                                    .themeSkinLegibleText(level: .inline, slot: .wardrobeItemCard, descriptor: wardrobeThemeDescriptor)
                             }
                         }
                     }
@@ -633,6 +648,7 @@ struct ClothingRow: View, Equatable {
     let themeInputs: WardrobeCellThemeInputs
 
     @Environment(\.containerPalette) private var palette
+    @Environment(\.colorScheme) private var colorScheme
     @State private var image: UIImage?
 
     @MainActor
@@ -702,15 +718,15 @@ struct ClothingRow: View, Equatable {
     }
 
     private var rowPrimaryColor: Color {
-        isThemeSkinThemed ? SkyConcertThemeSkin.labelColor(for: wardrobeThemeDescriptor) : palette.primary
+        isThemeSkinThemed ? SkyConcertThemeSkin.labelColor(for: wardrobeThemeDescriptor, colorScheme: colorScheme) : palette.primary
     }
 
     private var rowSecondaryColor: Color {
-        isThemeSkinThemed ? SkyConcertThemeSkin.labelColor(for: wardrobeThemeDescriptor).opacity(0.72) : palette.secondary
+        isThemeSkinThemed ? SkyConcertThemeSkin.labelColor(for: wardrobeThemeDescriptor, colorScheme: colorScheme).opacity(0.76) : palette.secondary
     }
 
     private var rowAccentColor: Color {
-        isThemeSkinThemed ? SkyConcertThemeSkin.accent(for: wardrobeThemeDescriptor) : palette.accent
+        isThemeSkinThemed ? SkyConcertThemeSkin.accent(for: wardrobeThemeDescriptor, colorScheme: colorScheme) : palette.accent
     }
     
     var body: some View {
@@ -760,6 +776,7 @@ struct ClothingRow: View, Equatable {
                         Text(snapshot.isFullPaymentReservation ? "全款" : "尾款")
                             .font(.system(size: 10, weight: .bold))
                             .foregroundStyle(.white)
+                            .themeSkinLegibleText(level: .chip, slot: .discountBadge, descriptor: wardrobeThemeDescriptor)
                             .padding(.horizontal, 4)
                             .padding(.vertical, 2)
                             .background(isThemeSkinThemed ? rowAccentColor : Color.pink)
@@ -772,17 +789,18 @@ struct ClothingRow: View, Equatable {
                     Text(snapshot.name)
                         .font(.headline)
                         .foregroundStyle(rowPrimaryColor)
+                        .themeSkinLegibleText(level: .inline, slot: .wardrobeItemCard, descriptor: wardrobeThemeDescriptor)
                     
                     // Attribute Display: Type, Color, Size
                     HStack(spacing: 6) {
                         if !snapshot.types.isEmpty {
-                            AttributePill(text: snapshot.types, icon: "tshirt", color: rowAccentColor)
+                            AttributePill(text: snapshot.types, icon: "tshirt", color: rowAccentColor, themeSkinDescriptor: wardrobeThemeDescriptor)
                         }
                         if !snapshot.colors.isEmpty {
-                            AttributePill(text: snapshot.colors, icon: "paintpalette", color: rowSecondaryColor)
+                            AttributePill(text: snapshot.colors, icon: "paintpalette", color: rowSecondaryColor, themeSkinDescriptor: wardrobeThemeDescriptor)
                         }
                         if !snapshot.sizes.isEmpty {
-                            AttributePill(text: snapshot.sizes, icon: "ruler", color: isThemeSkinThemed ? rowAccentColor.opacity(0.82) : palette.tertiary)
+                            AttributePill(text: snapshot.sizes, icon: "ruler", color: isThemeSkinThemed ? rowAccentColor.opacity(0.82) : palette.tertiary, themeSkinDescriptor: wardrobeThemeDescriptor)
                         }
                     }
                     
@@ -792,11 +810,13 @@ struct ClothingRow: View, Equatable {
                                 Text("#\(tagName)")
                                     .font(.caption2)
                                     .foregroundStyle(isThemeSkinThemed ? rowSecondaryColor : palette.tertiary)
+                                    .themeSkinLegibleText(level: .inline, slot: .wardrobeItemCard, descriptor: wardrobeThemeDescriptor)
                             }
                             if snapshot.tagNames.count > 3 {
                                 Text("...")
                                     .font(.caption2)
                                     .foregroundStyle(isThemeSkinThemed ? rowSecondaryColor : palette.tertiary)
+                                    .themeSkinLegibleText(level: .inline, slot: .wardrobeItemCard, descriptor: wardrobeThemeDescriptor)
                             }
                         }
                     }
@@ -809,6 +829,7 @@ struct ClothingRow: View, Equatable {
                         Text("原价: ¥\(snapshot.originalPrice, format: .number.precision(.fractionLength(0)))")
                             .font(.caption2)
                             .foregroundStyle(rowSecondaryColor)
+                            .themeSkinLegibleText(level: .inline, slot: .wardrobeItemCard, descriptor: wardrobeThemeDescriptor)
                     }
                     
                     if showPrice {
@@ -817,10 +838,12 @@ struct ClothingRow: View, Equatable {
                                 Text("全款预约")
                                     .font(.caption2)
                                     .foregroundStyle(rowAccentColor)
+                                    .themeSkinLegibleText(level: .inline, slot: .wardrobeItemCard, descriptor: wardrobeThemeDescriptor)
                                 Text("¥\(snapshot.fullPaymentReservationTotalAmount, format: .number.precision(.fractionLength(0)))")
                                     .font(.caption)
                                     .bold()
                                     .foregroundStyle(rowAccentColor)
+                                    .themeSkinLegibleText(level: .inline, slot: .wardrobeItemCard, descriptor: wardrobeThemeDescriptor)
                             } else {
                                 // 注意：totalDeposit 和 totalBalance 已经包含了 stock 的乘法，所以这里直接使用
                                 let totalDeposit = snapshot.totalDeposit
@@ -829,10 +852,12 @@ struct ClothingRow: View, Equatable {
                                 Text("定金: ¥\(totalDeposit, format: .number.precision(.fractionLength(0)))")
                                     .font(.caption)
                                     .foregroundStyle(rowAccentColor)
+                                    .themeSkinLegibleText(level: .inline, slot: .wardrobeItemCard, descriptor: wardrobeThemeDescriptor)
                                 Text("尾款: ¥\(totalBalance, format: .number.precision(.fractionLength(0)))")
                                     .font(.caption)
                                     .bold()
                                     .foregroundStyle(rowAccentColor)
+                                    .themeSkinLegibleText(level: .inline, slot: .wardrobeItemCard, descriptor: wardrobeThemeDescriptor)
                             }
                         } else {
                             let totalWithAccessories = snapshot.inventoryTotalPrice
@@ -841,6 +866,7 @@ struct ClothingRow: View, Equatable {
                                 .font(.subheadline)
                                 .bold()
                                 .foregroundStyle(rowPrimaryColor)
+                                .themeSkinLegibleText(level: .inline, slot: .wardrobeItemCard, descriptor: wardrobeThemeDescriptor)
                         }
                     }
                     
@@ -848,6 +874,7 @@ struct ClothingRow: View, Equatable {
                         Text("库存: \(snapshot.stock)")
                             .font(.caption)
                             .foregroundStyle(isThemeSkinThemed ? rowSecondaryColor : palette.tertiary)
+                            .themeSkinLegibleText(level: .inline, slot: .wardrobeItemCard, descriptor: wardrobeThemeDescriptor)
                     }
                 }
             }
@@ -873,6 +900,7 @@ struct ClothingRowBrief: View, Equatable {
     let themeInputs: WardrobeCellThemeInputs
 
     @Environment(\.containerPalette) private var palette
+    @Environment(\.colorScheme) private var colorScheme
     @State private var image: UIImage?
 
     @MainActor
@@ -942,15 +970,15 @@ struct ClothingRowBrief: View, Equatable {
     }
 
     private var rowPrimaryColor: Color {
-        isThemeSkinThemed ? SkyConcertThemeSkin.labelColor(for: wardrobeThemeDescriptor) : palette.primary
+        isThemeSkinThemed ? SkyConcertThemeSkin.labelColor(for: wardrobeThemeDescriptor, colorScheme: colorScheme) : palette.primary
     }
 
     private var rowSecondaryColor: Color {
-        isThemeSkinThemed ? SkyConcertThemeSkin.labelColor(for: wardrobeThemeDescriptor).opacity(0.72) : palette.secondary
+        isThemeSkinThemed ? SkyConcertThemeSkin.labelColor(for: wardrobeThemeDescriptor, colorScheme: colorScheme).opacity(0.76) : palette.secondary
     }
 
     private var rowAccentColor: Color {
-        isThemeSkinThemed ? SkyConcertThemeSkin.accent(for: wardrobeThemeDescriptor) : palette.accent
+        isThemeSkinThemed ? SkyConcertThemeSkin.accent(for: wardrobeThemeDescriptor, colorScheme: colorScheme) : palette.accent
     }
     
     var body: some View {
@@ -999,6 +1027,7 @@ struct ClothingRowBrief: View, Equatable {
                 Text(snapshot.name)
                     .font(.body)
                     .foregroundStyle(rowPrimaryColor)
+                    .themeSkinLegibleText(level: .inline, slot: .wardrobeItemCard, descriptor: wardrobeThemeDescriptor)
                     .lineLimit(1)
 
                 Spacer()
@@ -1007,6 +1036,7 @@ struct ClothingRowBrief: View, Equatable {
                     Text(brandName)
                         .font(.caption)
                         .foregroundStyle(rowSecondaryColor)
+                        .themeSkinLegibleText(level: .inline, slot: .wardrobeItemCard, descriptor: wardrobeThemeDescriptor)
                         .lineLimit(1)
                 }
 
@@ -1015,6 +1045,7 @@ struct ClothingRowBrief: View, Equatable {
                         Text("原价¥\(snapshot.originalPrice, format: .number.precision(.fractionLength(0)))")
                             .font(.caption)
                             .foregroundStyle(rowSecondaryColor)
+                            .themeSkinLegibleText(level: .inline, slot: .wardrobeItemCard, descriptor: wardrobeThemeDescriptor)
                     }
                 }
 
@@ -1026,11 +1057,13 @@ struct ClothingRowBrief: View, Equatable {
                             .font(.caption)
                             .bold()
                             .foregroundStyle(rowAccentColor)
+                            .themeSkinLegibleText(level: .inline, slot: .wardrobeItemCard, descriptor: wardrobeThemeDescriptor)
                     } else {
                         Text("¥\(snapshot.inventoryTotalPrice, format: .number.precision(.fractionLength(0)))")
                             .font(.subheadline)
                             .bold()
                             .foregroundStyle(rowPrimaryColor)
+                            .themeSkinLegibleText(level: .inline, slot: .wardrobeItemCard, descriptor: wardrobeThemeDescriptor)
                     }
                 }
             }
@@ -1044,6 +1077,7 @@ struct AttributePill: View {
     let text: String
     let icon: String
     var color: Color = .secondary
+    var themeSkinDescriptor: ThemeSkinDescriptor? = nil
     
     var body: some View {
         HStack(spacing: 4) {
@@ -1054,6 +1088,7 @@ struct AttributePill: View {
                 .lineLimit(1)
                 .fixedSize(horizontal: true, vertical: false)
         }
+        .themeSkinLegibleText(level: .inline, slot: .wardrobeItemCard, descriptor: themeSkinDescriptor)
         .padding(.horizontal, 6)
         .padding(.vertical, 4)
         .background(color.opacity(0.1))

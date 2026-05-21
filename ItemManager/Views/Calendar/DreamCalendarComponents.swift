@@ -69,6 +69,7 @@ struct DreamCalendarCell: View {
                                         Text("\(clothings.count)")
                                             .font(.system(size: 8, weight: .bold))
                                             .foregroundStyle(.white)
+                                            .themeSkinLegibleText(level: .chip, slot: .filterChip)
                                             .padding(3)
                                             .background(Color(uiColor: theme.accentColor))
                                             .clipShape(Circle())
@@ -92,6 +93,7 @@ struct DreamCalendarCell: View {
                                     Text(statusInfo.text)
                                         .font(.system(size: 8, weight: .bold))
                                         .foregroundStyle(.white)
+                                        .themeSkinLegibleText(level: .chip, slot: .filterChip)
                                         .padding(.horizontal, 3)
                                         .padding(.vertical, 1)
                                         .background(Color(uiColor: statusInfo.color))
@@ -108,6 +110,7 @@ struct DreamCalendarCell: View {
                                         Text(statusInfo.text)
                                             .font(.system(size: 8, weight: .bold))
                                             .foregroundStyle(.white)
+                                            .themeSkinLegibleText(level: .chip, slot: .filterChip)
                                             .padding(.horizontal, 3)
                                             .padding(.vertical, 1)
                                             .background(Color(uiColor: statusInfo.color))
@@ -117,6 +120,7 @@ struct DreamCalendarCell: View {
                                     Text("\(CalendarHelper.shared.dayOfMonth(dateObj.date))")
                                         .font(.system(size: 9, weight: .bold))
                                         .foregroundStyle(dateTextColor(hasImage: hasImage))
+                                        .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                                         .padding(.horizontal, 4)
                                         .padding(.vertical, 1)
                                         .background {
@@ -295,6 +299,7 @@ struct CalendarEventRow: View {
                     Text(clothing.name)
                         .font(.system(size: 15, weight: .bold))
                         .foregroundStyle(.primary)
+                        .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                         .lineLimit(1)
                     
                     HStack(spacing: 6) {
@@ -302,12 +307,14 @@ struct CalendarEventRow: View {
                             Text(brand.name)
                                 .font(.caption2)
                                 .foregroundStyle(.secondary)
+                                .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                         }
                         
                         // Event Status Label
                         if isDepositDay {
                             Text("定金日")
                                 .font(.caption2)
+                                .themeSkinLegibleText(level: .chip, slot: .filterChip)
                                 .padding(.horizontal, 5)
                                 .padding(.vertical, 1)
                                 .background(Color(uiColor: theme.depositColor).opacity(0.2))
@@ -316,6 +323,7 @@ struct CalendarEventRow: View {
                         } else if isFinalPaymentDay {
                             Text("预计尾款日")
                                 .font(.caption2)
+                                .themeSkinLegibleText(level: .chip, slot: .filterChip)
                                 .padding(.horizontal, 5)
                                 .padding(.vertical, 1)
                                 .background(Color(uiColor: theme.finalPaymentColor).opacity(0.2))
@@ -334,11 +342,13 @@ struct CalendarEventRow: View {
                             .font(.caption2)
                             .bold()
                             .foregroundStyle(Color(uiColor: theme.depositColor))
+                            .themeSkinLegibleText(level: .chip, slot: .sectionCard)
                         
                         Text("尾款¥\(clothing.totalBalance.formatted(.number.precision(.fractionLength(0))))")
                             .font(.caption2)
                             .bold()
                             .foregroundStyle(Color(uiColor: theme.finalPaymentColor))
+                            .themeSkinLegibleText(level: .chip, slot: .sectionCard)
                     }
                 }
             }
@@ -376,6 +386,7 @@ struct WeekHeaderView: View {
                 Text(week)
                     .font(.custom(theme.fontName, size: 12))
                     .foregroundStyle(.secondary)
+                    .themeSkinLegibleText(level: .inline, slot: .filterChip)
                     .frame(maxWidth: .infinity)
             }
         }
@@ -483,6 +494,7 @@ struct UnifiedEventsPopup: View {
                         .font(.title2)
                         .bold()
                         .foregroundStyle(Color(uiColor: themeManager.currentTheme.accentColor))
+                        .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                     
                     Spacer()
                     
@@ -517,6 +529,7 @@ struct UnifiedEventsPopup: View {
                                         Text(date.formatted(date: .complete, time: .omitted))
                                             .font(.subheadline)
                                             .foregroundStyle(Color(uiColor: themeManager.currentTheme.accentColor))
+                                            .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                                             .padding(.horizontal)
                                     }
                                     

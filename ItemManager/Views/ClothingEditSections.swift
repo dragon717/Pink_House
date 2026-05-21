@@ -42,6 +42,7 @@ struct ClothingBasicInfoView: View {
         VStack(alignment: .leading, spacing: 16) {
             Text("裙装信息")
                 .font(.headline)
+                .themeSkinLegibleText(level: .inline, slot: .sectionCard)
             
             ImagePickerGrid(imagePaths: $imagePaths)
                 .onChange(of: imagePaths) { oldValue, newValue in
@@ -55,6 +56,7 @@ struct ClothingBasicInfoView: View {
                 Text("品牌名称")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
+                    .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                     .padding(.leading, 4)
                 
                 HStack(spacing: 8) {
@@ -100,6 +102,7 @@ struct ClothingBasicInfoView: View {
                             .font(.caption)
                         Text("开启后，其他用户可以在社区中看到这条裙装")
                             .font(.caption)
+                            .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                     }
                     .foregroundStyle(.secondary)
                 }
@@ -118,6 +121,7 @@ struct ClothingBasicInfoView: View {
              Text(fieldTitle(for: field))
                  .font(.subheadline)
                  .foregroundStyle(.secondary)
+                 .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                  .padding(.leading, 4)
             
             HStack(spacing: 8) {
@@ -184,10 +188,12 @@ struct ClothingTagsView: View {
             HStack {
                 Text("标签分类")
                     .font(.headline)
+                    .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                 Spacer()
                 Button(action: { showingAddTagSheet = true }) {
                     Label("管理标签", systemImage: "tag")
                         .font(.subheadline)
+                        .themeSkinLegibleText(level: .chip, slot: .primaryButton)
                 }
             }
             
@@ -201,6 +207,7 @@ struct ClothingTagsView: View {
                                     .frame(width: 8, height: 8)
                                 Text(tag.name)
                                     .font(.subheadline)
+                                    .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                             }
                             .padding(.horizontal, 12)
                             .padding(.vertical, 6)
@@ -213,11 +220,13 @@ struct ClothingTagsView: View {
                 Text("暂无标签")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
+                    .themeSkinLegibleText(level: .inline, slot: .sectionCard)
             }
             
             Text("可选择多个标签分类，帮助你更好地管理衣橱")
                 .font(.caption)
                 .foregroundStyle(.secondary)
+                .themeSkinLegibleText(level: .inline, slot: .sectionCard)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding()
@@ -283,6 +292,7 @@ struct ClothingPriceView: View {
             HStack {
                 Text("价格信息")
                     .font(.headline)
+                    .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                 Spacer()
                 ChartImagePicker(
                     imagePath: $priceChartImagePath,
@@ -327,6 +337,7 @@ struct ClothingPriceView: View {
                     HStack {
                         Image(systemName: "wand.and.stars")
                         Text("自动计算")
+                            .themeSkinLegibleText(level: .chip, slot: .primaryButton)
                     }
                     .font(.subheadline)
                     .foregroundStyle(.white)
@@ -354,56 +365,69 @@ struct ClothingPriceView: View {
                     HStack {
                         Text("全款预约金额（单件含邮）")
                             .foregroundStyle(.primary)
+                            .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                         Spacer()
                         Text("¥ \(grandTotalWithShipping, specifier: "%.2f")")
                             .font(.headline)
                             .foregroundStyle(.pink)
+                            .themeSkinLegibleText(level: .chip, slot: .sectionCard)
                     }
                     if stock > 1 {
                         HStack {
                             Text("全款预约总额")
                                 .foregroundStyle(.secondary)
+                                .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                             Spacer()
                             Text("¥ \(grandTotalWithShipping * Double(stock), specifier: "%.2f")")
                                 .font(.subheadline.bold())
                                 .foregroundStyle(.pink)
+                                .themeSkinLegibleText(level: .chip, slot: .sectionCard)
                         }
                     }
                     Text("保存时会自动写入为「全款预约」，不再显示定金、尾款或尾款日期。")
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                        .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 } else if reservationKind == .depositPlan {
                     HStack {
                         Text("合计定金")
                             .foregroundStyle(.secondary)
+                            .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                         Spacer()
                         Text("¥ \(totalDeposit, specifier: "%.2f")")
                             .font(.subheadline.bold())
+                            .themeSkinLegibleText(level: .chip, slot: .sectionCard)
                     }
                     HStack {
                         Text("合计尾款")
                             .foregroundStyle(.secondary)
+                            .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                         Spacer()
                         Text("¥ \(totalBalance, specifier: "%.2f")")
                             .font(.subheadline.bold())
+                            .themeSkinLegibleText(level: .chip, slot: .sectionCard)
                     }
                 }
                 HStack {
                     Text("订单总价 (含小物)")
                         .foregroundStyle(.primary)
+                        .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                     Spacer()
                     Text("¥ \(grandTotal, specifier: "%.2f")")
                         .font(.subheadline.bold())
                         .foregroundStyle(.pink)
+                        .themeSkinLegibleText(level: .chip, slot: .sectionCard)
                 }
                 HStack {
                     Text("含邮订单总价")
                         .foregroundStyle(.primary)
+                        .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                     Spacer()
                     Text("¥ \(grandTotalWithShipping, specifier: "%.2f")")
                         .font(.headline)
                         .foregroundStyle(.pink)
+                        .themeSkinLegibleText(level: .chip, slot: .sectionCard)
                 }
             }
             .padding(.vertical, 4)
@@ -420,10 +444,12 @@ struct ClothingPriceView: View {
                     Text("自定义小物明细")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
+                        .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                     Spacer()
                     Button(action: addAccessory) {
                         Label("添加", systemImage: "plus.circle")
                             .font(.subheadline)
+                            .themeSkinLegibleText(level: .chip, slot: .primaryButton)
                     }
                 }
                 
@@ -468,6 +494,7 @@ struct ClothingPriceView: View {
                                         Text("定金")
                                             .font(.caption2)
                                             .foregroundStyle(.secondary)
+                                            .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                                         TextField("0", value: Binding<Double?>(
                                             get: { item.deposit == 0 ? nil : item.deposit },
                                             set: {
@@ -484,12 +511,14 @@ struct ClothingPriceView: View {
 
                                     Text("+")
                                         .foregroundStyle(.secondary)
+                                        .themeSkinLegibleText(level: .inline, slot: .sectionCard)
 
                                     // 尾款
                                     VStack(alignment: .leading, spacing: 2) {
                                         Text("尾款")
                                             .font(.caption2)
                                             .foregroundStyle(.secondary)
+                                            .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                                         TextField("0", value: Binding<Double?>(
                                             get: { item.balance == 0 ? nil : item.balance },
                                             set: {
@@ -506,6 +535,7 @@ struct ClothingPriceView: View {
 
                                     Text("=")
                                         .foregroundStyle(.secondary)
+                                        .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                                 }
 
                                 // 总价
@@ -513,6 +543,7 @@ struct ClothingPriceView: View {
                                     Text("单价")
                                         .font(.caption2)
                                         .foregroundStyle(.secondary)
+                                        .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                                     TextField("0", value: Binding<Double?>(
                                         get: { item.price == 0 ? nil : item.price },
                                         set: { item.price = $0 ?? 0 }
@@ -542,11 +573,13 @@ struct ClothingPriceView: View {
             
             HStack {
                 Text("库存数量")
+                    .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                 Spacer()
                 Stepper("", value: $stock, in: 1...999)
                     .labelsHidden()
                 Text("\(stock)")
                     .font(.body.monospacedDigit())
+                    .themeSkinLegibleText(level: .chip, slot: .sectionCard)
                     .frame(minWidth: 40, alignment: .trailing)
             }
         }
@@ -575,12 +608,15 @@ struct ClothingPriceView: View {
                 Text("原价日元汇率")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                    .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                 Text("1 CNY = \(jpyExchangeRate, specifier: "%.4f") JPY")
                     .font(.footnote.monospacedDigit())
                     .foregroundStyle(.primary)
+                    .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                 Text(originalPriceRateUpdatedAt.map { "记录时间：\($0.formatted(date: .numeric, time: .shortened))" } ?? "尚未记录实时汇率")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
+                    .themeSkinLegibleText(level: .inline, slot: .sectionCard)
             }
 
             Spacer(minLength: 8)
@@ -764,6 +800,7 @@ struct ClothingPurchaseInfoView: View {
         VStack(alignment: .leading, spacing: 16) {
             Text("购买信息")
                 .font(.headline)
+                .themeSkinLegibleText(level: .inline, slot: .sectionCard)
             
             DatePicker("购买日期", selection: $purchaseDate, displayedComponents: .date)
                 .environment(\.locale, Locale(identifier: "zh_CN"))
@@ -773,7 +810,9 @@ struct ClothingPurchaseInfoView: View {
             VStack(alignment: .leading, spacing: 8) {
                 Picker("预约状态", selection: $reservationKind) {
                     ForEach(ClothingReservationKind.allCases) { kind in
-                        Text(kind.displayName).tag(kind)
+                        Text(kind.displayName)
+                            .themeSkinLegibleText(level: .inline, slot: .segmentedControl)
+                            .tag(kind)
                     }
                 }
                 .pickerStyle(.segmented)
@@ -781,6 +820,7 @@ struct ClothingPurchaseInfoView: View {
                 Text(reservationHint)
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                    .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                 
                 switch reservationKind {
                 case .owned:
@@ -792,6 +832,7 @@ struct ClothingPurchaseInfoView: View {
                         Text("全款预约会复用现有预约数据结构：保存时自动将全款金额写入定金字段，尾款为 0。")
                             .font(.caption)
                             .foregroundStyle(.secondary)
+                            .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                     }
                 case .depositPlan:
                     VStack(alignment: .leading, spacing: 12) {
@@ -805,6 +846,7 @@ struct ClothingPurchaseInfoView: View {
                             Text("预计尾款时间")
                                 .font(.subheadline)
                                 .foregroundStyle(.secondary)
+                                .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                             
                             // 开始时间选择
                             DatePicker("开始", selection: $finalPaymentDate, displayedComponents: .date)
@@ -827,10 +869,12 @@ struct ClothingPurchaseInfoView: View {
                                     Text("时间段")
                                         .font(.subheadline)
                                         .foregroundStyle(.secondary)
+                                        .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                                     Spacer()
                                     Text(selectedDuration.label)
                                         .font(.subheadline.bold())
                                         .foregroundStyle(isCustomMode ? .orange : .pink)
+                                        .themeSkinLegibleText(level: .chip, slot: .sectionCard)
                                 }
                                 
                                 // 自定义滑块样式（包含自定义选项）
@@ -849,6 +893,7 @@ struct ClothingPurchaseInfoView: View {
                                                 .font(.caption)
                                                 .fontWeight(durationSliderValue == Double(index) ? .bold : .regular)
                                                 .foregroundStyle(durationSliderValue == Double(index) ? .white : .primary)
+                                                .themeSkinLegibleText(level: .chip, slot: .filterChip)
                                                 .padding(.horizontal, 10)
                                                 .padding(.vertical, 6)
                                                 .background(
@@ -879,10 +924,12 @@ struct ClothingPurchaseInfoView: View {
                                     Text("结束")
                                         .font(.subheadline)
                                         .foregroundStyle(.secondary)
+                                        .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                                     Spacer()
                                     Text(finalPaymentEndDate, style: .date)
                                         .font(.subheadline)
                                         .foregroundStyle(.primary)
+                                        .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                                 }
                                 .padding(.vertical, 8)
                                 .padding(.horizontal, 12)
@@ -893,6 +940,7 @@ struct ClothingPurchaseInfoView: View {
                             Text("设置预计尾款时间范围，方便在心愿尾款中统计和提醒")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
+                                .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                         }
                     }
                 }
@@ -902,6 +950,7 @@ struct ClothingPurchaseInfoView: View {
             
             VStack(alignment: .leading) {
                 Text("备注")
+                    .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                 TextEditor(text: $note)
                     .frame(height: 100)
                     .padding(4)

@@ -170,27 +170,27 @@ struct ThemeSkinLegibilityPalette {
         let isDark = colorScheme == .dark
         if SwanDreamThemeSkin.isSwanDream(descriptor) {
             return ThemeSkinLegibilityPalette(
-                outline: SwanDreamThemeSkin.text.opacity(isDark ? 0.96 : 0.28),
-                diagonalOutline: SwanDreamThemeSkin.roseLine.opacity(isDark ? 0.78 : 0.18),
-                innerGlow: SwanDreamThemeSkin.moonCream.opacity(isDark ? 0.58 : 0.18),
-                outerGlow: SwanDreamThemeSkin.moonGold.opacity(isDark ? 0.56 : 0.16),
-                backdropBase: SwanDreamThemeSkin.text.opacity(isDark ? 0.20 : 0.04),
-                backdropSoft: SwanDreamThemeSkin.moonCream.opacity(isDark ? 0.42 : 0.12),
+                outline: (isDark ? SwanDreamThemeSkin.moonCreamToken.dark : SwanDreamThemeSkin.text).opacity(isDark ? 0.92 : 0.28),
+                diagonalOutline: (isDark ? SwanDreamThemeSkin.roseLineToken.dark : SwanDreamThemeSkin.roseLine).opacity(isDark ? 0.72 : 0.18),
+                innerGlow: SwanDreamThemeSkin.moonCreamToken.resolved(for: colorScheme).opacity(isDark ? 0.68 : 0.18),
+                outerGlow: SwanDreamThemeSkin.moonGoldToken.resolved(for: colorScheme).opacity(isDark ? 0.60 : 0.16),
+                backdropBase: SwanDreamThemeSkin.textToken.resolved(for: colorScheme).opacity(isDark ? 0.16 : 0.04),
+                backdropSoft: SwanDreamThemeSkin.moonCreamToken.resolved(for: colorScheme).opacity(isDark ? 0.36 : 0.12),
                 backdropAccent: SwanDreamThemeSkin.ribbonPink.opacity(isDark ? 0.32 : 0.10),
-                backdropStroke: SwanDreamThemeSkin.moonGold.opacity(isDark ? 0.42 : 0.16)
+                backdropStroke: SwanDreamThemeSkin.moonGoldToken.resolved(for: colorScheme).opacity(isDark ? 0.42 : 0.16)
             )
         }
 
         if SkyConcertThemeSkin.isSkyConcert(descriptor) {
             return ThemeSkinLegibilityPalette(
-                outline: SkyConcertThemeSkin.text.opacity(isDark ? 0.96 : 0.28),
-                diagonalOutline: SkyConcertThemeSkin.cloudBlueDeep.opacity(isDark ? 0.72 : 0.18),
-                innerGlow: SkyConcertThemeSkin.creamTop.opacity(isDark ? 0.58 : 0.18),
-                outerGlow: SkyConcertThemeSkin.softGold.opacity(isDark ? 0.56 : 0.16),
-                backdropBase: SkyConcertThemeSkin.text.opacity(isDark ? 0.18 : 0.04),
-                backdropSoft: SkyConcertThemeSkin.creamTop.opacity(isDark ? 0.42 : 0.12),
+                outline: SkyConcertThemeSkin.creamTopToken.resolved(for: colorScheme).opacity(isDark ? 0.92 : 0.28),
+                diagonalOutline: SkyConcertThemeSkin.cloudBlueDeepToken.resolved(for: colorScheme).opacity(isDark ? 0.72 : 0.18),
+                innerGlow: SkyConcertThemeSkin.creamTopToken.resolved(for: colorScheme).opacity(isDark ? 0.68 : 0.18),
+                outerGlow: SkyConcertThemeSkin.softGoldToken.resolved(for: colorScheme).opacity(isDark ? 0.60 : 0.16),
+                backdropBase: SkyConcertThemeSkin.textToken.resolved(for: colorScheme).opacity(isDark ? 0.16 : 0.04),
+                backdropSoft: SkyConcertThemeSkin.creamTopToken.resolved(for: colorScheme).opacity(isDark ? 0.36 : 0.12),
                 backdropAccent: SkyConcertThemeSkin.cloudBlue.opacity(isDark ? 0.34 : 0.10),
-                backdropStroke: SkyConcertThemeSkin.softGold.opacity(isDark ? 0.38 : 0.14)
+                backdropStroke: SkyConcertThemeSkin.softGoldToken.resolved(for: colorScheme).opacity(isDark ? 0.38 : 0.14)
             )
         }
 

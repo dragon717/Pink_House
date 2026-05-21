@@ -554,11 +554,13 @@ struct FinalPaymentVaultView: View {
             Text(vaultHeroTitle)
                 .font(.title3.weight(.heavy))
                 .foregroundStyle(themeManager.primaryTextColor)
+                .themeSkinLegibleText(level: .chip, slot: .sectionCard)
 
             Text(WealthExperienceCopy.Vault.heroDescription)
                 .font(.caption)
                 .multilineTextAlignment(.center)
                 .foregroundStyle(themeManager.secondaryTextColor)
+                .themeSkinLegibleText(level: .inline, slot: .sectionCard)
         }
         .frame(maxWidth: .infinity)
         .padding(20)
@@ -576,10 +578,12 @@ struct FinalPaymentVaultView: View {
                 Text("¥")
                     .font(.title3.weight(.bold))
                     .foregroundStyle(WealthExperienceStyle.rose)
+                    .themeSkinLegibleText(level: .inline, slot: .statsCard)
                 Text(NSDecimalNumber(decimal: savedTotal).stringValue)
                     .font(.system(size: 42, weight: .heavy, design: .rounded))
                     .monospacedDigit()
                     .foregroundStyle(WealthExperienceStyle.roseGoldGradient)
+                    .themeSkinLegibleText(level: .chip, slot: .statsCard)
                     .lineLimit(1)
                     .minimumScaleFactor(0.45)
             }
@@ -606,9 +610,11 @@ struct FinalPaymentVaultView: View {
             Text(title)
                 .font(.caption2)
                 .foregroundStyle(themeManager.secondaryTextColor)
+                .themeSkinLegibleText(level: .inline, slot: .statsCard)
             Text(value)
                 .font(.caption.weight(.bold))
                 .foregroundStyle(color)
+                .themeSkinLegibleText(level: .inline, slot: .statsCard)
                 .monospacedDigit()
                 .lineLimit(1)
                 .minimumScaleFactor(0.65)
@@ -624,10 +630,12 @@ struct FinalPaymentVaultView: View {
                 Text(WealthExperienceCopy.Vault.unassignedTitle)
                     .font(.caption2)
                     .foregroundStyle(themeManager.secondaryTextColor)
+                    .themeSkinLegibleText(level: .inline, slot: .statsCard)
                 HStack(spacing: 3) {
                     Text("¥\(NSDecimalNumber(decimal: unassignedSavedTotal).stringValue)")
                         .font(.caption.weight(.bold))
                         .foregroundStyle(Color(hex: "C94C72"))
+                        .themeSkinLegibleText(level: .inline, slot: .statsCard)
                         .monospacedDigit()
                         .lineLimit(1)
                         .minimumScaleFactor(0.65)
@@ -650,9 +658,11 @@ struct FinalPaymentVaultView: View {
                     Text(WealthExperienceCopy.Vault.quickSaveTitle)
                         .font(.headline)
                         .foregroundStyle(themeManager.primaryTextColor)
+                        .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                     Text(WealthExperienceCopy.Vault.quickSaveDescription)
                         .font(.caption)
                         .foregroundStyle(themeManager.secondaryTextColor)
+                        .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                 }
                 Spacer()
                 Button {
@@ -688,10 +698,12 @@ struct FinalPaymentVaultView: View {
             Text(WealthExperienceCopy.Vault.emptyTitle)
                 .font(.headline)
                 .foregroundStyle(themeManager.primaryTextColor)
+                .themeSkinLegibleText(level: .inline, slot: .emptyState)
             Text(WealthExperienceCopy.Vault.emptyDescription)
                 .font(.caption)
                 .multilineTextAlignment(.center)
                 .foregroundStyle(themeManager.secondaryTextColor)
+                .themeSkinLegibleText(level: .inline, slot: .emptyState)
             HStack(spacing: 10) {
                 Button {
                     savingTargetClothingID = nil
@@ -733,6 +745,7 @@ struct FinalPaymentVaultView: View {
             Text(WealthExperienceCopy.Vault.listTitle)
                 .font(.headline)
                 .foregroundStyle(themeManager.primaryTextColor)
+                .themeSkinLegibleText(level: .inline, slot: .sectionCard)
 
             ForEach(clothingsWithSavingsOrDepositPlans) { clothing in
                 let saved = WealthSavingLedger.activeTotal(for: clothing.id, in: wealthSavingEntries)
@@ -762,10 +775,12 @@ struct FinalPaymentVaultView: View {
                                     Text(clothing.name)
                                         .font(.subheadline.weight(.semibold))
                                         .foregroundStyle(themeManager.primaryTextColor)
+                                        .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                                         .lineLimit(1)
                                     Text(clothing.isDepositPlan ? WealthExperienceCopy.Vault.depositProgressLabel : WealthExperienceCopy.Vault.normalProgressLabel)
                                         .font(.caption2)
                                         .foregroundStyle(themeManager.tertiaryTextColor)
+                                        .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                                 }
                             }
                             .contentShape(Rectangle())
@@ -797,9 +812,11 @@ struct FinalPaymentVaultView: View {
                         VStack(alignment: .leading, spacing: 6) {
                             HStack {
                                 Text("已付 ¥\(NSDecimalNumber(decimal: paid).stringValue) · 可抵扣 ¥\(NSDecimalNumber(decimal: saved).stringValue)")
+                                    .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                                 Spacer()
                                 Text("\(Int((ratio * 100).rounded()))%")
                                     .foregroundStyle(ratio > 1 ? WealthExperienceStyle.rose : WealthExperienceStyle.gold)
+                                    .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                             }
                             .font(.caption.weight(.semibold))
                             .foregroundStyle(themeManager.secondaryTextColor)
@@ -810,12 +827,15 @@ struct FinalPaymentVaultView: View {
                             Text("进度 ¥\(NSDecimalNumber(decimal: numerator).stringValue) / ¥\(NSDecimalNumber(decimal: target).stringValue)")
                                 .font(.caption2)
                                 .foregroundStyle(themeManager.tertiaryTextColor)
+                                .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                             Text("指定上限 ¥\(NSDecimalNumber(decimal: cap).stringValue) · 还能存 ¥\(NSDecimalNumber(decimal: remaining).stringValue)")
                                 .font(.caption2)
                                 .foregroundStyle(remaining > 0 ? themeManager.tertiaryTextColor : Color(hex: "C94C72"))
+                                .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                             Text("剩余尾款 ¥\(NSDecimalNumber(decimal: remainingPayment).stringValue) · 账单 \(paymentRecords.count) 笔")
                                 .font(.caption2)
                                 .foregroundStyle(themeManager.tertiaryTextColor)
+                                .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                             if clothing.finalPaymentInstallmentCount > 1 || paymentRecords.contains(where: { $0.paymentMode == .installment }) {
                                 FinalPaymentSegmentedProgressView(
                                     total: max(clothing.finalPaymentInstallmentCount, paymentRecords.map(\.installmentCount).max() ?? 0),
@@ -932,9 +952,11 @@ struct UnassignedSavingManagerSheet: View {
                             Label(WealthExperienceCopy.Vault.manageUnassigned, systemImage: "tray.full.fill")
                             .font(.headline)
                             .foregroundStyle(Color(hex: "C94C72"))
+                            .themeSkinLegibleText(level: .inline, slot: .statsCard)
                         Text("\(WealthExperienceCopy.Vault.unassignedSheetDescriptionPrefix)¥\(NSDecimalNumber(decimal: unassignedSavedTotal).stringValue)\(WealthExperienceCopy.Vault.unassignedSheetDescriptionSuffix)")
                             .font(.caption)
                             .foregroundStyle(themeManager.secondaryTextColor)
+                            .themeSkinLegibleText(level: .inline, slot: .statsCard)
                     }
                     .padding(16)
                     .themeSkinSectionCard(slot: .statsCard, cornerRadius: 22)
@@ -943,6 +965,7 @@ struct UnassignedSavingManagerSheet: View {
                         Text(statusMessage)
                             .font(.caption.weight(.semibold))
                             .foregroundStyle(.orange)
+                            .themeSkinLegibleText(level: .inline, slot: .filterChip)
                             .padding(.horizontal, 12)
                             .padding(.vertical, 8)
                             .frame(maxWidth: .infinity, alignment: .leading)
@@ -960,9 +983,11 @@ struct UnassignedSavingManagerSheet: View {
                             Text(WealthExperienceCopy.Vault.unassignedEmptyTitle)
                                 .font(.subheadline.weight(.semibold))
                                 .foregroundStyle(themeManager.primaryTextColor)
+                                .themeSkinLegibleText(level: .inline, slot: .emptyState)
                             Text(WealthExperienceCopy.Vault.unassignedEmptyDescription)
                                 .font(.caption)
                                 .foregroundStyle(themeManager.secondaryTextColor)
+                                .themeSkinLegibleText(level: .inline, slot: .emptyState)
                         }
                         .frame(maxWidth: .infinity)
                         .padding(24)
@@ -1006,10 +1031,12 @@ struct UnassignedSavingManagerSheet: View {
                     Text(clothing.name)
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(themeManager.primaryTextColor)
+                        .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                         .lineLimit(1)
                     Text("已存 ¥\(NSDecimalNumber(decimal: saved).stringValue) / 上限 ¥\(NSDecimalNumber(decimal: cap).stringValue)")
                         .font(.caption2)
                         .foregroundStyle(themeManager.secondaryTextColor)
+                        .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                 }
             }
 
@@ -1018,8 +1045,10 @@ struct UnassignedSavingManagerSheet: View {
 
             HStack {
                 Text("还能填充 ¥\(NSDecimalNumber(decimal: remaining).stringValue)")
+                    .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                 Spacer()
                 Text("本次最多 ¥\(NSDecimalNumber(decimal: fillAmount).stringValue)")
+                    .themeSkinLegibleText(level: .inline, slot: .sectionCard)
             }
             .font(.caption2)
             .foregroundStyle(themeManager.tertiaryTextColor)
@@ -1034,6 +1063,7 @@ struct UnassignedSavingManagerSheet: View {
                         .padding(.vertical, 8)
                         .frame(maxWidth: .infinity)
                         .foregroundStyle(.orange)
+                        .themeSkinLegibleText(level: .chip, slot: .primaryButton)
                         .themeSkinAdaptiveSectionCard(slot: .primaryButton, cornerRadius: 14, showsDecoration: false) {
                             RoundedRectangle(cornerRadius: 14)
                                 .fill(Color.orange.opacity(0.12))
@@ -1052,6 +1082,7 @@ struct UnassignedSavingManagerSheet: View {
                             .padding(.vertical, 8)
                             .frame(maxWidth: .infinity)
                             .foregroundStyle(Color(hex: "C94C72"))
+                            .themeSkinLegibleText(level: .chip, slot: .primaryButton)
                             .themeSkinAdaptiveSectionCard(slot: .primaryButton, cornerRadius: 14, showsDecoration: false) {
                                 RoundedRectangle(cornerRadius: 14)
                                     .fill(Color(hex: "C94C72").opacity(0.10))
@@ -1159,9 +1190,11 @@ struct VaultSavingSheet: View {
                                 Label(WealthExperienceCopy.Vault.sheetTargetTitle, systemImage: "tray.and.arrow.down.fill")
                                     .font(.headline)
                                     .foregroundStyle(.orange)
+                                    .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                                 Text(targetClothing.name)
                                     .font(.subheadline)
                                     .foregroundStyle(themeManager.secondaryTextColor)
+                                    .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                                     .lineLimit(2)
                             }
                         }
@@ -1169,9 +1202,11 @@ struct VaultSavingSheet: View {
                         Label(WealthExperienceCopy.Vault.sheetUnassignedTitle, systemImage: "tray.and.arrow.down.fill")
                             .font(.headline)
                             .foregroundStyle(.orange)
+                            .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                         Text(WealthExperienceCopy.Vault.sheetUnassignedDescription)
                             .font(.subheadline)
                             .foregroundStyle(themeManager.secondaryTextColor)
+                            .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                     }
                 }
 
@@ -1179,10 +1214,12 @@ struct VaultSavingSheet: View {
                     Text(WealthExperienceCopy.Vault.amountTitle)
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(themeManager.secondaryTextColor)
+                        .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                     HStack {
                         Text("¥")
                             .font(.title2.weight(.bold))
                             .foregroundStyle(.orange)
+                            .themeSkinLegibleText(level: .chip, slot: .sectionCard)
                         TextField("例如 100", text: $amountText)
                             .keyboardType(.decimalPad)
                             .font(.system(size: 32, weight: .heavy, design: .rounded))
@@ -1198,36 +1235,44 @@ struct VaultSavingSheet: View {
                 Text("\(WealthExperienceCopy.Vault.currentSaved) ¥\(NSDecimalNumber(decimal: currentSavedAmount).stringValue)")
                     .font(.caption)
                     .foregroundStyle(themeManager.tertiaryTextColor)
+                    .themeSkinLegibleText(level: .inline, slot: .sectionCard)
 
                 if let assignableCap, let remainingAmount {
                     VStack(alignment: .leading, spacing: 6) {
                         HStack {
                             Text(WealthExperienceCopy.Vault.capTitle)
+                                .themeSkinLegibleText(level: .inline, slot: .statsCard)
                             Spacer()
                             Text("¥\(NSDecimalNumber(decimal: assignableCap).stringValue)")
                                 .fontWeight(.semibold)
+                                .themeSkinLegibleText(level: .chip, slot: .statsCard)
                         }
 
                         HStack {
                             Text(WealthExperienceCopy.Vault.remainingTitle)
+                                .themeSkinLegibleText(level: .inline, slot: .statsCard)
                             Spacer()
                             Text("¥\(NSDecimalNumber(decimal: remainingAmount).stringValue)")
                                 .fontWeight(.semibold)
                                 .foregroundStyle(remainingAmount > 0 ? .orange : Color(hex: "C94C72"))
+                                .themeSkinLegibleText(level: .chip, slot: .statsCard)
                         }
 
                         if remainingAmount <= 0 {
                             Text(WealthExperienceCopy.Vault.fullHint)
                                 .font(.caption2)
                                 .foregroundStyle(themeManager.tertiaryTextColor)
+                                .themeSkinLegibleText(level: .inline, slot: .statsCard)
                         } else if isAmountClamped, let effectiveSaveAmount {
                             Text("\(WealthExperienceCopy.Vault.clampHintPrefix)¥\(NSDecimalNumber(decimal: effectiveSaveAmount).stringValue)\(WealthExperienceCopy.Vault.clampHintSuffix)")
                                 .font(.caption2)
                                 .foregroundStyle(.orange)
+                                .themeSkinLegibleText(level: .inline, slot: .statsCard)
                         } else {
                             Text(WealthExperienceCopy.Vault.capHint)
                                 .font(.caption2)
                                 .foregroundStyle(themeManager.tertiaryTextColor)
+                                .themeSkinLegibleText(level: .inline, slot: .statsCard)
                         }
                     }
                     .font(.caption)
@@ -1240,6 +1285,7 @@ struct VaultSavingSheet: View {
                     Text(WealthExperienceCopy.Vault.unassignedNoCapHint)
                         .font(.caption2)
                         .foregroundStyle(themeManager.tertiaryTextColor)
+                        .themeSkinLegibleText(level: .inline, slot: .statsCard)
                         .padding(12)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .themeSkinAdaptiveSectionCard(slot: .statsCard, cornerRadius: 16, showsDecoration: false) {

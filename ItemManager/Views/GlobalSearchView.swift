@@ -89,6 +89,7 @@ struct GlobalSearchView: View {
                 Text("最近搜索")
                     .font(.headline)
                     .foregroundStyle(.primary)
+                    .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                 
                 Spacer()
                 
@@ -98,6 +99,7 @@ struct GlobalSearchView: View {
                     Text("清除")
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                        .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                 }
             }
             
@@ -111,6 +113,7 @@ struct GlobalSearchView: View {
                                 .font(.caption)
                             Text(search)
                                 .font(.subheadline)
+                                .themeSkinLegibleText(level: .inline, slot: .filterChip)
                         }
                         .padding(.horizontal, 12)
                         .padding(.vertical, 6)
@@ -132,6 +135,7 @@ struct GlobalSearchView: View {
             Text("搜索建议")
                 .font(.headline)
                 .foregroundStyle(.primary)
+                .themeSkinLegibleText(level: .inline, slot: .sectionCard)
             
             VStack(alignment: .leading, spacing: 8) {
                 suggestionRow(icon: "tshirt", text: "输入裙装名称")
@@ -155,6 +159,7 @@ struct GlobalSearchView: View {
             Text(text)
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
+                .themeSkinLegibleText(level: .inline, slot: .sectionCard)
             Spacer()
         }
     }
@@ -165,6 +170,7 @@ struct GlobalSearchView: View {
             Text("可搜索内容")
                 .font(.headline)
                 .foregroundStyle(themeManager.primaryTextColor)
+                .themeSkinLegibleText(level: .inline, slot: .sectionCard)
 
             LazyVGrid(columns: [
                 GridItem(.flexible()),
@@ -211,10 +217,12 @@ struct GlobalSearchView: View {
                 .font(.subheadline)
                 .fontWeight(.medium)
                 .foregroundStyle(themeManager.primaryTextColor)
+                .themeSkinLegibleText(level: .inline, slot: .sectionCard)
 
             Text(description)
                 .font(.caption)
                 .foregroundStyle(themeManager.secondaryTextColor)
+                .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                 .multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity)
@@ -227,8 +235,10 @@ struct GlobalSearchView: View {
     private var noResultsView: some View {
         ContentUnavailableView {
             Label("未找到结果", systemImage: "magnifyingglass")
+                .themeSkinLegibleText(level: .inline, slot: .emptyState)
         } description: {
             Text("尝试其他关键词或检查拼写")
+                .themeSkinLegibleText(level: .inline, slot: .emptyState)
         } actions: {
             Button("查看搜索建议") {
                 searchText = ""
@@ -252,10 +262,12 @@ struct GlobalSearchView: View {
                     HStack {
                         Image(systemName: section.type.icon)
                         Text(section.type.rawValue)
+                            .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                         Spacer()
                         Text("\(section.items.count) 个结果")
                             .font(.caption)
                             .foregroundStyle(.secondary)
+                            .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                     }
                     .font(.subheadline)
                     .fontWeight(.medium)
@@ -329,12 +341,14 @@ struct SearchResultRow: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(item.title)
                     .font(.headline)
+                    .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                     .lineLimit(1)
                 
                 if let subtitle = item.subtitle {
                     Text(subtitle)
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                        .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                         .lineLimit(1)
                 }
             }
@@ -347,6 +361,7 @@ struct SearchResultRow: View {
                     .font(.caption)
                 Text(item.type.rawValue)
                     .font(.caption)
+                    .themeSkinLegibleText(level: .inline, slot: .filterChip)
             }
             .foregroundStyle(.secondary)
             .padding(.horizontal, 8)

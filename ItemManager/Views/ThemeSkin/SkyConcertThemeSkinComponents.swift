@@ -1,5 +1,14 @@
 import SwiftUI
 
+struct ThemeSkinColorToken {
+    let light: Color
+    let dark: Color
+
+    func resolved(for colorScheme: ColorScheme) -> Color {
+        colorScheme == .dark ? dark : light
+    }
+}
+
 enum SkyConcertThemeSkin {
     static let namespace = "sky_concert"
 
@@ -23,6 +32,10 @@ enum SkyConcertThemeSkin {
     static let roseLine = Color(hex: "C99AA4")
     static let text = Color(hex: "6A647D")
     static let shadow = Color(hex: "94CBEA").opacity(0.24)
+    static let textToken = ThemeSkinColorToken(light: text, dark: Color(hex: "D6CFE0"))
+    static let softGoldToken = ThemeSkinColorToken(light: softGold, dark: Color(hex: "F4D798"))
+    static let creamTopToken = ThemeSkinColorToken(light: creamTop, dark: Color(hex: "F7F1FF"))
+    static let cloudBlueDeepToken = ThemeSkinColorToken(light: cloudBlueDeep, dark: Color(hex: "D7ECFF"))
 
     static func isSkyConcert(_ descriptor: ThemeSkinDescriptor?) -> Bool {
         descriptor?.assetNamespace == namespace
@@ -75,6 +88,13 @@ enum SkyConcertThemeSkin {
         return isSkyConcert(descriptor) ? softGold : Color(hex: "D793AA")
     }
 
+    static func accent(for descriptor: ThemeSkinDescriptor?, colorScheme: ColorScheme) -> Color {
+        if SwanDreamThemeSkin.isSwanDream(descriptor) {
+            return SwanDreamThemeSkin.moonGoldToken.resolved(for: colorScheme)
+        }
+        return isSkyConcert(descriptor) ? softGoldToken.resolved(for: colorScheme) : Color(hex: "D793AA")
+    }
+
     static func accentSoft(for descriptor: ThemeSkinDescriptor?) -> Color {
         if SwanDreamThemeSkin.isSwanDream(descriptor) {
             return SwanDreamThemeSkin.ribbonPink.opacity(0.82)
@@ -87,6 +107,13 @@ enum SkyConcertThemeSkin {
             return SwanDreamThemeSkin.text
         }
         return isSkyConcert(descriptor) ? text : Color(hex: "8A5C6F")
+    }
+
+    static func labelColor(for descriptor: ThemeSkinDescriptor?, colorScheme: ColorScheme) -> Color {
+        if SwanDreamThemeSkin.isSwanDream(descriptor) {
+            return SwanDreamThemeSkin.textToken.resolved(for: colorScheme)
+        }
+        return isSkyConcert(descriptor) ? textToken.resolved(for: colorScheme) : Color(hex: "8A5C6F")
     }
 
     static func shadowColor(for descriptor: ThemeSkinDescriptor?) -> Color {
@@ -281,6 +308,10 @@ enum SwanDreamThemeSkin {
     static let moonGold = Color(hex: "E7C06F")
     static let text = Color(hex: "735E78")
     static let shadow = Color(hex: "CBA6D8").opacity(0.24)
+    static let textToken = ThemeSkinColorToken(light: text, dark: Color(hex: "E2D2E5"))
+    static let moonCreamToken = ThemeSkinColorToken(light: moonCream, dark: Color(hex: "FFF0C8"))
+    static let moonGoldToken = ThemeSkinColorToken(light: moonGold, dark: Color(hex: "F6D990"))
+    static let roseLineToken = ThemeSkinColorToken(light: roseLine, dark: Color(hex: "EEC6D2"))
 
     static func isSwanDream(_ descriptor: ThemeSkinDescriptor?) -> Bool {
         descriptor?.assetNamespace == namespace

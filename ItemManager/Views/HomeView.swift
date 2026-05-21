@@ -709,6 +709,7 @@ struct HomeView: View {
                     .font(.system(size: WardrobeTopBarMetrics.segmentIconSize))
                     Text("少女衣橱")
                         .font(.system(size: WardrobeTopBarMetrics.segmentTextSize, weight: selectedTab == .wardrobe ? .bold : .medium))
+                        .themeSkinLegibleText(level: .inline, slot: .topBarSegment, descriptor: themedTopBarSegmentDescriptor)
                         .lineLimit(1)
                         .minimumScaleFactor(0.88)
                 }
@@ -752,6 +753,7 @@ struct HomeView: View {
                     }
                     Text("心愿尾款")
                         .font(.system(size: WardrobeTopBarMetrics.segmentTextSize, weight: selectedTab == .depositPlan ? .bold : .medium))
+                        .themeSkinLegibleText(level: .inline, slot: .topBarSegment, descriptor: themedTopBarSegmentDescriptor)
                         .lineLimit(1)
                         .minimumScaleFactor(0.88)
                 }
@@ -1099,6 +1101,7 @@ struct HomeView: View {
                         Text("\(min(unreadNotificationCount, 99))")
                             .font(.system(size: 7, weight: .bold))
                             .foregroundColor(.white)
+                            .themeSkinLegibleText(level: .chip, slot: .topBarIconButton, descriptor: themedTopBarButtonDescriptor)
                             .padding(.horizontal, 3)
                             .padding(.vertical, 1)
                             .background(magicPalette.cardAccent)
@@ -1141,6 +1144,7 @@ struct HomeView: View {
             Picker("排序", selection: $sortOption) {
                 ForEach(SortOption.allCases) { option in
                     Text(option.rawValue)
+                        .themeSkinLegibleText(level: .inline, slot: .filterChip)
                         .tag(option)
                 }
             }
