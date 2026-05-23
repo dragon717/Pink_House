@@ -334,6 +334,11 @@ class SwiftDataMigrationManager: ObservableObject {
             try await migrateStoredImages(from: localContext, to: cloudContext)
             migrationProgress = 0.98
 
+            // 10b. 重建衣橱关系。Clothing 先于 Brand/Tag/AccessoryItem 复制，关系需要在目标
+            // context 对象都存在后统一补链，避免 iCloud 同步后编辑页看到孤儿小物。
+            try rebuildWardrobeRelationships(from: localContext, to: cloudContext)
+            migrationProgress = 0.985
+
             // 11. 重建 OOTD/手帐关系。前面的复制步骤按实体去重插入，关系对象必须在目标
             // context 全部存在后再统一补链，避免平面书页在 iCloud 迁移后变成孤儿。
             try rebuildOOTDRelationships(from: localContext, to: cloudContext)
@@ -631,6 +636,63 @@ class SwiftDataMigrationManager: ObservableObject {
         print("  - 迁移了 \(items.count) 条 StoredImage 记录")
     }
 
+    private func rebuildWardrobeRelationships(from localContext: ModelContext, to cloudContext: ModelContext) throws {
+        let localClothings = try localContext.fetch(FetchDescriptor<Clothing>())
+        let cloudClothings = try cloudContext.fetch(FetchDescriptor<Clothing>())
+        let cloudBrands = try cloudContext.fetch(FetchDescriptor<Brand>())
+        let cloudTags = try cloudContext.fetch(FetchDescriptor<Tag>())
+        let cloudAccessoryItems = try cloudContext.fetch(FetchDescriptor<AccessoryItem>())
+
+        let clothingMap = mapByID(cloudClothings, id: \.id)
+        let brandMap = mapByID(cloudBrands, id: \.id)
+        let tagMap = mapByID(cloudTags, id: \.id)
+        let accessoryMap = mapByID(cloudAccessoryItems, id: \.id)
+
+        var relinkedBrands = 0
+        var relinkedTags = 0
+        var relinkedAccessories = 0
+
+        for localClothing in localClothings {
+            guard let cloudClothing = clothingMap[localClothing.id] else { continue }
+
+            if let localBrandID = localClothing.brand?.id {
+                if cloudClothing.brand?.id != localBrandID,
+                   let cloudBrand = brandMap[localBrandID] {
+                    cloudClothing.brand = cloudBrand
+                    relinkedBrands += 1
+                }
+            } else if cloudClothing.brand != nil {
+                cloudClothing.brand = nil
+                relinkedBrands += 1
+            }
+
+            let localTagIDs = (localClothing.tags ?? []).map(\.id)
+            let currentTagIDs = (cloudClothing.tags ?? []).map(\.id)
+            if currentTagIDs != localTagIDs {
+                cloudClothing.tags = localTagIDs.compactMap { tagMap[$0] }
+                relinkedTags += 1
+            }
+
+            let localAccessoryIDs = (localClothing.accessoryItems ?? [])
+                .sorted { $0.sortIndex < $1.sortIndex }
+                .map(\.id)
+            let currentAccessoryIDs = (cloudClothing.accessoryItems ?? [])
+                .sorted { $0.sortIndex < $1.sortIndex }
+                .map(\.id)
+            if currentAccessoryIDs != localAccessoryIDs {
+                let cloudAccessories = localAccessoryIDs.compactMap { accessoryMap[$0] }
+                cloudClothing.accessoryItems = cloudAccessories
+                for accessory in cloudAccessories {
+                    accessory.clothing = cloudClothing
+                }
+                relinkedAccessories += 1
+            }
+        }
+
+        try cloudContext.save()
+        print("  - 重建衣橱关系：Clothing.brand \(relinkedBrands)，Clothing.tags \(relinkedTags)，Clothing.accessoryItems \(relinkedAccessories)")
+    }
+
     private func rebuildOOTDRelationships(from localContext: ModelContext, to cloudContext: ModelContext) throws {
         let localOutfits = try localContext.fetch(FetchDescriptor<Outfit>())
         let localOutfitItems = try localContext.fetch(FetchDescriptor<OutfitItem>())
@@ -772,6 +834,8 @@ class SwiftDataMigrationManager: ObservableObject {
         )
         new.copyCurrencyAndShippingMetadata(from: source)
         new.id = source.id
+        new.sizeChartImagePath = source.sizeChartImagePath
+        new.priceChartImagePath = source.priceChartImagePath
         new.sortIndex = source.sortIndex
         new.isDeleted = source.isDeleted
         new.deletedAt = source.deletedAt

@@ -97,6 +97,8 @@ Codex prompt 顶端写 `THEME_ID = <value>`，整份 `EXEC_PLAN.md` 喂下去；
 
 ## 模拟器与构建
 
+需要用 Computer Use / 电脑控制做模拟器 UI 验收时，先按 `docs/XCODE_SIMULATOR_COMPUTER_USE_ACCEPTANCE.md`：对当前目标模拟器重新编译、安装并重启新进程，再读取 Simulator 画面。
+
 ```bash
 cd "$PROJ"
 xcodebuild -scheme ItemManager -destination 'platform=iOS Simulator,name=iPhone 16 Pro' -quiet build

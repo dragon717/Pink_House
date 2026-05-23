@@ -645,7 +645,7 @@ struct VIPCenterView: View {
                     } else {
                         presentInfoAlert(
                             title: "个性图标",
-                            message: "开通 VIP 后即可自主切换应用图标，当前已接入 temp/图标素材与 image2 探索款。"
+                            message: "开通 VIP 后，可以把 Pink House 的桌面图标换成礼服、珍珠、月光等专属风格。"
                         )
                     }
                 } label: {
@@ -1269,7 +1269,7 @@ struct VIPCenterView: View {
             } else {
                 presentInfoAlert(
                     title: benefit.title,
-                    message: "开通 VIP 后即可自主切换应用图标，当前已接入 temp/图标素材与 image2 探索款。"
+                    message: "开通 VIP 后，可以把 Pink House 的桌面图标换成礼服、珍珠、月光等专属风格。"
                 )
             }
         case "weekly":

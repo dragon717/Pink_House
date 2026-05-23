@@ -198,6 +198,13 @@ class SharedContainer {
     // 这个方法应该在数据发生变化时调用（如添加、修改、删除衣物后）
     @MainActor
     func syncWidgetData(reason: String = "default") async {
+        #if !WIDGET_EXTENSION
+        guard !SwiftDataMigrationManager.shared.isMigrating else {
+            widgetLogger.info("sync_skip reason=\(reason) cloud_migration_in_progress=true")
+            return
+        }
+        #endif
+
         let startedAt = Date()
         let context = sharedModelContainer.mainContext
         

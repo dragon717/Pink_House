@@ -24,42 +24,42 @@ final class VIPAppIconManager: ObservableObject {
         VIPAppIconOption(
             id: "primary",
             displayName: "少女心愿立体",
-            subtitle: "当前默认图标 · 立体衣橱主视觉",
+            subtitle: "经典衣橱主视觉，甜美又有辨识度",
             previewAssetName: "vip_icon_preview_logo",
             alternateIconName: nil,
-            badgeText: "默认"
+            badgeText: "经典"
         ),
         VIPAppIconOption(
             id: "pink_wish",
             displayName: "心愿礼服馆",
-            subtitle: "来自 temp/图标 的粉色礼服馆图标",
+            subtitle: "粉色礼服馆风格，把少女心放上桌面",
             previewAssetName: "vip_icon_preview_pink_wish",
             alternateIconName: "VIPIconPinkWish",
-            badgeText: "VIP"
+            badgeText: "VIP专属"
         ),
         VIPAppIconOption(
             id: "dream_closet",
             displayName: "珍珠衣柜",
-            subtitle: "来自 temp/图标 的立体衣柜图标",
+            subtitle: "立体珍珠衣柜风格，温柔精致",
             previewAssetName: "vip_icon_preview_dream_closet",
             alternateIconName: "VIPIconDreamCloset",
-            badgeText: "VIP"
+            badgeText: "VIP专属"
         ),
         VIPAppIconOption(
             id: "pearl_wardrobe",
             displayName: "珍珠礼服柜",
-            subtitle: "image2 生成 · 粉金收藏风",
+            subtitle: "粉金珍藏款，像一只小小的礼服收藏柜",
             previewAssetName: "vip_icon_preview_pearl_wardrobe",
             alternateIconName: "VIPIconPearlWardrobe",
-            badgeText: "image2"
+            badgeText: "珍藏款"
         ),
         VIPAppIconOption(
             id: "moon_wardrobe",
             displayName: "月光玻璃柜",
-            subtitle: "image2 生成 · 月光琉璃风",
+            subtitle: "月光琉璃款，清透安静的夜色衣橱",
             previewAssetName: "vip_icon_preview_moon_wardrobe",
             alternateIconName: "VIPIconMoonWardrobe",
-            badgeText: "image2"
+            badgeText: "月光款"
         )
     ]
 
@@ -85,11 +85,11 @@ final class VIPAppIconManager: ObservableObject {
 
     func applyIcon(_ option: VIPAppIconOption) async -> (success: Bool, message: String) {
         guard VIPManager.shared.isVIP else {
-            return (false, "开通 VIP 后才能切换个性图标。")
+            return (false, "开通 VIP 后，就可以为桌面换上专属图标。")
         }
 
         guard supportsAlternateIcons else {
-            return (false, "当前设备暂不支持应用图标切换。")
+            return (false, "这台设备暂时不能切换桌面图标。")
         }
 
         guard currentIconID != option.id else {
@@ -108,7 +108,7 @@ final class VIPAppIconManager: ObservableObject {
             return (false, errorMessage(for: error, option: option))
         }
 #else
-        return (false, "当前平台暂不支持应用图标切换。")
+        return (false, "现在暂时不能切换桌面图标。")
 #endif
     }
 
@@ -135,6 +135,6 @@ final class VIPAppIconManager: ObservableObject {
 #endif
 
     private func errorMessage(for error: Error, option: VIPAppIconOption) -> String {
-        "切换到「\(option.displayName)」失败了：\(error.localizedDescription)"
+        "暂时没能换成「\(option.displayName)」，可以稍后再试。"
     }
 }

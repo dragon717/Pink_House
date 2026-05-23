@@ -1515,6 +1515,64 @@ class BackupService {
         // 3d. 恢复拼豆图案 (PerlerBeadPattern)
         try restorePerlerBeadPatterns(context: &context)
     }
+
+    private func reconcileAccessoryItems(
+        for clothing: Clothing,
+        from dtoItems: [AccessoryItemDTO],
+        context: ModelContext
+    ) {
+        let existingItems = clothing.accessoryItems ?? []
+        var existingByID: [UUID: AccessoryItem] = [:]
+        var duplicateExistingItems: [AccessoryItem] = []
+
+        for item in existingItems {
+            if existingByID[item.id] == nil {
+                existingByID[item.id] = item
+            } else {
+                duplicateExistingItems.append(item)
+            }
+        }
+
+        var desiredItems: [AccessoryItem] = []
+        var desiredIDs = Set<UUID>()
+
+        for dto in dtoItems {
+            let item: AccessoryItem
+            if let existing = existingByID[dto.id] {
+                item = existing
+            } else {
+                item = AccessoryItem(
+                    name: dto.name,
+                    price: dto.price,
+                    deposit: dto.deposit ?? 0,
+                    balance: dto.balance ?? 0,
+                    sortIndex: dto.sortIndex,
+                    imagePaths: dto.imagePaths
+                )
+                item.id = dto.id
+                context.insert(item)
+            }
+
+            item.name = dto.name
+            item.price = dto.price
+            item.deposit = dto.deposit ?? 0
+            item.balance = dto.balance ?? 0
+            item.sortIndex = dto.sortIndex
+            item.imagePaths = dto.imagePaths
+
+            desiredItems.append(item)
+            desiredIDs.insert(dto.id)
+        }
+
+        for item in existingItems where !desiredIDs.contains(item.id) {
+            context.delete(item)
+        }
+        for item in duplicateExistingItems {
+            context.delete(item)
+        }
+
+        clothing.accessoryItems = desiredItems
+    }
     
     private func restoreClothingAndOutfits(context: inout RestoreContext) throws {
         let modelContext = context.context
@@ -1720,27 +1778,7 @@ class BackupService {
             
             // Restore AccessoryItems
             if let accDTOs = dto.accessoryItems {
-                // Delete existing (strategy: replace all)
-                if let existingItems = clothingBack.accessoryItems {
-                    for item in existingItems {
-                        modelContext.delete(item)
-                    }
-                }
-                
-                var newItems: [AccessoryItem] = []
-                for accDTO in accDTOs {
-                    let accItem = AccessoryItem(
-                        name: accDTO.name,
-                        price: accDTO.price,
-                        deposit: accDTO.deposit ?? 0,
-                        balance: accDTO.balance ?? 0,
-                        sortIndex: accDTO.sortIndex,
-                        imagePaths: accDTO.imagePaths // v1.5+ 支持小物图片路径，旧备份默认为nil
-                    )
-                    accItem.id = accDTO.id
-                    newItems.append(accItem)
-                }
-                clothingBack.accessoryItems = newItems
+                reconcileAccessoryItems(for: clothingBack, from: accDTOs, context: modelContext)
             }
             
             // Re-link Brand

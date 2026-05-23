@@ -17,6 +17,13 @@ final class ClothingAccessoryPriceValidationService {
     func validateIfNeeded(modelContainer: ModelContainer) async {
         print("[AccessoryPriceValidation] 开始校验自定义小物总价...")
 
+        #if !WIDGET_EXTENSION
+        guard !SwiftDataMigrationManager.shared.isMigrating else {
+            print("[AccessoryPriceValidation] iCloud 迁移中，跳过本轮校验")
+            return
+        }
+        #endif
+
         let context = modelContainer.mainContext
 
         do {

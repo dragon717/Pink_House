@@ -1806,7 +1806,7 @@ struct ClothingEditView: View {
             accessoryList = items.sorted(by: { $0.sortIndex < $1.sortIndex })
                 .map {
                     AccessoryItemData(
-                        id: UUID(),
+                        id: $0.id,
                         name: $0.name,
                         price: NSDecimalNumber(decimal: $0.price).doubleValue,
                         deposit: NSDecimalNumber(decimal: $0.deposit).doubleValue,
@@ -2114,7 +2114,106 @@ struct ClothingEditView: View {
     }
 
     private var fullPaymentReservationUnitAmount: Double {
-        max(priceTotal + accessoriesPrice + shippingFee, 0)
+        sanitizedMoneyDouble(priceTotal) + sanitizedMoneyDouble(accessoriesPrice) + sanitizedMoneyDouble(shippingFee)
+    }
+
+    private func sanitizedMoneyDouble(_ value: Double) -> Double {
+        guard value.isFinite, value > 0 else { return 0 }
+        return min(value, 999_999_999)
+    }
+
+    private func sanitizedMoneyDecimal(_ value: Double) -> Decimal {
+        Decimal(sanitizedMoneyDouble(value))
+    }
+
+    private func sanitizedStock(_ value: Int) -> Int {
+        min(max(value, 1), 999)
+    }
+
+    private func sanitizedAccessoryData(_ data: AccessoryItemData, fallbackID: UUID? = nil) -> AccessoryItemData {
+        AccessoryItemData(
+            id: fallbackID ?? data.id,
+            name: data.name.trimmingCharacters(in: .whitespacesAndNewlines),
+            price: sanitizedMoneyDouble(data.price),
+            deposit: sanitizedMoneyDouble(data.deposit),
+            balance: sanitizedMoneyDouble(data.balance),
+            imagePaths: data.imagePaths
+        )
+    }
+
+    private func sanitizedAccessoryList(_ items: [AccessoryItemData]) -> [AccessoryItemData] {
+        var seenIDs = Set<UUID>()
+        return items.map { item in
+            let id = seenIDs.insert(item.id).inserted ? item.id : UUID()
+            return sanitizedAccessoryData(item, fallbackID: id)
+        }
+    }
+
+    private func makeAccessoryItem(from data: AccessoryItemData, sortIndex: Int) -> AccessoryItem {
+        let item = AccessoryItem(
+            name: data.name,
+            price: sanitizedMoneyDecimal(data.price),
+            deposit: sanitizedMoneyDecimal(data.deposit),
+            balance: sanitizedMoneyDecimal(data.balance),
+            sortIndex: sortIndex,
+            imagePaths: data.imagePaths
+        )
+        item.id = data.id
+        return item
+    }
+
+    private func updateAccessoryItem(_ item: AccessoryItem, from data: AccessoryItemData, sortIndex: Int) {
+        item.name = data.name
+        item.price = sanitizedMoneyDecimal(data.price)
+        item.deposit = sanitizedMoneyDecimal(data.deposit)
+        item.balance = sanitizedMoneyDecimal(data.balance)
+        item.sortIndex = sortIndex
+        item.imagePaths = data.imagePaths
+    }
+
+    private func makeAccessoryItems(from items: [AccessoryItemData]) -> [AccessoryItem] {
+        sanitizedAccessoryList(items).enumerated().map { index, data in
+            makeAccessoryItem(from: data, sortIndex: index)
+        }
+    }
+
+    private func reconcileAccessoryItems(on clothing: Clothing, with items: [AccessoryItemData]) {
+        let normalizedItems = sanitizedAccessoryList(items)
+        let existingItems = clothing.accessoryItems ?? []
+        var existingByID: [UUID: AccessoryItem] = [:]
+        var duplicateExistingItems: [AccessoryItem] = []
+
+        for item in existingItems {
+            if existingByID[item.id] == nil {
+                existingByID[item.id] = item
+            } else {
+                duplicateExistingItems.append(item)
+            }
+        }
+
+        var desiredItems: [AccessoryItem] = []
+        var desiredIDs = Set<UUID>()
+
+        for (index, data) in normalizedItems.enumerated() {
+            if let existing = existingByID[data.id] {
+                updateAccessoryItem(existing, from: data, sortIndex: index)
+                desiredItems.append(existing)
+            } else {
+                let newItem = makeAccessoryItem(from: data, sortIndex: index)
+                modelContext.insert(newItem)
+                desiredItems.append(newItem)
+            }
+            desiredIDs.insert(data.id)
+        }
+
+        for item in existingItems where !desiredIDs.contains(item.id) {
+            modelContext.delete(item)
+        }
+        for item in duplicateExistingItems {
+            modelContext.delete(item)
+        }
+
+        clothing.accessoryItems = desiredItems
     }
 
     private func derivedReservationKind(isDepositPlan: Bool, deposit: Double, balance: Double) -> ClothingReservationKind {
@@ -2324,7 +2423,8 @@ struct ClothingEditView: View {
         let finalDepositDate: Date? = finalIsDepositPlan ? depositDate : nil
         let finalPaymentStartDate: Date? = finalReservationKind == .depositPlan ? finalPaymentDate : nil
         let finalPaymentEndDateValue: Date? = finalReservationKind == .depositPlan ? finalPaymentEndDate : nil
-        let finalAccessoryList = accessoryList.map { data -> AccessoryItemData in
+        let normalizedAccessoryList = sanitizedAccessoryList(accessoryList)
+        let finalAccessoryList = normalizedAccessoryList.map { data -> AccessoryItemData in
             guard finalReservationKind != .depositPlan else { return data }
             var copy = data
             copy.deposit = 0
@@ -2398,40 +2498,23 @@ struct ClothingEditView: View {
 
             c.imagePaths = imagePaths
             c.isShared = isShared
-            c.originalPrice = Decimal(originalPrice)
-            c.originalPriceJPY = Decimal(originalPriceJPY)
+            c.originalPrice = sanitizedMoneyDecimal(originalPrice)
+            c.originalPriceJPY = sanitizedMoneyDecimal(originalPriceJPY)
             c.originalPriceCurrencyCode = originalPriceCurrency.rawValue
-            c.originalPriceExchangeRateJPY = Decimal(effectiveJPYRate)
+            c.originalPriceExchangeRateJPY = sanitizedMoneyDecimal(effectiveJPYRate)
             c.originalPriceRateUpdatedAt = originalPriceRateUpdatedAt
-            c.shippingFee = Decimal(shippingFee)
-            c.shippingFeeJPY = Decimal(shippingFeeJPY)
+            c.shippingFee = sanitizedMoneyDecimal(shippingFee)
+            c.shippingFeeJPY = sanitizedMoneyDecimal(shippingFeeJPY)
             c.shippingFeeCurrencyCode = shippingFeeCurrency.rawValue
-            c.shippingExchangeRateJPY = Decimal(effectiveJPYRate)
+            c.shippingExchangeRateJPY = sanitizedMoneyDecimal(effectiveJPYRate)
             c.shippingRateUpdatedAt = shippingRateUpdatedAt
-            c.price = Decimal(priceTotal)
-            c.deposit = Decimal(finalDeposit)
-            c.balance = Decimal(finalBalance)
-            c.accessoriesPrice = Decimal(accessoriesPrice)
+            c.price = sanitizedMoneyDecimal(priceTotal)
+            c.deposit = sanitizedMoneyDecimal(finalDeposit)
+            c.balance = sanitizedMoneyDecimal(finalBalance)
+            c.accessoriesPrice = sanitizedMoneyDecimal(accessoriesPrice)
 
-            // Update accessory items
-            // Remove old items (since we are replacing the list)
-            if let oldItems = c.accessoryItems {
-                for item in oldItems {
-                    modelContext.delete(item)
-                }
-            }
-            // Create new items
-            let newItems = finalAccessoryList.enumerated().map { index, data in
-                AccessoryItem(
-                    name: data.name,
-                    price: Decimal(data.price),
-                    deposit: Decimal(data.deposit),
-                    balance: Decimal(data.balance),
-                    sortIndex: index,
-                    imagePaths: data.imagePaths
-                )
-            }
-            c.accessoryItems = newItems
+            // Keep accessory item IDs stable so SwiftData CloudKit does not see every edit as delete + recreate.
+            reconcileAccessoryItems(on: c, with: finalAccessoryList)
 
             c.purchaseDate = purchaseDate
             c.depositDate = finalDepositDate
@@ -2449,7 +2532,7 @@ struct ClothingEditView: View {
                 c.finalPaymentInstallmentCount = 0
             }
             c.note = note
-            c.stock = stock
+            c.stock = sanitizedStock(stock)
             c.tags = selectedTags
             let now = Date()
             c.updatedAt = now
@@ -2482,19 +2565,19 @@ struct ClothingEditView: View {
                 accessories: finalAccessories,
                 imagePaths: imagePaths,
                 isShared: isShared,
-                originalPrice: Decimal(originalPrice),
-                originalPriceJPY: Decimal(originalPriceJPY),
+                originalPrice: sanitizedMoneyDecimal(originalPrice),
+                originalPriceJPY: sanitizedMoneyDecimal(originalPriceJPY),
                 originalPriceCurrencyCode: originalPriceCurrency.rawValue,
-                originalPriceExchangeRateJPY: Decimal(effectiveJPYRate),
+                originalPriceExchangeRateJPY: sanitizedMoneyDecimal(effectiveJPYRate),
                 originalPriceRateUpdatedAt: originalPriceRateUpdatedAt,
-                price: Decimal(priceTotal),
-                deposit: Decimal(finalDeposit),
-                balance: Decimal(finalBalance),
-                accessoriesPrice: Decimal(accessoriesPrice),
-                shippingFee: Decimal(shippingFee),
-                shippingFeeJPY: Decimal(shippingFeeJPY),
+                price: sanitizedMoneyDecimal(priceTotal),
+                deposit: sanitizedMoneyDecimal(finalDeposit),
+                balance: sanitizedMoneyDecimal(finalBalance),
+                accessoriesPrice: sanitizedMoneyDecimal(accessoriesPrice),
+                shippingFee: sanitizedMoneyDecimal(shippingFee),
+                shippingFeeJPY: sanitizedMoneyDecimal(shippingFeeJPY),
                 shippingFeeCurrencyCode: shippingFeeCurrency.rawValue,
-                shippingExchangeRateJPY: Decimal(effectiveJPYRate),
+                shippingExchangeRateJPY: sanitizedMoneyDecimal(effectiveJPYRate),
                 shippingRateUpdatedAt: shippingRateUpdatedAt,
                 purchaseDate: purchaseDate,
                 depositDate: finalDepositDate,
@@ -2502,7 +2585,7 @@ struct ClothingEditView: View {
                 finalPaymentDate: finalPaymentStartDate,
                 finalPaymentEndDate: finalPaymentEndDateValue,
                 note: note,
-                stock: stock
+                stock: sanitizedStock(stock)
             )
 
             // 保存表图字段
@@ -2511,17 +2594,7 @@ struct ClothingEditView: View {
             newClothing.sizeChartImagePath = (newSizeChartPath?.isEmpty == true) ? nil : newSizeChartPath
             newClothing.priceChartImagePath = (newPriceChartPath?.isEmpty == true) ? nil : newPriceChartPath
 
-            let newItems = finalAccessoryList.enumerated().map { index, data in
-                AccessoryItem(
-                    name: data.name,
-                    price: Decimal(data.price),
-                    deposit: Decimal(data.deposit),
-                    balance: Decimal(data.balance),
-                    sortIndex: index,
-                    imagePaths: data.imagePaths
-                )
-            }
-            newClothing.accessoryItems = newItems
+            newClothing.accessoryItems = makeAccessoryItems(from: finalAccessoryList)
 
             newClothing.tags = selectedTags
             let now = Date()

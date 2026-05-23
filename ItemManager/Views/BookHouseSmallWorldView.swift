@@ -95,7 +95,10 @@ private struct BookHousePrototypeStage: View {
     var body: some View {
         GeometryReader { geometry in
             ZStack {
-                Color(hex: "F2D9DD")
+                LiquidBackground(themeSkinWallpaperContext: .house)
+                    .ignoresSafeArea()
+
+                BookHouseStageAtmosphere()
                     .ignoresSafeArea()
 
                 ForEach(rooms) { room in
@@ -162,56 +165,146 @@ private struct BookHousePrototypeStage: View {
     }
 }
 
+private struct BookHouseStageAtmosphere: View {
+    @Environment(ThemeManager.self) private var themeManager
+    @Environment(\.colorScheme) private var colorScheme
+    @ObservedObject private var themeSkinManager = ThemeSkinManager.shared
+
+    var body: some View {
+        GeometryReader { geometry in
+            let isDark = colorScheme == .dark
+            let hasThemeSkin = themeSkinManager.activeProduct != nil
+
+            ZStack {
+                LinearGradient(
+                    colors: [
+                        Color.white.opacity(isDark ? 0.02 : (hasThemeSkin ? 0.06 : 0.18)),
+                        Color.clear,
+                        themeManager.accentTextColor.opacity(isDark ? 0.05 : (hasThemeSkin ? 0.04 : 0.08))
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+
+                if !hasThemeSkin {
+                    BookHousePaperTexture(
+                        accent: themeManager.accentTextColor,
+                        isDark: isDark
+                    )
+                }
+
+                VStack(spacing: 0) {
+                    Spacer(minLength: 0)
+                    LinearGradient(
+                        colors: [
+                            Color.white.opacity(isDark ? 0.04 : (hasThemeSkin ? 0.14 : 0.38)),
+                            themeManager.backgroundColor.opacity(isDark ? 0.14 : (hasThemeSkin ? 0.16 : 0.34)),
+                            themeManager.accentTextColor.opacity(isDark ? 0.08 : (hasThemeSkin ? 0.06 : 0.12))
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                    .frame(height: min(geometry.size.height * 0.34, 300))
+                    .blur(radius: hasThemeSkin ? 8 : 16)
+                    .offset(y: 50)
+                }
+            }
+        }
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+}
+
+private struct BookHousePaperTexture: View {
+    let accent: Color
+    let isDark: Bool
+
+    var body: some View {
+        GeometryReader { geometry in
+            let spacing = max(68, geometry.size.width / 5.4)
+
+            ZStack {
+                Path { path in
+                    var y = -spacing
+                    while y < geometry.size.height + spacing {
+                        path.move(to: CGPoint(x: -24, y: y))
+                        path.addLine(to: CGPoint(x: geometry.size.width + 24, y: y + spacing * 0.28))
+                        y += spacing
+                    }
+                }
+                .stroke(Color.white.opacity(isDark ? 0.035 : 0.18), lineWidth: 1)
+
+                Path { path in
+                    var x = -spacing
+                    while x < geometry.size.width + spacing {
+                        path.move(to: CGPoint(x: x, y: -24))
+                        path.addLine(to: CGPoint(x: x + spacing * 0.2, y: geometry.size.height + 24))
+                        x += spacing
+                    }
+                }
+                .stroke(accent.opacity(isDark ? 0.025 : 0.055), lineWidth: 0.8)
+            }
+        }
+    }
+}
+
 private struct BookHouseTopChrome: View {
     @Binding var isPlacementMode: Bool
     let onResetLayout: () -> Void
     let onOpenFeature: (AppFeatureDescriptor) -> Void
+    @ObservedObject private var themeSkinManager = ThemeSkinManager.shared
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
-            HStack(spacing: 0) {
-                topTabButton(
-                    title: "少女衣橱",
-                    systemImage: "cabinet.fill",
-                    featureID: .wardrobe
-                )
+            HomeThemeSkinToolbarShell(
+                descriptor: topBarSegmentDescriptor,
+                style: .segment,
+                horizontalPadding: 5,
+                verticalPadding: 5
+            ) {
+                HStack(spacing: 0) {
+                    topTabButton(
+                        title: "少女衣橱",
+                        systemImage: "cabinet.fill",
+                        featureID: .wardrobe
+                    )
 
-                topTabButton(
-                    title: "心愿尾款",
-                    systemImage: "calendar.badge.clock",
-                    featureID: .depositPlan
-                )
+                    topTabButton(
+                        title: "心愿尾款",
+                        systemImage: "calendar.badge.clock",
+                        featureID: .depositPlan
+                    )
+                }
             }
-            .padding(5)
-            .background(.white.opacity(0.62), in: Capsule())
-            .overlay(Capsule().stroke(Color.white.opacity(0.58), lineWidth: 1))
-            .shadow(color: .black.opacity(0.05), radius: 10, x: 0, y: 6)
 
             Spacer(minLength: 8)
 
-            HStack(spacing: 4) {
-                iconButton(
-                    isPlacementMode ? "checkmark" : "arrow.up.and.down.and.arrow.left.and.right",
-                    active: isPlacementMode
-                ) {
-                    withAnimation(.spring(response: 0.28, dampingFraction: 0.84)) {
-                        isPlacementMode.toggle()
+            HomeThemeSkinToolbarShell(
+                descriptor: topBarMainDescriptor,
+                style: .group,
+                horizontalPadding: 6,
+                verticalPadding: 6
+            ) {
+                HStack(spacing: 4) {
+                    iconButton(
+                        isPlacementMode ? "checkmark" : "arrow.up.and.down.and.arrow.left.and.right",
+                        active: isPlacementMode
+                    ) {
+                        withAnimation(.spring(response: 0.28, dampingFraction: 0.84)) {
+                            isPlacementMode.toggle()
+                        }
+                    }
+
+                    iconButton("yensign.circle", featureID: .wealth)
+                    iconButton("book.pages", featureID: .outfitJournal)
+                    iconButton("bell", featureID: .calendar)
+                    iconButton("ellipsis.circle", featureID: .petChat)
+
+                    iconButton("plus") {
+                        onResetLayout()
                     }
                 }
-
-                iconButton("yensign.circle", featureID: .wealth)
-                iconButton("book.pages", featureID: .outfitJournal)
-                iconButton("bell", featureID: .calendar)
-                iconButton("ellipsis.circle", featureID: .petChat)
-
-                iconButton("plus") {
-                    onResetLayout()
-                }
             }
-            .padding(6)
-            .background(.white.opacity(0.68), in: Capsule())
-            .overlay(Capsule().stroke(Color.white.opacity(0.58), lineWidth: 1))
-            .shadow(color: .black.opacity(0.05), radius: 10, x: 0, y: 6)
         }
     }
 
@@ -223,6 +316,7 @@ private struct BookHouseTopChrome: View {
                 .font(.system(size: 11, weight: .semibold))
                 .labelStyle(.titleAndIcon)
                 .foregroundStyle(Color(hex: featureID == .wardrobe ? "8E8288" : "D79AAD"))
+                .themeSkinLegibleText(level: .chip, slot: .topBarSegment, descriptor: topBarSegmentDescriptor)
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
                 .frame(width: 62, height: 34)
@@ -241,11 +335,32 @@ private struct BookHouseTopChrome: View {
             Image(systemName: systemImage)
                 .font(.system(size: 15, weight: .semibold))
                 .foregroundStyle(active ? Color.white : Color(hex: "5F565C"))
+                .themeSkinLegibleSymbol(level: .badge, slot: .topBarIconButton, descriptor: topBarIconButtonDescriptor)
                 .frame(width: 28, height: 28)
                 .background(active ? Color(hex: "E59AB0") : Color.clear, in: Circle())
         }
         .buttonStyle(.plain)
         .accessibilityLabel(systemImage)
+    }
+
+    private var topBarMainDescriptor: ThemeSkinDescriptor? {
+        themedDescriptor(for: .topBarMain)
+    }
+
+    private var topBarSegmentDescriptor: ThemeSkinDescriptor? {
+        themedDescriptor(for: .topBarSegment)
+    }
+
+    private var topBarIconButtonDescriptor: ThemeSkinDescriptor? {
+        themedDescriptor(for: .topBarIconButton)
+    }
+
+    private func themedDescriptor(for slot: ThemeSkinSlot) -> ThemeSkinDescriptor? {
+        guard let descriptor = themeSkinManager.activeThemeDescriptor(for: slot, state: .default),
+              WardrobeThemeSkinSupport.isThemeSkinDescriptor(descriptor) else {
+            return nil
+        }
+        return descriptor
     }
 }
 
@@ -258,10 +373,12 @@ private struct PrototypeBookRoomView: View {
 
     var body: some View {
         ZStack {
+            BookHouseRoomPedestalShadow(roomSize: roomSize)
+
             Image("book_house_room_shell")
                 .resizable()
                 .scaledToFit()
-                .shadow(color: Color(hex: "604A35").opacity(0.18), radius: 10, x: 0, y: 8)
+                .shadow(color: Color(hex: "604A35").opacity(0.22), radius: 14, x: 0, y: 10)
 
             ForEach(room.items) { item in
                 PrototypeRoomItemView(
@@ -283,6 +400,30 @@ private struct PrototypeBookRoomView: View {
         .frame(width: roomSize.width, height: roomSize.height)
         .accessibilityElement(children: .contain)
         .accessibilityLabel(room.title)
+    }
+}
+
+private struct BookHouseRoomPedestalShadow: View {
+    let roomSize: CGSize
+
+    var body: some View {
+        Ellipse()
+            .fill(
+                LinearGradient(
+                    colors: [
+                        Color(hex: "7B6048").opacity(0.18),
+                        Color(hex: "7B6048").opacity(0.04)
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+            )
+            .frame(
+                width: roomSize.width * 0.78,
+                height: max(24, roomSize.height * 0.13)
+            )
+            .blur(radius: 8)
+            .offset(y: roomSize.height * 0.38)
     }
 }
 

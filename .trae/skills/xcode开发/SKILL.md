@@ -1,53 +1,80 @@
 ---
 name: xcode开发
-description: 很强的开发
+description: Pink_House iOS/Xcode/SwiftUI 开发与模拟器验收技能。用于修改 iOS 代码后运行 xcodebuild、Xcode Simulator、simctl 或 Computer Use 电脑控制验收，尤其要保证先对当前目标模拟器重新编译、安装并重启新进程，再判断 UI。
 ---
 
-# 📱 App Skills & Intelligence Integration (iOS 26)
+# Pink House Xcode Development
 
-本文件定义了 **[Your App Name]** 如何通过 **App Intents** 协议向 iOS 26 系统（Apple Intelligence）暴露其核心能力。
+在 Pink_House 做 iOS / SwiftUI / Xcode 相关改动时使用本技能。重点不是“能看到模拟器”，而是确保看到的是刚刚修改代码编译出来的新 app。
 
----
+## 必读
 
-## 🏗 架构概览 (Architecture)
+如果任务涉及模拟器截图、电脑控制验收、文案/视觉核对，先读：
 
-在 iOS 26 中，App 的功能不再孤立。我们通过以下维度与系统深度融合：
-* **App Intents**: 定义可被执行的原子操作。
-* **App Entities**: 定义系统可识别的数据对象（如：账单、联系人、项目）。
-* **App Shortcuts**: 提供开箱即用的自动化组合。
-* **Deep Links**: 确保从系统 AI 建议中能够精准直达 UI 页面。
+- `docs/XCODE_SIMULATOR_COMPUTER_USE_ACCEPTANCE.md`
 
----
+## 电脑控制验收铁律
 
-## 🚀 核心技能列表 (Core Skills)
+Computer Use 只能证明当前 Simulator 窗口显示了什么，不能证明它来自新代码。验收必须按下面顺序：
 
-### 1. 生产力与操作 (Productivity)
-| 技能名称 (Skill) | 意图 ID (Intent ID) | 描述 | 关键参数 |
-| :--- | :--- | :--- | :--- |
-| **快速录入** | `QuickEntryIntent` | 通过语音或文本快速创建记录 | `content`, `tags`, `timestamp` |
-| **深度搜索** | `DeepSearchIntent` | 在 App 内部进行语义化内容检索 | `query`, `dateRange` |
-| **智能归档** | `AutoArchiveIntent` | AI 自动识别并整理过期项目 | `category`, `priorityThreshold` |
+1. 锁定用户正在看的模拟器 destination，例如 `platform=iOS Simulator,name=iPhone 17 Pro`。
+2. 对同一个 destination 重新编译。
+3. 安装新产物，或通过 Xcode Run 到同一个模拟器。
+4. `simctl terminate` 旧进程，再 `simctl launch`。
+5. 最后才用 Computer Use 读取页面和点击核验。
 
-### 2. 系统集成 (System Integration)
-* **灵动岛 (Dynamic Island)**: 支持实时活动 (Live Activities) 状态更新的意图触发。
-* **锁屏小组件**: 暴露最常用的 Skill 快捷入口。
-* **Siri 全局调用**: 无需唤醒 App，通过“嘿 Siri，用 [App Name] ...”直接执行。
+如果 Computer Use 看到旧文案，先假设是旧进程、旧构建、装错模拟器或页面缓存，不要先怀疑代码没改对。
 
----
+## 推荐命令
 
-## 🛠 技术实现 (Implementation)
+仓库路径：
 
-### 数据实体定义 (App Entity)
-为了让系统理解 App 内的数据对象，我们实现了以下实体：
+```bash
+PROJ="/Users/muniao/Library/Mobile Documents/com~apple~CloudDocs/游戏/github/Pink_House"
+cd "$PROJ"
+```
 
-```swift
-struct MyProjectEntity: AppEntity {
-    static var typeDisplayRepresentation: TypeDisplayRepresentation = "项目"
-    static var defaultQuery = MyProjectQuery()
-    
-    @Property(title: "项目名称")
-    var name: String
-    
-    @Property(title: "最后修改日期")
-    var lastModified: Date
-}
+常规构建：
+
+```bash
+xcodebuild \
+  -scheme ItemManager \
+  -destination 'platform=iOS Simulator,name=iPhone 17 Pro' \
+  -quiet build
+```
+
+iCloud 路径导致签名报 `resource fork, Finder information, or similar detritus not allowed` 时，优先把 DerivedData 放到 `/private/tmp`，并复用已有包缓存：
+
+```bash
+xcodebuild \
+  -scheme ItemManager \
+  -destination 'platform=iOS Simulator,name=iPhone 17 Pro' \
+  -derivedDataPath /private/tmp/pink-house-build-<ts> \
+  -clonedSourcePackagesDirPath build/SourcePackages \
+  -quiet build
+```
+
+安装和重启：
+
+```bash
+xcrun simctl install booted /private/tmp/pink-house-build-<ts>/Build/Products/Debug-iphonesimulator/ItemManager.app
+xcrun simctl terminate booted bugod2.ItemManager
+xcrun simctl launch booted bugod2.ItemManager
+```
+
+文案类改动可先查产物：
+
+```bash
+rg -a -n "新文案|旧文案" /private/tmp/pink-house-build-<ts>/Build/Products/Debug-iphonesimulator/ItemManager.app
+```
+
+## 输出要求
+
+最终回复必须写清：
+
+- 跑过的 `xcodebuild` 命令、destination、PASS/FAIL。
+- 是否安装、terminate、launch 到同一个模拟器。
+- Computer Use 实际观察到的关键 UI 文案或状态。
+- 未覆盖边界：未跑构建、未跑模拟器、未跑真机、或仅做静态检查。
+
+不要把“Simulator 里有一个页面”写成完整验收通过。缺少重新编译或进程重启时，必须明确标注验收不完整。

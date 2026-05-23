@@ -137,7 +137,7 @@ struct VIPAppIconSelectionView: View {
                 Text("个性图标库")
                     .font(.system(size: 24, weight: .bold))
                     .foregroundStyle(primaryTextColor)
-                Text("VIP 可自主切换应用图标")
+                Text("VIP 专属桌面换装")
                     .font(.system(size: 13, weight: .medium))
                     .foregroundStyle(secondaryTextColor)
             }
@@ -180,12 +180,12 @@ struct VIPAppIconSelectionView: View {
                 Image(systemName: "app.badge.fill")
                     .font(.system(size: 20, weight: .bold))
                     .foregroundStyle(isThemeSkinActive ? accentColor : visualTheme.primaryGlassStyle.iconTint)
-                Text("让 VIP 身份延伸到桌面")
+                Text("把喜欢的衣橱风格带到桌面")
                     .font(.system(size: 18, weight: .bold))
                     .foregroundStyle(primaryTextColor)
             }
 
-            Text("图标切换采用和 VIP 页同源的精致卡片视觉。当前已接入默认图标、temp/图标素材与 image2 探索款，后续继续往图标库里扩。")
+            Text("为 Pink House 换一枚更贴近心情的图标。经典、礼服、珍珠与月光风格都可以收藏，桌面也能保持你喜欢的样子。")
                 .font(.system(size: 13, weight: .medium))
                 .foregroundStyle(secondaryTextColor)
                 .fixedSize(horizontal: false, vertical: true)
@@ -203,7 +203,7 @@ struct VIPAppIconSelectionView: View {
                 .font(.system(size: 18, weight: .bold))
                 .foregroundStyle(iconManager.supportsAlternateIcons ? accentColor : Color.orange)
 
-            Text(iconManager.supportsAlternateIcons ? "当前设备支持应用图标切换。" : "当前设备暂不支持应用图标切换，可先保留这套图标库设计。")
+            Text(iconManager.supportsAlternateIcons ? "这台设备可以切换桌面图标。" : "这台设备暂时不能切换桌面图标。")
                 .font(.system(size: 13, weight: .medium))
                 .foregroundStyle(secondaryTextColor)
 
