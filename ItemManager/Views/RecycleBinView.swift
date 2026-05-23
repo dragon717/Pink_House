@@ -11,47 +11,48 @@ import SwiftData
 struct RecycleBinView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
-    
+    @Environment(ThemeManager.self) private var themeManager
+
     // Wardrobe Query
     @Query(filter: #Predicate<Clothing> { $0.deletedAt != nil }, sort: \Clothing.deletedAt, order: .reverse)
     private var deletedClothings: [Clothing]
-    
+
     // OOTD Queries
     @Query(filter: #Predicate<BookGroup> { $0.deletedAt != nil }, sort: \BookGroup.deletedAt, order: .reverse)
     private var deletedBooks: [BookGroup]
-    
+
     @Query(filter: #Predicate<Outfit> { $0.deletedAt != nil }, sort: \Outfit.deletedAt, order: .reverse)
     private var allDeletedOutfits: [Outfit]
-    
+
     // Space OOTD Queries
     @Query(filter: #Predicate<SpaceBookGroup> { $0.deletedAt != nil }, sort: \SpaceBookGroup.deletedAt, order: .reverse)
     private var deletedSpaceBooks: [SpaceBookGroup]
-    
+
     @Query(filter: #Predicate<SpaceOutfit> { $0.deletedAt != nil }, sort: \SpaceOutfit.deletedAt, order: .reverse)
     private var allDeletedSpaceOutfits: [SpaceOutfit]
-    
+
     // Model3D Query
     @Query(filter: #Predicate<Model3D> { $0.isDeleted == true }, sort: \Model3D.deletedAt, order: .reverse)
     private var deletedModel3Ds: [Model3D]
-    
+
     // Perler Bead Pattern Query
     @Query(filter: #Predicate<PerlerBeadPattern> { $0.isDeleted == true }, sort: \PerlerBeadPattern.deletedAt, order: .reverse)
     private var deletedPatterns: [PerlerBeadPattern]
-    
+
     // Filter out outfits that belong to deleted books (to avoid duplicates in the list)
     var isolatedDeletedOutfits: [Outfit] {
         allDeletedOutfits.filter { $0.book == nil || $0.book?.deletedAt == nil }
     }
-    
+
     var isolatedDeletedSpaceOutfits: [SpaceOutfit] {
         allDeletedSpaceOutfits.filter { $0.book == nil || $0.book?.deletedAt == nil }
     }
-    
+
     @State private var selectedTab: Int
     @State private var selectedSubTab: Int = 0 // 0=平面, 1=空间, 2=模型 (用于手帐子页签)
     @State private var selectedItems: Set<UUID> = [] // Shared selection
     @State private var editMode: EditMode = .inactive
-    
+
     // Alerts
     @State private var itemToDelete: Any? // Can be Clothing, BookGroup, Outfit, Model3D, or PerlerBeadPattern
     @State private var showingDeleteAlert = false
@@ -59,25 +60,54 @@ struct RecycleBinView: View {
     @State private var showingRestoreAllAlert = false
     @State private var showingBatchDeleteAlert = false
     @State private var showingBatchRestoreAlert = false
-    
+
     // Recovery/Delete from Trash
     @State private var showingRestoreAlert = false
-    
+
     init(initialTab: Int = 0) {
         _selectedTab = State(initialValue: initialTab)
     }
-    
+
     // Tab indices: 0=Wardrobe, 1=手帐(包含平面/空间/模型), 2=PerlerBeads
-    
+
+    private var recycleBinPalette: AdaptivePaletteV2 {
+        AdaptivePaletteV2.generate(
+            from: themeManager.backgroundColor,
+            accentColor: themeManager.cardTintColor,
+            containerBackground: .solid(color: themeManager.backgroundColor)
+        )
+    }
+
+    private var recycleBinColorScheme: ColorScheme {
+        themeManager.backgroundColor.isDark ? .dark : .light
+    }
+
+    private var recycleBinWardrobeCellThemeInputs: WardrobeCellThemeInputs {
+        let isDarkBackground = themeManager.backgroundColor.isDark
+        return WardrobeCellThemeInputs(
+            cardStyleRawValue: "solid",
+            skirtFillModeRawValue: "transparent",
+            isDarkMode: isDarkBackground,
+            cardBackgroundHex: isDarkBackground ? "#2A2229" : "#FFFFFF",
+            cardTintHex: themeManager.cardTintColor.toHex(),
+            transparentOpacity: 1.0,
+            tintOpacity: 1.0
+        )
+    }
     var body: some View {
         contentView
             .environment(\.editMode, $editMode)
+            .environment(\.containerPalette, recycleBinPalette)
             .navigationTitle("回收站")
             .navigationBarTitleDisplayMode(.inline)
             .background {
                 LiquidBackground()
             }
             .toolbar { trailingToolbar }
+            .toolbarBackground(.visible, for: .navigationBar)
+            .toolbarBackground(themeManager.backgroundColor, for: .navigationBar)
+            .toolbarColorScheme(recycleBinColorScheme, for: .navigationBar)
+            .tint(recycleBinPalette.accent)
             .onChange(of: selectedTab) { handleTabChange() }
             .onChange(of: selectedSubTab) { handleSubTabChange() }
             .alert("彻底删除", isPresented: $showingDeleteAlert) {
@@ -123,40 +153,60 @@ struct RecycleBinView: View {
                 Text("确定要恢复这个项目吗？")
             }
     }
-    
+
     private var contentView: some View {
         VStack(spacing: 0) {
             mainPicker
-            
+
             if selectedTab == 1 {
                 subTabPicker
             }
-            
+
             listContent
         }
     }
-    
+
     private var mainPicker: some View {
         Picker("分类", selection: $selectedTab) {
-            Text("衣橱").tag(0)
-            Text("手帐").tag(1)
-            Text("拼豆").tag(2)
+            Text("衣橱")
+                .foregroundStyle(recycleBinPalette.primary)
+                .themeSkinLegibleText(level: .inline, slot: .segmentedControl)
+                .tag(0)
+            Text("手帐")
+                .foregroundStyle(recycleBinPalette.primary)
+                .themeSkinLegibleText(level: .inline, slot: .segmentedControl)
+                .tag(1)
+            Text("拼豆")
+                .foregroundStyle(recycleBinPalette.primary)
+                .themeSkinLegibleText(level: .inline, slot: .segmentedControl)
+                .tag(2)
         }
         .pickerStyle(.segmented)
+        .environment(\.colorScheme, recycleBinColorScheme)
         .padding()
     }
-    
+
     private var subTabPicker: some View {
         Picker("手帐类型", selection: $selectedSubTab) {
-            Text("平面").tag(0)
-            Text("空间").tag(1)
-            Text("模型").tag(2)
+            Text("平面")
+                .foregroundStyle(recycleBinPalette.primary)
+                .themeSkinLegibleText(level: .inline, slot: .segmentedControl)
+                .tag(0)
+            Text("空间")
+                .foregroundStyle(recycleBinPalette.primary)
+                .themeSkinLegibleText(level: .inline, slot: .segmentedControl)
+                .tag(1)
+            Text("模型")
+                .foregroundStyle(recycleBinPalette.primary)
+                .themeSkinLegibleText(level: .inline, slot: .segmentedControl)
+                .tag(2)
         }
         .pickerStyle(.segmented)
+        .environment(\.colorScheme, recycleBinColorScheme)
         .padding(.horizontal)
         .padding(.bottom, 8)
     }
-    
+
     private var listContent: some View {
         Group {
             if selectedTab == 0 {
@@ -174,7 +224,7 @@ struct RecycleBinView: View {
             }
         }
     }
-    
+
     private var trailingToolbar: some ToolbarContent {
         ToolbarItem(placement: .topBarTrailing) {
             if editMode == .active {
@@ -184,7 +234,26 @@ struct RecycleBinView: View {
             }
         }
     }
-    
+
+    private func emptyState(_ title: String, systemImage: String, description: String) -> some View {
+        ContentUnavailableView {
+            Label(title, systemImage: systemImage)
+                .foregroundStyle(recycleBinPalette.primary)
+        } description: {
+            Text(description)
+                .foregroundStyle(recycleBinPalette.secondary)
+        }
+        .themeSkinLegibleText(level: .inline, slot: .emptyState)
+        .listRowBackground(Color.clear)
+    }
+
+    private func sectionHeader(_ title: String) -> some View {
+        Text(title)
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(recycleBinPalette.secondary)
+            .themeSkinLegibleText(level: .inline, slot: .sectionCard)
+    }
+
     private var editModeToolbar: some View {
         HStack(spacing: 16) {
             Button {
@@ -193,7 +262,8 @@ struct RecycleBinView: View {
                 Image(systemName: "arrow.uturn.backward")
             }
             .disabled(selectedItems.isEmpty)
-            
+            .foregroundStyle(selectedItems.isEmpty ? recycleBinPalette.disabled : recycleBinPalette.accent)
+
             Button {
                 showingBatchDeleteAlert = true
             } label: {
@@ -201,7 +271,7 @@ struct RecycleBinView: View {
             }
             .disabled(selectedItems.isEmpty)
             .foregroundStyle(.red)
-            
+
             Button("完成") {
                 withAnimation {
                     editMode = .inactive
@@ -209,9 +279,10 @@ struct RecycleBinView: View {
                 }
             }
             .fontWeight(.bold)
+            .foregroundStyle(recycleBinPalette.primary)
         }
     }
-    
+
     private var normalToolbar: some View {
         Menu {
             Button {
@@ -221,13 +292,13 @@ struct RecycleBinView: View {
             } label: {
                 Label("编辑", systemImage: "pencil")
             }
-            
+
             Button {
                 showingRestoreAllAlert = true
             } label: {
                 Label("全部恢复", systemImage: "arrow.uturn.backward.circle")
             }
-            
+
             Button(role: .destructive) {
                 showingDeleteAllAlert = true
             } label: {
@@ -235,9 +306,10 @@ struct RecycleBinView: View {
             }
         } label: {
             Image(systemName: "ellipsis.circle")
+                .foregroundStyle(recycleBinPalette.primary)
         }
     }
-    
+
     private func handleTabChange() {
         editMode = .inactive
         selectedItems.removeAll()
@@ -245,12 +317,12 @@ struct RecycleBinView: View {
             selectedSubTab = 0
         }
     }
-    
+
     private func handleSubTabChange() {
         editMode = .inactive
         selectedItems.removeAll()
     }
-    
+
     private func handleDelete() {
         if let clothing = itemToDelete as? Clothing {
             permanentlyDeleteClothing(clothing)
@@ -269,7 +341,7 @@ struct RecycleBinView: View {
         }
         itemToDelete = nil
     }
-    
+
     private func handleRestore() {
         if let clothing = itemToDelete as? Clothing {
             restoreClothing(clothing)
@@ -288,21 +360,19 @@ struct RecycleBinView: View {
         }
         itemToDelete = nil
     }
-    
+
     // MARK: - Wardrobe View
-    
+
     var wardrobeList: some View {
         List(selection: $selectedItems) {
             if deletedClothings.isEmpty {
-                ContentUnavailableView(
-                    "回收站是空的",
-                    systemImage: "trash",
-                    description: Text("删除的裙装会出现在这里")
-                )
-                .listRowBackground(Color.clear)
+                emptyState("回收站是空的", systemImage: "trash", description: "删除的裙装会出现在这里")
             } else {
                 ForEach(deletedClothings) { clothing in
-                    ClothingRowBrief(clothing: clothing)
+                    ClothingRowBrief(
+                        clothing: clothing,
+                        themeInputs: recycleBinWardrobeCellThemeInputs
+                    )
                         .padding(.vertical, 4)
                         .listRowBackground(Color.clear)
                         .swipeActions(edge: .leading, allowsFullSwipe: true) {
@@ -331,22 +401,17 @@ struct RecycleBinView: View {
         }
         .scrollContentBackground(.hidden)
     }
-    
+
     // MARK: - OOTD View
-    
+
     var ootdList: some View {
         List(selection: $selectedItems) {
             if deletedBooks.isEmpty && isolatedDeletedOutfits.isEmpty {
-                ContentUnavailableView(
-                    "回收站是空的",
-                    systemImage: "book.closed",
-                    description: Text("删除的手帐和书页会出现在这里")
-                )
-                .listRowBackground(Color.clear)
+                emptyState("回收站是空的", systemImage: "book.closed", description: "删除的手帐和书页会出现在这里")
             } else {
                 // Deleted Books Section
                 if !deletedBooks.isEmpty {
-                    Section("手帐本") {
+                    Section {
                         ForEach(deletedBooks) { book in
                             DeletedBookRow(book: book, isEditing: editMode == .active, onRestore: {
                                 itemToDelete = book
@@ -358,12 +423,14 @@ struct RecycleBinView: View {
                             .listRowBackground(Color.clear)
                             .tag(book.id) // Ensure ID is captured for selection
                         }
+                    } header: {
+                        sectionHeader("手帐本")
                     }
                 }
-                
+
                 // Deleted Pages Section
                 if !isolatedDeletedOutfits.isEmpty {
-                    Section("单独删除的书页") {
+                    Section {
                         ForEach(isolatedDeletedOutfits) { outfit in
                             DeletedOutfitRow(outfit: outfit, isEditing: editMode == .active, onRestore: {
                                 itemToDelete = outfit
@@ -375,28 +442,25 @@ struct RecycleBinView: View {
                             .listRowBackground(Color.clear)
                             .tag(outfit.id) // Ensure ID is captured for selection
                         }
+                    } header: {
+                        sectionHeader("单独删除的书页")
                     }
                 }
             }
         }
         .scrollContentBackground(.hidden)
     }
-    
+
     // MARK: - Space OOTD View
-    
+
     var spaceOOTDList: some View {
         List(selection: $selectedItems) {
             if deletedSpaceBooks.isEmpty && isolatedDeletedSpaceOutfits.isEmpty {
-                ContentUnavailableView(
-                    "回收站是空的",
-                    systemImage: "cube.transparent",
-                    description: Text("删除的空间手帐和书页会出现在这里")
-                )
-                .listRowBackground(Color.clear)
+                emptyState("回收站是空的", systemImage: "cube.transparent", description: "删除的空间手帐和书页会出现在这里")
             } else {
                 // Deleted Books Section
                 if !deletedSpaceBooks.isEmpty {
-                    Section("空间手帐") {
+                    Section {
                         ForEach(deletedSpaceBooks) { book in
                             DeletedSpaceBookRow(book: book, isEditing: editMode == .active, onRestore: {
                                 itemToDelete = book
@@ -408,12 +472,14 @@ struct RecycleBinView: View {
                             .listRowBackground(Color.clear)
                             .tag(book.id)
                         }
+                    } header: {
+                        sectionHeader("空间手帐")
                     }
                 }
-                
+
                 // Deleted Pages Section
                 if !isolatedDeletedSpaceOutfits.isEmpty {
-                    Section("单独删除的空间书页") {
+                    Section {
                         ForEach(isolatedDeletedSpaceOutfits) { outfit in
                             DeletedSpaceOutfitRow(outfit: outfit, isEditing: editMode == .active, onRestore: {
                                 itemToDelete = outfit
@@ -425,24 +491,21 @@ struct RecycleBinView: View {
                             .listRowBackground(Color.clear)
                             .tag(outfit.id)
                         }
+                    } header: {
+                        sectionHeader("单独删除的空间书页")
                     }
                 }
             }
         }
         .scrollContentBackground(.hidden)
     }
-    
+
     // MARK: - Model3D View
-    
+
     var model3DList: some View {
         List(selection: $selectedItems) {
             if deletedModel3Ds.isEmpty {
-                ContentUnavailableView(
-                    "回收站是空的",
-                    systemImage: "cube.box",
-                    description: Text("删除的3D模型会出现在这里")
-                )
-                .listRowBackground(Color.clear)
+                emptyState("回收站是空的", systemImage: "cube.box", description: "删除的3D模型会出现在这里")
             } else {
                 ForEach(deletedModel3Ds) { model in
                     DeletedModel3DRow(model: model, isEditing: editMode == .active, onRestore: {
@@ -459,18 +522,13 @@ struct RecycleBinView: View {
         }
         .scrollContentBackground(.hidden)
     }
-    
+
     // MARK: - Perler Beads View
-    
+
     var perlerBeadsList: some View {
         List(selection: $selectedItems) {
             if deletedPatterns.isEmpty {
-                ContentUnavailableView(
-                    "回收站是空的",
-                    systemImage: "circle.grid.2x2",
-                    description: Text("删除的拼豆/像素画会出现在这里")
-                )
-                .listRowBackground(Color.clear)
+                emptyState("回收站是空的", systemImage: "circle.grid.2x2", description: "删除的拼豆/像素画会出现在这里")
             } else {
                 ForEach(deletedPatterns) { pattern in
                     DeletedPerlerPatternRow(pattern: pattern, isEditing: editMode == .active, onRestore: {
@@ -487,9 +545,9 @@ struct RecycleBinView: View {
         }
         .scrollContentBackground(.hidden)
     }
-    
+
     // MARK: - Actions
-    
+
     private func restoreClothing(_ clothing: Clothing) {
         withAnimation {
             clothing.isDeleted = false
@@ -499,7 +557,7 @@ struct RecycleBinView: View {
         }
         // 从 DeleteTracker 中移除删除记录，防止被再次删除
         DeleteTracker.shared.removeDeletedClothing(id: clothing.id)
-        
+
         // 立即保存，确保恢复状态被持久化
         do {
             try modelContext.save()
@@ -508,7 +566,7 @@ struct RecycleBinView: View {
             print("RecycleBinView: 恢复裙装保存失败: \(error)")
         }
     }
-    
+
     private func permanentlyDeleteClothing(_ clothing: Clothing) {
         withAnimation {
             NotificationManager.shared.cancelNotification(for: clothing)
@@ -517,7 +575,7 @@ struct RecycleBinView: View {
         // 从 DeleteTracker 中移除删除记录，因为项目已被彻底删除
         DeleteTracker.shared.removeDeletedClothing(id: clothing.id)
     }
-    
+
     private func restoreBook(_ book: BookGroup) {
         withAnimation {
             book.isDeleted = false
@@ -536,7 +594,7 @@ struct RecycleBinView: View {
         DeleteTracker.shared.removeDeletedBookGroup(id: book.id)
         saveRestoreState("平面手帐「\(book.title)」")
     }
-    
+
     private func permanentlyDeleteBook(_ book: BookGroup) {
         withAnimation {
             // Delete snapshot files for all pages
@@ -552,7 +610,7 @@ struct RecycleBinView: View {
         // 从 DeleteTracker 中移除手帐本的删除记录
         DeleteTracker.shared.removeDeletedBookGroup(id: book.id)
     }
-    
+
     private func restoreOutfit(_ outfit: Outfit) {
         withAnimation {
             outfit.isDeleted = false
@@ -563,7 +621,7 @@ struct RecycleBinView: View {
         DeleteTracker.shared.removeDeletedOutfit(id: outfit.id)
         saveRestoreState("平面书页「\(outfit.note)」")
     }
-    
+
     private func permanentlyDeleteOutfit(_ outfit: Outfit) {
         withAnimation {
             if let path = outfit.snapshotPath {
@@ -574,7 +632,7 @@ struct RecycleBinView: View {
         // 从 DeleteTracker 中移除删除记录，因为项目已被彻底删除
         DeleteTracker.shared.removeDeletedOutfit(id: outfit.id)
     }
-    
+
     private func restoreSpaceBook(_ book: SpaceBookGroup) {
         withAnimation {
             book.isDeleted = false
@@ -603,7 +661,7 @@ struct RecycleBinView: View {
         // 注意：SpaceBookGroup 和 SpaceOutfit 目前没有在 DeleteTracker 中单独追踪
         // 如果需要，可以在这里添加相应的清理逻辑
     }
-    
+
     private func restoreSpaceOutfit(_ outfit: SpaceOutfit) {
         withAnimation {
             outfit.isDeleted = false
@@ -612,7 +670,7 @@ struct RecycleBinView: View {
         }
         saveRestoreState("空间书页「\(outfit.note)」")
     }
-    
+
     private func permanentlyDeleteSpaceOutfit(_ outfit: SpaceOutfit) {
         withAnimation {
             if let path = outfit.snapshotPath {
@@ -623,7 +681,7 @@ struct RecycleBinView: View {
         // 注意：SpaceOutfit 目前没有在 DeleteTracker 中单独追踪
         // 如果需要，可以在这里添加相应的清理逻辑
     }
-    
+
     private func restoreModel3D(_ model: Model3D) {
         withAnimation {
             model.isDeleted = false
@@ -634,7 +692,7 @@ struct RecycleBinView: View {
         DeleteTracker.shared.removeDeletedModel3D(id: model.id)
         saveRestoreState("3D模型「\(model.name)」")
     }
-    
+
     private func permanentlyDeleteModel3D(_ model: Model3D) {
         withAnimation {
             // 删除模型文件和目录
@@ -652,7 +710,7 @@ struct RecycleBinView: View {
         // 从 DeleteTracker 中移除删除记录，因为项目已被彻底删除
         DeleteTracker.shared.removeDeletedModel3D(id: model.id)
     }
-    
+
     private func restorePerlerPattern(_ pattern: PerlerBeadPattern) {
         withAnimation {
             pattern.isDeleted = false
@@ -674,7 +732,7 @@ struct RecycleBinView: View {
             print("RecycleBinView: 恢复\(label)保存失败: \(error)")
         }
     }
-    
+
     private func permanentlyDeletePerlerPattern(_ pattern: PerlerBeadPattern) {
         withAnimation {
             // 删除缩略图
@@ -690,9 +748,9 @@ struct RecycleBinView: View {
         // 从 DeleteTracker 中移除删除记录，因为项目已被彻底删除
         DeleteTracker.shared.removeDeletedPerlerPattern(id: pattern.id)
     }
-    
+
     // MARK: - Batch Actions
-    
+
     private func restoreAll() {
         if selectedTab == 0 {
             for clothing in deletedClothings {
@@ -724,7 +782,7 @@ struct RecycleBinView: View {
             }
         }
     }
-    
+
     private func deleteAll() {
         if selectedTab == 0 {
             for clothing in deletedClothings {
@@ -756,7 +814,7 @@ struct RecycleBinView: View {
             }
         }
     }
-    
+
     private func restoreSelected() {
         if selectedTab == 0 {
             let itemsToRestore = deletedClothings.filter { selectedItems.contains($0.id) }
@@ -769,7 +827,7 @@ struct RecycleBinView: View {
                 for book in booksToRestore {
                     restoreBook(book)
                 }
-                
+
                 let outfitsToRestore = isolatedDeletedOutfits.filter { selectedItems.contains($0.id) }
                 for outfit in outfitsToRestore {
                     restoreOutfit(outfit)
@@ -779,7 +837,7 @@ struct RecycleBinView: View {
                 for book in booksToRestore {
                     restoreSpaceBook(book)
                 }
-                
+
                 let outfitsToRestore = isolatedDeletedSpaceOutfits.filter { selectedItems.contains($0.id) }
                 for outfit in outfitsToRestore {
                     restoreSpaceOutfit(outfit)
@@ -798,7 +856,7 @@ struct RecycleBinView: View {
         }
         selectedItems.removeAll()
     }
-    
+
     private func deleteSelected() {
         if selectedTab == 0 {
             let itemsToDelete = deletedClothings.filter { selectedItems.contains($0.id) }
@@ -811,7 +869,7 @@ struct RecycleBinView: View {
                 for book in booksToDelete {
                     permanentlyDeleteBook(book)
                 }
-                
+
                 let outfitsToDelete = isolatedDeletedOutfits.filter { selectedItems.contains($0.id) }
                 for outfit in outfitsToDelete {
                     permanentlyDeleteOutfit(outfit)
@@ -821,7 +879,7 @@ struct RecycleBinView: View {
                 for book in booksToDelete {
                     permanentlyDeleteSpaceBook(book)
                 }
-                
+
                 let outfitsToDelete = isolatedDeletedSpaceOutfits.filter { selectedItems.contains($0.id) }
                 for outfit in outfitsToDelete {
                     permanentlyDeleteSpaceOutfit(outfit)
@@ -847,9 +905,15 @@ struct DeletedBookRow: View {
     var isEditing: Bool = false
     let onRestore: () -> Void
     let onDelete: () -> Void
-    
+
+    @Environment(\.containerPalette) private var palette
+    @Environment(ThemeManager.self) private var themeManager
     @State private var isExpanded = false
-    
+
+    private var cardBackground: Color {
+        themeManager.backgroundColor.isDark ? .white.opacity(0.12) : .white.opacity(0.74)
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
@@ -861,20 +925,21 @@ struct DeletedBookRow: View {
                     HStack {
                         Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
                             .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(palette.secondary)
                             .frame(width: 20)
-                        
+
                         Image(systemName: "folder.fill")
-                            .foregroundStyle(Color.accentColor)
-                        
+                            .foregroundStyle(palette.accent)
+
                         Text(book.title)
                             .font(.headline)
-                        
+                            .foregroundStyle(palette.primary)
+
                         Spacer()
-                        
+
                         Text("\(book.pages?.count ?? 0) 页")
                             .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(palette.secondary)
                     }
                 }
                 .buttonStyle(.plain)
@@ -885,7 +950,7 @@ struct DeletedBookRow: View {
                     HStack(spacing: 16) {
                         Button(action: onRestore) {
                             Image(systemName: "arrow.uturn.backward.circle.fill")
-                                .foregroundStyle(.blue)
+                                .foregroundStyle(palette.accent)
                                 .font(.title3)
                         }
                         .buttonStyle(.plain)
@@ -905,14 +970,15 @@ struct DeletedBookRow: View {
                     HStack {
                         Image(systemName: "doc.text")
                             .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(palette.secondary)
                             .padding(.leading, 28)
-                        
+
                         Text(page.note.isEmpty ? "未命名书页" : page.note)
                             .font(.subheadline)
-                        
+                            .foregroundStyle(palette.primary)
+
                         Spacer()
-                        
+
                         if page.shouldUseStoredSnapshot,
                            let snapshotPath = page.snapshotPath,
                            let uiImage = ImageManager.shared.loadImage(fileName: snapshotPath) {
@@ -928,7 +994,7 @@ struct DeletedBookRow: View {
             }
         }
         .padding()
-        .background(Color(uiColor: .secondarySystemBackground).opacity(0.5))
+        .background(cardBackground)
         .cornerRadius(12)
     }
 }
@@ -940,7 +1006,14 @@ struct DeletedModel3DRow: View {
     var isEditing: Bool = false
     let onRestore: () -> Void
     let onDelete: () -> Void
-    
+
+    @Environment(\.containerPalette) private var palette
+    @Environment(ThemeManager.self) private var themeManager
+
+    private var cardBackground: Color {
+        themeManager.backgroundColor.isDark ? .white.opacity(0.12) : .white.opacity(0.74)
+    }
+
     var body: some View {
         HStack {
             // 缩略图
@@ -954,35 +1027,36 @@ struct DeletedModel3DRow: View {
             } else {
                 Image(systemName: "cube.box")
                     .font(.system(size: 24))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(palette.secondary)
                     .frame(width: 50, height: 50)
                     .background(Color.gray.opacity(0.2))
                     .clipShape(RoundedRectangle(cornerRadius: 8))
             }
-            
+
             VStack(alignment: .leading, spacing: 4) {
                 Text(model.name)
                     .font(.headline)
-                
+                    .foregroundStyle(palette.primary)
+
                 if let deletedAt = model.deletedAt {
                     Text("删除于 \(deletedAt.formatted(date: .abbreviated, time: .shortened))")
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(palette.secondary)
                 }
             }
-            
+
             Spacer()
-            
+
             // Actions
             if !isEditing {
                 HStack(spacing: 16) {
                     Button(action: onRestore) {
                         Image(systemName: "arrow.uturn.backward.circle.fill")
-                            .foregroundStyle(.blue)
+                            .foregroundStyle(palette.accent)
                             .font(.title3)
                     }
                     .buttonStyle(.plain)
-                    
+
                     Button(action: onDelete) {
                         Image(systemName: "trash.circle.fill")
                             .foregroundStyle(.red)
@@ -993,7 +1067,7 @@ struct DeletedModel3DRow: View {
             }
         }
         .padding()
-        .background(Color(uiColor: .secondarySystemBackground).opacity(0.5))
+        .background(cardBackground)
         .cornerRadius(12)
     }
 }
@@ -1003,7 +1077,14 @@ struct DeletedOutfitRow: View {
     var isEditing: Bool = false
     let onRestore: () -> Void
     let onDelete: () -> Void
-    
+
+    @Environment(\.containerPalette) private var palette
+    @Environment(ThemeManager.self) private var themeManager
+
+    private var cardBackground: Color {
+        themeManager.backgroundColor.isDark ? .white.opacity(0.12) : .white.opacity(0.74)
+    }
+
     var body: some View {
         HStack {
             if outfit.shouldUseStoredSnapshot,
@@ -1016,29 +1097,31 @@ struct DeletedOutfitRow: View {
                     .cornerRadius(8)
             } else {
                 Image(systemName: "tshirt")
+                    .foregroundStyle(palette.secondary)
                     .frame(width: 40, height: 40)
                     .background(Color.gray.opacity(0.2))
                     .cornerRadius(8)
             }
-            
+
             VStack(alignment: .leading) {
                 Text(outfit.note.isEmpty ? "未命名书页" : outfit.note)
                     .font(.body)
+                    .foregroundStyle(palette.primary)
                 Text(outfit.deletedAt?.formatted() ?? "")
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(palette.secondary)
             }
-            
+
             Spacer()
-            
+
             if !isEditing {
                 HStack(spacing: 16) {
                     Button(action: onRestore) {
                         Image(systemName: "arrow.uturn.backward")
-                            .foregroundStyle(.blue)
+                            .foregroundStyle(palette.accent)
                     }
                     .buttonStyle(.plain)
-                    
+
                     Button(action: onDelete) {
                         Image(systemName: "trash")
                             .foregroundStyle(.red)
@@ -1048,7 +1131,7 @@ struct DeletedOutfitRow: View {
             }
         }
         .padding()
-        .background(Color(uiColor: .secondarySystemBackground).opacity(0.5))
+        .background(cardBackground)
         .cornerRadius(12)
     }
 }
@@ -1058,9 +1141,15 @@ struct DeletedSpaceBookRow: View {
     var isEditing: Bool = false
     let onRestore: () -> Void
     let onDelete: () -> Void
-    
+
+    @Environment(\.containerPalette) private var palette
+    @Environment(ThemeManager.self) private var themeManager
     @State private var isExpanded = false
-    
+
+    private var cardBackground: Color {
+        themeManager.backgroundColor.isDark ? .white.opacity(0.12) : .white.opacity(0.74)
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
@@ -1072,20 +1161,21 @@ struct DeletedSpaceBookRow: View {
                     HStack {
                         Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
                             .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(palette.secondary)
                             .frame(width: 20)
-                        
+
                         Image(systemName: "folder.fill")
-                            .foregroundStyle(Color.accentColor)
-                        
+                            .foregroundStyle(palette.accent)
+
                         Text(book.title)
                             .font(.headline)
-                        
+                            .foregroundStyle(palette.primary)
+
                         Spacer()
-                        
+
                         Text("\(book.pages?.count ?? 0) 页")
                             .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(palette.secondary)
                     }
                 }
                 .buttonStyle(.plain)
@@ -1096,7 +1186,7 @@ struct DeletedSpaceBookRow: View {
                     HStack(spacing: 16) {
                         Button(action: onRestore) {
                             Image(systemName: "arrow.uturn.backward.circle.fill")
-                                .foregroundStyle(.blue)
+                                .foregroundStyle(palette.accent)
                                 .font(.title3)
                         }
                         .buttonStyle(.plain)
@@ -1116,14 +1206,15 @@ struct DeletedSpaceBookRow: View {
                     HStack {
                         Image(systemName: "cube.transparent")
                             .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(palette.secondary)
                             .padding(.leading, 28)
-                        
+
                         Text(page.note.isEmpty ? "未命名书页" : page.note)
                             .font(.subheadline)
-                        
+                            .foregroundStyle(palette.primary)
+
                         Spacer()
-                        
+
                         if let snapshotPath = page.snapshotPath,
                            let uiImage = ImageManager.shared.loadImage(fileName: snapshotPath) {
                             Image(uiImage: uiImage)
@@ -1138,7 +1229,7 @@ struct DeletedSpaceBookRow: View {
             }
         }
         .padding()
-        .background(Color(uiColor: .secondarySystemBackground).opacity(0.5))
+        .background(cardBackground)
         .cornerRadius(12)
     }
 }
@@ -1148,7 +1239,14 @@ struct DeletedSpaceOutfitRow: View {
     var isEditing: Bool = false
     let onRestore: () -> Void
     let onDelete: () -> Void
-    
+
+    @Environment(\.containerPalette) private var palette
+    @Environment(ThemeManager.self) private var themeManager
+
+    private var cardBackground: Color {
+        themeManager.backgroundColor.isDark ? .white.opacity(0.12) : .white.opacity(0.74)
+    }
+
     var body: some View {
         HStack {
             if let snapshotPath = outfit.snapshotPath,
@@ -1160,26 +1258,28 @@ struct DeletedSpaceOutfitRow: View {
                     .cornerRadius(8)
             } else {
                 Image(systemName: "cube.transparent")
+                    .foregroundStyle(palette.secondary)
                     .frame(width: 40, height: 40)
                     .background(Color.gray.opacity(0.2))
                     .cornerRadius(8)
             }
-            
+
             VStack(alignment: .leading) {
                 Text(outfit.note.isEmpty ? "未命名书页" : outfit.note)
                     .font(.body)
+                    .foregroundStyle(palette.primary)
                 Text(outfit.deletedAt?.formatted() ?? "")
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(palette.secondary)
             }
-            
+
             Spacer()
-            
+
             if !isEditing {
                 HStack(spacing: 16) {
                     Button(action: onRestore) {
                         Image(systemName: "arrow.uturn.backward")
-                            .foregroundStyle(.blue)
+                            .foregroundStyle(palette.accent)
                     }
                     .buttonStyle(.plain)
 
@@ -1192,7 +1292,7 @@ struct DeletedSpaceOutfitRow: View {
             }
         }
         .padding()
-        .background(Color(uiColor: .secondarySystemBackground).opacity(0.5))
+        .background(cardBackground)
         .cornerRadius(12)
     }
 }
@@ -1204,7 +1304,14 @@ struct DeletedPerlerPatternRow: View {
     var isEditing: Bool = false
     let onRestore: () -> Void
     let onDelete: () -> Void
-    
+
+    @Environment(\.containerPalette) private var palette
+    @Environment(ThemeManager.self) private var themeManager
+
+    private var cardBackground: Color {
+        themeManager.backgroundColor.isDark ? .white.opacity(0.12) : .white.opacity(0.74)
+    }
+
     var body: some View {
         HStack {
             // 缩略图
@@ -1218,49 +1325,50 @@ struct DeletedPerlerPatternRow: View {
             } else {
                 Image(systemName: pattern.typeEnum.icon)
                     .font(.system(size: 24))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(palette.secondary)
                     .frame(width: 50, height: 50)
                     .background(Color.gray.opacity(0.2))
                     .clipShape(RoundedRectangle(cornerRadius: 8))
             }
-            
+
             VStack(alignment: .leading, spacing: 4) {
                 Text(pattern.name)
                     .font(.headline)
-                
+                    .foregroundStyle(palette.primary)
+
                 HStack(spacing: 8) {
                     Text(pattern.typeEnum.rawValue)
                         .font(.caption)
-                        .foregroundStyle(.pink)
-                    
+                        .foregroundStyle(palette.accent)
+
                     Text("·")
                         .font(.caption)
-                        .foregroundStyle(.secondary)
-                    
+                        .foregroundStyle(palette.secondary)
+
                     Text("\(pattern.totalPixels) 像素")
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(palette.secondary)
                 }
-                
+
                 if let deletedAt = pattern.deletedAt {
                     Text("删除于 \(deletedAt.formatted(date: .abbreviated, time: .shortened))")
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(palette.secondary)
                 }
             }
-            
+
             Spacer()
-            
+
             // Actions
             if !isEditing {
                 HStack(spacing: 16) {
                     Button(action: onRestore) {
                         Image(systemName: "arrow.uturn.backward.circle.fill")
-                            .foregroundStyle(.blue)
+                            .foregroundStyle(palette.accent)
                             .font(.title3)
                     }
                     .buttonStyle(.plain)
-                    
+
                     Button(action: onDelete) {
                         Image(systemName: "trash.circle.fill")
                             .foregroundStyle(.red)
@@ -1271,7 +1379,7 @@ struct DeletedPerlerPatternRow: View {
             }
         }
         .padding()
-        .background(Color(uiColor: .secondarySystemBackground).opacity(0.5))
+        .background(cardBackground)
         .cornerRadius(12)
     }
 }

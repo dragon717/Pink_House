@@ -509,6 +509,7 @@ struct WardrobeView: View {
     @Binding var isSelectionMode: Bool
     @Binding var isEditing: Bool
     @Environment(\.customBottomFloatingLift) private var customBottomFloatingLift
+    @Environment(\.customBottomNavigationAvoidanceInset) private var customBottomNavigationAvoidanceInset
     @Environment(\.modelContext) private var modelContext
     @Environment(ThemeManager.self) private var themeManager
     @Environment(\.colorScheme) private var colorScheme
@@ -953,6 +954,11 @@ struct WardrobeView: View {
     }
 
     private var selectionModeBottomBarBottomInset: CGFloat {
+        let bottomNavigationInset = max(0, customBottomNavigationAvoidanceInset)
+        if bottomNavigationInset > 0 {
+            return bottomNavigationInset
+        }
+
         let sharedLift = max(0, customBottomFloatingLift)
         return sharedLift > 0 ? sharedLift + 12 : 0
     }

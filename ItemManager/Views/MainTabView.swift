@@ -14,10 +14,22 @@ private struct IsSimulationActiveKey: EnvironmentKey {
 }
 
 enum LegacyCustomTabBarLayout {
+    static let barHeight: CGFloat = 56
+    static let bottomSpacingWithSafeArea: CGFloat = 2
+    static let bottomSpacingWithoutSafeArea: CGFloat = 4
+    static let floatingSurfaceGap: CGFloat = 12
     static let floatingElementLift: CGFloat = 20
+
+    static var floatingSurfaceBottomInset: CGFloat {
+        barHeight + max(bottomSpacingWithSafeArea, bottomSpacingWithoutSafeArea) + floatingSurfaceGap
+    }
 }
 
 private struct CustomBottomFloatingLiftKey: EnvironmentKey {
+    static let defaultValue: CGFloat = 0
+}
+
+private struct CustomBottomNavigationAvoidanceInsetKey: EnvironmentKey {
     static let defaultValue: CGFloat = 0
 }
 
@@ -30,6 +42,11 @@ extension EnvironmentValues {
     var customBottomFloatingLift: CGFloat {
         get { self[CustomBottomFloatingLiftKey.self] }
         set { self[CustomBottomFloatingLiftKey.self] = newValue }
+    }
+
+    var customBottomNavigationAvoidanceInset: CGFloat {
+        get { self[CustomBottomNavigationAvoidanceInsetKey.self] }
+        set { self[CustomBottomNavigationAvoidanceInsetKey.self] = newValue }
     }
 }
 
@@ -372,7 +389,7 @@ struct LegacyTabView: View {
                         bottomDockButton(slotIndex: slotIndex)
                     }
                 }
-                .frame(height: 56)
+                .frame(height: LegacyCustomTabBarLayout.barHeight)
                 .background {
                     if themedTabBarDescriptor != nil {
                         ThemeSkinTabBarBackdrop(
@@ -397,7 +414,7 @@ struct LegacyTabView: View {
                 }
                 .padding(.horizontal, 16)
                 // 往下挪，紧贴底部（减小安全区域间距）
-                .padding(.bottom, safeAreaBottom > 0 ? 2 : 4)
+                .padding(.bottom, safeAreaBottom > 0 ? LegacyCustomTabBarLayout.bottomSpacingWithSafeArea : LegacyCustomTabBarLayout.bottomSpacingWithoutSafeArea)
             }
         }
     }
@@ -421,7 +438,7 @@ struct LegacyTabView: View {
             .captureGuideTarget(feature.id == .house ? GuideTargetKey.homeHouseTab : nil)
             .overlay {
                 Color.clear
-                    .frame(width: 68, height: 56)
+                    .frame(width: 68, height: LegacyCustomTabBarLayout.barHeight)
                     .allowsHitTesting(false)
                     .captureGuideTarget(feature.id == .petChat ? .homePetChatTab : nil)
             }
@@ -1002,6 +1019,7 @@ struct MainTabView: View {
             isPlayingOpeningAnimation: $isPlayingOpeningAnimation
         )
         .environment(\.customBottomFloatingLift, LegacyCustomTabBarLayout.floatingElementLift)
+        .environment(\.customBottomNavigationAvoidanceInset, LegacyCustomTabBarLayout.floatingSurfaceBottomInset)
         .overlay {
             if isPlayingOpeningAnimation {
                 OpeningVideoOverlay(
