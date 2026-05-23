@@ -97,6 +97,7 @@ struct MainContentView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.scenePhase) private var scenePhase
     @State private var showSplash = true
+    @State private var hasMountedPrimaryInterface = false
     @State private var showMigrationOverlay = false
     @State private var showDailyCheckIn = false
     @State private var didStartLaunchFlow = false
@@ -108,8 +109,14 @@ struct MainContentView: View {
     
     var body: some View {
         ZStack {
-            MainTabView()
-                .zIndex(0)
+            if hasMountedPrimaryInterface {
+                MainTabView()
+                    .zIndex(0)
+            } else {
+                Color.clear
+                    .ignoresSafeArea()
+                    .zIndex(0)
+            }
 
             GlobalGuideOverlaySceneInstaller()
                 .frame(width: 0, height: 0)
@@ -166,6 +173,17 @@ struct MainContentView: View {
             CloudSyncManager.shared.checkNetworkPermission()
             
             Task {
+                let duplicateRepairStartedAt = Date()
+                let repairedDuplicateCount = await ClothingDuplicateRepairService.shared.repairIfNeeded(
+                    modelContainer: SharedPersistence.shared.sharedModelContainer,
+                    reason: "launch-start"
+                )
+                let duplicateRepairDurationMs = Int(Date().timeIntervalSince(duplicateRepairStartedAt) * 1000)
+                launchLogger.info("launch_duplicate_repair_finish removed=\(repairedDuplicateCount) duration_ms=\(duplicateRepairDurationMs)")
+                await MainActor.run {
+                    hasMountedPrimaryInterface = true
+                }
+
                 await SharedPersistence.shared.syncWidgetData(reason: "launch-start")
                 await runStartupInitialization()
             }

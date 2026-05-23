@@ -200,7 +200,7 @@ final class OOTDDataRepairService {
         report.scannedOutfitItems = outfitItems.count
         report.scannedOutfits = outfits.count
 
-        let clothingMap = Dictionary(uniqueKeysWithValues: clothings.map { ($0.id, $0) })
+        let clothingMap = ClothingDuplicateRepairService.preferredMap(from: clothings)
         let clothingByImageHash = buildClothingHashMap(clothings: clothings)
         var affectedOutfitIDs = Set<UUID>()
 

@@ -9,7 +9,7 @@ struct OOTDCutoutListView: View {
     @Query(filter: #Predicate<Clothing> { $0.deletedAt == nil }) private var allClothings: [Clothing]
     
     private var clothingMap: [UUID: Clothing] {
-        Dictionary(uniqueKeysWithValues: allClothings.map { ($0.id, $0) })
+        ClothingDuplicateRepairService.preferredMap(from: allClothings)
     }
     
     @Binding var isExpanded: Bool

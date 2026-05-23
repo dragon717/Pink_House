@@ -508,6 +508,7 @@ struct WardrobeView: View {
     @Binding var searchText: String
     @Binding var isSelectionMode: Bool
     @Binding var isEditing: Bool
+    @Environment(\.customBottomFloatingLift) private var customBottomFloatingLift
     @Environment(\.modelContext) private var modelContext
     @Environment(ThemeManager.self) private var themeManager
     @Environment(\.colorScheme) private var colorScheme
@@ -946,8 +947,14 @@ struct WardrobeView: View {
         content.safeAreaInset(edge: .bottom) {
             if isSelectionMode {
                 selectionModeBottomBar
+                    .padding(.bottom, selectionModeBottomBarBottomInset)
             }
         }
+    }
+
+    private var selectionModeBottomBarBottomInset: CGFloat {
+        let sharedLift = max(0, customBottomFloatingLift)
+        return sharedLift > 0 ? sharedLift + 12 : 0
     }
 
     private var selectionModeBottomBar: some View {
@@ -2203,9 +2210,11 @@ struct WardrobeView: View {
     private func rebuildFilteredClothings() async {
         let displayClothings = deduplicatedClothingsForDisplay(from: clothings)
         let snapshots = displayClothings.map(WardrobeClothingSnapshot.init(clothing:))
-        let cellSnapshots = Dictionary(uniqueKeysWithValues: displayClothings.map { clothing in
-            (clothing.id, WardrobeCellSnapshot(clothing: clothing))
-        })
+        var cellSnapshots: [UUID: WardrobeCellSnapshot] = [:]
+        cellSnapshots.reserveCapacity(displayClothings.count)
+        for clothing in displayClothings {
+            cellSnapshots[clothing.id] = WardrobeCellSnapshot(clothing: clothing)
+        }
         let input = WardrobeFilterInput(
             snapshots: snapshots,
             searchText: searchText,
@@ -2227,7 +2236,11 @@ struct WardrobeView: View {
 
         guard !Task.isCancelled else { return }
 
-        let clothingByID = Dictionary(uniqueKeysWithValues: displayClothings.map { ($0.id, $0) })
+        var clothingByID: [UUID: Clothing] = [:]
+        clothingByID.reserveCapacity(displayClothings.count)
+        for clothing in displayClothings {
+            clothingByID[clothing.id] = clothing
+        }
         let resolvedClothings = result.ids.compactMap { clothingByID[$0] }
 
         filteredClothings = resolvedClothings

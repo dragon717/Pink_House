@@ -455,7 +455,7 @@ class CutoutService {
             // 获取所有 Clothing
             let clothingDescriptor = FetchDescriptor<Clothing>()
             let allClothing = try context.fetch(clothingDescriptor)
-            let clothingMap = Dictionary(uniqueKeysWithValues: allClothing.map { ($0.id, $0) })
+            let clothingMap = ClothingDuplicateRepairService.preferredMap(from: allClothing)
             
             var updatedCount = 0
             for cutout in cutouts {

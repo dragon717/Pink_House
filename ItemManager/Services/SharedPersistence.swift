@@ -55,6 +55,11 @@ class SharedContainer {
             DeleteTracker.shared.pendingContext = context
             iCloudSyncManager.shared.startMonitoring(with: self.container)
             setupDeleteTrackerAfterSync()
+            ClothingDuplicateRepairService.shared.scheduleRepair(
+                modelContainer: self.container,
+                reason: "container-startup",
+                delayNanoseconds: 300_000_000
+            )
             
             // 延迟5秒首次应用删除，确保 iCloud 同步完成
             DispatchQueue.main.asyncAfter(deadline: .now() + 5.0) {
@@ -211,8 +216,12 @@ class SharedContainer {
 
     @MainActor
     private func replayDeletesAfterCloudSync(reason: String) {
-        DeleteTracker.shared.applyAllDeletes(context: container.mainContext, clearRecords: false)
         Task {
+            DeleteTracker.shared.applyAllDeletes(context: container.mainContext, clearRecords: false)
+            await ClothingDuplicateRepairService.shared.repairIfNeeded(
+                modelContainer: container,
+                reason: reason
+            )
             await syncWidgetData(reason: reason)
         }
     }
