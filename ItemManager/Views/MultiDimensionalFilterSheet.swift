@@ -79,8 +79,8 @@ struct WardrobeFilterFacetSnapshot: Equatable, Sendable {
         self.lengths = lengths
         self.conditions = conditions
         self.accessories = accessories
-        self.tagNameByID = tagNameByID ?? Dictionary(uniqueKeysWithValues: tags.map { ($0.id, $0.name) })
-        self.brandNameByID = brandNameByID ?? Dictionary(uniqueKeysWithValues: brands.map { ($0.id, $0.name) })
+        self.tagNameByID = tagNameByID ?? Self.nameByID(from: tags)
+        self.brandNameByID = brandNameByID ?? Self.nameByID(from: brands)
     }
 
     func options(for field: ClothingField) -> [String] {
@@ -92,6 +92,14 @@ struct WardrobeFilterFacetSnapshot: Equatable, Sendable {
         case .condition: return conditions
         case .accessories: return accessories
         }
+    }
+
+    private static func nameByID(from options: [WardrobeFilterNamedOption]) -> [UUID: String] {
+        var result: [UUID: String] = [:]
+        for option in options {
+            result[option.id] = option.name
+        }
+        return result
     }
 }
 

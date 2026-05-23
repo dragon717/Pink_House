@@ -227,17 +227,20 @@ private final class WardrobeMenuFacetCache: ObservableObject {
     }
 
     nonisolated private static func buildSnapshot(from sourceKey: WardrobeMenuFacetSourceKey) -> WardrobeMenuFacetSnapshot {
-        WardrobeMenuFacetSnapshot(
+        let tagOptions = deduplicatedNamedRows(sourceKey.tags)
+        let brandOptions = deduplicatedNamedRows(sourceKey.brands)
+
+        return WardrobeMenuFacetSnapshot(
             types: distinctValues(sourceKey.clothings.map(\.types)),
             colors: distinctValues(sourceKey.clothings.map(\.colors)),
             sizes: distinctValues(sourceKey.clothings.map(\.sizes)),
             lengths: distinctValues(sourceKey.clothings.map(\.length)),
             conditions: distinctValues(sourceKey.clothings.map(\.condition)),
             accessories: distinctValues(sourceKey.clothings.map(\.accessories)),
-            tagNameByID: Dictionary(uniqueKeysWithValues: sourceKey.tags.map { ($0.id, $0.name) }),
-            brandNameByID: Dictionary(uniqueKeysWithValues: sourceKey.brands.map { ($0.id, $0.name) }),
-            tagOptions: sourceKey.tags,
-            brandOptions: sourceKey.brands
+            tagNameByID: nameByID(from: tagOptions),
+            brandNameByID: nameByID(from: brandOptions),
+            tagOptions: tagOptions,
+            brandOptions: brandOptions
         )
     }
 
@@ -251,6 +254,47 @@ private final class WardrobeMenuFacetCache: ObservableObject {
                 .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
                 .filter { !$0.isEmpty }
         )).sorted()
+    }
+
+    nonisolated private static func deduplicatedNamedRows(_ rows: [WardrobeMenuFacetNamedRow]) -> [WardrobeMenuFacetNamedRow] {
+        var rowByID: [UUID: WardrobeMenuFacetNamedRow] = [:]
+        var firstIndexByID: [UUID: Int] = [:]
+
+        for (index, row) in rows.enumerated() {
+            if let existing = rowByID[row.id] {
+                rowByID[row.id] = preferredNamedRow(existing, row)
+            } else {
+                rowByID[row.id] = row
+                firstIndexByID[row.id] = index
+            }
+        }
+
+        return rowByID.values.sorted { lhs, rhs in
+            firstIndexByID[lhs.id, default: Int.max] < firstIndexByID[rhs.id, default: Int.max]
+        }
+    }
+
+    nonisolated private static func preferredNamedRow(_ existing: WardrobeMenuFacetNamedRow, _ candidate: WardrobeMenuFacetNamedRow) -> WardrobeMenuFacetNamedRow {
+        let existingNameIsEmpty = existing.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        let candidateNameIsEmpty = candidate.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+
+        if candidate.lastModified > existing.lastModified {
+            return candidateNameIsEmpty && !existingNameIsEmpty ? existing : candidate
+        }
+
+        if existingNameIsEmpty && !candidateNameIsEmpty {
+            return candidate
+        }
+
+        return existing
+    }
+
+    nonisolated private static func nameByID(from rows: [WardrobeMenuFacetNamedRow]) -> [UUID: String] {
+        var result: [UUID: String] = [:]
+        for row in rows {
+            result[row.id] = row.name
+        }
+        return result
     }
 }
 
