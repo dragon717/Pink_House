@@ -22,8 +22,7 @@ struct BookHouseSmallWorldView: View {
             layoutStore: layoutStore,
             isPlacementMode: $isPlacementMode,
             selectedFeatureID: $selectedFeatureID,
-            onResetLayout: resetAllRooms,
-            onOpenFeature: openFeature
+            onResetLayout: resetAllRooms
         )
         .sheet(item: $selectedFeatureID) { featureID in
             let feature = AppFeatureRegistry.descriptor(for: featureID)
@@ -90,7 +89,6 @@ private struct BookHousePrototypeStage: View {
     @Binding var isPlacementMode: Bool
     @Binding var selectedFeatureID: AppFeatureID?
     let onResetLayout: () -> Void
-    let onOpenFeature: (AppFeatureDescriptor) -> Void
 
     var body: some View {
         GeometryReader { geometry in
@@ -105,14 +103,13 @@ private struct BookHousePrototypeStage: View {
                     roomView(room, in: geometry)
                 }
 
-                BookHouseTopChrome(
+                BookHouseLayoutControls(
                     isPlacementMode: $isPlacementMode,
-                    onResetLayout: onResetLayout,
-                    onOpenFeature: onOpenFeature
+                    onResetLayout: onResetLayout
                 )
-                .padding(.top, geometry.safeAreaInsets.top + 38)
-                .padding(.horizontal, 22)
-                .frame(maxHeight: .infinity, alignment: .top)
+                .padding(.top, geometry.safeAreaInsets.top + 82)
+                .padding(.trailing, 18)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
 
                 if isPlacementMode {
                     placementHint(in: geometry)
@@ -248,119 +245,52 @@ private struct BookHousePaperTexture: View {
     }
 }
 
-private struct BookHouseTopChrome: View {
+private struct BookHouseLayoutControls: View {
     @Binding var isPlacementMode: Bool
     let onResetLayout: () -> Void
-    let onOpenFeature: (AppFeatureDescriptor) -> Void
-    @ObservedObject private var themeSkinManager = ThemeSkinManager.shared
+    @Environment(ThemeManager.self) private var themeManager
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
-        HStack(alignment: .top, spacing: 12) {
-            HomeThemeSkinToolbarShell(
-                descriptor: topBarSegmentDescriptor,
-                style: .segment,
-                horizontalPadding: 5,
-                verticalPadding: 5
-            ) {
-                HStack(spacing: 0) {
-                    topTabButton(
-                        title: "少女衣橱",
-                        systemImage: "cabinet.fill",
-                        featureID: .wardrobe
-                    )
-
-                    topTabButton(
-                        title: "心愿尾款",
-                        systemImage: "calendar.badge.clock",
-                        featureID: .depositPlan
-                    )
+        HStack(spacing: 8) {
+            if isPlacementMode {
+                controlButton(systemImage: "arrow.counterclockwise", label: "恢复默认摆放") {
+                    onResetLayout()
                 }
+                .transition(.scale.combined(with: .opacity))
             }
 
-            Spacer(minLength: 8)
-
-            HomeThemeSkinToolbarShell(
-                descriptor: topBarMainDescriptor,
-                style: .group,
-                horizontalPadding: 6,
-                verticalPadding: 6
+            controlButton(
+                systemImage: isPlacementMode ? "checkmark" : "arrow.up.and.down.and.arrow.left.and.right",
+                label: isPlacementMode ? "完成整理" : "整理房间",
+                active: isPlacementMode
             ) {
-                HStack(spacing: 4) {
-                    iconButton(
-                        isPlacementMode ? "checkmark" : "arrow.up.and.down.and.arrow.left.and.right",
-                        active: isPlacementMode
-                    ) {
-                        withAnimation(.spring(response: 0.28, dampingFraction: 0.84)) {
-                            isPlacementMode.toggle()
-                        }
-                    }
-
-                    iconButton("yensign.circle", featureID: .wealth)
-                    iconButton("book.pages", featureID: .outfitJournal)
-                    iconButton("bell", featureID: .calendar)
-                    iconButton("ellipsis.circle", featureID: .petChat)
-
-                    iconButton("plus") {
-                        onResetLayout()
-                    }
+                withAnimation(.spring(response: 0.28, dampingFraction: 0.84)) {
+                    isPlacementMode.toggle()
                 }
             }
         }
+        .animation(.spring(response: 0.28, dampingFraction: 0.84), value: isPlacementMode)
     }
 
-    private func topTabButton(title: String, systemImage: String, featureID: AppFeatureID) -> some View {
-        Button {
-            onOpenFeature(AppFeatureRegistry.descriptor(for: featureID))
-        } label: {
-            Label(title, systemImage: systemImage)
-                .font(.system(size: 11, weight: .semibold))
-                .labelStyle(.titleAndIcon)
-                .foregroundStyle(Color(hex: featureID == .wardrobe ? "8E8288" : "D79AAD"))
-                .themeSkinLegibleText(level: .chip, slot: .topBarSegment, descriptor: topBarSegmentDescriptor)
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
-                .frame(width: 62, height: 34)
-        }
-        .buttonStyle(.plain)
-    }
-
-    private func iconButton(_ systemImage: String, featureID: AppFeatureID) -> some View {
-        iconButton(systemImage) {
-            onOpenFeature(AppFeatureRegistry.descriptor(for: featureID))
-        }
-    }
-
-    private func iconButton(_ systemImage: String, active: Bool = false, action: @escaping () -> Void) -> some View {
+    private func controlButton(systemImage: String, label: String, active: Bool = false, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: systemImage)
-                .font(.system(size: 15, weight: .semibold))
-                .foregroundStyle(active ? Color.white : Color(hex: "5F565C"))
-                .themeSkinLegibleSymbol(level: .badge, slot: .topBarIconButton, descriptor: topBarIconButtonDescriptor)
-                .frame(width: 28, height: 28)
-                .background(active ? Color(hex: "E59AB0") : Color.clear, in: Circle())
+                .font(.system(size: 15, weight: .bold))
+                .foregroundStyle(active ? Color.white : themeManager.accentTextColor)
+                .frame(width: 38, height: 38)
+                .background {
+                    Circle()
+                        .fill(active ? themeManager.accentTextColor : themeManager.cardBackgroundColor.opacity(colorScheme == .dark ? 0.84 : 0.9))
+                        .overlay {
+                            Circle()
+                                .stroke(Color.white.opacity(colorScheme == .dark ? 0.16 : 0.68), lineWidth: 1)
+                        }
+                        .shadow(color: Color.black.opacity(colorScheme == .dark ? 0.28 : 0.10), radius: 8, x: 0, y: 4)
+                }
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(systemImage)
-    }
-
-    private var topBarMainDescriptor: ThemeSkinDescriptor? {
-        themedDescriptor(for: .topBarMain)
-    }
-
-    private var topBarSegmentDescriptor: ThemeSkinDescriptor? {
-        themedDescriptor(for: .topBarSegment)
-    }
-
-    private var topBarIconButtonDescriptor: ThemeSkinDescriptor? {
-        themedDescriptor(for: .topBarIconButton)
-    }
-
-    private func themedDescriptor(for slot: ThemeSkinSlot) -> ThemeSkinDescriptor? {
-        guard let descriptor = themeSkinManager.activeThemeDescriptor(for: slot, state: .default),
-              WardrobeThemeSkinSupport.isThemeSkinDescriptor(descriptor) else {
-            return nil
-        }
-        return descriptor
+        .accessibilityLabel(label)
     }
 }
 
