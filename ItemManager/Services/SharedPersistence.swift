@@ -53,6 +53,8 @@ class SharedContainer {
             // 因为 ModelContainer 创建后，iCloud 同步是异步的，需要等待一段时间
             let context = self.container.mainContext
             DeleteTracker.shared.pendingContext = context
+            iCloudSyncManager.shared.startMonitoring(with: self.container)
+            setupDeleteTrackerAfterSync()
             
             // 延迟5秒首次应用删除，确保 iCloud 同步完成
             DispatchQueue.main.asyncAfter(deadline: .now() + 5.0) {
@@ -157,7 +159,7 @@ class SharedContainer {
     #if !WIDGET_EXTENSION
     /// 设置 iCloud 同步完成后的删除追踪器
     /// 在 iCloud 同步完成后应用删除，避免访问失效对象导致崩溃
-    private func setupDeleteTrackerAfterSync(context: ModelContext) {
+    private func setupDeleteTrackerAfterSync() {
         // 监听 iCloud 同步完成事件
         NotificationCenter.default.addObserver(
             forName: .NSPersistentStoreRemoteChange,
@@ -171,7 +173,7 @@ class SharedContainer {
             // 延迟一小段时间确保同步完全完成
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
                 print("DeleteTracker: iCloud 同步后应用删除...")
-                DeleteTracker.shared.applyAllDeletes(context: context)
+                self.replayDeletesAfterCloudSync(reason: "icloud-remote-change")
             }
         }
         
@@ -188,8 +190,30 @@ class SharedContainer {
             // 延迟一小段时间确保导入完全完成
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
                 print("DeleteTracker: iCloud 导入后应用删除...")
-                DeleteTracker.shared.applyAllDeletes(context: context)
+                self.replayDeletesAfterCloudSync(reason: "icloud-import")
             }
+        }
+
+        NotificationCenter.default.addObserver(
+            forName: iCloudSyncManager.syncStatusChanged,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            guard let self = self else { return }
+            guard iCloudSyncManager.shared.syncStatus == .synced else { return }
+
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                print("DeleteTracker: iCloud 状态已同步，重放本地删除保护...")
+                self.replayDeletesAfterCloudSync(reason: "icloud-synced")
+            }
+        }
+    }
+
+    @MainActor
+    private func replayDeletesAfterCloudSync(reason: String) {
+        DeleteTracker.shared.applyAllDeletes(context: container.mainContext, clearRecords: false)
+        Task {
+            await syncWidgetData(reason: reason)
         }
     }
     #endif

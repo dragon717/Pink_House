@@ -70,6 +70,12 @@ final class iCloudSyncManager {
         setupCloudKitMonitoring()
     }
 
+    func startMonitoring(with container: ModelContainer) {
+        self.container = container
+        self.context = ModelContext(container)
+        setupCloudKitMonitoring()
+    }
+
     // MARK: - 数据迁移
     /// 执行从旧本地 Store 到 iCloud Store 的数据迁移
     func performMigration() async {
@@ -186,6 +192,8 @@ final class iCloudSyncManager {
     }
 
     private func setupCloudKitMonitoring() {
+        cancellables.removeAll()
+
         // 监听 CloudKit 同步通知
         NotificationCenter.default.publisher(for: NSPersistentCloudKitContainer.eventChangedNotification)
             .sink { [weak self] notification in

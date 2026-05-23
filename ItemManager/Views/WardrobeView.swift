@@ -88,6 +88,9 @@ private struct WardrobeClothingSnapshot: Sendable {
     let sortIndex: Int
     let purchaseDate: Date
     let createdAt: Date
+    let updatedAt: Date
+    let lastModified: Date
+    let isDeleted: Bool
     let deletedAt: Date?
 
     @MainActor
@@ -112,6 +115,9 @@ private struct WardrobeClothingSnapshot: Sendable {
         self.sortIndex = clothing.sortIndex
         self.purchaseDate = clothing.purchaseDate
         self.createdAt = clothing.createdAt
+        self.updatedAt = clothing.updatedAt
+        self.lastModified = clothing.lastModified
+        self.isDeleted = clothing.isDeleted
         self.deletedAt = clothing.deletedAt
     }
 }
@@ -157,7 +163,7 @@ private enum WardrobeFilterEngine {
             return WardrobeFilterResult(ids: [], stats: .empty, conditionOptions: ["全新"])
         }
 
-        var result = input.snapshots.filter { $0.deletedAt == nil }
+        var result = input.snapshots.filter { !$0.isDeleted && $0.deletedAt == nil }
         let query = input.searchText.trimmingCharacters(in: .whitespacesAndNewlines)
 
         if !query.isEmpty {
@@ -736,6 +742,62 @@ struct WardrobeView: View {
     @MainActor
     private func cellSnapshot(for clothing: Clothing) -> WardrobeCellSnapshot {
         cellSnapshotCache[clothing.id] ?? WardrobeCellSnapshot(clothing: clothing)
+    }
+
+    @MainActor
+    private func deduplicatedClothingsForDisplay(from source: [Clothing]) -> [Clothing] {
+        var clothingByID: [UUID: Clothing] = [:]
+        var firstIndexByID: [UUID: Int] = [:]
+        var duplicateCount = 0
+
+        for (index, clothing) in source.enumerated() {
+            let id = clothing.id
+            if let existing = clothingByID[id] {
+                duplicateCount += 1
+                clothingByID[id] = preferredClothing(existing, clothing)
+            } else {
+                clothingByID[id] = clothing
+                firstIndexByID[id] = index
+            }
+        }
+
+        if duplicateCount > 0 {
+            print("WardrobeView: Deduplicated \(duplicateCount) duplicate clothing row(s) from iCloud/restore results.")
+        }
+
+        return clothingByID.values.sorted { lhs, rhs in
+            firstIndexByID[lhs.id, default: Int.max] < firstIndexByID[rhs.id, default: Int.max]
+        }
+    }
+
+    @MainActor
+    private func preferredClothing(_ existing: Clothing, _ candidate: Clothing) -> Clothing {
+        let existingDeleted = existing.isDeleted || existing.deletedAt != nil
+        let candidateDeleted = candidate.isDeleted || candidate.deletedAt != nil
+
+        if existingDeleted != candidateDeleted {
+            return candidateDeleted ? existing : candidate
+        }
+
+        if candidate.lastModified != existing.lastModified {
+            return candidate.lastModified > existing.lastModified ? candidate : existing
+        }
+
+        if candidate.updatedAt != existing.updatedAt {
+            return candidate.updatedAt > existing.updatedAt ? candidate : existing
+        }
+
+        if candidate.imagePaths.count != existing.imagePaths.count {
+            return candidate.imagePaths.count > existing.imagePaths.count ? candidate : existing
+        }
+
+        let existingNameIsEmpty = existing.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        let candidateNameIsEmpty = candidate.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        if existingNameIsEmpty != candidateNameIsEmpty {
+            return candidateNameIsEmpty ? existing : candidate
+        }
+
+        return existing
     }
     
     private var wardrobeThemeDescriptor: ThemeSkinDescriptor? {
@@ -2139,8 +2201,9 @@ struct WardrobeView: View {
 
     @MainActor
     private func rebuildFilteredClothings() async {
-        let snapshots = clothings.map(WardrobeClothingSnapshot.init(clothing:))
-        let cellSnapshots = Dictionary(uniqueKeysWithValues: clothings.map { clothing in
+        let displayClothings = deduplicatedClothingsForDisplay(from: clothings)
+        let snapshots = displayClothings.map(WardrobeClothingSnapshot.init(clothing:))
+        let cellSnapshots = Dictionary(uniqueKeysWithValues: displayClothings.map { clothing in
             (clothing.id, WardrobeCellSnapshot(clothing: clothing))
         })
         let input = WardrobeFilterInput(
@@ -2164,7 +2227,7 @@ struct WardrobeView: View {
 
         guard !Task.isCancelled else { return }
 
-        let clothingByID = Dictionary(uniqueKeysWithValues: clothings.map { ($0.id, $0) })
+        let clothingByID = Dictionary(uniqueKeysWithValues: displayClothings.map { ($0.id, $0) })
         let resolvedClothings = result.ids.compactMap { clothingByID[$0] }
 
         filteredClothings = resolvedClothings
