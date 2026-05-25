@@ -21,6 +21,19 @@
 - **不写**：`/Users/muniao/Downloads/Pink_House`（鸿蒙 DevEco 用，独立 .git，靠 iCloud 文件级同步）
 - **鸿蒙 / ArkTS / harmony_next** 才在 Downloads 写
 
+## temp 治理与知识迁移
+
+`temp/` 默认不是长期 source of truth。整理、删除或迁移 `temp/` 前，先读 `docs/TEMP_GOVERNANCE_AND_KNOWLEDGE_MIGRATION.md`；需要复用工作流时使用 `docs/skills/pink-house-temp-governance-guide/SKILL.md`。
+
+固定顺序：
+
+1. 先读 `temp` 文档，记录它自己的声明。
+2. 再读实际代码 / 工具 / 资源，确认声明是否仍成立。
+3. 把可复用内容迁入 `docs/`、`tools/`、`scripts/`、`docs/skills/`。
+4. 把旧 `temp` 路径降级为历史参考、临时输入或删除前核对输入。
+5. 跑 `rg -n "temp/" ItemManager ItemManager.xcodeproj docs scripts tools AGENTS.md --glob '!temp/**'` 分类残留引用。
+6. 用户未明确允许时，不删除文件；用户手动删除后，更新正式文档和技能口径。
+
 ## 主题皮肤复刻 — 历史 harness 与正式规则
 
 工程已有 `ThemeSkin` 框架（`ItemManager/Services/ThemeSkin/*` + `ItemManager/Views/ThemeSkin/*`），架构与 slot 已落地。本系列任务 = **接入素材，不改架构**。
