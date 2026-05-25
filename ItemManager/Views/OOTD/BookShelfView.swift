@@ -314,10 +314,11 @@ struct BookShelfView: View {
     }
 
     private func deleteBook(_ book: BookGroup) {
+        let pages = book.pages ?? []
         book.isDeleted = true
         book.deletedAt = Date()
         book.lastModified = Date()
-        for page in book.pages ?? [] {
+        for page in pages {
             page.isDeleted = true
             page.deletedAt = Date()
             page.lastModified = Date()
@@ -327,9 +328,7 @@ struct BookShelfView: View {
 
             // 记录删除到 DeleteTracker，防止iCloud同步覆盖
             DeleteTracker.shared.recordDeletedBookGroup(id: book.id)
-            for page in book.pages ?? [] {
-                DeleteTracker.shared.recordDeletedOutfit(id: page.id)
-            }
+            DeleteTracker.shared.recordDeletedOutfits(ids: pages.map(\.id))
         } catch {
             print("BookShelfView: Failed to save deletion: \(error)")
         }

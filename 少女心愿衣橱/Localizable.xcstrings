@@ -1,0 +1,94 @@
+{
+  "sourceLanguage": "en",
+  "strings": {
+    "少女心愿衣橱": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pink House Closet"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "少女心愿衣橱"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "少女心願衣櫥"
+          }
+        }
+      }
+    },
+    "展示您的衣橱统计与近期动态": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show your closet stats and recent activity."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "展示您的衣橱统计与近期动态"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "展示您的衣櫥統計與近期動態"
+          }
+        }
+      }
+    },
+    "展示衣橱统计数据。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show closet statistics."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "展示衣橱统计数据。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "展示衣櫥統計資料。"
+          }
+        }
+      }
+    },
+    "配置衣橱小组件": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Configure Closet Widget"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "配置衣橱小组件"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "設定衣櫥小工具"
+          }
+        }
+      }
+    }
+  },
+  "version": "1.0"
+}

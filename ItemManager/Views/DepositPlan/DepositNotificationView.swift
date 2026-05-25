@@ -896,27 +896,27 @@ private enum DepositReminderDisplayFormatter {
 
     private static func dateTimeText(_ date: Date) -> String {
         let timeFormatter = DateFormatter()
-        timeFormatter.locale = Locale(identifier: "zh_Hans_CN")
+        timeFormatter.locale = LanguageManager.shared.locale
         timeFormatter.dateFormat = "HH:mm"
         let time = timeFormatter.string(from: date)
 
         let calendar = Calendar.current
         if calendar.isDateInToday(date) {
-            return "今天 \(time)"
+            return "\("今天".appLocalized) \(time)"
         }
         if calendar.isDateInTomorrow(date) {
-            return "明天 \(time)"
+            return "\("明天".appLocalized) \(time)"
         }
         if calendar.isDateInYesterday(date) {
-            return "昨天 \(time)"
+            return "\("昨天".appLocalized) \(time)"
         }
 
         let dateFormatter = DateFormatter()
-        dateFormatter.locale = Locale(identifier: "zh_Hans_CN")
+        dateFormatter.locale = LanguageManager.shared.locale
         if calendar.component(.year, from: date) == calendar.component(.year, from: Date()) {
-            dateFormatter.dateFormat = "M月d日 HH:mm"
+            dateFormatter.setLocalizedDateFormatFromTemplate("MdHm")
         } else {
-            dateFormatter.dateFormat = "yyyy年M月d日 HH:mm"
+            dateFormatter.setLocalizedDateFormatFromTemplate("yMdHm")
         }
         return dateFormatter.string(from: date)
     }

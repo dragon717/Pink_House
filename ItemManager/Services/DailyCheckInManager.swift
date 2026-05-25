@@ -163,7 +163,7 @@ final class DailyCheckInManager: ObservableObject {
         let records = loadAllRecords()
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "yyyy-MM-dd"
-        dateFormatter.locale = Locale(identifier: "zh_CN")
+        dateFormatter.locale = Locale(identifier: "en_US_POSIX")
         dateFormatter.timeZone = TimeZone.current
         
         var dateSet: Set<String> = []
@@ -195,7 +195,7 @@ final class DailyCheckInManager: ObservableObject {
         // 使用集合快速查询
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "yyyy-MM-dd"
-        dateFormatter.locale = Locale(identifier: "zh_CN")
+        dateFormatter.locale = Locale(identifier: "en_US_POSIX")
         dateFormatter.timeZone = TimeZone.current
         let dateString = dateFormatter.string(from: targetDate)
         

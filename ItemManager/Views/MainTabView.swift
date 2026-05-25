@@ -541,18 +541,18 @@ struct LegacyTabView: View {
 
     private var smallWorldTabTitle: String {
         switch smallWorldDestination {
-        case .bigWorld: return "世界书"
-        case .calendar: return "梦裙日历"
-        case .wealth(_): return "来财"
+        case .bigWorld: return "世界书".appLocalized
+        case .calendar: return "梦裙日历".appLocalized
+        case .wealth(_): return "来财".appLocalized
         case .pet: return petDataManager.status.displayName
-        case .ootd: return "穿搭手帐"
-        case .ootdDefaultBook: return "魔法贴纸"
+        case .ootd: return "穿搭手帐".appLocalized
+        case .ootdDefaultBook: return "魔法贴纸".appLocalized
         case .menu: return "House"
-        case .perler: return "拼豆工坊"
-        case .wardrobe: return "衣橱"
-        case .depositPlan: return "心愿尾款"
-        case .recycleBin: return "回收站"
-        case .dressStock: return "裙子股市"
+        case .perler: return "拼豆工坊".appLocalized
+        case .wardrobe: return "衣橱".appLocalized
+        case .depositPlan: return "心愿尾款".appLocalized
+        case .recycleBin: return "回收站".appLocalized
+        case .dressStock: return "裙子股市".appLocalized
         }
     }
 

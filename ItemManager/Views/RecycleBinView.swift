@@ -643,8 +643,10 @@ struct RecycleBinView: View {
                 page.isDeleted = false
                 page.deletedAt = nil
                 page.lastModified = Date()
+                DeleteTracker.shared.removeDeletedSpaceOutfit(id: page.id)
             }
         }
+        DeleteTracker.shared.removeDeletedSpaceBookGroup(id: book.id)
         saveRestoreState("空间手帐「\(book.title)」")
     }
 
@@ -655,11 +657,11 @@ struct RecycleBinView: View {
                 if let path = page.snapshotPath {
                     ImageManager.shared.deleteImage(fileName: path, context: modelContext)
                 }
+                DeleteTracker.shared.removeDeletedSpaceOutfit(id: page.id)
             }
             modelContext.delete(book)
         }
-        // 注意：SpaceBookGroup 和 SpaceOutfit 目前没有在 DeleteTracker 中单独追踪
-        // 如果需要，可以在这里添加相应的清理逻辑
+        DeleteTracker.shared.removeDeletedSpaceBookGroup(id: book.id)
     }
 
     private func restoreSpaceOutfit(_ outfit: SpaceOutfit) {
@@ -668,6 +670,7 @@ struct RecycleBinView: View {
             outfit.deletedAt = nil
             outfit.lastModified = Date()
         }
+        DeleteTracker.shared.removeDeletedSpaceOutfit(id: outfit.id)
         saveRestoreState("空间书页「\(outfit.note)」")
     }
 
@@ -678,8 +681,7 @@ struct RecycleBinView: View {
             }
             modelContext.delete(outfit)
         }
-        // 注意：SpaceOutfit 目前没有在 DeleteTracker 中单独追踪
-        // 如果需要，可以在这里添加相应的清理逻辑
+        DeleteTracker.shared.removeDeletedSpaceOutfit(id: outfit.id)
     }
 
     private func restoreModel3D(_ model: Model3D) {

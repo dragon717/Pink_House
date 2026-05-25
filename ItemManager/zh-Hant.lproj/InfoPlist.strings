@@ -1,0 +1,9 @@
+"CFBundleDisplayName" = "少女心願";
+"NSCameraUsageDescription" = "我們需要使用您的相機來拍攝衣物照片和進行 3D 掃描。";
+"NSLocationWhenInUseUsageDescription" = "我們需要存取您的位置資訊，為您提供基於位置的衣物推薦服務。";
+"NSMicrophoneUsageDescription" = "我們需要使用您的麥克風聆聽語音輸入，以支援寵物語音互動與錄音功能。";
+"NSMotionUsageDescription" = "我們需要存取動作資料，以實現主畫面的 3D 視差背景效果。";
+"NSPhotoLibraryAddUsageDescription" = "我們需要存取您的相簿以儲存圖片。";
+"NSPhotoLibraryUsageDescription" = "我們需要存取您的相簿來選擇衣物照片。";
+"NSSpeechRecognitionUsageDescription" = "我們需要使用語音辨識將您的語音轉成文字，以支援寵物語音互動和語音指令理解。";
+"NSWorldSensingUsageDescription" = "我們需要使用世界感知功能來進行 3D 物體掃描。";

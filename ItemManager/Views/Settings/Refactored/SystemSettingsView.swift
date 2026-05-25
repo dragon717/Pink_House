@@ -62,7 +62,7 @@ struct SystemSettingsView: View {
             AdaptiveSection(header: "通用设置") {
                 Picker("界面语言", selection: $languageManager.currentLanguage) {
                     ForEach(AppLanguage.allCases) { language in
-                        Text(language.displayName).tag(language)
+                        Text(language.localizedDisplayName).tag(language)
                     }
                 }
                 .onChange(of: languageManager.currentLanguage) { _, _ in

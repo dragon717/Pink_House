@@ -9,8 +9,8 @@ enum BackgroundStyle: String, CaseIterable, Identifiable {
     
     var displayName: String {
         switch self {
-        case .color: return "纯色背景"
-        case .image: return "图片背景"
+        case .color: return "纯色背景".appLocalized
+        case .image: return "图片背景".appLocalized
         }
     }
 }
@@ -25,10 +25,10 @@ enum CardStyle: String, CaseIterable, Identifiable {
     
     var displayName: String {
         switch self {
-        case .transparent: return "半透明"
-        case .fullyTransparent: return "全透明"
-        case .tinted: return "色调"
-        case .solid: return "经典"
+        case .transparent: return "半透明".appLocalized
+        case .fullyTransparent: return "全透明".appLocalized
+        case .tinted: return "色调".appLocalized
+        case .solid: return "经典".appLocalized
         }
     }
 }
@@ -43,10 +43,10 @@ enum SkirtFillMode: String, CaseIterable, Identifiable {
     
     var displayName: String {
         switch self {
-        case .transparent: return "半透明"
-        case .fullyTransparent: return "全透明"
-        case .tinted: return "色调"
-        case .solid: return "经典"
+        case .transparent: return "半透明".appLocalized
+        case .fullyTransparent: return "全透明".appLocalized
+        case .tinted: return "色调".appLocalized
+        case .solid: return "经典".appLocalized
         }
     }
 }
@@ -54,12 +54,17 @@ enum SkirtFillMode: String, CaseIterable, Identifiable {
 @Observable
 class ThemeManager {
     static let shared = ThemeManager()
-    static let themeSkinBackgroundHarmonyAppendix = "为了让这套主题更完整，已帮你切回纯色背景；停用主题后可再使用图片背景。"
-    static let themeSkinBackgroundLockAlertTitle = "先让主题保持成套吧"
+    static var themeSkinBackgroundHarmonyAppendix: String {
+        "为了让这套主题更完整，已帮你切回纯色背景；停用主题后可再使用图片背景。".appLocalized
+    }
+
+    static var themeSkinBackgroundLockAlertTitle: String {
+        "先让主题保持成套吧".appLocalized
+    }
 
     static func themeSkinBackgroundLockAlertMessage(activeThemeName: String?) -> String {
-        let name = activeThemeName ?? "当前主题"
-        return "当前正在使用「\(name)」。图片背景会和主题装饰抢风格，已帮你保持纯色背景；停用主题后就可以继续换回自己的照片啦。"
+        let name = activeThemeName ?? "当前主题".appLocalized
+        return "当前正在使用「%@」。图片背景会和主题装饰抢风格，已帮你保持纯色背景；停用主题后就可以继续换回自己的照片啦。".appLocalized(name)
     }
     
     // MARK: - V2 Color System (New)

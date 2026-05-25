@@ -20,6 +20,8 @@ final class DeleteTracker {
     private let deletedOutfitsKey = "deletedOutfits_local"  // local: 只保存在本地
     private let deletedClothingsKey = "deletedClothings_local"
     private let deletedBookGroupsKey = "deletedBookGroups_local"
+    private let deletedSpaceBookGroupsKey = "deletedSpaceBookGroups_local"
+    private let deletedSpaceOutfitsKey = "deletedSpaceOutfits_local"
     private let deletedModel3DsKey = "deletedModel3Ds_local"
     private let deletedPerlerPatternsKey = "deletedPerlerPatterns_local"
 
@@ -44,37 +46,73 @@ final class DeleteTracker {
     // MARK: - 记录删除（带时间戳）
 
     func recordDeletedOutfit(id: UUID) {
-        recordDelete(id: id, key: deletedOutfitsKey, typeName: "outfit")
+        recordDeletes(ids: [id], key: deletedOutfitsKey, typeName: "outfit")
+    }
+
+    func recordDeletedOutfits(ids: [UUID]) {
+        recordDeletes(ids: ids, key: deletedOutfitsKey, typeName: "outfit")
     }
 
     func recordDeletedClothing(id: UUID) {
-        recordDelete(id: id, key: deletedClothingsKey, typeName: "clothing")
+        recordDeletes(ids: [id], key: deletedClothingsKey, typeName: "clothing")
+    }
+
+    func recordDeletedClothings(ids: [UUID]) {
+        recordDeletes(ids: ids, key: deletedClothingsKey, typeName: "clothing")
     }
 
     func recordDeletedBookGroup(id: UUID) {
-        recordDelete(id: id, key: deletedBookGroupsKey, typeName: "book group")
+        recordDeletes(ids: [id], key: deletedBookGroupsKey, typeName: "book group")
+    }
+
+    func recordDeletedBookGroups(ids: [UUID]) {
+        recordDeletes(ids: ids, key: deletedBookGroupsKey, typeName: "book group")
+    }
+
+    func recordDeletedSpaceBookGroup(id: UUID) {
+        recordDeletes(ids: [id], key: deletedSpaceBookGroupsKey, typeName: "space book group")
+    }
+
+    func recordDeletedSpaceBookGroups(ids: [UUID]) {
+        recordDeletes(ids: ids, key: deletedSpaceBookGroupsKey, typeName: "space book group")
+    }
+
+    func recordDeletedSpaceOutfit(id: UUID) {
+        recordDeletes(ids: [id], key: deletedSpaceOutfitsKey, typeName: "space outfit")
+    }
+
+    func recordDeletedSpaceOutfits(ids: [UUID]) {
+        recordDeletes(ids: ids, key: deletedSpaceOutfitsKey, typeName: "space outfit")
     }
 
     func recordDeletedModel3D(id: UUID) {
-        recordDelete(id: id, key: deletedModel3DsKey, typeName: "3D model")
+        recordDeletes(ids: [id], key: deletedModel3DsKey, typeName: "3D model")
     }
 
     func recordDeletedPerlerPattern(id: UUID) {
-        recordDelete(id: id, key: deletedPerlerPatternsKey, typeName: "perler pattern")
+        recordDeletes(ids: [id], key: deletedPerlerPatternsKey, typeName: "perler pattern")
     }
 
     /// 记录删除 - 存储 UUID 和删除时间戳
-    private func recordDelete(id: UUID, key: String, typeName: String) {
+    private func recordDeletes(ids: [UUID], key: String, typeName: String) {
+        guard !ids.isEmpty else { return }
+
         let deleteTime = Date()
         var deletedRecords = getDeletedRecords(for: key)
 
         // 更新或添加删除记录
-        deletedRecords[id.uuidString] = deleteTime.timeIntervalSince1970
+        for id in ids {
+            deletedRecords[id.uuidString] = deleteTime.timeIntervalSince1970
+        }
 
-        // 保存到本地和 iCloud
+        // 保存到本地
         saveDeletedRecords(records: deletedRecords, key: key)
 
-        print("DeleteTracker: Recorded deleted \(typeName) \(id) at \(deleteTime)")
+        if ids.count == 1, let id = ids.first {
+            print("DeleteTracker: Recorded deleted \(typeName) \(id) at \(deleteTime)")
+        } else {
+            print("DeleteTracker: Recorded \(ids.count) deleted \(typeName) records at \(deleteTime)")
+        }
     }
 
     // MARK: - 获取删除记录
@@ -89,6 +127,14 @@ final class DeleteTracker {
 
     func getDeletedBookGroupRecords() -> [UUID: Date] {
         return getDeletedDates(for: deletedBookGroupsKey)
+    }
+
+    func getDeletedSpaceBookGroupRecords() -> [UUID: Date] {
+        return getDeletedDates(for: deletedSpaceBookGroupsKey)
+    }
+
+    func getDeletedSpaceOutfitRecords() -> [UUID: Date] {
+        return getDeletedDates(for: deletedSpaceOutfitsKey)
     }
 
     func getDeletedModel3DRecords() -> [UUID: Date] {
@@ -131,11 +177,16 @@ final class DeleteTracker {
             context: context,
             key: deletedOutfitsKey,
             typeName: "outfit",
-            clearRecords: clearRecords
+            clearRecords: clearRecords,
+            fetchItems: { context, ids in
+                let descriptor = FetchDescriptor<Outfit>(
+                    predicate: #Predicate<Outfit> { ids.contains($0.id) }
+                )
+                return try context.fetch(descriptor)
+            }
         ) { (item: Outfit, deleteTime: Date) -> Bool in
-            // 安全访问属性，使用可选绑定避免崩溃
-            let itemNote = (try? item.note) ?? "未知"
-            let isAlreadyDeleted = (try? item.isDeleted) ?? false
+            let itemNote = item.note
+            let isAlreadyDeleted = item.isDeleted
             
             // 强制删除策略：只要在删除记录中，就强制删除
             // 避免 iCloud 同步覆盖导致的删除失效
@@ -144,10 +195,11 @@ final class DeleteTracker {
                 item.deletedAt = deleteTime
                 item.lastModified = Date()
                 print("DeleteTracker: ✓ Force deleted outfit '\(itemNote)'")
+                return true
             } else {
                 print("DeleteTracker: ✓ Outfit '\(itemNote)' already deleted")
+                return false
             }
-            return true
         }
     }
 
@@ -156,21 +208,27 @@ final class DeleteTracker {
             context: context,
             key: deletedClothingsKey,
             typeName: "clothing",
-            clearRecords: clearRecords
+            clearRecords: clearRecords,
+            fetchItems: { context, ids in
+                let descriptor = FetchDescriptor<Clothing>(
+                    predicate: #Predicate<Clothing> { ids.contains($0.id) }
+                )
+                return try context.fetch(descriptor)
+            }
         ) { (item: Clothing, deleteTime: Date) -> Bool in
-            // 安全访问属性，使用可选绑定避免崩溃
-            let itemName = (try? item.name) ?? "未知"
-            let isAlreadyDeleted = (try? item.isDeleted) ?? false
+            let itemName = item.name
+            let isAlreadyDeleted = item.isDeleted
             
             if !isAlreadyDeleted {
                 item.isDeleted = true
                 item.deletedAt = deleteTime
                 item.lastModified = Date()
                 print("DeleteTracker: ✓ Force deleted clothing '\(itemName)'")
+                return true
             } else {
                 print("DeleteTracker: ✓ Clothing '\(itemName)' already deleted")
+                return false
             }
-            return true
         }
     }
 
@@ -179,11 +237,16 @@ final class DeleteTracker {
             context: context,
             key: deletedBookGroupsKey,
             typeName: "book group",
-            clearRecords: clearRecords
+            clearRecords: clearRecords,
+            fetchItems: { context, ids in
+                let descriptor = FetchDescriptor<BookGroup>(
+                    predicate: #Predicate<BookGroup> { ids.contains($0.id) }
+                )
+                return try context.fetch(descriptor)
+            }
         ) { (item: BookGroup, deleteTime: Date) -> Bool in
-            // 安全访问属性，使用可选绑定避免崩溃
-            let itemTitle = (try? item.title) ?? "未知"
-            let isAlreadyDeleted = (try? item.isDeleted) ?? false
+            let itemTitle = item.title
+            let isAlreadyDeleted = item.isDeleted
             
             // 强制删除策略：只要在删除记录中，就强制删除
             if !isAlreadyDeleted {
@@ -191,10 +254,69 @@ final class DeleteTracker {
                 item.deletedAt = deleteTime
                 item.lastModified = Date()
                 print("DeleteTracker: ✓ Force deleted book group '\(itemTitle)'")
+                return true
             } else {
                 print("DeleteTracker: ✓ Book group '\(itemTitle)' already deleted")
+                return false
             }
-            return true
+        }
+    }
+
+    func applyDeletedSpaceBookGroups(context: ModelContext, clearRecords: Bool = true) {
+        applyDeletedItems(
+            context: context,
+            key: deletedSpaceBookGroupsKey,
+            typeName: "space book group",
+            clearRecords: clearRecords,
+            fetchItems: { context, ids in
+                let descriptor = FetchDescriptor<SpaceBookGroup>(
+                    predicate: #Predicate<SpaceBookGroup> { ids.contains($0.id) }
+                )
+                return try context.fetch(descriptor)
+            }
+        ) { (item: SpaceBookGroup, deleteTime: Date) -> Bool in
+            let itemTitle = item.title
+            let isAlreadyDeleted = item.isDeleted
+
+            if !isAlreadyDeleted {
+                item.isDeleted = true
+                item.deletedAt = deleteTime
+                item.lastModified = Date()
+                print("DeleteTracker: ✓ Force deleted space book group '\(itemTitle)'")
+                return true
+            } else {
+                print("DeleteTracker: ✓ Space book group '\(itemTitle)' already deleted")
+                return false
+            }
+        }
+    }
+
+    func applyDeletedSpaceOutfits(context: ModelContext, clearRecords: Bool = true) {
+        applyDeletedItems(
+            context: context,
+            key: deletedSpaceOutfitsKey,
+            typeName: "space outfit",
+            clearRecords: clearRecords,
+            fetchItems: { context, ids in
+                let descriptor = FetchDescriptor<SpaceOutfit>(
+                    predicate: #Predicate<SpaceOutfit> { ids.contains($0.id) }
+                )
+                return try context.fetch(descriptor)
+            }
+        ) { (item: SpaceOutfit, deleteTime: Date) -> Bool in
+            let itemNote = item.note
+            let isAlreadyDeleted = item.isDeleted
+
+            if !isAlreadyDeleted {
+                item.isDeleted = true
+                item.deletedAt = deleteTime
+                item.lastModified = Date()
+                print("DeleteTracker: ✓ Force deleted space outfit '\(itemNote)'")
+                return true
+            } else {
+                print("DeleteTracker: ✓ Space outfit '\(itemNote)' already deleted")
+                return false
+            }
         }
     }
 
@@ -203,11 +325,16 @@ final class DeleteTracker {
             context: context,
             key: deletedModel3DsKey,
             typeName: "3D model",
-            clearRecords: clearRecords
+            clearRecords: clearRecords,
+            fetchItems: { context, ids in
+                let descriptor = FetchDescriptor<Model3D>(
+                    predicate: #Predicate<Model3D> { ids.contains($0.id) }
+                )
+                return try context.fetch(descriptor)
+            }
         ) { (item: Model3D, deleteTime: Date) -> Bool in
-            // 安全访问属性，使用可选绑定避免崩溃
-            let itemName = (try? item.name) ?? "未知"
-            let isAlreadyDeleted = (try? item.isDeleted) ?? false
+            let itemName = item.name
+            let isAlreadyDeleted = item.isDeleted
             
             // 强制删除策略：只要在删除记录中，就强制删除
             if !isAlreadyDeleted {
@@ -215,10 +342,11 @@ final class DeleteTracker {
                 item.deletedAt = deleteTime
                 item.lastModified = Date()
                 print("DeleteTracker: ✓ Force deleted 3D model '\(itemName)'")
+                return true
             } else {
                 print("DeleteTracker: ✓ 3D model '\(itemName)' already deleted")
+                return false
             }
-            return true
         }
     }
 
@@ -227,12 +355,17 @@ final class DeleteTracker {
             context: context,
             key: deletedPerlerPatternsKey,
             typeName: "perler pattern",
-            clearRecords: clearRecords
+            clearRecords: clearRecords,
+            fetchItems: { context, ids in
+                let descriptor = FetchDescriptor<PerlerBeadPattern>(
+                    predicate: #Predicate<PerlerBeadPattern> { ids.contains($0.id) }
+                )
+                return try context.fetch(descriptor)
+            }
         ) { (item: PerlerBeadPattern, deleteTime: Date) -> Bool in
-            // 安全访问属性，使用可选绑定避免崩溃
-            let itemName = (try? item.name) ?? "未知"
-            let itemModifiedTime = (try? item.lastModified) ?? Date.distantPast
-            let isAlreadyDeleted = (try? item.isDeleted) ?? false
+            let itemName = item.name
+            let itemModifiedTime = item.lastModified
+            let isAlreadyDeleted = item.isDeleted
             
             let timeDiff = deleteTime.timeIntervalSince(itemModifiedTime)
             print("DeleteTracker: [\(itemName)] deleteTime:\(deleteTime), lastModified:\(itemModifiedTime), diff:\(timeDiff)s, isDeleted:\(isAlreadyDeleted)")
@@ -244,10 +377,11 @@ final class DeleteTracker {
                 item.deletedAt = deleteTime
                 item.lastModified = Date()
                 print("DeleteTracker: ✓ Force deleted '\(itemName)' (in delete record)")
+                return true
             } else {
                 print("DeleteTracker: ✓ Already deleted '\(itemName)'")
+                return false
             }
-            return true
         }
     }
 
@@ -257,25 +391,28 @@ final class DeleteTracker {
         context: ModelContext,
         key: String,
         typeName: String,
-        shouldDelete: (T, Date) -> Bool,
-        clearRecords: Bool = true
+        clearRecords: Bool = true,
+        fetchItems: (ModelContext, [UUID]) throws -> [T],
+        applyDeleteIfNeeded: (T, Date) -> Bool
     ) {
+        pruneExpiredRecords(for: key, typeName: typeName)
+
         let deletedRecords = getDeletedDates(for: key)
         guard !deletedRecords.isEmpty else {
             print("DeleteTracker: No deleted \(typeName) records found")
             return
         }
 
-        print("DeleteTracker: Checking \(deletedRecords.count) deleted \(typeName)(s), IDs: \(Array(deletedRecords.keys).map { $0.uuidString.prefix(8) })")
+        let deletedIDs = Array(deletedRecords.keys)
+        print("DeleteTracker: Checking \(deletedRecords.count) deleted \(typeName)(s), IDs: \(deletedIDs.map { $0.uuidString.prefix(8) })")
 
         do {
-            let descriptor = FetchDescriptor<T>()
-            let allItems = try context.fetch(descriptor)
+            let allItems = try fetchItems(context, deletedIDs)
             
-            print("DeleteTracker: Fetched \(allItems.count) \(typeName)(s) from database")
+            print("DeleteTracker: Fetched \(allItems.count) matching \(typeName)(s) from database")
 
-            var appliedCount = 0
-            var clearedRecords: [UUID] = []
+            var changedCount = 0
+            var processedRecords: [UUID] = []
 
             for item in allItems {
                 // 检查对象是否仍然有效（未被 iCloud 同步分离）
@@ -289,40 +426,28 @@ final class DeleteTracker {
                 if let deleteTime = deletedRecords[itemID] {
                     print("DeleteTracker: Found matching record for \(typeName) ID:\(itemID.uuidString.prefix(8))")
                     
-                    // 使用 do-catch 包裹 shouldDelete 调用，防止访问失效属性时崩溃
-                    let shouldApplyDelete: Bool
-                    do {
-                        shouldApplyDelete = shouldDelete(item, deleteTime)
-                    } catch {
-                        print("DeleteTracker: Warning - Failed to check delete for \(typeName) \(itemID.uuidString.prefix(8)): \(error)")
-                        // 如果检查失败，假设应该删除（保守策略）
-                        shouldApplyDelete = true
-                    }
+                    let didChange = applyDeleteIfNeeded(item, deleteTime)
                     
-                    if shouldApplyDelete {
-                        appliedCount += 1
-                        if clearRecords {
-                            clearedRecords.append(itemID)
-                        }
-                    } else {
-                        // 数据被修改过，清除删除记录
-                        if clearRecords {
-                            clearedRecords.append(itemID)
-                        }
+                    if didChange {
+                        changedCount += 1
+                    }
+
+                    if clearRecords {
+                        processedRecords.append(itemID)
                     }
                 }
             }
 
-            if appliedCount > 0 {
+            if changedCount > 0 {
                 do {
                     try context.save()
-                    print("DeleteTracker: ✓ Saved \(appliedCount) \(typeName) deletes to database")
+                    print("DeleteTracker: ✓ Saved \(changedCount) \(typeName) deletes to database")
                     
                     // 立即再次保存，确保 iCloud 同步不会覆盖
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                         do {
                             try context.save()
-                            print("DeleteTracker: ✓ Re-saved \(appliedCount) \(typeName) deletes (anti-race)")
+                            print("DeleteTracker: ✓ Re-saved \(changedCount) \(typeName) deletes (anti-race)")
                         } catch {
                             print("DeleteTracker: ✗ Failed to re-save \(typeName) deletes: \(error)")
                         }
@@ -331,12 +456,12 @@ final class DeleteTracker {
                     print("DeleteTracker: ✗ Failed to save \(typeName) deletes: \(error)")
                 }
             } else {
-                print("DeleteTracker: No \(typeName) deletes to apply")
+                print("DeleteTracker: No \(typeName) deletes changed data")
             }
 
             // 清理已处理的删除记录（仅在启动时清理，同步后不清除）
-            if clearRecords && !clearedRecords.isEmpty {
-                clearProcessedRecords(ids: clearedRecords, key: key, typeName: typeName)
+            if clearRecords && !processedRecords.isEmpty {
+                clearProcessedRecords(ids: processedRecords, key: key, typeName: typeName)
             }
 
         } catch {
@@ -347,19 +472,43 @@ final class DeleteTracker {
     /// 获取 PersistentModel 的 ID
     /// 注意：此方法在 iCloud 同步期间可能被调用，需要处理对象上下文失效的情况
     private func getItemID<T: PersistentModel>(_ item: T) -> UUID? {
-        // 使用类型检查直接访问 id 属性，使用 try? 避免访问失效对象时崩溃
+        // 使用类型检查直接访问 id 属性，避免泛型层全库反射。
         if let outfit = item as? Outfit {
-            return (try? outfit.id)
+            return outfit.id
         } else if let clothing = item as? Clothing {
-            return (try? clothing.id)
+            return clothing.id
         } else if let bookGroup = item as? BookGroup {
-            return (try? bookGroup.id)
+            return bookGroup.id
+        } else if let spaceBookGroup = item as? SpaceBookGroup {
+            return spaceBookGroup.id
+        } else if let spaceOutfit = item as? SpaceOutfit {
+            return spaceOutfit.id
         } else if let model3D = item as? Model3D {
-            return (try? model3D.id)
+            return model3D.id
         } else if let perlerPattern = item as? PerlerBeadPattern {
-            return (try? perlerPattern.id)
+            return perlerPattern.id
         }
         return nil
+    }
+
+    /// 清理超过保留期的孤儿删除记录，避免历史记录长期触发同步重放扫描
+    private func pruneExpiredRecords(for key: String, typeName: String) {
+        var records = getDeletedRecords(for: key)
+        guard !records.isEmpty else { return }
+
+        let now = Date().timeIntervalSince1970
+        let retentionPeriod: Double = 24 * 60 * 60
+        let beforeCount = records.count
+
+        records = records.filter { _, timestamp in
+            now - timestamp <= retentionPeriod
+        }
+
+        let removedCount = beforeCount - records.count
+        if removedCount > 0 {
+            saveDeletedRecords(records: records, key: key)
+            print("DeleteTracker: Pruned \(removedCount) expired \(typeName) delete records")
+        }
     }
 
     /// 清理已处理的删除记录（保留24小时，防止iCloud同步延迟导致的问题）
@@ -407,6 +556,14 @@ final class DeleteTracker {
         clearDeletedItems(key: deletedBookGroupsKey, typeName: "book group")
     }
 
+    func clearDeletedSpaceBookGroups() {
+        clearDeletedItems(key: deletedSpaceBookGroupsKey, typeName: "space book group")
+    }
+
+    func clearDeletedSpaceOutfits() {
+        clearDeletedItems(key: deletedSpaceOutfitsKey, typeName: "space outfit")
+    }
+
     func clearDeletedModel3Ds() {
         clearDeletedItems(key: deletedModel3DsKey, typeName: "3D model")
     }
@@ -435,6 +592,14 @@ final class DeleteTracker {
         removeDeletedID(id: id, key: deletedBookGroupsKey, typeName: "book group")
     }
 
+    func removeDeletedSpaceBookGroup(id: UUID) {
+        removeDeletedID(id: id, key: deletedSpaceBookGroupsKey, typeName: "space book group")
+    }
+
+    func removeDeletedSpaceOutfit(id: UUID) {
+        removeDeletedID(id: id, key: deletedSpaceOutfitsKey, typeName: "space outfit")
+    }
+
     func removeDeletedModel3D(id: UUID) {
         removeDeletedID(id: id, key: deletedModel3DsKey, typeName: "3D model")
     }
@@ -460,9 +625,11 @@ final class DeleteTracker {
 
         // 应用各类删除
         applyDeletedOutfits(context: context, clearRecords: clearRecords)
+        applyDeletedSpaceOutfits(context: context, clearRecords: clearRecords)
         applyDeletedClothings(context: context, clearRecords: clearRecords)
         applyDeletedModel3Ds(context: context, clearRecords: clearRecords)
         applyDeletedBookGroups(context: context, clearRecords: clearRecords)
+        applyDeletedSpaceBookGroups(context: context, clearRecords: clearRecords)
         applyDeletedPerlerPatterns(context: context, clearRecords: clearRecords)
 
         print("DeleteTracker: Finished applying deletes")

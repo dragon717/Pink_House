@@ -123,7 +123,7 @@ struct iCloudStatusCard: View {
         if let lastDate = cloudManager.lastCloudBackupDate {
             let formatter = RelativeDateTimeFormatter()
             formatter.unitsStyle = .abbreviated
-            formatter.locale = Locale(identifier: "zh_CN")
+            formatter.locale = LanguageManager.shared.locale
             return "备份于 " + formatter.localizedString(for: lastDate, relativeTo: Date())
         }
         return "准备就绪"

@@ -775,9 +775,9 @@ struct BookDetailView: View {
                 page.isDeleted = true
                 page.deletedAt = Date()
                 page.lastModified = Date()
-                DeleteTracker.shared.recordDeletedOutfit(id: page.id)
             }
             try? modelContext.save()
+            DeleteTracker.shared.recordDeletedOutfits(ids: pagesToDelete.map(\.id))
             loadPages()
             selectedPages.removeAll()
             isBatchEditing = false

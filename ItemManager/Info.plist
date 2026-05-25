@@ -12,27 +12,29 @@
 		<string>com.yourapp.skirtmarket.fetch</string>
 	</array>
 	<key>CFBundleDevelopmentRegion</key>
-	<string>zh_CN</string>
+	<string>zh-Hans</string>
 	<key>CFBundleLocalizations</key>
 	<array>
-		<string>zh_CN</string>
+		<string>zh-Hans</string>
+		<string>zh-Hant</string>
+		<string>en</string>
 	</array>
 	<key>NSCameraUsageDescription</key>
-	<string>我们需要使用您的相机来拍摄衣物照片和进行 3D 扫描。</string>
+	<string>Pink House needs camera access to take clothing photos and perform 3D scans.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>我们需要访问您的位置信息来为您提供基于位置的衣物推荐服务。</string>
+	<string>Pink House uses your location to provide location-based outfit recommendations.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>我们需要使用您的麦克风来聆听您的语音输入，以支持宠物语音互动与录音功能。</string>
+	<string>Pink House needs microphone access for pet voice interactions and recording features.</string>
 	<key>NSMotionUsageDescription</key>
-	<string>我们需要访问运动数据以实现主屏幕的 3D 视差背景效果。</string>
+	<string>Pink House uses motion data to power the 3D parallax background effect.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
-	<string>我们需要访问您的相册以保存图片。</string>
+	<string>Pink House needs photo library access to save images.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>我们需要访问您的相册来选择衣物照片。</string>
+	<string>Pink House needs photo library access to choose clothing photos.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
-	<string>我们需要使用语音识别将您的语音转换为文字，以支持宠物语音互动和语音指令理解。</string>
+	<string>Pink House uses speech recognition to convert voice to text for pet voice interactions and commands.</string>
 	<key>NSWorldSensingUsageDescription</key>
-	<string>我们需要使用世界感知功能来进行 3D 物体扫描。</string>
+	<string>Pink House uses world sensing to perform 3D object scans.</string>
 	<key>ARKit</key>
 	<true/>
 	<key>NSAppTransportSecurity</key>

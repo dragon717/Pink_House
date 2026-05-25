@@ -68,6 +68,7 @@ struct ItemManagerApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     @State private var themeManager = ThemeManager.shared
     @State private var calendarThemeManager = CalendarThemeManager.shared
+    @State private var languageManager = LanguageManager.shared
     @Environment(\.scenePhase) private var scenePhase
     
     // Splash Screen State
@@ -84,6 +85,8 @@ struct ItemManagerApp: App {
             MainContentView()
                 .environment(themeManager)
                 .environment(calendarThemeManager)
+                .environment(languageManager)
+                .environment(\.locale, languageManager.locale)
                 .tint(themeManager.accentTextColor)
         }
         .modelContainer(SharedPersistence.shared.sharedModelContainer)

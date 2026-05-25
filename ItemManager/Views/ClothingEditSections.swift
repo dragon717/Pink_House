@@ -803,7 +803,7 @@ struct ClothingPurchaseInfoView: View {
                 .themeSkinLegibleText(level: .inline, slot: .sectionCard)
             
             DatePicker("购买日期", selection: $purchaseDate, displayedComponents: .date)
-                .environment(\.locale, Locale(identifier: "zh_CN"))
+                .environment(\.locale, LanguageManager.shared.locale)
             
             Divider()
             
@@ -828,7 +828,7 @@ struct ClothingPurchaseInfoView: View {
                 case .fullPaymentReservation:
                     VStack(alignment: .leading, spacing: 12) {
                         DatePicker("全款预约日期", selection: $depositDate, displayedComponents: .date)
-                            .environment(\.locale, Locale(identifier: "zh_CN"))
+                            .environment(\.locale, LanguageManager.shared.locale)
                         Text("全款预约会复用现有预约数据结构：保存时自动将全款金额写入定金字段，尾款为 0。")
                             .font(.caption)
                             .foregroundStyle(.secondary)
@@ -837,7 +837,7 @@ struct ClothingPurchaseInfoView: View {
                 case .depositPlan:
                     VStack(alignment: .leading, spacing: 12) {
                         DatePicker("定金日期", selection: $depositDate, displayedComponents: .date)
-                            .environment(\.locale, Locale(identifier: "zh_CN"))
+                            .environment(\.locale, LanguageManager.shared.locale)
                         
                         Divider()
                         
@@ -850,7 +850,7 @@ struct ClothingPurchaseInfoView: View {
                             
                             // 开始时间选择
                             DatePicker("开始", selection: $finalPaymentDate, displayedComponents: .date)
-                                .environment(\.locale, Locale(identifier: "zh_CN"))
+                                .environment(\.locale, LanguageManager.shared.locale)
                                 .onChange(of: finalPaymentDate) { _, newValue in
                                     // 开始时间变化时，如果不是自定义模式，根据时间段重新计算结束时间
                                     if !isCustomMode {
@@ -911,7 +911,7 @@ struct ClothingPurchaseInfoView: View {
                             if isCustomMode {
                                 // 自定义模式：显示日期选择器
                                 DatePicker("结束", selection: $finalPaymentEndDate, in: finalPaymentDate..., displayedComponents: .date)
-                                    .environment(\.locale, Locale(identifier: "zh_CN"))
+                                    .environment(\.locale, LanguageManager.shared.locale)
                                     .onChange(of: finalPaymentEndDate) { _, newValue in
                                         // 如果结束时间早于开始时间，强制设置为开始时间
                                         if newValue < finalPaymentDate {

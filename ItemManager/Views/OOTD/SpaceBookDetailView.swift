@@ -304,9 +304,9 @@ struct SpaceBookDetailView: View {
                 page.isDeleted = true
                 page.deletedAt = Date()
                 page.lastModified = Date()
-                DeleteTracker.shared.recordDeletedOutfit(id: page.id)
             }
             try? modelContext.save()
+            DeleteTracker.shared.recordDeletedSpaceOutfits(ids: pagesToDelete.map(\.id))
             refreshTrigger.toggle()
             selectedPages.removeAll()
             isBatchEditing = false
@@ -545,7 +545,7 @@ struct SpaceBookDetailView: View {
                 try modelContext.save()
 
                 // 记录删除到 DeleteTracker，防止iCloud同步覆盖
-                DeleteTracker.shared.recordDeletedOutfit(id: page.id)
+                DeleteTracker.shared.recordDeletedSpaceOutfit(id: page.id)
             } catch {
                 print("SpaceBookDetailView: Failed to save deletion: \(error)")
             }

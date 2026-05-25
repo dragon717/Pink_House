@@ -1804,7 +1804,7 @@ struct MakeupCheckInSheet: View {
 
     private var monthYearString: String {
         let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "zh_CN")
+        formatter.locale = LanguageManager.shared.locale
         formatter.dateFormat = "yyyy年M月"
         return formatter.string(from: currentMonth)
     }

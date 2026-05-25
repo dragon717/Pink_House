@@ -223,7 +223,7 @@ final class AudioManager: NSObject, ObservableObject, SFSpeechRecognizerDelegate
     private var recordingURL: URL?
     
     // Speech Recognition
-    private let speechRecognizer = SFSpeechRecognizer(locale: Locale(identifier: "zh_CN")) // 默认中文，可配置
+    private let speechRecognizer = SFSpeechRecognizer(locale: LanguageManager.shared.locale)
     private var recognitionRequest: SFSpeechAudioBufferRecognitionRequest?
     private var recognitionTask: SFSpeechRecognitionTask?
     

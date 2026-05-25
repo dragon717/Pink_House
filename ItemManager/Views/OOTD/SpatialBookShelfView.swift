@@ -420,11 +420,12 @@ struct SpatialBookShelfView: View {
     }
 
     private func deleteBook(_ book: SpaceBookGroup) {
+        let pages = book.pages ?? []
         book.isDeleted = true
         book.deletedAt = Date()
         book.lastModified = Date()
         // Also mark pages as deleted
-        for page in book.pages ?? [] {
+        for page in pages {
             page.isDeleted = true
             page.deletedAt = Date()
             page.lastModified = Date()
@@ -433,10 +434,8 @@ struct SpatialBookShelfView: View {
             try modelContext.save()
 
             // 记录删除到 DeleteTracker，防止iCloud同步覆盖
-            DeleteTracker.shared.recordDeletedBookGroup(id: book.id)
-            for page in book.pages ?? [] {
-                DeleteTracker.shared.recordDeletedOutfit(id: page.id)
-            }
+            DeleteTracker.shared.recordDeletedSpaceBookGroup(id: book.id)
+            DeleteTracker.shared.recordDeletedSpaceOutfits(ids: pages.map(\.id))
         } catch {
             print("SpatialBookShelfView: Failed to save deletion: \(error)")
         }

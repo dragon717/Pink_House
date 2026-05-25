@@ -713,7 +713,7 @@ struct EnhancedUserInfoView: View {
                     .signInWithAppleButtonStyle(colorScheme == .dark ? .white : .black)
                     .frame(height: 44)
                     .padding(.vertical, 4)
-                    .environment(\.locale, Locale(identifier: "zh_CN"))
+                    .environment(\.locale, LanguageManager.shared.locale)
                     .captureGuideTarget(.cloudAppleSignInButton)
                 }
                 
@@ -798,7 +798,7 @@ struct UserInfoView: View {
                     .signInWithAppleButtonStyle(colorScheme == .dark ? .white : .black)
                     .frame(height: 44)
                     .padding(.vertical, 4)
-                    .environment(\.locale, Locale(identifier: "zh_CN"))
+                    .environment(\.locale, LanguageManager.shared.locale)
                 }
                 
                 if let errorMessage = authManager.errorMessage {

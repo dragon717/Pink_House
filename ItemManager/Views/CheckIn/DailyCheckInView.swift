@@ -523,7 +523,7 @@ struct DailyCheckInView: View {
     // MARK: - 格式化日期（MM月dd日）
     private func formatDate(_ date: Date) -> String {
         let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "zh_CN")
+        formatter.locale = LanguageManager.shared.locale
         formatter.dateFormat = "MM月dd日"
         return formatter.string(from: date)
     }
@@ -708,7 +708,7 @@ struct DailyCheckInView: View {
     // MARK: - 辅助方法
     private var todayDateString: String {
         let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "zh_CN")
+        formatter.locale = LanguageManager.shared.locale
         formatter.dateFormat = "MM月dd日 EEEE"
         return formatter.string(from: Date())
     }
@@ -906,7 +906,7 @@ struct CheckInShareCardView: View {
 
     private var shareDateString: String {
         let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "zh_CN")
+        formatter.locale = LanguageManager.shared.locale
         if isToday {
             formatter.dateFormat = "yyyy年MM月dd日"
         } else {
@@ -1069,7 +1069,7 @@ struct CustomCalendarView: View {
     // 月份年份字符串
     private var monthYearString: String {
         let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "zh_CN")
+        formatter.locale = LanguageManager.shared.locale
         formatter.dateFormat = "yyyy年MM月"
         return formatter.string(from: currentMonth)
     }

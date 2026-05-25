@@ -285,13 +285,14 @@ struct ClothingListView: View {
             item.isDeleted = true
             item.deletedAt = Date()
             item.lastModified = Date()
-            
-            // 记录删除到 DeleteTracker，防止iCloud同步覆盖
-            DeleteTracker.shared.recordDeletedClothing(id: item.id)
         }
         
         do {
             try modelContext.save()
+
+            // 记录删除到 DeleteTracker，防止iCloud同步覆盖
+            DeleteTracker.shared.recordDeletedClothings(ids: itemsToDelete.map(\.id))
+
             Task { @MainActor in
                 await NotificationManager.shared.refreshAllKnownDepositNotifications(
                     modelContext: modelContext,

@@ -215,6 +215,7 @@ struct OOTDSidebarView: View {
     }
     
     private func deleteBook(_ book: BookGroup) {
+        let pages = book.pages ?? []
         // Soft delete book
         book.isDeleted = true
         book.deletedAt = Date()
@@ -225,7 +226,7 @@ struct OOTDSidebarView: View {
         // We can either mark them deleted, OR rely on the fact that if book is deleted, we don't fetch it.
         // But the requirement says "recover individually or as group".
         // So marking pages as deleted is better for consistency if we query "all deleted outfits".
-        for page in book.pages ?? [] {
+        for page in pages {
             page.isDeleted = true
             page.deletedAt = Date()
             page.lastModified = Date()
@@ -236,9 +237,7 @@ struct OOTDSidebarView: View {
 
             // 记录删除到 DeleteTracker，防止iCloud同步覆盖
             DeleteTracker.shared.recordDeletedBookGroup(id: book.id)
-            for page in book.pages ?? [] {
-                DeleteTracker.shared.recordDeletedOutfit(id: page.id)
-            }
+            DeleteTracker.shared.recordDeletedOutfits(ids: pages.map(\.id))
         } catch {
             print("OOTDSidebarView: Failed to save deletion: \(error)")
         }

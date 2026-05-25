@@ -27,6 +27,7 @@ class SharedContainer {
         subsystem: Bundle.main.bundleIdentifier ?? "com.pinkhouse.itemmanager",
         category: "WidgetSync"
     )
+    private var deleteReplayTask: Task<Void, Never>?
     
     // 使用 MigrationManager 创建 ModelContainer，支持本地和 iCloud 双模式
     let container: ModelContainer
@@ -175,10 +176,8 @@ class SharedContainer {
             
             print("☁️ iCloud 同步完成通知收到，准备应用删除...")
             
-            // 延迟一小段时间确保同步完全完成
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-                print("DeleteTracker: iCloud 同步后应用删除...")
-                self.replayDeletesAfterCloudSync(reason: "icloud-remote-change")
+            Task { @MainActor [weak self] in
+                self?.scheduleDeleteReplayAfterCloudSync(reason: "icloud-remote-change", delay: 1.0)
             }
         }
         
@@ -192,10 +191,8 @@ class SharedContainer {
             
             print("☁️ iCloud 内容导入完成，准备应用删除...")
             
-            // 延迟一小段时间确保导入完全完成
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-                print("DeleteTracker: iCloud 导入后应用删除...")
-                self.replayDeletesAfterCloudSync(reason: "icloud-import")
+            Task { @MainActor [weak self] in
+                self?.scheduleDeleteReplayAfterCloudSync(reason: "icloud-import", delay: 1.0)
             }
         }
 
@@ -207,10 +204,22 @@ class SharedContainer {
             guard let self = self else { return }
             guard iCloudSyncManager.shared.syncStatus == .synced else { return }
 
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                print("DeleteTracker: iCloud 状态已同步，重放本地删除保护...")
-                self.replayDeletesAfterCloudSync(reason: "icloud-synced")
+            Task { @MainActor [weak self] in
+                self?.scheduleDeleteReplayAfterCloudSync(reason: "icloud-synced", delay: 0.5)
             }
+        }
+    }
+
+    @MainActor
+    private func scheduleDeleteReplayAfterCloudSync(reason: String, delay: TimeInterval) {
+        deleteReplayTask?.cancel()
+        deleteReplayTask = Task { @MainActor [weak self] in
+            let nanoseconds = UInt64(delay * 1_000_000_000)
+            try? await Task.sleep(nanoseconds: nanoseconds)
+            guard !Task.isCancelled, let self else { return }
+
+            print("DeleteTracker: iCloud 同步稳定后应用删除保护 (\(reason))...")
+            self.replayDeletesAfterCloudSync(reason: reason)
         }
     }
 

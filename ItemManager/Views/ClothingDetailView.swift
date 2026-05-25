@@ -1160,15 +1160,15 @@ struct ClothingDetailView: View {
                 .unifiedPrimary()
                 .themeSkinLegibleText(level: .inline, slot: .sectionCard)
             
-            InfoRow(label: "购买日期", value: clothing.purchaseDate.formatted(.dateTime.year().month().day().locale(Locale(identifier: "zh_CN"))))
+            InfoRow(label: "购买日期", value: clothing.purchaseDate.formatted(.dateTime.year().month().day().locale(LanguageManager.shared.locale)))
             
             if clothing.isFullPaymentReservation {
                 if let reservationDate = clothing.depositDate {
-                    InfoRow(label: "全款预约日期", value: reservationDate.formatted(.dateTime.year().month().day().locale(Locale(identifier: "zh_CN"))))
+                    InfoRow(label: "全款预约日期", value: reservationDate.formatted(.dateTime.year().month().day().locale(LanguageManager.shared.locale)))
                 }
             } else if clothing.reservationKind == .depositPlan {
                 if let depositDate = clothing.depositDate {
-                    InfoRow(label: "定金日期", value: depositDate.formatted(.dateTime.year().month().day().locale(Locale(identifier: "zh_CN"))))
+                    InfoRow(label: "定金日期", value: depositDate.formatted(.dateTime.year().month().day().locale(LanguageManager.shared.locale)))
                 }
                 if let finalPaymentDate = clothing.finalPaymentDate {
                     InfoRow(label: "预估尾款", value: formatFinalPaymentDate(start: finalPaymentDate, end: clothing.finalPaymentEndDate))
@@ -1210,13 +1210,13 @@ struct ClothingDetailView: View {
     }
     
     private func formatFinalPaymentDate(start: Date, end: Date?) -> String {
-        let startDateString = start.formatted(.dateTime.year().month().day().locale(Locale(identifier: "zh_CN")))
+        let startDateString = start.formatted(.dateTime.year().month().day().locale(LanguageManager.shared.locale))
         
         if let endDate = end {
             // Check if end date is different from start date (ignoring time)
             let calendar = Calendar.current
             if !calendar.isDate(start, inSameDayAs: endDate) {
-                let endDateString = endDate.formatted(.dateTime.year().month().day().locale(Locale(identifier: "zh_CN")))
+                let endDateString = endDate.formatted(.dateTime.year().month().day().locale(LanguageManager.shared.locale))
                 return "\(startDateString) - \(endDateString)"
             }
         }

@@ -1490,9 +1490,7 @@ struct WardrobeView: View {
             print("WardrobeView: Successfully saved deletion of \(itemsToDelete.count) items.")
 
             // 记录删除到 DeleteTracker，防止iCloud同步覆盖
-            for item in itemsToDelete {
-                DeleteTracker.shared.recordDeletedClothing(id: item.id)
-            }
+            DeleteTracker.shared.recordDeletedClothings(ids: itemsToDelete.map(\.id))
         } catch {
             print("WardrobeView: Failed to save deletion: \(error)")
         }

@@ -18,14 +18,14 @@ enum UnlockConditionType: String, CaseIterable, Identifiable {
 
     var displayName: String {
         switch self {
-        case .free: return "免费"
-        case .vip: return "VIP专属"
-        case .meowCoin: return "喵币解锁"
-        case .clothingCount: return "收集解锁"
-        case .loginDays: return "签到解锁"
-        case .petLevel: return "萌宠等级"
-        case .redeemCode: return "限时开放"
-        case .manual: return "体验完成任务"
+        case .free: return "免费".appLocalized
+        case .vip: return "VIP专属".appLocalized
+        case .meowCoin: return "喵币解锁".appLocalized
+        case .clothingCount: return "收集解锁".appLocalized
+        case .loginDays: return "签到解锁".appLocalized
+        case .petLevel: return "萌宠等级".appLocalized
+        case .redeemCode: return "限时开放".appLocalized
+        case .manual: return "体验完成任务".appLocalized
         }
     }
 
@@ -126,46 +126,46 @@ enum FeatureItem: String, CaseIterable, Identifiable {
 
     var displayName: String {
         switch self {
-        case .wardrobe: return "少女衣橱"
-        case .finalPayment: return "心愿尾款"
-        case .pet: return "萌宠"
-        case .ootd: return "穿搭手帐"
-        case .ootdDefaultBook: return "魔法贴纸"
-        case .wealth: return "来财"
-        case .calendar: return "梦裙日历"
-        case .bigWorld: return "世界书"
-        case .perler: return "拼豆工坊"
-        case .recycleBin: return "回收站"
-        case .dressStock: return "裙装股市"
-        case .dataBackup: return "数据备份"
-        case .cloudSync: return "iCloud同步"
-        case .batchImport: return "批量导入"
-        case .themeCustomize: return "魔法配色"
-        case .widgetCustomize: return "小组件定制"
+        case .wardrobe: return "少女衣橱".appLocalized
+        case .finalPayment: return "心愿尾款".appLocalized
+        case .pet: return "萌宠".appLocalized
+        case .ootd: return "穿搭手帐".appLocalized
+        case .ootdDefaultBook: return "魔法贴纸".appLocalized
+        case .wealth: return "来财".appLocalized
+        case .calendar: return "梦裙日历".appLocalized
+        case .bigWorld: return "世界书".appLocalized
+        case .perler: return "拼豆工坊".appLocalized
+        case .recycleBin: return "回收站".appLocalized
+        case .dressStock: return "裙装股市".appLocalized
+        case .dataBackup: return "数据备份".appLocalized
+        case .cloudSync: return "iCloud同步".appLocalized
+        case .batchImport: return "批量导入".appLocalized
+        case .themeCustomize: return "魔法配色".appLocalized
+        case .widgetCustomize: return "小组件定制".appLocalized
         case .aiAnalysis:
-            return "萌宠智能对话"
+            return "萌宠智能对话".appLocalized
         case .customColorPersonalization:
-            return "客制化配色和个性化"
+            return "客制化配色和个性化".appLocalized
         case .networkCommunity:
-            return "联网社区"
+            return "联网社区".appLocalized
         case .magicTasks:
-            return "魔法任务"
+            return "魔法任务".appLocalized
         case .filterClassic:
-            return "个性化偏好"
+            return "个性化偏好".appLocalized
         case .privacyDisplay:
-            return "隐私显示"
+            return "隐私显示".appLocalized
         case .tagBrandFieldDisplay:
-            return "标签/品牌/裙装属性管理"
+            return "标签/品牌/裙装属性管理".appLocalized
         case .spaceBook:
-            return "空间手帐"
+            return "空间手帐".appLocalized
         case .batchEdit:
-            return "批量编辑"
+            return "批量编辑".appLocalized
         case .localFileBackupRestore:
-            return "本地文件的备份与恢复"
+            return "本地文件的备份与恢复".appLocalized
         case .exportCSV:
-            return "导出表格"
+            return "导出表格".appLocalized
         case .cloudFileBackupRestore:
-            return "云端的文件备份与恢复"
+            return "云端的文件备份与恢复".appLocalized
         }
     }
 

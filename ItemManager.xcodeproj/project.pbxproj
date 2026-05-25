@@ -343,6 +343,8 @@
 			hasScannedForEncodings = 0;
 			knownRegions = (
 				en,
+				"zh-Hans",
+				"zh-Hant",
 				Base,
 			);
 			mainGroup = A2AE586A2F19377400B4B6EB;
@@ -491,9 +493,9 @@
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = ItemManager/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = "少女心愿";
+				INFOPLIST_KEY_CFBundleDisplayName = "Pink House";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
-				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "需要访问您的相册以选择裙装图片";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Pink House needs photo library access to choose clothing photos.";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
@@ -544,9 +546,9 @@
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = ItemManager/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = "少女心愿";
+				INFOPLIST_KEY_CFBundleDisplayName = "Pink House";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
-				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "需要访问您的相册以选择裙装图片";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Pink House needs photo library access to choose clothing photos.";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
@@ -808,7 +810,7 @@
 				DEVELOPMENT_TEAM = 833FJ74GS2;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "少女心愿衣橱/Info.plist";
-				INFOPLIST_KEY_CFBundleDisplayName = "少女心愿衣橱";
+				INFOPLIST_KEY_CFBundleDisplayName = "Pink House Closet";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				IPHONEOS_DEPLOYMENT_TARGET = 17.4;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -842,7 +844,7 @@
 				DEVELOPMENT_TEAM = 833FJ74GS2;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "少女心愿衣橱/Info.plist";
-				INFOPLIST_KEY_CFBundleDisplayName = "少女心愿衣橱";
+				INFOPLIST_KEY_CFBundleDisplayName = "Pink House Closet";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				IPHONEOS_DEPLOYMENT_TARGET = 17.4;
 				LD_RUNPATH_SEARCH_PATHS = (
