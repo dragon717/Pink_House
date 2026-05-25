@@ -2,9 +2,10 @@
 # -*- coding: utf-8 -*-
 """Audit Magic Sticker / OOTD mannequin background assets.
 
-This script is intentionally non-mutating. It checks the supplied source PNG and
-the catalogued imageset used by SwiftUI so the static mannequin workflow remains
-manifest-gated and does not accidentally ship transparent placeholders.
+This script is intentionally non-mutating. It checks the bundled catalogued
+imageset used by SwiftUI so the static mannequin workflow remains manifest-gated
+and does not accidentally ship transparent placeholders. Historical source PNGs
+can be audited by passing --source explicitly.
 """
 from __future__ import annotations
 
@@ -56,13 +57,25 @@ def audit_png(path: Path) -> dict:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--source", default="temp/人台.png")
+    parser.add_argument("--source", help="Optional historical/source PNG to audit, for example temp/人台.png.")
     parser.add_argument("--asset", default="ItemManager/Assets.xcassets/OOTD/Mannequin/ootd_mannequin_default.imageset/ootd_mannequin_default.png")
     parser.add_argument("--imageset", default="ItemManager/Assets.xcassets/OOTD/Mannequin/ootd_mannequin_default.imageset")
     parser.add_argument("--out")
     args = parser.parse_args()
 
-    source = audit_png(Path(args.source))
+    if args.source:
+        source = audit_png(Path(args.source))
+        source["optional"] = True
+        source["skipped"] = False
+    else:
+        source = {
+            "path": None,
+            "exists": None,
+            "ok": True,
+            "optional": True,
+            "skipped": True,
+            "reason": "No --source supplied; source PNG audit is optional.",
+        }
     asset = audit_png(Path(args.asset))
     contents_path = Path(args.imageset) / "Contents.json"
     contents_ok = False
@@ -78,7 +91,7 @@ def main() -> int:
         contents_error = "Contents.json missing"
 
     report = {
-        "ok": source.get("ok") and asset.get("ok") and contents_ok,
+        "ok": asset.get("ok") and source.get("ok") and contents_ok,
         "source": source,
         "asset": asset,
         "contents_json": str(contents_path),

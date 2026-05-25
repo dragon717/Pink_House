@@ -16,7 +16,8 @@ enum WardrobePerfSeedService {
 
     /// DEBUG-only launch-argument seeding entry.
     /// Example:
-    /// xcrun simctl launch booted <bundle-id> --seed-wardrobe-perf --count 800 --image-dir "$PROJ/temp/商品图" --reset-wardrobe-perf
+    /// xcrun simctl launch booted <bundle-id> --seed-wardrobe-perf --count 800 --image-dir "$PROJ/tools/perf-samples/wardrobe-images" --reset-wardrobe-perf
+    /// Omit --image-dir to use generated fallback images, or pass an explicit sample image directory.
     @discardableResult
     static func seedIfRequested(modelContext: ModelContext) async -> Bool {
         let arguments = CommandLine.arguments

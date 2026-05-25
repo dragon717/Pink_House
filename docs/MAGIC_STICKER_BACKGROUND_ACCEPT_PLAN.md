@@ -2,7 +2,8 @@
 
 ## 静态校验
 
-- [ ] `python3 scripts/magic_sticker_harness/audit_mannequin_assets.py` 返回 `ok: true`。
+- [ ] `python3 scripts/magic_sticker_harness/audit_mannequin_assets.py` 返回 `ok: true`，且 `source.skipped: true` 表示未提供可选历史源图。
+- [ ] 如需核对历史源图，显式运行 `python3 scripts/magic_sticker_harness/audit_mannequin_assets.py --source temp/人台.png`；`temp/人台.png` 不属于默认审计依赖。
 - [ ] `ootd_mannequin_default` imageset 存在且文件名为 ASCII-safe。
 - [ ] 新增备份 DTO 字段均为 optional，旧备份不会因缺 key 解码失败。
 - [ ] 已记录 `xcodebuild` 验证状态：未运行 / PASS / FAIL；如已运行，附命令、scheme、destination 与结果。

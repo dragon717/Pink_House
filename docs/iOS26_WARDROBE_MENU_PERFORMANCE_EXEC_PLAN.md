@@ -320,7 +320,7 @@ notes.md                     # 主观手感（必填："丝滑/能用/明显卡"
 - 详情页 / 编辑器 / 拼豆 / 空间手帐 / 小世界视图的菜单。
 - iOS 26 整体导航栏 / 异形底栏 —— `docs/iOS26_导航栏统一与异形底栏方案.md` 主导，本计划仅保证不破坏其约定。
 - iCloud 同步策略与 SwiftData schema 改造。
-- 主题皮肤资产 —— `temp/_harness/EXEC_PLAN.md` 主导。
+- 主题皮肤资产 —— `temp/_harness/EXEC_PLAN.md` 仅作历史 ThemeSkin harness / 迁移前参考；正式口径遵循 `docs/THEME_SKIN_REPLICATION_BEST_PRACTICES.md` 和后续 `docs/` / `tools/`。
 - `presentGuideMenu` 引导菜单整体改造（仅做 M2 视觉对齐），完整重写另立项。
 
 ---

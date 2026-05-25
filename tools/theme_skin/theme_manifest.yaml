@@ -1,0 +1,225 @@
+# ThemeSkin formal manifest
+#
+# This file is the formal manifest used by tools/theme_skin scripts. It was
+# migrated from temp/_harness/MANIFEST.yaml so dry-run and materialization tools
+# no longer depend on the historical harness manifest by default.
+#
+# Migration note:
+# - theme_dir currently still points at temp/主题1 and temp/主题2 because the
+#   source PSDs, pre-extracted PNG stickers, and image2_manual artifact inputs
+#   have not been migrated yet.
+# - shared.accept_design_refs still preserves historical temp/design layout
+#   baseline paths. The current iCloud repo does not contain a temp/design
+#   directory, so these entries are semantic placeholders until the baseline
+#   images are found, migrated, or replaced.
+# - Do not delete temp until those artifact input locations and acceptance
+#   baselines have formal homes.
+#
+# 字段约定：
+#   theme_id           ThemeSkinManager 用的完整 id，必须以 theme_skin. 开头
+#   namespace          assetNamespace（去掉 theme_skin. 前缀），imageset 文件夹名
+#   display_name       UI 显示用的中文名
+#   subtitle           商店副标题（一句话气氛词）
+#   theme_dir          相对仓库根的设计稿 / artifact 输入目录（当前仍在 temp，待迁移）
+#   source_type        jpg | psd  —— ASSETS_SPEC 据此选 pipeline
+#   source_files       设计稿文件列表（相对 theme_dir）
+#   preview_hero_src   商店首图来源（相对 theme_dir，会整图入 preview_store_hero imageset）
+#   base_price / vip_price  喵币定价
+#   default_enabled_slots  product.defaultEnabledSlots（购买后自动开的 slot）
+#   imageset_extras    额外的 imageset（除了 shared.imageset_common，每主题可加几个特色装饰贴纸）
+#   layer_map          仅 source_type=psd 时有效；imageset 名 → 来源标记
+#                      - "psd_composite_crop:<imageset>"  ← UI 壳体由 PSD 顶层合成裁切而来
+#                      - "png:<file_under_theme_dir>"     ← 装饰贴纸已通过 拆分/*.tiff → png/*.png 预导出
+#   png_decor_dir      仅 source_type=psd 且贴纸已预导出时有效；相对 theme_dir 的 PNG 子目录
+#                      （例：sky_concert / swan_dream 走 Photoshop 切片 → TIFF → png/ 的离线流程）
+#   sticker_bbox       仅 source_type=jpg 时有效；参考图坐标 → imageset 名
+#   image2_prompts     需要 image2 生成的元素清单与 prompt
+#   visual_keywords    一句话视觉关键词，让 image2 prompt 和 RESULT 描述统一调性
+#
+# 通用 slot 列表（与 ThemeSkinSlot 完全一致，两主题共用，禁止增减）：
+#   topBarMain / topBarSegment / topBarIconButton / topBarAddButton
+#   searchBar
+#   tabBarMain / tabBarItem
+#   segmentedControl / filterChip
+#   statsCard / wardrobeItemCard / settingsGridCard / sectionCard
+#   primaryButton / iconCircleButton / discountBadge / filterSheet / emptyState
+
+shared:
+  # 两主题共用 imageset（命名空间换即可；数量以此清单实际 key 为准）
+  imageset_common:
+    top_bar:
+      - top_bar_main_default
+      - top_bar_icon_button_default
+      - top_bar_segment_default
+      - top_bar_segment_selected
+      - search_bar_compact_default
+    tab_bar:
+      - tab_bar_main_default
+      - tab_bar_item_default
+      - tab_bar_item_selected
+    cards:
+      - card_stats_default
+      - card_stats_pink
+      - card_stats_blue
+      - card_stats_purple
+      - card_wardrobe_item_default
+      - card_wardrobe_item_ribbon_top_left
+      - card_settings_grid_default
+      - badge_discount_default
+    wallpaper:
+      - wallpaper_main
+      - preview_store_hero
+
+  # 验收基准图（所有主题共用；历史引用路径。当前 iCloud 仓库未找到 temp/design 目录，
+  # 待找回、替换或迁移到正式验收归档）
+  accept_design_refs:
+    home: temp/design/IMG_7936.png
+    stats: temp/design/IMG_7937.png
+    house: temp/design/IMG_8204.PNG
+    wealth: temp/design/IMG_8208.PNG
+    wardrobe_journal: temp/design/IMG_8211.PNG
+
+  # 价格默认值（主题可覆盖）
+  default_base_price: 99
+  default_vip_price: 89
+
+  # 模拟器目标
+  simulator_destination: "platform=iOS Simulator,name=iPhone 16 Pro"
+
+themes:
+
+  - theme_id: theme_skin.sky_concert
+    namespace: sky_concert
+    display_name: 天空音乐会
+    subtitle: 云端管弦 · 星河谱表 · 鎏金五线谱
+    # Artifact input location not migrated yet; keep this temp path until PSD,
+    # pre-extracted PNG, and image2_manual inputs have a formal home.
+    theme_dir: temp/主题1
+    source_type: psd
+    source_files:
+      - 天空音乐会.psd
+    preview_hero_src: __EXPORT__/preview_store_hero.png
+    base_price: 99
+    vip_price: 89
+    visual_keywords: airy sky concert, pastel clouds, hand-drawn watercolor stickers, golden staves, cherub silhouettes, sky balloons & doves, unicorn prince, music scrolls, violin clouds
+    default_enabled_slots:
+      - topBarMain
+      - topBarIconButton
+      - tabBarMain
+      - tabBarItem
+      - statsCard
+      - wardrobeItemCard
+    # 装饰贴纸已通过 Photoshop 切片导出为 拆分/*.tiff，再经 convert_tiff_to_png.py 转为 png/*.png（透明底 RGBA）。
+    # 装饰贴纸的语义用途与摆放建议详见 temp/主题1/png/PENCIL_PROMPT.md。
+    png_decor_dir: png
+    layer_map:
+      # UI 壳体：从 PSD 顶层合成 (psd_composite.png) 按 imageset 名裁切
+      top_bar_main_default: "psd_composite_crop:top_bar_main_default"
+      top_bar_icon_button_default: "psd_composite_crop:top_bar_icon_button_default"
+      top_bar_segment_default: "psd_composite_crop:top_bar_segment_default"
+      top_bar_segment_selected: "psd_composite_crop:top_bar_segment_selected"
+      search_bar_compact_default: "psd_composite_crop:search_bar_compact_default"
+      tab_bar_main_default: "psd_composite_crop:tab_bar_main_default"
+      tab_bar_item_default: "psd_composite_crop:tab_bar_item_default"
+      tab_bar_item_selected: "psd_composite_crop:tab_bar_item_selected"
+      card_stats_default: "psd_composite_crop:card_stats_default"
+      card_stats_pink: "psd_composite_crop:card_stats_pink"
+      card_stats_blue: "psd_composite_crop:card_stats_blue"
+      card_stats_purple: "psd_composite_crop:card_stats_purple"
+      card_wardrobe_item_default: "psd_composite_crop:card_wardrobe_item_default"
+      card_wardrobe_item_ribbon_top_left: "psd_composite_crop:card_wardrobe_item_ribbon_top_left"
+      card_settings_grid_default: "psd_composite_crop:card_settings_grid_default"
+      badge_discount_default: "psd_composite_crop:badge_discount_default"
+      wallpaper_main: "psd_composite_crop:wallpaper_main"
+      preview_store_hero: "psd_composite_crop:preview_store_hero"
+      # 装饰贴纸：来自预导出 PNG（temp/主题1/png/<basename>.png），imageset 名沿用 <namespace>_decor_<basename> 约定
+      sky_concert_decor_bunny_accordion_stage: "png:png/bunny_accordion_stage.png"
+      sky_concert_decor_winged_unicorn_prince: "png:png/winged_unicorn_prince.png"
+      sky_concert_decor_sky_balloon_doves: "png:png/sky_balloon_doves.png"
+      sky_concert_decor_whale_cloud_stars: "png:png/whale_cloud_stars.png"
+      sky_concert_decor_moon_star_clouds: "png:png/moon_star_clouds.png"
+      sky_concert_decor_music_scroll_clouds: "png:png/music_scroll_clouds.png"
+      sky_concert_decor_violin_cloud: "png:png/violin_cloud.png"
+      sky_concert_decor_crescent_rain_cloud: "png:png/crescent_rain_cloud.png"
+      sky_concert_decor_pastel_planets: "png:png/pastel_planets.png"
+      sky_concert_decor_shooting_star: "png:png/shooting_star.png"
+    imageset_extras:
+      # 与 png/<basename>.png 一一对应，basename 即去掉 sky_concert_decor_ 前缀
+      - sky_concert_decor_bunny_accordion_stage   # 主视觉：兔子拉手风琴 + 云端舞台
+      - sky_concert_decor_winged_unicorn_prince   # 大型底部贴纸：飞马王子
+      - sky_concert_decor_sky_balloon_doves       # 大型背景：热气球 + 白鸽
+      - sky_concert_decor_whale_cloud_stars       # 横向云鲸（统计卡背景）
+      - sky_concert_decor_moon_star_clouds        # 顶部云月装饰
+      - sky_concert_decor_music_scroll_clouds     # 音乐卷轴
+      - sky_concert_decor_violin_cloud            # 小提琴云朵
+      - sky_concert_decor_crescent_rain_cloud     # 月亮雨云小贴纸
+      - sky_concert_decor_pastel_planets          # 星球小贴纸
+      - sky_concert_decor_shooting_star           # 流星 sparkle
+    image2_prompts: {}    # PSD + 预导出 PNG 已覆盖；如某 imageset 还缺再按需补
+
+  - theme_id: theme_skin.swan_dream
+    namespace: swan_dream
+    display_name: 天鹅入梦
+    subtitle: 月色湖面 · 天鹅羽翼 · 蕾丝纱裙
+    # Artifact input location not migrated yet; keep this temp path until PSD,
+    # pre-extracted PNG, and image2_manual inputs have a formal home.
+    theme_dir: temp/主题2
+    source_type: psd
+    source_files:
+      - 天鹅入梦.psd
+    preview_hero_src: __EXPORT__/preview_store_hero.png
+    base_price: 99
+    vip_price: 89
+    visual_keywords: moonlit lake swan, dreamy pink-purple gradient, hand-drawn watercolor stickers, crowned swan, ribbon swan, swan feather bow, dream castle clouds, pearl & ribbon bow, crystal stars
+    default_enabled_slots:
+      - topBarMain
+      - topBarIconButton
+      - tabBarMain
+      - tabBarItem
+      - statsCard
+      - wardrobeItemCard
+    # 装饰贴纸已通过 Photoshop 切片导出为 拆分/*.tiff，再经 convert_tiff_to_png.py 转为 png/*.png（透明底 RGBA）。
+    # 装饰贴纸的语义用途与摆放建议详见 temp/主题2/png/PENCIL_PROMPT.md。
+    png_decor_dir: png
+    layer_map:
+      # UI 壳体：从 PSD 顶层合成 (psd_composite.png) 按 imageset 名裁切
+      top_bar_main_default: "psd_composite_crop:top_bar_main_default"
+      top_bar_icon_button_default: "psd_composite_crop:top_bar_icon_button_default"
+      top_bar_segment_default: "psd_composite_crop:top_bar_segment_default"
+      top_bar_segment_selected: "psd_composite_crop:top_bar_segment_selected"
+      search_bar_compact_default: "psd_composite_crop:search_bar_compact_default"
+      tab_bar_main_default: "psd_composite_crop:tab_bar_main_default"
+      tab_bar_item_default: "psd_composite_crop:tab_bar_item_default"
+      tab_bar_item_selected: "psd_composite_crop:tab_bar_item_selected"
+      card_stats_default: "psd_composite_crop:card_stats_default"
+      card_stats_pink: "psd_composite_crop:card_stats_pink"
+      card_stats_blue: "psd_composite_crop:card_stats_blue"
+      card_stats_purple: "psd_composite_crop:card_stats_purple"
+      card_wardrobe_item_default: "psd_composite_crop:card_wardrobe_item_default"
+      card_wardrobe_item_ribbon_top_left: "psd_composite_crop:card_wardrobe_item_ribbon_top_left"
+      card_settings_grid_default: "psd_composite_crop:card_settings_grid_default"
+      badge_discount_default: "psd_composite_crop:badge_discount_default"
+      wallpaper_main: "psd_composite_crop:wallpaper_main"
+      preview_store_hero: "psd_composite_crop:preview_store_hero"
+      # 装饰贴纸：来自预导出 PNG（temp/主题2/png/<basename>.png），imageset 名沿用 <namespace>_decor_<basename> 约定
+      swan_dream_decor_crowned_swan_clouds: "png:png/crowned_swan_clouds.png"
+      swan_dream_decor_flying_swan_stars: "png:png/flying_swan_stars.png"
+      swan_dream_decor_ribbon_swan_clouds: "png:png/ribbon_swan_clouds.png"
+      swan_dream_decor_swan_feather_bow: "png:png/swan_feather_bow.png"
+      swan_dream_decor_crescent_planet_sparkle: "png:png/crescent_planet_sparkle.png"
+      swan_dream_decor_moon_bow_bottle: "png:png/moon_bow_bottle.png"
+      swan_dream_decor_pink_ribbon_bow: "png:png/pink_ribbon_bow.png"
+      swan_dream_decor_dream_castle_clouds: "png:png/dream_castle_clouds.png"
+      swan_dream_decor_crystal_stars: "png:png/crystal_stars.png"
+    imageset_extras:
+      # 与 png/<basename>.png 一一对应，basename 即去掉 swan_dream_decor_ 前缀
+      - swan_dream_decor_crowned_swan_clouds      # 主视觉：戴皇冠天鹅 + 云朵
+      - swan_dream_decor_flying_swan_stars        # 大型背景：飞翔天鹅 + 星点
+      - swan_dream_decor_ribbon_swan_clouds       # 大型贴纸：舞会天鹅 + 缎带
+      - swan_dream_decor_swan_feather_bow         # 羽毛蝴蝶结贴纸
+      - swan_dream_decor_crescent_planet_sparkle  # 月亮星环
+      - swan_dream_decor_moon_bow_bottle          # 月亮许愿瓶
+      - swan_dream_decor_pink_ribbon_bow          # 蝴蝶结丝带
+      - swan_dream_decor_dream_castle_clouds      # 梦境城堡 + 云朵
+      - swan_dream_decor_crystal_stars            # 水晶星星 sparkle
+    image2_prompts: {}

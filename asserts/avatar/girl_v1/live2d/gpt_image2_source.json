@@ -7,10 +7,16 @@
   "default_outfit_prompt": "Use case: stylized-concept. Asset type: project-bound gpt-image-2 source asset for a Live2D-riggable iOS magic sticker wardrobe character. Create a beautiful full-body front-facing anime wardrobe assistant girl, elegant sweet lolita / magical wardrobe style, young adult stylized character, large expressive eyes, soft smile, long layered hair with clearly separable front hair, side hair, and back hair masses, pastel pink and sky-blue outfit, delicate bow and heart accents, arms relaxed slightly away from body, legs visible, shoes visible, symmetrical neutral A-pose suitable for cutting into riggable parts and binding bones. Composition: centered full body, generous padding, vertical 3:4 canvas. Style: polished 2D mobile game character illustration, clean line art, soft cel shading, refined and cute, not chibi, not childish, high quality character design. Background: perfectly flat solid #00ff00 chroma-key only, no shadows, no gradient, no texture, no floor plane. Constraints: no text, no watermark, no phone UI, no cropped limbs, no fused fingers, no realistic photo, do not use #00ff00 or green anywhere in the character.",
   "short_bob_hairstyle_prompt": "Use case: stylized-concept. Asset type: project-bound gpt-image-2 source asset for an alternate Live2D-riggable hairstyle package. Create a full-body front-facing anime wardrobe assistant base avatar matching the proportions and pose of a Live2D dress-up doll base: young adult stylized character, elegant and refined, soft smile, large expressive eyes, same matte warm white and very pale blue unitard / bodysuit with visible joint guide rings at shoulders, elbows, wrists, hips, knees, ankles. Hairstyle requirement: alternate short bob hairstyle, pastel lavender-pink color, rounded bob silhouette at jaw/neck length, separate-looking back hair mass, front bangs, side locks, loose strand details, and highlight strands. Keep hair clearly separable into foreground bangs, background/back hair, side locks, and fine detail layers for Live2D binding. No long twin tails, no hat, no hair accessories. Pose and rigging: symmetrical neutral A-pose, arms relaxed slightly away from body, head centered, full body visible, easy to crop hairstyle layers. Composition: centered full body, generous padding, vertical 3:4 canvas. Style: polished 2D mobile game character illustration, clean line art, soft cel shading, cute but not chibi. Background: perfectly flat solid #00ff00 chroma-key only, no shadows, no gradient, no texture, no floor plane. Constraints: no text, no watermark, no phone UI, no cropped limbs, no fused fingers, no realistic photo, do not use #00ff00 or green anywhere in the character.",
   "workspace_static_asset": "ItemManager/Assets.xcassets/AvatarCharacter/girl_v1/avatar_girl_v1_static.imageset/avatar_girl_v1_static.png",
-  "base_body_chromakey_source": "temp/_live2d_avatar_harness/generated/gpt-image-2/avatar_girl_v1_base_body_chroma.png",
-  "base_body_alpha_source": "temp/_live2d_avatar_harness/generated/gpt-image-2/avatar_girl_v1_base_body_alpha.png",
-  "short_bob_chromakey_source": "temp/_live2d_avatar_harness/generated/gpt-image-2/avatar_girl_v1_short_bob_chromakey.png",
-  "short_bob_alpha_source": "temp/_live2d_avatar_harness/generated/gpt-image-2/avatar_girl_v1_short_bob_alpha.png",
+  "historical_intermediate_outputs": {
+    "status": "historical_record_only",
+    "note": "The chroma-key and alpha PNG intermediates were produced by the retired Live2D avatar harness and are not current file dependencies.",
+    "filenames": [
+      "avatar_girl_v1_base_body_chroma.png",
+      "avatar_girl_v1_base_body_alpha.png",
+      "avatar_girl_v1_short_bob_chromakey.png",
+      "avatar_girl_v1_short_bob_alpha.png"
+    ]
+  },
   "layer_manifest": "asserts/avatar/girl_v1/live2d/rig_manifest.json",
   "hairstyle_index": "asserts/avatar/girl_v1/live2d/hairstyles/hairstyle_index.json",
   "default_outfit_manifest": "asserts/avatar/girl_v1/live2d/outfits/default/outfit_manifest.json",

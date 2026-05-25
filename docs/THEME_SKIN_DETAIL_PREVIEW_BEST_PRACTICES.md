@@ -2,7 +2,7 @@
 
 > 范围：`ItemManager/Views/ThemeSkin/ThemeSkinDetailView.swift`、`ThemeSkinSlotToggleSection.swift`、`ThemeSkinSharedComponents.swift` 的「主题预览 / 实时组件预览 / 组件开关」三段。
 > 状态：**仅调研归档，未改任何代码**。后续若动手实现，请遵循本文档。
-> 与 Harness 的关系：本文档**不动** `temp/_harness/`、`MANIFEST.yaml`、`ThemeSkinSlot.rawValue`、`ThemeSkinManager` 行为，也**不增减 18 个 slot**。Codex 当前在执行的 `EXEC_PLAN.md` / `EXEC_PLAN_IOS26_UNIFY.md` 不受影响 —— 本文档只覆盖详情页的视觉层 / 信息架构。
+> 与历史 harness 的关系：本文档**不动** `temp/_harness/`、`MANIFEST.yaml`、`ThemeSkinSlot.rawValue`、`ThemeSkinManager` 行为，也**不增减 18 个 slot**。`temp/_harness/EXEC_PLAN*.md` 仅作为迁移前参考；长期口径以 `docs/THEME_SKIN_REPLICATION_BEST_PRACTICES.md` 以及后续迁入的 `tools/` / 正式 docs 为准。本文档只覆盖详情页的视觉层 / 信息架构。
 
 ## 1. 现状问题（2026-04-29 截图复盘）
 
@@ -44,7 +44,7 @@
 - **组件开关每行加左侧迷你缩略图**：在 `ThemeSkinSlotToggleSection.slotGroupCard` 行内，左侧放一个 `36×36` 的迷你预览，渲染该 slot 的真实当前样式。
   - 数据来源：复用 `ThemeSkinSharedComponents` 里已有的程序化绘制（带主题缺图回退）。
   - 不要用 SF Symbol。SF Symbol 只用于分组头。
-  - 缺图主题保留"程序化兜底" → 这与 harness 硬约束一致。
+  - 缺图主题保留"程序化兜底" → 这与 ThemeSkin 复刻硬约束一致。
 - **主预览卡换成"迷你 App 帧"图解**：把 `previewCard.heroFallback` 换成一张垂直堆叠的迷你帧：
   ```
   [顶栏样例] → 编号 ①
@@ -96,17 +96,17 @@
 - [ ] 暗黑模式 + iPad split view + 动态字体 XXL：版式不破。
 - [ ] VoiceOver：每个开关 + 缩略图组合朗读为「{displayName}，{slot.rawValue}，{已启用/已停用}」一条，不要拆成两条。
 
-## 7. 与 Harness 的边界（明确不冲突）
+## 7. 与历史 harness 的边界（明确不冲突）
 
-| Harness 关心 | 本文档关心 | 是否会撞 |
+| 历史 harness / 正式规则关心 | 本文档关心 | 是否会撞 |
 |---|---|---|
-| `MANIFEST.yaml` 的 imageset / sticker_bbox / namespace | 详情页 SwiftUI 视图布局 | 否，文件不重叠 |
-| `temp/_harness/EXEC_PLAN.md` 让 Codex 跑模拟器、写 Assets.xcassets | 详情页 UX 改造（V1 视觉锚 / V2 Live 预览 / V3 双向锚点）| 否，触达不同文件 |
+| 主题元数据、imageset / sticker_bbox / namespace；迁移完成前可对照历史 `MANIFEST.yaml` | 详情页 SwiftUI 视图布局 | 否，文件不重叠 |
+| 历史 `temp/_harness/EXEC_PLAN*.md` 的模拟器 / Assets.xcassets 步骤；长期应迁入 `tools/` 或正式 docs | 详情页 UX 改造（V1 视觉锚 / V2 Live 预览 / V3 双向锚点）| 否，触达不同文件 |
 | `ThemeSkinSlot` 18 个 case + 顺序 | 也只读取，不增减 | 否 |
 | 程序化绘制兜底 | 视觉锚里复用程序化绘制 | 否，反而强依赖它 |
 | `ThemeSkinManager` 的 `isSlotEnabled` / `activateTheme` 等 API | 只读，不改 | 否 |
 
-> **如果 Codex 当前 PR 还在跑 `EXEC_PLAN.md` / `EXEC_PLAN_IOS26_UNIFY.md`，本文档对应的实现 PR 应排在其后**（避免合并冲突 `ThemeSkinDetailView.swift`）。先等天空音乐会 / 天鹅入梦验收 PASS、git tag 打完，再开本文档对应的 UX 改造分支。
+> **如果当前仍在借用历史 `EXEC_PLAN*.md` 做主题复核，本文档对应的实现 PR 应排在其后**（避免合并冲突 `ThemeSkinDetailView.swift`）。后续新增或仍有效流程应沉淀到 `docs/THEME_SKIN_REPLICATION_BEST_PRACTICES.md`、正式 docs 或 `tools/`，不要继续扩写 `temp/_harness`。
 
 ## 8. 参考资料
 
@@ -130,4 +130,4 @@
 - 真组件渲染（V1/V2 缩略图 / 迷你帧的素材源）：`ItemManager/Views/ThemeSkin/HomeThemeSkinComponents.swift`、`TabBarThemeSkinComponents.swift`、`WardrobeThemeSkinComponents.swift`、`SkyConcertThemeSkinComponents.swift`
 - Slot 枚举与 `displayName`（不要改）：`ItemManager/Services/ThemeSkin/ThemeSkinModels.swift:3`
 - Manager（只读 API）：`ThemeSkinManager.shared.isSlotEnabled / setSlot / isPurchased / isActiveTheme / priceQuote`
-- Harness 入口（**实施时一律不改**）：`temp/_harness/README.md`、`MANIFEST.yaml`、`EXEC_PLAN.md`、`EXEC_PLAN_IOS26_UNIFY.md`
+- 历史 harness 入口（**实施时一律不改，仅迁移前参考**）：`temp/_harness/README.md`、`MANIFEST.yaml`、`EXEC_PLAN.md`、`EXEC_PLAN_IOS26_UNIFY.md`；仍有效流程应迁入正式 docs 或 `tools/`

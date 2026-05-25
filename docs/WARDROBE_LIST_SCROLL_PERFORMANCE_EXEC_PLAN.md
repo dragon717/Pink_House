@@ -63,7 +63,7 @@ DATA_TIERS=(50 200 800 2000)
 
 ### 2.1 数据集生成
 
-衣橱当前没有压测数据生成工具。**P0 任务之一**：在 `ItemManager/Scripts/` 增加 `seed_wardrobe_perf.swift`（仅 DEBUG 编译），从命令行参数 `--count <N>` 写入 N 件 `Clothing`，每件挂 1 张 200×200 JPEG（来自 `temp/商品图/`）。
+衣橱当前没有压测数据生成工具。**P0 任务之一**：在 `ItemManager/Scripts/` 增加 `seed_wardrobe_perf.swift`（仅 DEBUG 编译），从命令行参数 `--count <N>` 写入 N 件 `Clothing`，每件挂 1 张 200×200 JPEG。压测样例图不依赖 `temp/商品图/`：推荐迁到 `tools/perf-samples/wardrobe-images/`，或每次通过 `--image-dir <absolute-path>` 显式传入本机样例目录；未传 `--image-dir` 时脚本使用生成兜底图。
 > 硬约束：seed 出来的图片必须复用 `ImageManager.saveImage`，走真实哈希去重链路，否则 NSCache 命中数据失真。
 
 ### 2.2 指标定义
@@ -305,7 +305,7 @@ notes.md                      # 主观手感（必填："丝滑/能用/明显卡
 - 编辑器 (`ClothingEditView`) 性能。
 - 拼豆 / 空间手帐 / 小世界视图。
 - iCloud 同步策略改造 — 由 `iCloud_SYNC_GUIDE.md` 主导。
-- 主题皮肤资产替换 — 由 `temp/_harness/EXEC_PLAN.md` 主导，本计划只保证不打破其约定。
+- 主题皮肤资产替换 — `temp/_harness/EXEC_PLAN.md` 仅作历史 ThemeSkin harness / 迁移前参考；正式口径遵循 `docs/THEME_SKIN_REPLICATION_BEST_PRACTICES.md` 和后续 `docs/` / `tools/`，本计划只保证不打破当前主题约定。
 - `NavigationStack` 全面迁移 — 仅在 P2 内做衣橱局部迁移。
 
 ---

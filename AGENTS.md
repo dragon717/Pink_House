@@ -21,11 +21,13 @@
 - **不写**：`/Users/muniao/Downloads/Pink_House`（鸿蒙 DevEco 用，独立 .git，靠 iCloud 文件级同步）
 - **鸿蒙 / ArkTS / harmony_next** 才在 Downloads 写
 
-## 主题皮肤复刻 — 通用 harness
+## 主题皮肤复刻 — 历史 harness 与正式规则
 
 工程已有 `ThemeSkin` 框架（`ItemManager/Services/ThemeSkin/*` + `ItemManager/Views/ThemeSkin/*`），架构与 slot 已落地。本系列任务 = **接入素材，不改架构**。
 
-通用 harness 在 `temp/_harness/`，**一份模板覆盖所有主题**：
+`temp/_harness/` 是历史 harness / 待迁移归档，不再作为永久 source of truth 或 runtime 依赖。删除 `temp` 前，必须先把仍有效的主题元数据、素材清单、执行脚本、验收规则和 PSD/image2 说明迁入 `docs/` 或 `tools/`；在迁移闭环前，它只能作为历史参考和清理核对输入。手动 image2 素材入库优先使用正式入口 `tools/theme_skin/materialize_manual_image2_assets.rb`，该脚本默认读取 `tools/theme_skin/theme_manifest.yaml`；只有复核历史清单时才用 `--manifest-path temp/_harness/MANIFEST.yaml`。
+
+历史 harness 当前结构：
 
 ```text
 temp/_harness/
@@ -45,37 +47,37 @@ temp/<theme-dir>/_artifacts/
 └── accept/<ts>/ # Claude 验收截图 + RESULT.md
 ```
 
-### 待复刻主题
+### 已落地主题与未闭环项
 
 | THEME_ID | 目录 | 设计稿 | source_type | 状态 |
 |---|---|---|---|---|
-| `theme_skin.sky_concert` | `temp/主题1/` | 天空音乐会.psd（2480×3319） | psd | manifest ✅ / 代码 ✅ / 素材 dry-run ✅ / 验收待跑 |
-| `theme_skin.swan_dream` | `temp/主题2/` | 天鹅入梦.psd（4000×4000） | psd | manifest ✅ / 代码 ✅ / 素材 dry-run ✅ / 验收待跑 |
+| `theme_skin.sky_concert` | `temp/主题1/` | 天空音乐会.psd（2480×3319） | psd | 代码 ✅ / Asset Catalog 素材 ✅ / dry-run ✅ / A-O 视觉验收待跑 / 历史占位 imageset 待清理 |
+| `theme_skin.swan_dream` | `temp/主题2/` | 天鹅入梦.psd（4000×4000） | psd | 代码 ✅ / Asset Catalog 素材 ✅ / dry-run ✅ / A-O 视觉验收待跑 / 历史占位 imageset 待清理 |
 
 ### 复刻顺序
 
 1. 主题1 天空音乐会
 2. 主题2 天鹅入梦
 
-### 跑 harness 的方式
+### 使用历史 harness 的方式（迁移前临时参考）
 
-每个会话起手必须指定 THEME_ID：
+需要复核历史资料时，每个会话起手指定 THEME_ID：
 
 ```bash
 PROJ="/Users/muniao/Library/Mobile Documents/com~apple~CloudDocs/游戏/github/Pink_House"
 THEME_ID="theme_skin.sky_concert"   # 或 theme_skin.swan_dream
 ```
 
-Codex prompt 顶端写 `THEME_ID = <value>`，整份 `EXEC_PLAN.md` 喂下去；Codex 自己用 `yq` / `pyyaml` 从 `MANIFEST.yaml` 解析 `${...}` 变量。验收同理喂 `ACCEPT_PLAN.md`。
+Codex prompt 顶端写 `THEME_ID = <value>`，再按历史 `EXEC_PLAN.md` / `ACCEPT_PLAN.md` 复核。不要把这些 `temp/_harness` 文件继续扩写成长期流程；新增或仍有效规则应迁入正式 `docs/` 或 `tools/`。
 
 ### 新增主题的最小步骤
 
 1. 在 `temp/` 下建 `<theme-dir>/`，丢设计稿
-2. 在 `MANIFEST.yaml` 的 `themes[]` 追加一条
-3. 起 Codex 会话 → 喂 `EXEC_PLAN.md` + `THEME_ID`
-4. 完成后起 Claude 验收 → 喂 `ACCEPT_PLAN.md`
+2. 在正式主题文档 / 工具清单中登记主题元数据和素材映射；如果仍临时借用历史 harness，再同步 `MANIFEST.yaml`
+3. 起 Codex 会话 → 按正式 docs/tools 执行；历史 `EXEC_PLAN.md` 只作迁移前参考
+4. 完成后按正式验收清单做 A-O 视觉验收；历史 `ACCEPT_PLAN.md` 只作迁移前参考
 
-不再需要每主题一份 harness 副本。
+不再需要每主题一份 harness 副本，也不应把新流程继续沉淀在 `temp/_harness`。
 
 ## 主题包硬约束（所有主题通用）
 
@@ -110,13 +112,15 @@ xcrun simctl launch booted "$BUNDLE_ID"
 
 ## 验收图基准（所有主题共用）
 
+验收基准图的语义与迁移状态见 `docs/THEME_SKIN_VISUAL_BASELINES.md`。历史引用路径为：
+
 - `temp/design/IMG_7936.png` — 衣橱主页
 - `temp/design/IMG_7937.png` — 衣橱统计页
 - `temp/design/IMG_8204.PNG` — 大世界 House 页
 - `temp/design/IMG_8208.PNG` — 财富页
 - `temp/design/IMG_8211.PNG` — 穿搭手帐页
 
-不同主题视觉不同但**版式一致**，验收图作为版式基准，颜色 / 装饰随主题。
+当前 iCloud 仓库未发现完整 `temp/design/` 目录；不同主题视觉不同但**版式一致**，删除 `temp` 前需先找回这些基准图、迁入正式基准目录，或记录正式替代来源。
 
 ## 协作角色（双 computer use）
 
@@ -126,7 +130,7 @@ xcrun simctl launch booted "$BUNDLE_ID"
 ## 卡住怎么办
 
 - 看不懂 ThemeSkin 架构 → 读 `docs/少女衣橱主题皮肤重构方案.md`
-- 不知道 manifest 字段 → `temp/_harness/MANIFEST.yaml` 顶部注释列了全部
+- 不知道 manifest 字段 → 先看 `docs/THEME_SKIN_REPLICATION_BEST_PRACTICES.md`；迁移完成前可对照历史 `temp/_harness/MANIFEST.yaml` 顶部注释
 - imageset 加完 Xcode 找不到 → 检查 target membership + namespace 文件夹的 `provides-namespace: false`
 - PSD 图层导出全空 → `psd-tools` 默认只导可见层，先 `layer.visible = True`
 - iCloud 同步锁文件 → `find "$PROJ" -name "*.icloud"` 或 `brctl download "$PROJ"`

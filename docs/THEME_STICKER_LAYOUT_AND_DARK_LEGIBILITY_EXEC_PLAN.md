@@ -1,8 +1,8 @@
-# 主题贴纸排布规范 & 暗黑模式文字可读性 · 可执行计划（harness）
+# 主题贴纸排布规范 & 暗黑模式文字可读性 · 可执行计划
 
 > 状态：**2026-05-01 可执行版**。本文档只定义后续实施步骤与验收标准；本次文档修订只改本文档，不改 Swift、不新增脚本、不触碰 Xcode 工程。后续真正执行 T0a 时才新增 `scripts/theme_skin_harness/` 脚本。
 > 范围：`ItemManager/Views/ThemeSkin/**` 的贴纸 / 装饰层 / 容器外壳 / 文字可读性，以及 P0/P1 页面中与 ThemeSkin 交界的卡片容器。
-> 红线：不改 `ThemeSkinSlot.rawValue` 与 18 个 slot 数量；不改 `ThemeSkinManager` 持久化 key；不改 `temp/_harness/MANIFEST.yaml`；不新增暗黑专用 PNG；不让默认主题被主题装饰波及。
+> 红线：不改 `ThemeSkinSlot.rawValue` 与 18 个 slot 数量；不改 `ThemeSkinManager` 持久化 key；不改 `temp/_harness/MANIFEST.yaml`；不新增暗黑专用 PNG；不让默认主题被主题装饰波及。长期主题复刻口径以 `docs/THEME_SKIN_REPLICATION_BEST_PRACTICES.md` 以及后续迁入的 `tools/` / 正式 docs 为准，`temp/_harness` 只作为历史 harness / 迁移前参考。
 
 ---
 
