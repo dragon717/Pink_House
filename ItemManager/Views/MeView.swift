@@ -443,7 +443,7 @@ struct MeView: View {
             
             Task {
                 guard url.startAccessingSecurityScopedResource() else {
-                    importMessage = "无法访问文件，请检查权限"
+                    importMessage = "无法访问文件，请检查权限".appLocalized
                     showingImportAlert = true
                     return
                 }
@@ -452,18 +452,21 @@ struct MeView: View {
                 
                 do {
                     let result = try await ImportManager.shared.importBackup(from: url, context: modelContext)
-                    importMessage = "导入完成\n成功: \(result.successCount)\n失败: \(result.failCount)"
+                    importMessage = "导入完成\n成功: %@\n失败: %@".appLocalized(
+                        String(result.successCount),
+                        String(result.failCount)
+                    )
                     if !result.errors.isEmpty {
-                        importMessage += "\n\n错误详情:\n" + result.errors.prefix(3).joined(separator: "\n")
+                        importMessage += "\n\n" + "错误详情:\n%@".appLocalized(result.errors.prefix(3).joined(separator: "\n"))
                     }
                 } catch {
-                    importMessage = "导入失败: \(error.localizedDescription)"
+                    importMessage = "导入失败: %@".appLocalized(error.localizedDescription)
                 }
                 showingImportAlert = true
             }
             
         case .failure(let error):
-            importMessage = "选择文件失败: \(error.localizedDescription)"
+            importMessage = "选择文件失败: %@".appLocalized(error.localizedDescription)
             showingImportAlert = true
         }
     }
@@ -476,11 +479,11 @@ enum CloudFileConfirmationAction: String, Identifiable {
     var id: String { rawValue }
 
     var confirmButtonTitle: String {
-        "确认备份"
+        "确认备份".appLocalized
     }
 
     var message: String {
-        "将把当前本地数据上传为一份云端备份。若云端已有旧备份，会以最新上传内容为准。确定继续吗？"
+        "将把当前本地数据上传为一份云端备份。若云端已有旧备份，会以最新上传内容为准。确定继续吗？".appLocalized
     }
 }
 
@@ -1018,10 +1021,10 @@ struct SettingsRow: View {
                 .frame(width: 24)
             
             VStack(alignment: .leading) {
-                Text(title)
+                Text(title.appLocalized)
                     .font(.body)
                     .themeSkinLegibleText(level: .inline, slot: .sectionCard)
-                Text(subtitle)
+                Text(subtitle.appLocalized)
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .themeSkinLegibleText(level: .inline, slot: .sectionCard)

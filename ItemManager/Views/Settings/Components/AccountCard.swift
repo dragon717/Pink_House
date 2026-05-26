@@ -70,13 +70,13 @@ struct AccountCard: View {
                             .lineLimit(2)
                             .multilineTextAlignment(.leading)
                     } else {
-                        Text("Apple 登录")
+                        Text("Apple 登录".appLocalized)
                             .font(.headline)
                             .foregroundStyle(themeManager.primaryTextColor)
                             .themeSkinLegibleText(level: .inline, slot: .settingsGridCard, descriptor: themeSkinDescriptor)
                             .lineLimit(1)
                         
-                        Text("点击登录以同步数据")
+                        Text("点击登录以同步数据".appLocalized)
                             .font(.caption)
                             .foregroundStyle(themeManager.secondaryTextColor)
                             .themeSkinLegibleText(level: .inline, slot: .settingsGridCard, descriptor: themeSkinDescriptor)
@@ -137,11 +137,19 @@ struct AccountCard: View {
     }
     
     private var icloudStatusText: String {
-        if cloudManager.isSyncing { return "正在同步..." }
-        if cloudManager.syncError != nil { return "同步出错" }
+        if cloudManager.isSyncing { return "正在同步...".appLocalized }
+        if cloudManager.syncError != nil { return "同步出错".appLocalized }
         if let date = cloudManager.lastCloudBackupDate {
-            return "备份于 " + date.formatted(date: .abbreviated, time: .shortened)
+            return "备份于 %@".appLocalized(formattedBackupDate(date))
         }
-        return "iCloud 就绪"
+        return "iCloud 就绪".appLocalized
+    }
+
+    private func formattedBackupDate(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = LanguageManager.shared.locale
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .short
+        return formatter.string(from: date)
     }
 }

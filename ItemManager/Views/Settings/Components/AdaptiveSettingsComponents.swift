@@ -29,7 +29,7 @@ struct AdaptiveSettingsView<Content: View>: View {
                     .frame(height: legacyCustomTabBarAvoidanceInset(safeAreaBottom: proxy.safeAreaInsets.bottom))
             }
             .background(LiquidBackground())
-            .navigationTitle(title)
+            .navigationTitle(title.appLocalized)
             .navigationBarTitleDisplayMode(.inline)
         }
     }
@@ -71,7 +71,7 @@ struct AdaptiveSection<Content: View>: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             if let header {
-                Text(header.uppercased())
+                Text(header.appLocalized.uppercased(with: LanguageManager.shared.locale))
                     .font(.caption)
                     .foregroundStyle(themeManager.secondaryTextColor)
                     .padding(.leading, 8)
@@ -88,7 +88,7 @@ struct AdaptiveSection<Content: View>: View {
             .shadow(color: .black.opacity(0.05), radius: 4, x: 0, y: 2)
             
             if let footer {
-                Text(footer)
+                Text(footer.appLocalized)
                     .font(.caption2)
                     .foregroundStyle(themeManager.secondaryTextColor)
                     .padding(.leading, 8)

@@ -41,13 +41,13 @@ struct SettingsGridItem: View {
             }
             
             VStack(alignment: .leading, spacing: 4) {
-                Text(title)
+                Text(title.appLocalized)
                     .font(.headline)
                     .foregroundStyle(themeManager.primaryTextColor)
                     .themeSkinLegibleText(level: .inline, slot: .settingsGridCard, descriptor: themeSkinDescriptor)
                     .lineLimit(1)
                 
-                Text(subtitle)
+                Text(subtitle.appLocalized)
                     .font(.caption)
                     .foregroundStyle(themeManager.secondaryTextColor)
                     .themeSkinLegibleText(level: .inline, slot: .settingsGridCard, descriptor: themeSkinDescriptor)
