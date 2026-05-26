@@ -65,7 +65,7 @@ struct AssetPanel: View {
                 VStack(spacing: 8) {
                     // 第一行：标题和关闭按钮
                     HStack {
-                        Text("素材")
+                        Text("素材".appLocalized)
                             .font(.headline)
                             .foregroundStyle(.primary)
                         
@@ -94,7 +94,7 @@ struct AssetPanel: View {
                                     .foregroundColor(.gray)
                                     .font(.system(size: 14))
                                 
-                                TextField("搜索素材...", text: $searchText)
+                                TextField("搜索素材...".appLocalized, text: $searchText)
                                     .font(.system(size: 14))
                                     .textFieldStyle(PlainTextFieldStyle())
                                 
@@ -119,7 +119,7 @@ struct AssetPanel: View {
                                 HStack(spacing: 6) {
                                     ForEach(AssetCategory.allCases, id: \.self) { category in
                                         CategoryTab(
-                                            title: category.rawValue,
+                                            title: category.displayName,
                                             category: category,
                                             isSelected: selectedCategory == category
                                         ) {
@@ -223,7 +223,7 @@ struct CategoryTab: View {
     
     var body: some View {
         Button(action: action) {
-            Text(title)
+            Text(title.appLocalized)
                 .font(.system(size: 13))
                 .fontWeight(isSelected ? .semibold : .regular)
                 .foregroundStyle(isSelected ? .white : .primary)
@@ -264,11 +264,11 @@ struct ClothingAssetList: View {
                         .font(.system(size: 48))
                         .foregroundStyle(.secondary)
                     
-                    Text("暂无3D模型")
+                    Text("暂无3D模型".appLocalized)
                         .font(.headline)
                         .foregroundStyle(.secondary)
                     
-                    Text("使用相机拍摄20+张照片\n或从图库选择图片生成3D模型")
+                    Text("使用相机拍摄20+张照片\n或从图库选择图片生成3D模型".appLocalized)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
@@ -364,7 +364,7 @@ struct Clothing3DAssetCard: View {
                     
                     HStack(spacing: 4) {
                         // 3D类型标签
-                        Text(clothing.model3DTypeDescription ?? "3D")
+                        Text((clothing.model3DTypeDescription ?? "3D").appLocalized)
                             .font(.caption2)
                             .fontWeight(.bold)
                             .padding(.horizontal, 6)
@@ -465,7 +465,7 @@ struct EffectAssetCard: View {
                     }
                 }
                 
-                Text(name)
+                Text(name.appLocalized)
                     .font(.subheadline)
                 
                 Spacer()
@@ -542,7 +542,7 @@ struct LightAssetCard: View {
                         .foregroundStyle(color)
                 }
                 
-                Text(name)
+                Text(name.appLocalized)
                     .font(.subheadline)
                 
                 Spacer()
@@ -618,7 +618,7 @@ struct TemplateCard: View {
                             .foregroundStyle(color)
                     )
                 
-                Text(name)
+                Text(name.appLocalized)
                     .font(.caption)
                     .lineLimit(1)
             }
@@ -687,7 +687,7 @@ struct MaterialCard: View {
                             .stroke(Color.white.opacity(0.3), lineWidth: 1)
                     )
                 
-                Text(name)
+                Text(name.appLocalized)
                     .font(.caption)
                     .lineLimit(1)
             }
@@ -761,7 +761,7 @@ struct AccessoryCard: View {
                             .stroke(Color.white.opacity(0.3), lineWidth: 1)
                     )
                 
-                Text(name)
+                Text(name.appLocalized)
                     .font(.caption)
                     .lineLimit(1)
             }
@@ -835,7 +835,7 @@ struct FurnitureCard: View {
                             .stroke(Color.white.opacity(0.3), lineWidth: 1)
                     )
                 
-                Text(name)
+                Text(name.appLocalized)
                     .font(.caption)
                     .lineLimit(1)
             }
@@ -871,11 +871,11 @@ struct Model3DAssetList: View {
                         .font(.system(size: 48))
                         .foregroundStyle(.secondary)
                     
-                    Text("暂无3D模型")
+                    Text("暂无3D模型".appLocalized)
                         .font(.headline)
                         .foregroundStyle(.secondary)
                     
-                    Text("使用相机拍摄20+张照片\n或从图库选择图片生成3D模型")
+                    Text("使用相机拍摄20+张照片\n或从图库选择图片生成3D模型".appLocalized)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
@@ -986,7 +986,7 @@ struct Model3DAssetCard: View {
                     .lineLimit(1)
                 
                 HStack(spacing: 4) {
-                    Text(model.modelTypeDescription ?? "3D")
+                    Text((model.modelTypeDescription ?? "3D").appLocalized)
                         .font(.caption2)
                         .fontWeight(.bold)
                         .padding(.horizontal, 6)
@@ -1007,32 +1007,32 @@ struct Model3DAssetCard: View {
                 Button {
                     onAddToScene()
                 } label: {
-                    Label("添加到场景", systemImage: "plus.circle")
+                    Label("添加到场景".appLocalized, systemImage: "plus.circle")
                 }
                 
                 Button {
                     newName = model.name
                     showingRenameAlert = true
                 } label: {
-                    Label("重命名", systemImage: "pencil")
+                    Label("重命名".appLocalized, systemImage: "pencil")
                 }
                 
                 NavigationLink {
                     ModelThumbnailEditorView(model: model)
                 } label: {
-                    Label("设置缩略图", systemImage: "camera.viewfinder")
+                    Label("设置缩略图".appLocalized, systemImage: "camera.viewfinder")
                 }
                 
                 Button {
                     showingShareSheet = true
                 } label: {
-                    Label("导出模型分享", systemImage: "square.and.arrow.up")
+                    Label("导出模型分享".appLocalized, systemImage: "square.and.arrow.up")
                 }
                 
                 Button(role: .destructive) {
                     checkUsageAndShowDeleteAlert()
                 } label: {
-                    Label("删除", systemImage: "trash")
+                    Label("删除".appLocalized, systemImage: "trash")
                 }
             } label: {
                 Image(systemName: "ellipsis.circle.fill")
@@ -1048,26 +1048,26 @@ struct Model3DAssetCard: View {
             Button {
                 onAddToScene()
             } label: {
-                Label("添加到场景", systemImage: "plus.circle")
+                Label("添加到场景".appLocalized, systemImage: "plus.circle")
             }
             
             Button {
                 newName = model.name
                 showingRenameAlert = true
             } label: {
-                Label("重命名", systemImage: "pencil")
+                Label("重命名".appLocalized, systemImage: "pencil")
             }
             
             NavigationLink {
                 ModelThumbnailEditorView(model: model)
             } label: {
-                Label("设置缩略图", systemImage: "camera.viewfinder")
+                Label("设置缩略图".appLocalized, systemImage: "camera.viewfinder")
             }
             
             Button {
                 showingShareSheet = true
             } label: {
-                Label("导出模型分享", systemImage: "square.and.arrow.up")
+                Label("导出模型分享".appLocalized, systemImage: "square.and.arrow.up")
             }
             
             Divider()
@@ -1075,28 +1075,28 @@ struct Model3DAssetCard: View {
             Button(role: .destructive) {
                 checkUsageAndShowDeleteAlert()
             } label: {
-                Label("删除", systemImage: "trash")
+                Label("删除".appLocalized, systemImage: "trash")
             }
         }
-        .alert("重命名", isPresented: $showingRenameAlert) {
-            TextField("请输入新名称", text: $newName)
-            Button("取消", role: .cancel) { }
-            Button("确定") {
+        .alert("重命名".appLocalized, isPresented: $showingRenameAlert) {
+            TextField("请输入新名称".appLocalized, text: $newName)
+            Button("取消".appLocalized, role: .cancel) { }
+            Button("确定".appLocalized) {
                 renameModel()
             }
         }
-        .alert("确认删除", isPresented: $showingDeleteAlert) {
-            Button("取消", role: .cancel) { }
-            Button("删除", role: .destructive) {
+        .alert("确认删除".appLocalized, isPresented: $showingDeleteAlert) {
+            Button("取消".appLocalized, role: .cancel) { }
+            Button("删除".appLocalized, role: .destructive) {
                 performDelete()
             }
         } message: {
-            Text("确定要删除「\(model.name)」吗？此操作无法撤销，模型文件和数据将被永久删除。")
+            Text("确定要删除「%@」吗？此操作无法撤销，模型文件和数据将被永久删除。".appLocalized(model.name))
         }
-        .alert("无法删除", isPresented: $showingUsageAlert) {
-            Button("确定", role: .cancel) { }
+        .alert("无法删除".appLocalized, isPresented: $showingUsageAlert) {
+            Button("确定".appLocalized, role: .cancel) { }
         } message: {
-            Text("该模型正在被 \(usageCount) 个场景使用，请先从场景中移除后再删除。")
+            Text("该模型正在被 %@ 个场景使用，请先从场景中移除后再删除。".appLocalized("\(usageCount)"))
         }
         .sheet(isPresented: $showingShareSheet) {
             if let resolvedPath = model.resolvedModelPath {
@@ -1187,7 +1187,7 @@ struct ModelThumbnailEditorView: View {
                         .font(.system(size: 48))
                         .foregroundStyle(.secondary)
                     
-                    Text("无法加载模型")
+                    Text("无法加载模型".appLocalized)
                         .font(.headline)
                         .foregroundStyle(.secondary)
                 }
@@ -1240,7 +1240,7 @@ struct ModelThumbnailEditorView: View {
                     
                     Spacer()
                     
-                    Text("设置缩略图")
+                    Text("设置缩略图".appLocalized)
                         .font(.headline)
                     
                     Spacer()
@@ -1271,17 +1271,17 @@ struct ModelThumbnailEditorView: View {
                 HStack(spacing: 20) {
                     HStack(spacing: 4) {
                         Image(systemName: "hand.tap.fill")
-                        Text("单指旋转")
+                        Text("单指旋转".appLocalized)
                     }
                     
                     HStack(spacing: 4) {
                         Image(systemName: "hand.point.up.braille.fill")
-                        Text("双指移动")
+                        Text("双指移动".appLocalized)
                     }
                     
                     HStack(spacing: 4) {
                         Image(systemName: "arrow.up.and.down.circle.fill")
-                        Text("双指缩放")
+                        Text("双指缩放".appLocalized)
                     }
                 }
                 .font(.caption)
@@ -1299,7 +1299,7 @@ struct ModelThumbnailEditorView: View {
                     } label: {
                         HStack(spacing: 4) {
                             Image(systemName: "arrow.counterclockwise")
-                            Text("重置视角")
+                            Text("重置视角".appLocalized)
                         }
                         .font(.subheadline)
                         .padding(.horizontal, 16)

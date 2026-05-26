@@ -51,15 +51,15 @@ struct MultiImagePicker: View {
                             .font(.system(size: 60))
                             .foregroundStyle(.purple)
                         
-                        Text(selectedItems.isEmpty ? "从图库选择" : "已选择 \(selectedItems.count) 张图片")
+                        Text(selectedItems.isEmpty ? "从图库选择".appLocalized : "已选择 %@ 张图片".appLocalized("\(selectedItems.count)"))
                             .font(.headline)
                         
                         if selectedItems.isEmpty {
-                            Text("最多可选择 \(maxImages) 张图片")
+                            Text("最多可选择 %@ 张图片".appLocalized("\(maxImages)"))
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         } else {
-                            Text("点击继续添加更多图片")
+                            Text("点击继续添加更多图片".appLocalized)
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
@@ -75,19 +75,19 @@ struct MultiImagePicker: View {
                 // 底部操作栏
                 bottomActionBar
             }
-            .navigationTitle("选择图片")
+            .navigationTitle("选择图片".appLocalized)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    Button("取消") {
+                    Button("取消".appLocalized) {
                         dismiss()
                     }
                 }
             }
-            .alert("选择数量限制", isPresented: $showMaxSelectionAlert) {
-                Button("确定", role: .cancel) {}
+            .alert("选择数量限制".appLocalized, isPresented: $showMaxSelectionAlert) {
+                Button("确定".appLocalized, role: .cancel) {}
             } message: {
-                Text("一次最多只能选择 \(maxImages) 张图片")
+                Text("一次最多只能选择 %@ 张图片".appLocalized("\(maxImages)"))
             }
             .onChange(of: selectedItems) { _, newItems in
                 if newItems.count > maxImages {
@@ -109,9 +109,9 @@ struct MultiImagePicker: View {
                     .foregroundStyle(.purple)
                 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("3D高斯泼溅建模")
+                    Text("3D高斯泼溅建模".appLocalized)
                         .font(.headline)
-                    Text("选择 \(minRecommendedImages)+ 张图片以获得最佳效果")
+                    Text("选择 %@+ 张图片以获得最佳效果".appLocalized("\(minRecommendedImages)"))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -123,17 +123,17 @@ struct MultiImagePicker: View {
             
             // 已选数量指示
             HStack {
-                Text("已选择 \(selectedItems.count) 张图片")
+                Text("已选择 %@ 张图片".appLocalized("\(selectedItems.count)"))
                     .font(.subheadline)
                 
                 Spacer()
                 
                 if selectedItems.count < minRecommendedImages {
-                    Text("建议至少 \(minRecommendedImages) 张")
+                    Text("建议至少 %@ 张".appLocalized("\(minRecommendedImages)"))
                         .font(.caption)
                         .foregroundStyle(.orange)
                 } else {
-                    Text("✓ 数量充足")
+                    Text("✓ 数量充足".appLocalized)
                         .font(.caption)
                         .foregroundStyle(.green)
                 }
@@ -147,7 +147,7 @@ struct MultiImagePicker: View {
     private var selectedImagesPreview: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text("已选图片预览")
+                Text("已选图片预览".appLocalized)
                     .font(.subheadline)
                     .fontWeight(.medium)
                     .foregroundStyle(.secondary)
@@ -225,7 +225,7 @@ struct MultiImagePicker: View {
                 Button {
                     clearSelection()
                 } label: {
-                    Label("清空选择", systemImage: "xmark.circle")
+                    Label("清空选择".appLocalized, systemImage: "xmark.circle")
                         .font(.subheadline)
                 }
                 .buttonStyle(.bordered)
@@ -240,7 +240,7 @@ struct MultiImagePicker: View {
             } label: {
                 HStack {
                     Image(systemName: "checkmark.circle.fill")
-                    Text("确认选择 (\(selectedItems.count))")
+                    Text("确认选择 (%@)".appLocalized("\(selectedItems.count)"))
                 }
                 .font(.headline)
                 .foregroundStyle(.white)
@@ -367,16 +367,16 @@ struct ContinuousCameraCaptureView: View {
                     Spacer()
                     
                     VStack(spacing: 4) {
-                        Text("\(captureCount) 张")
+                        Text("%@ 张".appLocalized("\(captureCount)"))
                             .font(.headline)
                             .foregroundStyle(.white)
                         
                         if captureCount < 20 {
-                            Text("建议至少20张")
+                            Text("建议至少20张".appLocalized)
                                 .font(.caption)
                                 .foregroundStyle(.orange)
                         } else {
-                            Text("✓ 数量充足")
+                            Text("✓ 数量充足".appLocalized)
                                 .font(.caption)
                                 .foregroundStyle(.green)
                         }
@@ -432,7 +432,7 @@ struct ContinuousCameraCaptureView: View {
                         VStack {
                             Image(systemName: "checkmark.circle.fill")
                                 .font(.title2)
-                            Text("完成")
+                            Text("完成".appLocalized)
                                 .font(.caption)
                         }
                         .foregroundStyle(.white)
@@ -463,7 +463,7 @@ struct ContinuousCameraCaptureView: View {
                         VStack {
                             Image(systemName: "arrow.right.circle.fill")
                                 .font(.title2)
-                            Text("下一步")
+                            Text("下一步".appLocalized)
                                 .font(.caption)
                         }
                         .foregroundStyle(.white)
@@ -776,11 +776,11 @@ struct CaptureGuideOverlay: View {
                     .font(.system(size: 80))
                     .foregroundStyle(.white)
                 
-                Text("拍摄指导")
+                Text("拍摄指导".appLocalized)
                     .font(.title)
                     .foregroundStyle(.white)
                 
-                Text(guide.currentTip)
+                Text(guide.currentTip.appLocalized)
                     .font(.headline)
                     .foregroundStyle(.white)
                     .multilineTextAlignment(.center)
@@ -801,7 +801,7 @@ struct GuideTip: View {
         HStack(spacing: 4) {
             Image(systemName: icon)
                 .font(.caption)
-            Text(text)
+            Text(text.appLocalized)
                 .font(.caption)
         }
         .foregroundStyle(.white)

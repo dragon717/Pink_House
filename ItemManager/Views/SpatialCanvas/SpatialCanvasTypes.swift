@@ -132,6 +132,10 @@ enum AssetCategory: String, CaseIterable {
     case models = "服装"
     case effect = "特效"
     case light = "灯光"
+
+    var displayName: String {
+        rawValue.appLocalized
+    }
 }
 
 // MARK: - GS处理遮罩视图
@@ -305,24 +309,24 @@ struct TransformGizmoOverlay: View {
     
     var body: some View {
         VStack {
-            Text("变换控制")
+            Text("变换控制".appLocalized)
                 .font(.caption)
                 .padding(.top, 8)
             
             if mode == .rotate {
                 VStack(spacing: 8) {
                     Slider(value: $rotationX, in: -Double.pi...Double.pi) {
-                        Text("X轴旋转")
+                        Text("X轴旋转".appLocalized)
                     } onEditingChanged: { _ in
                         onTransformChange()
                     }
                     Slider(value: $rotationY, in: -Double.pi...Double.pi) {
-                        Text("Y轴旋转")
+                        Text("Y轴旋转".appLocalized)
                     } onEditingChanged: { _ in
                         onTransformChange()
                     }
                     Slider(value: $rotationZ, in: -Double.pi...Double.pi) {
-                        Text("Z轴旋转")
+                        Text("Z轴旋转".appLocalized)
                     } onEditingChanged: { _ in
                         onTransformChange()
                     }
@@ -330,7 +334,7 @@ struct TransformGizmoOverlay: View {
                 .padding()
             } else {
                 Slider(value: $scale, in: 0.1...3.0) {
-                    Text("缩放")
+                    Text("缩放".appLocalized)
                 } onEditingChanged: { _ in
                     onTransformChange()
                 }

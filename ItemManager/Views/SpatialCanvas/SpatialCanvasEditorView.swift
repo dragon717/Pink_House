@@ -123,7 +123,7 @@ struct SpatialCanvasEditorView: View {
                 VStack(spacing: 16) {
                     ProgressView()
                         .scaleEffect(1.5)
-                    Text("加载3D场景中...")
+                    Text("加载3D场景中...".appLocalized)
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
@@ -313,7 +313,7 @@ struct SpatialCanvasEditorView: View {
                 } label: {
                     HStack(spacing: 4) {
                         Image(systemName: "chevron.left")
-                        Text("返回")
+                        Text("返回".appLocalized)
                     }
                     .foregroundStyle(.primary)
                 }
@@ -326,7 +326,7 @@ struct SpatialCanvasEditorView: View {
                         selectedObject = nil
                         saveScene()
                     } label: {
-                        Label("保存", systemImage: "checkmark.circle")
+                        Label("保存".appLocalized, systemImage: "checkmark.circle")
                             .symbolVariant(hasUnsavedChanges ? .none : .fill)
                     }
                     .foregroundStyle(hasUnsavedChanges ? .purple : .secondary)
@@ -336,7 +336,7 @@ struct SpatialCanvasEditorView: View {
                     Button {
                         showingClearConfirmation = true
                     } label: {
-                        Label("清空", systemImage: "trash")
+                        Label("清空".appLocalized, systemImage: "trash")
                     }
                     .foregroundStyle(.red)
                     .disabled(sceneObjects.isEmpty)
@@ -355,14 +355,14 @@ struct SpatialCanvasEditorView: View {
                         Button {
                             saveScene()
                         } label: {
-                            Label("保存场景", systemImage: "checkmark.circle")
+                            Label("保存场景".appLocalized, systemImage: "checkmark.circle")
                         }
                         .disabled(!hasUnsavedChanges)
 
                         Button {
                             showingClearConfirmation = true
                         } label: {
-                            Label("清空场景", systemImage: "trash")
+                            Label("清空场景".appLocalized, systemImage: "trash")
                         }
                         .disabled(sceneObjects.isEmpty)
 
@@ -371,7 +371,7 @@ struct SpatialCanvasEditorView: View {
                         Button {
                             // 导出功能
                         } label: {
-                            Label("导出", systemImage: "square.and.arrow.up")
+                            Label("导出".appLocalized, systemImage: "square.and.arrow.up")
                         }
                     } label: {
                         Image(systemName: "ellipsis.circle")
@@ -389,8 +389,8 @@ struct SpatialCanvasEditorView: View {
                 )
             }
         }
-        .confirmationDialog("确认返回？", isPresented: $showingBackConfirmation, titleVisibility: .visible) {
-            Button("保存并返回", role: .none) {
+        .confirmationDialog("确认返回？".appLocalized, isPresented: $showingBackConfirmation, titleVisibility: .visible) {
+            Button("保存并返回".appLocalized, role: .none) {
                 selectedObject = nil
                 if hasUnsavedChanges {
                     saveScene {
@@ -400,29 +400,29 @@ struct SpatialCanvasEditorView: View {
                     dismiss()
                 }
             }
-            Button("不保存返回", role: .destructive) {
+            Button("不保存返回".appLocalized, role: .destructive) {
                 selectedObject = nil
                 dismiss()
             }
-            Button("取消", role: .cancel) {}
+            Button("取消".appLocalized, role: .cancel) {}
         } message: {
-            Text("您有未保存的更改，是否保存？")
+            Text("您有未保存的更改，是否保存？".appLocalized)
         }
-        .confirmationDialog("清空场景？", isPresented: $showingClearConfirmation, titleVisibility: .visible) {
-            Button("清空", role: .destructive) {
+        .confirmationDialog("清空场景？".appLocalized, isPresented: $showingClearConfirmation, titleVisibility: .visible) {
+            Button("清空".appLocalized, role: .destructive) {
                 sceneObjects.removeAll()
                 selectedObject = nil
                 hasUnsavedChanges = true
                 print("[Scene] 场景已清空（未保存）")
             }
-            Button("取消", role: .cancel) {}
+            Button("取消".appLocalized, role: .cancel) {}
         } message: {
-            Text("确定要清空场景中的所有模型吗？此操作不会删除已保存的数据。")
+            Text("确定要清空场景中的所有模型吗？此操作不会删除已保存的数据。".appLocalized)
         }
-        .alert("保存成功", isPresented: $showingSaveSuccess) {
-            Button("确定", role: .cancel) {}
+        .alert("保存成功".appLocalized, isPresented: $showingSaveSuccess) {
+            Button("确定".appLocalized, role: .cancel) {}
         } message: {
-            Text("场景已成功保存到数据库")
+            Text("场景已成功保存到数据库".appLocalized)
         }
         .interactiveDismissDisabled(hasUnsavedChanges)
     }
@@ -1332,15 +1332,15 @@ private struct ObjectCaptureUnavailableView: View {
             Image(systemName: "camera.metering.matrix")
                 .font(.system(size: 56, weight: .semibold))
                 .foregroundStyle(.secondary)
-            Text("Object Capture 需要 iOS 18 或更高版本")
+            Text("Object Capture 需要 iOS 18 或更高版本".appLocalized)
                 .font(.headline)
                 .multilineTextAlignment(.center)
-            Text("你仍然可以在 iOS 17.4 使用相册导入或 USDZ 文件导入，3D 扫描会在 iOS 18+ 设备上保持原有流程。")
+            Text("你仍然可以在 iOS 17.4 使用相册导入或 USDZ 文件导入，3D 扫描会在 iOS 18+ 设备上保持原有流程。".appLocalized)
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 32)
-            Button("返回") {
+            Button("返回".appLocalized) {
                 onDismiss()
             }
             .buttonStyle(.borderedProminent)
@@ -1422,13 +1422,13 @@ struct TopModelListView: View {
     private var modelListContent: some View {
         VStack(spacing: 8) {
             HStack {
-                Text("场景模型")
+                Text("场景模型".appLocalized)
                     .font(.headline)
                     .fontWeight(.medium)
                 
                 Spacer()
                 
-                Text("\(objects.count) 个模型")
+                Text("%@ 个模型".appLocalized("\(objects.count)"))
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -1459,7 +1459,7 @@ struct TopModelListView: View {
                 Image(systemName: "cube.box")
                     .font(.system(size: 32))
                     .foregroundStyle(.secondary.opacity(0.5))
-                Text("暂无模型")
+                Text("暂无模型".appLocalized)
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }
@@ -1525,7 +1525,7 @@ struct ModelCard: View {
         if let name = model3D?.name, !name.isEmpty {
             return name
         }
-        return "模型"
+        return "模型".appLocalized
     }
     
     var body: some View {

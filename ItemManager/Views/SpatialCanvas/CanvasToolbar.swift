@@ -125,19 +125,19 @@ struct AssetMenuButton: View {
             Button {
                 onOpenAssetPanel(.models)
             } label: {
-                Label("服装", systemImage: "tshirt")
+                Label("服装".appLocalized, systemImage: "tshirt")
             }
             
             Button {
                 onOpenAssetPanel(.effect)
             } label: {
-                Label("特效", systemImage: CanvasTool.effect.icon)
+                Label("特效".appLocalized, systemImage: CanvasTool.effect.icon)
             }
             
             Button {
                 onOpenAssetPanel(.light)
             } label: {
-                Label("灯光", systemImage: CanvasTool.light.icon)
+                Label("灯光".appLocalized, systemImage: CanvasTool.light.icon)
             }
             
             Divider()
@@ -145,7 +145,7 @@ struct AssetMenuButton: View {
             Button {
                 onToolTap(.text)
             } label: {
-                Label("文字", systemImage: CanvasTool.text.icon)
+                Label("文字".appLocalized, systemImage: CanvasTool.text.icon)
             }
         } label: {
             VStack(spacing: 4) {
@@ -164,7 +164,7 @@ struct AssetMenuButton: View {
                 }
                 .scaleEffect(isPressed ? 0.9 : 1.0)
                 
-                Text("素材")
+                Text("素材".appLocalized)
                     .font(.system(size: 10, weight: .medium))
                     .foregroundStyle(.primary.opacity(0.7))
             }
@@ -194,19 +194,19 @@ struct ImportMenuButton: View {
             Button {
                 onToolTap(.image)
             } label: {
-                Label("图片", systemImage: CanvasTool.image.icon)
+                Label("图片".appLocalized, systemImage: CanvasTool.image.icon)
             }
             
             Button {
                 onToolTap(.camera)
             } label: {
-                Label("相机", systemImage: CanvasTool.camera.icon)
+                Label("相机".appLocalized, systemImage: CanvasTool.camera.icon)
             }
             
             Button {
                 onToolTap(.usdzModel)
             } label: {
-                Label("3D模型", systemImage: CanvasTool.usdzModel.icon)
+                Label("3D模型".appLocalized, systemImage: CanvasTool.usdzModel.icon)
             }
         } label: {
             VStack(spacing: 4) {
@@ -225,7 +225,7 @@ struct ImportMenuButton: View {
                 }
                 .scaleEffect(isPressed ? 0.9 : 1.0)
                 
-                Text("导入")
+                Text("导入".appLocalized)
                     .font(.system(size: 10, weight: .medium))
                     .foregroundStyle(.primary.opacity(0.7))
             }
