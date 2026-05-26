@@ -95,7 +95,7 @@ struct ControlButton: View {
                     .foregroundStyle(isActive ? color : .primary.opacity(0.7))
                     .symbolRenderingMode(isActive ? .hierarchical : .monochrome)
                 
-                Text(title)
+                Text(title.appLocalized)
                     .font(.system(size: 11, weight: isActive ? .semibold : .medium))
                     .foregroundStyle(isActive ? color : .primary.opacity(0.6))
             }
@@ -159,7 +159,7 @@ struct TransformControlSliders: View {
                 // 缩放控制
                 VStack(spacing: 8) {
                     HStack {
-                        Text("缩放")
+                        Text("缩放".appLocalized)
                             .font(.subheadline)
                             .foregroundStyle(.white)
                         
@@ -196,7 +196,7 @@ struct AxisSlider: View {
     var body: some View {
         VStack(spacing: 8) {
             HStack {
-                Text(title)
+                Text(title.appLocalized)
                     .font(.subheadline)
                     .foregroundStyle(color)
                 

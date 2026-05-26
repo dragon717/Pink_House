@@ -93,16 +93,16 @@ enum GSProcessingStage: Equatable {
     
     var description: String {
         switch self {
-        case .idle: return "准备中..."
-        case .preparing: return "准备数据..."
-        case .processing: return "处理中..."
-        case .uploading: return "上传数据..."
-        case .sfm: return "SfM重建..."
-        case .training: return "训练模型..."
-        case .optimizing: return "优化模型..."
-        case .finalizing: return "最终处理..."
-        case .complete: return "完成!"
-        case .failed(let message): return "失败: \(message)"
+        case .idle: return "准备中...".appLocalized
+        case .preparing: return "准备数据...".appLocalized
+        case .processing: return "处理中...".appLocalized
+        case .uploading: return "上传数据...".appLocalized
+        case .sfm: return "SfM重建...".appLocalized
+        case .training: return "训练模型...".appLocalized
+        case .optimizing: return "优化模型...".appLocalized
+        case .finalizing: return "最终处理...".appLocalized
+        case .complete: return "完成!".appLocalized
+        case .failed(let message): return "失败: %@".appLocalized(message)
         }
     }
     
@@ -165,7 +165,7 @@ struct GSProcessingOverlay: View {
                 .foregroundStyle(.orange)
             
             VStack(spacing: 12) {
-                Text("处理失败")
+                Text("处理失败".appLocalized)
                     .font(.title2)
                     .fontWeight(.semibold)
                     .foregroundStyle(.white)
@@ -180,7 +180,7 @@ struct GSProcessingOverlay: View {
             Button {
                 onDismiss?()
             } label: {
-                Text("确定")
+                Text("确定".appLocalized)
                     .frame(maxWidth: .infinity)
                     .padding()
                     .background(Color.blue)
@@ -241,7 +241,7 @@ struct GSProcessingOverlay: View {
                 .frame(width: 240, height: 12)
                 
                 // 阶段文字 - 增加可读性
-                Text(stageText)
+                Text(stageText.appLocalized)
                     .font(.title3)
                     .fontWeight(.semibold)
                     .foregroundStyle(.white)
@@ -262,12 +262,12 @@ struct GSProcessingOverlay: View {
             
             // 底部提示 - 更醒目
             VStack(spacing: 8) {
-                Text("⏱️ 处理时间约 1-3 分钟")
+                Text("⏱️ 处理时间约 1-3 分钟".appLocalized)
                     .font(.subheadline)
                     .fontWeight(.medium)
                     .foregroundStyle(.yellow)
                 
-                Text("请保持应用在前台运行，不要锁屏")
+                Text("请保持应用在前台运行，不要锁屏".appLocalized)
                     .font(.caption)
                     .foregroundStyle(.white.opacity(0.8))
             }
@@ -280,11 +280,11 @@ struct GSProcessingOverlay: View {
     
     private func userFriendlyMessage(from error: String) -> String {
         if error.contains("不支持") || error.contains("not supported") {
-            return "您的设备不支持 3D 建模功能\n需要 iPhone 12 Pro 及以上机型"
+            return "您的设备不支持 3D 建模功能\n需要 iPhone 12 Pro 及以上机型".appLocalized
         } else if error.contains("图片") || error.contains("images") {
-            return "请确保选择至少 20 张清晰的照片"
+            return "请确保选择至少 20 张清晰的照片".appLocalized
         } else {
-            return "模型生成过程中出现错误\n请重试或检查照片质量"
+            return "模型生成过程中出现错误\n请重试或检查照片质量".appLocalized
         }
     }
     

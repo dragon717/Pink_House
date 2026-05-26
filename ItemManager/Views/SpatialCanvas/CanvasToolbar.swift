@@ -286,7 +286,7 @@ struct ToolButton: View {
                 .scaleEffect(isPressed ? 0.9 : 1.0)
                 
                 // 标签
-                Text(tool.rawValue)
+                Text(tool.rawValue.appLocalized)
                     .font(.system(size: 10, weight: .medium))
                     .foregroundStyle(isSelected ? tool.color : .primary.opacity(0.7))
             }
