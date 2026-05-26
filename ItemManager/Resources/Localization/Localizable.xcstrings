@@ -8167,6 +8167,9 @@
         }
       }
     },
+    "付清" : {
+
+    },
     "以下裙装还没有抠图：\n%@\n\n需要去生成抠图吗？" : {
       "localizations" : {
         "en" : {
@@ -20535,6 +20538,9 @@
           }
         }
       }
+    },
+    "尾款付清" : {
+
     },
     "尾款已过，请处理" : {
       "extractionState" : "stale",
@@ -45818,6 +45824,7 @@
       }
     },
     "记录" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
