@@ -44,16 +44,16 @@ struct ThemeSkinDetailPreviewPanel: View {
     private var header: some View {
         HStack(alignment: .top, spacing: 12) {
             VStack(alignment: .leading, spacing: 6) {
-                Text(product.name)
+                Text(product.localizedName)
                     .font(.system(size: 28, weight: .heavy, design: .rounded))
                     .foregroundStyle(themeManager.primaryTextColor)
-                Text(product.subtitle)
+                Text(product.localizedSubtitle)
                     .font(.subheadline)
                     .foregroundStyle(themeManager.secondaryTextColor)
                     .fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: 0)
-            Text(isActive ? "使用中" : (isPurchased ? "已拥有" : "预览中"))
+            Text(isActive ? "使用中".appLocalized : (isPurchased ? "已拥有".appLocalized : "预览中".appLocalized))
                 .font(.caption.weight(.bold))
                 .foregroundStyle(isActive ? Color(hex: "FF5C93") : themeManager.accentTextColor)
                 .padding(.horizontal, 10)
@@ -63,13 +63,13 @@ struct ThemeSkinDetailPreviewPanel: View {
     }
 
     private var previewModePicker: some View {
-        Picker("预览模式", selection: $mode) {
+        Picker("预览模式".appLocalized, selection: $mode) {
             ForEach(ThemeSkinPreviewMode.allCases) { mode in
                 Text(mode.title).tag(mode)
             }
         }
         .pickerStyle(.segmented)
-        .accessibilityLabel("默认与主题对照")
+        .accessibilityLabel("默认与主题对照".appLocalized)
     }
 
     private var phonePreview: some View {
@@ -115,7 +115,7 @@ struct ThemeSkinDetailPreviewPanel: View {
             Image(systemName: "hand.tap.fill")
                 .font(.caption.weight(.bold))
                 .foregroundStyle(themeManager.accentTextColor)
-            Text("点预览部位会跳到对应开关；点下方开关行会高亮这里的部位。")
+            Text("点预览部位会跳到对应开关；点下方开关行会高亮这里的部位。".appLocalized)
                 .font(.caption)
                 .foregroundStyle(themeManager.secondaryTextColor)
                 .fixedSize(horizontal: false, vertical: true)
@@ -132,7 +132,7 @@ struct ThemeSkinDetailPreviewPanel: View {
                 .foregroundStyle(SkyConcertThemeSkin.accent(for: noticeDescriptor, colorScheme: colorScheme))
                 .themeSkinLegibleSymbol(level: .chip, slot: .sectionCard, descriptor: noticeDescriptor)
 
-            Text("启用主题皮肤后，文字、图标与背景层级会跟随当前主题；普通魔法配色与主题皮肤视觉互斥，不叠加。")
+            Text("启用主题皮肤后，文字、图标与背景层级会跟随当前主题；普通魔法配色与主题皮肤视觉互斥，不叠加。".appLocalized)
                 .font(.caption2.weight(.semibold))
                 .foregroundStyle(SkyConcertThemeSkin.labelColor(for: noticeDescriptor, colorScheme: colorScheme).opacity(0.86))
                 .themeSkinLegibleText(level: .inline, slot: .sectionCard, descriptor: noticeDescriptor)
@@ -177,7 +177,7 @@ private struct ThemeSkinPreviewPhoneFrame: View {
         }
         .frame(width: 244, height: 448)
         .accessibilityElement(children: .contain)
-        .accessibilityLabel("主题实时预览")
+        .accessibilityLabel("主题实时预览".appLocalized)
     }
 
     private var sceneContent: some View {
@@ -370,7 +370,7 @@ private struct ThemeSkinPreviewHotspot<Content: View>: View {
         .onAppear { restartPulseIfNeeded() }
         .onChange(of: highlightedAnchor?.rawValue) { _, _ in restartPulseIfNeeded() }
         .accessibilityLabel(anchor.title)
-        .accessibilityHint("点按跳到对应组件开关")
+        .accessibilityHint("点按跳到对应组件开关".appLocalized)
     }
 
     private func restartPulseIfNeeded() {
@@ -397,7 +397,7 @@ private struct ThemeSkinPreviewTopBar: View {
 
     var body: some View {
         HStack(spacing: 8) {
-            Text(title)
+            Text(title.appLocalized)
                 .font(.system(size: 13, weight: .heavy, design: .rounded))
                 .foregroundStyle(SkyConcertThemeSkin.labelColor(for: descriptor, colorScheme: colorScheme))
                 .themeSkinLegibleText(level: .inline, slot: .topBarMain, descriptor: descriptor)
@@ -422,7 +422,7 @@ private struct ThemeSkinPreviewSearchBar: View {
     var body: some View {
         HStack(spacing: 7) {
             Circle().fill(SkyConcertThemeSkin.accent(for: descriptor, colorScheme: colorScheme).opacity(0.42)).frame(width: 10, height: 10)
-            Text("搜索衣物 / 主题")
+            Text("搜索衣物 / 主题".appLocalized)
                 .font(.system(size: 11, weight: .semibold, design: .rounded))
                 .foregroundStyle(SkyConcertThemeSkin.labelColor(for: descriptor, colorScheme: colorScheme).opacity(0.72))
                 .themeSkinLegibleText(level: .inline, slot: .searchBar, descriptor: descriptor)
@@ -459,7 +459,7 @@ private struct ThemeSkinPreviewTabBar: View {
             Circle()
                 .fill(selected ? SkyConcertThemeSkin.accent(for: descriptor, colorScheme: colorScheme) : SkyConcertThemeSkin.labelColor(for: descriptor, colorScheme: colorScheme).opacity(0.24))
                 .frame(width: 15, height: 15)
-            Text(title)
+            Text(title.appLocalized)
                 .font(.system(size: 9, weight: selected ? .bold : .medium, design: .rounded))
                 .foregroundStyle(selected ? SkyConcertThemeSkin.accent(for: descriptor, colorScheme: colorScheme) : SkyConcertThemeSkin.labelColor(for: descriptor, colorScheme: colorScheme).opacity(0.72))
                 .themeSkinLegibleText(level: selected ? .chip : .inline, slot: .tabBarMain, descriptor: descriptor)

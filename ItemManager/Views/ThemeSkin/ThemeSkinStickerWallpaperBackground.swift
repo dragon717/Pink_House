@@ -15,15 +15,15 @@ enum ThemeSkinWallpaperContext: String, CaseIterable, Identifiable, Hashable {
 
     var displayName: String {
         switch self {
-        case .general: return "通用"
-        case .wardrobe: return "衣橱"
-        case .depositPlan: return "心愿尾款"
-        case .house: return "House"
-        case .wealth: return "财富"
-        case .journal: return "穿搭手帐"
-        case .me: return "我的"
-        case .petChat: return "萌宠对话"
-        case .themeDetail: return "主题设置"
+        case .general: return "通用".appLocalized
+        case .wardrobe: return "衣橱".appLocalized
+        case .depositPlan: return "心愿尾款".appLocalized
+        case .house: return "House".appLocalized
+        case .wealth: return "财富".appLocalized
+        case .journal: return "穿搭手帐".appLocalized
+        case .me: return "我的".appLocalized
+        case .petChat: return "萌宠对话".appLocalized
+        case .themeDetail: return "主题设置".appLocalized
         }
     }
 
@@ -591,8 +591,8 @@ struct ThemeSkinBackgroundStickerSelectionCard: View {
     }
 
     private var selectedHeroTitle: String {
-        guard let selectedHeroAssetName else { return "全部小主图" }
-        return options.first { $0.assetName == selectedHeroAssetName }?.displayName ?? "默认大主图"
+        guard let selectedHeroAssetName else { return "全部小主图".appLocalized }
+        return options.first { $0.assetName == selectedHeroAssetName }?.localizedDisplayName ?? "默认大主图".appLocalized
     }
 
     var body: some View {
@@ -609,11 +609,11 @@ struct ThemeSkinBackgroundStickerSelectionCard: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("背景贴纸排布")
+            Text("背景贴纸排布".appLocalized)
                 .font(.headline)
                 .foregroundStyle(themeManager.primaryTextColor)
                 .themeSkinLegibleText(level: .inline, slot: .sectionCard, descriptor: descriptor)
-            Text("先选大主图与小主图的排列方式；需要换大图时，再从弹窗菜单里选择。")
+            Text("先选大主图与小主图的排列方式；需要换大图时，再从弹窗菜单里选择。".appLocalized)
                 .font(.footnote)
                 .foregroundStyle(themeManager.secondaryTextColor)
                 .themeSkinLegibleText(level: .inline, slot: .sectionCard, descriptor: descriptor)
@@ -633,7 +633,7 @@ struct ThemeSkinBackgroundStickerSelectionCard: View {
         .frame(height: 210)
         .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
         .overlay(alignment: .bottomLeading) {
-            Text("当前：\(selectedLayoutPreset.displayName) · \(selectedHeroTitle)")
+            Text("当前：%@ · %@".appLocalized(selectedLayoutPreset.displayName, selectedHeroTitle))
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(themeManager.primaryTextColor)
                 .themeSkinLegibleText(level: .chip, slot: .sectionCard, descriptor: descriptor)
@@ -690,8 +690,8 @@ struct ThemeSkinBackgroundStickerSelectionCard: View {
             )
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("背景贴纸排布：\(preset.displayName)")
-        .accessibilityValue(isSelected ? "已选择" : "未选择")
+        .accessibilityLabel("背景贴纸排布：%@".appLocalized(preset.displayName))
+        .accessibilityValue(isSelected ? "已选择".appLocalized : "未选择".appLocalized)
     }
 
     private var heroMenuButton: some View {
@@ -701,7 +701,7 @@ struct ThemeSkinBackgroundStickerSelectionCard: View {
             HStack(spacing: 12) {
                 heroThumbnail
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("选择大主图")
+                    Text("选择大主图".appLocalized)
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(themeManager.primaryTextColor)
                         .themeSkinLegibleText(level: .inline, slot: .sectionCard, descriptor: descriptor)
@@ -723,20 +723,20 @@ struct ThemeSkinBackgroundStickerSelectionCard: View {
             )
         }
         .buttonStyle(.plain)
-        .confirmationDialog("选择大主图", isPresented: $showingHeroMenu, titleVisibility: .visible) {
-            Button("全部小主图") {
+        .confirmationDialog("选择大主图".appLocalized, isPresented: $showingHeroMenu, titleVisibility: .visible) {
+            Button("全部小主图".appLocalized) {
                 themeSkinManager.setBackgroundHeroAssetName(nil, for: product.themeId)
             }
 
             ForEach(options) { option in
-                Button(option.displayName) {
+                Button(option.localizedDisplayName) {
                     themeSkinManager.setBackgroundHeroAssetName(option.assetName, for: product.themeId)
                 }
             }
 
-            Button("取消", role: .cancel) { }
+            Button("取消".appLocalized, role: .cancel) { }
         } message: {
-            Text("排列方式保持不变，只替换大主图。")
+            Text("排列方式保持不变，只替换大主图。".appLocalized)
         }
     }
 

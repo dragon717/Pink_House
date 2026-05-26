@@ -24,24 +24,24 @@ enum ThemeSkinSlot: String, Codable, CaseIterable, Identifiable, Hashable {
 
     var displayName: String {
         switch self {
-        case .topBarMain: return "顶部栏容器"
-        case .topBarSegment: return "顶部栏分段"
-        case .topBarIconButton: return "顶部栏图标按钮"
-        case .topBarAddButton: return "顶部栏新增按钮"
-        case .searchBar: return "搜索栏"
-        case .tabBarMain: return "底部栏容器"
-        case .tabBarItem: return "底部栏项目"
-        case .segmentedControl: return "分段选择器"
-        case .filterChip: return "筛选胶囊"
-        case .statsCard: return "统计卡"
-        case .wardrobeItemCard: return "衣橱商品卡"
-        case .settingsGridCard: return "设置豆腐块"
-        case .sectionCard: return "分组卡片"
-        case .primaryButton: return "主按钮"
-        case .iconCircleButton: return "圆形图标按钮"
-        case .discountBadge: return "折扣徽标"
-        case .filterSheet: return "筛选面板"
-        case .emptyState: return "空状态容器"
+        case .topBarMain: return "顶部栏容器".appLocalized
+        case .topBarSegment: return "顶部栏分段".appLocalized
+        case .topBarIconButton: return "顶部栏图标按钮".appLocalized
+        case .topBarAddButton: return "顶部栏新增按钮".appLocalized
+        case .searchBar: return "搜索栏".appLocalized
+        case .tabBarMain: return "底部栏容器".appLocalized
+        case .tabBarItem: return "底部栏项目".appLocalized
+        case .segmentedControl: return "分段选择器".appLocalized
+        case .filterChip: return "筛选胶囊".appLocalized
+        case .statsCard: return "统计卡".appLocalized
+        case .wardrobeItemCard: return "衣橱商品卡".appLocalized
+        case .settingsGridCard: return "设置豆腐块".appLocalized
+        case .sectionCard: return "分组卡片".appLocalized
+        case .primaryButton: return "主按钮".appLocalized
+        case .iconCircleButton: return "圆形图标按钮".appLocalized
+        case .discountBadge: return "折扣徽标".appLocalized
+        case .filterSheet: return "筛选面板".appLocalized
+        case .emptyState: return "空状态容器".appLocalized
         }
     }
 
@@ -117,32 +117,32 @@ enum ThemeSkinWallpaperLayoutPreset: String, Codable, CaseIterable, Identifiable
 
     var displayName: String {
         switch self {
-        case .mixedFocus: return "大小混合"
-        case .heroStatement: return "大主图"
-        case .balancedScatter: return "均匀散点"
-        case .miniPattern: return "小图满铺"
+        case .mixedFocus: return "大小混合".appLocalized
+        case .heroStatement: return "大主图".appLocalized
+        case .balancedScatter: return "均匀散点".appLocalized
+        case .miniPattern: return "小图满铺".appLocalized
         }
     }
 
     var shortLabel: String {
         switch self {
-        case .mixedFocus: return "混合"
-        case .heroStatement: return "大"
-        case .balancedScatter: return "散点"
-        case .miniPattern: return "小图"
+        case .mixedFocus: return "混合".appLocalized
+        case .heroStatement: return "大".appLocalized
+        case .balancedScatter: return "散点".appLocalized
+        case .miniPattern: return "小图".appLocalized
         }
     }
 
     var summary: String {
         switch self {
         case .mixedFocus:
-            return "大主图压住焦点，小贴纸按墙纸节奏补满。"
+            return "大主图压住焦点，小贴纸按墙纸节奏补满。".appLocalized
         case .heroStatement:
-            return "减少小图数量，让大主图成为主要视觉。"
+            return "减少小图数量，让大主图成为主要视觉。".appLocalized
         case .balancedScatter:
-            return "所有贴纸均匀散开，适合清爽背景。"
+            return "所有贴纸均匀散开，适合清爽背景。".appLocalized
         case .miniPattern:
-            return "取消大主图，使用小贴纸密铺。"
+            return "取消大主图，使用小贴纸密铺。".appLocalized
         }
     }
 
@@ -169,6 +169,14 @@ struct ThemeSkinProduct: Identifiable, Codable, Equatable {
 
     var assetNamespace: String {
         themeId.replacingOccurrences(of: "theme_skin.", with: "")
+    }
+
+    var localizedName: String {
+        name.appLocalized
+    }
+
+    var localizedSubtitle: String {
+        subtitle.appLocalized
     }
 
     var backgroundStickerOptions: [ThemeSkinBackgroundStickerOption] {
@@ -278,6 +286,10 @@ struct ThemeSkinBackgroundStickerOption: Identifiable, Codable, Equatable, Hasha
     let displayName: String
 
     var id: String { assetName }
+
+    var localizedDisplayName: String {
+        displayName.appLocalized
+    }
 }
 
 struct ThemeSkinBackgroundSelection: Codable, Equatable {

@@ -36,7 +36,7 @@ struct ThemeSkinPreviewSettingsGrid: View {
                     Circle()
                         .fill(SkyConcertThemeSkin.accent(for: descriptor, colorScheme: colorScheme).opacity(0.26))
                         .frame(width: 22, height: 22)
-                    Text(title)
+                    Text(title.appLocalized)
                         .font(.system(size: 10, weight: .bold, design: .rounded))
                         .foregroundStyle(SkyConcertThemeSkin.labelColor(for: descriptor, colorScheme: colorScheme))
                         .themeSkinLegibleText(level: .inline, slot: .settingsGridCard, descriptor: descriptor)
@@ -60,11 +60,11 @@ struct ThemeSkinPreviewSectionCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text(title)
+            Text(title.appLocalized)
                 .font(.system(size: 12, weight: .heavy, design: .rounded))
                 .foregroundStyle(SkyConcertThemeSkin.labelColor(for: descriptor, colorScheme: colorScheme))
                 .themeSkinLegibleText(level: .inline, slot: .sectionCard, descriptor: descriptor)
-            Text(subtitle)
+            Text(subtitle.appLocalized)
                 .font(.system(size: 10, weight: .semibold, design: .rounded))
                 .foregroundStyle(SkyConcertThemeSkin.labelColor(for: descriptor, colorScheme: colorScheme).opacity(0.66))
                 .themeSkinLegibleText(level: .inline, slot: .sectionCard, descriptor: descriptor)
@@ -87,11 +87,11 @@ struct ThemeSkinPreviewStatsCard: View {
     var body: some View {
         HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 5) {
-                Text("衣橱统计")
+                Text("衣橱统计".appLocalized)
                     .font(.system(size: 12, weight: .heavy, design: .rounded))
                     .foregroundStyle(SkyConcertThemeSkin.labelColor(for: descriptor, colorScheme: colorScheme))
                     .themeSkinLegibleText(level: .inline, slot: .statsCard, descriptor: descriptor)
-                Text("128 件 · 24 套穿搭")
+                Text("128 件 · 24 套穿搭".appLocalized)
                     .font(.system(size: 10, weight: .semibold, design: .rounded))
                     .foregroundStyle(SkyConcertThemeSkin.labelColor(for: descriptor, colorScheme: colorScheme).opacity(0.65))
                     .themeSkinLegibleText(level: .inline, slot: .statsCard, descriptor: descriptor)
@@ -129,11 +129,11 @@ struct ThemeSkinPreviewWardrobeCard: View {
                 .fill(SkyConcertThemeSkin.accentSoft(for: descriptor).opacity(0.72))
                 .frame(height: 58)
                 .overlay(alignment: .topLeading) { ribbon }
-            Text(title)
+            Text(title.appLocalized)
                 .font(.system(size: 11, weight: .bold, design: .rounded))
                 .foregroundStyle(SkyConcertThemeSkin.labelColor(for: descriptor, colorScheme: colorScheme))
                 .themeSkinLegibleText(level: .inline, slot: .wardrobeItemCard, descriptor: descriptor)
-            Text("今日推荐")
+            Text("今日推荐".appLocalized)
                 .font(.system(size: 9, weight: .medium, design: .rounded))
                 .foregroundStyle(SkyConcertThemeSkin.labelColor(for: descriptor, colorScheme: colorScheme).opacity(0.58))
                 .themeSkinLegibleText(level: .inline, slot: .wardrobeItemCard, descriptor: descriptor)
@@ -172,7 +172,7 @@ struct ThemeSkinPreviewPrimaryButton: View {
     private var descriptor: ThemeSkinDescriptor? { context.descriptor(for: .primaryButton) }
 
     var body: some View {
-        Text(title)
+        Text(title.appLocalized)
             .font(.system(size: 12, weight: .heavy, design: .rounded))
             .foregroundStyle(.white)
             .themeSkinLegibleText(level: .badge, slot: .primaryButton, descriptor: descriptor)
@@ -211,7 +211,7 @@ struct ThemeSkinPreviewSegmentedControl: View {
     }
 
     private func segment(_ title: String, selected: Bool) -> some View {
-        Text(title)
+        Text(title.appLocalized)
             .font(.system(size: 10, weight: .bold, design: .rounded))
             .foregroundStyle(selected ? .white : SkyConcertThemeSkin.labelColor(for: descriptor, colorScheme: colorScheme).opacity(0.78))
             .themeSkinLegibleText(level: selected ? .chip : .inline, slot: .segmentedControl, descriptor: descriptor)
@@ -230,7 +230,7 @@ struct ThemeSkinPreviewFilterChip: View {
     private var descriptor: ThemeSkinDescriptor? { context.descriptor(for: .filterChip) }
 
     var body: some View {
-        Text(title)
+        Text(title.appLocalized)
             .font(.system(size: 10, weight: .bold, design: .rounded))
             .foregroundStyle(SkyConcertThemeSkin.labelColor(for: descriptor, colorScheme: colorScheme))
             .themeSkinLegibleText(level: .chip, slot: .filterChip, descriptor: descriptor)
@@ -252,7 +252,7 @@ struct ThemeSkinPreviewDiscountBadge: View {
         VStack(spacing: 3) {
             Text("VIP")
                 .font(.system(size: 9, weight: .black, design: .rounded))
-            Text("9折")
+            Text("9折".appLocalized)
                 .font(.system(size: 13, weight: .black, design: .rounded))
         }
         .foregroundStyle(.white)
@@ -274,7 +274,7 @@ struct ThemeSkinPreviewFilterSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("筛选面板")
+            Text("筛选面板".appLocalized)
                 .font(.system(size: 12, weight: .heavy, design: .rounded))
                 .foregroundStyle(SkyConcertThemeSkin.labelColor(for: descriptor, colorScheme: colorScheme))
                 .themeSkinLegibleText(level: .inline, slot: .filterSheet, descriptor: descriptor)
@@ -303,11 +303,11 @@ struct ThemeSkinPreviewEmptyState: View {
                 .fill(SkyConcertThemeSkin.accentSoft(for: descriptor).opacity(0.78))
                 .frame(width: 38, height: 38)
                 .overlay(Text("✨").font(.system(size: 16)))
-            Text("这里还没有内容")
+            Text("这里还没有内容".appLocalized)
                 .font(.system(size: 12, weight: .heavy, design: .rounded))
                 .foregroundStyle(SkyConcertThemeSkin.labelColor(for: descriptor, colorScheme: colorScheme))
                 .themeSkinLegibleText(level: .inline, slot: .emptyState, descriptor: descriptor)
-            Text("主题空状态会保持温柔提示")
+            Text("主题空状态会保持温柔提示".appLocalized)
                 .font(.system(size: 10, weight: .medium, design: .rounded))
                 .foregroundStyle(SkyConcertThemeSkin.labelColor(for: descriptor, colorScheme: colorScheme).opacity(0.62))
                 .themeSkinLegibleText(level: .inline, slot: .emptyState, descriptor: descriptor)

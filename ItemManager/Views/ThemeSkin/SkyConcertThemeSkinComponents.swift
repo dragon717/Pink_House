@@ -52,11 +52,11 @@ enum SkyConcertThemeSkin {
     static func title(for descriptor: ThemeSkinDescriptor?) -> String {
         switch descriptor?.assetNamespace {
         case namespace:
-            return "天空音乐会"
+            return "天空音乐会".appLocalized
         case SwanDreamThemeSkin.namespace:
-            return "天鹅入梦"
+            return "天鹅入梦".appLocalized
         default:
-            return "少女衣橱"
+            return "少女衣橱".appLocalized
         }
     }
 

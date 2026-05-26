@@ -8,8 +8,8 @@ enum ThemeSkinPreviewMode: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .appDefault: return "默认"
-        case .theme: return "主题"
+        case .appDefault: return "默认".appLocalized
+        case .theme: return "主题".appLocalized
         }
     }
 }
@@ -23,9 +23,9 @@ enum ThemeSkinPreviewScene: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .me: return "我界面"
-        case .wardrobe: return "衣橱"
-        case .settings: return "设置"
+        case .me: return "我界面".appLocalized
+        case .wardrobe: return "衣橱".appLocalized
+        case .settings: return "设置".appLocalized
         }
     }
 }
@@ -50,20 +50,20 @@ enum ThemeSkinPreviewAnchor: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .topBar: return "顶部"
-        case .searchBar: return "搜索"
-        case .tabBar: return "底栏"
-        case .statsCard: return "统计卡"
-        case .wardrobeCard: return "衣橱卡"
-        case .settingsGrid: return "豆腐块"
-        case .sectionCard: return "分组卡"
-        case .primaryButton: return "主按钮"
-        case .iconButton: return "圆形按钮"
-        case .segmentedControl: return "分段"
-        case .filterChip: return "筛选"
-        case .discountBadge: return "折扣"
-        case .filterSheet: return "面板"
-        case .emptyState: return "空状态"
+        case .topBar: return "顶部".appLocalized
+        case .searchBar: return "搜索".appLocalized
+        case .tabBar: return "底栏".appLocalized
+        case .statsCard: return "统计卡".appLocalized
+        case .wardrobeCard: return "衣橱卡".appLocalized
+        case .settingsGrid: return "豆腐块".appLocalized
+        case .sectionCard: return "分组卡".appLocalized
+        case .primaryButton: return "主按钮".appLocalized
+        case .iconButton: return "圆形按钮".appLocalized
+        case .segmentedControl: return "分段".appLocalized
+        case .filterChip: return "筛选".appLocalized
+        case .discountBadge: return "折扣".appLocalized
+        case .filterSheet: return "面板".appLocalized
+        case .emptyState: return "空状态".appLocalized
         }
     }
 

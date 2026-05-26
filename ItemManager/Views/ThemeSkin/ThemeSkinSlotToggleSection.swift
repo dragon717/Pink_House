@@ -102,12 +102,12 @@ struct ThemeSkinSlotToggleSection: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("组件开关")
+            Text("组件开关".appLocalized)
                 .font(.title3.weight(.bold))
                 .foregroundStyle(primaryTextColor)
                 .themeSkinLegibleText(level: .chip, slot: .sectionCard, descriptor: sectionDescriptor)
 
-            Text(isPurchased ? "同一主题内部可以单独启用或停用组件；未启用的组件会回退到应用默认样式。" : "请先购买并应用这个主题，之后才能控制组件开关。")
+            Text(isPurchased ? "同一主题内部可以单独启用或停用组件；未启用的组件会回退到应用默认样式。".appLocalized : "请先购买并应用这个主题，之后才能控制组件开关。".appLocalized)
                 .font(.footnote)
                 .foregroundStyle(themeManager.secondaryTextColor)
                 .themeSkinLegibleText(level: .inline, slot: .sectionCard, descriptor: sectionDescriptor)
@@ -133,9 +133,9 @@ struct ThemeSkinSlotToggleSection: View {
 
     private func slotStateText(_ slot: ThemeSkinSlot) -> String {
         if isActive {
-            return themeSkinManager.isSlotEnabled(slot) ? "已启用" : "已停用"
+            return themeSkinManager.isSlotEnabled(slot) ? "已启用".appLocalized : "已停用".appLocalized
         }
-        return previewEnabledSlots.contains(slot) ? "主题预览" : "默认预览"
+        return previewEnabledSlots.contains(slot) ? "主题预览".appLocalized : "默认预览".appLocalized
     }
 
     private func slotBinding(_ slot: ThemeSkinSlot) -> Binding<Bool> {
@@ -186,8 +186,8 @@ struct ThemeSkinSlotToggleSection: View {
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(slot.displayName)，\(slot.rawValue)，\(slotStateText(slot))")
         .accessibilityValue(slotStateText(slot))
-        .accessibilityHint(isPurchased && isActive ? "点按定位预览；可执行切换操作启用或停用组件。" : "请先购买并应用主题后再切换，当前仍可点按定位预览。")
-        .accessibilityAction(named: Text(themeSkinManager.isSlotEnabled(slot) ? "停用" : "启用")) {
+        .accessibilityHint(isPurchased && isActive ? "点按定位预览；可执行切换操作启用或停用组件。".appLocalized : "请先购买并应用主题后再切换，当前仍可点按定位预览。".appLocalized)
+        .accessibilityAction(named: Text(themeSkinManager.isSlotEnabled(slot) ? "停用".appLocalized : "启用".appLocalized)) {
             guard isPurchased && isActive else { return }
             slotBinding(slot).wrappedValue.toggle()
         }
@@ -200,11 +200,11 @@ struct ThemeSkinSlotToggleSection: View {
                     ThemeSkinIconBadge(systemName: group.icon, fallbackColor: themeManager.accentTextColor, size: 36, symbolSize: 15)
 
                     VStack(alignment: .leading, spacing: 3) {
-                        Text(group.title)
+                        Text(group.title.appLocalized)
                             .font(.headline)
                             .foregroundStyle(primaryTextColor)
                             .themeSkinLegibleText(level: .inline, slot: .sectionCard, descriptor: sectionDescriptor)
-                        Text(group.subtitle)
+                        Text(group.subtitle.appLocalized)
                             .font(.caption)
                             .foregroundStyle(themeManager.secondaryTextColor)
                             .themeSkinLegibleText(level: .inline, slot: .sectionCard, descriptor: sectionDescriptor)

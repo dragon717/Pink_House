@@ -23,7 +23,7 @@ struct ThemeSkinStoreView: View {
 
     private var activeProductName: String? {
         guard let activeThemeId = themeSkinManager.activeThemeId else { return nil }
-        return themeSkinManager.product(for: activeThemeId)?.name
+        return themeSkinManager.product(for: activeThemeId)?.localizedName
     }
 
     var body: some View {
@@ -37,7 +37,7 @@ struct ThemeSkinStoreView: View {
             .padding(.top, 16)
             .padding(.bottom, 126)
         }
-        .navigationTitle("主题")
+        .navigationTitle("主题".appLocalized)
         .navigationBarTitleDisplayMode(.inline)
         .background(storeBackground.ignoresSafeArea())
         .refreshable {
@@ -48,7 +48,7 @@ struct ThemeSkinStoreView: View {
                 Button {
                     showCoinStore = true
                 } label: {
-                    Label("喵币商店", systemImage: "pawprint.fill")
+                    Label("喵币商店".appLocalized, systemImage: "pawprint.fill")
                         .font(.subheadline.weight(.semibold))
                 }
             }
@@ -57,7 +57,7 @@ struct ThemeSkinStoreView: View {
             MeowCoinStoreView()
         }
         .alert(alertTitle, isPresented: $showAlert) {
-            Button("知道了", role: .cancel) { }
+            Button("知道了".appLocalized, role: .cancel) { }
         } message: {
             Text(alertMessage)
         }
@@ -67,7 +67,7 @@ struct ThemeSkinStoreView: View {
         VStack(alignment: .leading, spacing: 16) {
             HStack(alignment: .top, spacing: 14) {
                 VStack(alignment: .leading, spacing: 8) {
-                    Label("Boutique Gallery", systemImage: "sparkles")
+                    Label("Boutique Gallery".appLocalized, systemImage: "sparkles")
                         .font(.caption.weight(.bold))
                         .foregroundStyle(themeManager.accentTextColor)
                         .themeSkinLegibleText(level: .chip, slot: .sectionCard)
@@ -76,12 +76,12 @@ struct ThemeSkinStoreView: View {
                         .padding(.vertical, 6)
                         .background(Color.white.opacity(0.52), in: Capsule())
 
-                    Text("主题皮肤画廊")
+                    Text("主题皮肤画廊".appLocalized)
                         .font(.system(size: 25, weight: .heavy, design: .rounded))
                         .foregroundStyle(themeManager.primaryTextColor)
                         .themeSkinLegibleText(level: .chip, slot: .sectionCard)
 
-                    Text("挑选一整套视觉语言，顶部、底栏、卡片与按钮只在同主题内成套生效。")
+                    Text("挑选一整套视觉语言，顶部、底栏、卡片与按钮只在同主题内成套生效。".appLocalized)
                         .font(.subheadline.weight(.medium))
                         .foregroundStyle(themeManager.secondaryTextColor)
                         .themeSkinLegibleText(level: .inline, slot: .sectionCard)
@@ -167,7 +167,7 @@ struct ThemeSkinStoreView: View {
 
     private var purchaseStateChip: some View {
         ThemeSkinInfoChip(
-            title: "\(themeSkinManager.products.count) 个主题",
+            title: "%@ 个主题".appLocalized("\(themeSkinManager.products.count)"),
             systemImage: "sparkles",
             tint: themeManager.accentTextColor
         )
@@ -175,7 +175,7 @@ struct ThemeSkinStoreView: View {
 
     private var activeStateChip: some View {
         ThemeSkinInfoChip(
-            title: activeProductName.map { "使用中：\($0)" } ?? "未启用",
+            title: activeProductName.map { "使用中：%@".appLocalized($0) } ?? "未启用".appLocalized,
             systemImage: activeProductName == nil ? "circle.dashed" : "wand.and.stars.inverse",
             tint: activeProductName == nil ? themeManager.secondaryTextColor : Color(hex: "FF6BA6")
         )
@@ -187,7 +187,7 @@ struct ThemeSkinStoreView: View {
                 DiscountBadgeView(text: VIPManager.themeSkinDiscountText, style: .capsuleGlow, size: .small)
             } else {
                 ThemeSkinInfoChip(
-                    title: "VIP 最低 \(lowestVipPrice)喵币",
+                    title: "VIP 最低 %@喵币".appLocalized("\(lowestVipPrice)"),
                     systemImage: "crown.fill",
                     tint: Color(hex: "FF8A5B")
                 )
@@ -197,7 +197,7 @@ struct ThemeSkinStoreView: View {
 
     private var purchaseNotesCard: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("购买说明")
+            Text("购买说明".appLocalized)
                 .font(.headline)
                 .foregroundStyle(themeManager.primaryTextColor)
                 .themeSkinLegibleText(level: .inline, slot: .sectionCard)
@@ -237,7 +237,7 @@ struct ThemeSkinStoreView: View {
     }
 
     private func present(_ result: ThemeSkinActionResult) {
-        alertTitle = result.success ? "操作成功" : "操作失败"
+        alertTitle = result.success ? "操作成功".appLocalized : "操作失败".appLocalized
         alertMessage = result.message
         showAlert = true
     }
@@ -271,28 +271,28 @@ private struct ThemeSkinProductStoreCard: View {
     private var componentSummaryTags: [String] {
         var tags: [String] = []
         if product.supportedSlots.contains(where: { [.topBarMain, .topBarSegment, .topBarIconButton, .topBarAddButton, .searchBar].contains($0) }) {
-            tags.append("顶栏")
+            tags.append("顶栏".appLocalized)
         }
         if product.supportedSlots.contains(where: { [.tabBarMain, .tabBarItem].contains($0) }) {
-            tags.append("底栏")
+            tags.append("底栏".appLocalized)
         }
         if product.supportedSlots.contains(where: { [.statsCard, .wardrobeItemCard, .settingsGridCard, .sectionCard].contains($0) }) {
-            tags.append("卡片")
+            tags.append("卡片".appLocalized)
         }
         if product.supportedSlots.contains(where: { [.primaryButton, .iconCircleButton, .segmentedControl, .filterChip, .discountBadge].contains($0) }) {
-            tags.append("按钮")
+            tags.append("按钮".appLocalized)
         }
         if product.supportedSlots.contains(where: { [.filterSheet, .emptyState].contains($0) }) {
-            tags.append("空态")
+            tags.append("空态".appLocalized)
         }
         return tags
     }
 
     private var componentCaption: String {
         guard !componentSummaryTags.isEmpty else {
-            return "\(product.supportedSlots.count) 项组件可单独开关"
+            return "%@ 项组件可单独开关".appLocalized("\(product.supportedSlots.count)")
         }
-        return "覆盖 \(componentSummaryTags.joined(separator: " · ")) · \(product.supportedSlots.count) 项组件"
+        return "覆盖 %@ · %@ 项组件".appLocalized(componentSummaryTags.joined(separator: " · "), "\(product.supportedSlots.count)")
     }
 
     var body: some View {
@@ -302,7 +302,7 @@ private struct ThemeSkinProductStoreCard: View {
 
                 VStack(alignment: .leading, spacing: 8) {
                     HStack(alignment: .firstTextBaseline, spacing: 8) {
-                        Text(product.name)
+                        Text(product.localizedName)
                             .font(.system(size: 22, weight: .heavy, design: .rounded))
                             .foregroundStyle(primaryTextColor)
                             .themeSkinLegibleText(level: .chip, slot: .sectionCard, descriptor: descriptor)
@@ -313,7 +313,7 @@ private struct ThemeSkinProductStoreCard: View {
                         ThemeSkinStatusBadge(isPurchased: isPurchased, isActive: isActive, descriptor: descriptor)
                     }
 
-                    Text(product.subtitle)
+                    Text(product.localizedSubtitle)
                         .font(.footnote.weight(.medium))
                         .foregroundStyle(secondaryTextColor)
                         .themeSkinLegibleText(level: .inline, slot: .sectionCard, descriptor: descriptor)
@@ -360,12 +360,12 @@ private struct ThemeSkinProductStoreCard: View {
                 .font(.system(size: 24, weight: .heavy, design: .rounded))
                 .foregroundStyle(primaryTextColor)
                 .themeSkinLegibleText(level: .chip, slot: .sectionCard, descriptor: descriptor)
-            Text("喵币")
+            Text("喵币".appLocalized)
                 .font(.footnote.weight(.semibold))
                 .foregroundStyle(secondaryTextColor)
                 .themeSkinLegibleText(level: .inline, slot: .sectionCard, descriptor: descriptor)
             if displayPrice < product.basePrice {
-                Text("原价 \(product.basePrice)")
+                Text("原价 %@".appLocalized("\(product.basePrice)"))
                     .font(.caption.weight(.medium))
                     .foregroundStyle(secondaryTextColor.opacity(0.82))
                     .themeSkinLegibleText(level: .inline, slot: .sectionCard, descriptor: descriptor)
@@ -396,7 +396,7 @@ private struct ThemeSkinProductStoreCard: View {
             Image(systemName: isActive ? "checkmark.seal.fill" : "checkmark.circle.fill")
                 .font(.caption.weight(.bold))
                 .foregroundStyle(isActive ? Color(hex: "A98654") : Color(hex: "62A871"))
-            Text(isActive ? "正在使用 · 可在详情里微调组件" : "已收入皮肤库 · 可随时应用")
+            Text(isActive ? "正在使用 · 可在详情里微调组件".appLocalized : "已收入皮肤库 · 可随时应用".appLocalized)
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(secondaryTextColor)
                 .themeSkinLegibleText(level: .inline, slot: .sectionCard, descriptor: descriptor)
@@ -411,14 +411,14 @@ private struct ThemeSkinProductStoreCard: View {
         HStack(spacing: 10) {
             Button(action: purchaseAction) {
                 ThemeSkinActionLabel(
-                    title: canAfford ? "购买并应用" : "补充喵币",
-                    subtitle: canAfford ? "\(displayPrice) 喵币 · VIP 9 折" : "当前 \(currentBalance)，还差 \(max(0, displayPrice - currentBalance))",
+                    title: canAfford ? "购买并应用".appLocalized : "补充喵币".appLocalized,
+                    subtitle: canAfford ? "%@ 喵币 · VIP 9 折".appLocalized("\(displayPrice)") : "当前 %@，还差 %@".appLocalized("\(currentBalance)", "\(max(0, displayPrice - currentBalance))"),
                     systemImage: canAfford ? "bag.fill" : "pawprint.fill"
                 )
             }
             .buttonStyle(ThemeSkinPrimaryButtonStyle(fallbackTint: Color(hex: "D9A66A"), cornerRadius: 18, verticalPadding: 0))
 
-            detailLink(title: "预览")
+            detailLink(title: "预览".appLocalized)
                 .frame(width: 86)
         }
     }
@@ -427,7 +427,7 @@ private struct ThemeSkinProductStoreCard: View {
         HStack(spacing: 10) {
             Button(action: toggleAction) {
                 ThemeSkinMiniActionLabel(
-                    title: isActive ? "停用当前" : "应用这套",
+                    title: isActive ? "停用当前".appLocalized : "应用这套".appLocalized,
                     systemImage: isActive ? "power.circle.fill" : "wand.and.stars",
                     tint: primaryTextColor,
                     descriptor: descriptor
@@ -445,7 +445,7 @@ private struct ThemeSkinProductStoreCard: View {
             )
             .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
 
-            detailLink(title: "组件细调")
+            detailLink(title: "组件细调".appLocalized)
                 .frame(maxWidth: .infinity)
         }
     }
@@ -477,7 +477,7 @@ private struct ThemeSkinStatusBadge: View {
     let descriptor: ThemeSkinDescriptor?
 
     var body: some View {
-        Text(isActive ? "使用中" : (isPurchased ? "已购" : "未购"))
+        Text(isActive ? "使用中".appLocalized : (isPurchased ? "已购".appLocalized : "未购".appLocalized))
             .font(.caption.weight(.bold))
             .foregroundStyle(isActive ? Color(hex: "9C6B4A") : (isPurchased ? Color(hex: "4F9B63") : Color(hex: "A78292")))
             .themeSkinLegibleText(level: .chip, slot: .sectionCard, descriptor: descriptor)
@@ -500,7 +500,7 @@ private struct ThemeSkinBalancePill: View {
 
     var body: some View {
         VStack(alignment: .trailing, spacing: 4) {
-            Label("余额", systemImage: "pawprint.fill")
+            Label("余额".appLocalized, systemImage: "pawprint.fill")
                 .font(.caption.weight(.bold))
                 .foregroundStyle(themeManager.accentTextColor)
                 .themeSkinLegibleText(level: .chip, slot: .sectionCard)
@@ -510,7 +510,7 @@ private struct ThemeSkinBalancePill: View {
                 .foregroundStyle(themeManager.primaryTextColor)
                 .themeSkinLegibleText(level: .chip, slot: .sectionCard)
 
-            Text("喵币可用")
+            Text("喵币可用".appLocalized)
                 .font(.caption2.weight(.semibold))
                 .foregroundStyle(themeManager.secondaryTextColor)
                 .themeSkinLegibleText(level: .inline, slot: .sectionCard)
@@ -560,7 +560,7 @@ private struct ThemeSkinGalleryPreviewTile: View {
             )
             .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
 
-            Text(product.name)
+            Text(product.localizedName)
                 .font(.caption.weight(.bold))
                 .foregroundStyle(.white)
                 .themeSkinLegibleText(level: .badge, slot: .sectionCard, descriptor: descriptor)
@@ -662,7 +662,7 @@ private struct ThemeSkinBulletRow: View {
                 .frame(width: 7, height: 7)
                 .padding(.top, 6)
 
-            Text(text)
+            Text(text.appLocalized)
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .themeSkinLegibleText(level: .inline, slot: .sectionCard)
@@ -726,7 +726,7 @@ private struct ThemeSkinProductPreviewFallback: View {
 
             VStack {
                 Spacer()
-                Text(product.name)
+                Text(product.localizedName)
                     .font(.caption.weight(.bold))
                     .foregroundStyle(isSwanDream ? SwanDreamThemeSkin.text : SkyConcertThemeSkin.text)
                     .themeSkinLegibleText(level: .chip, slot: .sectionCard, descriptor: descriptor)

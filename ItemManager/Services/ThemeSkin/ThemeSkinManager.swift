@@ -105,15 +105,15 @@ final class ThemeSkinManager: ObservableObject, ThemeSkinProviding {
     func purchaseTheme(_ idOrThemeId: String, autoActivateIfNeeded: Bool = true) -> ThemeSkinActionResult {
         guard let product = product(for: idOrThemeId),
               let quote = priceQuote(for: idOrThemeId) else {
-            return .failure("未找到主题商品。")
+            return .failure("未找到主题商品。".appLocalized)
         }
 
         if isPurchased(product.themeId) {
-            return .failure("这个主题已经购买过了。")
+            return .failure("这个主题已经购买过了。".appLocalized)
         }
 
         guard StoreManager.spendMeowCoins(quote.finalPrice) else {
-            return .failure("喵币不足，需要 \(quote.finalPrice) 喵币。")
+            return .failure("喵币不足，需要 %@ 喵币。".appLocalized("\(quote.finalPrice)"))
         }
 
         ownedThemeSkins.append(
@@ -125,10 +125,10 @@ final class ThemeSkinManager: ObservableObject, ThemeSkinProviding {
         )
         saveOwnedThemeSkins()
 
-        let purchaseMessage = "已购买「\(product.name)」，消费 \(quote.finalPrice) 喵币。"
+        let purchaseMessage = "已购买「%@」，消费 %@ 喵币。".appLocalized(product.localizedName, "\(quote.finalPrice)")
         if autoActivateIfNeeded {
             let didAdjustBackground = applyThemeSelection(product)
-            return .success("\(purchaseMessage) 已自动应用。\(themeBackgroundHarmonySuffix(didAdjustBackground))")
+            return .success("\(purchaseMessage) \("已自动应用。".appLocalized)\(themeBackgroundHarmonySuffix(didAdjustBackground))")
         }
 
         broadcastChange()
@@ -137,26 +137,26 @@ final class ThemeSkinManager: ObservableObject, ThemeSkinProviding {
 
     func activateTheme(_ idOrThemeId: String) -> ThemeSkinActionResult {
         guard let product = product(for: idOrThemeId) else {
-            return .failure("未找到主题。")
+            return .failure("未找到主题。".appLocalized)
         }
 
         guard isPurchased(product.themeId) else {
-            return .failure("请先购买这个主题。")
+            return .failure("请先购买这个主题。".appLocalized)
         }
 
         let didAdjustBackground = applyThemeSelection(product)
-        return .success("已应用「\(product.name)」。\(themeBackgroundHarmonySuffix(didAdjustBackground))")
+        return .success("已应用「%@」。".appLocalized(product.localizedName) + themeBackgroundHarmonySuffix(didAdjustBackground))
     }
 
     func deactivateCurrentTheme() -> ThemeSkinActionResult {
         guard activeSelection.activeThemeId != nil else {
-            return .failure("当前没有启用中的主题。")
+            return .failure("当前没有启用中的主题。".appLocalized)
         }
 
         activeSelection = .inactive
         saveActiveSelection()
         broadcastChange()
-        return .success("已停用当前主题。")
+        return .success("已停用当前主题。".appLocalized)
     }
 
     func isSlotSupported(_ slot: ThemeSkinSlot, in idOrThemeId: String? = nil) -> Bool {
@@ -181,11 +181,11 @@ final class ThemeSkinManager: ObservableObject, ThemeSkinProviding {
     func setSlot(_ slot: ThemeSkinSlot, enabled: Bool) -> ThemeSkinActionResult {
         guard let activeThemeId = activeSelection.activeThemeId,
               let product = product(for: activeThemeId) else {
-            return .failure("请先启用一个主题。")
+            return .failure("请先启用一个主题。".appLocalized)
         }
 
         guard product.supportedSlots.contains(slot) else {
-            return .failure("当前主题不支持这个组件。")
+            return .failure("当前主题不支持这个组件。".appLocalized)
         }
 
         if enabled {
@@ -197,7 +197,7 @@ final class ThemeSkinManager: ObservableObject, ThemeSkinProviding {
         activeSelection = sanitize(selection: activeSelection)
         saveActiveSelection()
         broadcastChange()
-        return .success(enabled ? "已启用\(slot.displayName)。" : "已停用\(slot.displayName)。")
+        return .success(enabled ? "已启用%@。".appLocalized(slot.displayName) : "已停用%@。".appLocalized(slot.displayName))
     }
 
     func descriptor(for slot: ThemeSkinSlot, state: ThemeSkinState = .default) -> ThemeSkinDescriptor? {

@@ -78,10 +78,10 @@ struct ThemeSkinDetailView: View {
             }
             .background(LiquidBackground(themeSkinWallpaperContext: .themeDetail))
         }
-        .navigationTitle(product?.name ?? "主题详情")
+        .navigationTitle(product?.localizedName ?? "主题详情".appLocalized)
         .navigationBarTitleDisplayMode(.inline)
-        .alert("主题操作", isPresented: $showActionAlert) {
-            Button("知道了", role: .cancel) { }
+        .alert("主题操作".appLocalized, isPresented: $showActionAlert) {
+            Button("知道了".appLocalized, role: .cancel) { }
         } message: {
             Text(actionMessage)
         }
@@ -90,7 +90,7 @@ struct ThemeSkinDetailView: View {
     private var purchaseCard: some View {
         ThemeSkinSectionCardContainer(cornerRadius: 24) {
             VStack(alignment: .leading, spacing: 14) {
-                Text("购买与应用")
+                Text("购买与应用".appLocalized)
                     .font(.headline)
                     .foregroundStyle(sectionPrimaryTextColor)
                     .themeSkinLegibleText(level: .inline, slot: .sectionCard, descriptor: sectionDescriptor)
@@ -101,11 +101,11 @@ struct ThemeSkinDetailView: View {
                             .font(.system(size: 30, weight: .heavy, design: .rounded))
                             .foregroundStyle(sectionPrimaryTextColor)
                             .themeSkinLegibleText(level: .chip, slot: .sectionCard, descriptor: sectionDescriptor)
-                        Text("喵币")
+                        Text("喵币".appLocalized)
                             .font(.subheadline.weight(.semibold))
                             .foregroundStyle(themeManager.secondaryTextColor)
                             .themeSkinLegibleText(level: .inline, slot: .sectionCard, descriptor: sectionDescriptor)
-                        Text("原价 \(product.basePrice)")
+                        Text("原价 %@".appLocalized("\(product.basePrice)"))
                             .font(.footnote.weight(.medium))
                             .foregroundStyle(themeManager.secondaryTextColor)
                             .themeSkinLegibleText(level: .inline, slot: .sectionCard, descriptor: sectionDescriptor)
@@ -117,7 +117,7 @@ struct ThemeSkinDetailView: View {
                     Button {
                         present(themeSkinManager.purchaseTheme(themeId, autoActivateIfNeeded: true).message)
                     } label: {
-                        Label("购买并应用", systemImage: "bag.fill")
+                        Label("购买并应用".appLocalized, systemImage: "bag.fill")
                     }
                     .buttonStyle(ThemeSkinPrimaryButtonStyle(fallbackTint: themeManager.accentTextColor))
                 } else {
@@ -127,7 +127,7 @@ struct ThemeSkinDetailView: View {
                             : themeSkinManager.activateTheme(themeId)
                         present(result.message)
                     } label: {
-                        Label(isActive ? "停用主题" : "应用主题", systemImage: isActive ? "power.circle.fill" : "wand.and.stars")
+                        Label(isActive ? "停用主题".appLocalized : "应用主题".appLocalized, systemImage: isActive ? "power.circle.fill" : "wand.and.stars")
                     }
                     .buttonStyle(ThemeSkinPrimaryButtonStyle(fallbackTint: isActive ? .gray : themeManager.accentTextColor))
                 }
