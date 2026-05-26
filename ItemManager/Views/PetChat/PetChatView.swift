@@ -90,7 +90,7 @@ struct PetChatView: View {
     // 搜索框提示文字，使用用户起的宠物名字
     private var searchPrompt: String {
         let petName = PetDataManager.shared.status.displayName
-        return "和\(petName)对话、搜索裙子..."
+        return "和%@对话、搜索裙子...".appLocalized(petName)
     }
 
     private var usesInlinePetSearchInput: Bool {
@@ -124,7 +124,7 @@ struct PetChatView: View {
     private var quickMenuAdoptionTitle: String? {
         let owned = Set(PetDataManager.shared.status.ownedPetIds)
         guard PetCharacter.allCases.contains(where: { !owned.contains($0.id) }) else { return nil }
-        return "领养\(quickMenuOwnedPets.count + 1)胎"
+        return "领养%d胎".appLocalized(quickMenuOwnedPets.count + 1)
     }
 
     private var currentCharacter: PetCharacter {
@@ -166,10 +166,11 @@ struct PetChatView: View {
 
     private func adoptionOptionTitle(for pet: PetCharacter, status: PetStatus) -> String {
         let (price, currency) = PetViewModel.adoptionPrice(for: pet, ownedPetIds: status.ownedPetIds)
+        let petName = displayName(for: pet, in: status)
         if price <= 0 {
-            return "领养\(pet.displayName)（免费）"
+            return "领养%@（免费）".appLocalized(petName)
         }
-        return "领养\(pet.displayName)（\(price)\(currency.rawValue)）"
+        return "领养%@（%d%@）".appLocalized(petName, price, currency.rawValue.appLocalized)
     }
 
     private func presentInitialAdoptionSheetIfNeeded() {
@@ -186,7 +187,11 @@ struct PetChatView: View {
     private func reusableWelcomeText() -> String {
         let greeting = greetingManager.getGreetingTitle()
         let petDisplayName = PetDataManager.shared.status.displayName
-        return "\(greeting)\(currentCharacter.catchphraseSuffix) 我是你的衣橱管家\(petDisplayName)，有什么可以帮你的吗？"
+        return "%1$@%2$@ 我是你的衣橱管家%3$@，有什么可以帮你的吗？".appLocalized(
+            greeting,
+            currentCharacter.localizedCatchphraseSuffix,
+            petDisplayName
+        )
     }
 
     private var currentThinkingImageName: String {
@@ -370,7 +375,7 @@ struct PetChatView: View {
                 }
 
             }
-            .navigationTitle("\(petAI.petName)的悄悄话")
+            .navigationTitle("%@的悄悄话".appLocalized(petAI.petName))
             .navigationBarTitleDisplayMode(.inline)
             .if(!usesInlinePetSearchInput) { view in
                 view
@@ -914,11 +919,11 @@ struct PetChatView: View {
             return [
                 PetWidgetData(
                     type: .quickOptions,
-                    title: "先领养一个小伙伴吧",
+                    title: "先领养一个小伙伴吧".appLocalized,
                     options: [
                         PetWidgetOption(title: adoptionOptionTitle(for: .naicha, status: status), command: "adopt_pet:naicha", icon: PetCharacter.naicha.quickOptionIconName),
                         PetWidgetOption(title: adoptionOptionTitle(for: .maomao, status: status), command: "adopt_pet:maomao", icon: PetCharacter.maomao.quickOptionIconName),
-                        PetWidgetOption(title: "看看货币余额", command: "pet_currency_panel", icon: "wallet.pass.fill")
+                        PetWidgetOption(title: "看看货币余额".appLocalized, command: "pet_currency_panel", icon: "wallet.pass.fill")
                     ]
                 )
             ]
@@ -1218,12 +1223,12 @@ struct PetChatView: View {
 
         let targetName = displayName(for: target, in: status)
         guard status.ownedPetIds.contains(target.id) else {
-            openAdoptionSheetWithFeedback("\(targetName)还没领养，我先带你去领养界面把它接回家吧～")
+            openAdoptionSheetWithFeedback("%@还没领养，我先带你去领养界面把它接回家吧～".appLocalized(targetName))
             return true
         }
 
         if status.selectedPetId == target.id {
-            messages.append(PetChatMessage(text: "现在已经是\(targetName)在陪你啦～", isUser: false, isAIGenerated: true))
+            messages.append(PetChatMessage(text: "现在已经是%@在陪你啦～".appLocalized(targetName), isUser: false, isAIGenerated: true))
             return true
         }
 
@@ -1231,7 +1236,7 @@ struct PetChatView: View {
         status.intimacy = min(100, status.intimacy + 2)
         PetDataManager.shared.saveStatus(status)
         setPetDialogueAction("idle")
-        messages.append(PetChatMessage(text: "好哒，已切换到\(targetName)管家模式～", isUser: false, isAIGenerated: true))
+        messages.append(PetChatMessage(text: "好哒，已切换到%@管家模式～".appLocalized(targetName), isUser: false, isAIGenerated: true))
         return true
     }
 
@@ -1558,8 +1563,9 @@ struct PetChatView: View {
         }
 
         let options = ownedPets.prefix(3).map { pet in
+            let petName = displayName(for: pet, in: status)
             return PetWidgetOption(
-                title: "切换到\(pet.displayName)",
+                title: "切换到%@".appLocalized(petName),
                 command: "switch_pet:\(pet.id)",
                 icon: pet.quickOptionIconName
             )
@@ -1567,7 +1573,7 @@ struct PetChatView: View {
 
         let widget = PetWidgetData(
             type: .quickOptions,
-            title: "选择你要切换的萌宠管家：",
+            title: "选择你要切换的萌宠管家：".appLocalized,
             options: options
         )
         messages.append(
@@ -1897,14 +1903,14 @@ struct PetChatView: View {
                 if let pet = PetCharacter(rawValue: rawId) {
                     var status = PetDataManager.shared.status
                     guard status.ownedPetIds.contains(pet.id) else {
-                        openAdoptionSheetWithFeedback("\(pet.displayName)还没领养，我先带你去领养界面把它接回家吧～")
+                        openAdoptionSheetWithFeedback("%@还没领养，我先带你去领养界面把它接回家吧～".appLocalized(pet.localizedDisplayName))
                         return
                     }
                     status.selectedPetId = pet.id
                     status.intimacy = min(100, status.intimacy + 2)
                     PetDataManager.shared.saveStatus(status)
                     setPetDialogueAction("idle")
-                    messages.append(PetChatMessage(text: "已切换到\(pet.displayName)管家模式，继续陪你～", isUser: false, isAIGenerated: true))
+                    messages.append(PetChatMessage(text: "已切换到%@管家模式，继续陪你～".appLocalized(displayName(for: pet, in: status)), isUser: false, isAIGenerated: true))
                 }
             } else if option.command.hasPrefix("adopt_pet:") {
                 let rawId = String(option.command.dropFirst("adopt_pet:".count))
@@ -1914,10 +1920,10 @@ struct PetChatView: View {
                         status.selectedPetId = pet.id
                         PetDataManager.shared.saveStatus(status)
                         setPetDialogueAction("idle")
-                        messages.append(PetChatMessage(text: "\(pet.displayName)已经在家里啦，已帮你切过去～", isUser: false, isAIGenerated: true))
+                        messages.append(PetChatMessage(text: "%@已经在家里啦，已帮你切过去～".appLocalized(displayName(for: pet, in: status)), isUser: false, isAIGenerated: true))
                         return
                     }
-                    messages.append(PetChatMessage(text: "这就打开领养界面，选中后就能带\(pet.displayName)回家啦～", isUser: false, isAIGenerated: true))
+                    messages.append(PetChatMessage(text: "这就打开领养界面，选中后就能带%@回家啦～".appLocalized(pet.localizedDisplayName), isUser: false, isAIGenerated: true))
                     presentAdoptionSheet()
                 }
             } else if option.command.hasPrefix("ask:") {

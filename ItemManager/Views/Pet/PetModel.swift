@@ -390,11 +390,19 @@ enum PetCharacter: String, Codable, CaseIterable, Identifiable {
         }
     }
 
+    var localizedDisplayName: String {
+        displayName.appLocalized
+    }
+
     var description: String {
         switch self {
         case .naicha: return "一只喜欢喝奶茶的橘猫，\n性格温顺，最爱撒娇。"
         case .maomao: return "活泼可爱的金毛犬，\n精力充沛，忠诚粘人。"
         }
+    }
+
+    var localizedDescription: String {
+        description.appLocalized
     }
 
     var portraitImageName: String {
@@ -413,6 +421,10 @@ enum PetCharacter: String, Codable, CaseIterable, Identifiable {
         case .naicha: return "喵~"
         case .maomao: return "汪~"
         }
+    }
+
+    var localizedCatchphraseSuffix: String {
+        catchphraseSuffix.appLocalized
     }
 
     func localizedCatchphraseText(_ text: String) -> String {
@@ -627,8 +639,8 @@ struct PetStatus: Codable {
     var displayName: String {
         guard let name = petName else {
             // 没有自定义名字时，返回宠物类型名
-            guard let id = selectedPetId, let character = PetCharacter(rawValue: id) else { return "小伙伴" }
-            return character.displayName
+            guard let id = selectedPetId, let character = PetCharacter(rawValue: id) else { return "小伙伴".appLocalized }
+            return character.localizedDisplayName
         }
         let clean = name.replacingOccurrences(of: "\"", with: "")
                         .replacingOccurrences(of: "\"", with: "")
@@ -636,8 +648,8 @@ struct PetStatus: Codable {
                         .trimmingCharacters(in: .whitespacesAndNewlines)
         // 如果用户起的名字为空，则使用宠物类型名
         if clean.isEmpty {
-            guard let id = selectedPetId, let character = PetCharacter(rawValue: id) else { return "小伙伴" }
-            return character.displayName
+            guard let id = selectedPetId, let character = PetCharacter(rawValue: id) else { return "小伙伴".appLocalized }
+            return character.localizedDisplayName
         }
         return clean
     }

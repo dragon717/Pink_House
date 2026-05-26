@@ -5,7 +5,7 @@ struct PetDialogueInputView: View {
     @Environment(ThemeManager.self) private var themeManager
     @Environment(\.colorScheme) private var colorScheme
 
-    var placeholder: String = "请输入的文字"
+    var placeholder: String = "请输入的文字".appLocalized
     var onSend: () -> Void
     var onQuickMenuAction: (() -> Void)? = nil
     var focusRequestID: Int = 0

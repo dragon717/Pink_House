@@ -2411,13 +2411,13 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "House"
+            "value": "小屋"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "House"
+            "value": "小屋"
           }
         }
       }
@@ -43087,6 +43087,556 @@
           "stringUnit": {
             "state": "translated",
             "value": "適合快速開始搭配拼貼。"
+          }
+        }
+      }
+    },
+    "%1$@%2$@ 我是你的衣橱管家%3$@，有什么可以帮你的吗？": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ %2$@ I'm %3$@, your closet helper. How can I help?"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@%2$@ 我是你的衣橱管家%3$@，有什么可以帮你的吗？"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@%2$@ 我是你的衣櫥管家%3$@，有什麼可以幫你的嗎？"
+          }
+        }
+      }
+    },
+    "%@已经在家里啦，已帮你切过去～": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ is already home. Switched over for you."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@已经在家里啦，已帮你切过去～"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@已經在家裡啦，已幫你切過去～"
+          }
+        }
+      }
+    },
+    "%@还没领养，我先带你去领养界面把它接回家吧～": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ hasn't been adopted yet. I'll take you to adoption so you can bring them home."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@还没领养，我先带你去领养界面把它接回家吧～"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@還沒領養，我先帶你去領養介面把牠接回家吧～"
+          }
+        }
+      }
+    },
+    "一只喜欢喝奶茶的橘猫，\n性格温顺，最爱撒娇。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "An orange cat who loves milk tea,\ngentle and very affectionate."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "一只喜欢喝奶茶的橘猫，\n性格温顺，最爱撒娇。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "一隻喜歡喝奶茶的橘貓，\n性格溫順，最愛撒嬌。"
+          }
+        }
+      }
+    },
+    "先领养一个小伙伴吧": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Let's adopt a buddy first"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "先领养一个小伙伴吧"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "先領養一個小夥伴吧"
+          }
+        }
+      }
+    },
+    "切换到%@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Switch to %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "切换到%@"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "切換到%@"
+          }
+        }
+      }
+    },
+    "和%@对话、搜索裙子...": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chat with %@ or search dresses..."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "和%@对话、搜索裙子..."
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "和%@對話、搜尋裙子..."
+          }
+        }
+      }
+    },
+    "喵~": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "meow~"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "喵~"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "喵~"
+          }
+        }
+      }
+    },
+    "奶茶": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Milk Tea"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "奶茶"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "奶茶"
+          }
+        }
+      }
+    },
+    "好哒，已切换到%@管家模式～": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "All set. Switched to %@ helper mode."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "好哒，已切换到%@管家模式～"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "好噠，已切換到%@管家模式～"
+          }
+        }
+      }
+    },
+    "小伙伴": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Buddy"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "小伙伴"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "小夥伴"
+          }
+        }
+      }
+    },
+    "已切换到%@管家模式，继续陪你～": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Switched to %@ helper mode. They will keep you company."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已切换到%@管家模式，继续陪你～"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已切換到%@管家模式，繼續陪你～"
+          }
+        }
+      }
+    },
+    "毛毛": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mao Mao"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "毛毛"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "毛毛"
+          }
+        }
+      }
+    },
+    "汪~": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "woof~"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "汪~"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "汪~"
+          }
+        }
+      }
+    },
+    "活泼可爱的金毛犬，\n精力充沛，忠诚粘人。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A lively golden retriever,\nenergetic, loyal, and cuddly."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "活泼可爱的金毛犬，\n精力充沛，忠诚粘人。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "活潑可愛的黃金獵犬，\n精力充沛，忠誠黏人。"
+          }
+        }
+      }
+    },
+    "现在已经是%@在陪你啦～": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ is already keeping you company."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "现在已经是%@在陪你啦～"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "現在已經是%@在陪你啦～"
+          }
+        }
+      }
+    },
+    "看看货币余额": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Check currency balance"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "看看货币余额"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "看看貨幣餘額"
+          }
+        }
+      }
+    },
+    "请输入的文字": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enter a message"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请输入的文字"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "請輸入文字"
+          }
+        }
+      }
+    },
+    "这就打开领养界面，选中后就能带%@回家啦～": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Opening adoption now. Select %@ to bring them home."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "这就打开领养界面，选中后就能带%@回家啦～"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "這就打開領養介面，選中後就能帶%@回家啦～"
+          }
+        }
+      }
+    },
+    "选择你要切换的萌宠管家：": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose the pet helper to switch to:"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "选择你要切换的萌宠管家："
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "選擇你要切換的萌寵管家："
+          }
+        }
+      }
+    },
+    "领养%@（%d%@）": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Adopt %@ (%d %@)"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "领养%@（%d%@）"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "領養%@（%d%@）"
+          }
+        }
+      }
+    },
+    "领养%@（免费）": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Adopt %@ (Free)"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "领养%@（免费）"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "領養%@（免費）"
+          }
+        }
+      }
+    },
+    "领养%d胎": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Adopt pet #%d"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "领养%d胎"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "領養第%d胎"
+          }
+        }
+      }
+    },
+    "骨头币": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bone Coins"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "骨头币"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "骨頭幣"
+          }
+        }
+      }
+    },
+    "鱼币": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fish Coins"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "鱼币"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "魚幣"
           }
         }
       }

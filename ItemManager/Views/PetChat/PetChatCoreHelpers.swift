@@ -508,7 +508,7 @@ func displayName(for pet: PetCharacter, in status: PetStatus) -> String {
     let customName = (status.petNames[pet.id] ?? "")
         .replacingOccurrences(of: "\"", with: "")
         .trimmingCharacters(in: .whitespacesAndNewlines)
-    return customName.isEmpty ? pet.displayName : customName
+    return customName.isEmpty ? pet.localizedDisplayName : customName
 }
 
 func petCleaningContext(for status: PetStatus) -> (pet: PetCharacter, petName: String, cost: Int, currency: PetCurrency, fundingDestination: PetChatFundingDestination) {

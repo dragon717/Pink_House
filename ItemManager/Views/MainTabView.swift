@@ -547,7 +547,7 @@ struct LegacyTabView: View {
         case .pet: return petDataManager.status.displayName
         case .ootd: return "穿搭手帐".appLocalized
         case .ootdDefaultBook: return "魔法贴纸".appLocalized
-        case .menu: return "House"
+        case .menu: return "House".appLocalized
         case .perler: return "拼豆工坊".appLocalized
         case .wardrobe: return "衣橱".appLocalized
         case .depositPlan: return "心愿尾款".appLocalized
