@@ -23,9 +23,9 @@ struct BookShelfToolbar: ToolbarContent {
         // Show mode picker when no book is selected
         if selectedBook == nil && !isSpatialBookSelected {
             ToolbarItem(placement: .principal) {
-                Picker("模式", selection: $viewMode) {
+                Picker("模式".appLocalized, selection: $viewMode) {
                     ForEach(BookShelfView.ViewMode.allCases) { mode in
-                        Text(mode.rawValue).tag(mode)
+                        Text(mode.localizedTitle).tag(mode)
                     }
                 }
                 .pickerStyle(.segmented)
@@ -67,13 +67,13 @@ struct BookShelfToolbar: ToolbarContent {
                                 Button {
                                     createOotdBook()
                                 } label: {
-                                    Label("新建手帐", systemImage: "plus.rectangle.on.folder")
+                                    Label("新建手帐".appLocalized, systemImage: "plus.rectangle.on.folder")
                                 }
 
                                 Button {
                                     showingTrash = true
                                 } label: {
-                                    Label("垃圾篓", systemImage: "trash")
+                                    Label("垃圾篓".appLocalized, systemImage: "trash")
                                 }
                             } label: {
                                 moreMenuIcon
@@ -119,13 +119,13 @@ struct BookShelfToolbar: ToolbarContent {
                 submenuDepth: 0,
                 items: [
                     .action(
-                        title: "新建手帐",
+                        title: "新建手帐".appLocalized,
                         systemImage: "plus.rectangle.on.folder",
                         isHighlighted: true,
                         action: createOotdBook
                     ),
                     .action(
-                        title: "垃圾篓",
+                        title: "垃圾篓".appLocalized,
                         systemImage: "trash",
                         action: { showingTrash = true }
                     )

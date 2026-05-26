@@ -21,6 +21,10 @@ struct BookShelfView: View {
         case planar = "平面"
         case spatial = "空间"
         var id: Self { self }
+
+        var localizedTitle: String {
+            rawValue.appLocalized
+        }
     }
     @AppStorage("bookShelfViewMode") var viewMode: ViewMode = .planar
 
@@ -30,7 +34,7 @@ struct BookShelfView: View {
             set: { newValue in
                 if newValue == .spatial && !FeatureUnlockManager.shared.isUnlocked(.spaceBook) {
                     viewMode = .planar
-                    ToastManager.shared.showWarning("请先完成「空间手帐」任务，再进入「空间」页签")
+                    ToastManager.shared.showWarning("请先完成「空间手帐」任务，再进入「空间」页签".appLocalized)
                     return
                 }
                 viewMode = newValue
@@ -130,13 +134,13 @@ struct BookShelfView: View {
                     isEditing: $isEditing
                 )
             }
-            .alert("新建手帐本", isPresented: $showingNewBookAlert) {
-                TextField("名称", text: $newBookName)
-                Button("取消", role: .cancel) {}
-                Button("创建") {
+            .alert("新建手帐本".appLocalized, isPresented: $showingNewBookAlert) {
+                TextField("名称".appLocalized, text: $newBookName)
+                Button("取消".appLocalized, role: .cancel) {}
+                Button("创建".appLocalized) {
                     let maxSortIndex = books.map { $0.sortIndex }.max() ?? -1
                     let book = BookGroup(
-                        title: newBookName.isEmpty ? "新书本" : newBookName,
+                        title: newBookName.isEmpty ? "新书本".appLocalized : newBookName,
                         sortIndex: maxSortIndex + 1
                     )
                     book.lastModified = Date()
@@ -222,16 +226,16 @@ struct BookShelfView: View {
             .onChange(of: navigateToBookID) { _, newBookID in
                 handleNavigateToBookChange(newBookID)
             }
-            .alert("删除手帐", isPresented: $showingDeleteBookAlert) {
-                Button("取消", role: .cancel) { bookToDelete = nil }
-                Button("删除", role: .destructive) {
+            .alert("删除手帐".appLocalized, isPresented: $showingDeleteBookAlert) {
+                Button("取消".appLocalized, role: .cancel) { bookToDelete = nil }
+                Button("删除".appLocalized, role: .destructive) {
                     if let book = bookToDelete {
                         deleteBook(book)
                     }
                     bookToDelete = nil
                 }
             } message: {
-                Text("确定要将「\(bookToDelete?.title ?? "此手帐")」移入回收站吗？")
+                Text("确定要将「%@」移入回收站吗？".appLocalized(bookToDelete?.title ?? "此手帐".appLocalized))
             }
             .onDisappear {
                 NotificationCenter.default.post(
@@ -247,7 +251,7 @@ struct BookShelfView: View {
         if viewMode == .spatial {
             return isSpatialBookSelected ? "" : ""
         }
-        return selectedBook == nil ? "穿搭手帐" : selectedBook!.title
+        return selectedBook == nil ? "穿搭手帐".appLocalized : selectedBook!.title
     }
 
     private func handleNavigateToBookChange(_ newBookID: UUID?) {

@@ -193,7 +193,7 @@ struct SpaceOutfitCard: View {
                     .stroke(Color.primary.opacity(0.1), lineWidth: 1)
             )
             .overlay(alignment: .bottom) {
-                Text(page.note.isEmpty ? "未命名" : page.note)
+                Text(page.note.isEmpty ? "未命名".appLocalized : page.note)
                     .font(.caption)
                     .lineLimit(1)
                     .themeSkinLegibleText(level: .inline, slot: .sectionCard)
@@ -691,15 +691,16 @@ struct SpaceMovePageSheet: View {
                         HStack {
                             Text(targetBook.title)
                             Spacer()
-                            Text("\((targetBook.pages ?? []).filter({ !$0.isDeleted }).count) 页").foregroundStyle(.secondary)
+                            Text("%d 页".appLocalized((targetBook.pages ?? []).filter({ !$0.isDeleted }).count))
+                                .foregroundStyle(.secondary)
                         }
                     }
                 }
             }
-            .navigationTitle("移动到...")
+            .navigationTitle("移动到...".appLocalized)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("取消") { dismiss() }
+                    Button("取消".appLocalized) { dismiss() }
                 }
             }
         }

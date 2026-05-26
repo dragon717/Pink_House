@@ -41,12 +41,12 @@ struct SpaceBookToolbar: ToolbarContent {
             HStack(spacing: 16) {
                 // View Options
                 Menu {
-                    Picker("视图", selection: $gridModeValue) {
-                        Label("单列", systemImage: "rectangle.grid.1x2")
+                    Picker("视图".appLocalized, selection: $gridModeValue) {
+                        Label("单列".appLocalized, systemImage: "rectangle.grid.1x2")
                             .tag(1)
-                        Label("双列", systemImage: "rectangle.grid.2x2")
+                        Label("双列".appLocalized, systemImage: "rectangle.grid.2x2")
                             .tag(2)
-                        Label("三列", systemImage: "rectangle.grid.3x2")
+                        Label("三列".appLocalized, systemImage: "rectangle.grid.3x2")
                             .tag(3)
                     }
                 } label: {
@@ -83,19 +83,19 @@ struct SpaceBookToolbar: ToolbarContent {
                             Button {
                                 showingNewPageAlert = true
                             } label: {
-                                Label("新建空间搭配", systemImage: "plus")
+                                Label("新建空间搭配".appLocalized, systemImage: "plus")
                             }
 
                             Button {
                                 showingCoverPicker = true
                             } label: {
-                                Label("修改手帐封面", systemImage: "photo")
+                                Label("修改手帐封面".appLocalized, systemImage: "photo")
                             }
 
                             Button {
                                 onRenameBook()
                             } label: {
-                                Label("重命名手帐", systemImage: "pencil")
+                                Label("重命名手帐".appLocalized, systemImage: "pencil")
                             }
 
                             Divider()
@@ -105,7 +105,7 @@ struct SpaceBookToolbar: ToolbarContent {
                                 isBatchEditing = true
                                 selectedPages.removeAll()
                             } label: {
-                                Label("批量编辑", systemImage: "checkmark.circle")
+                                Label("批量编辑".appLocalized, systemImage: "checkmark.circle")
                             }
 
                             Divider()
@@ -113,7 +113,7 @@ struct SpaceBookToolbar: ToolbarContent {
                             Button {
                                 showingTrash = true
                             } label: {
-                                Label("垃圾篓", systemImage: "trash")
+                                Label("垃圾篓".appLocalized, systemImage: "trash")
                             }
                         } label: {
                             Image(systemName: "ellipsis.circle")
@@ -143,24 +143,24 @@ struct SpaceBookToolbar: ToolbarContent {
                 submenuDepth: 0,
                 items: [
                     .action(
-                        title: "新建空间书页",
+                        title: "新建空间书页".appLocalized,
                         systemImage: "plus",
                         isHighlighted: true,
                         action: { showingNewPageAlert = true }
                     ),
                     .action(
-                        title: "修改手帐封面",
+                        title: "修改手帐封面".appLocalized,
                         systemImage: "photo",
                         action: { showingCoverPicker = true }
                     ),
                     .action(
-                        title: "重命名手帐",
+                        title: "重命名手帐".appLocalized,
                         systemImage: "pencil",
                         action: onRenameBook
                     ),
                     .divider,
                     .action(
-                        title: "批量编辑",
+                        title: "批量编辑".appLocalized,
                         systemImage: "checkmark.circle",
                         action: {
                             isBatchEditing = true
@@ -169,7 +169,7 @@ struct SpaceBookToolbar: ToolbarContent {
                     ),
                     .divider,
                     .action(
-                        title: "垃圾篓",
+                        title: "垃圾篓".appLocalized,
                         systemImage: "trash",
                         action: { showingTrash = true }
                     )

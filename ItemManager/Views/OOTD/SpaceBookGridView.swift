@@ -23,9 +23,9 @@ struct SpaceBookGridView: View {
             if books.isEmpty {
                 ThemeSkinEmptyStateSurface {
                     ContentUnavailableView {
-                        Label("暂无空间手帐", systemImage: "cube.transparent")
+                        Label("暂无空间手帐".appLocalized, systemImage: "cube.transparent")
                     } description: {
-                        Text("点击右上角 + 创建新的空间手帐")
+                        Text("点击右上角 + 创建新的空间手帐".appLocalized)
                     }
                     .foregroundStyle(emptyStateForegroundColor)
                 }
@@ -48,19 +48,19 @@ struct SpaceBookGridView: View {
                             Button {
                                 onRename(book)
                             } label: {
-                                Label("重命名", systemImage: "pencil")
+                                Label("重命名".appLocalized, systemImage: "pencil")
                             }
 
                             Button {
                                 onSetCover(book)
                             } label: {
-                                Label("设置封面", systemImage: "photo")
+                                Label("设置封面".appLocalized, systemImage: "photo")
                             }
 
                             Button(role: .destructive) {
                                 onDelete(book)
                             } label: {
-                                Label("删除手帐", systemImage: "trash")
+                                Label("删除手帐".appLocalized, systemImage: "trash")
                             }
                         }
                     }

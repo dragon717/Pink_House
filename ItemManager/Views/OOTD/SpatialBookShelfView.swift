@@ -189,13 +189,13 @@ struct SpatialBookShelfView: View {
     }
 
     private func applyNewBookAlert<Content: View>(to content: Content) -> some View {
-        content.alert("新建空间手帐", isPresented: $showingNewBookAlert) {
-            TextField("名称", text: $newBookName)
-            Button("取消", role: .cancel) {}
-            Button("创建") {
+        content.alert("新建空间手帐".appLocalized, isPresented: $showingNewBookAlert) {
+            TextField("名称".appLocalized, text: $newBookName)
+            Button("取消".appLocalized, role: .cancel) {}
+            Button("创建".appLocalized) {
                 let maxSortIndex = books.map { $0.sortIndex }.max() ?? -1
                 let book = SpaceBookGroup(
-                    title: newBookName.isEmpty ? "新空间" : newBookName,
+                    title: newBookName.isEmpty ? "新空间".appLocalized : newBookName,
                     sortIndex: maxSortIndex + 1
                 )
                 modelContext.insert(book)
@@ -212,9 +212,9 @@ struct SpatialBookShelfView: View {
     }
 
     private func applyDeleteBookAlert<Content: View>(to content: Content) -> some View {
-        content.alert("删除手帐", isPresented: $showingDeleteBookAlert) {
-            Button("取消", role: .cancel) { bookToDelete = nil }
-            Button("删除", role: .destructive) {
+        content.alert("删除手帐".appLocalized, isPresented: $showingDeleteBookAlert) {
+            Button("取消".appLocalized, role: .cancel) { bookToDelete = nil }
+            Button("删除".appLocalized, role: .destructive) {
                 if let book = bookToDelete {
                     deleteBook(book)
                     if selectedBook?.id == book.id {
@@ -224,15 +224,15 @@ struct SpatialBookShelfView: View {
                 bookToDelete = nil
             }
         } message: {
-            Text("确定要将「\(bookToDelete?.title ?? "此手帐")」移入回收站吗？")
+            Text("确定要将「%@」移入回收站吗？".appLocalized(bookToDelete?.title ?? "此手帐".appLocalized))
         }
     }
 
     private func applyRenameBookAlert<Content: View>(to content: Content) -> some View {
-        content.alert("重命名手帐", isPresented: $showingRenameBookAlert) {
-            TextField("名称", text: $renameBookName)
-            Button("取消", role: .cancel) { bookToRename = nil }
-            Button("保存") {
+        content.alert("重命名手帐".appLocalized, isPresented: $showingRenameBookAlert) {
+            TextField("名称".appLocalized, text: $renameBookName)
+            Button("取消".appLocalized, role: .cancel) { bookToRename = nil }
+            Button("保存".appLocalized) {
                 if let book = bookToRename {
                     book.title = renameBookName
                     try? modelContext.save()
@@ -289,7 +289,7 @@ struct SpatialBookShelfView: View {
                                 Button {
                                     createSpaceBook()
                                 } label: {
-                                    Label("新建空间手帐", systemImage: "plus.rectangle.on.folder")
+                                    Label("新建空间手帐".appLocalized, systemImage: "plus.rectangle.on.folder")
                                 }
 
                                 Divider()
@@ -297,7 +297,7 @@ struct SpatialBookShelfView: View {
                                 Button {
                                     showingTrash = true
                                 } label: {
-                                    Label("垃圾篓", systemImage: "trash")
+                                    Label("垃圾篓".appLocalized, systemImage: "trash")
                                 }
                             } label: {
                                 Image(systemName: "ellipsis.circle")
@@ -325,14 +325,14 @@ struct SpatialBookShelfView: View {
                 submenuDepth: 0,
                 items: [
                     .action(
-                        title: "新建空间手帐",
+                        title: "新建空间手帐".appLocalized,
                         systemImage: "plus.rectangle.on.folder",
                         isHighlighted: true,
                         action: createSpaceBook
                     ),
                     .divider,
                     .action(
-                        title: "垃圾篓",
+                        title: "垃圾篓".appLocalized,
                         systemImage: "trash",
                         action: { showingTrash = true }
                     )

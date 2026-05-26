@@ -62,14 +62,18 @@ struct OOTDMannequinBackground: Identifiable, Hashable {
         all[0]
     }
 
+    var localizedDisplayName: String {
+        displayName.appLocalized
+    }
+
     var selectionSubtitle: String {
         if avatarCharacterID != nil {
             if avatarHairStyleID == .defaultLongPink {
-                return "不含默认裙装，已清理侧发碎片，适合直接叠衣服贴纸。"
+                return "不含默认裙装，已清理侧发碎片，适合直接叠衣服贴纸。".appLocalized
             }
-            return "不含默认裙装，可叠衣服贴纸；\(avatarHairStyleID.displayName)透明发型层。"
+            return "不含默认裙装，可叠衣服贴纸；%@透明发型层。".appLocalized(avatarHairStyleID.displayName.appLocalized)
         }
-        return "适合快速开始搭配拼贴。"
+        return "适合快速开始搭配拼贴。".appLocalized
     }
 
     var canvasScale: CGFloat {
@@ -219,16 +223,16 @@ struct OOTDBackgroundSelectionSheet: View {
                     }
 
                     VStack(alignment: .leading, spacing: 12) {
-                        Text("人台")
+                        Text("人台".appLocalized)
                             .font(.headline)
                             .foregroundStyle(.primary)
 
                         let mannequins = OOTDMannequinBackground.available
                         if mannequins.isEmpty {
                             ContentUnavailableView(
-                                "暂无可用人台",
+                                "暂无可用人台".appLocalized,
                                 systemImage: "tshirt",
-                                description: Text("当前版本暂未提供可选择的人台底图。")
+                                description: Text("当前版本暂未提供可选择的人台底图。".appLocalized)
                             )
                         } else {
                             ForEach(mannequins) { mannequin in
@@ -240,7 +244,7 @@ struct OOTDBackgroundSelectionSheet: View {
                                         mannequinThumbnail(mannequin)
 
                                         VStack(alignment: .leading, spacing: 4) {
-                                            Text(mannequin.displayName)
+                                            Text(mannequin.localizedDisplayName)
                                                 .font(.system(size: 16, weight: .semibold))
                                                 .foregroundStyle(.primary)
                                             Text(mannequin.selectionSubtitle)
@@ -291,11 +295,11 @@ struct OOTDBackgroundSelectionSheet: View {
                 }
                 .padding(20)
             }
-            .navigationTitle("更换底图")
+            .navigationTitle("更换底图".appLocalized)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("完成") {
+                    Button("完成".appLocalized) {
                         dismiss()
                     }
                 }
@@ -323,10 +327,10 @@ struct OOTDBackgroundSelectionSheet: View {
                     )
 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(title)
+                    Text(title.appLocalized)
                         .font(.system(size: 16, weight: .semibold))
                         .foregroundStyle(.primary)
-                    Text(subtitle)
+                    Text(subtitle.appLocalized)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -424,7 +428,7 @@ struct OOTDContentArea: View {
                         .id(outfit.id)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                     } else {
-                        ContentUnavailableView("开始新的穿搭", systemImage: "tshirt.fill")
+                        ContentUnavailableView("开始新的穿搭".appLocalized, systemImage: "tshirt.fill")
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
                     }
                     
@@ -479,7 +483,7 @@ struct OOTDContentArea: View {
                         )
                         .id(outfit.id)
                     } else {
-                        ContentUnavailableView("开始新的穿搭", systemImage: "tshirt.fill")
+                        ContentUnavailableView("开始新的穿搭".appLocalized, systemImage: "tshirt.fill")
                     }
                     
                     // 贴纸库 - 底部弹出
@@ -535,33 +539,33 @@ struct OOTDAlertsModifier: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            .alert("重命名搭配", isPresented: $showingRenameAlert) {
-                TextField("名称", text: $newName)
-                Button("取消", role: .cancel) { }
-                Button("确定", action: onRename)
+            .alert("重命名搭配".appLocalized, isPresented: $showingRenameAlert) {
+                TextField("名称".appLocalized, text: $newName)
+                Button("取消".appLocalized, role: .cancel) { }
+                Button("确定".appLocalized, action: onRename)
             }
-            .alert("删除当前搭配", isPresented: $showingDeleteCurrentAlert) {
-                Button("删除", role: .destructive, action: onDeleteCurrent)
-                Button("取消", role: .cancel) { }
+            .alert("删除当前搭配".appLocalized, isPresented: $showingDeleteCurrentAlert) {
+                Button("删除".appLocalized, role: .destructive, action: onDeleteCurrent)
+                Button("取消".appLocalized, role: .cancel) { }
             } message: {
-                Text("确定要删除当前搭配吗？此操作无法撤销。")
+                Text("确定要删除当前搭配吗？此操作无法撤销。".appLocalized)
             }
-            .alert("数量已达上限", isPresented: $showingLimitAlert) {
-                Button("确定", role: .cancel) { }
+            .alert("数量已达上限".appLocalized, isPresented: $showingLimitAlert) {
+                Button("确定".appLocalized, role: .cancel) { }
             } message: {
-                Text("每个搭配最多只能添加20个抠图。")
+                Text("每个搭配最多只能添加20个抠图。".appLocalized)
             }
-            .alert("批量处理", isPresented: $showingBatchConfirmation) {
-                Button("开始扫描", role: .destructive, action: onBatchProcess)
-                Button("取消", role: .cancel) {}
+            .alert("批量处理".appLocalized, isPresented: $showingBatchConfirmation) {
+                Button("开始扫描".appLocalized, role: .destructive, action: onBatchProcess)
+                Button("取消".appLocalized, role: .cancel) {}
             } message: {
-                Text("将扫描衣橱中所有裙装并尝试生成抠图。这可能需要一些时间。")
+                Text("将扫描衣橱中所有裙装并尝试生成抠图。这可能需要一些时间。".appLocalized)
             }
-            .alert("修复数据", isPresented: $showingRepairConfirmation) {
-                Button("开始深度修复", action: onRepair)
-                Button("取消", role: .cancel) {}
+            .alert("修复数据".appLocalized, isPresented: $showingRepairConfirmation) {
+                Button("开始深度修复".appLocalized, action: onRepair)
+                Button("取消".appLocalized, role: .cancel) {}
             } message: {
-                Text("将扫描所有搭配，尝试通过哈希匹配、关联服饰匹配等方式，找回丢失的图片引用。")
+                Text("将扫描所有搭配，尝试通过哈希匹配、关联服饰匹配等方式，找回丢失的图片引用。".appLocalized)
             }
     }
 }

@@ -71,9 +71,9 @@ struct SpaceBookDetailView: View {
 
         var displayName: String {
             switch self {
-            case .single: return "单列"
-            case .double: return "双列"
-            case .triple: return "三列"
+            case .single: return "单列".appLocalized
+            case .double: return "双列".appLocalized
+            case .triple: return "三列".appLocalized
             }
         }
 
@@ -110,7 +110,7 @@ struct SpaceBookDetailView: View {
     var body: some View {
         mainContent
             .id(refreshTrigger)
-            .navigationTitle(isBatchEditing ? "已选择 \(selectedPages.count) 项" : book.title)
+            .navigationTitle(isBatchEditing ? "已选择 %d 项".appLocalized(selectedPages.count) : book.title)
             .onAppear {
                 publishSpaceBookDetailGuideDataState()
                 NotificationCenter.default.post(name: .spaceBookDetailOpened, object: nil)
@@ -155,10 +155,10 @@ struct SpaceBookDetailView: View {
                     )
                 }
             }
-            .alert("新建空间书页", isPresented: $showingNewPageAlert) {
-                TextField("备注", text: $newPageNote)
-                Button("取消", role: .cancel) {}
-                Button("创建") {
+            .alert("新建空间书页".appLocalized, isPresented: $showingNewPageAlert) {
+                TextField("备注".appLocalized, text: $newPageNote)
+                Button("取消".appLocalized, role: .cancel) {}
+                Button("创建".appLocalized) {
                     let newPage = SpaceOutfit(note: newPageNote, book: book)
                     newPage.sortIndex = (sortedPages.last?.sortIndex ?? 0) + 1
                     modelContext.insert(newPage)
@@ -173,10 +173,10 @@ struct SpaceBookDetailView: View {
                     }
                 }
             }
-            .alert("修改名称", isPresented: $showingRenameAlert) {
-                TextField("名称", text: $renamePageName)
-                Button("取消", role: .cancel) {}
-                Button("确定") {
+            .alert("修改名称".appLocalized, isPresented: $showingRenameAlert) {
+                TextField("名称".appLocalized, text: $renamePageName)
+                Button("取消".appLocalized, role: .cancel) {}
+                Button("确定".appLocalized) {
                     if let page = pageToRename {
                         page.note = renamePageName
                         try? modelContext.save()
@@ -212,29 +212,29 @@ struct SpaceBookDetailView: View {
             }
             .toolbarBackground(.hidden, for: .navigationBar)
             .navigationBarBackButtonHidden(true) // 隐藏系统返回按钮，使用自定义的返回按钮
-            .alert("重命名手帐", isPresented: $showingRenameBookAlert) {
-                TextField("名称", text: $renameBookName)
-                Button("取消", role: .cancel) {}
-                Button("保存") {
+            .alert("重命名手帐".appLocalized, isPresented: $showingRenameBookAlert) {
+                TextField("名称".appLocalized, text: $renameBookName)
+                Button("取消".appLocalized, role: .cancel) {}
+                Button("保存".appLocalized) {
                     book.title = renameBookName
                     try? modelContext.save()
                 }
             }
-            .alert("确认批量删除", isPresented: $showingBatchDeleteConfirmation) {
-                Button("取消", role: .cancel) {}
-                Button("删除", role: .destructive) {
+            .alert("确认批量删除".appLocalized, isPresented: $showingBatchDeleteConfirmation) {
+                Button("取消".appLocalized, role: .cancel) {}
+                Button("删除".appLocalized, role: .destructive) {
                     confirmBatchDelete()
                 }
             } message: {
-                Text("确定要删除选中的 \(selectedPages.count) 个书页吗？删除后可在回收站中恢复。")
+                Text("确定要删除选中的 %d 个书页吗？删除后可在回收站中恢复。".appLocalized(selectedPages.count))
             }
-            .alert("确认批量复制", isPresented: $showingBatchCopyConfirmation) {
-                Button("取消", role: .cancel) {}
-                Button("复制") {
+            .alert("确认批量复制".appLocalized, isPresented: $showingBatchCopyConfirmation) {
+                Button("取消".appLocalized, role: .cancel) {}
+                Button("复制".appLocalized) {
                     confirmBatchCopy()
                 }
             } message: {
-                Text("确定要复制选中的 \(selectedPages.count) 个书页吗？")
+                Text("确定要复制选中的 %d 个书页吗？".appLocalized(selectedPages.count))
             }
     }
 
@@ -247,7 +247,7 @@ struct SpaceBookDetailView: View {
                 Button {
                     toggleSelectAll()
                 } label: {
-                    Text(selectedPages.count == sortedPages.count ? "取消全选" : "全选")
+                    Text(selectedPages.count == sortedPages.count ? "取消全选".appLocalized : "全选".appLocalized)
                         .font(.system(size: 16, weight: .medium))
                 }
 
@@ -279,7 +279,7 @@ struct SpaceBookDetailView: View {
                     isBatchEditing = false
                     selectedPages.removeAll()
                 } label: {
-                    Text("完成")
+                    Text("完成".appLocalized)
                         .font(.system(size: 16, weight: .semibold))
                         .foregroundStyle(.pink)
                 }
@@ -320,7 +320,7 @@ struct SpaceBookDetailView: View {
 
             for page in pagesToCopy {
                 currentMaxSortIndex += 1
-                let newPage = SpaceOutfit(note: page.note + " 副本", book: book)
+                let newPage = SpaceOutfit(note: "%@ 副本".appLocalized(page.note), book: book)
                 newPage.sortIndex = currentMaxSortIndex
                 newPage.snapshotPath = page.snapshotPath
                 newPage.modelPath = page.modelPath
@@ -353,9 +353,9 @@ struct SpaceBookDetailView: View {
     private var emptyStateView: some View {
         ThemeSkinEmptyStateSurface {
             ContentUnavailableView {
-                Label("暂无空间书页", systemImage: "doc.text.image")
+                Label("暂无空间书页".appLocalized, systemImage: "doc.text.image")
             } description: {
-                Text("点击 + 创建新的空间书页")
+                Text("点击 + 创建新的空间书页".appLocalized)
             }
             .foregroundStyle(emptyStateForegroundColor)
         }
@@ -456,51 +456,51 @@ struct SpaceBookDetailView: View {
             renamePageName = page.note
             showingRenameAlert = true
         } label: {
-            Label("修改名称", systemImage: "pencil")
+            Label("修改名称".appLocalized, systemImage: "pencil")
         }
 
         Button {
             duplicatePage(page)
         } label: {
-            Label("复制", systemImage: "doc.on.doc")
+            Label("复制".appLocalized, systemImage: "doc.on.doc")
         }
 
         Button {
             sharePage(page)
         } label: {
-            Label("分享成图片", systemImage: "square.and.arrow.up")
+            Label("分享成图片".appLocalized, systemImage: "square.and.arrow.up")
         }
 
         Button {
             pageToEditThumbnail = page
             showingThumbnailEditor = true
         } label: {
-            Label("设置缩略图", systemImage: "photo")
+            Label("设置缩略图".appLocalized, systemImage: "photo")
         }
 
         Button {
             insertPage(after: page)
         } label: {
-            Label("在后面新增", systemImage: "arrow.right.square")
+            Label("在后面新增".appLocalized, systemImage: "arrow.right.square")
         }
 
         Button {
             insertPage(before: page)
         } label: {
-            Label("在前面新增", systemImage: "arrow.left.square")
+            Label("在前面新增".appLocalized, systemImage: "arrow.left.square")
         }
 
         Button {
             pageToMove = page
             showingMoveSheet = true
         } label: {
-            Label("移动到...", systemImage: "folder")
+            Label("移动到...".appLocalized, systemImage: "folder")
         }
 
         Button(role: .destructive) {
             deletePage(page)
         } label: {
-            Label("删除", systemImage: "trash")
+            Label("删除".appLocalized, systemImage: "trash")
         }
     }
 
@@ -555,7 +555,7 @@ struct SpaceBookDetailView: View {
     }
 
     private func duplicatePage(_ page: SpaceOutfit) {
-        let newPage = SpaceOutfit(note: page.note + " 副本", book: book)
+        let newPage = SpaceOutfit(note: "%@ 副本".appLocalized(page.note), book: book)
         newPage.sortIndex = (sortedPages.last?.sortIndex ?? 0) + 1
         modelContext.insert(newPage)
         try? modelContext.save()
