@@ -155,6 +155,8 @@ struct ThemeSkinStickerWallpaperBackground: View {
     var renderMode: ThemeSkinWallpaperRenderMode = .page
     var includeBaseFill: Bool = true
 
+    @Environment(\.colorScheme) private var colorScheme
+
     private var stickerOptions: [ThemeSkinBackgroundStickerOption] {
         product.backgroundStickerOptions
     }
@@ -168,6 +170,7 @@ struct ThemeSkinStickerWallpaperBackground: View {
             ZStack {
                 if includeBaseFill {
                     baseBackground
+                    depthOverlay
                     contextTintOverlay
                 }
 
@@ -185,6 +188,8 @@ struct ThemeSkinStickerWallpaperBackground: View {
                             height: base * widthMultiplier(for: placement)
                         )
                         .opacity(opacity(for: placement))
+                        .saturation(stickerSaturation)
+                        .brightness(stickerBrightness)
                         .rotationEffect(.degrees(placement.rotationDegrees))
                         .scaleEffect(x: placement.flipped ? -1 : 1, y: 1)
                         .position(x: placement.x * size.width, y: placement.y * size.height)
@@ -210,16 +215,42 @@ struct ThemeSkinStickerWallpaperBackground: View {
     private var contextTintOverlay: some View {
         LinearGradient(
             colors: [
-                context.tintColor(namespace: product.assetNamespace).opacity(context.tintOpacity),
-                Color.white.opacity(context.tintOpacity * 0.38),
-                context.tintColor(namespace: product.assetNamespace).opacity(context.tintOpacity * 0.7)
+                resolvedContextTintColor.opacity(resolvedContextTintOpacity),
+                contextTintMiddleColor,
+                resolvedContextTintColor.opacity(resolvedContextTintOpacity * 0.7)
             ],
             startPoint: .topTrailing,
             endPoint: .bottomLeading
         )
     }
 
+    @ViewBuilder
+    private var depthOverlay: some View {
+        if colorScheme == .dark {
+            LinearGradient(
+                colors: [
+                    Color.black.opacity(renderMode == .preview ? 0.18 : 0.24),
+                    Color.black.opacity(renderMode == .preview ? 0.08 : 0.14),
+                    Color.black.opacity(renderMode == .preview ? 0.22 : 0.30)
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+        }
+    }
+
     private var baseColors: [Color] {
+        if colorScheme == .dark {
+            switch product.assetNamespace {
+            case SwanDreamThemeSkin.namespace:
+                return [Color(hex: "191523"), Color(hex: "2A2038"), Color(hex: "21182E")]
+            case SkyConcertThemeSkin.namespace:
+                return [Color(hex: "111D2A"), Color(hex: "1B3141"), Color(hex: "221A2C")]
+            default:
+                return [Color(hex: "211923"), Color(hex: "181722")]
+            }
+        }
+
         switch product.assetNamespace {
         case SwanDreamThemeSkin.namespace:
             return [
@@ -236,6 +267,52 @@ struct ThemeSkinStickerWallpaperBackground: View {
         default:
             return [Color(hex: "F4DADB"), Color.white.opacity(0.86)]
         }
+    }
+
+    private var resolvedContextTintColor: Color {
+        guard colorScheme == .dark else {
+            return context.tintColor(namespace: product.assetNamespace)
+        }
+
+        switch (product.assetNamespace, context) {
+        case (SwanDreamThemeSkin.namespace, .depositPlan), (SwanDreamThemeSkin.namespace, .wealth):
+            return SwanDreamThemeSkin.moonGoldToken.dark
+        case (SwanDreamThemeSkin.namespace, .house), (SwanDreamThemeSkin.namespace, .petChat):
+            return Color(hex: "CAB7F4")
+        case (SwanDreamThemeSkin.namespace, .journal):
+            return SwanDreamThemeSkin.roseLineToken.dark
+        case (SwanDreamThemeSkin.namespace, _):
+            return SwanDreamThemeSkin.textToken.dark
+        case (SkyConcertThemeSkin.namespace, .depositPlan), (SkyConcertThemeSkin.namespace, .wealth):
+            return SkyConcertThemeSkin.softGoldToken.dark
+        case (SkyConcertThemeSkin.namespace, .house), (SkyConcertThemeSkin.namespace, .petChat):
+            return SkyConcertThemeSkin.cloudBlueDeepToken.dark
+        case (SkyConcertThemeSkin.namespace, .journal):
+            return Color(hex: "F2C8D8")
+        case (SkyConcertThemeSkin.namespace, _):
+            return SkyConcertThemeSkin.cloudBlueDeepToken.dark
+        default:
+            return Color.white.opacity(0.5)
+        }
+    }
+
+    private var resolvedContextTintOpacity: Double {
+        guard colorScheme == .dark else { return context.tintOpacity }
+        return min(context.tintOpacity * 1.35 + 0.04, 0.24)
+    }
+
+    private var contextTintMiddleColor: Color {
+        colorScheme == .dark
+            ? Color.white.opacity(resolvedContextTintOpacity * 0.08)
+            : Color.white.opacity(context.tintOpacity * 0.38)
+    }
+
+    private var stickerSaturation: Double {
+        colorScheme == .dark ? 0.88 : 1
+    }
+
+    private var stickerBrightness: Double {
+        colorScheme == .dark ? -0.05 : 0
     }
 
     private func assetName(for placement: ThemeSkinWallpaperStickerPlacement) -> String? {
@@ -272,6 +349,10 @@ struct ThemeSkinStickerWallpaperBackground: View {
         var opacity = placement.opacity * context.opacityMultiplier
         if placement.isHero, heroAssetName == nil {
             opacity = min(opacity + 0.06, 0.92)
+        }
+        if colorScheme == .dark {
+            opacity *= renderMode == .preview ? 0.78 : 0.70
+            return min(max(opacity, 0.10), 0.72)
         }
         return min(max(opacity, 0.12), 0.92)
     }

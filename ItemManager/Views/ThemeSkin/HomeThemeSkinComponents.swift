@@ -30,6 +30,10 @@ private enum HomeThemeSkinTokens {
         SkyConcertThemeSkin.hasDedicatedVisualProfile(descriptor) ? SkyConcertThemeSkin.accent(for: descriptor) : rose
     }
 
+    static func accent(for descriptor: ThemeSkinDescriptor?, colorScheme: ColorScheme) -> Color {
+        SkyConcertThemeSkin.hasDedicatedVisualProfile(descriptor) ? SkyConcertThemeSkin.accent(for: descriptor, colorScheme: colorScheme) : rose
+    }
+
     static func softAccent(for descriptor: ThemeSkinDescriptor?) -> Color {
         SkyConcertThemeSkin.hasDedicatedVisualProfile(descriptor) ? SkyConcertThemeSkin.accentSoft(for: descriptor) : blush
     }
@@ -182,17 +186,19 @@ struct HomeThemeSkinSearchMenuLabel: View {
     let title: String
     let systemImage: String
 
+    @Environment(\.colorScheme) private var colorScheme
+
     var body: some View {
         if isActive {
             HStack(spacing: 10) {
                 Image(systemName: systemImage)
                     .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(HomeThemeSkinTokens.accent(for: descriptor))
+                    .foregroundStyle(HomeThemeSkinTokens.accent(for: descriptor, colorScheme: colorScheme))
                     .themeSkinLegibleSymbol(level: .chip, slot: descriptor?.slot ?? .searchBar, descriptor: descriptor)
 
                 Text(title)
                     .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(Color.primary.opacity(0.85))
+                    .foregroundStyle(SkyConcertThemeSkin.labelColor(for: descriptor, colorScheme: colorScheme))
                     .themeSkinLegibleText(level: .inline, slot: descriptor?.slot ?? .searchBar, descriptor: descriptor)
 
                 Spacer(minLength: 0)

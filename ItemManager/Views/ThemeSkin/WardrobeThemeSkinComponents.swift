@@ -226,6 +226,8 @@ struct WardrobeThemeCardTitle: View {
     let title: String
     let descriptor: ThemeSkinDescriptor?
 
+    @Environment(\.colorScheme) private var colorScheme
+
     init(title: String, descriptor: ThemeSkinDescriptor? = ThemeSkinManager.shared.descriptor(for: .wardrobeItemCard)) {
         self.title = title
         self.descriptor = descriptor
@@ -250,7 +252,7 @@ struct WardrobeThemeCardTitle: View {
 
                     Text(title)
                         .font(.system(size: 13, weight: .semibold, design: .rounded))
-                        .foregroundStyle(SkyConcertThemeSkin.labelColor(for: descriptor))
+                        .foregroundStyle(SkyConcertThemeSkin.labelColor(for: descriptor, colorScheme: colorScheme))
                         .themeSkinLegibleText(level: .inline, slot: .wardrobeItemCard, descriptor: descriptor)
                         .lineLimit(1)
                         .frame(maxWidth: .infinity, alignment: .leading)

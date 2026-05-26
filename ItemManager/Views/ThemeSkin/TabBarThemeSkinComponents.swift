@@ -33,8 +33,16 @@ private enum TabBarThemeSkinTokens {
         SkyConcertThemeSkin.hasDedicatedVisualProfile(descriptor) ? SkyConcertThemeSkin.accent(for: descriptor) : pinkAccent
     }
 
+    static func accent(for descriptor: ThemeSkinDescriptor?, colorScheme: ColorScheme) -> Color {
+        SkyConcertThemeSkin.hasDedicatedVisualProfile(descriptor) ? SkyConcertThemeSkin.accent(for: descriptor, colorScheme: colorScheme) : pinkAccent
+    }
+
     static func text(for descriptor: ThemeSkinDescriptor?) -> Color {
         SkyConcertThemeSkin.hasDedicatedVisualProfile(descriptor) ? SkyConcertThemeSkin.labelColor(for: descriptor) : roseText
+    }
+
+    static func text(for descriptor: ThemeSkinDescriptor?, colorScheme: ColorScheme) -> Color {
+        SkyConcertThemeSkin.hasDedicatedVisualProfile(descriptor) ? SkyConcertThemeSkin.labelColor(for: descriptor, colorScheme: colorScheme) : roseText
     }
 
     static func shadow(for descriptor: ThemeSkinDescriptor?) -> Color {
@@ -239,6 +247,8 @@ struct ThemeSkinModernTabLabel: View {
     let isSelected: Bool
     var tabRole: ThemeSkinTabRole? = nil
 
+    @Environment(\.colorScheme) private var colorScheme
+
     private var isActive: Bool {
         descriptor?.usesThemeSkinTabBarChrome == true
     }
@@ -257,8 +267,8 @@ struct ThemeSkinModernTabLabel: View {
                     .lineLimit(1)
                     .foregroundStyle(
                         isSelected
-                            ? TabBarThemeSkinTokens.accent(for: descriptor)
-                            : TabBarThemeSkinTokens.text(for: descriptor).opacity(0.88)
+                            ? TabBarThemeSkinTokens.accent(for: descriptor, colorScheme: colorScheme)
+                            : TabBarThemeSkinTokens.text(for: descriptor, colorScheme: colorScheme).opacity(0.88)
                     )
                     .themeSkinLegibleText(level: isSelected ? .chip : .inline, slot: .tabBarMain, descriptor: descriptor)
             }
@@ -279,6 +289,8 @@ struct ThemeSkinLegacyTabLabel: View {
     let inactiveColor: Color
     var tabRole: ThemeSkinTabRole? = nil
 
+    @Environment(\.colorScheme) private var colorScheme
+
     private var isActive: Bool {
         descriptor?.usesThemeSkinTabBarChrome == true
     }
@@ -297,8 +309,8 @@ struct ThemeSkinLegacyTabLabel: View {
                     .lineLimit(1)
                     .foregroundStyle(
                         isSelected
-                            ? TabBarThemeSkinTokens.accent(for: descriptor)
-                            : TabBarThemeSkinTokens.text(for: descriptor).opacity(0.88)
+                            ? TabBarThemeSkinTokens.accent(for: descriptor, colorScheme: colorScheme)
+                            : TabBarThemeSkinTokens.text(for: descriptor, colorScheme: colorScheme).opacity(0.88)
                     )
                     .themeSkinLegibleText(level: isSelected ? .chip : .inline, slot: .tabBarMain, descriptor: descriptor)
             }
@@ -326,6 +338,8 @@ private struct ThemeSkinTabStickerIcon: View {
     let systemImage: String
     let fallbackPointSize: CGFloat
 
+    @Environment(\.colorScheme) private var colorScheme
+
     private var stickerAssetName: String? {
         TabBarThemeSkinTokens.fullStickerAssetName(for: tabRole, descriptor: descriptor)
     }
@@ -351,6 +365,6 @@ private struct ThemeSkinTabStickerIcon: View {
     private var fallbackIcon: some View {
         Image(systemName: systemImage)
             .font(.system(size: fallbackPointSize, weight: .medium))
-            .foregroundStyle(TabBarThemeSkinTokens.text(for: descriptor).opacity(0.88))
+            .foregroundStyle(TabBarThemeSkinTokens.text(for: descriptor, colorScheme: colorScheme).opacity(0.88))
     }
 }

@@ -8,6 +8,7 @@ struct ThemeSkinSlotPreviewThumbnail: View {
     var size: CGFloat = 42
 
     @Environment(ThemeManager.self) private var themeManager
+    @Environment(\.colorScheme) private var colorScheme
 
     private var context: ThemeSkinPreviewContext {
         ThemeSkinPreviewContext(product: product, mode: .theme, enabledSlots: enabledSlots)
@@ -286,8 +287,8 @@ struct ThemeSkinSlotPreviewThumbnail: View {
         )
     }
 
-    private var accentColor: Color { SkyConcertThemeSkin.accent(for: descriptor) }
-    private var labelColor: Color { SkyConcertThemeSkin.labelColor(for: descriptor) }
+    private var accentColor: Color { SkyConcertThemeSkin.accent(for: descriptor, colorScheme: colorScheme) }
+    private var labelColor: Color { SkyConcertThemeSkin.labelColor(for: descriptor, colorScheme: colorScheme) }
 
     private var borderColor: Color {
         isFocused ? accentColor.opacity(0.9) : SkyConcertThemeSkin.shellStroke(for: descriptor).opacity(context.isThemed(slot) ? 0.72 : 0.28)

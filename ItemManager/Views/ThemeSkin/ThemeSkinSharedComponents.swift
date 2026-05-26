@@ -43,49 +43,6 @@ enum ThemeSkinLegibilityLevel: Equatable {
     case preview
     case hero
 
-    var outlineOffset: CGFloat {
-        switch self {
-        case .inline:
-            return 0.72
-        case .chip:
-            return 0.86
-        case .badge:
-            return 0.96
-        case .preview:
-            return 0.92
-        case .hero:
-            return 1.08
-        }
-    }
-
-    var innerGlowRadius: CGFloat {
-        switch self {
-        case .inline:
-            return 1.15
-        case .chip, .badge:
-            return 1.55
-        case .preview:
-            return 1.8
-        case .hero:
-            return 2.2
-        }
-    }
-
-    var outerGlowRadius: CGFloat {
-        switch self {
-        case .inline:
-            return 3.2
-        case .chip:
-            return 5.5
-        case .badge:
-            return 7
-        case .preview:
-            return 9
-        case .hero:
-            return 12
-        }
-    }
-
     var backdropOutset: CGFloat {
         switch self {
         case .inline:
@@ -98,26 +55,6 @@ enum ThemeSkinLegibilityLevel: Equatable {
             return 8
         case .hero:
             return 12
-        }
-    }
-
-    var usesBlurredBackdrop: Bool {
-        switch self {
-        case .preview, .hero:
-            return true
-        case .inline, .chip, .badge:
-            return false
-        }
-    }
-
-    var backdropBlurRadius: CGFloat {
-        switch self {
-        case .preview:
-            return 7
-        case .hero:
-            return 13
-        case .inline, .chip, .badge:
-            return 0
         }
     }
 }
@@ -150,10 +87,6 @@ private enum ThemeSkinDarkLegibilityFeature {
 }
 
 struct ThemeSkinLegibilityPalette {
-    let outline: Color
-    let diagonalOutline: Color
-    let innerGlow: Color
-    let outerGlow: Color
     let backdropBase: Color
     let backdropSoft: Color
     let backdropAccent: Color
@@ -170,10 +103,6 @@ struct ThemeSkinLegibilityPalette {
         let isDark = colorScheme == .dark
         if SwanDreamThemeSkin.isSwanDream(descriptor) {
             return ThemeSkinLegibilityPalette(
-                outline: (isDark ? SwanDreamThemeSkin.moonCreamToken.dark : SwanDreamThemeSkin.text).opacity(isDark ? 0.92 : 0.28),
-                diagonalOutline: (isDark ? SwanDreamThemeSkin.roseLineToken.dark : SwanDreamThemeSkin.roseLine).opacity(isDark ? 0.72 : 0.18),
-                innerGlow: SwanDreamThemeSkin.moonCreamToken.resolved(for: colorScheme).opacity(isDark ? 0.68 : 0.18),
-                outerGlow: SwanDreamThemeSkin.moonGoldToken.resolved(for: colorScheme).opacity(isDark ? 0.60 : 0.16),
                 backdropBase: SwanDreamThemeSkin.textToken.resolved(for: colorScheme).opacity(isDark ? 0.16 : 0.04),
                 backdropSoft: SwanDreamThemeSkin.moonCreamToken.resolved(for: colorScheme).opacity(isDark ? 0.36 : 0.12),
                 backdropAccent: SwanDreamThemeSkin.ribbonPink.opacity(isDark ? 0.32 : 0.10),
@@ -183,10 +112,6 @@ struct ThemeSkinLegibilityPalette {
 
         if SkyConcertThemeSkin.isSkyConcert(descriptor) {
             return ThemeSkinLegibilityPalette(
-                outline: SkyConcertThemeSkin.creamTopToken.resolved(for: colorScheme).opacity(isDark ? 0.92 : 0.28),
-                diagonalOutline: SkyConcertThemeSkin.cloudBlueDeepToken.resolved(for: colorScheme).opacity(isDark ? 0.72 : 0.18),
-                innerGlow: SkyConcertThemeSkin.creamTopToken.resolved(for: colorScheme).opacity(isDark ? 0.68 : 0.18),
-                outerGlow: SkyConcertThemeSkin.softGoldToken.resolved(for: colorScheme).opacity(isDark ? 0.60 : 0.16),
                 backdropBase: SkyConcertThemeSkin.textToken.resolved(for: colorScheme).opacity(isDark ? 0.16 : 0.04),
                 backdropSoft: SkyConcertThemeSkin.creamTopToken.resolved(for: colorScheme).opacity(isDark ? 0.36 : 0.12),
                 backdropAccent: SkyConcertThemeSkin.cloudBlue.opacity(isDark ? 0.34 : 0.10),
@@ -753,54 +678,12 @@ struct ThemeSkinEdgeSticker: View {
 private typealias ThemeSkinCornerSticker = ThemeSkinEdgeSticker
 
 private struct ThemeSkinLegibleTextModifier: ViewModifier {
-    @Environment(\.colorScheme) private var colorScheme
-    @ObservedObject private var themeSkinManager = ThemeSkinManager.shared
-
     let level: ThemeSkinLegibilityLevel
     let slot: ThemeSkinSlot
     let descriptor: ThemeSkinDescriptor?
 
-    private var resolvedDescriptor: ThemeSkinDescriptor? {
-        descriptor ?? themeSkinManager.activeThemeDescriptor(for: slot, state: .default)
-    }
-
-    private var palette: ThemeSkinLegibilityPalette? {
-        ThemeSkinLegibilityPalette.resolve(for: resolvedDescriptor, colorScheme: colorScheme)
-    }
-
-    private var shouldApply: Bool {
-        colorScheme == .dark
-            && ThemeSkinDarkLegibilityFeature.isEnabled
-            && palette != nil
-    }
-
-    @ViewBuilder
     func body(content: Content) -> some View {
-        if shouldApply, let palette {
-            if level == .inline {
-                content
-                    .shadow(color: palette.outline, radius: 0, x: level.outlineOffset, y: 0)
-                    .shadow(color: palette.outline, radius: 0, x: -level.outlineOffset, y: 0)
-                    .shadow(color: palette.outline, radius: 0, x: 0, y: level.outlineOffset)
-                    .shadow(color: palette.outline, radius: 0, x: 0, y: -level.outlineOffset)
-                    .shadow(color: palette.innerGlow, radius: level.innerGlowRadius, x: 0, y: 0)
-                    .shadow(color: palette.outerGlow, radius: level.outerGlowRadius, x: 0, y: 0)
-            } else {
-                content
-                    .shadow(color: palette.outline, radius: 0, x: level.outlineOffset, y: 0)
-                    .shadow(color: palette.outline, radius: 0, x: -level.outlineOffset, y: 0)
-                    .shadow(color: palette.outline, radius: 0, x: 0, y: level.outlineOffset)
-                    .shadow(color: palette.outline, radius: 0, x: 0, y: -level.outlineOffset)
-                    .shadow(color: palette.diagonalOutline, radius: 0, x: level.outlineOffset * 0.72, y: level.outlineOffset * 0.72)
-                    .shadow(color: palette.diagonalOutline, radius: 0, x: -level.outlineOffset * 0.72, y: level.outlineOffset * 0.72)
-                    .shadow(color: palette.diagonalOutline, radius: 0, x: level.outlineOffset * 0.72, y: -level.outlineOffset * 0.72)
-                    .shadow(color: palette.diagonalOutline, radius: 0, x: -level.outlineOffset * 0.72, y: -level.outlineOffset * 0.72)
-                    .shadow(color: palette.innerGlow, radius: level.innerGlowRadius, x: 0, y: 0)
-                    .shadow(color: palette.outerGlow, radius: level.outerGlowRadius, x: 0, y: 0)
-            }
-        } else {
-            content
-        }
+        content
     }
 }
 
@@ -856,30 +739,12 @@ private struct ThemeSkinLegibilityBackdrop: View {
 
     var body: some View {
         ZStack {
-            if level.usesBlurredBackdrop {
-                shape
-                    .fill(palette.backdropBase)
-                    .padding(-(level.backdropOutset + 3))
-                    .blur(radius: max(6, level.backdropBlurRadius - 1))
-
-                shape
-                    .fill(palette.backdropSoft)
-                    .padding(-level.backdropOutset)
-                    .blur(radius: level.backdropBlurRadius)
-
-                shape
-                    .fill(palette.backdropAccent)
-                    .padding(-(level.backdropOutset + 6))
-                    .blur(radius: level.backdropBlurRadius + 3)
-            }
-
             shape
                 .fill(
                     LinearGradient(
                         colors: [
                             palette.backdropBase,
                             palette.backdropSoft,
-                            palette.innerGlow,
                             palette.backdropAccent
                         ],
                         startPoint: .topLeading,
@@ -892,7 +757,7 @@ private struct ThemeSkinLegibilityBackdrop: View {
                 .stroke(
                     LinearGradient(
                         colors: [
-                            palette.innerGlow,
+                            palette.backdropSoft,
                             palette.backdropStroke
                         ],
                         startPoint: .topLeading,

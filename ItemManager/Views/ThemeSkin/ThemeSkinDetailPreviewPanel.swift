@@ -11,6 +11,7 @@ struct ThemeSkinDetailPreviewPanel: View {
     let onPreviewSlotTap: (ThemeSkinSlot) -> Void
 
     @Environment(ThemeManager.self) private var themeManager
+    @Environment(\.colorScheme) private var colorScheme
 
     private var context: ThemeSkinPreviewContext {
         ThemeSkinPreviewContext(product: product, mode: mode, enabledSlots: enabledSlots)
@@ -128,12 +129,12 @@ struct ThemeSkinDetailPreviewPanel: View {
         HStack(alignment: .top, spacing: 8) {
             Image(systemName: "paintpalette.fill")
                 .font(.caption.weight(.bold))
-                .foregroundStyle(SkyConcertThemeSkin.accent(for: noticeDescriptor))
+                .foregroundStyle(SkyConcertThemeSkin.accent(for: noticeDescriptor, colorScheme: colorScheme))
                 .themeSkinLegibleSymbol(level: .chip, slot: .sectionCard, descriptor: noticeDescriptor)
 
-            Text("启用主题皮肤后，文字与图标光效会跟随当前主题；普通魔法配色与主题皮肤视觉互斥，不叠加。")
+            Text("启用主题皮肤后，文字、图标与背景层级会跟随当前主题；普通魔法配色与主题皮肤视觉互斥，不叠加。")
                 .font(.caption2.weight(.semibold))
-                .foregroundStyle(SkyConcertThemeSkin.labelColor(for: noticeDescriptor).opacity(0.86))
+                .foregroundStyle(SkyConcertThemeSkin.labelColor(for: noticeDescriptor, colorScheme: colorScheme).opacity(0.86))
                 .themeSkinLegibleText(level: .inline, slot: .sectionCard, descriptor: noticeDescriptor)
                 .fixedSize(horizontal: false, vertical: true)
         }
@@ -155,6 +156,7 @@ private struct ThemeSkinPreviewPhoneFrame: View {
     let onPreviewSlotTap: (ThemeSkinSlot) -> Void
 
     @Environment(ThemeManager.self) private var themeManager
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         ZStack {
@@ -206,12 +208,30 @@ private struct ThemeSkinPreviewPhoneFrame: View {
 
     private var appBackground: LinearGradient {
         if let descriptor = context.representativeDescriptor {
+            if colorScheme == .dark {
+                switch descriptor.assetNamespace {
+                case SwanDreamThemeSkin.namespace:
+                    return LinearGradient(colors: [Color(hex: "191523"), Color(hex: "2A2038"), Color(hex: "21182E")], startPoint: .top, endPoint: .bottom)
+                case SkyConcertThemeSkin.namespace:
+                    return LinearGradient(colors: [Color(hex: "111D2A"), Color(hex: "1B3141"), Color(hex: "221A2C")], startPoint: .top, endPoint: .bottom)
+                default:
+                    break
+                }
+            }
+
             return LinearGradient(
                 colors: [
                     SkyConcertThemeSkin.shellFillTop(for: descriptor).opacity(0.98),
                     SkyConcertThemeSkin.shellFillBottom(for: descriptor).opacity(0.82),
                     Color.white.opacity(0.72)
                 ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+        }
+        if colorScheme == .dark {
+            return LinearGradient(
+                colors: [Color(hex: "181722"), Color(hex: "211923")],
                 startPoint: .top,
                 endPoint: .bottom
             )
@@ -370,13 +390,16 @@ private struct ThemeSkinPreviewHotspot<Content: View>: View {
 private struct ThemeSkinPreviewTopBar: View {
     let context: ThemeSkinPreviewContext
     let title: String
+
+    @Environment(\.colorScheme) private var colorScheme
+
     private var descriptor: ThemeSkinDescriptor? { context.descriptor(for: .topBarMain) }
 
     var body: some View {
         HStack(spacing: 8) {
             Text(title)
                 .font(.system(size: 13, weight: .heavy, design: .rounded))
-                .foregroundStyle(SkyConcertThemeSkin.labelColor(for: descriptor))
+                .foregroundStyle(SkyConcertThemeSkin.labelColor(for: descriptor, colorScheme: colorScheme))
                 .themeSkinLegibleText(level: .inline, slot: .topBarMain, descriptor: descriptor)
             Spacer(minLength: 0)
             ThemeSkinPreviewRoundButton(context: context, label: "＋", size: 28, slot: .topBarAddButton)
@@ -391,14 +414,17 @@ private struct ThemeSkinPreviewTopBar: View {
 
 private struct ThemeSkinPreviewSearchBar: View {
     let context: ThemeSkinPreviewContext
+
+    @Environment(\.colorScheme) private var colorScheme
+
     private var descriptor: ThemeSkinDescriptor? { context.descriptor(for: .searchBar) }
 
     var body: some View {
         HStack(spacing: 7) {
-            Circle().fill(SkyConcertThemeSkin.accent(for: descriptor).opacity(0.42)).frame(width: 10, height: 10)
+            Circle().fill(SkyConcertThemeSkin.accent(for: descriptor, colorScheme: colorScheme).opacity(0.42)).frame(width: 10, height: 10)
             Text("搜索衣物 / 主题")
                 .font(.system(size: 11, weight: .semibold, design: .rounded))
-                .foregroundStyle(SkyConcertThemeSkin.labelColor(for: descriptor).opacity(0.72))
+                .foregroundStyle(SkyConcertThemeSkin.labelColor(for: descriptor, colorScheme: colorScheme).opacity(0.72))
                 .themeSkinLegibleText(level: .inline, slot: .searchBar, descriptor: descriptor)
             Spacer(minLength: 0)
         }
@@ -411,6 +437,9 @@ private struct ThemeSkinPreviewSearchBar: View {
 
 private struct ThemeSkinPreviewTabBar: View {
     let context: ThemeSkinPreviewContext
+
+    @Environment(\.colorScheme) private var colorScheme
+
     private var descriptor: ThemeSkinDescriptor? { context.descriptor(for: .tabBarMain) }
 
     var body: some View {
@@ -428,11 +457,11 @@ private struct ThemeSkinPreviewTabBar: View {
     private func tab(_ title: String, selected: Bool) -> some View {
         VStack(spacing: 3) {
             Circle()
-                .fill(selected ? SkyConcertThemeSkin.accent(for: descriptor) : SkyConcertThemeSkin.labelColor(for: descriptor).opacity(0.24))
+                .fill(selected ? SkyConcertThemeSkin.accent(for: descriptor, colorScheme: colorScheme) : SkyConcertThemeSkin.labelColor(for: descriptor, colorScheme: colorScheme).opacity(0.24))
                 .frame(width: 15, height: 15)
             Text(title)
                 .font(.system(size: 9, weight: selected ? .bold : .medium, design: .rounded))
-                .foregroundStyle(selected ? SkyConcertThemeSkin.accent(for: descriptor) : SkyConcertThemeSkin.labelColor(for: descriptor).opacity(0.72))
+                .foregroundStyle(selected ? SkyConcertThemeSkin.accent(for: descriptor, colorScheme: colorScheme) : SkyConcertThemeSkin.labelColor(for: descriptor, colorScheme: colorScheme).opacity(0.72))
                 .themeSkinLegibleText(level: selected ? .chip : .inline, slot: .tabBarMain, descriptor: descriptor)
         }
         .frame(maxWidth: .infinity)
