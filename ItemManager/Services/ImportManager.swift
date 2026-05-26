@@ -144,7 +144,7 @@ class ImportManager {
                     
                     // 基础信息
                     // clothing.name = bItem.name // Set via init
-                    clothing.stock = bItem.num
+                    clothing.stock = FinancialDataSanitizer.stock(bItem.num)
                     
                     // 关联品牌
                     if let brand = brandMap[bItem.brandId] {
@@ -177,7 +177,7 @@ class ImportManager {
                     }
                     
                     // 价格与支付信息
-                    clothing.price = Decimal(bItem.originalPrice)
+                    clothing.price = FinancialDataSanitizer.money(bItem.originalPrice)
                     clothing.isDepositPlan = bItem.isDepositMode
                     
                     if let paymentInfo = bItem.paymentInfo {
@@ -186,14 +186,14 @@ class ImportManager {
                         // 注意：这里 key 可能是中文 "定金", "尾款"
                         
                         if let depositInfo = paymentInfo["定金"] {
-                            clothing.deposit = Decimal(depositInfo.amount)
+                            clothing.deposit = FinancialDataSanitizer.money(depositInfo.amount)
                             if let date = parseDate(depositInfo.paymentDate) {
                                 clothing.depositDate = date
                             }
                         }
                         
                         if let balanceInfo = paymentInfo["尾款"] {
-                            clothing.balance = Decimal(balanceInfo.amount)
+                            clothing.balance = FinancialDataSanitizer.money(balanceInfo.amount)
                             // finalPaymentDate 逻辑比较复杂，这里简单映射
                         }
                     }
