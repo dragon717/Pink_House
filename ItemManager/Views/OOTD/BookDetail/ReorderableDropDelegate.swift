@@ -4,7 +4,7 @@ import UniformTypeIdentifiers
 
 struct ReorderableDropDelegate: DropDelegate {
     let item: Outfit
-    var pages: [Outfit]
+    @Binding var draggingItem: Outfit?
     var onMove: (Outfit, Outfit) -> Void
     
     func dropEntered(info: DropInfo) {
@@ -20,18 +20,14 @@ struct ReorderableDropDelegate: DropDelegate {
     }
     
     func performDrop(info: DropInfo) -> Bool {
-        if let itemProvider = info.itemProviders(for: [.text]).first {
-            itemProvider.loadItem(forTypeIdentifier: "public.text", options: nil) { (data, error) in
-                if let data = data as? Data, let idString = String(data: data, encoding: .utf8), let uuid = UUID(uuidString: idString) {
-                    DispatchQueue.main.async {
-                        if let source = pages.first(where: { $0.id == uuid }) {
-                            onMove(source, item)
-                        }
-                    }
-                }
-            }
-            return true
+        guard let source = draggingItem else {
+            return false
         }
-        return false
+
+        DispatchQueue.main.async {
+            onMove(source, item)
+            draggingItem = nil
+        }
+        return true
     }
 }

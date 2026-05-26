@@ -17,7 +17,7 @@ extension BookDetailView {
 
     @ViewBuilder
     private func batchEditingPageCell(for page: Outfit) -> some View {
-        let isSelected = selectedPages.contains(page.id)
+        let isSelected = selectedPages.contains(page.persistentModelID)
         PageThumbnailView(page: page, gridMode: gridMode)
             .overlay(alignment: .topLeading) {
                 selectionIndicator(isSelected: isSelected)
@@ -29,9 +29,9 @@ extension BookDetailView {
             .onTapGesture {
                 withAnimation(.spring(response: 0.2)) {
                     if isSelected {
-                        selectedPages.remove(page.id)
+                        selectedPages.remove(page.persistentModelID)
                     } else {
-                        selectedPages.insert(page.id)
+                        selectedPages.insert(page.persistentModelID)
                     }
                 }
             }
@@ -48,9 +48,10 @@ extension BookDetailView {
                 dragHandle
             }
             .onDrag {
-                return NSItemProvider(object: page.id.uuidString as NSString)
+                draggingPage = page
+                return NSItemProvider(object: String(describing: page.persistentModelID) as NSString)
             }
-            .onDrop(of: [.text], delegate: ReorderableDropDelegate(item: page, pages: sortedPages, onMove: movePage))
+            .onDrop(of: [.text], delegate: ReorderableDropDelegate(item: page, draggingItem: $draggingPage, onMove: movePage))
     }
 
     private var dragHandle: some View {

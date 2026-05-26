@@ -21,9 +21,12 @@ struct BookDetailView: View {
     @State private var pages: [Outfit] = []
 
     var sortedPages: [Outfit] {
-        pages.filter { $0.book?.id == book.id }.sorted {
+        pages.filter { $0.book?.persistentModelID == book.persistentModelID }.sorted {
             if $0.sortIndex == $1.sortIndex {
-                return $0.createdAt < $1.createdAt
+                if $0.createdAt != $1.createdAt {
+                    return $0.createdAt < $1.createdAt
+                }
+                return String(describing: $0.persistentModelID) < String(describing: $1.persistentModelID)
             }
             return $0.sortIndex < $1.sortIndex
         }
@@ -86,9 +89,10 @@ struct BookDetailView: View {
     
     // 批量编辑相关状态
     @State var isBatchEditing = false
-    @State var selectedPages = Set<UUID>()
+    @State var selectedPages = Set<PersistentIdentifier>()
     @State var showingBatchDeleteConfirmation = false
     @State var showingBatchCopyConfirmation = false
+    @State var draggingPage: Outfit?
 
     @AppStorage("bookDetailGridMode") var gridModeValue = 2
 
@@ -115,7 +119,7 @@ struct BookDetailView: View {
             } else {
                 ScrollView {
                     LazyVGrid(columns: gridColumns, spacing: 16) {
-                        ForEach(sortedPages) { page in
+                        ForEach(sortedPages, id: \.persistentModelID) { page in
                             pageCell(for: page)
                         }
                     }
@@ -214,6 +218,7 @@ struct BookDetailView: View {
                 Button("取消", role: .cancel) {}
                 Button("保存") {
                     book.title = renameBookName
+                    book.lastModified = Date()
                     try? modelContext.save()
                 }
             }
@@ -355,6 +360,7 @@ struct BookDetailView: View {
                             book: book
                         )
                         newPage.sortIndex = startSortIndex + index
+                        newPage.lastModified = Date()
                         
                         // 裁剪图片为 3:4 比例
                         let croppedImage = cropImageToAspectRatio(image, aspectRatio: 0.75)
@@ -365,6 +371,7 @@ struct BookDetailView: View {
                         }
                         
                         modelContext.insert(newPage)
+                        book.lastModified = Date()
                         batchProcessingProgress = index + 1
                     }
                 }
@@ -436,14 +443,16 @@ struct BookDetailView: View {
     private func saveRename() {
         if let page = pageToRename {
             page.note = newPageName
+            page.lastModified = Date()
+            book.lastModified = Date()
             try? modelContext.save()
         }
     }
 
     func movePage(from source: Outfit, to destination: Outfit) {
         var localPages = sortedPages
-        guard let sourceIndex = localPages.firstIndex(where: { $0.id == source.id }),
-              let destIndex = localPages.firstIndex(where: { $0.id == destination.id }) else { return }
+        guard let sourceIndex = localPages.firstIndex(where: { $0.persistentModelID == source.persistentModelID }),
+              let destIndex = localPages.firstIndex(where: { $0.persistentModelID == destination.persistentModelID }) else { return }
 
         if sourceIndex == destIndex { return }
 
@@ -453,7 +462,9 @@ struct BookDetailView: View {
 
             for (index, page) in localPages.enumerated() {
                 page.sortIndex = index
+                page.lastModified = Date()
             }
+            book.lastModified = Date()
         }
 
         do {
@@ -473,6 +484,7 @@ struct BookDetailView: View {
             book: book
         )
         newPage.sortIndex = (sortedPages.last?.sortIndex ?? 0) + 1
+        newPage.lastModified = Date()
 
         if canvasType == OOTDCanvasType.custom, let image = customImage {
             if let path = ImageManager.shared.saveImage(image, context: modelContext) {
@@ -482,6 +494,8 @@ struct BookDetailView: View {
         }
 
         modelContext.insert(newPage)
+        book.lastModified = Date()
+        try? modelContext.save()
         loadPages()
         // 发送通知用于空间手帐引导
         NotificationCenter.default.post(name: .ootdPageCreated, object: nil)
@@ -489,33 +503,41 @@ struct BookDetailView: View {
 
     func insertPage(after page: Outfit) {
         let newPage = Outfit(note: "新书页", book: book)
+        newPage.lastModified = Date()
 
         let localPages = sortedPages
         if let index = localPages.firstIndex(of: page) {
             newPage.sortIndex = page.sortIndex + 1
             for p in localPages where p.sortIndex > page.sortIndex {
                 p.sortIndex += 1
+                p.lastModified = Date()
             }
         } else {
             newPage.sortIndex = (localPages.last?.sortIndex ?? 0) + 1
         }
 
         modelContext.insert(newPage)
+        book.lastModified = Date()
+        try? modelContext.save()
         loadPages()
     }
 
     func insertPage(before page: Outfit) {
         let newPage = Outfit(note: "新书页", book: book)
+        newPage.lastModified = Date()
 
         let localPages = sortedPages
         if let index = localPages.firstIndex(of: page) {
             newPage.sortIndex = page.sortIndex
             for p in localPages where p.sortIndex >= page.sortIndex {
                 p.sortIndex += 1
+                p.lastModified = Date()
             }
         }
 
         modelContext.insert(newPage)
+        book.lastModified = Date()
+        try? modelContext.save()
         loadPages()
     }
 
@@ -527,12 +549,14 @@ struct BookDetailView: View {
             mannequinAssetID: page.mannequinAssetID,
             book: book
         )
+        newPage.lastModified = Date()
 
         let localPages = sortedPages
         if let index = localPages.firstIndex(of: page) {
             newPage.sortIndex = page.sortIndex + 1
             for p in localPages where p.sortIndex > page.sortIndex {
                 p.sortIndex += 1
+                p.lastModified = Date()
             }
         }
 
@@ -553,6 +577,8 @@ struct BookDetailView: View {
            let newPath = ImageManager.shared.saveImage(image, context: modelContext) {
             newPage.snapshotPath = newPath
         }
+        book.lastModified = Date()
+        try? modelContext.save()
         loadPages()
     }
 
@@ -596,6 +622,7 @@ struct BookDetailView: View {
                let path = ImageManager.shared.saveImage(image, context: modelContext) {
                 await MainActor.run {
                     book.coverImage = path
+                    book.lastModified = Date()
                     selectedCoverItem = nil
                     // 保存到数据库并刷新视图
                     try? modelContext.save()
@@ -764,18 +791,19 @@ struct BookDetailView: View {
         if selectedPages.count == sortedPages.count {
             selectedPages.removeAll()
         } else {
-            selectedPages = Set(sortedPages.map { $0.id })
+            selectedPages = Set(sortedPages.map { $0.persistentModelID })
         }
     }
 
     private func confirmBatchDelete() {
         withAnimation {
-            let pagesToDelete = sortedPages.filter { selectedPages.contains($0.id) }
+            let pagesToDelete = sortedPages.filter { selectedPages.contains($0.persistentModelID) }
             for page in pagesToDelete {
                 page.isDeleted = true
                 page.deletedAt = Date()
                 page.lastModified = Date()
             }
+            book.lastModified = Date()
             try? modelContext.save()
             DeleteTracker.shared.recordDeletedOutfits(ids: pagesToDelete.map(\.id))
             loadPages()
@@ -786,7 +814,7 @@ struct BookDetailView: View {
 
     private func confirmBatchCopy() {
         withAnimation {
-            let pagesToCopy = sortedPages.filter { selectedPages.contains($0.id) }
+            let pagesToCopy = sortedPages.filter { selectedPages.contains($0.persistentModelID) }
             var currentMaxSortIndex = sortedPages.last?.sortIndex ?? 0
 
             for page in pagesToCopy {
@@ -799,6 +827,7 @@ struct BookDetailView: View {
                     book: book
                 )
                 newPage.sortIndex = currentMaxSortIndex
+                newPage.lastModified = Date()
                 modelContext.insert(newPage)
 
                 // 复制书页中的物品
@@ -830,6 +859,7 @@ struct BookDetailView: View {
                 }
             }
 
+            book.lastModified = Date()
             try? modelContext.save()
             loadPages()
             selectedPages.removeAll()

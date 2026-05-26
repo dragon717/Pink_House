@@ -78,6 +78,18 @@ struct BookShelfView: View {
     // Custom Sort Editing
     @State var isEditing = false
     @State var editableBooks: [BookGroup] = []
+
+    private var orderedBooks: [BookGroup] {
+        books.sorted {
+            if $0.sortIndex != $1.sortIndex {
+                return $0.sortIndex < $1.sortIndex
+            }
+            if $0.createdAt != $1.createdAt {
+                return $0.createdAt < $1.createdAt
+            }
+            return String(describing: $0.persistentModelID) < String(describing: $1.persistentModelID)
+        }
+    }
     
     var body: some View {
         NavigationStack(path: $navigationPath) {
@@ -90,7 +102,7 @@ struct BookShelfView: View {
                 showingDeleteBookAlert: $showingDeleteBookAlert,
                 selectedBookForCover: $selectedBookForCover,
                 showingCoverPicker: $showingCoverPicker,
-                books: books,
+                books: orderedBooks,
                 namespace: animationNamespace,
                 onBookTap: { book in
                     withAnimation {
@@ -127,7 +139,9 @@ struct BookShelfView: View {
                         title: newBookName.isEmpty ? "新书本" : newBookName,
                         sortIndex: maxSortIndex + 1
                     )
+                    book.lastModified = Date()
                     modelContext.insert(book)
+                    try? modelContext.save()
                     // 发送通知用于空间手帐引导
                     NotificationCenter.default.post(name: .ootdBookCreated, object: nil)
                 }
@@ -341,6 +355,7 @@ struct BookShelfView: View {
                let path = ImageManager.shared.saveImage(image, context: modelContext) {
                 await MainActor.run {
                     book.coverImage = path
+                    book.lastModified = Date()
                     selectedCoverItem = nil
                     selectedBookForCover = nil
                     // 保存到数据库
@@ -351,12 +366,22 @@ struct BookShelfView: View {
     }
     
     private func performMigration(source: String = "onAppear") {
-        _ = OOTDOrphanPageRepairService.repairPlanarOrphans(
+        let identityReport = OOTDIdentityRepairService.repairIfNeeded(
             context: modelContext,
-            activeBooks: books,
+            source: source
+        )
+        let orphanReport = OOTDOrphanPageRepairService.repairPlanarOrphans(
+            context: modelContext,
+            activeBooks: orderedBooks,
             allOutfits: allOutfits,
             source: source
         )
+        if identityReport.didChange || orphanReport.movedToDefaultBook > 0 || orphanReport.createdDefaultBook {
+            _ = OOTDIdentityRepairService.repairIfNeeded(
+                context: modelContext,
+                source: "\(source)-post-orphan"
+            )
+        }
 
         // 打印默认手帐的书页状态
         printDefaultBookPagesStatus()

@@ -174,18 +174,26 @@ struct MainContentView: View {
             
             launchLogger.info("launch_start low_memory=\(NotificationManager.Config.isLowMemoryDevice)")
             CloudSyncManager.shared.checkNetworkPermission()
+            hasMountedPrimaryInterface = true
             
             Task {
-                let duplicateRepairStartedAt = Date()
-                let repairedDuplicateCount = await ClothingDuplicateRepairService.shared.repairIfNeeded(
-                    modelContainer: SharedPersistence.shared.sharedModelContainer,
-                    reason: "launch-start"
-                )
-                let duplicateRepairDurationMs = Int(Date().timeIntervalSince(duplicateRepairStartedAt) * 1000)
-                launchLogger.info("launch_duplicate_repair_finish removed=\(repairedDuplicateCount) duration_ms=\(duplicateRepairDurationMs)")
                 await MainActor.run {
-                    hasMountedPrimaryInterface = true
+                    ClothingDuplicateRepairService.shared.scheduleRepair(
+                        modelContainer: SharedPersistence.shared.sharedModelContainer,
+                        reason: "launch-start",
+                        delayNanoseconds: 1_800_000_000
+                    )
+                    launchLogger.info("launch_duplicate_repair_scheduled")
                 }
+                let ootdIdentityStartedAt = Date()
+                let ootdIdentityReport = await MainActor.run {
+                    OOTDIdentityRepairService.repairIfNeeded(
+                        context: modelContext,
+                        source: "launch-start"
+                    )
+                }
+                let ootdIdentityDurationMs = Int(Date().timeIntervalSince(ootdIdentityStartedAt) * 1000)
+                launchLogger.info("launch_ootd_identity_repair_finish changed=\(ootdIdentityReport.didChange) duration_ms=\(ootdIdentityDurationMs)")
 
                 await SharedPersistence.shared.syncWidgetData(reason: "launch-start")
                 await runStartupInitialization()

@@ -85,7 +85,7 @@ struct BookShelfContentView: View {
                             self.selectedBook = nil
                         }
                     )
-                        .id(selectedBook.id)
+                        .id(selectedBook.persistentModelID)
                         .transition(.opacity)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                         .navigationBarBackButtonHidden(true) // 隐藏系统返回按钮，使用自定义返回按钮
@@ -114,6 +114,7 @@ struct BookShelfContentView: View {
                 // Save sort order
                 for (index, book) in editableBooks.enumerated() {
                     book.sortIndex = index
+                    book.lastModified = Date()
                 }
                 try? modelContext.save()
             }
@@ -131,7 +132,7 @@ struct BookShelfContentView: View {
             if isEditing {
                 // Editing Mode: Draggable Grid
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 160), spacing: 24)], spacing: 32) {
-                    ForEach(editableBooks) { book in
+                    ForEach(editableBooks, id: \.persistentModelID) { book in
                         editingBookCell(for: book)
                     }
                 }
@@ -164,6 +165,7 @@ struct BookShelfContentView: View {
             Button("保存") {
                 if let book = bookToRename {
                     book.title = renameBookName
+                    book.lastModified = Date()
                     try? modelContext.save()
                 }
                 bookToRename = nil
@@ -185,7 +187,7 @@ struct BookShelfContentView: View {
             }
             .onDrag {
                 self.draggingItem = book
-                return NSItemProvider(object: book.id.uuidString as NSString)
+                return NSItemProvider(object: String(describing: book.persistentModelID) as NSString)
             }
             .onDrop(of: [.text], delegate: BookReorderableDropDelegate(item: book, books: $editableBooks, draggingItem: $draggingItem))
     }
@@ -204,28 +206,18 @@ struct BookReorderableDropDelegate: DropDelegate {
     
     func performDrop(info: DropInfo) -> Bool {
         guard let draggingItem = draggingItem else { return false }
-        
-        if let itemProvider = info.itemProviders(for: [.text]).first {
-            itemProvider.loadItem(forTypeIdentifier: "public.text", options: nil) { (data, error) in
-                if let data = data as? Data,
-                   let idString = String(data: data, encoding: .utf8),
-                   let uuid = UUID(uuidString: idString) {
-                    DispatchQueue.main.async {
-                        if let sourceIndex = books.firstIndex(where: { $0.id == uuid }),
-                           let destinationIndex = books.firstIndex(where: { $0.id == item.id }) {
-                            if sourceIndex != destinationIndex {
-                                withAnimation {
-                                    let item = books.remove(at: sourceIndex)
-                                    books.insert(item, at: destinationIndex)
-                                }
-                            }
-                        }
+
+        DispatchQueue.main.async {
+            if let sourceIndex = books.firstIndex(where: { $0.persistentModelID == draggingItem.persistentModelID }),
+               let destinationIndex = books.firstIndex(where: { $0.persistentModelID == item.persistentModelID }) {
+                if sourceIndex != destinationIndex {
+                    withAnimation {
+                        let item = books.remove(at: sourceIndex)
+                        books.insert(item, at: destinationIndex)
                     }
                 }
             }
-            return true
         }
-        return false
+        return true
     }
 }
-

@@ -5,14 +5,19 @@ struct MovePageSheet: View {
     let page: Outfit
     let currentBook: BookGroup
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.modelContext) private var modelContext
     @Query(filter: #Predicate<BookGroup> { $0.deletedAt == nil }) private var books: [BookGroup]
     
     var body: some View {
         NavigationStack {
-            List(books) { targetBook in
-                if targetBook.id != currentBook.id {
+            List(books, id: \.persistentModelID) { targetBook in
+                if targetBook.persistentModelID != currentBook.persistentModelID {
                     Button {
                         page.book = targetBook
+                        page.lastModified = Date()
+                        currentBook.lastModified = Date()
+                        targetBook.lastModified = Date()
+                        try? modelContext.save()
                         dismiss()
                     } label: {
                         HStack {

@@ -15,7 +15,7 @@ struct BookSidebarView: View {
     var body: some View {
         ScrollView(.vertical, showsIndicators: false) {
             VStack(spacing: 16) {
-                ForEach(books) { book in
+                ForEach(books, id: \.persistentModelID) { book in
                     if isEditing {
                         // Editing Mode: Draggable
                         editingBookCell(for: book)
@@ -42,7 +42,7 @@ struct BookSidebarView: View {
     
     @ViewBuilder
     private func normalBookCell(for book: BookGroup) -> some View {
-        ThreeDBookView(book: book, isSelected: selectedBook?.id == book.id)
+        ThreeDBookView(book: book, isSelected: selectedBook?.persistentModelID == book.persistentModelID)
             .frame(width: 60, height: 80) // Small thumbnail
             .scaleEffect(0.4) // Visual scaling
             .frame(width: 60, height: 80) // Clip frame
@@ -51,7 +51,7 @@ struct BookSidebarView: View {
                     onSelect(book)
                 }
             }
-            .opacity(book.id == selectedBook?.id ? 1.0 : 0.6)
+            .opacity(book.persistentModelID == selectedBook?.persistentModelID ? 1.0 : 0.6)
     }
     
     @ViewBuilder
@@ -71,7 +71,7 @@ struct BookSidebarView: View {
             }
             .onDrag {
                 self.draggingItem = book
-                return NSItemProvider(object: book.id.uuidString as NSString)
+                return NSItemProvider(object: String(describing: book.persistentModelID) as NSString)
             }
             .onDrop(of: [.text], delegate: BookSidebarReorderableDropDelegate(item: book, books: books, draggingItem: $draggingItem))
     }
@@ -90,47 +90,40 @@ struct BookSidebarReorderableDropDelegate: DropDelegate {
     
     func performDrop(info: DropInfo) -> Bool {
         guard let draggingItem = draggingItem else { return false }
-        
-        if let itemProvider = info.itemProviders(for: [.text]).first {
-            itemProvider.loadItem(forTypeIdentifier: "public.text", options: nil) { (data, error) in
-                if let data = data as? Data,
-                   let idString = String(data: data, encoding: .utf8),
-                   let uuid = UUID(uuidString: idString) {
-                    DispatchQueue.main.async {
-                        if let sourceIndex = books.firstIndex(where: { $0.id == uuid }),
-                           let destinationIndex = books.firstIndex(where: { $0.id == item.id }) {
-                            if sourceIndex != destinationIndex {
-                                // Update sort indices
-                                let minIndex = min(sourceIndex, destinationIndex)
-                                let maxIndex = max(sourceIndex, destinationIndex)
-                                
-                                if sourceIndex < destinationIndex {
-                                    // Moving down
-                                    for i in minIndex...maxIndex {
-                                        if i == sourceIndex {
-                                            books[i].sortIndex = destinationIndex
-                                        } else {
-                                            books[i].sortIndex -= 1
-                                        }
-                                    }
-                                } else {
-                                    // Moving up
-                                    for i in minIndex...maxIndex {
-                                        if i == sourceIndex {
-                                            books[i].sortIndex = destinationIndex
-                                        } else {
-                                            books[i].sortIndex += 1
-                                        }
-                                    }
-                                }
+
+        DispatchQueue.main.async {
+            if let sourceIndex = books.firstIndex(where: { $0.persistentModelID == draggingItem.persistentModelID }),
+               let destinationIndex = books.firstIndex(where: { $0.persistentModelID == item.persistentModelID }) {
+                if sourceIndex != destinationIndex {
+                    // Update sort indices
+                    let minIndex = min(sourceIndex, destinationIndex)
+                    let maxIndex = max(sourceIndex, destinationIndex)
+
+                    if sourceIndex < destinationIndex {
+                        // Moving down
+                        for i in minIndex...maxIndex {
+                            if i == sourceIndex {
+                                books[i].sortIndex = destinationIndex
+                            } else {
+                                books[i].sortIndex -= 1
                             }
+                            books[i].lastModified = Date()
+                        }
+                    } else {
+                        // Moving up
+                        for i in minIndex...maxIndex {
+                            if i == sourceIndex {
+                                books[i].sortIndex = destinationIndex
+                            } else {
+                                books[i].sortIndex += 1
+                            }
+                            books[i].lastModified = Date()
                         }
                     }
                 }
             }
-            return true
         }
-        return false
+        return true
     }
 }
 
@@ -153,7 +146,7 @@ struct BookGridView: View {
     var body: some View {
         ScrollView {
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 160), spacing: 24)], spacing: 32) {
-                ForEach(books) { book in
+                ForEach(books, id: \.persistentModelID) { book in
                     Button {
                         if let onBookTap = onBookTap {
                             onBookTap(book)
@@ -163,7 +156,7 @@ struct BookGridView: View {
                             }
                         }
                     } label: {
-                        if book.id == openingBook?.id {
+                        if book.persistentModelID == openingBook?.persistentModelID {
                             // 占位符，保持布局但不显示内容，移除 matchedGeometryEffect
                             Color.clear
                                 .frame(width: 160, height: 220)
@@ -202,11 +195,11 @@ struct BookGridView: View {
     /// 根据手帐返回对应的高亮目标键
     private func guideTargetKey(for book: BookGroup) -> GuideTargetKey? {
         // 第一个非默认手帐（用于 Step 3 引导）
-        if book.id == firstNonDefaultBook?.id {
+        if book.persistentModelID == firstNonDefaultBook?.persistentModelID {
             return .ootdFirstNonDefaultBookCard
         }
         // 第一个手帐（用于其他场景）
-        if book.id == books.first?.id {
+        if book.persistentModelID == books.first?.persistentModelID {
             return .ootdFirstBookCard
         }
         return nil
@@ -241,7 +234,7 @@ struct ThreeDBookView: View {
         }
         .padding(.trailing, 10) // Reserve space for 3D thickness
         .if(namespace != nil) { view in
-            view.matchedGeometryEffect(id: "book_\(book.id)", in: namespace!)
+            view.matchedGeometryEffect(id: "book_\(String(describing: book.persistentModelID))", in: namespace!)
         }
     }
 }

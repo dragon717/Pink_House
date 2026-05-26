@@ -59,7 +59,7 @@ class SharedContainer {
             ClothingDuplicateRepairService.shared.scheduleRepair(
                 modelContainer: self.container,
                 reason: "container-startup",
-                delayNanoseconds: 300_000_000
+                delayNanoseconds: 1_500_000_000
             )
             
             // 延迟5秒首次应用删除，确保 iCloud 同步完成
@@ -227,9 +227,14 @@ class SharedContainer {
     private func replayDeletesAfterCloudSync(reason: String) {
         Task {
             DeleteTracker.shared.applyAllDeletes(context: container.mainContext, clearRecords: false)
-            await ClothingDuplicateRepairService.shared.repairIfNeeded(
+            ClothingDuplicateRepairService.shared.scheduleRepair(
                 modelContainer: container,
-                reason: reason
+                reason: reason,
+                delayNanoseconds: 700_000_000
+            )
+            OOTDIdentityRepairService.repairIfNeeded(
+                context: container.mainContext,
+                source: reason
             )
             await syncWidgetData(reason: reason)
         }

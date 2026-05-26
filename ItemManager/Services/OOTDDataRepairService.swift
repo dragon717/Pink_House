@@ -168,6 +168,265 @@ enum OOTDOrphanPageRepairService {
     }
 }
 
+struct OOTDIdentityRepairReport {
+    var source: String
+    var scannedBooks = 0
+    var scannedPages = 0
+    var scannedPageItems = 0
+    var scannedCutouts = 0
+    var rekeyedBooks = 0
+    var rekeyedPages = 0
+    var rekeyedPageItems = 0
+    var rekeyedCutouts = 0
+    var normalizedBookSort = 0
+    var normalizedPageSort = 0
+    var saved = false
+    var error: String?
+
+    var didChange: Bool {
+        rekeyedBooks > 0 ||
+        rekeyedPages > 0 ||
+        rekeyedPageItems > 0 ||
+        rekeyedCutouts > 0 ||
+        normalizedBookSort > 0 ||
+        normalizedPageSort > 0
+    }
+
+    var summary: String {
+        var parts = [
+            "source=\(source)",
+            "books=\(scannedBooks)",
+            "pages=\(scannedPages)",
+            "items=\(scannedPageItems)",
+            "cutouts=\(scannedCutouts)",
+            "rekeyedBooks=\(rekeyedBooks)",
+            "rekeyedPages=\(rekeyedPages)",
+            "rekeyedItems=\(rekeyedPageItems)",
+            "rekeyedCutouts=\(rekeyedCutouts)",
+            "bookSort=\(normalizedBookSort)",
+            "pageSort=\(normalizedPageSort)"
+        ]
+        if saved {
+            parts.append("saved=true")
+        }
+        if let error {
+            parts.append("error=\(error)")
+        }
+        return parts.joined(separator: ", ")
+    }
+}
+
+@MainActor
+enum OOTDIdentityRepairService {
+    @discardableResult
+    static func repairIfNeeded(context: ModelContext, source: String) -> OOTDIdentityRepairReport {
+        var report = OOTDIdentityRepairReport(source: source)
+
+        do {
+            let books = try context.fetch(FetchDescriptor<BookGroup>())
+            let pages = try context.fetch(FetchDescriptor<Outfit>())
+            let pageItems = try context.fetch(FetchDescriptor<OutfitItem>())
+            let cutouts = try context.fetch(FetchDescriptor<CutoutItem>())
+            let now = Date()
+
+            report.scannedBooks = books.count
+            report.scannedPages = pages.count
+            report.scannedPageItems = pageItems.count
+            report.scannedCutouts = cutouts.count
+
+            repairDuplicateBookIDs(books, now: now, report: &report)
+            repairDuplicatePageIDs(pages, now: now, report: &report)
+            repairDuplicatePageItemIDs(pageItems, report: &report)
+            repairDuplicateCutoutIDs(cutouts, now: now, report: &report)
+            normalizeBookSort(books, now: now, report: &report)
+            normalizePageSort(pages, now: now, report: &report)
+
+            if report.didChange {
+                context.processPendingChanges()
+                try context.save()
+                report.saved = true
+            }
+        } catch {
+            report.error = error.localizedDescription
+            print("[OOTDIdentityRepair] Failed: \(error)")
+        }
+
+        print("[OOTDIdentityRepair] \(report.summary)")
+        return report
+    }
+
+    private static func repairDuplicateBookIDs(_ books: [BookGroup], now: Date, report: inout OOTDIdentityRepairReport) {
+        var usedIDs = Set(books.map(\.id))
+        let groups = Dictionary(grouping: books, by: \.id)
+        for duplicates in groups.values where duplicates.count > 1 {
+            let ordered = duplicates.sorted(by: preferredBook)
+            for book in ordered.dropFirst() {
+                book.id = makeUniqueID(usedIDs: &usedIDs)
+                book.lastModified = now
+                report.rekeyedBooks += 1
+            }
+        }
+    }
+
+    private static func repairDuplicatePageIDs(_ pages: [Outfit], now: Date, report: inout OOTDIdentityRepairReport) {
+        var usedIDs = Set(pages.map(\.id))
+        let groups = Dictionary(grouping: pages, by: \.id)
+        for duplicates in groups.values where duplicates.count > 1 {
+            let ordered = duplicates.sorted(by: preferredPage)
+            for page in ordered.dropFirst() {
+                page.id = makeUniqueID(usedIDs: &usedIDs)
+                page.lastModified = now
+                report.rekeyedPages += 1
+            }
+        }
+    }
+
+    private static func repairDuplicatePageItemIDs(_ pageItems: [OutfitItem], report: inout OOTDIdentityRepairReport) {
+        var usedIDs = Set(pageItems.map(\.id))
+        let groups = Dictionary(grouping: pageItems, by: \.id)
+        for duplicates in groups.values where duplicates.count > 1 {
+            let ordered = duplicates.sorted(by: preferredPageItem)
+            for item in ordered.dropFirst() {
+                item.id = makeUniqueID(usedIDs: &usedIDs)
+                report.rekeyedPageItems += 1
+            }
+        }
+    }
+
+    private static func repairDuplicateCutoutIDs(_ cutouts: [CutoutItem], now: Date, report: inout OOTDIdentityRepairReport) {
+        var usedIDs = Set(cutouts.map(\.id))
+        let groups = Dictionary(grouping: cutouts, by: \.id)
+        for duplicates in groups.values where duplicates.count > 1 {
+            let ordered = duplicates.sorted(by: preferredCutout)
+            for cutout in ordered.dropFirst() {
+                cutout.id = makeUniqueID(usedIDs: &usedIDs)
+                cutout.lastModified = now
+                report.rekeyedCutouts += 1
+            }
+        }
+    }
+
+    private static func normalizeBookSort(_ books: [BookGroup], now: Date, report: inout OOTDIdentityRepairReport) {
+        let activeBooks = books
+            .filter { isActiveBook($0) }
+            .sorted(by: stableBookOrder)
+
+        for (index, book) in activeBooks.enumerated() where book.sortIndex != index {
+            book.sortIndex = index
+            book.lastModified = now
+            report.normalizedBookSort += 1
+        }
+    }
+
+    private static func normalizePageSort(_ pages: [Outfit], now: Date, report: inout OOTDIdentityRepairReport) {
+        let activePages = pages.filter { isActivePage($0) && $0.book != nil }
+        let pagesByBook = Dictionary(grouping: activePages) { page in
+            persistentKey(page.book)
+        }
+
+        for pagesInBook in pagesByBook.values {
+            let orderedPages = pagesInBook.sorted(by: stablePageOrder)
+            for (index, page) in orderedPages.enumerated() where page.sortIndex != index {
+                page.sortIndex = index
+                page.lastModified = now
+                page.book?.lastModified = now
+                report.normalizedPageSort += 1
+            }
+        }
+    }
+
+    private static func makeUniqueID(usedIDs: inout Set<UUID>) -> UUID {
+        var newID = UUID()
+        while usedIDs.contains(newID) {
+            newID = UUID()
+        }
+        usedIDs.insert(newID)
+        return newID
+    }
+
+    private static func isActiveBook(_ book: BookGroup) -> Bool {
+        !book.isDeleted && book.deletedAt == nil
+    }
+
+    private static func isActivePage(_ page: Outfit) -> Bool {
+        !page.isDeleted && page.deletedAt == nil
+    }
+
+    private static func preferredBook(_ lhs: BookGroup, _ rhs: BookGroup) -> Bool {
+        if isActiveBook(lhs) != isActiveBook(rhs) {
+            return isActiveBook(lhs)
+        }
+        if lhs.lastModified != rhs.lastModified {
+            return lhs.lastModified > rhs.lastModified
+        }
+        if lhs.createdAt != rhs.createdAt {
+            return lhs.createdAt < rhs.createdAt
+        }
+        return persistentKey(lhs) < persistentKey(rhs)
+    }
+
+    private static func preferredPage(_ lhs: Outfit, _ rhs: Outfit) -> Bool {
+        if isActivePage(lhs) != isActivePage(rhs) {
+            return isActivePage(lhs)
+        }
+        if (lhs.book != nil) != (rhs.book != nil) {
+            return lhs.book != nil
+        }
+        if lhs.lastModified != rhs.lastModified {
+            return lhs.lastModified > rhs.lastModified
+        }
+        if lhs.createdAt != rhs.createdAt {
+            return lhs.createdAt < rhs.createdAt
+        }
+        return persistentKey(lhs) < persistentKey(rhs)
+    }
+
+    private static func preferredPageItem(_ lhs: OutfitItem, _ rhs: OutfitItem) -> Bool {
+        if (lhs.outfit != nil) != (rhs.outfit != nil) {
+            return lhs.outfit != nil
+        }
+        if lhs.zIndex != rhs.zIndex {
+            return lhs.zIndex < rhs.zIndex
+        }
+        return persistentKey(lhs) < persistentKey(rhs)
+    }
+
+    private static func preferredCutout(_ lhs: CutoutItem, _ rhs: CutoutItem) -> Bool {
+        if lhs.lastModified != rhs.lastModified {
+            return lhs.lastModified > rhs.lastModified
+        }
+        if lhs.timestamp != rhs.timestamp {
+            return lhs.timestamp < rhs.timestamp
+        }
+        return persistentKey(lhs) < persistentKey(rhs)
+    }
+
+    private static func stableBookOrder(_ lhs: BookGroup, _ rhs: BookGroup) -> Bool {
+        if lhs.sortIndex != rhs.sortIndex {
+            return lhs.sortIndex < rhs.sortIndex
+        }
+        if lhs.createdAt != rhs.createdAt {
+            return lhs.createdAt < rhs.createdAt
+        }
+        return persistentKey(lhs) < persistentKey(rhs)
+    }
+
+    private static func stablePageOrder(_ lhs: Outfit, _ rhs: Outfit) -> Bool {
+        if lhs.sortIndex != rhs.sortIndex {
+            return lhs.sortIndex < rhs.sortIndex
+        }
+        if lhs.createdAt != rhs.createdAt {
+            return lhs.createdAt < rhs.createdAt
+        }
+        return persistentKey(lhs) < persistentKey(rhs)
+    }
+
+    private static func persistentKey(_ model: (any PersistentModel)?) -> String {
+        guard let model else { return "" }
+        return String(describing: model.persistentModelID)
+    }
+}
+
 @MainActor
 final class OOTDDataRepairService {
     static let shared = OOTDDataRepairService()
