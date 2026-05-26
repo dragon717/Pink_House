@@ -210,11 +210,11 @@ struct DepositNotificationView: View {
 
     private var reminderRuleSummary: String {
         guard isEnabled else {
-            return "开启后按尾款日提醒"
+            return "开启后按尾款日提醒".appLocalized
         }
 
         let daysText = selectedDays.sorted().map(dayText(for:)).joined(separator: "、")
-        return "\(daysText) · 每天 \(formatTime(notificationTime)) 提醒"
+        return "%@ · 每天 %@ 提醒".appLocalized(daysText, formatTime(notificationTime))
     }
 
     // MARK: - 折叠时显示的设置摘要
@@ -294,7 +294,7 @@ struct DepositNotificationView: View {
                 .buttonStyle(.plain)
                 .disabled(testTargetClothing == nil)
 
-                Text(testTargetClothing.map { "将使用「\($0.name)」作为测试目标。正式通知发送时间可直接用上方时间选择器修改。" } ?? "请先创建至少一条心愿尾款记录，再发送测试通知。")
+                Text(testTargetDescription)
                     .font(.system(size: 11))
                     .foregroundStyle(palette.secondaryText)
                     .themeSkinLegibleText(level: .inline, slot: .sectionCard)
@@ -385,7 +385,7 @@ struct DepositNotificationView: View {
         VStack(alignment: .leading, spacing: 10) {
             sectionHeader(
                 title: "已发送提醒",
-                summary: unreadCount > 0 ? "\(unreadCount) 未读 / \(triggeredRecords.count) 条" : "\(triggeredRecords.count) 条",
+                summary: historySummaryText,
                 isExpanded: isHistoryExpanded
             ) {
                 withAnimation(.spring(response: 0.28, dampingFraction: 0.82)) {
@@ -424,7 +424,7 @@ struct DepositNotificationView: View {
     private var pendingHeaderRow: some View {
         sectionHeader(
             title: "待提醒",
-            summary: "\(pendingRecords.count) 条",
+            summary: "%d 条".appLocalized(pendingRecords.count),
             isExpanded: isPendingExpanded
         ) {
             withAnimation(.spring(response: 0.28, dampingFraction: 0.82)) {
@@ -494,14 +494,25 @@ struct DepositNotificationView: View {
 
     private func dayText(for day: Int) -> String {
         switch day {
-        case 0: return "当天"
-        case 1: return "提前1天"
-        case 3: return "3天"
-        case 7: return "7天"
-        case 15: return "15天"
-        case 30: return "30天"
-        default: return "提前\(day)天"
+        case 0: return "当天".appLocalized
+        case 1: return "提前1天".appLocalized
+        case 3, 7, 15, 30: return "%d天".appLocalized(day)
+        default: return "提前%d天".appLocalized(day)
         }
+    }
+
+    private var historySummaryText: String {
+        if unreadCount > 0 {
+            return "%d 未读 / %d 条".appLocalized(unreadCount, triggeredRecords.count)
+        }
+        return "%d 条".appLocalized(triggeredRecords.count)
+    }
+
+    private var testTargetDescription: String {
+        if let clothing = testTargetClothing {
+            return "将使用「%@」作为测试目标。正式通知发送时间可直接用上方时间选择器修改。".appLocalized(clothing.name)
+        }
+        return "请先创建至少一条心愿尾款记录，再发送测试通知。".appLocalized
     }
 
     private func formatTime(_ date: Date) -> String {
@@ -526,7 +537,7 @@ struct DepositNotificationView: View {
         Button(action: action) {
             HStack(spacing: 8) {
                 Image(systemName: systemImage)
-                Text(title)
+                Text(title.appLocalized)
             }
             .font(.system(size: 14, weight: .semibold))
             .foregroundStyle(foreground)
@@ -553,7 +564,7 @@ struct DepositNotificationView: View {
                     .font(.system(size: 12, weight: .bold))
                     .foregroundStyle(palette.secondaryText)
 
-                Text(title)
+                Text(title.appLocalized)
                     .font(.headline)
                     .foregroundStyle(.primary)
                     .themeSkinLegibleText(level: .inline, slot: .sectionCard)
@@ -610,7 +621,7 @@ struct DepositNotificationView: View {
 
     private func sendTestNotification() {
         guard let clothing = testTargetClothing else {
-            testAlertMessage = "请先创建一条用于测试的心愿尾款记录。建议新建一条“通知测试裙”，避免影响正式数据。"
+            testAlertMessage = "请先创建一条用于测试的心愿尾款记录。建议新建一条“通知测试裙”，避免影响正式数据。".appLocalized
             return
         }
 
@@ -636,11 +647,11 @@ struct DepositNotificationView: View {
                 try await NotificationManager.shared.scheduleTestNotification(for: clothing)
                 await refreshDebugSnapshot()
                 await MainActor.run {
-                    testAlertMessage = "已为「\(clothing.name)」安排 5 秒测试通知。请切到桌面或锁屏等待弹出，然后点击通知验证是否直达详情页。"
+                    testAlertMessage = "已为「%@」安排 5 秒测试通知。请切到桌面或锁屏等待弹出，然后点击通知验证是否直达详情页。".appLocalized(clothing.name)
                 }
             } catch {
                 await MainActor.run {
-                    testAlertMessage = "测试通知发送失败：\(error.localizedDescription)"
+                    testAlertMessage = "测试通知发送失败：%@".appLocalized(error.localizedDescription)
                 }
             }
         }
@@ -653,12 +664,12 @@ struct DepositNotificationView: View {
 
     private func authorizationText(_ status: UNAuthorizationStatus) -> String {
         switch status {
-        case .notDetermined: return "未决定"
-        case .denied: return "已拒绝"
-        case .authorized: return "已允许"
-        case .provisional: return "临时允许"
-        case .ephemeral: return "临时会话"
-        @unknown default: return "未知"
+        case .notDetermined: return "未决定".appLocalized
+        case .denied: return "已拒绝".appLocalized
+        case .authorized: return "已允许".appLocalized
+        case .provisional: return "临时允许".appLocalized
+        case .ephemeral: return "临时会话".appLocalized
+        @unknown default: return "未知".appLocalized
         }
     }
 }
@@ -871,26 +882,21 @@ struct PendingNotificationRecordRow: View {
 private enum DepositReminderDisplayFormatter {
     static func clothingName(for record: DepositNotificationRecord, clothing: Clothing?) -> String {
         let name = clothing?.name ?? record.clothingName
-        return name.isEmpty ? "这件心愿尾款" : name
+        return name.isEmpty ? "这件心愿尾款".appLocalized : name
     }
 
     static func pendingTimeText(for record: DepositNotificationRecord) -> String {
-        "\(dateTimeText(record.scheduledDate)) · \(dayText(for: record.daysBefore))"
+        "%@ · %@".appLocalized(dateTimeText(record.scheduledDate), dayText(for: record.daysBefore))
     }
 
     static func triggeredTimeText(for record: DepositNotificationRecord) -> String {
-        "\(dateTimeText(record.actualDate ?? record.scheduledDate)) · \(dayText(for: record.daysBefore))"
+        "%@ · %@".appLocalized(dateTimeText(record.actualDate ?? record.scheduledDate), dayText(for: record.daysBefore))
     }
 
     static func dayText(for day: Int) -> String {
         switch day {
-        case 0: return "当天提醒"
-        case 1: return "提前 1 天"
-        case 3: return "提前 3 天"
-        case 7: return "提前 7 天"
-        case 15: return "提前 15 天"
-        case 30: return "提前 30 天"
-        default: return "提前 \(day) 天"
+        case 0: return "当天提醒".appLocalized
+        default: return "提前 %d 天".appLocalized(day)
         }
     }
 
