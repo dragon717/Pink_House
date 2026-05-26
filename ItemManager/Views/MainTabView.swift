@@ -465,7 +465,7 @@ struct LegacyTabView: View {
         if feature.id == .house && shouldUseDynamicHouseLabel {
             return smallWorldTabTitle
         }
-        return feature.title
+        return feature.localizedTitle
     }
 
     private func tabIcon(for feature: AppFeatureDescriptor) -> String {

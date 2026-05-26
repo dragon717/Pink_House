@@ -254,7 +254,7 @@ struct DepositStatsView: View {
     private func statItem(title: String, value: String, valueColor: Color = .primary, showIcon: Bool = false) -> some View {
         VStack(spacing: 8) {
             HStack(spacing: 4) {
-                Text(title)
+                Text(title.appLocalized)
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .themeSkinLegibleText(level: .inline, slot: .statsCard)
@@ -379,7 +379,7 @@ struct DepositStatItem: View {
     
     var body: some View {
         VStack(spacing: 6) {
-            Text(title)
+            Text(title.appLocalized)
                 .font(.caption)
                 .foregroundStyle(titleColor)
                 .themeSkinLegibleText(level: .inline, slot: .statsCard)

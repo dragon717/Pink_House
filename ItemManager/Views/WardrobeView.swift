@@ -2503,7 +2503,7 @@ struct WardrobeStatsView: View {
         VStack(spacing: 4) {
             // 标题行：使用固定高度确保对齐
             HStack(spacing: 4) {
-                Text(title)
+                Text(title.appLocalized)
                     .font(.caption)
                     .foregroundStyle(palette.secondary)
                     .themeSkinLegibleText(level: .inline, slot: .statsCard)
@@ -3267,7 +3267,7 @@ struct MergeAccessoryFilterSheet: View {
                         .foregroundStyle(selectedCount > 0 ? magicPalette.accent : magicPalette.secondaryText)
                         .frame(width: 28)
 
-                    Text(title)
+                    Text(title.appLocalized)
                         .font(.body)
                         .foregroundStyle(magicPalette.primaryText)
                         .themeSkinLegibleText(level: .inline, slot: .filterSheet)

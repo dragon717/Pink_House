@@ -46,6 +46,14 @@ struct AppFeatureDescriptor: Identifiable {
         guard let unlockFeature else { return true }
         return FeatureUnlockManager.shared.isUnlocked(unlockFeature)
     }
+
+    var localizedTitle: String {
+        title.appLocalized
+    }
+
+    var localizedSubtitle: String {
+        subtitle.appLocalized
+    }
 }
 
 enum AppFeatureRegistry {
@@ -272,7 +280,7 @@ final class BottomDockSettingsManager: ObservableObject {
     }
 
     func slotTitle(for slotIndex: Int) -> String {
-        "位置 \(slotIndex + 1)"
+        "位置 %d".appLocalized(slotIndex + 1)
     }
 
     func setSelectedFeature(_ featureID: AppFeatureID) {

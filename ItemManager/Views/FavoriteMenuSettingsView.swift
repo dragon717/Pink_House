@@ -25,15 +25,15 @@ struct FavoriteMenuSettingsView: View {
                             .listRowBackground(settingsRowBackground)
                         }
                     } header: {
-                        Text("底部导航")
+                        Text("底部导航".appLocalized)
                             .foregroundColor(themeManager.secondaryTextColor)
                     } footer: {
-                        Text("四个位置都可以调整；选择已在其他位置使用的入口时，会自动互换。系统会保留「House」和「我」入口，避免房间和设置页失联。")
+                        Text("四个位置都可以调整；选择已在其他位置使用的入口时，会自动互换。系统会保留「House」和「我」入口，避免房间和设置页失联。".appLocalized)
                             .foregroundColor(themeManager.secondaryTextColor)
                     }
                 }
                 .scrollContentBackground(.hidden)
-                .navigationTitle("底部导航设置")
+                .navigationTitle("底部导航设置".appLocalized)
                 .navigationBarTitleDisplayMode(.inline)
             }
         }
@@ -73,11 +73,11 @@ private struct BottomDockSlotPickerRow: View {
                 .clipShape(RoundedRectangle(cornerRadius: 8))
 
             VStack(alignment: .leading, spacing: 3) {
-                Text(selectedFeature.title)
+                Text(selectedFeature.localizedTitle)
                     .font(.body)
                     .foregroundColor(themeManager.primaryTextColor)
 
-                Text(selectedFeature.subtitle)
+                Text(selectedFeature.localizedSubtitle)
                     .font(.caption)
                     .foregroundColor(themeManager.secondaryTextColor)
                     .lineLimit(1)
@@ -90,7 +90,7 @@ private struct BottomDockSlotPickerRow: View {
                     Button {
                         onSelect(feature.id)
                     } label: {
-                        Label(feature.title, systemImage: feature.systemImage)
+                        Label(feature.localizedTitle, systemImage: feature.systemImage)
                     }
                 }
             } label: {

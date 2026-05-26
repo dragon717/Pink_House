@@ -192,7 +192,7 @@ struct StatBox: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(title)
+            Text(title.appLocalized)
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .themeSkinLegibleText(level: .inline, slot: .statsCard)
@@ -203,7 +203,7 @@ struct StatBox: View {
                     .foregroundStyle(color)
                     .themeSkinLegibleText(level: .chip, slot: .statsCard)
                 if !unit.isEmpty {
-                    Text(unit)
+                    Text(unit.appLocalized)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .themeSkinLegibleText(level: .inline, slot: .statsCard)

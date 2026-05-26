@@ -36,17 +36,18 @@ struct BookHouseSmallWorldView: View {
             .presentationDetents([.height(260)])
             .presentationDragIndicator(.visible)
         }
-        .alert("功能未解锁", isPresented: $showUnlockAlert) {
-            Button("知道了", role: .cancel) { }
-            Button("去解锁") {
+        .alert("功能未解锁".appLocalized, isPresented: $showUnlockAlert) {
+            Button("知道了".appLocalized, role: .cancel) { }
+            Button("去解锁".appLocalized) {
                 NotificationCenter.default.post(name: .navigateToMagicTasks, object: nil)
             }
         } message: {
             if let unlockFeature = lockedFeature?.unlockFeature {
                 let condition = featureManager.getCondition(for: unlockFeature)
-                Text("\(lockedFeature?.title ?? "该功能") 尚未解锁\n\(condition.description)")
+                let title = lockedFeature?.localizedTitle ?? "该功能".appLocalized
+                Text("「%@」尚未解锁\n%@".appLocalized(title, condition.description))
             } else {
-                Text("该功能尚未解锁，请先完成对应任务")
+                Text("该功能尚未解锁，请先完成对应任务".appLocalized)
             }
         }
         .onDisappear {
@@ -329,7 +330,7 @@ private struct PrototypeBookRoomView: View {
         }
         .frame(width: roomSize.width, height: roomSize.height)
         .accessibilityElement(children: .contain)
-        .accessibilityLabel(room.title)
+        .accessibilityLabel(room.localizedTitle)
     }
 }
 
@@ -419,7 +420,7 @@ private struct PrototypeRoomItemView: View {
                     dragStart = nil
                 }
         )
-        .accessibilityLabel(item.feature.title)
+        .accessibilityLabel(item.feature.localizedTitle)
     }
 
     private func clamp(_ value: CGFloat, _ minValue: CGFloat, _ maxValue: CGFloat) -> CGFloat {
@@ -498,6 +499,10 @@ private struct BookHousePrototypeRoom: Identifiable {
     let title: String
     let slot: BookHouseRoomSlot
     let items: [BookHouseRoomItem]
+
+    var localizedTitle: String {
+        title.appLocalized
+    }
 }
 
 private enum BookHouseRoomSlot {
@@ -564,9 +569,9 @@ private struct BookHouseFeatureSheet: View {
                     .background(Color(hex: feature.tintHex).opacity(0.14), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(feature.title)
+                    Text(feature.localizedTitle)
                         .font(.title3.weight(.bold))
-                    Text(feature.subtitle)
+                    Text(feature.localizedSubtitle)
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
@@ -575,12 +580,12 @@ private struct BookHouseFeatureSheet: View {
             Spacer(minLength: 4)
 
             HStack(spacing: 12) {
-                Button("关闭") {
+                Button("关闭".appLocalized) {
                     dismiss()
                 }
                 .buttonStyle(.bordered)
 
-                Button(feature.isUnlocked ? "进入" : "查看解锁条件") {
+                Button(feature.isUnlocked ? "进入".appLocalized : "查看解锁条件".appLocalized) {
                     onEnter()
                 }
                 .buttonStyle(.borderedProminent)
