@@ -20,6 +20,10 @@ struct BigWorldView: View {
         case dream = "后花园"
         
         var id: String { rawValue }
+
+        var localizedTitle: String {
+            rawValue.appLocalized
+        }
     }
     
     var body: some View {
@@ -76,9 +80,9 @@ struct BigWorldView: View {
                 // 顶部导航栏 - 世界书/梦幻页签（参考马上来财的分段选择器）
                 if case .idle = viewModel.flightStatus {
                     ToolbarItem(placement: .principal) {
-                        Picker("功能", selection: $selectedTab) {
+                        Picker("功能".appLocalized, selection: $selectedTab) {
                             ForEach(BigWorldTab.allCases) { tab in
-                                Text(tab.rawValue).tag(tab)
+                                Text(tab.localizedTitle).tag(tab)
                             }
                         }
                         .pickerStyle(.segmented)
@@ -141,11 +145,11 @@ struct DreamPlaceholderView: View {
                     .font(.system(size: 60))
                     .foregroundStyle(themeManager.accentTextColor.opacity(0.5))
                 
-                Text("梦幻世界")
+                Text("梦幻世界".appLocalized)
                     .font(.system(size: 24, weight: .bold, design: .serif))
                     .foregroundStyle(themeManager.primaryTextColor)
                 
-                Text("即将开启，敬请期待...")
+                Text("即将开启，敬请期待...".appLocalized)
                     .font(.subheadline)
                     .foregroundStyle(themeManager.secondaryTextColor)
             }
@@ -190,16 +194,16 @@ struct EnhancedArrivalView: View {
                     
                     // 到达信息
                     VStack(spacing: 16) {
-                        Text("已到达目的地")
+                        Text("已到达目的地".appLocalized)
                             .font(.system(size: 18))
                             .foregroundStyle(.white.opacity(0.8))
                         
                         if let landmark = viewModel.selectedLandmark {
-                            Text(landmark.name)
+                            Text(landmark.localizedName)
                                 .font(.system(size: 36, weight: .bold, design: .serif))
                                 .foregroundStyle(.white)
                             
-                            Text(landmark.subtitle)
+                            Text(landmark.localizedSubtitle)
                                 .font(.title3)
                                 .foregroundStyle(landmark.type.themeColor)
                         }
@@ -223,7 +227,7 @@ struct EnhancedArrivalView: View {
                     } label: {
                         HStack(spacing: 8) {
                             Image(systemName: "checkmark.circle.fill")
-                            Text("立即打卡")
+                            Text("立即打卡".appLocalized)
                         }
                         .font(.system(size: 18, weight: .semibold))
                         .foregroundStyle(.black)
@@ -270,7 +274,7 @@ struct WeatherInfo: View {
             Text(value)
                 .font(.system(size: 16, weight: .semibold))
                 .foregroundStyle(.white)
-            Text(label)
+            Text(label.appLocalized)
                 .font(.caption)
                 .foregroundStyle(.white.opacity(0.6))
         }
@@ -416,7 +420,7 @@ struct EnhancedCheckInView: View {
                             )
                         
                         if let landmark = viewModel.selectedLandmark {
-                            Text("欢迎来到\(landmark.name)")
+                            Text("欢迎来到%@".appLocalized(landmark.localizedName))
                                 .font(.title3)
                                 .foregroundStyle(.white)
                             
@@ -483,7 +487,7 @@ struct EnhancedCheckInView: View {
                             .rotation3DEffect(.degrees(rotation * 0.5), axis: (x: 0, y: 1, z: 0))
                         }
                         
-                        Text("获得徽章：\(badge.name)")
+                        Text("获得徽章：%@".appLocalized(badge.localizedName))
                             .font(.headline)
                             .foregroundStyle(.white)
                             .padding(.top, 20)
@@ -707,7 +711,7 @@ struct CheckInShareCard: View {
                             )
                         )
                     
-                    Text("欢迎来到\(landmark.name)")
+                    Text("欢迎来到%@".appLocalized(landmark.localizedName))
                         .font(.title3)
                         .foregroundStyle(.white)
                     
@@ -772,7 +776,7 @@ struct CheckInShareCard: View {
                 }
                 
                 // 徽章名称
-                Text("获得徽章：\(badge.name)")
+                Text("获得徽章：%@".appLocalized(badge.localizedName))
                     .font(.headline)
                     .foregroundStyle(.white)
                 

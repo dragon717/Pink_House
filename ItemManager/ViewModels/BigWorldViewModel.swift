@@ -135,7 +135,7 @@ class BigWorldViewModel: ObservableObject {
         generateCurrentBoardingPass(seatNumber: seatNumber)
         
         // 播放登机广播
-        currentNarrative = FlightNarrative.boardingMessages.randomElement() ?? "欢迎登机"
+        currentNarrative = FlightNarrative.boardingMessages.randomElement() ?? "欢迎登机".appLocalized
         
         // 2秒后开始飞行
         DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self] in
@@ -147,9 +147,9 @@ class BigWorldViewModel: ObservableObject {
         guard let landmark = selectedLandmark else { return }
         
         currentBoardingPass = BoardingPass(
-            passengerName: "Lo同好",
-            from: isDepartureHidden ? "???" : (departureCity ?? "出发地"),
-            to: landmark.name,
+            passengerName: "Lo同好".appLocalized,
+            from: isDepartureHidden ? "???" : (departureCity ?? "出发地".appLocalized),
+            to: landmark.localizedName,
             flightDate: Date(),
             seatNumber: seatNumber,
             gate: String(format: "%02d", Int.random(in: 1...20)),
@@ -161,7 +161,7 @@ class BigWorldViewModel: ObservableObject {
     }
     
     func startFlight() {
-        flightStatus = .flying(progress: 0, narrative: FlightNarrative.boardingMessages.randomElement() ?? "起飞")
+        flightStatus = .flying(progress: 0, narrative: FlightNarrative.boardingMessages.randomElement() ?? "起飞".appLocalized)
         flightProgress = 0
         
         guard let landmark = selectedLandmark else { return }
@@ -202,7 +202,7 @@ class BigWorldViewModel: ObservableObject {
         guard let landmark = selectedLandmark else { return }
         
         // 播放到达广播
-        currentNarrative = FlightNarrative.arrivalMessages.randomElement() ?? "欢迎抵达"
+        currentNarrative = FlightNarrative.arrivalMessages.randomElement() ?? "欢迎抵达".appLocalized
         
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
             self?.flightStatus = .arrived(landmark: landmark)
@@ -343,9 +343,9 @@ class BigWorldViewModel: ObservableObject {
     // MARK: - Boarding Pass Generation
     func generateBoardingPass(for record: FlightRecord) -> BoardingPass {
         BoardingPass(
-            passengerName: "Lo同好",
+            passengerName: "Lo同好".appLocalized,
             from: isDepartureHidden ? "???" : record.departureLocation,
-            to: record.landmark.name,
+            to: record.landmark.localizedName,
             flightDate: record.flightDate,
             seatNumber: record.seatNumber,
             gate: String(format: "%02d", Int.random(in: 1...20)),

@@ -88,10 +88,10 @@ struct EnhancedGlobeView: View {
                     
                     HStack {
                         VStack(alignment: .leading, spacing: 4) {
-                            Text("选择目的地")
+                            Text("选择目的地".appLocalized)
                                 .font(.system(size: 24, weight: .bold, design: .serif))
                                 .foregroundStyle(.white)
-                            Text("探索全球茶会圣地")
+                            Text("探索全球茶会圣地".appLocalized)
                                 .font(.caption)
                                 .foregroundStyle(.gray)
                         }
@@ -312,11 +312,11 @@ struct UserLevelSheet: View {
                     }
                     
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("Lo同好")
+                        Text("Lo同好".appLocalized)
                             .font(.headline)
                             .foregroundStyle(.primary)
                         
-                        Text("已解锁 \(viewModel.unlockedBadges.count) 枚徽章")
+                        Text("已解锁 %d 枚徽章".appLocalized(viewModel.unlockedBadges.count))
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                     }
@@ -329,7 +329,7 @@ struct UserLevelSheet: View {
                 // 常佩戴/最近获得徽章
                 VStack(alignment: .leading, spacing: 12) {
                     HStack {
-                        Text(equippedBadges.isEmpty ? "最近获得" : "常佩戴徽章")
+                        Text((equippedBadges.isEmpty ? "最近获得" : "常佩戴徽章").appLocalized)
                             .font(.subheadline)
                             .fontWeight(.semibold)
                             .foregroundStyle(.primary)
@@ -339,7 +339,7 @@ struct UserLevelSheet: View {
                         NavigationLink {
                             BadgeWallView(viewModel: viewModel)
                         } label: {
-                            Text("查看全部")
+                            Text("查看全部".appLocalized)
                                 .font(.caption)
                                 .foregroundStyle(.blue)
                         }
@@ -353,10 +353,10 @@ struct UserLevelSheet: View {
                                 Image(systemName: "medal")
                                     .font(.system(size: 32))
                                     .foregroundStyle(.gray.opacity(0.5))
-                                Text("还没有获得徽章")
+                                Text("还没有获得徽章".appLocalized)
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
-                                Text("去探索世界获得徽章吧！")
+                                Text("去探索世界获得徽章吧！".appLocalized)
                                     .font(.caption2)
                                     .foregroundStyle(.secondary)
                             }
@@ -390,7 +390,7 @@ struct UserLevelSheet: View {
                                             .font(.system(size: 24))
                                     }
                                     
-                                    Text(badge.name)
+                                    Text(badge.localizedName)
                                         .font(.caption)
                                         .foregroundStyle(.primary)
                                         .lineLimit(1)
@@ -404,11 +404,11 @@ struct UserLevelSheet: View {
                 Spacer()
             }
             .padding()
-            .navigationTitle("我的等级")
+            .navigationTitle("我的等级".appLocalized)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("完成") {
+                    Button("完成".appLocalized) {
                         dismiss()
                     }
                 }
@@ -439,11 +439,11 @@ struct LandmarkDetailSheet: View {
                     }
                     
                     VStack(alignment: .leading, spacing: 4) {
-                        Text(landmark.name)
+                        Text(landmark.localizedName)
                             .font(.system(size: 20, weight: .bold))
                             .foregroundStyle(.primary)
                         
-                        Text(landmark.subtitle)
+                        Text(landmark.localizedSubtitle)
                             .font(.subheadline)
                             .foregroundStyle(landmark.type.themeColor)
                         
@@ -464,10 +464,10 @@ struct LandmarkDetailSheet: View {
                 // 茶会主题和徽章
                 HStack(spacing: 20) {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("茶会主题")
+                        Text("茶会主题".appLocalized)
                             .font(.caption)
                             .foregroundStyle(.secondary)
-                        Text(landmark.teaPartyTheme)
+                        Text(landmark.localizedTeaPartyTheme)
                             .font(.subheadline)
                             .foregroundStyle(.primary)
                             .lineLimit(1)
@@ -477,7 +477,7 @@ struct LandmarkDetailSheet: View {
                     
                     // 可获得徽章
                     VStack(alignment: .trailing, spacing: 4) {
-                        Text("可获得")
+                        Text("可获得".appLocalized)
                             .font(.caption)
                             .foregroundStyle(.secondary)
                         HStack(spacing: 4) {
@@ -489,7 +489,7 @@ struct LandmarkDetailSheet: View {
                                         endPoint: .bottom
                                     )
                                 )
-                            Text(landmark.badgeName)
+                            Text(landmark.localizedBadgeName)
                                 .font(.caption)
                                 .foregroundStyle(.primary)
                         }
@@ -502,7 +502,7 @@ struct LandmarkDetailSheet: View {
                 Button(action: onBookFlight) {
                     HStack(spacing: 8) {
                         Image(systemName: "airplane.departure")
-                        Text("预订航班")
+                        Text("预订航班".appLocalized)
                     }
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundStyle(.white)
@@ -519,11 +519,11 @@ struct LandmarkDetailSheet: View {
                 }
             }
             .padding()
-            .navigationTitle("目的地")
+            .navigationTitle("目的地".appLocalized)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("取消") {
+                    Button("取消".appLocalized) {
                         dismiss()
                     }
                 }
@@ -707,7 +707,7 @@ struct LandmarkAnnotationView: View {
             
             // 标签
             if isSelected {
-                Text(landmark.name)
+                Text(landmark.localizedName)
                     .font(.caption)
                     .fontWeight(.semibold)
                     .foregroundStyle(.white)

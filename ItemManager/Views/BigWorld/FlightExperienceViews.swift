@@ -43,11 +43,11 @@ struct FlightPreparationView: View {
                                         .font(.subheadline)
                                         .foregroundStyle(.gray)
                                     
-                                    Text(landmark.name)
+                                    Text(landmark.localizedName)
                                         .font(.system(size: 28, weight: .bold, design: .serif))
                                         .foregroundStyle(.white)
                                     
-                                    Text(landmark.subtitle)
+                                    Text(landmark.localizedSubtitle)
                                         .font(.title3)
                                         .foregroundStyle(landmark.type.themeColor)
                                 }
@@ -63,10 +63,10 @@ struct FlightPreparationView: View {
                                     Image(systemName: viewModel.isDepartureHidden ? "eye.slash" : "eye")
                                         .foregroundStyle(.gray)
                                     VStack(alignment: .leading, spacing: 4) {
-                                        Text("隐藏出发地")
+                                        Text("隐藏出发地".appLocalized)
                                             .font(.subheadline)
                                             .foregroundStyle(.white)
-                                        Text("分享时出发地将显示为???")
+                                        Text("分享时出发地将显示为???".appLocalized)
                                             .font(.caption)
                                             .foregroundStyle(.gray)
                                     }
@@ -81,7 +81,7 @@ struct FlightPreparationView: View {
                             } label: {
                                 HStack(spacing: 8) {
                                     Image(systemName: "airplane")
-                                    Text("开始登机")
+                                    Text("开始登机".appLocalized)
                                 }
                                 .font(.system(size: 18, weight: .semibold))
                                 .foregroundStyle(.black)
@@ -103,11 +103,11 @@ struct FlightPreparationView: View {
                     }
                 }
             }
-            .navigationTitle("飞行准备")
+            .navigationTitle("飞行准备".appLocalized)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
-                    Button("取消") {
+                    Button("取消".appLocalized) {
                         dismiss()
                     }
                     .foregroundStyle(Color(red: 1.0, green: 0.41, blue: 0.71))
@@ -204,7 +204,7 @@ struct BoardingView: View {
                     }
                 }
             }
-            .navigationTitle("正在登机")
+            .navigationTitle("正在登机".appLocalized)
             .navigationBarTitleDisplayMode(.inline)
         }
     }
@@ -242,7 +242,7 @@ struct BoardingPassCard: View {
                     Text(viewModel.isDepartureHidden ? "???" : (viewModel.currentLocation.prefix(3).uppercased()))
                         .font(.system(size: 32, weight: .bold, design: .monospaced))
                         .foregroundStyle(.white)
-                    Text(viewModel.isDepartureHidden ? "神秘出发地" : viewModel.currentLocation)
+                    Text(viewModel.isDepartureHidden ? "神秘出发地".appLocalized : viewModel.currentLocation)
                         .font(.caption)
                         .foregroundStyle(.gray)
                 }
@@ -258,10 +258,10 @@ struct BoardingPassCard: View {
                 
                 VStack(alignment: .trailing, spacing: 4) {
                     if let landmark = viewModel.selectedLandmark {
-                        Text(landmark.name.prefix(3).uppercased())
+                        Text(landmark.localizedName.prefix(3).uppercased())
                             .font(.system(size: 32, weight: .bold, design: .monospaced))
                             .foregroundStyle(landmark.type.themeColor)
-                        Text(landmark.name)
+                        Text(landmark.localizedName)
                             .font(.caption)
                             .foregroundStyle(.gray)
                     }
@@ -469,7 +469,7 @@ struct FlightExperienceView: View {
                     }
                 }
             }
-            .navigationTitle("飞行体验")
+            .navigationTitle("飞行体验".appLocalized)
             .navigationBarTitleDisplayMode(.inline)
             .onAppear {
                 // 云朵动画
@@ -589,15 +589,15 @@ struct ArrivalView: View {
                             
                             // 到达信息
                             VStack(spacing: 16) {
-                                Text("已抵达")
+                                Text("已抵达".appLocalized)
                                     .font(.title3)
                                     .foregroundStyle(.gray)
                                 
-                                Text(landmark.name)
+                                Text(landmark.localizedName)
                                     .font(.system(size: 32, weight: .bold, design: .serif))
                                     .foregroundStyle(.white)
                                 
-                                Text(landmark.subtitle)
+                                Text(landmark.localizedSubtitle)
                                     .font(.title3)
                                     .foregroundStyle(landmark.type.themeColor)
                                 
@@ -619,7 +619,7 @@ struct ArrivalView: View {
                         } label: {
                             HStack(spacing: 8) {
                                 Image(systemName: "checkmark.circle.fill")
-                                Text("茶会打卡")
+                                Text("茶会打卡".appLocalized)
                             }
                             .font(.system(size: 18, weight: .semibold))
                             .foregroundStyle(.black)
@@ -641,7 +641,7 @@ struct ArrivalView: View {
                     }
                 }
             }
-            .navigationTitle("抵达目的地")
+            .navigationTitle("抵达目的地".appLocalized)
             .navigationBarTitleDisplayMode(.inline)
             .onAppear {
                 withAnimation(.easeOut(duration: 0.6)) {
@@ -734,7 +734,7 @@ struct CheckInCompleteView: View {
                     }
                 }
             }
-            .navigationTitle("打卡完成")
+            .navigationTitle("打卡完成".appLocalized)
             .navigationBarTitleDisplayMode(.inline)
             .onAppear {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
@@ -802,11 +802,11 @@ struct BadgeEarnedView: View {
             
             // 文字
             VStack(spacing: 8) {
-                Text("获得徽章")
+                Text("获得徽章".appLocalized)
                     .font(.title3)
                     .foregroundStyle(.gray)
                 
-                Text(badge.name)
+                Text(badge.localizedName)
                     .font(.system(size: 28, weight: .bold, design: .serif))
                     .foregroundStyle(
                         LinearGradient(
@@ -816,7 +816,7 @@ struct BadgeEarnedView: View {
                         )
                     )
                 
-                Text(badge.description)
+                Text(badge.localizedDescription)
                     .font(.subheadline)
                     .foregroundStyle(.gray)
                     .multilineTextAlignment(.center)
@@ -888,11 +888,11 @@ struct ShareCardView: View {
                     ShareLoadingOverlay(message: "正在准备分享...")
                 }
             }
-            .navigationTitle("分享登机牌")
+            .navigationTitle("分享登机牌".appLocalized)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("完成") {
+                    Button("完成".appLocalized) {
                         dismiss()
                     }
                     .foregroundStyle(Color(red: 1.0, green: 0.84, blue: 0.0))

@@ -65,11 +65,11 @@ struct BadgeWallView: View {
                     }
                 }
             }
-            .navigationTitle("茶会徽章墙")
+            .navigationTitle("茶会徽章墙".appLocalized)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("完成") {
+                    Button("完成".appLocalized) {
                         dismiss()
                     }
                     .foregroundStyle(Color(red: 1.0, green: 0.41, blue: 0.71))
@@ -265,7 +265,7 @@ struct BadgeCell: View {
                         }
                     }
                     
-                    Text(landmark.badgeName)
+                    Text(landmark.localizedBadgeName)
                         .font(.caption)
                         .fontWeight(.medium)
                         .foregroundStyle(isUnlocked ? .white : .gray)
@@ -413,11 +413,11 @@ struct BadgeDetailView: View {
                 
                 // 徽章信息
                 VStack(spacing: 12) {
-                    Text(badge.name)
+                    Text(badge.localizedName)
                         .font(.system(size: 28, weight: .bold))
                         .foregroundStyle(.white)
                     
-                    Text(badge.description)
+                    Text(badge.localizedDescription)
                         .font(.body)
                         .foregroundStyle(.gray)
                         .multilineTextAlignment(.center)
@@ -427,7 +427,7 @@ struct BadgeDetailView: View {
                     HStack(spacing: 8) {
                         Image(systemName: "calendar")
                             .foregroundStyle(.gray)
-                        Text("获得于 \(badge.earnedDate.formatted(date: .long, time: .shortened))")
+                        Text("获得于 %@".appLocalized(badge.earnedDate.formatted(date: .long, time: .shortened)))
                             .font(.caption)
                             .foregroundStyle(.gray)
                     }
@@ -442,7 +442,7 @@ struct BadgeDetailView: View {
                 }) {
                     HStack(spacing: 8) {
                         Image(systemName: "square.and.arrow.up")
-                        Text("分享徽章")
+                        Text("分享徽章".appLocalized)
                     }
                     .font(.system(size: 17, weight: .semibold))
                     .foregroundStyle(.black)
@@ -475,7 +475,7 @@ struct AchievementSummaryView: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("成就进度")
+            Text("成就进度".appLocalized)
                 .font(.system(size: 18, weight: .semibold))
                 .foregroundStyle(.white)
             
@@ -485,7 +485,7 @@ struct AchievementSummaryView: View {
             
             NavigationLink(destination: AchievementListView(viewModel: viewModel)) {
                 HStack {
-                    Text("查看全部成就")
+                    Text("查看全部成就".appLocalized)
                         .font(.subheadline)
                         .foregroundStyle(.blue)
                     Image(systemName: "chevron.right")
@@ -530,11 +530,11 @@ struct AchievementListView: View {
                 .padding(.top, 60)
             }
         }
-        .navigationTitle("成就")
+        .navigationTitle("成就".appLocalized)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
-                Button("完成") { dismiss() }
+                Button("完成".appLocalized) { dismiss() }
             }
         }
     }
@@ -584,7 +584,7 @@ struct BadgeStatItem: View {
             Text(value)
                 .font(.system(size: 28, weight: .bold, design: .rounded))
                 .foregroundStyle(color)
-            Text(label)
+            Text(label.appLocalized)
                 .font(.caption)
                 .foregroundStyle(.gray)
         }
@@ -612,7 +612,7 @@ struct AchievementCard: View {
             // 信息
             VStack(alignment: .leading, spacing: 4) {
                 HStack {
-                    Text(achievement.name)
+                    Text(achievement.localizedName)
                         .font(.system(size: 16, weight: .semibold))
                         .foregroundStyle(achievement.isUnlocked ? .white : .gray)
                     
@@ -623,7 +623,7 @@ struct AchievementCard: View {
                     }
                 }
                 
-                Text(achievement.description)
+                Text(achievement.localizedDescription)
                     .font(.caption)
                     .foregroundStyle(.gray)
                     .lineLimit(2)
@@ -691,7 +691,7 @@ struct AchievementRow: View {
                 )
             
             VStack(alignment: .leading, spacing: 2) {
-                Text(achievement.name)
+                Text(achievement.localizedName)
                     .font(.subheadline)
                     .fontWeight(.medium)
                     .foregroundStyle(achievement.isUnlocked ? .white : .gray)

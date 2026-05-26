@@ -19,6 +19,10 @@ enum LandmarkType: String, CaseIterable, Codable {
     case castle = "古堡花园"
     case sakura = "樱花神社"
     case lavender = "薰衣草田"
+
+    var localizedName: String {
+        rawValue.appLocalized
+    }
     
     var icon: String {
         switch self {
@@ -80,6 +84,30 @@ struct Landmark: Identifiable, Codable, Equatable {
         let prefix = String(name.prefix(3)).uppercased()
         return prefix
     }
+
+    var localizedName: String {
+        name.appLocalized
+    }
+
+    var localizedSubtitle: String {
+        subtitle.appLocalized
+    }
+
+    var localizedDescription: String {
+        description.appLocalized
+    }
+
+    var localizedTeaPartyTheme: String {
+        teaPartyTheme.appLocalized
+    }
+
+    var localizedBadgeName: String {
+        badgeName.appLocalized
+    }
+
+    var localizedBadgeDescription: String {
+        badgeDescription.appLocalized
+    }
     
     static func == (lhs: Landmark, rhs: Landmark) -> Bool {
         lhs.id == rhs.id
@@ -122,6 +150,14 @@ struct TeaPartyBadge: Identifiable, Codable {
     
     var isUnlocked: Bool {
         unlockDate != nil
+    }
+
+    var localizedName: String {
+        name.appLocalized
+    }
+
+    var localizedDescription: String {
+        description.appLocalized
     }
     
     // 计算属性：主题颜色
@@ -170,6 +206,18 @@ struct Achievement: Identifiable, Codable {
     // 计算属性：名称（兼容旧代码）
     var name: String {
         title
+    }
+
+    var localizedName: String {
+        title.appLocalized
+    }
+
+    var localizedDescription: String {
+        description.appLocalized
+    }
+
+    var localizedRewardBadge: String? {
+        rewardBadge?.appLocalized
     }
     
     // 计算属性：进度（兼容旧代码，0.0-1.0）
@@ -375,28 +423,32 @@ extension Landmark {
 
 // MARK: - AI 飞行叙事
 struct FlightNarrative {
-    static let boardingMessages: [String] = [
-        "欢迎乘坐茶会专机，您的茶会礼裙已准备就绪",
-        "请系好安全带，我们即将启程前往梦幻之地",
-        "今天的航班将带您穿越云海，抵达奇妙的茶会现场",
-        "茶会专机即将起飞，请确认您的蕾丝边安全带"
-    ]
-    
-    static func inFlightMessages(to landmark: Landmark) -> [String] {
+    static var boardingMessages: [String] {
         [
-            "正在穿过太平洋上空的粉色积云...",
-            "前方即将到达\(landmark.name)，请准备好您的茶杯...",
-            "机长提示：目的地天气晴朗，非常适合户外茶会...",
-            "我们的空乘正在准备\(landmark.teaPartyTheme)主题的欢迎仪式...",
-            "预计还有几分钟即可抵达\(landmark.subtitle)...",
-            "您即将成为获得「\(landmark.badgeName)」徽章的幸运儿..."
+            "欢迎乘坐茶会专机，您的茶会礼裙已准备就绪".appLocalized,
+            "请系好安全带，我们即将启程前往梦幻之地".appLocalized,
+            "今天的航班将带您穿越云海，抵达奇妙的茶会现场".appLocalized,
+            "茶会专机即将起飞，请确认您的蕾丝边安全带".appLocalized
         ]
     }
     
-    static let arrivalMessages: [String] = [
-        "欢迎抵达目的地，茶会即将开始",
-        "您已到达梦幻茶会现场，请享受这美好时光",
-        "目的地到达！快去打卡获得专属徽章吧",
-        "茶会主人正在等待您的到来，请前往主会场"
-    ]
+    static func inFlightMessages(to landmark: Landmark) -> [String] {
+        [
+            "正在穿过太平洋上空的粉色积云...".appLocalized,
+            "前方即将到达%@，请准备好您的茶杯...".appLocalized(landmark.localizedName),
+            "机长提示：目的地天气晴朗，非常适合户外茶会...".appLocalized,
+            "我们的空乘正在准备%@主题的欢迎仪式...".appLocalized(landmark.localizedTeaPartyTheme),
+            "预计还有几分钟即可抵达%@...".appLocalized(landmark.localizedSubtitle),
+            "您即将成为获得「%@」徽章的幸运儿...".appLocalized(landmark.localizedBadgeName)
+        ]
+    }
+    
+    static var arrivalMessages: [String] {
+        [
+            "欢迎抵达目的地，茶会即将开始".appLocalized,
+            "您已到达梦幻茶会现场，请享受这美好时光".appLocalized,
+            "目的地到达！快去打卡获得专属徽章吧".appLocalized,
+            "茶会主人正在等待您的到来，请前往主会场".appLocalized
+        ]
+    }
 }

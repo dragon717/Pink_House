@@ -402,11 +402,11 @@ struct PrivacyCheckView: View {
             }
             
             VStack(spacing: 12) {
-                Text("隐私设置")
+                Text("隐私设置".appLocalized)
                     .font(.system(size: 24, weight: .bold))
                     .foregroundStyle(.primary)
                 
-                Text("您可以选择是否显示出发地信息")
+                Text("您可以选择是否显示出发地信息".appLocalized)
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
@@ -414,7 +414,7 @@ struct PrivacyCheckView: View {
             
             // 预览卡片
             VStack(alignment: .leading, spacing: 12) {
-                Text("分享预览")
+                Text("分享预览".appLocalized)
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 
@@ -423,11 +423,11 @@ struct PrivacyCheckView: View {
                         .foregroundStyle(.pink)
                     
                     if showDeparture, let city = viewModel.departureCity {
-                        Text("从 \(city) 出发")
+                        Text("从 %@ 出发".appLocalized(String(city)))
                             .font(.subheadline)
                             .foregroundStyle(.primary)
                     } else {
-                        Text("出发地")
+                        Text("出发地".appLocalized)
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                     }
@@ -440,7 +440,7 @@ struct PrivacyCheckView: View {
                     Spacer()
                     
                     if let landmark = viewModel.selectedLandmark {
-                        Text("飞往 \(landmark.name)")
+                        Text("飞往 %@".appLocalized(landmark.localizedName))
                             .font(.subheadline)
                             .foregroundStyle(.primary)
                     }
@@ -455,7 +455,7 @@ struct PrivacyCheckView: View {
             .padding(.horizontal, 30)
             
             // 开关
-            Toggle("显示出发地", isOn: $showDeparture)
+            Toggle("显示出发地".appLocalized, isOn: $showDeparture)
                 .onChange(of: showDeparture) { newValue in
                     viewModel.isDepartureHidden = !newValue
                 }
@@ -701,7 +701,7 @@ struct SeatLegend: View {
             RoundedRectangle(cornerRadius: 4)
                 .fill(color)
                 .frame(width: 16, height: 16)
-            Text(label)
+            Text(label.appLocalized)
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
@@ -759,7 +759,7 @@ struct BoardingPassView: View {
                     // 航班信息
                     HStack {
                         VStack(alignment: .leading, spacing: 4) {
-                            Text("FROM")
+                            Text("FROM".appLocalized)
                                 .font(.caption2)
                                 .foregroundStyle(.secondary)
                             if viewModel.isDepartureHidden {
@@ -786,7 +786,7 @@ struct BoardingPassView: View {
                         Spacer()
                         
                         VStack(alignment: .trailing, spacing: 4) {
-                            Text("TO")
+                            Text("TO".appLocalized)
                                 .font(.caption2)
                                 .foregroundStyle(.secondary)
                             Text(viewModel.selectedLandmark?.code ?? "???")
@@ -981,7 +981,7 @@ struct InfoItem: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text(title)
+            Text(title.appLocalized)
                 .font(.caption2)
                 .foregroundStyle(.secondary)
             Text(value)
@@ -1215,7 +1215,7 @@ struct BoardingCompleteView: View {
                         .foregroundStyle(.secondary)
                     
                     if let landmark = viewModel.selectedLandmark {
-                        Text("目的地: \(landmark.name)")
+                        Text("目的地: %@".appLocalized(landmark.localizedName))
                             .font(.headline)
                             .foregroundStyle(landmark.type.themeColor)
                             .padding(.top, 8)
@@ -1287,7 +1287,7 @@ struct BoardingInfoItem: View {
                 .font(.system(size: 24))
                 .foregroundStyle(monicaPrimary)
             
-            Text(title)
+            Text(title.appLocalized)
                 .font(.caption)
                 .foregroundStyle(.secondary)
             

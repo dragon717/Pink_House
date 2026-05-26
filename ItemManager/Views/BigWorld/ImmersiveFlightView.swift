@@ -956,9 +956,9 @@ struct FlightStatusBar: View {
             HStack {
                 // 出发地
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(viewModel.isDepartureHidden ? "***" : (viewModel.departureCity ?? "出发地"))
+                    Text(viewModel.isDepartureHidden ? "***" : (viewModel.departureCity ?? "出发地".appLocalized))
                         .font(.system(size: 18, weight: .semibold))
-                    Text("FROM")
+                    Text("FROM".appLocalized)
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                 }
@@ -1006,7 +1006,7 @@ struct FlightStatusBar: View {
                 VStack(alignment: .trailing, spacing: 4) {
                     Text(viewModel.selectedLandmark?.code ?? "???")
                         .font(.system(size: 18, weight: .semibold))
-                    Text("TO")
+                    Text("TO".appLocalized)
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                 }
@@ -1024,11 +1024,11 @@ struct FlightStatusBar: View {
     
     private var phaseText: String {
         switch flightPhase {
-        case .taxi: return "滑行中"
-        case .takeoff: return "起飞中"
-        case .cruise: return "巡航中"
-        case .descent: return "下降中"
-        case .landing: return "着陆中"
+        case .taxi: return "滑行中".appLocalized
+        case .takeoff: return "起飞中".appLocalized
+        case .cruise: return "巡航中".appLocalized
+        case .descent: return "下降中".appLocalized
+        case .landing: return "着陆中".appLocalized
         }
     }
 }
@@ -1127,7 +1127,7 @@ struct FlightMetricView: View {
             HStack(spacing: 4) {
                 Image(systemName: icon)
                     .font(.caption)
-                Text(title)
+                Text(title.appLocalized)
                     .font(.caption)
             }
             .foregroundStyle(.secondary)
