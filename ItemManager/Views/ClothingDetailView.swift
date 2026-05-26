@@ -549,7 +549,7 @@ struct ClothingDetailView: View {
                     HStack(spacing: 2) {
                         Image(systemName: "checkmark.circle.fill")
                             .font(.caption2)
-                        Text(clothing.isFullPaymentReservation ? "全款预约" : "心愿尾款")
+                        Text((clothing.isFullPaymentReservation ? "全款预约" : "心愿尾款").appLocalized)
                             .font(.caption)
                             .bold()
                     }
@@ -590,9 +590,9 @@ struct ClothingDetailView: View {
     private func buildDetailRow(for field: ClothingField) -> some View {
         switch field {
         case .types:
-            InfoRow(label: "类型", value: clothing.types.isEmpty ? "未填写" : clothing.types)
+            InfoRow(label: "类型", value: clothing.types.isEmpty ? "未填写".appLocalized : clothing.types)
         case .colors:
-            InfoRow(label: "颜色", value: clothing.colors.isEmpty ? "未填写" : clothing.colors)
+            InfoRow(label: "颜色", value: clothing.colors.isEmpty ? "未填写".appLocalized : clothing.colors)
         case .sizes:
             // 尺码行特殊处理，显示尺码表缩略图
             HStack {
@@ -627,18 +627,18 @@ struct ClothingDetailView: View {
                         }
                 }
                 
-                Text(clothing.sizes.isEmpty ? "未填写" : clothing.sizes)
+                Text(clothing.sizes.isEmpty ? "未填写".appLocalized : clothing.sizes)
                     .font(.subheadline)
                     .foregroundStyle(themeManager.primaryTextColor)
                     .themeSkinLegibleText(level: .inline, slot: .sectionCard)
             }
             .contentShape(Rectangle())
         case .length:
-            InfoRow(label: "衣长", value: clothing.length.isEmpty ? "未填写" : clothing.length)
+            InfoRow(label: "衣长", value: clothing.length.isEmpty ? "未填写".appLocalized : clothing.length)
         case .condition:
             InfoRow(label: "状态", value: clothing.condition)
         case .accessories:
-            InfoRow(label: "小物", value: clothing.accessories.isEmpty ? "无" : clothing.accessories)
+            InfoRow(label: "小物", value: clothing.accessories.isEmpty ? "无".appLocalized : clothing.accessories)
         }
     }
     
@@ -661,7 +661,7 @@ struct ClothingDetailView: View {
             : Decimal(CurrencyExchangeRateService.defaultJPYRate)
         let rateText = rate.formatted(.number.precision(.fractionLength(0...4)))
         guard let updatedAt = clothing.originalPriceRateUpdatedAt else {
-            return "1 CNY = \(rateText) JPY（未记录时间）"
+            return "1 CNY = %@ JPY（未记录时间）".appLocalized(rateText)
         }
         return "1 CNY = \(rateText) JPY（\(updatedAt.formatted(date: .numeric, time: .shortened))）"
     }
@@ -762,7 +762,7 @@ struct ClothingDetailView: View {
                     ForEach(items.sorted(by: { $0.sortIndex < $1.sortIndex })) { item in
                         VStack(alignment: .leading, spacing: 2) {
                             HStack {
-                                Text(item.name.isEmpty ? "未命名小物" : item.name)
+                                Text(item.name.isEmpty ? "未命名小物".appLocalized : item.name)
                                     .unifiedPrimary()
                                     .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                                 Spacer()
@@ -795,7 +795,11 @@ struct ClothingDetailView: View {
             }
             
             HStack {
-                Label(clothing.isFullPaymentReservation ? "全款预约总额" : "合计金额（含邮）", systemImage: "star.circle.fill")
+                Label {
+                    Text((clothing.isFullPaymentReservation ? "全款预约总额" : "合计金额（含邮）").appLocalized)
+                } icon: {
+                    Image(systemName: "star.circle.fill")
+                }
                     .font(.subheadline)
                     .unifiedSecondary()
                     .themeSkinLegibleText(level: .inline, slot: .sectionCard)
@@ -876,7 +880,7 @@ struct ClothingDetailView: View {
 
                 Spacer()
 
-                Text(isPaidOff ? "已付清" : "剩余 ¥\(moneyString(remaining))")
+                Text(isPaidOff ? "已付清".appLocalized : "剩余 ¥%@".appLocalized(moneyString(remaining)))
                     .font(.caption.weight(.bold))
                     .padding(.horizontal, 10)
                     .padding(.vertical, 6)
@@ -893,7 +897,7 @@ struct ClothingDetailView: View {
                 Divider().frame(height: 34)
                 finalPaymentMetric(title: "剩余", value: "¥\(moneyString(remaining))", color: Color(hex: "C94C72"))
                 Divider().frame(height: 34)
-                finalPaymentMetric(title: "账单", value: "\(finalPaymentRecords.count) 笔", color: .orange)
+                finalPaymentMetric(title: "账单", value: "%@ 笔".appLocalized(String(finalPaymentRecords.count)), color: .orange)
             }
             .padding(12)
             .background(Color.secondary.opacity(0.06), in: RoundedRectangle(cornerRadius: 16))
@@ -918,7 +922,7 @@ struct ClothingDetailView: View {
                                 .foregroundStyle(themeManager.primaryTextColor)
                                 .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                             Spacer()
-                            Text(entry.paidAt?.formatted(date: .numeric, time: .omitted) ?? "已记录")
+                            Text(formattedRecordDate(entry.paidAt))
                                 .font(.caption2)
                                 .foregroundStyle(themeManager.tertiaryTextColor)
                                 .themeSkinLegibleText(level: .inline, slot: .sectionCard)
@@ -940,14 +944,14 @@ struct ClothingDetailView: View {
 
     private func finalPaymentStatusSubtitle(paidOff: Bool) -> String {
         if paidOff {
-            return "尾款已完成"
+            return "尾款已完成".appLocalized
         }
-        return "记录剩余尾款，付清后按钮会消失"
+        return "记录剩余尾款，付清后按钮会消失".appLocalized
     }
 
     private func finalPaymentMetric(title: String, value: String, color: Color) -> some View {
         VStack(spacing: 5) {
-            Text(title)
+            Text(title.appLocalized)
                 .font(.caption2)
                 .foregroundStyle(themeManager.secondaryTextColor)
                 .themeSkinLegibleText(level: .inline, slot: .sectionCard)
@@ -964,6 +968,10 @@ struct ClothingDetailView: View {
 
     private func moneyString(_ value: Decimal) -> String {
         NSDecimalNumber(decimal: value).stringValue
+    }
+
+    private func formattedRecordDate(_ date: Date?) -> String {
+        date?.formatted(.dateTime.year().month().day().locale(LanguageManager.shared.locale)) ?? "已记录".appLocalized
     }
 
     /// 购买信息卡片 - 使用统一配色
@@ -990,7 +998,7 @@ struct ClothingDetailView: View {
             }
             
             let duration = Calendar.current.dateComponents([.day], from: clothing.purchaseDate, to: Date()).day ?? 0
-            InfoRow(label: "拥有时长", value: "\(duration)天")
+            InfoRow(label: "拥有时长", value: "%@天".appLocalized(String(duration)))
             
             if clothing.balance > 0 {
                 // 如果是心愿尾款，显示总尾款（含小物），否则显示尾款×库存的总价格
@@ -1113,7 +1121,7 @@ struct FinalPaymentRecordingSheet: View {
                 .font(.headline)
                 .foregroundStyle(Color(hex: "C94C72"))
                 .themeSkinLegibleText(level: .inline, slot: .sectionCard)
-            Text("本次将记录剩余全部尾款 ¥\(moneyText(remainingAmount))。")
+            Text("本次将记录剩余全部尾款 ¥%@。".appLocalized(moneyText(remainingAmount)))
                 .font(.subheadline)
                 .foregroundStyle(themeManager.secondaryTextColor)
                 .themeSkinLegibleText(level: .inline, slot: .sectionCard)
@@ -1141,7 +1149,7 @@ struct FinalPaymentRecordingSheet: View {
                                 .font(.subheadline.weight(.semibold))
                                 .foregroundStyle(themeManager.primaryTextColor)
                                 .themeSkinLegibleText(level: .inline, slot: .sectionCard)
-                            Text(entry.paidAt?.formatted(date: .numeric, time: .omitted) ?? "已记录")
+                            Text(formattedRecordDate(entry.paidAt))
                                 .font(.caption2)
                                 .foregroundStyle(themeManager.secondaryTextColor)
                                 .themeSkinLegibleText(level: .inline, slot: .sectionCard)
@@ -1163,13 +1171,17 @@ struct FinalPaymentRecordingSheet: View {
 
     private func paymentStat(title: String, value: Decimal, color: Color) -> some View {
         VStack(spacing: 5) {
-            Text(title).font(.caption2).foregroundStyle(themeManager.secondaryTextColor).themeSkinLegibleText(level: .inline, slot: .sectionCard)
+            Text(title.appLocalized).font(.caption2).foregroundStyle(themeManager.secondaryTextColor).themeSkinLegibleText(level: .inline, slot: .sectionCard)
             Text("¥\(moneyText(value))").font(.caption.weight(.bold)).foregroundStyle(color).themeSkinLegibleText(level: .chip, slot: .sectionCard).lineLimit(1).minimumScaleFactor(0.65)
         }
         .frame(maxWidth: .infinity)
     }
 
     private func moneyText(_ value: Decimal) -> String { NSDecimalNumber(decimal: value).stringValue }
+
+    private func formattedRecordDate(_ date: Date?) -> String {
+        date?.formatted(.dateTime.year().month().day().locale(LanguageManager.shared.locale)) ?? "已记录".appLocalized
+    }
 }
 
 /// 信息行组件 - 使用统一配色
@@ -1185,7 +1197,7 @@ struct InfoRow: View {
                 .foregroundStyle(themeManager.tertiaryTextColor)
                 .frame(width: 20)
             
-            Text(label)
+            Text(label.appLocalized)
                 .font(.subheadline)
                 .foregroundStyle(themeManager.secondaryTextColor)
             
