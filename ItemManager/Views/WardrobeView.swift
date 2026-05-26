@@ -335,15 +335,16 @@ private struct WardrobeVisibleItemFramePreferenceKey: PreferenceKey {
 }
 
 private final class WardrobeStatsAutoCollapseCoordinator {
-    private let topThreshold: CGFloat = 12
-    private let collapseThreshold: CGFloat = 44
+    static let topThreshold: CGFloat = 12
+    static let collapseThreshold: CGFloat = 44
+
     private let directionHysteresis: CGFloat = 8
     private var lastScrollDistance: CGFloat = 0
     private var hasReceivedScrollOffset = false
     private var manualExpansionLockedUntilTop = false
 
     var isAwayFromTop: Bool {
-        hasReceivedScrollOffset && lastScrollDistance > topThreshold
+        hasReceivedScrollOffset && lastScrollDistance > Self.topThreshold
     }
 
     func reset() {
@@ -372,7 +373,7 @@ private final class WardrobeStatsAutoCollapseCoordinator {
         hasReceivedScrollOffset = true
         lastScrollDistance = scrollDistance
 
-        if scrollDistance <= topThreshold {
+        if scrollDistance <= Self.topThreshold {
             manualExpansionLockedUntilTop = false
             guard !isExpanded else { return }
             setExpanded(true)
@@ -381,11 +382,11 @@ private final class WardrobeStatsAutoCollapseCoordinator {
 
         guard !manualExpansionLockedUntilTop,
               isExpanded,
-              scrollDistance >= collapseThreshold else {
+              scrollDistance >= Self.collapseThreshold else {
             return
         }
 
-        let crossedCollapseThreshold = previousDistance < collapseThreshold
+        let crossedCollapseThreshold = previousDistance < Self.collapseThreshold
         let movedDownEnough = scrollDistance - previousDistance >= directionHysteresis
         if crossedCollapseThreshold || movedDownEnough {
             setExpanded(false)
@@ -419,6 +420,12 @@ private struct WardrobeStatsScrollObserver: UIViewRepresentable {
     }
 
     final class Coordinator: NSObject {
+        private enum ScrollRange: Equatable {
+            case top
+            case middle
+            case collapse
+        }
+
         var onScroll: (CGFloat) -> Void
         private weak var scrollView: UIScrollView?
         private var observation: NSKeyValueObservation?
@@ -467,10 +474,17 @@ private struct WardrobeStatsScrollObserver: UIViewRepresentable {
 
         private func shouldEmit(_ distance: CGFloat) -> Bool {
             guard let lastEmittedDistance else { return true }
-            if abs(distance - lastEmittedDistance) >= 6 { return true }
-            if lastEmittedDistance > 12, distance <= 12 { return true }
-            if lastEmittedDistance < 44, distance >= 44 { return true }
-            return false
+            return scrollRange(for: distance) != scrollRange(for: lastEmittedDistance)
+        }
+
+        private func scrollRange(for distance: CGFloat) -> ScrollRange {
+            if distance <= WardrobeStatsAutoCollapseCoordinator.topThreshold {
+                return .top
+            }
+            if distance >= WardrobeStatsAutoCollapseCoordinator.collapseThreshold {
+                return .collapse
+            }
+            return .middle
         }
 
         private func findScrollView(from view: UIView) -> UIScrollView? {
@@ -1905,14 +1919,13 @@ struct WardrobeView: View {
                     .accessibilityHidden(!isShowingStatsRuleHint)
             }
 
-            WardrobeStatsView(clothings: filteredClothings,
-                              statsSummary: filteredStatsSummary,
-                              filterDescription: filterDescription,
-                              onClearFilter: onClearFilter)
-                .fixedSize(horizontal: false, vertical: true)
-                .opacity(showStats ? 1 : 0)
-                .allowsHitTesting(showStats)
-                .accessibilityHidden(!showStats)
+            if showStats {
+                WardrobeStatsView(clothings: filteredClothings,
+                                  statsSummary: filteredStatsSummary,
+                                  filterDescription: filterDescription,
+                                  onClearFilter: onClearFilter)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
         .fixedSize(horizontal: false, vertical: true)
         .transaction { transaction in
