@@ -294,7 +294,7 @@ class SwiftDataMigrationManager: ObservableObject {
             try await migrateClothing(from: localContext, to: cloudContext)
             migrationProgress = 0.12
 
-            // 1b. 迁移小金库隐藏存款记录
+            // 1b. 迁移历史财富记录
             try await migrateWealthSavingEntries(from: localContext, to: cloudContext)
             migrationProgress = 0.15
             
@@ -818,21 +818,24 @@ class SwiftDataMigrationManager: ObservableObject {
             accessories: source.accessories,
             imagePaths: source.imagePaths,
             isShared: source.isShared,
-            originalPrice: source.originalPrice,
-            price: source.price,
-            deposit: source.deposit,
-            balance: source.balance,
-            accessoriesPrice: source.accessoriesPrice,
+            originalPrice: FinancialDataSanitizer.money(source.originalPrice),
+            price: FinancialDataSanitizer.money(source.price),
+            deposit: FinancialDataSanitizer.money(source.deposit),
+            balance: FinancialDataSanitizer.money(source.balance),
+            accessoriesPrice: FinancialDataSanitizer.money(source.accessoriesPrice),
             purchaseDate: source.purchaseDate,
             depositDate: source.depositDate,
             isDepositPlan: source.isDepositPlan,
             finalPaymentDate: source.finalPaymentDate,
             finalPaymentEndDate: source.finalPaymentEndDate,
             note: source.note,
-            stock: source.stock,
+            stock: FinancialDataSanitizer.stock(source.stock),
             status: source.status
         )
         new.copyCurrencyAndShippingMetadata(from: source)
+        new.originalPriceJPY = FinancialDataSanitizer.money(source.originalPriceJPY)
+        new.shippingFee = FinancialDataSanitizer.money(source.shippingFee)
+        new.shippingFeeJPY = FinancialDataSanitizer.money(source.shippingFeeJPY)
         new.id = source.id
         new.sizeChartImagePath = source.sizeChartImagePath
         new.priceChartImagePath = source.priceChartImagePath
@@ -842,9 +845,9 @@ class SwiftDataMigrationManager: ObservableObject {
         new.createdAt = source.createdAt
         new.updatedAt = source.updatedAt
         new.lastModified = source.lastModified
-        new.isFinalPaymentSavedToWealth = source.isFinalPaymentSavedToWealth
-        new.finalPaymentSavedAt = source.finalPaymentSavedAt
-        new.finalPaymentInstallmentCount = source.finalPaymentInstallmentCount
+        new.isFinalPaymentSavedToWealth = false
+        new.finalPaymentSavedAt = nil
+        new.finalPaymentInstallmentCount = 0
         new.model3DPath = source.model3DPath
         new.model3DType = source.model3DType
         new.model3DThumbnailPath = source.model3DThumbnailPath
@@ -853,18 +856,15 @@ class SwiftDataMigrationManager: ObservableObject {
     }
 
     private func createWealthSavingEntryCopy(from source: WealthSavingEntry) -> WealthSavingEntry {
+        let normalizedKind = source.kind
+        let normalizedAmount = FinancialDataSanitizer.money(source.amount)
         let new = WealthSavingEntry(
-            amount: source.amount,
+            amount: normalizedAmount,
             clothingID: source.clothingID,
             note: source.note,
             migrationSource: source.migrationSource,
-            entryKind: source.kind,
-            finalPaymentMode: source.paymentMode,
-            installmentIndex: source.installmentIndex,
-            installmentCount: source.installmentCount,
+            entryKind: normalizedKind,
             paidAt: source.paidAt,
-            vaultDeductionAmount: source.vaultDeductionAmount,
-            externalPaymentAmount: source.externalPaymentAmount,
             createdAt: source.createdAt
         )
         new.id = source.id
@@ -890,9 +890,9 @@ class SwiftDataMigrationManager: ObservableObject {
     private func createAccessoryItemCopy(from source: AccessoryItem) -> AccessoryItem {
         let new = AccessoryItem(
             name: source.name,
-            price: source.price,
-            deposit: source.deposit,
-            balance: source.balance,
+            price: FinancialDataSanitizer.money(source.price),
+            deposit: FinancialDataSanitizer.money(source.deposit),
+            balance: FinancialDataSanitizer.money(source.balance),
             sortIndex: source.sortIndex,
             imagePaths: source.imagePaths
         )

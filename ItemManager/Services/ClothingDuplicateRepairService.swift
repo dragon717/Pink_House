@@ -321,16 +321,12 @@ final class ClothingDuplicateRepairService {
         if keeper.finalPaymentEndDate == nil {
             keeper.finalPaymentEndDate = duplicate.finalPaymentEndDate
         }
-        if keeper.finalPaymentInstallmentCount == 0 {
-            keeper.finalPaymentInstallmentCount = duplicate.finalPaymentInstallmentCount
-        }
+        keeper.finalPaymentInstallmentCount = 0
         if !keeper.isDepositPlan, duplicate.isDepositPlan {
             keeper.isDepositPlan = true
         }
-        keeper.isFinalPaymentSavedToWealth = keeper.isFinalPaymentSavedToWealth || duplicate.isFinalPaymentSavedToWealth
-        if keeper.finalPaymentSavedAt == nil {
-            keeper.finalPaymentSavedAt = duplicate.finalPaymentSavedAt
-        }
+        keeper.isFinalPaymentSavedToWealth = false
+        keeper.finalPaymentSavedAt = nil
     }
 
     private func mergeModelFields(from duplicate: Clothing, into keeper: Clothing) {

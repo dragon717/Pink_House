@@ -45,7 +45,7 @@ struct BackupManifest: Codable {
     let brands: [BrandDTO]
     let tags: [TagDTO]
     let clothings: [ClothingDTO]
-    let wealthSavingEntries: [WealthSavingEntryDTO]? // v1.12+ 小金库隐藏存款记录，老版本备份可能不存在
+    let wealthSavingEntries: [WealthSavingEntryDTO]? // v1.12+ 历史财富记录，老版本备份可能不存在
     let storedImages: [StoredImageDTO]
     let cutouts: [CutoutItemDTO]
     // Deprecated: outfits are now handled as snapshots
@@ -415,9 +415,9 @@ struct ClothingDTO: Codable {
     let isDepositPlan: Bool
     let finalPaymentDate: Date?
     let finalPaymentEndDate: Date?
-    let finalPaymentInstallmentCount: Int? // v1.13+ 尾款分期期数，老版本备份可能不存在
-    let isFinalPaymentSavedToWealth: Bool? // v1.10+ 尾款是否已存入马上来财招财猫，老版本备份可能不存在
-    let finalPaymentSavedAt: Date? // v1.10+ 尾款存入招财猫时间，老版本备份可能不存在
+    let finalPaymentInstallmentCount: Int? // v1.13+ 旧版尾款账单兼容字段，恢复时会清理
+    let isFinalPaymentSavedToWealth: Bool? // v1.10+ 旧版尾款标记，恢复时会清理
+    let finalPaymentSavedAt: Date? // v1.10+ 旧版尾款标记时间，恢复时会清理
     let note: String
     let stock: Int
     let status: String? // v1.2+ 上架状态，老版本备份可能不存在
@@ -453,11 +453,11 @@ struct WealthSavingEntryDTO: Codable {
     let note: String?
     let migrationSource: String?
     let entryKind: String? // v1.13+ saving / final_payment，老版本备份默认 saving
-    let finalPaymentMode: String? // v1.13+ one_time / installment
-    let installmentIndex: Int? // v1.13+ 第几期
-    let installmentCount: Int? // v1.13+ 共几期
+    let finalPaymentMode: String? // v1.13+ 旧版尾款账单兼容字段
+    let installmentIndex: Int? // v1.13+ 旧版尾款账单兼容字段
+    let installmentCount: Int? // v1.13+ 旧版尾款账单兼容字段
     let paidAt: Date? // v1.13+ 尾款实付时间
-    let vaultDeductionAmount: Decimal? // v1.13+ 小金库自动抵扣金额
+    let vaultDeductionAmount: Decimal? // v1.13+ 旧版金额兼容字段
     let externalPaymentAmount: Decimal? // v1.13+ 外部实付补差金额
     let createdAt: Date
     let updatedAt: Date?

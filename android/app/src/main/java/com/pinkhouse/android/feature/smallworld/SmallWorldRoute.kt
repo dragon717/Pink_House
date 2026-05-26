@@ -88,7 +88,7 @@ enum class SmallWorldDestination(
     CheckIn("每日打卡", "签到、问候语与今日穿搭色", Icons.Filled.CheckCircle, "记录今天的心情和穿搭灵感。"),
     Calendar("梦裙日历", "尾款与穿搭日程", Icons.Filled.CalendarMonth, "查看定金、尾款和入手日程。"),
     NoticeCenter("通知中心", "公告、提醒与待确认消息", Icons.Filled.Notifications, "查看最新公告和需要确认的消息。"),
-    Wealth("来财", "招财、数钱、储蓄", Icons.Filled.Paid, "记录小金库和可爱财富目标。"),
+    Wealth("来财", "财富记录与数钱", Icons.Filled.Paid, "记录资产和数钱小工具。"),
     Ootd("穿搭手帐", "记录每日搭配", Icons.Filled.Book, "保存每日穿搭灵感和搭配记录。"),
     Perler("拼豆工坊", "像素图纸与工坊", Icons.Filled.PieChart, "整理拼豆图纸和制作计划。"),
     DressStock("裙子股市", "监控裙装行情", Icons.AutoMirrored.Filled.TrendingUp, "关注心仪裙装的价格和热度。"),

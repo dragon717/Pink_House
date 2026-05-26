@@ -775,9 +775,9 @@ enum WealthGuideStep: Int, CaseIterable, GuideStepDescribable {
         case .step3_divination:
             return "「请签」会给出今日心愿提醒，适合像茶会开场一样轻轻打卡。"
         case .step4_moneyCounting:
-            return "「数钱」会把衣橱总值、心愿定金和小匣储蓄变成沉浸式账本。"
+            return "「数钱」会把衣橱总值和心愿定金变成沉浸式账本。"
         case .step5_wealthStorage:
-            return "「安财」可查看黄金、白银、萌宠货币和尾款心愿小匣。"
+            return "「安财」可查看黄金、白银和萌宠货币。"
         }
     }
 

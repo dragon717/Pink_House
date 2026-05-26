@@ -135,9 +135,6 @@ struct DepositItemRow: View {
                     }
                 }
 
-                if !clothing.isFullPaymentReservation {
-                    FinalPaymentWealthButton(clothing: clothing, compact: false)
-                }
 
                 // Note Section
                 if !clothing.note.isEmpty {
@@ -404,9 +401,6 @@ struct SimpleDepositItemRow: View {
                     }
                 }
 
-                if !clothing.isFullPaymentReservation {
-                    FinalPaymentWealthButton(clothing: clothing, compact: true)
-                }
             }
             .padding(16)
             .themeSkinSectionCard(cornerRadius: 24)
@@ -423,128 +417,6 @@ struct SimpleDepositItemRow: View {
             Task { await SharedPersistence.shared.syncWidgetData() }
         } catch {
             print("SimpleDepositItemRow: Failed to save note change: \(error)")
-        }
-    }
-}
-
-struct FinalPaymentWealthButton: View {
-    @Environment(\.modelContext) private var modelContext
-    @Environment(ThemeManager.self) private var themeManager
-    @Query private var wealthSavingEntries: [WealthSavingEntry]
-    @State private var showingSavingSheet = false
-    @State private var celebrationAmount: Decimal?
-
-    let clothing: Clothing
-    var compact: Bool = false
-
-    private var savedAmount: Decimal {
-        WealthSavingLedger.activeTotal(for: clothing.id, in: wealthSavingEntries)
-    }
-
-    private var paidAmount: Decimal {
-        WealthSavingLedger.paidFinalPaymentTotal(for: clothing.id, in: wealthSavingEntries)
-    }
-
-    private var finalPaymentRemainingAmount: Decimal {
-        WealthSavingLedger.remainingFinalPaymentAmount(for: clothing, entries: wealthSavingEntries)
-    }
-
-    private var remainingAmount: Decimal {
-        WealthSavingLedger.remainingAssignableAmount(for: clothing, entries: wealthSavingEntries)
-    }
-
-    private var overflowAmount: Decimal {
-        WealthSavingLedger.overflowAmount(for: clothing, entries: wealthSavingEntries)
-    }
-
-    var body: some View {
-        Group {
-            if !clothing.isFullPaymentReservation {
-                Button {
-                    showingSavingSheet = true
-                } label: {
-                    statusLabel(
-                        icon: overflowAmount > 0 ? "exclamationmark.triangle.fill" : (savedAmount > 0 ? "tray.full.fill" : "tray.and.arrow.down"),
-                        title: overflowAmount > 0 ? "小金库超额" : (paidAmount > 0 ? "尾款支付进度" : (remainingAmount <= 0 ? "已存到上限" : (savedAmount > 0 ? "小金库进度" : "存一笔到小金库"))),
-                        detail: overflowAmount > 0 ? "超额¥\(NSDecimalNumber(decimal: overflowAmount).stringValue)" : "已付¥\(NSDecimalNumber(decimal: paidAmount).stringValue) · 剩余¥\(NSDecimalNumber(decimal: finalPaymentRemainingAmount).stringValue) · 可抵扣¥\(NSDecimalNumber(decimal: savedAmount).stringValue)",
-                        foreground: overflowAmount > 0 ? Color(hex: "C94C72") : .orange,
-                        background: Color.orange.opacity(0.10)
-                    )
-                }
-                .buttonStyle(.plain)
-                .disabled(remainingAmount <= 0)
-                .sheet(isPresented: $showingSavingSheet) {
-                    VaultSavingSheet(
-                        targetClothing: clothing,
-                        currentSavedAmount: savedAmount,
-                        onSave: saveWealthSavingAmount
-                    )
-                }
-                .overlay {
-                    if let celebrationAmount {
-                        VaultSavingCelebrationOverlay(
-                            amount: celebrationAmount,
-                            onComplete: { self.celebrationAmount = nil }
-                        )
-                        .allowsHitTesting(false)
-                    }
-                }
-            }
-        }
-    }
-
-    private var savedDateText: String {
-        guard let date = clothing.finalPaymentSavedAt else { return "已计入来财统计" }
-        return "存入于 \(date.formatted(date: .numeric, time: .omitted))"
-    }
-
-    private func statusLabel(
-        icon: String,
-        title: String,
-        detail: String,
-        foreground: Color,
-        background: Color
-    ) -> some View {
-        HStack(spacing: 8) {
-            Image(systemName: icon)
-                .font(.caption.weight(.bold))
-            Text(title)
-                .font(.caption.weight(.bold))
-                .themeSkinLegibleText(level: .chip, slot: .primaryButton)
-            if !compact {
-                Text(detail)
-                    .font(.caption2)
-                    .foregroundStyle(themeManager.secondaryTextColor)
-                    .themeSkinLegibleText(level: .inline, slot: .primaryButton)
-            } else {
-                Spacer(minLength: 0)
-                Text(detail)
-                    .font(.caption2.weight(.semibold))
-                    .themeSkinLegibleText(level: .chip, slot: .primaryButton)
-            }
-        }
-        .foregroundStyle(foreground)
-        .padding(.horizontal, 12)
-        .padding(.vertical, 7)
-        .frame(maxWidth: compact ? .infinity : nil, alignment: .leading)
-        .themeSkinAdaptiveSectionCard(slot: .primaryButton, cornerRadius: 18, showsDecoration: false) {
-            Capsule().fill(background)
-        }
-    }
-
-    private func saveWealthSavingAmount(_ amount: Decimal) {
-        do {
-            guard let entry = try WealthSavingLedger.addSaving(
-                amount: amount,
-                for: clothing,
-                entries: wealthSavingEntries,
-                note: "为「\(clothing.name)」存钱",
-                context: modelContext
-            ) else { return }
-            Task { await SharedPersistence.shared.syncWidgetData() }
-            celebrationAmount = entry.amount
-        } catch {
-            print("FinalPaymentWealthButton: Failed to save wealth saving entry: \(error)")
         }
     }
 }

@@ -2456,7 +2456,6 @@ struct ClothingEditView: View {
         if let c = clothing {
             // Update
             AppLogger.info("Updating clothing: \(c.id)")
-            let wasDepositPlan = c.isDepositPlan
             let oldSizeChartPath = c.sizeChartImagePath?.trimmingCharacters(in: .whitespacesAndNewlines)
             let oldPriceChartPath = c.priceChartImagePath?.trimmingCharacters(in: .whitespacesAndNewlines)
             c.name = name
@@ -2521,9 +2520,6 @@ struct ClothingEditView: View {
             c.isDepositPlan = finalIsDepositPlan
             c.finalPaymentDate = finalPaymentStartDate
             c.finalPaymentEndDate = finalPaymentEndDateValue
-            if wasDepositPlan && finalReservationKind != .depositPlan {
-                try? WealthSavingLedger.markActiveSavingsUsed(for: c.id, context: modelContext)
-            }
             if !finalIsDepositPlan {
                 c.isFinalPaymentSavedToWealth = false
                 c.finalPaymentSavedAt = nil

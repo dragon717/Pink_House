@@ -4693,28 +4693,6 @@
         }
       }
     },
-    "为这条裙装存一笔": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Save money for this dress item"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "为这条裙装存一笔"
-          }
-        },
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "為這條裙裝存一筆"
-          }
-        }
-      }
-    },
     "主人：先给我看天气穿搭～": {
       "localizations": {
         "en": {
@@ -11225,72 +11203,6 @@
         }
       }
     },
-    "可抵扣 ¥%@": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Deductible ¥%@"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "可抵扣 ¥%@"
-          }
-        },
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "可抵扣 ¥%@"
-          }
-        }
-      }
-    },
-    "可抵扣小金库": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Savings Box"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "可抵扣小金库"
-          }
-        },
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "可抵扣小金庫"
-          }
-        }
-      }
-    },
-    "可抵扣小金库 ¥%@，记录付款时会自动优先抵扣；不足部分记为外部实付。": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Savings Box can deduct ¥%@. Payment records deduct it first automatically; any shortfall is recorded as external payment."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "可抵扣小金库 ¥%@，记录付款时会自动优先抵扣；不足部分记为外部实付。"
-          }
-        },
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "可抵扣小金庫 ¥%@，記錄付款時會自動優先抵扣；不足部分記為外部實付。"
-          }
-        }
-      }
-    },
     "可搜索内容": {
       "localizations": {
         "en": {
@@ -13804,50 +13716,6 @@
         }
       }
     },
-    "存一笔": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Save an Amount"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "存一笔"
-          }
-        },
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "存一筆"
-          }
-        }
-      }
-    },
-    "存一笔到小金库": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Savings Box"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "存一笔到小金库"
-          }
-        },
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "存一筆到小金庫"
-          }
-        }
-      }
-    },
     "存储与性能": {
       "extractionState": "stale",
       "localizations": {
@@ -14890,28 +14758,6 @@
         }
       }
     },
-    "小金库只作为尾款抵扣资金；实付进度见上方分期卡片": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Savings Box Balance; Actual Paid Progress Card"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "小金库只作为尾款抵扣资金；实付进度见上方分期卡片"
-          }
-        },
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "小金庫只作為尾款抵扣資金；實付進度見上方分期卡片"
-          }
-        }
-      }
-    },
     "少女心愿": {
       "localizations": {
         "en": {
@@ -15216,50 +15062,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "尾款¥%@"
-          }
-        }
-      }
-    },
-    "尾款分期进度 %lld / %lld": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Balance Installment Progress %lld / %lld"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "尾款分期进度 %1$lld / %2$lld"
-          }
-        },
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "尾款分期進度 %1$lld / %2$lld"
-          }
-        }
-      }
-    },
-    "尾款已付清，小金库入口已收起；若有剩余备款已转回未指定小匣。": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Balance, Savings Box Collapse;."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "尾款已付清，小金库入口已收起；若有剩余备款已转回未指定小匣。"
-          }
-        },
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "尾款已付清，小金庫入口已收起；若有剩餘備款已轉回未指定小匣。"
           }
         }
       }
@@ -15635,50 +15437,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "已付 ¥%1$@ · 剩餘 ¥%2$@"
-          }
-        }
-      }
-    },
-    "已付 ¥%@ · 可抵扣 ¥%@": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Paid ¥%@ · Deductible ¥%@"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "已付 ¥%1$@ · 可抵扣 ¥%2$@"
-          }
-        },
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "已付 ¥%1$@ · 可抵扣 ¥%2$@"
-          }
-        }
-      }
-    },
-    "已付尾款 ¥%@ · 剩余尾款 ¥%@ · 可抵扣 ¥%@": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Paid Balance ¥%@ · Remaining Balance ¥%@ · Deductible ¥%@"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "已付尾款 ¥%1$@ · 剩余尾款 ¥%2$@ · 可抵扣 ¥%3$@"
-          }
-        },
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "已付尾款 ¥%1$@ · 剩餘尾款 ¥%2$@ · 可抵扣 ¥%3$@"
           }
         }
       }
@@ -24034,28 +23792,6 @@
         }
       }
     },
-    "最后一期会自动记录剩余尾款 ¥%@，避免分期尾差。": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Auto Remaining Balance ¥ %@,."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "最后一期会自动记录剩余尾款 ¥%@，避免分期尾差。"
-          }
-        },
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "最後一期會自動記錄剩餘尾款 ¥%@，避免分期尾差。"
-          }
-        }
-      }
-    },
     "最多 %lld 色": {
       "localizations": {
         "en": {
@@ -24780,50 +24516,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "本期實付金額"
-          }
-        }
-      }
-    },
-    "本期最多记录剩余尾款 ¥%@。": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Remaining Balance ¥ %@."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "本期最多记录剩余尾款 ¥%@。"
-          }
-        },
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "本期最多記錄剩餘尾款 ¥%@。"
-          }
-        }
-      }
-    },
-    "本次为第 %lld / %lld 期；默认金额按剩余尾款均分，最后一期自动兜底。": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%lld / %lld; Default Amount Remaining Balance, Auto."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "本次为第 %1$lld / %2$lld 期；默认金额按剩余尾款均分，最后一期自动兜底。"
-          }
-        },
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "本次為第 %1$lld / %2$lld 期；默認金額按剩餘尾款均分，最後一期自動兜底。"
           }
         }
       }
@@ -35230,50 +34922,6 @@
         }
       }
     },
-    "请选择分期期数": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Please choose"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "请选择分期期数"
-          }
-        },
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "請選擇分期期數"
-          }
-        }
-      }
-    },
-    "请选择期数后自动均分": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Please choose auto"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "请选择期数后自动均分"
-          }
-        },
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "請選擇期數後自動均分"
-          }
-        }
-      }
-    },
     "请重新选择一张图片以进行裁剪和移动。": {
       "localizations": {
         "en": {
@@ -36261,28 +35909,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "返回始發地"
-          }
-        }
-      }
-    },
-    "还没有实付账单。已有小金库存款会作为可抵扣余额保留。": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "No Actual Paid. Savings Box Balance Keep."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "还没有实付账单。已有小金库存款会作为可抵扣余额保留。"
-          }
-        },
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "還沒有實付賬單。已有小金庫存款會作為可抵扣餘額保留。"
           }
         }
       }

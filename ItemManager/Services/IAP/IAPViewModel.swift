@@ -370,7 +370,7 @@ struct MeowCoinProductDisplay: Identifiable {
             self.isBestValue = false
             self.tag = "+10%"
             self.packageName = "喵币小钱包"
-            self.packageDescription = "一只轻巧的小钱包，装着 60 喵币，适合先给小猫存一笔零花。"
+            self.packageDescription = "一只轻巧的小钱包，装着 60 喵币，适合先给小猫添一点零花。"
             self.assetName = "meowcoin_60"
         case .meowCoin120:
             // 12元档：首次240，之后132（+10%）
@@ -420,7 +420,7 @@ struct MeowCoinProductDisplay: Identifiable {
             self.isBestValue = false
             self.tag = "+35%"
             self.packageName = "喵币藏宝库入场券"
-            self.packageDescription = "一座堆得满满的藏宝库，装着 3280 喵币，想把一整片小金库都搬回家。"
+            self.packageDescription = "一座堆得满满的藏宝库，装着 3280 喵币，想把一整片钱袋都搬回家。"
             self.assetName = "mcoin_3280"
         default:
             self.coinAmount = 0

@@ -80,7 +80,6 @@ class BackupService {
         "UserPreference_DepositDisplayMode",
         "UserPreference_WardrobeNavigationStyle",
         "shouldShowWealthContainerBackground",
-        "wealth.finalPaymentVaultMascot",
         "visualModelPriority",
         "textModelPriority",
         "voiceModelId",
@@ -290,9 +289,9 @@ class BackupService {
                     isDepositPlan: c.isDepositPlan,
                     finalPaymentDate: c.finalPaymentDate,
                     finalPaymentEndDate: c.finalPaymentEndDate,
-                    finalPaymentInstallmentCount: c.finalPaymentInstallmentCount,
-                    isFinalPaymentSavedToWealth: c.isFinalPaymentSavedToWealth,
-                    finalPaymentSavedAt: c.finalPaymentSavedAt,
+                    finalPaymentInstallmentCount: 0,
+                    isFinalPaymentSavedToWealth: false,
+                    finalPaymentSavedAt: nil,
                     note: c.note,
                     stock: c.stock,
                     status: c.status.rawValue,
@@ -312,19 +311,21 @@ class BackupService {
                 descriptor: FetchDescriptor<WealthSavingEntry>(),
                 entityName: "WealthSavingEntries"
             ) { entry in
-                WealthSavingEntryDTO(
+                let normalizedKind = entry.kind
+                let normalizedAmount = FinancialDataSanitizer.money(entry.amount)
+                return WealthSavingEntryDTO(
                     id: entry.id,
-                    amount: entry.amount,
+                    amount: normalizedAmount,
                     clothingID: entry.clothingID,
                     note: entry.note,
                     migrationSource: entry.migrationSource,
-                    entryKind: entry.entryKind,
-                    finalPaymentMode: entry.finalPaymentMode,
-                    installmentIndex: entry.installmentIndex,
-                    installmentCount: entry.installmentCount,
+                    entryKind: normalizedKind.rawValue,
+                    finalPaymentMode: nil,
+                    installmentIndex: nil,
+                    installmentCount: nil,
                     paidAt: entry.paidAt,
-                    vaultDeductionAmount: entry.vaultDeductionAmount,
-                    externalPaymentAmount: entry.externalPaymentAmount,
+                    vaultDeductionAmount: nil,
+                    externalPaymentAmount: nil,
                     createdAt: entry.createdAt,
                     updatedAt: entry.updatedAt,
                     usedAt: entry.usedAt,
@@ -1537,15 +1538,18 @@ class BackupService {
         var desiredIDs = Set<UUID>()
 
         for dto in dtoItems {
+            let sanitizedPrice = FinancialDataSanitizer.money(dto.price)
+            let sanitizedDeposit = FinancialDataSanitizer.money(dto.deposit ?? 0)
+            let sanitizedBalance = FinancialDataSanitizer.money(dto.balance ?? 0)
             let item: AccessoryItem
             if let existing = existingByID[dto.id] {
                 item = existing
             } else {
                 item = AccessoryItem(
                     name: dto.name,
-                    price: dto.price,
-                    deposit: dto.deposit ?? 0,
-                    balance: dto.balance ?? 0,
+                    price: sanitizedPrice,
+                    deposit: sanitizedDeposit,
+                    balance: sanitizedBalance,
                     sortIndex: dto.sortIndex,
                     imagePaths: dto.imagePaths
                 )
@@ -1554,9 +1558,9 @@ class BackupService {
             }
 
             item.name = dto.name
-            item.price = dto.price
-            item.deposit = dto.deposit ?? 0
-            item.balance = dto.balance ?? 0
+            item.price = sanitizedPrice
+            item.deposit = sanitizedDeposit
+            item.balance = sanitizedBalance
             item.sortIndex = dto.sortIndex
             item.imagePaths = dto.imagePaths
 
@@ -1723,19 +1727,19 @@ class BackupService {
             clothingBack.isShared = dto.isShared ?? false
 
             // Prices: backup data overwrites (user may have updated prices)
-            clothingBack.originalPrice = dto.originalPrice ?? 0
-            clothingBack.originalPriceJPY = dto.originalPriceJPY ?? 0
+            clothingBack.originalPrice = FinancialDataSanitizer.money(dto.originalPrice ?? 0)
+            clothingBack.originalPriceJPY = FinancialDataSanitizer.money(dto.originalPriceJPY ?? 0)
             clothingBack.originalPriceCurrencyCode = dto.originalPriceCurrencyCode ?? ClothingPriceCurrency.cny.rawValue
-            clothingBack.originalPriceExchangeRateJPY = dto.originalPriceExchangeRateJPY ?? 21.0
+            clothingBack.originalPriceExchangeRateJPY = FinancialDataSanitizer.money(dto.originalPriceExchangeRateJPY ?? 21.0)
             clothingBack.originalPriceRateUpdatedAt = dto.originalPriceRateUpdatedAt
-            clothingBack.price = dto.price
-            clothingBack.deposit = dto.deposit
-            clothingBack.balance = dto.balance
-            clothingBack.accessoriesPrice = dto.accessoriesPrice ?? 0
-            clothingBack.shippingFee = dto.shippingFee ?? 0
-            clothingBack.shippingFeeJPY = dto.shippingFeeJPY ?? 0
+            clothingBack.price = FinancialDataSanitizer.money(dto.price)
+            clothingBack.deposit = FinancialDataSanitizer.money(dto.deposit)
+            clothingBack.balance = FinancialDataSanitizer.money(dto.balance)
+            clothingBack.accessoriesPrice = FinancialDataSanitizer.money(dto.accessoriesPrice ?? 0)
+            clothingBack.shippingFee = FinancialDataSanitizer.money(dto.shippingFee ?? 0)
+            clothingBack.shippingFeeJPY = FinancialDataSanitizer.money(dto.shippingFeeJPY ?? 0)
             clothingBack.shippingFeeCurrencyCode = dto.shippingFeeCurrencyCode ?? ClothingPriceCurrency.cny.rawValue
-            clothingBack.shippingExchangeRateJPY = dto.shippingExchangeRateJPY ?? 21.0
+            clothingBack.shippingExchangeRateJPY = FinancialDataSanitizer.money(dto.shippingExchangeRateJPY ?? 21.0)
             clothingBack.shippingRateUpdatedAt = dto.shippingRateUpdatedAt
             
             // Dates: backup data overwrites
@@ -1744,14 +1748,14 @@ class BackupService {
             clothingBack.isDepositPlan = dto.isDepositPlan
             clothingBack.finalPaymentDate = dto.finalPaymentDate
             clothingBack.finalPaymentEndDate = dto.finalPaymentEndDate
-            clothingBack.finalPaymentInstallmentCount = dto.finalPaymentInstallmentCount ?? 0
-            clothingBack.isFinalPaymentSavedToWealth = dto.isDepositPlan && (dto.isFinalPaymentSavedToWealth ?? false)
-            clothingBack.finalPaymentSavedAt = clothingBack.isFinalPaymentSavedToWealth ? dto.finalPaymentSavedAt : nil
+            clothingBack.finalPaymentInstallmentCount = 0
+            clothingBack.isFinalPaymentSavedToWealth = false
+            clothingBack.finalPaymentSavedAt = nil
             
             clothingBack.note = dto.note
             
             // Stock: use backup value (backup is source of truth for inventory)
-            clothingBack.stock = dto.stock
+            clothingBack.stock = FinancialDataSanitizer.stock(dto.stock)
             
             clothingBack.status = ClothingStatus(rawValue: dto.status ?? "") ?? .onShelf
             
@@ -2699,25 +2703,27 @@ class BackupService {
 
         if let dtoEntries = manifest.wealthSavingEntries, !dtoEntries.isEmpty {
             for dto in dtoEntries {
+                let sanitizedAmount = FinancialDataSanitizer.money(dto.amount)
+                let normalizedKind = WealthSavingEntryKind(rawValue: dto.entryKind ?? WealthSavingEntryKind.saving.rawValue) ?? .saving
                 let entry = entryMap[dto.id] ?? {
-                    let newEntry = WealthSavingEntry(amount: dto.amount, clothingID: dto.clothingID, createdAt: dto.createdAt)
+                    let newEntry = WealthSavingEntry(amount: sanitizedAmount, clothingID: dto.clothingID, createdAt: dto.createdAt)
                     newEntry.id = dto.id
                     modelContext.insert(newEntry)
                     entryMap[dto.id] = newEntry
                     return newEntry
                 }()
 
-                entry.amount = dto.amount
+                entry.amount = sanitizedAmount
                 entry.clothingID = dto.clothingID
                 entry.note = dto.note ?? ""
                 entry.migrationSource = dto.migrationSource
-                entry.entryKind = dto.entryKind ?? WealthSavingEntryKind.saving.rawValue
-                entry.finalPaymentMode = dto.finalPaymentMode
-                entry.installmentIndex = dto.installmentIndex ?? 0
-                entry.installmentCount = dto.installmentCount ?? 0
+                entry.entryKind = normalizedKind.rawValue
+                entry.finalPaymentMode = nil
+                entry.installmentIndex = 0
+                entry.installmentCount = 0
                 entry.paidAt = dto.paidAt
-                entry.vaultDeductionAmount = dto.vaultDeductionAmount ?? 0
-                entry.externalPaymentAmount = dto.externalPaymentAmount ?? 0
+                entry.vaultDeductionAmount = 0
+                entry.externalPaymentAmount = 0
                 entry.createdAt = dto.createdAt
                 entry.updatedAt = dto.updatedAt ?? dto.createdAt
                 entry.usedAt = dto.usedAt

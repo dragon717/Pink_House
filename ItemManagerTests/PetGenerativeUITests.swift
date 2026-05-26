@@ -374,7 +374,7 @@ final class PetGenerativeUITests: XCTestCase {
 
         let currencyWidget = makeCurrencyPanelWidget(status: status, kind: .all)
         XCTAssertEqual(currencyWidget.title, "我的货币余额")
-        XCTAssertTrue(currencyWidget.subtitle?.contains("我的小金库") == true)
+        XCTAssertTrue(currencyWidget.subtitle?.contains("我的随身钱袋") == true)
     }
 
     func testSleepyExpressionRuleSupportsLowEnergyAndTimeOfDay() {
@@ -722,7 +722,7 @@ final class PetGenerativeUITests: XCTestCase {
         let widget = makeShopPanelWidget(status: status)
         let intro = shopPanelIntroMessage(status: status)
 
-        XCTAssertTrue(widget.title.contains("奶茶"))
+        XCTAssertTrue(widget.title?.contains("奶茶") == true)
         XCTAssertTrue(widget.subtitle?.contains("猫罐头") == true || widget.subtitle?.contains("冻干") == true || widget.subtitle?.contains("猫条") == true)
         XCTAssertTrue(intro.contains("宠物商店"))
         XCTAssertTrue(intro.contains("好不好喵"))
@@ -736,7 +736,7 @@ final class PetGenerativeUITests: XCTestCase {
         let widget = makeShopPanelWidget(status: status)
         let intro = shopPanelIntroMessage(status: status)
 
-        XCTAssertTrue(widget.title.contains("毛毛"))
+        XCTAssertTrue(widget.title?.contains("毛毛") == true)
         XCTAssertTrue(widget.subtitle?.contains("生骨肉") == true || widget.subtitle?.contains("鸡胸肉") == true || widget.subtitle?.contains("山羊奶") == true)
         XCTAssertFalse(widget.subtitle?.contains("狗骨头") == true)
         XCTAssertFalse(intro.contains("狗骨头"))
