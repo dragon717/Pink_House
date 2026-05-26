@@ -102,21 +102,11 @@
 		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
-/* Begin PBXFileSystemSynchronizedGroupBuildPhaseMembershipExceptionSet section */
-		A25CCD542F3DCBBC00796B6D /* Exceptions for "ItemManager" folder in "Compile Sources" phase from "ItemManager" target */ = {
-			isa = PBXFileSystemSynchronizedGroupBuildPhaseMembershipExceptionSet;
-			buildPhase = A2AE586F2F19377500B4B6EB /* Sources */;
-			membershipExceptions = (
-			);
-		};
-/* End PBXFileSystemSynchronizedGroupBuildPhaseMembershipExceptionSet section */
-
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		A2AE58752F19377500B4B6EB /* ItemManager */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
 				A2AE58962F19377600B4B6EB /* Exceptions for "ItemManager" folder in "ItemManager" target */,
-				A25CCD542F3DCBBC00796B6D /* Exceptions for "ItemManager" folder in "Compile Sources" phase from "ItemManager" target */,
 				A2AE59E92F1EB9C200B4B6EB /* Exceptions for "ItemManager" folder in "少女心愿衣橱Extension" target */,
 			);
 			path = ItemManager;
@@ -485,7 +475,7 @@
 				CODE_SIGN_ALLOW_ENTITLEMENTS_MODIFICATION = YES;
 				CODE_SIGN_ENTITLEMENTS = ItemManager/ItemManager.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 3;
 				DEVELOPMENT_TEAM = 833FJ74GS2;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -538,7 +528,7 @@
 				CODE_SIGN_ALLOW_ENTITLEMENTS_MODIFICATION = YES;
 				CODE_SIGN_ENTITLEMENTS = ItemManager/ItemManager.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 3;
 				DEVELOPMENT_TEAM = 833FJ74GS2;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;

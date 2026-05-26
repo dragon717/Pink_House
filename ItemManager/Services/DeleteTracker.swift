@@ -25,6 +25,34 @@ final class DeleteTracker {
     private let deletedModel3DsKey = "deletedModel3Ds_local"
     private let deletedPerlerPatternsKey = "deletedPerlerPatterns_local"
 
+    private var allDeleteRecordKeys: [String] {
+        [
+            deletedOutfitsKey,
+            deletedClothingsKey,
+            deletedBookGroupsKey,
+            deletedSpaceBookGroupsKey,
+            deletedSpaceOutfitsKey,
+            deletedModel3DsKey,
+            deletedPerlerPatternsKey
+        ]
+    }
+
+    var hasPendingDeletes: Bool {
+        allDeleteRecordKeys.contains { !getDeletedRecords(for: $0).isEmpty }
+    }
+
+    var pendingDeletesFingerprint: String {
+        allDeleteRecordKeys.map { key in
+            let records = getDeletedRecords(for: key)
+            let entries = records
+                .map { id, timestamp in "\(id):\(Int(timestamp))" }
+                .sorted()
+                .joined(separator: ",")
+            return "\(key)=\(entries)"
+        }
+        .joined(separator: "|")
+    }
+
     // MARK: - 初始化
 
     init() {
@@ -618,6 +646,11 @@ final class DeleteTracker {
     // MARK: - 应用所有删除
 
     func applyAllDeletes(context: ModelContext, clearRecords: Bool = true) {
+        guard hasPendingDeletes else {
+            print("DeleteTracker: No tracked deletes pending")
+            return
+        }
+
         print("DeleteTracker: Applying all tracked deletes with timestamp comparison...")
 
         // 保存 context

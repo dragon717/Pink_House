@@ -10,6 +10,7 @@ import SwiftData
 import WidgetKit
 import SwiftUI
 import CoreData
+import ImageIO
 import os
 
 private enum SharedPersistencePerformanceConfig {
@@ -17,6 +18,29 @@ private enum SharedPersistencePerformanceConfig {
 
     static var isLowMemoryDevice: Bool {
         ProcessInfo.processInfo.physicalMemory <= lowMemoryThresholdBytes
+    }
+
+    static var cloudMaintenanceDebounceDelay: TimeInterval {
+        isLowMemoryDevice ? 3.0 : 2.0
+    }
+
+    static var cloudMaintenanceMinimumInterval: TimeInterval {
+        isLowMemoryDevice ? 45.0 : 20.0
+    }
+
+    static var ootdRemoteRepairMinimumInterval: TimeInterval {
+        isLowMemoryDevice ? 600.0 : 240.0
+    }
+
+    static func widgetSyncMinimumInterval(for bucket: String) -> TimeInterval {
+        switch bucket {
+        case "cloud":
+            return isLowMemoryDevice ? 45.0 : 25.0
+        case "launch":
+            return isLowMemoryDevice ? 10.0 : 5.0
+        default:
+            return 0
+        }
     }
 }
 
@@ -28,6 +52,11 @@ class SharedContainer {
         category: "WidgetSync"
     )
     private var deleteReplayTask: Task<Void, Never>?
+    private var lastCloudMaintenanceAt: Date?
+    private var lastCloudMaintenanceDeleteFingerprint: String?
+    private var lastOOTDRemoteRepairAt: Date?
+    private var activeWidgetSyncBuckets = Set<String>()
+    private var lastSuccessfulWidgetSyncByBucket: [String: Date] = [:]
     
     // 使用 MigrationManager 创建 ModelContainer，支持本地和 iCloud 双模式
     let container: ModelContainer
@@ -177,7 +206,10 @@ class SharedContainer {
             print("☁️ iCloud 同步完成通知收到，准备应用删除...")
             
             Task { @MainActor [weak self] in
-                self?.scheduleDeleteReplayAfterCloudSync(reason: "icloud-remote-change", delay: 1.0)
+                self?.scheduleDeleteReplayAfterCloudSync(
+                    reason: "icloud-remote-change",
+                    delay: SharedPersistencePerformanceConfig.cloudMaintenanceDebounceDelay
+                )
             }
         }
         
@@ -192,7 +224,10 @@ class SharedContainer {
             print("☁️ iCloud 内容导入完成，准备应用删除...")
             
             Task { @MainActor [weak self] in
-                self?.scheduleDeleteReplayAfterCloudSync(reason: "icloud-import", delay: 1.0)
+                self?.scheduleDeleteReplayAfterCloudSync(
+                    reason: "icloud-import",
+                    delay: SharedPersistencePerformanceConfig.cloudMaintenanceDebounceDelay
+                )
             }
         }
 
@@ -205,19 +240,34 @@ class SharedContainer {
             guard iCloudSyncManager.shared.syncStatus == .synced else { return }
 
             Task { @MainActor [weak self] in
-                self?.scheduleDeleteReplayAfterCloudSync(reason: "icloud-synced", delay: 0.5)
+                self?.scheduleDeleteReplayAfterCloudSync(
+                    reason: "icloud-synced",
+                    delay: SharedPersistencePerformanceConfig.cloudMaintenanceDebounceDelay
+                )
             }
         }
     }
 
     @MainActor
     private func scheduleDeleteReplayAfterCloudSync(reason: String, delay: TimeInterval) {
+        let now = Date()
+        let pendingFingerprint = DeleteTracker.shared.pendingDeletesFingerprint
+        let deleteRecordsChanged = pendingFingerprint != lastCloudMaintenanceDeleteFingerprint
+        if !deleteRecordsChanged,
+           let lastCloudMaintenanceAt,
+           now.timeIntervalSince(lastCloudMaintenanceAt) < SharedPersistencePerformanceConfig.cloudMaintenanceMinimumInterval {
+            widgetLogger.info("cloud_maintenance_skip reason=\(reason) cooldown=true pending_deletes=\(DeleteTracker.shared.hasPendingDeletes)")
+            return
+        }
+
         deleteReplayTask?.cancel()
         deleteReplayTask = Task { @MainActor [weak self] in
             let nanoseconds = UInt64(delay * 1_000_000_000)
             try? await Task.sleep(nanoseconds: nanoseconds)
             guard !Task.isCancelled, let self else { return }
 
+            self.lastCloudMaintenanceAt = Date()
+            self.lastCloudMaintenanceDeleteFingerprint = DeleteTracker.shared.pendingDeletesFingerprint
             print("DeleteTracker: iCloud 同步稳定后应用删除保护 (\(reason))...")
             self.replayDeletesAfterCloudSync(reason: reason)
         }
@@ -226,18 +276,37 @@ class SharedContainer {
     @MainActor
     private func replayDeletesAfterCloudSync(reason: String) {
         Task {
-            DeleteTracker.shared.applyAllDeletes(context: container.mainContext, clearRecords: false)
-            ClothingDuplicateRepairService.shared.scheduleRepair(
-                modelContainer: container,
-                reason: reason,
-                delayNanoseconds: 700_000_000
-            )
-            OOTDIdentityRepairService.repairIfNeeded(
-                context: container.mainContext,
-                source: reason
-            )
+            if DeleteTracker.shared.hasPendingDeletes {
+                DeleteTracker.shared.applyAllDeletes(context: container.mainContext, clearRecords: false)
+                ClothingDuplicateRepairService.shared.scheduleRepair(
+                    modelContainer: container,
+                    reason: reason,
+                    delayNanoseconds: 700_000_000
+                )
+                if shouldRunOOTDRemoteRepair(reason: reason) {
+                    OOTDIdentityRepairService.repairIfNeeded(
+                        context: container.mainContext,
+                        source: reason
+                    )
+                }
+            } else {
+                widgetLogger.info("delete_replay_skip reason=\(reason) pending_deletes=false")
+            }
             await syncWidgetData(reason: reason)
         }
+    }
+
+    @MainActor
+    private func shouldRunOOTDRemoteRepair(reason: String) -> Bool {
+        let now = Date()
+        if let lastOOTDRemoteRepairAt,
+           now.timeIntervalSince(lastOOTDRemoteRepairAt) < SharedPersistencePerformanceConfig.ootdRemoteRepairMinimumInterval {
+            widgetLogger.info("ootd_repair_skip reason=\(reason) cooldown=true")
+            return false
+        }
+
+        lastOOTDRemoteRepairAt = now
+        return true
     }
     #endif
     
@@ -251,6 +320,25 @@ class SharedContainer {
             return
         }
         #endif
+
+        let throttleBucket = Self.widgetSyncThrottleBucket(for: reason)
+        let throttleInterval = SharedPersistencePerformanceConfig.widgetSyncMinimumInterval(for: throttleBucket)
+        let now = Date()
+        if activeWidgetSyncBuckets.contains(throttleBucket) {
+            widgetLogger.info("sync_skip reason=\(reason) bucket=\(throttleBucket) in_flight=true")
+            return
+        }
+        if throttleInterval > 0,
+           let lastSyncAt = lastSuccessfulWidgetSyncByBucket[throttleBucket],
+           now.timeIntervalSince(lastSyncAt) < throttleInterval {
+            widgetLogger.info("sync_skip reason=\(reason) bucket=\(throttleBucket) cooldown=true")
+            return
+        }
+
+        activeWidgetSyncBuckets.insert(throttleBucket)
+        defer {
+            activeWidgetSyncBuckets.remove(throttleBucket)
+        }
 
         let startedAt = Date()
         let context = sharedModelContainer.mainContext
@@ -351,12 +439,25 @@ class SharedContainer {
             
             WidgetDataManager.shared.save(data: widgetData)
             WidgetCenter.shared.reloadAllTimelines()
+            lastSuccessfulWidgetSyncByBucket[throttleBucket] = Date()
             let durationMs = Int(Date().timeIntervalSince(startedAt) * 1000)
             widgetLogger.info("sync_finish reason=\(reason) duration_ms=\(durationMs) clothing_count=\(clothings.count) deposit_plan_count=\(depositPlans.count) recent_item_limit=\(recentItemLimit) low_memory=\(SharedPersistencePerformanceConfig.isLowMemoryDevice)")
             
         } catch {
             widgetLogger.error("sync_failed reason=\(reason) error=\(error.localizedDescription)")
         }
+    }
+
+    private static func widgetSyncThrottleBucket(for reason: String) -> String {
+        if reason.hasPrefix("icloud-") {
+            return "cloud"
+        }
+
+        if reason == "launch-start" || reason == "launch-deferred" {
+            return "launch"
+        }
+
+        return reason
     }
     
     // DTO for safe transfer to background task
@@ -391,37 +492,10 @@ class SharedContainer {
                 
                 // Compress and Copy if not exists
                 if !fileManager.fileExists(atPath: destURL.path) {
-                    if let image = UIImage(contentsOfFile: sourceURL.path) {
-                        // Compress to max 300px width/height and low quality to save memory
-                        let size = image.size
-                        let maxDimension: CGFloat = 300
-                        var newSize = size
-                        if size.width > maxDimension || size.height > maxDimension {
-                            let ratio = size.width / size.height
-                            if size.width > size.height {
-                                newSize = CGSize(width: maxDimension, height: maxDimension / ratio)
-                            } else {
-                                newSize = CGSize(width: maxDimension * ratio, height: maxDimension)
-                            }
-                        }
-                        
-                        // Optimize: Use opaque context if source is opaque
-                        let isOpaque: Bool
-                        if let alphaInfo = image.cgImage?.alphaInfo {
-                            isOpaque = (alphaInfo == .none || alphaInfo == .noneSkipFirst || alphaInfo == .noneSkipLast)
-                        } else {
-                            isOpaque = false
-                        }
-                        
-                        UIGraphicsBeginImageContextWithOptions(newSize, isOpaque, 1.0)
-                        image.draw(in: CGRect(origin: .zero, size: newSize))
-                        let newImage = UIGraphicsGetImageFromCurrentImageContext()
-                        UIGraphicsEndImageContext()
-                        
-                        if let data = newImage?.jpegData(compressionQuality: 0.5) {
-                            try? data.write(to: destURL)
-                            widgetImagePath = destFileName
-                        }
+                    if fileManager.fileExists(atPath: sourceURL.path),
+                       let data = makeWidgetThumbnailJPEGData(sourceURL: sourceURL) {
+                        try? data.write(to: destURL)
+                        widgetImagePath = destFileName
                     }
                 } else {
                     widgetImagePath = destFileName
@@ -437,6 +511,41 @@ class SharedContainer {
             ))
         }
         return widgetClothings
+    }
+
+    private nonisolated static func makeWidgetThumbnailJPEGData(sourceURL: URL) -> Data? {
+        autoreleasepool {
+            let sourceOptions = [kCGImageSourceShouldCache: false] as CFDictionary
+            guard let imageSource = CGImageSourceCreateWithURL(sourceURL as CFURL, sourceOptions) else {
+                return nil
+            }
+
+            let thumbnailOptions = [
+                kCGImageSourceCreateThumbnailFromImageAlways: true,
+                kCGImageSourceCreateThumbnailWithTransform: true,
+                kCGImageSourceShouldCacheImmediately: false,
+                kCGImageSourceThumbnailMaxPixelSize: 300
+            ] as CFDictionary
+
+            guard let thumbnail = CGImageSourceCreateThumbnailAtIndex(imageSource, 0, thumbnailOptions) else {
+                return nil
+            }
+
+            let data = NSMutableData()
+            guard let destination = CGImageDestinationCreateWithData(data, "public.jpeg" as CFString, 1, nil) else {
+                return nil
+            }
+
+            let destinationOptions = [
+                kCGImageDestinationLossyCompressionQuality: 0.5
+            ] as CFDictionary
+            CGImageDestinationAddImage(destination, thumbnail, destinationOptions)
+
+            guard CGImageDestinationFinalize(destination) else {
+                return nil
+            }
+            return data as Data
+        }
     }
 }
 

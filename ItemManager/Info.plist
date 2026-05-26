@@ -44,12 +44,12 @@
 	</dict>
 	<key>UIAppFonts</key>
 	<array>
-		<string>XCDUANZHUANGSONGTI.ttf</string>
-		<string>LoversQuarrel-Regular.ttf</string>
-		<string>字嶼雲遊手書.ttf</string>
-		<string>也字工厂小石头.ttf</string>
-		<string>KouzanMouhituFont.ttf</string>
-		<string>临海隶书.ttf</string>
+		<string>asserts/XCDUANZHUANGSONGTI.ttf</string>
+		<string>asserts/LoversQuarrel-Regular.ttf</string>
+		<string>asserts/字嶼雲遊手書.ttf</string>
+		<string>asserts/也字工厂小石头.ttf</string>
+		<string>asserts/KouzanMouhituFont.ttf</string>
+		<string>asserts/临海隶书.ttf</string>
 	</array>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
