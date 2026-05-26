@@ -77,7 +77,7 @@ struct MoneyCountingView: View {
                 // 顶部状态栏
                 HStack {
                     VStack(alignment: .leading) {
-                        Text("剩余金额")
+                        Text("剩余金额".appLocalized)
                             .font(.caption)
                             .foregroundStyle(.secondary)
                         Text("\(currency.symbol)\(remainingBills * denomination.value)")
@@ -90,7 +90,7 @@ struct MoneyCountingView: View {
                     Spacer()
                     
                     Button(action: onSkip) {
-                        Text("跳过")
+                        Text("跳过".appLocalized)
                             .font(.subheadline)
                             .fontWeight(.medium)
                             .padding(.horizontal, 16)
@@ -109,7 +109,7 @@ struct MoneyCountingView: View {
                 ZStack {
                     // 底部占位文字，当钱数完时显示
                     if remainingBills == 0 {
-                        Text("数钱数到手抽筋 🎉")
+                        Text("数钱数到手抽筋 🎉".appLocalized)
                             .font(.title3)
                             .fontWeight(.bold)
                             .foregroundStyle(.white.opacity(0.8))
@@ -250,7 +250,7 @@ struct MoneyCountingView: View {
                 
                 // 提示文字
                 if remainingBills > 0 {
-                    Text("向上滑动或点击数钞")
+                    Text("向上滑动或点击数钞".appLocalized)
                         .font(.caption)
                         .foregroundStyle(.white.opacity(0.5))
                         .padding(.bottom, 40)

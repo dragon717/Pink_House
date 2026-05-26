@@ -8,6 +8,13 @@
 import SwiftUI
 import SwiftData
 
+private func depositLocalizedDateString(_ date: Date, template: String) -> String {
+    let formatter = DateFormatter()
+    formatter.locale = LanguageManager.shared.locale
+    formatter.setLocalizedDateFormatFromTemplate(template)
+    return formatter.string(from: date)
+}
+
 struct DepositItemRow: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(ThemeManager.self) private var themeManager
@@ -15,12 +22,6 @@ struct DepositItemRow: View {
     @State private var showEditNoteAlert: Bool = false
     @State private var editingNote: String = ""
     @State private var thumbnailImage: UIImage?
-
-    private static let dateFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy年M月"
-        return formatter
-    }()
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -70,7 +71,7 @@ struct DepositItemRow: View {
                         }
 
                         if clothing.stock > 1 {
-                            Text("库存: \(clothing.stock)")
+                            Text("库存: %d".appLocalized(clothing.stock))
                                 .font(.caption)
                                 .foregroundStyle(themeManager.tertiaryTextColor)
                                 .themeSkinLegibleText(level: .inline, slot: .sectionCard)
@@ -96,7 +97,7 @@ struct DepositItemRow: View {
 
                     VStack(alignment: .trailing, spacing: 2) {
                         if clothing.isFullPaymentReservation {
-                            Text("全款预约")
+                            Text("全款预约".appLocalized)
                                 .font(.caption2)
                                 .bold()
                                 .foregroundStyle(themeManager.accentTextColor)
@@ -107,12 +108,12 @@ struct DepositItemRow: View {
                                 .foregroundStyle(themeManager.accentTextColor)
                                 .themeSkinLegibleText(level: .chip, slot: .sectionCard)
                         } else {
-                            Text("定金¥\(clothing.totalDeposit.formatted(.number.precision(.fractionLength(0))))")
+                            Text("定金¥%@".appLocalized(clothing.totalDeposit.formatted(.number.precision(.fractionLength(0)))))
                                 .font(.caption)
                                 .bold()
                                 .foregroundStyle(themeManager.accentTextColor)
                                 .themeSkinLegibleText(level: .chip, slot: .sectionCard)
-                            Text("尾款¥\(clothing.totalBalance.formatted(.number.precision(.fractionLength(0))))")
+                            Text("尾款¥%@".appLocalized(clothing.totalBalance.formatted(.number.precision(.fractionLength(0)))))
                                 .font(.caption)
                                 .bold()
                                 .foregroundStyle(themeManager.accentTextColor)
@@ -138,7 +139,7 @@ struct DepositItemRow: View {
 
                 // Note Section
                 if !clothing.note.isEmpty {
-                    Text("备注: \(clothing.note)")
+                    Text("备注: %@".appLocalized(clothing.note))
                         .font(.caption)
                         .foregroundStyle(themeManager.tertiaryTextColor)
                         .themeSkinLegibleText(level: .inline, slot: .sectionCard)
@@ -151,7 +152,7 @@ struct DepositItemRow: View {
                 HStack {
                     Image(systemName: "calendar")
                         .foregroundStyle(.orange)
-                    Text(clothing.isFullPaymentReservation ? "全款预约日期: \(formatDate(clothing.depositDate))" : "预估尾款时间: \(formatDate(clothing.finalPaymentDate))")
+                    Text(clothing.isFullPaymentReservation ? "全款预约日期: %@".appLocalized(formatDate(clothing.depositDate)) : "预估尾款时间: %@".appLocalized(formatDate(clothing.finalPaymentDate)))
                         .font(.caption)
                         .foregroundStyle(.orange)
                         .themeSkinLegibleText(level: .inline, slot: .sectionCard)
@@ -164,7 +165,7 @@ struct DepositItemRow: View {
                     } label: {
                         HStack(spacing: 4) {
                             Image(systemName: "square.and.pencil")
-                            Text("修改备注")
+                            Text("修改备注".appLocalized)
                                 .themeSkinLegibleText(level: .chip, slot: .primaryButton)
                         }
                         .font(.caption)
@@ -174,10 +175,10 @@ struct DepositItemRow: View {
                         .foregroundStyle(.white)
                         .clipShape(Capsule())
                     }
-                    .alert("修改备注", isPresented: $showEditNoteAlert) {
-                        TextField("请输入备注", text: $editingNote)
-                        Button("取消", role: .cancel) { }
-                        Button("保存") {
+                    .alert("修改备注".appLocalized, isPresented: $showEditNoteAlert) {
+                        TextField("请输入备注".appLocalized, text: $editingNote)
+                        Button("取消".appLocalized, role: .cancel) { }
+                        Button("保存".appLocalized) {
                             saveNoteChange()
                         }
                     }
@@ -188,8 +189,8 @@ struct DepositItemRow: View {
     }
 
     private func formatDate(_ date: Date?) -> String {
-        guard let date = date else { return "待定" }
-        return Self.dateFormatter.string(from: date)
+        guard let date = date else { return "待定".appLocalized }
+        return depositLocalizedDateString(date, template: "yMMM")
     }
 
     private func getDepositStatus() -> String? {
@@ -200,11 +201,11 @@ struct DepositItemRow: View {
         let days = calendar.dateComponents([.day], from: calendar.startOfDay(for: now), to: calendar.startOfDay(for: date)).day ?? 0
 
         if days > 0 {
-            return "距定金: \(days)天"
+            return "距定金: %d天".appLocalized(days)
         } else if days == 0 {
-            return "定金日"
+            return "定金日".appLocalized
         } else {
-            return "定金已结束"
+            return "定金已结束".appLocalized
         }
     }
 
@@ -216,11 +217,11 @@ struct DepositItemRow: View {
         let days = calendar.dateComponents([.day], from: calendar.startOfDay(for: now), to: calendar.startOfDay(for: date)).day ?? 0
 
         if days > 0 {
-            return "距预约: \(days)天"
+            return "距预约: %d天".appLocalized(days)
         } else if days == 0 {
-            return "预约日"
+            return "预约日".appLocalized
         } else {
-            return "已预约"
+            return "已预约".appLocalized
         }
     }
 
@@ -236,7 +237,7 @@ struct DepositItemRow: View {
         let daysFromDeposit = calendar.dateComponents([.day], from: depositDay, to: today).day ?? 0
 
         if daysFromDeposit < 0 {
-            return "还没开定金"
+            return "还没开定金".appLocalized
         } else if daysFromDeposit == 0 {
             return nil
         } else {
@@ -245,12 +246,12 @@ struct DepositItemRow: View {
             if let endDate = clothing.finalPaymentEndDate {
                 let daysToEnd = calendar.dateComponents([.day], from: today, to: calendar.startOfDay(for: endDate)).day ?? 0
                 if daysToEnd < 0 {
-                    return "尾款已过，请处理"
+                    return "尾款已过，请处理".appLocalized
                 }
             }
 
             if daysToFinalPayment > 0 {
-                return "距尾款: \(daysToFinalPayment)天"
+                return "距尾款: %d天".appLocalized(daysToFinalPayment)
             } else {
                 return nil
             }
@@ -279,12 +280,6 @@ struct SimpleDepositItemRow: View {
     @State private var thumbnailImage: UIImage?
     @State private var showEditNoteAlert: Bool = false
     @State private var editingNote: String = ""
-
-    private static let monthFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "M月"
-        return formatter
-    }()
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -324,7 +319,8 @@ struct SimpleDepositItemRow: View {
 
                         HStack(spacing: 6) {
                             if let date = clothing.reservationGroupingDate {
-                                Text("\(clothing.isFullPaymentReservation ? "全款" : "尾款"): \(Self.monthFormatter.string(from: date))")
+                                let groupLabel = clothing.isFullPaymentReservation ? "全款".appLocalized : "尾款".appLocalized
+                                Text("%@: %@".appLocalized(groupLabel, formatMonth(date)))
                                     .font(.caption2)
                                     .foregroundStyle(themeManager.accentTextColor)
                                     .themeSkinLegibleText(level: .inline, slot: .filterChip)
@@ -333,7 +329,7 @@ struct SimpleDepositItemRow: View {
                                     .background(themeManager.accentTextColor.opacity(0.1))
                                     .clipShape(RoundedRectangle(cornerRadius: 4))
                             } else {
-                                Text(clothing.isFullPaymentReservation ? "预约待定" : "尾款待定")
+                                Text(clothing.isFullPaymentReservation ? "预约待定".appLocalized : "尾款待定".appLocalized)
                                     .font(.caption2)
                                     .foregroundStyle(themeManager.tertiaryTextColor)
                                     .themeSkinLegibleText(level: .inline, slot: .sectionCard)
@@ -362,17 +358,17 @@ struct SimpleDepositItemRow: View {
                     // 3. Prices
                     VStack(alignment: .trailing, spacing: 2) {
                         if clothing.isFullPaymentReservation {
-                            Text("全款¥\(clothing.fullPaymentReservationTotalAmount.formatted(.number.precision(.fractionLength(0))))")
+                            Text("全款¥%@".appLocalized(clothing.fullPaymentReservationTotalAmount.formatted(.number.precision(.fractionLength(0)))))
                                 .font(.caption)
                                 .bold()
                                 .foregroundStyle(themeManager.accentTextColor)
                                 .themeSkinLegibleText(level: .chip, slot: .sectionCard)
                         } else {
-                            Text("定金¥\(clothing.totalDeposit.formatted(.number.precision(.fractionLength(0))))")
+                            Text("定金¥%@".appLocalized(clothing.totalDeposit.formatted(.number.precision(.fractionLength(0)))))
                                 .font(.caption)
                                 .foregroundStyle(themeManager.accentTextColor)
                                 .themeSkinLegibleText(level: .inline, slot: .sectionCard)
-                            Text("尾款¥\(clothing.totalBalance.formatted(.number.precision(.fractionLength(0))))")
+                            Text("尾款¥%@".appLocalized(clothing.totalBalance.formatted(.number.precision(.fractionLength(0)))))
                                 .font(.caption)
                                 .bold()
                                 .foregroundStyle(themeManager.accentTextColor)
@@ -392,10 +388,10 @@ struct SimpleDepositItemRow: View {
                             .background(Color.secondary.opacity(0.1))
                             .clipShape(Circle())
                     }
-                    .alert("修改备注", isPresented: $showEditNoteAlert) {
-                        TextField("请输入备注", text: $editingNote)
-                        Button("取消", role: .cancel) { }
-                        Button("保存") {
+                    .alert("修改备注".appLocalized, isPresented: $showEditNoteAlert) {
+                        TextField("请输入备注".appLocalized, text: $editingNote)
+                        Button("取消".appLocalized, role: .cancel) { }
+                        Button("保存".appLocalized) {
                             saveNoteChange()
                         }
                     }
@@ -418,6 +414,10 @@ struct SimpleDepositItemRow: View {
         } catch {
             print("SimpleDepositItemRow: Failed to save note change: \(error)")
         }
+    }
+
+    private func formatMonth(_ date: Date) -> String {
+        depositLocalizedDateString(date, template: "MMM")
     }
 }
 
@@ -445,15 +445,9 @@ struct TimelineRow: View {
     let date: Date?
     var trailing: String? = nil
 
-    private static let dateFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy/MM/dd"
-        return formatter
-    }()
-
     var body: some View {
         HStack {
-            Text(title)
+            Text(title.appLocalized)
                 .font(.caption)
                 .fontWeight(.medium)
                 .foregroundStyle(themeManager.primaryTextColor)
@@ -466,7 +460,7 @@ struct TimelineRow: View {
                     .foregroundStyle(themeManager.secondaryTextColor)
                     .themeSkinLegibleText(level: .inline, slot: .sectionCard)
             } else {
-                Text("待定")
+                Text("待定".appLocalized)
                     .font(.caption)
                     .foregroundStyle(themeManager.tertiaryTextColor)
                     .themeSkinLegibleText(level: .inline, slot: .sectionCard)
@@ -488,6 +482,6 @@ struct TimelineRow: View {
     }
 
     private func formatDate(_ date: Date) -> String {
-        return Self.dateFormatter.string(from: date)
+        depositLocalizedDateString(date, template: "yyyyMMdd")
     }
 }
