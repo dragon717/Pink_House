@@ -141,7 +141,7 @@ struct ShopItemView: View {
                     .background(Color.gray.opacity(0.1))
                     .cornerRadius(10)
                 
-                Text(item.name)
+                Text(item.localizedName)
                     .font(.caption)
                     .foregroundColor(.primary)
                 
@@ -160,7 +160,7 @@ struct ShopItemView: View {
                 .clipShape(Capsule())
 
                 if let originalPrice, originalPrice > (displayPrice ?? item.price) {
-                    Text("原价 \(originalPrice)")
+                    Text("原价 %d".appLocalized(originalPrice))
                         .font(.system(size: 10, weight: .medium))
                         .foregroundColor(.secondary)
                 }
@@ -210,7 +210,7 @@ struct InventoryItemView: View {
                     .offset(x: 5, y: -5)
             }
             
-            Text(item.name)
+            Text(item.localizedName)
                 .font(.caption)
                 .foregroundColor(.primary)
         }

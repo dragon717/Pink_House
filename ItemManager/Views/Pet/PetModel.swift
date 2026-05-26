@@ -56,6 +56,10 @@ enum PetCurrency: String, Codable, CaseIterable, Identifiable, Hashable {
 
     var id: String { rawValue }
 
+    var localizedName: String {
+        rawValue.appLocalized
+    }
+
     var iconName: String {
         switch self {
         case .meowCoin: return "pawprint.circle.fill"
@@ -160,6 +164,10 @@ struct PetCategory: Codable, Identifiable, Hashable {
     let id: String
     let name: String
     let icon: String
+
+    var localizedName: String {
+        name.appLocalized
+    }
 }
 
 struct PetItemDefinition: Codable, Identifiable, Hashable {
@@ -189,6 +197,14 @@ struct PetItemDefinition: Codable, Identifiable, Hashable {
     var isToy: Bool {
         return category == "toy"
     }
+
+    var localizedName: String {
+        name.appLocalized
+    }
+
+    var localizedDescription: String {
+        description.appLocalized
+    }
 }
 
 
@@ -201,12 +217,16 @@ enum PetJob: String, Codable, CaseIterable, Identifiable {
 
     var id: String { rawValue }
 
+    var localizedTitle: String {
+        rawValue.appLocalized
+    }
+
     var description: String {
         switch self {
-        case .none: return "宠物正在啃老，状态消耗正常。"
-        case .waiter: return "在猫咖被rua，赚取少量鱼币，稍微有点累。"
-        case .security: return "负责巡逻抓老鼠，赚取大等鱼币，比较累。"
-        case .streamer: return "在线卖萌直播，赚取巨量鱼币，非常累！"
+        case .none: return "宠物正在啃老，状态消耗正常。".appLocalized
+        case .waiter: return "在猫咖被rua，赚取少量鱼币，稍微有点累。".appLocalized
+        case .security: return "负责巡逻抓老鼠，赚取大等鱼币，比较累。".appLocalized
+        case .streamer: return "在线卖萌直播，赚取巨量鱼币，非常累！".appLocalized
         }
     }
 
@@ -255,10 +275,10 @@ struct PetAutoWorkThresholds {
 
     func blockerDescription(for status: PetStatus) -> String? {
         let candidates: [(String, Double, Double)] = [
-            ("饱食", status.hunger, hunger),
-            ("清洁", status.hygiene, hygiene),
-            ("精力", status.energy, energy),
-            ("心情", status.mood, mood)
+            ("饱食".appLocalized, status.hunger, hunger),
+            ("清洁".appLocalized, status.hygiene, hygiene),
+            ("精力".appLocalized, status.energy, energy),
+            ("心情".appLocalized, status.mood, mood)
         ]
 
         guard let weakest = candidates
@@ -268,7 +288,7 @@ struct PetAutoWorkThresholds {
             return nil
         }
 
-        return "\(weakest.0)需要 \(Int(weakest.2))+，当前 \(Int(weakest.1))"
+        return "%@需要 %d+，当前 %d".appLocalized(weakest.0, Int(weakest.2), Int(weakest.1))
     }
 }
 
@@ -281,20 +301,20 @@ enum PetAutoWorkStrategy: String, Codable, CaseIterable, Identifiable, Hashable 
 
     var title: String {
         switch self {
-        case .conservative: return "稳妥"
-        case .balanced: return "平衡"
-        case .ambitious: return "拼一把"
+        case .conservative: return "稳妥".appLocalized
+        case .balanced: return "平衡".appLocalized
+        case .ambitious: return "拼一把".appLocalized
         }
     }
 
     var description: String {
         switch self {
         case .conservative:
-            return "只接轻松活，状态保护更严格。"
+            return "只接轻松活，状态保护更严格。".appLocalized
         case .balanced:
-            return "收益和消耗都适中，适合日常挂机。"
+            return "收益和消耗都适中，适合日常挂机。".appLocalized
         case .ambitious:
-            return "状态很好时才上强度，收益更高也更累。"
+            return "状态很好时才上强度，收益更高也更累。".appLocalized
         }
     }
 
@@ -342,20 +362,20 @@ enum PetAutoWorkRewardMode: String, Codable, CaseIterable, Identifiable, Hashabl
 
     var title: String {
         switch self {
-        case .followPet: return "跟随萌宠"
-        case .fishCoin: return "鱼币"
-        case .boneCoin: return "骨头币"
+        case .followPet: return "跟随萌宠".appLocalized
+        case .fishCoin: return PetCurrency.fishCoin.localizedName
+        case .boneCoin: return PetCurrency.boneCoin.localizedName
         }
     }
 
     var description: String {
         switch self {
         case .followPet:
-            return "奶茶优先赚鱼币，毛毛优先赚骨头币。"
+            return "奶茶优先赚鱼币，毛毛优先赚骨头币。".appLocalized
         case .fishCoin:
-            return "自动打工收益固定为鱼币。"
+            return "自动打工收益固定为鱼币。".appLocalized
         case .boneCoin:
-            return "自动打工收益固定为骨头币。"
+            return "自动打工收益固定为骨头币。".appLocalized
         }
     }
 
@@ -503,7 +523,7 @@ struct DefaultPetBehavior: PetBehavior {
 
     func getWorkFinishResult(job: PetJob, status: PetStatus) -> (video: String, message: String, success: Bool) {
         // 默认逻辑：没有特殊视频，只返回文案
-        return ("idle", "打工结束，赚了 \(status.currentJobEarnedAmount) \(status.currentJobRewardCurrency.rawValue)", true)
+        return ("idle", "打工结束，赚了 %d %@".appLocalized(status.currentJobEarnedAmount, status.currentJobRewardCurrency.localizedName), true)
     }
 
     func getWorkInterruptedVideo() -> String {
@@ -529,13 +549,13 @@ struct NaichaBehavior: PetBehavior {
         if earned > 0 || status.energy > 50 {
             return (
                 "work_success",
-                "打工赚了 \(earned) \(status.currentJobRewardCurrency.rawValue)!",
+                "打工赚了 %d %@!".appLocalized(earned, status.currentJobRewardCurrency.localizedName),
                 true
             )
         } else {
              return (
                 "work_exhausted",
-                "累死宝宝了...",
+                "累死宝宝了...".appLocalized,
                 false
             )
         }

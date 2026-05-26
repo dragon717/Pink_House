@@ -88,7 +88,7 @@ enum PetWorkStateMachine {
                 job: .none,
                 rewardCurrency: normalizedRewardCurrency(rewardCurrency ?? .fishCoin),
                 startedAutomatically: isAutomatic,
-                message: "我现在没有要开始的新工作。"
+                message: "我现在没有要开始的新工作。".appLocalized
             )
         }
 
@@ -98,7 +98,7 @@ enum PetWorkStateMachine {
                 job: status.currentJob,
                 rewardCurrency: status.currentJobRewardCurrency,
                 startedAutomatically: status.currentJobStartedAutomatically,
-                message: "\(status.displayName)已经在\(status.currentJob.rawValue)啦，先下班再换工作吧。"
+                message: "%@已经在%@啦，先下班再换工作吧。".appLocalized(status.displayName, status.currentJob.localizedTitle)
             )
         }
 
@@ -113,13 +113,13 @@ enum PetWorkStateMachine {
         status.currentJobEarnedAmount = 0
         status.currentJobEarnedFishCoin = 0
 
-        let prefix = isAutomatic ? "自动打工" : "开始打工"
+        let prefix = (isAutomatic ? "自动打工" : "开始打工").appLocalized
         return PetWorkStartResult(
             didStart: true,
             job: job,
             rewardCurrency: resolvedCurrency,
             startedAutomatically: isAutomatic,
-            message: "\(prefix): \(job.rawValue)，这次赚\(resolvedCurrency.rawValue)。"
+            message: "%@: %@，这次赚%@。".appLocalized(prefix, job.localizedTitle, resolvedCurrency.localizedName)
         )
     }
 
@@ -137,9 +137,9 @@ enum PetWorkStateMachine {
 
         let message: String
         if isInterrupted {
-            message = "\(status.displayName)状态太低，被迫停止打工。"
+            message = "%@状态太低，被迫停止打工。".appLocalized(status.displayName)
         } else {
-            message = "\(status.displayName)下班啦，本次赚了 \(earnedAmount) \(rewardCurrency.rawValue)。"
+            message = "%@下班啦，本次赚了 %d %@。".appLocalized(status.displayName, earnedAmount, rewardCurrency.localizedName)
         }
 
         return PetWorkStopResult(
@@ -172,18 +172,18 @@ enum PetWorkStateMachine {
     }
 
     static func autoWorkStatusSummary(for status: PetStatus) -> String {
-        guard status.isAutoWorkEnabled else { return "自动打工未开启" }
+        guard status.isAutoWorkEnabled else { return "自动打工未开启".appLocalized }
         if status.currentJobStartedAutomatically, status.currentJob != .none {
-            return "\(status.currentJob.rawValue)进行中，已赚 \(status.currentJobEarnedAmount) \(status.currentJobRewardCurrency.rawValue)"
+            return "%@进行中，已赚 %d %@".appLocalized(status.currentJob.localizedTitle, status.currentJobEarnedAmount, status.currentJobRewardCurrency.localizedName)
         }
         let currency = resolvedAutoWorkRewardCurrency(for: status)
         if remainingJobIncomeQuota(in: status, for: currency) <= 0 {
-            return "今日\(currency.rawValue)收益已达上限"
+            return "今日%@收益已达上限".appLocalized(currency.localizedName)
         }
         if let blocker = status.autoWorkStrategy.startThresholds.blockerDescription(for: status) {
             return blocker
         }
-        return "状态不错，闲下来会自动去打工"
+        return "状态不错，闲下来会自动去打工".appLocalized
     }
 
     @discardableResult

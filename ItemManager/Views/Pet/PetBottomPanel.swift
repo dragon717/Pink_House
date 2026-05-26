@@ -358,7 +358,7 @@ struct InventoryView: View {
                                 }) {
                                     HStack(spacing: 4) {
                                         Image(systemName: category.icon)
-                                        Text(category.name)
+                                        Text(category.localizedName)
                                     }
                                     .font(.caption)
                                     .padding(.horizontal, 12)
@@ -380,7 +380,7 @@ struct InventoryView: View {
                     Image(systemName: "cube.box")
                     .font(.largeTitle)
                     .foregroundColor(.gray.opacity(0.5))
-                    Text(searchText.isEmpty && selectedCategoryId == "all" ? "背包空空如也，去商店买点东西吧~" : "没有找到相关物品")
+                    Text((searchText.isEmpty && selectedCategoryId == "all" ? "背包空空如也，去商店买点东西吧~" : "没有找到相关物品").appLocalized)
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
@@ -433,33 +433,34 @@ struct InventoryView: View {
         .alert(isPresented: $showUseAlert) {
             if let item = selectedItemToUse {
                 return Alert(
-                    title: Text("使用 \(item.name)"),
+                    title: Text("使用 %@".appLocalized(item.localizedName)),
                     message: Text(getUsageMessage(for: item)),
-                    primaryButton: .default(Text("使用")) {
+                    primaryButton: .default(Text("使用".appLocalized)) {
                         viewModel.consumeItem(item)
                     },
-                    secondaryButton: .cancel(Text("取消"))
+                    secondaryButton: .cancel(Text("取消".appLocalized))
                 )
             } else {
-                return Alert(title: Text("错误"), message: Text("未选择物品"), dismissButton: .cancel())
+                return Alert(title: Text("错误".appLocalized), message: Text("未选择物品".appLocalized), dismissButton: .cancel())
             }
         }
     }
     
     private func getUsageMessage(for item: PetItemDefinition) -> String {
         let petName = viewModel.status.displayName
+        let itemName = item.localizedName
         if item.isToy {
-            return "确定要让\(petName)玩 \(item.name) 吗？\n将消耗 \(item.energyCost ?? 0) 点精力，增加心情。"
+            return "确定要让%@玩 %@ 吗？\n将消耗 %d 点精力，增加心情。".appLocalized(petName, itemName, item.energyCost ?? 0)
         } else if item.isDrink {
-            return "确定要给\(petName)喝 \(item.name) 吗？"
+            return "确定要给%@喝 %@ 吗？".appLocalized(petName, itemName)
         } else if item.category == "food" {
-            return "确定要给\(petName)喂食 \(item.name) 吗？"
+            return "确定要给%@喂食 %@ 吗？".appLocalized(petName, itemName)
         } else if item.id == "energyPill" {
-            return "确定要使用 \(item.name) 吗？\n将快速恢复精力。"
+            return "确定要使用 %@ 吗？\n将快速恢复精力。".appLocalized(itemName)
         } else if item.id == "renameCard" {
-            return "确定要使用 \(item.name) 吗？"
+            return "确定要使用 %@ 吗？".appLocalized(itemName)
         } else {
-            return "确定要使用 \(item.name) 吗？"
+            return "确定要使用 %@ 吗？".appLocalized(itemName)
         }
     }
 }
@@ -494,7 +495,9 @@ struct ShopView: View {
         if !searchText.isEmpty {
             items = items.filter {
                 $0.name.localizedCaseInsensitiveContains(searchText) ||
-                $0.description.localizedCaseInsensitiveContains(searchText)
+                $0.description.localizedCaseInsensitiveContains(searchText) ||
+                $0.localizedName.localizedCaseInsensitiveContains(searchText) ||
+                $0.localizedDescription.localizedCaseInsensitiveContains(searchText)
             }
         }
         
@@ -524,7 +527,7 @@ struct ShopView: View {
                     HStack {
                         Image(systemName: "magnifyingglass")
                             .foregroundColor(.gray)
-                        TextField("搜索商品...", text: $searchText)
+                        TextField("搜索商品...".appLocalized, text: $searchText)
                             .textFieldStyle(PlainTextFieldStyle())
                         if !searchText.isEmpty {
                             Button(action: { searchText = "" }) {
@@ -549,7 +552,7 @@ struct ShopView: View {
                                 }) {
                                     HStack(spacing: 4) {
                                         Image(systemName: category.icon)
-                                        Text(category.name)
+                                        Text(category.localizedName)
                                     }
                                     .font(.caption)
                                     .padding(.horizontal, 12)
@@ -576,7 +579,7 @@ struct ShopView: View {
                                 style: .capsuleGlow,
                                 size: .small
                             )
-                            Text("VIP 萌宠商店专享 6 折优惠")
+                            Text("VIP 萌宠商店专享 6 折优惠".appLocalized)
                                 .font(.system(size: 12, weight: .semibold))
                                 .foregroundStyle(.primary)
                             Spacer()

@@ -94,10 +94,10 @@ enum PetCurrencyPanelKind: CaseIterable {
 
     var title: String {
         switch self {
-        case .all: return "全部货币"
-        case .meowCoin: return "喵币"
-        case .fishCoin: return "鱼币"
-        case .boneCoin: return "骨头币"
+        case .all: return "全部货币".appLocalized
+        case .meowCoin: return PetCurrency.meowCoin.localizedName
+        case .fishCoin: return PetCurrency.fishCoin.localizedName
+        case .boneCoin: return PetCurrency.boneCoin.localizedName
         }
     }
 
@@ -140,10 +140,10 @@ enum PetCurrencyExchangeDirection: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .fishToBone: return "鱼币 → 骨头币"
-        case .boneToFish: return "骨头币 → 鱼币"
-        case .meowToFish: return "喵币 → 鱼币"
-        case .meowToBone: return "喵币 → 骨头币"
+        case .fishToBone: return "\(PetCurrency.fishCoin.localizedName) → \(PetCurrency.boneCoin.localizedName)"
+        case .boneToFish: return "\(PetCurrency.boneCoin.localizedName) → \(PetCurrency.fishCoin.localizedName)"
+        case .meowToFish: return "\(PetCurrency.meowCoin.localizedName) → \(PetCurrency.fishCoin.localizedName)"
+        case .meowToBone: return "\(PetCurrency.meowCoin.localizedName) → \(PetCurrency.boneCoin.localizedName)"
         }
     }
 
@@ -540,24 +540,24 @@ private func currencySubtitle(for status: PetStatus, kind: PetCurrencyPanelKind)
     case .all:
         return WealthExperienceCopy.PetChat.currencyAllSubtitle
     case .meowCoin:
-        return "这是我的喵币，领养二宝和充值时会先看它。"
+        return "这是我的喵币，领养二宝和充值时会先看它。".appLocalized
     case .fishCoin:
-        return "这是我的鱼币，买日常道具和看打工收益都会用到。"
+        return "这是我的鱼币，买日常道具和看打工收益都会用到。".appLocalized
     case .boneCoin:
-        return "这是我的骨头币，毛毛会更常用这个币种。"
+        return "这是我的骨头币，毛毛会更常用这个币种。".appLocalized
     }
 }
 
 private func currencyMetrics(for status: PetStatus, kind: PetCurrencyPanelKind) -> [PetWidgetMetric] {
     kind.currencies.map { currency in
-        PetWidgetMetric(name: currency.rawValue, value: "\(currencyAmount(for: currency, status: status))")
+        PetWidgetMetric(name: currency.localizedName, value: "\(currencyAmount(for: currency, status: status))")
     }
 }
 
 func makeCurrencyPanelWidget(status: PetStatus, kind: PetCurrencyPanelKind, feedback: String? = nil) -> PetWidgetData {
     PetWidgetData(
         type: .currencyPanel,
-        title: kind == .all ? "我的货币余额" : "我的\(kind.title)",
+        title: kind == .all ? "我的货币余额".appLocalized : "我的%@".appLocalized(kind.title),
         subtitle: feedback ?? currencySubtitle(for: status, kind: kind),
         metrics: currencyMetrics(for: status, kind: kind)
     )
@@ -580,15 +580,15 @@ func isPetWorkCommand(_ command: String) -> Bool {
 private func workRuntimeLabel(for status: PetStatus) -> String {
     switch PetWorkStateMachine.runtimeState(for: status) {
     case .idle:
-        return "闲置"
+        return "闲置".appLocalized
     case .manualWorking(let job):
-        return "\(job.rawValue) · 手动"
+        return "%@ · 手动".appLocalized(job.localizedTitle)
     case .autoWorking(let job):
-        return "\(job.rawValue) · 自动"
+        return "%@ · 自动".appLocalized(job.localizedTitle)
     case .sleepSuspendedWorking(let job, isAutomatic: let isAutomatic):
-        return "\(job.rawValue) · \(isAutomatic ? "自动" : "手动")休息中"
+        return "%@ · %@休息中".appLocalized(job.localizedTitle, (isAutomatic ? "自动" : "手动").appLocalized)
     case .interrupted:
-        return "被迫中断"
+        return "被迫中断".appLocalized
     }
 }
 
@@ -599,50 +599,50 @@ private func workQuotaText(status: PetStatus, currency: PetCurrency) -> String {
     case .boneCoin:
         return "\(status.dailyBoneCoinEarned)/\(PetStatus.dailyBoneCoinLimit)"
     case .meowCoin:
-        return "不支持"
+        return "不支持".appLocalized
     }
 }
 
 private func petWorkPanelSubtitle(status: PetStatus, feedback: String?) -> String {
     if let feedback, !feedback.isEmpty { return feedback }
     if status.currentJob != .none {
-        let mode = status.currentJobStartedAutomatically ? "自动打工" : "手动打工"
-        return "\(status.displayName)正在\(status.currentJob.rawValue)，\(mode)本次已赚 \(status.currentJobEarnedAmount) \(status.currentJobRewardCurrency.rawValue)。"
+        let mode = (status.currentJobStartedAutomatically ? "自动打工" : "手动打工").appLocalized
+        return "%@正在%@，%@本次已赚 %d %@。".appLocalized(status.displayName, status.currentJob.localizedTitle, mode, status.currentJobEarnedAmount, status.currentJobRewardCurrency.localizedName)
     }
     if status.isAutoWorkEnabled {
         return PetWorkStateMachine.autoWorkStatusSummary(for: status)
     }
-    return "现在空闲。可以点按钮让\(status.displayName)去打工，或开启闲时自动打工。"
+    return "现在空闲。可以点按钮让%@去打工，或开启闲时自动打工。".appLocalized(status.displayName)
 }
 
 private func petWorkOptions(for status: PetStatus) -> [PetWidgetOption] {
     if status.currentJob != .none {
         return [
-            PetWidgetOption(title: "下班结算", command: "pet_work_stop", icon: "checkmark.circle.fill"),
-            PetWidgetOption(title: "刷新打工状态", command: "pet_work_panel", icon: "arrow.clockwise"),
-            PetWidgetOption(title: "看看货币余额", command: "pet_currency_panel", icon: "wallet.pass.fill")
+            PetWidgetOption(title: "下班结算".appLocalized, command: "pet_work_stop", icon: "checkmark.circle.fill"),
+            PetWidgetOption(title: "刷新打工状态".appLocalized, command: "pet_work_panel", icon: "arrow.clockwise"),
+            PetWidgetOption(title: "看看货币余额".appLocalized, command: "pet_currency_panel", icon: "wallet.pass.fill")
         ]
     }
 
     let autoToggle = status.isAutoWorkEnabled
-        ? PetWidgetOption(title: "关闭自动打工", command: "pet_work_auto:off", icon: "pause.circle.fill")
-        : PetWidgetOption(title: "开启自动打工", command: "pet_work_auto:on", icon: "clock.badge.checkmark")
+        ? PetWidgetOption(title: "关闭自动打工".appLocalized, command: "pet_work_auto:off", icon: "pause.circle.fill")
+        : PetWidgetOption(title: "开启自动打工".appLocalized, command: "pet_work_auto:on", icon: "clock.badge.checkmark")
 
     var options: [PetWidgetOption] = [
-        PetWidgetOption(title: "猫咖喵赚鱼币", command: "pet_work_start:waiter:fishCoin", icon: PetJob.waiter.icon),
-        PetWidgetOption(title: "喵警长赚骨头币", command: "pet_work_start:security:boneCoin", icon: PetJob.security.icon),
-        PetWidgetOption(title: "直播喵赚鱼币", command: "pet_work_start:streamer:fishCoin", icon: PetJob.streamer.icon),
+        PetWidgetOption(title: "猫咖喵赚鱼币".appLocalized, command: "pet_work_start:waiter:fishCoin", icon: PetJob.waiter.icon),
+        PetWidgetOption(title: "喵警长赚骨头币".appLocalized, command: "pet_work_start:security:boneCoin", icon: PetJob.security.icon),
+        PetWidgetOption(title: "直播喵赚鱼币".appLocalized, command: "pet_work_start:streamer:fishCoin", icon: PetJob.streamer.icon),
         autoToggle
     ]
 
     if status.isAutoWorkEnabled {
         options.append(contentsOf: [
-            PetWidgetOption(title: "策略: 稳妥", command: "pet_work_strategy:conservative", icon: "leaf.fill"),
-            PetWidgetOption(title: "策略: 平衡", command: "pet_work_strategy:balanced", icon: "scale.3d"),
-            PetWidgetOption(title: "策略: 拼一把", command: "pet_work_strategy:ambitious", icon: "bolt.fill"),
-            PetWidgetOption(title: "收益跟随萌宠", command: "pet_work_reward:followPet", icon: "pawprint.fill"),
-            PetWidgetOption(title: "收益鱼币", command: "pet_work_reward:fishCoin", icon: "fish.fill"),
-            PetWidgetOption(title: "收益骨头币", command: "pet_work_reward:boneCoin", icon: "bone.fill")
+            PetWidgetOption(title: "策略: 稳妥".appLocalized, command: "pet_work_strategy:conservative", icon: "leaf.fill"),
+            PetWidgetOption(title: "策略: 平衡".appLocalized, command: "pet_work_strategy:balanced", icon: "scale.3d"),
+            PetWidgetOption(title: "策略: 拼一把".appLocalized, command: "pet_work_strategy:ambitious", icon: "bolt.fill"),
+            PetWidgetOption(title: "收益跟随萌宠".appLocalized, command: "pet_work_reward:followPet", icon: "pawprint.fill"),
+            PetWidgetOption(title: "收益鱼币".appLocalized, command: "pet_work_reward:fishCoin", icon: "fish.fill"),
+            PetWidgetOption(title: "收益骨头币".appLocalized, command: "pet_work_reward:boneCoin", icon: "bone.fill")
         ])
     }
 
@@ -652,24 +652,24 @@ private func petWorkOptions(for status: PetStatus) -> [PetWidgetOption] {
 func makePetWorkPanelWidget(status: PetStatus, feedback: String? = nil) -> PetWidgetData {
     PetWidgetData(
         type: .workPanel,
-        title: "\(status.displayName)的打工状态",
+        title: "%@的打工状态".appLocalized(status.displayName),
         subtitle: petWorkPanelSubtitle(status: status, feedback: feedback),
         options: petWorkOptions(for: status),
         metrics: [
-            PetWidgetMetric(name: "工作状态", value: workRuntimeLabel(for: status)),
-            PetWidgetMetric(name: "本次收益", value: "\(status.currentJobEarnedAmount) \(status.currentJobRewardCurrency.rawValue)"),
-            PetWidgetMetric(name: "今日鱼币", value: workQuotaText(status: status, currency: .fishCoin)),
-            PetWidgetMetric(name: "今日骨头币", value: workQuotaText(status: status, currency: .boneCoin)),
-            PetWidgetMetric(name: "自动打工", value: status.isAutoWorkEnabled ? "\(status.autoWorkStrategy.title) · \(status.autoWorkRewardMode.title)" : "未开启")
+            PetWidgetMetric(name: "工作状态".appLocalized, value: workRuntimeLabel(for: status)),
+            PetWidgetMetric(name: "本次收益".appLocalized, value: "%d %@".appLocalized(status.currentJobEarnedAmount, status.currentJobRewardCurrency.localizedName)),
+            PetWidgetMetric(name: "今日鱼币".appLocalized, value: workQuotaText(status: status, currency: .fishCoin)),
+            PetWidgetMetric(name: "今日骨头币".appLocalized, value: workQuotaText(status: status, currency: .boneCoin)),
+            PetWidgetMetric(name: "自动打工".appLocalized, value: status.isAutoWorkEnabled ? "%@ · %@".appLocalized(status.autoWorkStrategy.title, status.autoWorkRewardMode.title) : "未开启".appLocalized)
         ]
     )
 }
 
 func petWorkPanelIntroMessage(status: PetStatus) -> String {
     if status.currentJob != .none {
-        return "\(status.displayName)正在打工，我把状态和下班按钮放这里啦。"
+        return "%@正在打工，我把状态和下班按钮放这里啦。".appLocalized(status.displayName)
     }
-    return "可以安排\(status.displayName)去打工，也可以让它状态好、闲下来的时候自动去赚鱼币或骨头币。"
+    return "可以安排%@去打工，也可以让它状态好、闲下来的时候自动去赚鱼币或骨头币。".appLocalized(status.displayName)
 }
 
 @discardableResult
@@ -697,7 +697,7 @@ func applyPetWorkCommand(_ command: String) -> PetChatWorkActionResult {
         if settlement.didMutateStatus {
             PetDataManager.shared.saveStatusAndNotify(status, fullReload: true, source: "\(saveSource):panel")
         }
-        let feedback = settlement.earnedAmount > 0 ? "刚刚结算了 \(settlement.earnedAmount) \(status.currentJobRewardCurrency.rawValue)，面板已更新。" : nil
+        let feedback = settlement.earnedAmount > 0 ? "刚刚结算了 %d %@，面板已更新。".appLocalized(settlement.earnedAmount, status.currentJobRewardCurrency.localizedName) : nil
         return PetChatWorkActionResult(feedback: feedback, didChangeStatus: settlement.didMutateStatus)
     }
 
@@ -706,7 +706,7 @@ func applyPetWorkCommand(_ command: String) -> PetChatWorkActionResult {
             if settlement.didMutateStatus {
                 PetDataManager.shared.saveStatusAndNotify(status, fullReload: true, source: "\(saveSource):settlement")
             }
-            return PetChatWorkActionResult(feedback: "\(status.displayName)现在没有在打工。", didChangeStatus: false)
+            return PetChatWorkActionResult(feedback: "%@现在没有在打工。".appLocalized(status.displayName), didChangeStatus: false)
         }
         PetDataManager.shared.saveStatusAndNotify(status, fullReload: true, source: saveSource)
         return PetChatWorkActionResult(feedback: result.message, didChangeStatus: true)
@@ -714,7 +714,7 @@ func applyPetWorkCommand(_ command: String) -> PetChatWorkActionResult {
 
     if parts.first == "pet_work_start" {
         guard parts.count >= 2, let job = PetWorkStateMachine.job(forToken: parts[1]) else {
-            return PetChatWorkActionResult(feedback: "我还没认出这份工作，换个按钮试试。", didChangeStatus: false)
+            return PetChatWorkActionResult(feedback: "我还没认出这份工作，换个按钮试试。".appLocalized, didChangeStatus: false)
         }
         let currency = parts.count >= 3
             ? PetWorkStateMachine.currency(forToken: parts[2])
@@ -742,9 +742,9 @@ func applyPetWorkCommand(_ command: String) -> PetChatWorkActionResult {
         PetDataManager.shared.saveStatusAndNotify(status, fullReload: true, source: saveSource)
         let feedback: String
         if let stopResult {
-            feedback = "自动打工已关闭。\(stopResult.message)"
+            feedback = "自动打工已关闭。%@".appLocalized(stopResult.message)
         } else {
-            feedback = enabled ? "自动打工已开启，状态好、闲下来就会去赚币。" : "自动打工已关闭。"
+            feedback = enabled ? "自动打工已开启，状态好、闲下来就会去赚币。".appLocalized : "自动打工已关闭。".appLocalized
         }
         return PetChatWorkActionResult(feedback: feedback, didChangeStatus: true)
     }
@@ -752,16 +752,16 @@ func applyPetWorkCommand(_ command: String) -> PetChatWorkActionResult {
     if parts.first == "pet_work_strategy", parts.count >= 2, let strategy = PetAutoWorkStrategy(rawValue: parts[1]) {
         PetWorkStateMachine.updateAutoWorkStrategy(strategy, in: &status)
         PetDataManager.shared.saveStatusAndNotify(status, fullReload: true, source: saveSource)
-        return PetChatWorkActionResult(feedback: "自动打工策略已切到\(strategy.title)。\(strategy.description)", didChangeStatus: true)
+        return PetChatWorkActionResult(feedback: "自动打工策略已切到%@。%@".appLocalized(strategy.title, strategy.description), didChangeStatus: true)
     }
 
     if parts.first == "pet_work_reward", parts.count >= 2, let rewardMode = PetWorkStateMachine.rewardMode(forToken: parts[1]) {
         PetWorkStateMachine.updateAutoWorkRewardMode(rewardMode, in: &status)
         PetDataManager.shared.saveStatusAndNotify(status, fullReload: true, source: saveSource)
-        return PetChatWorkActionResult(feedback: "自动打工收益已切到\(rewardMode.title)。\(rewardMode.description)", didChangeStatus: true)
+        return PetChatWorkActionResult(feedback: "自动打工收益已切到%@。%@".appLocalized(rewardMode.title, rewardMode.description), didChangeStatus: true)
     }
 
-    return PetChatWorkActionResult(feedback: "这个打工指令我还没学会，先帮你刷新状态面板。", didChangeStatus: false)
+    return PetChatWorkActionResult(feedback: "这个打工指令我还没学会，先帮你刷新状态面板。".appLocalized, didChangeStatus: false)
 }
 
 private func inventoryOptions(status: PetStatus, limit: Int? = nil) -> [PetWidgetOption] {
@@ -770,7 +770,7 @@ private func inventoryOptions(status: PetStatus, limit: Int? = nil) -> [PetWidge
         .compactMap { entry -> PetWidgetOption? in
             guard let item = PetConfigManager.shared.getItem(byId: entry.key) else { return nil }
             return PetWidgetOption(
-                title: "\(item.name) x\(entry.value)",
+                title: "%@ x%d".appLocalized(item.localizedName, entry.value),
                 command: "use_item:\(item.id)",
                 icon: item.icon
             )
@@ -787,8 +787,8 @@ func makeInventoryPanelWidget(status: PetStatus, feedback: String? = nil) -> Pet
     let options = inventoryOptions(status: status)
     return PetWidgetData(
         type: .inventoryPanel,
-        title: "我的背包",
-        subtitle: feedback ?? (options.isEmpty ? "我现在还没有囤货呢。" : "这些都是我现在有的东西，点一下就能用，也可以直接拖去投喂区。"),
+        title: "我的背包".appLocalized,
+        subtitle: feedback ?? (options.isEmpty ? "我现在还没有囤货呢。".appLocalized : "这些都是我现在有的东西，点一下就能用，也可以直接拖去投喂区。".appLocalized),
         options: options
     )
 }
@@ -840,26 +840,19 @@ private func preferredShopItems(for pet: PetCharacter, limit: Int = 3) -> [PetIt
 
 private func naturalListText(_ names: [String]) -> String {
     let filtered = names.filter { !$0.isEmpty }
-    switch filtered.count {
-    case 0:
-        return ""
-    case 1:
-        return filtered[0]
-    case 2:
-        return "\(filtered[0])和\(filtered[1])"
-    default:
-        let head = filtered.dropLast().joined(separator: "、")
-        return "\(head)和\(filtered.last!)"
-    }
+    guard filtered.count > 1 else { return filtered.first ?? "" }
+    let formatter = ListFormatter()
+    formatter.locale = LanguageManager.shared.locale
+    return formatter.string(from: filtered) ?? filtered.joined(separator: ", ")
 }
 
 private func shopPanelPresentation(status: PetStatus, feedback: String? = nil) -> PetShopPanelPresentation {
     let pet = selectedPetCharacter(from: status)
     let petName = displayName(for: pet, in: status)
     let featuredItems = preferredShopItems(for: pet)
-    let featuredNames = featuredItems.map(\.name)
+    let featuredNames = featuredItems.map(\.localizedName)
     let featuredList = naturalListText(featuredNames)
-    let fallbackNames = PetConfigManager.shared.items.prefix(3).map(\.name)
+    let fallbackNames = PetConfigManager.shared.items.prefix(3).map(\.localizedName)
     let fallbackList = naturalListText(fallbackNames)
     let displayList = featuredList.isEmpty ? fallbackList : featuredList
 
@@ -869,34 +862,34 @@ private func shopPanelPresentation(status: PetStatus, feedback: String? = nil) -
 
     switch pet {
     case .naicha:
-        title = displayList.isEmpty ? "\(petName)的宠物商店" : "\(petName)想吃这些"
+        title = displayList.isEmpty ? "%@的宠物商店".appLocalized(petName) : "%@想吃这些".appLocalized(petName)
         if let feedback {
             subtitle = feedback
         } else if displayList.isEmpty {
-            subtitle = "我先帮你把宠物商店打开啦，等店里补货了我们再来挑。"
+            subtitle = "我先帮你把宠物商店打开啦，等店里补货了我们再来挑。".appLocalized
         } else {
-            subtitle = "我刚刚盯过货架啦，现在店里有\(displayList)。点一下先放进背包，拖到投喂区就能马上给我吃喝。"
+            subtitle = "我刚刚盯过货架啦，现在店里有%@。点一下先放进背包，拖到投喂区就能马上给我吃喝。".appLocalized(displayList)
         }
 
         if displayList.isEmpty {
-            introMessage = "快带我去宠物商店看看嘛，我想补点吃的和喝的喵~"
+            introMessage = "快带我去宠物商店看看嘛，我想补点吃的和喝的喵~".appLocalized
         } else {
-            introMessage = "快带我去宠物商店嘛，我想吃\(displayList)～给我买一点好不好喵？"
+            introMessage = "快带我去宠物商店嘛，我想吃%@～给我买一点好不好喵？".appLocalized(displayList)
         }
     case .maomao:
-        title = displayList.isEmpty ? "\(petName)的宠物商店" : "\(petName)想补这些"
+        title = displayList.isEmpty ? "%@的宠物商店".appLocalized(petName) : "%@想补这些".appLocalized(petName)
         if let feedback {
             subtitle = feedback
         } else if displayList.isEmpty {
-            subtitle = "我先把宠物商店打开啦，等店里补货我们再冲进去挑！"
+            subtitle = "我先把宠物商店打开啦，等店里补货我们再冲进去挑！".appLocalized
         } else {
-            subtitle = "我已经先闻过货架啦，现在店里有\(displayList)。点一下先放进背包，拖到投喂区就能马上给我享用。"
+            subtitle = "我已经先闻过货架啦，现在店里有%@。点一下先放进背包，拖到投喂区就能马上给我享用。".appLocalized(displayList)
         }
 
         if displayList.isEmpty {
-            introMessage = "主人，我们先去宠物商店看看吧！给我补点吃的喝的就更开心啦汪！"
+            introMessage = "主人，我们先去宠物商店看看吧！给我补点吃的喝的就更开心啦汪！".appLocalized
         } else {
-            introMessage = "主人，我们去宠物商店补给吧！我想吃\(displayList)，给我买一点好不好汪！"
+            introMessage = "主人，我们去宠物商店补给吧！我想吃%@，给我买一点好不好汪！".appLocalized(displayList)
         }
     }
 
@@ -919,10 +912,10 @@ private func shopOptions(limit: Int? = nil) -> [PetWidgetOption] {
     }
     
     return visibleItems.map { item in
-        let currencyName = item.petCurrency.rawValue
+        let currencyName = item.petCurrency.localizedName
         let finalPrice = VIPManager.shared.petShopPrice(for: item.price)
         return PetWidgetOption(
-            title: "\(item.name) · \(finalPrice)\(currencyName)",
+            title: "%@ · %d%@".appLocalized(item.localizedName, finalPrice, currencyName),
             command: "buy_item:\(item.id)",
             icon: item.icon
         )
