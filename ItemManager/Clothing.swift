@@ -449,12 +449,19 @@ enum WealthSavingLedger {
             return 0
         }
 
-        if clothing.isDepositPlan || clothing.totalBalance > 0 {
-            let target = clothing.totalDeposit + clothing.totalBalance + clothing.resolvedShippingFee
-            let due = target - clothing.totalDeposit
+        if clothing.reservationKind == .depositPlan {
+            let due = clothing.totalBalance
             if due > 0 { return due }
         }
         return 0
+    }
+
+    static func unpaidFinalPaymentAmount(for clothing: Clothing) -> Decimal {
+        finalPaymentDueAmount(for: clothing)
+    }
+
+    static func shouldShowFinalPaymentPayoffAction(for clothing: Clothing) -> Bool {
+        clothing.reservationKind == .depositPlan && unpaidFinalPaymentAmount(for: clothing) > 0
     }
 
     static func finalPaymentRecords(for clothingID: UUID, in entries: [WealthSavingEntry]) -> [WealthSavingEntry] {
@@ -473,9 +480,8 @@ enum WealthSavingLedger {
             .reduce(Decimal(0)) { $0 + FinancialDataSanitizer.money($1.amount) }
     }
 
-    static func remainingFinalPaymentAmount(for clothing: Clothing, entries: [WealthSavingEntry]) -> Decimal {
-        let remaining = finalPaymentDueAmount(for: clothing) - paidFinalPaymentTotal(for: clothing.id, in: entries)
-        return max(remaining, Decimal(0))
+    static func remainingFinalPaymentAmount(for clothing: Clothing, entries _: [WealthSavingEntry]) -> Decimal {
+        unpaidFinalPaymentAmount(for: clothing)
     }
 
     @discardableResult
@@ -483,45 +489,65 @@ enum WealthSavingLedger {
     static func recordFinalPayment(
         amount requestedAmount: Decimal,
         for clothing: Clothing,
-        entries: [WealthSavingEntry],
         context: ModelContext
     ) throws -> FinalPaymentRecordResult? {
-        let remainingBefore = remainingFinalPaymentAmount(for: clothing, entries: entries)
+        let remainingBefore = unpaidFinalPaymentAmount(for: clothing)
         guard remainingBefore > 0, requestedAmount > 0 else { return nil }
 
         let now = Date()
         let actualAmount = remainingBefore
         guard actualAmount > 0 else { return nil }
 
+        try resetLegacyFinalPaymentProgress(for: clothing.id, context: context, at: now)
+
         let entry = WealthSavingEntry(
             amount: actualAmount,
             clothingID: clothing.id,
-            note: "一次性付清尾款",
+            note: "尾款付清",
             entryKind: .finalPayment,
             paidAt: now,
             createdAt: now
         )
         context.insert(entry)
 
-        let paidTotal = paidFinalPaymentTotal(for: clothing.id, in: entries) + actualAmount
-        let remainingAfter = max(finalPaymentDueAmount(for: clothing) - paidTotal, Decimal(0))
-        let paidOff = remainingAfter <= 0
-
-        if paidOff {
-            markClothingFinalPaymentCompleted(clothing, at: now)
-        } else {
-            clothing.updatedAt = now
-            clothing.lastModified = now
-        }
+        markClothingFinalPaymentCompleted(clothing, at: now)
 
         try context.save()
         return FinalPaymentRecordResult(
             paymentEntry: entry,
-            paidOff: paidOff,
+            paidOff: true,
             paidAmount: actualAmount,
-            paidTotal: paidTotal,
-            remainingAmount: remainingAfter
+            paidTotal: actualAmount,
+            remainingAmount: 0
         )
+    }
+
+    @MainActor
+    private static func resetLegacyFinalPaymentProgress(
+        for clothingID: UUID,
+        context: ModelContext,
+        at date: Date
+    ) throws {
+        let finalPaymentKind = WealthSavingEntryKind.finalPayment.rawValue
+        let descriptor = FetchDescriptor<WealthSavingEntry>(
+            predicate: #Predicate { entry in
+                entry.clothingID == clothingID && entry.entryKind == finalPaymentKind
+            }
+        )
+
+        let existingEntries = try context.fetch(descriptor)
+        for entry in existingEntries {
+            entry.finalPaymentMode = nil
+            entry.installmentIndex = 0
+            entry.installmentCount = 0
+            entry.vaultDeductionAmount = 0
+            entry.externalPaymentAmount = 0
+            if entry.voidedAt == nil {
+                entry.voidedAt = date
+            }
+            entry.updatedAt = date
+            entry.lastModified = date
+        }
     }
 
     @MainActor

@@ -200,11 +200,11 @@ final class ClothingAccessoryTests: XCTestCase {
         context.insert(WealthSavingEntry(amount: 300, clothingID: clothing.id))
         try context.save()
 
-        let beforeEntries = try context.fetch(FetchDescriptor<WealthSavingEntry>())
+        XCTAssertTrue(WealthSavingLedger.shouldShowFinalPaymentPayoffAction(for: clothing))
+
         let result = try WealthSavingLedger.recordFinalPayment(
             amount: 800,
             for: clothing,
-            entries: beforeEntries,
             context: context
         )
 
@@ -212,6 +212,7 @@ final class ClothingAccessoryTests: XCTestCase {
         XCTAssertEqual(result?.paidAmount, 800)
         XCTAssertEqual(result?.paidOff, true)
         XCTAssertFalse(clothing.isDepositPlan)
+        XCTAssertFalse(WealthSavingLedger.shouldShowFinalPaymentPayoffAction(for: clothing))
         XCTAssertEqual(clothing.finalPaymentInstallmentCount, 0)
         XCTAssertEqual(WealthSavingLedger.activeTotal(for: clothing.id, in: entries), 300)
         XCTAssertEqual(WealthSavingLedger.paidFinalPaymentTotal(for: clothing.id, in: entries), 800)
@@ -225,7 +226,6 @@ final class ClothingAccessoryTests: XCTestCase {
         let result = try WealthSavingLedger.recordFinalPayment(
             amount: 1,
             for: clothing,
-            entries: [],
             context: context
         )
 
@@ -233,6 +233,7 @@ final class ClothingAccessoryTests: XCTestCase {
         XCTAssertEqual(result?.paidAmount, Decimal(string: "1.004")!)
         XCTAssertEqual(result?.remainingAmount, 0)
         XCTAssertEqual(WealthSavingLedger.remainingFinalPaymentAmount(for: clothing, entries: entries), 0)
+        XCTAssertFalse(WealthSavingLedger.shouldShowFinalPaymentPayoffAction(for: clothing))
         XCTAssertFalse(clothing.isDepositPlan)
     }
 
@@ -240,11 +241,9 @@ final class ClothingAccessoryTests: XCTestCase {
         let clothing = Clothing(name: "Final Payment OP", price: 1000, deposit: 200, balance: 800, isDepositPlan: true)
         context.insert(clothing)
 
-        let beforeEntries = try context.fetch(FetchDescriptor<WealthSavingEntry>())
         let first = try WealthSavingLedger.recordFinalPayment(
             amount: 300,
             for: clothing,
-            entries: beforeEntries,
             context: context
         )
 
@@ -252,6 +251,7 @@ final class ClothingAccessoryTests: XCTestCase {
         let payment = WealthSavingLedger.finalPaymentRecords(for: clothing.id, in: entries).first
         XCTAssertEqual(first?.paidOff, true)
         XCTAssertFalse(clothing.isDepositPlan)
+        XCTAssertFalse(WealthSavingLedger.shouldShowFinalPaymentPayoffAction(for: clothing))
         XCTAssertEqual(clothing.finalPaymentInstallmentCount, 0)
         XCTAssertEqual(payment?.kind, .finalPayment)
         XCTAssertEqual(payment?.amount, 800)
@@ -275,7 +275,6 @@ final class ClothingAccessoryTests: XCTestCase {
         _ = try WealthSavingLedger.recordFinalPayment(
             amount: 500,
             for: clothing,
-            entries: entries,
             context: context
         )
 
@@ -283,6 +282,48 @@ final class ClothingAccessoryTests: XCTestCase {
         let payment = WealthSavingLedger.finalPaymentRecords(for: clothing.id, in: entries).first
         XCTAssertEqual(payment?.amount, 800)
         XCTAssertEqual(WealthSavingLedger.activeTotal(for: clothing.id, in: entries), 200)
+        XCTAssertEqual(WealthSavingLedger.paidFinalPaymentTotal(for: clothing.id, in: entries), 800)
+    }
+
+    func testFinalPaymentClearsLegacyProgressBeforeRecordingPaidOffEntry() throws {
+        let clothing = Clothing(name: "Legacy Progress OP", price: 1000, deposit: 200, balance: 800, isDepositPlan: true)
+        context.insert(clothing)
+
+        let legacyPayment = WealthSavingEntry(
+            amount: 100,
+            clothingID: clothing.id,
+            note: "legacy partial payment",
+            entryKind: .finalPayment,
+            paidAt: Date(timeIntervalSince1970: 1_700_000_100)
+        )
+        legacyPayment.finalPaymentMode = "legacy"
+        legacyPayment.installmentIndex = 1
+        legacyPayment.installmentCount = 3
+        legacyPayment.vaultDeductionAmount = 40
+        legacyPayment.externalPaymentAmount = 60
+        context.insert(legacyPayment)
+        try context.save()
+
+        let result = try WealthSavingLedger.recordFinalPayment(
+            amount: 1,
+            for: clothing,
+            context: context
+        )
+
+        let entries = try context.fetch(FetchDescriptor<WealthSavingEntry>())
+        let activePayments = WealthSavingLedger.finalPaymentRecords(for: clothing.id, in: entries)
+
+        XCTAssertEqual(result?.paidAmount, 800)
+        XCTAssertFalse(clothing.isDepositPlan)
+        XCTAssertFalse(WealthSavingLedger.shouldShowFinalPaymentPayoffAction(for: clothing))
+        XCTAssertNotNil(legacyPayment.voidedAt)
+        XCTAssertNil(legacyPayment.finalPaymentMode)
+        XCTAssertEqual(legacyPayment.installmentIndex, 0)
+        XCTAssertEqual(legacyPayment.installmentCount, 0)
+        XCTAssertEqual(legacyPayment.vaultDeductionAmount, 0)
+        XCTAssertEqual(legacyPayment.externalPaymentAmount, 0)
+        XCTAssertEqual(activePayments.count, 1)
+        XCTAssertEqual(activePayments.first?.amount, 800)
         XCTAssertEqual(WealthSavingLedger.paidFinalPaymentTotal(for: clothing.id, in: entries), 800)
     }
 

@@ -5561,50 +5561,6 @@
         }
       }
     },
-    "一次性" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "One-time"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "一次性"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "一次性"
-          }
-        }
-      }
-    },
-    "一次性付清" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Pay in full once"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "一次性付清"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "一次性付清"
-          }
-        }
-      }
-    },
     "一键已读" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -11471,28 +11427,6 @@
         }
       }
     },
-    "最近账单" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Recent"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "最近账单"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "最近賬單"
-          }
-        }
-      }
-    },
     "最高" : {
       "localizations" : {
         "en" : {
@@ -13074,52 +13008,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "剩餘"
-          }
-        }
-      }
-    },
-    "剩余 ¥%@" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Remaining ¥%@"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "剩余 ¥%@"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "剩餘 ¥%@"
-          }
-        }
-      }
-    },
-    "剩余尾款 ¥%@ · 账单 %lld 笔" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Remaining balance ¥%@ · %lld bills"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "剩余尾款 ¥%1$@ · 账单 %2$lld 笔"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "剩餘尾款 ¥%1$@ · 賬單 %2$lld 筆"
           }
         }
       }
@@ -20648,32 +20536,6 @@
         }
       }
     },
-    "尾款已付清，记录按钮已收起。" : {
-
-    },
-    "尾款已完成" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Final payment completed"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "尾款已完成"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "尾款已完成"
-          }
-        }
-      }
-    },
     "尾款已过，请处理" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -20738,28 +20600,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "尾款提醒"
-          }
-        }
-      }
-    },
-    "尾款支付进度" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Balance Payment Progress"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "尾款支付进度"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "尾款支付進度"
           }
         }
       }
@@ -21166,29 +21006,6 @@
         }
       }
     },
-    "已付 ¥%@ · 剩余 ¥%@" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Paid ¥%@ · Remaining ¥%@"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "已付 ¥%1$@ · 剩余 ¥%2$@"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "已付 ¥%1$@ · 剩餘 ¥%2$@"
-          }
-        }
-      }
-    },
     "已付定金" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -21231,29 +21048,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "已付訂金總額"
-          }
-        }
-      }
-    },
-    "已付清" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "completed"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "已付清"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "已付清"
           }
         }
       }
@@ -23094,29 +22888,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "庫存數量"
-          }
-        }
-      }
-    },
-    "应付尾款" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Final Payment Due"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "应付尾款"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "應付尾款"
           }
         }
       }
@@ -33098,29 +32869,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "本次最多 ¥%@"
-          }
-        }
-      }
-    },
-    "本次将记录剩余全部尾款 ¥%@。" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Balance ¥ %@."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "本次将记录剩余全部尾款 ¥%@。"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "本次將記錄剩餘全部尾款 ¥%@。"
           }
         }
       }
@@ -46091,51 +45839,6 @@
         }
       }
     },
-    "记录剩余尾款，付清后按钮会消失" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Record the remaining final payment. The button will disappear after it is paid off."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "记录剩余尾款，付清后按钮会消失"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "記錄剩餘尾款，付清後按鈕會消失"
-          }
-        }
-      }
-    },
-    "记录已付尾款" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Paid Balance"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "记录已付尾款"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "記錄已付尾款"
-          }
-        }
-      }
-    },
     "记录时间：%@" : {
       "localizations" : {
         "en" : {
@@ -47833,51 +47536,6 @@
         }
       }
     },
-    "账单" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Bills"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "账单"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "帳單"
-          }
-        }
-      }
-    },
-    "账单明细" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Bill Details"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "账单明细"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "賬單明細"
-          }
-        }
-      }
-    },
     "账号、公告、任务与调试工具" : {
       "localizations" : {
         "en" : {
@@ -48973,9 +48631,6 @@
         }
       }
     },
-    "还没有实付账单。" : {
-
-    },
     "还没有拼豆/像素画" : {
       "localizations" : {
         "en" : {
@@ -49579,29 +49234,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "進入手帳房間"
-          }
-        }
-      }
-    },
-    "进度 ¥%@ / ¥%@" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Progress ¥ %@ / ¥ %@"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "进度 ¥%1$@ / ¥%2$@"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "進度 ¥%1$@ / ¥%2$@"
           }
         }
       }

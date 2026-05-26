@@ -10,7 +10,6 @@ import SwiftData
 
 struct ClothingDetailView: View {
     @Bindable var clothing: Clothing
-    @Query private var wealthSavingEntries: [WealthSavingEntry]
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
     @Environment(ThemeManager.self) private var themeManager
@@ -75,24 +74,16 @@ struct ClothingDetailView: View {
                             .padding(.horizontal)
                             .offset(y: -40)
 
-                        if shouldShowFinalPaymentStatusCard {
-                            finalPaymentStatusCard
-                                .padding(.horizontal)
-                                .offset(y: -40)
-                        }
-
-                        
                         // MARK: - Reservation Action / Status
                         if clothing.isFullPaymentReservation {
                             fullPaymentReservationStatusPill
                                 .padding(.horizontal)
                                 .offset(y: -40)
-                        } else if clothing.reservationKind == .depositPlan &&
-                            WealthSavingLedger.remainingFinalPaymentAmount(for: clothing, entries: wealthSavingEntries) > 0 {
+                        } else if WealthSavingLedger.shouldShowFinalPaymentPayoffAction(for: clothing) {
                             Button {
                                 showingFinalPaymentSheet = true
                             } label: {
-                                Text("记录已付尾款")
+                                Text("尾款付清")
                                     .themeSkinLegibleText(level: .chip, slot: .primaryButton)
                             }
                             .buttonStyle(ThemeSkinPrimaryButtonStyle(fallbackTint: .pink, cornerRadius: 16, verticalPadding: 15))
@@ -220,7 +211,6 @@ struct ClothingDetailView: View {
         .sheet(isPresented: $showingFinalPaymentSheet) {
             FinalPaymentRecordingSheet(
                 clothing: clothing,
-                wealthSavingEntries: wealthSavingEntries,
                 onRecord: recordFinalPayment
             )
         }
@@ -284,7 +274,6 @@ struct ClothingDetailView: View {
             guard let result = try WealthSavingLedger.recordFinalPayment(
                 amount: amount,
                 for: clothing,
-                entries: wealthSavingEntries,
                 context: modelContext
             ) else { return }
 
@@ -845,15 +834,6 @@ struct ClothingDetailView: View {
         }
     }
 
-    private var finalPaymentRecords: [WealthSavingEntry] {
-        WealthSavingLedger.finalPaymentRecords(for: clothing.id, in: wealthSavingEntries)
-    }
-
-    private var shouldShowFinalPaymentStatusCard: Bool {
-        guard !clothing.isFullPaymentReservation else { return false }
-        return clothing.reservationKind == .depositPlan || !finalPaymentRecords.isEmpty
-    }
-
     private var fullPaymentReservationStatusPill: some View {
         HStack(spacing: 8) {
             Image(systemName: "shippingbox.fill")
@@ -870,121 +850,6 @@ struct ClothingDetailView: View {
             RoundedRectangle(cornerRadius: 16, style: .continuous)
                 .stroke(Color.green.opacity(0.35), lineWidth: 1)
         }
-    }
-
-    private var finalPaymentStatusCard: some View {
-        let paid = WealthSavingLedger.paidFinalPaymentTotal(for: clothing.id, in: wealthSavingEntries)
-        let due = WealthSavingLedger.finalPaymentDueAmount(for: clothing)
-        let remaining = WealthSavingLedger.remainingFinalPaymentAmount(for: clothing, entries: wealthSavingEntries)
-        let paymentProgressValue = due > 0 ? min(NSDecimalNumber(decimal: paid / due).doubleValue, 1.0) : 0
-        let isPaidOff = due > 0 && remaining <= 0
-
-        return VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .center, spacing: 10) {
-                Image(systemName: isPaidOff ? "checkmark.seal.fill" : "creditcard.fill")
-                    .font(.title3.weight(.bold))
-                    .foregroundStyle(isPaidOff ? .green : Color(hex: "C94C72"))
-                    .frame(width: 38, height: 38)
-                    .background((isPaidOff ? Color.green : Color(hex: "C94C72")).opacity(0.12))
-                    .clipShape(Circle())
-
-                VStack(alignment: .leading, spacing: 3) {
-                    Text("尾款支付进度")
-                        .font(.headline)
-                        .foregroundStyle(themeManager.primaryTextColor)
-                        .themeSkinLegibleText(level: .inline, slot: .sectionCard)
-                    Text(finalPaymentStatusSubtitle(paidOff: isPaidOff))
-                        .font(.caption)
-                        .foregroundStyle(themeManager.secondaryTextColor)
-                        .themeSkinLegibleText(level: .inline, slot: .sectionCard)
-                }
-
-                Spacer()
-
-                Text(isPaidOff ? "已付清".appLocalized : "剩余 ¥%@".appLocalized(moneyString(remaining)))
-                    .font(.caption.weight(.bold))
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
-                    .foregroundStyle(isPaidOff ? .green : Color(hex: "C94C72"))
-                    .themeSkinLegibleText(level: .chip, slot: .discountBadge)
-                    .background((isPaidOff ? Color.green : Color(hex: "C94C72")).opacity(0.12), in: Capsule())
-            }
-
-            ProgressView(value: paymentProgressValue)
-                .tint(isPaidOff ? .green : Color(hex: "C94C72"))
-
-            HStack(spacing: 0) {
-                finalPaymentMetric(title: "已付", value: "¥\(moneyString(paid))", color: .green)
-                Divider().frame(height: 34)
-                finalPaymentMetric(title: "剩余", value: "¥\(moneyString(remaining))", color: Color(hex: "C94C72"))
-                Divider().frame(height: 34)
-                finalPaymentMetric(title: "账单", value: "%@ 笔".appLocalized(String(finalPaymentRecords.count)), color: .orange)
-            }
-            .padding(12)
-            .background(Color.secondary.opacity(0.06), in: RoundedRectangle(cornerRadius: 16))
-
-            if !finalPaymentRecords.isEmpty {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("最近账单")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(themeManager.secondaryTextColor)
-                        .themeSkinLegibleText(level: .inline, slot: .sectionCard)
-                    ForEach(Array(finalPaymentRecords.suffix(3).reversed())) { entry in
-                        HStack(spacing: 8) {
-                            Text("一次性")
-                                .font(.caption.weight(.bold))
-                                .foregroundStyle(Color(hex: "C94C72"))
-                                .themeSkinLegibleText(level: .chip, slot: .discountBadge)
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 4)
-                                .background(Color(hex: "C94C72").opacity(0.10), in: Capsule())
-                            Text("¥\(moneyString(entry.amount))")
-                                .font(.caption.weight(.semibold))
-                                .foregroundStyle(themeManager.primaryTextColor)
-                                .themeSkinLegibleText(level: .inline, slot: .sectionCard)
-                            Spacer()
-                            Text(formattedRecordDate(entry.paidAt))
-                                .font(.caption2)
-                                .foregroundStyle(themeManager.tertiaryTextColor)
-                                .themeSkinLegibleText(level: .inline, slot: .sectionCard)
-                        }
-                    }
-                }
-            }
-
-            if isPaidOff {
-                Text("尾款已付清，记录按钮已收起。")
-                    .font(.caption2)
-                    .foregroundStyle(themeManager.tertiaryTextColor)
-                    .themeSkinLegibleText(level: .inline, slot: .sectionCard)
-            }
-        }
-        .padding()
-        .themeSkinSectionCard(cornerRadius: 18)
-    }
-
-    private func finalPaymentStatusSubtitle(paidOff: Bool) -> String {
-        if paidOff {
-            return "尾款已完成".appLocalized
-        }
-        return "记录剩余尾款，付清后按钮会消失".appLocalized
-    }
-
-    private func finalPaymentMetric(title: String, value: String, color: Color) -> some View {
-        VStack(spacing: 5) {
-            Text(title.appLocalized)
-                .font(.caption2)
-                .foregroundStyle(themeManager.secondaryTextColor)
-                .themeSkinLegibleText(level: .inline, slot: .sectionCard)
-            Text(value)
-                .font(.caption.weight(.bold))
-                .foregroundStyle(color)
-                .themeSkinLegibleText(level: .chip, slot: .sectionCard)
-                .monospacedDigit()
-                .lineLimit(1)
-                .minimumScaleFactor(0.65)
-        }
-        .frame(maxWidth: .infinity)
     }
 
     private func moneyString(_ value: Decimal) -> String {
@@ -1070,38 +935,26 @@ struct ClothingDetailView: View {
 
 struct FinalPaymentRecordingSheet: View {
     let clothing: Clothing
-    let wealthSavingEntries: [WealthSavingEntry]
     let onRecord: (Decimal) -> Void
 
     @Environment(\.dismiss) private var dismiss
     @Environment(ThemeManager.self) private var themeManager
 
-    private var totalDue: Decimal { WealthSavingLedger.finalPaymentDueAmount(for: clothing) }
-    private var paidTotal: Decimal { WealthSavingLedger.paidFinalPaymentTotal(for: clothing.id, in: wealthSavingEntries) }
-    private var paidRatio: Double {
-        guard totalDue > 0 else { return 0 }
-        return min(NSDecimalNumber(decimal: paidTotal / totalDue).doubleValue, 1.0)
-    }
-    private var remainingAmount: Decimal { WealthSavingLedger.remainingFinalPaymentAmount(for: clothing, entries: wealthSavingEntries) }
-    private var paidRecords: [WealthSavingEntry] { WealthSavingLedger.finalPaymentRecords(for: clothing.id, in: wealthSavingEntries) }
+    private var remainingAmount: Decimal { WealthSavingLedger.unpaidFinalPaymentAmount(for: clothing) }
     private var canRecord: Bool { remainingAmount > 0 }
 
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: 18) {
-                    summaryCard
-                    oneTimeAmountCard
-                    ledgerPreview
-                }
+                confirmCard
                 .padding()
             }
-            .navigationTitle("记录已付尾款")
+            .navigationTitle("尾款付清")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("取消") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("记录") {
+                    Button("付清") {
                         onRecord(remainingAmount)
                         dismiss()
                     }
@@ -1112,97 +965,34 @@ struct FinalPaymentRecordingSheet: View {
         .presentationDetents([.medium])
     }
 
-    private var summaryCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text(clothing.name)
+    private var confirmCard: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Label("尾款付清", systemImage: "checkmark.seal.fill")
                 .font(.headline)
+                .foregroundStyle(Color(hex: "C94C72"))
+                .themeSkinLegibleText(level: .inline, slot: .sectionCard)
+
+            Text(clothing.name)
+                .font(.subheadline.weight(.semibold))
                 .foregroundStyle(themeManager.primaryTextColor)
                 .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                 .lineLimit(2)
-            HStack(spacing: 0) {
-                paymentStat(title: "应付尾款", value: totalDue, color: Color(hex: "C94C72"))
-                Divider().frame(height: 34)
-                paymentStat(title: "已付", value: paidTotal, color: .green)
-                Divider().frame(height: 34)
-                paymentStat(title: "剩余", value: remainingAmount, color: .orange)
-            }
-            ProgressView(value: paidRatio).tint(Color(hex: "C94C72"))
+
+            Text("¥\(moneyText(remainingAmount))")
+                .font(.title2.weight(.bold))
+                .foregroundStyle(Color(hex: "C94C72"))
+                .themeSkinLegibleText(level: .chip, slot: .sectionCard)
+
             Text("确认后会把剩余尾款记为已支付，并恢复为普通已购裙装。")
                 .font(.caption)
                 .foregroundStyle(themeManager.secondaryTextColor)
                 .themeSkinLegibleText(level: .inline, slot: .sectionCard)
         }
         .padding()
-        .themeSkinSectionCard(cornerRadius: 20)
-    }
-
-    private var oneTimeAmountCard: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Label("一次性付清", systemImage: "checkmark.seal.fill")
-                .font(.headline)
-                .foregroundStyle(Color(hex: "C94C72"))
-                .themeSkinLegibleText(level: .inline, slot: .sectionCard)
-            Text("本次将记录剩余全部尾款 ¥%@。".appLocalized(moneyText(remainingAmount)))
-                .font(.subheadline)
-                .foregroundStyle(themeManager.secondaryTextColor)
-                .themeSkinLegibleText(level: .inline, slot: .sectionCard)
-        }
-        .padding()
         .themeSkinSectionCard(cornerRadius: 18)
-    }
-
-    private var ledgerPreview: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Label("账单明细", systemImage: "list.bullet.rectangle")
-                .font(.headline)
-                .foregroundStyle(themeManager.primaryTextColor)
-                .themeSkinLegibleText(level: .inline, slot: .sectionCard)
-            if paidRecords.isEmpty {
-                Text("还没有实付账单。")
-                    .font(.caption)
-                    .foregroundStyle(themeManager.secondaryTextColor)
-                    .themeSkinLegibleText(level: .inline, slot: .sectionCard)
-            } else {
-                ForEach(paidRecords) { entry in
-                    HStack {
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text("一次性付清")
-                                .font(.subheadline.weight(.semibold))
-                                .foregroundStyle(themeManager.primaryTextColor)
-                                .themeSkinLegibleText(level: .inline, slot: .sectionCard)
-                            Text(formattedRecordDate(entry.paidAt))
-                                .font(.caption2)
-                                .foregroundStyle(themeManager.secondaryTextColor)
-                                .themeSkinLegibleText(level: .inline, slot: .sectionCard)
-                        }
-                        Spacer()
-                        Text("¥\(moneyText(entry.amount))")
-                            .font(.subheadline.weight(.bold))
-                            .foregroundStyle(Color(hex: "C94C72"))
-                            .themeSkinLegibleText(level: .chip, slot: .sectionCard)
-                    }
-                    .padding(10)
-                    .background(Color.secondary.opacity(0.06), in: RoundedRectangle(cornerRadius: 12))
-                }
-            }
-        }
-        .padding()
-        .themeSkinSectionCard(cornerRadius: 18)
-    }
-
-    private func paymentStat(title: String, value: Decimal, color: Color) -> some View {
-        VStack(spacing: 5) {
-            Text(title.appLocalized).font(.caption2).foregroundStyle(themeManager.secondaryTextColor).themeSkinLegibleText(level: .inline, slot: .sectionCard)
-            Text("¥\(moneyText(value))").font(.caption.weight(.bold)).foregroundStyle(color).themeSkinLegibleText(level: .chip, slot: .sectionCard).lineLimit(1).minimumScaleFactor(0.65)
-        }
-        .frame(maxWidth: .infinity)
     }
 
     private func moneyText(_ value: Decimal) -> String { NSDecimalNumber(decimal: value).stringValue }
-
-    private func formattedRecordDate(_ date: Date?) -> String {
-        date?.formatted(.dateTime.year().month().day().locale(LanguageManager.shared.locale)) ?? "已记录".appLocalized
-    }
 }
 
 /// 信息行组件 - 使用统一配色
