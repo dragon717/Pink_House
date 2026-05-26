@@ -394,7 +394,12 @@ class ImageManager {
     
     /// 保存图片：压缩 -> 哈希去重 -> 存储/引用计数
     /// - Returns: 文件名 (如果成功)
-    func saveImage(_ image: UIImage, context: ModelContext, format: ImageFormat = .jpeg(quality: 0.7)) -> String? {
+    func saveImage(
+        _ image: UIImage,
+        context: ModelContext,
+        format: ImageFormat = .jpeg(quality: 0.7),
+        triggerImageSync: Bool = true
+    ) -> String? {
         // 1. Resize large images to save disk space and memory
         // Limit max dimension to 2048px (Enough for full screen on most iPhones)
         // Note: resized(toMaxDimension:) works in points, so we need to adjust for scale to limit pixels
@@ -460,9 +465,11 @@ class ImageManager {
                 
                 AppLogger.info("New image saved (Hash: \(hash), File: \(fileName))")
                 
-                // 触发 CloudKit 同步（异步，不阻塞主线程）
-                Task {
-                    await ClothingImageSyncService.shared.syncPendingImages()
+                if triggerImageSync {
+                    // 触发 CloudKit 同步（异步，不阻塞主线程）
+                    Task {
+                        await ClothingImageSyncService.shared.syncPendingImages()
+                    }
                 }
                 
                 return fileName

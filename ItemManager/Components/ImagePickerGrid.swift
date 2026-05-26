@@ -13,7 +13,7 @@ import UniformTypeIdentifiers
 struct ImagePickerGrid: View {
     @Binding var imagePaths: [String]
     let maxCount: Int = 9
-    
+
     private struct EditingSelection: Identifiable {
         let id = UUID()
         let index: Int
@@ -286,47 +286,81 @@ struct ImagePickerGrid: View {
         } message: {
             Text(errorMessage)
         }
-        .photosPicker(isPresented: $showingPhotosPicker, selection: $selectedItems, maxSelectionCount: maxCount - imagePaths.count, matching: .images)
+        .photosPicker(
+            isPresented: $showingPhotosPicker,
+            selection: $selectedItems,
+            maxSelectionCount: maxCount - imagePaths.count,
+            selectionBehavior: .ordered,
+            matching: .images,
+            preferredItemEncoding: .current
+        )
         .onChange(of: selectedItems) { _, newItems in
-            guard !newItems.isEmpty else { return }
-            
-            isProcessingImages = true
-            Task {
-                for item in newItems {
-                    do {
-                        if let data = try await item.loadTransferable(type: Data.self),
-                           let uiImage = UIImage(data: data) {
-                            // 压缩图片以节省空间
-                            let compressedImage = uiImage.jpegData(compressionQuality: 0.7).flatMap { UIImage(data: $0) } ?? uiImage
-                            await MainActor.run {
-                                saveImage(compressedImage)
-                            }
-                        } else {
-                            print("Failed to load image data or create UIImage")
-                            await MainActor.run {
-                                errorMessage = "无法加载图片数据"
-                                showingErrorAlert = true
-                            }
+            guard !newItems.isEmpty, !isProcessingImages else { return }
+
+            if !showingPhotosPicker {
+                processSelectedPhotoItemsIfNeeded()
+            }
+        }
+        .onChange(of: showingPhotosPicker) { wasPresented, isPresented in
+            guard wasPresented && !isPresented else { return }
+            processSelectedPhotoItemsIfNeeded()
+        }
+    }
+
+    private func processSelectedPhotoItemsIfNeeded() {
+        guard !selectedItems.isEmpty, !isProcessingImages else { return }
+
+        let itemsToProcess = selectedItems
+        isProcessingImages = true
+        selectedItems = []
+
+        Task {
+            var savedCount = 0
+
+            for item in itemsToProcess {
+                do {
+                    if let data = try await item.loadTransferable(type: Data.self),
+                       let uiImage = UIImage(data: data) {
+                        // 压缩图片以节省空间
+                        let compressedImage = uiImage.jpegData(compressionQuality: 0.7).flatMap { UIImage(data: $0) } ?? uiImage
+                        let didSave = await MainActor.run {
+                            saveImage(compressedImage, triggerImageSync: false)
                         }
-                    } catch {
-                        print("Error loading image: \(error)")
+                        if didSave {
+                            savedCount += 1
+                        }
+                    } else {
+                        print("Failed to load image data or create UIImage")
                         await MainActor.run {
-                            errorMessage = "加载图片出错：\(error.localizedDescription)"
+                            errorMessage = "无法加载图片数据"
                             showingErrorAlert = true
                         }
                     }
+                } catch {
+                    print("Error loading image: \(error)")
+                    await MainActor.run {
+                        errorMessage = "加载图片出错：\(error.localizedDescription)"
+                        showingErrorAlert = true
+                    }
                 }
-                await MainActor.run {
-                    selectedItems = []
-                    isProcessingImages = false
+            }
+
+            if savedCount > 0 {
+                Task {
+                    await ClothingImageSyncService.shared.syncPendingImages()
                 }
+            }
+
+            await MainActor.run {
+                isProcessingImages = false
             }
         }
     }
-    
-    private func saveImage(_ image: UIImage) {
+
+    @discardableResult
+    private func saveImage(_ image: UIImage, triggerImageSync: Bool = true) -> Bool {
         print("ImagePickerGrid: Saving image, current imagePaths count: \(imagePaths.count)")
-        if let fileName = ImageManager.shared.saveImage(image, context: modelContext) {
+        if let fileName = ImageManager.shared.saveImage(image, context: modelContext, triggerImageSync: triggerImageSync) {
             // 使用 withAnimation 确保状态更新被 SwiftUI 捕获
             withAnimation {
                 imagePaths.append(fileName)
@@ -336,10 +370,12 @@ struct ImagePickerGrid: View {
             DispatchQueue.main.async {
                 print("ImagePickerGrid: Triggering state sync, imagePaths now has \(self.imagePaths.count) items")
             }
+            return true
         } else {
             errorMessage = "保存图片失败"
             showingErrorAlert = true
             print("ImagePickerGrid: Failed to save image")
+            return false
         }
     }
 
@@ -373,5 +409,3 @@ struct ImagePickerGrid: View {
         imagePaths.insert(item, at: 0)
     }
 }
-
-

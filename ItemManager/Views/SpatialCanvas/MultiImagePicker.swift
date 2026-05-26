@@ -17,6 +17,7 @@ struct MultiImagePicker: View {
     @State private var isLoading = false
     @State private var selectedImages: [UIImage] = []
     @State private var showMaxSelectionAlert = false
+    @State private var previewLoadTask: Task<Void, Never>?
     
     // 3DGS建议的最小图片数
     private let minRecommendedImages = 20
@@ -90,12 +91,19 @@ struct MultiImagePicker: View {
                 Text("一次最多只能选择 %@ 张图片".appLocalized("\(maxImages)"))
             }
             .onChange(of: selectedItems) { _, newItems in
+                let itemsForPreview: [PhotosPickerItem]
                 if newItems.count > maxImages {
                     showMaxSelectionAlert = true
-                    selectedItems = Array(newItems.prefix(maxImages))
+                    itemsForPreview = Array(newItems.prefix(maxImages))
+                    selectedItems = itemsForPreview
+                } else {
+                    itemsForPreview = newItems
                 }
                 // 加载选中图片的预览
-                loadSelectedImages()
+                loadSelectedImages(from: itemsForPreview)
+            }
+            .onDisappear {
+                previewLoadTask?.cancel()
             }
         }
     }
@@ -258,15 +266,26 @@ struct MultiImagePicker: View {
     }
     
     // MARK: - 加载已选图片
-    private func loadSelectedImages() {
-        Task {
+    private func loadSelectedImages(from items: [PhotosPickerItem]) {
+        previewLoadTask?.cancel()
+
+        guard !items.isEmpty else {
+            selectedImages = []
+            return
+        }
+
+        previewLoadTask = Task {
             var images: [UIImage] = []
-            for item in selectedItems {
+            for item in items {
+                if Task.isCancelled { return }
+
                 if let data = try? await item.loadTransferable(type: Data.self),
                    let image = UIImage(data: data) {
                     images.append(image)
                 }
             }
+            if Task.isCancelled { return }
+
             await MainActor.run {
                 selectedImages = images
             }
@@ -281,6 +300,7 @@ struct MultiImagePicker: View {
     }
     
     private func clearSelection() {
+        previewLoadTask?.cancel()
         selectedItems.removeAll()
         selectedImages.removeAll()
     }

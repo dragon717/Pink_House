@@ -1,6 +1,8 @@
 import SwiftUI
 import SwiftData
 import PhotosUI
+import CoreImage
+import ImageIO
 
 struct BookDetailView: View {
     @Bindable var book: BookGroup
@@ -227,14 +229,20 @@ struct BookDetailView: View {
                 selection: $selectedBatchPhotos,
                 maxSelectionCount: 20,
                 selectionBehavior: .ordered,
-                matching: .images
+                matching: .images,
+                preferredItemEncoding: .current
             )
             .onChange(of: selectedBatchPhotos) { _, newItems in
-                if !newItems.isEmpty {
-                    batchTotalCount = newItems.count
-                    processBatchPhotos(newItems)
-                    selectedBatchPhotos = []
+                guard !isBatchProcessing else { return }
+                batchTotalCount = newItems.count
+
+                if !showingBatchPhotoPicker {
+                    beginBatchPhotoProcessingIfNeeded()
                 }
+            }
+            .onChange(of: showingBatchPhotoPicker) { wasPresented, isPresented in
+                guard wasPresented && !isPresented else { return }
+                beginBatchPhotoProcessingIfNeeded()
             }
         
         let withBatchOverlays = withSheets
@@ -341,39 +349,68 @@ struct BookDetailView: View {
         }
     }
     
+    private func beginBatchPhotoProcessingIfNeeded() {
+        guard !isBatchProcessing else { return }
+
+        let itemsToProcess = selectedBatchPhotos
+        guard !itemsToProcess.isEmpty else { return }
+
+        batchTotalCount = itemsToProcess.count
+        processBatchPhotos(itemsToProcess)
+        selectedBatchPhotos = []
+    }
+
     private func processBatchPhotos(_ items: [PhotosPickerItem]) {
-        guard !items.isEmpty else { return }
+        guard !items.isEmpty, !isBatchProcessing else { return }
         
         isBatchProcessing = true
         batchProcessingProgress = 0
+        batchTotalCount = items.count
         
         Task {
             let startSortIndex = (sortedPages.last?.sortIndex ?? 0) + 1
+            var insertedPageCount = 0
             
             for (index, item) in items.enumerated() {
-                if let data = try? await item.loadTransferable(type: Data.self),
-                   let image = UIImage(data: data) {
-                    await MainActor.run {
+                let croppedImage: UIImage?
+                if let data = try? await item.loadTransferable(type: Data.self) {
+                    croppedImage = await Task.detached(priority: .userInitiated) {
+                        guard let image = UIImage(data: data) else { return nil }
+                        return Self.cropImageToAspectRatio(image, aspectRatio: 0.75)
+                    }.value
+                } else {
+                    croppedImage = nil
+                }
+
+                if let croppedImage {
+                    let sortIndex = startSortIndex + insertedPageCount
+                    let didInsertPage = await MainActor.run {
+                        guard let path = ImageManager.shared.saveImage(croppedImage, context: modelContext, triggerImageSync: false) else {
+                            return false
+                        }
+
                         let newPage = Outfit(
                             note: "图片书页 \(Date().formatted(date: .numeric, time: .shortened))",
                             canvasType: OOTDCanvasType.custom,
                             book: book
                         )
-                        newPage.sortIndex = startSortIndex + index
+                        newPage.sortIndex = sortIndex
                         newPage.lastModified = Date()
-                        
-                        // 裁剪图片为 3:4 比例
-                        let croppedImage = cropImageToAspectRatio(image, aspectRatio: 0.75)
-                        
-                        if let path = ImageManager.shared.saveImage(croppedImage, context: modelContext) {
-                            newPage.backgroundImagePath = path
-                            newPage.snapshotPath = path
-                        }
+                        newPage.backgroundImagePath = path
+                        newPage.snapshotPath = path
                         
                         modelContext.insert(newPage)
                         book.lastModified = Date()
-                        batchProcessingProgress = index + 1
+                        return true
                     }
+
+                    if didInsertPage {
+                        insertedPageCount += 1
+                    }
+                }
+
+                await MainActor.run {
+                    batchProcessingProgress = index + 1
                 }
             }
             
@@ -384,11 +421,21 @@ struct BookDetailView: View {
                 refreshTrigger.toggle()
                 isBatchProcessing = false
             }
+
+            if insertedPageCount > 0 {
+                Task {
+                    await ClothingImageSyncService.shared.syncPendingImages()
+                }
+            }
         }
     }
     
-    private func cropImageToAspectRatio(_ image: UIImage, aspectRatio: CGFloat) -> UIImage {
-        let imageSize = image.size
+    nonisolated private static func cropImageToAspectRatio(_ image: UIImage, aspectRatio: CGFloat) -> UIImage {
+        guard let sourceImage = normalizedCGImage(from: image) else {
+            return image
+        }
+
+        let imageSize = CGSize(width: sourceImage.width, height: sourceImage.height)
         let targetRatio = aspectRatio
         let currentRatio = imageSize.width / imageSize.height
         
@@ -406,11 +453,44 @@ struct BookDetailView: View {
             cropRect = CGRect(x: 0, y: yOffset, width: imageSize.width, height: newHeight)
         }
         
-        guard let cgImage = image.cgImage?.cropping(to: cropRect) else {
-            return image
+        guard let cgImage = sourceImage.cropping(to: cropRect.integral) else {
+            return UIImage(cgImage: sourceImage, scale: image.scale, orientation: .up)
         }
         
-        return UIImage(cgImage: cgImage, scale: image.scale, orientation: image.imageOrientation)
+        return UIImage(cgImage: cgImage, scale: image.scale, orientation: .up)
+    }
+
+    nonisolated private static func normalizedCGImage(from image: UIImage) -> CGImage? {
+        guard let sourceImage = image.cgImage else {
+            return nil
+        }
+
+        let ciImage = CIImage(cgImage: sourceImage)
+            .oriented(cgImageOrientation(from: image.imageOrientation))
+        return CIContext().createCGImage(ciImage, from: ciImage.extent)
+    }
+
+    nonisolated private static func cgImageOrientation(from orientation: UIImage.Orientation) -> CGImagePropertyOrientation {
+        switch orientation {
+        case .up:
+            return .up
+        case .upMirrored:
+            return .upMirrored
+        case .down:
+            return .down
+        case .downMirrored:
+            return .downMirrored
+        case .left:
+            return .left
+        case .leftMirrored:
+            return .leftMirrored
+        case .right:
+            return .right
+        case .rightMirrored:
+            return .rightMirrored
+        @unknown default:
+            return .up
+        }
     }
 
     private var backgroundCropperSheet: some View {

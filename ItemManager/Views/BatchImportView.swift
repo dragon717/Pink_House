@@ -162,9 +162,22 @@ struct BatchImportView: View {
                     cameraImage = nil
                 }
             }
-            .photosPicker(isPresented: $showingPhotosPicker, selection: $selectedItems, matching: .images, photoLibrary: .shared())
+            .photosPicker(
+                isPresented: $showingPhotosPicker,
+                selection: $selectedItems,
+                selectionBehavior: .ordered,
+                matching: .images,
+                preferredItemEncoding: .current,
+                photoLibrary: .shared()
+            )
             .onChange(of: selectedItems) { _, newItems in
-                loadImages(from: newItems)
+                if !showingPhotosPicker {
+                    loadImages(from: newItems)
+                }
+            }
+            .onChange(of: showingPhotosPicker) { wasPresented, isPresented in
+                guard wasPresented && !isPresented else { return }
+                loadImages(from: selectedItems)
             }
             .onAppear {
                 validateAccessOnAppear()
@@ -356,6 +369,14 @@ struct BatchImportView: View {
             }
         }
     }
+
+    private nonisolated static func loadFullImage(from item: PhotosPickerItem) async -> UIImage? {
+        guard let data = try? await item.loadTransferable(type: Data.self) else { return nil }
+
+        return await Task.detached(priority: .userInitiated) {
+            UIImage(data: data)
+        }.value
+    }
     
     private func removeImage(item: BatchImageItem) {
         print("DEBUG: Requesting removal of item: \(item.id)")
@@ -405,14 +426,17 @@ struct BatchImportView: View {
             
             // We can process images in background, get filenames, then insert on main.
             
-            var createdItems: [(String, String)] = [] // (filename, name)
+            var savedImageCount = 0
             
             for item in displayedItems {
                 if item.image == nil { continue } // Skip failed loads
                 
                 // If it's a camera image (sourceItem is nil), save directly
                 if item.sourceItem == nil, let image = item.image {
-                    if let fileName = await ImageManager.shared.saveImage(image, context: modelContext) {
+                    if let fileName = await MainActor.run(body: {
+                        ImageManager.shared.saveImage(image, context: modelContext, triggerImageSync: false)
+                    }) {
+                        savedImageCount += 1
                         let clothing = Clothing(
                             name: seriesName,
                             imagePaths: [fileName]
@@ -426,11 +450,13 @@ struct BatchImportView: View {
                 
                 // Load FULL image from sourceItem
                 if let sourceItem = item.sourceItem,
-                   let data = try? await sourceItem.loadTransferable(type: Data.self),
-                   let image = UIImage(data: data) {
+                   let image = await Self.loadFullImage(from: sourceItem) {
                     
                     // Save image
-                    if let fileName = await ImageManager.shared.saveImage(image, context: modelContext) {
+                    if let fileName = await MainActor.run(body: {
+                        ImageManager.shared.saveImage(image, context: modelContext, triggerImageSync: false)
+                    }) {
+                        savedImageCount += 1
                          // We can insert immediately
                         let clothing = Clothing(
                             name: seriesName,
@@ -456,6 +482,12 @@ struct BatchImportView: View {
                 
                 isProcessing = false
                 dismiss()
+            }
+
+            if savedImageCount > 0 {
+                Task {
+                    await ClothingImageSyncService.shared.syncPendingImages()
+                }
             }
         }
     }

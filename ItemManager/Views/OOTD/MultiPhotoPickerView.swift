@@ -28,6 +28,7 @@ struct MultiPhotoPickerView: View {
     @State private var showConfirmation = false
     @State private var showMaxSelectionAlert = false
     @State private var cutoutResults: [CutoutItem] = []
+    @State private var previewLoadTask: Task<Void, Never>?
     
     // MARK: - 常量
     private let maxSelectionCount = 20
@@ -104,12 +105,16 @@ struct MultiPhotoPickerView: View {
                 .padding()
             }
             .onChange(of: selectedItems) { _, newItems in
+                let itemsForPreview: [PhotosPickerItem]
                 if newItems.count > maxSelectionCount {
                     showMaxSelectionAlert = true
-                    selectedItems = Array(newItems.prefix(maxSelectionCount))
+                    itemsForPreview = Array(newItems.prefix(maxSelectionCount))
+                    selectedItems = itemsForPreview
+                } else {
+                    itemsForPreview = newItems
                 }
                 // 加载选中图片的预览
-                loadSelectedImages()
+                loadSelectedImages(from: itemsForPreview)
             }
             
             // 底部操作栏
@@ -119,6 +124,9 @@ struct MultiPhotoPickerView: View {
             Button("确定", role: .cancel) {}
         } message: {
             Text("一次最多只能选择 \(maxSelectionCount) 张照片")
+        }
+        .onDisappear {
+            previewLoadTask?.cancel()
         }
     }
     
@@ -197,15 +205,26 @@ struct MultiPhotoPickerView: View {
     }
     
     // MARK: - 加载已选图片
-    private func loadSelectedImages() {
-        Task {
+    private func loadSelectedImages(from items: [PhotosPickerItem]) {
+        previewLoadTask?.cancel()
+
+        guard !items.isEmpty else {
+            selectedImages = []
+            return
+        }
+
+        previewLoadTask = Task {
             var images: [UIImage] = []
-            for item in selectedItems {
+            for item in items {
+                if Task.isCancelled { return }
+
                 if let data = try? await item.loadTransferable(type: Data.self),
                    let image = UIImage(data: data) {
                     images.append(image)
                 }
             }
+            if Task.isCancelled { return }
+
             await MainActor.run {
                 selectedImages = images
             }
