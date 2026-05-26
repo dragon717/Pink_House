@@ -80,7 +80,6 @@ class BackupService {
         "UserPreference_DepositDisplayMode",
         "UserPreference_WardrobeNavigationStyle",
         "shouldShowWealthContainerBackground",
-        "wealth.finalPaymentVaultMascot",
         "visualModelPriority",
         "textModelPriority",
         "voiceModelId",
@@ -1537,15 +1536,18 @@ class BackupService {
         var desiredIDs = Set<UUID>()
 
         for dto in dtoItems {
+            let sanitizedPrice = FinancialDataSanitizer.money(dto.price)
+            let sanitizedDeposit = FinancialDataSanitizer.money(dto.deposit ?? 0)
+            let sanitizedBalance = FinancialDataSanitizer.money(dto.balance ?? 0)
             let item: AccessoryItem
             if let existing = existingByID[dto.id] {
                 item = existing
             } else {
                 item = AccessoryItem(
                     name: dto.name,
-                    price: dto.price,
-                    deposit: dto.deposit ?? 0,
-                    balance: dto.balance ?? 0,
+                    price: sanitizedPrice,
+                    deposit: sanitizedDeposit,
+                    balance: sanitizedBalance,
                     sortIndex: dto.sortIndex,
                     imagePaths: dto.imagePaths
                 )
@@ -1554,9 +1556,9 @@ class BackupService {
             }
 
             item.name = dto.name
-            item.price = dto.price
-            item.deposit = dto.deposit ?? 0
-            item.balance = dto.balance ?? 0
+            item.price = sanitizedPrice
+            item.deposit = sanitizedDeposit
+            item.balance = sanitizedBalance
             item.sortIndex = dto.sortIndex
             item.imagePaths = dto.imagePaths
 
@@ -1723,19 +1725,19 @@ class BackupService {
             clothingBack.isShared = dto.isShared ?? false
 
             // Prices: backup data overwrites (user may have updated prices)
-            clothingBack.originalPrice = dto.originalPrice ?? 0
-            clothingBack.originalPriceJPY = dto.originalPriceJPY ?? 0
+            clothingBack.originalPrice = FinancialDataSanitizer.money(dto.originalPrice ?? 0)
+            clothingBack.originalPriceJPY = FinancialDataSanitizer.money(dto.originalPriceJPY ?? 0)
             clothingBack.originalPriceCurrencyCode = dto.originalPriceCurrencyCode ?? ClothingPriceCurrency.cny.rawValue
-            clothingBack.originalPriceExchangeRateJPY = dto.originalPriceExchangeRateJPY ?? 21.0
+            clothingBack.originalPriceExchangeRateJPY = FinancialDataSanitizer.money(dto.originalPriceExchangeRateJPY ?? 21.0)
             clothingBack.originalPriceRateUpdatedAt = dto.originalPriceRateUpdatedAt
-            clothingBack.price = dto.price
-            clothingBack.deposit = dto.deposit
-            clothingBack.balance = dto.balance
-            clothingBack.accessoriesPrice = dto.accessoriesPrice ?? 0
-            clothingBack.shippingFee = dto.shippingFee ?? 0
-            clothingBack.shippingFeeJPY = dto.shippingFeeJPY ?? 0
+            clothingBack.price = FinancialDataSanitizer.money(dto.price)
+            clothingBack.deposit = FinancialDataSanitizer.money(dto.deposit)
+            clothingBack.balance = FinancialDataSanitizer.money(dto.balance)
+            clothingBack.accessoriesPrice = FinancialDataSanitizer.money(dto.accessoriesPrice ?? 0)
+            clothingBack.shippingFee = FinancialDataSanitizer.money(dto.shippingFee ?? 0)
+            clothingBack.shippingFeeJPY = FinancialDataSanitizer.money(dto.shippingFeeJPY ?? 0)
             clothingBack.shippingFeeCurrencyCode = dto.shippingFeeCurrencyCode ?? ClothingPriceCurrency.cny.rawValue
-            clothingBack.shippingExchangeRateJPY = dto.shippingExchangeRateJPY ?? 21.0
+            clothingBack.shippingExchangeRateJPY = FinancialDataSanitizer.money(dto.shippingExchangeRateJPY ?? 21.0)
             clothingBack.shippingRateUpdatedAt = dto.shippingRateUpdatedAt
             
             // Dates: backup data overwrites
@@ -1751,7 +1753,7 @@ class BackupService {
             clothingBack.note = dto.note
             
             // Stock: use backup value (backup is source of truth for inventory)
-            clothingBack.stock = dto.stock
+            clothingBack.stock = FinancialDataSanitizer.stock(dto.stock)
             
             clothingBack.status = ClothingStatus(rawValue: dto.status ?? "") ?? .onShelf
             
@@ -2699,15 +2701,18 @@ class BackupService {
 
         if let dtoEntries = manifest.wealthSavingEntries, !dtoEntries.isEmpty {
             for dto in dtoEntries {
+                let sanitizedAmount = FinancialDataSanitizer.money(dto.amount)
+                let sanitizedVaultDeductionAmount = FinancialDataSanitizer.money(dto.vaultDeductionAmount ?? 0)
+                let sanitizedExternalPaymentAmount = FinancialDataSanitizer.money(dto.externalPaymentAmount ?? 0)
                 let entry = entryMap[dto.id] ?? {
-                    let newEntry = WealthSavingEntry(amount: dto.amount, clothingID: dto.clothingID, createdAt: dto.createdAt)
+                    let newEntry = WealthSavingEntry(amount: sanitizedAmount, clothingID: dto.clothingID, createdAt: dto.createdAt)
                     newEntry.id = dto.id
                     modelContext.insert(newEntry)
                     entryMap[dto.id] = newEntry
                     return newEntry
                 }()
 
-                entry.amount = dto.amount
+                entry.amount = sanitizedAmount
                 entry.clothingID = dto.clothingID
                 entry.note = dto.note ?? ""
                 entry.migrationSource = dto.migrationSource
@@ -2716,8 +2721,8 @@ class BackupService {
                 entry.installmentIndex = dto.installmentIndex ?? 0
                 entry.installmentCount = dto.installmentCount ?? 0
                 entry.paidAt = dto.paidAt
-                entry.vaultDeductionAmount = dto.vaultDeductionAmount ?? 0
-                entry.externalPaymentAmount = dto.externalPaymentAmount ?? 0
+                entry.vaultDeductionAmount = sanitizedVaultDeductionAmount
+                entry.externalPaymentAmount = sanitizedExternalPaymentAmount
                 entry.createdAt = dto.createdAt
                 entry.updatedAt = dto.updatedAt ?? dto.createdAt
                 entry.usedAt = dto.usedAt

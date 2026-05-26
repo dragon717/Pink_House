@@ -90,6 +90,7 @@
 				Brand.swift,
 				Clothing.swift,
 				Item.swift,
+				Services/FinancialDataSanitizer.swift,
 				Services/SharedPersistence.swift,
 				Services/WidgetBackgroundManager.swift,
 				Services/WidgetDataManager.swift,

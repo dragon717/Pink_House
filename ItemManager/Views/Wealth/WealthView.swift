@@ -52,15 +52,10 @@ struct WealthView: View {
     @State private var moneyCountingState: MoneyCountingState?
     
     private var calculatedTotalAmount: Decimal {
-        let wardrobeTotal = allClothings.reduce(Decimal(0)) { partialResult, clothing in
-            guard !clothing.isDeleted && clothing.deletedAt == nil else { return partialResult }
-            if clothing.isDepositPlan {
-                return partialResult + clothing.totalDeposit + clothing.resolvedShippingFee
-            } else {
-                return partialResult + clothing.inventoryTotalPrice
-            }
-        }
-        return wardrobeTotal + WealthSavingLedger.activeTotal(in: wealthSavingEntries)
+        WealthViewModel.calculateBaseAmountCNY(
+            clothings: allClothings,
+            wealthSavingEntries: wealthSavingEntries
+        )
     }
 
     private var magicPalette: MagicThemePalette {

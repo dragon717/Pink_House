@@ -39,7 +39,9 @@ final class ClothingAccessoryPriceValidationService {
                     continue
                 }
 
-                let recalculatedTotal = accessoryItems.reduce(Decimal(0)) { $0 + $1.price }
+                let recalculatedTotal = accessoryItems.reduce(Decimal(0)) {
+                    $0 + FinancialDataSanitizer.money($1.price)
+                }
                 guard clothing.accessoriesPrice != recalculatedTotal else { continue }
 
                 clothing.accessoriesPrice = recalculatedTotal

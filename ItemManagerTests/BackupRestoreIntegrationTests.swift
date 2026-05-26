@@ -46,6 +46,56 @@ final class BackupRestoreIntegrationTests: XCTestCase {
         container = nil
         context = nil
     }
+
+    func testWealthAggregateSanitizesNegativeImportedFinancialValues() throws {
+        let negativeStockClothing = Clothing(
+            name: "Dirty Negative Stock OP",
+            price: 200,
+            stock: 1
+        )
+        negativeStockClothing.stock = -3
+        context.insert(negativeStockClothing)
+
+        let negativeDepositClothing = Clothing(name: "Dirty Deposit JSK")
+        negativeDepositClothing.price = -100
+        negativeDepositClothing.deposit = -40
+        negativeDepositClothing.balance = -60
+        negativeDepositClothing.shippingFee = -20
+        negativeDepositClothing.isDepositPlan = true
+        negativeDepositClothing.stock = -2
+        context.insert(negativeDepositClothing)
+
+        let negativeSavingEntry = WealthSavingEntry(
+            amount: 1,
+            clothingID: nil,
+            note: "导入脏数据负数小金库"
+        )
+        negativeSavingEntry.amount = -999
+        context.insert(negativeSavingEntry)
+        try context.save()
+
+        let clothings = try context.fetch(FetchDescriptor<Clothing>())
+        let savingEntries = try context.fetch(FetchDescriptor<WealthSavingEntry>())
+        let total = WealthViewModel.calculateBaseAmountCNY(
+            clothings: clothings,
+            wealthSavingEntries: savingEntries
+        )
+
+        XCTAssertGreaterThanOrEqual(total, 0, "负金额/负库存导入样本经过来财聚合兜底后不应产生负数")
+    }
+
+    func testWealthViewModelClampsNegativeBaseAmountBeforeDisplayAndStackSplitting() {
+        let viewModel = WealthViewModel()
+        viewModel.baseAmountCNY = -123
+        viewModel.selectedCurrency = .rmb
+
+        XCTAssertEqual(viewModel.totalAmount, 0)
+        XCTAssertTrue(viewModel.calculateStacks().isEmpty)
+
+        viewModel.selectedCurrency = .jpy
+        XCTAssertEqual(viewModel.totalAmount, 0)
+        XCTAssertTrue(viewModel.calculateStacks().isEmpty)
+    }
     
     func testFullBackupRestoreCycle() async throws {
         // 1. 准备复杂的测试数据

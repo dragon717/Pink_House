@@ -80,14 +80,15 @@ class WealthViewModel {
     // Note: For Gold, this might not be sufficient if we want decimals.
     // We'll add a specific formatted string or value for Gold.
     var totalAmount: Int {
+        let safeBaseAmountCNY = sanitizedBaseAmountCNY
         switch selectedCurrency {
         case .rmb:
-            return NSDecimalNumber(decimal: baseAmountCNY).intValue
+            return NSDecimalNumber(decimal: safeBaseAmountCNY).intValue
         case .jpy:
-            let converted = baseAmountCNY * Decimal(exchangeRateJPY)
+            let converted = safeBaseAmountCNY * Decimal(exchangeRateJPY)
             return NSDecimalNumber(decimal: converted).intValue
         case .usd:
-            let converted = baseAmountCNY * Decimal(exchangeRateUSD)
+            let converted = safeBaseAmountCNY * Decimal(exchangeRateUSD)
             return NSDecimalNumber(decimal: converted).intValue
         case .gold:
             // This is just a placeholder, we won't use this Int for Gold display likely
@@ -100,15 +101,84 @@ class WealthViewModel {
     }
     
     var totalGoldWeightGrams: Double {
-        let cny = NSDecimalNumber(decimal: baseAmountCNY).doubleValue
+        let cny = NSDecimalNumber(decimal: sanitizedBaseAmountCNY).doubleValue
         guard goldPriceCNYPerGram > 0 else { return 0 }
         return cny / goldPriceCNYPerGram
     }
     
     var totalSilverWeightGrams: Double {
-        let cny = NSDecimalNumber(decimal: baseAmountCNY).doubleValue
+        let cny = NSDecimalNumber(decimal: sanitizedBaseAmountCNY).doubleValue
         guard silverPriceCNYPerGram > 0 else { return 0 }
         return cny / silverPriceCNYPerGram
+    }
+
+    var sanitizedBaseAmountCNY: Decimal {
+        let sanitized = FinancialDataSanitizer.aggregateMoney(baseAmountCNY)
+        if sanitized != baseAmountCNY {
+            print("💰 WealthViewModel: sanitized baseAmountCNY raw=\(baseAmountCNY), sanitized=\(sanitized)")
+        }
+        return sanitized
+    }
+
+    static func calculateBaseAmountCNY(
+        clothings: [Clothing],
+        wealthSavingEntries: [WealthSavingEntry]
+    ) -> Decimal {
+        let wardrobeTotal = clothings.reduce(Decimal(0)) { partialResult, clothing in
+            guard !clothing.isDeleted && clothing.deletedAt == nil else { return partialResult }
+            logNegativeFinancialFieldsIfNeeded(clothing)
+            return partialResult + sanitizedWardrobeContribution(for: clothing)
+        }
+        let rawSavingTotal = WealthSavingLedger.activeTotal(in: wealthSavingEntries)
+        let sanitizedSavingTotal = FinancialDataSanitizer.aggregateMoney(rawSavingTotal)
+        if sanitizedSavingTotal != rawSavingTotal {
+            print("💰 WealthViewModel: sanitized wealth saving total raw=\(rawSavingTotal), sanitized=\(sanitizedSavingTotal)")
+        }
+
+        let rawTotal = wardrobeTotal + sanitizedSavingTotal
+        let sanitizedTotal = FinancialDataSanitizer.aggregateMoney(rawTotal)
+        if sanitizedTotal != rawTotal {
+            print("💰 WealthViewModel: sanitized aggregate total raw=\(rawTotal), sanitized=\(sanitizedTotal)")
+        }
+        return sanitizedTotal
+    }
+
+    static func sanitizedWardrobeContribution(for clothing: Clothing) -> Decimal {
+        let safeStock = Decimal(FinancialDataSanitizer.stock(clothing.stock))
+        let safeShippingFee = FinancialDataSanitizer.money(clothing.shippingFee)
+
+        if clothing.isDepositPlan {
+            let safeDeposit = FinancialDataSanitizer.money(clothing.deposit)
+            let safeAccessoryDeposit = FinancialDataSanitizer.money(
+                clothing.accessoryItems?.reduce(Decimal(0)) { $0 + $1.deposit } ?? 0
+            )
+            return ((safeDeposit + safeAccessoryDeposit) * safeStock) + safeShippingFee
+        } else {
+            let safePrice = FinancialDataSanitizer.money(clothing.price)
+            let safeAccessoriesPrice = FinancialDataSanitizer.money(clothing.resolvedAccessoriesPrice)
+            return (safePrice * safeStock) + safeAccessoriesPrice + safeShippingFee
+        }
+    }
+
+    private static func logNegativeFinancialFieldsIfNeeded(_ clothing: Clothing) {
+        let negativeFields = [
+            clothing.price < 0 ? "price" : nil,
+            clothing.deposit < 0 ? "deposit" : nil,
+            clothing.balance < 0 ? "balance" : nil,
+            clothing.shippingFee < 0 ? "shippingFee" : nil,
+            clothing.stock < 0 ? "stock" : nil
+        ].compactMap { $0 }
+
+        guard !negativeFields.isEmpty else { return }
+        print(
+            """
+            💰 WealthViewModel: negative clothing financial fields \
+            id=\(clothing.id.uuidString), name=\(clothing.name), \
+            price=\(clothing.price), deposit=\(clothing.deposit), \
+            balance=\(clothing.balance), shippingFee=\(clothing.shippingFee), \
+            stock=\(clothing.stock), negativeFields=\(negativeFields.joined(separator: ","))
+            """
+        )
     }
     
     // Gold Display Logic
@@ -326,6 +396,11 @@ class WealthViewModel {
         var result: [MoneyPile] = []
         
         print("💰 calculateStacks: selectedCurrency=\(selectedCurrency), baseAmountCNY=\(baseAmountCNY), totalAmount=\(totalAmount), remaining=\(remaining)")
+
+        guard remaining > 0 else {
+            print("💰 calculateStacks: skip splitting because sanitized remaining=\(remaining)")
+            return []
+        }
         
         for denom in currentDenominations {
             let totalCountForDenom = remaining / denom.value

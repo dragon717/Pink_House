@@ -77,6 +77,94 @@ final class ClothingAccessoryTests: XCTestCase {
         XCTAssertEqual(clothing.inventoryTotalPrice, 1130.0)
     }
 
+    func testFinancialDataSanitizerClampsMoneyAndStock() throws {
+        XCTAssertEqual(FinancialDataSanitizer.money(Decimal.nan), 0)
+        XCTAssertEqual(FinancialDataSanitizer.money(Decimal(-1)), 0)
+        XCTAssertEqual(FinancialDataSanitizer.money(Double.nan), 0)
+        XCTAssertEqual(FinancialDataSanitizer.money(Double.infinity), 0)
+        XCTAssertEqual(FinancialDataSanitizer.money(Decimal(1_000_000_000)), FinancialDataSanitizer.maxMoney)
+        XCTAssertEqual(FinancialDataSanitizer.stock(-3), 1)
+        XCTAssertEqual(FinancialDataSanitizer.stock(1_000), 999)
+    }
+
+    func testModelInitializersSanitizeNegativeFinancialValues() throws {
+        let clothing = Clothing(
+            name: "Dirty Init JSK",
+            originalPrice: -1,
+            originalPriceJPY: -2,
+            originalPriceExchangeRateJPY: -3,
+            price: -10,
+            deposit: -20,
+            balance: -30,
+            accessoriesPrice: -40,
+            shippingFee: -50,
+            shippingFeeJPY: -60,
+            shippingExchangeRateJPY: -70,
+            stock: -5
+        )
+        let accessory = AccessoryItem(name: "Dirty Accessory", price: -10, deposit: -20, balance: -30)
+        let savingEntry = WealthSavingEntry(amount: -10, vaultDeductionAmount: -20, externalPaymentAmount: -30)
+
+        XCTAssertEqual(clothing.originalPrice, 0)
+        XCTAssertEqual(clothing.originalPriceJPY, 0)
+        XCTAssertEqual(clothing.originalPriceExchangeRateJPY, 0)
+        XCTAssertEqual(clothing.price, 0)
+        XCTAssertEqual(clothing.deposit, 0)
+        XCTAssertEqual(clothing.balance, 0)
+        XCTAssertEqual(clothing.accessoriesPrice, 0)
+        XCTAssertEqual(clothing.shippingFee, 0)
+        XCTAssertEqual(clothing.shippingFeeJPY, 0)
+        XCTAssertEqual(clothing.shippingExchangeRateJPY, 0)
+        XCTAssertEqual(clothing.stock, 1)
+        XCTAssertEqual(accessory.price, 0)
+        XCTAssertEqual(accessory.deposit, 0)
+        XCTAssertEqual(accessory.balance, 0)
+        XCTAssertEqual(savingEntry.amount, 0)
+        XCTAssertEqual(savingEntry.vaultDeductionAmount, 0)
+        XCTAssertEqual(savingEntry.externalPaymentAmount, 0)
+    }
+
+    func testNegativeHistoricalFinancialValuesDoNotMakeTotalsNegative() throws {
+        let clothing = Clothing(
+            name: "Dirty Historical JSK",
+            price: 100,
+            deposit: 40,
+            balance: 60,
+            accessoriesPrice: 20,
+            shippingFee: 10,
+            stock: 1
+        )
+        let accessory = AccessoryItem(name: "Dirty Accessory", price: 10, deposit: 5, balance: 5)
+        clothing.accessoryItems = [accessory]
+
+        clothing.price = -100
+        clothing.deposit = -40
+        clothing.balance = -60
+        clothing.accessoriesPrice = -20
+        clothing.shippingFee = -10
+        clothing.stock = -3
+        accessory.price = -10
+        accessory.deposit = -5
+        accessory.balance = -5
+
+        XCTAssertEqual(clothing.resolvedAccessoriesPrice, 0)
+        XCTAssertEqual(clothing.unitTotalPrice, 0)
+        XCTAssertEqual(clothing.inventoryTotalPrice, 0)
+        XCTAssertEqual(clothing.totalDeposit, 0)
+        XCTAssertEqual(clothing.totalBalance, 0)
+    }
+
+    func testNegativeWealthSavingEntryAmountDoesNotContributeToActiveTotal() throws {
+        let clothing = Clothing(name: "Saving Dirty JSK", price: 100)
+        let dirtyEntry = WealthSavingEntry(amount: 50, clothingID: clothing.id)
+        let validEntry = WealthSavingEntry(amount: 30, clothingID: clothing.id)
+
+        dirtyEntry.amount = -50
+
+        XCTAssertEqual(WealthSavingLedger.activeTotal(in: [dirtyEntry, validEntry]), 30)
+        XCTAssertEqual(WealthSavingLedger.activeTotal(for: clothing.id, in: [dirtyEntry, validEntry]), 30)
+    }
+
     func testOriginalPriceJPYConvertsToCNYForStatisticsSource() throws {
         let clothing = Clothing(
             name: "JPY OP",
@@ -265,6 +353,7 @@ final class ClothingAccessoryTests: XCTestCase {
         XCTAssertEqual(result?.externalPaymentAmount, 500)
         XCTAssertEqual(result?.paidOff, true)
         XCTAssertFalse(clothing.isDepositPlan)
+        XCTAssertEqual(clothing.finalPaymentInstallmentCount, 0)
         XCTAssertEqual(WealthSavingLedger.activeTotal(for: clothing.id, in: entries), 0)
         XCTAssertEqual(WealthSavingLedger.paidFinalPaymentTotal(for: clothing.id, in: entries), 800)
         XCTAssertEqual(WealthSavingLedger.finalPaymentRecords(for: clothing.id, in: entries).count, 1)
@@ -302,6 +391,7 @@ final class ClothingAccessoryTests: XCTestCase {
 
         entries = try context.fetch(FetchDescriptor<WealthSavingEntry>())
         XCTAssertFalse(clothing.isDepositPlan)
+        XCTAssertEqual(clothing.finalPaymentInstallmentCount, 0)
         XCTAssertEqual(WealthSavingLedger.paidFinalPaymentTotal(for: clothing.id, in: entries), 800)
         XCTAssertEqual(WealthSavingLedger.remainingFinalPaymentAmount(for: clothing, entries: entries), 0)
     }

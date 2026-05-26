@@ -80,7 +80,7 @@ struct MoneyCountingView: View {
                         Text("剩余金额")
                             .font(.caption)
                             .foregroundStyle(.secondary)
-                        Text("¥\(remainingBills * denomination.value)")
+                        Text("\(currency.symbol)\(remainingBills * denomination.value)")
                             .font(.title2)
                             .fontWeight(.bold)
                             .foregroundStyle(.white)
@@ -318,4 +318,3 @@ struct MoneyCountingView: View {
         }
     }
 }
-
