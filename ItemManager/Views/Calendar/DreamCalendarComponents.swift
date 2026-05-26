@@ -337,7 +337,7 @@ struct CalendarEventRow: View {
                 
                 // 3. Price Info
                 VStack(alignment: .trailing, spacing: 2) {
-                    if clothing.isDepositPlan {
+                    if clothing.isFinalPaymentPlan {
                         Text("定金¥\(clothing.totalDeposit.formatted(.number.precision(.fractionLength(0))))")
                             .font(.caption2)
                             .bold()

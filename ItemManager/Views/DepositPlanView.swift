@@ -84,7 +84,8 @@ struct DepositPlanView: View {
         _searchText = searchText
         _displayMode = displayMode
         // 统一使用 deletedAt == nil 作为未删除的判断条件，与衣橱列表保持一致
-        // 避免 isDeleted 和 deletedAt 不一致导致的数据问题
+        // 避免 isDeleted 和 deletedAt 不一致导致的数据问题。全款预约仍复用 isDepositPlan 存储，
+        // 后续用 isFinalPaymentPlan 收窄为真正的定金尾款。
         let filter = #Predicate<Clothing> { $0.isDepositPlan == true && $0.deletedAt == nil }
         // Use default sort since we'll apply sorting manually in updateBaseClothings
         _depositClothings = Query(filter: filter, sort: \Clothing.createdAt, order: .reverse)
@@ -100,13 +101,17 @@ struct DepositPlanView: View {
         self.sortOption = sortOption
     }
     
+    private var finalPaymentClothings: [Clothing] {
+        depositClothings.filter { $0.isFinalPaymentPlan }
+    }
+
     private func updateBaseClothings() {
         // 使用 ClothingSearchService 进行搜索
-        let searchService = ClothingSearchService(clothings: depositClothings)
+        let searchService = ClothingSearchService(clothings: finalPaymentClothings)
         let searchResults = searchService.search(query: searchText)
         
         // 如果没有搜索词，返回所有衣物
-        let baseResults = searchText.isEmpty ? depositClothings : searchResults
+        let baseResults = searchText.isEmpty ? finalPaymentClothings : searchResults
         
         // 使用统一的筛选服务（不包含年份筛选）
         let config = ClothingFilterService.FilterConfig(
@@ -118,7 +123,7 @@ struct DepositPlanView: View {
             selectedLengths: selectedLengths,
             selectedConditions: selectedConditions,
             selectedAccessories: selectedAccessories,
-            depositStatusFilter: .all // 心愿尾款视图只显示 depositPlan，已经在 Query 中过滤
+            depositStatusFilter: .all // 心愿尾款视图已收窄为真正的定金尾款
         )
         
         let filtered = ClothingFilterService.filter(baseResults, config: config)
@@ -233,7 +238,7 @@ struct DepositPlanView: View {
     
     // 计算所有待付尾款（不受年份筛选影响）
     private var totalPendingBalanceAll: Decimal {
-        depositClothings.reduce(0) { $0 + $1.pendingFinalPaymentAmount }
+        finalPaymentClothings.reduce(0) { $0 + $1.pendingFinalPaymentAmount }
     }
     
     // 计算当前月

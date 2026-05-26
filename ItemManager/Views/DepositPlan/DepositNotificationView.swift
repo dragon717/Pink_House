@@ -37,8 +37,12 @@ struct DepositNotificationView: View {
         MagicThemeDesignSystem.palette(themeManager: themeManager, colorScheme: colorScheme)
     }
 
+    private var finalPaymentPlans: [Clothing] {
+        depositPlans.filter { $0.isFinalPaymentPlan }
+    }
+
     private func clothing(for clothingID: UUID) -> Clothing? {
-        depositPlans.first { $0.id == clothingID }
+        finalPaymentPlans.first { $0.id == clothingID }
     }
 
     /// 未读记录数量
@@ -56,7 +60,7 @@ struct DepositNotificationView: View {
     }
 
     private var testTargetClothing: Clothing? {
-        depositPlans
+        finalPaymentPlans
             .sorted { lhs, rhs in
                 let lhsDate = lhs.finalPaymentDate ?? .distantFuture
                 let rhsDate = rhs.finalPaymentDate ?? .distantFuture
@@ -119,10 +123,10 @@ struct DepositNotificationView: View {
         .onAppear {
             loadSettings()
             Task {
-                logger.info("view_appear deposit_plan_count=\(depositPlans.count)")
+                logger.info("view_appear deposit_plan_count=\(finalPaymentPlans.count)")
                 await NotificationManager.shared.reconcileDeliveredNotifications(modelContext: modelContext)
                 await NotificationManager.shared.refreshDepositNotifications(
-                    clothings: depositPlans,
+                    clothings: finalPaymentPlans,
                     modelContext: modelContext,
                     force: false,
                     reason: "notification-view-appear"
@@ -326,7 +330,7 @@ struct DepositNotificationView: View {
                 Button("重新同步") {
                     Task {
                         await NotificationManager.shared.refreshDepositNotifications(
-                            clothings: depositPlans,
+                            clothings: finalPaymentPlans,
                             modelContext: modelContext,
                             force: true,
                             reason: "manual"
@@ -588,7 +592,7 @@ struct DepositNotificationView: View {
         settingsSyncTask = Task {
             try? await Task.sleep(nanoseconds: 650_000_000)
             guard !Task.isCancelled else { return }
-            logger.info("settings_change_apply enabled=\(enabled) deposit_plan_count=\(depositPlans.count)")
+            logger.info("settings_change_apply enabled=\(enabled) deposit_plan_count=\(finalPaymentPlans.count)")
 
             if enabled {
                 let status = await NotificationManager.shared.checkAuthorizationStatus()
@@ -610,7 +614,7 @@ struct DepositNotificationView: View {
             }
 
             await NotificationManager.shared.refreshDepositNotifications(
-                clothings: depositPlans,
+                clothings: finalPaymentPlans,
                 modelContext: modelContext,
                 force: false,
                 reason: "settings-change"

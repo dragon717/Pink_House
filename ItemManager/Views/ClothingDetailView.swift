@@ -82,8 +82,12 @@ struct ClothingDetailView: View {
                         }
 
                         
-                        // MARK: - Pay Balance Button
-                        if clothing.reservationKind == .depositPlan &&
+                        // MARK: - Reservation Action / Status
+                        if clothing.isFullPaymentReservation {
+                            fullPaymentReservationStatusPill
+                                .padding(.horizontal)
+                                .offset(y: -40)
+                        } else if clothing.reservationKind == .depositPlan &&
                             WealthSavingLedger.remainingFinalPaymentAmount(for: clothing, entries: wealthSavingEntries) > 0 {
                             Button {
                                 showingFinalPaymentSheet = true
@@ -850,6 +854,23 @@ struct ClothingDetailView: View {
         return clothing.reservationKind == .depositPlan || !finalPaymentRecords.isEmpty
     }
 
+    private var fullPaymentReservationStatusPill: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "shippingbox.fill")
+                .font(.headline.weight(.bold))
+            Text("待签收".appLocalized)
+                .font(.headline.weight(.semibold))
+                .themeSkinLegibleText(level: .chip, slot: .primaryButton)
+        }
+        .foregroundStyle(.green)
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 15)
+        .background(Color.green.opacity(0.12), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .stroke(Color.green.opacity(0.35), lineWidth: 1)
+        }
+    }
 
     private var finalPaymentStatusCard: some View {
         let paid = WealthSavingLedger.paidFinalPaymentTotal(for: clothing.id, in: wealthSavingEntries)

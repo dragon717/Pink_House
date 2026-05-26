@@ -295,6 +295,10 @@ final class Clothing {
             && FinancialDataSanitizer.money(balance) == 0
     }
 
+    var isFinalPaymentPlan: Bool {
+        isDepositPlan && !isFullPaymentReservation
+    }
+
     var reservationGroupingDate: Date? {
         switch reservationKind {
         case .owned:

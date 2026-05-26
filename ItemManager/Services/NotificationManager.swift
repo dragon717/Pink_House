@@ -348,7 +348,7 @@ class NotificationManager: NSObject, UNUserNotificationCenterDelegate {
                 clothing.isDepositPlan == true && clothing.deletedAt == nil
             }
         )
-        let clothings = (try? modelContext.fetch(descriptor)) ?? []
+        let clothings = ((try? modelContext.fetch(descriptor)) ?? []).filter { $0.isFinalPaymentPlan }
         await refreshDepositNotifications(
             clothings: clothings,
             modelContext: modelContext,
@@ -424,7 +424,7 @@ class NotificationManager: NSObject, UNUserNotificationCenterDelegate {
     /// 根据设置生成所有提醒记录（用于历史补款多次显示）
     @MainActor
     func generateRecordsForDepositPlan(clothing: Clothing, modelContext: ModelContext) {
-        guard clothing.isDepositPlan, let finalDate = clothing.finalPaymentDate else { return }
+        guard clothing.isFinalPaymentPlan, let finalDate = clothing.finalPaymentDate else { return }
 
         let calendar = Calendar.current
         let finalDateStart = calendar.startOfDay(for: finalDate)
@@ -910,7 +910,7 @@ class NotificationManager: NSObject, UNUserNotificationCenterDelegate {
 
         return clothings
             .compactMap { clothing -> [(NotificationCandidate)]? in
-                guard clothing.isDepositPlan, let finalPaymentStart = clothing.finalPaymentDate else {
+                guard clothing.isFinalPaymentPlan, let finalPaymentStart = clothing.finalPaymentDate else {
                     return nil
                 }
 
@@ -1209,7 +1209,7 @@ class NotificationManager: NSObject, UNUserNotificationCenterDelegate {
                 let updatedAt = clothing.updatedAt.timeIntervalSince1970
                 let start = clothing.finalPaymentDate?.timeIntervalSince1970 ?? 0
                 let end = clothing.finalPaymentEndDate?.timeIntervalSince1970 ?? 0
-                return "\(clothing.id.uuidString)|\(updatedAt)|\(start)|\(end)|\(clothing.isDepositPlan)"
+                return "\(clothing.id.uuidString)|\(updatedAt)|\(start)|\(end)|\(clothing.isFinalPaymentPlan)"
             }
             .joined(separator: ";")
 

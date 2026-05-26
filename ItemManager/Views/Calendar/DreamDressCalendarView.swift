@@ -120,7 +120,7 @@ struct DreamDressCalendarView: View {
     
     @MainActor
     private func updateData() async {
-        let filtered = showDepositPlanOnly ? allClothings.filter { $0.isDepositPlan } : allClothings
+        let filtered = showDepositPlanOnly ? allClothings.filter { $0.isFinalPaymentPlan } : allClothings
         await viewModel.processClothings(filtered)
     }
     

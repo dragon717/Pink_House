@@ -441,7 +441,7 @@ struct DepositStatsCard: View {
     let clothings: [Clothing]
     
     var depositPlans: [Clothing] {
-        clothings.filter { $0.isDepositPlan }
+        clothings.filter { $0.isFinalPaymentPlan }
     }
     
     var planCount: Int {

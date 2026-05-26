@@ -221,7 +221,7 @@ struct DepositItemRow: View {
         } else if days == 0 {
             return "预约日".appLocalized
         } else {
-            return "已预约".appLocalized
+            return "待签收".appLocalized
         }
     }
 

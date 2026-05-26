@@ -1,7 +1,7 @@
 import Foundation
 
 enum OutfitRecommendabilityReason: String {
-    case depositPlan
+    case reservation
     case pendingFulfillment
 }
 
@@ -27,8 +27,8 @@ enum OutfitRecommendability {
     static func exclusionReasons(for clothing: Clothing) -> [OutfitRecommendabilityReason] {
         var reasons: [OutfitRecommendabilityReason] = []
 
-        if clothing.isDepositPlan {
-            reasons.append(.depositPlan)
+        if clothing.reservationKind != .owned {
+            reasons.append(.reservation)
         }
 
         if hasPendingFulfillmentSignal(clothing) {

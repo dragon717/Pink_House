@@ -57,7 +57,7 @@ class WardrobeContextManager {
         let mostExpensivePrice = mostExpensiveItem.map(\.inventoryTotalPrice) ?? 0
 
         // 3. 心愿尾款统计
-        let depositPlans = clothings.filter { $0.isDepositPlan }
+        let depositPlans = clothings.filter { $0.isFinalPaymentPlan }
         let totalDeposit = depositPlans.reduce(Decimal(0)) { $0 + ($1.deposit * Decimal($1.stock)) }
         let totalBalance = depositPlans.reduce(Decimal(0)) { $0 + ($1.balance * Decimal($1.stock)) }
 
@@ -272,7 +272,7 @@ class WardrobeContextManager {
                     score += 6
                 }
             }
-            if clothing.isDepositPlan, (query.contains("尾款") || query.contains("定金")) {
+            if clothing.isFinalPaymentPlan, (query.contains("尾款") || query.contains("定金")) {
                 score += 3
             }
             
@@ -405,9 +405,9 @@ class WardrobeContextManager {
     private func applyFocusFilter(_ focus: ContextFocus, query: String, sortedClothings: [Clothing]) -> [Clothing] {
         switch focus {
         case .deposit:
-            let depositItems = sortedClothings.filter { $0.isDepositPlan }
+            let depositItems = sortedClothings.filter { $0.isFinalPaymentPlan }
             if !depositItems.isEmpty {
-                return depositItems + sortedClothings.filter { !$0.isDepositPlan }
+                return depositItems + sortedClothings.filter { !$0.isFinalPaymentPlan }
             }
             return sortedClothings
         case .weatherOutfit:
@@ -590,8 +590,10 @@ class WardrobeContextManager {
             features.append("状态:\(clothing.condition)")
         }
         
-        if clothing.isDepositPlan {
+        if clothing.isFinalPaymentPlan {
             features.append("心愿尾款:是")
+        } else if clothing.isFullPaymentReservation {
+            features.append("全款预约:是")
         }
 
         if !clothing.note.isEmpty {
@@ -950,12 +952,14 @@ class WardrobeContextManager {
             detail += "\n类型：\(clothing.types)"
         }
         
-        if clothing.isDepositPlan {
+        if clothing.isFinalPaymentPlan {
             detail += "\n状态：预定中 (定金 ¥\(NSDecimalNumber(decimal: clothing.deposit).stringValue), 尾款 ¥\(NSDecimalNumber(decimal: clothing.balance).stringValue))"
             if let finalDate = clothing.finalPaymentDate {
                 let dateStr = finalDate.formatted(date: .abbreviated, time: .omitted)
                 detail += "\n补款时间：\(dateStr)"
             }
+        } else if clothing.isFullPaymentReservation {
+            detail += "\n状态：全款预约，待签收"
         }
         
         return detail

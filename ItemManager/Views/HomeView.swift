@@ -1902,7 +1902,7 @@ extension HomeView {
         
         func pickDay(in interval: DateInterval) -> Int? {
             var candidates: [Date] = []
-            for c in allClothings where c.isDepositPlan {
+            for c in allClothings where c.isFinalPaymentPlan {
                 if let end = c.finalPaymentEndDate, interval.contains(end) {
                     candidates.append(end)
                     continue

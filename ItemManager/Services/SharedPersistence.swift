@@ -271,7 +271,7 @@ class SharedContainer {
             let currentYear = calendar.component(.year, from: Date())
             
             let depositPlans = clothings.filter { clothing in
-                guard clothing.isDepositPlan else { return false }
+                guard clothing.isFinalPaymentPlan else { return false }
                 // Filter by current year if finalPaymentDate exists
                 if let paymentDate = clothing.finalPaymentDate {
                     let year = calendar.component(.year, from: paymentDate)

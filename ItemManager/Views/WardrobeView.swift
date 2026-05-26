@@ -85,6 +85,7 @@ private struct WardrobeClothingSnapshot: Sendable {
     let inventoryTotalPrice: Decimal
     let stock: Int
     let isDepositPlan: Bool
+    let isFullPaymentReservation: Bool
     let sortIndex: Int
     let purchaseDate: Date
     let createdAt: Date
@@ -112,6 +113,7 @@ private struct WardrobeClothingSnapshot: Sendable {
         self.inventoryTotalPrice = clothing.inventoryTotalPrice
         self.stock = clothing.stock
         self.isDepositPlan = clothing.isDepositPlan
+        self.isFullPaymentReservation = clothing.isFullPaymentReservation
         self.sortIndex = clothing.sortIndex
         self.purchaseDate = clothing.purchaseDate
         self.createdAt = clothing.createdAt
@@ -274,7 +276,7 @@ private enum WardrobeFilterEngine {
         case "owned":
             return !snapshot.isDepositPlan
         case "depositPlan":
-            return snapshot.isDepositPlan
+            return snapshot.isDepositPlan && !snapshot.isFullPaymentReservation
         default:
             return true
         }
@@ -2825,7 +2827,7 @@ struct MergeToAccessorySheet: View {
         case .owned:
             result = result.filter { !$0.isDepositPlan }
         case .depositPlan:
-            result = result.filter { $0.isDepositPlan }
+            result = result.filter { $0.isFinalPaymentPlan }
         }
 
         return result

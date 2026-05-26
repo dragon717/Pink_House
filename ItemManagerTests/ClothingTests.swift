@@ -52,4 +52,59 @@ final class ClothingTests: XCTestCase {
         
         XCTAssertEqual(clothing.name, "New Name")
     }
+
+    func testReservationKindSeparatesFullPaymentAndFinalPaymentPlans() throws {
+        let owned = Clothing(name: "Owned OP")
+        let fullPayment = Clothing(
+            name: "Full Payment OP",
+            price: 1000,
+            deposit: 1000,
+            balance: 0,
+            isDepositPlan: true
+        )
+        let finalPayment = Clothing(
+            name: "Final Payment OP",
+            price: 1000,
+            deposit: 200,
+            balance: 800,
+            isDepositPlan: true
+        )
+
+        XCTAssertEqual(owned.reservationKind, .owned)
+        XCTAssertFalse(owned.isFinalPaymentPlan)
+        XCTAssertEqual(fullPayment.reservationKind, .fullPaymentReservation)
+        XCTAssertTrue(fullPayment.isFullPaymentReservation)
+        XCTAssertFalse(fullPayment.isFinalPaymentPlan)
+        XCTAssertEqual(finalPayment.reservationKind, .depositPlan)
+        XCTAssertTrue(finalPayment.isFinalPaymentPlan)
+    }
+
+    func testOutfitRecommendabilityExcludesReservationsAndPendingFulfillment() throws {
+        let owned = Clothing(name: "Owned OP")
+        let fullPayment = Clothing(
+            name: "Full Payment OP",
+            price: 1000,
+            deposit: 1000,
+            balance: 0,
+            isDepositPlan: true
+        )
+        let finalPayment = Clothing(
+            name: "Final Payment OP",
+            price: 1000,
+            deposit: 200,
+            balance: 800,
+            isDepositPlan: true
+        )
+        let pending = Clothing(name: "Shipping OP")
+        pending.note = "待收货"
+
+        let recommendable = OutfitRecommendability.recommendableClothings(
+            from: [owned, fullPayment, finalPayment, pending]
+        )
+
+        XCTAssertEqual(recommendable.map(\.id), [owned.id])
+        XCTAssertTrue(OutfitRecommendability.exclusionReasons(for: fullPayment).contains(.reservation))
+        XCTAssertTrue(OutfitRecommendability.exclusionReasons(for: finalPayment).contains(.reservation))
+        XCTAssertTrue(OutfitRecommendability.exclusionReasons(for: pending).contains(.pendingFulfillment))
+    }
 }

@@ -166,7 +166,7 @@ class ClothingFilterService {
         case .owned:
             return !clothing.isDepositPlan
         case .depositPlan:
-            return clothing.isDepositPlan
+            return clothing.isFinalPaymentPlan
         }
     }
     
