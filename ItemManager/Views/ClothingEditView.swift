@@ -1493,9 +1493,12 @@ struct ClothingEditView: View {
             depositDate: modelBinding(\.depositDate),
             reservationKind: modelBinding(\.reservationKind),
             finalPaymentDate: modelBinding(\.finalPaymentDate),
-            finalPaymentEndDate: modelBinding(\.finalPaymentEndDate),
-            note: modelBinding(\.note)
+            finalPaymentEndDate: modelBinding(\.finalPaymentEndDate)
         )
+    }
+
+    private var noteSection: some View {
+        ClothingNoteView(note: modelBinding(\.note))
     }
 
     // 处理 Toast 显示的回调
@@ -1529,6 +1532,9 @@ struct ClothingEditView: View {
 
                     // MARK: - 价格信息
                     priceSection
+
+                    // MARK: - 备注
+                    noteSection
                 }
                 .padding()
             }

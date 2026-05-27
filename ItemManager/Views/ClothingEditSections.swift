@@ -765,7 +765,6 @@ struct ClothingPurchaseInfoView: View {
     @Binding var reservationKind: ClothingReservationKind
     @Binding var finalPaymentDate: Date
     @Binding var finalPaymentEndDate: Date
-    @Binding var note: String
     
     // 时间段滑块状态（0=10天, 1=30天, 2=60天, 3=自定义）
     @State private var durationSliderValue: Double = 1.0
@@ -945,18 +944,6 @@ struct ClothingPurchaseInfoView: View {
                     }
                 }
             }
-            
-            Divider()
-            
-            VStack(alignment: .leading) {
-                Text("备注")
-                    .themeSkinLegibleText(level: .inline, slot: .sectionCard)
-                TextEditor(text: $note)
-                    .frame(height: 100)
-                    .padding(4)
-                    .background(Color(uiColor: .secondarySystemBackground))
-                    .cornerRadius(8)
-            }
         }
         .padding()
         .themeSkinAdaptiveSectionCard(slot: .sectionCard, cornerRadius: 16) {
@@ -1010,6 +997,27 @@ struct ClothingPurchaseInfoView: View {
             if let customIndex = PaymentDurationOption.allCases.firstIndex(of: .custom) {
                 durationSliderValue = Double(customIndex)
             }
+        }
+    }
+}
+
+struct ClothingNoteView: View {
+    @Binding var note: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("备注")
+                .font(.headline)
+                .themeSkinLegibleText(level: .inline, slot: .sectionCard)
+            TextEditor(text: $note)
+                .frame(height: 100)
+                .padding(4)
+                .background(Color(uiColor: .secondarySystemBackground))
+                .cornerRadius(8)
+        }
+        .padding()
+        .themeSkinAdaptiveSectionCard(slot: .sectionCard, cornerRadius: 16) {
+            Color(uiColor: .secondarySystemGroupedBackground)
         }
     }
 }
