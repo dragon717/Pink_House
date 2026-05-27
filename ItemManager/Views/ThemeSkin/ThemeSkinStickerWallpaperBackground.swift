@@ -155,6 +155,7 @@ struct ThemeSkinStickerWallpaperBackground: View {
     var context: ThemeSkinWallpaperContext = .general
     var renderMode: ThemeSkinWallpaperRenderMode = .page
     var includeBaseFill: Bool = true
+    var includeStickers: Bool = true
 
     @Environment(\.colorScheme) private var colorScheme
 
@@ -175,25 +176,27 @@ struct ThemeSkinStickerWallpaperBackground: View {
                     contextTintOverlay
                 }
 
-                ForEach(placements) { placement in
-                    if let assetName = assetName(for: placement) {
-                        ThemeSkinOptionalFittedAsset(
-                            assetName,
-                            namespace: product.assetNamespace,
-                            allowShortNameFallback: false
-                        ) {
-                            Color.clear
+                if includeStickers {
+                    ForEach(placements) { placement in
+                        if let assetName = assetName(for: placement) {
+                            ThemeSkinOptionalFittedAsset(
+                                assetName,
+                                namespace: product.assetNamespace,
+                                allowShortNameFallback: false
+                            ) {
+                                Color.clear
+                            }
+                            .frame(
+                                width: base * widthMultiplier(for: placement),
+                                height: base * widthMultiplier(for: placement)
+                            )
+                            .opacity(opacity(for: placement))
+                            .saturation(stickerSaturation)
+                            .brightness(stickerBrightness)
+                            .rotationEffect(.degrees(placement.rotationDegrees))
+                            .scaleEffect(x: placement.flipped ? -1 : 1, y: 1)
+                            .position(x: placement.x * size.width, y: placement.y * size.height)
                         }
-                        .frame(
-                            width: base * widthMultiplier(for: placement),
-                            height: base * widthMultiplier(for: placement)
-                        )
-                        .opacity(opacity(for: placement))
-                        .saturation(stickerSaturation)
-                        .brightness(stickerBrightness)
-                        .rotationEffect(.degrees(placement.rotationDegrees))
-                        .scaleEffect(x: placement.flipped ? -1 : 1, y: 1)
-                        .position(x: placement.x * size.width, y: placement.y * size.height)
                     }
                 }
             }

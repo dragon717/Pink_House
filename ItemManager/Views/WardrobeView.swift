@@ -2252,6 +2252,11 @@ struct WardrobeView: View {
 
     @MainActor
     private func rebuildFilteredClothings() async {
+        let interval = PerformanceSignpost.wardrobeRebuild(count: clothings.count, reason: "filterSignature")
+        defer {
+            PerformanceSignpost.end(interval, detail: "filtered=\(filteredClothings.count)")
+        }
+
         WealthSavingLedger.reconcilePaidFinalPaymentsIfNeededForView(
             context: modelContext,
             reason: "WardrobeView"

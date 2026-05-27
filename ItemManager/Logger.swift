@@ -165,3 +165,118 @@ enum DraftReliabilitySignpost {
     static func scenePhase(_ phase: String, reason: String) -> Bool { true }
     #endif
 }
+
+enum PerformanceSignpost {
+    enum Operation {
+        case routeTransition
+        case wardrobeRebuild
+        case depositUpdate
+        case monthStats
+
+        #if DEBUG
+        fileprivate var name: StaticString {
+            switch self {
+            case .routeTransition:
+                return "route_transition"
+            case .wardrobeRebuild:
+                return "wardrobe_rebuild"
+            case .depositUpdate:
+                return "deposit_update"
+            case .monthStats:
+                return "month_stats"
+            }
+        }
+        #endif
+    }
+
+    struct Interval {
+        #if DEBUG
+        fileprivate let operation: Operation
+        fileprivate let state: OSSignpostIntervalState
+        #endif
+    }
+
+    #if DEBUG
+    private static let subsystem = Bundle.main.bundleIdentifier ?? "com.pinkhouse.itemmanager"
+    private static let logger = Logger(subsystem: subsystem, category: "Performance")
+    private static let signposter = OSSignposter(logger: logger)
+
+    @discardableResult
+    static func begin(_ operation: Operation, label: String = "", detail: String = "") -> Interval {
+        let state = signposter.beginInterval(
+            operation.name,
+            "label=\(label, privacy: .public) detail=\(detail, privacy: .public)"
+        )
+        return Interval(operation: operation, state: state)
+    }
+
+    static func end(_ interval: Interval, detail: String = "") {
+        signposter.endInterval(
+            interval.operation.name,
+            interval.state,
+            "detail=\(detail, privacy: .public)"
+        )
+    }
+
+    @discardableResult
+    static func event(_ operation: Operation, label: String = "", detail: String = "") -> Bool {
+        signposter.emitEvent(
+            operation.name,
+            "label=\(label, privacy: .public) detail=\(detail, privacy: .public)"
+        )
+        return true
+    }
+
+    static func measure<T>(_ operation: Operation, label: String = "", detail: String = "", _ body: () throws -> T) rethrows -> T {
+        let interval = begin(operation, label: label, detail: detail)
+        defer { end(interval) }
+        return try body()
+    }
+
+    static func measureAsync<T>(_ operation: Operation, label: String = "", detail: String = "", _ body: () async throws -> T) async rethrows -> T {
+        let interval = begin(operation, label: label, detail: detail)
+        defer { end(interval) }
+        return try await body()
+    }
+    #else
+    @discardableResult
+    static func begin(_ operation: Operation, label: String = "", detail: String = "") -> Interval {
+        Interval()
+    }
+
+    static func end(_ interval: Interval, detail: String = "") {}
+
+    @discardableResult
+    static func event(_ operation: Operation, label: String = "", detail: String = "") -> Bool {
+        true
+    }
+
+    static func measure<T>(_ operation: Operation, label: String = "", detail: String = "", _ body: () throws -> T) rethrows -> T {
+        try body()
+    }
+
+    static func measureAsync<T>(_ operation: Operation, label: String = "", detail: String = "", _ body: () async throws -> T) async rethrows -> T {
+        try await body()
+    }
+    #endif
+
+    @discardableResult
+    static func routeTransition(from: String, to: String, reason: String = "") -> Interval {
+        begin(.routeTransition, label: "\(from)->\(to)", detail: reason)
+    }
+
+    @discardableResult
+    static func wardrobeRebuild(count: Int, reason: String = "") -> Interval {
+        begin(.wardrobeRebuild, label: "count=\(count)", detail: reason)
+    }
+
+    @discardableResult
+    static func depositUpdate(count: Int, reason: String = "") -> Interval {
+        begin(.depositUpdate, label: "count=\(count)", detail: reason)
+    }
+
+    @discardableResult
+    static func monthStats(month: String, itemCount: Int) -> Interval {
+        begin(.monthStats, label: month, detail: "items=\(itemCount)")
+    }
+}

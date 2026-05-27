@@ -13,6 +13,10 @@ private struct IsSimulationActiveKey: EnvironmentKey {
     static let defaultValue: Bool = true
 }
 
+private struct IsRouteTransitionCoolingDownKey: EnvironmentKey {
+    static let defaultValue: Bool = false
+}
+
 enum LegacyCustomTabBarLayout {
     static let barHeight: CGFloat = 56
     static let bottomSpacingWithSafeArea: CGFloat = 2
@@ -37,6 +41,11 @@ extension EnvironmentValues {
     var isSimulationActive: Bool {
         get { self[IsSimulationActiveKey.self] }
         set { self[IsSimulationActiveKey.self] = newValue }
+    }
+
+    var isRouteTransitionCoolingDown: Bool {
+        get { self[IsRouteTransitionCoolingDownKey.self] }
+        set { self[IsRouteTransitionCoolingDownKey.self] = newValue }
     }
 
     var customBottomFloatingLift: CGFloat {
@@ -274,6 +283,11 @@ struct LegacyTabView: View {
     
     // 搜索文本状态
     @State private var searchText = ""
+    @State private var loadedTabs: Set<Int> = [0]
+    @State private var isRouteTransitionCoolingDown = false
+    @State private var routeTransitionQuietWorkItem: DispatchWorkItem?
+
+    private let routeTransitionQuietDuration: TimeInterval = 0.4
 
     private var magicPalette: MagicThemePalette {
         MagicThemeDesignSystem.palette(themeManager: themeManager, colorScheme: colorScheme)
@@ -299,10 +313,12 @@ struct LegacyTabView: View {
             }
         }
         .overlay {
-            RewardBubbleView()
+            if !isRouteTransitionCoolingDown {
+                RewardBubbleView()
+            }
             // The floating pet is a root companionship layer; task, guide, and modal
             // flows report blockers through FloatingPetVisibilityManager.
-            if effectiveFloatingPetHiddenReasons.isEmpty {
+            if effectiveFloatingPetHiddenReasons.isEmpty && !isRouteTransitionCoolingDown {
                 PetOverlayView(action: {
                     // 点击悬浮小猫：切换到萌宠对话 Tab 并自动展开搜索栏
                     switchRouteWithoutContentAnimation {
@@ -342,7 +358,13 @@ struct LegacyTabView: View {
                 tabNavigationManager.navigateToSmallWorld = nil
             }
         }
-        .onChange(of: selectedTab) { newTab in
+        .onAppear {
+            markTabLoaded(selectedTab)
+        }
+        .onChange(of: selectedTab) { _, newTab in
+            markTabLoaded(newTab)
+            beginRouteTransitionQuietPeriod()
+
             // 发送Tab切换通知，用于新手引导
             let tabName: String
             switch newTab {
@@ -358,33 +380,113 @@ struct LegacyTabView: View {
                 userInfo: ["tab": tabName]
             )
         }
+        .onChange(of: homeTabSelection) { _, _ in
+            beginRouteTransitionQuietPeriod()
+        }
+        .onChange(of: smallWorldDestination) { _, _ in
+            beginRouteTransitionQuietPeriod()
+        }
+        .onDisappear {
+            routeTransitionQuietWorkItem?.cancel()
+            routeTransitionQuietWorkItem = nil
+        }
     }
 
     @ViewBuilder
     private var contentView: some View {
-        switch selectedTab {
-        case 0:
-            HomeView(selectedTab: $homeTabSelection)
-        case 1:
-            NavigationStack {
-                SmallWorldContainerViewLegacy(
-                    selectedTab: $selectedTab,
-                    homeTab: $homeTabSelection,
-                    destination: $smallWorldDestination,
-                    isPlayingOpeningAnimation: $isPlayingOpeningAnimation
-                )
-                .toolbarBackground(.hidden, for: .navigationBar)
+        ZStack {
+            if shouldRenderTab(0) {
+                persistentTabPage(tab: 0) {
+                    HomeView(selectedTab: $homeTabSelection)
+                }
             }
-        case 2:
-            NavigationStack {
-                MeView()
-                    .toolbarBackground(.hidden, for: .navigationBar)
+
+            if shouldRenderTab(1) {
+                persistentTabPage(tab: 1) {
+                    NavigationStack {
+                        SmallWorldContainerViewLegacy(
+                            selectedTab: $selectedTab,
+                            homeTab: $homeTabSelection,
+                            destination: $smallWorldDestination,
+                            isPlayingOpeningAnimation: $isPlayingOpeningAnimation
+                        )
+                        .toolbarBackground(.hidden, for: .navigationBar)
+                    }
+                }
             }
-        case 3:
-            PetChatViewLegacy(searchText: $searchText)
-        default:
-            HomeView(selectedTab: $homeTabSelection)
+
+            if shouldRenderTab(2) {
+                persistentTabPage(tab: 2) {
+                    NavigationStack {
+                        MeView()
+                            .toolbarBackground(.hidden, for: .navigationBar)
+                    }
+                }
+            }
+
+            if shouldRenderTab(3) {
+                persistentTabPage(tab: 3) {
+                    PetChatViewLegacy(searchText: $searchText)
+                }
+            }
         }
+        .transaction { transaction in
+            transaction.animation = nil
+            transaction.disablesAnimations = true
+        }
+    }
+
+    private func shouldRenderTab(_ tab: Int) -> Bool {
+        loadedTabs.contains(tab) || selectedTab == tab
+    }
+
+    private func markTabLoaded(_ tab: Int) {
+        guard !loadedTabs.contains(tab) else { return }
+        loadedTabs.insert(tab)
+    }
+
+    private func isActiveTab(_ tab: Int) -> Bool {
+        selectedTab == tab
+    }
+
+    private func beginRouteTransitionQuietPeriod() {
+        routeTransitionQuietWorkItem?.cancel()
+        _ = PerformanceSignpost.event(
+            .routeTransition,
+            label: "tab=\(selectedTab)",
+            detail: "home=\(homeTabSelection) destination=\(smallWorldDestination)"
+        )
+
+        if !isRouteTransitionCoolingDown {
+            isRouteTransitionCoolingDown = true
+        }
+
+        let workItem = DispatchWorkItem {
+            isRouteTransitionCoolingDown = false
+        }
+        routeTransitionQuietWorkItem = workItem
+
+        DispatchQueue.main.asyncAfter(
+            deadline: .now() + routeTransitionQuietDuration,
+            execute: workItem
+        )
+    }
+
+    private func persistentTabPage<Content: View>(
+        tab: Int,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        let isActive = isActiveTab(tab)
+
+        return content()
+            .environment(\.isSimulationActive, isActive && !isRouteTransitionCoolingDown)
+            .environment(\.isRouteTransitionCoolingDown, isRouteTransitionCoolingDown)
+            .opacity(isActive ? 1 : 0)
+            .allowsHitTesting(isActive)
+            .accessibilityHidden(!isActive)
+            .toolbar(isActive ? .automatic : .hidden, for: .navigationBar)
+            .zIndex(isActive ? 1 : 0)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     private var customTabBar: some View {
@@ -491,6 +593,10 @@ struct LegacyTabView: View {
             reasons.insert(.petChatRoute)
         }
 
+        if isRouteTransitionCoolingDown {
+            reasons.insert(.routeTransition)
+        }
+
         if guideManager.isShowingGuide ||
             guideManager.isShowingFeatureExperienceGuide ||
             guideManager.isRunningAnimation ||
@@ -580,6 +686,7 @@ struct LegacyTabView: View {
     }
 
     private func switchRouteWithoutContentAnimation(_ updates: () -> Void) {
+        beginRouteTransitionQuietPeriod()
         performWithoutRouteContentAnimation(updates)
     }
 

@@ -7,13 +7,44 @@
 
 import SwiftUI
 
+struct DepositRecentAddedStats {
+    let title: String
+    let count: Int
+    let amount: Decimal
+    let hasData: Bool
+
+    init(title: String = "最近添加", count: Int = 0, amount: Decimal = 0, hasData: Bool = false) {
+        self.title = title
+        self.count = count
+        self.amount = amount
+        self.hasData = hasData
+    }
+
+    init(clothings: [Clothing], calendar: Calendar = .current, now: Date = Date()) {
+        guard let oneMonthAgo = calendar.date(byAdding: .month, value: -1, to: now) else {
+            self.init()
+            return
+        }
+
+        var count = 0
+        var amount: Decimal = 0
+
+        for clothing in clothings where clothing.createdAt >= oneMonthAgo {
+            count += clothing.stock
+            amount += clothing.reservationListAmount
+        }
+
+        self.init(title: "最近添加", count: count, amount: amount, hasData: count > 0)
+    }
+}
+
 struct SeriesSelectorView: View {
     @Binding var selectedSeries: Set<String>
     @Binding var year: Int
     let seriesList: [SeriesInfo]
     let isAnalyzing: Bool
     @Binding var showYearStats: Bool
-    let clothings: [Clothing] // 用于计算当前月统计（不区分系列）
+    let recentAddedStats: DepositRecentAddedStats
     @Binding var isExpanded: Bool
     @State private var showTips: Bool = false
 
@@ -39,26 +70,6 @@ struct SeriesSelectorView: View {
         return (totalCount, styleCount, paidDeposit, pendingBalance)
     }
 
-    // 计算最近添加的统计（一个月内添加的商品，不区分系列）
-    private var recentAddedStats: (title: String, count: Int, amount: Decimal, hasData: Bool) {
-        let calendar = Calendar.current
-        let now = Date()
-        // 获取一个月前的日期
-        guard let oneMonthAgo = calendar.date(byAdding: .month, value: -1, to: now) else {
-            return ("最近添加", 0, 0, false)
-        }
-
-        // 统计最近一个月内添加的商品（按 createdAt 字段）
-        let recentClothings = clothings.filter { clothing in
-            clothing.createdAt >= oneMonthAgo
-        }
-
-        let count = recentClothings.reduce(0) { $0 + $1.stock }
-        let amount = recentClothings.reduce(0) { $0 + $1.reservationListAmount }
-
-        return ("最近添加", count, amount, count > 0)
-    }
-    
     var body: some View {
         VStack(spacing: 16) {
             // Header
@@ -200,7 +211,7 @@ struct SeriesSelectorView: View {
 
 // MARK: - 最近添加统计卡片
 struct RecentAddedCard: View {
-    let stats: (title: String, count: Int, amount: Decimal, hasData: Bool)
+    let stats: DepositRecentAddedStats
     @Environment(\.colorScheme) private var colorScheme
     @ObservedObject private var themeSkinManager = ThemeSkinManager.shared
 

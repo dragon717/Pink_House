@@ -23,6 +23,7 @@ enum FloatingPetHiddenReason: String, CaseIterable, Hashable, Identifiable {
     case unlockNotification
     case immersiveMedia
     case transactionFlow
+    case routeTransition
 
     var id: String { rawValue }
 }

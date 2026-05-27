@@ -46,6 +46,8 @@ struct DepositPlanView: View {
     
     @State private var filteredClothings: [Clothing] = []
     @State private var baseClothings: [Clothing] = []
+    @State private var monthSelectorSummary = DepositMonthSelectorSummary()
+    @State private var recentAddedStats = DepositRecentAddedStats()
     @State private var seriesAnalysisTask: Task<Void, Never>?
     
     // Money Counting Animation State
@@ -116,6 +118,11 @@ struct DepositPlanView: View {
     }
 
     private func updateBaseClothings() {
+        let interval = PerformanceSignpost.depositUpdate(count: depositClothings.count, reason: "updateBaseClothings")
+        defer {
+            PerformanceSignpost.end(interval, detail: "base=\(baseClothings.count) filtered=\(filteredClothings.count)")
+        }
+
         WealthSavingLedger.reconcilePaidFinalPaymentsIfNeededForView(
             context: modelContext,
             reason: "DepositPlanView"
@@ -180,36 +187,51 @@ struct DepositPlanView: View {
         }
         
         self.baseClothings = sortedResult
+        self.monthSelectorSummary = DepositMonthSelectorSummary(clothings: sortedResult)
+        self.recentAddedStats = DepositRecentAddedStats(clothings: sortedResult)
         updateFilteredClothings()
     }
     
     private func updateFilteredClothings() {
+        let calendar = Calendar.current
+        let collapsedRecentMonth = monthSelectorSummary.recentMonth
+        let selectedMonthsForFilter = selectedMonths
+        let selectedSeriesForFilter = selectedSeries
+        let isMonthlyMode = viewMode == .monthly
+        let isMonthExpanded = isMonthSelectorExpanded
+        let isSeriesExpanded = isSeriesSelectorExpanded
+        let oneMonthAgo = calendar.date(byAdding: .month, value: -1, to: Date())
+
         let result = baseClothings.filter { clothing in
-            if viewMode == .monthly {
+            if isMonthlyMode {
                 // 月份视图
-                if !isMonthSelectorExpanded {
+                guard let start = clothing.reservationGroupingDate else { return false }
+                let month = calendar.component(.month, from: start)
+
+                if !isMonthExpanded {
                     // 面板折叠时，显示最近月份
-                    return isClothingInRecentMonth(clothing)
+                    return month == collapsedRecentMonth
                 }
-                if selectedMonths.isEmpty {
+                if selectedMonthsForFilter.isEmpty {
                     // 面板展开且未选中月份：显示全年
                     return true
                 } else {
                     // 有选中月份时，只显示选中的月份
-                    return isClothingInSelectedMonths(clothing)
+                    return selectedMonthsForFilter.contains(month)
                 }
             } else {
                 // Series Mode
-                if !isSeriesSelectorExpanded {
+                if !isSeriesExpanded {
                     // 面板隐藏时，显示最近添加（一个月内）
-                    return isClothingRecentlyAdded(clothing)
+                    guard let oneMonthAgo else { return false }
+                    return clothing.createdAt >= oneMonthAgo
                 }
-                if selectedSeries.isEmpty {
+                if selectedSeriesForFilter.isEmpty {
                     // 面板展开且未选中系列：显示全部系列
                     return true
                 } else {
                     // 有选中系列时，只显示选中的系列
-                    return selectedSeries.contains { seriesPrefix in
+                    return selectedSeriesForFilter.contains { seriesPrefix in
                         let sanitizedName = SeriesAnalyzer.shared.sanitize(clothing.name).lowercased()
                         let prefix = seriesPrefix.lowercased()
                         return sanitizedName.hasPrefix(prefix)
@@ -220,75 +242,11 @@ struct DepositPlanView: View {
         self.filteredClothings = result
     }
     
-    // 检查商品是否在当前月份（只判断预计尾款开始时间）
-    private func isClothingInCurrentMonth(_ clothing: Clothing) -> Bool {
-        guard let start = clothing.reservationGroupingDate else { return false }
-        let month = Calendar.current.component(.month, from: start)
-        return month == currentMonth
-    }
-
-    // 检查商品是否在最近月份（当面板折叠时使用）
-    private func isClothingInRecentMonth(_ clothing: Clothing) -> Bool {
-        guard let start = clothing.reservationGroupingDate else { return false }
-        let month = Calendar.current.component(.month, from: start)
-        return month == recentMonth
-    }
-
-    // 检查商品是否在选中的月份（只判断预计尾款开始时间）
-    private func isClothingInSelectedMonths(_ clothing: Clothing) -> Bool {
-        guard let start = clothing.reservationGroupingDate else { return false }
-        let month = Calendar.current.component(.month, from: start)
-        return selectedMonths.contains(month)
-    }
-
-    // 检查商品是否是最近添加（一个月内）
-    private func isClothingRecentlyAdded(_ clothing: Clothing) -> Bool {
-        let calendar = Calendar.current
-        let now = Date()
-        guard let oneMonthAgo = calendar.date(byAdding: .month, value: -1, to: now) else {
-            return false
-        }
-        return clothing.createdAt >= oneMonthAgo
-    }
-    
     // 计算所有待付尾款（不受年份筛选影响）
     private var totalPendingBalanceAll: Decimal {
         finalPaymentClothings.reduce(0) { $0 + $1.pendingFinalPaymentAmount }
     }
     
-    // 计算当前月
-    private var currentMonth: Int {
-        Calendar.current.component(.month, from: Date())
-    }
-
-    // 计算最近有数据的月份（优先找当前时间之后的月份，如果没有则取最后一个有数据的月份）
-    private var recentMonth: Int {
-        let calendar = Calendar.current
-        let now = Date()
-
-        // 收集所有有数据的月份
-        let monthsWithData = baseClothings.compactMap { clothing -> Int? in
-            guard let date = clothing.reservationGroupingDate else { return nil }
-            return calendar.component(.month, from: date)
-        }
-
-        guard !monthsWithData.isEmpty else {
-            // 没有数据时返回当前月份
-            return calendar.component(.month, from: now)
-        }
-
-        // 去重并排序
-        let uniqueMonths = Set(monthsWithData).sorted()
-
-        // 优先找当前月份之后的月份
-        if let afterCurrent = uniqueMonths.first(where: { $0 >= calendar.component(.month, from: now) }) {
-            return afterCurrent
-        }
-
-        // 没有之后的月份，取最后一个
-        return uniqueMonths.last ?? calendar.component(.month, from: now)
-    }
-
     // 视图模式选择器
     private var viewModePicker: some View {
         Picker("视图模式", selection: $viewMode) {
@@ -316,7 +274,7 @@ struct DepositPlanView: View {
                 MonthSelectorView(
                     selectedMonths: $selectedMonths,
                     year: $selectedYear,
-                    clothings: baseClothings,
+                    summary: monthSelectorSummary,
                     showYearStats: $showYearStats,
                     isExpanded: $isMonthSelectorExpanded
                 )
@@ -328,7 +286,7 @@ struct DepositPlanView: View {
                     seriesList: seriesList,
                     isAnalyzing: isAnalyzing,
                     showYearStats: $showYearStats,
-                    clothings: baseClothings,
+                    recentAddedStats: recentAddedStats,
                     isExpanded: $isSeriesSelectorExpanded
                 )
                 .padding(.horizontal)

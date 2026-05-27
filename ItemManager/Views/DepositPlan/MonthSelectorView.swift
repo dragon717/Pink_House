@@ -7,110 +7,126 @@
 
 import SwiftUI
 
+struct DepositMonthStats {
+    let count: Int
+    let amount: Decimal
+    let paidDeposit: Decimal
+}
+
+struct DepositYearStatsSummary {
+    let totalCount: Int
+    let styleCount: Int
+    let paidDeposit: Decimal
+    let pendingBalance: Decimal
+}
+
+struct DepositMonthSelectorSummary {
+    private let statsByMonth: [Int: DepositMonthStats]
+    private let styleKeysByMonth: [Int: Set<String>]
+    let recentMonth: Int
+
+    init(
+        statsByMonth: [Int: DepositMonthStats] = [:],
+        styleKeysByMonth: [Int: Set<String>] = [:],
+        recentMonth: Int = Calendar.current.component(.month, from: Date())
+    ) {
+        self.statsByMonth = statsByMonth
+        self.styleKeysByMonth = styleKeysByMonth
+        self.recentMonth = recentMonth
+    }
+
+    init(clothings: [Clothing], calendar: Calendar = .current, now: Date = Date()) {
+        let interval = PerformanceSignpost.monthStats(month: "base", itemCount: clothings.count)
+        defer { PerformanceSignpost.end(interval, detail: "summary") }
+
+        var monthlyCounts: [Int: Int] = [:]
+        var monthlyAmounts: [Int: Decimal] = [:]
+        var monthlyPaidDeposits: [Int: Decimal] = [:]
+        var monthlyStyleKeys: [Int: Set<String>] = [:]
+
+        for clothing in clothings {
+            guard let date = clothing.reservationGroupingDate else { continue }
+
+            let month = calendar.component(.month, from: date)
+            monthlyCounts[month, default: 0] += clothing.stock
+            monthlyAmounts[month, default: 0] += clothing.reservationListAmount
+            monthlyPaidDeposits[month, default: 0] += clothing.reservationPaidAmount
+            monthlyStyleKeys[month, default: []].insert(Self.styleKey(for: clothing))
+        }
+
+        let stats = monthlyCounts.reduce(into: [Int: DepositMonthStats]()) { result, element in
+            let (month, count) = element
+            result[month] = DepositMonthStats(
+                count: count,
+                amount: monthlyAmounts[month, default: 0],
+                paidDeposit: monthlyPaidDeposits[month, default: 0]
+            )
+        }
+
+        let monthsWithData = Set(monthlyCounts.keys).sorted()
+        let currentMonth = calendar.component(.month, from: now)
+        let recentMonth = monthsWithData.first(where: { $0 >= currentMonth })
+            ?? monthsWithData.last
+            ?? currentMonth
+
+        self.init(
+            statsByMonth: stats,
+            styleKeysByMonth: monthlyStyleKeys,
+            recentMonth: recentMonth
+        )
+    }
+
+    func statsForMonth(_ month: Int) -> DepositMonthStats {
+        statsByMonth[month] ?? DepositMonthStats(count: 0, amount: 0, paidDeposit: 0)
+    }
+
+    func yearStats(selectedMonths: Set<Int>) -> DepositYearStatsSummary {
+        let months = selectedMonths.isEmpty ? Set(statsByMonth.keys) : selectedMonths
+        var totalCount = 0
+        var pendingBalance: Decimal = 0
+        var paidDeposit: Decimal = 0
+        var styleKeys: Set<String> = []
+
+        for month in months {
+            let stats = statsForMonth(month)
+            totalCount += stats.count
+            pendingBalance += stats.amount
+            paidDeposit += stats.paidDeposit
+            styleKeys.formUnion(styleKeysByMonth[month, default: []])
+        }
+
+        return DepositYearStatsSummary(
+            totalCount: totalCount,
+            styleCount: styleKeys.count,
+            paidDeposit: paidDeposit,
+            pendingBalance: pendingBalance
+        )
+    }
+
+    var currentMonthStats: (month: Int, count: Int, amount: Decimal, hasData: Bool) {
+        let stats = statsForMonth(recentMonth)
+        return (recentMonth, stats.count, stats.amount, stats.count > 0)
+    }
+
+    private static func styleKey(for clothing: Clothing) -> String {
+        "\(clothing.name)|\(clothing.deposit)|\(clothing.balance)"
+    }
+}
+
 struct MonthSelectorView: View {
     @Binding var selectedMonths: Set<Int>
     @Binding var year: Int
-    let clothings: [Clothing] // Pass in all deposit clothings to calculate monthly stats
+    let summary: DepositMonthSelectorSummary
     @Binding var showYearStats: Bool
     @Binding var isExpanded: Bool
-    
+
     let months = Array(1...12)
     let columns = Array(repeating: GridItem(.flexible(), spacing: 10), count: 4)
-    
-    // Calculate stats for a specific month
-    private func statsForMonth(_ month: Int) -> (count: Int, amount: Decimal) {
-        let calendar = Calendar.current
-        let monthlyClothings = clothings.filter { clothing in
-            guard let date = clothing.reservationGroupingDate else { return false }
-            // Year is already filtered in baseClothings, but double check doesn't hurt
-            // Actually baseClothings already filtered by year, so we just check month
-            let m = calendar.component(.month, from: date)
-            return m == month
-        }
-        
-        let itemCount = monthlyClothings.reduce(0) { $0 + $1.stock }
-        let amount = monthlyClothings.reduce(0) { $0 + $1.reservationListAmount }
-        return (itemCount, amount)
-    }
-    
+
     // 计算年份统计（根据选中的月份筛选，未选中则显示全年）
     private var yearStats: (totalCount: Int, styleCount: Int, paidDeposit: Decimal, pendingBalance: Decimal) {
-        // 根据选中的月份筛选商品，未选中则使用全部
-        let filteredClothings: [Clothing]
-        if selectedMonths.isEmpty {
-            filteredClothings = clothings
-        } else {
-            let calendar = Calendar.current
-            filteredClothings = clothings.filter { clothing in
-                guard let date = clothing.reservationGroupingDate else { return false }
-                let month = calendar.component(.month, from: date)
-                return selectedMonths.contains(month)
-            }
-        }
-        
-        // 去重计算款数
-        var seenKeys: Set<String> = []
-        var uniqueStyles: [Clothing] = []
-        
-        for clothing in filteredClothings {
-            let key = "\(clothing.name)|\(clothing.deposit)|\(clothing.balance)"
-            if !seenKeys.contains(key) {
-                seenKeys.insert(key)
-                uniqueStyles.append(clothing)
-            }
-        }
-        
-        let totalCount = filteredClothings.reduce(0) { $0 + $1.stock }
-        let styleCount = uniqueStyles.count
-        let paidDeposit = filteredClothings.reduce(0) { $0 + $1.reservationPaidAmount }
-        let pendingBalance = filteredClothings.reduce(0) { $0 + $1.reservationListAmount }
-        
-        return (totalCount, styleCount, paidDeposit, pendingBalance)
-    }
-    
-    // 计算最近有数据的月份（优先找当前时间之后的月份，如果没有则取最后一个有数据的月份）
-    private var recentMonth: Int {
-        let calendar = Calendar.current
-        let now = Date()
-
-        // 收集所有有数据的月份
-        let monthsWithData = clothings.compactMap { clothing -> Int? in
-            guard let date = clothing.reservationGroupingDate else { return nil }
-            return calendar.component(.month, from: date)
-        }
-
-        guard !monthsWithData.isEmpty else {
-            // 没有数据时返回当前月份
-            return calendar.component(.month, from: now)
-        }
-
-        // 去重并排序
-        let uniqueMonths = Set(monthsWithData).sorted()
-
-        // 优先找当前月份之后的月份
-        if let afterCurrent = uniqueMonths.first(where: { $0 >= calendar.component(.month, from: now) }) {
-            return afterCurrent
-        }
-
-        // 没有之后的月份，取最后一个
-        return uniqueMonths.last ?? calendar.component(.month, from: now)
-    }
-
-    // 计算最近月份的统计（使用最近月份而不是当前月份）
-    private var currentMonthStats: (month: Int, count: Int, amount: Decimal, hasData: Bool) {
-        let calendar = Calendar.current
-
-        // 使用最近月份而不是当前月份
-        let monthClothings = clothings.filter { clothing in
-            guard let start = clothing.reservationGroupingDate else { return false }
-            let m = calendar.component(.month, from: start)
-            return m == recentMonth
-        }
-
-        let count = monthClothings.reduce(0) { $0 + $1.stock }
-        let amount = monthClothings.reduce(0) { $0 + $1.reservationListAmount }
-
-        return (recentMonth, count, amount, count > 0)
+        let stats = summary.yearStats(selectedMonths: selectedMonths)
+        return (stats.totalCount, stats.styleCount, stats.paidDeposit, stats.pendingBalance)
     }
     
     var body: some View {
@@ -151,7 +167,7 @@ struct MonthSelectorView: View {
                 // Month Grid
                 LazyVGrid(columns: columns, spacing: 10) {
                     ForEach(months, id: \.self) { month in
-                        let stats = statsForMonth(month)
+                        let stats = summary.statsForMonth(month)
                         let isSelected = selectedMonths.contains(month)
                         
                         Button {
@@ -217,7 +233,7 @@ struct MonthSelectorView: View {
                 }
             } else {
                 // 隐藏时显示当前月统计
-                RecentMonthCard(stats: currentMonthStats)
+                RecentMonthCard(stats: summary.currentMonthStats)
             }
         }
     }
