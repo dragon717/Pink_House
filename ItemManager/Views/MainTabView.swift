@@ -50,6 +50,14 @@ extension EnvironmentValues {
     }
 }
 
+private func performWithoutRouteContentAnimation(_ updates: () -> Void) {
+    var transaction = Transaction(animation: nil)
+    transaction.disablesAnimations = true
+    withTransaction(transaction) {
+        updates()
+    }
+}
+
 // MARK: - 衣橱 Tab 内容
 struct WardrobeTabContent: View {
     @Binding var homeTabSelection: HomeTab
@@ -297,7 +305,7 @@ struct LegacyTabView: View {
             if effectiveFloatingPetHiddenReasons.isEmpty {
                 PetOverlayView(action: {
                     // 点击悬浮小猫：切换到萌宠对话 Tab 并自动展开搜索栏
-                    withAnimation {
+                    switchRouteWithoutContentAnimation {
                         selectedTab = 3
                     }
                 },
@@ -307,7 +315,7 @@ struct LegacyTabView: View {
         }
         .onReceive(tabNavigationManager.$navigateToTab) { tab in
             if let tab = tab {
-                withAnimation {
+                switchRouteWithoutContentAnimation {
                     if tab == 1 && selectedTab != 1 {
                         tabNavigationManager.recordEnteringSmallWorldFromHomeTab(homeTabSelection)
                     }
@@ -317,7 +325,7 @@ struct LegacyTabView: View {
         }
         .onReceive(tabNavigationManager.$navigateToHomeTab) { homeTab in
             if let homeTab = homeTab {
-                withAnimation {
+                switchRouteWithoutContentAnimation {
                     homeTabSelection = homeTab
                 }
                 tabNavigationManager.navigateToHomeTab = nil
@@ -325,7 +333,7 @@ struct LegacyTabView: View {
         }
         .onReceive(tabNavigationManager.$navigateToSmallWorld) { destination in
             if let destination = destination {
-                withAnimation {
+                switchRouteWithoutContentAnimation {
                     if !tabNavigationManager.isNavigatingInsideSmallWorld {
                         tabNavigationManager.recordEnteringSmallWorldFromHomeTab(homeTabSelection)
                     }
@@ -552,7 +560,7 @@ struct LegacyTabView: View {
     private func activateBottomDockFeature(_ feature: AppFeatureDescriptor) {
         guard feature.isUnlocked else { return }
 
-        withAnimation(.easeInOut(duration: 0.2)) {
+        switchRouteWithoutContentAnimation {
             switch feature.route {
             case .tab(let tabIndex):
                 selectedTab = tabIndex
@@ -569,6 +577,10 @@ struct LegacyTabView: View {
                 selectedTab = 1
             }
         }
+    }
+
+    private func switchRouteWithoutContentAnimation(_ updates: () -> Void) {
+        performWithoutRouteContentAnimation(updates)
     }
 
     private var smallWorldTabTitle: String {
@@ -692,7 +704,7 @@ struct SmallWorldBackButtonLegacy: View {
 
     var body: some View {
         Button {
-            withAnimation {
+            performWithoutRouteContentAnimation {
                 switch tabNavigationManager.currentSmallWorldSource {
                 case .wardrobe:
                     homeTab = .wardrobe
@@ -754,7 +766,7 @@ struct OOTDDefaultBookViewWithBackButtonLegacy: View {
             }
             .onReceive(NotificationCenter.default.publisher(for: .navigateToBook)) { _ in
                 // 导航到 OOTD 手帐列表
-                withAnimation {
+                performWithoutRouteContentAnimation {
                     destination = .ootd
                 }
             }
@@ -810,7 +822,7 @@ struct MagicStickerBackButtonLegacy: View {
     }
 
     private func goBack() {
-        withAnimation {
+        performWithoutRouteContentAnimation {
             switch tabNavigationManager.currentSmallWorldSource {
             case .wardrobe:
                 homeTab = .wardrobe
@@ -1075,7 +1087,7 @@ struct MainTabView: View {
             if let destination = notification.userInfo?["destination"] as? SmallWorldDestination {
                 // 检查功能是否已解锁
                 if destination.canAccess {
-                    withAnimation {
+                    performWithoutRouteContentAnimation {
                         smallWorldDestination = destination
                         selectedTab = 1 // 切换到 House Tab
                     }
@@ -1091,7 +1103,7 @@ struct MainTabView: View {
         .onReceive(NotificationCenter.default.publisher(for: .navigateToSettings)) { notification in
             print("[PetChatGuide] MainTabView 收到 navigateToSettings 通知")
             // 跳转到设置页面
-            withAnimation {
+            performWithoutRouteContentAnimation {
                 selectedTab = 2 // 切换到"我"Tab
                 print("[PetChatGuide] 已切换到 Tab 2 (我)")
             }
@@ -1110,7 +1122,7 @@ struct MainTabView: View {
         .onReceive(NotificationCenter.default.publisher(for: .navigateToHomeTab)) { notification in
             // 跳转到衣橱页面（用于批量导入等功能）
             if let homeTabString = notification.userInfo?["homeTab"] as? String {
-                withAnimation {
+                performWithoutRouteContentAnimation {
                     if homeTabString == "wardrobe" {
                         homeTabSelection = .wardrobe
                     } else if homeTabString == "depositPlan" {
@@ -1122,7 +1134,7 @@ struct MainTabView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: .navigateToMagicTasks)) { _ in
             // 跳转到"我"Tab，然后显示魔法任务
-            withAnimation {
+            performWithoutRouteContentAnimation {
                 selectedTab = 2 // 切换到"我"Tab
             }
             // 延迟后发送通知显示魔法任务
@@ -1135,7 +1147,7 @@ struct MainTabView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: .navigateToPetChat)) { _ in
             // 跳转到萌宠对话页面
-            withAnimation {
+            performWithoutRouteContentAnimation {
                 selectedTab = 3
             }
         }
@@ -1160,7 +1172,7 @@ struct MainTabView: View {
         switch feature {
         case .dataBackup:
             // 跳转到设置页面的备份功能
-            withAnimation {
+            performWithoutRouteContentAnimation {
                 selectedTab = 2
             }
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
@@ -1173,7 +1185,7 @@ struct MainTabView: View {
             }
         case .cloudSync:
             // 跳转到设置页面的iCloud同步功能
-            withAnimation {
+            performWithoutRouteContentAnimation {
                 selectedTab = 2
             }
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
@@ -1202,7 +1214,7 @@ struct MainTabView: View {
         case .widgetCustomize:
             AppFirstLaunchGuideManager.shared.startFeatureExperienceGuide(for: .widgetCustomize)
         case .ootd:
-            withAnimation {
+            performWithoutRouteContentAnimation {
                 if isUnlocked {
                     selectedTab = 1
                     smallWorldDestination = .menu
@@ -1216,14 +1228,14 @@ struct MainTabView: View {
             if isUnlocked {
                 AppFirstLaunchGuideManager.shared.startFeatureExperienceGuide(for: .ootdDefaultBook)
             } else {
-                withAnimation {
+                performWithoutRouteContentAnimation {
                     selectedTab = 0
                     homeTabSelection = .wardrobe
                 }
                 startFeatureGuideAfterNavigation(feature)
             }
         case .calendar:
-            withAnimation {
+            performWithoutRouteContentAnimation {
                 if isUnlocked {
                     selectedTab = 1
                     smallWorldDestination = .menu
@@ -1237,7 +1249,7 @@ struct MainTabView: View {
             // 不自动跳转到萌宠对话，按引导第一步由用户手动点击 House 页签
             AppFirstLaunchGuideManager.shared.startFeatureExperienceGuide(for: .wealth)
         case .batchImport:
-            withAnimation {
+            performWithoutRouteContentAnimation {
                 selectedTab = 0
                 homeTabSelection = .wardrobe
             }
@@ -1260,14 +1272,14 @@ struct MainTabView: View {
                 // 空间手账引导要求先从「平面」切到「空间」，这里确保步骤2稳定可见
                 UserDefaults.standard.set("平面", forKey: "bookShelfViewMode")
             }
-            withAnimation {
+            performWithoutRouteContentAnimation {
                 selectedTab = 0
                 homeTabSelection = .wardrobe
             }
             startFeatureGuideAfterNavigation(feature)
         case .batchEdit:
             // 批量编辑从衣橱列表进入，先回到衣橱页
-            withAnimation {
+            performWithoutRouteContentAnimation {
                 selectedTab = 0
                 homeTabSelection = .wardrobe
             }
@@ -1347,7 +1359,7 @@ struct SmallWorldBackButton: View {
     
     var body: some View {
         Button {
-            withAnimation {
+            performWithoutRouteContentAnimation {
                 switch tabNavigationManager.currentSmallWorldSource {
                 case .wardrobe:
                     // 返回衣橱
@@ -1424,7 +1436,7 @@ struct OOTDDefaultBookViewWithBackButton: View {
             }
             .onReceive(NotificationCenter.default.publisher(for: .navigateToBook)) { _ in
                 // 导航到 OOTD 手帐列表
-                withAnimation {
+                performWithoutRouteContentAnimation {
                     destination = .ootd
                 }
             }
@@ -1482,7 +1494,7 @@ struct MagicStickerBackButton: View {
     }
 
     private func goBack() {
-        withAnimation {
+        performWithoutRouteContentAnimation {
             switch tabNavigationManager.currentSmallWorldSource {
             case .wardrobe:
                 homeTab = .wardrobe

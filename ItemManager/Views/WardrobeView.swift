@@ -337,10 +337,10 @@ private struct WardrobeVisibleItemFramePreferenceKey: PreferenceKey {
 }
 
 private final class WardrobeStatsAutoCollapseCoordinator {
-    static let topThreshold: CGFloat = 12
-    static let collapseThreshold: CGFloat = 44
+    static let topThreshold: CGFloat = 16
+    static let collapseThreshold: CGFloat = 88
 
-    private let directionHysteresis: CGFloat = 8
+    private let directionHysteresis: CGFloat = 14
     private var lastScrollDistance: CGFloat = 0
     private var hasReceivedScrollOffset = false
     private var manualExpansionLockedUntilTop = false
@@ -532,7 +532,7 @@ struct WardrobeView: View {
     @Environment(ThemeManager.self) private var themeManager
     @Environment(\.colorScheme) private var colorScheme
     @Query private var clothings: [Clothing]
-    @State private var showStats = true
+    @SceneStorage("WardrobeView.showStats") private var showStats = true
     @State private var hasShownStatsRulePrompt = false
     @State private var isShowingStatsRuleHint = false
     @State private var statsRuleHintTask: Task<Void, Never>?
@@ -957,7 +957,7 @@ struct WardrobeView: View {
             .onAppear {
                 cachedGridColumns = Self.makeGridColumns(for: viewLayout)
                 refreshWardrobeThemeCaches()
-                resetStatsScrollState(expand: true)
+                resetStatsScrollState(expand: false)
             }
             .task(id: filterSignature) {
                 await rebuildFilteredClothings()
@@ -2252,10 +2252,10 @@ struct WardrobeView: View {
 
     @MainActor
     private func rebuildFilteredClothings() async {
-        let reconciledCount = WealthSavingLedger.reconcilePaidFinalPayments(context: modelContext)
-        if reconciledCount > 0 {
-            print("WardrobeView: Reconciled \(reconciledCount) paid final payment clothing record(s) before filtering.")
-        }
+        WealthSavingLedger.reconcilePaidFinalPaymentsIfNeededForView(
+            context: modelContext,
+            reason: "WardrobeView"
+        )
 
         let displayClothings = deduplicatedClothingsForDisplay(from: clothings)
         let snapshots = displayClothings.map(WardrobeClothingSnapshot.init(clothing:))

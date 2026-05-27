@@ -46,6 +46,7 @@ struct DepositPlanView: View {
     
     @State private var filteredClothings: [Clothing] = []
     @State private var baseClothings: [Clothing] = []
+    @State private var seriesAnalysisTask: Task<Void, Never>?
     
     // Money Counting Animation State
     struct MoneyCountingState: Identifiable {
@@ -115,10 +116,10 @@ struct DepositPlanView: View {
     }
 
     private func updateBaseClothings() {
-        let reconciledCount = WealthSavingLedger.reconcilePaidFinalPayments(context: modelContext)
-        if reconciledCount > 0 {
-            print("DepositPlanView: Reconciled \(reconciledCount) paid final payment clothing record(s) before filtering.")
-        }
+        WealthSavingLedger.reconcilePaidFinalPaymentsIfNeededForView(
+            context: modelContext,
+            reason: "DepositPlanView"
+        )
 
         // 使用 ClothingSearchService 进行搜索
         let searchService = ClothingSearchService(clothings: finalPaymentClothings)
@@ -421,6 +422,11 @@ struct DepositPlanView: View {
                 analyzeSeries()
             }
         }
+        .onDisappear {
+            seriesAnalysisTask?.cancel()
+            seriesAnalysisTask = nil
+            isAnalyzing = false
+        }
         .onChange(of: depositClothings) { oldValue, newValue in
             updateBaseClothings()
             if viewMode == .series {
@@ -451,12 +457,16 @@ struct DepositPlanView: View {
         isAnalyzing = true
         // Analyze based on the YEAR filtered clothings
         let clothingsToAnalyze = baseClothings
-        
-        Task {
+
+        seriesAnalysisTask?.cancel()
+        seriesAnalysisTask = Task {
             let series = await SeriesAnalyzer.shared.analyzeSeries(from: clothingsToAnalyze)
+            guard !Task.isCancelled else { return }
             await MainActor.run {
+                guard !Task.isCancelled else { return }
                 self.seriesList = series
                 self.isAnalyzing = false
+                self.seriesAnalysisTask = nil
             }
         }
     }

@@ -12,6 +12,17 @@ import Foundation
 import UIKit
 #endif
 
+private func wardrobeVisibleImageLoadPriority() -> TaskPriority {
+    ProcessInfo.processInfo.physicalMemory <= 3_500_000_000 ? .utility : .userInitiated
+}
+
+private func deferVisibleWardrobeImageDecodeForFirstFrame() async {
+    let delay: UInt64 = ProcessInfo.processInfo.physicalMemory <= 3_500_000_000
+        ? 60_000_000
+        : 30_000_000
+    try? await Task.sleep(nanoseconds: delay)
+}
+
 struct WardrobeCellSnapshot: Identifiable, Equatable, Sendable {
     let id: UUID
     let name: String
@@ -421,7 +432,9 @@ struct ClothingCard: View, Equatable {
                             return
                         }
                         if Task.isCancelled { return }
-                        let loadedImage = await ImageManager.shared.loadImageAsync(fileName: imagePath, targetSize: size, priority: .userInitiated)
+                        await deferVisibleWardrobeImageDecodeForFirstFrame()
+                        if Task.isCancelled { return }
+                        let loadedImage = await ImageManager.shared.loadImageAsync(fileName: imagePath, targetSize: size, priority: wardrobeVisibleImageLoadPriority())
                         if Task.isCancelled { return }
                         self.image = loadedImage
                     } else {
@@ -562,7 +575,9 @@ struct ClothingThumbnail: View, Equatable {
                     return
                 }
                 if Task.isCancelled { return }
-                let loadedImage = await ImageManager.shared.loadImageAsync(fileName: imagePath, targetSize: size, priority: .userInitiated)
+                await deferVisibleWardrobeImageDecodeForFirstFrame()
+                if Task.isCancelled { return }
+                let loadedImage = await ImageManager.shared.loadImageAsync(fileName: imagePath, targetSize: size, priority: wardrobeVisibleImageLoadPriority())
                 if Task.isCancelled { return }
                 self.image = loadedImage
             } else {
@@ -763,7 +778,9 @@ struct ClothingRow: View, Equatable {
                             return
                         }
                         if Task.isCancelled { return }
-                        let loadedImage = await ImageManager.shared.loadImageAsync(fileName: firstPath, targetSize: size, priority: .userInitiated)
+                        await deferVisibleWardrobeImageDecodeForFirstFrame()
+                        if Task.isCancelled { return }
+                        let loadedImage = await ImageManager.shared.loadImageAsync(fileName: firstPath, targetSize: size, priority: wardrobeVisibleImageLoadPriority())
                         if Task.isCancelled { return }
                         self.image = loadedImage
                     } else {
@@ -1019,7 +1036,9 @@ struct ClothingRowBrief: View, Equatable {
                         return
                     }
                     if Task.isCancelled { return }
-                    let loadedImage = await ImageManager.shared.loadImageAsync(fileName: firstPath, targetSize: size, priority: .userInitiated)
+                    await deferVisibleWardrobeImageDecodeForFirstFrame()
+                    if Task.isCancelled { return }
+                    let loadedImage = await ImageManager.shared.loadImageAsync(fileName: firstPath, targetSize: size, priority: wardrobeVisibleImageLoadPriority())
                     if Task.isCancelled { return }
                     self.image = loadedImage
                 }

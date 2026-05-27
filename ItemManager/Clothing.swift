@@ -416,6 +416,11 @@ final class WealthSavingEntry {
 
 enum WealthSavingLedger {
     static let legacyFinalPaymentMigrationSource = "legacy.finalPaymentSavedToWealth"
+    @MainActor private static var lastViewReconciliationAt: Date?
+
+    private static var viewReconciliationMinimumInterval: TimeInterval {
+        ProcessInfo.processInfo.physicalMemory <= 3_500_000_000 ? 45 : 20
+    }
 
     static func isActive(_ entry: WealthSavingEntry) -> Bool {
         entry.kind == .saving
@@ -565,6 +570,26 @@ enum WealthSavingLedger {
             print("WealthSavingLedger: Failed to fetch final payment reconciliation data: \(error)")
             return 0
         }
+    }
+
+    @discardableResult
+    @MainActor
+    static func reconcilePaidFinalPaymentsIfNeededForView(
+        context: ModelContext,
+        reason: String,
+        at date: Date = Date()
+    ) -> Int {
+        if let lastViewReconciliationAt,
+           date.timeIntervalSince(lastViewReconciliationAt) < viewReconciliationMinimumInterval {
+            return 0
+        }
+
+        lastViewReconciliationAt = date
+        let reconciledCount = reconcilePaidFinalPayments(context: context, at: date)
+        if reconciledCount > 0 {
+            print("\(reason): Reconciled \(reconciledCount) paid final payment clothing record(s) before filtering.")
+        }
+        return reconciledCount
     }
 
     @discardableResult

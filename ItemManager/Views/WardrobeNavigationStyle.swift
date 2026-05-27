@@ -145,7 +145,9 @@ struct WardrobeFashionTabSwitcher: View {
         let isSelected = selectedTab == targetTab
 
         Button {
-            withAnimation(.easeInOut(duration: 0.2)) {
+            var transaction = Transaction(animation: nil)
+            transaction.disablesAnimations = true
+            withTransaction(transaction) {
                 selectedTab = targetTab
             }
         } label: {

@@ -8,11 +8,30 @@
 import SwiftUI
 import SwiftData
 
+@MainActor
+private enum DepositDateFormatterCache {
+    private static var formatters: [String: DateFormatter] = [:]
+
+    static func string(from date: Date, template: String) -> String {
+        let localeIdentifier = LanguageManager.shared.locale.identifier
+        let cacheKey = "\(localeIdentifier)|\(template)"
+        let formatter: DateFormatter
+        if let cached = formatters[cacheKey] {
+            formatter = cached
+        } else {
+            let created = DateFormatter()
+            created.locale = LanguageManager.shared.locale
+            created.setLocalizedDateFormatFromTemplate(template)
+            formatters[cacheKey] = created
+            formatter = created
+        }
+        return formatter.string(from: date)
+    }
+}
+
+@MainActor
 private func depositLocalizedDateString(_ date: Date, template: String) -> String {
-    let formatter = DateFormatter()
-    formatter.locale = LanguageManager.shared.locale
-    formatter.setLocalizedDateFormatFromTemplate(template)
-    return formatter.string(from: date)
+    DepositDateFormatterCache.string(from: date, template: template)
 }
 
 struct DepositItemRow: View {

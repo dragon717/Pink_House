@@ -74,6 +74,10 @@ struct LiquidBackground: View {
                     .ignoresSafeArea()
             }
         }
+        .transaction { transaction in
+            transaction.animation = nil
+            transaction.disablesAnimations = true
+        }
     }
 }
 

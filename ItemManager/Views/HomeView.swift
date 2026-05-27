@@ -463,6 +463,7 @@ struct HomeView: View {
     @State private var showingDepositNotificationSheet = false
     @State private var notificationTargetClothing: Clothing?
     @State private var navigateToNotificationDetail = false
+    @State private var hasLoadedDepositPlan = false
     @AppStorage("UserPreference_DepositDisplayMode") private var depositDisplayMode: DepositDisplayMode = .detail
     
     // View Layout Management
@@ -541,8 +542,7 @@ struct HomeView: View {
                         .allowsHitTesting(false)
                 }
                 
-                // Content
-                if selectedTab == .wardrobe {
+                ZStack {
                     WardrobeView(
                         searchText: $wardrobeSearchText,
                         isSelectionMode: $isSelectionMode,
@@ -563,22 +563,36 @@ struct HomeView: View {
                     )
                     // Force recreation when sortOption changes to ensure proper sorting
                     .id("wardrobe_\(sortOption.id)")
-                } else {
-                    DepositPlanView(
-                        searchText: $depositSearchText,
-                        displayMode: $depositDisplayMode,
-                        sortOption: sortOption,
-                        selectedTagIDs: selectedTagIDs,
-                        selectedBrandIDs: selectedBrandIDs,
-                        selectedTypes: selectedTypes,
-                        selectedColors: selectedColors,
-                        selectedSizes: selectedSizes,
-                        selectedLengths: selectedLengths,
-                        selectedConditions: selectedConditions,
-                        selectedAccessories: selectedAccessories
-                    )
-                    // Force recreation when sortOption changes to ensure proper sorting
-                    .id("deposit_\(sortOption.id)")
+                    .opacity(selectedTab == .wardrobe ? 1 : 0)
+                    .allowsHitTesting(selectedTab == .wardrobe)
+                    .accessibilityHidden(selectedTab != .wardrobe)
+                    .zIndex(selectedTab == .wardrobe ? 1 : 0)
+
+                    if selectedTab == .depositPlan || hasLoadedDepositPlan {
+                        DepositPlanView(
+                            searchText: $depositSearchText,
+                            displayMode: $depositDisplayMode,
+                            sortOption: sortOption,
+                            selectedTagIDs: selectedTagIDs,
+                            selectedBrandIDs: selectedBrandIDs,
+                            selectedTypes: selectedTypes,
+                            selectedColors: selectedColors,
+                            selectedSizes: selectedSizes,
+                            selectedLengths: selectedLengths,
+                            selectedConditions: selectedConditions,
+                            selectedAccessories: selectedAccessories
+                        )
+                        // Force recreation when sortOption changes to ensure proper sorting
+                        .id("deposit_\(sortOption.id)")
+                        .opacity(selectedTab == .depositPlan ? 1 : 0)
+                        .allowsHitTesting(selectedTab == .depositPlan)
+                        .accessibilityHidden(selectedTab != .depositPlan)
+                        .zIndex(selectedTab == .depositPlan ? 1 : 0)
+                    }
+                }
+                .transaction { transaction in
+                    transaction.animation = nil
+                    transaction.disablesAnimations = true
                 }
             }
             .onChange(of: viewLayout) { _, _ in
@@ -587,6 +601,9 @@ struct HomeView: View {
             .onChange(of: selectedTab) { _, _ in
                 // 切换标签页时关闭搜索栏
                 isSearchActive = false
+                if selectedTab == .depositPlan {
+                    hasLoadedDepositPlan = true
+                }
             }
             .sheet(isPresented: $showingBatchImportSheet) {
                 BatchImportView()
@@ -635,6 +652,7 @@ struct HomeView: View {
             .onAppear {
                 // 确保初始状态下搜索栏不显示
                 isSearchActive = false
+                hasLoadedDepositPlan = hasLoadedDepositPlan || selectedTab == .depositPlan
                 wardrobeNavigationStyle = WardrobeNavigationStyle.normalizeStoredPreference()
                 draftManager.refreshDraftPresence()
                 refreshMenuFacetCache()
@@ -728,7 +746,7 @@ struct HomeView: View {
         }
 
         if selectedTab != .depositPlan {
-            selectedTab = .depositPlan
+            setHomeTabWithoutContentAnimation(.depositPlan)
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
                 presentDetail()
             }
@@ -740,9 +758,7 @@ struct HomeView: View {
     private var tabSwitcher: some View {
         HStack(spacing: classicSegmentInterItemSpacing) {
             Button {
-                withAnimation {
-                    selectedTab = .wardrobe
-                }
+                setHomeTabWithoutContentAnimation(.wardrobe)
             } label: {
                 VStack(spacing: WardrobeTopBarMetrics.segmentStackSpacing) {
                     Group {
@@ -770,9 +786,7 @@ struct HomeView: View {
             }
             
             Button {
-                withAnimation {
-                    selectedTab = .depositPlan
-                }
+                setHomeTabWithoutContentAnimation(.depositPlan)
             } label: {
                 VStack(spacing: WardrobeTopBarMetrics.segmentStackSpacing) {
                     if selectedTab == .wardrobe {
@@ -814,6 +828,16 @@ struct HomeView: View {
             }
         }
         .frame(width: classicSegmentContentWidth)
+    }
+
+    private func setHomeTabWithoutContentAnimation(_ tab: HomeTab) {
+        guard selectedTab != tab else { return }
+        var transaction = Transaction(animation: nil)
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            selectedTab = tab
+            isSearchActive = false
+        }
     }
 
     private var classicSegmentShellHorizontalPadding: CGFloat {

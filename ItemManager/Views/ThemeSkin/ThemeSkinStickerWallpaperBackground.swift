@@ -1,3 +1,4 @@
+import Foundation
 import SwiftUI
 
 enum ThemeSkinWallpaperContext: String, CaseIterable, Identifiable, Hashable {
@@ -394,7 +395,15 @@ struct ThemeSkinStickerWallpaperBackground: View {
             }
         }
 
-        return base.map { $0.adjusted(for: context) }
+        let adjusted = base.map { $0.adjusted(for: context) }
+        guard renderMode == .page,
+              ProcessInfo.processInfo.physicalMemory <= 3_500_000_000 else {
+            return adjusted
+        }
+
+        return adjusted.filter { placement in
+            placement.isHero || placement.id.isMultiple(of: 2)
+        }
     }
 
     private static let mixedFocusPlacements: [ThemeSkinWallpaperStickerPlacement] = [
