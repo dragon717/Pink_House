@@ -20,7 +20,7 @@ final class ClothingAccessoryTests: XCTestCase {
         container = nil
         context = nil
     }
-    
+
     func testAccessoryItemCreationAndCalculation() throws {
         // 1. 创建 Clothing
         let clothing = Clothing(name: "Test Dress")
@@ -324,6 +324,95 @@ final class ClothingAccessoryTests: XCTestCase {
         XCTAssertEqual(finalPayments.count, 1)
         XCTAssertNil(finalPayments.first?.voidedAt)
         XCTAssertEqual(finalPayments.first?.amount, 800)
+    }
+
+    func testFinalPaymentMigrationMergeUsesLocalPaidFactOverExistingCloudDepositPlan() throws {
+        let clothingID = UUID()
+        let paidAt = Date(timeIntervalSince1970: 1_700_172_800)
+        let mergedAt = Date(timeIntervalSince1970: 1_700_259_200)
+
+        let localClothing = Clothing(name: "Paid Local OP", price: 1000, deposit: 200, balance: 800, isDepositPlan: false)
+        localClothing.id = clothingID
+        let localFinalPayment = WealthSavingEntry(
+            amount: 800,
+            clothingID: clothingID,
+            note: "尾款付清",
+            entryKind: .finalPayment,
+            paidAt: paidAt,
+            createdAt: paidAt
+        )
+
+        let cloudClothing = Clothing(
+            name: "Paid Local OP",
+            price: 1000,
+            deposit: 200,
+            balance: 800,
+            depositDate: Date(timeIntervalSince1970: 1_700_000_000),
+            isDepositPlan: true,
+            finalPaymentDate: Date(timeIntervalSince1970: 1_700_086_400)
+        )
+        cloudClothing.id = clothingID
+
+        let didMerge = SwiftDataMigrationManager.FinalPaymentMigrationMerge.applyLocalPaidFinalPaymentFact(
+            from: localClothing,
+            localFinalPaymentEntries: [localFinalPayment],
+            to: cloudClothing,
+            at: mergedAt
+        )
+
+        XCTAssertTrue(didMerge)
+        XCTAssertFalse(cloudClothing.isDepositPlan)
+        XCTAssertNil(cloudClothing.depositDate)
+        XCTAssertNil(cloudClothing.finalPaymentDate)
+        XCTAssertNil(cloudClothing.finalPaymentEndDate)
+        XCTAssertEqual(cloudClothing.updatedAt, mergedAt)
+        XCTAssertFalse(WealthSavingLedger.shouldShowFinalPaymentPayoffAction(for: cloudClothing))
+    }
+
+    func testFinalPaymentMigrationMergeSkipsOnlySameFinalPaymentFact() throws {
+        let clothingID = UUID()
+        let paidAt = Date(timeIntervalSince1970: 1_700_172_800)
+        let existingFullPayment = WealthSavingEntry(
+            amount: 800,
+            clothingID: clothingID,
+            note: "尾款付清",
+            entryKind: .finalPayment,
+            paidAt: paidAt,
+            createdAt: paidAt
+        )
+        let existingPartialPayment = WealthSavingEntry(
+            amount: 500,
+            clothingID: clothingID,
+            note: "尾款一段",
+            entryKind: .finalPayment,
+            paidAt: paidAt.addingTimeInterval(-60),
+            createdAt: paidAt.addingTimeInterval(-60)
+        )
+        let samePaymentFromLocal = WealthSavingEntry(
+            amount: 800,
+            clothingID: clothingID,
+            note: "尾款付清",
+            entryKind: .finalPayment,
+            paidAt: paidAt,
+            createdAt: paidAt
+        )
+        let complementaryPayment = WealthSavingEntry(
+            amount: 300,
+            clothingID: clothingID,
+            note: "补尾款",
+            entryKind: .finalPayment,
+            paidAt: paidAt.addingTimeInterval(60),
+            createdAt: paidAt.addingTimeInterval(60)
+        )
+
+        XCTAssertTrue(SwiftDataMigrationManager.FinalPaymentMigrationMerge.shouldSkipMigratingDuplicateFinalPayment(
+            samePaymentFromLocal,
+            existingEntries: [existingFullPayment]
+        ))
+        XCTAssertFalse(SwiftDataMigrationManager.FinalPaymentMigrationMerge.shouldSkipMigratingDuplicateFinalPayment(
+            complementaryPayment,
+            existingEntries: [existingPartialPayment]
+        ))
     }
 
     func testExistingLegacySavingIsIgnoredByFinalPaymentRecord() throws {

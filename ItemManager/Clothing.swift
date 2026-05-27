@@ -494,8 +494,19 @@ enum WealthSavingLedger {
         return paidFinalPaymentTotal(for: clothing.id, in: entries) >= due
     }
 
+    static func hasPaidFinalPaymentFact(for clothing: Clothing, entries: [WealthSavingEntry]) -> Bool {
+        isFinalPaymentPaidOff(for: clothing, entries: entries)
+            || hasCompletedFinalPaymentState(for: clothing)
+    }
+
+    static func hasCompletedFinalPaymentState(for clothing: Clothing) -> Bool {
+        !clothing.isDeleted
+            && clothing.deletedAt == nil
+            && !clothing.isDepositPlan
+            && clothing.totalBalance > 0
+    }
+
     @discardableResult
-    @MainActor
     static func reconcilePaidFinalPayments(
         clothings: [Clothing],
         entries: [WealthSavingEntry],
@@ -512,7 +523,7 @@ enum WealthSavingLedger {
                 continue
             }
 
-            markClothingFinalPaymentCompleted(clothing, at: date)
+            markFinalPaymentCompleted(clothing, at: date)
             changedCount += 1
         }
 
@@ -528,7 +539,6 @@ enum WealthSavingLedger {
     }
 
     @discardableResult
-    @MainActor
     static func reconcilePaidFinalPayments(context: ModelContext, at date: Date = Date()) -> Int {
         let finalPaymentKind = WealthSavingEntryKind.finalPayment.rawValue
         let clothingDescriptor = FetchDescriptor<Clothing>(
@@ -567,7 +577,7 @@ enum WealthSavingLedger {
         let existingEntries = try fetchFinalPaymentEntries(for: clothing.id, context: context)
         if isFinalPaymentPaidOff(for: clothing, entries: existingEntries) {
             if clothing.isFinalPaymentPlan {
-                markClothingFinalPaymentCompleted(clothing, at: Date())
+                markFinalPaymentCompleted(clothing, at: Date())
                 try context.save()
             }
             return nil
@@ -592,7 +602,7 @@ enum WealthSavingLedger {
         )
         context.insert(entry)
 
-        markClothingFinalPaymentCompleted(clothing, at: now)
+        markFinalPaymentCompleted(clothing, at: now)
 
         try context.save()
         return FinalPaymentRecordResult(
@@ -668,8 +678,7 @@ enum WealthSavingLedger {
         }
     }
 
-    @MainActor
-    private static func markClothingFinalPaymentCompleted(_ clothing: Clothing, at date: Date) {
+    static func markFinalPaymentCompleted(_ clothing: Clothing, at date: Date) {
         clothing.isDepositPlan = false
         clothing.isFinalPaymentSavedToWealth = false
         clothing.finalPaymentSavedAt = nil

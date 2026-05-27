@@ -89,8 +89,13 @@ final class ClothingDuplicateRepairService {
 
             let duplicateGroups = groupsByID.values.filter { $0.count > 1 }
             guard !duplicateGroups.isEmpty else {
+                let reconciledFinalPayments = WealthSavingLedger.reconcilePaidFinalPayments(
+                    clothings: allClothings,
+                    entries: finalPaymentEntries,
+                    context: context
+                )
                 let durationMs = Int(Date().timeIntervalSince(startedAt) * 1000)
-                print("[ClothingDuplicateRepair] no duplicates reason=\(reason) scanned=\(allClothings.count) duration_ms=\(durationMs)")
+                print("[ClothingDuplicateRepair] no duplicates reason=\(reason) scanned=\(allClothings.count) reconciled_final_payments=\(reconciledFinalPayments) duration_ms=\(durationMs)")
                 return 0
             }
 
@@ -104,7 +109,7 @@ final class ClothingDuplicateRepairService {
                 keepersForPaymentReconciliation.append(keeper)
 
                 for duplicate in group where duplicate !== keeper {
-                    merge(duplicate, into: keeper)
+                    merge(duplicate, into: keeper, finalPaymentEntries: finalPaymentEntries)
                     let duplicateID = duplicate.id
                     duplicate.accessoryItems = []
                     duplicate.tags = []
@@ -194,7 +199,11 @@ final class ClothingDuplicateRepairService {
         return score
     }
 
-    private func merge(_ duplicate: Clothing, into keeper: Clothing) {
+    private func merge(
+        _ duplicate: Clothing,
+        into keeper: Clothing,
+        finalPaymentEntries: [WealthSavingEntry]
+    ) {
         mergeText(\.name, from: duplicate, into: keeper)
         mergeText(\.types, from: duplicate, into: keeper)
         mergeText(\.colors, from: duplicate, into: keeper)
@@ -209,7 +218,7 @@ final class ClothingDuplicateRepairService {
         mergeBrand(from: duplicate, into: keeper)
         mergeTags(from: duplicate, into: keeper)
         mergeAccessories(from: duplicate, into: keeper)
-        mergePricesAndReservationFields(from: duplicate, into: keeper)
+        mergePricesAndReservationFields(from: duplicate, into: keeper, finalPaymentEntries: finalPaymentEntries)
         mergeModelFields(from: duplicate, into: keeper)
 
         keeper.isShared = keeper.isShared || duplicate.isShared
@@ -303,7 +312,11 @@ final class ClothingDuplicateRepairService {
         duplicate.accessoryItems = []
     }
 
-    private func mergePricesAndReservationFields(from duplicate: Clothing, into keeper: Clothing) {
+    private func mergePricesAndReservationFields(
+        from duplicate: Clothing,
+        into keeper: Clothing,
+        finalPaymentEntries: [WealthSavingEntry]
+    ) {
         if keeper.originalPrice == 0, duplicate.originalPrice > 0 {
             keeper.originalPrice = duplicate.originalPrice
         }
@@ -340,7 +353,11 @@ final class ClothingDuplicateRepairService {
             keeper.finalPaymentEndDate = duplicate.finalPaymentEndDate
         }
         keeper.finalPaymentInstallmentCount = 0
-        if !keeper.isDepositPlan, duplicate.isDepositPlan {
+        let paidFinalPaymentWins = WealthSavingLedger.hasPaidFinalPaymentFact(for: keeper, entries: finalPaymentEntries)
+            || WealthSavingLedger.hasPaidFinalPaymentFact(for: duplicate, entries: finalPaymentEntries)
+        if paidFinalPaymentWins {
+            WealthSavingLedger.markFinalPaymentCompleted(keeper, at: Date())
+        } else if !keeper.isDepositPlan, duplicate.isDepositPlan {
             keeper.isDepositPlan = true
         }
         keeper.isFinalPaymentSavedToWealth = false

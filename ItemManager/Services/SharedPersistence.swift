@@ -276,13 +276,13 @@ class SharedContainer {
     @MainActor
     private func replayDeletesAfterCloudSync(reason: String) {
         Task {
+            let reconciledFinalPayments = WealthSavingLedger.reconcilePaidFinalPayments(context: container.mainContext)
+            if reconciledFinalPayments > 0 {
+                widgetLogger.info("final_payment_reconcile reason=\(reason) count=\(reconciledFinalPayments)")
+            }
+
             if DeleteTracker.shared.hasPendingDeletes {
                 DeleteTracker.shared.applyAllDeletes(context: container.mainContext, clearRecords: false)
-                ClothingDuplicateRepairService.shared.scheduleRepair(
-                    modelContainer: container,
-                    reason: reason,
-                    delayNanoseconds: 700_000_000
-                )
                 if shouldRunOOTDRemoteRepair(reason: reason) {
                     OOTDIdentityRepairService.repairIfNeeded(
                         context: container.mainContext,
@@ -292,6 +292,11 @@ class SharedContainer {
             } else {
                 widgetLogger.info("delete_replay_skip reason=\(reason) pending_deletes=false")
             }
+            ClothingDuplicateRepairService.shared.scheduleRepair(
+                modelContainer: container,
+                reason: reason,
+                delayNanoseconds: 700_000_000
+            )
             await syncWidgetData(reason: reason)
         }
     }

@@ -296,6 +296,7 @@ class SwiftDataMigrationManager: ObservableObject {
 
             // 1b. 迁移历史财富记录
             try await migrateWealthSavingEntries(from: localContext, to: cloudContext)
+            reconcilePaidFinalPayments(in: cloudContext, reason: "wealth-entry-migration")
             migrationProgress = 0.15
             
             // 2. 迁移 Tag
@@ -337,6 +338,7 @@ class SwiftDataMigrationManager: ObservableObject {
             // 10b. 重建衣橱关系。Clothing 先于 Brand/Tag/AccessoryItem 复制，关系需要在目标
             // context 对象都存在后统一补链，避免 iCloud 同步后编辑页看到孤儿小物。
             try rebuildWardrobeRelationships(from: localContext, to: cloudContext)
+            reconcilePaidFinalPayments(in: cloudContext, reason: "wardrobe-relationship-rebuild")
             migrationProgress = 0.985
 
             // 11. 重建 OOTD/手帐关系。前面的复制步骤按实体去重插入，关系对象必须在目标
@@ -367,31 +369,57 @@ class SwiftDataMigrationManager: ObservableObject {
     }
     
     // MARK: - Entity Migration Methods
+
+    func mergeWardrobePaymentFacts(from localContext: ModelContext, to cloudContext: ModelContext) throws {
+        try migrateClothing(from: localContext, to: cloudContext)
+        try migrateWealthSavingEntries(from: localContext, to: cloudContext)
+        reconcilePaidFinalPayments(in: cloudContext, reason: "wardrobe-payment-facts")
+    }
     
     private func migrateClothing(from localContext: ModelContext, to cloudContext: ModelContext) throws {
         let descriptor = FetchDescriptor<Clothing>()
         let items = try localContext.fetch(descriptor)
+        let localFinalPaymentEntries = try fetchActiveFinalPaymentEntries(in: localContext)
+        var paidFinalPaymentMergedCount = 0
         
         for item in items {
             // 检查云端是否已存在（通过 UUID 查重）
             let id = item.id
             var fetchDescriptor = FetchDescriptor<Clothing>(predicate: #Predicate { $0.id == id })
             let existing = try? cloudContext.fetch(fetchDescriptor).first
-            
-            if existing == nil {
+            if let existing {
+                if Self.FinalPaymentMigrationMerge.applyLocalPaidFinalPaymentFact(
+                    from: item,
+                    localFinalPaymentEntries: localFinalPaymentEntries,
+                    to: existing,
+                    at: Date()
+                ) {
+                    paidFinalPaymentMergedCount += 1
+                }
+            } else {
                 // 创建新实例插入云端
                 let newItem = createClothingCopy(from: item)
+                if Self.FinalPaymentMigrationMerge.applyLocalPaidFinalPaymentFact(
+                    from: item,
+                    localFinalPaymentEntries: localFinalPaymentEntries,
+                    to: newItem,
+                    at: Date()
+                ) {
+                    paidFinalPaymentMergedCount += 1
+                }
                 cloudContext.insert(newItem)
             }
         }
         
         try cloudContext.save()
-        print("  - 迁移了 \(items.count) 条 Clothing 记录")
+        print("  - 迁移了 \(items.count) 条 Clothing 记录，合并已付尾款状态 \(paidFinalPaymentMergedCount) 条")
     }
 
     private func migrateWealthSavingEntries(from localContext: ModelContext, to cloudContext: ModelContext) throws {
         let descriptor = FetchDescriptor<WealthSavingEntry>()
         let items = try localContext.fetch(descriptor)
+        var cloudFinalPaymentEntries = try fetchActiveFinalPaymentEntries(in: cloudContext)
+        var skippedDuplicateFinalPayments = 0
 
         for item in items {
             let id = item.id
@@ -399,13 +427,48 @@ class SwiftDataMigrationManager: ObservableObject {
             let existing = try? cloudContext.fetch(fetchDescriptor).first
 
             if existing == nil {
+                if shouldSkipMigratingDuplicateFinalPayment(item, existingEntries: cloudFinalPaymentEntries) {
+                    skippedDuplicateFinalPayments += 1
+                    continue
+                }
+
                 let newItem = createWealthSavingEntryCopy(from: item)
                 cloudContext.insert(newItem)
+                if WealthSavingLedger.isFinalPaymentRecord(newItem) {
+                    cloudFinalPaymentEntries.append(newItem)
+                }
             }
         }
 
         try cloudContext.save()
-        print("  - 迁移了 \(items.count) 条 WealthSavingEntry 记录")
+        print("  - 迁移了 \(items.count) 条 WealthSavingEntry 记录，跳过重复尾款账本 \(skippedDuplicateFinalPayments) 条")
+    }
+
+    private func fetchActiveFinalPaymentEntries(in context: ModelContext) throws -> [WealthSavingEntry] {
+        let finalPaymentKind = WealthSavingEntryKind.finalPayment.rawValue
+        let descriptor = FetchDescriptor<WealthSavingEntry>(
+            predicate: #Predicate { entry in
+                entry.entryKind == finalPaymentKind && entry.voidedAt == nil
+            }
+        )
+        return try context.fetch(descriptor)
+    }
+
+    private func shouldSkipMigratingDuplicateFinalPayment(
+        _ source: WealthSavingEntry,
+        existingEntries: [WealthSavingEntry]
+    ) -> Bool {
+        Self.FinalPaymentMigrationMerge.shouldSkipMigratingDuplicateFinalPayment(
+            source,
+            existingEntries: existingEntries
+        )
+    }
+
+    private func reconcilePaidFinalPayments(in context: ModelContext, reason: String) {
+        let reconciledCount = WealthSavingLedger.reconcilePaidFinalPayments(context: context)
+        if reconciledCount > 0 {
+            print("  - 智能合并已付尾款状态 (\(reason)): \(reconciledCount) 条")
+        }
     }
     
     private func migrateTags(from localContext: ModelContext, to cloudContext: ModelContext) throws {
@@ -1107,6 +1170,76 @@ class SwiftDataMigrationManager: ObservableObject {
         lastMigrationDate = nil
         UserDefaults.standard.removeObject(forKey: lastMigrationDateKey)
         print("🔄 迁移状态已重置")
+    }
+}
+
+extension SwiftDataMigrationManager {
+    enum FinalPaymentMigrationMerge {
+        @discardableResult
+        static func applyLocalPaidFinalPaymentFact(
+            from localClothing: Clothing,
+            localFinalPaymentEntries: [WealthSavingEntry],
+            to cloudClothing: Clothing,
+            at date: Date = Date()
+        ) -> Bool {
+            guard localClothing.id == cloudClothing.id,
+                  cloudClothing.isFinalPaymentPlan,
+                  WealthSavingLedger.hasPaidFinalPaymentFact(
+                    for: localClothing,
+                    entries: localFinalPaymentEntries
+                  ) else {
+                return false
+            }
+
+            WealthSavingLedger.markFinalPaymentCompleted(cloudClothing, at: date)
+            return true
+        }
+
+        static func shouldSkipMigratingDuplicateFinalPayment(
+            _ source: WealthSavingEntry,
+            existingEntries: [WealthSavingEntry]
+        ) -> Bool {
+            guard WealthSavingLedger.isFinalPaymentRecord(source),
+                  let clothingID = source.clothingID else {
+                return false
+            }
+
+            return existingEntries.contains { existing in
+                isSameMigratedFinalPaymentFact(source, existing, clothingID: clothingID)
+            }
+        }
+
+        private static func isSameMigratedFinalPaymentFact(
+            _ source: WealthSavingEntry,
+            _ existing: WealthSavingEntry,
+            clothingID: UUID
+        ) -> Bool {
+            guard WealthSavingLedger.isFinalPaymentRecord(existing),
+                  existing.clothingID == clothingID,
+                  FinancialDataSanitizer.money(existing.amount) == FinancialDataSanitizer.money(source.amount) else {
+                return false
+            }
+
+            if let sourcePaidAt = source.paidAt,
+               let existingPaidAt = existing.paidAt {
+                return sourcePaidAt == existingPaidAt
+            }
+
+            let sourceEventDate = source.paidAt ?? source.createdAt
+            let existingEventDate = existing.paidAt ?? existing.createdAt
+            guard sourceEventDate == existingEventDate else { return false }
+
+            return normalized(source.note) == normalized(existing.note)
+                && normalized(source.migrationSource) == normalized(existing.migrationSource)
+        }
+
+        private static func normalized(_ value: String) -> String {
+            value.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+
+        private static func normalized(_ value: String?) -> String {
+            normalized(value ?? "")
+        }
     }
 }
 
