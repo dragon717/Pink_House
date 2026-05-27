@@ -557,6 +557,12 @@ struct ClothingEditUserActivityPayload: Codable {
 
 @Observable
 final class ClothingEditModel {
+    fileprivate static let defaultFinalPaymentDurationDays = 30
+
+    fileprivate static func defaultFinalPaymentEndDate(from startDate: Date) -> Date {
+        Calendar.current.date(byAdding: .day, value: defaultFinalPaymentDurationDays, to: startDate) ?? startDate
+    }
+
     var name: String = ""
     var brandName: String = ""
     var types: String = ""
@@ -596,6 +602,7 @@ final class ClothingEditModel {
     var didPersistForLifecycle = false
 
     init() {
+        finalPaymentEndDate = Self.defaultFinalPaymentEndDate(from: finalPaymentDate)
         DraftReliabilitySignpost.editorModelInit()
     }
 }
@@ -1517,11 +1524,11 @@ struct ClothingEditView: View {
                     // MARK: - 标签分类
                     tagsSection
 
-                    // MARK: - 价格信息
-                    priceSection
-
                     // MARK: - 购买信息
                     purchaseInfoSection
+
+                    // MARK: - 价格信息
+                    priceSection
                 }
                 .padding()
             }
@@ -1823,7 +1830,7 @@ struct ClothingEditView: View {
         depositDate = c.depositDate ?? Date()
         reservationKind = c.reservationKind
         finalPaymentDate = c.finalPaymentDate ?? Date()
-        finalPaymentEndDate = c.finalPaymentEndDate ?? (c.finalPaymentDate ?? Date())
+        finalPaymentEndDate = c.finalPaymentEndDate ?? ClothingEditModel.defaultFinalPaymentEndDate(from: finalPaymentDate)
         note = c.note
         selectedTags = c.tags ?? []
 
@@ -2040,8 +2047,9 @@ struct ClothingEditView: View {
         purchaseDate = Date()
         depositDate = Date()
         reservationKind = .owned
-        finalPaymentDate = Date()
-        finalPaymentEndDate = Date()
+        let defaultFinalPaymentDate = Date()
+        finalPaymentDate = defaultFinalPaymentDate
+        finalPaymentEndDate = ClothingEditModel.defaultFinalPaymentEndDate(from: defaultFinalPaymentDate)
         note = ""
         accessoryList = []
         selectedTags = []
@@ -2223,32 +2231,9 @@ struct ClothingEditView: View {
 
     private func applyReservationKindChange(from oldValue: ClothingReservationKind, to newValue: ClothingReservationKind) {
         isDepositPlan = newValue != .owned
-        switch newValue {
-        case .owned:
-            deposit = 0
-            balance = 0
-            clearAccessoryReservationAmounts()
-        case .fullPaymentReservation:
-            balance = 0
-            clearAccessoryReservationAmounts()
-        case .depositPlan:
-            if oldValue == .fullPaymentReservation {
-                deposit = 0
-                balance = 0
-            }
-        }
+        // Preserve in-progress price input while users compare reservation tabs.
+        // Save-time mapping still decides which amounts are persisted for each mode.
     }
-
-    private func clearAccessoryReservationAmounts() {
-        guard accessoryList.contains(where: { $0.deposit != 0 || $0.balance != 0 }) else { return }
-        accessoryList = accessoryList.map { item in
-            var copy = item
-            copy.deposit = 0
-            copy.balance = 0
-            return copy
-        }
-    }
-
 
     private var effectiveJPYRate: Double {
         jpyExchangeRate > 0 ? jpyExchangeRate : CurrencyExchangeRateService.defaultJPYRate
