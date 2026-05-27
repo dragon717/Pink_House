@@ -710,6 +710,8 @@ struct HomeView: View {
                     )
                 }
             }
+            .floatingPetHidden(.wardrobeEditing, isActive: isInWardrobeEditMode)
+            .floatingPetHidden(.presentationActive, isActive: isFloatingPetPresentationActive)
         }
     }
 
@@ -1023,6 +1025,15 @@ struct HomeView: View {
     
     private var isInWardrobeEditMode: Bool {
         selectedTab == .wardrobe && (isSelectionMode || (sortOption == .custom && isEditing))
+    }
+
+    private var isFloatingPetPresentationActive: Bool {
+        showingBatchImportSheet ||
+            showingAddSheet ||
+            showingDepositNotificationSheet ||
+            showingMultiDimensionalFilterSheet ||
+            navigateToNotificationDetail ||
+            batchImportUnlockAlert != nil
     }
     
     private var classicActionButtons: some View {

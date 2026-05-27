@@ -10,6 +10,114 @@ enum FloatingPetState {
     case analyzing      // Analyzing image content (hidden/waiting)
 }
 
+enum FloatingPetHiddenReason: String, CaseIterable, Hashable, Identifiable {
+    case noOwnedPet
+    case houseRoute
+    case petChatRoute
+    case wardrobeEditing
+    case presentationActive
+    case guideActive
+    case launchPresentation
+    case migrationOverlay
+    case noticeModal
+    case unlockNotification
+    case immersiveMedia
+    case transactionFlow
+
+    var id: String { rawValue }
+}
+
+@MainActor
+final class FloatingPetVisibilityManager: ObservableObject {
+    static let shared = FloatingPetVisibilityManager()
+
+    @Published private(set) var hiddenReasons: Set<FloatingPetHiddenReason> = []
+
+    private var tokenReasons: [UUID: FloatingPetHiddenReason] = [:]
+    private var reasonCounts: [FloatingPetHiddenReason: Int] = [:]
+
+    private init() {}
+
+    var shouldShow: Bool {
+        hiddenReasons.isEmpty
+    }
+
+    func canShow(additionalHiddenReasons: Set<FloatingPetHiddenReason> = []) -> Bool {
+        hiddenReasons.union(additionalHiddenReasons).isEmpty
+    }
+
+    func setHidden(_ reason: FloatingPetHiddenReason, isActive: Bool, token: UUID) {
+        if isActive {
+            activate(reason, token: token)
+        } else {
+            deactivate(token: token)
+        }
+    }
+
+    func activate(_ reason: FloatingPetHiddenReason, token: UUID) {
+        if tokenReasons[token] == reason {
+            return
+        }
+
+        if tokenReasons[token] != nil {
+            deactivate(token: token)
+        }
+
+        tokenReasons[token] = reason
+        reasonCounts[reason, default: 0] += 1
+        refreshHiddenReasons()
+    }
+
+    func deactivate(token: UUID) {
+        guard let reason = tokenReasons.removeValue(forKey: token) else { return }
+
+        let nextCount = (reasonCounts[reason] ?? 0) - 1
+        if nextCount > 0 {
+            reasonCounts[reason] = nextCount
+        } else {
+            reasonCounts.removeValue(forKey: reason)
+        }
+        refreshHiddenReasons()
+    }
+
+    private func refreshHiddenReasons() {
+        let nextReasons = Set(reasonCounts.keys)
+        if hiddenReasons != nextReasons {
+            hiddenReasons = nextReasons
+        }
+    }
+}
+
+private struct FloatingPetHiddenModifier: ViewModifier {
+    let reason: FloatingPetHiddenReason
+    let isActive: Bool
+
+    @State private var token = UUID()
+    @ObservedObject private var visibilityManager = FloatingPetVisibilityManager.shared
+
+    func body(content: Content) -> some View {
+        content
+            .onAppear {
+                visibilityManager.setHidden(reason, isActive: isActive, token: token)
+            }
+            .onChange(of: isActive) { _, newValue in
+                visibilityManager.setHidden(reason, isActive: newValue, token: token)
+            }
+            .onDisappear {
+                visibilityManager.deactivate(token: token)
+            }
+    }
+}
+
+extension View {
+    func floatingPetHidden(
+        _ reason: FloatingPetHiddenReason,
+        isActive: Bool = true
+    ) -> some View {
+        modifier(FloatingPetHiddenModifier(reason: reason, isActive: isActive))
+    }
+}
+
 class PetInteractionManager: ObservableObject {
     static let shared = PetInteractionManager()
     

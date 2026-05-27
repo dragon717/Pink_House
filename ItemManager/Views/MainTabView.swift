@@ -261,6 +261,8 @@ struct LegacyTabView: View {
     @StateObject private var mediaStateManager = MediaStateManager.shared
     @StateObject private var tabNavigationManager = TabNavigationManager.shared
     @StateObject private var bottomDockSettingsManager = BottomDockSettingsManager.shared
+    @StateObject private var floatingPetVisibilityManager = FloatingPetVisibilityManager.shared
+    @StateObject private var guideManager = AppFirstLaunchGuideManager.shared
     
     // 搜索文本状态
     @State private var searchText = ""
@@ -290,8 +292,9 @@ struct LegacyTabView: View {
         }
         .overlay {
             RewardBubbleView()
-            // 进入 House / 萌宠对话页后不再显示全局悬浮宠物，避免挡住房间热区或搜索/输入交互
-            if !isHouseRouteActive && !isPetChatRouteActive {
+            // The floating pet is a root companionship layer; task, guide, and modal
+            // flows report blockers through FloatingPetVisibilityManager.
+            if effectiveFloatingPetHiddenReasons.isEmpty {
                 PetOverlayView(action: {
                     // 点击悬浮小猫：切换到萌宠对话 Tab 并自动展开搜索栏
                     withAnimation {
@@ -459,6 +462,35 @@ struct LegacyTabView: View {
 
     private var isPetChatRouteActive: Bool {
         selectedTab == 3
+    }
+
+    private var effectiveFloatingPetHiddenReasons: Set<FloatingPetHiddenReason> {
+        floatingPetVisibilityManager.hiddenReasons.union(localFloatingPetHiddenReasons)
+    }
+
+    private var localFloatingPetHiddenReasons: Set<FloatingPetHiddenReason> {
+        var reasons = Set<FloatingPetHiddenReason>()
+
+        if petDataManager.status.ownedPetIds.isEmpty {
+            reasons.insert(.noOwnedPet)
+        }
+
+        if isHouseRouteActive {
+            reasons.insert(.houseRoute)
+        }
+
+        if isPetChatRouteActive {
+            reasons.insert(.petChatRoute)
+        }
+
+        if guideManager.isShowingGuide ||
+            guideManager.isShowingFeatureExperienceGuide ||
+            guideManager.isRunningAnimation ||
+            guideManager.showPointingVideo {
+            reasons.insert(.guideActive)
+        }
+
+        return reasons
     }
 
     private func tabTitle(for feature: AppFeatureDescriptor) -> String {
@@ -1010,6 +1042,8 @@ struct MainTabView: View {
     @State private var homeTabSelection: HomeTab = .wardrobe
     @State private var smallWorldDestination: SmallWorldDestination = .menu
     @State private var isPlayingOpeningAnimation = false
+    @StateObject private var noticePopupManager = NoticePopupManager.shared
+    @StateObject private var unlockNotificationManager = FeatureUnlockNotificationManager.shared
 
     var body: some View {
         LegacyTabView(
@@ -1018,6 +1052,9 @@ struct MainTabView: View {
             smallWorldDestination: $smallWorldDestination,
             isPlayingOpeningAnimation: $isPlayingOpeningAnimation
         )
+        .floatingPetHidden(.noticeModal, isActive: noticePopupManager.isShowing)
+        .floatingPetHidden(.unlockNotification, isActive: unlockNotificationManager.isShowing)
+        .floatingPetHidden(.immersiveMedia, isActive: isPlayingOpeningAnimation)
         .environment(\.customBottomFloatingLift, LegacyCustomTabBarLayout.floatingElementLift)
         .environment(\.customBottomNavigationAvoidanceInset, LegacyCustomTabBarLayout.floatingSurfaceBottomInset)
         .overlay {

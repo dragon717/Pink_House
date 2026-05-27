@@ -108,12 +108,16 @@ struct MainContentView: View {
     @State private var hasScheduledDeferredLaunchMaintenance = false
     @State private var pendingFirstLaunchGuideAfterCheckIn = false
     @StateObject private var guideManager = AppFirstLaunchGuideManager.shared
+    @StateObject private var migrationManager = SwiftDataMigrationManager.shared
     private let launchLogger = AppLogger.category("LaunchFlow")
     
     var body: some View {
         ZStack {
             if hasMountedPrimaryInterface {
                 MainTabView()
+                    .floatingPetHidden(.launchPresentation, isActive: showSplash || !hasCompletedLaunchPresentation)
+                    .floatingPetHidden(.migrationOverlay, isActive: migrationManager.isMigrating)
+                    .floatingPetHidden(.presentationActive, isActive: showDailyCheckIn)
                     .zIndex(0)
             } else {
                 Color.clear
@@ -137,7 +141,7 @@ struct MainContentView: View {
             }
             
             // 迁移进度遮罩
-            if SwiftDataMigrationManager.shared.isMigrating {
+            if migrationManager.isMigrating {
                 MigrationProgressView()
                     .zIndex(2)
             }

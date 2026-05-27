@@ -874,6 +874,27 @@ struct WardrobeView: View {
                 )
             )
         )
+        .floatingPetHidden(.wardrobeEditing, isActive: isSelectionMode || isEditing)
+        .floatingPetHidden(.presentationActive, isActive: isFloatingPetPresentationActive)
+    }
+
+    private var isFloatingPetPresentationActive: Bool {
+        showingDeleteAlert ||
+            showingBatchCopyAlert ||
+            showingTagSelection ||
+            showingAddTagsConfirmation ||
+            showingBrandSelection ||
+            showingSetBrandConfirmation ||
+            showingColorSelection ||
+            showingSizeSelection ||
+            showingLengthSelection ||
+            showingAccessorySelection ||
+            showingConditionSelection ||
+            showingMergeToAccessorySheet ||
+            showingMergeConfirmation ||
+            showingDeleteAfterMergeConfirmation ||
+            showingDeleteSingleAlert ||
+            showingCopyAlert
     }
 
     private var baseWardrobeView: some View {

@@ -41,6 +41,12 @@ struct MeView: View {
     private var shouldShowAdminEntries: Bool {
         !isCheckingAdmin && isAdminUser
     }
+
+    private var isFloatingPetPresentationActive: Bool {
+        showingCloudSyncSheet ||
+            isImporting ||
+            showingImportAlert
+    }
     
     // MARK: - 魔法任务卡片背景（适配主题色）
     private var magicTaskCardBackground: some View {
@@ -335,6 +341,7 @@ struct MeView: View {
         .overlay {
             hiddenNavigationLinks
         }
+        .floatingPetHidden(.presentationActive, isActive: isFloatingPetPresentationActive)
     }
 
     // MARK: - 隐藏的 NavigationLink 用于编程导航

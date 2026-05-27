@@ -57,6 +57,14 @@ struct DepositPlanView: View {
     
     // 显示确认弹窗
     @State private var showConfirmDialog = false
+
+    private var isFloatingPetTransactionActive: Bool {
+        moneyCountingState != nil
+    }
+
+    private var isFloatingPetPresentationActive: Bool {
+        showConfirmDialog
+    }
     
     // Filter properties
     let selectedTagIDs: Set<UUID>
@@ -404,6 +412,8 @@ struct DepositPlanView: View {
         } message: {
             Text("⚠️ 前方尾款大军已集结！\n温馨提示：看完请抱紧你的钱包，深呼吸是没用的，不如默念\"美貌无价\"！\n(｡•́ω•̀｡)")
         }
+        .floatingPetHidden(.transactionFlow, isActive: isFloatingPetTransactionActive)
+        .floatingPetHidden(.presentationActive, isActive: isFloatingPetPresentationActive)
         .task {
             // Initial load
             updateBaseClothings()
