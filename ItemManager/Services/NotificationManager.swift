@@ -343,6 +343,11 @@ class NotificationManager: NSObject, UNUserNotificationCenterDelegate {
         force: Bool = false,
         reason: String = "all-known"
     ) async {
+        let reconciledFinalPayments = WealthSavingLedger.reconcilePaidFinalPayments(context: modelContext)
+        if reconciledFinalPayments > 0 {
+            logger.info("final_payment_reconcile reason=\(reason, privacy: .public) count=\(reconciledFinalPayments)")
+        }
+
         let descriptor = FetchDescriptor<Clothing>(
             predicate: #Predicate<Clothing> { clothing in
                 clothing.isDepositPlan == true && clothing.deletedAt == nil

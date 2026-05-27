@@ -73,6 +73,13 @@ final class ClothingDuplicateRepairService {
             var descriptor = FetchDescriptor<Clothing>()
             descriptor.includePendingChanges = true
             let allClothings = try context.fetch(descriptor)
+            let finalPaymentKind = WealthSavingEntryKind.finalPayment.rawValue
+            let finalPaymentDescriptor = FetchDescriptor<WealthSavingEntry>(
+                predicate: #Predicate { entry in
+                    entry.entryKind == finalPaymentKind && entry.voidedAt == nil
+                }
+            )
+            let finalPaymentEntries = try context.fetch(finalPaymentDescriptor)
 
             var groupsByID: [UUID: [Clothing]] = [:]
             groupsByID.reserveCapacity(allClothings.count)
@@ -89,10 +96,12 @@ final class ClothingDuplicateRepairService {
 
             var removedCount = 0
             var repairedGroupCount = 0
+            var keepersForPaymentReconciliation: [Clothing] = []
 
             for group in duplicateGroups {
                 guard let keeper = preferredKeeper(from: group) else { continue }
                 repairedGroupCount += 1
+                keepersForPaymentReconciliation.append(keeper)
 
                 for duplicate in group where duplicate !== keeper {
                     merge(duplicate, into: keeper)
@@ -106,6 +115,15 @@ final class ClothingDuplicateRepairService {
                 }
 
                 keeper.lastModified = Date()
+            }
+
+            let reconciledFinalPayments = WealthSavingLedger.reconcilePaidFinalPayments(
+                clothings: keepersForPaymentReconciliation,
+                entries: finalPaymentEntries,
+                context: context
+            )
+            if reconciledFinalPayments > 0 {
+                print("[ClothingDuplicateRepair] reconciled paid final payment records count=\(reconciledFinalPayments)")
             }
 
             if removedCount > 0 {

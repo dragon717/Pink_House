@@ -29,6 +29,7 @@ enum DepositDisplayMode: String, CaseIterable, Identifiable {
 struct DepositPlanView: View {
     @Binding var searchText: String
     @Binding var displayMode: DepositDisplayMode
+    @Environment(\.modelContext) private var modelContext
     @Environment(ThemeManager.self) private var themeManager
     @Query private var depositClothings: [Clothing]
     
@@ -106,6 +107,11 @@ struct DepositPlanView: View {
     }
 
     private func updateBaseClothings() {
+        let reconciledCount = WealthSavingLedger.reconcilePaidFinalPayments(context: modelContext)
+        if reconciledCount > 0 {
+            print("DepositPlanView: Reconciled \(reconciledCount) paid final payment clothing record(s) before filtering.")
+        }
+
         // 使用 ClothingSearchService 进行搜索
         let searchService = ClothingSearchService(clothings: finalPaymentClothings)
         let searchResults = searchService.search(query: searchText)

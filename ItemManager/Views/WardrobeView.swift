@@ -16,6 +16,8 @@ private struct WardrobeClothingRevision: Hashable {
     let lastModified: Date
     let deletedAt: Date?
     let sortIndex: Int
+    let isDepositPlan: Bool
+    let isFullPaymentReservation: Bool
 }
 
 private struct WardrobeFilterSignature: Hashable {
@@ -852,7 +854,9 @@ struct WardrobeView: View {
                     updatedAt: clothing.updatedAt,
                     lastModified: clothing.lastModified,
                     deletedAt: clothing.deletedAt,
-                    sortIndex: clothing.sortIndex
+                    sortIndex: clothing.sortIndex,
+                    isDepositPlan: clothing.isDepositPlan,
+                    isFullPaymentReservation: clothing.isFullPaymentReservation
                 )
             }
         )
@@ -2227,6 +2231,11 @@ struct WardrobeView: View {
 
     @MainActor
     private func rebuildFilteredClothings() async {
+        let reconciledCount = WealthSavingLedger.reconcilePaidFinalPayments(context: modelContext)
+        if reconciledCount > 0 {
+            print("WardrobeView: Reconciled \(reconciledCount) paid final payment clothing record(s) before filtering.")
+        }
+
         let displayClothings = deduplicatedClothingsForDisplay(from: clothings)
         let snapshots = displayClothings.map(WardrobeClothingSnapshot.init(clothing:))
         var cellSnapshots: [UUID: WardrobeCellSnapshot] = [:]

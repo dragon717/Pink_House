@@ -344,6 +344,11 @@ class SharedContainer {
         let context = sharedModelContainer.mainContext
         
         do {
+            let reconciledFinalPayments = WealthSavingLedger.reconcilePaidFinalPayments(context: context)
+            if reconciledFinalPayments > 0 {
+                widgetLogger.info("final_payment_reconcile reason=\(reason) count=\(reconciledFinalPayments)")
+            }
+
             // 1. Fetch Data (只获取未删除的数据)
             let descriptor = FetchDescriptor<Clothing>(predicate: #Predicate { $0.deletedAt == nil }, sortBy: [SortDescriptor(\.purchaseDate, order: .reverse)])
             let clothings = try context.fetch(descriptor)

@@ -262,6 +262,70 @@ final class ClothingAccessoryTests: XCTestCase {
         XCTAssertEqual(WealthSavingLedger.remainingFinalPaymentAmount(for: clothing, entries: entries), 0)
     }
 
+    func testPaidFinalPaymentEntrySuppressesICloudResurrectedDepositPlan() throws {
+        let clothing = Clothing(name: "Synced Back OP", price: 1000, deposit: 200, balance: 800, isDepositPlan: true)
+        clothing.depositDate = Date(timeIntervalSince1970: 1_700_000_000)
+        clothing.finalPaymentDate = Date(timeIntervalSince1970: 1_700_086_400)
+        context.insert(clothing)
+
+        let payment = WealthSavingEntry(
+            amount: 800,
+            clothingID: clothing.id,
+            note: "尾款付清",
+            entryKind: .finalPayment,
+            paidAt: Date(timeIntervalSince1970: 1_700_172_800)
+        )
+        context.insert(payment)
+        try context.save()
+
+        let entries = try context.fetch(FetchDescriptor<WealthSavingEntry>())
+        XCTAssertEqual(WealthSavingLedger.remainingFinalPaymentAmount(for: clothing, entries: entries), 0)
+
+        let reconciledCount = WealthSavingLedger.reconcilePaidFinalPayments(
+            clothings: [clothing],
+            entries: entries,
+            context: context,
+            at: Date(timeIntervalSince1970: 1_700_259_200)
+        )
+
+        XCTAssertEqual(reconciledCount, 1)
+        XCTAssertFalse(clothing.isDepositPlan)
+        XCTAssertFalse(WealthSavingLedger.shouldShowFinalPaymentPayoffAction(for: clothing))
+        XCTAssertNil(clothing.depositDate)
+        XCTAssertNil(clothing.finalPaymentDate)
+        XCTAssertNil(clothing.finalPaymentEndDate)
+    }
+
+    func testRecordFinalPaymentDoesNotDuplicatePaidEntryAfterICloudResurrectsFlag() throws {
+        let clothing = Clothing(name: "Duplicate Guard OP", price: 1000, deposit: 200, balance: 800, isDepositPlan: true)
+        context.insert(clothing)
+
+        let payment = WealthSavingEntry(
+            amount: 800,
+            clothingID: clothing.id,
+            note: "尾款付清",
+            entryKind: .finalPayment,
+            paidAt: Date(timeIntervalSince1970: 1_700_172_800)
+        )
+        context.insert(payment)
+        try context.save()
+
+        let result = try WealthSavingLedger.recordFinalPayment(
+            amount: 800,
+            for: clothing,
+            context: context
+        )
+
+        let entries = try context.fetch(FetchDescriptor<WealthSavingEntry>())
+        let finalPayments = WealthSavingLedger.finalPaymentRecords(for: clothing.id, in: entries)
+
+        XCTAssertNil(result)
+        XCTAssertFalse(clothing.isDepositPlan)
+        XCTAssertEqual(finalPayments.count, 1)
+        XCTAssertNil(finalPayments.first?.voidedAt)
+        XCTAssertEqual(finalPayments.first?.amount, 800)
+    }
+
     func testExistingLegacySavingIsIgnoredByFinalPaymentRecord() throws {
         let clothing = Clothing(name: "Legacy Saving OP", price: 1000, deposit: 200, balance: 800, isDepositPlan: true)
         context.insert(clothing)

@@ -480,8 +480,81 @@ enum WealthSavingLedger {
             .reduce(Decimal(0)) { $0 + FinancialDataSanitizer.money($1.amount) }
     }
 
-    static func remainingFinalPaymentAmount(for clothing: Clothing, entries _: [WealthSavingEntry]) -> Decimal {
-        unpaidFinalPaymentAmount(for: clothing)
+    static func remainingFinalPaymentAmount(for clothing: Clothing, entries: [WealthSavingEntry]) -> Decimal {
+        let due = finalPaymentDueAmount(for: clothing)
+        guard due > 0 else { return 0 }
+        let remaining = due - paidFinalPaymentTotal(for: clothing.id, in: entries)
+        return remaining > 0 ? remaining : 0
+    }
+
+    static func isFinalPaymentPaidOff(for clothing: Clothing, entries: [WealthSavingEntry]) -> Bool {
+        guard !clothing.isFullPaymentReservation else { return false }
+        let due = clothing.totalBalance
+        guard due > 0 else { return false }
+        return paidFinalPaymentTotal(for: clothing.id, in: entries) >= due
+    }
+
+    @discardableResult
+    @MainActor
+    static func reconcilePaidFinalPayments(
+        clothings: [Clothing],
+        entries: [WealthSavingEntry],
+        context: ModelContext,
+        at date: Date = Date()
+    ) -> Int {
+        var changedCount = 0
+
+        for clothing in clothings {
+            guard !clothing.isDeleted,
+                  clothing.deletedAt == nil,
+                  clothing.isFinalPaymentPlan,
+                  isFinalPaymentPaidOff(for: clothing, entries: entries) else {
+                continue
+            }
+
+            markClothingFinalPaymentCompleted(clothing, at: date)
+            changedCount += 1
+        }
+
+        if changedCount > 0 {
+            do {
+                try context.save()
+            } catch {
+                print("WealthSavingLedger: Failed to reconcile paid final payments: \(error)")
+            }
+        }
+
+        return changedCount
+    }
+
+    @discardableResult
+    @MainActor
+    static func reconcilePaidFinalPayments(context: ModelContext, at date: Date = Date()) -> Int {
+        let finalPaymentKind = WealthSavingEntryKind.finalPayment.rawValue
+        let clothingDescriptor = FetchDescriptor<Clothing>(
+            predicate: #Predicate { clothing in
+                clothing.deletedAt == nil && clothing.isDepositPlan == true
+            }
+        )
+        let entryDescriptor = FetchDescriptor<WealthSavingEntry>(
+            predicate: #Predicate { entry in
+                entry.entryKind == finalPaymentKind && entry.voidedAt == nil
+            }
+        )
+
+        do {
+            let clothings = try context.fetch(clothingDescriptor)
+            let entries = try context.fetch(entryDescriptor)
+            return reconcilePaidFinalPayments(
+                clothings: clothings,
+                entries: entries,
+                context: context,
+                at: date
+            )
+        } catch {
+            print("WealthSavingLedger: Failed to fetch final payment reconciliation data: \(error)")
+            return 0
+        }
     }
 
     @discardableResult
@@ -491,6 +564,15 @@ enum WealthSavingLedger {
         for clothing: Clothing,
         context: ModelContext
     ) throws -> FinalPaymentRecordResult? {
+        let existingEntries = try fetchFinalPaymentEntries(for: clothing.id, context: context)
+        if isFinalPaymentPaidOff(for: clothing, entries: existingEntries) {
+            if clothing.isFinalPaymentPlan {
+                markClothingFinalPaymentCompleted(clothing, at: Date())
+                try context.save()
+            }
+            return nil
+        }
+
         let remainingBefore = unpaidFinalPaymentAmount(for: clothing)
         guard remainingBefore > 0, requestedAmount > 0 else { return nil }
 
@@ -523,19 +605,26 @@ enum WealthSavingLedger {
     }
 
     @MainActor
-    private static func resetLegacyFinalPaymentProgress(
+    private static func fetchFinalPaymentEntries(
         for clothingID: UUID,
-        context: ModelContext,
-        at date: Date
-    ) throws {
+        context: ModelContext
+    ) throws -> [WealthSavingEntry] {
         let finalPaymentKind = WealthSavingEntryKind.finalPayment.rawValue
         let descriptor = FetchDescriptor<WealthSavingEntry>(
             predicate: #Predicate { entry in
                 entry.clothingID == clothingID && entry.entryKind == finalPaymentKind
             }
         )
+        return try context.fetch(descriptor)
+    }
 
-        let existingEntries = try context.fetch(descriptor)
+    @MainActor
+    private static func resetLegacyFinalPaymentProgress(
+        for clothingID: UUID,
+        context: ModelContext,
+        at date: Date
+    ) throws {
+        let existingEntries = try fetchFinalPaymentEntries(for: clothingID, context: context)
         for entry in existingEntries {
             entry.finalPaymentMode = nil
             entry.installmentIndex = 0
