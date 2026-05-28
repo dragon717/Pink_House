@@ -45,7 +45,7 @@ class SuggestionManager {
         let accessories = ["KC", "发带", "BNT", "扁帽", "发卡", "边夹", "手袖", "腕饰", "项链", "戒指", "胸针", "包", "袜子", "过膝袜", "连裤袜", "手套", "遮阳伞", "扇子"]
         
         // 常见状态
-        let conditions = ["全新", "仅试穿", "99新", "95新", "9成新", "有瑕疵", "战斗成色"]
+        let conditions = ["全新", "仅试穿", "99新", "95新", "9成新", "有瑕疵", "战斗成色", "未到货", "待付尾款"]
         
         queue.async { [weak self] in
             guard let self = self else { return }
