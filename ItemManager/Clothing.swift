@@ -63,6 +63,10 @@ enum ClothingReservationKind: String, Codable, CaseIterable, Identifiable {
     }
 }
 
+enum ClothingDeletionSource: String, Codable {
+    case mergeToAccessory = "merge_to_accessory"
+}
+
 enum WealthSavingEntryKind: String, Codable {
     case saving = "saving"
     case finalPayment = "final_payment"
@@ -129,6 +133,7 @@ final class Clothing {
     var status: ClothingStatus = ClothingStatus.onShelf
     var isDeleted: Bool = false // 软删除标记
     var deletedAt: Date? = nil // 删除时间
+    var deletionSource: String? = nil // 删除来源，nil 表示普通删除并进入回收站
     var createdAt: Date = Date()
     var updatedAt: Date = Date()
     var lastModified: Date = Date() // iCloud 同步时间戳
@@ -280,8 +285,19 @@ final class Clothing {
     // 总尾款 = (裙装尾款 + 小物尾款总和) * 库存数量
     var totalBalance: Decimal {
         let accBalance = accessoryItems?.reduce(Decimal(0)) { $0 + FinancialDataSanitizer.money($1.balance) } ?? 0
-        return (FinancialDataSanitizer.money(balance) + accBalance)
+        let storedBalance = (FinancialDataSanitizer.money(balance) + accBalance)
             * Decimal(FinancialDataSanitizer.stock(stock))
+        if storedBalance > 0 {
+            return storedBalance
+        }
+
+        let conditionText = condition.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard isDepositPlan,
+              !isFullPaymentReservation,
+              conditionText == "待付尾款" else {
+            return 0
+        }
+        return inventoryTotalPrice
     }
 
     var reservationKind: ClothingReservationKind {
@@ -651,6 +667,20 @@ enum WealthSavingLedger {
             }
         )
         return try context.fetch(descriptor)
+    }
+
+    @MainActor
+    static func resetFinalPaymentProgress(
+        for clothing: Clothing,
+        context: ModelContext,
+        at date: Date = Date()
+    ) throws {
+        try resetLegacyFinalPaymentProgress(for: clothing.id, context: context, at: date)
+        clothing.isFinalPaymentSavedToWealth = false
+        clothing.finalPaymentSavedAt = nil
+        clothing.finalPaymentInstallmentCount = 0
+        clothing.updatedAt = date
+        clothing.lastModified = date
     }
 
     @MainActor

@@ -297,6 +297,7 @@ class BackupService {
                     status: c.status.rawValue,
                     isDeleted: c.isDeleted,
                     deletedAt: c.deletedAt,
+                    deletionSource: c.deletionSource,
                     createdAt: c.createdAt,
                     updatedAt: c.updatedAt,
                     sortIndex: c.sortIndex,
@@ -1643,6 +1644,9 @@ class BackupService {
                 if keeper.balance == 0 && duplicate.balance > 0 {
                     keeper.balance = duplicate.balance
                 }
+                if keeper.deletionSource == nil {
+                    keeper.deletionSource = duplicate.deletionSource
+                }
                 // Use earlier purchase date if available
                 if let dupDate = duplicate.purchaseDate as Date?, dupDate < keeper.purchaseDate {
                     keeper.purchaseDate = dupDate
@@ -1698,6 +1702,7 @@ class BackupService {
                     isLocalDeleted = false
                 }
             }
+            let localDeletionSource = clothingBack.deletionSource
             
             // Update properties - Smart merge strategy
             // Basic info: backup overwrites
@@ -1762,13 +1767,15 @@ class BackupService {
             // 恢复删除状态：优先使用备份的删除状态
             clothingBack.isDeleted = dto.isDeleted ?? false
             clothingBack.deletedAt = dto.deletedAt
+            clothingBack.deletionSource = isBackupDeleted ? dto.deletionSource : nil
 
             // 如果本地被删除但备份未删除，保持本地删除状态（避免已删除数据复活）
-            if isLocalDeleted && !(dto.isDeleted ?? false) {
+            if isLocalDeleted && !isBackupDeleted {
                 clothingBack.isDeleted = true
                 if clothingBack.deletedAt == nil {
                     clothingBack.deletedAt = Date()
                 }
+                clothingBack.deletionSource = localDeletionSource
                 print("### Restore: FORCE DELETED applied to '\(clothingBack.name)' (local deleted but backup not deleted)")
             }
             

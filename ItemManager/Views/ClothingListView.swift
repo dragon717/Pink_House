@@ -284,6 +284,7 @@ struct ClothingListView: View {
             // 软删除
             item.isDeleted = true
             item.deletedAt = Date()
+            item.deletionSource = nil
             item.lastModified = Date()
         }
         

@@ -175,8 +175,8 @@ struct WardrobeFashionTabSwitcher: View {
         }
 
         return isSelected
-            ? SkyConcertThemeSkin.accent(for: themeSkinDescriptor)
-            : SkyConcertThemeSkin.labelColor(for: themeSkinDescriptor).opacity(0.68)
+            ? SkyConcertThemeSkin.readableAccent(for: themeSkinDescriptor, colorScheme: colorScheme)
+            : SkyConcertThemeSkin.labelColor(for: themeSkinDescriptor, colorScheme: colorScheme).opacity(0.72)
     }
 
     @ViewBuilder

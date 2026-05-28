@@ -28,6 +28,14 @@ private enum SharedPersistencePerformanceConfig {
         isLowMemoryDevice ? 45.0 : 20.0
     }
 
+    static var repeatedDeleteReplayMinimumInterval: TimeInterval {
+        isLowMemoryDevice ? 5 * 60 : 2 * 60
+    }
+
+    static var cloudDuplicateRepairMinimumInterval: TimeInterval {
+        isLowMemoryDevice ? 15 * 60 : 8 * 60
+    }
+
     static var ootdRemoteRepairMinimumInterval: TimeInterval {
         isLowMemoryDevice ? 600.0 : 240.0
     }
@@ -54,6 +62,7 @@ class SharedContainer {
     private var deleteReplayTask: Task<Void, Never>?
     private var lastCloudMaintenanceAt: Date?
     private var lastCloudMaintenanceDeleteFingerprint: String?
+    private var lastCloudDuplicateRepairAt: Date?
     private var lastOOTDRemoteRepairAt: Date?
     private var activeWidgetSyncBuckets = Set<String>()
     private var lastSuccessfulWidgetSyncByBucket: [String: Date] = [:]
@@ -253,9 +262,12 @@ class SharedContainer {
         let now = Date()
         let pendingFingerprint = DeleteTracker.shared.pendingDeletesFingerprint
         let deleteRecordsChanged = pendingFingerprint != lastCloudMaintenanceDeleteFingerprint
+        let minimumInterval = DeleteTracker.shared.hasPendingDeletes && !deleteRecordsChanged
+            ? SharedPersistencePerformanceConfig.repeatedDeleteReplayMinimumInterval
+            : SharedPersistencePerformanceConfig.cloudMaintenanceMinimumInterval
         if !deleteRecordsChanged,
            let lastCloudMaintenanceAt,
-           now.timeIntervalSince(lastCloudMaintenanceAt) < SharedPersistencePerformanceConfig.cloudMaintenanceMinimumInterval {
+           now.timeIntervalSince(lastCloudMaintenanceAt) < minimumInterval {
             widgetLogger.info("cloud_maintenance_skip reason=\(reason) cooldown=true pending_deletes=\(DeleteTracker.shared.hasPendingDeletes)")
             return
         }
@@ -281,9 +293,10 @@ class SharedContainer {
                 widgetLogger.info("final_payment_reconcile reason=\(reason) count=\(reconciledFinalPayments)")
             }
 
+            var deleteReplayResult = DeleteTracker.ApplyResult.noPending
             if DeleteTracker.shared.hasPendingDeletes {
-                DeleteTracker.shared.applyAllDeletes(context: container.mainContext, clearRecords: false)
-                if shouldRunOOTDRemoteRepair(reason: reason) {
+                deleteReplayResult = DeleteTracker.shared.applyAllDeletes(context: container.mainContext, clearRecords: false)
+                if deleteReplayResult.didChangeData, shouldRunOOTDRemoteRepair(reason: reason) {
                     OOTDIdentityRepairService.repairIfNeeded(
                         context: container.mainContext,
                         source: reason
@@ -292,13 +305,30 @@ class SharedContainer {
             } else {
                 widgetLogger.info("delete_replay_skip reason=\(reason) pending_deletes=false")
             }
-            ClothingDuplicateRepairService.shared.scheduleRepair(
-                modelContainer: container,
-                reason: reason,
-                delayNanoseconds: 700_000_000
-            )
+
+            if shouldRunCloudDuplicateRepair(reason: reason, deleteReplayChanged: deleteReplayResult.didChangeData) {
+                ClothingDuplicateRepairService.shared.scheduleRepair(
+                    modelContainer: container,
+                    reason: reason,
+                    delayNanoseconds: 700_000_000
+                )
+            }
             await syncWidgetData(reason: reason)
         }
+    }
+
+    @MainActor
+    private func shouldRunCloudDuplicateRepair(reason: String, deleteReplayChanged: Bool) -> Bool {
+        let now = Date()
+        if !deleteReplayChanged,
+           let lastCloudDuplicateRepairAt,
+           now.timeIntervalSince(lastCloudDuplicateRepairAt) < SharedPersistencePerformanceConfig.cloudDuplicateRepairMinimumInterval {
+            widgetLogger.info("duplicate_repair_skip reason=\(reason) cooldown=true delete_replay_changed=false")
+            return false
+        }
+
+        lastCloudDuplicateRepairAt = now
+        return true
     }
 
     @MainActor

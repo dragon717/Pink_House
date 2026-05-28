@@ -905,6 +905,7 @@ class SwiftDataMigrationManager: ObservableObject {
         new.sortIndex = source.sortIndex
         new.isDeleted = source.isDeleted
         new.deletedAt = source.deletedAt
+        new.deletionSource = source.deletionSource
         new.createdAt = source.createdAt
         new.updatedAt = source.updatedAt
         new.lastModified = source.lastModified

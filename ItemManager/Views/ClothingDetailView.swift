@@ -18,6 +18,7 @@ struct ClothingDetailView: View {
     @State private var showingImageViewer = false
     @State private var showingDeleteAlert = false
     @State private var showingFinalPaymentSheet = false
+    @State private var showingFullPaymentReceiptAlert = false
     @State private var showCelebration = false
     @State private var currentImageIndex = 0
     @State private var showingShareSheet = false
@@ -76,9 +77,14 @@ struct ClothingDetailView: View {
 
                         // MARK: - Reservation Action / Status
                         if clothing.isFullPaymentReservation {
-                            fullPaymentReservationStatusPill
-                                .padding(.horizontal)
-                                .offset(y: -40)
+                            Button {
+                                showingFullPaymentReceiptAlert = true
+                            } label: {
+                                fullPaymentReservationStatusLabel
+                            }
+                            .buttonStyle(ThemeSkinPrimaryButtonStyle(fallbackTint: .green, cornerRadius: 16, verticalPadding: 15))
+                            .padding(.horizontal)
+                            .offset(y: -40)
                         } else if WealthSavingLedger.shouldShowFinalPaymentPayoffAction(for: clothing) {
                             Button {
                                 showingFinalPaymentSheet = true
@@ -221,6 +227,7 @@ struct ClothingDetailView: View {
                 // Soft delete
                 clothing.isDeleted = true
                 clothing.deletedAt = Date()
+                clothing.deletionSource = nil
                 clothing.lastModified = Date()
 
                 // 记录删除到 DeleteTracker，防止iCloud同步覆盖
@@ -244,6 +251,14 @@ struct ClothingDetailView: View {
         } message: {
             Text("确定要删除这件裙装吗？它将被移动到回收站，你可以随时恢复。")
         }
+        .alert("确认签收？", isPresented: $showingFullPaymentReceiptAlert) {
+            Button("取消", role: .cancel) { }
+            Button("确认签收") {
+                markFullPaymentReservationReceived()
+            }
+        } message: {
+            Text("确认后会把这条全款预约移入已拥有，并将「未到货」状态改回「全新」。")
+        }
         .onAppear {
             // 进入详情页时，若定金和尾款 存在，自动重算总价并保存
             if clothing.reservationKind == .depositPlan && (clothing.deposit > 0 || clothing.balance > 0) {
@@ -259,6 +274,64 @@ struct ClothingDetailView: View {
             // 当图片路径变化时（如删除图片），验证索引
             validateCurrentImageIndex()
         }
+    }
+
+    private func markFullPaymentReservationReceived() {
+        guard clothing.isFullPaymentReservation else { return }
+
+        let now = Date()
+        let reservationUnitAmount = clothing.fullPaymentReservationUnitAmount
+        let receivedUnitPrice: Decimal
+        if clothing.price > 0 {
+            receivedUnitPrice = clothing.price
+        } else {
+            let unitPriceWithoutOneTimeFees = reservationUnitAmount - clothing.resolvedAccessoriesPrice - clothing.resolvedShippingFee
+            receivedUnitPrice = unitPriceWithoutOneTimeFees > 0 ? unitPriceWithoutOneTimeFees : reservationUnitAmount
+        }
+        clothing.isDepositPlan = false
+        clothing.deposit = 0
+        clothing.balance = 0
+        clothing.depositDate = nil
+        clothing.finalPaymentDate = nil
+        clothing.finalPaymentEndDate = nil
+        clothing.isFinalPaymentSavedToWealth = false
+        clothing.finalPaymentSavedAt = nil
+        clothing.finalPaymentInstallmentCount = 0
+        clothing.updatedAt = now
+        clothing.lastModified = now
+        if receivedUnitPrice > 0 {
+            clothing.price = receivedUnitPrice
+        }
+        if shouldResetConditionAfterReceipt(clothing.condition) {
+            clothing.condition = "全新"
+        }
+
+        do {
+            try modelContext.save()
+            NotificationCenter.default.post(name: .depositPlanDataDidChange, object: clothing.id)
+        } catch {
+            print("ClothingDetailView: Failed to receive full payment reservation: \(error)")
+            ToastManager.shared.showError("签收失败，请稍后再试")
+            return
+        }
+
+        NotificationManager.shared.cancelNotification(for: clothing)
+        Task { @MainActor in
+            await NotificationManager.shared.refreshAllKnownDepositNotifications(
+                modelContext: modelContext,
+                force: true,
+                reason: "full-payment-received"
+            )
+        }
+        NotificationManager.shared.updateApplicationBadge(modelContext: modelContext)
+        Task { await SharedPersistence.shared.syncWidgetData(reason: "full-payment-received") }
+        updateClothingCountCache()
+        ToastManager.shared.showSuccess("已签收，已移入已拥有")
+    }
+
+    private func shouldResetConditionAfterReceipt(_ condition: String) -> Bool {
+        let normalized = condition.trimmingCharacters(in: .whitespacesAndNewlines)
+        return normalized.isEmpty || normalized == "未到货"
     }
     
     private func validateCurrentImageIndex() {
@@ -305,6 +378,7 @@ struct ClothingDetailView: View {
             )
         }
         NotificationManager.shared.updateApplicationBadge(modelContext: modelContext)
+        NotificationCenter.default.post(name: .depositPlanDataDidChange, object: clothing.id)
         Task { await SharedPersistence.shared.syncWidgetData(reason: "final-payment-paid-off") }
 
         // Trigger Celebration Effect
@@ -834,21 +908,13 @@ struct ClothingDetailView: View {
         }
     }
 
-    private var fullPaymentReservationStatusPill: some View {
+    private var fullPaymentReservationStatusLabel: some View {
         HStack(spacing: 8) {
             Image(systemName: "shippingbox.fill")
                 .font(.headline.weight(.bold))
             Text("待签收".appLocalized)
                 .font(.headline.weight(.semibold))
                 .themeSkinLegibleText(level: .chip, slot: .primaryButton)
-        }
-        .foregroundStyle(.green)
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 15)
-        .background(Color.green.opacity(0.12), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .stroke(Color.green.opacity(0.35), lineWidth: 1)
         }
     }
 

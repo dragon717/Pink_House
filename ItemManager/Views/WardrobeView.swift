@@ -574,6 +574,7 @@ struct WardrobeView: View {
     @State private var showingMergeConfirmation = false
     @State private var showingDeleteAfterMergeConfirmation = false
     @State private var mergedItemCount = 0
+    @State private var mergedSourceItemIDs: Set<UUID> = []
     
     // Context Menu Actions
     @State private var itemToDelete: Clothing?
@@ -1314,11 +1315,11 @@ struct WardrobeView: View {
             .alert("合并完成", isPresented: $showingDeleteAfterMergeConfirmation) {
                 Button("保留原裙装") {
                     selectedItemIDs.removeAll()
+                    mergedSourceItemIDs.removeAll()
                     targetClothingForMerge = nil
                 }
                 Button("删除原裙装", role: .destructive) {
-                    deleteSelectedItems()
-                    targetClothingForMerge = nil
+                    deleteMergedSourceItems()
                 }
             } message: {
                 Text("已成功合并 \(mergedItemCount) 个小物。是否删除原选中的裙装？")
@@ -1521,6 +1522,7 @@ struct WardrobeView: View {
             for item in itemsToDelete {
                 item.isDeleted = true
                 item.deletedAt = Date()
+                item.deletionSource = nil
                 item.lastModified = Date()
             }
         }
@@ -1542,9 +1544,53 @@ struct WardrobeView: View {
         }
     }
 
+    private func deleteMergedSourceItems() {
+        let sourceIDs = selectedItemIDs.intersection(mergedSourceItemIDs)
+        let sourceItems = clothings.filter { sourceIDs.contains($0.id) }
+
+        guard !sourceItems.isEmpty else {
+            print("WardrobeView: No merged source items to delete.")
+            withAnimation {
+                isSelectionMode = false
+                selectedItemIDs.removeAll()
+            }
+            mergedSourceItemIDs.removeAll()
+            targetClothingForMerge = nil
+            return
+        }
+
+        let now = Date()
+        let deletionSource = ClothingDeletionSource.mergeToAccessory.rawValue
+        for item in sourceItems {
+            item.isDeleted = true
+            item.deletedAt = now
+            item.deletionSource = deletionSource
+            item.updatedAt = now
+            item.lastModified = now
+        }
+
+        do {
+            try modelContext.save()
+            let ids = sourceItems.map(\.id)
+            DeleteTracker.shared.recordDeletedClothings(ids: ids, source: deletionSource)
+            print("WardrobeView: Successfully soft deleted \(sourceItems.count) merged source items.")
+
+            withAnimation {
+                isSelectionMode = false
+                selectedItemIDs.removeAll()
+            }
+            mergedSourceItemIDs.removeAll()
+            targetClothingForMerge = nil
+            updateClothingCountCache()
+        } catch {
+            print("WardrobeView: Failed to save merged source deletion: \(error)")
+        }
+    }
+
     private func deleteItem(_ item: Clothing) {
         item.isDeleted = true
         item.deletedAt = Date()
+        item.deletionSource = nil
         item.lastModified = Date()
         do {
             try modelContext.save()
@@ -1789,6 +1835,7 @@ struct WardrobeView: View {
         
         guard !selectedClothings.isEmpty else {
             // 如果没有有效的选中项（可能只选中了目标本身），直接返回
+            mergedSourceItemIDs.removeAll()
             targetClothingForMerge = nil
             return
         }
@@ -1856,14 +1903,19 @@ struct WardrobeView: View {
         
         // 重新计算目标裙装的自定义小物总价，避免历史值累加漂移
         targetClothing.accessoriesPrice = targetClothing.resolvedAccessoriesPrice
+        let now = Date()
+        targetClothing.updatedAt = now
+        targetClothing.lastModified = now
         
         // 保存更改
         do {
             try modelContext.save()
+            mergedSourceItemIDs = Set(selectedClothings.map(\.id))
             mergedItemCount = newAccessoryItems.count
             showingDeleteAfterMergeConfirmation = true
         } catch {
             print("❌ 合并小物失败: \(error)")
+            mergedSourceItemIDs.removeAll()
             targetClothingForMerge = nil
         }
     }

@@ -423,6 +423,7 @@ struct ClothingDTO: Codable {
     let status: String? // v1.2+ 上架状态，老版本备份可能不存在
     let isDeleted: Bool? // v1.4+ 软删除标记，老版本备份可能不存在
     let deletedAt: Date? // v1.4+ 删除时间，老版本备份可能不存在
+    let deletionSource: String? // v1.14+ 删除来源，nil 表示普通回收站删除，老版本备份可能不存在
     let createdAt: Date
     let updatedAt: Date
     let sortIndex: Int? // v1.2+ 排序索引，老版本备份可能不存在

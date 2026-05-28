@@ -117,6 +117,88 @@ struct DepositPlanView: View {
         depositClothings.filter { $0.isFinalPaymentPlan }
     }
 
+    private var finalPaymentRefreshToken: String {
+        depositClothings
+            .map { clothing in
+                [
+                    clothing.id.uuidString,
+                    clothing.isFinalPaymentPlan ? "final" : "non-final",
+                    clothing.reservationKind.rawValue,
+                    clothing.name,
+                    clothing.condition,
+                    String(clothing.stock),
+                    Self.decimalToken(clothing.deposit),
+                    Self.decimalToken(clothing.balance),
+                    Self.decimalToken(clothing.totalBalance),
+                    Self.dateToken(clothing.depositDate),
+                    Self.dateToken(clothing.finalPaymentDate),
+                    Self.dateToken(clothing.finalPaymentEndDate),
+                    Self.dateToken(clothing.updatedAt),
+                    Self.dateToken(clothing.lastModified),
+                    Self.dateToken(clothing.deletedAt)
+                ].joined(separator: "|")
+            }
+            .sorted()
+            .joined(separator: "||")
+    }
+
+    private var filterRefreshToken: String {
+        [
+            searchText,
+            sortOption.rawValue,
+            selectedTagIDs.map(\.uuidString).sorted().joined(separator: ","),
+            selectedBrandIDs.map(\.uuidString).sorted().joined(separator: ","),
+            selectedTypes.sorted().joined(separator: ","),
+            selectedColors.sorted().joined(separator: ","),
+            selectedSizes.sorted().joined(separator: ","),
+            selectedLengths.sorted().joined(separator: ","),
+            selectedConditions.sorted().joined(separator: ","),
+            selectedAccessories.sorted().joined(separator: ",")
+        ].joined(separator: "|")
+    }
+
+    private static func decimalToken(_ value: Decimal) -> String {
+        NSDecimalNumber(decimal: value).stringValue
+    }
+
+    private static func dateToken(_ value: Date?) -> String {
+        value.map { String($0.timeIntervalSince1970) } ?? "nil"
+    }
+
+    private func refreshDepositData(reanalyzeSeries: Bool) {
+        updateBaseClothings()
+        if reanalyzeSeries {
+            analyzeSeries()
+        }
+    }
+
+    private func handleInitialLoad() {
+        updateBaseClothings()
+        if viewMode == .series && seriesList.isEmpty {
+            analyzeSeries()
+        }
+    }
+
+    private func handleDepositDataChanged() {
+        refreshDepositData(reanalyzeSeries: viewMode == .series)
+    }
+
+    private func handleYearChanged() {
+        updateBaseClothings()
+        if viewMode == .series {
+            analyzeSeries()
+        }
+        // Clear selections when year changes to avoid confusion
+        selectedMonths.removeAll()
+        selectedSeries.removeAll()
+    }
+
+    private func handleDisappear() {
+        seriesAnalysisTask?.cancel()
+        seriesAnalysisTask = nil
+        isAnalyzing = false
+    }
+
     private func updateBaseClothings() {
         let interval = PerformanceSignpost.depositUpdate(count: depositClothings.count, reason: "updateBaseClothings")
         defer {
@@ -299,6 +381,10 @@ struct DepositPlanView: View {
     }
 
     var body: some View {
+        lifecycleContent
+    }
+
+    private var scrollContent: some View {
         ScrollView {
             VStack(spacing: 20) {
                 // 总待付尾款统计（最顶部）
@@ -348,6 +434,10 @@ struct DepositPlanView: View {
             .padding(.top, 10)
         }
         .scrollIndicators(.hidden)
+    }
+
+    private var presentedContent: some View {
+        scrollContent
         .fullScreenCover(item: $moneyCountingState) { state in
             MoneyCountingView(
                 amount: state.amount,
@@ -373,42 +463,28 @@ struct DepositPlanView: View {
         }
         .floatingPetHidden(.transactionFlow, isActive: isFloatingPetTransactionActive)
         .floatingPetHidden(.presentationActive, isActive: isFloatingPetPresentationActive)
+    }
+
+    private var lifecycleContent: some View {
+        presentedContent
         .task {
-            // Initial load
-            updateBaseClothings()
-            if viewMode == .series && seriesList.isEmpty {
-                analyzeSeries()
-            }
+            handleInitialLoad()
         }
         .onDisappear {
-            seriesAnalysisTask?.cancel()
-            seriesAnalysisTask = nil
-            isAnalyzing = false
+            handleDisappear()
         }
-        .onChange(of: depositClothings) { oldValue, newValue in
-            updateBaseClothings()
-            if viewMode == .series {
-                analyzeSeries()
-            }
+        .onChange(of: finalPaymentRefreshToken) { oldValue, newValue in
+            handleDepositDataChanged()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .depositPlanDataDidChange)) { _ in
+            handleDepositDataChanged()
         }
         .onChange(of: selectedYear) { oldValue, newValue in
-            updateBaseClothings()
-            if viewMode == .series {
-                analyzeSeries()
-            }
-            // Clear selections when year changes to avoid confusion
-            selectedMonths.removeAll()
-            selectedSeries.removeAll()
+            handleYearChanged()
         }
-        .onChange(of: searchText) { updateBaseClothings() }
-        .onChange(of: selectedTagIDs) { updateBaseClothings() }
-        .onChange(of: selectedBrandIDs) { updateBaseClothings() }
-        .onChange(of: selectedTypes) { updateBaseClothings() }
-        .onChange(of: selectedColors) { updateBaseClothings() }
-        .onChange(of: selectedSizes) { updateBaseClothings() }
-        .onChange(of: selectedLengths) { updateBaseClothings() }
-        .onChange(of: selectedConditions) { updateBaseClothings() }
-        .onChange(of: selectedAccessories) { updateBaseClothings() }
+        .onChange(of: filterRefreshToken) { oldValue, newValue in
+            updateBaseClothings()
+        }
     }
 
     private func analyzeSeries() {
@@ -423,9 +499,16 @@ struct DepositPlanView: View {
             await MainActor.run {
                 guard !Task.isCancelled else { return }
                 self.seriesList = series
+                let validSeriesNames = Set(series.map(\.name))
+                self.selectedSeries.formIntersection(validSeriesNames)
+                self.updateFilteredClothings()
                 self.isAnalyzing = false
                 self.seriesAnalysisTask = nil
             }
         }
     }
+}
+
+extension Notification.Name {
+    static let depositPlanDataDidChange = Notification.Name("depositPlanDataDidChange")
 }

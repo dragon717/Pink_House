@@ -14,7 +14,7 @@ struct RecycleBinView: View {
     @Environment(ThemeManager.self) private var themeManager
 
     // Wardrobe Query
-    @Query(filter: #Predicate<Clothing> { $0.deletedAt != nil }, sort: \Clothing.deletedAt, order: .reverse)
+    @Query(filter: #Predicate<Clothing> { $0.deletedAt != nil && $0.deletionSource == nil }, sort: \Clothing.deletedAt, order: .reverse)
     private var deletedClothings: [Clothing]
 
     // OOTD Queries
@@ -552,6 +552,7 @@ struct RecycleBinView: View {
         withAnimation {
             clothing.isDeleted = false
             clothing.deletedAt = nil
+            clothing.deletionSource = nil
             // 关键：更新 lastModified，确保恢复后的状态不会被 iCloud 同步覆盖
             clothing.lastModified = Date()
         }

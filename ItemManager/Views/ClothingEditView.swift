@@ -1776,6 +1776,11 @@ struct ClothingEditView: View {
             showToastMessage("全款预约需要先填写裙装总价、小物或邮费", type: .error)
             return false
         }
+        if reservationKind == .depositPlan,
+           depositPlanAmountResolution(existingClothing: clothing).balance <= 0 {
+            showToastMessage("定金尾款需要先填写尾款金额；从已拥有切换时可先填写裙装总价，我会自动转为待付尾款", type: .error)
+            return false
+        }
 
         return true
     }
@@ -2204,6 +2209,36 @@ struct ClothingEditView: View {
         sanitizedMoneyDouble(priceTotal) + sanitizedMoneyDouble(accessoriesPrice) + sanitizedMoneyDouble(shippingFee)
     }
 
+    private func depositPlanAmountResolution(existingClothing: Clothing?) -> (deposit: Double, balance: Double, priceTotal: Double) {
+        let resolvedDeposit = sanitizedMoneyDouble(deposit)
+        var resolvedBalance = sanitizedMoneyDouble(balance)
+        var resolvedPriceTotal = sanitizedMoneyDouble(priceTotal)
+
+        if resolvedPriceTotal <= 0, let existingClothing {
+            resolvedPriceTotal = sanitizedMoneyDouble(NSDecimalNumber(decimal: existingClothing.price).doubleValue)
+        }
+
+        if resolvedBalance <= 0,
+           isEditing,
+           originalReservationKind == .owned,
+           reservationKind == .depositPlan,
+           resolvedPriceTotal > 0 {
+            let inferredBalance = resolvedPriceTotal - resolvedDeposit
+            if inferredBalance > 0 {
+                resolvedBalance = inferredBalance
+            }
+        }
+
+        if resolvedPriceTotal <= 0 {
+            let inferredTotal = resolvedDeposit + resolvedBalance
+            if inferredTotal > 0 {
+                resolvedPriceTotal = inferredTotal
+            }
+        }
+
+        return (resolvedDeposit, resolvedBalance, resolvedPriceTotal)
+    }
+
     private func sanitizedMoneyDouble(_ value: Double) -> Double {
         guard value.isFinite, value > 0 else { return 0 }
         return min(value, 999_999_999)
@@ -2303,6 +2338,13 @@ struct ClothingEditView: View {
         clothing.accessoryItems = desiredItems
     }
 
+    private func shouldResetFinalPaymentProgress(
+        for clothing: Clothing,
+        finalReservationKind: ClothingReservationKind
+    ) -> Bool {
+        finalReservationKind == .depositPlan && clothing.reservationKind != .depositPlan
+    }
+
     private func derivedReservationKind(isDepositPlan: Bool, deposit: Double, balance: Double) -> ClothingReservationKind {
         guard isDepositPlan else { return .owned }
         return deposit > 0 && balance == 0 ? .fullPaymentReservation : .depositPlan
@@ -2340,6 +2382,15 @@ struct ClothingEditView: View {
         if let targetCondition = newValue.conditionWhenSwitchingFromOwned,
            canAutoFillOwnedTransitionCondition {
             condition = targetCondition
+        }
+        if newValue == .depositPlan, sanitizedMoneyDouble(balance) <= 0 {
+            let resolved = depositPlanAmountResolution(existingClothing: clothing)
+            if resolved.balance > 0 {
+                balance = resolved.balance
+                if sanitizedMoneyDouble(priceTotal) <= 0 {
+                    priceTotal = resolved.priceTotal
+                }
+            }
         }
     }
 
@@ -2498,9 +2549,15 @@ struct ClothingEditView: View {
             showToastMessage("全款预约需要先填写裙装总价、小物或邮费", type: .error)
             return false
         }
+        let depositPlanResolution = depositPlanAmountResolution(existingClothing: clothing)
+        if finalReservationKind == .depositPlan, depositPlanResolution.balance <= 0 {
+            showToastMessage("定金尾款需要先填写尾款金额；从已拥有切换时可先填写裙装总价，我会自动转为待付尾款", type: .error)
+            return false
+        }
 
         let finalDeposit: Double
         let finalBalance: Double
+        var finalPriceTotal = priceTotal
         switch finalReservationKind {
         case .owned:
             finalDeposit = 0
@@ -2509,8 +2566,15 @@ struct ClothingEditView: View {
             finalDeposit = finalFullPaymentUnitAmount
             finalBalance = 0
         case .depositPlan:
-            finalDeposit = deposit
-            finalBalance = balance
+            finalDeposit = depositPlanResolution.deposit
+            finalBalance = depositPlanResolution.balance
+            finalPriceTotal = depositPlanResolution.priceTotal
+            if sanitizedMoneyDouble(balance) <= 0 {
+                balance = finalBalance
+            }
+            if sanitizedMoneyDouble(priceTotal) <= 0 {
+                priceTotal = finalPriceTotal
+            }
         }
 
         let finalDepositDate: Date? = finalIsDepositPlan ? depositDate : nil
@@ -2556,6 +2620,10 @@ struct ClothingEditView: View {
             AppLogger.info("Updating clothing: \(c.id)")
             let oldSizeChartPath = c.sizeChartImagePath?.trimmingCharacters(in: .whitespacesAndNewlines)
             let oldPriceChartPath = c.priceChartImagePath?.trimmingCharacters(in: .whitespacesAndNewlines)
+            let needsFinalPaymentProgressReset = shouldResetFinalPaymentProgress(
+                for: c,
+                finalReservationKind: finalReservationKind
+            )
             c.name = name
             c.brand = finalBrand
             c.types = finalTypes
@@ -2605,7 +2673,7 @@ struct ClothingEditView: View {
             c.shippingFeeCurrencyCode = shippingFeeCurrency.rawValue
             c.shippingExchangeRateJPY = sanitizedMoneyDecimal(effectiveJPYRate)
             c.shippingRateUpdatedAt = shippingRateUpdatedAt
-            c.price = sanitizedMoneyDecimal(priceTotal)
+            c.price = sanitizedMoneyDecimal(finalPriceTotal)
             c.deposit = sanitizedMoneyDecimal(finalDeposit)
             c.balance = sanitizedMoneyDecimal(finalBalance)
             c.accessoriesPrice = sanitizedMoneyDecimal(accessoriesPrice)
@@ -2629,6 +2697,15 @@ struct ClothingEditView: View {
             c.stock = sanitizedStock(stock)
             c.tags = selectedTags
             let now = Date()
+            if needsFinalPaymentProgressReset {
+                do {
+                    try WealthSavingLedger.resetFinalPaymentProgress(for: c, context: modelContext, at: now)
+                } catch {
+                    AppLogger.error("Failed to reset stale final payment progress: \(error)")
+                    showToastMessage("保存失败：无法清理旧尾款记录", type: .error)
+                    return false
+                }
+            }
             c.updatedAt = now
             c.lastModified = now
 
@@ -2664,7 +2741,7 @@ struct ClothingEditView: View {
                 originalPriceCurrencyCode: originalPriceCurrency.rawValue,
                 originalPriceExchangeRateJPY: sanitizedMoneyDecimal(effectiveJPYRate),
                 originalPriceRateUpdatedAt: originalPriceRateUpdatedAt,
-                price: sanitizedMoneyDecimal(priceTotal),
+                price: sanitizedMoneyDecimal(finalPriceTotal),
                 deposit: sanitizedMoneyDecimal(finalDeposit),
                 balance: sanitizedMoneyDecimal(finalBalance),
                 accessoriesPrice: sanitizedMoneyDecimal(accessoriesPrice),
@@ -2704,6 +2781,7 @@ struct ClothingEditView: View {
         // Save context and sync widget
         do {
             try modelContext.save()
+            NotificationCenter.default.post(name: .depositPlanDataDidChange, object: notificationTarget?.id)
             if let notificationTarget {
                 NotificationManager.shared.scheduleNotification(for: notificationTarget, modelContext: modelContext)
             }

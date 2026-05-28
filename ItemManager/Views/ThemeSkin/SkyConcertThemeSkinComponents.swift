@@ -95,6 +95,15 @@ enum SkyConcertThemeSkin {
         return isSkyConcert(descriptor) ? softGoldToken.resolved(for: colorScheme) : Color(hex: "D793AA")
     }
 
+    static func readableAccent(for descriptor: ThemeSkinDescriptor?, colorScheme: ColorScheme) -> Color {
+        let accentColor = accent(for: descriptor, colorScheme: colorScheme)
+        guard colorScheme == .light, accentColor.luminance > 0.58 else {
+            return accentColor
+        }
+
+        return accentColor.mixed(with: labelColor(for: descriptor, colorScheme: colorScheme), amount: 0.42)
+    }
+
     static func accentSoft(for descriptor: ThemeSkinDescriptor?) -> Color {
         if SwanDreamThemeSkin.isSwanDream(descriptor) {
             return SwanDreamThemeSkin.ribbonPink.opacity(0.82)

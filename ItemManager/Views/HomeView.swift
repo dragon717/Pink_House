@@ -528,6 +528,36 @@ struct HomeView: View {
     private var themedSearchEntryDescriptor: ThemeSkinDescriptor? {
         themeDescriptor(for: .searchBar)
     }
+
+    private var activeTopBarThemeSkinDescriptor: ThemeSkinDescriptor? {
+        themedTopBarButtonDescriptor ??
+            themedTopBarAddButtonDescriptor ??
+            themedTopBarGroupDescriptor ??
+            themedTopBarSegmentDescriptor ??
+            themedSearchEntryDescriptor
+    }
+
+    private var topBarToolbarColorScheme: ColorScheme {
+        activeTopBarThemeSkinDescriptor == nil
+            ? (magicPalette.navigationBackground.isDark ? .dark : .light)
+            : colorScheme
+    }
+
+    private var topBarIconForeground: Color {
+        guard let descriptor = activeTopBarThemeSkinDescriptor else {
+            return magicPalette.navigationForeground
+        }
+
+        return SkyConcertThemeSkin.labelColor(for: descriptor, colorScheme: colorScheme)
+    }
+
+    private var topBarAccentForeground: Color {
+        guard let descriptor = activeTopBarThemeSkinDescriptor else {
+            return magicPalette.accent
+        }
+
+        return SkyConcertThemeSkin.readableAccent(for: descriptor, colorScheme: colorScheme)
+    }
     
     var body: some View {
         NavigationStack {
@@ -646,9 +676,9 @@ struct HomeView: View {
                 }
             }
             .toolbarBackground(.hidden, for: .navigationBar)
-            .toolbarColorScheme(magicPalette.navigationBackground.isDark ? .dark : .light, for: .navigationBar)
+            .toolbarColorScheme(topBarToolbarColorScheme, for: .navigationBar)
             .navigationBarTitleDisplayMode(.inline)
-            .tint(magicPalette.accent)
+            .tint(topBarAccentForeground)
             .onAppear {
                 // 确保初始状态下搜索栏不显示
                 isSearchActive = false
@@ -977,7 +1007,7 @@ struct HomeView: View {
                 isSearchActive = false
             }
             .font(.system(size: 13, weight: .semibold))
-            .foregroundStyle(magicPalette.accent)
+            .foregroundStyle(topBarAccentForeground)
         }
         .frame(width: topBarContentWidth)
         .onAppear {
@@ -1019,8 +1049,8 @@ struct HomeView: View {
         }
 
         return isSelected
-            ? SkyConcertThemeSkin.accent(for: descriptor)
-            : SkyConcertThemeSkin.labelColor(for: descriptor).opacity(0.68)
+            ? SkyConcertThemeSkin.readableAccent(for: descriptor, colorScheme: colorScheme)
+            : SkyConcertThemeSkin.labelColor(for: descriptor, colorScheme: colorScheme).opacity(0.72)
     }
 
     @ViewBuilder
@@ -1140,7 +1170,7 @@ struct HomeView: View {
             HomeThemeSkinToolbarIconShell(descriptor: themedTopBarButtonDescriptor) {
                 Image(systemName: "checkmark.circle.fill")
                     .font(.system(size: 15))
-                    .foregroundStyle(magicPalette.accent)
+                    .foregroundStyle(topBarAccentForeground)
             }
         }
         .captureGuideTarget(.wardrobeDoneSelectionButton)
@@ -1156,11 +1186,11 @@ struct HomeView: View {
                 if #available(iOS 26.0, *) {
                     Image(systemName: "list.number.badge.ellipsis")
                         .font(.system(size: 15))
-                        .foregroundStyle(magicPalette.accent)
+                        .foregroundStyle(topBarAccentForeground)
                 } else {
                     Image(systemName: "checkmark.circle")
                         .font(.system(size: 15))
-                        .foregroundStyle(magicPalette.accent)
+                        .foregroundStyle(topBarAccentForeground)
                 }
             }
         }
@@ -1174,7 +1204,7 @@ struct HomeView: View {
                 ZStack {
                     Image(systemName: unreadNotificationCount > 0 ? "bell.badge" : "bell")
                         .font(.system(size: 12))
-                        .foregroundStyle(magicPalette.navigationForeground)
+                        .foregroundStyle(topBarIconForeground)
 
                     if unreadNotificationCount > 0 {
                         Text("\(min(unreadNotificationCount, 99))")
@@ -1231,7 +1261,7 @@ struct HomeView: View {
             HomeThemeSkinToolbarIconShell(descriptor: themedTopBarButtonDescriptor) {
                 Image(systemName: "arrow.up.arrow.down")
                     .font(.system(size: 12))
-                    .foregroundStyle(magicPalette.navigationForeground)
+                    .foregroundStyle(topBarIconForeground)
             }
             .onTapGesture {
                 _ = MenuPerfSignpost.menuOpen("wardrobe.sort")
@@ -1276,7 +1306,7 @@ struct HomeView: View {
         HomeThemeSkinToolbarIconShell(descriptor: themedTopBarButtonDescriptor) {
             Image(systemName: "line.3.horizontal.decrease.circle")
                 .font(.system(size: 12))
-                .foregroundStyle(magicPalette.navigationForeground)
+                .foregroundStyle(topBarIconForeground)
                 .symbolVariant(selectedTagIDs.isEmpty && selectedBrandIDs.isEmpty && selectedTypes.isEmpty && selectedColors.isEmpty && selectedSizes.isEmpty && selectedLengths.isEmpty && selectedConditions.isEmpty && selectedAccessories.isEmpty ? .none : .fill)
         }
     }
@@ -1486,7 +1516,7 @@ struct HomeView: View {
             HomeThemeSkinToolbarIconShell(descriptor: themedTopBarButtonDescriptor) {
                 Image(systemName: selectedTab == .wardrobe ? viewLayout.icon : depositDisplayMode.icon)
                     .font(.system(size: 12))
-                    .foregroundStyle(magicPalette.navigationForeground)
+                    .foregroundStyle(topBarIconForeground)
             }
             .onTapGesture {
                 _ = MenuPerfSignpost.menuOpen("wardrobe.display")
@@ -1510,7 +1540,7 @@ struct HomeView: View {
         HomeThemeSkinToolbarIconShell(descriptor: themedTopBarButtonDescriptor) {
             Image(systemName: "ellipsis.circle")
                 .font(.system(size: 12))
-                .foregroundStyle(magicPalette.navigationForeground)
+                .foregroundStyle(topBarIconForeground)
                 .captureGuideToolbarIconTarget(.wardrobeMoreMenuButton)
         }
     }
@@ -1784,7 +1814,7 @@ struct HomeView: View {
         HomeThemeSkinToolbarIconShell(descriptor: themedTopBarAddButtonDescriptor) {
             Image(systemName: "plus")
                 .font(.system(size: 12))
-                .foregroundStyle(magicPalette.navigationForeground)
+                .foregroundStyle(topBarIconForeground)
                 .captureGuideToolbarIconTarget(.wardrobeAddButton)
         }
     }
