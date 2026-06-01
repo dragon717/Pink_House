@@ -1973,7 +1973,7 @@ struct WardrobeView: View {
                     toggleStatsVisibility()
                 } label: {
                     HStack(spacing: 4) {
-                        Text(showStats ? "隐藏" : "显示")
+                        Text(showStats ? "隐藏".appLocalized : "显示".appLocalized)
                             .themeSkinLegibleText(level: .inline, slot: .statsCard)
                         Image(systemName: showStats ? "chevron.up" : "chevron.down")
                     }
@@ -2009,7 +2009,7 @@ struct WardrobeView: View {
         return HStack(spacing: 5) {
             Image(systemName: "sparkles")
                 .font(.system(size: 10, weight: .semibold))
-            Text("下滑收起，点「显示」临时展开，回到顶部恢复。")
+            Text("下滑收起，点「显示」临时展开，回到顶部恢复。".appLocalized)
                 .lineLimit(1)
                 .minimumScaleFactor(0.72)
                 .themeSkinLegibleText(level: .inline, slot: .statsCard)
@@ -2028,7 +2028,7 @@ struct WardrobeView: View {
             Capsule()
                 .stroke(palette.accent.opacity(colorScheme == .dark ? 0.32 : 0.22), lineWidth: 0.5)
         }
-        .accessibilityLabel("下滑收起，点显示临时展开，回到顶部恢复")
+        .accessibilityLabel("下滑收起，点显示临时展开，回到顶部恢复".appLocalized)
     }
 
     private func statsScrollObserver() -> some View {
@@ -2249,13 +2249,13 @@ struct WardrobeView: View {
                 isSelectionMode = true
                 selectedItemIDs.insert(clothingID)
             } label: {
-                Label("选择", systemImage: "checkmark.circle")
+                Label("选择".appLocalized, systemImage: "checkmark.circle")
             }
 
             Button {
                 openDetailIfPresent(clothingID)
             } label: {
-                Label("查看详情", systemImage: "info.circle")
+                Label("查看详情".appLocalized, systemImage: "info.circle")
             }
 
             Divider()
@@ -2264,14 +2264,14 @@ struct WardrobeView: View {
                 itemToCopy = clothing(with: clothingID)
                 showingCopyAlert = true
             } label: {
-                Label("复制", systemImage: "doc.on.doc")
+                Label("复制".appLocalized, systemImage: "doc.on.doc")
             }
 
             Button(role: .destructive) {
                 itemToDelete = clothing(with: clothingID)
                 showingDeleteSingleAlert = true
             } label: {
-                Label("删除", systemImage: "trash")
+                Label("删除".appLocalized, systemImage: "trash")
             }
         }
     }
@@ -2282,14 +2282,14 @@ struct WardrobeView: View {
                 itemToDelete = clothing
                 showingDeleteSingleAlert = true
             } label: {
-                Label("删除", systemImage: "trash")
+                Label("删除".appLocalized, systemImage: "trash")
             }
 
             Button {
                 itemToCopy = clothing
                 showingCopyAlert = true
             } label: {
-                Label("复制", systemImage: "doc.on.doc")
+                Label("复制".appLocalized, systemImage: "doc.on.doc")
             }
             .tint(.blue)
         }
@@ -2519,15 +2519,15 @@ struct WardrobeStatsView: View {
             VStack(spacing: 12) {
                 // Main Stats
                 HStack(spacing: 0) {
-                    statItem(title: "总件数/款", value: "\(totalCount)/\(styleCount)", isVisible: $showCountAndStyle)
+                    statItem(title: "总件数/款".appLocalized, value: "\(totalCount)/\(styleCount)", isVisible: $showCountAndStyle)
 
                     Divider()
 
-                    statItem(title: "裙装价值", value: "¥\(formatValue(dressValue))", isVisible: $showDressValue, valueColor: Color(hex: "FF9800"))
+                    statItem(title: "裙装价值".appLocalized, value: "¥\(formatValue(dressValue))", isVisible: $showDressValue, valueColor: Color(hex: "FF9800"))
 
                     Divider()
 
-                    statItem(title: "总价值", value: "¥\(formatValue(totalValue))", isVisible: $showTotalValue)
+                    statItem(title: "总价值".appLocalized, value: "¥\(formatValue(totalValue))", isVisible: $showTotalValue)
                 }
                 .frame(height: 52)
 
@@ -2540,7 +2540,7 @@ struct WardrobeStatsView: View {
                         VStack(spacing: 4) {
                             Image(systemName: "sparkles")
                                 .font(.system(size: 20))
-                            Text("今日穿搭色")
+                            Text("今日穿搭色".appLocalized)
                                 .font(.system(size: 11, weight: .medium))
                                 .themeSkinLegibleText(level: .inline, slot: .statsCard)
                         }
@@ -2564,7 +2564,7 @@ struct WardrobeStatsView: View {
                         VStack(spacing: 4) {
                             Image(systemName: "book.closed.fill")
                                 .font(.system(size: 20))
-                            Text("穿搭手帐")
+                            Text("穿搭手帐".appLocalized)
                                 .font(.system(size: 11, weight: .medium))
                                 .themeSkinLegibleText(level: .inline, slot: .statsCard)
                         }
@@ -2581,7 +2581,7 @@ struct WardrobeStatsView: View {
                         VStack(spacing: 4) {
                             Image(systemName: "chart.bar.fill")
                                 .font(.system(size: 20))
-                            Text("详细统计")
+                            Text("详细统计".appLocalized)
                                 .font(.system(size: 11, weight: .medium))
                                 .themeSkinLegibleText(level: .inline, slot: .statsCard)
                         }
@@ -2606,7 +2606,7 @@ struct WardrobeStatsView: View {
         VStack(spacing: 4) {
             // 标题行：使用固定高度确保对齐
             HStack(spacing: 4) {
-                Text(title.appLocalized)
+                Text(title)
                     .font(.caption)
                     .foregroundStyle(palette.secondary)
                     .themeSkinLegibleText(level: .inline, slot: .statsCard)
