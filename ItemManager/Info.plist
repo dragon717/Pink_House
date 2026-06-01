@@ -18,6 +18,12 @@
 		<string>zh-Hans</string>
 		<string>zh-Hant</string>
 		<string>en</string>
+		<string>ja</string>
+		<string>ko</string>
+		<string>fr</string>
+		<string>de</string>
+		<string>es</string>
+		<string>pt-BR</string>
 	</array>
 	<key>NSCameraUsageDescription</key>
 	<string>Pink House needs camera access to take clothing photos and perform 3D scans.</string>

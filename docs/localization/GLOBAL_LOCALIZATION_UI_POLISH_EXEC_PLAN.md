@@ -8,10 +8,10 @@
 
 - App localization resources now exist under `ItemManager/Resources/Localization/Localizable.xcstrings`.
 - Current app locales are `en`, `zh-Hans`, and `zh-Hant`.
-- `LanguageManager` supports system, Simplified Chinese, Traditional Chinese, and English.
-- `ItemManager.xcodeproj/project.pbxproj` known regions currently list only `en`, `zh-Hans`, and `zh-Hant`.
+- `LanguageManager` supports system, Simplified Chinese, Traditional Chinese, English, Japanese, Korean, French, German, Spanish, and Brazilian Portuguese.
+- `ItemManager.xcodeproj/project.pbxproj` known regions list `en`, `ja`, `ko`, `fr`, `de`, `es`, `pt-BR`, `zh-Hans`, and `zh-Hant`.
 - `Localizable.xcstrings` contains 2403 string entries. The existing three locales cover 2393 entries each; 9 recently added final-payment/detail strings are missing translations.
-- Main target `InfoPlist.strings` exists for `en`, `zh-Hans`, and `zh-Hant`.
+- Main target `InfoPlist.strings` exists for `en`, `zh-Hans`, `zh-Hant`, `ja`, `ko`, `fr`, `de`, `es`, and `pt-BR`; the six new locales currently use English permission-copy fallback.
 - Older research docs from 2026-05-25 predate the current String Catalog and should be treated as historical baseline unless this file or a newer localization doc supersedes them.
 
 ## Apple Source Check
@@ -31,9 +31,9 @@ Goal: support global release without pretending every storefront needs a separat
 
 Stage A1:
 
-- Confirm the first expansion locale list against current Apple docs.
-- Update `AppLanguage`, project known regions, and InfoPlist localization folders.
-- Seed String Catalog localizations only where translations are available or intentionally inherited.
+- Confirm the first expansion locale list against current Apple docs. Completed 2026-06-01.
+- Update `AppLanguage`, project known regions, and InfoPlist localization folders. Completed 2026-06-01.
+- Keep String Catalog translations source-controlled per language batch; `String.appLocalized` falls back to English for new non-source locales when a translation is not present.
 - Verify language picker, bundle lookup, and build output.
 
 Confirmed first-batch app binary locale candidates:
