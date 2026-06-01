@@ -1007,7 +1007,7 @@ struct WardrobeView: View {
                 } label: {
                     VStack(spacing: 4) {
                         Image(systemName: "trash")
-                        Text("删除")
+                        Text("删除".appLocalized)
                             .font(.caption)
                     }
                     .frame(maxWidth: .infinity)
@@ -1022,7 +1022,7 @@ struct WardrobeView: View {
                 } label: {
                     VStack(spacing: 4) {
                         Image(systemName: "doc.on.doc")
-                        Text("复制")
+                        Text("复制".appLocalized)
                             .font(.caption)
                     }
                     .frame(maxWidth: .infinity)
@@ -1039,14 +1039,14 @@ struct WardrobeView: View {
                         batchEditDraft.selectedTags = []
                         showingTagSelection = true
                     } label: {
-                        Label("添加标签", systemImage: "tag")
+                        Label("添加标签".appLocalized, systemImage: "tag")
                     }
 
                     Button {
                         batchEditDraft.selectedBrand = nil
                         showingBrandSelection = true
                     } label: {
-                        Label("归类品牌", systemImage: "bag")
+                        Label("归类品牌".appLocalized, systemImage: "bag")
                     }
 
                     Divider()
@@ -1055,35 +1055,35 @@ struct WardrobeView: View {
                         batchEditDraft.selectedColors = []
                         showingColorSelection = true
                     } label: {
-                        Label("染上颜色", systemImage: "paintbrush")
+                        Label("染上颜色".appLocalized, systemImage: "paintbrush")
                     }
 
                     Button {
                         batchEditDraft.selectedSizes = []
                         showingSizeSelection = true
                     } label: {
-                        Label("变换尺码", systemImage: "ruler")
+                        Label("变换尺码".appLocalized, systemImage: "ruler")
                     }
 
                     Button {
                         batchEditDraft.selectedLengths = []
                         showingLengthSelection = true
                     } label: {
-                        Label("设置衣长", systemImage: "lines.measurement.vertical")
+                        Label("设置衣长".appLocalized, systemImage: "lines.measurement.vertical")
                     }
 
                     Button {
                         batchEditDraft.selectedAccessories = []
                         showingAccessorySelection = true
                     } label: {
-                        Label("搭配小物", systemImage: "sparkles")
+                        Label("搭配小物".appLocalized, systemImage: "sparkles")
                     }
 
                     Button {
                         batchEditDraft.selectedCondition = nil
                         showingConditionSelection = true
                     } label: {
-                        Label("改变成色", systemImage: "arrow.2.circlepath")
+                        Label("改变成色".appLocalized, systemImage: "arrow.2.circlepath")
                     }
 
                     Divider()
@@ -1091,12 +1091,12 @@ struct WardrobeView: View {
                     Button {
                         showingMergeToAccessorySheet = true
                     } label: {
-                        Label("合并为小物到裙装", systemImage: "arrow.down.square")
+                        Label("合并为小物到裙装".appLocalized, systemImage: "arrow.down.square")
                     }
                 } label: {
                     VStack(spacing: 4) {
                         Image(systemName: "ellipsis.circle")
-                        Text("更多")
+                        Text("更多".appLocalized)
                             .font(.caption)
                     }
                     .frame(maxWidth: .infinity)
@@ -1114,7 +1114,7 @@ struct WardrobeView: View {
                 } label: {
                     VStack(spacing: 4) {
                         Image(systemName: isAllSelectedInView ? "xmark.circle" : "checkmark.circle")
-                        Text(isAllSelectedInView ? "取消全选" : "全选")
+                        Text(isAllSelectedInView ? "取消全选".appLocalized : "全选".appLocalized)
                             .font(.caption)
                     }
                     .frame(maxWidth: .infinity)
@@ -1152,7 +1152,7 @@ struct WardrobeView: View {
             }
             .sheet(isPresented: $showingColorSelection) {
                 BatchStringSelectionView(
-                    title: "染上颜色",
+                    title: "染上颜色".appLocalized,
                     options: SuggestionManager.shared.getAllColors(),
                     selectedItems: $batchEditDraft.selectedColors
                 )
@@ -1164,7 +1164,7 @@ struct WardrobeView: View {
             }
             .sheet(isPresented: $showingSizeSelection) {
                 BatchStringSelectionView(
-                    title: "变换尺码",
+                    title: "变换尺码".appLocalized,
                     options: SuggestionManager.shared.getAllSizes(),
                     selectedItems: $batchEditDraft.selectedSizes
                 )
@@ -1176,7 +1176,7 @@ struct WardrobeView: View {
             }
             .sheet(isPresented: $showingLengthSelection) {
                 BatchStringSelectionView(
-                    title: "设置衣长",
+                    title: "设置衣长".appLocalized,
                     options: SuggestionManager.shared.getAllLengths(),
                     selectedItems: $batchEditDraft.selectedLengths
                 )
@@ -1188,7 +1188,7 @@ struct WardrobeView: View {
             }
             .sheet(isPresented: $showingAccessorySelection) {
                 BatchStringSelectionView(
-                    title: "搭配小物",
+                    title: "搭配小物".appLocalized,
                     options: SuggestionManager.shared.getAllAccessories(),
                     selectedItems: $batchEditDraft.selectedAccessories
                 )
@@ -1223,99 +1223,99 @@ struct WardrobeView: View {
 
     private func applyAlerts<Content: View>(to content: Content) -> some View {
         content
-            .alert("确认删除", isPresented: $showingDeleteAlert) {
-                Button("取消", role: .cancel) { }
-                Button("删除 \(selectedItemIDs.count) 项", role: .destructive) {
+            .alert("确认删除".appLocalized, isPresented: $showingDeleteAlert) {
+                Button("取消".appLocalized, role: .cancel) { }
+                Button("删除 %d 项".appLocalized(selectedItemIDs.count), role: .destructive) {
                     deleteSelectedItems()
                 }
             }
-            .alert("确认批量复制", isPresented: $showingBatchCopyAlert) {
-                Button("取消", role: .cancel) { }
-                Button("复制 \(selectedItemIDs.count) 项") {
+            .alert("确认批量复制".appLocalized, isPresented: $showingBatchCopyAlert) {
+                Button("取消".appLocalized, role: .cancel) { }
+                Button("复制 %d 项".appLocalized(selectedItemIDs.count)) {
                     batchCopySelectedItems()
                 }
             } message: {
-                Text("确定要复制选中的 \(selectedItemIDs.count) 件物品吗？")
+                Text("确定要复制选中的 %d 件物品吗？".appLocalized(selectedItemIDs.count))
             }
-            .alert("确认添加标签", isPresented: $showingAddTagsConfirmation) {
-                Button("取消", role: .cancel) {
+            .alert("确认添加标签".appLocalized, isPresented: $showingAddTagsConfirmation) {
+                Button("取消".appLocalized, role: .cancel) {
                     batchEditDraft.selectedTags = []
                 }
-                Button("确认添加") {
+                Button("确认添加".appLocalized) {
                     if !batchEditDraft.selectedTags.isEmpty {
                         addTagsToSelectedItems(batchEditDraft.selectedTags)
                     }
                 }
             } message: {
-                Text("确定要为选中的 \(selectedItemIDs.count) 件物品添加 \(batchEditDraft.selectedTags.count) 个标签吗？")
+                Text("确定要为选中的 %d 件物品添加 %d 个标签吗？".appLocalized(selectedItemIDs.count, batchEditDraft.selectedTags.count))
             }
-            .alert("确认归类品牌", isPresented: $showingSetBrandConfirmation) {
-                Button("取消", role: .cancel) {
+            .alert("确认归类品牌".appLocalized, isPresented: $showingSetBrandConfirmation) {
+                Button("取消".appLocalized, role: .cancel) {
                     batchEditDraft.selectedBrand = nil
                 }
-                Button("确认修改") {
+                Button("确认修改".appLocalized) {
                     if let brand = batchEditDraft.selectedBrand {
                         setBrandForSelectedItems(brand)
                     }
                 }
             } message: {
                 if let brand = batchEditDraft.selectedBrand {
-                    Text("确定要将选中的 \(selectedItemIDs.count) 件物品归类到品牌“\(brand.name)”吗？")
+                    Text("确定要将选中的 %d 件物品归类到品牌“%@”吗？".appLocalized(selectedItemIDs.count, brand.name))
                 }
             }
-            .alert("确认删除", isPresented: $showingDeleteSingleAlert) {
-                Button("取消", role: .cancel) {
+            .alert("确认删除".appLocalized, isPresented: $showingDeleteSingleAlert) {
+                Button("取消".appLocalized, role: .cancel) {
                     itemToDelete = nil
                 }
-                Button("删除", role: .destructive) {
+                Button("删除".appLocalized, role: .destructive) {
                     if let item = itemToDelete {
                         deleteItem(item)
                     }
                 }
             } message: {
                 if let item = itemToDelete {
-                    Text("确定要删除“\(item.name)”吗？此操作无法撤销。")
+                    Text("确定要删除“%@”吗？此操作无法撤销。".appLocalized(item.name))
                 }
             }
-            .alert("确认复制", isPresented: $showingCopyAlert) {
-                Button("取消", role: .cancel) {
+            .alert("确认复制".appLocalized, isPresented: $showingCopyAlert) {
+                Button("取消".appLocalized, role: .cancel) {
                     itemToCopy = nil
                 }
-                Button("复制") {
+                Button("复制".appLocalized) {
                     if let item = itemToCopy {
                         copyItem(item)
                     }
                 }
             } message: {
                 if let item = itemToCopy {
-                    Text("确定要复制「\(item.name)」吗？")
+                    Text("确定要复制「%@」吗？".appLocalized(item.name))
                 }
             }
-            .alert("确认合并", isPresented: $showingMergeConfirmation) {
-                Button("取消", role: .cancel) {
+            .alert("确认合并".appLocalized, isPresented: $showingMergeConfirmation) {
+                Button("取消".appLocalized, role: .cancel) {
                     targetClothingForMerge = nil
                 }
-                Button("确认合并") {
+                Button("确认合并".appLocalized) {
                     if let target = targetClothingForMerge {
                         performMergeToAccessory(targetClothing: target)
                     }
                 }
             } message: {
                 if let target = targetClothingForMerge {
-                    Text("确定要将选中的 \(selectedItemIDs.count) 件裙装作为小物合并到「\(target.name)」中吗？")
+                    Text("确定要将选中的 %d 件裙装作为小物合并到「%@」中吗？".appLocalized(selectedItemIDs.count, target.name))
                 }
             }
-            .alert("合并完成", isPresented: $showingDeleteAfterMergeConfirmation) {
-                Button("保留原裙装") {
+            .alert("合并完成".appLocalized, isPresented: $showingDeleteAfterMergeConfirmation) {
+                Button("保留原裙装".appLocalized) {
                     selectedItemIDs.removeAll()
                     mergedSourceItemIDs.removeAll()
                     targetClothingForMerge = nil
                 }
-                Button("删除原裙装", role: .destructive) {
+                Button("删除原裙装".appLocalized, role: .destructive) {
                     deleteMergedSourceItems()
                 }
             } message: {
-                Text("已成功合并 \(mergedItemCount) 个小物。是否删除原选中的裙装？")
+                Text("已成功合并 %d 个小物。是否删除原选中的裙装？".appLocalized(mergedItemCount))
             }
     }
 
