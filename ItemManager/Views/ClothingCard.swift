@@ -356,6 +356,18 @@ struct ClothingCard: View, Equatable {
         isThemeSkinThemed ? SkyConcertThemeSkin.accent(for: wardrobeThemeDescriptor, colorScheme: colorScheme) : palette.accent
     }
 
+    private var showsCompactPriceInfo: Bool {
+        (showOriginalPrice && snapshot.originalPrice > 0 && !snapshot.isDepositPlan) || showPrice
+    }
+
+    private var compactPriceSurfaceFill: Color {
+        isThemeSkinThemed ? themedAccentColor.opacity(0.14) : themedAccentColor.opacity(0.08)
+    }
+
+    private var compactPriceSurfaceStroke: Color {
+        isThemeSkinThemed ? themedAccentColor.opacity(0.28) : themedAccentColor.opacity(0.16)
+    }
+
     private func badgeFillColor(for tint: Color) -> Color {
         isThemeSkinThemed ? tint.opacity(0.18) : tint.opacity(0.88)
     }
@@ -374,6 +386,7 @@ struct ClothingCard: View, Equatable {
             Text(text)
                 .font(.system(size: 10, weight: .bold))
                 .lineLimit(1)
+                .minimumScaleFactor(0.78)
         }
         .padding(.horizontal, 6)
         .padding(.vertical, 4)
@@ -522,6 +535,21 @@ struct ClothingCard: View, Equatable {
                                     .foregroundStyle(titleColor)
                                     .themeSkinLegibleText(level: .inline, slot: .wardrobeItemCard, descriptor: wardrobeThemeDescriptor)
                             }
+                        }
+                    }
+                    .padding(.horizontal, showsCompactPriceInfo ? 6 : 0)
+                    .padding(.vertical, showsCompactPriceInfo ? 5 : 0)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background {
+                        if showsCompactPriceInfo {
+                            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                .fill(compactPriceSurfaceFill)
+                        }
+                    }
+                    .overlay {
+                        if showsCompactPriceInfo {
+                            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                .strokeBorder(compactPriceSurfaceStroke, lineWidth: 0.7)
                         }
                     }
                 }
@@ -767,6 +795,18 @@ struct ClothingRow: View, Equatable {
     private var rowAccentColor: Color {
         isThemeSkinThemed ? SkyConcertThemeSkin.accent(for: wardrobeThemeDescriptor, colorScheme: colorScheme) : palette.accent
     }
+
+    private var showsRowPriceInfo: Bool {
+        (showOriginalPrice && snapshot.originalPrice > 0) || showPrice || snapshot.stock > 1
+    }
+
+    private var rowPriceSurfaceFill: Color {
+        isThemeSkinThemed ? rowAccentColor.opacity(0.12) : rowAccentColor.opacity(0.07)
+    }
+
+    private var rowPriceSurfaceStroke: Color {
+        isThemeSkinThemed ? rowAccentColor.opacity(0.24) : rowAccentColor.opacity(0.14)
+    }
     
     var body: some View {
         WardrobeThemeClothingCardContainer(
@@ -880,6 +920,8 @@ struct ClothingRow: View, Equatable {
                                     .font(.caption2)
                                     .foregroundStyle(rowAccentColor)
                                     .themeSkinLegibleText(level: .inline, slot: .wardrobeItemCard, descriptor: wardrobeThemeDescriptor)
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.75)
                                 Text("¥\(snapshot.fullPaymentReservationTotalAmount, format: .number.precision(.fractionLength(0)))")
                                     .font(.caption)
                                     .bold()
@@ -916,6 +958,20 @@ struct ClothingRow: View, Equatable {
                             .font(.caption)
                             .foregroundStyle(isThemeSkinThemed ? rowSecondaryColor : palette.tertiary)
                             .themeSkinLegibleText(level: .inline, slot: .wardrobeItemCard, descriptor: wardrobeThemeDescriptor)
+                    }
+                }
+                .padding(.horizontal, showsRowPriceInfo ? 8 : 0)
+                .padding(.vertical, showsRowPriceInfo ? 6 : 0)
+                .background(alignment: .trailing) {
+                    if showsRowPriceInfo {
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .fill(rowPriceSurfaceFill)
+                    }
+                }
+                .overlay {
+                    if showsRowPriceInfo {
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .strokeBorder(rowPriceSurfaceStroke, lineWidth: 0.7)
                     }
                 }
             }
