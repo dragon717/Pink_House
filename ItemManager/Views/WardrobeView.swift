@@ -32,8 +32,6 @@ private struct WardrobeFilterSignature: Hashable {
     let selectedAccessories: [String]
     let depositStatusFilterRawValue: String
     let sortOptionRawValue: String
-    let privacyShowPrice: Bool
-    let privacyShowOriginalPrice: Bool
     let clothingRevisions: [WardrobeClothingRevision]
 
     init(
@@ -48,8 +46,6 @@ private struct WardrobeFilterSignature: Hashable {
         selectedAccessories: Set<String>,
         depositStatusFilterRawValue: String,
         sortOptionRawValue: String,
-        privacyShowPrice: Bool,
-        privacyShowOriginalPrice: Bool,
         clothingRevisions: [WardrobeClothingRevision]
     ) {
         self.searchText = searchText
@@ -63,8 +59,6 @@ private struct WardrobeFilterSignature: Hashable {
         self.selectedAccessories = selectedAccessories.sorted()
         self.depositStatusFilterRawValue = depositStatusFilterRawValue
         self.sortOptionRawValue = sortOptionRawValue
-        self.privacyShowPrice = privacyShowPrice
-        self.privacyShowOriginalPrice = privacyShowOriginalPrice
         self.clothingRevisions = clothingRevisions
     }
 }
@@ -112,7 +106,7 @@ private struct WardrobeClothingSnapshot: Sendable {
         self.accessories = clothing.accessories
         self.note = clothing.note
         self.price = clothing.price
-        self.inventoryTotalPrice = clothing.inventoryTotalPrice
+        self.inventoryTotalPrice = clothing.wardrobeListInventoryTotalPrice
         self.stock = clothing.stock
         self.isDepositPlan = clothing.isDepositPlan
         self.isFullPaymentReservation = clothing.isFullPaymentReservation
@@ -847,8 +841,6 @@ struct WardrobeView: View {
             selectedAccessories: selectedAccessories,
             depositStatusFilterRawValue: depositStatusFilter.rawValue,
             sortOptionRawValue: sortOption.rawValue,
-            privacyShowPrice: showPrice,
-            privacyShowOriginalPrice: showOriginalPrice,
             clothingRevisions: clothings.map { clothing in
                 WardrobeClothingRevision(
                     id: clothing.id,

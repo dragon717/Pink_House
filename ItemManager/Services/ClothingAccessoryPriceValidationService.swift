@@ -12,9 +12,18 @@ import SwiftData
 final class ClothingAccessoryPriceValidationService {
     static let shared = ClothingAccessoryPriceValidationService()
 
+    private let validationVersion = "2026-06-accessory-price-cache-v1"
+    private let validationVersionKey = "clothingAccessoryPriceValidation.completedVersion"
+    private let fullValidationItemLimit = 2_000
+
     private init() {}
 
     func validateIfNeeded(modelContainer: ModelContainer) async {
+        guard UserDefaults.standard.string(forKey: validationVersionKey) != validationVersion else {
+            print("[AccessoryPriceValidation] 已完成当前版本校验，跳过")
+            return
+        }
+
         print("[AccessoryPriceValidation] 开始校验自定义小物总价...")
 
         #if !WIDGET_EXTENSION
@@ -27,10 +36,16 @@ final class ClothingAccessoryPriceValidationService {
         let context = modelContainer.mainContext
 
         do {
-            let descriptor = FetchDescriptor<Clothing>(
+            var descriptor = FetchDescriptor<Clothing>(
                 predicate: #Predicate<Clothing> { $0.deletedAt == nil }
             )
+            descriptor.fetchLimit = fullValidationItemLimit + 1
             let clothings = try context.fetch(descriptor)
+            guard clothings.count <= fullValidationItemLimit else {
+                print("[AccessoryPriceValidation] 活跃衣物超过 \(fullValidationItemLimit) 件，跳过启动期全量小物校验")
+                UserDefaults.standard.set(validationVersion, forKey: validationVersionKey)
+                return
+            }
 
             var fixedCount = 0
 
@@ -55,6 +70,7 @@ final class ClothingAccessoryPriceValidationService {
             } else {
                 print("[AccessoryPriceValidation] 无需修正")
             }
+            UserDefaults.standard.set(validationVersion, forKey: validationVersionKey)
         } catch {
             print("[AccessoryPriceValidation] 校验失败: \(error)")
         }

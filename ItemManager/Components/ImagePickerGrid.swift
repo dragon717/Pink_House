@@ -12,7 +12,7 @@ import UniformTypeIdentifiers
 
 struct ImagePickerGrid: View {
     @Binding var imagePaths: [String]
-    let maxCount: Int = 9
+    let maxCount: Int = 20
 
     private struct EditingSelection: Identifiable {
         let id = UUID()
@@ -84,42 +84,16 @@ struct ImagePickerGrid: View {
                     // Image List
                     ForEach(Array(imagePaths.enumerated()), id: \.offset) { index, path in
                         ZStack(alignment: .topTrailing) {
-                            // Image Display
-                            if let image = ImageManager.shared.loadImage(fileName: path) {
-                                Image(uiImage: image)
-                                    .resizable()
-                                    .scaledToFit()
-                                    .frame(width: 100, height: 100)
-                                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 12)
-                                            .stroke(index == 0 ? Color.accentColor : Color.clear, lineWidth: 3)
-                                    )
-                                    .overlay(alignment: .bottom) {
-                                        if index == 0 {
-                                            Text("主图")
-                                                .font(.caption2)
-                                                .fontWeight(.bold)
-                                                .foregroundStyle(.white)
-                                                .padding(.horizontal, 6)
-                                                .padding(.vertical, 2)
-                                                .background(Color.accentColor.opacity(0.8))
-                                                .clipShape(Capsule())
-                                                .padding(.bottom, 4)
+                            ImagePickerGridThumbnail(fileName: path, isMain: index == 0)
+                                .onTapGesture {
+                                    Task {
+                                        if let image = await ImageManager.shared.loadImageAsync(fileName: path, priority: .userInitiated) {
+                                            await MainActor.run {
+                                                editingSelection = EditingSelection(index: index, image: image)
+                                            }
                                         }
                                     }
-                                    .onTapGesture {
-                                        editingSelection = EditingSelection(index: index, image: image)
-                                    }
-                            } else {
-                                RoundedRectangle(cornerRadius: 12)
-                                    .fill(Color.gray.opacity(0.2))
-                                    .frame(width: 100, height: 100)
-                                    .overlay {
-                                        Image(systemName: "photo")
-                                            .foregroundStyle(.secondary)
-                                    }
-                            }
+                                }
                             
                             // Delete Button
                             Button(action: {
@@ -133,15 +107,7 @@ struct ImagePickerGrid: View {
                             .padding(4)
                         }
                         .draggable(path) {
-                            if let image = ImageManager.shared.loadImage(fileName: path) {
-                                Image(uiImage: image)
-                                    .resizable()
-                                    .scaledToFit()
-                                    .frame(width: 100, height: 100)
-                                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                            } else {
-                                Text(path)
-                            }
+                            ImagePickerGridThumbnail(fileName: path, isMain: index == 0)
                         }
                         .dropDestination(for: String.self) { items, location in
                             draggingIndex = nil
@@ -272,9 +238,8 @@ struct ImagePickerGrid: View {
             if let image = newImage {
                 isProcessingImages = true
                 Task {
-                    let compressedImage = image.jpegData(compressionQuality: 0.7).flatMap { UIImage(data: $0) } ?? image
                     await MainActor.run {
-                        saveImage(compressedImage)
+                        saveImage(image)
                         cameraImage = nil
                         isProcessingImages = false
                     }
@@ -321,10 +286,8 @@ struct ImagePickerGrid: View {
                 do {
                     if let data = try await item.loadTransferable(type: Data.self),
                        let uiImage = UIImage(data: data) {
-                        // 压缩图片以节省空间
-                        let compressedImage = uiImage.jpegData(compressionQuality: 0.7).flatMap { UIImage(data: $0) } ?? uiImage
                         let didSave = await MainActor.run {
-                            saveImage(compressedImage, triggerImageSync: false)
+                            saveImage(uiImage, triggerImageSync: false)
                         }
                         if didSave {
                             savedCount += 1
@@ -360,6 +323,11 @@ struct ImagePickerGrid: View {
     @discardableResult
     private func saveImage(_ image: UIImage, triggerImageSync: Bool = true) -> Bool {
         print("ImagePickerGrid: Saving image, current imagePaths count: \(imagePaths.count)")
+        guard imagePaths.count < maxCount else {
+            errorMessage = "最多只能添加 \(maxCount) 张图片"
+            showingErrorAlert = true
+            return false
+        }
         if let fileName = ImageManager.shared.saveImage(image, context: modelContext, triggerImageSync: triggerImageSync) {
             // 使用 withAnimation 确保状态更新被 SwiftUI 捕获
             withAnimation {
@@ -407,5 +375,50 @@ struct ImagePickerGrid: View {
     private func moveImageToFront(from index: Int) {
         let item = imagePaths.remove(at: index)
         imagePaths.insert(item, at: 0)
+    }
+}
+
+private struct ImagePickerGridThumbnail: View {
+    let fileName: String
+    let isMain: Bool
+
+    private let targetSize = CGSize(width: 100, height: 100)
+
+    var body: some View {
+        AsyncDownsampledImage(
+            fileName: fileName,
+            targetSize: targetSize
+        ) { image in
+            Image(uiImage: image)
+                .resizable()
+                .scaledToFit()
+                .frame(width: 100, height: 100)
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(isMain ? Color.accentColor : Color.clear, lineWidth: 3)
+                )
+                .overlay(alignment: .bottom) {
+                    if isMain {
+                        Text("主图")
+                            .font(.caption2)
+                            .fontWeight(.bold)
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Color.accentColor.opacity(0.8))
+                            .clipShape(Capsule())
+                            .padding(.bottom, 4)
+                    }
+                }
+        } placeholder: {
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color.gray.opacity(0.2))
+                .frame(width: 100, height: 100)
+                .overlay {
+                    Image(systemName: "photo")
+                        .foregroundStyle(.secondary)
+                }
+        }
     }
 }

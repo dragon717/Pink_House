@@ -71,6 +71,7 @@ class ImageManager {
     private var cacheKeysByTargetBucket: [String: Set<String>] = [:]
     private var inFlightImageLoads: [String: Task<UIImage?, Never>] = [:]
     private var cachedImagesDirectory: URL?
+    private var cachedThumbnailDirectory: URL?
     private var cachedICloudAvailability: Bool?
     private var hasLoggedICloudUnavailable = false
     
@@ -149,6 +150,23 @@ class ImageManager {
         cacheKeysByTargetBucket.removeAll()
         inFlightImageLoads.removeAll()
     }
+
+    private func cacheCost(for image: UIImage) -> Int {
+        if let cgImage = image.cgImage {
+            return cgImage.bytesPerRow * cgImage.height
+        }
+        return Int(image.size.width * image.size.height * image.scale * image.scale * 4)
+    }
+
+    private func cacheImage(_ image: UIImage, forKey key: NSString) {
+        let cost = cacheCost(for: image)
+        let singleImageLimit = max(2 * 1024 * 1024, memoryCache.totalCostLimit / 4)
+        guard cost <= singleImageLimit else {
+            memoryCache.removeObject(forKey: key)
+            return
+        }
+        memoryCache.setObject(image, forKey: key, cost: cost)
+    }
     
     // MARK: - Directory Management
     
@@ -207,6 +225,21 @@ class ImageManager {
         }
         
         return imagesDirectory
+    }
+
+    /// Local-only thumbnails for list/grid scrolling. They are derived from source images and should not sync to iCloud.
+    private var thumbnailDirectory: URL {
+        if let cachedThumbnailDirectory {
+            return cachedThumbnailDirectory
+        }
+
+        let cacheRoot = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
+        let directory = cacheRoot.appendingPathComponent("ImageThumbnails", isDirectory: true)
+        if !FileManager.default.fileExists(atPath: directory.path) {
+            try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        }
+        cachedThumbnailDirectory = directory
+        return directory
     }
     
     /// 检查 iCloud 是否可用
@@ -440,8 +473,7 @@ class ImageManager {
                 AppLogger.info("Image exists (Hash: \(hash)), incrementing refCount to \(existingImage.refCount)")
                 
                 // Ensure it's in cache
-                let cost = Int(image.size.width * image.size.height * 4)
-                memoryCache.setObject(image, forKey: existingImage.fileName as NSString, cost: cost)
+                cacheImage(normalizedImage, forKey: existingImage.fileName as NSString)
                 
                 return existingImage.fileName
             } else {
@@ -460,8 +492,7 @@ class ImageManager {
                 context.insert(storedImage)
                 
                 // Cache the new image
-                let cost = Int(image.size.width * image.size.height * 4)
-                memoryCache.setObject(image, forKey: fileName as NSString, cost: cost)
+                cacheImage(normalizedImage, forKey: fileName as NSString)
                 
                 AppLogger.info("New image saved (Hash: \(hash), File: \(fileName))")
                 
@@ -523,8 +554,7 @@ class ImageManager {
                 AppLogger.info("Chart image exists (Hash: \(hash)), incrementing refCount to \(existingImage.refCount)")
 
                 if let image = UIImage(data: data) {
-                    let cost = Int(image.size.width * image.size.height * 4)
-                    memoryCache.setObject(image, forKey: existingImage.fileName as NSString, cost: cost)
+                    cacheImage(image, forKey: existingImage.fileName as NSString)
                 }
 
                 return existingImage.fileName
@@ -542,8 +572,7 @@ class ImageManager {
                 context.insert(storedImage)
 
                 if let image = UIImage(data: data) {
-                    let cost = Int(image.size.width * image.size.height * 4)
-                    memoryCache.setObject(image, forKey: fileName as NSString, cost: cost)
+                    cacheImage(image, forKey: fileName as NSString)
                 }
 
                 AppLogger.info("New chart image saved (Hash: \(hash), File: \(fileName), Size: \(data.count / 1024)KB)")
@@ -694,8 +723,7 @@ class ImageManager {
         guard let data = try? Data(contentsOf: fileURL), let image = UIImage(data: data) else { return nil }
         
         // Cache loaded image
-        let cost = Int(image.size.width * image.size.height * 4)
-        memoryCache.setObject(image, forKey: fileName as NSString, cost: cost)
+        cacheImage(image, forKey: fileName as NSString)
         return image
     }
     
@@ -760,8 +788,14 @@ class ImageManager {
         
         // Load in background
         let scale = UIScreen.main.scale
+        let thumbnailURL = targetSize.map { thumbnailFileURL(fileName: fileName, targetSize: $0) }
         let loadTask = Task.detached(priority: priority) { () -> UIImage? in
-            await Self.decodeImageFile(fileURL: fileURL, targetSize: targetSize, scale: scale)
+            await Self.decodeImageFile(
+                fileURL: fileURL,
+                targetSize: targetSize,
+                scale: scale,
+                thumbnailURL: thumbnailURL
+            )
         }
         inFlightImageLoads[cacheKeyString] = loadTask
         let image = await loadTask.value
@@ -771,8 +805,7 @@ class ImageManager {
         
         // Cache back on MainActor
         if let image = image {
-            let cost = Int(image.size.width * image.size.height * 4)
-            memoryCache.setObject(image, forKey: cacheKey, cost: cost)
+            cacheImage(image, forKey: cacheKey)
             registerCacheKey(cacheKeyString, targetSize: targetSize)
         }
         
@@ -815,13 +848,29 @@ class ImageManager {
         "\(Int(targetSize.width))x\(Int(targetSize.height))"
     }
 
+    private func thumbnailFileURL(fileName: String, targetSize: CGSize) -> URL {
+        let originalExtension = (fileName as NSString).pathExtension.lowercased()
+        let thumbnailExtension = originalExtension == "png" ? "png" : "jpg"
+        let baseName = (fileName as NSString).deletingPathExtension
+        let safeBaseName = baseName.map { character -> Character in
+            character.isLetter || character.isNumber || character == "-" || character == "_" ? character : "_"
+        }
+        let fileName = "\(String(safeBaseName))_\(Self.targetBucket(targetSize)).\(thumbnailExtension)"
+        return thumbnailDirectory.appendingPathComponent(fileName)
+    }
+
     private func registerCacheKey(_ cacheKey: String, targetSize: CGSize?) {
         guard let targetSize else { return }
         let bucket = Self.targetBucket(targetSize)
         cacheKeysByTargetBucket[bucket, default: []].insert(cacheKey)
     }
 
-    private nonisolated static func decodeImageFile(fileURL: URL, targetSize: CGSize?, scale: CGFloat) async -> UIImage? {
+    private nonisolated static func decodeImageFile(
+        fileURL: URL,
+        targetSize: CGSize?,
+        scale: CGFloat,
+        thumbnailURL: URL?
+    ) async -> UIImage? {
         await ImageDecodeSemaphore.shared.acquire()
         if Task.isCancelled {
             await ImageDecodeSemaphore.shared.release()
@@ -830,6 +879,14 @@ class ImageManager {
 
         let decoded: UIImage?
         if let targetSize {
+            if let thumbnailURL,
+               FileManager.default.fileExists(atPath: thumbnailURL.path),
+               let thumbnail = downsample(imageAt: thumbnailURL, to: targetSize, scale: scale),
+               let decodedThumbnail = forceDecode(thumbnail, targetSize: targetSize) {
+                await ImageDecodeSemaphore.shared.release()
+                return decodedThumbnail
+            }
+
             guard let downsampled = downsample(imageAt: fileURL, to: targetSize, scale: scale) else {
                 await ImageDecodeSemaphore.shared.release()
                 return nil
@@ -840,6 +897,9 @@ class ImageManager {
                 return nil
             }
             decoded = forceDecode(downsampled, targetSize: targetSize)
+            if let decoded, let thumbnailURL {
+                persistThumbnailIfNeeded(decoded, to: thumbnailURL, sourceExtension: fileURL.pathExtension)
+            }
         } else {
             guard let data = try? Data(contentsOf: fileURL),
                   let loadedImage = UIImage(data: data) else {
@@ -856,6 +916,27 @@ class ImageManager {
 
         await ImageDecodeSemaphore.shared.release()
         return decoded
+    }
+
+    private nonisolated static func persistThumbnailIfNeeded(
+        _ image: UIImage,
+        to thumbnailURL: URL,
+        sourceExtension: String
+    ) {
+        guard !FileManager.default.fileExists(atPath: thumbnailURL.path) else { return }
+        try? FileManager.default.createDirectory(
+            at: thumbnailURL.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+
+        let data: Data?
+        if sourceExtension.lowercased() == "png" {
+            data = image.pngData()
+        } else {
+            data = image.jpegData(compressionQuality: 0.82)
+        }
+        guard let data else { return }
+        try? data.write(to: thumbnailURL, options: [.atomic])
     }
     
     /// Downsample image to save memory and improve performance

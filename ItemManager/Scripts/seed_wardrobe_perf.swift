@@ -11,12 +11,15 @@ enum WardrobePerfSeedService {
     private static let seedFlag = "--seed-wardrobe-perf"
     private static let countFlag = "--count"
     private static let imageDirFlag = "--image-dir"
+    private static let imagesPerItemFlag = "--images-per-item"
+    private static let accessoriesPerItemFlag = "--accessories-per-item"
+    private static let seedImageSizeFlag = "--seed-image-size"
     private static let resetFlag = "--reset-wardrobe-perf"
     private static let generatedPrefix = "性能压测裙装"
 
     /// DEBUG-only launch-argument seeding entry.
     /// Example:
-    /// xcrun simctl launch booted <bundle-id> --seed-wardrobe-perf --count 800 --image-dir "$PROJ/tools/perf-samples/wardrobe-images" --reset-wardrobe-perf
+    /// xcrun simctl launch booted <bundle-id> --seed-wardrobe-perf --count 10000 --images-per-item 20 --accessories-per-item 50 --seed-image-size 2048 --image-dir "$PROJ/tools/perf-samples/wardrobe-images" --reset-wardrobe-perf
     /// Omit --image-dir to use generated fallback images, or pass an explicit sample image directory.
     @discardableResult
     static func seedIfRequested(modelContext: ModelContext) async -> Bool {
@@ -24,6 +27,9 @@ enum WardrobePerfSeedService {
         guard arguments.contains(seedFlag) else { return false }
 
         let count = parsedInt(after: countFlag, in: arguments) ?? 800
+        let imagesPerItem = boundedInt(parsedInt(after: imagesPerItemFlag, in: arguments) ?? 1, min: 1, max: 20)
+        let accessoriesPerItem = boundedInt(parsedInt(after: accessoriesPerItemFlag, in: arguments) ?? 0, min: 0, max: 50)
+        let seedImageSize = boundedInt(parsedInt(after: seedImageSizeFlag, in: arguments) ?? 512, min: 200, max: 2048)
         let imageDirectory = parsedString(after: imageDirFlag, in: arguments)
         let shouldReset = arguments.contains(resetFlag)
 
@@ -31,18 +37,26 @@ enum WardrobePerfSeedService {
             softDeleteExistingPerfItems(modelContext: modelContext)
         }
 
-        let sourceImages = loadSourceImages(from: imageDirectory)
-        let fallbackImages = sourceImages.isEmpty ? [makeFallbackImage(index: 0)] : sourceImages
+        let sourceImages = loadSourceImages(from: imageDirectory, maxDimension: CGFloat(seedImageSize))
+        let fallbackImages = sourceImages.isEmpty
+            ? (0..<imagesPerItem).map { makeFallbackImage(index: $0, dimension: CGFloat(seedImageSize)) }
+            : sourceImages
         guard !fallbackImages.isEmpty else {
             AppLogger.error("WardrobePerfSeedService: no source image available")
             return true
+        }
+        let seedImagePaths = fallbackImages.compactMap { image in
+            ImageManager.shared.saveImage(image, context: modelContext, triggerImageSync: false)
         }
 
         for index in 0..<count {
             if Task.isCancelled { break }
 
-            let sourceImage = fallbackImages[index % fallbackImages.count]
-            let imagePath = ImageManager.shared.saveImage(sourceImage, context: modelContext)
+            let imagePaths = makeSeedImagePaths(
+                index: index,
+                imagesPerItem: imagesPerItem,
+                seedImagePaths: seedImagePaths
+            )
             let clothing = Clothing(
                 name: "\(generatedPrefix) #\(index + 1)",
                 brand: nil,
@@ -52,13 +66,13 @@ enum WardrobePerfSeedService {
                 length: ["短款", "常规", "长款"][index % 3],
                 condition: index % 7 == 0 ? "非全新" : "全新",
                 accessories: index % 5 == 0 ? "蝴蝶结,KC" : "",
-                imagePaths: imagePath.map { [$0] } ?? [],
+                imagePaths: imagePaths,
                 isShared: false,
                 originalPrice: Decimal(180 + (index % 80) * 10),
                 price: Decimal(120 + (index % 120) * 8),
                 deposit: index % 6 == 0 ? Decimal(50) : Decimal(0),
                 balance: index % 6 == 0 ? Decimal(300 + index % 90) : Decimal(0),
-                accessoriesPrice: Decimal(index % 9) * Decimal(12),
+                accessoriesPrice: 0,
                 purchaseDate: Calendar.current.date(byAdding: .day, value: -index, to: Date()) ?? Date(),
                 isDepositPlan: index % 6 == 0,
                 note: "Wardrobe perf seed item \(index + 1)",
@@ -66,6 +80,15 @@ enum WardrobePerfSeedService {
                 status: .onShelf
             )
             clothing.sortIndex = index
+            if accessoriesPerItem > 0 {
+                let accessoryItems = makeAccessoryItems(
+                    clothingIndex: index,
+                    count: accessoriesPerItem,
+                    imagePaths: imagePaths
+                )
+                clothing.accessoryItems = accessoryItems
+                clothing.accessoriesPrice = accessoryItems.reduce(Decimal(0)) { $0 + $1.price }
+            }
             modelContext.insert(clothing)
 
             if index % 50 == 49 {
@@ -95,6 +118,39 @@ enum WardrobePerfSeedService {
         return arguments[index + 1]
     }
 
+    private static func boundedInt(_ value: Int, min: Int, max: Int) -> Int {
+        Swift.max(min, Swift.min(max, value))
+    }
+
+    private static func makeSeedImagePaths(
+        index: Int,
+        imagesPerItem: Int,
+        seedImagePaths: [String]
+    ) -> [String] {
+        guard !seedImagePaths.isEmpty else { return [] }
+        return (0..<imagesPerItem).map { offset in
+            seedImagePaths[(index + offset) % seedImagePaths.count]
+        }
+    }
+
+    private static func makeAccessoryItems(
+        clothingIndex: Int,
+        count: Int,
+        imagePaths: [String]
+    ) -> [AccessoryItem] {
+        let firstImagePath = imagePaths.first
+        return (0..<count).map { index in
+            AccessoryItem(
+                name: "压测小物 \(clothingIndex + 1)-\(index + 1)",
+                price: Decimal((index % 9) + 1) * Decimal(12),
+                deposit: Decimal(index % 3) * Decimal(10),
+                balance: Decimal(index % 5) * Decimal(18),
+                sortIndex: index,
+                imagePaths: firstImagePath.map { [$0] }
+            )
+        }
+    }
+
     private static func softDeleteExistingPerfItems(modelContext: ModelContext) {
         let descriptor = FetchDescriptor<Clothing>(predicate: #Predicate { clothing in
             clothing.deletedAt == nil
@@ -109,7 +165,7 @@ enum WardrobePerfSeedService {
         try? modelContext.save()
     }
 
-    private static func loadSourceImages(from directory: String?) -> [UIImage] {
+    private static func loadSourceImages(from directory: String?, maxDimension: CGFloat) -> [UIImage] {
         guard let directory, !directory.isEmpty else { return [] }
         let rootURL = URL(fileURLWithPath: directory)
         guard let enumerator = FileManager.default.enumerator(
@@ -124,30 +180,25 @@ enum WardrobePerfSeedService {
             let ext = fileURL.pathExtension.lowercased()
             guard ["jpg", "jpeg", "png", "heic"].contains(ext),
                   let image = UIImage(contentsOfFile: fileURL.path) else { continue }
-            images.append(resizedToSeedThumbnail(image))
+            images.append(resizedToSeedImage(image, maxDimension: maxDimension))
         }
         return images
     }
 
-    private static func resizedToSeedThumbnail(_ image: UIImage) -> UIImage {
-        let targetSize = CGSize(width: 200, height: 200)
+    private static func resizedToSeedImage(_ image: UIImage, maxDimension: CGFloat) -> UIImage {
+        let longestSide = max(image.size.width, image.size.height)
+        guard longestSide > maxDimension else { return image }
+
+        let scale = maxDimension / longestSide
+        let targetSize = CGSize(width: image.size.width * scale, height: image.size.height * scale)
         let renderer = UIGraphicsImageRenderer(size: targetSize)
         return renderer.image { context in
-            UIColor.systemBackground.setFill()
-            context.fill(CGRect(origin: .zero, size: targetSize))
-
-            let scale = min(targetSize.width / image.size.width, targetSize.height / image.size.height)
-            let drawSize = CGSize(width: image.size.width * scale, height: image.size.height * scale)
-            let drawOrigin = CGPoint(
-                x: (targetSize.width - drawSize.width) / 2,
-                y: (targetSize.height - drawSize.height) / 2
-            )
-            image.draw(in: CGRect(origin: drawOrigin, size: drawSize))
+            image.draw(in: CGRect(origin: .zero, size: targetSize))
         }
     }
 
-    private static func makeFallbackImage(index: Int) -> UIImage {
-        let targetSize = CGSize(width: 200, height: 200)
+    private static func makeFallbackImage(index: Int, dimension: CGFloat) -> UIImage {
+        let targetSize = CGSize(width: dimension, height: dimension)
         let renderer = UIGraphicsImageRenderer(size: targetSize)
         return renderer.image { context in
             let rect = CGRect(origin: .zero, size: targetSize)
@@ -156,11 +207,11 @@ enum WardrobePerfSeedService {
 
             let insetRect = rect.insetBy(dx: 28, dy: 28)
             UIColor.systemPink.withAlphaComponent(0.55).setFill()
-            UIBezierPath(roundedRect: insetRect, cornerRadius: 28).fill()
+            UIBezierPath(roundedRect: insetRect, cornerRadius: max(28, dimension * 0.08)).fill()
 
             let label = "P\(index + 1)" as NSString
             let attributes: [NSAttributedString.Key: Any] = [
-                .font: UIFont.systemFont(ofSize: 34, weight: .bold),
+                .font: UIFont.systemFont(ofSize: max(34, dimension * 0.14), weight: .bold),
                 .foregroundColor: UIColor.white
             ]
             let labelSize = label.size(withAttributes: attributes)

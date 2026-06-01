@@ -59,10 +59,10 @@ struct WardrobeCellSnapshot: Identifiable, Equatable, Sendable {
         self.stock = clothing.stock
         self.isDepositPlan = clothing.isDepositPlan
         self.isFullPaymentReservation = clothing.isFullPaymentReservation
-        self.totalDeposit = clothing.totalDeposit
-        self.totalBalance = clothing.totalBalance
-        self.fullPaymentReservationTotalAmount = clothing.fullPaymentReservationTotalAmount
-        self.inventoryTotalPrice = clothing.inventoryTotalPrice
+        self.totalDeposit = clothing.wardrobeListTotalDeposit
+        self.totalBalance = clothing.wardrobeListTotalBalance
+        self.fullPaymentReservationTotalAmount = clothing.wardrobeListFullPaymentReservationTotalAmount
+        self.inventoryTotalPrice = clothing.wardrobeListInventoryTotalPrice
         self.is3DModel = clothing.is3DModel
         self.model3DTypeDescription = clothing.model3DTypeDescription
         self.types = clothing.types

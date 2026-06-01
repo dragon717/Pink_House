@@ -359,6 +359,39 @@ final class Clothing {
     }
 }
 
+extension Clothing {
+    /// Wardrobe list/stats summary values must not fault the accessory relationship for every row.
+    /// `accessoriesPrice` is maintained by edit/validation flows and is the list-scale source.
+    var wardrobeListInventoryTotalPrice: Decimal {
+        (FinancialDataSanitizer.money(price) * Decimal(FinancialDataSanitizer.stock(stock)))
+            + FinancialDataSanitizer.money(accessoriesPrice)
+            + FinancialDataSanitizer.money(shippingFee)
+    }
+
+    var wardrobeListTotalDeposit: Decimal {
+        FinancialDataSanitizer.money(deposit) * Decimal(FinancialDataSanitizer.stock(stock))
+    }
+
+    var wardrobeListTotalBalance: Decimal {
+        let storedBalance = FinancialDataSanitizer.money(balance) * Decimal(FinancialDataSanitizer.stock(stock))
+        if storedBalance > 0 {
+            return storedBalance
+        }
+
+        let conditionText = condition.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard isDepositPlan,
+              !isFullPaymentReservation,
+              conditionText == "待付尾款" else {
+            return 0
+        }
+        return wardrobeListInventoryTotalPrice
+    }
+
+    var wardrobeListFullPaymentReservationTotalAmount: Decimal {
+        isFullPaymentReservation ? wardrobeListTotalDeposit : 0
+    }
+}
+
 @Model
 final class AccessoryItem {
     var id: UUID = UUID()
