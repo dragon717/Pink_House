@@ -24,13 +24,13 @@ struct SimpleStringSelectionView: View {
                 Section {
                     if isAddingNew {
                         HStack {
-                            TextField("新选项", text: $newItemName)
+                            TextField("新选项".appLocalized, text: $newItemName)
                                 .textFieldStyle(.roundedBorder)
                                 .onSubmit {
                                     addNewItem()
                                 }
                             
-                            Button("添加") {
+                            Button("添加".appLocalized) {
                                 addNewItem()
                             }
                             .disabled(newItemName.isEmpty)
@@ -39,7 +39,7 @@ struct SimpleStringSelectionView: View {
                         Button(action: {
                             isAddingNew = true
                         }) {
-                            Label("添加新选项", systemImage: "plus.circle.fill")
+                            Label("添加新选项".appLocalized, systemImage: "plus.circle.fill")
                                 .foregroundStyle(.blue)
                         }
                     }
@@ -47,7 +47,7 @@ struct SimpleStringSelectionView: View {
                 
                 Section {
                     if options.isEmpty && selectedItems.isEmpty {
-                        Text("暂无选项")
+                        Text("暂无选项".appLocalized)
                             .foregroundStyle(.secondary)
                     } else {
                         // Merge predefined options with any newly added ones that might not be in the list yet
@@ -71,17 +71,17 @@ struct SimpleStringSelectionView: View {
                     }
                 }
             }
-            .navigationTitle(title)
+            .navigationTitle(title.appLocalized)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("取消") {
+                    Button("取消".appLocalized) {
                         dismiss()
                     }
                 }
                 
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("完成") {
+                    Button("完成".appLocalized) {
                         saveSelection()
                         dismiss()
                     }

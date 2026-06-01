@@ -52,15 +52,15 @@ struct PriceRow: View {
         HStack {
             if let subtitle = subtitle {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(title)
+                    Text(title.appLocalized)
                         .themeSkinLegibleText(level: .inline, slot: .sectionCard)
-                    Text(subtitle)
+                    Text(subtitle.appLocalized)
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                         .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                 }
             } else {
-                Text(title)
+                Text(title.appLocalized)
                     .themeSkinLegibleText(level: .inline, slot: .sectionCard)
             }
             Spacer()
@@ -109,14 +109,14 @@ struct CurrencyPriceRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .center) {
-                Text(title)
+                Text(title.appLocalized)
                     .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                 Spacer()
-                Picker(title, selection: $currency) {
-                    Text("人民币")
+                Picker(title.appLocalized, selection: $currency) {
+                    Text("人民币".appLocalized)
                         .themeSkinLegibleText(level: .inline, slot: .segmentedControl)
                         .tag(ClothingPriceCurrency.cny)
-                    Text("日元")
+                    Text("日元".appLocalized)
                         .themeSkinLegibleText(level: .inline, slot: .segmentedControl)
                         .tag(ClothingPriceCurrency.jpy)
                 }

@@ -612,7 +612,7 @@ enum ClothingEditUserActivity {
     private static let payloadKey = "clothingEditDraftPayload"
 
     static func configure(_ activity: NSUserActivity, payload: ClothingEditUserActivityPayload) {
-        activity.title = payload.isEditing ? "继续编辑衣物" : "继续手动创建"
+        activity.title = payload.isEditing ? "继续编辑衣物".appLocalized : "继续手动创建".appLocalized
         activity.isEligibleForHandoff = true
         activity.isEligibleForSearch = false
         activity.isEligibleForPrediction = true
@@ -1546,7 +1546,7 @@ struct ClothingEditView: View {
             // Toast 提示层
             toastOverlay
         }
-        .navigationTitle(isEditing ? "编辑" : "手动创建")
+        .navigationTitle((isEditing ? "编辑" : "手动创建").appLocalized)
         .navigationBarTitleDisplayMode(.inline)
         .userActivity(ClothingEditUserActivity.activityType) { activity in
             ClothingEditUserActivity.configure(
@@ -1561,7 +1561,7 @@ struct ClothingEditView: View {
         }
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
-                Button("取消") {
+                Button("取消".appLocalized) {
                     cancelPendingDraftPersistence()
                     isCancelling = true
                     // 取消时如果有有效信息或用户碰过任一字段，则保存草稿，方便用户下次恢复。
@@ -1581,18 +1581,18 @@ struct ClothingEditView: View {
             }
 
             ToolbarItem(placement: .confirmationAction) {
-                Button("保存") {
+                Button("保存".appLocalized) {
                     handleSaveTapped()
                 }
                 .disabled(name.isEmpty)
             }
         }
-        .alert("确认切换预约状态？", isPresented: $showingOwnedToReservationConfirmation) {
-            Button("再检查一下", role: .cancel) {
+        .alert("确认切换预约状态？".appLocalized, isPresented: $showingOwnedToReservationConfirmation) {
+            Button("再检查一下".appLocalized, role: .cancel) {
                 pendingOwnedToReservationKind = .owned
                 isSaving = false
             }
-            Button("确认保存") {
+            Button("确认保存".appLocalized) {
                 let targetCondition = pendingOwnedToReservationKind.conditionWhenSwitchingFromOwned
                 pendingOwnedToReservationKind = .owned
                 performSave(enforcedCondition: targetCondition)
@@ -1614,7 +1614,7 @@ struct ClothingEditView: View {
         .sheet(isPresented: $showingGenericSelection) {
             if let field = activeSelectionField {
                 SimpleStringSelectionView(
-                    title: "选择\(field.rawValue)",
+                    title: "选择%@".appLocalized(field.displayName.appLocalized),
                     options: getAllOptions(for: field),
                     allowMultiple: isMultiSelect(field),
                     selection: binding(for: field)
@@ -1748,12 +1748,16 @@ struct ClothingEditView: View {
         case .owned:
             detailHint = ""
         case .fullPaymentReservation:
-            detailHint = "详情页会显示「待签收」状态。"
+            detailHint = "详情页会显示「待签收」状态。".appLocalized
         case .depositPlan:
-            detailHint = "详情页会显示「尾款付清」按钮。"
+            detailHint = "详情页会显示「尾款付清」按钮。".appLocalized
         }
 
-        return "保存后会把这条裙装从「已拥有」切换为「\(targetKind.displayName)」，并将裙装状态改为「\(targetStatus)」。\(detailHint)"
+        return "保存后会把这条裙装从「已拥有」切换为「%@」，并将裙装状态改为「%@」。%@".appLocalized(
+            targetKind.displayName.appLocalized,
+            targetStatus.appLocalized,
+            detailHint
+        )
     }
 
     private func handleSaveTapped() {
@@ -1773,12 +1777,12 @@ struct ClothingEditView: View {
         updateTotalPrice()
 
         if reservationKind == .fullPaymentReservation, fullPaymentReservationUnitAmount <= 0 {
-            showToastMessage("全款预约需要先填写裙装总价、小物或邮费", type: .error)
+            showToastMessage("全款预约需要先填写裙装总价、小物或邮费".appLocalized, type: .error)
             return false
         }
         if reservationKind == .depositPlan,
            depositPlanAmountResolution(existingClothing: clothing).balance <= 0 {
-            showToastMessage("定金尾款需要先填写尾款金额；从已拥有切换时可先填写裙装总价，我会自动转为待付尾款", type: .error)
+            showToastMessage("定金尾款需要先填写尾款金额；从已拥有切换时可先填写裙装总价，我会自动转为待付尾款".appLocalized, type: .error)
             return false
         }
 
@@ -2546,12 +2550,12 @@ struct ClothingEditView: View {
         let finalIsDepositPlan = finalReservationKind != .owned
         let finalFullPaymentUnitAmount = fullPaymentReservationUnitAmount
         if finalReservationKind == .fullPaymentReservation, finalFullPaymentUnitAmount <= 0 {
-            showToastMessage("全款预约需要先填写裙装总价、小物或邮费", type: .error)
+            showToastMessage("全款预约需要先填写裙装总价、小物或邮费".appLocalized, type: .error)
             return false
         }
         let depositPlanResolution = depositPlanAmountResolution(existingClothing: clothing)
         if finalReservationKind == .depositPlan, depositPlanResolution.balance <= 0 {
-            showToastMessage("定金尾款需要先填写尾款金额；从已拥有切换时可先填写裙装总价，我会自动转为待付尾款", type: .error)
+            showToastMessage("定金尾款需要先填写尾款金额；从已拥有切换时可先填写裙装总价，我会自动转为待付尾款".appLocalized, type: .error)
             return false
         }
 
@@ -2702,7 +2706,7 @@ struct ClothingEditView: View {
                     try WealthSavingLedger.resetFinalPaymentProgress(for: c, context: modelContext, at: now)
                 } catch {
                     AppLogger.error("Failed to reset stale final payment progress: \(error)")
-                    showToastMessage("保存失败：无法清理旧尾款记录", type: .error)
+                    showToastMessage("保存失败：无法清理旧尾款记录".appLocalized, type: .error)
                     return false
                 }
             }
@@ -2791,7 +2795,7 @@ struct ClothingEditView: View {
             updateClothingCountCache()
         } catch {
             AppLogger.error("Failed to save context: \(error)")
-            showToastMessage("保存失败，请稍后重试", type: .error)
+            showToastMessage("保存失败，请稍后重试".appLocalized, type: .error)
             return false
         }
 

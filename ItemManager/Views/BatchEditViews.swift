@@ -24,13 +24,13 @@ struct BatchStringSelectionView: View {
                 Section {
                     if isAddingNew {
                         HStack {
-                            TextField("新选项", text: $newItemName)
+                            TextField("新选项".appLocalized, text: $newItemName)
                                 .textFieldStyle(.roundedBorder)
                                 .onSubmit {
                                     addNewItem()
                                 }
                             
-                            Button("添加") {
+                            Button("添加".appLocalized) {
                                 addNewItem()
                             }
                             .disabled(newItemName.isEmpty)
@@ -39,7 +39,7 @@ struct BatchStringSelectionView: View {
                         Button(action: {
                             isAddingNew = true
                         }) {
-                            Label("添加新选项", systemImage: "plus.circle.fill")
+                            Label("添加新选项".appLocalized, systemImage: "plus.circle.fill")
                                 .foregroundStyle(.pink)
                         }
                     }
@@ -47,7 +47,7 @@ struct BatchStringSelectionView: View {
                 
                 Section {
                     if options.isEmpty && tempSelectedItems.isEmpty {
-                        Text("暂无选项")
+                        Text("暂无选项".appLocalized)
                             .foregroundStyle(.secondary)
                     } else {
                         let displayOptions = Array(Set(options).union(tempSelectedItems)).sorted()
@@ -69,18 +69,18 @@ struct BatchStringSelectionView: View {
                     }
                 }
             }
-            .navigationTitle(title)
+            .navigationTitle(title.appLocalized)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("取消") {
+                    Button("取消".appLocalized) {
                         tempSelectedItems.removeAll()
                         dismiss()
                     }
                 }
                 
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("完成") {
+                    Button("完成".appLocalized) {
                         selectedItems = Array(tempSelectedItems)
                         dismiss()
                     }
@@ -133,7 +133,7 @@ struct BatchConditionSelectionView: View {
             List {
                 Section {
                     if conditionOptions.isEmpty {
-                        Text("暂无可选成色")
+                        Text("暂无可选成色".appLocalized)
                             .foregroundStyle(.secondary)
                     } else {
                         ForEach(conditionOptions, id: \.self) { condition in
@@ -153,18 +153,18 @@ struct BatchConditionSelectionView: View {
                     }
                 }
             }
-            .navigationTitle("改变成色")
+            .navigationTitle("改变成色".appLocalized)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("取消") {
+                    Button("取消".appLocalized) {
                         tempSelectedCondition = nil
                         dismiss()
                     }
                 }
                 
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("完成") {
+                    Button("完成".appLocalized) {
                         selectedCondition = tempSelectedCondition
                         dismiss()
                     }
