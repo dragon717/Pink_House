@@ -36,7 +36,7 @@ struct ClothingFilterMenu: View {
                 Button(role: .destructive) {
                     selectedTagIDs.removeAll()
                 } label: {
-                    Label("清除筛选", systemImage: "xmark.circle")
+                    Label("清除筛选".appLocalized, systemImage: "xmark.circle")
                 }
                 
                 // 无标签选项
@@ -49,7 +49,7 @@ struct ClothingFilterMenu: View {
                     }
                 } label: {
                     HStack {
-                        Text("无标签")
+                        Text("无标签".appLocalized)
                         if selectedTagIDs.contains(ClothingFilterMenu.noTagUUID) {
                             Image(systemName: "checkmark")
                         }
@@ -76,11 +76,11 @@ struct ClothingFilterMenu: View {
             } label: {
                 let selectedTagName: String? = selectedTagIDs.first.flatMap { id in
                     if id == ClothingFilterMenu.noTagUUID {
-                        return "无标签"
+                        return "无标签".appLocalized
                     }
                     return tags.first(where: { $0.id == id })?.name
                 }
-                Label(selectedTagName ?? "标签", systemImage: selectedTagIDs.isEmpty ? "tag" : "tag.fill")
+                Label(selectedTagName ?? "标签".appLocalized, systemImage: selectedTagIDs.isEmpty ? "tag" : "tag.fill")
             }
             
             // Brands Filter
@@ -88,7 +88,7 @@ struct ClothingFilterMenu: View {
                 Button(role: .destructive) {
                     selectedBrandIDs.removeAll()
                 } label: {
-                    Label("清除筛选", systemImage: "xmark.circle")
+                    Label("清除筛选".appLocalized, systemImage: "xmark.circle")
                 }
                 
                 // 无品牌选项
@@ -101,7 +101,7 @@ struct ClothingFilterMenu: View {
                     }
                 } label: {
                     HStack {
-                        Text("无品牌")
+                        Text("无品牌".appLocalized)
                         if selectedBrandIDs.contains(ClothingFilterMenu.noBrandUUID) {
                             Image(systemName: "checkmark")
                         }
@@ -128,11 +128,11 @@ struct ClothingFilterMenu: View {
             } label: {
                 let selectedBrandName: String? = selectedBrandIDs.first.flatMap { id in
                     if id == ClothingFilterMenu.noBrandUUID {
-                        return "无品牌"
+                        return "无品牌".appLocalized
                     }
                     return brands.first(where: { $0.id == id })?.name
                 }
-                Label(selectedBrandName ?? "品牌", systemImage: selectedBrandIDs.isEmpty ? "bag" : "bag.fill")
+                Label(selectedBrandName ?? "品牌".appLocalized, systemImage: selectedBrandIDs.isEmpty ? "bag" : "bag.fill")
             }
             
             // String-based Filters
@@ -143,7 +143,7 @@ struct ClothingFilterMenu: View {
             }
             
         } label: {
-            Label("筛选", systemImage: "line.3.horizontal.decrease.circle")
+            Label("筛选".appLocalized, systemImage: "line.3.horizontal.decrease.circle")
         }
     }
     
@@ -156,7 +156,7 @@ struct ClothingFilterMenu: View {
                 Button(role: .destructive) {
                     selectedTypes.removeAll()
                 } label: {
-                    Label("清除筛选", systemImage: "xmark.circle")
+                    Label("清除筛选".appLocalized, systemImage: "xmark.circle")
                 }
                 
                 // 无类型选项
@@ -169,7 +169,7 @@ struct ClothingFilterMenu: View {
                     }
                 } label: {
                     HStack {
-                        Text("无类型")
+                        Text("无类型".appLocalized)
                         if selectedTypes.contains(ClothingFilterMenu.noTypeMarker) {
                             Image(systemName: "checkmark")
                         }
@@ -195,9 +195,9 @@ struct ClothingFilterMenu: View {
                 }
             } label: {
                 let selectedTypeName: String? = selectedTypes.first.flatMap { type in
-                    type == ClothingFilterMenu.noTypeMarker ? "无类型" : type
+                    type == ClothingFilterMenu.noTypeMarker ? "无类型".appLocalized : type
                 }
-                Label(selectedTypeName ?? "类型", systemImage: selectedTypes.isEmpty ? "tshirt" : "tshirt.fill")
+                Label(selectedTypeName ?? "类型".appLocalized, systemImage: selectedTypes.isEmpty ? "tshirt" : "tshirt.fill")
             }
             
         case .colors:
@@ -206,7 +206,7 @@ struct ClothingFilterMenu: View {
                 Button(role: .destructive) {
                     selectedColors.removeAll()
                 } label: {
-                    Label("清除筛选", systemImage: "xmark.circle")
+                    Label("清除筛选".appLocalized, systemImage: "xmark.circle")
                 }
                 
                 // 无颜色选项
@@ -219,7 +219,7 @@ struct ClothingFilterMenu: View {
                     }
                 } label: {
                     HStack {
-                        Text("无颜色")
+                        Text("无颜色".appLocalized)
                         if selectedColors.contains(ClothingFilterMenu.noColorMarker) {
                             Image(systemName: "checkmark")
                         }
@@ -245,9 +245,9 @@ struct ClothingFilterMenu: View {
                 }
             } label: {
                 let selectedColorName: String? = selectedColors.first.flatMap { color in
-                    color == ClothingFilterMenu.noColorMarker ? "无颜色" : color
+                    color == ClothingFilterMenu.noColorMarker ? "无颜色".appLocalized : color
                 }
-                Label(selectedColorName ?? "颜色", systemImage: selectedColors.isEmpty ? "paintpalette" : "paintpalette.fill")
+                Label(selectedColorName ?? "颜色".appLocalized, systemImage: selectedColors.isEmpty ? "paintpalette" : "paintpalette.fill")
             }
             
         case .sizes:
@@ -256,7 +256,7 @@ struct ClothingFilterMenu: View {
                 Button(role: .destructive) {
                     selectedSizes.removeAll()
                 } label: {
-                    Label("清除筛选", systemImage: "xmark.circle")
+                    Label("清除筛选".appLocalized, systemImage: "xmark.circle")
                 }
                 
                 // 无尺码选项
@@ -269,7 +269,7 @@ struct ClothingFilterMenu: View {
                     }
                 } label: {
                     HStack {
-                        Text("无尺码")
+                        Text("无尺码".appLocalized)
                         if selectedSizes.contains(ClothingFilterMenu.noSizeMarker) {
                             Image(systemName: "checkmark")
                         }
@@ -295,9 +295,9 @@ struct ClothingFilterMenu: View {
                 }
             } label: {
                 let selectedSizeName: String? = selectedSizes.first.flatMap { size in
-                    size == ClothingFilterMenu.noSizeMarker ? "无尺码" : size
+                    size == ClothingFilterMenu.noSizeMarker ? "无尺码".appLocalized : size
                 }
-                Label(selectedSizeName ?? "尺码", systemImage: selectedSizes.isEmpty ? "ruler" : "ruler.fill")
+                Label(selectedSizeName ?? "尺码".appLocalized, systemImage: selectedSizes.isEmpty ? "ruler" : "ruler.fill")
             }
             
         case .length:
@@ -306,7 +306,7 @@ struct ClothingFilterMenu: View {
                 Button(role: .destructive) {
                     selectedLengths.removeAll()
                 } label: {
-                    Label("清除筛选", systemImage: "xmark.circle")
+                    Label("清除筛选".appLocalized, systemImage: "xmark.circle")
                 }
                 
                 // 无衣长选项
@@ -319,7 +319,7 @@ struct ClothingFilterMenu: View {
                     }
                 } label: {
                     HStack {
-                        Text("无衣长")
+                        Text("无衣长".appLocalized)
                         if selectedLengths.contains(ClothingFilterMenu.noLengthMarker) {
                             Image(systemName: "checkmark")
                         }
@@ -345,9 +345,9 @@ struct ClothingFilterMenu: View {
                 }
             } label: {
                 let selectedLengthName: String? = selectedLengths.first.flatMap { length in
-                    length == ClothingFilterMenu.noLengthMarker ? "无衣长" : length
+                    length == ClothingFilterMenu.noLengthMarker ? "无衣长".appLocalized : length
                 }
-                Label(selectedLengthName ?? "衣长", systemImage: selectedLengths.isEmpty ? "arrow.up.and.down" : "arrow.up.and.down.circle.fill")
+                Label(selectedLengthName ?? "衣长".appLocalized, systemImage: selectedLengths.isEmpty ? "arrow.up.and.down" : "arrow.up.and.down.circle.fill")
             }
             
         case .condition:
@@ -356,7 +356,7 @@ struct ClothingFilterMenu: View {
                 Button(role: .destructive) {
                     selectedConditions.removeAll()
                 } label: {
-                    Label("清除筛选", systemImage: "xmark.circle")
+                    Label("清除筛选".appLocalized, systemImage: "xmark.circle")
                 }
                 
                 // 无状态选项
@@ -369,7 +369,7 @@ struct ClothingFilterMenu: View {
                     }
                 } label: {
                     HStack {
-                        Text("无状态")
+                        Text("无状态".appLocalized)
                         if selectedConditions.contains(ClothingFilterMenu.noConditionMarker) {
                             Image(systemName: "checkmark")
                         }
@@ -395,9 +395,9 @@ struct ClothingFilterMenu: View {
                 }
             } label: {
                 let selectedConditionName: String? = selectedConditions.first.flatMap { condition in
-                    condition == ClothingFilterMenu.noConditionMarker ? "无状态" : condition
+                    condition == ClothingFilterMenu.noConditionMarker ? "无状态".appLocalized : condition
                 }
-                Label(selectedConditionName ?? "状态", systemImage: selectedConditions.isEmpty ? "star" : "star.fill")
+                Label(selectedConditionName ?? "状态".appLocalized, systemImage: selectedConditions.isEmpty ? "star" : "star.fill")
             }
             
         case .accessories:
@@ -406,7 +406,7 @@ struct ClothingFilterMenu: View {
                 Button(role: .destructive) {
                     selectedAccessories.removeAll()
                 } label: {
-                    Label("清除筛选", systemImage: "xmark.circle")
+                    Label("清除筛选".appLocalized, systemImage: "xmark.circle")
                 }
                 
                 // 无小物选项
@@ -419,7 +419,7 @@ struct ClothingFilterMenu: View {
                     }
                 } label: {
                     HStack {
-                        Text("无小物")
+                        Text("无小物".appLocalized)
                         if selectedAccessories.contains(ClothingFilterMenu.noAccessoryMarker) {
                             Image(systemName: "checkmark")
                         }
@@ -445,9 +445,9 @@ struct ClothingFilterMenu: View {
                 }
             } label: {
                 let selectedAccessoryName: String? = selectedAccessories.first.flatMap { accessory in
-                    accessory == ClothingFilterMenu.noAccessoryMarker ? "无小物" : accessory
+                    accessory == ClothingFilterMenu.noAccessoryMarker ? "无小物".appLocalized : accessory
                 }
-                Label(selectedAccessoryName ?? "小物", systemImage: selectedAccessories.isEmpty ? "sparkles" : "sparkles.rectangle.stack.fill")
+                Label(selectedAccessoryName ?? "小物".appLocalized, systemImage: selectedAccessories.isEmpty ? "sparkles" : "sparkles.rectangle.stack.fill")
             }
         }
     }
@@ -473,7 +473,7 @@ struct FilterStringSection: View {
             Button(role: .destructive) {
                 selection.removeAll()
             } label: {
-                Label("清除筛选", systemImage: "xmark.circle")
+                Label("清除筛选".appLocalized, systemImage: "xmark.circle")
             }
             
             ForEach(options, id: \.self) { option in
@@ -494,7 +494,7 @@ struct FilterStringSection: View {
                 }
             }
         } label: {
-            Label(selection.first ?? title, systemImage: selection.isEmpty ? icon : selectedIcon)
+            Label(selection.first ?? title.appLocalized, systemImage: selection.isEmpty ? icon : selectedIcon)
         }
     }
 }
