@@ -148,7 +148,7 @@ private struct BookHousePrototypeStage: View {
     }
 
     private func placementHint(in geometry: GeometryProxy) -> some View {
-        Text("拖动物件调整入口位置")
+        Text("拖动物件调整入口位置".appLocalized)
             .font(.caption.weight(.semibold))
             .foregroundStyle(Color(hex: "7B5E61"))
             .padding(.horizontal, 14)
@@ -255,7 +255,7 @@ private struct BookHouseLayoutControls: View {
     var body: some View {
         HStack(spacing: 8) {
             if isPlacementMode {
-                controlButton(systemImage: "arrow.counterclockwise", label: "恢复默认摆放") {
+                controlButton(systemImage: "arrow.counterclockwise", label: "恢复默认摆放".appLocalized) {
                     onResetLayout()
                 }
                 .transition(.scale.combined(with: .opacity))
@@ -263,7 +263,7 @@ private struct BookHouseLayoutControls: View {
 
             controlButton(
                 systemImage: isPlacementMode ? "checkmark" : "arrow.up.and.down.and.arrow.left.and.right",
-                label: isPlacementMode ? "完成整理" : "整理房间",
+                label: isPlacementMode ? "完成整理".appLocalized : "整理房间".appLocalized,
                 active: isPlacementMode
             ) {
                 withAnimation(.spring(response: 0.28, dampingFraction: 0.84)) {
