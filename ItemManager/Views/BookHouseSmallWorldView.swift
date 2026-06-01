@@ -33,7 +33,7 @@ struct BookHouseSmallWorldView: View {
                     openFeature(feature)
                 }
             )
-            .presentationDetents([.height(260)])
+            .presentationDetents([.height(292)])
             .presentationDragIndicator(.visible)
         }
         .alert("功能未解锁".appLocalized, isPresented: $showUnlockAlert) {
@@ -90,6 +90,8 @@ private struct BookHousePrototypeStage: View {
     @Binding var isPlacementMode: Bool
     @Binding var selectedFeatureID: AppFeatureID?
     let onResetLayout: () -> Void
+    @Environment(ThemeManager.self) private var themeManager
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         GeometryReader { geometry in
@@ -148,14 +150,26 @@ private struct BookHousePrototypeStage: View {
     }
 
     private func placementHint(in geometry: GeometryProxy) -> some View {
-        Text("拖动物件调整入口位置".appLocalized)
+        HStack(spacing: 7) {
+            Image(systemName: "hand.draw.fill")
+                .font(.system(size: 12, weight: .bold))
+            Text("拖动物件调整入口位置".appLocalized)
+        }
             .font(.caption.weight(.semibold))
-            .foregroundStyle(Color(hex: "7B5E61"))
-            .padding(.horizontal, 14)
-            .padding(.vertical, 8)
-            .background(.white.opacity(0.78), in: Capsule())
-            .overlay(Capsule().stroke(Color.white.opacity(0.8), lineWidth: 1))
-            .shadow(color: .black.opacity(0.08), radius: 10, x: 0, y: 5)
+            .foregroundStyle(themeManager.accentTextColor)
+            .themeSkinLegibleText(level: .chip, slot: .sectionCard)
+            .padding(.horizontal, 15)
+            .padding(.vertical, 9)
+            .themeSkinAdaptiveSectionCard(slot: .sectionCard, cornerRadius: 18, showsDecoration: false) {
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .fill(themeManager.cardBackgroundColor.opacity(colorScheme == .dark ? 0.78 : 0.88))
+                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 18, style: .continuous)
+                            .stroke(Color.white.opacity(colorScheme == .dark ? 0.14 : 0.64), lineWidth: 1)
+                    }
+            }
+            .shadow(color: .black.opacity(colorScheme == .dark ? 0.24 : 0.08), radius: 10, x: 0, y: 5)
             .position(
                 x: geometry.size.width * 0.5,
                 y: geometry.size.height - geometry.safeAreaInsets.bottom - 158
@@ -253,7 +267,7 @@ private struct BookHouseLayoutControls: View {
     @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 6) {
             if isPlacementMode {
                 controlButton(systemImage: "arrow.counterclockwise", label: "恢复默认摆放".appLocalized) {
                     onResetLayout()
@@ -271,24 +285,55 @@ private struct BookHouseLayoutControls: View {
                 }
             }
         }
+        .padding(6)
+        .themeSkinAdaptiveSectionCard(slot: .sectionCard, cornerRadius: 26, showsDecoration: false) {
+            RoundedRectangle(cornerRadius: 26, style: .continuous)
+                .fill(themeManager.cardBackgroundColor.opacity(colorScheme == .dark ? 0.78 : 0.90))
+                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 26, style: .continuous))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 26, style: .continuous)
+                        .stroke(Color.white.opacity(colorScheme == .dark ? 0.16 : 0.70), lineWidth: 1)
+                }
+        }
+        .shadow(color: Color.black.opacity(colorScheme == .dark ? 0.26 : 0.10), radius: 10, x: 0, y: 5)
         .animation(.spring(response: 0.28, dampingFraction: 0.84), value: isPlacementMode)
     }
 
     private func controlButton(systemImage: String, label: String, active: Bool = false, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            Image(systemName: systemImage)
-                .font(.system(size: 15, weight: .bold))
-                .foregroundStyle(active ? Color.white : themeManager.accentTextColor)
-                .frame(width: 38, height: 38)
-                .background {
+            ZStack {
+                if active {
                     Circle()
-                        .fill(active ? themeManager.accentTextColor : themeManager.cardBackgroundColor.opacity(colorScheme == .dark ? 0.84 : 0.9))
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    themeManager.accentTextColor.opacity(0.96),
+                                    themeManager.accentTextColor.opacity(0.74)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
                         .overlay {
                             Circle()
-                                .stroke(Color.white.opacity(colorScheme == .dark ? 0.16 : 0.68), lineWidth: 1)
+                                .stroke(Color.white.opacity(0.58), lineWidth: 1)
                         }
-                        .shadow(color: Color.black.opacity(colorScheme == .dark ? 0.28 : 0.10), radius: 8, x: 0, y: 4)
+
+                    Image(systemName: systemImage)
+                        .font(.system(size: 15, weight: .bold))
+                        .foregroundStyle(Color.white)
+                        .themeSkinLegibleSymbol(level: .badge, slot: .iconCircleButton)
+                } else {
+                    ThemeSkinIconBadge(
+                        systemName: systemImage,
+                        fallbackColor: themeManager.accentTextColor,
+                        size: 38,
+                        symbolSize: 15
+                    )
                 }
+            }
+            .frame(width: 40, height: 40)
+            .contentShape(Circle())
         }
         .buttonStyle(.plain)
         .accessibilityLabel(label)
@@ -558,40 +603,75 @@ private struct BookHouseFeatureSheet: View {
     let feature: AppFeatureDescriptor
     let onEnter: () -> Void
     @Environment(\.dismiss) private var dismiss
+    @Environment(ThemeManager.self) private var themeManager
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
             HStack(spacing: 14) {
-                Image(systemName: feature.systemImage)
-                    .font(.system(size: 28, weight: .semibold))
-                    .foregroundStyle(Color(hex: feature.tintHex))
-                    .frame(width: 58, height: 58)
-                    .background(Color(hex: feature.tintHex).opacity(0.14), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                ThemeSkinIconBadge(
+                    systemName: feature.systemImage,
+                    fallbackColor: Color(hex: feature.tintHex),
+                    size: 58,
+                    symbolSize: 25
+                )
 
                 VStack(alignment: .leading, spacing: 4) {
                     Text(feature.localizedTitle)
                         .font(.title3.weight(.bold))
+                        .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                     Text(feature.localizedSubtitle)
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
+                        .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                 }
+            }
+            .padding(16)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .themeSkinAdaptiveSectionCard(slot: .sectionCard, cornerRadius: 20) {
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .fill(themeManager.cardBackgroundColor.opacity(colorScheme == .dark ? 0.80 : 0.92))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 20, style: .continuous)
+                            .stroke(Color(hex: feature.tintHex).opacity(colorScheme == .dark ? 0.22 : 0.16), lineWidth: 1)
+                    }
             }
 
             Spacer(minLength: 4)
 
             HStack(spacing: 12) {
-                Button("关闭".appLocalized) {
+                Button {
                     dismiss()
+                } label: {
+                    Label("关闭".appLocalized, systemImage: "xmark")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(themeManager.secondaryTextColor)
+                        .themeSkinLegibleText(level: .chip, slot: .sectionCard)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 11)
                 }
-                .buttonStyle(.bordered)
+                .buttonStyle(.plain)
+                .background {
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .fill(themeManager.cardBackgroundColor.opacity(colorScheme == .dark ? 0.72 : 0.84))
+                        .overlay {
+                            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                .stroke(themeManager.secondaryTextColor.opacity(colorScheme == .dark ? 0.20 : 0.14), lineWidth: 1)
+                        }
+                }
 
-                Button(feature.isUnlocked ? "进入".appLocalized : "查看解锁条件".appLocalized) {
+                Button {
                     onEnter()
+                } label: {
+                    Label(
+                        feature.isUnlocked ? "进入".appLocalized : "查看解锁条件".appLocalized,
+                        systemImage: feature.isUnlocked ? "arrow.right.circle.fill" : "lock.circle.fill"
+                    )
                 }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(ThemeSkinPrimaryButtonStyle(fallbackTint: Color(hex: feature.tintHex), cornerRadius: 16, verticalPadding: 11))
             }
         }
-        .padding(22)
+        .padding(18)
     }
 }
 
