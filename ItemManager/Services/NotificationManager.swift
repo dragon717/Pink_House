@@ -305,6 +305,8 @@ class NotificationManager: NSObject, UNUserNotificationCenterDelegate {
                 recordStats = syncPendingRecords(desiredCandidates: [], scheduledKeys: [], modelContext: context)
                 try? context.save()
             }
+            lastRefreshSignature = signature
+            lastRefreshAt = Date()
             let durationMs = Int(Date().timeIntervalSince(startedAt) * 1000)
             logger.info("refresh_finish reason=\(reason, privacy: .public) duration_ms=\(durationMs) permission_blocked=true status=\(status.rawValue) request_removed=\(requestStats.removed) record_removed=\(recordStats.removed)")
             return

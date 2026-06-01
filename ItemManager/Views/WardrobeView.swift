@@ -537,6 +537,7 @@ struct WardrobeView: View {
     @State private var cachedGridColumns: [GridItem]
     @State private var cachedWardrobeThemeDescriptor: ThemeSkinDescriptor?
     @State private var wardrobeCellThemeInputs: WardrobeCellThemeInputs
+    @State private var didReconcilePaidFinalPaymentsForWardrobe = false
     @ObservedObject private var themeSkinManager = ThemeSkinManager.shared
     @AppStorage("privacyShowPrice") private var showPrice = true
     @AppStorage("privacyShowOriginalPrice") private var showOriginalPrice = true
@@ -953,7 +954,7 @@ struct WardrobeView: View {
                 resetStatsScrollState(expand: false)
             }
             .task(id: filterSignature) {
-                await rebuildFilteredClothings()
+                await rebuildFilteredClothings(debounceIfWarm: true)
             }
             .onChange(of: currentWardrobeCellThemeInputs) { _, newValue in
                 wardrobeCellThemeInputs = newValue
@@ -2295,16 +2296,24 @@ struct WardrobeView: View {
     }
 
     @MainActor
-    private func rebuildFilteredClothings() async {
+    private func rebuildFilteredClothings(debounceIfWarm: Bool = false) async {
+        if debounceIfWarm, !filteredClothings.isEmpty {
+            try? await Task.sleep(nanoseconds: 350_000_000)
+            guard !Task.isCancelled else { return }
+        }
+
         let interval = PerformanceSignpost.wardrobeRebuild(count: clothings.count, reason: "filterSignature")
         defer {
             PerformanceSignpost.end(interval, detail: "filtered=\(filteredClothings.count)")
         }
 
-        WealthSavingLedger.reconcilePaidFinalPaymentsIfNeededForView(
-            context: modelContext,
-            reason: "WardrobeView"
-        )
+        if !didReconcilePaidFinalPaymentsForWardrobe {
+            didReconcilePaidFinalPaymentsForWardrobe = true
+            WealthSavingLedger.reconcilePaidFinalPaymentsIfNeededForView(
+                context: modelContext,
+                reason: "WardrobeView"
+            )
+        }
 
         let displayClothings = deduplicatedClothingsForDisplay(from: clothings)
         let snapshots = displayClothings.map(WardrobeClothingSnapshot.init(clothing:))

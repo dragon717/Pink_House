@@ -222,6 +222,7 @@ struct MainContentView: View {
                 // 从后台回到前台时检查是否需要打卡
                 checkAndShowDailyCheckIn()
                 startDeferredFirstLaunchGuideIfNeeded()
+                guard hasCompletedLaunchPresentation else { return }
                 Task {
                     await NotificationManager.shared.reconcileDeliveredNotifications(modelContext: modelContext)
                     await syncDepositNotificationsIfNeeded(reason: "foreground")

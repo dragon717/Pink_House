@@ -13,6 +13,7 @@ final class DailyGreetingManager: ObservableObject {
     
     // 缓存的问候语（按日期+时间段缓存）
     private var greetingCache: [String: DailyGreeting] = [:]
+    private var currentFetchTask: Task<DailyGreeting?, Never>?
     
     // CloudKit 容器
     private let container = CKContainer(identifier: "iCloud.bugod2.SkirtMarket")
@@ -37,16 +38,27 @@ final class DailyGreetingManager: ObservableObject {
            isGreetingValid(greeting) {
             return greeting
         }
+
+        if let currentFetchTask {
+            return await currentFetchTask.value
+        }
         
         // 需要获取新的问候语
-        await fetchOrGenerateGreeting()
-        return currentGreeting
+        let task = Task<DailyGreeting?, Never> { @MainActor [weak self] in
+            guard let self else { return nil }
+            await self.fetchOrGenerateGreeting()
+            return self.currentGreeting
+        }
+        currentFetchTask = task
+        let greeting = await task.value
+        currentFetchTask = nil
+        return greeting
     }
     
     // MARK: - 检查并更新问候语
     private func checkAndUpdateGreeting() {
         Task {
-            await fetchOrGenerateGreeting()
+            _ = await getCurrentGreeting()
         }
     }
     

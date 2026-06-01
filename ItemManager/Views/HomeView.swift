@@ -408,6 +408,7 @@ struct HomeView: View {
     @StateObject private var menuFacetCache = WardrobeMenuFacetCache()
     @StateObject private var draftManager = ClothingEditDraftManager.shared
     @Query(filter: #Predicate<Clothing> { $0.deletedAt == nil }) private var allClothings: [Clothing]
+    @Query(filter: #Predicate<Clothing> { $0.deletedAt == nil && $0.isDepositPlan == true }) private var depositPlanClothings: [Clothing]
     @Query(sort: \Tag.name) private var tags: [Tag]
     @Query(sort: \Brand.name) private var brands: [Brand]
     @Query(filter: #Predicate<DepositNotificationRecord> { $0.isTriggered == true && $0.isRead == false }) private var unreadNotificationRecords: [DepositNotificationRecord]
@@ -685,10 +686,6 @@ struct HomeView: View {
                 hasLoadedDepositPlan = hasLoadedDepositPlan || selectedTab == .depositPlan
                 wardrobeNavigationStyle = WardrobeNavigationStyle.normalizeStoredPreference()
                 draftManager.refreshDraftPresence()
-                refreshMenuFacetCache()
-            }
-            .onChange(of: menuFacetSourceKey) { _, _ in
-                refreshMenuFacetCache()
             }
             .sheet(isPresented: $showingAddSheet) {
                 NavigationStack {
@@ -1430,10 +1427,11 @@ struct HomeView: View {
                     buildFilterSection(for: field)
                 }
             }
-            
+
         } label: {
             filterButtonLabel
                 .onTapGesture {
+                    refreshMenuFacetCache()
                     _ = MenuPerfSignpost.menuOpen("wardrobe.filter")
                 }
         }
@@ -1967,7 +1965,7 @@ extension HomeView {
         
         func pickDay(in interval: DateInterval) -> Int? {
             var candidates: [Date] = []
-            for c in allClothings where c.isFinalPaymentPlan {
+            for c in depositPlanClothings where c.isFinalPaymentPlan {
                 if let end = c.finalPaymentEndDate, interval.contains(end) {
                     candidates.append(end)
                     continue

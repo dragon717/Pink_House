@@ -60,6 +60,8 @@ class SharedContainer {
         category: "WidgetSync"
     )
     private var deleteReplayTask: Task<Void, Never>?
+    private var pendingCloudMaintenanceReason: String?
+    private var pendingCloudMaintenanceEventCount = 0
     private var lastCloudMaintenanceAt: Date?
     private var lastCloudMaintenanceDeleteFingerprint: String?
     private var lastCloudDuplicateRepairAt: Date?
@@ -212,8 +214,6 @@ class SharedContainer {
         ) { [weak self] notification in
             guard let self = self else { return }
             
-            print("☁️ iCloud 同步完成通知收到，准备应用删除...")
-            
             Task { @MainActor [weak self] in
                 self?.scheduleDeleteReplayAfterCloudSync(
                     reason: "icloud-remote-change",
@@ -229,8 +229,6 @@ class SharedContainer {
             queue: .main
         ) { [weak self] notification in
             guard let self = self else { return }
-            
-            print("☁️ iCloud 内容导入完成，准备应用删除...")
             
             Task { @MainActor [weak self] in
                 self?.scheduleDeleteReplayAfterCloudSync(
@@ -259,6 +257,13 @@ class SharedContainer {
 
     @MainActor
     private func scheduleDeleteReplayAfterCloudSync(reason: String, delay: TimeInterval) {
+        pendingCloudMaintenanceReason = reason
+        pendingCloudMaintenanceEventCount += 1
+
+        if deleteReplayTask != nil {
+            return
+        }
+
         let now = Date()
         let pendingFingerprint = DeleteTracker.shared.pendingDeletesFingerprint
         let deleteRecordsChanged = pendingFingerprint != lastCloudMaintenanceDeleteFingerprint
@@ -269,19 +274,26 @@ class SharedContainer {
            let lastCloudMaintenanceAt,
            now.timeIntervalSince(lastCloudMaintenanceAt) < minimumInterval {
             widgetLogger.info("cloud_maintenance_skip reason=\(reason) cooldown=true pending_deletes=\(DeleteTracker.shared.hasPendingDeletes)")
+            pendingCloudMaintenanceReason = nil
+            pendingCloudMaintenanceEventCount = 0
             return
         }
 
-        deleteReplayTask?.cancel()
         deleteReplayTask = Task { @MainActor [weak self] in
             let nanoseconds = UInt64(delay * 1_000_000_000)
             try? await Task.sleep(nanoseconds: nanoseconds)
             guard !Task.isCancelled, let self else { return }
 
+            let replayReason = self.pendingCloudMaintenanceReason ?? reason
+            let eventCount = self.pendingCloudMaintenanceEventCount
+            self.pendingCloudMaintenanceReason = nil
+            self.pendingCloudMaintenanceEventCount = 0
+            self.deleteReplayTask = nil
+
             self.lastCloudMaintenanceAt = Date()
             self.lastCloudMaintenanceDeleteFingerprint = DeleteTracker.shared.pendingDeletesFingerprint
-            print("DeleteTracker: iCloud 同步稳定后应用删除保护 (\(reason))...")
-            self.replayDeletesAfterCloudSync(reason: reason)
+            print("DeleteTracker: iCloud 同步稳定后应用删除保护 (\(replayReason))，合并事件数: \(eventCount)")
+            self.replayDeletesAfterCloudSync(reason: replayReason)
         }
     }
 
@@ -379,11 +391,6 @@ class SharedContainer {
         let context = sharedModelContainer.mainContext
         
         do {
-            let reconciledFinalPayments = WealthSavingLedger.reconcilePaidFinalPayments(context: context)
-            if reconciledFinalPayments > 0 {
-                widgetLogger.info("final_payment_reconcile reason=\(reason) count=\(reconciledFinalPayments)")
-            }
-
             // 1. Fetch Data (只获取未删除的数据)
             let descriptor = FetchDescriptor<Clothing>(predicate: #Predicate { $0.deletedAt == nil }, sortBy: [SortDescriptor(\.purchaseDate, order: .reverse)])
             let clothings = try context.fetch(descriptor)
@@ -391,7 +398,7 @@ class SharedContainer {
             // 2. Calculate Stats
             let totalCount = clothings.reduce(0) { $0 + $1.stock }
             let totalStyleCount = clothings.count
-            let totalPrice = clothings.reduce(Decimal(0)) { $0 + $1.inventoryTotalPrice }
+            let totalPrice = clothings.reduce(Decimal(0)) { $0 + $1.wardrobeListInventoryTotalPrice }
             
             // Calculate Deposit and Balance for active plans
             // Note: App default view filters by current year. Widget should match this to be less confusing.
@@ -411,8 +418,8 @@ class SharedContainer {
             let depositCount = depositPlans.reduce(0) { $0 + $1.stock }
             let depositStyleCount = depositPlans.count // Number of unique clothing items (styles) in the plan
             // 注意：totalDeposit 和 totalBalance 已经包含了 stock 的乘法，所以这里直接使用
-            let totalDeposit = depositPlans.reduce(0) { $0 + $1.totalDeposit }
-            let totalBalance = depositPlans.reduce(0) { $0 + $1.totalBalance }
+            let totalDeposit = depositPlans.reduce(0) { $0 + $1.wardrobeListTotalDeposit }
+            let totalBalance = depositPlans.reduce(0) { $0 + $1.wardrobeListTotalBalance }
             
             // 3. Recent Items & Image Processing (Optimized)
             // Extract DTOs for background processing
@@ -440,8 +447,8 @@ class SharedContainer {
                 
                 let count = monthlyItems.reduce(0) { $0 + $1.stock }
                 // 注意：totalDeposit 和 totalBalance 已经包含了 stock 的乘法，所以这里直接使用
-                let mBalance = monthlyItems.reduce(0) { $0 + $1.totalBalance }
-                let mDeposit = monthlyItems.reduce(0) { $0 + $1.totalDeposit }
+                let mBalance = monthlyItems.reduce(0) { $0 + $1.wardrobeListTotalBalance }
+                let mDeposit = monthlyItems.reduce(0) { $0 + $1.wardrobeListTotalDeposit }
                 
                 monthStats.append(WidgetMonthInfo(
                     month: month,

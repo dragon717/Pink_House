@@ -173,22 +173,18 @@ class NoticeCloudKitService: ObservableObject {
     private func fetchNoticeRecordsWithFallback() async throws -> [CKRecord] {
         do {
             return try await performNoticeQuery(
-                includeSortDescriptors: true,
+                includeSortDescriptors: false,
                 predicate: NSPredicate(format: "createdAt > %@", Date(timeIntervalSince1970: 0) as NSDate)
             )
         } catch let error as CKError where error.code == .invalidArguments {
-            print("⚠️ 公告排序查询失败，降级为业务字段查询 + 本地排序: \(error.localizedDescription)")
+            print("⚠️ 公告 createdAt 查询失败，尝试切换到 title 查询: \(error.localizedDescription)")
             do {
-                return try await performNoticeQuery(
-                    includeSortDescriptors: false,
-                    predicate: NSPredicate(format: "createdAt > %@", Date(timeIntervalSince1970: 0) as NSDate)
-                )
-            } catch let fallbackError as CKError where fallbackError.code == .invalidArguments {
-                print("⚠️ 公告 createdAt 查询仍失败，尝试切换到 title 查询: \(fallbackError.localizedDescription)")
                 return try await performNoticeQuery(
                     includeSortDescriptors: false,
                     predicate: NSPredicate(format: "title != %@", "")
                 )
+            } catch {
+                throw error
             }
         }
     }
