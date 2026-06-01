@@ -23,6 +23,30 @@ private func deferVisibleWardrobeImageDecodeForFirstFrame() async {
     try? await Task.sleep(nanoseconds: delay)
 }
 
+private func wardrobeLocalizedNumber(_ value: Decimal, fractionLength: Int = 0) -> String {
+    value.formatted(
+        .number
+            .precision(.fractionLength(fractionLength))
+            .locale(LanguageManager.shared.locale)
+    )
+}
+
+private func wardrobeCurrencyText(label: String, amount: Decimal, fractionLength: Int = 0) -> String {
+    "%@¥%@".appLocalized(label, wardrobeLocalizedNumber(amount, fractionLength: fractionLength))
+}
+
+private func wardrobeCurrencyLineText(label: String, amount: Decimal, fractionLength: Int = 0) -> String {
+    "%@: ¥%@".appLocalized(label, wardrobeLocalizedNumber(amount, fractionLength: fractionLength))
+}
+
+private func wardrobeLabelValueText(label: String, value: String) -> String {
+    "%@: %@".appLocalized(label, value)
+}
+
+private func wardrobeDepositPlanSummary(deposit: Decimal, balance: Decimal) -> String {
+    "\(wardrobeCurrencyText(label: "定金".appLocalized, amount: deposit))+\(wardrobeCurrencyText(label: "尾款".appLocalized, amount: balance))"
+}
+
 struct WardrobeCellSnapshot: Identifiable, Equatable, Sendable {
     let id: UUID
     let name: String
@@ -399,7 +423,7 @@ struct ClothingCard: View, Equatable {
                     
                     if snapshot.isDepositPlan {
                         wardrobeCellBadge(
-                            text: snapshot.isFullPaymentReservation ? "全款预约" : "心愿尾款",
+                            text: snapshot.isFullPaymentReservation ? "全款预约".appLocalized : "心愿尾款".appLocalized,
                             tint: Color(hex: "7A5A54"),
                             icon: "heart.fill"
                         )
@@ -462,7 +486,7 @@ struct ClothingCard: View, Equatable {
                     
                     VStack(alignment: .leading, spacing: 2) {
                         if showOriginalPrice && snapshot.originalPrice > 0 && !snapshot.isDepositPlan {
-                            Text("原价¥\(snapshot.originalPrice, format: .number.precision(.fractionLength(0)))")
+                            Text(wardrobeCurrencyText(label: "原价".appLocalized, amount: snapshot.originalPrice))
                                 .font(.system(size: 10))
                                 .strikethrough()
                                 .foregroundStyle(themedSecondaryColor)
@@ -472,7 +496,7 @@ struct ClothingCard: View, Equatable {
                         if showPrice {
                             if snapshot.isDepositPlan {
                                 if snapshot.isFullPaymentReservation {
-                                    Text("全款¥\(snapshot.fullPaymentReservationTotalAmount, format: .number.precision(.fractionLength(0)))")
+                                    Text(wardrobeCurrencyText(label: "全款".appLocalized, amount: snapshot.fullPaymentReservationTotalAmount))
                                         .font(.system(size: 11, weight: .bold))
                                         .foregroundStyle(themedAccentColor)
                                         .themeSkinLegibleText(level: .inline, slot: .wardrobeItemCard, descriptor: wardrobeThemeDescriptor)
@@ -482,8 +506,8 @@ struct ClothingCard: View, Equatable {
                                     let totalDeposit = snapshot.totalDeposit
                                     let totalBalance = snapshot.totalBalance
                                     HStack(spacing: 4) {
-                                        Text("定金¥\(totalDeposit, format: .number.precision(.fractionLength(0)))")
-                                        Text("尾款¥\(totalBalance, format: .number.precision(.fractionLength(0)))")
+                                        Text(wardrobeCurrencyText(label: "定金".appLocalized, amount: totalDeposit))
+                                        Text(wardrobeCurrencyText(label: "尾款".appLocalized, amount: totalBalance))
                                     }
                                     .font(.system(size: 11, weight: .bold))
                                     .foregroundStyle(themedAccentColor)
@@ -790,7 +814,7 @@ struct ClothingRow: View, Equatable {
                 }
                 .overlay(alignment: .topTrailing) {
                     if snapshot.isDepositPlan {
-                        Text(snapshot.isFullPaymentReservation ? "全款" : "尾款")
+                        Text(snapshot.isFullPaymentReservation ? "全款".appLocalized : "尾款".appLocalized)
                             .font(.system(size: 10, weight: .bold))
                             .foregroundStyle(.white)
                             .themeSkinLegibleText(level: .chip, slot: .discountBadge, descriptor: wardrobeThemeDescriptor)
@@ -843,7 +867,7 @@ struct ClothingRow: View, Equatable {
                 
                 VStack(alignment: .trailing, spacing: 4) {
                     if showOriginalPrice && snapshot.originalPrice > 0 {
-                        Text("原价: ¥\(snapshot.originalPrice, format: .number.precision(.fractionLength(0)))")
+                        Text(wardrobeCurrencyLineText(label: "原价".appLocalized, amount: snapshot.originalPrice))
                             .font(.caption2)
                             .foregroundStyle(rowSecondaryColor)
                             .themeSkinLegibleText(level: .inline, slot: .wardrobeItemCard, descriptor: wardrobeThemeDescriptor)
@@ -852,7 +876,7 @@ struct ClothingRow: View, Equatable {
                     if showPrice {
                         if snapshot.isDepositPlan {
                             if snapshot.isFullPaymentReservation {
-                                Text("全款预约")
+                                Text("全款预约".appLocalized)
                                     .font(.caption2)
                                     .foregroundStyle(rowAccentColor)
                                     .themeSkinLegibleText(level: .inline, slot: .wardrobeItemCard, descriptor: wardrobeThemeDescriptor)
@@ -866,11 +890,11 @@ struct ClothingRow: View, Equatable {
                                 let totalDeposit = snapshot.totalDeposit
                                 let totalBalance = snapshot.totalBalance
 
-                                Text("定金: ¥\(totalDeposit, format: .number.precision(.fractionLength(0)))")
+                                Text(wardrobeCurrencyLineText(label: "定金".appLocalized, amount: totalDeposit))
                                     .font(.caption)
                                     .foregroundStyle(rowAccentColor)
                                     .themeSkinLegibleText(level: .inline, slot: .wardrobeItemCard, descriptor: wardrobeThemeDescriptor)
-                                Text("尾款: ¥\(totalBalance, format: .number.precision(.fractionLength(0)))")
+                                Text(wardrobeCurrencyLineText(label: "尾款".appLocalized, amount: totalBalance))
                                     .font(.caption)
                                     .bold()
                                     .foregroundStyle(rowAccentColor)
@@ -879,7 +903,7 @@ struct ClothingRow: View, Equatable {
                         } else {
                             let totalWithAccessories = snapshot.inventoryTotalPrice
                             
-                            Text("合计: ¥\(totalWithAccessories, format: .number.precision(.fractionLength(0)))")
+                            Text(wardrobeCurrencyLineText(label: "合计".appLocalized, amount: totalWithAccessories))
                                 .font(.subheadline)
                                 .bold()
                                 .foregroundStyle(rowPrimaryColor)
@@ -888,7 +912,7 @@ struct ClothingRow: View, Equatable {
                     }
                     
                     if snapshot.stock > 1 {
-                        Text("库存: \(snapshot.stock)")
+                        Text(wardrobeLabelValueText(label: "库存".appLocalized, value: "\(snapshot.stock)"))
                             .font(.caption)
                             .foregroundStyle(isThemeSkinThemed ? rowSecondaryColor : palette.tertiary)
                             .themeSkinLegibleText(level: .inline, slot: .wardrobeItemCard, descriptor: wardrobeThemeDescriptor)
@@ -1061,7 +1085,7 @@ struct ClothingRowBrief: View, Equatable {
 
                 if showOriginalPrice {
                     if snapshot.originalPrice > 0 {
-                        Text("原价¥\(snapshot.originalPrice, format: .number.precision(.fractionLength(0)))")
+                        Text(wardrobeCurrencyText(label: "原价".appLocalized, amount: snapshot.originalPrice))
                             .font(.caption)
                             .foregroundStyle(rowSecondaryColor)
                             .themeSkinLegibleText(level: .inline, slot: .wardrobeItemCard, descriptor: wardrobeThemeDescriptor)
@@ -1071,8 +1095,8 @@ struct ClothingRowBrief: View, Equatable {
                 if showPrice {
                     if snapshot.isDepositPlan {
                         Text(snapshot.isFullPaymentReservation
-                             ? "全款¥\(snapshot.fullPaymentReservationTotalAmount.formatted(.number.precision(.fractionLength(0))))"
-                             : "定金¥\(snapshot.totalDeposit.formatted(.number.precision(.fractionLength(0))))+尾款¥\(snapshot.totalBalance.formatted(.number.precision(.fractionLength(0))))")
+                             ? wardrobeCurrencyText(label: "全款".appLocalized, amount: snapshot.fullPaymentReservationTotalAmount)
+                             : wardrobeDepositPlanSummary(deposit: snapshot.totalDeposit, balance: snapshot.totalBalance))
                             .font(.caption)
                             .bold()
                             .foregroundStyle(rowAccentColor)
