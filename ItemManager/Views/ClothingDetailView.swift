@@ -89,7 +89,7 @@ struct ClothingDetailView: View {
                             Button {
                                 showingFinalPaymentSheet = true
                             } label: {
-                                Text("尾款付清")
+                                Text("尾款付清".appLocalized)
                                     .themeSkinLegibleText(level: .chip, slot: .primaryButton)
                             }
                             .buttonStyle(ThemeSkinPrimaryButtonStyle(fallbackTint: .pink, cornerRadius: 16, verticalPadding: 15))
@@ -99,9 +99,9 @@ struct ClothingDetailView: View {
                         
                         // MARK: - Metadata Info (Created/Updated)
                         VStack(spacing: 4) {
-                            Text("添加时间: \(clothing.createdAt.formatted(date: .numeric, time: .shortened))")
+                            Text("添加时间: %@".appLocalized(formattedMetadataDate(clothing.createdAt)))
                                 .themeSkinLegibleText(level: .inline, slot: .sectionCard)
-                            Text("修改时间: \(clothing.updatedAt.formatted(date: .numeric, time: .shortened))")
+                            Text("修改时间: %@".appLocalized(formattedMetadataDate(clothing.updatedAt)))
                                 .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                         }
                         .font(.caption2)
@@ -128,7 +128,7 @@ struct ClothingDetailView: View {
                                 VStack(spacing: 2) {
                                     Image(systemName: "bubble.left.and.bubble.right")
                                         .font(.title2)
-                                    Text("社区")
+                                    Text("社区".appLocalized)
                                         .font(.caption2)
                                         .themeSkinLegibleText(level: .chip, slot: .iconCircleButton)
                                 }
@@ -152,7 +152,7 @@ struct ClothingDetailView: View {
 
             }
         }
-        .navigationTitle("衣橱详情")
+        .navigationTitle("衣橱详情".appLocalized)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
@@ -171,19 +171,19 @@ struct ClothingDetailView: View {
                         Button {
                             showingEditSheet = true
                         } label: {
-                            Label("编辑", systemImage: "pencil")
+                            Label("编辑".appLocalized, systemImage: "pencil")
                         }
                         
                         Button {
                             duplicateClothing()
                         } label: {
-                            Label("复制", systemImage: "doc.on.doc")
+                            Label("复制".appLocalized, systemImage: "doc.on.doc")
                         }
                         
                         Button(role: .destructive) {
                             showingDeleteAlert = true
                         } label: {
-                            Label("删除", systemImage: "trash")
+                            Label("删除".appLocalized, systemImage: "trash")
                         }
                     } label: {
                         Image(systemName: "ellipsis")
@@ -220,9 +220,9 @@ struct ClothingDetailView: View {
                 onRecord: recordFinalPayment
             )
         }
-        .alert("确认删除", isPresented: $showingDeleteAlert) {
-            Button("取消", role: .cancel) { }
-            Button("删除", role: .destructive) {
+        .alert("确认删除".appLocalized, isPresented: $showingDeleteAlert) {
+            Button("取消".appLocalized, role: .cancel) { }
+            Button("删除".appLocalized, role: .destructive) {
                 NotificationManager.shared.cancelNotification(for: clothing)
                 // Soft delete
                 clothing.isDeleted = true
@@ -249,15 +249,15 @@ struct ClothingDetailView: View {
                 dismiss()
             }
         } message: {
-            Text("确定要删除这件裙装吗？它将被移动到回收站，你可以随时恢复。")
+            Text("确定要删除这件裙装吗？它将被移动到回收站，你可以随时恢复。".appLocalized)
         }
-        .alert("确认签收？", isPresented: $showingFullPaymentReceiptAlert) {
-            Button("取消", role: .cancel) { }
-            Button("确认签收") {
+        .alert("确认签收？".appLocalized, isPresented: $showingFullPaymentReceiptAlert) {
+            Button("取消".appLocalized, role: .cancel) { }
+            Button("确认签收".appLocalized) {
                 markFullPaymentReservationReceived()
             }
         } message: {
-            Text("确认后会把这条全款预约移入已拥有，并将「未到货」状态改回「全新」。")
+            Text("确认后会把这条全款预约移入已拥有，并将「未到货」状态改回「全新」。".appLocalized)
         }
         .onAppear {
             // 进入详情页时，若定金和尾款 存在，自动重算总价并保存
@@ -311,7 +311,7 @@ struct ClothingDetailView: View {
             NotificationCenter.default.post(name: .depositPlanDataDidChange, object: clothing.id)
         } catch {
             print("ClothingDetailView: Failed to receive full payment reservation: \(error)")
-            ToastManager.shared.showError("签收失败，请稍后再试")
+            ToastManager.shared.showError("签收失败，请稍后再试".appLocalized)
             return
         }
 
@@ -326,12 +326,16 @@ struct ClothingDetailView: View {
         NotificationManager.shared.updateApplicationBadge(modelContext: modelContext)
         Task { await SharedPersistence.shared.syncWidgetData(reason: "full-payment-received") }
         updateClothingCountCache()
-        ToastManager.shared.showSuccess("已签收，已移入已拥有")
+        ToastManager.shared.showSuccess("已签收，已移入已拥有".appLocalized)
     }
 
     private func shouldResetConditionAfterReceipt(_ condition: String) -> Bool {
         let normalized = condition.trimmingCharacters(in: .whitespacesAndNewlines)
         return normalized.isEmpty || normalized == "未到货"
+    }
+
+    private func formattedMetadataDate(_ date: Date) -> String {
+        date.formatted(.dateTime.year().month().day().hour().minute().locale(LanguageManager.shared.locale))
     }
     
     private func validateCurrentImageIndex() {
@@ -541,7 +545,7 @@ struct ClothingDetailView: View {
                     } label: {
                         HStack(spacing: 4) {
                             Image(systemName: "arrow.right.circle.fill")
-                            Text("追根溯源")
+                            Text("追根溯源".appLocalized)
                                 .themeSkinLegibleText(level: .chip, slot: .primaryButton)
                         }
                         .font(.caption)
@@ -606,7 +610,7 @@ struct ClothingDetailView: View {
                         alignment: .leading
                     )
                 } else {
-                    Text("暂无品牌信息")
+                    Text("暂无品牌信息".appLocalized)
                         .font(.subheadline)
                         .unifiedTertiary()
                         .themeSkinLegibleText(level: .inline, slot: .sectionCard)
@@ -638,7 +642,7 @@ struct ClothingDetailView: View {
     /// 详细信息卡片 - 使用统一配色
     private var detailInfoCard: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Label("裙装信息", systemImage: "info.circle.fill")
+            Label("裙装信息".appLocalized, systemImage: "info.circle.fill")
                 .font(.headline)
                 .unifiedPrimary()
                 .themeSkinLegibleText(level: .inline, slot: .sectionCard)
@@ -668,7 +672,7 @@ struct ClothingDetailView: View {
                     .foregroundStyle(themeManager.tertiaryTextColor)
                     .frame(width: 20)
                 
-                Text("尺码")
+                Text("尺码".appLocalized)
                     .font(.subheadline)
                     .foregroundStyle(themeManager.secondaryTextColor)
                     .themeSkinLegibleText(level: .inline, slot: .sectionCard)
@@ -713,12 +717,18 @@ struct ClothingDetailView: View {
         switch clothing.originalPriceCurrency {
         case .cny:
             if clothing.originalPriceJPY > 0 {
-                return "¥\(clothing.originalPrice.formatted(.number.precision(.fractionLength(0...2))))（约 JP¥\(clothing.originalPriceJPY.formatted(.number.precision(.fractionLength(0...2))))）"
+                return "¥%@（约 JP¥%@）".appLocalized(
+                    detailNumberText(clothing.originalPrice),
+                    detailNumberText(clothing.originalPriceJPY)
+                )
             }
-            return "¥\(clothing.originalPrice.formatted(.number.precision(.fractionLength(0...2))))"
+            return "¥%@".appLocalized(detailNumberText(clothing.originalPrice))
         case .jpy:
             let jpy = clothing.originalPriceJPY > 0 ? clothing.originalPriceJPY : clothing.originalPrice * clothing.originalPriceExchangeRateJPY
-            return "JP¥\(jpy.formatted(.number.precision(.fractionLength(0...2))))（折合 ¥\(clothing.originalPrice.formatted(.number.precision(.fractionLength(0...2))))）"
+            return "JP¥%@（折合 ¥%@）".appLocalized(
+                detailNumberText(jpy),
+                detailNumberText(clothing.originalPrice)
+            )
         }
     }
 
@@ -730,19 +740,25 @@ struct ClothingDetailView: View {
         guard let updatedAt = clothing.originalPriceRateUpdatedAt else {
             return "1 CNY = %@ JPY（未记录时间）".appLocalized(rateText)
         }
-        return "1 CNY = \(rateText) JPY（\(updatedAt.formatted(date: .numeric, time: .shortened))）"
+        return "1 CNY = %@ JPY（%@）".appLocalized(rateText, formattedMetadataDate(updatedAt))
     }
 
     private var formattedShippingFee: String {
         switch clothing.shippingFeeCurrency {
         case .cny:
             if clothing.shippingFeeJPY > 0 {
-                return "¥\(clothing.resolvedShippingFee.formatted(.number.precision(.fractionLength(0...2))))（约 JP¥\(clothing.shippingFeeJPY.formatted(.number.precision(.fractionLength(0...2))))）"
+                return "¥%@（约 JP¥%@）".appLocalized(
+                    detailNumberText(clothing.resolvedShippingFee),
+                    detailNumberText(clothing.shippingFeeJPY)
+                )
             }
-            return "¥\(clothing.resolvedShippingFee.formatted(.number.precision(.fractionLength(0...2))))"
+            return "¥%@".appLocalized(detailNumberText(clothing.resolvedShippingFee))
         case .jpy:
             let jpy = clothing.shippingFeeJPY > 0 ? clothing.shippingFeeJPY : clothing.resolvedShippingFee * clothing.shippingExchangeRateJPY
-            return "JP¥\(jpy.formatted(.number.precision(.fractionLength(0...2))))（折合 ¥\(clothing.resolvedShippingFee.formatted(.number.precision(.fractionLength(0...2))))）"
+            return "JP¥%@（折合 ¥%@）".appLocalized(
+                detailNumberText(jpy),
+                detailNumberText(clothing.resolvedShippingFee)
+            )
         }
     }
 
@@ -751,7 +767,7 @@ struct ClothingDetailView: View {
         VStack(alignment: .leading, spacing: 16) {
             // 价格信息标题行，右侧显示价格表缩略图
             HStack {
-                Label("价格信息", systemImage: "yensign.circle.fill")
+                Label("价格信息".appLocalized, systemImage: "yensign.circle.fill")
                     .font(.headline)
                     .unifiedPrimary()
                 
@@ -816,11 +832,11 @@ struct ClothingDetailView: View {
                     .background(themeManager.tertiaryTextColor.opacity(0.3))
                 VStack(alignment: .leading, spacing: 8) {
                     HStack {
-                        Text("小物明细")
+                        Text("小物明细".appLocalized)
                             .unifiedPrimary()
                             .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                         Spacer()
-                        Text("小物总价: ¥\(items.reduce(Decimal(0)) { $0 + $1.price }.formatted(.number.precision(.fractionLength(0...2))))")
+                        Text("小物总价: ¥%@".appLocalized(detailNumberText(items.reduce(Decimal(0)) { $0 + $1.price })))
                             .unifiedSecondary()
                             .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                     }
@@ -842,12 +858,12 @@ struct ClothingDetailView: View {
                             if clothing.reservationKind == .depositPlan && (item.deposit > 0 || item.balance > 0) {
                                 HStack {
                                     if item.deposit > 0 {
-                                        Text("定金: ¥\(item.deposit.formatted(.number.precision(.fractionLength(0...2))))")
+                                        Text("定金: ¥%@".appLocalized(detailNumberText(item.deposit)))
                                             .unifiedTertiary()
                                             .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                                     }
                                     if item.balance > 0 {
-                                        Text("尾款: ¥\(item.balance.formatted(.number.precision(.fractionLength(0...2))))")
+                                        Text("尾款: ¥%@".appLocalized(detailNumberText(item.balance)))
                                             .unifiedTertiary()
                                             .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                                     }
@@ -885,7 +901,10 @@ struct ClothingDetailView: View {
             .cornerRadius(12)
             
             if clothing.stock > 1 && !clothing.isFullPaymentReservation {
-                Text("包含 \(clothing.stock) 件库存，单套价值 ¥\(clothing.unitTotalPrice.formatted(.number.precision(.fractionLength(0))))；邮费不随库存倍增")
+                Text("包含 %d 件库存，单套价值 ¥%@；邮费不随库存倍增".appLocalized(
+                    clothing.stock,
+                    clothing.unitTotalPrice.formatted(.number.precision(.fractionLength(0)).locale(LanguageManager.shared.locale))
+                ))
                     .font(.caption)
                     .unifiedTertiary()
                     .themeSkinLegibleText(level: .inline, slot: .sectionCard)
@@ -922,6 +941,14 @@ struct ClothingDetailView: View {
         NSDecimalNumber(decimal: value).stringValue
     }
 
+    private func detailNumberText(_ value: Decimal) -> String {
+        value.formatted(
+            .number
+                .precision(.fractionLength(0...2))
+                .locale(LanguageManager.shared.locale)
+        )
+    }
+
     private func formattedRecordDate(_ date: Date?) -> String {
         date?.formatted(.dateTime.year().month().day().locale(LanguageManager.shared.locale)) ?? "已记录".appLocalized
     }
@@ -929,7 +956,7 @@ struct ClothingDetailView: View {
     /// 购买信息卡片 - 使用统一配色
     private var purchaseInfoCard: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Label("购买信息", systemImage: "bag.fill")
+            Label("购买信息".appLocalized, systemImage: "bag.fill")
                 .font(.headline)
                 .unifiedPrimary()
                 .themeSkinLegibleText(level: .inline, slot: .sectionCard)
@@ -965,7 +992,7 @@ struct ClothingDetailView: View {
             
             if !clothing.note.isEmpty {
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("备注")
+                    Text("备注".appLocalized)
                         .font(.subheadline)
                         .unifiedSecondary()
                         .themeSkinLegibleText(level: .inline, slot: .sectionCard)
@@ -1015,12 +1042,12 @@ struct FinalPaymentRecordingSheet: View {
                 confirmCard
                 .padding()
             }
-            .navigationTitle("尾款付清")
+            .navigationTitle("尾款付清".appLocalized)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("取消") { dismiss() } }
+                ToolbarItem(placement: .cancellationAction) { Button("取消".appLocalized) { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("付清") {
+                    Button("付清".appLocalized) {
                         onRecord(remainingAmount)
                         dismiss()
                     }
@@ -1033,7 +1060,7 @@ struct FinalPaymentRecordingSheet: View {
 
     private var confirmCard: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Label("尾款付清", systemImage: "checkmark.seal.fill")
+            Label("尾款付清".appLocalized, systemImage: "checkmark.seal.fill")
                 .font(.headline)
                 .foregroundStyle(Color(hex: "C94C72"))
                 .themeSkinLegibleText(level: .inline, slot: .sectionCard)
@@ -1049,7 +1076,7 @@ struct FinalPaymentRecordingSheet: View {
                 .foregroundStyle(Color(hex: "C94C72"))
                 .themeSkinLegibleText(level: .chip, slot: .sectionCard)
 
-            Text("确认后会把剩余尾款记为已支付，并恢复为普通已购裙装。")
+            Text("确认后会把剩余尾款记为已支付，并恢复为普通已购裙装。".appLocalized)
                 .font(.caption)
                 .foregroundStyle(themeManager.secondaryTextColor)
                 .themeSkinLegibleText(level: .inline, slot: .sectionCard)
