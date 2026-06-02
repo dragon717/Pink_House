@@ -1014,7 +1014,7 @@ private struct PetMoneyCounterWidget: View {
 
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("剩余金额")
+                    Text("剩余金额".appLocalized)
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                         .themeSkinLegibleText(level: .inline, slot: .sectionCard)
@@ -1025,7 +1025,7 @@ private struct PetMoneyCounterWidget: View {
                         .monospacedDigit()
                 }
                 Spacer()
-                Text("已数：\(currencySymbol)\(extractedBills * denomination.value)")
+                Text("已数：%@".appLocalized("\(currencySymbol)\(extractedBills * denomination.value)"))
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .themeSkinLegibleText(level: .inline, slot: .sectionCard)
@@ -1040,7 +1040,7 @@ private struct PetMoneyCounterWidget: View {
                     )
 
                 if remainingBills == 0 {
-                    Text(WealthExperienceCopy.Counting.finishedInline)
+                    Text(WealthExperienceCopy.Counting.finishedInline.appLocalized)
                         .font(.headline)
                         .foregroundStyle(.white.opacity(0.9))
                         .themeSkinLegibleText(level: .chip, slot: .sectionCard)
@@ -1061,7 +1061,7 @@ private struct PetMoneyCounterWidget: View {
             .scaleEffect(stackScale)
             .animation(.spring(response: 0.28, dampingFraction: 0.68), value: stackScale)
 
-            Text("拖走最上面那张，或者点一下数钞")
+            Text("拖走最上面那张，或者点一下数钞".appLocalized)
                 .font(.caption2)
                 .foregroundStyle(.secondary)
                 .themeSkinLegibleText(level: .inline, slot: .sectionCard)
