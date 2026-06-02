@@ -52,7 +52,7 @@ struct PetAdoptionView: View {
                                         }
                                         
                                         if !canAfford {
-                                            missingCurrencyName = currency.rawValue
+                                            missingCurrencyName = currency.localizedName
                                             showInsufficientFundsAlert = true
                                             return
                                         }
@@ -77,7 +77,7 @@ struct PetAdoptionView: View {
                 .padding(.horizontal, layout.horizontalInset)
             }
         }
-        .navigationTitle("领养伙伴")
+        .navigationTitle("领养伙伴".appLocalized)
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {
             postAdoptionGuideNotification(
@@ -106,9 +106,9 @@ struct PetAdoptionView: View {
                 )
             }
         }
-        .alert("为它起个名字", isPresented: $showNameInput) {
-            TextField("名字", text: $inputName)
-            Button("确定") {
+        .alert("为它起个名字".appLocalized, isPresented: $showNameInput) {
+            TextField("名字".appLocalized, text: $inputName)
+            Button("确定".appLocalized) {
                 if let pet = selectedPet {
                     let name = inputName.trimmingCharacters(in: .whitespacesAndNewlines)
                     let didAdopt = viewModel.adoptPet(pet, name: name.isEmpty ? nil : name)
@@ -121,14 +121,14 @@ struct PetAdoptionView: View {
                     }
                 }
             }
-            Button("取消", role: .cancel) { }
+            Button("取消".appLocalized, role: .cancel) { }
         } message: {
-            Text("给你的小伙伴起个独特的名字吧！")
+            Text("给你的小伙伴起个独特的名字吧！".appLocalized)
         }
-        .alert("余额不足", isPresented: $showInsufficientFundsAlert) {
-            Button("好的", role: .cancel) { }
+        .alert("余额不足".appLocalized, isPresented: $showInsufficientFundsAlert) {
+            Button("好的".appLocalized, role: .cancel) { }
         } message: {
-            Text("您需要更多的 \(missingCurrencyName) 才能领养这只小可爱。")
+            Text("您需要更多的 %@ 才能领养这只小可爱。".appLocalized(missingCurrencyName))
         }
     }
 
@@ -197,12 +197,12 @@ struct PetAdoptionCard: View {
                 .scaleEffect(1.0 + abs(minX / 1000.0))
             
             VStack(spacing: layout.textSpacing) {
-                Text(pet.displayName)
+                Text(pet.localizedDisplayName)
                     .font(.system(size: layout.titleFontSize, weight: .bold, design: .rounded))
                     .minimumScaleFactor(0.85)
                     .lineLimit(1)
                 
-                Text(pet.description)
+                Text(pet.localizedDescription)
                     .font(.system(size: layout.descriptionFontSize))
                     .multilineTextAlignment(.center)
                     .foregroundColor(.secondary)
@@ -215,7 +215,7 @@ struct PetAdoptionCard: View {
             }
             
             if isOwned {
-                Text("已领养")
+                Text("已领养".appLocalized)
                     .font(.system(size: layout.badgeFontSize, weight: .black))
                     .foregroundColor(.pink.opacity(0.8))
                     .padding(.horizontal, layout.badgeHorizontalPadding)
@@ -229,11 +229,11 @@ struct PetAdoptionCard: View {
             } else {
                 Button(action: onAdopt) {
                     HStack(spacing: 4) {
-                        Text("领养")
+                        Text("领养".appLocalized)
                             .font(.system(size: layout.buttonTitleFontSize, weight: .bold))
                         
                         if price > 0 {
-                            Text("(\(price)\(currency.rawValue))")
+                            Text("（%d%@）".appLocalized(price, currency.localizedName))
                                 .font(.system(size: layout.buttonDetailFontSize, weight: .semibold))
                         }
                     }
