@@ -56,21 +56,21 @@ struct PetChatMenuContent: View {
     // iOS26+ 风格：使用 Section 布局
     private var sectionBasedLayout: some View {
         Group {
-            Section("AI搭配") {
+            Section("AI搭配".appLocalized) {
                 aiOutfitButtons
             }
             
             Menu {
                 shortcutFunctionButtons
             } label: {
-                Label("快捷功能", systemImage: "sparkles")
+                Label("快捷功能".appLocalized, systemImage: "sparkles")
             }
             
-            Section("查找") {
+            Section("查找".appLocalized) {
                 searchButtons
             }
             
-            Section("其他") {
+            Section("其他".appLocalized) {
                 Button {
                     callbacks.handleDivinationPanel()
                 } label: {
@@ -83,11 +83,11 @@ struct PetChatMenuContent: View {
     // iOS18 以下风格：使用嵌套 Menu 布局
     private var nestedMenuLayout: some View {
         Group {
-            Menu("AI搭配") {
+            Menu("AI搭配".appLocalized) {
                 aiOutfitButtons
             }
             
-            Menu("快捷功能") {
+            Menu("快捷功能".appLocalized) {
                 shortcutFunctionButtons
             }
             
@@ -99,16 +99,16 @@ struct PetChatMenuContent: View {
     private var aiOutfitButtons: some View {
         Group {
             Button {
-                callbacks.handleOutfitSuggestion("帮我搭配一套")
+                callbacks.handleOutfitSuggestion("帮我搭配一套".appLocalized)
             } label: {
-                Label("智能搭配", systemImage: "wand.and.stars")
+                Label("智能搭配".appLocalized, systemImage: "wand.and.stars")
             }
             
             if useSectionLayout {
                 Menu {
                     quickOutfitButtons
                 } label: {
-                    Label("快速搭配", systemImage: "sparkles")
+                    Label("快速搭配".appLocalized, systemImage: "sparkles")
                 }
             } else {
                 quickOutfitButtons
@@ -122,19 +122,19 @@ struct PetChatMenuContent: View {
             Button {
                 callbacks.createQuickOutfit("甜美", "约会")
             } label: {
-                Label("甜美约会", systemImage: useSectionLayout ? "heart.fill" : "heart")
+                Label("甜美约会".appLocalized, systemImage: useSectionLayout ? "heart.fill" : "heart")
             }
             
             Button {
                 callbacks.createQuickOutfit("优雅", "茶会")
             } label: {
-                Label("优雅茶会", systemImage: useSectionLayout ? "cup.and.saucer.fill" : "cup.and.saucer")
+                Label("优雅茶会".appLocalized, systemImage: useSectionLayout ? "cup.and.saucer.fill" : "cup.and.saucer")
             }
             
             Button {
                 callbacks.createQuickOutfit("日常", "出门")
             } label: {
-                Label("日常出门", systemImage: useSectionLayout ? "bag.fill" : "bag")
+                Label("日常出门".appLocalized, systemImage: useSectionLayout ? "bag.fill" : "bag")
             }
         }
     }
@@ -145,20 +145,20 @@ struct PetChatMenuContent: View {
             Button {
                 callbacks.handleWardrobeStatistics()
             } label: {
-                Label("统计裙子", systemImage: useSectionLayout ? "chart.pie.fill" : "chart.pie")
+                Label("统计裙子".appLocalized, systemImage: useSectionLayout ? "chart.pie.fill" : "chart.pie")
             }
             
             Button {
                 callbacks.handlePetStatusOverview()
             } label: {
-                Label("查看萌宠状态", systemImage: "heart.text.square.fill")
+                Label("查看萌宠状态".appLocalized, systemImage: "heart.text.square.fill")
             }
             
             if context.quickMenuOwnedPets.count > 1 {
                 Button {
                     callbacks.handleSwitchPetIntent()
                 } label: {
-                    Label("切换萌宠", systemImage: "arrow.triangle.2.circlepath")
+                    Label("切换萌宠".appLocalized, systemImage: "arrow.triangle.2.circlepath")
                 }
             }
             
@@ -173,31 +173,31 @@ struct PetChatMenuContent: View {
             Button {
                 callbacks.handleRenamePetIntent()
             } label: {
-                Label("改名", systemImage: "pencil")
+                Label("改名".appLocalized, systemImage: "pencil")
             }
             
             Button {
                 callbacks.handleInventoryPanel()
             } label: {
-                Label("看看我的背包", systemImage: "shippingbox.fill")
+                Label("看看我的背包".appLocalized, systemImage: "shippingbox.fill")
             }
             
             Button {
                 callbacks.handleShopPanel()
             } label: {
-                Label("带我逛逛商店", systemImage: "cart.fill")
+                Label("带我逛逛商店".appLocalized, systemImage: "cart.fill")
             }
             
             Button {
                 callbacks.handleWeatherOutfitGuidance()
             } label: {
-                Label("查看天气穿搭", systemImage: "cloud.sun.rain.fill")
+                Label("查看天气穿搭".appLocalized, systemImage: "cloud.sun.rain.fill")
             }
             
             Button {
                 callbacks.handleDepositPlanQuery()
             } label: {
-                Label("尾款提醒", systemImage: useSectionLayout ? "tag.fill" : "tag")
+                Label("尾款提醒".appLocalized, systemImage: useSectionLayout ? "tag.fill" : "tag")
             }
             
             Button {
@@ -220,13 +220,13 @@ struct PetChatMenuContent: View {
             Button {
                 callbacks.onSearchWardrobe()
             } label: {
-                Label("查找衣柜", systemImage: "magnifyingglass")
+                Label("查找衣柜".appLocalized, systemImage: "magnifyingglass")
             }
             
             Button {
                 callbacks.onShowHistorySearch()
             } label: {
-                Label("历史消息查询", systemImage: "clock.arrow.circlepath")
+                Label("历史消息查询".appLocalized, systemImage: "clock.arrow.circlepath")
             }
         }
     }
