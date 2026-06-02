@@ -60,33 +60,33 @@ enum PetChatIntent: Equatable {
     var guideTitle: String {
         switch self {
         case .wardrobeStats:
-            return "我想看衣橱统计"
+            return "我想看衣橱统计".appLocalized
         case .outfitSuggestion:
-            return "我想要一套穿搭"
+            return "我想要一套穿搭".appLocalized
         case .lastOutfitPrice:
-            return "我想看上一套价格"
+            return "我想看上一套价格".appLocalized
         case .weatherGuidance:
-            return "我想看天气穿搭"
+            return "我想看天气穿搭".appLocalized
         case .search:
-            return "我想找裙子"
+            return "我想找裙子".appLocalized
         case .depositPlan:
-            return "我想看尾款计划"
+            return "我想看尾款计划".appLocalized
         case .currencyOverview:
-            return "我想看三种货币余额"
+            return "我想看三种货币余额".appLocalized
         case .petStatusOverview:
-            return "我想看萌宠状态"
+            return "我想看萌宠状态".appLocalized
         case .petWork:
-            return "我想让萌宠打工"
+            return "我想让萌宠打工".appLocalized
         case .secondPetAdoption:
-            return "我想领养二胎"
+            return "我想领养二胎".appLocalized
         case .switchPetCompanion:
-            return "我想切换宠物管家"
+            return "我想切换宠物管家".appLocalized
         case .meowCoinTopUp:
-            return "我想充值喵币"
+            return "我想充值喵币".appLocalized
         case .moodSupport:
-            return "我想先被安慰一下"
+            return "我想先被安慰一下".appLocalized
         case .generalChat:
-            return "我先随便聊聊"
+            return "我先随便聊聊".appLocalized
         }
     }
 
