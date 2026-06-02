@@ -695,11 +695,11 @@ struct CalendarThemeSelectorView: View {
                 .padding()
             }
             .background(LiquidBackground(themeSkinWallpaperContext: .journal))
-            .navigationTitle("选择主题")
+            .navigationTitle("选择主题".appLocalized)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("完成") { dismiss() }
+                    Button("完成".appLocalized) { dismiss() }
                 }
             }
         }
@@ -708,7 +708,7 @@ struct CalendarThemeSelectorView: View {
     // MARK: - 预设主题区域
     private var presetThemesSection: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("预设主题")
+            Text("预设主题".appLocalized)
                 .font(.headline)
                 .padding(.horizontal, 4)
 
@@ -736,7 +736,7 @@ struct CalendarThemeSelectorView: View {
     // MARK: - 客制化配色区域
     private var customColorSection: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("客制化配色")
+            Text("客制化配色".appLocalized)
                 .font(.headline)
                 .padding(.horizontal, 4)
 
@@ -774,11 +774,11 @@ struct CalendarThemeSelectorView: View {
                     }
 
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("自定义")
+                        Text("自定义".appLocalized)
                             .font(.subheadline)
                             .fontWeight(.medium)
 
-                        Text("自定义字体和卡片配色")
+                        Text("自定义字体和卡片配色".appLocalized)
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -805,7 +805,7 @@ struct CalendarThemeSelectorView: View {
             // 用户保存的自定义方案
             if !appThemeManager.themeColorConfig.customColorConfig.userCustomThemes.isEmpty {
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("我的方案")
+                    Text("我的方案".appLocalized)
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                         .padding(.horizontal, 4)
@@ -868,7 +868,7 @@ struct CalendarThemeSelectorView: View {
             } label: {
                 HStack {
                     Image(systemName: "slider.horizontal.3")
-                    Text("调整配色方案")
+                    Text("调整配色方案".appLocalized)
                     Spacer()
                     Image(systemName: "chevron.right")
                 }
@@ -920,7 +920,7 @@ struct CalendarThemeButton: View {
                             .stroke(isSelected ? Color.pink : Color.clear, lineWidth: 2)
                     )
 
-                Text(preset.name)
+                Text(preset.localizedName)
                     .font(.caption)
                     .fontWeight(isSelected ? .bold : .regular)
                     .foregroundStyle(isSelected ? .primary : .secondary)

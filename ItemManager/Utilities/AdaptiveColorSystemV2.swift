@@ -101,6 +101,10 @@ struct ThemePreset: Codable, Identifiable {
     var darkTextAccentRGBA: ColorRGBA?
     var darkCardConfig: CardColorConfig?
 
+    var localizedName: String {
+        name.appLocalized
+    }
+
     // 获取指定模式下的字体配色
     func textColors(forDarkMode isDark: Bool) -> (primary: ColorRGBA, secondary: ColorRGBA, tertiary: ColorRGBA, accent: ColorRGBA) {
         if isDark && supportsDarkMode {
