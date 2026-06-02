@@ -763,10 +763,10 @@ enum PaymentDurationOption: Int, CaseIterable {
     
     var label: String {
         switch self {
-        case .fiveteenDays: return "15天"
-        case .thirtyDays: return "30天"
-        case .sixtyDays: return "60天"
-        case .custom: return "自定义"
+        case .fiveteenDays, .thirtyDays, .sixtyDays:
+            return "%d天".appLocalized(rawValue)
+        case .custom:
+            return "自定义".appLocalized
         }
     }
 }
@@ -799,29 +799,29 @@ struct ClothingPurchaseInfoView: View {
     private var reservationHint: String {
         switch reservationKind {
         case .owned:
-            return "已拥有：按普通入库裙装保存，不进入预约列表。"
+            return "已拥有：按普通入库裙装保存，不进入预约列表。".appLocalized
         case .fullPaymentReservation:
-            return "全款预约：进入预约列表，只显示全款预约日期和全款金额。"
+            return "全款预约：进入预约列表，只显示全款预约日期和全款金额。".appLocalized
         case .depositPlan:
-            return "定金尾款：进入心愿尾款，可设置定金日期和预计尾款时间。"
+            return "定金尾款：进入心愿尾款，可设置定金日期和预计尾款时间。".appLocalized
         }
     }
     
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("购买信息")
+            Text("购买信息".appLocalized)
                 .font(.headline)
                 .themeSkinLegibleText(level: .inline, slot: .sectionCard)
             
-            DatePicker("购买日期", selection: $purchaseDate, displayedComponents: .date)
+            DatePicker("购买日期".appLocalized, selection: $purchaseDate, displayedComponents: .date)
                 .environment(\.locale, LanguageManager.shared.locale)
             
             Divider()
             
             VStack(alignment: .leading, spacing: 8) {
-                Picker("预约状态", selection: $reservationKind) {
+                Picker("预约状态".appLocalized, selection: $reservationKind) {
                     ForEach(ClothingReservationKind.allCases) { kind in
-                        Text(kind.displayName)
+                        Text(kind.displayName.appLocalized)
                             .themeSkinLegibleText(level: .inline, slot: .segmentedControl)
                             .tag(kind)
                     }
@@ -838,29 +838,29 @@ struct ClothingPurchaseInfoView: View {
                     EmptyView()
                 case .fullPaymentReservation:
                     VStack(alignment: .leading, spacing: 12) {
-                        DatePicker("全款预约日期", selection: $depositDate, displayedComponents: .date)
+                        DatePicker("全款预约日期".appLocalized, selection: $depositDate, displayedComponents: .date)
                             .environment(\.locale, LanguageManager.shared.locale)
-                        Text("全款预约会复用现有预约数据结构：保存时自动将全款金额写入定金字段，尾款为 0。")
+                        Text("全款预约会复用现有预约数据结构：保存时自动将全款金额写入定金字段，尾款为 0。".appLocalized)
                             .font(.caption)
                             .foregroundStyle(.secondary)
                             .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                     }
                 case .depositPlan:
                     VStack(alignment: .leading, spacing: 12) {
-                        DatePicker("定金日期", selection: $depositDate, displayedComponents: .date)
+                        DatePicker("定金日期".appLocalized, selection: $depositDate, displayedComponents: .date)
                             .environment(\.locale, LanguageManager.shared.locale)
                         
                         Divider()
                         
                         // 预计尾款时间区域
                         VStack(alignment: .leading, spacing: 8) {
-                            Text("预计尾款时间")
+                            Text("预计尾款时间".appLocalized)
                                 .font(.subheadline)
                                 .foregroundStyle(.secondary)
                                 .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                             
                             // 开始时间选择
-                            DatePicker("开始", selection: $finalPaymentDate, displayedComponents: .date)
+                            DatePicker("开始".appLocalized, selection: $finalPaymentDate, displayedComponents: .date)
                                 .environment(\.locale, LanguageManager.shared.locale)
                                 .onChange(of: finalPaymentDate) { _, newValue in
                                     // 开始时间变化时，如果不是自定义模式，根据时间段重新计算结束时间
@@ -877,7 +877,7 @@ struct ClothingPurchaseInfoView: View {
                             // 时间段滑块
                             VStack(alignment: .leading, spacing: 4) {
                                 HStack {
-                                    Text("时间段")
+                                    Text("时间段".appLocalized)
                                         .font(.subheadline)
                                         .foregroundStyle(.secondary)
                                         .themeSkinLegibleText(level: .inline, slot: .sectionCard)
@@ -921,7 +921,7 @@ struct ClothingPurchaseInfoView: View {
                             // 结束时间显示
                             if isCustomMode {
                                 // 自定义模式：显示日期选择器
-                                DatePicker("结束", selection: $finalPaymentEndDate, in: finalPaymentDate..., displayedComponents: .date)
+                                DatePicker("结束".appLocalized, selection: $finalPaymentEndDate, in: finalPaymentDate..., displayedComponents: .date)
                                     .environment(\.locale, LanguageManager.shared.locale)
                                     .onChange(of: finalPaymentEndDate) { _, newValue in
                                         // 如果结束时间早于开始时间，强制设置为开始时间
@@ -932,7 +932,7 @@ struct ClothingPurchaseInfoView: View {
                             } else {
                                 // 预设模式：只读显示自动计算的结束时间
                                 HStack {
-                                    Text("结束")
+                                    Text("结束".appLocalized)
                                         .font(.subheadline)
                                         .foregroundStyle(.secondary)
                                         .themeSkinLegibleText(level: .inline, slot: .sectionCard)
@@ -948,7 +948,7 @@ struct ClothingPurchaseInfoView: View {
                                 .cornerRadius(8)
                             }
                             
-                            Text("设置预计尾款时间范围，方便在心愿尾款中统计和提醒")
+                            Text("设置预计尾款时间范围，方便在心愿尾款中统计和提醒".appLocalized)
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                                 .themeSkinLegibleText(level: .inline, slot: .sectionCard)
@@ -1018,7 +1018,7 @@ struct ClothingNoteView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("备注")
+            Text("备注".appLocalized)
                 .font(.headline)
                 .themeSkinLegibleText(level: .inline, slot: .sectionCard)
             TextEditor(text: $note)

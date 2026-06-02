@@ -2399,7 +2399,6 @@
       }
     },
     "%d天" : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -2417,6 +2416,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%d天"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%d日"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%d일"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%d jours"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%d Tage"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%d días"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%d dias"
           }
         }
       }
@@ -3811,7 +3846,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Deposit & Balance"
+            "value" : "Deposit and balance"
           }
         },
         "zh-Hans" : {
@@ -3823,19 +3858,19 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "定金尾款"
+            "value" : "訂金尾款"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "内金・残金"
+            "value" : "内金と残金"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "예약금/잔금"
+            "value" : "계약금과 잔금"
           }
         },
         "fr" : {
@@ -3859,7 +3894,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Entrada e saldo"
+            "value" : "Sinal e saldo"
           }
         }
       }
@@ -13236,7 +13271,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Full Reservation"
+            "value" : "Full reservation"
           }
         },
         "zh-Hans" : {
@@ -13266,36 +13301,35 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Réservation payée intégralement"
+            "value" : "Réservation complète"
           }
         },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Vollzahlungs-Reservierung"
+            "value" : "Vollreservierung"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Reserva con pago completo"
+            "value" : "Reserva completa"
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Reserva com pagamento integral"
+            "value" : "Reserva integral"
           }
         }
       }
     },
     "全款预约：进入预约列表，只显示全款预约日期和全款金额。" : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Full reservation: adds this item to reservations and shows only the full reservation date and full amount."
+            "value" : "Full reservation: added to the reservation list and shows only the full reservation date and amount."
           }
         },
         "zh-Hans" : {
@@ -13309,6 +13343,42 @@
             "state" : "translated",
             "value" : "全款預約：進入預約列表，只顯示全款預約日期和全款金額。"
           }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "全額予約：予約リストに入り、全額予約日と金額のみ表示します。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "전액 예약: 예약 목록에 들어가며 전액 예약 날짜와 금액만 표시됩니다."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Réservation complète : ajoutée à la liste des réservations, avec seulement la date et le montant complet."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vollreservierung: Wird zur Reservierungsliste hinzugefügt und zeigt nur Datum und Betrag der Vollreservierung."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reserva completa: entra en la lista de reservas y solo muestra fecha e importe completos."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reserva integral: entra na lista de reservas e mostra apenas a data e o valor integral."
+          }
         }
       }
     },
@@ -13317,7 +13387,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Full reservations reuse the existing reservation data model: the full amount is saved in the deposit field and the balance is 0."
+            "value" : "Full reservation reuses the existing reservation structure: when saved, the full amount is written to the deposit field and the balance is 0."
           }
         },
         "zh-Hans" : {
@@ -13330,6 +13400,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "全款預約會復用現有預約資料結構：儲存時自動將全款金額寫入訂金欄位，尾款為 0。"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "全額予約は既存の予約データ構造を利用します。保存時に全額を内金欄へ書き込み、残金は0になります。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "전액 예약은 기존 예약 데이터 구조를 재사용합니다. 저장 시 전액이 계약금 필드에 기록되고 잔금은 0이 됩니다."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La réservation complète réutilise la structure existante : à l’enregistrement, le montant complet est écrit dans l’acompte et le solde vaut 0."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die Vollreservierung nutzt die bestehende Reservierungsstruktur: Beim Speichern wird der volle Betrag in die Anzahlung geschrieben, der Restbetrag ist 0."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La reserva completa reutiliza la estructura existente: al guardar, el importe completo se escribe en depósito y el saldo queda en 0."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A reserva integral reutiliza a estrutura existente: ao salvar, o valor integral vai para o campo de sinal e o saldo fica 0."
           }
         }
       }
@@ -13397,7 +13503,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Full Reservation Date"
+            "value" : "Full reservation date"
           }
         },
         "zh-Hans" : {
@@ -13427,13 +13533,13 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Date de réservation intégrale"
+            "value" : "Date de réservation complète"
           }
         },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Datum der Vollzahlungs-Reservierung"
+            "value" : "Datum der Vollreservierung"
           }
         },
         "es" : {
@@ -24590,12 +24696,11 @@
       }
     },
     "定金尾款：进入心愿尾款，可设置定金日期和预计尾款时间。" : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Deposit plan: adds this item to Wishlist Payments, with a deposit date and estimated balance period."
+            "value" : "Deposit and balance: added to wish balances, with deposit date and estimated balance window."
           }
         },
         "zh-Hans" : {
@@ -24608,6 +24713,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "訂金尾款：進入心願尾款，可設定訂金日期和預計尾款時間。"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "内金と残金：心願残金に入り、内金日と残金予定期間を設定できます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "계약금과 잔금: 위시 잔금에 들어가며 계약금 날짜와 예상 잔금 기간을 설정할 수 있습니다."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Acompte et solde : ajouté aux soldes souhaités, avec date d’acompte et période estimée du solde."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Anzahlung und Restbetrag: Wird zu Wunsch-Restbeträgen hinzugefügt; Datum und erwarteter Zeitraum sind einstellbar."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Depósito y saldo: entra en saldos deseados y permite definir fecha de depósito y periodo estimado de saldo."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sinal e saldo: entra em saldos desejados, com data do sinal e período estimado do saldo."
           }
         }
       }
@@ -24662,7 +24803,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Deposit Date"
+            "value" : "Deposit date"
           }
         },
         "zh-Hans" : {
@@ -24674,13 +24815,13 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "定金日期"
+            "value" : "訂金日期"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "予約金日"
+            "value" : "内金日"
           }
         },
         "ko" : {
@@ -24692,7 +24833,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Date d’acompte"
+            "value" : "Date de l’acompte"
           }
         },
         "de" : {
@@ -24704,7 +24845,7 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Fecha de depósito"
+            "value" : "Fecha del depósito"
           }
         },
         "pt-BR" : {
@@ -27685,7 +27826,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Possédée"
+            "value" : "Possédé"
           }
         },
         "de" : {
@@ -27697,24 +27838,23 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "En propiedad"
+            "value" : "En posesión"
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Já possui"
+            "value" : "Possuído"
           }
         }
       }
     },
     "已拥有：按普通入库裙装保存，不进入预约列表。" : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Owned: saves as a normal closet item and does not add it to reservations."
+            "value" : "Owned: saved as a regular wardrobe item and not added to the reservation list."
           }
         },
         "zh-Hans" : {
@@ -27726,7 +27866,43 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "已擁有：按一般入庫裙裝儲存，不進入預約列表。"
+            "value" : "已擁有：按普通入庫裙裝儲存，不進入預約列表。"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "所有済み：通常の入庫ドレスとして保存し、予約リストには入りません。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "보유 중: 일반 입고 드레스로 저장되며 예약 목록에는 들어가지 않습니다."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Possédé : enregistré comme une robe classique de la garde-robe, sans l’ajouter aux réservations."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Im Besitz: Wird als normales Kleid gespeichert und nicht zur Reservierungsliste hinzugefügt."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En posesión: se guarda como una prenda normal del armario y no entra en la lista de reservas."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Possuído: salvo como vestido normal no guarda-roupa, sem entrar na lista de reservas."
           }
         }
       }
@@ -29979,6 +30155,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "開始"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "開始"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "시작"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Début"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Start"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Inicio"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Início"
           }
         }
       }
@@ -40113,7 +40325,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Period"
+            "value" : "Duration"
           }
         },
         "zh-Hans" : {
@@ -40126,6 +40338,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "時間段"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "期間"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "기간"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Durée"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zeitraum"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Duración"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Duração"
           }
         }
       }
@@ -55288,6 +55536,42 @@
             "state" : "translated",
             "value" : "結束"
           }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "終了"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "종료"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fin"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ende"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fin"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fim"
+          }
         }
       }
     },
@@ -57385,7 +57669,43 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "自定義"
+            "value" : "自訂"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "カスタム"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "사용자 지정"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Personnalisé"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Benutzerdefiniert"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Personalizado"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Personalizado"
           }
         }
       }
@@ -60274,7 +60594,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Set an estimated balance payment time range, Wishlist Payments Stats Reminder"
+            "value" : "Set the estimated balance window for easier wish balance statistics and reminders"
           }
         },
         "zh-Hans" : {
@@ -60286,7 +60606,43 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "設置預計尾款時間範圍，方便在心願尾款中統計和提醒"
+            "value" : "設定預計尾款時間範圍，方便在心願尾款中統計和提醒"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "残金予定期間を設定すると、心願残金の集計とリマインダーに使えます"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "예상 잔금 기간을 설정하면 위시 잔금 통계와 알림에 활용할 수 있어요"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Définissez la période estimée du solde pour faciliter les statistiques et rappels"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lege den erwarteten Restbetrag-Zeitraum für Statistiken und Erinnerungen fest"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Define el periodo estimado del saldo para estadísticas y recordatorios"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Defina o período estimado do saldo para facilitar estatísticas e lembretes"
           }
         }
       }
@@ -61950,7 +62306,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Purchase Info"
+            "value" : "Purchase information"
           }
         },
         "zh-Hans" : {
@@ -61980,7 +62336,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Infos d’achat"
+            "value" : "Informations d’achat"
           }
         },
         "de" : {
@@ -62120,7 +62476,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Purchase Date"
+            "value" : "Purchase date"
           }
         },
         "zh-Hans" : {
@@ -62168,7 +62524,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Data de compra"
+            "value" : "Data da compra"
           }
         }
       }
@@ -67288,7 +67644,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Reservation Status"
+            "value" : "Reservation status"
           }
         },
         "zh-Hans" : {
@@ -67301,6 +67657,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "預約狀態"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "予約ステータス"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "예약 상태"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Statut de réservation"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reservierungsstatus"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Estado de reserva"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Status da reserva"
           }
         }
       }
@@ -67511,7 +67903,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Estimated Balance Period"
+            "value" : "Estimated balance time"
           }
         },
         "zh-Hans" : {
@@ -67524,6 +67916,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "預計尾款時間"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "残金予定時期"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "예상 잔금 기간"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Période estimée du solde"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Erwarteter Restbetrag-Zeitraum"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Periodo estimado del saldo"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Período estimado do saldo"
           }
         }
       }
