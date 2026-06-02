@@ -7409,7 +7409,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Move Up"
+            "value" : "Move up"
           }
         },
         "zh-Hans" : {
@@ -7422,6 +7422,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "上移"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "上へ移動"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "위로 이동"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Déplacer vers le haut"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nach oben verschieben"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mover arriba"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mover para cima"
           }
         }
       }
@@ -7753,7 +7789,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Move Down"
+            "value" : "Move down"
           }
         },
         "zh-Hans" : {
@@ -7766,6 +7802,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "下移"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "下へ移動"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "아래로 이동"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Déplacer vers le bas"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nach unten verschieben"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mover abajo"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mover para baixo"
           }
         }
       }
@@ -10455,7 +10527,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Price Info"
+            "value" : "Price information"
           }
         },
         "zh-Hans" : {
@@ -10485,7 +10557,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Infos de prix"
+            "value" : "Informations sur le prix"
           }
         },
         "de" : {
@@ -10837,7 +10909,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "The app will fetch the current CNY to JPY exchange rate and recalculate the original price and shipping. After saving, this rate is stored with this dress item record."
+            "value" : "This will look up the current CNY→JPY exchange rate online and recalculate the original price and shipping. After saving, this rate will be stored as the rate for this dress record."
           }
         },
         "zh-Hans" : {
@@ -10849,7 +10921,43 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "會聯網查詢當前 CNY→JPY 匯率，並用新匯率重新折算原價和郵費。保存後，這個匯率會作為這條裙裝記錄的當時匯率。"
+            "value" : "會連網查詢目前 CNY→JPY 匯率，並用新匯率重新折算原價和郵費。儲存後，這個匯率會作為這條裙裝記錄的當時匯率。"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "現在の CNY→JPY レートをオンラインで取得し、新しいレートで元価格と送料を再計算します。保存後、このレートはこのドレス記録の当時レートとして保存されます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "현재 CNY→JPY 환율을 온라인으로 조회하고 새 환율로 원가와 배송비를 다시 계산합니다. 저장 후 이 환율은 이 드레스 기록의 당시 환율로 저장됩니다."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le taux CNY→JPY actuel sera recherché en ligne, puis le prix d’origine et la livraison seront recalculés. Après enregistrement, ce taux sera conservé comme taux de cette fiche robe."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Der aktuelle CNY→JPY-Kurs wird online abgefragt und Originalpreis sowie Versand werden neu berechnet. Nach dem Speichern wird dieser Kurs für diesen Kleiddatensatz gespeichert."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Se consultará en línea el tipo CNY→JPY actual y se recalcularán el precio original y el envío. Al guardar, este tipo se almacenará como el tipo de esta prenda."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A taxa CNY→JPY atual será consultada online, e o preço original e o frete serão recalculados. Ao salvar, essa taxa ficará registrada para este vestido."
           }
         }
       }
@@ -11836,7 +11944,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Save Auto “ Full Reservation ”, Show Deposit, Balance Balance Date."
+            "value" : "When saved, this will be recorded as “full reservation”; deposit, balance, and balance due date will no longer be shown."
           }
         },
         "zh-Hans" : {
@@ -11848,7 +11956,43 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "保存時會自動寫入為「全款預約」，不再顯示定金、尾款或尾款日期。"
+            "value" : "儲存時會自動寫入為「全款預約」，不再顯示訂金、尾款或尾款日期。"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "保存時に「全額予約」として記録され、内金・残金・残金予定日は表示されません。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "저장하면 “전액 예약”으로 기록되며, 계약금과 잔금 및 잔금 날짜는 더 이상 표시되지 않습니다."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "À l’enregistrement, ce sera noté comme « réservation complète » ; l’acompte, le solde et la date du solde ne seront plus affichés."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Beim Speichern wird dies als „Vollreservierung“ erfasst; Anzahlung, Restbetrag und Fälligkeitsdatum werden nicht mehr angezeigt."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Al guardar, se registrará como “reserva completa”; ya no se mostrarán el depósito, el saldo ni la fecha de saldo."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ao salvar, será registrado como “reserva integral”; sinal, saldo e data do saldo não serão mais exibidos."
           }
         }
       }
@@ -13195,7 +13339,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Full Reservation Total"
+            "value" : "Full reservation total"
           }
         },
         "zh-Hans" : {
@@ -13213,25 +13357,25 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "全額予約合計"
+            "value" : "全額予約の合計"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "전액 예약 합계"
+            "value" : "전액 예약 총액"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Total réservation intégrale"
+            "value" : "Total de réservation complet"
           }
         },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Vollzahlungs-Reservierung gesamt"
+            "value" : "Gesamtbetrag der Vollreservierung"
           }
         },
         "es" : {
@@ -13393,7 +13537,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Full Reservation Amount ()"
+            "value" : "Full reservation amount (single item with shipping)"
           }
         },
         "zh-Hans" : {
@@ -13406,6 +13550,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "全款預約金額（單件含郵）"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "全額予約金額（1点・送料込み）"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "전액 예약 금액(단품 배송비 포함)"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Montant de réservation complet (article unique avec livraison)"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vollreservierungsbetrag (Einzelstück inkl. Versand)"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Importe de reserva completo (una prenda con envío)"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Valor da reserva integral (item único com frete)"
           }
         }
       }
@@ -16210,7 +16390,43 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "刷新"
+            "value" : "重新整理"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "更新"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "새로고침"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Actualiser"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aktualisieren"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Actualizar"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Atualizar"
           }
         }
       }
@@ -16279,7 +16495,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Refresh JPY Rate"
+            "value" : "Refresh JPY exchange rate"
           }
         },
         "zh-Hans" : {
@@ -16291,7 +16507,43 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "刷新日元匯率"
+            "value" : "重新整理日元匯率"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "日本円レートを更新"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "엔화 환율 새로고침"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Actualiser le taux JPY"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "JPY-Wechselkurs aktualisieren"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Actualizar el tipo JPY"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Atualizar a taxa JPY"
           }
         }
       }
@@ -16301,7 +16553,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Refresh JPY Rate?"
+            "value" : "Refresh JPY exchange rate?"
           }
         },
         "zh-Hans" : {
@@ -16313,7 +16565,43 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "刷新日元匯率？"
+            "value" : "重新整理日元匯率？"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "日本円レートを更新しますか？"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "엔화 환율을 새로고침할까요?"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Actualiser le taux JPY ?"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "JPY-Wechselkurs aktualisieren?"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "¿Actualizar el tipo de cambio JPY?"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Atualizar a taxa de câmbio do JPY?"
           }
         }
       }
@@ -16323,7 +16611,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Refresh Exchange Rate"
+            "value" : "Refresh rate"
           }
         },
         "zh-Hans" : {
@@ -16335,7 +16623,43 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "刷新匯率"
+            "value" : "重新整理匯率"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "レートを更新"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "환율 새로고침"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Actualiser le taux"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kurs aktualisieren"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Actualizar tipo de cambio"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Atualizar taxa"
           }
         }
       }
@@ -17210,7 +17534,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Unit Price"
+            "value" : "Unit price"
           }
         },
         "zh-Hans" : {
@@ -17223,6 +17547,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "單價"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "単価"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "단가"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Prix unitaire"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Einzelpreis"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Precio unitario"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Preço unitário"
           }
         }
       }
@@ -17820,7 +18180,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Original Price Japanese Yen"
+            "value" : "Original price JPY rate"
           }
         },
         "zh-Hans" : {
@@ -17833,6 +18193,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "原價日元匯率"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "元価格の日本円レート"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "원가 엔화 환율"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Taux JPY du prix d’origine"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "JPY-Kurs des Originalpreises"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tipo JPY del precio original"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Taxa JPY do preço original"
           }
         }
       }
@@ -19594,7 +19990,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Deposit"
+            "value" : "Total deposit"
           }
         },
         "zh-Hans" : {
@@ -19606,7 +20002,43 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "合計定金"
+            "value" : "合計訂金"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "内金合計"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "계약금 합계"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Total de l’acompte"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Anzahlung gesamt"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Depósito total"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Total do sinal"
           }
         }
       }
@@ -19616,7 +20048,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Balance"
+            "value" : "Total balance"
           }
         },
         "zh-Hans" : {
@@ -19629,6 +20061,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "合計尾款"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "残金合計"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "잔금 합계"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Total du solde"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Restbetrag gesamt"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Saldo total"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Total do saldo"
           }
         }
       }
@@ -19979,7 +20447,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Order Total Including Shipping"
+            "value" : "Order total with shipping"
           }
         },
         "zh-Hans" : {
@@ -19992,6 +20460,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "含郵訂單總價"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "送料込み注文合計"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "배송비 포함 주문 총액"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Total de la commande avec livraison"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bestellsumme inkl. Versand"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Total del pedido con envío"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Total do pedido com frete"
           }
         }
       }
@@ -25090,7 +25594,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Accessory Name"
+            "value" : "Accessory name"
           }
         },
         "zh-Hans" : {
@@ -25103,6 +25607,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "小物名稱"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "小物名"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "소품 이름"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nom de l’accessoire"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Accessoire-Name"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nombre del accesorio"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nome do acessório"
           }
         }
       }
@@ -25607,7 +26147,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Not yet"
+            "value" : "No live exchange rate recorded yet"
           }
         },
         "zh-Hans" : {
@@ -25619,7 +26159,43 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "尚未記錄實時匯率"
+            "value" : "尚未記錄即時匯率"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "リアルタイムレートはまだ記録されていません"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "아직 실시간 환율이 기록되지 않았어요"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucun taux en direct enregistré"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Noch kein Live-Wechselkurs erfasst"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aún no hay tipo de cambio en vivo registrado"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nenhuma taxa em tempo real registrada ainda"
           }
         }
       }
@@ -28607,7 +29183,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Quantity"
+            "value" : "Stock quantity"
           }
         },
         "zh-Hans" : {
@@ -28620,6 +29196,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "庫存數量"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在庫数"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "재고 수량"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quantité en stock"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bestand"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cantidad en stock"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quantidade em estoque"
           }
         }
       }
@@ -56703,7 +57315,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Auto Calculate"
+            "value" : "Auto calculate"
           }
         },
         "zh-Hans" : {
@@ -56716,6 +57328,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "自動計算"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自動計算"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "자동 계산"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Calcul automatique"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Automatisch berechnen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Calcular automáticamente"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Calcular automaticamente"
           }
         }
       }
@@ -56791,7 +57439,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Custom Accessory Details"
+            "value" : "Custom accessory details"
           }
         },
         "zh-Hans" : {
@@ -56803,7 +57451,43 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "自定義小物明細"
+            "value" : "自訂小物明細"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "カスタム小物明細"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "사용자 지정 소품 내역"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Détails des accessoires personnalisés"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Benutzerdefinierte Accessoire-Details"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Detalles de accesorios personalizados"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Detalhes de acessórios personalizados"
           }
         }
       }
@@ -59036,7 +59720,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "(Accessory)"
+            "value" : "Order total (including accessories)"
           }
         },
         "zh-Hans" : {
@@ -59048,7 +59732,43 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "訂單總價 (含小物)"
+            "value" : "訂單總價（含小物）"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "注文合計（小物込み）"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "주문 총액(소품 포함)"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Total de la commande (accessoires inclus)"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bestellsumme (inkl. Accessoires)"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Total del pedido (accesorios incluidos)"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Total do pedido (inclui acessórios)"
           }
         }
       }
@@ -59126,7 +59846,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Record Time: %@"
+            "value" : "Recorded at: %@"
           }
         },
         "zh-Hans" : {
@@ -59139,6 +59859,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "記錄時間：%@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "記録時刻：%@"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "기록 시간: %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enregistré le : %@"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Erfasst am: %@"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Registrado el: %@"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Registrado em: %@"
           }
         }
       }
@@ -85889,6 +86645,644 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Falha ao salvar a imagem"
+          }
+        }
+      }
+    },
+    "裙装总价合计" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dress total"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "裙装总价合计"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "裙裝總價合計"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ドレス合計金額"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "드레스 총액"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Total de la robe"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kleid-Gesamtpreis"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Total del vestido"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Total do vestido"
+          }
+        }
+      }
+    },
+    "小物总价" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Accessory total"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "小物总价"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "小物總價"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "小物合計"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "소품 총액"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Total des accessoires"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Accessoire-Gesamtpreis"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Total de accesorios"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Total dos acessórios"
+          }
+        }
+      }
+    },
+    "已自动计算尾款：%@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Balance auto-calculated: %@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已自动计算尾款：%@"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已自動計算尾款：%@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "残金を自動計算しました：%@"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "잔금을 자동 계산했어요: %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Solde calculé automatiquement : %@"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Restbetrag automatisch berechnet: %@"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Saldo calculado automáticamente: %@"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Saldo calculado automaticamente: %@"
+          }
+        }
+      }
+    },
+    "计算失败：定金不能大于总价" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Calculation failed: deposit cannot exceed the total price"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "计算失败：定金不能大于总价"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "計算失敗：訂金不能大於總價"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "計算失敗：内金は合計金額を超えられません"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "계산 실패: 계약금은 총액보다 클 수 없어요"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Échec du calcul : l’acompte ne peut pas dépasser le total"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Berechnung fehlgeschlagen: Die Anzahlung darf den Gesamtpreis nicht überschreiten"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Error de cálculo: el depósito no puede superar el total"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Falha no cálculo: o sinal não pode exceder o total"
+          }
+        }
+      }
+    },
+    "已自动计算定金：%@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Deposit auto-calculated: %@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已自动计算定金：%@"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已自動計算訂金：%@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "内金を自動計算しました：%@"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "계약금을 자동 계산했어요: %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Acompte calculé automatiquement : %@"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Anzahlung automatisch berechnet: %@"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Depósito calculado automáticamente: %@"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sinal calculado automaticamente: %@"
+          }
+        }
+      }
+    },
+    "计算失败：尾款不能大于总价" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Calculation failed: balance cannot exceed the total price"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "计算失败：尾款不能大于总价"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "計算失敗：尾款不能大於總價"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "計算失敗：残金は合計金額を超えられません"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "계산 실패: 잔금은 총액보다 클 수 없어요"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Échec du calcul : le solde ne peut pas dépasser le total"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Berechnung fehlgeschlagen: Der Restbetrag darf den Gesamtpreis nicht überschreiten"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Error de cálculo: el saldo no puede superar el total"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Falha no cálculo: o saldo não pode exceder o total"
+          }
+        }
+      }
+    },
+    "总价已校正为：%@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Total corrected to: %@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "总价已校正为：%@"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "總價已校正為：%@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "合計金額を修正しました：%@"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "총액을 수정했어요: %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Total corrigé à : %@"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gesamtpreis korrigiert auf: %@"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Total corregido a: %@"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Total corrigido para: %@"
+          }
+        }
+      }
+    },
+    "价格计算正确，无需调整" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Price calculation is correct; no adjustment needed"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "价格计算正确，无需调整"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "價格計算正確，無需調整"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "価格計算は正しいため調整不要です"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "가격 계산이 맞아 조정할 필요가 없어요"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le calcul du prix est correct ; aucun ajustement nécessaire"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die Preisberechnung ist korrekt; keine Anpassung nötig"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El cálculo del precio es correcto; no hace falta ajustar"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O cálculo do preço está correto; nenhum ajuste necessário"
+          }
+        }
+      }
+    },
+    "无法计算，请至少输入两个价格值" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cannot calculate. Please enter at least two price values"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法计算，请至少输入两个价格值"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "無法計算，請至少輸入兩個價格值"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "計算できません。少なくとも2つの価格を入力してください"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "계산할 수 없어요. 가격 값을 두 개 이상 입력해 주세요"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Calcul impossible. Saisissez au moins deux valeurs de prix"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Berechnung nicht möglich. Bitte mindestens zwei Preiswerte eingeben"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No se puede calcular. Introduce al menos dos valores de precio"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Não é possível calcular. Insira pelo menos dois valores de preço"
+          }
+        }
+      }
+    },
+    "刷新失败：%@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Refresh failed: %@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "刷新失败：%@"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重新整理失敗：%@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "更新に失敗しました：%@"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "새로고침 실패: %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Échec de l’actualisation : %@"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aktualisierung fehlgeschlagen: %@"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Error al actualizar: %@"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Falha ao atualizar: %@"
+          }
+        }
+      }
+    },
+    "已刷新并记录当前日元汇率" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Current JPY exchange rate refreshed and recorded"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已刷新并记录当前日元汇率"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已重新整理並記錄目前日元匯率"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "現在の日本円レートを更新して記録しました"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "현재 엔화 환율을 새로고침하고 기록했어요"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Taux JPY actuel actualisé et enregistré"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aktueller JPY-Wechselkurs aktualisiert und erfasst"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tipo JPY actual actualizado y registrado"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Taxa JPY atualizada e registrada"
           }
         }
       }

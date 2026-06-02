@@ -290,7 +290,7 @@ struct ClothingPriceView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 24) {
             HStack {
-                Text("价格信息")
+                Text("价格信息".appLocalized)
                     .font(.headline)
                     .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                 Spacer()
@@ -336,7 +336,7 @@ struct ClothingPriceView: View {
                 Button(action: autoCalculateWithFeedback) {
                     HStack {
                         Image(systemName: "wand.and.stars")
-                        Text("自动计算")
+                        Text("自动计算".appLocalized)
                             .themeSkinLegibleText(level: .chip, slot: .primaryButton)
                     }
                     .font(.subheadline)
@@ -363,7 +363,7 @@ struct ClothingPriceView: View {
                 Divider()
                 if reservationKind == .fullPaymentReservation {
                     HStack {
-                        Text("全款预约金额（单件含邮）")
+                        Text("全款预约金额（单件含邮）".appLocalized)
                             .foregroundStyle(.primary)
                             .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                         Spacer()
@@ -374,7 +374,7 @@ struct ClothingPriceView: View {
                     }
                     if stock > 1 {
                         HStack {
-                            Text("全款预约总额")
+                            Text("全款预约总额".appLocalized)
                                 .foregroundStyle(.secondary)
                                 .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                             Spacer()
@@ -384,14 +384,14 @@ struct ClothingPriceView: View {
                                 .themeSkinLegibleText(level: .chip, slot: .sectionCard)
                         }
                     }
-                    Text("保存时会自动写入为「全款预约」，不再显示定金、尾款或尾款日期。")
+                    Text("保存时会自动写入为「全款预约」，不再显示定金、尾款或尾款日期。".appLocalized)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 } else if reservationKind == .depositPlan {
                     HStack {
-                        Text("合计定金")
+                        Text("合计定金".appLocalized)
                             .foregroundStyle(.secondary)
                             .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                         Spacer()
@@ -400,7 +400,7 @@ struct ClothingPriceView: View {
                             .themeSkinLegibleText(level: .chip, slot: .sectionCard)
                     }
                     HStack {
-                        Text("合计尾款")
+                        Text("合计尾款".appLocalized)
                             .foregroundStyle(.secondary)
                             .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                         Spacer()
@@ -410,7 +410,7 @@ struct ClothingPriceView: View {
                     }
                 }
                 HStack {
-                    Text("订单总价 (含小物)")
+                    Text("订单总价 (含小物)".appLocalized)
                         .foregroundStyle(.primary)
                         .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                     Spacer()
@@ -420,7 +420,7 @@ struct ClothingPriceView: View {
                         .themeSkinLegibleText(level: .chip, slot: .sectionCard)
                 }
                 HStack {
-                    Text("含邮订单总价")
+                    Text("含邮订单总价".appLocalized)
                         .foregroundStyle(.primary)
                         .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                     Spacer()
@@ -441,13 +441,13 @@ struct ClothingPriceView: View {
             // 自定义小物列表
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
-                    Text("自定义小物明细")
+                    Text("自定义小物明细".appLocalized)
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                         .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                     Spacer()
                     Button(action: addAccessory) {
-                        Label("添加", systemImage: "plus.circle")
+                        Label("添加".appLocalized, systemImage: "plus.circle")
                             .font(.subheadline)
                             .themeSkinLegibleText(level: .chip, slot: .primaryButton)
                     }
@@ -457,7 +457,7 @@ struct ClothingPriceView: View {
                     ForEach($accessoryList) { $item in
                         VStack(spacing: 8) {
                             HStack {
-                                TextField("小物名称", text: $item.name)
+                                TextField("小物名称".appLocalized, text: $item.name)
                                     .textFieldStyle(.roundedBorder)
                                 
                                 Menu {
@@ -466,19 +466,19 @@ struct ClothingPriceView: View {
                                             deleteAccessory(at: IndexSet(integer: index))
                                         }
                                     } label: {
-                                        Label("删除", systemImage: "trash")
+                                        Label("删除".appLocalized, systemImage: "trash")
                                     }
                                     
                                     Button {
                                         moveAccessoryUp(item)
                                     } label: {
-                                        Label("上移", systemImage: "arrow.up")
+                                        Label("上移".appLocalized, systemImage: "arrow.up")
                                     }
                                     
                                     Button {
                                         moveAccessoryDown(item)
                                     } label: {
-                                        Label("下移", systemImage: "arrow.down")
+                                        Label("下移".appLocalized, systemImage: "arrow.down")
                                     }
                                 } label: {
                                     Image(systemName: "ellipsis.circle")
@@ -491,7 +491,7 @@ struct ClothingPriceView: View {
                                 if reservationKind == .depositPlan {
                                     // 定金
                                     VStack(alignment: .leading, spacing: 2) {
-                                        Text("定金")
+                                        Text("定金".appLocalized)
                                             .font(.caption2)
                                             .foregroundStyle(.secondary)
                                             .themeSkinLegibleText(level: .inline, slot: .sectionCard)
@@ -515,7 +515,7 @@ struct ClothingPriceView: View {
 
                                     // 尾款
                                     VStack(alignment: .leading, spacing: 2) {
-                                        Text("尾款")
+                                        Text("尾款".appLocalized)
                                             .font(.caption2)
                                             .foregroundStyle(.secondary)
                                             .themeSkinLegibleText(level: .inline, slot: .sectionCard)
@@ -540,7 +540,7 @@ struct ClothingPriceView: View {
 
                                 // 总价
                                 VStack(alignment: .leading, spacing: 2) {
-                                    Text("单价")
+                                    Text("单价".appLocalized)
                                         .font(.caption2)
                                         .foregroundStyle(.secondary)
                                         .themeSkinLegibleText(level: .inline, slot: .sectionCard)
@@ -572,7 +572,7 @@ struct ClothingPriceView: View {
             .padding(.top, 4)
             
             HStack {
-                Text("库存数量")
+                Text("库存数量".appLocalized)
                     .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                 Spacer()
                 Stepper("", value: $stock, in: 1...999)
@@ -587,13 +587,13 @@ struct ClothingPriceView: View {
         .themeSkinAdaptiveSectionCard(slot: .sectionCard, cornerRadius: 16) {
             Color(uiColor: .secondarySystemGroupedBackground)
         }
-        .alert("刷新日元汇率？", isPresented: $showingRefreshRateConfirmation) {
-            Button("取消", role: .cancel) {}
-            Button("刷新汇率") {
+        .alert("刷新日元汇率？".appLocalized, isPresented: $showingRefreshRateConfirmation) {
+            Button("取消".appLocalized, role: .cancel) {}
+            Button("刷新汇率".appLocalized) {
                 Task { await refreshJPYRateAfterConfirmation() }
             }
         } message: {
-            Text("会联网查询当前 CNY→JPY 汇率，并用新汇率重新折算原价和邮费。保存后，这个汇率会作为这条裙装记录的当时汇率。")
+            Text("会联网查询当前 CNY→JPY 汇率，并用新汇率重新折算原价和邮费。保存后，这个汇率会作为这条裙装记录的当时汇率。".appLocalized)
         }
     }
 
@@ -605,7 +605,7 @@ struct ClothingPriceView: View {
                 .frame(width: 20)
 
             VStack(alignment: .leading, spacing: 3) {
-                Text("原价日元汇率")
+                Text("原价日元汇率".appLocalized)
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .themeSkinLegibleText(level: .inline, slot: .sectionCard)
@@ -613,7 +613,7 @@ struct ClothingPriceView: View {
                     .font(.footnote.monospacedDigit())
                     .foregroundStyle(.primary)
                     .themeSkinLegibleText(level: .inline, slot: .sectionCard)
-                Text(originalPriceRateUpdatedAt.map { "记录时间：\($0.formatted(date: .numeric, time: .shortened))" } ?? "尚未记录实时汇率")
+                Text(originalPriceRateUpdatedAt.map { "记录时间：%@".appLocalized(formattedRateUpdateDate($0)) } ?? "尚未记录实时汇率".appLocalized)
                     .font(.caption2)
                     .foregroundStyle(.secondary)
                     .themeSkinLegibleText(level: .inline, slot: .sectionCard)
@@ -628,14 +628,14 @@ struct ClothingPriceView: View {
                     ProgressView()
                         .controlSize(.small)
                 } else {
-                    Label("刷新", systemImage: "arrow.clockwise")
+                    Label("刷新".appLocalized, systemImage: "arrow.clockwise")
                         .font(.caption)
                 }
             }
             .buttonStyle(.bordered)
             .controlSize(.small)
             .disabled(isRefreshingJPYRate || onRefreshJPYRate == nil)
-            .accessibilityLabel("刷新日元汇率")
+            .accessibilityLabel("刷新日元汇率".appLocalized)
         }
         .padding(10)
         .background(Color(uiColor: .tertiarySystemGroupedBackground).opacity(0.55))
@@ -694,9 +694,9 @@ struct ClothingPriceView: View {
             let newBalance = priceTotal - deposit
             if newBalance >= 0 {
                 balance = newBalance
-                return (true, "已自动计算尾款：¥\(String(format: "%.2f", balance))")
+                return (true, "已自动计算尾款：%@".appLocalized(formattedCNYAmount(balance)))
             } else {
-                return (false, "计算失败：定金不能大于总价")
+                return (false, "计算失败：定金不能大于总价".appLocalized)
             }
         }
         // 情况2: 总价 + 尾款 → 计算定金
@@ -704,9 +704,9 @@ struct ClothingPriceView: View {
             let newDeposit = priceTotal - balance
             if newDeposit >= 0 {
                 deposit = newDeposit
-                return (true, "已自动计算定金：¥\(String(format: "%.2f", deposit))")
+                return (true, "已自动计算定金：%@".appLocalized(formattedCNYAmount(deposit)))
             } else {
-                return (false, "计算失败：尾款不能大于总价")
+                return (false, "计算失败：尾款不能大于总价".appLocalized)
             }
         }
         // 情况3: 三个值都已输入，校验并校正（以定金+尾款为准重新计算总价）
@@ -714,12 +714,12 @@ struct ClothingPriceView: View {
             let calculatedTotal = deposit + balance
             if calculatedTotal != priceTotal {
                 priceTotal = calculatedTotal
-                return (true, "总价已校正为：¥\(String(format: "%.2f", priceTotal))")
+                return (true, "总价已校正为：%@".appLocalized(formattedCNYAmount(priceTotal)))
             } else {
-                return (true, "价格计算正确，无需调整")
+                return (true, "价格计算正确，无需调整".appLocalized)
             }
         }
-        return (false, "无法计算，请至少输入两个价格值")
+        return (false, "无法计算，请至少输入两个价格值".appLocalized)
     }
     
     /// 显示提示信息
@@ -733,10 +733,22 @@ struct ClothingPriceView: View {
         let result = await onRefreshJPYRate()
         isRefreshingJPYRate = false
         if let errorMessage = result.errorMessage {
-            showToastMessage("刷新失败：\(errorMessage)", type: .error)
+            showToastMessage("刷新失败：%@".appLocalized(errorMessage), type: .error)
         } else {
-            showToastMessage("已刷新并记录当前日元汇率", type: .success)
+            showToastMessage("已刷新并记录当前日元汇率".appLocalized, type: .success)
         }
+    }
+
+    private func formattedCNYAmount(_ value: Double) -> String {
+        String(format: "¥%.2f", value)
+    }
+
+    private func formattedRateUpdateDate(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = LanguageManager.shared.locale
+        formatter.dateStyle = .short
+        formatter.timeStyle = .short
+        return formatter.string(from: date)
     }
 }
 
