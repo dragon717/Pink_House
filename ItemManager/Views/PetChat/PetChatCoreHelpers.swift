@@ -970,13 +970,13 @@ func makeMoneyCounterWidget(totalValue: Decimal, currency: CurrencyType = .rmb) 
         title: "\(WealthExperienceCopy.Counting.petTitlePrefix)（\(currency.displayTitle)）",
         subtitle: WealthExperienceCopy.Counting.petSubtitle,
         options: [
-            PetWidgetOption(title: "看看我的全部状态", command: "pet_status_all", icon: "heart.text.square.fill"),
-            PetWidgetOption(title: "打开我的背包", command: "pet_inventory_panel", icon: "shippingbox.fill")
+            PetWidgetOption(title: "看看我的全部状态".appLocalized, command: "pet_status_all", icon: "heart.text.square.fill"),
+            PetWidgetOption(title: "打开我的背包".appLocalized, command: "pet_inventory_panel", icon: "shippingbox.fill")
         ],
         metrics: [
             PetWidgetMetric(name: PetMoneyCounterMetricKey.currency, value: currency.rawValue),
             PetWidgetMetric(name: PetMoneyCounterMetricKey.amount, value: "\(displayAmount)"),
-            PetWidgetMetric(name: "衣橱总值", value: "\(symbol)\(displayAmount)")
+            PetWidgetMetric(name: "衣橱总值".appLocalized, value: "\(symbol)\(displayAmount)")
         ]
     )
 }
