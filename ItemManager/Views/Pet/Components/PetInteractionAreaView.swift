@@ -303,12 +303,12 @@ struct PetInteractionAreaView: View {
     
     private func getInteractionText(for state: PetInteractionState) -> String {
         switch state {
-        case .idle: return "未开启"
-        case .preparing: return "准备中..."
-        case .listening: return "倾听中..."
-        case .recording: return "正在听..."
-        case .processing: return "思考中..."
-        case .playing: return "复述中..."
+        case .idle: return "未开启".appLocalized
+        case .preparing: return "准备中...".appLocalized
+        case .listening: return "倾听中...".appLocalized
+        case .recording: return "正在听...".appLocalized
+        case .processing: return "思考中...".appLocalized
+        case .playing: return "复述中...".appLocalized
         }
     }
 }

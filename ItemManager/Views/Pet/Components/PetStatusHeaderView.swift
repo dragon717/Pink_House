@@ -131,11 +131,11 @@ struct MoreCurrenciesView: View {
                 }
             }
             .listStyle(.plain)
-            .navigationTitle("所有货币")
+            .navigationTitle("所有货币".appLocalized)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("关闭") {
+                    Button("关闭".appLocalized) {
                         dismiss()
                     }
                     .foregroundStyle(themeManager.primaryTextColor)
