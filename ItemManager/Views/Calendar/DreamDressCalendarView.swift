@@ -63,7 +63,7 @@ struct DreamDressCalendarView: View {
                 // 3. Popup Overlay (Day & Month)
                 if let date = showingDayPopup {
                     UnifiedEventsPopup(
-                        title: date.formatted(date: .complete, time: .omitted),
+                        title: CalendarHelper.shared.completeDateString(date),
                         clothings: viewModel.clothings(for: date),
                         filterDate: date, // Pass context date to filter irrelevant events
                         onClose: { showingDayPopup = nil }
@@ -133,7 +133,7 @@ struct DreamDressCalendarView: View {
             // Custom Segmented Control for older versions
             HStack(spacing: 0) {
                 ForEach(CalendarViewMode.allCases) { mode in
-                    Text(mode.rawValue)
+                    Text(mode.displayName)
                         .font(.custom(themeManager.currentTheme.fontName, size: 14))
                         .fontWeight(viewMode == mode ? .bold : .regular)
                         .themeSkinLegibleText(level: .inline, slot: .segmentedControl)
@@ -177,9 +177,9 @@ extension View {
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
                     ToolbarItem(placement: .principal) {
-                        Picker("视图模式", selection: viewMode) {
+                        Picker("视图模式".appLocalized, selection: viewMode) {
                             ForEach(CalendarViewMode.allCases) { mode in
-                                Text(mode.rawValue)
+                                Text(mode.displayName)
                                     .themeSkinLegibleText(level: .inline, slot: .segmentedControl)
                                     .tag(mode)
                             }
@@ -208,7 +208,7 @@ extension View {
                                         }
                                     }
                                 )) {
-                                    Label("只看心愿尾款", systemImage: "star")
+                                    Label("只看心愿尾款".appLocalized, systemImage: "star")
                                 }
                             } label: {
                                 Image(systemName: showFilter.wrappedValue ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
@@ -226,9 +226,9 @@ extension View {
                 .toolbar {
                     // 页签选择器（中间）
                     ToolbarItem(placement: .principal) {
-                        Picker("视图模式", selection: viewMode) {
+                        Picker("视图模式".appLocalized, selection: viewMode) {
                             ForEach(CalendarViewMode.allCases) { mode in
-                                Text(mode.rawValue)
+                                Text(mode.displayName)
                                     .themeSkinLegibleText(level: .inline, slot: .segmentedControl)
                                     .tag(mode)
                             }
@@ -258,7 +258,7 @@ extension View {
                                         }
                                     }
                                 )) {
-                                    Label("只看心愿尾款", systemImage: "star")
+                                    Label("只看心愿尾款".appLocalized, systemImage: "star")
                                 }
                             } label: {
                                 Image(systemName: showFilter.wrappedValue ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
@@ -286,7 +286,7 @@ struct RecentTimelineView: View {
                 daySection(offset: 1, title: "明天")
                 
                 // Future Lookahead (Next 7 days)
-                Text("未来一周")
+                Text("未来一周".appLocalized)
                     .font(.headline)
                     .foregroundStyle(.secondary)
                     .themeSkinLegibleText(level: .inline, slot: .sectionCard)
@@ -313,13 +313,13 @@ struct RecentTimelineView: View {
         if let date = Calendar.current.date(byAdding: .day, value: offset, to: Date()) {
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
-                    Text(title)
+                    Text(title.appLocalized)
                         .font(.title2)
                         .bold()
                         .foregroundStyle(Color(uiColor: themeManager.currentTheme.accentColor))
                         .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                     
-                    Text(date.formatted(date: .abbreviated, time: .omitted))
+                    Text(CalendarHelper.shared.abbreviatedDateString(date))
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                         .themeSkinLegibleText(level: .inline, slot: .sectionCard)
@@ -329,7 +329,7 @@ struct RecentTimelineView: View {
                 
                 let events = viewModel.clothings(for: date)
                 if events.isEmpty {
-                    Text("无特殊安排")
+                    Text("无特殊安排".appLocalized)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .themeSkinLegibleText(level: .inline, slot: .emptyState)
@@ -399,11 +399,11 @@ struct ClothingCardTiny: View {
                 HStack(spacing: 2) {
                     if let depositDate = clothing.depositDate, Calendar.current.isDate(depositDate, inSameDayAs: date) {
                         Circle().fill(Color(uiColor: theme.depositColor)).frame(width: 6, height: 6)
-                        Text("定金").font(.caption2).foregroundStyle(.secondary)
+                        Text("定金".appLocalized).font(.caption2).foregroundStyle(.secondary)
                             .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                     } else if let finalDate = clothing.finalPaymentDate, Calendar.current.isDate(finalDate, inSameDayAs: date) {
                         Circle().fill(Color(uiColor: theme.finalPaymentColor)).frame(width: 6, height: 6)
-                        Text("尾款").font(.caption2).foregroundStyle(.secondary)
+                        Text("尾款".appLocalized).font(.caption2).foregroundStyle(.secondary)
                             .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                     }
                 }
@@ -429,7 +429,7 @@ struct CompactDayRow: View {
     var body: some View {
         Button(action: onTap) {
             HStack {
-                Text(date.formatted(date: .abbreviated, time: .omitted))
+                Text(CalendarHelper.shared.abbreviatedDateString(date))
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .themeSkinLegibleText(level: .inline, slot: .sectionCard)
@@ -574,7 +574,7 @@ struct YearlyHeatmapView: View {
                             .padding()
                     }
                     
-                    Text("\(String(year))年 概览")
+                    Text("%d年 概览".appLocalized(year))
                         .font(.title2)
                         .bold()
                         .foregroundStyle(Color(uiColor: themeManager.currentTheme.accentColor))
@@ -599,7 +599,7 @@ struct YearlyHeatmapView: View {
                             }
                         } label: {
                             VStack {
-                                Text("\(month)月")
+                                Text(CalendarHelper.shared.monthName(month, year: year))
                                     .font(.headline)
                                     .foregroundStyle(.secondary)
                                     .themeSkinLegibleText(level: .inline, slot: .sectionCard)

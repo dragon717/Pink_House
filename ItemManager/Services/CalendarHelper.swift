@@ -20,7 +20,38 @@ class CalendarHelper {
     
     func monthYearString(_ date: Date) -> String {
         let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy年 M月"
+        formatter.locale = LanguageManager.shared.locale
+        formatter.setLocalizedDateFormatFromTemplate("yMMM")
+        return formatter.string(from: date)
+    }
+
+    func completeDateString(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = LanguageManager.shared.locale
+        formatter.dateStyle = .full
+        formatter.timeStyle = .none
+        return formatter.string(from: date)
+    }
+
+    func abbreviatedDateString(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = LanguageManager.shared.locale
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .none
+        return formatter.string(from: date)
+    }
+
+    func monthName(_ month: Int, year: Int? = nil) -> String {
+        var components = DateComponents()
+        components.year = year ?? calendar.component(.year, from: Date())
+        components.month = month
+        components.day = 1
+        guard let date = calendar.date(from: components) else {
+            return "\(month)"
+        }
+        let formatter = DateFormatter()
+        formatter.locale = LanguageManager.shared.locale
+        formatter.setLocalizedDateFormatFromTemplate("MMM")
         return formatter.string(from: date)
     }
     

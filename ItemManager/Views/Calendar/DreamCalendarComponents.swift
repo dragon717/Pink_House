@@ -15,6 +15,10 @@ enum CalendarViewMode: String, CaseIterable, Identifiable {
     case yearly = "年度"
     
     var id: String { rawValue }
+
+    var displayName: String {
+        rawValue.appLocalized
+    }
 }
 
 // MARK: - Cells
@@ -151,7 +155,7 @@ struct DreamCalendarCell: View {
         // 1. Check for Deposit (Highest Priority)
         if clothings.contains(where: { isDepositDay($0, on: dateObj.date) }) {
             // Deposit is also a "Start" event, so we put it bottomTrailing
-            return (isPad ? "定金" : "定", theme.depositColor, .bottomTrailing)
+            return (isPad ? "定金".appLocalized : "定".appLocalized, theme.depositColor, .bottomTrailing)
         }
         
         // 2. Check for Final Payment
@@ -159,10 +163,10 @@ struct DreamCalendarCell: View {
             // Check if it is start or end
             if let start = clothing.finalPaymentDate, Calendar.current.isDate(start, inSameDayAs: dateObj.date) {
                 // Start -> Bottom Right
-                return (isPad ? "尾款" : "尾", theme.finalPaymentColor, .bottomTrailing)
+                return (isPad ? "尾款".appLocalized : "尾".appLocalized, theme.finalPaymentColor, .bottomTrailing)
             } else {
                 // End -> Bottom Left
-                return (isPad ? "尾款" : "尾", theme.finalPaymentColor, .bottomLeading)
+                return (isPad ? "尾款".appLocalized : "尾".appLocalized, theme.finalPaymentColor, .bottomLeading)
             }
         }
         
@@ -312,7 +316,7 @@ struct CalendarEventRow: View {
                         
                         // Event Status Label
                         if isDepositDay {
-                            Text("定金日")
+                            Text("定金日".appLocalized)
                                 .font(.caption2)
                                 .themeSkinLegibleText(level: .chip, slot: .filterChip)
                                 .padding(.horizontal, 5)
@@ -321,7 +325,7 @@ struct CalendarEventRow: View {
                                 .foregroundStyle(Color(uiColor: theme.depositColor))
                                 .clipShape(Capsule())
                         } else if isFinalPaymentDay {
-                            Text("预计尾款日")
+                            Text("预计尾款日".appLocalized)
                                 .font(.caption2)
                                 .themeSkinLegibleText(level: .chip, slot: .filterChip)
                                 .padding(.horizontal, 5)
@@ -338,13 +342,13 @@ struct CalendarEventRow: View {
                 // 3. Price Info
                 VStack(alignment: .trailing, spacing: 2) {
                     if clothing.isFinalPaymentPlan {
-                        Text("定金¥\(clothing.totalDeposit.formatted(.number.precision(.fractionLength(0))))")
+                        Text("定金¥%@".appLocalized(clothing.totalDeposit.formatted(.number.precision(.fractionLength(0)))))
                             .font(.caption2)
                             .bold()
                             .foregroundStyle(Color(uiColor: theme.depositColor))
                             .themeSkinLegibleText(level: .chip, slot: .sectionCard)
                         
-                        Text("尾款¥\(clothing.totalBalance.formatted(.number.precision(.fractionLength(0))))")
+                        Text("尾款¥%@".appLocalized(clothing.totalBalance.formatted(.number.precision(.fractionLength(0)))))
                             .font(.caption2)
                             .bold()
                             .foregroundStyle(Color(uiColor: theme.finalPaymentColor))
@@ -378,7 +382,11 @@ struct CalendarEventRow: View {
 
 struct WeekHeaderView: View {
     let theme: CalendarTheme
-    let weeks = ["日", "一", "二", "三", "四", "五", "六"]
+    private var weeks: [String] {
+        let formatter = DateFormatter()
+        formatter.locale = LanguageManager.shared.locale
+        return formatter.shortStandaloneWeekdaySymbols ?? ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+    }
     
     var body: some View {
         HStack {
