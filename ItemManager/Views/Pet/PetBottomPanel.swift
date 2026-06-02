@@ -219,7 +219,7 @@ struct PetBottomPanel: View {
     private var tabHeader: some View {
         HStack {
             Button(action: { selectedTab = 0 }) {
-                Text("背包")
+                Text("背包".appLocalized)
                     .font(.headline)
                     .fontWeight(selectedTab == 0 ? .bold : .regular)
                     .foregroundColor(selectedTab == 0 ? .primary : .secondary)
@@ -230,7 +230,7 @@ struct PetBottomPanel: View {
                 .padding(.horizontal, 10)
             
             Button(action: { selectedTab = 1 }) {
-                Text("商店")
+                Text("商店".appLocalized)
                     .font(.headline)
                     .fontWeight(selectedTab == 1 ? .bold : .regular)
                     .foregroundColor(selectedTab == 1 ? .primary : .secondary)
@@ -317,7 +317,9 @@ struct InventoryView: View {
         if !searchText.isEmpty {
             items = items.filter {
                 $0.name.localizedCaseInsensitiveContains(searchText) ||
-                $0.description.localizedCaseInsensitiveContains(searchText)
+                $0.description.localizedCaseInsensitiveContains(searchText) ||
+                $0.localizedName.localizedCaseInsensitiveContains(searchText) ||
+                $0.localizedDescription.localizedCaseInsensitiveContains(searchText)
             }
         }
         
@@ -333,7 +335,7 @@ struct InventoryView: View {
                     HStack {
                         Image(systemName: "magnifyingglass")
                             .foregroundColor(.gray)
-                        TextField("搜索背包...", text: $searchText)
+                        TextField("搜索背包...".appLocalized, text: $searchText)
                             .textFieldStyle(PlainTextFieldStyle())
                         if !searchText.isEmpty {
                             Button(action: { searchText = "" }) {

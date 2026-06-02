@@ -6697,6 +6697,42 @@
             "state" : "translated",
             "value" : "VIP 萌寵商店專享 6 折優惠"
           }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "VIP限定、ペットショップ40%オフ"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "VIP 전용 펫 상점 40% 할인"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les VIP ont 40 % de réduction à la boutique des animaux"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "VIPs erhalten 40 % Rabatt im Haustier-Shop"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "VIP obtiene 40 % de descuento en la tienda de mascotas"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "VIP tem 40% de desconto na loja de pets"
+          }
         }
       }
     },
@@ -11124,6 +11160,42 @@
             "state" : "translated",
             "value" : "使用"
           }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使う"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "사용"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Utiliser"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Verwenden"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Usar"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Usar"
+          }
         }
       }
     },
@@ -11146,6 +11218,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "使用 %@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@を使う"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 사용"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Utiliser %@"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ verwenden"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Usar %@"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Usar %@"
           }
         }
       }
@@ -20252,13 +20360,13 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Laden"
+            "value" : "Shop"
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Store"
+            "value" : "Shop"
           }
         },
         "es" : {
@@ -35274,7 +35382,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Search Product..."
+            "value" : "Search products..."
           }
         },
         "zh-Hans" : {
@@ -35286,7 +35394,43 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "搜索商品..."
+            "value" : "搜尋商品..."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "商品を検索..."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "상품 검색..."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rechercher des articles..."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Produkte suchen..."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Buscar productos..."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Buscar produtos..."
           }
         }
       }
@@ -35386,7 +35530,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Search Backpack..."
+            "value" : "Search backpack..."
           }
         },
         "zh-Hans" : {
@@ -35398,7 +35542,43 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "搜索背包..."
+            "value" : "搜尋背包..."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "バッグを検索..."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "가방 검색..."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rechercher dans le sac..."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rucksack durchsuchen..."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Buscar en la mochila..."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Buscar na mochila..."
           }
         }
       }
@@ -40772,7 +40952,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Not choose"
+            "value" : "No item selected"
           }
         },
         "zh-Hans" : {
@@ -40785,6 +40965,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "未選擇物品"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アイテムが選択されていません"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "선택한 아이템이 없어요"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucun objet sélectionné"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kein Gegenstand ausgewählt"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No se seleccionó ningún objeto"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nenhum item selecionado"
           }
         }
       }
@@ -44046,7 +44262,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "No"
+            "value" : "No matching items"
           }
         },
         "zh-Hans" : {
@@ -44059,6 +44275,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "沒有找到相關物品"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "該当するアイテムがありません"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "관련 아이템을 찾지 못했어요"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucun objet correspondant"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keine passenden Gegenstände"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No se encontraron objetos relacionados"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nenhum item correspondente"
           }
         }
       }
@@ -48223,6 +48475,42 @@
             "state" : "translated",
             "value" : "確定要使用 %@ 嗎？"
           }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@を使いますか？"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@을(를) 사용할까요?"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Utiliser %@ ?"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ verwenden?"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "¿Usar %@?"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Usar %@?"
+          }
         }
       }
     },
@@ -48245,6 +48533,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "確定要使用 %@ 嗎？\n將快速恢復精力。"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@を使いますか？\n精力をすばやく回復します。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@을(를) 사용할까요?\n에너지를 빠르게 회복해요."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Utiliser %@ ?\nCela restaure rapidement l’énergie."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ verwenden?\nDas stellt Energie schnell wieder her."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "¿Usar %@?\nRestaurará energía rápidamente."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Usar %@?\nIsso recupera energia rapidamente."
           }
         }
       }
@@ -49197,6 +49521,42 @@
             "state" : "translated",
             "value" : "確定要給%@餵食 %@ 嗎？"
           }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@に%@を食べさせますか？"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@에게 %@을(를) 먹일까요?"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Donner %@ à manger à %@ ?"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Soll %@ %@ fressen?"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "¿Alimentar a %@ con %@?"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dar %@ para %@ comer?"
+          }
         }
       }
     },
@@ -49220,6 +49580,42 @@
             "state" : "translated",
             "value" : "確定要給%@喝 %@ 嗎？"
           }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@に%@を飲ませますか？"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@에게 %@을(를) 마시게 할까요?"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Donner %@ à boire à %@ ?"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Soll %@ %@ trinken?"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "¿Dar %@ a %@ para beber?"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dar %@ para %@ beber?"
+          }
         }
       }
     },
@@ -49242,6 +49638,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "確定要讓%@玩 %@ 嗎？\n將消耗 %d 點精力，增加心情。"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@に%@で遊ばせますか？\n精力を%d消耗し、気分が上がります。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@에게 %@을(를) 가지고 놀게 할까요?\n에너지 %d을(를) 소모하고 기분이 올라가요."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Laisser %@ jouer avec %@ ?\nCela consomme %d points d’énergie et augmente l’humeur."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Soll %@ mit %@ spielen?\nDas kostet %d Energie und hebt die Stimmung."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "¿Dejar que %@ juegue con %@?\nConsumirá %d de energía y mejorará el ánimo."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Deixar %@ brincar com %@?\nIsso consome %d de energia e melhora o humor."
           }
         }
       }
@@ -54257,7 +54689,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Backpack, Store ~"
+            "value" : "Your backpack is empty. Buy something in the shop!"
           }
         },
         "zh-Hans" : {
@@ -54270,6 +54702,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "背包空空如也，去商店買點東西吧~"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "バッグは空です。ショップで何か買いましょう。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "가방이 비어 있어요. 상점에서 뭔가 사 보세요!"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le sac est vide. Achetez quelque chose dans la boutique !"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dein Rucksack ist leer. Kauf etwas im Shop!"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La mochila está vacía. Compra algo en la tienda."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A mochila está vazia. Compre algo na loja!"
           }
         }
       }
@@ -63534,6 +64002,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "錯誤"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "エラー"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "오류"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Erreur"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fehler"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Error"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Erro"
           }
         }
       }
