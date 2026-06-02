@@ -62,20 +62,20 @@ struct BrandManagementView: View {
         .background {
             LiquidBackground()
         }
-        .navigationTitle("品牌管理")
+        .navigationTitle("品牌管理".appLocalized)
         .sheet(item: $selectedBrand) { brand in
              BrandEditSheet(brand: brand)
         }
-        .alert("删除品牌", isPresented: $showingDeleteAlert) {
-            Button("取消", role: .cancel) { }
-            Button("删除", role: .destructive) {
+        .alert("删除品牌".appLocalized, isPresented: $showingDeleteAlert) {
+            Button("取消".appLocalized, role: .cancel) { }
+            Button("删除".appLocalized, role: .destructive) {
                 if let brand = selectedBrand {
                     modelContext.delete(brand)
                     try? modelContext.save()
                 }
             }
         } message: {
-            Text("确定要删除此品牌吗？\n删除后，商品上的品牌关联将被移除。")
+            Text("确定要删除此品牌吗？\n删除后，商品上的品牌关联将被移除。".appLocalized)
         }
     }
 }
@@ -95,11 +95,11 @@ struct BrandEditSheet: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section("基本信息") {
-                    TextField("品牌名称", text: $brand.name)
+                Section("基本信息".appLocalized) {
+                    TextField("品牌名称".appLocalized, text: $brand.name)
                 }
                 
-                Section("品牌图片") {
+                Section("品牌图片".appLocalized) {
                     HStack {
                         if let path = brand.imagePath,
                            let image = ImageManager.shared.loadImage(fileName: path) {
@@ -111,7 +111,7 @@ struct BrandEditSheet: View {
                         }
                         
                         PhotosPicker(selection: $selectedItem, matching: .images) {
-                            Text(brand.imagePath == nil ? "选择图片" : "更换图片")
+                            Text(brand.imagePath == nil ? "选择图片".appLocalized : "更换图片".appLocalized)
                         }
                         
                         if brand.imagePath != nil {
@@ -127,7 +127,7 @@ struct BrandEditSheet: View {
                     }
                 }
                 
-                Section("品牌颜色") {
+                Section("品牌颜色".appLocalized) {
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 12) {
                             ForEach(predefinedColors, id: \.self) { hex in
@@ -151,11 +151,11 @@ struct BrandEditSheet: View {
             .background {
                 LiquidBackground()
             }
-            .navigationTitle("编辑品牌")
+            .navigationTitle("编辑品牌".appLocalized)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("完成") { dismiss() }
+                    Button("完成".appLocalized) { dismiss() }
                 }
             }
             .task(id: selectedItem) {
@@ -212,27 +212,27 @@ struct TagModelManagementView: View {
         .background {
             LiquidBackground()
         }
-        .navigationTitle("标签管理")
-        .alert("修改标签名称", isPresented: $isEditing) {
-            TextField("新名称", text: $editText)
-            Button("取消", role: .cancel) { }
-            Button("保存") {
+        .navigationTitle("标签管理".appLocalized)
+        .alert("修改标签名称".appLocalized, isPresented: $isEditing) {
+            TextField("新名称".appLocalized, text: $editText)
+            Button("取消".appLocalized, role: .cancel) { }
+            Button("保存".appLocalized) {
                 if let tag = selectedTag {
                     tag.name = editText
                     try? modelContext.save()
                 }
             }
         }
-        .alert("删除标签", isPresented: $showingDeleteAlert) {
-            Button("取消", role: .cancel) { }
-            Button("删除", role: .destructive) {
+        .alert("删除标签".appLocalized, isPresented: $showingDeleteAlert) {
+            Button("取消".appLocalized, role: .cancel) { }
+            Button("删除".appLocalized, role: .destructive) {
                 if let tag = selectedTag {
                     modelContext.delete(tag)
                     try? modelContext.save()
                 }
             }
         } message: {
-            Text("确定要删除“\(selectedTag?.name ?? "")”吗？\n删除后，商品上的标签关联将被移除。")
+            Text("确定要删除“%@”吗？\n删除后，商品上的标签关联将被移除。".appLocalized(selectedTag?.name ?? ""))
         }
     }
 }

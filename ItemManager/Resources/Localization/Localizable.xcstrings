@@ -12358,7 +12358,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Change Tag Name"
+            "value" : "Rename Tag"
           }
         },
         "zh-Hans" : {
@@ -12371,6 +12371,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "修改標籤名稱"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "タグ名を変更"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "태그 이름 변경"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Renommer l’étiquette"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tag umbenennen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Renombrar etiqueta"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Renomear etiqueta"
           }
         }
       }
@@ -15860,6 +15896,42 @@
             "state" : "translated",
             "value" : "刪除品牌"
           }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ブランドを削除"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "브랜드 삭제"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Supprimer la marque"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Marke löschen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eliminar marca"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Excluir marca"
+          }
         }
       }
     },
@@ -16015,6 +16087,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "刪除標籤"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "タグを削除"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "태그 삭제"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Supprimer l’étiquette"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tag löschen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eliminar etiqueta"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Excluir etiqueta"
           }
         }
       }
@@ -20117,7 +20225,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Brand Name"
+            "value" : "Brand name"
           }
         },
         "zh-Hans" : {
@@ -20130,6 +20238,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "品牌名稱"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ブランド名"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "브랜드 이름"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nom de la marque"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Markenname"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nombre de marca"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nome da marca"
           }
         }
       }
@@ -20175,6 +20319,42 @@
             "state" : "translated",
             "value" : "品牌圖片"
           }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ブランド画像"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "브랜드 이미지"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Image de marque"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Markenbild"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Imagen de marca"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Imagem da marca"
+          }
         }
       }
     },
@@ -20196,6 +20376,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "品牌管理"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ブランド管理"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "브랜드 관리"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gestion des marques"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Markenverwaltung"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gestión de marcas"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gerenciar marcas"
           }
         }
       }
@@ -20240,6 +20456,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "品牌顏色"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ブランドカラー"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "브랜드 색상"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couleur de marque"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Markenfarbe"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Color de marca"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cor da marca"
           }
         }
       }
@@ -21932,7 +22184,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Info"
+            "value" : "Basic Info"
           }
         },
         "zh-Hans" : {
@@ -21944,7 +22196,43 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "基本信息"
+            "value" : "基本資訊"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "基本情報"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "기본 정보"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Infos de base"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Basisinfos"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Información básica"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Informações básicas"
           }
         }
       }
@@ -23519,7 +23807,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Concluído"
+            "value" : "Concluir"
           }
         }
       }
@@ -33067,7 +33355,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Brand"
+            "value" : "All Brands"
           }
         },
         "zh-Hans" : {
@@ -33081,6 +33369,42 @@
             "state" : "translated",
             "value" : "所有品牌"
           }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "すべてのブランド"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "모든 브랜드"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Toutes les marques"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Alle Marken"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Todas las marcas"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Todas as marcas"
+          }
         }
       }
     },
@@ -33089,7 +33413,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Tag"
+            "value" : "All Tags"
           }
         },
         "zh-Hans" : {
@@ -33102,6 +33426,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "所有標籤"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "すべてのタグ"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "모든 태그"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Toutes les étiquettes"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Alle Tags"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Todas las etiquetas"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Todas as etiquetas"
           }
         }
       }
@@ -37330,7 +37690,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Name"
+            "value" : "New name"
           }
         },
         "zh-Hans" : {
@@ -37344,6 +37704,42 @@
             "state" : "translated",
             "value" : "新名稱"
           }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新しい名前"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "새 이름"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nouveau nom"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Neuer Name"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nuevo nombre"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Novo nome"
+          }
         }
       }
     },
@@ -37352,7 +37748,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Brand Name"
+            "value" : "New brand name"
           }
         },
         "zh-Hans" : {
@@ -37365,6 +37761,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "新品牌名稱"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新しいブランド名"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "새 브랜드 이름"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nouveau nom de marque"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Neuer Markenname"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nuevo nombre de marca"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Novo nome da marca"
           }
         }
       }
@@ -37408,7 +37840,43 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "新建品牌"
+            "value" : "新增品牌"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ブランドを追加"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "브랜드 만들기"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nouvelle marque"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Neue Marke"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nueva marca"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nova marca"
           }
         }
       }
@@ -37519,7 +37987,43 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "新建標籤"
+            "value" : "新增標籤"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "タグを追加"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "태그 만들기"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nouvelle étiquette"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Neuer Tag"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nueva etiqueta"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nova etiqueta"
           }
         }
       }
@@ -37730,7 +38234,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Tag Name"
+            "value" : "New tag name"
           }
         },
         "zh-Hans" : {
@@ -37743,6 +38247,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "新標籤名稱"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新しいタグ名"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "새 태그 이름"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nouveau nom d’étiquette"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Neuer Tag-Name"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nuevo nombre de etiqueta"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Novo nome da etiqueta"
           }
         }
       }
@@ -39630,7 +40170,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "No brand yet"
+            "value" : "No brands yet"
           }
         },
         "zh-Hans" : {
@@ -39643,6 +40183,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "暫無品牌"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ブランドはまだありません"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "아직 브랜드가 없어요"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucune marque pour le moment"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Noch keine Marken"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aún no hay marcas"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nenhuma marca ainda"
           }
         }
       }
@@ -39864,7 +40440,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "No tag yet"
+            "value" : "No tags yet"
           }
         },
         "zh-Hans" : {
@@ -39877,6 +40453,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "暫無標籤"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "タグはまだありません"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "아직 태그가 없어요"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucune étiquette pour le moment"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Noch keine Tags"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aún no hay etiquetas"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nenhuma etiqueta ainda"
           }
         }
       }
@@ -40181,7 +40793,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Image"
+            "value" : "Change Image"
           }
         },
         "zh-Hans" : {
@@ -40194,6 +40806,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "更換圖片"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "画像を変更"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이미지 변경"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Changer l’image"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bild ändern"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cambiar imagen"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trocar imagem"
           }
         }
       }
@@ -42260,7 +42908,43 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "標籤信息"
+            "value" : "標籤資訊"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "タグ情報"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "태그 정보"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Infos de l’étiquette"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tag-Info"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Información de etiqueta"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Informações da etiqueta"
           }
         }
       }
@@ -42314,7 +42998,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Tag Name"
+            "value" : "Tag name"
           }
         },
         "zh-Hans" : {
@@ -42327,6 +43011,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "標籤名稱"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "タグ名"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "태그 이름"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nom de l’étiquette"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tag-Name"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nombre de etiqueta"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nome da etiqueta"
           }
         }
       }
@@ -42349,6 +43069,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "標籤管理"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "タグ管理"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "태그 관리"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gestion des étiquettes"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tag-Verwaltung"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gestión de etiquetas"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gerenciar etiquetas"
           }
         }
       }
@@ -42393,6 +43149,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "標籤顏色"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "タグカラー"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "태그 색상"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couleur de l’étiquette"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tag-Farbe"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Color de etiqueta"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cor da etiqueta"
           }
         }
       }
@@ -44744,7 +45536,7 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "添加"
+            "value" : "新增"
           }
         },
         "ja" : {
@@ -48650,7 +49442,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Delete “ %@ ”?\nDelete, Product Tag."
+            "value" : "Delete “%@”?\nAfter deletion, tag links on items will be removed."
           }
         },
         "zh-Hans" : {
@@ -48662,7 +49454,43 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "確定要刪除“%@”嗎？\n刪除後，商品上的標籤關聯將被移除。"
+            "value" : "確定要刪除「%@」嗎？\n刪除後，商品上的標籤關聯將被移除。"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「%@」を削除しますか？\n削除後、アイテムのタグ関連付けは解除されます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“%@”을(를) 삭제할까요?\n삭제 후 아이템의 태그 연결이 제거됩니다."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Supprimer « %@ » ?\nAprès suppression, les liens d’étiquette des articles seront retirés."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "„%@“ löschen?\nDanach werden Tag-Verknüpfungen auf Artikeln entfernt."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "¿Eliminar “%@”?\nDespués, se quitarán las asociaciones de etiqueta de los artículos."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Excluir “%@”?\nDepois, os vínculos de etiqueta dos itens serão removidos."
           }
         }
       }
@@ -48886,7 +49714,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Delete brand?"
+            "value" : "Delete this brand?"
           }
         },
         "zh-Hans" : {
@@ -48900,6 +49728,42 @@
             "state" : "translated",
             "value" : "確定要刪除此品牌嗎？"
           }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このブランドを削除しますか？"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이 브랜드를 삭제할까요?"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Supprimer cette marque ?"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Diese Marke löschen?"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "¿Eliminar esta marca?"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Excluir esta marca?"
+          }
         }
       }
     },
@@ -48908,7 +49772,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Delete brand?\nDelete, Product Brand."
+            "value" : "Delete this brand?\nAfter deletion, brand links on items will be removed."
           }
         },
         "zh-Hans" : {
@@ -48922,6 +49786,42 @@
             "state" : "translated",
             "value" : "確定要刪除此品牌嗎？\n刪除後，商品上的品牌關聯將被移除。"
           }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このブランドを削除しますか？\n削除後、アイテムのブランド関連付けは解除されます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이 브랜드를 삭제할까요?\n삭제 후 아이템의 브랜드 연결이 제거됩니다."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Supprimer cette marque ?\nAprès suppression, les liens de marque des articles seront retirés."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Diese Marke löschen?\nDanach werden Markenverknüpfungen auf Artikeln entfernt."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "¿Eliminar esta marca?\nDespués, se quitarán las asociaciones de marca de los artículos."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Excluir esta marca?\nDepois, os vínculos de marca dos itens serão removidos."
+          }
         }
       }
     },
@@ -48930,7 +49830,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Delete tag?"
+            "value" : "Delete this tag?"
           }
         },
         "zh-Hans" : {
@@ -48943,6 +49843,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "確定要刪除此標籤嗎？"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このタグを削除しますか？"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이 태그를 삭제할까요?"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Supprimer cette étiquette ?"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Diesen Tag löschen?"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "¿Eliminar esta etiqueta?"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Excluir esta etiqueta?"
           }
         }
       }
@@ -50097,7 +51033,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Confirm delete brand"
+            "value" : "Delete Brand?"
           }
         },
         "zh-Hans" : {
@@ -50111,6 +51047,42 @@
             "state" : "translated",
             "value" : "確認刪除品牌"
           }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ブランドを削除しますか？"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "브랜드를 삭제할까요?"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Supprimer la marque ?"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Marke löschen?"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "¿Eliminar marca?"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Excluir marca?"
+          }
         }
       }
     },
@@ -50119,7 +51091,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Confirm delete tag"
+            "value" : "Delete Tag?"
           }
         },
         "zh-Hans" : {
@@ -50132,6 +51104,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "確認刪除標籤"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "タグを削除しますか？"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "태그를 삭제할까요?"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Supprimer l’étiquette ?"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tag löschen?"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "¿Eliminar etiqueta?"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Excluir etiqueta?"
           }
         }
       }
@@ -52881,7 +53889,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Tag"
+            "value" : "Manage Tags"
           }
         },
         "zh-Hans" : {
@@ -52894,6 +53902,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "管理標籤"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "タグを管理"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "태그 관리"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gérer les étiquettes"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tags verwalten"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gestionar etiquetas"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gerenciar etiquetas"
           }
         }
       }
@@ -54255,6 +55299,42 @@
             "state" : "translated",
             "value" : "編輯品牌"
           }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ブランドを編集"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "브랜드 편집"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Modifier la marque"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Marke bearbeiten"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Editar marca"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Editar marca"
+          }
         }
       }
     },
@@ -54276,6 +55356,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "編輯標籤"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "タグを編集"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "태그 편집"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Modifier l’étiquette"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tag bearbeiten"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Editar etiqueta"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Editar etiqueta"
           }
         }
       }
@@ -62784,6 +63900,42 @@
             "state" : "translated",
             "value" : "選擇品牌"
           }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ブランドを選択"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "브랜드 선택"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choisir une marque"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Marke auswählen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Elegir marca"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Escolher marca"
+          }
         }
       }
     },
@@ -62792,7 +63944,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Choose Images"
+            "value" : "Choose Image"
           }
         },
         "zh-Hans" : {
@@ -62805,6 +63957,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "選擇圖片"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "画像を選択"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이미지 선택"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choisir une image"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bild auswählen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Elegir imagen"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Escolher imagem"
           }
         }
       }
@@ -83483,6 +84671,122 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Repetindo..."
+          }
+        }
+      }
+    },
+    "该品牌已被 %d 件裙装使用，删除后这些裙装的品牌信息将被清除。确定要删除吗？" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This brand is used by %d dresses. Deleting it will clear the brand from those dresses. Delete it?"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "该品牌已被 %d 件裙装使用，删除后这些裙装的品牌信息将被清除。确定要删除吗？"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "該品牌已被 %d 件裙裝使用，刪除後這些裙裝的品牌資訊將被清除。確定要刪除嗎？"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このブランドは%d件のドレスで使用されています。削除すると、それらのドレスのブランド情報が消去されます。削除しますか？"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이 브랜드는 드레스 %d벌에서 사용 중이에요. 삭제하면 해당 드레스의 브랜드 정보가 지워집니다. 삭제할까요?"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cette marque est utilisée par %d robes. La supprimer effacera la marque de ces robes. La supprimer ?"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Diese Marke wird von %d Kleidern verwendet. Beim Löschen wird die Marke dort entfernt. Löschen?"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Esta marca se usa en %d vestidos. Al eliminarla, se borrará la marca de esos vestidos. ¿Eliminarla?"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Esta marca é usada por %d vestidos. Ao excluí-la, a marca será removida desses vestidos. Excluir?"
+          }
+        }
+      }
+    },
+    "该标签已被 %d 件裙装使用，删除后这些裙装将不再包含此标签。确定要删除吗？" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This tag is used by %d dresses. Deleting it will remove the tag from those dresses. Delete it?"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "该标签已被 %d 件裙装使用，删除后这些裙装将不再包含此标签。确定要删除吗？"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "該標籤已被 %d 件裙裝使用，刪除後這些裙裝將不再包含此標籤。確定要刪除嗎？"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このタグは%d件のドレスで使用されています。削除すると、それらのドレスからタグが外れます。削除しますか？"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이 태그는 드레스 %d벌에서 사용 중이에요. 삭제하면 해당 드레스에서 태그가 제거됩니다. 삭제할까요?"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cette étiquette est utilisée par %d robes. La supprimer retirera l’étiquette de ces robes. La supprimer ?"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dieser Tag wird von %d Kleidern verwendet. Beim Löschen wird er dort entfernt. Löschen?"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Esta etiqueta se usa en %d vestidos. Al eliminarla, se quitará de esos vestidos. ¿Eliminarla?"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Esta etiqueta é usada por %d vestidos. Ao excluí-la, ela será removida desses vestidos. Excluir?"
           }
         }
       }

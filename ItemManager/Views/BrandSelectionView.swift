@@ -74,7 +74,7 @@ struct BrandSelectionView: View {
                                     }
                                 }
                                 
-                                TextField("新品牌名称", text: $newBrandName)
+                                TextField("新品牌名称".appLocalized, text: $newBrandName)
                                     .textFieldStyle(.roundedBorder)
                                     .onSubmit {
                                         addNewBrand()
@@ -100,7 +100,7 @@ struct BrandSelectionView: View {
                             }
                             
                             HStack {
-                                Button("取消") {
+                                Button("取消".appLocalized) {
                                     isAddingBrand = false
                                     newBrandName = ""
                                     selectedColorHex = "#FFB6C1"
@@ -109,7 +109,7 @@ struct BrandSelectionView: View {
                                 
                                 Spacer()
                                 
-                                Button("添加") {
+                                Button("添加".appLocalized) {
                                     addNewBrand()
                                 }
                                 .disabled(newBrandName.isEmpty)
@@ -121,15 +121,15 @@ struct BrandSelectionView: View {
                         Button(action: {
                             isAddingBrand = true
                         }) {
-                            Label("新建品牌", systemImage: "plus.circle.fill")
+                            Label("新建品牌".appLocalized, systemImage: "plus.circle.fill")
                                 .foregroundStyle(.pink)
                         }
                     }
                 }
                 
-                Section("所有品牌") {
+                Section("所有品牌".appLocalized) {
                     if allBrands.isEmpty {
-                        Text("暂无品牌")
+                        Text("暂无品牌".appLocalized)
                             .foregroundStyle(.secondary)
                     } else {
                         ForEach(allBrands) { brand in
@@ -164,13 +164,13 @@ struct BrandSelectionView: View {
                                 Button(role: .destructive) {
                                     deleteBrand(brand)
                                 } label: {
-                                    Label("删除", systemImage: "trash")
+                                    Label("删除".appLocalized, systemImage: "trash")
                                 }
                                 
                                 Button {
                                     editingBrand = brand
                                 } label: {
-                                    Label("编辑", systemImage: "pencil")
+                                    Label("编辑".appLocalized, systemImage: "pencil")
                                 }
                                 .tint(.orange)
                             }
@@ -178,11 +178,11 @@ struct BrandSelectionView: View {
                     }
                 }
             }
-            .navigationTitle("选择品牌")
+            .navigationTitle("选择品牌".appLocalized)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("取消") {
+                    Button("取消".appLocalized) {
                         dismiss()
                     }
                 }
@@ -190,11 +190,11 @@ struct BrandSelectionView: View {
             .sheet(item: $editingBrand) { brand in
                 BrandEditSheet(brand: brand)
             }
-            .alert("确认删除品牌", isPresented: $showingDeleteAlert) {
-                Button("取消", role: .cancel) {
+            .alert("确认删除品牌".appLocalized, isPresented: $showingDeleteAlert) {
+                Button("取消".appLocalized, role: .cancel) {
                     brandToDelete = nil
                 }
-                Button("删除", role: .destructive) {
+                Button("删除".appLocalized, role: .destructive) {
                     if let brand = brandToDelete {
                         performDelete(brand)
                     }
@@ -202,9 +202,9 @@ struct BrandSelectionView: View {
                 }
             } message: {
                 if let brand = brandToDelete, let count = brand.clothings?.count {
-                    Text("该品牌已被 \(count) 件裙装使用，删除后这些裙装的品牌信息将被清除。确定要删除吗？")
+                    Text("该品牌已被 %d 件裙装使用，删除后这些裙装的品牌信息将被清除。确定要删除吗？".appLocalized(count))
                 } else {
-                    Text("确定要删除此品牌吗？")
+                    Text("确定要删除此品牌吗？".appLocalized)
                 }
             }
         }

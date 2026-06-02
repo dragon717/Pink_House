@@ -47,7 +47,7 @@ struct TagSelectionView: View {
                 Section {
                     if isAddingTag {
                         VStack(alignment: .leading, spacing: 12) {
-                            TextField("新标签名称", text: $newTagName)
+                            TextField("新标签名称".appLocalized, text: $newTagName)
                                 .textFieldStyle(.roundedBorder)
                                 .onSubmit {
                                     addNewTag()
@@ -72,7 +72,7 @@ struct TagSelectionView: View {
                             }
                             
                             HStack {
-                                Button("取消") {
+                                Button("取消".appLocalized) {
                                     isAddingTag = false
                                     newTagName = ""
                                     selectedColorHex = "#FFB6C1"
@@ -81,7 +81,7 @@ struct TagSelectionView: View {
                                 
                                 Spacer()
                                 
-                                Button("添加") {
+                                Button("添加".appLocalized) {
                                     addNewTag()
                                 }
                                 .disabled(newTagName.isEmpty)
@@ -93,15 +93,15 @@ struct TagSelectionView: View {
                         Button(action: {
                             isAddingTag = true
                         }) {
-                            Label("新建标签", systemImage: "plus.circle.fill")
+                            Label("新建标签".appLocalized, systemImage: "plus.circle.fill")
                                 .foregroundStyle(.pink)
                         }
                     }
                 }
                 
-                Section("所有标签") {
+                Section("所有标签".appLocalized) {
                     if allTags.isEmpty {
-                        Text("暂无标签")
+                        Text("暂无标签".appLocalized)
                             .foregroundStyle(.secondary)
                     } else {
                         ForEach(allTags) { tag in
@@ -127,13 +127,13 @@ struct TagSelectionView: View {
                                 Button(role: .destructive) {
                                     deleteTag(tag)
                                 } label: {
-                                    Label("删除", systemImage: "trash")
+                                    Label("删除".appLocalized, systemImage: "trash")
                                 }
                                 
                                 Button {
                                     editingTag = tag
                                 } label: {
-                                    Label("编辑", systemImage: "pencil")
+                                    Label("编辑".appLocalized, systemImage: "pencil")
                                 }
                                 .tint(.orange)
                             }
@@ -141,11 +141,11 @@ struct TagSelectionView: View {
                     }
                 }
             }
-            .navigationTitle("管理标签")
+            .navigationTitle("管理标签".appLocalized)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("完成") {
+                    Button("完成".appLocalized) {
                         dismiss()
                     }
                 }
@@ -153,11 +153,11 @@ struct TagSelectionView: View {
             .sheet(item: $editingTag) { tag in
                 TagEditSheet(tag: tag, predefinedColors: predefinedColors)
             }
-            .alert("确认删除标签", isPresented: $showingDeleteAlert) {
-                Button("取消", role: .cancel) {
+            .alert("确认删除标签".appLocalized, isPresented: $showingDeleteAlert) {
+                Button("取消".appLocalized, role: .cancel) {
                     tagToDelete = nil
                 }
-                Button("删除", role: .destructive) {
+                Button("删除".appLocalized, role: .destructive) {
                     if let tag = tagToDelete {
                         performDelete(tag)
                     }
@@ -165,9 +165,9 @@ struct TagSelectionView: View {
                 }
             } message: {
                 if let tag = tagToDelete, let count = tag.clothings?.count {
-                    Text("该标签已被 \(count) 件裙装使用，删除后这些裙装将不再包含此标签。确定要删除吗？")
+                    Text("该标签已被 %d 件裙装使用，删除后这些裙装将不再包含此标签。确定要删除吗？".appLocalized(count))
                 } else {
-                    Text("确定要删除此标签吗？")
+                    Text("确定要删除此标签吗？".appLocalized)
                 }
             }
         }
@@ -232,11 +232,11 @@ struct TagEditSheet: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section("标签信息") {
-                    TextField("标签名称", text: $name)
+                Section("标签信息".appLocalized) {
+                    TextField("标签名称".appLocalized, text: $name)
                 }
                 
-                Section("标签颜色") {
+                Section("标签颜色".appLocalized) {
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 12) {
                             ForEach(predefinedColors, id: \.self) { hex in
@@ -256,17 +256,17 @@ struct TagEditSheet: View {
                     }
                 }
             }
-            .navigationTitle("编辑标签")
+            .navigationTitle("编辑标签".appLocalized)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("取消") {
+                    Button("取消".appLocalized) {
                         dismiss()
                     }
                 }
                 
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("保存") {
+                    Button("保存".appLocalized) {
                         saveChanges()
                     }
                     .disabled(name.isEmpty)
