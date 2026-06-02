@@ -632,10 +632,10 @@ private struct PetInventoryPanelWidget: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             PetPanelHeader(title: widget.title, subtitle: widget.subtitle)
-            PetSegmentTabs(primary: "背包", secondary: "商店", isPrimarySelected: true) {
-                onAction(PetWidgetOption(title: "背包", command: "pet_inventory_panel"))
+            PetSegmentTabs(primary: "背包".appLocalized, secondary: "商店".appLocalized, isPrimarySelected: true) {
+                onAction(PetWidgetOption(title: "背包".appLocalized, command: "pet_inventory_panel"))
             } secondaryAction: {
-                onAction(PetWidgetOption(title: "商店", command: "pet_shop_panel"))
+                onAction(PetWidgetOption(title: "商店".appLocalized, command: "pet_shop_panel"))
             }
             inventoryGrid
             inventoryDropZone
@@ -656,8 +656,8 @@ private struct PetInventoryPanelWidget: View {
             if widget.options.isEmpty {
                 PetPanelEmptyState(
                     systemIcon: "shippingbox",
-                    title: "我的背包空空的",
-                    subtitle: "带我去商店补一点猫粮、罐头或者玩具吧。"
+                    title: "我的背包空空的".appLocalized,
+                    subtitle: "带我去商店补一点猫粮、罐头或者玩具吧。".appLocalized
                 )
             } else {
                 ScrollView(.vertical, showsIndicators: true) {
@@ -689,7 +689,7 @@ private struct PetInventoryPanelWidget: View {
     private var inventoryDropZone: some View {
         HStack(spacing: 6) {
             Image(systemName: "pawprint.circle.fill")
-            Text("拖到这里就能直接喂我")
+            Text("拖到这里就能直接喂我".appLocalized)
                 .font(.caption2)
                 .themeSkinLegibleText(level: .inline, slot: .filterChip)
         }
@@ -703,7 +703,7 @@ private struct PetInventoryPanelWidget: View {
         .contentShape(RoundedRectangle(cornerRadius: 12))
         .onDrop(of: PetEmbeddedPanelDragDrop.supportedTypeIdentifiers, isTargeted: $isDropTargeted) { providers in
             PetEmbeddedPanelDragDrop.handleDrop(from: providers) { payload in
-                onAction(PetWidgetOption(title: "拖拽使用", command: payload, icon: "pawprint.circle.fill"))
+                onAction(PetWidgetOption(title: "拖拽使用".appLocalized, command: payload, icon: "pawprint.circle.fill"))
             }
         }
     }
@@ -767,10 +767,10 @@ private struct PetShopPanelWidget: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             PetPanelHeader(title: widget.title, subtitle: widget.subtitle)
-            PetSegmentTabs(primary: "背包", secondary: "商店", isPrimarySelected: false) {
-                onAction(PetWidgetOption(title: "背包", command: "pet_inventory_panel"))
+            PetSegmentTabs(primary: "背包".appLocalized, secondary: "商店".appLocalized, isPrimarySelected: false) {
+                onAction(PetWidgetOption(title: "背包".appLocalized, command: "pet_inventory_panel"))
             } secondaryAction: {
-                onAction(PetWidgetOption(title: "商店", command: "pet_shop_panel"))
+                onAction(PetWidgetOption(title: "商店".appLocalized, command: "pet_shop_panel"))
             }
             shopGrid
             shopDropZone
@@ -791,8 +791,8 @@ private struct PetShopPanelWidget: View {
             if widget.options.isEmpty {
                 PetPanelEmptyState(
                     systemIcon: "cart",
-                    title: "今天的小卖部空空的",
-                    subtitle: "等会儿再陪我来看看有没有新道具。"
+                    title: "今天的小卖部空空的".appLocalized,
+                    subtitle: "等会儿再陪我来看看有没有新道具。".appLocalized
                 )
             } else {
                 ScrollView(.vertical, showsIndicators: true) {
@@ -826,7 +826,7 @@ private struct PetShopPanelWidget: View {
     private var shopDropZone: some View {
         HStack(spacing: 6) {
             Image(systemName: "cart.circle.fill")
-            Text("拖到这里就能买来马上喂我")
+            Text("拖到这里就能买来马上喂我".appLocalized)
                 .font(.caption2)
                 .themeSkinLegibleText(level: .inline, slot: .filterChip)
         }
@@ -844,7 +844,7 @@ private struct PetShopPanelWidget: View {
                     .replacingOccurrences(of: "buy_item:", with: "")
                     .replacingOccurrences(of: "shop:", with: "")
                 guard !itemId.isEmpty else { return }
-                onAction(PetWidgetOption(title: "拖拽投喂", command: "drag_shop_item:\(itemId)", icon: "cart.circle.fill"))
+                onAction(PetWidgetOption(title: "拖拽投喂".appLocalized, command: "drag_shop_item:\(itemId)", icon: "cart.circle.fill"))
             }
         }
     }
