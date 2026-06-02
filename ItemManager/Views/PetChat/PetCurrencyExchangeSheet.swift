@@ -25,7 +25,7 @@ struct PetCurrencyExchangeSheet: View {
                 ScrollView(.vertical, showsIndicators: false) {
                     VStack(spacing: layout.sectionSpacing) {
                         VStack(spacing: 8) {
-                            Text("货币兑换")
+                            Text("货币兑换".appLocalized)
                                 .font(.title2)
                                 .fontWeight(.bold)
                             Text(exchangeRateDescription)
@@ -83,12 +83,12 @@ struct PetCurrencyExchangeSheet: View {
                             ViewThatFits(in: .horizontal) {
                                 HStack(spacing: 12) {
                                     balanceCard(
-                                        title: "\(title(for: direction.sourceCurrency))余额",
+                                        title: "%@余额".appLocalized(title(for: direction.sourceCurrency)),
                                         amount: sourceBalance,
                                         layout: layout
                                     )
                                     balanceCard(
-                                        title: "\(title(for: direction.targetCurrency))余额",
+                                        title: "%@余额".appLocalized(title(for: direction.targetCurrency)),
                                         amount: targetBalance,
                                         layout: layout
                                     )
@@ -96,12 +96,12 @@ struct PetCurrencyExchangeSheet: View {
 
                                 VStack(spacing: 8) {
                                     balanceCard(
-                                        title: "\(title(for: direction.sourceCurrency))余额",
+                                        title: "%@余额".appLocalized(title(for: direction.sourceCurrency)),
                                         amount: sourceBalance,
                                         layout: layout
                                     )
                                     balanceCard(
-                                        title: "\(title(for: direction.targetCurrency))余额",
+                                        title: "%@余额".appLocalized(title(for: direction.targetCurrency)),
                                         amount: targetBalance,
                                         layout: layout
                                     )
@@ -112,7 +112,7 @@ struct PetCurrencyExchangeSheet: View {
                                 inputAmountText = "\(exchangeAmountValue)"
                                 showAmountInput = true
                             } label: {
-                                Text("兑换数量: \(exchangeAmountValue)")
+                                Text("兑换数量: %d".appLocalized(exchangeAmountValue))
                                     .font(.headline)
                                     .foregroundStyle(themeManager.primaryTextColor)
                                     .padding(.horizontal, 12)
@@ -135,21 +135,21 @@ struct PetCurrencyExchangeSheet: View {
                                 .font(.caption2)
                                 .foregroundStyle(.tertiary)
                             } else if hasExchangeableBalance {
-                                Text("当前最多可兑换 \(maxExchangeableSourceAmount)")
+                                Text("当前最多可兑换 %d".appLocalized(maxExchangeableSourceAmount))
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                             } else if sourceBalance > 0 {
-                                Text("目标货币已接近上限，暂时无法继续兑换")
+                                Text("目标货币已接近上限，暂时无法继续兑换".appLocalized)
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                             } else {
-                                Text("当前没有可用于兑换的\(title(for: direction.sourceCurrency))")
+                                Text("当前没有可用于兑换的%@".appLocalized(title(for: direction.sourceCurrency)))
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                             }
 
                             if hasExchangeableBalance {
-                                Text("预计到账 \(convertedTargetAmount(for: exchangeAmountValue) ?? 0) \(title(for: direction.targetCurrency))")
+                                Text("预计到账 %d %@".appLocalized(convertedTargetAmount(for: exchangeAmountValue) ?? 0, title(for: direction.targetCurrency)))
                                     .font(.caption)
                                     .foregroundStyle(themeManager.secondaryTextColor)
                             }
@@ -189,7 +189,7 @@ struct PetCurrencyExchangeSheet: View {
                     Button {
                         _ = PetDataManager.shared.updateCurrency(type: .fishCoin, delta: 1000)
                         _ = PetDataManager.shared.updateCurrency(type: .boneCoin, delta: 1000)
-                        resultMessage = "🛠️ Debug：已增加 1000 鱼币和 1000 骨头币"
+                        resultMessage = "Debug：已增加 1000 %@和 1000 %@".appLocalized(PetCurrency.fishCoin.localizedName, PetCurrency.boneCoin.localizedName)
                     } label: {
                         Image(systemName: "plus.circle.fill")
                             .foregroundStyle(.red)
@@ -197,24 +197,24 @@ struct PetCurrencyExchangeSheet: View {
                 }
                 #endif
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("完成") {
+                    Button("完成".appLocalized) {
                         dismiss()
                     }
                 }
             }
-            .alert("输入兑换数量", isPresented: $showAmountInput) {
-                TextField("数量", text: $inputAmountText)
+            .alert("输入兑换数量".appLocalized, isPresented: $showAmountInput) {
+                TextField("数量".appLocalized, text: $inputAmountText)
                     .keyboardType(.numberPad)
-                Button("取消", role: .cancel) { }
-                Button("确定") {
+                Button("取消".appLocalized, role: .cancel) { }
+                Button("确定".appLocalized) {
                     if let value = Int(inputAmountText), value > 0 {
                         exchangeAmount = min(Double(value), maxExchangeAmount)
                         clampExchangeAmount()
                     }
                 }
             }
-            .alert("兑换失败", isPresented: $showingErrorAlert) {
-                Button("知道了", role: .cancel) { }
+            .alert("兑换失败".appLocalized, isPresented: $showingErrorAlert) {
+                Button("知道了".appLocalized, role: .cancel) { }
             } message: {
                 Text(errorMessage)
             }
@@ -265,11 +265,11 @@ struct PetCurrencyExchangeSheet: View {
     private var exchangeRateDescription: String {
         switch direction {
         case .fishToBone, .boneToFish:
-            return "汇率 1:1"
+            return "汇率 1:1".appLocalized
         case .meowToFish:
-            return "1 喵币 = 1000 鱼币"
+            return "1 %@ = 1000 %@".appLocalized(PetCurrency.meowCoin.localizedName, PetCurrency.fishCoin.localizedName)
         case .meowToBone:
-            return "1 喵币 = 1000 骨头币"
+            return "1 %@ = 1000 %@".appLocalized(PetCurrency.meowCoin.localizedName, PetCurrency.boneCoin.localizedName)
         }
     }
 
@@ -310,22 +310,18 @@ struct PetCurrencyExchangeSheet: View {
     }
 
     private func title(for currency: PetCurrency) -> String {
-        switch currency {
-        case .meowCoin: return "喵币"
-        case .fishCoin: return "鱼币"
-        case .boneCoin: return "骨头币"
-        }
+        currency.localizedName
     }
 
     private func performExchange() {
         let sourceAmount = min(exchangeAmountValue, maxExchangeableSourceAmount)
         guard sourceAmount > 0 else {
-            presentError("当前数量无法兑换")
+            presentError("当前数量无法兑换".appLocalized)
             return
         }
 
         guard let targetAmount = convertedTargetAmount(for: sourceAmount) else {
-            presentError("兑换数量过大，请减少后重试")
+            presentError("兑换数量过大，请减少后重试".appLocalized)
             return
         }
 
@@ -333,54 +329,54 @@ struct PetCurrencyExchangeSheet: View {
         switch direction {
         case .fishToBone:
             guard status.fishCoin >= sourceAmount else {
-                presentError("鱼币不足")
+                presentError("%@不足".appLocalized(PetCurrency.fishCoin.localizedName))
                 return
             }
             let (newBoneCoin, overflow) = status.boneCoin.addingReportingOverflow(targetAmount)
             guard !overflow else {
-                presentError("骨头币数量过大，暂时无法继续兑换")
+                presentError("%@数量过大，暂时无法继续兑换".appLocalized(PetCurrency.boneCoin.localizedName))
                 return
             }
             status.fishCoin -= sourceAmount
             status.boneCoin = newBoneCoin
-            resultMessage = "兑换成功：\(sourceAmount) 鱼币 → \(targetAmount) 骨头币"
+            resultMessage = "兑换成功：%d %@ → %d %@".appLocalized(sourceAmount, PetCurrency.fishCoin.localizedName, targetAmount, PetCurrency.boneCoin.localizedName)
         case .boneToFish:
             guard status.boneCoin >= sourceAmount else {
-                presentError("骨头币不足")
+                presentError("%@不足".appLocalized(PetCurrency.boneCoin.localizedName))
                 return
             }
             let (newFishCoin, overflow) = status.fishCoin.addingReportingOverflow(targetAmount)
             guard !overflow else {
-                presentError("鱼币数量过大，暂时无法继续兑换")
+                presentError("%@数量过大，暂时无法继续兑换".appLocalized(PetCurrency.fishCoin.localizedName))
                 return
             }
             status.boneCoin -= sourceAmount
             status.fishCoin = newFishCoin
-            resultMessage = "兑换成功：\(sourceAmount) 骨头币 → \(targetAmount) 鱼币"
+            resultMessage = "兑换成功：%d %@ → %d %@".appLocalized(sourceAmount, PetCurrency.boneCoin.localizedName, targetAmount, PetCurrency.fishCoin.localizedName)
         case .meowToFish:
             let (newFishCoin, overflow) = status.fishCoin.addingReportingOverflow(targetAmount)
             guard !overflow else {
-                presentError("鱼币数量过大，暂时无法继续兑换")
+                presentError("%@数量过大，暂时无法继续兑换".appLocalized(PetCurrency.fishCoin.localizedName))
                 return
             }
             guard StoreManager.spendMeowCoins(sourceAmount, in: &status) else {
-                presentError("喵币不足")
+                presentError("%@不足".appLocalized(PetCurrency.meowCoin.localizedName))
                 return
             }
             status.fishCoin = newFishCoin
-            resultMessage = "兑换成功：\(sourceAmount) 喵币 → \(targetAmount) 鱼币"
+            resultMessage = "兑换成功：%d %@ → %d %@".appLocalized(sourceAmount, PetCurrency.meowCoin.localizedName, targetAmount, PetCurrency.fishCoin.localizedName)
         case .meowToBone:
             let (newBoneCoin, overflow) = status.boneCoin.addingReportingOverflow(targetAmount)
             guard !overflow else {
-                presentError("骨头币数量过大，暂时无法继续兑换")
+                presentError("%@数量过大，暂时无法继续兑换".appLocalized(PetCurrency.boneCoin.localizedName))
                 return
             }
             guard StoreManager.spendMeowCoins(sourceAmount, in: &status) else {
-                presentError("喵币不足")
+                presentError("%@不足".appLocalized(PetCurrency.meowCoin.localizedName))
                 return
             }
             status.boneCoin = newBoneCoin
-            resultMessage = "兑换成功：\(sourceAmount) 喵币 → \(targetAmount) 骨头币"
+            resultMessage = "兑换成功：%d %@ → %d %@".appLocalized(sourceAmount, PetCurrency.meowCoin.localizedName, targetAmount, PetCurrency.boneCoin.localizedName)
         }
 
         PetDataManager.shared.saveStatus(status)
