@@ -419,14 +419,14 @@ struct PetChatView: View {
                 }
                 .presentationDetents([.large])
             }
-            .alert("修改名字", isPresented: $showingRenameAlert) {
-                TextField("输入新名字", text: $renameInputText)
-                Button("取消", role: .cancel) { }
-                Button("确定") {
+            .alert("修改名字".appLocalized, isPresented: $showingRenameAlert) {
+                TextField("输入新名字".appLocalized, text: $renameInputText)
+                Button("取消".appLocalized, role: .cancel) { }
+                Button("确定".appLocalized) {
                     commitPetRename()
                 }
             } message: {
-                Text("改名将消耗一个改名项圈")
+                Text("改名将消耗一个改名项圈".appLocalized)
             }
             // 保存成功提示覆盖层
             .overlay {
@@ -448,7 +448,7 @@ struct PetChatView: View {
 
                     if showingPurchaseSuccessToast {
                         PetActionSuccessToast(
-                            title: "购买成功",
+                            title: "购买成功".appLocalized,
                             message: purchaseSuccessMessage,
                             systemImage: "cart.badge.plus"
                         )
@@ -1384,7 +1384,7 @@ struct PetChatView: View {
         let widget = makeInventoryPanelWidget(status: status)
         messages.append(
             PetChatMessage(
-                text: "这是我的背包呀，点一下就能用，也可以直接拖过去～",
+                text: "这是我的背包呀，点一下就能用，也可以直接拖过去～".appLocalized,
                 isUser: false,
                 isAIGenerated: true,
                 widgets: [widget]
@@ -1546,19 +1546,19 @@ struct PetChatView: View {
     private func handleSecondPetAdoptionIntent() {
         let status = PetDataManager.shared.status
         if status.ownedPetIds.count >= PetCharacter.allCases.count {
-            messages.append(PetChatMessage(text: "你已经是双宝家庭啦，要不要我帮你切换宠物管家？", isUser: false, isAIGenerated: true))
+            messages.append(PetChatMessage(text: "你已经是双宝家庭啦，要不要我帮你切换宠物管家？".appLocalized, isUser: false, isAIGenerated: true))
             handleSwitchPetIntent()
             return
         }
 
-        openAdoptionSheetWithFeedback("好哒，给你打开领养界面啦～")
+        openAdoptionSheetWithFeedback("好哒，给你打开领养界面啦～".appLocalized)
     }
 
     private func handleSwitchPetIntent() {
         let status = PetDataManager.shared.status
         let ownedPets = PetCharacter.allCases.filter { status.ownedPetIds.contains($0.id) }
         guard ownedPets.count >= 2 else {
-            openAdoptionSheetWithFeedback("想换新伙伴的话，我先带你去领养界面挑一只呀～")
+            openAdoptionSheetWithFeedback("想换新伙伴的话，我先带你去领养界面挑一只呀～".appLocalized)
             return
         }
 
@@ -1578,7 +1578,7 @@ struct PetChatView: View {
         )
         messages.append(
             PetChatMessage(
-                text: "来，点一下就切换。",
+                text: "来，点一下就切换。".appLocalized,
                 isUser: false,
                 isAIGenerated: true,
                 widgets: [widget]
@@ -1589,7 +1589,7 @@ struct PetChatView: View {
     private func handleRenamePetIntent() {
         var status = PetDataManager.shared.status
         guard !status.ownedPetIds.isEmpty, status.selectedPetId != nil else {
-            messages.append(PetChatMessage(text: "先领养一个萌宠，再来改名喔～", isUser: false, isAIGenerated: true))
+            messages.append(PetChatMessage(text: "先领养一个萌宠，再来改名喔～".appLocalized, isUser: false, isAIGenerated: true))
             return
         }
 
@@ -1597,14 +1597,14 @@ struct PetChatView: View {
             let renameCost = PetConfigManager.shared.getItem(byId: "renameCard")?.price ?? 10
             guard status.meowCoin >= renameCost else {
                 showingMeowCoinStore = true
-                messages.append(PetChatMessage(text: "改名项圈需要 \(renameCost) 喵币，你现在喵币不够，先带你去 Apple 原生充值～", isUser: false, isAIGenerated: true))
+                messages.append(PetChatMessage(text: "改名项圈需要 %d %@，你现在%@不够，先带你去 Apple 原生充值～".appLocalized(renameCost, PetCurrency.meowCoin.localizedName, PetCurrency.meowCoin.localizedName), isUser: false, isAIGenerated: true))
                 return
             }
 
             _ = StoreManager.spendMeowCoins(renameCost, in: &status)
             status.inventory["renameCard", default: 0] += 1
             PetDataManager.shared.saveStatus(status)
-            messages.append(PetChatMessage(text: "已帮你买好改名项圈，来起个新名字吧～", isUser: false, isAIGenerated: true))
+            messages.append(PetChatMessage(text: "已帮你买好改名项圈，来起个新名字吧～".appLocalized, isUser: false, isAIGenerated: true))
         }
 
         renameInputText = status.displayName
@@ -1632,22 +1632,22 @@ struct PetChatView: View {
         PetDataManager.shared.saveStatus(status)
         configureAIService()
 
-        messages.append(PetChatMessage(text: "改名成功！我现在叫「\(cleanName)」～", isUser: false, isAIGenerated: true))
+        messages.append(PetChatMessage(text: "改名成功！我现在叫「%@」～".appLocalized(cleanName), isUser: false, isAIGenerated: true))
     }
 
     private func handleMeowCoinTopUpIntent() {
         let widget = PetWidgetData(
             type: .quickOptions,
-            title: "你是想充值喵币吗？",
+            title: "你是想充值喵币吗？".appLocalized,
             options: [
-                PetWidgetOption(title: "打开喵币充值", command: "open_meow_store", icon: "cart.fill"),
-                PetWidgetOption(title: "看看三种货币余额", command: "pet_currency_panel", icon: "wallet.pass.fill"),
-                PetWidgetOption(title: "先不充，继续聊", command: "mood_support", icon: "face.smiling.fill")
+                PetWidgetOption(title: "打开喵币充值".appLocalized, command: "open_meow_store", icon: "cart.fill"),
+                PetWidgetOption(title: "看看三种货币余额".appLocalized, command: "pet_currency_panel", icon: "wallet.pass.fill"),
+                PetWidgetOption(title: "先不充，继续聊".appLocalized, command: "mood_support", icon: "face.smiling.fill")
             ]
         )
         messages.append(
             PetChatMessage(
-                text: "没问题，我这就带你去充喵币～",
+                text: "没问题，我这就带你去充喵币～".appLocalized,
                 isUser: false,
                 isAIGenerated: true,
                 widgets: [widget]
@@ -2423,9 +2423,9 @@ struct PetChatView: View {
 
             let responseText: String
             if totalCount == 0 {
-                responseText = localizedCatchphraseText("喵？你的衣橱还是空的耶，快去添加几件漂亮裙子吧~")
+                responseText = localizedCatchphraseText("喵？你的衣橱还是空的耶，快去添加几件漂亮裙子吧~".appLocalized)
             } else {
-                responseText = "（翻看着小账本）主人，你的衣橱里有\(totalCount)件宝贝，总价值\(NSDecimalNumber(decimal: totalValue).stringValue)元呢！"
+                responseText = localizedCatchphraseText("（翻看着小账本）主人，你的衣橱里有%d件宝贝，总价值%@元呢！".appLocalized(totalCount, NSDecimalNumber(decimal: totalValue).stringValue))
             }
 
             let message = PetChatMessage(

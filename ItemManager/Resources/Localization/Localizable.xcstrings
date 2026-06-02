@@ -11856,6 +11856,42 @@
             "state" : "translated",
             "value" : "修改名字"
           }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Namen ändern"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cambiar nombre"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Renommer"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "名前を変更"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이름 변경"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Renomear"
+          }
         }
       }
     },
@@ -35507,6 +35543,42 @@
             "state" : "translated",
             "value" : "改名將消耗一個改名項圈"
           }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Beim Umbenennen wird ein Umbenennungshalsband verbraucht"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cambiar el nombre usará un collar de cambio de nombre"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Renommer utilisera un collier de renommage"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "名前を変更すると改名首輪を1つ使います"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이름을 바꾸면 이름 변경 목걸이 1개를 사용해요"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Renomear usará uma Coleira de Renomear"
+          }
         }
       }
     },
@@ -58569,6 +58641,42 @@
             "state" : "translated",
             "value" : "輸入新名字"
           }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Neuen Namen eingeben"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Introduce un nuevo nombre"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Saisir un nouveau nom"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新しい名前を入力"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "새 이름 입력"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Insira um novo nome"
+          }
         }
       }
     },
@@ -79253,6 +79361,992 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Debug：已增加 1000 %@和 1000 %@"
+          }
+        }
+      }
+    },
+    "购买成功" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kauf erfolgreich"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Purchase Successful"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Compra realizada"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Achat réussi"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "購入完了"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "구매 성공"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Compra concluída"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "购买成功"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "購買成功"
+          }
+        }
+      }
+    },
+    "这是我的背包呀，点一下就能用，也可以直接拖过去～" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Das ist mein Rucksack. Tippe auf ein Objekt, um es zu benutzen, oder zieh es direkt hinüber."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This is my backpack. Tap an item to use it, or drag it over directly."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Esta es mi mochila. Toca un objeto para usarlo, o arrástralo directamente."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Voici mon sac. Touchez un objet pour l’utiliser, ou faites-le glisser directement."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "これが私のバッグだよ。タップで使えるし、そのままドラッグしてもいいよ。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이게 내 가방이야. 눌러서 바로 쓰거나 직접 끌어다 놓아도 돼."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Esta é minha mochila. Toque em um item para usar ou arraste direto."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "这是我的背包呀，点一下就能用，也可以直接拖过去～"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "這是我的背包呀，點一下就能使用，也可以直接拖過去～"
+          }
+        }
+      }
+    },
+    "你已经是双宝家庭啦，要不要我帮你切换宠物管家？" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Du hast bereits beide Begleiter. Soll ich den Haustier-Assistenten wechseln?"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You already have both companions. Want me to help switch pet assistants?"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ya tienes a los dos compañeros. ¿Quieres que cambie el asistente de mascota?"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vous avez déjà les deux compagnons. Voulez-vous changer d’assistant animal ?"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "もう2匹ともお迎え済みだよ。ペットアシスタントを切り替える？"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이미 두 친구가 모두 함께 있어요. 펫 매니저를 바꿔 드릴까요?"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Você já tem os dois companheiros. Quer que eu troque o assistente pet?"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你已经是双宝家庭啦，要不要我帮你切换宠物管家？"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你已經是雙寶家庭啦，要不要我幫你切換寵物管家？"
+          }
+        }
+      }
+    },
+    "好哒，给你打开领养界面啦～" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Alles klar, ich öffne die Adoptionsseite."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sure, I’ll open the adoption screen for you."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Claro, abriré la pantalla de adopción."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "D’accord, j’ouvre l’écran d’adoption."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "了解、里親画面を開くね。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "좋아요, 입양 화면을 열어 드릴게요."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Claro, vou abrir a tela de adoção."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "好哒，给你打开领养界面啦～"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "好呀，幫你打開領養介面啦～"
+          }
+        }
+      }
+    },
+    "想换新伙伴的话，我先带你去领养界面挑一只呀～" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wenn du einen neuen Begleiter möchtest, bringe ich dich zuerst zur Adoptionsseite."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "If you want a new companion, I’ll take you to the adoption screen first."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Si quieres un nuevo compañero, primero te llevo a la pantalla de adopción."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pour changer de compagnon, je vous emmène d’abord choisir sur l’écran d’adoption."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新しい相棒に替えたいなら、まず里親画面で選びに行こう。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "새 친구로 바꾸고 싶다면 먼저 입양 화면에서 골라 봐요."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Se quiser um novo companheiro, levo você primeiro para a tela de adoção."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "想换新伙伴的话，我先带你去领养界面挑一只呀～"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "想換新夥伴的話，我先帶你去領養介面挑一隻呀～"
+          }
+        }
+      }
+    },
+    "来，点一下就切换。" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hier, tippe einmal zum Wechseln."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Here, tap once to switch."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Listo, toca una vez para cambiar."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Voilà, touchez pour changer."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ほら、タップすると切り替わるよ。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "여기서 한 번 누르면 바뀌어요."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pronto, toque uma vez para trocar."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "来，点一下就切换。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "來，點一下就切換。"
+          }
+        }
+      }
+    },
+    "先领养一个萌宠，再来改名喔～" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adoptiere zuerst ein Haustier, dann kannst du es umbenennen."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adopt a pet first, then you can rename it."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Primero adopta una mascota y luego podrás cambiarle el nombre."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adoptez d’abord un animal, puis vous pourrez le renommer."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "まずペットをお迎えしてから名前を変えようね。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "먼저 펫을 입양한 뒤 이름을 바꿔 주세요."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adote um pet primeiro, depois você pode renomeá-lo."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "先领养一个萌宠，再来改名喔～"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "先領養一個萌寵，再來改名喔～"
+          }
+        }
+      }
+    },
+    "改名项圈需要 %d %@，你现在%@不够，先带你去 Apple 原生充值～" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ein Umbenennungshalsband kostet %d %@, und du hast gerade nicht genug %@. Ich bringe dich zuerst zur nativen Apple-Aufladung."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A Rename Collar costs %d %@, and you don’t have enough %@ right now. I’ll take you to Apple’s native top-up first."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un collar de cambio de nombre cuesta %d %@ y ahora no tienes suficiente %@. Primero te llevaré a la recarga nativa de Apple."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un collier de renommage coûte %d %@, et vous n’avez pas assez de %@. Je vous emmène d’abord vers la recharge Apple native."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "改名首輪には%d %@が必要ですが、今は%@が足りません。先にApple標準のチャージへ案内します。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이름 변경 목걸이는 %d %@이(가) 필요하지만 지금 %@이(가) 부족해요. 먼저 Apple 기본 충전으로 안내할게요."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Uma Coleira de Renomear custa %d %@, e você não tem %@ suficiente agora. Vou levar você primeiro para a recarga nativa da Apple."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "改名项圈需要 %d %@，你现在%@不够，先带你去 Apple 原生充值～"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "改名項圈需要 %d %@，你現在%@不夠，先帶你去 Apple 原生儲值～"
+          }
+        }
+      }
+    },
+    "已帮你买好改名项圈，来起个新名字吧～" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ich habe ein Umbenennungshalsband gekauft. Lass uns einen neuen Namen wählen."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "I bought a Rename Collar for you. Let’s pick a new name."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ya compré un collar de cambio de nombre. Elijamos un nombre nuevo."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "J’ai acheté un collier de renommage. Choisissons un nouveau nom."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "改名首輪を買っておいたよ。新しい名前を決めよう。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이름 변경 목걸이를 사 뒀어요. 새 이름을 정해 봐요."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Comprei uma Coleira de Renomear. Vamos escolher um novo nome."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已帮你买好改名项圈，来起个新名字吧～"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已幫你買好改名項圈，來取個新名字吧～"
+          }
+        }
+      }
+    },
+    "改名成功！我现在叫「%@」～" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Name geändert! Ich heiße jetzt „%@“."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Renamed successfully! I’m now “%@”."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "¡Nombre cambiado! Ahora me llamo «%@»."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nom modifié ! Je m’appelle maintenant « %@ »."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "名前を変更しました！今は「%@」だよ。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이름 변경 완료! 이제 제 이름은 “%@”예요."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nome alterado! Agora me chamo “%@”."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "改名成功！我现在叫「%@」～"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "改名成功！我現在叫「%@」～"
+          }
+        }
+      }
+    },
+    "你是想充值喵币吗？" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Möchtest du Miau-Münzen aufladen?"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Do you want to top up Meow Coins?"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "¿Quieres recargar monedas Miau?"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Voulez-vous recharger des pièces Miaou ?"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ニャーコインをチャージしたいですか？"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "야옹 코인을 충전하고 싶나요?"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quer recarregar Moedas Miau?"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你是想充值喵币吗？"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你是想儲值喵幣嗎？"
+          }
+        }
+      }
+    },
+    "打开喵币充值" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Miau-Aufladung öffnen"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open Meow Coin Top-Up"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abrir recarga Miau"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ouvrir la recharge Miaou"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ニャーコインチャージを開く"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "야옹 코인 충전 열기"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abrir recarga Miau"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打开喵币充值"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打開喵幣儲值"
+          }
+        }
+      }
+    },
+    "看看三种货币余额" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Alle drei Guthaben ansehen"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "View all three balances"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ver los tres saldos"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Voir les trois soldes"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "3種類の残高を見る"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "세 가지 통화 잔액 보기"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ver os três saldos"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "看看三种货币余额"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "看看三種貨幣餘額"
+          }
+        }
+      }
+    },
+    "先不充，继续聊" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nicht jetzt, weiterchatten"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not now, keep chatting"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ahora no, seguir chateando"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pas maintenant, continuer à discuter"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "今はやめて、会話を続ける"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "지금은 안 하고 계속 대화하기"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Agora não, continuar conversando"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "先不充，继续聊"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "先不儲值，繼續聊"
+          }
+        }
+      }
+    },
+    "没问题，我这就带你去充喵币～" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kein Problem, ich bringe dich jetzt zur Miau-Aufladung."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No problem, I’ll take you to top up Meow Coins now."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sin problema, te llevaré a recargar monedas Miau."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pas de souci, je vous emmène recharger des pièces Miaou."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "大丈夫、今すぐニャーコインのチャージへ案内するね。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "문제없어요, 바로 야옹 코인 충전으로 안내할게요."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sem problema, vou levar você para recarregar Moedas Miau."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "没问题，我这就带你去充喵币～"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "沒問題，我這就帶你去儲值喵幣～"
+          }
+        }
+      }
+    },
+    "喵？你的衣橱还是空的耶，快去添加几件漂亮裙子吧~" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hm? Dein Kleiderschrank ist noch leer. Füge erst ein paar hübsche Kleider hinzu."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hmm? Your wardrobe is still empty. Add a few pretty dresses first."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "¿Eh? Tu armario todavía está vacío. Añade primero unos vestidos bonitos."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hmm ? Votre garde-robe est encore vide. Ajoutez d’abord quelques jolies robes."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "あれ？ワードローブはまだ空だよ。先にかわいいワンピースをいくつか追加しよう。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "응? 옷장이 아직 비어 있어요. 예쁜 원피스를 몇 벌 먼저 추가해 봐요."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hmm? Seu guarda-roupa ainda está vazio. Adicione alguns vestidos bonitos primeiro."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "喵？你的衣橱还是空的耶，快去添加几件漂亮裙子吧~"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "喵？你的衣櫥還是空的耶，快去新增幾件漂亮裙子吧~"
+          }
+        }
+      }
+    },
+    "（翻看着小账本）主人，你的衣橱里有%d件宝贝，总价值%@元呢！" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "(Blättert im kleinen Kassenbuch) In deinem Kleiderschrank sind %d Schätze mit einem Gesamtwert von %@ Yuan!"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "(Flipping through the little ledger) You have %d treasures in your wardrobe, worth %@ yuan in total!"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "(Revisando el librito de cuentas) Tienes %d tesoros en el armario, con un valor total de %@ yuanes."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "(En feuilletant le petit carnet) Votre garde-robe contient %d trésors, pour une valeur totale de %@ yuans !"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "（小さな帳簿をめくりながら）ワードローブには%d件の宝物があって、合計%@元の価値があります！"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "(작은 장부를 넘기며) 옷장에는 보물 %d개가 있고, 총가치는 %@위안이에요!"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "(Folheando o caderninho) Seu guarda-roupa tem %d tesouros, com valor total de %@ yuans!"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "（翻看着小账本）主人，你的衣橱里有%d件宝贝，总价值%@元呢！"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "（翻著小帳本）主人，你的衣櫥裡有%d件寶貝，總價值%@元呢！"
           }
         }
       }
