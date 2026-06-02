@@ -758,7 +758,7 @@ class PetViewModel: ObservableObject {
         // 0. 检查精力是否足够 (如果道具消耗精力)
         if let energyCost = item.energyCost, energyCost > 0 {
              if status.energy < Double(energyCost) {
-                 showFloatingText("\(status.displayName)太累了，不想玩...", style: .warning)
+                 showFloatingText("%@太累了，不想玩...".appLocalized(status.displayName), style: .warning)
                  return
              }
         }
@@ -826,7 +826,7 @@ class PetViewModel: ObservableObject {
     func consumeItem(_ item: PetItemDefinition) {
         // 特殊道具不能直接食用
         if item.id == "renameCard" {
-            showFloatingText("这个不能吃哦", style: .warning)
+            showFloatingText("这个不能吃哦".appLocalized, style: .warning)
             return
         }
 
@@ -846,9 +846,9 @@ class PetViewModel: ObservableObject {
 
             // 提示
             if recovered > 0 {
-                showFloatingText("精力 +\(Int(recovered))", style: .energy)
+                showFloatingText("精力 +%d".appLocalized(Int(recovered)), style: .energy)
             } else {
-                showFloatingText("精力已满", style: .energy)
+                showFloatingText("精力已满".appLocalized, style: .energy)
             }
 
             saveStatus()
@@ -858,7 +858,7 @@ class PetViewModel: ObservableObject {
         // 检查精力是否足够 (如果道具消耗精力)
         if let energyCost = item.energyCost, energyCost > 0 {
              if status.energy < Double(energyCost) {
-                 showFloatingText("\(status.displayName)太累了，不想玩...", style: .warning)
+                 showFloatingText("%@太累了，不想玩...".appLocalized(status.displayName), style: .warning)
                  return
              }
         }
@@ -876,9 +876,9 @@ class PetViewModel: ObservableObject {
 
             // 提示
             if energyCost > 0 {
-                showFloatingText("精力 -\(Int(energyCost))", style: .energy)
+                showFloatingText("精力 -%d".appLocalized(Int(energyCost)), style: .energy)
             }
-            showFloatingText("心情 +\(Int(item.recoveryValue))", style: .mood)
+            showFloatingText("心情 +%d".appLocalized(Int(item.recoveryValue)), style: .mood)
         } else {
             // 食物/水
             // 增加属性
@@ -912,13 +912,13 @@ class PetViewModel: ObservableObject {
                 if item.isDrink {
                     // 饮水可能同时增加饱食度（如果是奶）或者只是解渴？当前逻辑是加 hunger
                     // 但通常水是解渴。这里假设 hunger 也代表渴度。
-                    showFloatingText("饱食度 +\(Int(item.recoveryValue))", style: .hunger)
+                    showFloatingText("饱食度 +%d".appLocalized(Int(item.recoveryValue)), style: .hunger)
                 } else {
-                    showFloatingText("饱食度 +\(Int(item.recoveryValue))", style: .hunger)
+                    showFloatingText("饱食度 +%d".appLocalized(Int(item.recoveryValue)), style: .hunger)
                 }
             }
             if moodRecovery >= 1 {
-                showFloatingText("心情 +\(Int(moodRecovery))", style: .mood)
+                showFloatingText("心情 +%d".appLocalized(Int(moodRecovery)), style: .mood)
             }
         }
 
@@ -978,20 +978,22 @@ class PetViewModel: ObservableObject {
             // 结算心情 (每次完整的短按算一次)
             let moodIncrease = 5.0
             status.mood = min(100, status.mood + moodIncrease)
-            showFloatingText("心情 +\(Int(moodIncrease))", style: .mood)
+            showFloatingText("心情 +%d".appLocalized(Int(moodIncrease)), style: .mood)
 
             // 如果触发了生气视频，额外提示
             if currentVideoName == PetVideoPaths.angry {
-                 showFloatingText("别碰我！", style: .warning)
+                 showFloatingText("别碰我！".appLocalized, style: .warning)
                  // 生气语音
                  Task { @MainActor in
-                     PetVoiceManager.shared.speak("别碰我！", for: self.currentPet.aiRole)
+                     PetVoiceManager.shared.speak("别碰我！".appLocalized, for: self.currentPet.aiRole)
                  }
             } else {
                 // 随机撒娇语音 (增加互动感)
-                let interactions = ["蹭蹭~", "喵~", "主人最好了", "好舒服喵", "还要摸摸"]
+                let interactions = currentPet == .maomao
+                    ? ["蹭蹭~", "汪~", "主人最好了", "好舒服汪", "还要摸摸"]
+                    : ["蹭蹭~", "喵~", "主人最好了", "好舒服喵", "还要摸摸"]
                 let randomText = interactions.randomElement() ?? "喵~"
-                let localizedText = currentPet.localizedCatchphraseText(randomText)
+                let localizedText = randomText.appLocalized
                 Task { @MainActor in
                     PetVoiceManager.shared.speak(localizedText, for: self.currentPet.aiRole)
                 }
@@ -1044,20 +1046,20 @@ class PetViewModel: ObservableObject {
             switch currentState {
             case .sleeping:
                 if status.energy < 20 {
-                    message = "\(petName)太累了，需要休息~"
+                    message = "%@太累了，需要休息~".appLocalized(petName)
                 } else {
-                    message = "\(petName)正在休息，请稍后再来~"
+                    message = "%@正在休息，请稍后再来~".appLocalized(petName)
                 }
             case .working:
-                message = "\(petName)正在努力打工，不能洗澡哦~"
+                message = "%@正在努力打工，不能洗澡哦~".appLocalized(petName)
             case .eating, .drinking:
-                message = "\(petName)正在用餐，请稍等~"
+                message = "%@正在用餐，请稍等~".appLocalized(petName)
             case .playing:
-                message = "\(petName)玩得正开心呢~"
+                message = "%@玩得正开心呢~".appLocalized(petName)
             case .expecting:
-                message = "\(petName)正在期待你的投喂呢~"
+                message = "%@正在期待你的投喂呢~".appLocalized(petName)
             default:
-                message = "\(petName)正忙着呢~ (\(currentState.rawValue))"
+                message = "%@正忙着呢~ (%@)".appLocalized(petName, currentState.rawValue)
             }
 
             showFloatingText(message, style: .warning)
@@ -1127,11 +1129,11 @@ class PetViewModel: ObservableObject {
 
             // 提示属性变化
             if addedHygiene > 0 {
-                showFloatingText("清洁度 +\(Int(addedHygiene))", style: .hygiene)
+                showFloatingText("清洁度 +%d".appLocalized(Int(addedHygiene)), style: .hygiene)
             } else {
-                showFloatingText("清洁度已满", style: .hygiene)
+                showFloatingText("清洁度已满".appLocalized, style: .hygiene)
             }
-            showFloatingText("心情 +10", style: .mood)
+            showFloatingText("心情 +%d".appLocalized(10), style: .mood)
         } else {
             presentFundingFlow(for: cleaningCurrency)
         }
@@ -1294,13 +1296,13 @@ class PetViewModel: ObservableObject {
         presentedFundingPrompt = nil
         switch currency {
         case .meowCoin:
-            showFloatingText("喵币不足", style: .warning)
+            showFloatingText("喵币不足".appLocalized, style: .warning)
             presentedFundingSheet = .meowCoinStore
         case .fishCoin:
-            showFloatingText("鱼币不足", style: .warning)
+            showFloatingText("鱼币不足".appLocalized, style: .warning)
             presentedFundingSheet = .currencyExchange(.boneToFish)
         case .boneCoin:
-            showFloatingText("骨头币不足", style: .warning)
+            showFloatingText("骨头币不足".appLocalized, style: .warning)
             presentedFundingSheet = .currencyExchange(.fishToBone)
         }
     }
@@ -1310,25 +1312,25 @@ class PetViewModel: ObservableObject {
         case .meowCoin:
             return PetFundingPrompt(
                 currency: .meowCoin,
-                title: "喵币不够啦",
-                message: "想把\(itemName)带回家，还差一点喵币。先去充值一下，再回来继续逛萌宠商店吧。",
-                actionTitle: "去充喵币",
+                title: "喵币不够啦".appLocalized,
+                message: "想把%@带回家，还差一点喵币。先去充值一下，再回来继续逛萌宠商店吧。".appLocalized(itemName),
+                actionTitle: "去充喵币".appLocalized,
                 destination: .meowCoinStore
             )
         case .fishCoin:
             return PetFundingPrompt(
                 currency: .fishCoin,
-                title: "鱼币不够啦",
-                message: "想买\(itemName)，还差一点鱼币。先把骨头币换成鱼币，再回来继续挑吧。",
-                actionTitle: "去换鱼币",
+                title: "鱼币不够啦".appLocalized,
+                message: "想买%@，还差一点鱼币。先把骨头币换成鱼币，再回来继续挑吧。".appLocalized(itemName),
+                actionTitle: "去换鱼币".appLocalized,
                 destination: .currencyExchange(.boneToFish)
             )
         case .boneCoin:
             return PetFundingPrompt(
                 currency: .boneCoin,
-                title: "骨头币不够啦",
-                message: "想买\(itemName)，还差一点骨头币。先把鱼币换成骨头币，再回来继续挑吧。",
-                actionTitle: "去换骨头币",
+                title: "骨头币不够啦".appLocalized,
+                message: "想买%@，还差一点骨头币。先把鱼币换成骨头币，再回来继续挑吧。".appLocalized(itemName),
+                actionTitle: "去换骨头币".appLocalized,
                 destination: .currencyExchange(.fishToBone)
             )
         }
@@ -1352,13 +1354,13 @@ class PetViewModel: ObservableObject {
     func exchangeFishToBone(amount: Int) -> Bool {
         guard amount > 0 else { return false }
         guard status.fishCoin >= amount else {
-            showFloatingText("鱼币不足", style: .warning)
+            showFloatingText("鱼币不足".appLocalized, style: .warning)
             return false
         }
 
         let (newBoneCoin, overflow) = status.boneCoin.addingReportingOverflow(amount)
         guard !overflow else {
-            showFloatingText("骨头币过多", style: .warning)
+            showFloatingText("骨头币过多".appLocalized, style: .warning)
             return false
         }
 
@@ -1375,13 +1377,13 @@ class PetViewModel: ObservableObject {
     func exchangeBoneToFish(amount: Int) -> Bool {
         guard amount > 0 else { return false }
         guard status.boneCoin >= amount else {
-            showFloatingText("骨头币不足", style: .warning)
+            showFloatingText("骨头币不足".appLocalized, style: .warning)
             return false
         }
 
         let (newFishCoin, overflow) = status.fishCoin.addingReportingOverflow(amount)
         guard !overflow else {
-            showFloatingText("鱼币过多", style: .warning)
+            showFloatingText("鱼币过多".appLocalized, style: .warning)
             return false
         }
 
@@ -1561,7 +1563,7 @@ class PetViewModel: ObservableObject {
             let video = currentBehavior.getWorkInterruptedVideo()
             // 播放中断视频
             changeState(to: .interacting, videoName: video, forceLoop: false)
-            showFloatingText("被迫停止打工...", style: .warning)
+            showFloatingText("被迫停止打工...".appLocalized, style: .warning)
         } else {
             // 正常结束
             let result = currentBehavior.getWorkFinishResult(job: stopResult.job, status: status)
@@ -1584,7 +1586,7 @@ class PetViewModel: ObservableObject {
             presentWorkStopResult(stopResult)
         }
 
-        showFloatingText(isEnabled ? "自动打工已开启" : "自动打工已关闭", style: .custom(.blue))
+        showFloatingText(isEnabled ? "自动打工已开启".appLocalized : "自动打工已关闭".appLocalized, style: .custom(.blue))
     }
 
     func updateAutoWorkStrategy(_ strategy: PetAutoWorkStrategy) {

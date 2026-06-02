@@ -635,7 +635,7 @@ private struct PetFundingPromptOverlay: View {
                     }
 
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("余额不足")
+                        Text("余额不足".appLocalized)
                             .font(.caption.weight(.semibold))
                             .foregroundStyle(accentTint)
                             .themeSkinLegibleText(level: .chip, slot: .filterChip)
@@ -670,7 +670,7 @@ private struct PetFundingPromptOverlay: View {
 
                 HStack(spacing: 12) {
                     Button(action: onDismiss) {
-                        Text("稍后再说")
+                        Text("稍后再说".appLocalized)
                             .font(.system(size: 15, weight: .semibold))
                             .foregroundStyle(.secondary)
                             .themeSkinLegibleText(level: .chip, slot: .primaryButton)

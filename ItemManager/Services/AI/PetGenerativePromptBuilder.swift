@@ -24,9 +24,11 @@ enum PetGenerativePromptBuilder {
             hasWardrobeContext: hasWardrobeContext,
             role: input.persona.role
         )
+        let languageInstruction = responseLanguageInstruction()
 
         var parts: [String] = []
         parts.append("你正在扮演：\(input.persona.displayName)（\(input.persona.species)）")
+        parts.append(languageInstruction)
         parts.append("风格要求：\(input.persona.stylePrompt)")
         parts.append(
             """
@@ -149,6 +151,35 @@ enum PetGenerativePromptBuilder {
             (lower.contains("价格") || lower.contains("总价") || lower.contains("多少钱"))
     }
 
+    private static func responseLanguageInstruction() -> String {
+        let localeIdentifier = LanguageManager.shared.localeIdentifier
+        let languageName: String
+        switch localeIdentifier {
+        case AppLanguage.simplifiedChinese.rawValue:
+            languageName = "简体中文"
+        case AppLanguage.traditionalChinese.rawValue:
+            languageName = "繁體中文"
+        case AppLanguage.japanese.rawValue:
+            languageName = "日本語"
+        case AppLanguage.korean.rawValue:
+            languageName = "한국어"
+        case AppLanguage.french.rawValue:
+            languageName = "français"
+        case AppLanguage.german.rawValue:
+            languageName = "Deutsch"
+        case AppLanguage.spanish.rawValue:
+            languageName = "español"
+        case AppLanguage.portugueseBrazil.rawValue:
+            languageName = "português do Brasil"
+        default:
+            languageName = "English"
+        }
+
+        return """
+        回复语言：请优先使用\(languageName)回答用户。除非用户明确要求其他语言，不要切回中文；保留用户原文中的品牌名、裙名、标签和专有名词。
+        """
+    }
+
     private static func extractPromptField(after marker: String, in text: String) -> String? {
         guard let markerRange = text.range(of: marker) else { return nil }
         let suffix = String(text[markerRange.upperBound...])
@@ -209,6 +240,7 @@ enum PetGenerativePromptBuilder {
 
     private static let internalPromptMarkers = [
         "你正在扮演：",
+        "回复语言：",
         "角色卡：",
         "模块目标：",
         "禁用词：",
