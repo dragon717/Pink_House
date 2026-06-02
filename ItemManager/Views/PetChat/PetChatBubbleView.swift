@@ -79,7 +79,7 @@ struct PetChatBubble: View {
                     HStack(spacing: 4) {
                         Image(systemName: "sparkles")
                             .font(.caption2)
-                        Text("AI 生成")
+                        Text("AI 生成".appLocalized)
                             .font(.caption2)
                             .themeSkinLegibleText(level: .inline, slot: .sectionCard, descriptor: sectionCardDescriptor)
                     }
@@ -191,7 +191,7 @@ struct PetChatBubble: View {
                             HStack(spacing: 2) {
                                 Image(systemName: "exclamationmark.bubble")
                                     .font(.caption2)
-                                Text("举报")
+                                Text("举报".appLocalized)
                                     .font(.caption2)
                                     .themeSkinLegibleText(level: .inline, slot: .sectionCard, descriptor: sectionCardDescriptor)
                             }
@@ -529,7 +529,7 @@ struct PetChatBubble: View {
 
     private func inlineSearchResults(_ results: [Clothing]) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("可选单品")
+            Text("可选单品".appLocalized)
                 .font(.caption)
                 .foregroundStyle(themeManager.secondaryTextColor)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -666,16 +666,16 @@ struct PetChatBubble: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
             
             VStack(spacing: 10) {
-                statRow(icon: "hanger", title: "总件数", value: "\(stats.totalCount) 件")
-                statRow(icon: "yensign.circle", title: "总价值", value: "¥\(NSDecimalNumber(decimal: stats.totalValue).stringValue)")
+                statRow(icon: "hanger", title: "总件数".appLocalized, value: "%d 件".appLocalized(stats.totalCount))
+                statRow(icon: "yensign.circle", title: "总价值".appLocalized, value: "¥\(NSDecimalNumber(decimal: stats.totalValue).stringValue)")
                 
                 if let mostExpensive = stats.mostExpensiveItem {
-                    statRow(icon: "crown", title: "最贵单品", value: mostExpensive.name)
+                    statRow(icon: "crown", title: "最贵单品".appLocalized, value: mostExpensive.name)
                 }
                 
                 if stats.depositPlanCount > 0 {
-                    statRow(icon: "tag", title: "心愿尾款", value: "\(stats.depositPlanCount) 款")
-                    statRow(icon: "creditcard", title: "待付尾款", value: "¥\(NSDecimalNumber(decimal: stats.totalBalance).stringValue)")
+                    statRow(icon: "tag", title: "心愿尾款".appLocalized, value: "%d 款".appLocalized(stats.depositPlanCount))
+                    statRow(icon: "creditcard", title: "待付尾款".appLocalized, value: "¥\(NSDecimalNumber(decimal: stats.totalBalance).stringValue)")
                 }
             }
             .padding(12)
@@ -760,7 +760,7 @@ struct PetChatBubble: View {
                         .stroke(themeManager.tertiaryTextColor.opacity(0.3), lineWidth: 1)
                 )
             
-            Text(label)
+            Text(label.appLocalized)
                 .font(.caption2)
                 .foregroundStyle(themeManager.secondaryTextColor)
                 .themeSkinLegibleText(level: .inline, slot: .sectionCard, descriptor: sectionCardDescriptor)
@@ -829,7 +829,7 @@ struct PetChatBubble: View {
             }
 
             VStack(alignment: .leading, spacing: 8) {
-                Text("推荐单品")
+                Text("推荐单品".appLocalized)
                     .font(.caption)
                     .foregroundStyle(themeManager.secondaryTextColor)
                     .themeSkinLegibleText(level: .inline, slot: .sectionCard, descriptor: sectionCardDescriptor)
@@ -842,7 +842,7 @@ struct PetChatBubble: View {
             } label: {
                 HStack(spacing: 6) {
                     Image(systemName: "wand.and.stars")
-                    Text("魔法贴纸")
+                    Text("魔法贴纸".appLocalized)
                         .themeSkinLegibleText(level: .chip, slot: .primaryButton, descriptor: primaryButtonDescriptor)
                 }
                 .font(.subheadline)
