@@ -46494,7 +46494,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "No Matching Dresses"
+            "value" : "No dresses match these filters"
           }
         },
         "zh-Hans" : {
@@ -46507,6 +46507,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "沒有符合條件的裙裝"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "条件に合うドレスがありません"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "조건에 맞는 드레스가 없어요"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucune robe ne correspond à ces filtres"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keine Kleider passen zu diesen Filtern"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No hay vestidos que coincidan con estos filtros"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nenhum vestido corresponde a estes filtros"
           }
         }
       }
@@ -88970,6 +89006,238 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Boneca gótica"
+          }
+        }
+      }
+    },
+    "衣橱还空着" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your wardrobe is still empty"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "衣橱还空着"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "衣櫥還空著"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "クローゼットはまだ空です"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "옷장이 아직 비어 있어요"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Votre garde-robe est encore vide"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dein Kleiderschrank ist noch leer"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tu armario aún está vacío"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Seu guarda-roupa ainda está vazio"
+          }
+        }
+      }
+    },
+    "先添加第一件裙装，衣橱就会在这里慢慢亮起来。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add your first dress and this wardrobe will start to shine."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "先添加第一件裙装，衣橱就会在这里慢慢亮起来。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "先新增第一件裙裝，衣櫥就會在這裡慢慢亮起來。"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最初のドレスを追加すると、このクローゼットが少しずつ華やぎます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "첫 번째 드레스를 추가하면 이 옷장이 조금씩 빛나기 시작해요."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ajoutez votre première robe et cette garde-robe commencera à s'illuminer."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Füge dein erstes Kleid hinzu, dann beginnt dieser Kleiderschrank zu strahlen."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Añade tu primer vestido y este armario empezará a brillar."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adicione seu primeiro vestido e este guarda-roupa começará a brilhar."
+          }
+        }
+      }
+    },
+    "试试换个关键词，或清除筛选后再看看。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Try another keyword, or clear the filters and look again."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "试试换个关键词，或清除筛选后再看看。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "試試換個關鍵字，或清除篩選後再看看。"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "別のキーワードを試すか、フィルターをクリアしてもう一度確認してください。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "다른 검색어를 입력하거나 필터를 지우고 다시 확인해 보세요."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Essayez un autre mot-clé, ou effacez les filtres puis regardez à nouveau."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Versuche ein anderes Suchwort oder lösche die Filter und sieh erneut nach."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Prueba otra palabra clave, o borra los filtros y vuelve a mirar."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tente outra palavra-chave, ou limpe os filtros e veja novamente."
+          }
+        }
+      }
+    },
+    "当前筛选没有匹配结果，清除条件后可以回到完整衣橱。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "These filters have no matches. Clear them to return to the full wardrobe."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "当前筛选没有匹配结果，清除条件后可以回到完整衣橱。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "目前篩選沒有符合結果，清除條件後可以回到完整衣櫥。"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "現在のフィルターに一致する結果はありません。条件をクリアすると全体のクローゼットに戻れます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "현재 필터와 일치하는 결과가 없어요. 조건을 지우면 전체 옷장으로 돌아갈 수 있어요."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ces filtres ne donnent aucun résultat. Effacez-les pour revenir à toute la garde-robe."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Diese Filter liefern keine Treffer. Lösche sie, um zum gesamten Kleiderschrank zurückzukehren."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Estos filtros no tienen resultados. Bórralos para volver al armario completo."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Estes filtros não têm resultados. Limpe-os para voltar ao guarda-roupa completo."
           }
         }
       }

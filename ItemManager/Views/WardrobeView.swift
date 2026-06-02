@@ -1382,7 +1382,13 @@ struct WardrobeView: View {
                 .animation(isEditing ? .default : nil, value: editableClothings)
                 .padding(.horizontal, gridHorizontalPadding)
                 .padding(.top, statsContentReservedHeight + 8)
-                .padding(.bottom, 100)
+                .padding(.bottom, displayed.isEmpty ? 0 : 100)
+
+                if displayed.isEmpty {
+                    wardrobeEmptyState
+                        .padding(.top, 18)
+                        .padding(.bottom, 100)
+                }
             }
 
             statsSection
@@ -2134,7 +2140,14 @@ struct WardrobeView: View {
         ZStack(alignment: .top) {
             List {
                 editableListStatsSpacer
-                listContent
+                if editableClothings.isEmpty {
+                    wardrobeEmptyState
+                        .listRowInsets(EdgeInsets(top: 12, leading: 0, bottom: 20, trailing: 0))
+                        .listRowBackground(Color.clear)
+                        .listRowSeparator(.hidden)
+                } else {
+                    listContent
+                }
             }
             .listStyle(.plain)
             .scrollContentBackground(.hidden)
@@ -2153,9 +2166,14 @@ struct WardrobeView: View {
                 statsScrollObserver()
 
                 LazyVStack(spacing: 0) {
-                    ForEach(filteredClothings) { clothing in
-                        listRow(for: clothing)
-                            .padding(.horizontal, 16)
+                    if filteredClothings.isEmpty {
+                        wardrobeEmptyState
+                            .padding(.top, 18)
+                    } else {
+                        ForEach(filteredClothings) { clothing in
+                            listRow(for: clothing)
+                                .padding(.horizontal, 16)
+                        }
                     }
                 }
                 .padding(.top, statsContentReservedHeight + 8)
@@ -2179,6 +2197,64 @@ struct WardrobeView: View {
                 editableClothings.move(fromOffsets: from, toOffset: to)
             }
         }
+    }
+
+    private var wardrobeEmptyState: some View {
+        let palette = MagicThemeDesignSystem.palette(themeManager: themeManager, colorScheme: colorScheme)
+        let isFiltered = hasActiveEmptyStateFilter
+
+        return ThemeSkinEmptyStateSurface(cornerRadius: 24) {
+            VStack(spacing: 16) {
+                Image(systemName: isFiltered ? "line.3.horizontal.decrease.circle" : "hanger")
+                    .font(.system(size: 32, weight: .semibold))
+                    .foregroundStyle(palette.accent)
+                    .themeSkinLegibleSymbol(level: .badge, slot: .emptyState)
+                    .padding(14)
+                    .background(
+                        Circle()
+                            .fill(palette.cardAccent.opacity(colorScheme == .dark ? 0.32 : 0.18))
+                    )
+
+                VStack(spacing: 8) {
+                    Text(isFiltered ? "没有符合条件的裙装".appLocalized : "衣橱还空着".appLocalized)
+                        .font(.headline.weight(.semibold))
+                        .foregroundStyle(palette.primaryText)
+                        .themeSkinLegibleText(level: .inline, slot: .emptyState)
+
+                    Text(isFiltered ? wardrobeFilteredEmptyDescription : "先添加第一件裙装，衣橱就会在这里慢慢亮起来。".appLocalized)
+                        .font(.subheadline)
+                        .multilineTextAlignment(.center)
+                        .foregroundStyle(palette.secondaryText)
+                        .themeSkinLegibleText(level: .inline, slot: .emptyState)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                if isFiltered, let onClearFilter {
+                    Button {
+                        onClearFilter()
+                    } label: {
+                        Label("清除筛选".appLocalized, systemImage: "xmark.circle")
+                    }
+                    .buttonStyle(ThemeSkinPrimaryButtonStyle(fallbackTint: palette.accent, cornerRadius: 14, verticalPadding: 10))
+                    .padding(.top, 2)
+                }
+            }
+            .frame(maxWidth: 380)
+        }
+    }
+
+    private var hasActiveEmptyStateFilter: Bool {
+        let hasSearch = !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        let trimmedFilterDescription = filterDescription?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let hasFilter = !trimmedFilterDescription.isEmpty
+        return !clothings.isEmpty && (hasSearch || hasFilter)
+    }
+
+    private var wardrobeFilteredEmptyDescription: String {
+        if !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return "试试换个关键词，或清除筛选后再看看。".appLocalized
+        }
+        return "当前筛选没有匹配结果，清除条件后可以回到完整衣橱。".appLocalized
     }
 
     private func listRow(for clothing: Clothing) -> some View {
