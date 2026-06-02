@@ -40,7 +40,7 @@ struct ClothingBasicInfoView: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("裙装信息")
+            Text("裙装信息".appLocalized)
                 .font(.headline)
                 .themeSkinLegibleText(level: .inline, slot: .sectionCard)
             
@@ -53,7 +53,7 @@ struct ClothingBasicInfoView: View {
             
             // Brand Field with Selection Button
             VStack(alignment: .leading, spacing: 8) {
-                Text("品牌名称")
+                Text("品牌名称".appLocalized)
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .themeSkinLegibleText(level: .inline, slot: .sectionCard)
@@ -94,13 +94,13 @@ struct ClothingBasicInfoView: View {
             // 联网选项：只有在联网功能解锁并开启时才显示
             if networkManager.canShowNetworkUI() {
                 VStack(alignment: .leading, spacing: 8) {
-                    Toggle("加入联网社区", isOn: $isShared)
+                    Toggle("加入联网社区".appLocalized, isOn: $isShared)
                         .tint(.pink)
                     
                     HStack(spacing: 4) {
                         Image(systemName: "info.circle")
                             .font(.caption)
-                        Text("开启后，其他用户可以在社区中看到这条裙装")
+                        Text("开启后，其他用户可以在社区中看到这条裙装".appLocalized)
                             .font(.caption)
                             .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                     }
@@ -118,7 +118,7 @@ struct ClothingBasicInfoView: View {
     @ViewBuilder
     private func buildFieldView(for field: ClothingField) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-             Text(fieldTitle(for: field))
+             Text(fieldTitle(for: field).appLocalized)
                  .font(.subheadline)
                  .foregroundStyle(.secondary)
                  .themeSkinLegibleText(level: .inline, slot: .sectionCard)
@@ -186,12 +186,12 @@ struct ClothingTagsView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
-                Text("标签分类")
+                Text("标签分类".appLocalized)
                     .font(.headline)
                     .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                 Spacer()
                 Button(action: { showingAddTagSheet = true }) {
-                    Label("管理标签", systemImage: "tag")
+                    Label("管理标签".appLocalized, systemImage: "tag")
                         .font(.subheadline)
                         .themeSkinLegibleText(level: .chip, slot: .primaryButton)
                 }
@@ -217,13 +217,13 @@ struct ClothingTagsView: View {
                     }
                 }
             } else {
-                Text("暂无标签")
+                Text("暂无标签".appLocalized)
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .themeSkinLegibleText(level: .inline, slot: .sectionCard)
             }
             
-            Text("可选择多个标签分类，帮助你更好地管理衣橱")
+            Text("可选择多个标签分类，帮助你更好地管理衣橱".appLocalized)
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .themeSkinLegibleText(level: .inline, slot: .sectionCard)

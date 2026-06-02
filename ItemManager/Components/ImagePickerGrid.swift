@@ -38,7 +38,7 @@ struct ImagePickerGrid: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("选择图片 (最多\(maxCount)张，第一张为主图)")
+            Text("选择图片 (最多%lld张，第一张为主图)".appLocalized(Int64(maxCount)))
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .padding(.leading, 4)
@@ -56,7 +56,7 @@ struct ImagePickerGrid: View {
                                 } else {
                                     Image(systemName: "plus")
                                         .font(.title)
-                                    Text("添加")
+                                    Text("添加".appLocalized)
                                         .font(.caption)
                                 }
                             }
@@ -66,18 +66,18 @@ struct ImagePickerGrid: View {
                             .foregroundStyle(.secondary)
                         }
                         .disabled(isProcessingImages)
-                        .confirmationDialog("选择图片来源", isPresented: $showingActionSheet) {
+                        .confirmationDialog("选择图片来源".appLocalized, isPresented: $showingActionSheet) {
                             if UIImagePickerController.isSourceTypeAvailable(.camera) {
-                                Button("拍照") {
+                                Button("拍照".appLocalized) {
                                     showingCamera = true
                                 }
                             }
                             
-                            Button("从相册选择") {
+                            Button("从相册选择".appLocalized) {
                                 showingPhotosPicker = true
                             }
                             
-                            Button("取消", role: .cancel) {}
+                            Button("取消".appLocalized, role: .cancel) {}
                         }
                     }
                     
@@ -129,15 +129,15 @@ struct ImagePickerGrid: View {
                 }
             }
         }
-        .alert("需要相册权限", isPresented: $showingPermissionAlert) {
-            Button("去设置", role: .cancel) {
+        .alert("需要相册权限".appLocalized, isPresented: $showingPermissionAlert) {
+            Button("去设置".appLocalized, role: .cancel) {
                 if let url = URL(string: UIApplication.openSettingsURLString) {
                     UIApplication.shared.open(url)
                 }
             }
-            Button("取消", role: .destructive) {}
+            Button("取消".appLocalized, role: .destructive) {}
         } message: {
-            Text("请在设置中允许访问相册以选择图片")
+            Text("请在设置中允许访问相册以选择图片".appLocalized)
         }
         .sheet(item: $editingSelection) { selection in
             NavigationStack {
@@ -156,7 +156,7 @@ struct ImagePickerGrid: View {
                                     moveImageToFront(from: index)
                                     editingSelection = nil
                                 }) {
-                                    Label("设为主图", systemImage: "star.fill")
+                                    Label("设为主图".appLocalized, systemImage: "star.fill")
                                         .font(.subheadline)
                                         .lineLimit(1)
                                         .minimumScaleFactor(0.5)
@@ -171,7 +171,7 @@ struct ImagePickerGrid: View {
                                 shouldDismissSheet = true
                                 showingCropper = true
                             }) {
-                                Label("编辑为主图", systemImage: "crop")
+                                Label("编辑为主图".appLocalized, systemImage: "crop")
                                     .font(.subheadline)
                                     .lineLimit(1)
                                     .minimumScaleFactor(0.5)
@@ -183,7 +183,7 @@ struct ImagePickerGrid: View {
                                 deleteImage(at: index)
                                 editingSelection = nil
                             }) {
-                                Label("删除", systemImage: "trash")
+                                Label("删除".appLocalized, systemImage: "trash")
                                     .font(.subheadline)
                                     .lineLimit(1)
                                     .minimumScaleFactor(0.5)
@@ -195,11 +195,11 @@ struct ImagePickerGrid: View {
                     .padding(.horizontal, 12)
                     .padding(.bottom, 20)
                 }
-                .navigationTitle("图片预览")
+                .navigationTitle("图片预览".appLocalized)
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
                     ToolbarItem(placement: .cancellationAction) {
-                        Button("关闭") {
+                        Button("关闭".appLocalized) {
                             editingSelection = nil
                         }
                     }
@@ -246,8 +246,8 @@ struct ImagePickerGrid: View {
                 }
             }
         }
-        .alert("错误", isPresented: $showingErrorAlert) {
-            Button("确定", role: .cancel) {}
+        .alert("错误".appLocalized, isPresented: $showingErrorAlert) {
+            Button("确定".appLocalized, role: .cancel) {}
         } message: {
             Text(errorMessage)
         }
@@ -295,14 +295,14 @@ struct ImagePickerGrid: View {
                     } else {
                         print("Failed to load image data or create UIImage")
                         await MainActor.run {
-                            errorMessage = "无法加载图片数据"
+                            errorMessage = "无法加载图片数据".appLocalized
                             showingErrorAlert = true
                         }
                     }
                 } catch {
                     print("Error loading image: \(error)")
                     await MainActor.run {
-                        errorMessage = "加载图片出错：\(error.localizedDescription)"
+                        errorMessage = "加载图片出错：%@".appLocalized(error.localizedDescription)
                         showingErrorAlert = true
                     }
                 }
@@ -324,7 +324,7 @@ struct ImagePickerGrid: View {
     private func saveImage(_ image: UIImage, triggerImageSync: Bool = true) -> Bool {
         print("ImagePickerGrid: Saving image, current imagePaths count: \(imagePaths.count)")
         guard imagePaths.count < maxCount else {
-            errorMessage = "最多只能添加 \(maxCount) 张图片"
+            errorMessage = "最多只能添加 %lld 张图片".appLocalized(Int64(maxCount))
             showingErrorAlert = true
             return false
         }
@@ -340,7 +340,7 @@ struct ImagePickerGrid: View {
             }
             return true
         } else {
-            errorMessage = "保存图片失败"
+            errorMessage = "保存图片失败".appLocalized
             showingErrorAlert = true
             print("ImagePickerGrid: Failed to save image")
             return false
@@ -354,7 +354,7 @@ struct ImagePickerGrid: View {
             imagePaths.insert(fileName, at: 0)
             print("ImagePickerGrid: Image saved as main, new imagePaths count: \(imagePaths.count), fileName: \(fileName)")
         } else {
-            errorMessage = "保存图片失败"
+            errorMessage = "保存图片失败".appLocalized
             showingErrorAlert = true
             print("ImagePickerGrid: Failed to save image as main")
         }
@@ -400,7 +400,7 @@ private struct ImagePickerGridThumbnail: View {
                 )
                 .overlay(alignment: .bottom) {
                     if isMain {
-                        Text("主图")
+                        Text("主图".appLocalized)
                             .font(.caption2)
                             .fontWeight(.bold)
                             .foregroundStyle(.white)

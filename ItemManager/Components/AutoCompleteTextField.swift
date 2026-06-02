@@ -20,7 +20,7 @@ struct AutoCompleteTextField: View {
             // Title
             if !title.isEmpty {
                 HStack(spacing: 4) {
-                    Text(title)
+                    Text(title.appLocalized)
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                     
@@ -35,7 +35,7 @@ struct AutoCompleteTextField: View {
             // TextField + Inline Suggestions
             VStack(spacing: 0) {
                 HStack {
-                    TextField(placeholder, text: $text)
+                    TextField(placeholder.appLocalized, text: $text)
                         .focused($isFocused)
                         .padding()
                         .background(

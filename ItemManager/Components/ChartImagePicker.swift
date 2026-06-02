@@ -97,19 +97,19 @@ struct ChartImagePicker: View {
                 .ignoresSafeArea()
             }
         }
-        .alert("修改表图", isPresented: $showingDeleteAlert) {
-            Button("查看大图") {
+        .alert("修改表图".appLocalized, isPresented: $showingDeleteAlert) {
+            Button("查看大图".appLocalized) {
                 showingFullScreenViewer = true
             }
-            Button("更换图片") {
+            Button("更换图片".appLocalized) {
                 showingPhotosPicker = true
             }
-            Button("删除图片", role: .destructive) {
+            Button("删除图片".appLocalized, role: .destructive) {
                 deleteImage()
             }
-            Button("取消", role: .cancel) { }
+            Button("取消".appLocalized, role: .cancel) { }
         } message: {
-            Text("选择操作")
+            Text("选择操作".appLocalized)
         }
         .task {
             await loadThumbnail()
@@ -120,7 +120,7 @@ struct ChartImagePicker: View {
         VStack(spacing: 1) {
             Image(systemName: "plus")
                 .font(.system(size: 12))
-            Text(placeholder)
+            Text(placeholder.appLocalized)
                 .font(.system(size: 8))
         }
         .foregroundStyle(.secondary)
