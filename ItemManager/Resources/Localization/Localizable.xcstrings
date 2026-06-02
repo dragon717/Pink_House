@@ -71962,6 +71962,1224 @@
           }
         }
       }
+    },
+    "背包里还没有毛线球喔，我先把商店打开给你。记得一直往下拉到最下面，毛线球在商店最底层，买好后点一下会先收进背包，也可以直接拖过来陪我玩。" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Im Rucksack ist noch kein Wollknäuel. Ich öffne dir erst einmal den Shop. Scroll ganz nach unten: Das Wollknäuel liegt ganz unten im Shop. Nach dem Kauf antippen, um es in den Rucksack zu legen, oder direkt zu mir ziehen, damit wir spielen können."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "There is no yarn ball in the bag yet, so I opened the shop for you. Keep scrolling all the way down: the yarn ball is at the bottom of the shop. After buying it, tap it to put it in the bag first, or drag it over so I can play with it."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Todavía no hay ovillo en la mochila, así que abrí la tienda. Baja hasta el final: el ovillo está en la parte más baja. Después de comprarlo, tócalo para guardarlo en la mochila o arrástralo hasta mí para jugar."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Il n’y a pas encore de pelote dans le sac, alors j’ouvre la boutique. Fais défiler tout en bas : la pelote est au dernier rayon. Après l’achat, touche-la pour la mettre dans le sac, ou fais-la glisser vers moi pour jouer."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "バッグに毛糸玉がまだないので、お店を開きます。いちばん下までスクロールしてね。毛糸玉はお店の最下段にあります。買ったらタップしてバッグに入れるか、そのまま私のところへドラッグして遊ばせてね。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "가방에 아직 털실공이 없어서 상점을 열어둘게요. 맨 아래까지 내려가면 털실공이 있어요. 산 뒤에는 한 번 눌러 가방에 넣거나 바로 내게 끌어와서 놀 수 있어요."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ainda não tem novelo na mochila, então abri a loja para você. Role até o fim: o novelo fica no final da loja. Depois de comprar, toque nele para guardar na mochila ou arraste até mim para brincar."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "背包里还没有毛线球喔，我先把商店打开给你。记得一直往下拉到最下面，毛线球在商店最底层，买好后点一下会先收进背包，也可以直接拖过来陪我玩。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "背包裡還沒有毛線球喔，我先把商店打開給你。記得一直往下拉到最下面，毛線球在商店最底層，買好後點一下會先收進背包，也可以直接拖過來陪我玩。"
+          }
+        }
+      }
+    },
+    "%@现在不在背包里，我先把商店打开给你补货吧。" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ ist gerade nicht im Rucksack. Ich öffne dir den Shop zum Nachfüllen."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ is not in the bag right now, so I opened the shop for restocking."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ no está en la mochila ahora; abrí la tienda para reponer."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ n’est pas dans le sac pour l’instant, alors j’ouvre la boutique pour refaire le stock."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@は今バッグにありません。補充できるようにお店を開くね。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@가 지금 가방에 없어서 보충할 수 있게 상점을 열어둘게요."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ não está na mochila agora, então abri a loja para reabastecer."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@现在不在背包里，我先把商店打开给你补货吧。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@現在不在背包裡，我先把商店打開給你補貨吧。"
+          }
+        }
+      }
+    },
+    "这个东西我暂时没找到，稍后再帮我看看吧。" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ich finde diesen Gegenstand gerade nicht. Schau später noch einmal für mich nach."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "I cannot find that item right now. Please check again for me later."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No encuentro ese objeto por ahora. Vuelve a revisarlo por mí más tarde."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Je ne trouve pas cet objet pour l’instant. Regarde encore pour moi plus tard."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "そのアイテムは今のところ見つかりません。あとでまた確認してね。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "그 물건은 지금 찾지 못했어요. 나중에 다시 확인해 주세요."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Não encontrei esse item agora. Confira de novo para mim mais tarde."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "这个东西我暂时没找到，稍后再帮我看看吧。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "這個東西我暫時沒找到，稍後再幫我看看吧。"
+          }
+        }
+      }
+    },
+    "我的%@不够啦，先帮我攒一点再来买%@吧。" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ich habe nicht genug %@. Sammle erst ein bisschen, dann kaufen wir %@."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "I do not have enough %@. Help me save a little more before buying %@."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No tengo suficientes %@. Ayúdame a ahorrar un poco antes de comprar %@."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Je n’ai pas assez de %@. Aide-moi à en économiser un peu avant d’acheter %@."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@が足りません。%@を買う前に少し貯めてね。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@가 부족해요. %@를 사기 전에 조금 더 모아 주세요."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Não tenho %@ suficiente. Me ajude a juntar um pouco antes de comprar %@."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "我的%@不够啦，先帮我攒一点再来买%@吧。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "我的%@不夠啦，先幫我攢一點再來買%@吧。"
+          }
+        }
+      }
+    },
+    "我的%@不够啦，先帮我充一点再来买%@吧。" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ich habe nicht genug %@. Lade erst ein bisschen auf, dann kaufen wir %@."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "I do not have enough %@. Top up a little before buying %@."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No tengo suficientes %@. Recarga un poco antes de comprar %@."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Je n’ai pas assez de %@. Recharge un peu avant d’acheter %@."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@が足りません。%@を買う前に少しチャージしてね。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@가 부족해요. %@를 사기 전에 조금 충전해 주세요."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Não tenho %@ suficiente. Recarregue um pouco antes de comprar %@."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "我的%@不够啦，先帮我充一点再来买%@吧。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "我的%@不夠啦，先幫我充一點再來買%@吧。"
+          }
+        }
+      }
+    },
+    "我的%@不够啦，这个币种更适合毛毛用喔。" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ich habe nicht genug %@. Diese Währung passt eher zu Mao Mao."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "I do not have enough %@. This currency is a better fit for Mao Mao."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No tengo suficientes %@. Esta moneda le viene mejor a Mao Mao."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Je n’ai pas assez de %@. Cette monnaie convient plutôt à Mao Mao."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@が足りません。この通貨は毛毛に向いています。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@가 부족해요. 이 화폐는 마오마오에게 더 잘 맞아요."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Não tenho %@ suficiente. Essa moeda combina mais com Mao Mao."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "我的%@不够啦，这个币种更适合毛毛用喔。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "我的%@不夠啦，這個幣種更適合毛毛用喔。"
+          }
+        }
+      }
+    },
+    "买好就马上给我用啦～%@" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gekauft und gleich für mich benutzt. %@"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bought it and used it for me right away. %@"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lo compraste y lo usaste conmigo enseguida. %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Acheté et utilisé pour moi tout de suite. %@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "買ってすぐ使ってくれたよ。%@"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "사자마자 바로 내게 써줬어요. %@"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Comprou e usou em mim na hora. %@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "买好就马上给我用啦～%@"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "買好就馬上給我用啦～%@"
+          }
+        }
+      }
+    },
+    "买好啦，%@我已经收进背包啦。" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gekauft. %@ liegt jetzt in meinem Rucksack."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "All bought. I put %@ into the bag."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Listo, comprado. Guardé %@ en la mochila."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "C’est acheté. J’ai rangé %@ dans le sac."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "買えました。%@はバッグにしまったよ。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "다 샀어요. %@는 가방에 넣어뒀어요."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Comprado. Guardei %@ na mochila."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "买好啦，%@我已经收进背包啦。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "買好啦，%@我已經收進背包啦。"
+          }
+        }
+      }
+    },
+    "这个道具我暂时没认出来。" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Diesen Gegenstand erkenne ich gerade nicht."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "I do not recognize this item right now."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No reconozco este objeto por ahora."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Je ne reconnais pas cet objet pour l’instant."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このアイテムはまだ認識できません。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이 아이템은 아직 알아보지 못했어요."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ainda não reconheci este item."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "这个道具我暂时没认出来。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "這個道具我暫時沒認出來。"
+          }
+        }
+      }
+    },
+    "%@已经被我用完啦，要不要带我去商店补货？" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ ist schon aufgebraucht. Bringst du mich zum Shop zum Nachfüllen?"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "I already used up %@. Want to take me to the shop to restock?"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ya usé todo %@. ¿Me llevas a la tienda para reponer?"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "J’ai déjà utilisé %@. Tu veux m’emmener à la boutique refaire le stock ?"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@はもう使い切りました。お店へ補充に連れて行ってくれる？"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@는 이미 다 써버렸어요. 상점에 데려가 보충할까요?"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Já usei todo %@. Quer me levar à loja para reabastecer?"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@已经被我用完啦，要不要带我去商店补货？"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@已經被我用完啦，要不要帶我去商店補貨？"
+          }
+        }
+      }
+    },
+    "改名项圈先留着吧，我得走专门的改名流程。" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Heb das Umbenennungs-Halsband erst auf. Dafür brauche ich den eigenen Umbenennungsablauf."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keep the rename collar for now. I need to use the dedicated rename flow."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Guarda el collar de cambio de nombre por ahora. Necesito usar el flujo especial de cambio de nombre."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Garde le collier de renommage pour l’instant. Je dois passer par le flux dédié."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "改名首輪は今は取っておいてね。専用の改名手順が必要です。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이름 변경 목걸이는 잠시 보관해 주세요. 전용 이름 변경 절차가 필요해요."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Guarde a coleira de renomear por enquanto. Preciso usar o fluxo próprio de renomeação."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "改名项圈先留着吧，我得走专门的改名流程。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "改名項圈先留著吧，我得走專門的改名流程。"
+          }
+        }
+      }
+    },
+    "我精神回来啦，精力恢复了 %d 点。" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Meine Energie ist zurück. Ich habe %d Energiepunkte erholt."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "My energy is back. I recovered %d energy points."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ya recuperé energía. Restauré %d puntos de energía."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mon énergie revient. J’ai récupéré %d points d’énergie."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "元気が戻りました。エネルギーが%dポイント回復したよ。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "기운이 돌아왔어요. 에너지가 %d포인트 회복됐어요."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Minha energia voltou. Recuperei %d pontos de energia."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "我精神回来啦，精力恢复了 %d 点。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "我精神回來啦，精力恢復了 %d 點。"
+          }
+        }
+      }
+    },
+    "我现在精力已经满满的啦。" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Meine Energie ist schon ganz voll."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "My energy is already full."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mi energía ya está al máximo."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mon énergie est déjà au maximum."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "今はもうエネルギー満タンです。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "지금은 에너지가 이미 가득해요."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Minha energia já está cheia."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "我现在精力已经满满的啦。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "我現在精力已經滿滿的啦。"
+          }
+        }
+      }
+    },
+    "我现在太累啦，不想玩%@。" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ich bin gerade zu müde und möchte nicht mit %@ spielen."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "I am too tired right now and do not want to play with %@."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ahora estoy demasiado cansado y no quiero jugar con %@."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Je suis trop fatigué pour jouer avec %@ maintenant."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "今は疲れすぎていて、%@で遊びたくありません。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "지금 너무 피곤해서 %@로 놀고 싶지 않아요."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Estou cansado demais agora e não quero brincar com %@."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "我现在太累啦，不想玩%@。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "我現在太累啦，不想玩%@。"
+          }
+        }
+      }
+    },
+    "我抱着%@玩得好开心呀，心情一下就变好了。" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ich hatte so viel Spaß mit %@, meine Stimmung ist sofort besser geworden."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "I had so much fun playing with %@, and my mood got better right away."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Me divertí mucho jugando con %@ y mi ánimo mejoró enseguida."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Je me suis tellement amusé avec %@ que mon humeur s’est améliorée tout de suite."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@で遊んですごく楽しかった。気分が一気によくなりました。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@를 안고 놀아서 정말 즐거웠고 기분이 바로 좋아졌어요."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Me diverti muito brincando com %@ e meu humor melhorou na hora."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "我抱着%@玩得好开心呀，心情一下就变好了。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "我抱著%@玩得好開心呀，心情一下就變好了。"
+          }
+        }
+      }
+    },
+    "我把%@喝掉啦，感觉没那么渴了。" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ich habe %@ getrunken und bin nicht mehr so durstig."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "I drank %@ and do not feel as thirsty anymore."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Me tomé %@ y ya no tengo tanta sed."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "J’ai bu %@ et j’ai moins soif."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@を飲みました。あまり喉が渇かなくなったよ。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@를 마셨더니 덜 목말라요."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bebi %@ e já não estou com tanta sede."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "我把%@喝掉啦，感觉没那么渴了。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "我把%@喝掉啦，感覺沒那麼渴了。"
+          }
+        }
+      }
+    },
+    "我把%@吃掉啦，肚子舒服多了。" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ich habe %@ gegessen und mein Bauch fühlt sich viel besser an."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "I ate %@ and my tummy feels much better."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Me comí %@ y mi pancita se siente mucho mejor."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "J’ai mangé %@ et mon ventre va beaucoup mieux."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@を食べました。お腹がずっと楽になったよ。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@를 먹었더니 배가 훨씬 편해졌어요."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Comi %@ e minha barriguinha está muito melhor."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "我把%@吃掉啦，肚子舒服多了。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "我把%@吃掉啦，肚子舒服多了。"
+          }
+        }
+      }
+    },
+    "%@已经香香的啦，这次先不用花%d%@。" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ duftet schon gut. Diesmal müssen wir keine %d %@ ausgeben."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ already smells lovely, so we do not need to spend %d %@ this time."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ ya huele muy bien, así que no hace falta gastar %d %@ esta vez."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ sent déjà très bon, pas besoin de dépenser %d %@ cette fois."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@はもういい香りです。今回は%d%@を使わなくて大丈夫。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@는 이미 향기로워요. 이번에는 %d %@를 쓰지 않아도 돼요."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ já está cheirosinho, então não precisamos gastar %d %@ desta vez."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@已经香香的啦，这次先不用花%d%@。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@已經香香的啦，這次先不用花%d%@。"
+          }
+        }
+      }
+    },
+    "给%@洗香香要花%d%@，我现在%@还不够，先带你去换一点。" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ zu waschen kostet %d %@. Ich habe gerade nicht genug %@, also bringe ich dich erst zum Umtauschen."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Washing %@ costs %d %@. I do not have enough %@ right now, so I will take you to exchange some first."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bañar a %@ cuesta %d %@. Ahora no tengo suficientes %@, así que te llevaré a cambiar un poco primero."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Laver %@ coûte %d %@. Je n’ai pas assez de %@ pour l’instant, alors je t’emmène d’abord en échanger."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@を洗うには%d%@かかります。今は%@が足りないので、先に交換へ連れて行くね。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@를 씻기려면 %d %@가 필요해요. 지금 %@가 부족해서 먼저 교환하러 데려갈게요."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dar banho em %@ custa %d %@. Não tenho %@ suficiente agora, então vou levar você para trocar um pouco primeiro."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "给%@洗香香要花%d%@，我现在%@还不够，先带你去换一点。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "給%@洗香香要花%d%@，我現在%@還不夠，先帶你去換一點。"
+          }
+        }
+      }
+    },
+    "给%@洗香香要花%d%@，我现在%@还不够，先带你去充值。" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ zu waschen kostet %d %@. Ich habe gerade nicht genug %@, also bringe ich dich erst zum Aufladen."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Washing %@ costs %d %@. I do not have enough %@ right now, so I will take you to top up first."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bañar a %@ cuesta %d %@. Ahora no tengo suficientes %@, así que te llevaré a recargar primero."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Laver %@ coûte %d %@. Je n’ai pas assez de %@ pour l’instant, alors je t’emmène d’abord recharger."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@を洗うには%d%@かかります。今は%@が足りないので、先にチャージへ連れて行くね。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@를 씻기려면 %d %@가 필요해요. 지금 %@가 부족해서 먼저 충전하러 데려갈게요."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dar banho em %@ custa %d %@. Não tenho %@ suficiente agora, então vou levar você para recarregar primeiro."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "给%@洗香香要花%d%@，我现在%@还不够，先带你去充值。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "給%@洗香香要花%d%@，我現在%@還不夠，先帶你去充值。"
+          }
+        }
+      }
+    },
+    "%@已经洗香香啦，花掉%d%@，清洁度补满了。" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ ist jetzt frisch gewaschen. Wir haben %d %@ ausgegeben und die Sauberkeit ist wieder voll."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ is freshly washed now. We spent %d %@ and cleanliness is full again."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ ya quedó bañadito. Gastamos %d %@ y la limpieza volvió al máximo."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ est tout propre maintenant. Nous avons dépensé %d %@ et la propreté est de nouveau pleine."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@はきれいに洗えました。%d%@を使って、清潔度が満タンになったよ。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@가 깨끗하게 씻었어요. %d %@를 쓰고 청결도가 가득 찼어요."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ ficou limpinho agora. Gastamos %d %@ e a limpeza voltou ao máximo."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@已经洗香香啦，花掉%d%@，清洁度补满了。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@已經洗香香啦，花掉%d%@，清潔度補滿了。"
+          }
+        }
+      }
     }
   },
   "version" : "1.0"
