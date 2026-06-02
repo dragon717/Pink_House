@@ -673,7 +673,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%@ · automatique"
+            "value" : "%@ · auto"
           }
         },
         "ja" : {
@@ -2184,6 +2184,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%@進行中，已賺 %d %@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@進行中、%d %@を獲得済み"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 진행 중, %d %@ 벌었어요"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ en cours, %d %@ gagnés"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ läuft, %d %@ verdient"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ en curso, %d %@ ganados"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ em andamento, %d %@ ganhos"
           }
         }
       }
@@ -9570,6 +9606,42 @@
             "state" : "translated",
             "value" : "今日%@收益已達上限"
           }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "今日の%@収益は上限に達しました"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "오늘 %@ 수익이 한도에 도달했어요"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les gains en %@ du jour ont atteint la limite"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Das heutige %@-Einnahmelimit ist erreicht"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Las ganancias de %@ de hoy alcanzaron el límite"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Os ganhos de %@ de hoje atingiram o limite"
+          }
         }
       }
     },
@@ -11972,7 +12044,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Change Name Required, Store Purchase ～"
+            "value" : "Renaming requires a Rename Collar. Please buy one in the shop."
           }
         },
         "zh-Hans" : {
@@ -11985,6 +12057,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "修改名字需要消耗改名項圈，請前往商店購買喵～"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "名前の変更には改名首輪が必要です。ショップで購入してください。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이름을 바꾸려면 이름 변경 목걸이가 필요해요. 상점에서 구매해 주세요."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Renommer nécessite un collier de renommage. Achetez-en un dans la boutique."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zum Umbenennen brauchst du ein Umbenennungshalsband. Kaufe bitte eins im Shop."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cambiar el nombre requiere un collar de cambio de nombre. Compra uno en la tienda."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Renomear exige uma Coleira de Renomear. Compre uma na loja."
           }
         }
       }
@@ -14943,7 +15051,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Companion"
+            "value" : "Switch Companion"
           }
         },
         "zh-Hans" : {
@@ -14956,6 +15064,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "切換夥伴"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "パートナーを切り替え"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "친구 바꾸기"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Changer de compagnon"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Begleiter wechseln"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cambiar compañero"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trocar companheiro"
           }
         }
       }
@@ -15237,7 +15381,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Initializing %@ brain..."
+            "value" : "Initializing %@'s brain..."
           }
         },
         "zh-Hans" : {
@@ -15249,7 +15393,43 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "初始化%@大腦..."
+            "value" : "正在初始化%@的大腦..."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@の頭脳を初期化中..."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@의 두뇌를 초기화하는 중..."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Initialisation du cerveau de %@..."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@s Gehirn wird initialisiert..."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Inicializando el cerebro de %@..."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Inicializando o cérebro de %@..."
           }
         }
       }
@@ -18480,6 +18660,42 @@
             "state" : "translated",
             "value" : "只接輕鬆活，狀態保護更嚴格。"
           }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "軽い仕事だけ受けて、ステータス保護はより厳しめです。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "쉬운 일만 받고 상태 보호 기준이 더 엄격해요."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ne prend que les tâches faciles, avec une protection d'état plus stricte."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nimmt nur leichte Jobs an, mit strengeren Status-Schutzwerten."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Solo acepta trabajos fáciles, con protección de estado más estricta."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aceita apenas trabalhos leves, com proteção de status mais rígida."
+          }
         }
       }
     },
@@ -19904,6 +20120,42 @@
             "state" : "translated",
             "value" : "啃老喵"
           }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "のんびり猫"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "쉬는 고양이"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chat tranquille"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couch-Katze"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gato descansando"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gato descansando"
+          }
         }
       }
     },
@@ -20348,6 +20600,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "喵警長"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ニャー保安官"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "야옹 보안관"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Shérif Miaou"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Miau-Sheriff"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sheriff Miau"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Xerife Miau"
           }
         }
       }
@@ -22538,7 +22826,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Naicha prioritizes Fish Coins, while Maomao prioritizes Bone Coins."
+            "value" : "Milk Tea prioritizes Fish Coins, while Mao Mao prioritizes Bone Coins."
           }
         },
         "zh-Hans" : {
@@ -22551,6 +22839,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "奶茶優先賺魚幣，毛毛優先賺骨頭幣。"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ミルクティーはさかなコイン、マオマオはほねコインを優先して稼ぎます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "밀크티는 물고기 코인, 마오마오는 뼈다귀 코인을 우선으로 벌어요."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Milk Tea privilégie les pièces Poisson, tandis que Mao Mao privilégie les pièces Os."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Milk Tea verdient bevorzugt Fischmünzen, Mao Mao bevorzugt Knochenmünzen."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Milk Tea prioriza monedas Pez y Mao Mao prioriza monedas Hueso."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Milk Tea prioriza Moedas Peixe, enquanto Mao Mao prioriza Moedas Osso."
           }
         }
       }
@@ -23612,7 +23936,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Conversation"
+            "value" : "Chat"
           }
         },
         "zh-Hans" : {
@@ -23625,6 +23949,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "對話"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "チャット"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "대화"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Discussion"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chat"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chat"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chat"
           }
         }
       }
@@ -27111,6 +27471,42 @@
             "state" : "translated",
             "value" : "幣種"
           }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "通貨"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "통화"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Devise"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Währung"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Moneda"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Moeda"
+          }
         }
       }
     },
@@ -27368,6 +27764,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "平衡"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "バランス"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "균형"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Équilibré"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ausgewogen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Equilibrado"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Equilibrado"
           }
         }
       }
@@ -28111,7 +28543,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Enable, Pet, Status, Daily Auto. Manual,, Auto."
+            "value" : "After enabling this, your pet only accepts jobs when idle, stat thresholds are met, and the daily earnings cap has not been reached. Manual interactions, sleep, feeding, and bathing are not interrupted."
           }
         },
         "zh-Hans" : {
@@ -28123,7 +28555,43 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "開啓後，萌寵只有在空閒、狀態達標、未到每日收益上限時才會自動接活。手動互動、睡覺、餵食和洗澡不會被自動打斷。"
+            "value" : "開啟後，萌寵只有在空閒、狀態達標、未到每日收益上限時才會自動接活。手動互動、睡覺、餵食和洗澡不會被自動打斷。"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "オンにすると、ペットは暇で状態が基準を満たし、1日の収益上限に達していない時だけ自動で仕事を受けます。手動のふれあい、睡眠、食事、お風呂は自動で中断されません。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "켜면 펫이 한가하고 상태가 기준을 충족하며 일일 수익 한도에 도달하지 않았을 때만 자동으로 일을 받아요. 수동 상호작용, 수면, 먹이기, 목욕은 자동으로 중단되지 않아요."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Une fois activé, l'animal accepte automatiquement du travail seulement s'il est libre, en bon état et sous la limite de gains quotidienne. Les interactions manuelles, le sommeil, le repas et le bain ne seront pas interrompus."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wenn aktiviert, nimmt dein Haustier nur automatisch Jobs an, wenn es frei ist, die Statuswerte passen und das tägliche Einnahmelimit nicht erreicht ist. Manuelle Interaktionen, Schlafen, Füttern und Baden werden nicht unterbrochen."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Al activarlo, la mascota solo aceptará trabajos automáticamente cuando esté libre, tenga buen estado y no haya alcanzado el límite diario de ganancias. Las interacciones manuales, dormir, alimentar y bañar no se interrumpirán."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ao ativar, o pet só aceita trabalhos automaticamente quando estiver ocioso, com status suficiente e abaixo do limite diário de ganhos. Interações manuais, sono, alimentação e banho não serão interrompidos."
           }
         }
       }
@@ -28336,7 +28804,7 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "開啓自動打工"
+            "value" : "開啟自動打工"
           }
         }
       }
@@ -29321,7 +29789,43 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "當前狀態"
+            "value" : "目前狀態"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "現在の状態"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "현재 상태"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "État actuel"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aktueller Status"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Estado actual"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Status atual"
           }
         }
       }
@@ -32719,6 +33223,42 @@
             "state" : "translated",
             "value" : "打工策略"
           }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "仕事方針"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "일하기 전략"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stratégie de travail"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Arbeitsstrategie"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Estrategia de trabajo"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Estratégia de trabalho"
+          }
         }
       }
     },
@@ -33806,6 +34346,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "拼一把"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "思い切る"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "한 번 도전"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "À fond"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Alles geben"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A por todas"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ir com tudo"
           }
         }
       }
@@ -35286,6 +35862,42 @@
             "state" : "translated",
             "value" : "收益和消耗都適中，適合日常掛機。"
           }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "収益と消耗がどちらもほどよく、普段の放置に向いています。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "수익과 소모가 모두 적당해서 평소 자동 진행에 좋아요."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gains et fatigue modérés, idéal pour le travail automatique quotidien."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Moderate Einnahmen und Belastung, gut für tägliche Leerlauf-Arbeit."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ganancias y desgaste moderados, ideal para el trabajo diario en reposo."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ganhos e desgaste moderados, bom para trabalho automático do dia a dia."
+          }
         }
       }
     },
@@ -35294,7 +35906,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Earning Currency"
+            "value" : "Reward Currency"
           }
         },
         "zh-Hans" : {
@@ -35307,6 +35919,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "收益幣種"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "報酬通貨"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "수익 통화"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Devise des gains"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Belohnungswährung"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Moneda de recompensa"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Moeda de recompensa"
           }
         }
       }
@@ -45380,6 +46028,42 @@
             "state" : "translated",
             "value" : "狀態不錯，閒下來會自動去打工"
           }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "状態は良好です。暇になると自動で仕事に行きます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "상태가 좋아요. 한가해지면 자동으로 일하러 가요."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L'état est bon. L'animal travaillera automatiquement quand il sera libre."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die Werte sehen gut aus. Dein Haustier arbeitet automatisch, wenn es frei ist."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El estado se ve bien. La mascota trabajará automáticamente cuando esté libre."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O status está bom. O pet trabalhará automaticamente quando estiver ocioso."
+          }
         }
       }
     },
@@ -45388,7 +46072,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Status Guard Line"
+            "value" : "Stat Protection Lines"
           }
         },
         "zh-Hans" : {
@@ -45401,6 +46085,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "狀態保護線"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ステータス保護ライン"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "상태 보호선"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Seuils de protection"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Status-Schutzwerte"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Límites de protección"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Linhas de proteção de status"
           }
         }
       }
@@ -45424,6 +46144,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "狀態很好時才上強度，收益更高也更累。"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "状態がとても良い時だけ頑張ります。収益は高いけれど疲れやすくなります。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "상태가 아주 좋을 때만 강도를 올려요. 수익은 높지만 더 피곤해져요."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Travaille plus fort seulement quand tout va très bien. Gains plus élevés, mais plus de fatigue."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Arbeitet nur härter, wenn die Werte sehr gut sind. Mehr Einnahmen, aber anstrengender."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Solo trabaja más duro cuando el estado es excelente. Más ganancias, pero más cansancio."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Só pega pesado quando o status está ótimo. Mais ganhos, mas cansa mais."
           }
         }
       }
@@ -45470,6 +46226,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "貓咖喵"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "猫カフェ係"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "고양이 카페 도우미"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aide du café-chat"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Katzen-Café-Helfer"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ayudante del café gatuno"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ajudante do café de gatos"
           }
         }
       }
@@ -46675,6 +47467,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "直播喵"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "配信猫"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "방송 고양이"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chat streamer"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Streamer-Katze"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gato streamer"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gato streamer"
           }
         }
       }
@@ -50326,6 +51154,42 @@
             "state" : "translated",
             "value" : "穩妥"
           }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ゆったり"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "안정"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Doux"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sanft"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Suave"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tranquilo"
+          }
         }
       }
     },
@@ -50873,6 +51737,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "策略"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "方針"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "전략"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stratégie"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Strategie"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Estrategia"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Estratégia"
           }
         }
       }
@@ -52070,6 +52970,42 @@
             "state" : "translated",
             "value" : "結束打工"
           }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "仕事を終了"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "일 끝내기"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Terminer le travail"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Arbeit beenden"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Terminar trabajo"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Encerrar trabalho"
+          }
         }
       }
     },
@@ -52724,6 +53660,42 @@
             "state" : "translated",
             "value" : "缺少道具"
           }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アイテム不足"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "아이템 부족"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Objet manquant"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gegenstand fehlt"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Falta un objeto"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Item ausente"
+          }
         }
       }
     },
@@ -53064,7 +54036,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Sac"
+            "value" : "Sac à dos"
           }
         },
         "ja" : {
@@ -53543,7 +54515,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Auto-work rewards are fixed to Bone Coins."
+            "value" : "Auto work rewards are fixed to Bone Coins."
           }
         },
         "zh-Hans" : {
@@ -53557,6 +54529,42 @@
             "state" : "translated",
             "value" : "自動打工收益固定為骨頭幣。"
           }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自動仕事の報酬はほねコインに固定されます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "자동 일하기 수익은 뼈다귀 코인으로 고정돼요."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les gains du travail auto sont fixés en pièces Os."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Auto-Arbeit zahlt fest in Knochenmünzen aus."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Las recompensas del trabajo automático serán monedas Hueso."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "As recompensas do trabalho automático ficam fixas em Moedas Osso."
+          }
         }
       }
     },
@@ -53566,7 +54574,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Auto-work rewards are fixed to Fish Coins."
+            "value" : "Auto work rewards are fixed to Fish Coins."
           }
         },
         "zh-Hans" : {
@@ -53579,6 +54587,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "自動打工收益固定為魚幣。"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自動仕事の報酬はさかなコインに固定されます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "자동 일하기 수익은 물고기 코인으로 고정돼요."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les gains du travail auto sont fixés en pièces Poisson."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Auto-Arbeit zahlt fest in Fischmünzen aus."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Las recompensas del trabajo automático serán monedas Pez."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "As recompensas do trabalho automático ficam fixas em Moedas Peixe."
           }
         }
       }
@@ -53662,6 +54706,42 @@
             "state" : "translated",
             "value" : "自動打工未開啟"
           }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自動仕事はオフです"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "자동 일하기가 꺼져 있어요"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le travail auto est désactivé"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Auto-Arbeit ist aus"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El trabajo automático está desactivado"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trabalho automático desativado"
+          }
         }
       }
     },
@@ -53741,7 +54821,43 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "自動打工設置"
+            "value" : "自動打工設定"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自動仕事設定"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "자동 일하기 설정"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Réglages du travail auto"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Auto-Arbeit-Einstellungen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ajustes de trabajo automático"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Configurações de trabalho automático"
           }
         }
       }
@@ -58699,6 +59815,42 @@
             "state" : "translated",
             "value" : "跟隨萌寵"
           }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ペットに合わせる"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "펫에 맞추기"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Suivre l'animal"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Haustier folgen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Seguir mascota"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Seguir pet"
+          }
         }
       }
     },
@@ -59156,7 +60308,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Start Auto, Auto."
+            "value" : "Auto work starts only after reaching the start line, and stops when it drops to the stop line."
           }
         },
         "zh-Hans" : {
@@ -59169,6 +60321,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "達到開始線才會自動出門，跌到停工線會自動下班。"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "開始ラインに達すると自動で出勤し、停止ラインまで下がると自動で帰ります。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "시작선에 도달해야 자동으로 나가고, 중지선까지 떨어지면 자동으로 퇴근해요."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le travail auto démarre seulement au seuil de départ et s'arrête au seuil d'arrêt."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Auto-Arbeit startet erst ab dem Startwert und stoppt beim Stoppwert."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El trabajo automático empieza al alcanzar el umbral de inicio y se detiene al caer al umbral de parada."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O trabalho automático começa ao atingir a linha de início e para ao cair até a linha de parada."
           }
         }
       }
@@ -59964,7 +61152,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "!"
+            "value" : "OK, I'll buy one!"
           }
         },
         "zh-Hans" : {
@@ -59977,6 +61165,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "這都要買！"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "それも買う！"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이것도 사야 해요!"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OK, j'en achète un !"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Okay, ich kaufe eins!"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "¡Vale, compraré uno!"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OK, vou comprar um!"
           }
         }
       }
@@ -60360,6 +61584,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "送去打工"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "仕事に行かせる"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "일 보내기"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Envoyer travailler"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zur Arbeit schicken"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enviar a trabajar"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enviar para trabalhar"
           }
         }
       }
@@ -62111,6 +63371,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "閒時自動打工"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "暇なときの自動仕事"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "한가할 때 자동 일하기"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Travail auto pendant l'inactivité"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Auto-Arbeit im Leerlauf"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trabajo automático en reposo"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trabalho automático no tempo livre"
           }
         }
       }
@@ -68168,7 +69464,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "自動お仕事がオンになりました"
+            "value" : "自動仕事がオンになりました"
           }
         },
         "ko" : {
@@ -68226,7 +69522,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "自動お仕事がオフになりました"
+            "value" : "自動仕事がオフになりました"
           }
         },
         "ko" : {
@@ -80837,6 +82133,238 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "（%d%@）"
+          }
+        }
+      }
+    },
+    "%@ - \"%@\"" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ - \"%@\""
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ - \"%@\""
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ - \"%@\""
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ - \"%@\""
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ - \"%@\""
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ - \"%@\""
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ - \"%@\""
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ - \"%@\""
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ - \"%@\""
+          }
+        }
+      }
+    },
+    "再要%d胎" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adopt companion #%d"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "再要%d胎"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "再要第%d胎"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%d匹目をお迎え"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%d번째 친구 입양"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adopter le compagnon n° %d"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Begleiter Nr. %d adoptieren"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adoptar compañero n.º %d"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adotar companheiro nº %d"
+          }
+        }
+      }
+    },
+    "开始 %d+" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Start %d+"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "开始 %d+"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "開始 %d+"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "開始 %d+"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "시작 %d+"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Début %d+"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Start %d+"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Inicio %d+"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Início %d+"
+          }
+        }
+      }
+    },
+    "停工 %d" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stop %d"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "停工 %d"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "停工 %d"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "停止 %d"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "중지 %d"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Arrêt %d"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stopp %d"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Parada %d"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Parar %d"
           }
         }
       }

@@ -129,7 +129,7 @@ struct PetHomeView: View {
                                                 HStack(spacing: 4) {
                                                     Image(systemName: "bubble.left.and.bubble.right.fill")
                                                         .font(.system(size: 20))
-                                                    Text("对话")
+                                                    Text("对话".appLocalized)
                                                     .font(.system(size: 16, weight: .bold))
                                                     .themeSkinLegibleText(level: .chip, slot: .primaryButton)
                                             }
@@ -153,7 +153,7 @@ struct PetHomeView: View {
                                             HStack(spacing: 4) {
                                                 Image(systemName: "backpack.fill")
                                                     .font(.system(size: 20))
-                                                Text("背包")
+                                                Text("背包".appLocalized)
                                                     .font(.system(size: 16, weight: .bold))
                                                     .themeSkinLegibleText(level: .chip, slot: .primaryButton)
                                             }
@@ -198,22 +198,22 @@ struct PetHomeView: View {
                             }
                         }
                     }
-                .alert("修改名字", isPresented: $showRenameAlert) {
-                    TextField("输入新名字", text: $newName)
-                    Button("取消", role: .cancel) { }
-                    Button("确定") {
+                .alert("修改名字".appLocalized, isPresented: $showRenameAlert) {
+                    TextField("输入新名字".appLocalized, text: $newName)
+                    Button("取消".appLocalized, role: .cancel) { }
+                    Button("确定".appLocalized) {
                         let trimmed = newName.trimmingCharacters(in: .whitespacesAndNewlines)
                         if !trimmed.isEmpty {
                             _ = viewModel.useRenameCard(newName: trimmed)
                         }
                     }
                 } message: {
-                    Text("改名将消耗一个改名项圈")
+                    Text("改名将消耗一个改名项圈".appLocalized)
                 }
-                .alert("缺少道具", isPresented: $showNoCardAlert) {
-                    Button("这都要买！", role: .cancel) { }
+                .alert("缺少道具".appLocalized, isPresented: $showNoCardAlert) {
+                    Button("这都要买！".appLocalized, role: .cancel) { }
                 } message: {
-                    Text("修改名字需要消耗改名项圈，请前往商店购买喵～")
+                    Text("修改名字需要消耗改名项圈，请前往商店购买喵～".appLocalized)
                 }
 
                 .sheet(isPresented: $showVIPView) {
@@ -245,7 +245,7 @@ struct PetHomeView: View {
                         Menu {
                             // 切换萌宠 (如果有2只及以上)
                             if viewModel.status.ownedPetIds.count >= 2 {
-                                Menu("切换伙伴") {
+                                Menu("切换伙伴".appLocalized) {
                                     ForEach(PetCharacter.allCases) { pet in
                                         if viewModel.status.ownedPetIds.contains(pet.id) {
                                             Button {
@@ -253,9 +253,9 @@ struct PetHomeView: View {
                                             } label: {
                                                 HStack {
                                                     petShortcutIcon(for: pet, size: 14)
-                                                    let pName = viewModel.status.petNames[pet.id] ?? ""
-                                                    let nameText = pName.isEmpty ? "" : " - \"\(pName)\""
-                                                    Text("\(pet.displayName)\(nameText)")
+                                                    let customName = viewModel.status.petNames[pet.id] ?? ""
+                                                    let nameText = customName.isEmpty ? pet.localizedDisplayName : "%@ - \"%@\"".appLocalized(pet.localizedDisplayName, customName)
+                                                    Text(nameText)
                                                         .themeSkinLegibleText(level: .inline, slot: .topBarMain)
                                                     if viewModel.status.selectedPetId == pet.id {
                                                         Image(systemName: "checkmark")
@@ -272,7 +272,7 @@ struct PetHomeView: View {
                                 Button {
                                     showAdoptionView = true
                                 } label: {
-                                    Label("再要\(viewModel.nextAdoptionNumberText)胎", systemImage: "plus.circle")
+                                    Label("再要%d胎".appLocalized(viewModel.status.ownedPetIds.count + 1), systemImage: "plus.circle")
                                 }
 
                                 Divider()
@@ -286,20 +286,20 @@ struct PetHomeView: View {
                                     showNoCardAlert = true
                                 }
                             } label: {
-                                Label("修改名字", systemImage: "pencil")
+                                Label("修改名字".appLocalized, systemImage: "pencil")
                             }
 
                             if viewModel.status.currentJob != .none {
                                 Button {
                                     viewModel.stopJob()
                                 } label: {
-                                    Label("结束打工", systemImage: "briefcase.fill")
+                                    Label("结束打工".appLocalized, systemImage: "briefcase.fill")
                                 }
                             } else {
                                 Button {
                                     showJobSelection = true
                                 } label: {
-                                    Label("送去打工", systemImage: "briefcase")
+                                    Label("送去打工".appLocalized, systemImage: "briefcase")
                                 }
                             }
 
@@ -307,7 +307,7 @@ struct PetHomeView: View {
                                 showAutoWorkSettings = true
                             } label: {
                                 Label(
-                                    viewModel.status.isAutoWorkEnabled ? "自动打工设置" : "开启自动打工",
+                                    viewModel.status.isAutoWorkEnabled ? "自动打工设置".appLocalized : "开启自动打工".appLocalized,
                                     systemImage: viewModel.status.isAutoWorkEnabled ? "gearshape.fill" : "clock"
                                 )
                             }
@@ -324,7 +324,8 @@ struct PetHomeView: View {
                                         .themeSkinLegibleText(level: .inline, slot: .topBarMain)
 
                                     if viewModel.status.currentJob != .none {
-                                        Text(viewModel.status.currentJobStartedAutomatically ? "\(viewModel.status.currentJob.rawValue) · 自动" : viewModel.status.currentJob.rawValue)
+                                        let jobTitle = viewModel.status.currentJob.localizedTitle
+                                        Text(viewModel.status.currentJobStartedAutomatically ? "%@ · 自动".appLocalized(jobTitle) : jobTitle)
                                             .font(.caption2)
                                             .foregroundStyle(.blue)
                                             .themeSkinLegibleText(level: .inline, slot: .topBarMain)
@@ -381,7 +382,7 @@ struct PetHomeView: View {
                     if let service = viewModel.aiService {
                         ChatView(service: service)
                     } else {
-                        ProgressView("初始化\(viewModel.status.displayName)大脑...")
+                        ProgressView("初始化%@大脑...".appLocalized(viewModel.status.displayName))
                             .onAppear {
                                 viewModel.updateWardrobeContext(clothings: clothings)
                             }
@@ -489,17 +490,17 @@ private struct PetAutoWorkSettingsView: View {
             Form {
                 Section {
                     Toggle(isOn: isEnabledBinding) {
-                        Label("闲时自动打工", systemImage: "briefcase.fill")
+                        Label("闲时自动打工".appLocalized, systemImage: "briefcase.fill")
                     }
 
-                    LabeledContent("当前状态", value: viewModel.autoWorkStatusSummary)
+                    LabeledContent("当前状态".appLocalized, value: viewModel.autoWorkStatusSummary)
                 } footer: {
-                    Text("开启后，萌宠只有在空闲、状态达标、未到每日收益上限时才会自动接活。手动互动、睡觉、喂食和洗澡不会被自动打断。")
+                    Text("开启后，萌宠只有在空闲、状态达标、未到每日收益上限时才会自动接活。手动互动、睡觉、喂食和洗澡不会被自动打断。".appLocalized)
                         .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                 }
 
-                Section("打工策略") {
-                    Picker("策略", selection: strategyBinding) {
+                Section("打工策略".appLocalized) {
+                    Picker("策略".appLocalized, selection: strategyBinding) {
                         ForEach(PetAutoWorkStrategy.allCases) { strategy in
                             Text(strategy.title)
                                 .themeSkinLegibleText(level: .inline, slot: .segmentedControl)
@@ -513,8 +514,8 @@ private struct PetAutoWorkSettingsView: View {
                         .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                 }
 
-                Section("收益币种") {
-                    Picker("币种", selection: rewardModeBinding) {
+                Section("收益币种".appLocalized) {
+                    Picker("币种".appLocalized, selection: rewardModeBinding) {
                         ForEach(PetAutoWorkRewardMode.allCases) { mode in
                             Text(mode.title)
                                 .themeSkinLegibleText(level: .inline, slot: .segmentedControl)
@@ -531,23 +532,23 @@ private struct PetAutoWorkSettingsView: View {
                 Section {
                     let start = viewModel.status.autoWorkStrategy.startThresholds
                     let stop = viewModel.status.autoWorkStrategy.stopThresholds
-                    thresholdRow(title: "饱食", current: viewModel.status.hunger, start: start.hunger, stop: stop.hunger)
-                    thresholdRow(title: "清洁", current: viewModel.status.hygiene, start: start.hygiene, stop: stop.hygiene)
-                    thresholdRow(title: "精力", current: viewModel.status.energy, start: start.energy, stop: stop.energy)
-                    thresholdRow(title: "心情", current: viewModel.status.mood, start: start.mood, stop: stop.mood)
+                    thresholdRow(title: "饱食".appLocalized, current: viewModel.status.hunger, start: start.hunger, stop: stop.hunger)
+                    thresholdRow(title: "清洁".appLocalized, current: viewModel.status.hygiene, start: start.hygiene, stop: stop.hygiene)
+                    thresholdRow(title: "精力".appLocalized, current: viewModel.status.energy, start: start.energy, stop: stop.energy)
+                    thresholdRow(title: "心情".appLocalized, current: viewModel.status.mood, start: start.mood, stop: stop.mood)
                 } header: {
-                    Text("状态保护线")
+                    Text("状态保护线".appLocalized)
                         .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                 } footer: {
-                    Text("达到开始线才会自动出门，跌到停工线会自动下班。")
+                    Text("达到开始线才会自动出门，跌到停工线会自动下班。".appLocalized)
                         .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                 }
             }
-            .navigationTitle("自动打工")
+            .navigationTitle("自动打工".appLocalized)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("完成") {
+                    Button("完成".appLocalized) {
                         isPresented = false
                     }
                 }
@@ -566,10 +567,10 @@ private struct PetAutoWorkSettingsView: View {
                     .themeSkinLegibleText(level: .inline, slot: .sectionCard)
             }
             HStack(spacing: 12) {
-                Label("开始 \(Int(start))+", systemImage: "arrow.up.circle.fill")
+                Label("开始 %d+".appLocalized(Int(start)), systemImage: "arrow.up.circle.fill")
                     .foregroundStyle(.green)
                     .themeSkinLegibleText(level: .inline, slot: .filterChip)
-                Label("停工 \(Int(stop))", systemImage: "pause.circle.fill")
+                Label("停工 %d".appLocalized(Int(stop)), systemImage: "pause.circle.fill")
                     .foregroundStyle(.orange)
                     .themeSkinLegibleText(level: .inline, slot: .filterChip)
             }
