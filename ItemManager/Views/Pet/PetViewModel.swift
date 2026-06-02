@@ -1258,7 +1258,7 @@ class PetViewModel: ObservableObject {
                 showFloatingText("-\(finalPrice)", style: .fishCoin)
                 return true
             } else {
-                presentShopFundingPrompt(for: .fishCoin, itemName: item.name)
+                presentShopFundingPrompt(for: .fishCoin, itemName: item.localizedName)
             }
         case .meowCoin:
             if StoreManager.spendMeowCoins(finalPrice, in: &status) {
@@ -1267,7 +1267,7 @@ class PetViewModel: ObservableObject {
                 showFloatingText("-\(finalPrice)", style: .meowCoin)
                 return true
             } else {
-                presentShopFundingPrompt(for: .meowCoin, itemName: item.name)
+                presentShopFundingPrompt(for: .meowCoin, itemName: item.localizedName)
             }
         case .boneCoin:
             if status.boneCoin >= finalPrice {
@@ -1277,7 +1277,7 @@ class PetViewModel: ObservableObject {
                 showFloatingText("-\(finalPrice)", style: .boneCoin)
                 return true
             } else {
-                presentShopFundingPrompt(for: .boneCoin, itemName: item.name)
+                presentShopFundingPrompt(for: .boneCoin, itemName: item.localizedName)
             }
         }
         return false

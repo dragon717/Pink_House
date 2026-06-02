@@ -56,7 +56,7 @@ struct PetShopFundingPromptOverlay: View {
                     }
 
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("余额不足")
+                        Text("余额不足".appLocalized)
                             .font(.caption.weight(.semibold))
                             .foregroundStyle(accentTint)
                             .padding(.horizontal, 10)
@@ -90,7 +90,7 @@ struct PetShopFundingPromptOverlay: View {
 
                 HStack(spacing: 12) {
                     Button(action: onDismiss) {
-                        Text("稍后再说")
+                        Text("稍后再说".appLocalized)
                             .font(.system(size: 15, weight: .semibold))
                             .foregroundStyle(.secondary)
                             .frame(maxWidth: .infinity)
