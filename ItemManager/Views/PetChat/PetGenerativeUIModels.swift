@@ -57,7 +57,7 @@ struct PetWidgetOption: Identifiable, Codable, Equatable {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         let title = try container.decodeIfPresent(String.self, forKey: .title)
             ?? container.decodeIfPresent(String.self, forKey: .text)
-            ?? "继续"
+            ?? "继续".appLocalized
         let command = try container.decodeIfPresent(String.self, forKey: .command)
             ?? container.decodeIfPresent(String.self, forKey: .action)
             ?? "noop"
@@ -100,7 +100,7 @@ struct PetWidgetMetric: Identifiable, Codable, Equatable {
         self.id = try container.decodeIfPresent(String.self, forKey: .id) ?? UUID().uuidString
         self.name = try container.decodeIfPresent(String.self, forKey: .name)
             ?? container.decodeIfPresent(String.self, forKey: .key)
-            ?? "指标"
+            ?? "指标".appLocalized
         self.value = try container.decodeIfPresent(String.self, forKey: .value) ?? "-"
     }
 
@@ -356,17 +356,18 @@ enum PetWidgetSuggestionBuilder {
     }
 
     static func onboardingWidgets() -> [PetWidgetData] {
-        [defaultQuickOptions(title: "你想先聊哪一类呀？")]
+        [defaultQuickOptions(title: "你想先聊哪一类呀？".appLocalized)]
     }
 
-    private static func defaultQuickOptions(title: String = "喵，我准备了三种快捷方式：") -> PetWidgetData {
-        PetWidgetData(
+    private static func defaultQuickOptions(title: String? = nil) -> PetWidgetData {
+        let resolvedTitle = title ?? "喵，我准备了三种快捷方式：".appLocalized
+        return PetWidgetData(
             type: .quickOptions,
-            title: title,
+            title: resolvedTitle,
             options: [
-                PetWidgetOption(title: "A. 帮我搭一套", command: "outfit_suggest", icon: "wand.and.stars"),
-                PetWidgetOption(title: "B. 看天气穿搭", command: "weather_guidance", icon: "cloud.sun"),
-                PetWidgetOption(title: "C. 帮我找裙子", command: "search_prompt", icon: "magnifyingglass")
+                PetWidgetOption(title: "A. 帮我搭一套".appLocalized, command: "outfit_suggest", icon: "wand.and.stars"),
+                PetWidgetOption(title: "B. 看天气穿搭".appLocalized, command: "weather_guidance", icon: "cloud.sun"),
+                PetWidgetOption(title: "C. 帮我找裙子".appLocalized, command: "search_prompt", icon: "magnifyingglass")
             ]
         )
     }
@@ -374,11 +375,11 @@ enum PetWidgetSuggestionBuilder {
     private static func outfitQuickOptions() -> PetWidgetData {
         PetWidgetData(
             type: .quickOptions,
-            title: "继续细化一下穿搭方向吧：",
+            title: "继续细化一下穿搭方向吧：".appLocalized,
             options: [
-                PetWidgetOption(title: "A. 甜美约会", command: "ask:帮我搭配一套甜美约会风", icon: "heart"),
-                PetWidgetOption(title: "B. 通勤日常", command: "ask:帮我搭配一套通勤日常风", icon: "briefcase"),
-                PetWidgetOption(title: "C. 我有点焦虑，先聊聊", command: "mood_support", icon: "face.smiling")
+                PetWidgetOption(title: "A. 甜美约会".appLocalized, command: "ask:帮我搭配一套甜美约会风", icon: "heart"),
+                PetWidgetOption(title: "B. 通勤日常".appLocalized, command: "ask:帮我搭配一套通勤日常风", icon: "briefcase"),
+                PetWidgetOption(title: "C. 我有点焦虑，先聊聊".appLocalized, command: "mood_support", icon: "face.smiling")
             ]
         )
     }
@@ -386,11 +387,11 @@ enum PetWidgetSuggestionBuilder {
     private static func weatherQuickOptions() -> PetWidgetData {
         PetWidgetData(
             type: .quickOptions,
-            title: "根据天气我可以马上做这三件事：",
+            title: "根据天气我可以马上做这三件事：".appLocalized,
             options: [
-                PetWidgetOption(title: "A. 直接给我穿搭建议", command: "weather_guidance", icon: "umbrella"),
-                PetWidgetOption(title: "B. 只看雨天裙+鞋+伞", command: "weather_guidance", icon: "cloud.rain"),
-                PetWidgetOption(title: "C. 先安慰我一下", command: "mood_support", icon: "sparkles")
+                PetWidgetOption(title: "A. 直接给我穿搭建议".appLocalized, command: "weather_guidance", icon: "umbrella"),
+                PetWidgetOption(title: "B. 只看雨天裙+鞋+伞".appLocalized, command: "weather_guidance", icon: "cloud.rain"),
+                PetWidgetOption(title: "C. 先安慰我一下".appLocalized, command: "mood_support", icon: "sparkles")
             ]
         )
     }
