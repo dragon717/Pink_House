@@ -21481,6 +21481,42 @@
             "state" : "translated",
             "value" : "在貓咖被 rua，賺取少量魚幣，稍微有點累。"
           }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "猫カフェでなでられて、少しのさかなコインを稼ぎ、少し疲れます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "고양이 카페에서 쓰다듬받고 물고기 코인을 조금 벌지만 살짝 피곤해져요."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Se fait câliner au café-chat, gagne quelques pièces Poisson et fatigue un peu."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wird im Katzencafé gekuschelt, verdient ein paar Fischmünzen und wird etwas müde."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recibe mimos en el café gatuno, gana algunas monedas Pez y se cansa un poco."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recebe carinho no café de gatos, ganha algumas Moedas Peixe e fica um pouco cansado."
+          }
         }
       }
     },
@@ -21503,6 +21539,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "在線賣萌直播，賺取巨量魚幣，非常累！"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "オンラインでかわいさを配信し、たくさんのさかなコインを稼ぎますが、とても疲れます！"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "온라인에서 귀여움을 방송해 물고기 코인을 많이 벌지만 아주 피곤해져요!"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fait un live tout mignon, gagne beaucoup de pièces Poisson et se fatigue énormément !"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Streamt niedliche Momente online, verdient viele Fischmünzen und wird sehr müde!"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hace directos adorables, gana muchas monedas Pez y se cansa muchísimo."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Faz lives fofas, ganha muitas Moedas Peixe e fica muito cansado!"
           }
         }
       }
@@ -23814,6 +23886,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "寵物正在啃老，狀態消耗正常。"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ペットはのんびりしています。ステータス消耗は通常どおりです。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "펫이 쉬고 있어요. 상태 소모는 평소와 같아요."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Votre animal se repose tranquillement. Les stats baissent normalement."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dein Haustier lässt es ruhig angehen. Werte sinken normal."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tu mascota se lo toma con calma. Las estadísticas bajan con normalidad."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Seu pet está relaxando. Os status diminuem normalmente."
           }
         }
       }
@@ -37863,7 +37971,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "No"
+            "value" : "No earnings"
           }
         },
         "zh-Hans" : {
@@ -37876,6 +37984,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "無收益"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "収益なし"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "수익 없음"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucun gain"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keine Einnahmen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sin ganancias"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sem ganhos"
           }
         }
       }
@@ -44139,7 +44283,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "x %@"
+            "value" : "Drain x%@"
           }
         },
         "zh-Hans" : {
@@ -44152,6 +44296,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "消耗 x%@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "消耗 x%@"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "소모 x%@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dépense x%@"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Verbrauch x%@"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Consumo x%@"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Consumo x%@"
           }
         }
       }
@@ -59077,6 +59257,42 @@
             "state" : "translated",
             "value" : "負責巡邏抓老鼠，賺取大等魚幣，比較累。"
           }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "パトロールしてネズミを捕まえ、かなりのさかなコインを稼ぎますが、けっこう疲れます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "순찰하며 쥐를 잡고 물고기 코인을 꽤 벌지만 제법 피곤해져요."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Patrouille et attrape des souris, gagne pas mal de pièces Poisson et fatigue assez vite."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Patrouilliert und fängt Mäuse, verdient ordentlich Fischmünzen und wird recht müde."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Patrulla y atrapa ratones, gana bastantes monedas Pez y se cansa bastante."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Patrulha e pega ratos, ganha uma boa quantidade de Moedas Peixe e fica bem cansado."
+          }
         }
       }
     },
@@ -62204,6 +62420,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "選擇打工"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "仕事を選択"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "일 선택"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choisir un travail"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Arbeit wählen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Elegir trabajo"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Escolher trabalho"
           }
         }
       }
@@ -82365,6 +82617,64 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Parar %d"
+          }
+        }
+      }
+    },
+    "%d/分" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%d/min"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%d/分"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%d/分"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%d/分"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%d/분"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%d/min"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%d/Min."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%d/min"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%d/min"
           }
         }
       }
