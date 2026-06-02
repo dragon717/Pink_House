@@ -54,12 +54,12 @@ enum PetStatusPanelKind: CaseIterable {
 
     var title: String {
         switch self {
-        case .all: return "全部状态"
-        case .hunger: return "饱食"
-        case .hydration: return "饮水"
-        case .hygiene: return "清洁"
-        case .mood: return "心情"
-        case .intimacy: return "亲密度"
+        case .all: return "全部状态".appLocalized
+        case .hunger: return "饱食".appLocalized
+        case .hydration: return "饮水".appLocalized
+        case .hygiene: return "清洁".appLocalized
+        case .mood: return "心情".appLocalized
+        case .intimacy: return "亲密度".appLocalized
         }
     }
 

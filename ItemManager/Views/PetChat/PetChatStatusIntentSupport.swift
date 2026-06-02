@@ -58,8 +58,8 @@ func contextualStatusReply(
     sourceText: String?
 ) -> (message: String, subtitle: String?) {
     let defaultMessage = kind == .all
-        ? "这是我现在的全部状态。"
-        : "我把我的\(kind.title)单独拿出来给你看啦。"
+        ? "这是我现在的全部状态。".appLocalized
+        : "我把我的%@单独拿出来给你看啦。".appLocalized(kind.title)
 
     guard sourceText != nil else {
         return (defaultMessage, nil)
@@ -71,17 +71,17 @@ func contextualStatusReply(
         let subtitle: String
         switch status.hunger {
         case 75...:
-            summary = "我现在还挺有饱腹感的"
-            subtitle = "我现在不太饿，想让我继续稳稳的，可以先帮我备点吃的。"
+            summary = "我现在还挺有饱腹感的".appLocalized
+            subtitle = "我现在不太饿，想让我继续稳稳的，可以先帮我备点吃的。".appLocalized
         case 40..<75:
-            summary = "我有点想加餐啦"
-            subtitle = "我有一点点饿，点下面按钮就能马上喂我。"
+            summary = "我有点想加餐啦".appLocalized
+            subtitle = "我有一点点饿，点下面按钮就能马上喂我。".appLocalized
         default:
-            summary = "我真的有点饿啦，最好先让我吃一口"
-            subtitle = "我现在饱食偏低，先打开背包喂我，或者带我去商店补货都可以。"
+            summary = "我真的有点饿啦，最好先让我吃一口".appLocalized
+            subtitle = "我现在饱食偏低，先打开背包喂我，或者带我去商店补货都可以。".appLocalized
         }
         return (
-            "你这么一问我就懂啦，我先把我现在的饱食情况给你看看，\(summary)。",
+            "你这么一问我就懂啦，我先把我现在的饱食情况给你看看，%@。".appLocalized(summary),
             subtitle
         )
     case .hydration:
@@ -89,24 +89,24 @@ func contextualStatusReply(
         let subtitle: String
         switch status.energy {
         case 75...:
-            summary = "我现在的饮水状态还挺稳"
-            subtitle = "我现在不太渴，想提前照顾我也可以点下面按钮。"
+            summary = "我现在的饮水状态还挺稳".appLocalized
+            subtitle = "我现在不太渴，想提前照顾我也可以点下面按钮。".appLocalized
         case 40..<75:
-            summary = "我有点渴了"
-            subtitle = "我现在有点缺水，点下面就能马上给我补水。"
+            summary = "我有点渴了".appLocalized
+            subtitle = "我现在有点缺水，点下面就能马上给我补水。".appLocalized
         default:
-            summary = "我现在挺渴的，最好快点给我补水"
-            subtitle = "我现在饮水偏低，先打开背包喂我喝点东西吧。"
+            summary = "我现在挺渴的，最好快点给我补水".appLocalized
+            subtitle = "我现在饮水偏低，先打开背包喂我喝点东西吧。".appLocalized
         }
         return (
-            "这个你问得特别及时，我先把我现在的饮水情况给你看看，\(summary)。",
+            "这个你问得特别及时，我先把我现在的饮水情况给你看看，%@。".appLocalized(summary),
             subtitle
         )
     case .mood:
         if petChatShouldShowSleepyExpression(status: status) {
             return (
-                "我这会儿有点困困的，像在强撑着打哈欠。",
-                "我现在更需要休息或者放松一下，先别给我太强的刺激哦。"
+                "我这会儿有点困困的，像在强撑着打哈欠。".appLocalized,
+                "我现在更需要休息或者放松一下，先别给我太强的刺激哦。".appLocalized
             )
         }
 
@@ -114,20 +114,20 @@ func contextualStatusReply(
         let subtitle: String
         switch status.mood {
         case 80...:
-            summary = "我现在情绪很在线，整只都在发光"
-            subtitle = "我现在心情超好，正适合多夸夸我。"
+            summary = "我现在情绪很在线，整只都在发光".appLocalized
+            subtitle = "我现在心情超好，正适合多夸夸我。".appLocalized
         case 55..<80:
-            summary = "我状态还不错，就是有点想你多陪陪"
-            subtitle = "我整体心情还算稳定，陪我聊两句会更开心。"
+            summary = "我状态还不错，就是有点想你多陪陪".appLocalized
+            subtitle = "我整体心情还算稳定，陪我聊两句会更开心。".appLocalized
         case 30..<55:
-            summary = "我有点蔫蔫的，像在等你安慰"
-            subtitle = "我现在心情有点低，先陪我聊聊或者玩一会儿吧。"
+            summary = "我有点蔫蔫的，像在等你安慰".appLocalized
+            subtitle = "我现在心情有点低，先陪我聊聊或者玩一会儿吧。".appLocalized
         default:
-            summary = "我明显有点低落，最好先多关注我一下"
-            subtitle = "我现在心情不太好，先安慰我会更合适。"
+            summary = "我明显有点低落，最好先多关注我一下".appLocalized
+            subtitle = "我现在心情不太好，先安慰我会更合适。".appLocalized
         }
         return (
-            "我懂你在担心我，我先把我现在的心情摊开给你看，\(summary)。",
+            "我懂你在担心我，我先把我现在的心情摊开给你看，%@。".appLocalized(summary),
             subtitle
         )
     default:
