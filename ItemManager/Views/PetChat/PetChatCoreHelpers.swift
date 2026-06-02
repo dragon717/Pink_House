@@ -346,26 +346,26 @@ func buildOutfitContinuationWidget(for suggestion: OutfitSuggestionData) -> PetW
 
     var options = [
         PetWidgetOption(title: "+1", command: "ask:+1", icon: "plus.circle.fill"),
-        PetWidgetOption(title: "换一件", command: "ask:换一件", icon: "arrow.triangle.2.circlepath")
+        PetWidgetOption(title: "换一件".appLocalized, command: "ask:换一件", icon: "arrow.triangle.2.circlepath")
     ]
 
     if !hasTop {
         options.append(
-            PetWidgetOption(title: "加一件上衣", command: "ask:加一件上衣", icon: "sparkles")
+            PetWidgetOption(title: "加一件上衣".appLocalized, command: "ask:加一件上衣", icon: "sparkles")
         )
     } else if !hasOuterwear {
         options.append(
-            PetWidgetOption(title: "加一件轻薄开衫", command: "ask:加一件轻薄开衫", icon: "sparkles")
+            PetWidgetOption(title: "加一件轻薄开衫".appLocalized, command: "ask:加一件轻薄开衫", icon: "sparkles")
         )
     } else {
         options.append(
-            PetWidgetOption(title: "换个浅色小物", command: "ask:换一个浅色小物", icon: "sparkles")
+            PetWidgetOption(title: "换个浅色小物".appLocalized, command: "ask:换一个浅色小物", icon: "sparkles")
         )
     }
 
     return PetWidgetData(
         type: .quickOptions,
-        title: "继续这套搭配",
+        title: "继续这套搭配".appLocalized,
         options: options
     )
 }
@@ -378,10 +378,10 @@ func buildOutfitPriceSummary(clothings: [Clothing], detailLimit: Int = 6) -> Str
         return "\(item.name)(¥\(unitPrice))"
     }.joined(separator: "、")
 
-    let suffix = clothings.count > detailLimit ? "等\(clothings.count)件" : ""
+    let suffix = clothings.count > detailLimit ? "等%d件".appLocalized(clothings.count) : ""
     let total = clothings.reduce(Decimal(0)) { $0 + $1.unitTotalPrice }
     let totalText = NSDecimalNumber(decimal: total).stringValue
-    return "最近搭配：\(details)\(suffix)；合计¥\(totalText)"
+    return "最近搭配：%@%@；合计¥%@".appLocalized(details, suffix, totalText)
 }
 
 func shouldTreatAsOutfitPriceFollowUp(
