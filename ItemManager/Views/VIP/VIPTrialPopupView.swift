@@ -159,23 +159,23 @@ struct VIPTrialPopupView: View {
                     .font(.system(size: isCompactHeight ? 22 : 24, weight: .bold))
                     .foregroundStyle(accentColor)
 
-                Text("先体验 3 天 VIP")
+                Text("先体验 3 天 VIP".appLocalized)
                     .font(.system(size: isCompactHeight ? 22 : 24, weight: .bold))
                     .foregroundStyle(primaryTextColor)
 
-                Text("解锁智能能力、尊贵身份与会员优惠")
+                Text("解锁智能能力、尊贵身份与会员优惠".appLocalized)
                     .font(.system(size: 14, weight: .medium))
                     .foregroundStyle(secondaryTextColor)
                     .multilineTextAlignment(.center)
             }
 
             VStack(spacing: privilegesSpacing) {
-                privilegeRow(icon: "bubble.left.and.bubble.right.fill", text: "萌宠智能对话与多模态能力")
-                privilegeRow(icon: "crown.fill", text: "专属 VIP 身份与卡片皮肤")
-                privilegeRow(icon: "ticket.fill", text: "萌宠商店 \(VIPManager.petShopDiscountText)")
+                privilegeRow(icon: "bubble.left.and.bubble.right.fill", text: "萌宠智能对话与多模态能力".appLocalized)
+                privilegeRow(icon: "crown.fill", text: "专属 VIP 身份与卡片皮肤".appLocalized)
+                privilegeRow(icon: "ticket.fill", text: "萌宠商店 %@".appLocalized(VIPManager.petShopDiscountText))
             }
 
-            Text("体验结束后可继续兑换 1个月 / 3个月 会员时长")
+            Text("体验结束后可继续兑换 1个月 / 3个月 会员时长".appLocalized)
                 .font(.system(size: 12, weight: .medium))
                 .foregroundStyle(secondaryTextColor.opacity(0.76))
                 .multilineTextAlignment(.center)
@@ -189,7 +189,7 @@ struct VIPTrialPopupView: View {
                 } label: {
                     HStack(spacing: 8) {
                         Image(systemName: "sparkles")
-                        Text("确认体验")
+                        Text("确认体验".appLocalized)
                     }
                     .font(.system(size: 17, weight: .bold))
                     .foregroundStyle(isThemeSkinActive ? primaryTextColor : Color.black.opacity(0.92))
@@ -208,7 +208,7 @@ struct VIPTrialPopupView: View {
                 Button {
                     dismissPopup()
                 } label: {
-                    Text("稍后")
+                    Text("稍后".appLocalized)
                         .font(.system(size: 15, weight: .medium))
                         .foregroundStyle(secondaryTextColor)
                         .frame(maxWidth: .infinity)
