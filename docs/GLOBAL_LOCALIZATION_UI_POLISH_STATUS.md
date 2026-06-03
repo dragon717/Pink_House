@@ -1,6 +1,6 @@
 # 全局多语言与界面美化阶段状态
 
-更新日期：2026-06-02
+更新日期：2026-06-03
 
 ## 多语言推进状态
 
@@ -18,6 +18,17 @@
 | 编辑页购买与预约区域 | `c1921ea` | 已提交 | 购买、尾款、预约相关字段 | `xcodebuild` 通过 |
 | 梦裙日历基础界面 | `da45894` | 已提交 | 日历视图切换、日期、定金/尾款、近期列表 | `xcodebuild` 通过 |
 | 梦裙日历主题选择器 | `828e3d5` | 已提交 | 主题选择器固定文案、内置主题名展示 | `xcodebuild` 通过 |
+| VIP 试用弹窗 | `73cc868` | 已提交 | 试用弹窗标题、福利、倒计时、确认按钮 | `xcodebuild` 通过 |
+| 衣橱空态主题化 | `9c3aa8f` | 已提交 | 无衣物/筛选无结果空态、主题 empty surface、空态入口按钮 | `xcodebuild` 通过 |
+| 每日打卡界面壳层 | `3ae1449` | 已提交 | 打卡主页、周签到、分享卡、日历星期/月年、日期与计数字符串 | `xcodebuild` 通过 |
+
+## Subagent 最新盘点
+
+| Subagent | 分工 | 已完成/已验证 | 还没有做 | 需要重点优化 |
+|---|---|---|---|---|
+| Singer | DailyCheckIn 本地化审计 | 确认每日打卡主界面大部分固定文案已经接入 `.appLocalized`；本阶段已补齐分享加载、连续/累计天数、日期格式、星期/月年、分享卡等 27 个 key 的 9 语言覆盖 | 天气、季节、AI 生成的颜色/配饰等动态内容仍来自上游服务或模型输出 | 后续要把动态推荐内容的本地化责任前移到生成/存储层，避免 UI 层只翻壳不翻内容 |
+| James | VIP/IAP 购买链路审计 | 已提交 VIP 试用弹窗本地化，确认购买链路仍有多处用户可见文案未覆盖 | `VIPCenterView`、`MeowCoinStoreView`、`IAPViewModel`、`IAPError`、`StoreManager` 的成功/失败/协议/权益文案 | 下一个 P0 建议先做 VIP Center + 购买错误提示，避免上架多地区时支付链路仍露中文 |
+| Carson | 萌宠 prompt/fallback 审计 | 确认萌宠主页壳层已有多阶段提交，但 AI prompt 与 fallback 仍是主要漏点 | `PetGenerativePromptBuilder`、`PetPersonaProfile`、`PetConversationV2Support`、`VisionAnalysisService`、`OutfitSuggestionService`、`PetAIService`、`PetChatIntentRouter` | 重点拆分“给用户看的 fallback”和“给模型看的 prompt”，再按用户语言生成回复，避免 Humanizer/旧 prompt 把回复改回中文 |
 
 ## UI 美化盘点
 
