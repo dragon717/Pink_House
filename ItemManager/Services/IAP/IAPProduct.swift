@@ -65,7 +65,7 @@ enum IAPOfferCodeRedemption {
     }
 
     static func successMessage(for amount: Int) -> String {
-        "兑换成功！获得 \(amount) 喵币"
+        "兑换成功！获得 %d 喵币".appLocalized(amount)
     }
 }
 

@@ -322,8 +322,8 @@ class StoreManager: ObservableObject {
             )
             await publishPurchaseSuccess(
                 isFirstDouble
-                ? "🎉 首充双倍！获得 \(deliveredCoins) 喵币"
-                : "成功获得 \(deliveredCoins) 喵币",
+                ? "🎉 首充双倍！获得 %d 喵币".appLocalized(deliveredCoins)
+                : "成功获得 %d 喵币".appLocalized(deliveredCoins),
                 attemptID: attemptID,
                 source: "test_mode"
             )
@@ -431,7 +431,7 @@ class StoreManager: ObservableObject {
                     attemptID: attemptID,
                     productID: product.id
                 )
-                return .failed(.purchaseFailed("未知状态"))
+                return .failed(.purchaseFailed("未知状态".appLocalized))
             }
 
         } catch let error as Product.PurchaseError {
@@ -786,11 +786,11 @@ class StoreManager: ObservableObject {
 
         let successMessage: String
         if isFirstDouble {
-            successMessage = "🎉 首充双倍！获得 \(totalAmount) 喵币"
+            successMessage = "🎉 首充双倍！获得 %d 喵币".appLocalized(totalAmount)
         } else if bonus > 0 {
-            successMessage = "成功获得 \(totalAmount) 喵币（含赠送 \(bonus)）"
+            successMessage = "成功获得 %d 喵币（含赠送 %d）".appLocalized(totalAmount, bonus)
         } else {
-            successMessage = "成功获得 \(totalAmount) 喵币"
+            successMessage = "成功获得 %d 喵币".appLocalized(totalAmount)
         }
 
         // 更新用户喵币余额

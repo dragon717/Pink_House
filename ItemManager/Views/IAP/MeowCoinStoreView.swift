@@ -20,7 +20,7 @@ struct MeowCoinStoreView: View {
     @State private var showingOfferCodeInfoAlert = false
     @State private var showingOfferCodeRedemption = false
     @State private var showingOfferCodeErrorAlert = false
-    @State private var offerCodeErrorMessage = "暂时无法打开 App Store 优惠码兑换界面，请稍后重试。"
+    @State private var offerCodeErrorMessage = "暂时无法打开 App Store 优惠码兑换界面，请稍后重试。".appLocalized
 
     var body: some View {
         NavigationStack {
@@ -52,30 +52,30 @@ struct MeowCoinStoreView: View {
                     }
                 }
             }
-            .navigationTitle("获取喵币")
+            .navigationTitle("获取喵币".appLocalized)
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
-                    Button("问题反馈") {
+                    Button("问题反馈".appLocalized) {
                         exportDiagnostics()
                     }
                     .disabled(isPreparingDiagnosticFeedback)
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("完成") {
+                    Button("完成".appLocalized) {
                         dismiss()
                     }
                 }
             }
-            .alert("购买失败", isPresented: $viewModel.showErrorAlert) {
-                Button("确定") {
+            .alert("购买失败".appLocalized, isPresented: $viewModel.showErrorAlert) {
+                Button("确定".appLocalized) {
                     viewModel.dismissErrorAlert()
                 }
             } message: {
                 Text(viewModel.errorMessage)
             }
-            .alert("问题反馈", isPresented: $showDiagnosticAlert) {
-                Button("确定", role: .cancel) {
+            .alert("问题反馈".appLocalized, isPresented: $showDiagnosticAlert) {
+                Button("确定".appLocalized, role: .cancel) {
                     if shouldOpenDiagnosticShareAfterAlert {
                         shouldOpenDiagnosticShareAfterAlert = false
                         showDiagnosticShareSheet = true
@@ -84,18 +84,18 @@ struct MeowCoinStoreView: View {
             } message: {
                 Text(diagnosticAlertMessage)
             }
-            .alert("使用 App Store 兑换码", isPresented: $showingOfferCodeInfoAlert) {
-                Button("取消", role: .cancel) { }
-                Button("继续") {
+            .alert("使用 App Store 兑换码".appLocalized, isPresented: $showingOfferCodeInfoAlert) {
+                Button("取消".appLocalized, role: .cancel) { }
+                Button("继续".appLocalized) {
                     Task {
                         await prepareAndShowOfferCodeRedemption()
                     }
                 }
             } message: {
-                Text("请输入官方 App Store 优惠码。")
+                Text("请输入官方 App Store 优惠码。".appLocalized)
             }
-            .alert("App Store 兑换码", isPresented: $showingOfferCodeErrorAlert) {
-                Button("知道了", role: .cancel) { }
+            .alert("App Store 兑换码".appLocalized, isPresented: $showingOfferCodeErrorAlert) {
+                Button("知道了".appLocalized, role: .cancel) { }
             } message: {
                 Text(offerCodeErrorMessage)
             }
@@ -131,7 +131,7 @@ struct MeowCoinStoreView: View {
                         )
                     }
                     StoreManager.shared.cancelOfferCodeRedemptionSession(reason: "meow_coin_store_redemption_failed: \(error.localizedDescription)")
-                    offerCodeErrorMessage = "无法打开 App Store 优惠码兑换界面：\(error.localizedDescription)"
+                    offerCodeErrorMessage = "无法打开 App Store 优惠码兑换界面：%@".appLocalized(error.localizedDescription)
                     showingOfferCodeErrorAlert = true
                 } else {
                     Task {
@@ -167,7 +167,7 @@ struct MeowCoinStoreView: View {
                 .shadow(color: .yellow.opacity(0.3), radius: 10, x: 0, y: 5)
 
             VStack(spacing: 8) {
-                Text("当前余额")
+                Text("当前余额".appLocalized)
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
 
@@ -175,7 +175,7 @@ struct MeowCoinStoreView: View {
                     .font(.system(size: 48, weight: .bold, design: .rounded))
                     .foregroundStyle(.primary)
 
-                Text("喵币")
+                Text("喵币".appLocalized)
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -204,7 +204,7 @@ struct MeowCoinStoreView: View {
     private var coinPurchaseSection: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
-                Text("获取喵币")
+                Text("获取喵币".appLocalized)
                     .font(.title2.bold())
 
                 Spacer()
@@ -249,7 +249,7 @@ struct MeowCoinStoreView: View {
     // MARK: - App Store 兑换码入口
     private var offerCodeSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("App Store 优惠码")
+            Text("App Store 优惠码".appLocalized)
                 .font(.title2.bold())
                 .padding(.horizontal)
 
@@ -267,11 +267,11 @@ struct MeowCoinStoreView: View {
                         )
 
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("兑换 App Store 优惠码")
+                        Text("兑换 App Store 优惠码".appLocalized)
                             .font(.headline)
                             .foregroundStyle(.primary)
 
-                        Text("支持 6 个喵币档优惠码，不影响首充双倍")
+                        Text("支持 6 个喵币档优惠码，不影响首充双倍".appLocalized)
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                     }
@@ -297,7 +297,7 @@ struct MeowCoinStoreView: View {
     private var vipExchangeHintSection: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
-                Text("VIP会员")
+                Text("VIP会员".appLocalized)
                     .font(.title2.bold())
 
                 Spacer()
@@ -306,7 +306,7 @@ struct MeowCoinStoreView: View {
                     HStack(spacing: 4) {
                         Image(systemName: "crown.fill")
                             .font(.caption)
-                        Text("已开通")
+                        Text("已开通".appLocalized)
                             .font(.caption.bold())
                     }
                     .foregroundStyle(.yellow)
@@ -321,21 +321,21 @@ struct MeowCoinStoreView: View {
             .padding(.horizontal)
 
             if viewModel.isVIP, let expireDate = viewModel.vipExpireDate {
-                Text("有效期至: \(expireDate.formatted(date: .long, time: .omitted))")
+                Text("有效期至: %@".appLocalized(expireDate.formatted(date: .long, time: .omitted)))
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .padding(.horizontal)
             }
 
             VStack(alignment: .leading, spacing: 12) {
-                Label("VIP 不单独售卖", systemImage: "info.circle.fill")
+                Label("VIP 不单独售卖".appLocalized, systemImage: "info.circle.fill")
                     .font(.headline)
 
-                Text("先购买喵币，再前往会员中心兑换会员时长。")
+                Text("先购买喵币，再前往会员中心兑换会员时长。".appLocalized)
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
 
-                Text("当前兑换价格：66 喵币 / 月")
+                Text("当前兑换价格：66 喵币 / 月".appLocalized)
                     .font(.subheadline.bold())
                     .foregroundStyle(.primary)
             }
@@ -351,26 +351,26 @@ struct MeowCoinStoreView: View {
     // MARK: - 服务协议
     private var termsSection: some View {
         VStack(spacing: 8) {
-            Text("由于虚拟商品的特殊性，购买成功后不支持退款")
+            Text("由于虚拟商品的特殊性，购买成功后不支持退款".appLocalized)
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
 
             HStack(spacing: 4) {
-                Text("购买即表示同意")
+                Text("购买即表示同意".appLocalized)
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
-                Button("用户服务协议") {
+                Button("用户服务协议".appLocalized) {
                     openExternalURL(LegalLinks.userAgreementURL)
                 }
                 .font(.caption)
 
-                Text("和")
+                Text("和".appLocalized)
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
-                Button("隐私政策") {
+                Button("隐私政策".appLocalized) {
                     openExternalURL(LegalLinks.privacyURL)
                 }
                 .font(.caption)
@@ -398,7 +398,7 @@ struct MeowCoinStoreView: View {
             )
             showingOfferCodeRedemption = true
         } else {
-            offerCodeErrorMessage = "当前 App Store 环境没有返回任何可兑换的喵币商品，优惠码无法兑换。请检查 6 个喵币档是否可用、每个 Free Offer 是否绑定对应商品；沙盒账号只能测试 Sandbox Codes，不能兑换生产环境 URL / Custom / One-Time Use Codes。"
+            offerCodeErrorMessage = "当前 App Store 环境没有返回任何可兑换的喵币商品，优惠码无法兑换。请检查 6 个喵币档是否可用、每个 Free Offer 是否绑定对应商品；沙盒账号只能测试 Sandbox Codes，不能兑换生产环境 URL / Custom / One-Time Use Codes。".appLocalized
             showingOfferCodeErrorAlert = true
         }
     }
@@ -449,7 +449,7 @@ struct MeowCoinStoreView: View {
 
                     await MainActor.run {
                         diagnosticShareItems = [exportedURL]
-                        diagnosticAlertMessage = "当前设备没有配置系统邮件账户，已改为打开文件分享。请将日志文件发送给开发者邮箱：\(LegalLinks.supportEmailAddress)"
+                        diagnosticAlertMessage = "当前设备没有配置系统邮件账户，已改为打开文件分享。请将日志文件发送给开发者邮箱：%@".appLocalized(LegalLinks.supportEmailAddress)
                         shouldOpenDiagnosticShareAfterAlert = true
                         showDiagnosticAlert = true
                         isPreparingDiagnosticFeedback = false
@@ -464,7 +464,7 @@ struct MeowCoinStoreView: View {
                 )
 
                 await MainActor.run {
-                    diagnosticAlertMessage = "问题反馈日志导出失败：\(error.localizedDescription)"
+                    diagnosticAlertMessage = "问题反馈日志导出失败：%@".appLocalized(error.localizedDescription)
                     shouldOpenDiagnosticShareAfterAlert = false
                     showDiagnosticAlert = true
                     isPreparingDiagnosticFeedback = false
@@ -474,11 +474,13 @@ struct MeowCoinStoreView: View {
     }
 
     private var diagnosticMailSubject: String {
-        "Pink House IAP 问题反馈"
+        "Pink House IAP 问题反馈".appLocalized
     }
 
     private var diagnosticMailBody: String {
-        """
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "unknown"
+        let build = Bundle.main.object(forInfoDictionaryKey: kCFBundleVersionKey as String) as? String ?? "unknown"
+        return """
         你好，开发者：
 
         我遇到了应用内购买问题，已自动附带 IAP 诊断日志文件。
@@ -490,8 +492,8 @@ struct MeowCoinStoreView: View {
         - 实际结果：
         - 期望结果：
 
-        当前应用版本：\(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "unknown") (\(Bundle.main.object(forInfoDictionaryKey: kCFBundleVersionKey as String) as? String ?? "unknown"))
-        """
+        当前应用版本：%@ (%@)
+        """.appLocalized(version, build)
     }
 
     private func handleDiagnosticMailResult(result: MFMailComposeResult, error: Error?) {
@@ -511,7 +513,7 @@ struct MeowCoinStoreView: View {
         }
 
         if let error {
-            diagnosticAlertMessage = "邮件草稿打开失败：\(error.localizedDescription)"
+            diagnosticAlertMessage = "邮件草稿打开失败：%@".appLocalized(error.localizedDescription)
             shouldOpenDiagnosticShareAfterAlert = false
             showDiagnosticAlert = true
         }
@@ -551,11 +553,11 @@ struct FirstDoubleBanner: View {
                         .foregroundStyle(.yellow)
 
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("🎉 首充双倍活动")
+                        Text("🎉 首充双倍活动".appLocalized)
                             .font(.headline.bold())
                             .foregroundStyle(.primary)
 
-                        Text("首次购买任意档位，喵币数量翻倍！")
+                        Text("首次购买任意档位，喵币数量翻倍！".appLocalized)
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                     }
@@ -606,7 +608,7 @@ struct CoinProductCard: View {
                 // 标签区域
                 HStack(alignment: .top) {
                     if hasFirstDouble {
-                        Text("首充双倍")
+                        Text("首充双倍".appLocalized)
                             .font(.caption2.bold())
                             .foregroundStyle(.white)
                             .padding(.horizontal, 8)
@@ -726,11 +728,11 @@ struct EmptyProductPlaceholder: View {
                 .font(.system(size: 48))
                 .foregroundStyle(.secondary)
 
-            Text("暂时无法获取商品信息")
+            Text("暂时无法获取商品信息".appLocalized)
                 .font(.headline)
                 .foregroundStyle(.secondary)
 
-            Text("请检查网络连接或稍后重试")
+            Text("请检查网络连接或稍后重试".appLocalized)
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
         }

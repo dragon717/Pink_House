@@ -59,7 +59,7 @@ class IAPViewModel: ObservableObject {
             .sink { [weak self] error in
                 if let error = error {
                     self?.showErrorAlert = true
-                    self?.errorMessage = error.errorDescription ?? "购买失败"
+                    self?.errorMessage = error.errorDescription ?? "购买失败".appLocalized
                 }
             }
             .store(in: &cancellables)
@@ -143,7 +143,7 @@ class IAPViewModel: ObservableObject {
 
         guard canMakePurchases else {
             showErrorAlert = true
-            errorMessage = "当前设备或账户无法发起购买，请检查系统购买限制后重试。"
+            errorMessage = "当前设备或账户无法发起购买，请检查系统购买限制后重试。".appLocalized
             await IAPDiagnosticStore.shared.record(
                 category: .flow,
                 name: "purchase_blocked_cannot_make_payments",
@@ -156,7 +156,7 @@ class IAPViewModel: ObservableObject {
 
         guard let storeProduct = storeManager.coinProducts.first(where: { $0.id == product.id }) else {
             showErrorAlert = true
-            errorMessage = "商品信息已过期，请刷新重试"
+            errorMessage = "商品信息已过期，请刷新重试".appLocalized
             await IAPDiagnosticStore.shared.record(
                 category: .flow,
                 name: "purchase_store_product_missing",
@@ -189,7 +189,7 @@ class IAPViewModel: ObservableObject {
         case .pending:
             activePurchaseAttemptID = nil
             showSuccessToast = true
-            successMessage = "购买请求已提交，正在等待 App Store 处理。到账后会自动更新余额。"
+            successMessage = "购买请求已提交，正在等待 App Store 处理。到账后会自动更新余额。".appLocalized
             Task {
                 await IAPDiagnosticStore.shared.record(
                     category: .flow,
@@ -215,7 +215,7 @@ class IAPViewModel: ObservableObject {
         case .failed(let error):
             activePurchaseAttemptID = nil
             showErrorAlert = true
-            errorMessage = error.errorDescription ?? "购买失败"
+            errorMessage = error.errorDescription ?? "购买失败".appLocalized
             Task {
                 await IAPDiagnosticStore.shared.record(
                     category: .flow,
@@ -324,27 +324,27 @@ struct MeowCoinProductDisplay: Identifiable {
 
     var displayTitle: String {
         if bonusAmount > 0 {
-            return "\(totalCoins) 喵币"
+            return "%d 喵币".appLocalized(totalCoins)
         } else {
-            return "\(coinAmount) 喵币"
+            return "%d 喵币".appLocalized(coinAmount)
         }
     }
 
     var baseTitle: String {
-        "\(coinAmount) 喵币"
+        "%d 喵币".appLocalized(coinAmount)
     }
 
     var firstDoubleTitle: String {
-        "\(firstDoubleCoins) 喵币"
+        "%d 喵币".appLocalized(firstDoubleCoins)
     }
 
     var subtitle: String {
         if isBestValue {
-            return "最划算"
+            return "最划算".appLocalized
         } else if isPopular {
-            return "热门"
+            return "热门".appLocalized
         } else if bonusAmount > 0 {
-            return "送 \(bonusAmount)"
+            return "送 %d".appLocalized(bonusAmount)
         } else {
             return ""
         }
@@ -369,8 +369,8 @@ struct MeowCoinProductDisplay: Identifiable {
             self.isPopular = false
             self.isBestValue = false
             self.tag = "+10%"
-            self.packageName = "喵币小钱包"
-            self.packageDescription = "一只轻巧的小钱包，装着 60 喵币，适合先给小猫添一点零花。"
+            self.packageName = "喵币小钱包".appLocalized
+            self.packageDescription = "一只轻巧的小钱包，装着 60 喵币，适合先给小猫添一点零花。".appLocalized
             self.assetName = "meowcoin_60"
         case .meowCoin120:
             // 12元档：首次240，之后132（+10%）
@@ -379,8 +379,8 @@ struct MeowCoinProductDisplay: Identifiable {
             self.isPopular = false
             self.isBestValue = false
             self.tag = "+10%"
-            self.packageName = "喵币零食袋"
-            self.packageDescription = "一袋鼓鼓的零食袋，装着 120 喵币，刚好够添几样喜欢的小东西。"
+            self.packageName = "喵币零食袋".appLocalized
+            self.packageDescription = "一袋鼓鼓的零食袋，装着 120 喵币，刚好够添几样喜欢的小东西。".appLocalized
             self.assetName = "meowcoin_120"
         case .meowCoin300:
             // 30元档：首次600，之后330（+10%）
@@ -389,8 +389,8 @@ struct MeowCoinProductDisplay: Identifiable {
             self.isPopular = false
             self.isBestValue = false
             self.tag = "+10%"
-            self.packageName = "喵币鼓鼓袋"
-            self.packageDescription = "一袋沉甸甸的鼓鼓袋，装着 300 喵币，花起来更从容一些。"
+            self.packageName = "喵币鼓鼓袋".appLocalized
+            self.packageDescription = "一袋沉甸甸的鼓鼓袋，装着 300 喵币，花起来更从容一些。".appLocalized
             self.assetName = "meowcoin_300"
         case .meowCoin500:
             // 50元档：首次1000，之后575（+15%）
@@ -398,9 +398,9 @@ struct MeowCoinProductDisplay: Identifiable {
             self.bonusAmount = 75
             self.isPopular = true
             self.isBestValue = false
-            self.tag = "热门"
-            self.packageName = "喵币小宝箱"
-            self.packageDescription = "一只满满当当的小宝箱，装着 500 喵币，拿在手里都觉得底气足。"
+            self.tag = "热门".appLocalized
+            self.packageName = "喵币小宝箱".appLocalized
+            self.packageDescription = "一只满满当当的小宝箱，装着 500 喵币，拿在手里都觉得底气足。".appLocalized
             self.assetName = "meowcoin_500"
         case .meowCoin1280:
             // 128元档：首次2560，之后1600（+25%）
@@ -408,9 +408,9 @@ struct MeowCoinProductDisplay: Identifiable {
             self.bonusAmount = 320
             self.isPopular = false
             self.isBestValue = true
-            self.tag = "最划算"
-            self.packageName = "喵币大宝箱"
-            self.packageDescription = "一个闪闪发亮的大宝箱，装着 1280 喵币，一开箱就是满满收获。"
+            self.tag = "最划算".appLocalized
+            self.packageName = "喵币大宝箱".appLocalized
+            self.packageDescription = "一个闪闪发亮的大宝箱，装着 1280 喵币，一开箱就是满满收获。".appLocalized
             self.assetName = "mcoin_1280"
         case .meowCoin3280:
             // 328元档：首次6560，之后4428（+35%）
@@ -419,8 +419,8 @@ struct MeowCoinProductDisplay: Identifiable {
             self.isPopular = false
             self.isBestValue = false
             self.tag = "+35%"
-            self.packageName = "喵币藏宝库入场券"
-            self.packageDescription = "一座堆得满满的藏宝库，装着 3280 喵币，想把一整片钱袋都搬回家。"
+            self.packageName = "喵币藏宝库入场券".appLocalized
+            self.packageDescription = "一座堆得满满的藏宝库，装着 3280 喵币，想把一整片钱袋都搬回家。".appLocalized
             self.assetName = "mcoin_3280"
         default:
             self.coinAmount = 0

@@ -42,47 +42,47 @@ enum IAPError: Error, LocalizedError, Equatable {
     var errorDescription: String? {
         switch self {
         case .productNotFound:
-            return "商品暂时不可用"
+            return "商品暂时不可用".appLocalized
         case .productRequestFailed:
-            return "获取商品信息失败"
+            return "获取商品信息失败".appLocalized
         case .invalidProductID:
-            return "无效的商品"
+            return "无效的商品".appLocalized
         case .purchaseFailed:
-            return "购买失败，请重试"
+            return "购买失败，请重试".appLocalized
         case .purchasePending:
-            return "购买等待中，请稍后查看"
+            return "购买等待中，请稍后查看".appLocalized
         case .purchaseCancelled:
-            return "已取消购买"
+            return "已取消购买".appLocalized
         case .purchaseNotAllowed:
-            return "当前无法购买"
+            return "当前无法购买".appLocalized
         case .paymentInvalid:
-            return "支付信息无效"
+            return "支付信息无效".appLocalized
         case .verificationFailed:
-            return "交易验证失败"
+            return "交易验证失败".appLocalized
         case .serverVerificationFailed:
-            return "服务器验证失败"
+            return "服务器验证失败".appLocalized
         case .receiptNotFound:
-            return "找不到购买凭证"
+            return "找不到购买凭证".appLocalized
         case .invalidReceipt:
-            return "购买凭证无效"
+            return "购买凭证无效".appLocalized
         case .alreadyProcessed:
-            return "该订单已处理"
+            return "该订单已处理".appLocalized
         case .networkError:
-            return "网络连接失败"
+            return "网络连接失败".appLocalized
         case .serverError:
-            return "服务器繁忙"
+            return "服务器繁忙".appLocalized
         case .timeout:
-            return "请求超时"
+            return "请求超时".appLocalized
         case .notAuthenticated:
-            return "请先登录"
+            return "请先登录".appLocalized
         case .accountRestricted:
-            return "账户受限"
+            return "账户受限".appLocalized
         case .storeKitError(let error):
             return error.localizedDescription
         case .unknown:
-            return "发生未知错误"
+            return "发生未知错误".appLocalized
         case .systemError:
-            return "系统错误"
+            return "系统错误".appLocalized
         }
     }
 
@@ -167,13 +167,13 @@ enum IAPError: Error, LocalizedError, Equatable {
     static func from(purchaseError: Product.PurchaseError) -> IAPError {
         switch purchaseError {
         case .invalidQuantity:
-            return .purchaseFailed("无效的数量")
+            return .purchaseFailed("无效的数量".appLocalized)
         case .productUnavailable:
             return .productNotFound("")
         case .purchaseNotAllowed:
             return .purchaseNotAllowed
         @unknown default:
-            return .purchaseFailed("未知购买错误")
+            return .purchaseFailed("未知购买错误".appLocalized)
         }
     }
 
