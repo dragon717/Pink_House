@@ -29,22 +29,25 @@
 | 衣橱统计详情 | `a5952bd` | 已提交 | 统计详情导航/筛选摘要、总览/标签/心愿尾款/购买时间标题、金额/百分比格式 key、月份 label、图表轴标题；补齐 9 语言 | `xcodebuild` 通过 |
 | Home 筛选与菜单入口 | `b1da749` | 已提交 | 经典筛选清除/无标签/无品牌/无类型等展示名、字段名、更多/新增菜单、引导菜单 overlay、社区导入提示；保留 sentinel/rawValue/用户数据 | `xcodebuild` 通过 |
 | 功能解锁提示 | `8e48603` | 已提交 | Home/批量导入/FeatureUnlockButton 解锁 alert、条件描述、进度 message、MagicTasks/MagicColor/FeatureUnlockSettings/小屋/尾款入口条件展示；保留 Codable description 和测试页 | `xcodebuild` 通过（临时源码快照） |
+| VIP 图标与卡片动态名称 | `e582e6c` | 已提交 | VIPAppIcon option 名称/副标题/badge、切换结果消息、VIPCardStyle displayName、卡片皮肤 hint、VIP 卡片角标；保留 rawValue/option id/alternateIconName | `xcodebuild` 通过（临时源码快照） |
 
 ## Subagent 最新盘点
 
 | Subagent | 分工 | 已完成/已验证 | 还没有做 | 需要重点优化 |
 |---|---|---|---|---|
 | Peirce | Home 顶栏/筛选/菜单审计 | 确认 `SortOption`、`ViewLayout`、`ClothingField` rawValue 都是持久化/偏好边界，不能直接改；顶栏排序/布局、搜索 prompt、经典筛选、更多/新增菜单和 Home 解锁 alert 已落地 | 测试页 `condition.description` 暂按测试页后置；Home 其它深层动态文案继续滚动审计 | 后续继续避免改 rawValue/sentinel；Home 不再把解锁 alert 列为 P0 阻塞 |
-| Hubble | VIP 子页审计 | 确认 VIP Center 主体已完成；子页主要漏点是动态 `Text(String)` 不会走自定义语言 | `VIPVisualSystem.displayHint(for:)`、`VIPCardSkinSelectionView`、`VIPCardView` tag、`VIPAppIconSelectionView`、`VIPAppIconManager` option/result message | 先拆“卡片皮肤选择页”，再拆“桌面图标选择页”；动态名称用 localized helper，不把插值中文写进 alert |
+| Hubble | VIP 子页审计 | 确认 VIP Center 主体已完成；`VIPVisualSystem.displayHint(for:)`、`VIPCardSkinSelectionView`、`VIPCardView` tag、`VIPAppIconSelectionView`、`VIPAppIconManager` option/result message 已按 `e582e6c` 落地 | VIP 子页仍可继续复核低频 literal 与 IAP 价格/权益边界 | 动态名称已完成；后续 VIP/IAP 转向价格、权益和低频购买/兑换失败态复核 |
 | Euclid | 萌宠 prompt/fallback 最小切片选择 | 从 P0 prompt/fallback 候选中确认 `PetPersonaProfile.swift` 是最小且收益最高的第一刀 | PromptBuilder marker、PetAIService system prompt、Vision/Outfit prompt、IntentRouter command payload 仍后置 | 下一刀萌宠建议只做 `PetPersonaProfile`：prompt 字段走 `ai.prompt.*`，用户 fallback 走 `pet.chat.fallback.*`，不要混改 marker/JSON/command |
 | Nietzsche | 衣橱统计详情审计 | P0 本地化已按 `a5952bd` 落地：导航/筛选栏、概览、标签表头/占比、心愿尾款、购买时间标题、月份/坐标轴、金额/百分比格式 key | 统计图表硬编码色、标签无数据空态 surface、金额货币地区化仍需 P1/P2 处理 | 下一步不再把统计详情列为 P0 文案阻塞；后续走 UI 主题色/空态专项 |
 | Meitner | 修改/编辑页表单审计 | 确认 `ClothingEditSections` 主表单大多已通过组件内部本地化；`未到货`/`待付尾款` 是存储语义，UI 已局部本地化，不能直接改语义值 | 精确 key `裙装名称` 缺失；`¥ %.2f`、`¥%.2f`、`1 CNY = ... JPY` 等币种/汇率格式仍需单独 formatter 切片 | 编辑页 P0 补缺失字段 key；金额/汇率放到后续格式化治理，不和表单文案混改 |
 | Cicero | Home 剩余 P0 审计 | 普通 UI 菜单/经典筛选已按 `b1da749` 落地；`FeatureUnlockManager.localizedDescription`、状态消息、Home/批量导入解锁 alert 已按 `8e48603` 落地；`FilterMode`、noTag/noBrand/noType sentinel 和 `@AppStorage` rawValue 未改 | 测试页与低频开发/内测提示继续后置；仍需滚动扫 Home 新增入口 | Home P0 当前可降级为跟踪项；下一刀转向 VIP 动态名称或编辑页精确缺 key |
 | Anscombe | 萌宠 prompt/fallback 审计 | 明确 P0 不动 prompt marker、JSON schema、command 白名单；用户可见 fallback 和 humanizer 文案要先做 | S1 用户可见兜底、S2 Vision 展示文案、S3 Outfit 展示/错误文案、S4 intent/search payload 显示与 command 分离、S5 AI prompt 多语言化 | 下一刀萌宠从 S1 开始：`warmthSuffixes`、`PetAIService` 低频 fallback、`PetResponseHumanizer`、消歧标题；不要翻译 `ask:` 前缀和 command id |
-| Goodall | VIP 子页复核 | 确认 P0 集中在变量 `String`/模型字段/动态 result message，而不是纯 literal；`VIPAppIconManager` option 文案与 apply result、`VIPVisualSystem.displayHint(for:)`、`VIPCardStyle.displayName` 是最高收益切片 | VIPCardView tag、VIPAppIconSelectionView 三元文案/按钮、VIPCardSkinSelectionView 纯 literal 仍需 P1 显式化和翻译校对 | 先做“VIP 图标与卡片皮肤动态名称”P0，动态名称用 localized helper，不把插值中文写进 alert |
+| Goodall | VIP 子页复核 | 确认 P0 集中在变量 `String`/模型字段/动态 result message；最高收益切片已按 `e582e6c` 完成，插值消息用 localized helper | VIPCardSkinSelectionView 和 VIPAppIconSelectionView 仍可做低频 literal/翻译校对；IAP 失败态需另行扫 | VIP 动态名称不再是 P0 阻塞；下一刀转 DepositPlan 或萌宠 fallback |
 | Schrodinger | 编辑/品牌标签复核 | 确认品牌/标签壳层和删除确认 key 基本已有；用户 brand/tag/option 不应本地化；存储 rawValue 不动 | P0 最明确缺口是 `ClothingEditSections` 的 `裙装名称` key；价格/汇率展示、toast 参数和汇率服务错误需要独立格式化切片 | 下一刀编辑页可先补 `裙装名称` key；金额/汇率另开 formatter，不和品牌/标签管理混改 |
 | Lorentz | 详情/分享/查看器 P1 审计 | 确认详情页主体验不再是 P0 文案阻塞；剩余高收益点集中在 viewer 保存结果、分享卡 chrome、分享卡内容 label | `ImageViewer`/`ChartImageViewer` 的保存结果变量、`ShareCardManager` 的分享标题/准备中/按钮、`ClothingShareCardView` 的 `型色` key 未做 | 先做 viewer 保存结果，再做分享卡 chrome，最后补分享卡内容 label；用户输入/品牌/衣物状态值不翻译 |
 | Huygens | 日历/打卡 P0 审计 | 已派发；本轮两次 `wait_agent` 未返回最终结果，随后关闭，前置状态为 running | 未产出可采纳审计结论，暂不据此改代码或调整优先级 | 下轮重新派发或恢复同类审计，再决定每日打卡/日历是否还有 P0 切片 |
+| Descartes | 日历/打卡 P0 审计 | 确认 `DailyCheckInView` 主 UI 基本已覆盖；梦裙日历只剩少量尾巴；P0 最大口子在 DepositPlan 月/系列/通知提醒 | `DepositPlanView/Components`、`MonthSelectorView`、`SeriesSelectorView`、`DepositNotificationView` 缺 6 语和 month/year/time formatter；每日内容生成语言仍需独立切片 | 下一刀 P0 推荐 `DepositPlanView + Components + MonthSelector + SeriesSelector`，再做通知页；rawValue/日期存储 key 不动 |
+| Sartre | 萌宠 fallback/prompt 审计 | 确认 P0 是用户可见 fallback/humanizer 与会生成并同步用户内容的每日 prompt；协议字段和 command id 不翻译 | `PetAIService` 空回复/错误 fallback、`PetPersonaProfile.warmthSuffixes`、`PetResponseHumanizer`、PetChat/Legacy、DailyGreeting/DailyCheckIn 内容生成仍需切片 | 下一刀先做用户可见 fallback，再做每日 AI prompt；`ask:`、command id、JSON schema 和存储字段保持稳定 |
 
 ## UI 美化盘点
 
@@ -63,8 +66,9 @@
 
 ## 下一阶段建议
 
-1. 代码主线继续补 P0 本地化：优先 VIP 图标/卡片皮肤动态名称、编辑页 `裙装名称` key；Home 解锁 alert/条件 formatter 已完成。
-2. 详情页 P1 可接 Lorentz 建议：先 viewer 保存结果，再分享卡 chrome，最后补分享卡内容 label。
-3. 萌宠国际化单独开 P0 prompt/fallback 线：先处理 S1 用户可见兜底，再做 Vision/Outfit 展示文案；PromptBuilder/PetAIService system prompt 和 JSON/command marker 放最后。
-4. UI 美化先从衣橱 P0 开刀：无衣物/筛选无结果空态已完成，下一步复核窄网格 pill 溢出与统计图表主题色。
-5. 小屋美化排 P1：先补素材缺失空态，再处理萌宠/大世界子页的主题按钮与提示面板统一。
+1. 代码主线继续补 P0 本地化：优先 `DepositPlanView + DepositPlanComponents + MonthSelectorView + SeriesSelectorView`，同时修 month/year formatter；VIP 动态名称和 Home 解锁已完成。
+2. 萌宠国际化下一刀按 Sartre 建议先做用户可见 fallback/humanizer：`PetAIService`、`PetPersonaProfile.warmthSuffixes`、`PetResponseHumanizer`，再扩到 PetChat/Legacy。
+3. 详情页 P1 可接 Lorentz 建议：先 viewer 保存结果，再分享卡 chrome，最后补分享卡内容 label。
+4. 编辑页 P0 仍保留精确小切片：补 `裙装名称` key；金额/汇率另开 formatter。
+5. UI 美化先从衣橱 P0 开刀：无衣物/筛选无结果空态已完成，下一步复核窄网格 pill 溢出与统计图表主题色。
+6. 小屋美化排 P1：先补素材缺失空态，再处理萌宠/大世界子页的主题按钮与提示面板统一。
