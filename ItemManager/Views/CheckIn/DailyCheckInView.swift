@@ -174,7 +174,7 @@ struct DailyCheckInView: View {
                 ProgressView()
                     .scaleEffect(0.8)
             } else if let greeting = greetingManager.currentGreeting,
-                      let firstMessage = greeting.messages.first {
+                      let firstMessage = greeting.localizedMessages.first {
                 Text(firstMessage)
                     .font(.system(size: 18, weight: .medium))
                     .foregroundColor(.primary)

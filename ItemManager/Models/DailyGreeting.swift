@@ -66,15 +66,22 @@ struct DailyGreeting: Codable, Identifiable {
     let messages: [String] // 3条问候语，带•符号
     let source: String // 来源：cloudkit/ai/local
     let createdAt: Date
+
+    var localizedMessages: [String] {
+        guard source == "local" else { return messages }
+        return messages.map { $0.appLocalized }
+    }
     
     /// 获取第一条问候语作为主问候
     var primaryMessage: String {
-        return messages.first?.replacingOccurrences(of: "•", with: "").trimmingCharacters(in: .whitespaces) ?? ""
+        localizedMessages.first?
+            .replacingOccurrences(of: "•", with: "")
+            .trimmingCharacters(in: .whitespaces) ?? ""
     }
     
     /// 获取格式化的完整问候语（用于分享等）
     var formattedMessages: String {
-        return messages.joined(separator: "\n\n")
+        return localizedMessages.joined(separator: "\n\n")
     }
 }
 

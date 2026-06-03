@@ -290,17 +290,17 @@ final class DailyGreetingManager: ObservableObject {
     private func getDefaultPoeticGreeting() -> String {
         switch TimeOfDay.current {
         case .dawn:
-            return "星光还在值班，月亮说该你接班了"
+            return "星光还在值班，月亮说该你接班了".appLocalized
         case .morning:
-            return "晨光为你铺好了路，今天也要闪闪发光"
+            return "晨光为你铺好了路，今天也要闪闪发光".appLocalized
         case .noon:
-            return "正午的阳光最烈，但你的笑容更耀眼"
+            return "正午的阳光最烈，但你的笑容更耀眼".appLocalized
         case .afternoon:
-            return "下午的时光，适合发呆，适合想你"
+            return "下午的时光，适合发呆，适合想你".appLocalized
         case .evening:
-            return "今夜星光为你守护"
+            return "今夜星光为你守护".appLocalized
         case .night:
-            return "我把思念装进梦里了，等你去打开"
+            return "我把思念装进梦里了，等你去打开".appLocalized
         }
     }
 }
