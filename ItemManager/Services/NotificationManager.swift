@@ -602,10 +602,11 @@ class NotificationManager: NSObject, UNUserNotificationCenterDelegate {
             clothing: clothing,
             daysBefore: 0,
             finalDate: clothing.finalPaymentDate ?? Date(),
-            title: "测试尾款提醒",
+            title: "测试尾款提醒".appLocalized,
             isTest: true
         )
-        content.body = "5 秒测试：点击后会直达「\(clothing.name)」详情页。"
+        let seconds = Int(max(1, secondsFromNow.rounded(.up)))
+        content.body = "%d 秒测试：点击后会直达「%@」详情页。".appLocalized(seconds, clothing.name)
 
         let identifier = "\(clothing.id.uuidString)_test_\(Int(Date().timeIntervalSince1970))"
         let trigger = UNTimeIntervalNotificationTrigger(timeInterval: max(1, secondsFromNow), repeats: false)
@@ -676,13 +677,13 @@ class NotificationManager: NSObject, UNUserNotificationCenterDelegate {
         let amountText = reminderAmountText(for: clothing)
         let body: String
         if isTest {
-            body = "测试通知：点击后会打开「\(clothing.name)」详情页。\(paymentWindowText)。"
+            body = "测试通知：点击后会打开「%@」详情页。%@。".appLocalized(clothing.name, paymentWindowText)
         } else if isCatchUpDuringPaymentWindow {
-            body = "「\(clothing.name)」已进入尾款支付期：\(paymentWindowText)。\(amountText)，若尚未处理请尽快确认。"
+            body = "「%@」已进入尾款支付期：%@。%@，若尚未处理请尽快确认。".appLocalized(clothing.name, paymentWindowText, amountText)
         } else if daysBefore > 0 {
-            body = "「\(clothing.name)」还有 \(daysBefore) 天开始付尾款：\(paymentWindowText)。\(amountText)，点击查看详情。"
+            body = "「%@」还有 %d 天开始付尾款：%@。%@，点击查看详情。".appLocalized(clothing.name, daysBefore, paymentWindowText, amountText)
         } else {
-            body = "「\(clothing.name)」今天开始付尾款：\(paymentWindowText)。\(amountText)，请确认是否已处理。"
+            body = "「%@」今天开始付尾款：%@。%@，请确认是否已处理。".appLocalized(clothing.name, paymentWindowText, amountText)
         }
 
         content.body = body
@@ -862,7 +863,7 @@ class NotificationManager: NSObject, UNUserNotificationCenterDelegate {
             clothing: candidate.clothing,
             daysBefore: candidate.daysBefore,
             finalDate: candidate.finalPaymentStart,
-            title: "尾款支付提醒",
+            title: "尾款支付提醒".appLocalized,
             isTest: false,
             isCatchUpDuringPaymentWindow: candidate.shouldCatchUpNow
         )
@@ -1130,7 +1131,7 @@ class NotificationManager: NSObject, UNUserNotificationCenterDelegate {
             clothing: candidate.clothing,
             daysBefore: candidate.daysBefore,
             finalDate: candidate.finalPaymentStart,
-            title: "尾款支付提醒",
+            title: "尾款支付提醒".appLocalized,
             isTest: false,
             isCatchUpDuringPaymentWindow: candidate.shouldCatchUpNow
         )
@@ -1231,23 +1232,24 @@ class NotificationManager: NSObject, UNUserNotificationCenterDelegate {
     private func reminderPaymentWindowText(finalDate: Date, finalPaymentEndDate: Date?) -> String {
         if let finalPaymentEndDate,
            Calendar.current.startOfDay(for: finalPaymentEndDate) > Calendar.current.startOfDay(for: finalDate) {
-            return "支付期 \(formatDate(finalDate)) 至 \(formatDate(finalPaymentEndDate))"
+            return "支付期 %@ 至 %@".appLocalized(formatDate(finalDate), formatDate(finalPaymentEndDate))
         }
 
-        return "尾款日 \(formatDate(finalDate))"
+        return "尾款日 %@".appLocalized(formatDate(finalDate))
     }
 
     private func reminderAmountText(for clothing: Clothing) -> String {
         guard clothing.totalBalance > 0 else {
-            return "尾款金额待确认"
+            return "尾款金额待确认".appLocalized
         }
 
-        return "待付尾款 ¥\(NSDecimalNumber(decimal: clothing.totalBalance).stringValue)"
+        return "待付尾款 ¥%@".appLocalized(NSDecimalNumber(decimal: clothing.totalBalance).stringValue)
     }
 
     private func formatDate(_ date: Date) -> String {
         let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd"
+        formatter.locale = LanguageManager.shared.locale
+        formatter.setLocalizedDateFormatFromTemplate("yMd")
         return formatter.string(from: date)
     }
 }

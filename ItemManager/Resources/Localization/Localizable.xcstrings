@@ -699,12 +699,11 @@
       }
     },
     "%@ · 每天 %@ 提醒" : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%@ · Remind daily at %@"
+            "value" : "%@ · Daily at %@"
           }
         },
         "zh-Hans" : {
@@ -717,6 +716,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%@ · 每天 %@ 提醒"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ · 毎日 %@ に通知"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ · 매일 %@ 알림"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ · Rappel quotidien a %@"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ · Taeglich um %@"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ · Aviso diario a las %@"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ · Lembrete diario as %@"
           }
         }
       }
@@ -2546,7 +2581,6 @@
       }
     },
     "%d 未读 / %d 条" : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -2565,16 +2599,51 @@
             "state" : "translated",
             "value" : "%d 未讀 / %d 條"
           }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未読 %d / 合計 %d"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "읽지 않음 %d / 전체 %d"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%d non lues / %d au total"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%d ungelesen / %d gesamt"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%d sin leer / %d en total"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%d nao lidas / %d no total"
+          }
         }
       }
     },
     "%d 条" : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%d items"
+            "value" : "%d records"
           }
         },
         "zh-Hans" : {
@@ -2587,6 +2656,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%d 條"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%d件"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%d개"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%d enregistrements"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%d Datensaetze"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%d registros"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%d registros"
           }
         }
       }
@@ -2631,13 +2736,13 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%d天"
+            "value" : "%d 天"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%d日"
+            "value" : "%d日前"
           }
         },
         "ko" : {
@@ -2661,7 +2766,7 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%d días"
+            "value" : "%d dias"
           }
         },
         "pt-BR" : {
@@ -7948,7 +8053,6 @@
       }
     },
     "一键已读" : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -7966,6 +8070,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "一鍵已讀"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "すべて既読"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "모두 읽음"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tout marquer comme lu"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Alle als gelesen markieren"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Marcar todo como leido"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Marcar tudo como lido"
           }
         }
       }
@@ -7993,7 +8133,6 @@
       }
     },
     "一键清除" : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -8011,6 +8150,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "一鍵清除"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "すべて消去"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "모두 지우기"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tout effacer"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Alle loeschen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Borrar todo"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Limpar tudo"
           }
         }
       }
@@ -9161,12 +9336,11 @@
       }
     },
     "临时会话" : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ephemeral"
+            "value" : "Ephemeral session"
           }
         },
         "zh-Hans" : {
@@ -9180,16 +9354,51 @@
             "state" : "translated",
             "value" : "臨時會話"
           }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "一時セッション"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "임시 세션"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Session ephemere"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kurzzeit-Sitzung"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sesion efimera"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sessao efemera"
+          }
         }
       }
     },
     "临时允许" : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Provisional"
+            "value" : "Provisionally allowed"
           }
         },
         "zh-Hans" : {
@@ -9202,6 +9411,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "臨時允許"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "暫定許可"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "임시 허용"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Autorise provisoirement"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vorlaeufig erlaubt"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Permitido provisionalmente"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Permitido provisoriamente"
           }
         }
       }
@@ -10688,7 +10933,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Aujourd’hui"
+            "value" : "Aujourd'hui"
           }
         },
         "de" : {
@@ -16205,7 +16450,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Schließen"
+            "value" : "Schliessen"
           }
         },
         "es" : {
@@ -18292,7 +18537,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Löschen"
+            "value" : "Loeschen"
           }
         },
         "es" : {
@@ -21135,7 +21380,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Settings"
+            "value" : "Open Settings"
           }
         },
         "zh-Hans" : {
@@ -21147,7 +21392,43 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "去設置"
+            "value" : "前往設定"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "設定へ"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "설정으로"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ouvrir les reglages"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Einstellungen öffnen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abrir ajustes"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abrir ajustes"
           }
         }
       }
@@ -28279,12 +28560,11 @@
       }
     },
     "将使用「%@」作为测试目标。正式通知发送时间可直接用上方时间选择器修改。" : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Will use \"%@\" as the test target. You can change the official notification time with the time picker above."
+            "value" : "\"%@\" will be used as the test target. You can change the real notification time with the picker above."
           }
         },
         "zh-Hans" : {
@@ -28297,6 +28577,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "將使用「%@」作為測試目標。正式通知發送時間可直接用上方時間選擇器修改。"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「%@」をテスト対象として使用します。実際の通知時刻は上の時刻ピッカーで変更できます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "\"%@\"을 테스트 대상으로 사용할게요. 실제 알림 시간은 위의 시간 선택기에서 바로 바꿀 수 있어요."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "\"%@\" sera utilise comme cible de test. L'heure reelle des notifications peut etre modifiee avec le selecteur ci-dessus."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "\"%@\" wird als Testziel verwendet. Die echte Benachrichtigungszeit kannst du oben im Zeitwaehler aendern."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Se usara \"%@\" como objetivo de prueba. Puedes cambiar la hora real de notificacion con el selector de arriba."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "\"%@\" sera usado como alvo de teste. Voce pode alterar o horario real da notificacao no seletor acima."
           }
         }
       }
@@ -29803,28 +30119,22 @@
     },
     "尾款提醒" : {
       "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Restzahlung erinnern"
-          }
-        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Balance Reminder"
+            "value" : "Final Payment Reminders"
           }
         },
-        "es" : {
+        "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Recordatorio de saldo"
+            "value" : "尾款提醒"
           }
         },
-        "fr" : {
+        "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Rappel de solde"
+            "value" : "尾款提醒"
           }
         },
         "ja" : {
@@ -29839,22 +30149,28 @@
             "value" : "잔금 알림"
           }
         },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rappels de solde final"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Restzahlungs-Erinnerungen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recordatorios de pago final"
+          }
+        },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Lembrete de saldo"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "尾款提醒"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "尾款提醒"
+            "value" : "Lembretes de pagamento final"
           }
         }
       }
@@ -30252,12 +30568,11 @@
       }
     },
     "已为「%@」安排 5 秒测试通知。请切到桌面或锁屏等待弹出，然后点击通知验证是否直达详情页。" : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Scheduled a 5-second test notification for \"%@\". Go to the Home Screen or lock the device, wait for it to appear, then tap it to verify it opens the detail page."
+            "value" : "A 5-second test notification has been scheduled for \"%@\". Go to the Home Screen or lock the device, wait for it to appear, then tap it to verify it opens the detail page."
           }
         },
         "zh-Hans" : {
@@ -30270,6 +30585,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "已為「%@」安排 5 秒測試通知。請切到桌面或鎖屏等待彈出，然後點擊通知驗證是否直達詳情頁。"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「%@」の5秒後テスト通知を設定しました。ホーム画面に戻るか画面をロックして表示を待ち、通知をタップして詳細ページへ直接移動するか確認してください。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "\"%@\"의 5초 테스트 알림을 예약했어요. 홈 화면으로 이동하거나 화면을 잠근 뒤 알림이 뜨면 눌러서 상세 페이지로 바로 가는지 확인해 주세요."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Une notification de test dans 5 s a ete programmee pour \"%@\". Passe a l'ecran d'accueil ou verrouille l'appareil, attends son apparition, puis touche-la pour verifier l'ouverture de la page de detail."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eine 5-Sekunden-Testbenachrichtigung fuer \"%@\" wurde geplant. Wechsle zum Home-Bildschirm oder sperre das Geraet, warte auf die Meldung und tippe sie an, um die Detailseite zu pruefen."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Se programo una notificacion de prueba de 5 s para \"%@\". Ve a la pantalla de inicio o bloquea el dispositivo, espera a que aparezca y tocala para verificar que abra la pagina de detalle."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Uma notificacao de teste de 5 s foi agendada para \"%@\". Va para a tela inicial ou bloqueie o aparelho, espere aparecer e toque nela para verificar se abre a pagina de detalhes."
           }
         }
       }
@@ -30505,7 +30856,6 @@
       }
     },
     "已允许" : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -30523,6 +30873,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "已允許"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "許可済み"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "허용됨"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Autorise"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Erlaubt"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Permitido"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Permitido"
           }
         }
       }
@@ -30597,7 +30983,6 @@
       }
     },
     "已发送提醒" : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -30615,6 +31000,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "已發送提醒"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "送信済みリマインダー"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "보낸 알림"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rappels envoyes"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gesendete Erinnerungen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recordatorios enviados"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lembretes enviados"
           }
         }
       }
@@ -31027,7 +31448,6 @@
       }
     },
     "已拒绝" : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -31045,6 +31465,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "已拒絕"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "拒否済み"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "거부됨"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Refuse"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abgelehnt"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Denegado"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Negado"
           }
         }
       }
@@ -33429,12 +33885,11 @@
       }
     },
     "开启后按尾款日提醒" : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Enable to remind by final payment date"
+            "value" : "Enable reminders based on the final payment date"
           }
         },
         "zh-Hans" : {
@@ -33446,7 +33901,43 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "開啟後依尾款日提醒"
+            "value" : "開啟後按尾款日提醒"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "有効にすると残金支払日に合わせて通知します"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "켜면 잔금일 기준으로 알려드려요"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Une fois active, les rappels suivent la date de solde final"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nach dem Aktivieren wird nach dem Restzahlungsdatum erinnert"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Al activarlo, se avisara segun la fecha de pago final"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ao ativar, os lembretes seguem a data de pagamento final"
           }
         }
       }
@@ -33456,7 +33947,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Enable Balance Reminder"
+            "value" : "Enable Final Payment Reminders"
           }
         },
         "zh-Hans" : {
@@ -33468,7 +33959,43 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "開啓尾款提醒"
+            "value" : "開啟尾款提醒"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "残金リマインダーを有効にする"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "잔금 알림 켜기"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Activer les rappels de solde final"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Restzahlungs-Erinnerungen aktivieren"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Activar recordatorios de pago final"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ativar lembretes de pagamento final"
           }
         }
       }
@@ -34887,7 +35414,6 @@
       }
     },
     "当天" : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -34906,11 +35432,46 @@
             "state" : "translated",
             "value" : "當天"
           }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "当日"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "당일"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le jour meme"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Am selben Tag"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El mismo dia"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No mesmo dia"
+          }
         }
       }
     },
     "当天提醒" : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -34929,6 +35490,42 @@
             "state" : "translated",
             "value" : "當天提醒"
           }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "当日リマインダー"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "당일 알림"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rappel le jour meme"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Erinnerung am selben Tag"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aviso el mismo dia"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lembrete no mesmo dia"
+          }
         }
       }
     },
@@ -34937,7 +35534,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Balance Reminder, Show"
+            "value" : "When a final payment reminder is delivered by the system or captured in app, it will appear here."
           }
         },
         "zh-Hans" : {
@@ -34950,6 +35547,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "當尾款提醒被系統送達或在站內記錄後，將顯示在這裡"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "残金リマインダーがシステムから配信されるかアプリ内に記録されると、ここに表示されます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "잔금 알림이 시스템으로 전달되거나 앱 안에 기록되면 여기에 표시돼요."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quand un rappel de solde final est livre par le systeme ou enregistre dans l'app, il apparait ici."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wenn eine Restzahlungs-Erinnerung vom System zugestellt oder in der App erfasst wird, erscheint sie hier."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cuando el sistema entregue un recordatorio de pago final o se registre en la app, aparecera aqui."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quando um lembrete de pagamento final for entregue pelo sistema ou registrado no app, ele aparecera aqui."
           }
         }
       }
@@ -35249,12 +35882,11 @@
       }
     },
     "待提醒" : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Pending Reminders"
+            "value" : "Pending"
           }
         },
         "zh-Hans" : {
@@ -35267,6 +35899,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "待提醒"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "通知待ち"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "알림 예정"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En attente"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ausstehend"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pendientes"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pendentes"
           }
         }
       }
@@ -41121,7 +41789,6 @@
       }
     },
     "提前 %d 天" : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -41139,12 +41806,47 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "提前 %d 天"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%d日前"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%d일 전"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%d jours avant"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%d Tage vorher"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%d dias antes"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%d dias antes"
           }
         }
       }
     },
     "提前%d天" : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -41161,13 +41863,48 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "提前%d天"
+            "value" : "提前 %d 天"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%d日前"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%d일 전"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%d jours avant"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%d Tage vorher"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%d dias antes"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%d dias antes"
           }
         }
       }
     },
     "提前1天" : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -41184,7 +41921,43 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "提前1天"
+            "value" : "提前 1 天"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1日前"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1일 전"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 jour avant"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 Tag vorher"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 dia antes"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 dia antes"
           }
         }
       }
@@ -41230,6 +42003,42 @@
             "state" : "translated",
             "value" : "提醒天數"
           }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "通知日数"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "알림 날짜"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Jours de rappel"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Erinnerungstage"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dias de aviso"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dias de lembrete"
+          }
         }
       }
     },
@@ -41251,6 +42060,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "提醒時間"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "通知時刻"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "알림 시간"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Heure du rappel"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Erinnerungszeit"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hora del aviso"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Horario do lembrete"
           }
         }
       }
@@ -45316,13 +46161,13 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Mañana"
+            "value" : "Manana"
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Amanhã"
+            "value" : "Amanha"
           }
         }
       }
@@ -46165,7 +47010,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "No reminder yet"
+            "value" : "No sent reminders yet"
           }
         },
         "zh-Hans" : {
@@ -46179,6 +47024,42 @@
             "state" : "translated",
             "value" : "暫無已發送的提醒"
           }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "送信済みリマインダーはまだありません"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "아직 보낸 알림이 없어요"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucun rappel envoye pour le moment"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Noch keine gesendeten Erinnerungen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aun no hay recordatorios enviados"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ainda nao ha lembretes enviados"
+          }
         }
       }
     },
@@ -46187,7 +47068,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "No reminder yet"
+            "value" : "No pending reminders"
           }
         },
         "zh-Hans" : {
@@ -46200,6 +47081,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "暫無待提醒記錄"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "通知待ちの記録はありません"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "예정된 알림 기록이 없어요"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucun rappel en attente"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keine ausstehenden Erinnerungen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No hay recordatorios pendientes"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nao ha lembretes pendentes"
           }
         }
       }
@@ -47225,12 +48142,11 @@
       }
     },
     "未决定" : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Not Determined"
+            "value" : "Not determined"
           }
         },
         "zh-Hans" : {
@@ -47243,6 +48159,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "未決定"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未決定"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "결정되지 않음"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Non determine"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nicht festgelegt"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No determinado"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nao determinado"
           }
         }
       }
@@ -47641,30 +48593,23 @@
       }
     },
     "未知" : {
-      "extractionState" : "stale",
       "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "unbekannt"
-          }
-        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "unknown"
+            "value" : "Unknown"
           }
         },
-        "es" : {
+        "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "desconocido"
+            "value" : "未知"
           }
         },
-        "fr" : {
+        "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "inconnu"
+            "value" : "未知"
           }
         },
         "ja" : {
@@ -47679,22 +48624,28 @@
             "value" : "알 수 없음"
           }
         },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Inconnu"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unbekannt"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Desconocido"
+          }
+        },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "desconhecido"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "未知"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "未知"
+            "value" : "Desconhecido"
           }
         }
       }
@@ -48200,7 +49151,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Permission Status: %@"
+            "value" : "Permission status: %@"
           }
         },
         "zh-Hans" : {
@@ -48213,6 +49164,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "權限狀態：%@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "権限状態：%@"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "권한 상태: %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Statut de l'autorisation : %@"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Berechtigungsstatus: %@"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Estado del permiso: %@"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Status da permissao: %@"
           }
         }
       }
@@ -49107,6 +50094,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "標為已讀"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "既読にする"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "읽음으로 표시"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Marquer comme lu"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Als gelesen markieren"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Marcar como leido"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Marcar como lido"
           }
         }
       }
@@ -50912,7 +51935,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Status..."
+            "value" : "Reading system notification status..."
           }
         },
         "zh-Hans" : {
@@ -50925,6 +51948,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "正在讀取系統通知狀態…"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "システム通知状態を読み込み中..."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "시스템 알림 상태를 읽는 중..."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lecture de l'etat des notifications systeme..."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Systembenachrichtigungsstatus wird gelesen..."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Leyendo el estado de notificaciones del sistema..."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lendo o status das notificacoes do sistema..."
           }
         }
       }
@@ -51921,16 +52980,51 @@
             "state" : "translated",
             "value" : "測試通知"
           }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "テスト通知"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "테스트 알림"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Notification de test"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Testbenachrichtigung"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Notificacion de prueba"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Notificacao de teste"
+          }
         }
       }
     },
     "测试通知发送失败：%@" : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Failed to send test notification: %@"
+            "value" : "Test notification failed: %@"
           }
         },
         "zh-Hans" : {
@@ -51943,6 +53037,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "測試通知發送失敗：%@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "テスト通知の送信に失敗しました：%@"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "테스트 알림 전송 실패: %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Echec de la notification de test : %@"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Testbenachrichtigung fehlgeschlagen: %@"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Error al enviar la notificacion de prueba: %@"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Falha ao enviar a notificacao de teste: %@"
           }
         }
       }
@@ -52676,7 +53806,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "クリア"
+            "value" : "消去"
           }
         },
         "ko" : {
@@ -52694,7 +53824,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Leeren"
+            "value" : "Loeschen"
           }
         },
         "es" : {
@@ -52795,6 +53925,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "清除已讀通知"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "既読通知を消去"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "읽은 알림 지우기"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Effacer les notifications lues"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gelesene Benachrichtigungen loeschen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Borrar notificaciones leidas"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Limpar notificacoes lidas"
           }
         }
       }
@@ -57441,7 +58607,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Do you want to clear?"
+            "value" : "Clear all read notification records? This cannot be undone."
           }
         },
         "zh-Hans" : {
@@ -57453,7 +58619,43 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "確定要清除所有已讀的通知記錄嗎？此操作不可撤銷。"
+            "value" : "確定要清除所有已讀的通知記錄嗎？此操作無法復原。"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "既読の通知記録をすべて消去しますか？この操作は元に戻せません。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "읽은 알림 기록을 모두 지울까요? 이 작업은 되돌릴 수 없어요."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Effacer tous les enregistrements de notifications lues ? Cette action est irreversible."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Alle gelesenen Benachrichtigungsdatensaetze loeschen? Dies kann nicht rueckgaengig gemacht werden."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "¿Borrar todos los registros de notificaciones leidas? Esta accion no se puede deshacer."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Limpar todos os registros de notificacoes lidas? Esta acao nao pode ser desfeita."
           }
         }
       }
@@ -67182,7 +68384,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : ": %@"
+            "value" : "Device mode: %@"
           }
         },
         "zh-Hans" : {
@@ -67194,7 +68396,43 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "設備模式：%@"
+            "value" : "裝置模式：%@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "デバイスモード：%@"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "기기 모드: %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mode de l'appareil : %@"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Geraetemodus: %@"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Modo del dispositivo: %@"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Modo do dispositivo: %@"
           }
         }
       }
@@ -68303,12 +69541,11 @@
       }
     },
     "请先创建一条用于测试的心愿尾款记录。建议新建一条“通知测试裙”，避免影响正式数据。" : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Create a final payment record for testing first. We recommend creating a new test dress to avoid affecting real data."
+            "value" : "Create a final payment record for testing first. We recommend adding a \"notification test dress\" so real data is not affected."
           }
         },
         "zh-Hans" : {
@@ -68320,18 +69557,53 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "請先建立一條用於測試的心願尾款記錄。建議新建一條「通知測試裙」，避免影響正式資料。"
+            "value" : "請先建立一條用於測試的心願尾款記錄。建議新增一條「通知測試裙」，避免影響正式資料。"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "テスト用の残金記録を先に作成してください。正式データに影響しないよう「通知テストドレス」を新規作成することをおすすめします。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "먼저 테스트용 잔금 기록을 만들어 주세요. 실제 데이터에 영향이 없도록 \"알림 테스트 드레스\"를 새로 만드는 것을 추천해요."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cree d'abord un enregistrement de solde final pour le test. Nous recommandons d'ajouter une \"robe de test de notification\" afin de ne pas toucher aux vraies donnees."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Erstelle zuerst einen Restzahlungsdatensatz zum Testen. Wir empfehlen ein neues \"Benachrichtigungstest-Kleid\", damit echte Daten nicht betroffen sind."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Crea primero un registro de pago final para pruebas. Recomendamos agregar un \"vestido de prueba de notificacion\" para no afectar datos reales."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Crie primeiro um registro de pagamento final para teste. Recomendamos adicionar um \"vestido de teste de notificacao\" para nao afetar os dados reais."
           }
         }
       }
     },
     "请先创建至少一条心愿尾款记录，再发送测试通知。" : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Please create wishlist payments, test notification."
+            "value" : "Create at least one final payment record before sending a test notification."
           }
         },
         "zh-Hans" : {
@@ -68343,7 +69615,43 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "請先創建至少一條心願尾款記錄，再發送測試通知。"
+            "value" : "請先建立至少一條心願尾款記錄，再發送測試通知。"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "テスト通知を送信する前に、少なくとも1件の残金記録を作成してください。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "테스트 알림을 보내기 전에 잔금 기록을 최소 1개 만들어 주세요."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cree au moins un enregistrement de solde final avant d'envoyer une notification de test."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Erstelle mindestens einen Restzahlungsdatensatz, bevor du eine Testbenachrichtigung sendest."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Crea al menos un registro de pago final antes de enviar una notificacion de prueba."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Crie pelo menos um registro de pagamento final antes de enviar uma notificacao de teste."
           }
         }
       }
@@ -68578,7 +69886,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Please settings a p p, balance reminder."
+            "value" : "Allow the app to send notifications in Settings so you can receive final payment reminders."
           }
         },
         "zh-Hans" : {
@@ -68590,7 +69898,43 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "請在設置中允許 App 發送通知，以便接收尾款提醒。"
+            "value" : "請在設定中允許 App 發送通知，以便接收尾款提醒。"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "残金リマインダーを受け取るには、設定でアプリからの通知を許可してください。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "잔금 알림을 받으려면 설정에서 앱 알림 전송을 허용해 주세요."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Autorise l'app a envoyer des notifications dans les reglages pour recevoir les rappels de solde final."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Erlaube der App in den Einstellungen, Benachrichtigungen zu senden, damit du Restzahlungs-Erinnerungen erhaeltst."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Permite que la app envie notificaciones en Ajustes para recibir recordatorios de pago final."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Permita que o app envie notificacoes nos Ajustes para receber lembretes de pagamento final."
           }
         }
       }
@@ -71129,12 +72473,11 @@
       }
     },
     "这件心愿尾款" : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "This Final Payment Item"
+            "value" : "This final payment item"
           }
         },
         "zh-Hans" : {
@@ -71147,6 +72490,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "這件心願尾款"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この残金アイテム"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이 잔금 항목"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cet article avec solde final"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dieser Restzahlungsartikel"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Este articulo de pago final"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Este item de pagamento final"
           }
         }
       }
@@ -73347,7 +74726,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Diagnostics"
+            "value" : "Notification Diagnostics"
           }
         },
         "zh-Hans" : {
@@ -73360,6 +74739,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "通知診斷"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "通知診断"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "알림 진단"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Diagnostic des notifications"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Benachrichtigungsdiagnose"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Diagnostico de notificaciones"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Diagnostico de notificacoes"
           }
         }
       }
@@ -73641,6 +75056,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "重新同步"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "再同期"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "다시 동기화"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Resynchroniser"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Neu synchronisieren"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Resincronizar"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ressincronizar"
           }
         }
       }
@@ -74724,7 +76175,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Required Notification Permission"
+            "value" : "Notification Permission Required"
           }
         },
         "zh-Hans" : {
@@ -74737,6 +76188,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "需要通知權限"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "通知権限が必要です"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "알림 권한이 필요해요"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Autorisation de notification requise"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Benachrichtigungsberechtigung erforderlich"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Se requiere permiso de notificaciones"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Permissao de notificacao necessaria"
           }
         }
       }
@@ -106990,6 +108477,1166 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Adicionados recentemente"
+          }
+        }
+      }
+    },
+    "测试工具" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Test Tools"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "测试工具"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "測試工具"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "テストツール"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "테스트 도구"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Outils de test"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Testwerkzeuge"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Herramientas de prueba"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ferramentas de teste"
+          }
+        }
+      }
+    },
+    "发送 5 秒测试通知" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Send 5-second test notification"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "发送 5 秒测试通知"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "發送 5 秒測試通知"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "5秒後のテスト通知を送信"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "5초 테스트 알림 보내기"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Envoyer une notification de test dans 5 s"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "5-Sekunden-Testbenachrichtigung senden"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enviar notificacion de prueba en 5 s"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enviar notificacao de teste em 5 s"
+          }
+        }
+      }
+    },
+    "系统待发送：总 %d / 补款 %d" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "System pending: total %d / final payment %d"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "系统待发送：总 %d / 补款 %d"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "系統待發送：總 %d / 補款 %d"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "システム送信待ち：合計 %d / 残金 %d"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "시스템 대기: 총 %d / 잔금 %d"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En attente systeme : total %d / solde final %d"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "System ausstehend: gesamt %d / Restzahlung %d"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pendientes del sistema: total %d / pago final %d"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pendentes do sistema: total %d / pagamento final %d"
+          }
+        }
+      }
+    },
+    "系统已送达：总 %d / 补款 %d" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "System delivered: total %d / final payment %d"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "系统已送达：总 %d / 补款 %d"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "系統已送達：總 %d / 補款 %d"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "システム配信済み：合計 %d / 残金 %d"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "시스템 전달됨: 총 %d / 잔금 %d"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Livrees par le systeme : total %d / solde final %d"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "System zugestellt: gesamt %d / Restzahlung %d"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Entregadas por el sistema: total %d / pago final %d"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Entregues pelo sistema: total %d / pagamento final %d"
+          }
+        }
+      }
+    },
+    "待提醒记录：%d（系统 %d / 站内 %d，上限 %d）" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pending records: %d (system %d / in-app %d, limit %d)"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "待提醒记录：%d（系统 %d / 站内 %d，上限 %d）"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "待提醒記錄：%d（系統 %d / 站內 %d，上限 %d）"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "通知待ち記録：%d（システム %d / アプリ内 %d、上限 %d）"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "대기 알림 기록: %d (시스템 %d / 앱 내 %d, 한도 %d)"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enregistrements en attente : %d (systeme %d / dans l'app %d, limite %d)"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ausstehende Datensaetze: %d (System %d / In-App %d, Limit %d)"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Registros pendientes: %d (sistema %d / en app %d, limite %d)"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Registros pendentes: %d (sistema %d / no app %d, limite %d)"
+          }
+        }
+      }
+    },
+    "App Icon 红点：%d" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "App icon badge: %d"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "App Icon 红点：%d"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "App Icon 紅點：%d"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "App Icon バッジ：%d"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "앱 아이콘 배지: %d"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Badge de l'icone d'app : %d"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "App-Symbol-Badge: %d"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Insignia del icono de la app: %d"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Badge do icone do app: %d"
+          }
+        }
+      }
+    },
+    "App 内未读：%d" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unread in app: %d"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "App 内未读：%d"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "App 內未讀：%d"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アプリ内未読：%d"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "앱 내 읽지 않음: %d"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Non lues dans l'app : %d"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "In der App ungelesen: %d"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sin leer en la app: %d"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nao lidas no app: %d"
+          }
+        }
+      }
+    },
+    "小内存保护" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Low-memory protection"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "小内存保护"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "小記憶體保護"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "低メモリ保護"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "저메모리 보호"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Protection memoire reduite"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Speicherschutzmodus"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Proteccion de poca memoria"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Protecao de pouca memoria"
+          }
+        }
+      }
+    },
+    "标准" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Standard"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "标准"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "標準"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "標準"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "표준"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Standard"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Standard"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Estandar"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Padrao"
+          }
+        }
+      }
+    },
+    "测试尾款提醒" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Final Payment Test Reminder"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "测试尾款提醒"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "測試尾款提醒"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "残金テストリマインダー"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "잔금 테스트 알림"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rappel de test du solde final"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Restzahlungs-Test-Erinnerung"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recordatorio de prueba de pago final"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lembrete de teste de pagamento final"
+          }
+        }
+      }
+    },
+    "%d 秒测试：点击后会直达「%@」详情页。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%d-second test: tap to open \"%@\" directly."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%d 秒测试：点击后会直达「%@」详情页。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%d 秒測試：點擊後會直達「%@」詳情頁。"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%d秒テスト：タップすると「%@」の詳細ページへ直接移動します。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%d초 테스트: 누르면 \"%@\" 상세 페이지로 바로 이동합니다."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Test de %d s : touche pour ouvrir directement la page de detail de \"%@\"."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%d-Sekunden-Test: Tippen, um direkt die Detailseite von \"%@\" zu oeffnen."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Prueba de %d s: toca para abrir directamente la pagina de detalle de \"%@\"."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Teste de %d s: toque para abrir diretamente a pagina de detalhes de \"%@\"."
+          }
+        }
+      }
+    },
+    "测试通知：点击后会打开「%@」详情页。%@。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Test notification: tap to open the detail page for \"%@\". %@."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "测试通知：点击后会打开「%@」详情页。%@。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "測試通知：點擊後會打開「%@」詳情頁。%@。"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "テスト通知：タップすると「%@」の詳細ページを開きます。%@。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "테스트 알림: 누르면 \"%@\" 상세 페이지가 열립니다. %@."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Notification de test : touche pour ouvrir la page de detail de \"%@\". %@."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Testbenachrichtigung: Tippen, um die Detailseite von \"%@\" zu oeffnen. %@."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Notificacion de prueba: toca para abrir la pagina de detalle de \"%@\". %@."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Notificacao de teste: toque para abrir a pagina de detalhes de \"%@\". %@."
+          }
+        }
+      }
+    },
+    "「%@」已进入尾款支付期：%@。%@，若尚未处理请尽快确认。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "\"%@\" has entered the final payment window: %@. %@. If you have not handled it yet, please confirm soon."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「%@」已进入尾款支付期：%@。%@，若尚未处理请尽快确认。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「%@」已進入尾款支付期：%@。%@，若尚未處理請盡快確認。"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「%@」は残金支払い期間に入りました：%@。%@。未対応の場合は早めに確認してください。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "\"%@\"이 잔금 결제 기간에 들어갔어요: %@. %@. 아직 처리하지 않았다면 빠르게 확인해 주세요."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "\"%@\" est entre dans la periode de paiement final : %@. %@. Si ce n'est pas encore traite, confirme vite."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "\"%@\" ist im Restzahlungszeitraum: %@. %@. Falls noch nicht erledigt, bitte bald bestaetigen."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "\"%@\" ya entro en el periodo de pago final: %@. %@. Si aun no lo has gestionado, confirmalo pronto."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "\"%@\" entrou no periodo de pagamento final: %@. %@. Se ainda nao tratou disso, confirme em breve."
+          }
+        }
+      }
+    },
+    "「%@」还有 %d 天开始付尾款：%@。%@，点击查看详情。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "\"%@\" starts final payment in %d days: %@. %@. Tap to view details."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「%@」还有 %d 天开始付尾款：%@。%@，点击查看详情。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「%@」還有 %d 天開始付尾款：%@。%@，點擊查看詳情。"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「%@」はあと%d日で残金支払い開始：%@。%@。タップして詳細を確認してください。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "\"%@\" 잔금 결제가 %d일 후 시작돼요: %@. %@. 눌러서 자세히 보기."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "\"%@\" commence son paiement final dans %d jours : %@. %@. Touche pour voir les details."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "\"%@\" beginnt die Restzahlung in %d Tagen: %@. %@. Tippen fuer Details."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "\"%@\" empieza el pago final en %d dias: %@. %@. Toca para ver detalles."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "\"%@\" comeca o pagamento final em %d dias: %@. %@. Toque para ver detalhes."
+          }
+        }
+      }
+    },
+    "「%@」今天开始付尾款：%@。%@，请确认是否已处理。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "\"%@\" starts final payment today: %@. %@. Please confirm whether it has been handled."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「%@」今天开始付尾款：%@。%@，请确认是否已处理。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「%@」今天開始付尾款：%@。%@，請確認是否已處理。"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「%@」は今日から残金支払い開始：%@。%@。処理済みか確認してください。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "\"%@\" 잔금 결제가 오늘 시작돼요: %@. %@. 처리했는지 확인해 주세요."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "\"%@\" commence son paiement final aujourd'hui : %@. %@. Confirme si c'est deja traite."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "\"%@\" beginnt die Restzahlung heute: %@. %@. Bitte bestaetige, ob sie erledigt ist."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "\"%@\" empieza hoy el pago final: %@. %@. Confirma si ya lo gestionaste."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "\"%@\" comeca o pagamento final hoje: %@. %@. Confirme se ja foi tratado."
+          }
+        }
+      }
+    },
+    "尾款支付提醒" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Final Payment Reminder"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "尾款支付提醒"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "尾款支付提醒"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "残金支払いリマインダー"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "잔금 결제 알림"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rappel de solde final"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Restzahlungs-Erinnerung"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recordatorio de pago final"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lembrete de pagamento final"
+          }
+        }
+      }
+    },
+    "支付期 %@ 至 %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Payment window %@ to %@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "支付期 %@ 至 %@"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "支付期 %@ 至 %@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "支払い期間 %@ 〜 %@"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "결제 기간 %@ ~ %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Periode de paiement : %@ a %@"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zahlungszeitraum %@ bis %@"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Periodo de pago: %@ a %@"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Periodo de pagamento: %@ a %@"
+          }
+        }
+      }
+    },
+    "尾款日 %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Final payment date %@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "尾款日 %@"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "尾款日 %@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "残金日 %@"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "잔금일 %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Date de solde final %@"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Restzahlungstag %@"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fecha de pago final %@"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Data do pagamento final %@"
+          }
+        }
+      }
+    },
+    "尾款金额待确认" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Final payment amount to be confirmed"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "尾款金额待确认"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "尾款金額待確認"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "残金額は確認待ち"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "잔금 금액 확인 대기"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Montant du solde final a confirmer"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Restzahlungsbetrag noch zu bestaetigen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Importe de pago final pendiente de confirmar"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Valor do pagamento final a confirmar"
+          }
+        }
+      }
+    },
+    "待付尾款 ¥%@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Final payment due ¥%@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "待付尾款 ¥%@"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "待付尾款 ¥%@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未払い残金 ¥%@"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "남은 잔금 ¥%@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Solde final a payer ¥%@"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Faellige Restzahlung ¥%@"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pago final pendiente ¥%@"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pagamento final pendente ¥%@"
           }
         }
       }

@@ -111,11 +111,11 @@ struct DepositNotificationView: View {
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
         .background(LiquidBackground(themeSkinWallpaperContext: .depositPlan))
-        .navigationTitle("尾款提醒")
+        .navigationTitle("尾款提醒".appLocalized)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
-                Button("关闭") {
+                Button("关闭".appLocalized) {
                     dismiss()
                 }
             }
@@ -137,26 +137,26 @@ struct DepositNotificationView: View {
             NotificationManager.shared.enforceHistoryLimit(modelContext: modelContext)
             NotificationManager.shared.updateApplicationBadge(modelContext: modelContext)
         }
-        .alert("需要通知权限", isPresented: $showPermissionAlert) {
-            Button("去设置", role: .none) {
+        .alert("需要通知权限".appLocalized, isPresented: $showPermissionAlert) {
+            Button("去设置".appLocalized, role: .none) {
                 if let url = URL(string: UIApplication.openSettingsURLString) {
                     UIApplication.shared.open(url)
                 }
             }
-            Button("取消", role: .cancel) { }
+            Button("取消".appLocalized, role: .cancel) { }
         } message: {
-            Text("请在设置中允许 App 发送通知，以便接收尾款提醒。")
+            Text("请在设置中允许 App 发送通知，以便接收尾款提醒。".appLocalized)
         }
-        .alert("清除已读通知", isPresented: $showClearReadConfirmation) {
-            Button("清除", role: .destructive) {
+        .alert("清除已读通知".appLocalized, isPresented: $showClearReadConfirmation) {
+            Button("清除".appLocalized, role: .destructive) {
                 NotificationManager.shared.clearAllReadNotifications(modelContext: modelContext)
             }
-            Button("取消", role: .cancel) { }
+            Button("取消".appLocalized, role: .cancel) { }
         } message: {
-            Text("确定要清除所有已读的通知记录吗？此操作不可撤销。")
+            Text("确定要清除所有已读的通知记录吗？此操作不可撤销。".appLocalized)
         }
         .alert(
-            "测试通知",
+            "测试通知".appLocalized,
             isPresented: Binding(
                 get: { testAlertMessage != nil },
                 set: { newValue in
@@ -166,7 +166,7 @@ struct DepositNotificationView: View {
                 }
             )
         ) {
-            Button("确定", role: .cancel) { }
+            Button("确定".appLocalized, role: .cancel) { }
         } message: {
             Text(testAlertMessage ?? "")
         }
@@ -178,7 +178,7 @@ struct DepositNotificationView: View {
         ThemeSkinSectionCardContainer(cornerRadius: 12, showsDecoration: false) {
             VStack(alignment: .leading, spacing: 8) {
                 HStack(spacing: 12) {
-                    Toggle("开启尾款提醒", isOn: $isEnabled)
+                    Toggle("开启尾款提醒".appLocalized, isOn: $isEnabled)
                         .font(.subheadline.weight(.semibold))
                         .onChange(of: isEnabled) { _, newValue in
                             handleSettingsChange(enabled: newValue)
@@ -244,7 +244,7 @@ struct DepositNotificationView: View {
         VStack(spacing: 12) {
             // 提醒天数选择
             VStack(alignment: .leading, spacing: 6) {
-                Text("提醒天数")
+                Text("提醒天数".appLocalized)
                     .font(.system(size: 13))
                     .foregroundStyle(palette.secondaryText)
                     .themeSkinLegibleText(level: .inline, slot: .sectionCard)
@@ -258,7 +258,7 @@ struct DepositNotificationView: View {
 
             // 提醒时间
             HStack {
-                Text("提醒时间")
+                Text("提醒时间".appLocalized)
                     .font(.system(size: 13))
                     .foregroundStyle(palette.secondaryText)
                     .themeSkinLegibleText(level: .inline, slot: .sectionCard)
@@ -267,6 +267,7 @@ struct DepositNotificationView: View {
 
                 DatePicker("", selection: $notificationTime, displayedComponents: .hourAndMinute)
                     .labelsHidden()
+                    .environment(\.locale, LanguageManager.shared.locale)
                     .onChange(of: notificationTime) { _, newValue in
                         UserDefaults.standard.set(newValue, forKey: NotificationManager.Keys.depositNotificationTime)
                         handleSettingsChange(enabled: isEnabled)
@@ -275,7 +276,7 @@ struct DepositNotificationView: View {
 
             #if DEBUG
             VStack(alignment: .leading, spacing: 8) {
-                Text("测试工具")
+                Text("测试工具".appLocalized)
                     .font(.system(size: 13))
                     .foregroundStyle(palette.secondaryText)
                     .themeSkinLegibleText(level: .inline, slot: .sectionCard)
@@ -285,7 +286,7 @@ struct DepositNotificationView: View {
                 } label: {
                     HStack(spacing: 8) {
                         Image(systemName: "paperplane.fill")
-                        Text("发送 5 秒测试通知")
+                        Text("发送 5 秒测试通知".appLocalized)
                             .themeSkinLegibleText(level: .chip, slot: .primaryButton)
                     }
                     .font(.system(size: 13, weight: .semibold))
@@ -313,21 +314,21 @@ struct DepositNotificationView: View {
     private var diagnosticsPanel: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text("通知诊断")
+                Text("通知诊断".appLocalized)
                     .font(.system(size: 13))
                     .foregroundStyle(palette.secondaryText)
                     .themeSkinLegibleText(level: .inline, slot: .sectionCard)
 
                 Spacer()
 
-                Button("刷新") {
+                Button("刷新".appLocalized) {
                     Task {
                         await refreshDebugSnapshot()
                     }
                 }
                 .font(.system(size: 11, weight: .semibold))
 
-                Button("重新同步") {
+                Button("重新同步".appLocalized) {
                     Task {
                         await NotificationManager.shared.refreshDepositNotifications(
                             clothings: finalPaymentPlans,
@@ -343,19 +344,20 @@ struct DepositNotificationView: View {
 
             if let snapshot = debugSnapshot {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("权限状态：\(authorizationText(snapshot.authorizationStatus))")
-                    Text("系统待发送：总 \(snapshot.pendingCount) / 补款 \(snapshot.depositPendingCount)")
-                    Text("系统已送达：总 \(snapshot.deliveredCount) / 补款 \(snapshot.depositDeliveredCount)")
-                    Text("待提醒记录：\(snapshot.pendingRecordCount)（系统 \(snapshot.depositPendingCount) / 站内 \(snapshot.capturedRecordCount)，上限 \(snapshot.scheduledSystemLimit)）")
-                    Text("App Icon 红点：\(snapshot.applicationBadgeCount)")
-                    Text("App 内未读：\(unreadCount)")
-                    Text("设备模式：\(snapshot.isMemoryConstrained ? "小内存保护" : "标准")")
+                    let deviceMode = snapshot.isMemoryConstrained ? "小内存保护".appLocalized : "标准".appLocalized
+                    Text("权限状态：%@".appLocalized(authorizationText(snapshot.authorizationStatus)))
+                    Text("系统待发送：总 %d / 补款 %d".appLocalized(snapshot.pendingCount, snapshot.depositPendingCount))
+                    Text("系统已送达：总 %d / 补款 %d".appLocalized(snapshot.deliveredCount, snapshot.depositDeliveredCount))
+                    Text("待提醒记录：%d（系统 %d / 站内 %d，上限 %d）".appLocalized(snapshot.pendingRecordCount, snapshot.depositPendingCount, snapshot.capturedRecordCount, snapshot.scheduledSystemLimit))
+                    Text("App Icon 红点：%d".appLocalized(snapshot.applicationBadgeCount))
+                    Text("App 内未读：%d".appLocalized(unreadCount))
+                    Text("设备模式：%@".appLocalized(deviceMode))
                 }
                 .font(.system(size: 11))
                 .foregroundStyle(palette.secondaryText)
                 .themeSkinLegibleText(level: .inline, slot: .sectionCard)
             } else {
-                Text("正在读取系统通知状态…")
+                Text("正在读取系统通知状态…".appLocalized)
                     .font(.system(size: 11))
                     .foregroundStyle(palette.secondaryText)
                     .themeSkinLegibleText(level: .inline, slot: .sectionCard)
@@ -443,12 +445,12 @@ struct DepositNotificationView: View {
                 .font(.system(size: 40))
                 .foregroundStyle(palette.secondaryText.opacity(0.5))
 
-            Text("暂无已发送的提醒")
+            Text("暂无已发送的提醒".appLocalized)
                 .font(.headline)
                 .foregroundStyle(palette.secondaryText)
                 .themeSkinLegibleText(level: .inline, slot: .emptyState)
 
-            Text("当尾款提醒被系统送达或在站内记录后，将显示在这里")
+            Text("当尾款提醒被系统送达或在站内记录后，将显示在这里".appLocalized)
                 .font(.caption)
                 .foregroundStyle(palette.secondaryText.opacity(0.7))
                 .themeSkinLegibleText(level: .inline, slot: .emptyState)
@@ -463,7 +465,7 @@ struct DepositNotificationView: View {
             Image(systemName: "calendar.badge.clock")
                 .font(.system(size: 32))
                 .foregroundStyle(palette.secondaryText.opacity(0.5))
-            Text("暂无待提醒记录")
+            Text("暂无待提醒记录".appLocalized)
                 .font(.subheadline)
                 .foregroundStyle(palette.secondaryText)
                 .themeSkinLegibleText(level: .inline, slot: .emptyState)
@@ -521,7 +523,8 @@ struct DepositNotificationView: View {
 
     private func formatTime(_ date: Date) -> String {
         let formatter = DateFormatter()
-        formatter.dateFormat = "HH:mm"
+        formatter.locale = LanguageManager.shared.locale
+        formatter.setLocalizedDateFormatFromTemplate("Hm")
         return formatter.string(from: date)
     }
 
@@ -789,14 +792,14 @@ struct NotificationRecordRow: View {
             Button(role: .destructive) {
                 NotificationManager.shared.deleteRecord(record, modelContext: modelContext)
             } label: {
-                Label("删除", systemImage: "trash")
+                Label("删除".appLocalized, systemImage: "trash")
             }
 
             if !record.isRead {
                 Button {
                     markRecordAsRead()
                 } label: {
-                    Label("标为已读", systemImage: "checkmark.circle")
+                    Label("标为已读".appLocalized, systemImage: "checkmark.circle")
                 }
                 .tint(.blue)
             }
@@ -877,7 +880,7 @@ struct PendingNotificationRecordRow: View {
             Button(role: .destructive) {
                 NotificationManager.shared.deleteRecord(record, modelContext: modelContext)
             } label: {
-                Label("删除", systemImage: "trash")
+                Label("删除".appLocalized, systemImage: "trash")
             }
         }
     }
@@ -907,7 +910,7 @@ private enum DepositReminderDisplayFormatter {
     private static func dateTimeText(_ date: Date) -> String {
         let timeFormatter = DateFormatter()
         timeFormatter.locale = LanguageManager.shared.locale
-        timeFormatter.dateFormat = "HH:mm"
+        timeFormatter.setLocalizedDateFormatFromTemplate("Hm")
         let time = timeFormatter.string(from: date)
 
         let calendar = Calendar.current
