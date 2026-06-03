@@ -1185,7 +1185,9 @@ struct AttributePill: View {
             Text(text.replacingOccurrences(of: "\n", with: " "))
                 .font(.caption2)
                 .lineLimit(1)
-                .fixedSize(horizontal: true, vertical: false)
+                .minimumScaleFactor(0.78)
+                .truncationMode(.tail)
+                .allowsTightening(true)
         }
         .themeSkinLegibleText(level: .inline, slot: .wardrobeItemCard, descriptor: themeSkinDescriptor)
         .padding(.horizontal, 6)
