@@ -34,6 +34,7 @@
 | 尾款提醒通知流程 | `0bebbec` | 已提交 | DepositNotificationView 导航/权限/设置/记录/测试/诊断文案、DatePicker/time formatter、NotificationManager 正式/测试通知 title/body、支付期/金额短语；保留 payload/UserDefaults/identifier | `xcodebuild` 通过（临时源码快照） |
 | 萌宠 AI 兜底回复 | `45876f7` | 已提交 | `PetPersonaProfile.warmthSuffixes`、`PetAIService` 空回复/timeout/error fallback、`PetResponseHumanizer` JSON 输出外壳；新增 19 key/9 语言 | `xcodebuild` 通过（临时源码快照） |
 | 衣橱属性标签溢出修复 | `4fac66f` | 已提交 | `AttributePill` 移除横向 fixedSize，补 `minimumScaleFactor`/tail truncation/tightening，避免详细列表长字段顶开布局 | `xcodebuild` 通过（临时源码快照） |
+| 每日问候本地模板 | `9d4ab3c` | 已提交 | `GreetingTemplates` 60 条本地诗意问候、6 条默认问候、`DailyGreeting.localizedMessages` 展示层本地化；本地缓存保留 raw key，AI/CloudKit 内容不误翻译 | `xcodebuild` 通过（index 源码快照） |
 
 ## Subagent 最新盘点
 
@@ -50,7 +51,7 @@
 | Schrodinger | 编辑/品牌标签复核 | 确认品牌/标签壳层和删除确认 key 基本已有；用户 brand/tag/option 不应本地化；存储 rawValue 不动 | P0 最明确缺口是 `ClothingEditSections` 的 `裙装名称` key；价格/汇率展示、toast 参数和汇率服务错误需要独立格式化切片 | 下一刀编辑页可先补 `裙装名称` key；金额/汇率另开 formatter，不和品牌/标签管理混改 |
 | Lorentz | 详情/分享/查看器 P1 审计 | 确认详情页主体验不再是 P0 文案阻塞；剩余高收益点集中在 viewer 保存结果、分享卡 chrome、分享卡内容 label | `ImageViewer`/`ChartImageViewer` 的保存结果变量、`ShareCardManager` 的分享标题/准备中/按钮、`ClothingShareCardView` 的 `型色` key 未做 | 先做 viewer 保存结果，再做分享卡 chrome，最后补分享卡内容 label；用户输入/品牌/衣物状态值不翻译 |
 | Huygens | 日历/打卡 P0 审计 | 已派发；本轮两次 `wait_agent` 未返回最终结果，随后关闭，前置状态为 running | 未产出可采纳审计结论，暂不据此改代码或调整优先级 | 下轮重新派发或恢复同类审计，再决定每日打卡/日历是否还有 P0 切片 |
-| Descartes | 日历/打卡 P0 审计 | 确认 `DailyCheckInView` 主 UI 基本已覆盖；DepositPlan 月/系列选择按 `b29ee98` 落地，尾款通知流程按 `0bebbec` 落地 | 每日内容生成语言仍需独立切片；DailyGreeting/DailyCheckIn 的 AI prompt 与 CloudKit 公共内容 locale 维度未处理 | 日历/打卡 P0 下一刀转每日内容 fallback/prompt；rawValue/日期存储 key 不动 |
+| Descartes | 日历/打卡 P0 审计 | 确认 `DailyCheckInView` 主 UI 基本已覆盖；DepositPlan 月/系列选择按 `b29ee98` 落地，尾款通知流程按 `0bebbec` 落地；DailyGreeting 本地模板按 `9d4ab3c` 落地 | DailyCheckIn 穿搭色本地 fallback、DailyGreeting/DailyCheckIn 的 AI prompt 与 CloudKit 公共内容 locale 维度未处理 | 日历/打卡下一刀转 DailyCheckIn 本地 fallback；rawValue/日期存储 key/CloudKit record 不动 |
 | Sartre | 萌宠 fallback/prompt 审计 | 确认 P0 是用户可见 fallback/humanizer 与会生成并同步用户内容的每日 prompt；`PetAIService`/`PetPersonaProfile.warmthSuffixes`/`PetResponseHumanizer` 已按 `45876f7` 落地 | PetChat/Legacy 共享 fallback、DailyGreeting/DailyCheckIn 内容生成仍需切片 | 下一刀转每日内容或 PetChat 低频 fallback；`ask:`、command id、JSON schema 和存储字段保持稳定 |
 | Fermat | 萌宠 fallback/prompt 复核 | 明确第一刀应只做用户可见 fallback/humanizer；该第一刀已按 `45876f7` 落地，未触碰 prompt/schema/command | prompt key 化、PetGenerativePromptBuilder、PetConversationV2Support、PetRole、CloudKit 公共内容 locale 维度后置 | key 前缀建议 `daily.greeting.*`、`daily.checkin.*`；不翻译 JSON schema、command id、`ask:` 前缀 |
 | Chandrasekhar | 尾款通知服务审计 | 指出正式/测试系统通知 title/body、支付期/金额短语需与 View 同刀处理；已按 `0bebbec` 落地，测试秒数由硬写 5 秒改为动态 `%d` | 复数规则和货币格式仍是后续格式化治理；既有 pending request 语言切换后会因 title/body 变化触发重排属预期 | payload keys、UserDefaults keys、threadIdentifier、`depositPlan`/`test`/`_catchup` identifier token 继续禁止翻译 |
@@ -59,6 +60,8 @@
 | Jason | UI 美化静态复核 | 确认衣橱空态已完成；小屋素材基本齐但缺失素材无主题化 fallback；`AttributePill.fixedSize` 风险已按 `4fac66f` 修复 | 统计图表硬编码色、详情页无图 placeholder/hero offset、编辑页首屏/图片 tile、小屋素材缺失空态仍未做 | UI 下一刀转统计图表主题色或小屋素材缺失空态；仍需窄屏/大字号模拟器验收 `AttributePill` |
 | Leibniz | AttributePill 溢出最小修法 | 定位 `AttributePill` 只在 `ClothingRow` 详细列表属性行使用；6 列缩略图和普通网格不走该路径；最小修法已按 `4fac66f` 落地 | 详细列表长类型/颜色/尺码仍需真机/模拟器大字号视觉复核 | 后续如仍溢出，再给中间列 `minWidth:0,maxWidth:.infinity`，不要扩大到普通网格卡片 |
 | Lovelace | AttributePill worker 实现 | 直接修改 `ClothingCard.swift`，移除横向 fixedSize，补 `minimumScaleFactor(0.78)`、tail truncation、tightening；主代理已验收并提交 `4fac66f` | worker 未返回最终验收报告，关闭时状态仍为 running；未做 Computer Use 视觉截图 | 该切片仅静态/构建验收，下一轮 UI 验收需跑窄屏和大字号页面截图 |
+| Kierkegaard | DailyCheckIn 本地 fallback/AI prompt 边界审计 | 确认本地 fallback 应分层改 `DailyCheckInManager`、`DailyCheckInView`、`Season`/`WeatherCondition` display、`ColorInfo` 展示名；AI prompt 与 CloudKit locale 维度必须另切 | DailyCheckIn 颜色名/accessories/description/season/weather 展示仍未做；CloudKit public 内容暂无 locale 维度 | 颜色 rawName/hex 与 displayName 必须分离；`DailyOutfitColor` record/key、`source` token、enum rawValue、JSON schema、record id 绝对不翻译 |
+| Parfit | PetChat/Legacy fallback 与 command 边界审计 | 确认剩余中文直出集中在 disambiguation、搜索 fallback、投喂/摸摸/玩耍反馈、搭配/天气低频失败和 Legacy 菜单 label | 两份 PetChat 实现重复，尚未改；`localizedCatchphraseText` 仍只做喵/汪替换 | 下一刀建议同刀改两份 View 的用户可见文案或先抽 `PetChatCopy`；command id、`ask:` 前缀、widget command、JSON schema、transcript/memory 字段不翻译 |
 
 ## UI 美化盘点
 
@@ -77,8 +80,8 @@
 
 ## 下一阶段建议
 
-1. 萌宠用户可见 fallback/humanizer 已按 `45876f7` 完成；下一刀转 PetChat/Legacy 低频 fallback 或 Daily 内容生成，不要混改 prompt、JSON、command。
-2. 日历/打卡 P0 下一刀转每日内容生成：`DailyGreeting` 本地 fallback、`DailyCheckIn` 本地 fallback/toast，AI prompt 多语言和 CloudKit locale 维度单独切片。
+1. 萌宠用户可见 fallback/humanizer 已按 `45876f7` 完成；下一刀可按 Parfit 做 PetChat/Legacy 低频 fallback，不要混改 command、JSON、transcript。
+2. 日历/打卡 P0：`DailyGreeting` 本地模板已按 `9d4ab3c` 完成；下一刀按 Kierkegaard 做 `DailyCheckIn` 本地 fallback 展示层，AI prompt 多语言和 CloudKit locale 维度单独切片。
 3. Settings/Me P1 可按 Bacon 建议做 `MeView` 首屏/CloudSyncSheet + `UserProfileEditView` + `PrivacySettingsView`。
 4. 详情页 P1 可接 Lorentz 建议：先 viewer 保存结果，再分享卡 chrome，最后补分享卡内容 label。
 5. 编辑页 P0 仍保留精确小切片：补 `裙装名称` key；金额/汇率另开 formatter。
