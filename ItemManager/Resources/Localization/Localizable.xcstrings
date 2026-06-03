@@ -130,6 +130,42 @@
             "state" : "translated",
             "value" : "· 更多會員權益正在路上"
           }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "· さらに多くの会員特典を準備中"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "· 더 많은 회원 혜택 준비 중"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "· D'autres avantages arrivent"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "· Weitere Vorteile sind unterwegs"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "· Vienen mas beneficios"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "· Mais beneficios estao a caminho"
+          }
         }
       }
     },
@@ -7010,6 +7046,42 @@
             "state" : "translated",
             "value" : "VIP 為喵幣兌換型權益，不自動續費。"
           }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "VIP はニャーコインで引き換える特典で、自動更新はありません。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "VIP는 야옹 코인으로 교환하는 혜택이며 자동 갱신되지 않습니다."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le VIP s'echange avec des pieces Miaou et ne se renouvelle pas automatiquement."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "VIP wird mit Miau-Muenzen eingeloest und verlaengert sich nicht automatisch."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "VIP se canjea con monedas Miau y no se renueva automaticamente."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "VIP e resgatado com Moedas Miau e nao renova automaticamente."
+          }
         }
       }
     },
@@ -8619,7 +8691,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Custom Icon"
+            "value" : "Custom Icons"
           }
         },
         "zh-Hans" : {
@@ -8631,7 +8703,43 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "個性圖標"
+            "value" : "個性圖示"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "カスタムアイコン"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "개성 아이콘"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Icones personnalisees"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Individuelle Icons"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Iconos personalizados"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Icones personalizados"
           }
         }
       }
@@ -9294,6 +9402,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "主題皮膚商店"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "テーマスキンストア"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "테마 스킨 상점"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Boutique de skins de theme"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Theme-Skin-Shop"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tienda de skins de tema"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Loja de skins de tema"
           }
         }
       }
@@ -11278,7 +11422,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Offer codes apply only to in-app purchases offered by this app on the App Store."
+            "value" : "Offer codes only apply to in-app purchases this app provides through the App Store."
           }
         },
         "zh-Hans" : {
@@ -11291,6 +11435,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "優惠碼僅適用於本 App 在 App Store 中提供的內購項目。"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "オファーコードは、このアプリが App Store で提供するアプリ内購入にのみ適用されます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "혜택 코드는 이 앱이 App Store에서 제공하는 앱 내 구매에만 적용됩니다."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les codes promotionnels s'appliquent uniquement aux achats integres fournis par cette app via l'App Store."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Angebotscodes gelten nur fuer In-App-Kaeufe, die diese App im App Store anbietet."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Los codigos promocionales solo se aplican a compras dentro de la app ofrecidas por esta app en App Store."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Codigos promocionais se aplicam apenas a compras no app oferecidas por este app na App Store."
           }
         }
       }
@@ -11381,7 +11561,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Redeem Membership"
+            "value" : "VIP Redemption"
           }
         },
         "zh-Hans" : {
@@ -11394,6 +11574,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "會員兌換"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "VIP 引き換え"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "VIP 교환"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Echange VIP"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "VIP-Einloesung"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Canje VIP"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Resgate VIP"
           }
         }
       }
@@ -11417,6 +11633,42 @@
             "state" : "translated",
             "value" : "會員協議"
           }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "VIP 規約"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "VIP 약관"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Accord VIP"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "VIP-Vereinbarung"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Acuerdo VIP"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Contrato VIP"
+          }
         }
       }
     },
@@ -11438,6 +11690,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "會員權益"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "会員特典"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "회원 혜택"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Avantages membre"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mitgliedsvorteile"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Beneficios de miembro"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Beneficios de membro"
           }
         }
       }
@@ -11967,7 +12255,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Use App Store Offer Code"
+            "value" : "Use an App Store Code"
           }
         },
         "zh-Hans" : {
@@ -11980,6 +12268,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "使用 App Store 優惠碼"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "App Store コードを使う"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "App Store 코드 사용"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Utiliser un code App Store"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "App Store Code verwenden"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Usar codigo de App Store"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Usar codigo da App Store"
           }
         }
       }
@@ -12115,7 +12439,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Terms of Use"
+            "value" : "User Agreement"
           }
         },
         "zh-Hans" : {
@@ -12128,6 +12452,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "使用協議"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "利用規約"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "사용 약관"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Conditions d'utilisation"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nutzungsvereinbarung"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Acuerdo de uso"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Contrato de Uso"
           }
         }
       }
@@ -13706,7 +14066,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Redeem %@ Membership"
+            "value" : "Redeem %@ VIP"
           }
         },
         "zh-Hans" : {
@@ -13720,6 +14080,42 @@
             "state" : "translated",
             "value" : "兌換%@會員"
           }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ VIP を引き換え"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ VIP 교환"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Echanger VIP %@"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ VIP einloesen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Canjear VIP de %@"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Resgatar VIP de %@"
+          }
         }
       }
     },
@@ -13728,7 +14124,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Redeem, 《 VIP Agreement 》 《 Terms of Use 》. Confirm Meow Coins."
+            "value" : "Before redeeming VIP, please read and check the VIP Agreement and User Agreement. After confirmation, the required Meow Coins will be deducted and VIP will take effect immediately."
           }
         },
         "zh-Hans" : {
@@ -13741,6 +14137,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "兌換會員前，請先閱讀並勾選《會員協議》和《使用協議》。確認後將立即扣除對應喵幣並生效。"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "VIP を引き換える前に、VIP 規約と利用規約を読んでチェックしてください。確認後、必要なニャーコインがすぐに差し引かれ、VIP が有効になります。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "VIP를 교환하기 전에 VIP 약관과 사용 약관을 읽고 체크해 주세요. 확인 후 필요한 야옹 코인이 즉시 차감되고 VIP가 적용됩니다."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Avant d'echanger le VIP, lisez et cochez l'accord VIP et les conditions d'utilisation. Apres confirmation, les pieces Miaou requises seront deduites et le VIP prendra effet immediatement."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lies und markiere vor dem Einloesen die VIP-Vereinbarung und Nutzungsvereinbarung. Nach der Bestaetigung werden die erforderlichen Miau-Muenzen sofort abgezogen und VIP wird aktiv."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Antes de canjear VIP, lee y marca el Acuerdo VIP y el Acuerdo de uso. Tras confirmar, se descontaran las monedas Miau requeridas y VIP se activara de inmediato."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Antes de resgatar o VIP, leia e marque o Contrato VIP e o Contrato de Uso. Apos confirmar, as Moedas Miau necessarias serao descontadas e o VIP entrara em vigor imediatamente."
           }
         }
       }
@@ -13830,7 +14262,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Redeem Confirmation"
+            "value" : "Confirm Redemption"
           }
         },
         "zh-Hans" : {
@@ -13843,6 +14275,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "兌換確認"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "引き換え確認"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "교환 확인"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Confirmer l'echange"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Einloesung bestaetigen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Confirmar canje"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Confirmar resgate"
           }
         }
       }
@@ -16422,7 +16890,43 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "切換圖標"
+            "value" : "切換圖示"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アイコン切替"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "아이콘 변경"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Changer d'icone"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Icon wechseln"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cambiar icono"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trocar icone"
           }
         }
       }
@@ -22377,7 +22881,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Meow Coins? Store Meow Coins"
+            "value" : "Need more Meow Coins? Visit the store."
           }
         },
         "zh-Hans" : {
@@ -22389,7 +22893,43 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "喵幣不足？前往商店獲取喵幣"
+            "value" : "喵幣不足？前往商店取得喵幣"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ニャーコインが足りませんか？ストアへ行きましょう。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "야옹 코인이 부족한가요? 상점으로 가세요."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Besoin de pieces Miaou ? Allez a la boutique."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mehr Miau-Muenzen benoetigt? Zum Shop."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Necesitas mas monedas Miau? Ve a la tienda."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Precisa de mais Moedas Miau? Va para a loja."
           }
         }
       }
@@ -24616,7 +25156,6 @@
       }
     },
     "天空音乐会" : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -24635,11 +25174,46 @@
             "state" : "translated",
             "value" : "天空音樂會"
           }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "天空音楽会"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "하늘 콘서트"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Concert du ciel"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Himmelskonzert"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Concierto del cielo"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Concerto no ceu"
+          }
         }
       }
     },
     "天鹅入梦" : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -24657,6 +25231,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "天鵝入夢"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "白鳥の夢"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "백조의 꿈"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reve de cygne"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Schwanentraum"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sueno de cisne"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sonho do cisne"
           }
         }
       }
@@ -25223,7 +25833,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Protect every lovely moment"
+            "value" : "Guard every lovely wish"
           }
         },
         "zh-Hans" : {
@@ -25236,6 +25846,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "守護少女每一份美好"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "少女のすべての素敵な願いを守る"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "소녀의 모든 아름다운 소원을 지켜요"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Proteger chaque joli souhait"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Jeden schoenen Wunsch behueten"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Protege cada deseo bonito"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Proteja cada lindo desejo"
           }
         }
       }
@@ -27143,6 +27789,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "少女心願"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "少女の願い"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "소녀의 소원"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pink House"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pink House"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pink House"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pink House"
           }
         }
       }
@@ -31617,7 +32299,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Activate,"
+            "value" : "Takes effect immediately and can extend your current period."
           }
         },
         "zh-Hans" : {
@@ -31630,6 +32312,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "開通後立即生效，可疊加有效期"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "有効化後すぐに反映され、現在の期限に加算できます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "활성화 후 즉시 적용되며 기존 기간에 누적됩니다."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Prend effet immediatement et peut prolonger votre periode actuelle."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wird sofort aktiv und kann deine aktuelle Laufzeit verlaengern."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Se activa de inmediato y puede ampliar tu periodo actual."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Entra em vigor imediatamente e pode estender seu periodo atual."
           }
         }
       }
@@ -34778,7 +35496,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "I agree and have checked it"
+            "value" : "I have agreed and checked it"
           }
         },
         "zh-Hans" : {
@@ -34791,6 +35509,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "我已同意並勾選"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "同意してチェックしました"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "동의하고 체크했습니다"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "J'ai accepte et coche"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ich habe zugestimmt und es markiert"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "He aceptado y marcado la casilla"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Concordei e marquei"
           }
         }
       }
@@ -44473,12 +45227,11 @@
       }
     },
     "来财个性化" : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Wealth Personalization"
+            "value" : "Fortune Personalization"
           }
         },
         "zh-Hans" : {
@@ -44491,6 +45244,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "來財個人化"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "来財のカスタマイズ"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "재물 기능 개인화"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Personnalisation Fortune"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fortune-Personalisierung"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Personalizacion de fortuna"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Personalizacao de fortuna"
           }
         }
       }
@@ -57658,7 +58447,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Give your wishes a more premium guard"
+            "value" : "A more premium guard for your wishes"
           }
         },
         "zh-Hans" : {
@@ -57671,6 +58460,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "給你的心願一份更尊貴的守護"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "あなたの願いをより上質に守ります"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "당신의 소원을 더 품격 있게 지켜요"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Une protection plus premium pour vos souhaits"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ein edlerer Schutz fuer deine Wuensche"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Una proteccion mas premium para tus deseos"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Uma protecao mais premium para seus desejos"
           }
         }
       }
@@ -60537,7 +61362,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Pet Store"
+            "value" : "Pet Shop"
           }
         },
         "zh-Hans" : {
@@ -60550,6 +61375,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "萌寵商店"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ペットショップ"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "펫 상점"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Boutique des animaux"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Haustier-Shop"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tienda de mascotas"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Loja de pets"
           }
         }
       }
@@ -62512,7 +63373,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Settings Card"
+            "value" : "Set Card"
           }
         },
         "zh-Hans" : {
@@ -62524,7 +63385,43 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "設置卡片"
+            "value" : "設定卡片"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "カード設定"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "카드 설정"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Regler la carte"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Karte festlegen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Configurar tarjeta"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Configurar cartao"
           }
         }
       }
@@ -64162,7 +65059,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Please"
+            "value" : "Please read and agree to"
           }
         },
         "zh-Hans" : {
@@ -64175,6 +65072,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "請閱讀並同意"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "読んで同意してください"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "읽고 동의해 주세요"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Veuillez lire et accepter"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bitte lesen und zustimmen:"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lee y acepta"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Leia e concorde com"
           }
         }
       }
@@ -71885,13 +72818,13 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "マジック配色"
+            "value" : "魔法カラー"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "매직 색상"
+            "value" : "마법 색상"
           }
         },
         "fr" : {
@@ -71909,13 +72842,13 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Colores mágicos"
+            "value" : "Colores magicos"
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Cores mágicas"
+            "value" : "Cores magicas"
           }
         }
       }
@@ -90710,7 +91643,7 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Rosa Mónica"
+            "value" : "Rosa Monica"
           }
         },
         "pt-BR" : {
@@ -91336,7 +92269,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Boutique des pets %@"
+            "value" : "Boutique des animaux %@"
           }
         },
         "de" : {
@@ -94661,6 +95594,2674 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Resgate concluido! Voce recebeu %d Moedas Miau"
+          }
+        }
+      }
+    },
+    "一个月" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 month"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "一个月"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "一個月"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1か月"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1개월"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 mois"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 Monat"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 mes"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 mes"
+          }
+        }
+      }
+    },
+    "三个月" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "3 months"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "三个月"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "三個月"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "3か月"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "3개월"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "3 mois"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "3 Monate"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "3 meses"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "3 meses"
+          }
+        }
+      }
+    },
+    "%d喵币" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%d Meow Coins"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%d喵币"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%d喵幣"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%d ニャーコイン"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%d 야옹 코인"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%d pieces Miaou"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%d Miau-Muenzen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%d monedas Miau"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%d Moedas Miau"
+          }
+        }
+      }
+    },
+    "喵币不足，需要 %d 喵币" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not enough Meow Coins. You need %d Meow Coins."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "喵币不足，需要 %d 喵币"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "喵幣不足，需要 %d 喵幣"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ニャーコインが足りません。%d ニャーコイン必要です。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "야옹 코인이 부족합니다. %d 야옹 코인이 필요해요."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pieces Miaou insuffisantes. Il en faut %d."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nicht genug Miau-Muenzen. Du brauchst %d Miau-Muenzen."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No tienes suficientes monedas Miau. Necesitas %d."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Moedas Miau insuficientes. Voce precisa de %d."
+          }
+        }
+      }
+    },
+    "开通成功！有效期至 %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "VIP activated! Valid until %@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "开通成功！有效期至 %@"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "開通成功！有效期至 %@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "VIP が有効になりました！有効期限: %@"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "VIP가 활성화되었습니다! 유효 기간: %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "VIP active ! Valable jusqu'au %@"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "VIP aktiviert! Gueltig bis %@"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "VIP activado! Valido hasta %@"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "VIP ativado! Valido ate %@"
+          }
+        }
+      }
+    },
+    "您已经使用过试用期了" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You have already used the trial."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "您已经使用过试用期了"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "您已經使用過試用期了"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "すでに試用期間を利用済みです。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이미 체험 기간을 사용했습니다."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vous avez deja utilise l'essai."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Du hast die Testphase bereits genutzt."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ya usaste el periodo de prueba."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Voce ja usou o periodo de teste."
+          }
+        }
+      }
+    },
+    "您已经是VIP会员了" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You are already a VIP member."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "您已经是VIP会员了"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "您已經是 VIP 會員了"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "すでに VIP メンバーです。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이미 VIP 회원입니다."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vous etes deja membre VIP."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Du bist bereits VIP-Mitglied."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ya eres miembro VIP."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Voce ja e membro VIP."
+          }
+        }
+      }
+    },
+    "系统错误，请稍后重试" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "System error. Please try again later."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "系统错误，请稍后重试"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "系統錯誤，請稍後再試"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "システムエラーです。しばらくしてからもう一度お試しください。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "시스템 오류입니다. 잠시 후 다시 시도해 주세요."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Erreur systeme. Reessayez plus tard."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Systemfehler. Bitte versuche es spaeter erneut."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Error del sistema. Intentalo mas tarde."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Erro do sistema. Tente novamente mais tarde."
+          }
+        }
+      }
+    },
+    "试用期已开启！有效期至 %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trial started! Valid until %@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "试用期已开启！有效期至 %@"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "試用期已開啟！有效期至 %@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "試用期間が開始しました！有効期限: %@"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "체험 기간이 시작되었습니다! 유효 기간: %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Essai active ! Valable jusqu'au %@"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Testphase gestartet! Gueltig bis %@"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Prueba iniciada! Valida hasta %@"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Teste iniciado! Valido ate %@"
+          }
+        }
+      }
+    },
+    "有效期至 %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Valid until %@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "有效期至 %@"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "有效期至 %@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "有効期限: %@"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "유효 기간: %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Valable jusqu'au %@"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gueltig bis %@"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Valido hasta %@"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Valido ate %@"
+          }
+        }
+      }
+    },
+    "体验中 · 截止 %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trial active · Ends %@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "体验中 · 截止 %@"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "體驗中 · 截止 %@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "試用中 · %@ まで"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "체험 중 · %@까지"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Essai en cours · Jusqu'au %@"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Testphase aktiv · Bis %@"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Prueba activa · Hasta %@"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Teste ativo · Ate %@"
+          }
+        }
+      }
+    },
+    "开通后解锁智能能力、尊贵身份与专属优惠" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unlock smart features, VIP identity, and exclusive discounts."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "开通后解锁智能能力、尊贵身份与专属优惠"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "開通後解鎖智慧能力、尊貴身份與專屬優惠"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "有効化するとスマート機能、VIP 身分、限定割引を解除できます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "활성화하면 스마트 기능, VIP 신분, 전용 할인을 해제할 수 있어요."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Debloquez des fonctions intelligentes, une identite VIP et des remises exclusives."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Schalte smarte Funktionen, VIP-Identitaet und exklusive Rabatte frei."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Desbloquea funciones inteligentes, identidad VIP y descuentos exclusivos."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Desbloqueie recursos inteligentes, identidade VIP e descontos exclusivos."
+          }
+        }
+      }
+    },
+    "智能统计" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Smart Stats"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "智能统计"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "智慧統計"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "スマート統計"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "스마트 통계"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stats intelligentes"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Smarte Statistiken"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Estadisticas inteligentes"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Estatisticas inteligentes"
+          }
+        }
+      }
+    },
+    "本地分析 · 更懂你的衣橱" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Local analysis · Understands your closet better"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "本地分析 · 更懂你的衣橱"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "本地分析 · 更懂你的衣櫥"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ローカル分析 · クローゼットをより深く理解"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "로컬 분석 · 옷장을 더 잘 이해"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Analyse locale · Comprend mieux votre garde-robe"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lokale Analyse · Versteht deinen Kleiderschrank besser"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Analisis local · Entiende mejor tu armario"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Analise local · Entende melhor seu closet"
+          }
+        }
+      }
+    },
+    "多模态智能" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Multimodal AI"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "多模态智能"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "多模態智慧"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "マルチモーダルAI"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "멀티모달 AI"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "IA multimodale"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Multimodale KI"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "IA multimodal"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "IA multimodal"
+          }
+        }
+      }
+    },
+    "图片识别 · 智能互动" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Image recognition · Smart interaction"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "图片识别 · 智能互动"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "圖片辨識 · 智慧互動"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "画像認識 · スマートなやり取り"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이미지 인식 · 스마트 상호작용"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reconnaissance d'image · Interaction intelligente"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bilderkennung · Smarte Interaktion"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reconocimiento de imagen · Interaccion inteligente"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reconhecimento de imagem · Interacao inteligente"
+          }
+        }
+      }
+    },
+    "VIP身份" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "VIP Identity"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "VIP身份"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "VIP 身份"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "VIP 身分"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "VIP 신분"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Identite VIP"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "VIP-Identitaet"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Identidad VIP"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Identidade VIP"
+          }
+        }
+      }
+    },
+    "靓号身份 · 卡片皮肤" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lucky number · Card skins"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "靓号身份 · 卡片皮肤"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "靚號身份 · 卡片皮膚"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ラッキーナンバー · カードスキン"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "행운 번호 · 카드 스킨"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Numero chanceux · Skins de carte"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gluecksnummer · Karten-Skins"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Numero especial · Skins de tarjeta"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Numero especial · Skins de cartao"
+          }
+        }
+      }
+    },
+    "付费内容优惠" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Paid Content Discounts"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "付费内容优惠"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "付費內容優惠"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "有料コンテンツ割引"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "유료 콘텐츠 할인"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remises sur contenu payant"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rabatte auf Bezahl-Inhalte"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Descuentos en contenido de pago"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Descontos em conteudo pago"
+          }
+        }
+      }
+    },
+    "纸币背景" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bill backgrounds"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "纸币背景"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "紙幣背景"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "紙幣背景"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "지폐 배경"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Arriere-plans de billets"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Geldschein-Hintergruende"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fondos de billetes"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fundos de cedulas"
+          }
+        }
+      }
+    },
+    "主题特权 · 智能调色" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Theme privilege · Smart colors"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "主题特权 · 智能调色"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "主題特權 · 智慧調色"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "テーマ特典 · スマート配色"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "테마 특권 · 스마트 색상"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Privilege theme · Couleurs intelligentes"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Theme-Vorteil · Smarte Farbwahl"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Privilegio de tema · Color inteligente"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Privilegio de tema · Cores inteligentes"
+          }
+        }
+      }
+    },
+    "图标切换 · 专属收藏" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Icon switching · Exclusive collection"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "图标切换 · 专属收藏"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "圖示切換 · 專屬收藏"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アイコン切替 · 限定コレクション"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "아이콘 변경 · 전용 컬렉션"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Changement d'icone · Collection exclusive"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Icon-Wechsel · Exklusive Sammlung"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cambio de icono · Coleccion exclusiva"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Troca de icone · Colecao exclusiva"
+          }
+        }
+      }
+    },
+    "持续更新" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ongoing Updates"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "持续更新"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "持續更新"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "継続アップデート"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "지속 업데이트"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mises a jour continues"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Laufende Updates"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Actualizaciones continuas"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Atualizacoes continuas"
+          }
+        }
+      }
+    },
+    "主题皮肤商店\n%@\n· 更多会员权益正在路上" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Theme Skin Store\n%@\n· More member benefits are on the way"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "主题皮肤商店\n%@\n· 更多会员权益正在路上"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "主題皮膚商店\n%@\n· 更多會員權益正在路上"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "テーマスキンストア\n%@\n· さらに多くの会員特典を準備中"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "테마 스킨 상점\n%@\n· 더 많은 회원 혜택 준비 중"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Boutique de skins de theme\n%@\n· D'autres avantages arrivent"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Theme-Skin-Shop\n%@\n· Weitere Vorteile sind unterwegs"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tienda de skins de tema\n%@\n· Vienen mas beneficios"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Loja de skins de tema\n%@\n· Mais beneficios estao a caminho"
+          }
+        }
+      }
+    },
+    "暂时无法打开" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cannot Open Right Now"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "暂时无法打开"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "暫時無法開啟"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "現在開けません"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "지금은 열 수 없습니다"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ouverture impossible pour le moment"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kann derzeit nicht geoeffnet werden"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No se puede abrir ahora"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nao e possivel abrir agora"
+          }
+        }
+      }
+    },
+    "暂时无法兑换" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cannot Redeem Right Now"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "暂时无法兑换"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "暫時無法兌換"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "現在引き換えできません"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "지금은 교환할 수 없습니다"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Echange impossible pour le moment"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kann derzeit nicht eingeloest werden"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No se puede canjear ahora"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nao e possivel resgatar agora"
+          }
+        }
+      }
+    },
+    "开通 VIP 后即可切换专属卡片皮肤，并解锁你的尊贵身份样式。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Activate VIP to switch exclusive card skins and unlock your premium identity style."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "开通 VIP 后即可切换专属卡片皮肤，并解锁你的尊贵身份样式。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "開通 VIP 後即可切換專屬卡片皮膚，並解鎖你的尊貴身份樣式。"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "VIP を有効にすると限定カードスキンを切り替え、プレミアムな身分スタイルを解除できます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "VIP를 활성화하면 전용 카드 스킨을 바꾸고 프리미엄 신분 스타일을 해제할 수 있어요."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Activez le VIP pour changer de skins de carte exclusifs et debloquer votre style d'identite premium."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aktiviere VIP, um exklusive Karten-Skins zu wechseln und deinen Premium-Identitaetsstil freizuschalten."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Activa VIP para cambiar skins de tarjeta exclusivos y desbloquear tu estilo de identidad premium."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ative o VIP para trocar skins de cartao exclusivos e desbloquear seu estilo de identidade premium."
+          }
+        }
+      }
+    },
+    "开通 VIP 后，可以把 Pink House 的桌面图标换成礼服、珍珠、月光等专属风格。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "After activating VIP, you can change the Pink House home-screen icon to exclusive styles such as gown, pearl, or moonlight."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "开通 VIP 后，可以把 Pink House 的桌面图标换成礼服、珍珠、月光等专属风格。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "開通 VIP 後，可以把 Pink House 的桌面圖示換成禮服、珍珠、月光等專屬風格。"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "VIP を有効にすると、Pink House のホーム画面アイコンをドレス、真珠、月光などの限定スタイルに変更できます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "VIP를 활성화하면 Pink House 홈 화면 아이콘을 드레스, 진주, 달빛 같은 전용 스타일로 바꿀 수 있어요."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apres activation VIP, vous pouvez changer l'icone Pink House de l'ecran d'accueil en styles exclusifs comme robe, perle ou clair de lune."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nach der VIP-Aktivierung kannst du das Pink House Homescreen-Icon in exklusive Stile wie Kleid, Perle oder Mondlicht aendern."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tras activar VIP, puedes cambiar el icono de Pink House por estilos exclusivos como vestido, perla o luz de luna."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Depois de ativar o VIP, voce pode trocar o icone do Pink House por estilos exclusivos como vestido, perola ou luar."
+          }
+        }
+      }
+    },
+    "尊贵身份" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "VIP Identity"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "尊贵身份"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "尊貴身份"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "プレミアム身分"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "프리미엄 신분"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Identite premium"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Premium-Identitaet"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Identidad premium"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Identidade premium"
+          }
+        }
+      }
+    },
+    "智能升级" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Smart Upgrade"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "智能升级"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "智慧升級"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "スマートアップグレード"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "스마트 업그레이드"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mise a niveau intelligente"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Smartes Upgrade"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mejora inteligente"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Upgrade inteligente"
+          }
+        }
+      }
+    },
+    "试用可体验" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trial available"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "试用可体验"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "可試用體驗"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "試用できます"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "체험 가능"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Essai disponible"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Test verfuegbar"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Prueba disponible"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Teste disponivel"
+          }
+        }
+      }
+    },
+    "你正在体验 VIP 中" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You are trying VIP"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你正在体验 VIP 中"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你正在體驗 VIP 中"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "VIP を試用中です"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "VIP를 체험 중입니다"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vous essayez le VIP"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Du testest VIP"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Estas probando VIP"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Voce esta testando o VIP"
+          }
+        }
+      }
+    },
+    "你已经拥有 VIP 身份" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You already have VIP status"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你已经拥有 VIP 身份"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你已經擁有 VIP 身份"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "すでに VIP ステータスを持っています"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이미 VIP 신분을 보유 중입니다"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vous avez deja le statut VIP"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Du hast bereits VIP-Status"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ya tienes estado VIP"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Voce ja tem status VIP"
+          }
+        }
+      }
+    },
+    "升级为 VIP，解锁更完整的智能体验" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Upgrade to VIP to unlock the full smart experience."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "升级为 VIP，解锁更完整的智能体验"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "升級為 VIP，解鎖更完整的智慧體驗"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "VIP にアップグレードして、より完全なスマート体験を解除しましょう。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "VIP로 업그레이드하고 더 완전한 스마트 경험을 해제하세요."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Passez VIP pour debloquer l'experience intelligente complete."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Upgrade auf VIP und schalte das volle smarte Erlebnis frei."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sube a VIP para desbloquear la experiencia inteligente completa."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Faca upgrade para VIP e desbloqueie a experiencia inteligente completa."
+          }
+        }
+      }
+    },
+    "体验期间即可抢先感受多模态智能、专属身份和会员优惠。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "During the trial, you can preview multimodal AI, VIP identity, and member discounts."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "体验期间即可抢先感受多模态智能、专属身份和会员优惠。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "體驗期間即可搶先感受多模態智慧、專屬身份和會員優惠。"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "試用中は、マルチモーダルAI、VIP 身分、会員割引を先に体験できます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "체험 기간 동안 멀티모달 AI, 전용 신분, 회원 할인을 먼저 느껴볼 수 있어요."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pendant l'essai, decouvrez l'IA multimodale, l'identite VIP et les remises membre."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Waerend der Testphase kannst du multimodale KI, VIP-Identitaet und Mitgliedsrabatte ausprobieren."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Durante la prueba, disfruta antes de IA multimodal, identidad VIP y descuentos de miembro."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Durante o teste, experimente IA multimodal, identidade VIP e descontos de membro."
+          }
+        }
+      }
+    },
+    "专属权益已生效，快去试试萌宠智能对话、卡片皮肤和会员优惠。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your exclusive benefits are active. Try pet AI chat, card skins, and member discounts."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "专属权益已生效，快去试试萌宠智能对话、卡片皮肤和会员优惠。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "專屬權益已生效，快去試試萌寵智慧對話、卡片皮膚和會員優惠。"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "限定特典が有効です。ペットAIチャット、カードスキン、会員割引を試してみましょう。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "전용 혜택이 적용되었습니다. 펫 AI 대화, 카드 스킨, 회원 할인을 사용해 보세요."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vos avantages exclusifs sont actifs. Essayez le chat IA des animaux, les skins de carte et les remises."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Deine exklusiven Vorteile sind aktiv. Probiere Haustier-KI-Chat, Karten-Skins und Rabatte aus."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tus beneficios exclusivos estan activos. Prueba el chat IA de mascotas, skins de tarjeta y descuentos."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Seus beneficios exclusivos estao ativos. Experimente chat IA dos pets, skins de cartao e descontos."
+          }
+        }
+      }
+    },
+    "本地能力依然可用，涉及第三方模型和 API 的智能能力会在开通后完整开放。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Local features remain available. Smart features that use third-party models and APIs fully unlock after activation."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "本地能力依然可用，涉及第三方模型和 API 的智能能力会在开通后完整开放。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "本地能力依然可用，涉及第三方模型和 API 的智慧能力會在開通後完整開放。"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ローカル機能は引き続き使えます。サードパーティモデルや API を使うスマート機能は、有効化後に完全に開放されます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "로컬 기능은 계속 사용할 수 있습니다. 타사 모델과 API를 쓰는 스마트 기능은 활성화 후 완전히 열립니다."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les fonctions locales restent disponibles. Les fonctions intelligentes utilisant des modeles tiers et des API se debloquent completement apres activation."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lokale Funktionen bleiben verfuegbar. Smarte Funktionen mit Drittanbieter-Modellen und APIs werden nach der Aktivierung voll freigeschaltet."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Las funciones locales siguen disponibles. Las funciones inteligentes con modelos y API de terceros se desbloquean por completo tras activar."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recursos locais continuam disponiveis. Recursos inteligentes com modelos e APIs de terceiros sao liberados totalmente apos a ativacao."
+          }
+        }
+      }
+    },
+    "黑金尊享" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Black Gold"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "黑金尊享"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "黑金尊享"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ブラックゴールド"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "블랙 골드"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Noir et or"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Schwarzgold"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Negro dorado"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Preto dourado"
+          }
+        }
+      }
+    },
+    "跟随主题" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Follow Theme"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "跟随主题"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "跟隨主題"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "テーマに合わせる"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "테마 따르기"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Suivre le theme"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Theme folgen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Seguir tema"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Seguir tema"
+          }
+        }
+      }
+    },
+    "开通 VIP 后即可解锁专属身份标识、靓号与卡片皮肤。右上角的「设置卡片」入口也会继续保留。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Activate VIP to unlock exclusive identity badges, lucky numbers, and card skins. The Set Card entry in the top-right menu will remain available."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "开通 VIP 后即可解锁专属身份标识、靓号与卡片皮肤。右上角的「设置卡片」入口也会继续保留。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "開通 VIP 後即可解鎖專屬身份標識、靚號與卡片皮膚。右上角的「設定卡片」入口也會繼續保留。"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "VIP を有効にすると、限定身分バッジ、ラッキーナンバー、カードスキンを解除できます。右上の「カード設定」入口も引き続き使えます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "VIP를 활성화하면 전용 신분 표시, 행운 번호, 카드 스킨을 해제할 수 있습니다. 오른쪽 위의 카드 설정 입구도 계속 유지됩니다."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Activez le VIP pour debloquer badges d'identite exclusifs, numeros chanceux et skins de carte. L'entree Regler la carte restera dans le menu en haut a droite."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aktiviere VIP, um exklusive Identitaetsabzeichen, Gluecksnummern und Karten-Skins freizuschalten. Der Eintrag Karte festlegen oben rechts bleibt erhalten."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Activa VIP para desbloquear insignias de identidad, numeros especiales y skins de tarjeta. La entrada Configurar tarjeta seguira en el menu superior derecho."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ative o VIP para desbloquear identificadores exclusivos, numeros especiais e skins de cartao. A entrada Configurar cartao no canto superior direito continuara disponivel."
+          }
+        }
+      }
+    },
+    "VIP 期间萌宠商店享 %@，\n主题皮肤商店 %@。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "During VIP, enjoy %@ in the Pet Shop,\nand %@ in the Theme Skin Store."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "VIP 期间萌宠商店享 %@，\n主题皮肤商店 %@。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "VIP 期間萌寵商店享 %@，\n主題皮膚商店 %@。"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "VIP 期間中、ペットショップは %@、\nテーマスキンストアは %@ です。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "VIP 기간 동안 펫 상점 %@,\n테마 스킨 상점 %@ 혜택을 누리세요."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pendant le VIP, profitez de %@ dans la boutique des animaux,\net de %@ dans la boutique de skins."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Waehrend VIP erhaelst du %@ im Haustier-Shop\nund %@ im Theme-Skin-Shop."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Durante VIP, disfruta %@ en la tienda de mascotas\ny %@ en la tienda de skins."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Durante o VIP, aproveite %@ na loja de pets\ne %@ na loja de skins."
+          }
+        }
+      }
+    },
+    "VIP 期间可直接使用魔法配色；若你已经单独花喵币解锁，就算 VIP 到期也不会关闭。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "During VIP, Magic Colors are available directly. If you already unlocked them separately with Meow Coins, they will stay available even after VIP expires."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "VIP 期间可直接使用魔法配色；若你已经单独花喵币解锁，就算 VIP 到期也不会关闭。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "VIP 期間可直接使用魔法配色；若你已經單獨花喵幣解鎖，就算 VIP 到期也不會關閉。"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "VIP 期間中は魔法カラーを直接使えます。ニャーコインで個別に解除済みの場合、VIP 期限後も使えます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "VIP 기간에는 마법 색상을 바로 사용할 수 있습니다. 야옹 코인으로 따로 해제했다면 VIP가 만료되어도 닫히지 않습니다."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pendant le VIP, les Couleurs magiques sont disponibles directement. Si vous les avez deja debloquees avec des pieces Miaou, elles restent actives apres expiration du VIP."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Waehrend VIP kannst du Magische Farben direkt nutzen. Wenn du sie separat mit Miau-Muenzen freigeschaltet hast, bleiben sie auch nach VIP-Ablauf aktiv."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Durante VIP, puedes usar Colores magicos directamente. Si ya los desbloqueaste con monedas Miau, seguiran disponibles tras vencer VIP."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Durante o VIP, Cores magicas ficam disponiveis diretamente. Se voce ja desbloqueou com Moedas Miau, elas continuam mesmo apos o VIP expirar."
+          }
+        }
+      }
+    },
+    "你已拥有来财个性化权益。可在「我 → 马上来财设置」中继续自定义纸币与背景样式。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You already have Fortune personalization. Continue customizing bill and background styles in Me -> Fortune Settings."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你已拥有来财个性化权益。可在「我 → 马上来财设置」中继续自定义纸币与背景样式。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你已擁有來財個人化權益。可在「我 → 馬上來財設定」中繼續自訂紙幣與背景樣式。"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "来財カスタマイズ特典をすでに利用できます。「自分 -> 来財設定」で紙幣と背景スタイルを続けて編集できます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이미 재물 기능 개인화 혜택을 보유 중입니다. 나 -> 재물 설정에서 지폐와 배경 스타일을 계속 사용자화할 수 있어요."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vous avez deja la personnalisation Fortune. Continuez a personnaliser billets et arriere-plans dans Moi -> Parametres Fortune."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Du hast Fortune-Personalisierung bereits. Passe Geldscheine und Hintergruende weiter unter Ich -> Fortune-Einstellungen an."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ya tienes personalizacion de fortuna. Sigue personalizando billetes y fondos en Yo -> Ajustes de fortuna."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Voce ja tem personalizacao de fortuna. Continue personalizando cedulas e fundos em Eu -> Configuracoes de fortuna."
+          }
+        }
+      }
+    },
+    "开通 VIP 后即可解锁来财纸币与背景样式自定义能力。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Activate VIP to unlock custom bill and background styles for Fortune."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "开通 VIP 后即可解锁来财纸币与背景样式自定义能力。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "開通 VIP 後即可解鎖來財紙幣與背景樣式自訂能力。"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "VIP を有効にすると、来財の紙幣と背景スタイルのカスタマイズを解除できます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "VIP를 활성화하면 재물 기능의 지폐와 배경 스타일 사용자화를 해제할 수 있어요."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Activez le VIP pour debloquer la personnalisation des billets et arriere-plans Fortune."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aktiviere VIP, um individuelle Geldschein- und Hintergrundstile fuer Fortune freizuschalten."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Activa VIP para desbloquear estilos personalizados de billetes y fondos de fortuna."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ative o VIP para desbloquear estilos personalizados de cedulas e fundos de fortuna."
+          }
+        }
+      }
+    },
+    "会员周报，后续会补充每周衣橱、萌宠与消费概览。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Member weekly reports will later include closet, pet, and spending summaries."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "会员周报，后续会补充每周衣橱、萌宠与消费概览。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "會員週報後續會補充每週衣櫥、萌寵與消費概覽。"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "会員週報には今後、クローゼット、ペット、支出の週間サマリーを追加予定です。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "회원 주간 리포트에는 추후 옷장, 펫, 소비 요약이 추가됩니다."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les rapports hebdomadaires membre ajouteront bientot des resumes garde-robe, animaux et depenses."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mitglieds-Wochenberichte werden spaeter Kleiderschrank-, Haustier- und Ausgabenuebersichten enthalten."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Los informes semanales de miembro incluiran luego resumen de armario, mascotas y gastos."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Relatorios semanais de membro incluirao resumos de closet, pets e gastos."
+          }
+        }
+      }
+    },
+    "后续会持续补充主题皮肤商店、周报与更多会员限定内容。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Theme Skin Store perks, weekly reports, and more member-only content will keep expanding."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "后续会持续补充主题皮肤商店、周报与更多会员限定内容。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "後續會持續補充主題皮膚商店、週報與更多會員限定內容。"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "テーマスキンストア特典、週報、さらに多くの会員限定コンテンツを今後も追加します。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "테마 스킨 상점 혜택, 주간 리포트, 더 많은 회원 전용 콘텐츠가 계속 추가됩니다."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les avantages de la boutique de skins, les rapports hebdomadaires et plus de contenu membre continueront de s'enrichir."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Theme-Skin-Shop-Vorteile, Wochenberichte und weitere Mitgliederinhalte werden fortlaufend ausgebaut."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Los beneficios de la tienda de skins, informes semanales y mas contenido exclusivo seguiran creciendo."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Beneficios da loja de skins, relatorios semanais e mais conteudos exclusivos continuarao crescendo."
           }
         }
       }

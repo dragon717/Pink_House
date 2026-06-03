@@ -71,16 +71,16 @@ class VIPManager: ObservableObject {
         [
             VIPPlan(
                 id: "monthly",
-                title: "一个月",
-                subtitle: "\(Self.monthlyPrice)喵币",
+                title: "一个月".appLocalized,
+                subtitle: "%d喵币".appLocalized(Self.monthlyPrice),
                 months: 1,
                 meowCoins: Self.monthlyPrice,
                 badgeText: nil
             ),
             VIPPlan(
                 id: "quarterly",
-                title: "三个月",
-                subtitle: "\(Self.quarterlyPrice)喵币",
+                title: "三个月".appLocalized,
+                subtitle: "%d喵币".appLocalized(Self.quarterlyPrice),
                 months: 3,
                 meowCoins: Self.quarterlyPrice,
                 badgeText: Self.quarterlyDiscountText
@@ -95,11 +95,11 @@ class VIPManager: ObservableObject {
         let cost = costOverride ?? months * VIPManager.monthlyPrice
         
         if status.meowCoin < cost {
-            return (false, "喵币不足，需要 \(cost) 喵币")
+            return (false, "喵币不足，需要 %d 喵币".appLocalized(cost))
         }
         
         guard StoreManager.spendMeowCoins(cost, in: &status) else {
-            return (false, "喵币不足，需要 \(cost) 喵币")
+            return (false, "喵币不足，需要 %d 喵币".appLocalized(cost))
         }
         
         // Update VIP Status
@@ -126,7 +126,7 @@ class VIPManager: ObservableObject {
         // Update local state
         reloadStatus()
         
-        return (true, "开通成功！有效期至 \(newExpireDate.formatted(date: .numeric, time: .omitted))")
+        return (true, "开通成功！有效期至 %@".appLocalized(Self.localizedDateText(newExpireDate)))
     }
 
     func purchaseVIP(plan: VIPPlan) -> (success: Bool, message: String) {
@@ -169,12 +169,12 @@ class VIPManager: ObservableObject {
         
         // 检查是否已使用过试用期
         guard !status.vipStatus.trialUsed else {
-            return (false, "您已经使用过试用期了")
+            return (false, "您已经使用过试用期了".appLocalized)
         }
         
         // 检查当前是否已经是VIP
         guard !status.vipStatus.isActive || status.vipStatus.isExpired else {
-            return (false, "您已经是VIP会员了")
+            return (false, "您已经是VIP会员了".appLocalized)
         }
         
         let now = Date()
@@ -182,7 +182,7 @@ class VIPManager: ObservableObject {
         
         // 设置试用期为3天
         guard let trialExpireDate = calendar.date(byAdding: .day, value: 3, to: now) else {
-            return (false, "系统错误，请稍后重试")
+            return (false, "系统错误，请稍后重试".appLocalized)
         }
         
         // 更新VIP状态
@@ -203,11 +203,7 @@ class VIPManager: ObservableObject {
         // 更新本地状态
         reloadStatus()
         
-        let dateFormatter = DateFormatter()
-        dateFormatter.dateFormat = "MM月dd日"
-        let expireDateString = dateFormatter.string(from: trialExpireDate)
-        
-        return (true, "试用期已开启！有效期至 \(expireDateString)")
+        return (true, "试用期已开启！有效期至 %@".appLocalized(Self.localizedDateText(trialExpireDate, template: "MMMdd")))
     }
     
     // Generate a lucky number (6-8 digits, favoring 6, 8, 9, 0)
@@ -228,5 +224,12 @@ class VIPManager: ObservableObject {
         }
         
         return result
+    }
+
+    private static func localizedDateText(_ date: Date, template: String = "yMMMd") -> String {
+        let formatter = DateFormatter()
+        formatter.locale = LanguageManager.shared.locale
+        formatter.setLocalizedDateFormatFromTemplate(template)
+        return formatter.string(from: date)
     }
 }

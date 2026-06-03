@@ -106,55 +106,55 @@ struct VIPCenterView: View {
 
     private var heroSubtitle: String {
         if vipManager.isVIP, let expireDate = vipManager.vipExpireDate {
-            return "有效期至 \(expireDate.formatted(date: .numeric, time: .omitted))"
+            return "有效期至 %@".appLocalized(vipCenterDateText(expireDate))
         }
         if vipManager.isInTrialPeriod, let expireDate = vipManager.vipExpireDate {
-            return "体验中 · 截止 \(expireDate.formatted(date: .numeric, time: .omitted))"
+            return "体验中 · 截止 %@".appLocalized(vipCenterDateText(expireDate))
         }
-        return "开通后解锁智能能力、尊贵身份与专属优惠"
+        return "开通后解锁智能能力、尊贵身份与专属优惠".appLocalized
     }
 
     private var benefitsTopRows: [VIPBenefit] {
         [
             VIPBenefit(
                 id: "statistics",
-                title: "智能统计",
-                subtitle: "本地分析 · 更懂你的衣橱",
+                title: "智能统计".appLocalized,
+                subtitle: "本地分析 · 更懂你的衣橱".appLocalized,
                 icon: "chart.bar.fill",
                 preferredGlassStyle: .mistBlue
             ),
             VIPBenefit(
                 id: "multimodal",
-                title: "多模态智能",
-                subtitle: "图片识别 · 智能互动",
+                title: "多模态智能".appLocalized,
+                subtitle: "图片识别 · 智能互动".appLocalized,
                 icon: "sparkles",
                 preferredGlassStyle: .dustyLavender
             ),
             VIPBenefit(
                 id: "identity",
-                title: "VIP身份",
-                subtitle: "靓号身份 · 卡片皮肤",
+                title: "VIP身份".appLocalized,
+                subtitle: "靓号身份 · 卡片皮肤".appLocalized,
                 icon: "crown.fill",
                 preferredGlassStyle: .roseTaupe
             ),
             VIPBenefit(
                 id: "discount",
-                title: "付费内容优惠",
-                subtitle: "萌宠商店 \(VIPManager.petShopDiscountText)",
+                title: "付费内容优惠".appLocalized,
+                subtitle: "萌宠商店 %@".appLocalized(VIPManager.petShopDiscountText),
                 icon: "ticket.fill",
                 preferredGlassStyle: .apricotCream
             ),
             VIPBenefit(
                 id: "wealthPersonalization",
-                title: "来财个性化",
-                subtitle: WealthExperienceCopy.VIP.benefitSubtitle,
+                title: "来财个性化".appLocalized,
+                subtitle: WealthExperienceCopy.VIP.benefitSubtitle.appLocalized,
                 icon: "cat.fill",
                 preferredGlassStyle: .sageMint
             ),
             VIPBenefit(
                 id: "magicTheme",
-                title: "魔法配色",
-                subtitle: "主题特权 · 智能调色",
+                title: "魔法配色".appLocalized,
+                subtitle: "主题特权 · 智能调色".appLocalized,
                 icon: "paintpalette.fill",
                 preferredGlassStyle: .mutedLilac
             )
@@ -165,15 +165,15 @@ struct VIPCenterView: View {
         [
             VIPBenefit(
                 id: "icons",
-                title: "个性图标",
-                subtitle: "图标切换 · 专属收藏",
+                title: "个性图标".appLocalized,
+                subtitle: "图标切换 · 专属收藏".appLocalized,
                 icon: "square.grid.2x2.fill",
                 preferredGlassStyle: .dustyLavender
             ),
             VIPBenefit(
                 id: "updates",
-                title: "持续更新",
-                subtitle: "主题皮肤商店\n \(VIPManager.themeSkinDiscountText) \n · 更多会员权益正在路上",
+                title: "持续更新".appLocalized,
+                subtitle: "主题皮肤商店\n%@\n· 更多会员权益正在路上".appLocalized(VIPManager.themeSkinDiscountText),
                 icon: "heart.fill",
                 preferredGlassStyle: .roseTaupe,
                 isWide: true
@@ -215,34 +215,34 @@ struct VIPCenterView: View {
         .sheet(isPresented: $showCoinStore) {
             MeowCoinStoreView()
         }
-        .alert("兑换确认", isPresented: $showingAgreementConfirmation) {
-            Button("取消", role: .cancel) { }
-            Button("我已同意并勾选") {
+        .alert("兑换确认".appLocalized, isPresented: $showingAgreementConfirmation) {
+            Button("取消".appLocalized, role: .cancel) { }
+            Button("我已同意并勾选".appLocalized) {
                 hasAcceptedVIPAgreements = true
                 performPurchase()
             }
         } message: {
-            Text("兑换会员前，请先阅读并勾选《会员协议》和《使用协议》。确认后将立即扣除对应喵币并生效。")
+            Text("兑换会员前，请先阅读并勾选《会员协议》和《使用协议》。确认后将立即扣除对应喵币并生效。".appLocalized)
         }
-        .alert("会员兑换", isPresented: $showingPurchaseAlert) {
-            Button("确定", role: .cancel) { }
+        .alert("会员兑换".appLocalized, isPresented: $showingPurchaseAlert) {
+            Button("确定".appLocalized, role: .cancel) { }
         } message: {
             Text(alertMessage)
         }
         .alert(infoAlertTitle, isPresented: $showInfoAlert) {
-            Button("知道了", role: .cancel) { }
+            Button("知道了".appLocalized, role: .cancel) { }
         } message: {
             Text(infoAlertMessage)
         }
-        .alert("使用 App Store 优惠码", isPresented: $showingOfferCodeInfoAlert) {
-            Button("取消", role: .cancel) { }
-            Button("继续") {
+        .alert("使用 App Store 优惠码".appLocalized, isPresented: $showingOfferCodeInfoAlert) {
+            Button("取消".appLocalized, role: .cancel) { }
+            Button("继续".appLocalized) {
                 Task {
                     await prepareAndShowOfferCodeRedemption()
                 }
             }
         } message: {
-            Text("优惠码仅适用于本 App 在 App Store 中提供的内购项目。")
+            Text("优惠码仅适用于本 App 在 App Store 中提供的内购项目。".appLocalized)
         }
         .overlay {
             if showTrialPopup {
@@ -307,8 +307,8 @@ struct VIPCenterView: View {
                 }
                 StoreManager.shared.cancelOfferCodeRedemptionSession(reason: "vip_center_redemption_failed: \(error.localizedDescription)")
                 presentInfoAlert(
-                    title: "暂时无法打开",
-                    message: "无法打开 App Store 优惠码兑换界面：\(error.localizedDescription)"
+                    title: "暂时无法打开".appLocalized,
+                    message: "无法打开 App Store 优惠码兑换界面：%@".appLocalized(error.localizedDescription)
                 )
             } else {
                 Task {
@@ -342,8 +342,8 @@ struct VIPCenterView: View {
             showingOfferCodeRedemption = true
         } else {
             presentInfoAlert(
-                title: "暂时无法兑换",
-                message: "当前 App Store 环境没有返回任何可兑换的喵币商品，优惠码无法兑换。请检查 6 个喵币档是否可用、每个 Free Offer 是否绑定对应商品；沙盒账号只能测试 Sandbox Codes，不能兑换生产环境 URL / Custom / One-Time Use Codes。"
+                title: "暂时无法兑换".appLocalized,
+                message: "当前 App Store 环境没有返回任何可兑换的喵币商品，优惠码无法兑换。请检查 6 个喵币档是否可用、每个 Free Offer 是否绑定对应商品；沙盒账号只能测试 Sandbox Codes，不能兑换生产环境 URL / Custom / One-Time Use Codes。".appLocalized
             )
         }
     }
@@ -595,7 +595,7 @@ struct VIPCenterView: View {
     private var topBar: some View {
         HStack(spacing: 12) {
             HStack(spacing: 8) {
-                Text("少女心愿")
+                Text("少女心愿".appLocalized)
                     .font(.system(size: scaledFont(18), weight: .semibold))
                     .themeSkinLegibleText(level: .inline, slot: .topBarMain, descriptor: themeSkinDescriptor)
                 Text("VIP")
@@ -631,12 +631,12 @@ struct VIPCenterView: View {
                         showSkinSelection = true
                     } else {
                         presentInfoAlert(
-                            title: "VIP身份",
-                            message: "开通 VIP 后即可切换专属卡片皮肤，并解锁你的尊贵身份样式。"
+                            title: "VIP身份".appLocalized,
+                            message: "开通 VIP 后即可切换专属卡片皮肤，并解锁你的尊贵身份样式。".appLocalized
                         )
                     }
                 } label: {
-                    Label("设置卡片", systemImage: "creditcard")
+                    Label("设置卡片".appLocalized, systemImage: "creditcard")
                 }
 
                 Button {
@@ -644,18 +644,18 @@ struct VIPCenterView: View {
                         showAppIconSelection = true
                     } else {
                         presentInfoAlert(
-                            title: "个性图标",
-                            message: "开通 VIP 后，可以把 Pink House 的桌面图标换成礼服、珍珠、月光等专属风格。"
+                            title: "个性图标".appLocalized,
+                            message: "开通 VIP 后，可以把 Pink House 的桌面图标换成礼服、珍珠、月光等专属风格。".appLocalized
                         )
                     }
                 } label: {
-                    Label("切换图标", systemImage: "app.badge")
+                    Label("切换图标".appLocalized, systemImage: "app.badge")
                 }
 
                 Button {
                     showingOfferCodeInfoAlert = true
                 } label: {
-                    Label("兑换 App Store 优惠码", systemImage: "gift")
+                    Label("兑换 App Store 优惠码".appLocalized, systemImage: "gift")
                 }
             } label: {
                 floatingActionButton(icon: "ellipsis")
@@ -671,7 +671,7 @@ struct VIPCenterView: View {
 
     private var heroSection: some View {
         VStack(spacing: 14) {
-            Text(vipManager.isVIP ? "守护少女每一份美好" : "给你的心愿一份更尊贵的守护")
+            Text(vipManager.isVIP ? "守护少女每一份美好".appLocalized : "给你的心愿一份更尊贵的守护".appLocalized)
                 .font(.system(size: scaledFont(26), weight: .bold))
                 .foregroundStyle(primaryTextColor)
                 .themeSkinLegibleText(level: .hero, slot: .sectionCard, descriptor: themeSkinDescriptor)
@@ -702,8 +702,8 @@ struct VIPCenterView: View {
                         .multilineTextAlignment(.center)
 
                     HStack(spacing: 8) {
-                        heroTag(text: vipManager.isVIP ? "尊贵身份" : "智能升级")
-                        heroTag(text: vipManager.isVIP ? currentIdentityTag : "试用可体验")
+                        heroTag(text: vipManager.isVIP ? "尊贵身份".appLocalized : "智能升级".appLocalized)
+                        heroTag(text: vipManager.isVIP ? currentIdentityTag : "试用可体验".appLocalized)
                     }
                 }
                 .padding(.horizontal, 18)
@@ -714,7 +714,7 @@ struct VIPCenterView: View {
             }
             .frame(height: 154)
 
-            Text("会员权益")
+            Text("会员权益".appLocalized)
                 .font(.system(size: scaledFont(16), weight: .semibold))
                 .foregroundStyle(secondaryTextColor)
                 .themeSkinLegibleText(level: .inline, slot: .sectionCard, descriptor: themeSkinDescriptor)
@@ -796,10 +796,10 @@ struct VIPCenterView: View {
             } label: {
                 HStack {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("兑换\(selectedPlan.title)会员")
+                        Text("兑换%@会员".appLocalized(selectedPlan.title))
                             .font(.system(size: scaledFont(18), weight: .bold))
                             .themeSkinLegibleText(level: .chip, slot: .primaryButton, descriptor: themeSkinDescriptor)
-                        Text("开通后立即生效，可叠加有效期")
+                        Text("开通后立即生效，可叠加有效期".appLocalized)
                             .font(.system(size: scaledFont(12), weight: .medium))
                             .foregroundStyle(buttonSecondaryLabelColor)
                             .themeSkinLegibleText(level: .inline, slot: .primaryButton, descriptor: themeSkinDescriptor)
@@ -807,7 +807,7 @@ struct VIPCenterView: View {
 
                     Spacer()
 
-                    Text("\(selectedPlan.meowCoins)喵币")
+                    Text("%d喵币".appLocalized(selectedPlan.meowCoins))
                         .font(.system(size: scaledFont(16), weight: .bold))
                         .themeSkinLegibleText(level: .chip, slot: .primaryButton, descriptor: themeSkinDescriptor)
                 }
@@ -837,7 +837,7 @@ struct VIPCenterView: View {
             Button {
                 showCoinStore = true
             } label: {
-                Text("喵币不足？前往商店获取喵币")
+                Text("喵币不足？前往商店获取喵币".appLocalized)
                     .font(.system(size: scaledFont(12), weight: .medium))
                     .foregroundStyle(secondaryTextColor)
                     .themeSkinLegibleText(level: .inline, slot: .sectionCard, descriptor: themeSkinDescriptor)
@@ -857,25 +857,25 @@ struct VIPCenterView: View {
                         Image(systemName: hasAcceptedVIPAgreements ? "checkmark.circle.fill" : "circle")
                             .font(.system(size: scaledFont(11), weight: .semibold))
                             .foregroundStyle(hasAcceptedVIPAgreements ? accentColor : secondaryTextColor)
-                        Text("请阅读并同意")
+                        Text("请阅读并同意".appLocalized)
                             .foregroundStyle(secondaryTextColor.opacity(0.86))
                             .themeSkinLegibleText(level: .inline, slot: .sectionCard, descriptor: themeSkinDescriptor)
                     }
                 }
                 .buttonStyle(.plain)
 
-                Button("会员协议") {
+                Button("会员协议".appLocalized) {
                     openExternalURL(LegalLinks.vipAgreementURL)
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(primaryTextColor)
                 .underline()
 
-                Text("和")
+                Text("和".appLocalized)
                     .foregroundStyle(secondaryTextColor.opacity(0.86))
                     .themeSkinLegibleText(level: .inline, slot: .sectionCard, descriptor: themeSkinDescriptor)
 
-                Button("使用协议") {
+                Button("使用协议".appLocalized) {
                     openExternalURL(LegalLinks.userAgreementURL)
                 }
                 .buttonStyle(.plain)
@@ -884,7 +884,7 @@ struct VIPCenterView: View {
             }
             .font(.system(size: scaledFont(10), weight: .medium))
 
-            Text("VIP 为喵币兑换型权益，不自动续费。")
+            Text("VIP 为喵币兑换型权益，不自动续费。".appLocalized)
                 .font(.system(size: scaledFont(9), weight: .medium))
                 .foregroundStyle(secondaryTextColor.opacity(0.72))
                 .themeSkinLegibleText(level: .inline, slot: .sectionCard, descriptor: themeSkinDescriptor)
@@ -1166,7 +1166,7 @@ struct VIPCenterView: View {
         switch benefit.id {
         case "discount":
             VStack(alignment: .leading, spacing: 2) {
-                Text("萌宠商店")
+                Text("萌宠商店".appLocalized)
                     .font(.system(size: fontSize, weight: .medium))
                     .foregroundStyle(benefitSecondaryTextColor)
                     .themeSkinLegibleText(level: .inline, slot: .sectionCard, descriptor: themeSkinDescriptor)
@@ -1179,7 +1179,7 @@ struct VIPCenterView: View {
             .multilineTextAlignment(.leading)
         case "updates":
             VStack(alignment: .leading, spacing: 2) {
-                Text("主题皮肤商店")
+                Text("主题皮肤商店".appLocalized)
                     .font(.system(size: fontSize, weight: .medium))
                     .foregroundStyle(benefitSecondaryTextColor)
                     .themeSkinLegibleText(level: .inline, slot: .sectionCard, descriptor: themeSkinDescriptor)
@@ -1188,7 +1188,7 @@ struct VIPCenterView: View {
                     style: .inlineGlow,
                     size: fontSize > 11 ? .medium : .small
                 )
-                Text("· 更多会员权益正在路上")
+                Text("· 更多会员权益正在路上".appLocalized)
                     .font(.system(size: fontSize, weight: .medium))
                     .foregroundStyle(benefitSecondaryTextColor)
                     .themeSkinLegibleText(level: .inline, slot: .sectionCard, descriptor: themeSkinDescriptor)
@@ -1206,32 +1206,32 @@ struct VIPCenterView: View {
 
     private var statusTitle: String {
         if vipManager.isVIP {
-            return vipManager.isInTrialPeriod ? "你正在体验 VIP 中" : "你已经拥有 VIP 身份"
+            return vipManager.isInTrialPeriod ? "你正在体验 VIP 中".appLocalized : "你已经拥有 VIP 身份".appLocalized
         }
-        return "升级为 VIP，解锁更完整的智能体验"
+        return "升级为 VIP，解锁更完整的智能体验".appLocalized
     }
 
     private var statusDescription: String {
         if vipManager.isVIP {
             return vipManager.isInTrialPeriod
-                ? "体验期间即可抢先感受多模态智能、专属身份和会员优惠。"
-                : "专属权益已生效，快去试试萌宠智能对话、卡片皮肤和会员优惠。"
+                ? "体验期间即可抢先感受多模态智能、专属身份和会员优惠。".appLocalized
+                : "专属权益已生效，快去试试萌宠智能对话、卡片皮肤和会员优惠。".appLocalized
         }
-        return "本地能力依然可用，涉及第三方模型和 API 的智能能力会在开通后完整开放。"
+        return "本地能力依然可用，涉及第三方模型和 API 的智能能力会在开通后完整开放。".appLocalized
     }
 
     private var currentIdentityTag: String {
         switch vipManager.cardStyle {
         case .blackGold:
-            return "黑金尊享"
+            return "黑金尊享".appLocalized
         case .monicaPink:
-            return "莫妮卡粉"
+            return "莫妮卡粉".appLocalized
         case .themeSkinAdaptive:
-            return "跟随主题"
+            return "跟随主题".appLocalized
         case .skyConcertTheme:
-            return "天空音乐会"
+            return "天空音乐会".appLocalized
         case .swanDreamTheme:
-            return "天鹅入梦"
+            return "天鹅入梦".appLocalized
         }
     }
 
@@ -1243,25 +1243,25 @@ struct VIPCenterView: View {
             } else {
                 presentInfoAlert(
                     title: benefit.title,
-                    message: "开通 VIP 后即可解锁专属身份标识、靓号与卡片皮肤。右上角的「设置卡片」入口也会继续保留。"
+                    message: "开通 VIP 后即可解锁专属身份标识、靓号与卡片皮肤。右上角的「设置卡片」入口也会继续保留。".appLocalized
                 )
             }
         case "discount":
             presentInfoAlert(
                 title: benefit.title,
-                message: "VIP 期间萌宠商店享 \(VIPManager.petShopDiscountText)，\n主题皮肤商店 \(VIPManager.themeSkinDiscountText)."
+                message: "VIP 期间萌宠商店享 %@，\n主题皮肤商店 %@。".appLocalized(VIPManager.petShopDiscountText, VIPManager.themeSkinDiscountText)
             )
         case "magicTheme":
             presentInfoAlert(
                 title: benefit.title,
-                message: "VIP 期间可直接使用魔法配色；若你已经单独花喵币解锁，就算 VIP 到期也不会关闭。"
+                message: "VIP 期间可直接使用魔法配色；若你已经单独花喵币解锁，就算 VIP 到期也不会关闭。".appLocalized
             )
         case "wealthPersonalization":
             presentInfoAlert(
                 title: benefit.title,
                 message: vipManager.isVIP
-                    ? WealthExperienceCopy.VIP.ownedMessage
-                    : WealthExperienceCopy.VIP.lockedMessage
+                    ? WealthExperienceCopy.VIP.ownedMessage.appLocalized
+                    : WealthExperienceCopy.VIP.lockedMessage.appLocalized
             )
         case "icons":
             if vipManager.isVIP {
@@ -1269,18 +1269,18 @@ struct VIPCenterView: View {
             } else {
                 presentInfoAlert(
                     title: benefit.title,
-                    message: "开通 VIP 后，可以把 Pink House 的桌面图标换成礼服、珍珠、月光等专属风格。"
+                    message: "开通 VIP 后，可以把 Pink House 的桌面图标换成礼服、珍珠、月光等专属风格。".appLocalized
                 )
             }
         case "weekly":
             presentInfoAlert(
                 title: benefit.title,
-                message: "会员周报，后续会补充每周衣橱、萌宠与消费概览。"
+                message: "会员周报，后续会补充每周衣橱、萌宠与消费概览。".appLocalized
             )
         case "updates":
             presentInfoAlert(
                 title: benefit.title,
-                message: "后续会持续补充主题皮肤商店、周报与更多会员限定内容。"
+                message: "后续会持续补充主题皮肤商店、周报与更多会员限定内容。".appLocalized
             )
         default:
             presentInfoAlert(title: benefit.title, message: benefit.subtitle)
@@ -1306,6 +1306,13 @@ struct VIPCenterView: View {
         infoAlertTitle = title
         infoAlertMessage = message
         showInfoAlert = true
+    }
+
+    private func vipCenterDateText(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = LanguageManager.shared.locale
+        formatter.setLocalizedDateFormatFromTemplate("yMMMd")
+        return formatter.string(from: date)
     }
 }
 
