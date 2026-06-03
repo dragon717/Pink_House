@@ -38,7 +38,11 @@ enum PetPersonaRegistry {
                     .wardrobe: "基于候选单品名和特征说人话，不要复述字段。",
                     .mood: "先安抚情绪，再给一条低压力建议。"
                 ],
-                warmthSuffixes: ["我会陪着你慢慢来喵~", "你不用急，我在呢喵。", "抱抱你，再一起挑一套~"],
+                warmthSuffixes: [
+                    "我会陪着你慢慢来喵~".appLocalized,
+                    "你不用急，我在呢喵。".appLocalized,
+                    "抱抱你，再一起挑一套~".appLocalized
+                ],
                 timeoutReplies: [
                     "（蹭蹭你）我刚刚有点卡壳喵，可以换个稳定网络，或把需求缩短成“场景+风格”再试一次~".appLocalized,
                     "（轻轻贴你）这一条我没接稳喵，稍等半分钟再试，我会继续认真帮你挑。".appLocalized
@@ -63,7 +67,11 @@ enum PetPersonaRegistry {
                     .wardrobe: "只基于候选单品做人话建议，不念字段名。",
                     .mood: "先安慰主人，再给轻量行动建议。"
                 ],
-                warmthSuffixes: ["我会一直陪着你汪。", "你说一声我就来，最喜欢你了。", "别担心，我们一起搞定！"],
+                warmthSuffixes: [
+                    "我会一直陪着你汪。".appLocalized,
+                    "你说一声我就来，最喜欢你了。".appLocalized,
+                    "别担心，我们一起搞定！".appLocalized
+                ],
                 timeoutReplies: [
                     "（摇尾巴安抚你）这次网络有点拥挤汪，换个稳定网络或简化需求，我们马上再来！".appLocalized,
                     "（轻轻靠近）我刚刚没接稳，等半分钟再试，我会第一时间冲回来帮你。".appLocalized

@@ -83,7 +83,7 @@ enum PetResponseHumanizer {
         }
         
         if let emotion = firstString(in: dict, keys: ["emotion", "emotion_support", "mood_support"]) {
-            parts.append("我也在乎你的心情：\(emotion)")
+            parts.append("我也在乎你的心情：%@".appLocalized(emotion))
         }
         
         if let advice = firstString(in: dict, keys: ["advice", "reasoning", "tips"]) {
@@ -93,18 +93,18 @@ enum PetResponseHumanizer {
         let style = firstString(in: dict, keys: ["style", "风格"])
         let occasion = firstString(in: dict, keys: ["occasion", "场景"])
         if style != nil || occasion != nil {
-            let styleText = style.map { "风格\($0)" } ?? nil
-            let occasionText = occasion.map { "场景\($0)" } ?? nil
-            let combo = [styleText, occasionText].compactMap { $0 }.joined(separator: "，")
+            let styleText = style.map { "风格%@".appLocalized($0) } ?? nil
+            let occasionText = occasion.map { "场景%@".appLocalized($0) } ?? nil
+            let combo = [styleText, occasionText].compactMap { $0 }.joined(separator: localizedClauseSeparator)
             if !combo.isEmpty {
-                parts.append("如果你愿意，我们可以先按\(combo)来细化。")
+                parts.append("如果你愿意，我们可以先按%@来细化。".appLocalized(combo))
             }
         }
         
         if let list = firstStringList(in: dict, keys: ["recommendations", "items", "steps", "suggestions"]) {
-            let concise = list.prefix(3).joined(separator: "、")
+            let concise = list.prefix(3).joined(separator: localizedListSeparator)
             if !concise.isEmpty {
-                parts.append("我先给你这几条：\(concise)。")
+                parts.append("我先给你这几条：%@。".appLocalized(concise))
             }
         }
         
@@ -115,7 +115,7 @@ enum PetResponseHumanizer {
                 .compactMap { valueAsReadableText($0.value) }
                 .filter { !$0.isEmpty }
                 .prefix(3)
-                .joined(separator: "。")
+                .joined(separator: localizedSentenceSeparator)
             return fallback
         }
         
@@ -148,7 +148,7 @@ enum PetResponseHumanizer {
             return normalizeSpaces(text)
         }
         if let list = value as? [String] {
-            return list.prefix(3).joined(separator: "、")
+            return list.prefix(3).joined(separator: localizedListSeparator)
         }
         return nil
     }
@@ -169,8 +169,8 @@ enum PetResponseHumanizer {
             ("answer:", ""),
             ("message:", ""),
             ("description:", ""),
-            ("reasoning:", "原因："),
-            ("advice:", "建议：")
+            ("reasoning:", "原因：".appLocalized),
+            ("advice:", "建议：".appLocalized)
         ]
         for (from, to) in replacements {
             output = output.replacingOccurrences(of: from, with: to, options: .caseInsensitive)
@@ -184,6 +184,18 @@ enum PetResponseHumanizer {
             .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
             .replacingOccurrences(of: " ,", with: ",")
             .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private static var localizedClauseSeparator: String {
+        "，".appLocalized
+    }
+
+    private static var localizedListSeparator: String {
+        "、".appLocalized
+    }
+
+    private static var localizedSentenceSeparator: String {
+        "。".appLocalized
     }
     
     private static func stripModelNames(in text: String) -> String {

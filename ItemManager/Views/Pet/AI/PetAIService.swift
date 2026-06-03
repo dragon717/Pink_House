@@ -521,7 +521,7 @@ class PetAIService: ObservableObject {
         let provider = self.provider
         let historyLimit = historyMessageLimit(forPromptLength: text.count)
         let fallbackCharacter: PetCharacter = role == .goldenRetriever ? .maomao : .naicha
-        let fallbackUnknownReply = fallbackCharacter.localizedCatchphraseText("（歪头摇尾巴，不知道你在说什么喵...）")
+        let fallbackUnknownReply = fallbackCharacter.localizedCatchphraseText("（歪头摇尾巴，不知道你在说什么喵...）".appLocalized)
         
         print("🔍 [PetAIService] 发送请求 - Provider: \(provider)")
         if apiKey.isEmpty {
@@ -689,7 +689,7 @@ class PetAIService: ObservableObject {
         } catch is TimeoutError {
             print("❌ [Debug] 请求超时 (30s)")
             let errorMsg = ChatMessage(
-                text: personaProfile.timeoutReplies.randomElement() ?? "我稍微卡了一下，换个稳定网络我们再试一次。",
+                text: personaProfile.timeoutReplies.randomElement() ?? "我稍微卡了一下，换个稳定网络我们再试一次。".appLocalized,
                 imageName: defaultTimeoutImageName(),
                 isUser: false
             )
@@ -699,7 +699,7 @@ class PetAIService: ObservableObject {
         } catch {
             print("❌ [Debug] 请求发生错误: \(error)")
             let errorMsg = ChatMessage(
-                text: personaProfile.errorReplies.randomElement() ?? "我刚刚失手了，咱们再试一次。",
+                text: personaProfile.errorReplies.randomElement() ?? "我刚刚失手了，咱们再试一次。".appLocalized,
                 imageName: defaultErrorImageName(),
                 isUser: false
             )
