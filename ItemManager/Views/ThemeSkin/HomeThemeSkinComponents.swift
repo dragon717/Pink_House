@@ -196,7 +196,7 @@ struct HomeThemeSkinSearchMenuLabel: View {
                     .foregroundStyle(HomeThemeSkinTokens.accent(for: descriptor, colorScheme: colorScheme))
                     .themeSkinLegibleSymbol(level: .chip, slot: descriptor?.slot ?? .searchBar, descriptor: descriptor)
 
-                Text(title)
+                Text(title.appLocalized)
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(SkyConcertThemeSkin.labelColor(for: descriptor, colorScheme: colorScheme))
                     .themeSkinLegibleText(level: .inline, slot: descriptor?.slot ?? .searchBar, descriptor: descriptor)
@@ -210,7 +210,7 @@ struct HomeThemeSkinSearchMenuLabel: View {
                 HomeThemeSkinChromeBackground(descriptor: descriptor, style: .searchEntry)
             }
         } else {
-            Label(title, systemImage: systemImage)
+            Label(title.appLocalized, systemImage: systemImage)
         }
     }
 

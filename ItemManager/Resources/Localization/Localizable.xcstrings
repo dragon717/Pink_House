@@ -10917,7 +10917,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Continue from Unsaved Draft"
+            "value" : "Continue from Last Unsaved Draft"
           }
         },
         "zh-Hans" : {
@@ -10929,7 +10929,43 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "從上次未保存繼續"
+            "value" : "從上次未儲存繼續"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "前回の未保存から続行"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "저장하지 않은 이전 초안에서 계속"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Continuer depuis le dernier brouillon non enregistré"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aus letztem ungespeicherten Entwurf fortfahren"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Continuar desde el último borrador sin guardar"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Continuar do último rascunho não salvo"
           }
         }
       }
@@ -11107,7 +11143,43 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "從社區導入"
+            "value" : "從社群匯入"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "コミュニティからインポート"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "커뮤니티에서 가져오기"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Importer depuis la communauté"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aus der Community importieren"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Importar desde la comunidad"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Importar da comunidade"
           }
         }
       }
@@ -38235,7 +38307,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Batch Import"
+            "value" : "Bulk Import"
           }
         },
         "zh-Hans" : {
@@ -38247,7 +38319,43 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "批次匯入"
+            "value" : "批量匯入"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "一括インポート"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "일괄 가져오기"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Importation groupée"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Massenimport"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Importación masiva"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Importação em massa"
           }
         }
       }
@@ -40006,7 +40114,6 @@
       }
     },
     "搜索" : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -40024,6 +40131,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "搜尋"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "検索"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "검색"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rechercher"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Suchen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Buscar"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Buscar"
           }
         }
       }
@@ -66069,7 +66212,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Feature, ～!"
+            "value" : "This feature is coming soon. The online version is being actively built!"
           }
         },
         "zh-Hans" : {
@@ -66081,7 +66224,43 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "該功能敬請期待，聯網版本激情開拓中～！"
+            "value" : "該功能敬請期待，聯網版本熱烈開拓中～！"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この機能は近日公開予定です。オンライン版を鋭意開発中です！"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이 기능은 곧 제공될 예정이에요. 온라인 버전을 열심히 준비 중입니다!"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cette fonctionnalité arrive bientôt. La version en ligne est en pleine préparation !"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Diese Funktion kommt bald. Die Online-Version wird mit Hochdruck entwickelt!"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Esta función llegará pronto. La versión en línea se está desarrollando activamente."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Este recurso chegará em breve. A versão online está sendo desenvolvida com tudo!"
           }
         }
       }
@@ -67393,7 +67572,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Adjust Order"
+            "value" : "Reorder"
           }
         },
         "zh-Hans" : {
@@ -67406,6 +67585,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "調整順序"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "並べ替え"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "순서 조정"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Réorganiser"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reihenfolge ändern"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reordenar"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reordenar"
           }
         }
       }

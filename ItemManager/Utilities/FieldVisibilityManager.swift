@@ -20,12 +20,12 @@ enum ClothingField: String, CaseIterable, Identifiable, Hashable, Sendable {
     
     var displayName: String {
         switch self {
-        case .types: return "类型"
-        case .colors: return "颜色"
-        case .sizes: return "尺码"
-        case .length: return "衣长"
-        case .condition: return "状况"
-        case .accessories: return "小物"
+        case .types: return "类型".appLocalized
+        case .colors: return "颜色".appLocalized
+        case .sizes: return "尺码".appLocalized
+        case .length: return "衣长".appLocalized
+        case .condition: return "状况".appLocalized
+        case .accessories: return "小物".appLocalized
         }
     }
 }

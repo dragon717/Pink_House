@@ -39,7 +39,7 @@ struct FeatureGuideMenuOverlay: View {
                                                 .frame(width: 18, height: 18)
                                         }
 
-                                        Text(item.title)
+                                        Text(item.title.appLocalized)
                                             .font(.system(size: 16))
                                             .lineLimit(1)
 

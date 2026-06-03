@@ -322,7 +322,7 @@ private struct FilterSubmenuView: View, Equatable {
             Button(role: .destructive) {
                 selection.removeAll()
             } label: {
-                Label("清除筛选", systemImage: "xmark.circle")
+                Label("清除筛选".appLocalized, systemImage: "xmark.circle")
             }
 
             Button {
@@ -334,7 +334,7 @@ private struct FilterSubmenuView: View, Equatable {
                 }
             } label: {
                 HStack {
-                    Text(emptyDisplayName)
+                    Text(emptyDisplayName.appLocalized)
                     if selection.contains(noValueMarker) {
                         Image(systemName: "checkmark")
                     }
@@ -365,7 +365,7 @@ private struct FilterSubmenuView: View, Equatable {
 
     private var selectedDisplayName: String? {
         guard let value = selection.first else { return nil }
-        return value == noValueMarker ? emptyDisplayName : value
+        return value == noValueMarker ? emptyDisplayName.appLocalized : value
     }
 
     private var emptyDisplayName: String {
@@ -1328,7 +1328,7 @@ struct HomeView: View {
                 Button(role: .destructive) {
                     selectedTagIDs.removeAll()
                 } label: {
-                    Label("清除筛选", systemImage: "xmark.circle")
+                    Label("清除筛选".appLocalized, systemImage: "xmark.circle")
                 }
                 
                 // 无标签选项
@@ -1341,7 +1341,7 @@ struct HomeView: View {
                     }
                 } label: {
                     HStack {
-                        Text("无标签")
+                        Text("无标签".appLocalized)
                         if selectedTagIDs.contains(HomeView.noTagUUID) {
                             Image(systemName: "checkmark")
                         }
@@ -1368,11 +1368,11 @@ struct HomeView: View {
             } label: {
                 let selectedTagName: String? = selectedTagIDs.first.flatMap { id in
                     if id == HomeView.noTagUUID {
-                        return "无标签"
+                        return "无标签".appLocalized
                     }
                     return menuFacetCache.tagNameByID[id]
                 }
-                Label(selectedTagName ?? "标签", systemImage: selectedTagIDs.isEmpty ? "tag" : "tag.fill")
+                Label(selectedTagName ?? "标签".appLocalized, systemImage: selectedTagIDs.isEmpty ? "tag" : "tag.fill")
             }
             
             // Brands Filter
@@ -1382,7 +1382,7 @@ struct HomeView: View {
                 Button(role: .destructive) {
                     selectedBrandIDs.removeAll()
                 } label: {
-                    Label("清除筛选", systemImage: "xmark.circle")
+                    Label("清除筛选".appLocalized, systemImage: "xmark.circle")
                 }
                 
                 // 无品牌选项
@@ -1395,7 +1395,7 @@ struct HomeView: View {
                     }
                 } label: {
                     HStack {
-                        Text("无品牌")
+                        Text("无品牌".appLocalized)
                         if selectedBrandIDs.contains(HomeView.noBrandUUID) {
                             Image(systemName: "checkmark")
                         }
@@ -1422,11 +1422,11 @@ struct HomeView: View {
             } label: {
                 let selectedBrandName: String? = selectedBrandIDs.first.flatMap { id in
                     if id == HomeView.noBrandUUID {
-                        return "无品牌"
+                        return "无品牌".appLocalized
                     }
                     return menuFacetCache.brandNameByID[id]
                 }
-                Label(selectedBrandName ?? "品牌", systemImage: selectedBrandIDs.isEmpty ? "bag" : "bag.fill")
+                Label(selectedBrandName ?? "品牌".appLocalized, systemImage: selectedBrandIDs.isEmpty ? "bag" : "bag.fill")
             }
             
             // Dynamic String-based Filters
@@ -1570,7 +1570,7 @@ struct HomeView: View {
                 Button {
                     enterWardrobeSelectionMode()
                 } label: {
-                    Label("编辑", systemImage: "pencil.circle")
+                    Label("编辑".appLocalized, systemImage: "pencil.circle")
                 }
                 .captureGuideTarget(.wardrobeEditMenuEntry)
             }
@@ -1579,7 +1579,7 @@ struct HomeView: View {
                 Button {
                     startWardrobeCustomSortEditing()
                 } label: {
-                    Label("调整顺序", systemImage: "list.number")
+                    Label("调整顺序".appLocalized, systemImage: "list.number")
                 }
             }
         }
@@ -1700,7 +1700,7 @@ struct HomeView: View {
             Button {
                 continueWardrobeDraft()
             } label: {
-                Label("从上次未保存继续", systemImage: "doc.badge.clock")
+                Label("从上次未保存继续".appLocalized, systemImage: "doc.badge.clock")
             }
 
             Divider()
@@ -1709,14 +1709,14 @@ struct HomeView: View {
         Button {
             presentWardrobeManualCreate()
         } label: {
-            Label("手动创建", systemImage: "square.and.pencil")
+            Label("手动创建".appLocalized, systemImage: "square.and.pencil")
         }
         .captureGuideTarget(.wardrobeManualCreateEntry)
 
         Button {
             presentBatchImport()
         } label: {
-            Label("批量导入", systemImage: "square.and.arrow.down.on.square")
+            Label("批量导入".appLocalized, systemImage: "square.and.arrow.down.on.square")
         }
         .captureGuideTarget(.wardrobeBatchImportEntry)
 
@@ -1724,7 +1724,7 @@ struct HomeView: View {
             Button {
                 presentCommunityImportAlert()
             } label: {
-                Label("从社区导入", systemImage: "icloud.and.arrow.down")
+                Label("从社区导入".appLocalized, systemImage: "icloud.and.arrow.down")
             }
         }
     }
@@ -1811,8 +1811,8 @@ struct HomeView: View {
                 }
             }
         }
-        .alert("该功能敬请期待，联网版本激情开拓中～！", isPresented: $showingCommunityImportAlert) {
-            Button("好的", role: .cancel) { }
+        .alert("该功能敬请期待，联网版本激情开拓中～！".appLocalized, isPresented: $showingCommunityImportAlert) {
+            Button("好的".appLocalized, role: .cancel) { }
         }
     }
 
@@ -1883,7 +1883,7 @@ struct HomeView: View {
             var names: [String] = []
             for id in selectedTagIDs {
                 if id == HomeView.noTagUUID {
-                    names.append("无标签")
+                    names.append("无标签".appLocalized)
                 } else if let tagName = menuFacetCache.tagNameByID[id] {
                     names.append(tagName)
                 }
@@ -1896,7 +1896,7 @@ struct HomeView: View {
             var names: [String] = []
             for id in selectedBrandIDs {
                 if id == HomeView.noBrandUUID {
-                    names.append("无品牌")
+                    names.append("无品牌".appLocalized)
                 } else if let brandName = menuFacetCache.brandNameByID[id] {
                     names.append(brandName)
                 }
@@ -1906,37 +1906,37 @@ struct HomeView: View {
         
         // Types
         if !selectedTypes.isEmpty {
-            let names = selectedTypes.map { $0 == HomeView.noTypeMarker ? "无类型" : $0 }
+            let names = selectedTypes.map { $0 == HomeView.noTypeMarker ? "无类型".appLocalized : $0 }
             descriptions.append(names.joined(separator: "/"))
         }
         
         // Colors
         if !selectedColors.isEmpty {
-            let names = selectedColors.map { $0 == HomeView.noColorMarker ? "无颜色" : $0 }
+            let names = selectedColors.map { $0 == HomeView.noColorMarker ? "无颜色".appLocalized : $0 }
             descriptions.append(names.joined(separator: "/"))
         }
         
         // Sizes
         if !selectedSizes.isEmpty {
-            let names = selectedSizes.map { $0 == HomeView.noSizeMarker ? "无尺码" : $0 }
+            let names = selectedSizes.map { $0 == HomeView.noSizeMarker ? "无尺码".appLocalized : $0 }
             descriptions.append(names.joined(separator: "/"))
         }
         
         // Lengths
         if !selectedLengths.isEmpty {
-            let names = selectedLengths.map { $0 == HomeView.noLengthMarker ? "无衣长" : $0 }
+            let names = selectedLengths.map { $0 == HomeView.noLengthMarker ? "无衣长".appLocalized : $0 }
             descriptions.append(names.joined(separator: "/"))
         }
         
         // Conditions
         if !selectedConditions.isEmpty {
-            let names = selectedConditions.map { $0 == HomeView.noConditionMarker ? "无状态" : $0 }
+            let names = selectedConditions.map { $0 == HomeView.noConditionMarker ? "无状态".appLocalized : $0 }
             descriptions.append(names.joined(separator: "/"))
         }
         
         // Accessories
         if !selectedAccessories.isEmpty {
-            let names = selectedAccessories.map { $0 == HomeView.noAccessoryMarker ? "无小物" : $0 }
+            let names = selectedAccessories.map { $0 == HomeView.noAccessoryMarker ? "无小物".appLocalized : $0 }
             descriptions.append(names.joined(separator: "/"))
         }
         
