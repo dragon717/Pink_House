@@ -3030,17 +3030,17 @@ struct MergeToAccessorySheet: View {
                     if availableClothings.isEmpty {
                         Section {
                             ContentUnavailableView {
-                                Label("没有可选的裙装", systemImage: "hanger")
+                                Label("没有可选的裙装".appLocalized, systemImage: "hanger")
                             } description: {
-                                Text("请确保除了选中的裙装外，衣橱中还有其他裙装")
+                                Text("请确保除了选中的裙装外，衣橱中还有其他裙装".appLocalized)
                             }
                         }
                     } else if filteredClothings.isEmpty {
                         Section {
                             ContentUnavailableView {
-                                Label("没有符合条件的裙装", systemImage: "magnifyingglass")
+                                Label("没有符合条件的裙装".appLocalized, systemImage: "magnifyingglass")
                             } description: {
-                                Text("试试调整筛选条件")
+                                Text("试试调整筛选条件".appLocalized)
                             }
                         }
                     } else {
@@ -3055,19 +3055,19 @@ struct MergeToAccessorySheet: View {
                             }
                         } header: {
                             if !searchText.isEmpty || totalFilterCount > 0 {
-                                Text("找到 \(filteredClothings.count) 件裙装")
+                                Text("找到 %lld 件裙装".appLocalized(Int64(filteredClothings.count)))
                             }
                         }
                     }
                 }
                 .listStyle(.plain)
             }
-            .navigationTitle("选择目标裙装")
+            .navigationTitle("选择目标裙装".appLocalized)
             .navigationBarTitleDisplayMode(.inline)
-            .searchable(text: $searchText, prompt: "搜索裙装名称或品牌")
+            .searchable(text: $searchText, prompt: Text("搜索裙装名称或品牌".appLocalized))
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("取消") {
+                    Button("取消".appLocalized) {
                         dismiss()
                     }
                 }
@@ -3139,7 +3139,7 @@ struct MergeToAccessorySheet: View {
 
         for id in selectedTagIDs {
             if id == MergeToAccessorySheet.noTagUUID {
-                items.append("无标签")
+                items.append("无标签".appLocalized)
             } else if let tag = tags.first(where: { $0.id == id }) {
                 items.append(tag.name)
             }
@@ -3147,18 +3147,18 @@ struct MergeToAccessorySheet: View {
 
         for id in selectedBrandIDs {
             if id == MergeToAccessorySheet.noBrandUUID {
-                items.append("无品牌")
+                items.append("无品牌".appLocalized)
             } else if let brand = brands.first(where: { $0.id == id }) {
                 items.append(brand.name)
             }
         }
 
-        items.append(contentsOf: selectedTypes.map { $0 == MergeToAccessorySheet.noTypeMarker ? "无类型" : $0 })
-        items.append(contentsOf: selectedColors.map { $0 == MergeToAccessorySheet.noColorMarker ? "无颜色" : $0 })
-        items.append(contentsOf: selectedSizes.map { $0 == MergeToAccessorySheet.noSizeMarker ? "无尺码" : $0 })
-        items.append(contentsOf: selectedLengths.map { $0 == MergeToAccessorySheet.noLengthMarker ? "无衣长" : $0 })
-        items.append(contentsOf: selectedConditions.map { $0 == MergeToAccessorySheet.noConditionMarker ? "无状态" : $0 })
-        items.append(contentsOf: selectedAccessories.map { $0 == MergeToAccessorySheet.noAccessoryMarker ? "无小物" : $0 })
+        items.append(contentsOf: selectedTypes.map { $0 == MergeToAccessorySheet.noTypeMarker ? "无类型".appLocalized : $0 })
+        items.append(contentsOf: selectedColors.map { $0 == MergeToAccessorySheet.noColorMarker ? "无颜色".appLocalized : $0 })
+        items.append(contentsOf: selectedSizes.map { $0 == MergeToAccessorySheet.noSizeMarker ? "无尺码".appLocalized : $0 })
+        items.append(contentsOf: selectedLengths.map { $0 == MergeToAccessorySheet.noLengthMarker ? "无衣长".appLocalized : $0 })
+        items.append(contentsOf: selectedConditions.map { $0 == MergeToAccessorySheet.noConditionMarker ? "无状态".appLocalized : $0 })
+        items.append(contentsOf: selectedAccessories.map { $0 == MergeToAccessorySheet.noAccessoryMarker ? "无小物".appLocalized : $0 })
 
         return items
     }
@@ -3242,7 +3242,7 @@ struct MergeAccessoryFilterSheet: View {
                     }
                 }
             }
-            .navigationTitle("筛选")
+            .navigationTitle("筛选".appLocalized)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
@@ -3278,7 +3278,7 @@ struct MergeAccessoryFilterSheet: View {
                             HStack(spacing: 4) {
                                 Image(systemName: depositStatusFilter == .all ? "heart" : "heart.fill")
                                 if depositStatusFilter != .all {
-                                    Text("\(depositStatusFilter == .owned ? "已拥有" : "心愿")")
+                                    Text((depositStatusFilter == .owned ? "已拥有" : "心愿").appLocalized)
                                         .font(.caption)
                                         .themeSkinLegibleText(level: .inline, slot: .filterChip)
                                 }
@@ -3291,7 +3291,7 @@ struct MergeAccessoryFilterSheet: View {
                             Button {
                                 clearAllFilters()
                             } label: {
-                                Text("清除")
+                                Text("清除".appLocalized)
                                     .font(.subheadline)
                                     .foregroundStyle(.red)
                                     .themeSkinLegibleText(level: .inline, slot: .filterChip)
@@ -3309,7 +3309,7 @@ struct MergeAccessoryFilterSheet: View {
     private var selectedFiltersSummary: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text("已选条件 (\(totalFilterCount))")
+                Text("已选条件 (%lld)".appLocalized(Int64(totalFilterCount)))
                     .font(.subheadline)
                     .fontWeight(.medium)
                     .foregroundStyle(magicPalette.primaryText)
@@ -3345,42 +3345,42 @@ struct MergeAccessoryFilterSheet: View {
         var items: [SelectedFilterItem] = []
 
         for id in selectedTagIDs {
-            let name = id == MergeToAccessorySheet.noTagUUID ? "无标签" : tags.first(where: { $0.id == id })?.name ?? ""
+            let name = id == MergeToAccessorySheet.noTagUUID ? "无标签".appLocalized : tags.first(where: { $0.id == id })?.name ?? ""
             items.append(SelectedFilterItem(section: .tags, value: name, rawValue: id.uuidString))
         }
 
         for id in selectedBrandIDs {
-            let name = id == MergeToAccessorySheet.noBrandUUID ? "无品牌" : brands.first(where: { $0.id == id })?.name ?? ""
+            let name = id == MergeToAccessorySheet.noBrandUUID ? "无品牌".appLocalized : brands.first(where: { $0.id == id })?.name ?? ""
             items.append(SelectedFilterItem(section: .brands, value: name, rawValue: id.uuidString))
         }
 
         for type in selectedTypes {
-            let name = type == MergeToAccessorySheet.noTypeMarker ? "无类型" : type
+            let name = type == MergeToAccessorySheet.noTypeMarker ? "无类型".appLocalized : type
             items.append(SelectedFilterItem(section: .types, value: name, rawValue: type))
         }
 
         for color in selectedColors {
-            let name = color == MergeToAccessorySheet.noColorMarker ? "无颜色" : color
+            let name = color == MergeToAccessorySheet.noColorMarker ? "无颜色".appLocalized : color
             items.append(SelectedFilterItem(section: .colors, value: name, rawValue: color))
         }
 
         for size in selectedSizes {
-            let name = size == MergeToAccessorySheet.noSizeMarker ? "无尺码" : size
+            let name = size == MergeToAccessorySheet.noSizeMarker ? "无尺码".appLocalized : size
             items.append(SelectedFilterItem(section: .sizes, value: name, rawValue: size))
         }
 
         for length in selectedLengths {
-            let name = length == MergeToAccessorySheet.noLengthMarker ? "无衣长" : length
+            let name = length == MergeToAccessorySheet.noLengthMarker ? "无衣长".appLocalized : length
             items.append(SelectedFilterItem(section: .length, value: name, rawValue: length))
         }
 
         for condition in selectedConditions {
-            let name = condition == MergeToAccessorySheet.noConditionMarker ? "无状态" : condition
+            let name = condition == MergeToAccessorySheet.noConditionMarker ? "无状态".appLocalized : condition
             items.append(SelectedFilterItem(section: .condition, value: name, rawValue: condition))
         }
 
         for accessory in selectedAccessories {
-            let name = accessory == MergeToAccessorySheet.noAccessoryMarker ? "无小物" : accessory
+            let name = accessory == MergeToAccessorySheet.noAccessoryMarker ? "无小物".appLocalized : accessory
             items.append(SelectedFilterItem(section: .accessories, value: name, rawValue: accessory))
         }
 
@@ -3567,21 +3567,21 @@ struct MergeAccessoryFilterSheet: View {
 
     private var tagOptions: [MergeFilterOption] {
         var options: [MergeFilterOption] = []
-        options.append(MergeFilterOption(value: MergeToAccessorySheet.noTagUUID.uuidString, displayName: "无标签"))
+        options.append(MergeFilterOption(value: MergeToAccessorySheet.noTagUUID.uuidString, displayName: "无标签".appLocalized))
         options.append(contentsOf: tags.map { MergeFilterOption(value: $0.id.uuidString, displayName: $0.name) })
         return options
     }
 
     private var brandOptions: [MergeFilterOption] {
         var options: [MergeFilterOption] = []
-        options.append(MergeFilterOption(value: MergeToAccessorySheet.noBrandUUID.uuidString, displayName: "无品牌"))
+        options.append(MergeFilterOption(value: MergeToAccessorySheet.noBrandUUID.uuidString, displayName: "无品牌".appLocalized))
         options.append(contentsOf: brands.map { MergeFilterOption(value: $0.id.uuidString, displayName: $0.name) })
         return options
     }
 
     private var typeOptions: [MergeFilterOption] {
         var options: [MergeFilterOption] = []
-        options.append(MergeFilterOption(value: MergeToAccessorySheet.noTypeMarker, displayName: "无类型"))
+        options.append(MergeFilterOption(value: MergeToAccessorySheet.noTypeMarker, displayName: "无类型".appLocalized))
         let values = getAllValues(for: \.types)
         options.append(contentsOf: values.map { MergeFilterOption(value: $0, displayName: $0) })
         return options
@@ -3589,7 +3589,7 @@ struct MergeAccessoryFilterSheet: View {
 
     private var colorOptions: [MergeFilterOption] {
         var options: [MergeFilterOption] = []
-        options.append(MergeFilterOption(value: MergeToAccessorySheet.noColorMarker, displayName: "无颜色"))
+        options.append(MergeFilterOption(value: MergeToAccessorySheet.noColorMarker, displayName: "无颜色".appLocalized))
         let values = getAllValues(for: \.colors)
         options.append(contentsOf: values.map { MergeFilterOption(value: $0, displayName: $0) })
         return options
@@ -3597,7 +3597,7 @@ struct MergeAccessoryFilterSheet: View {
 
     private var sizeOptions: [MergeFilterOption] {
         var options: [MergeFilterOption] = []
-        options.append(MergeFilterOption(value: MergeToAccessorySheet.noSizeMarker, displayName: "无尺码"))
+        options.append(MergeFilterOption(value: MergeToAccessorySheet.noSizeMarker, displayName: "无尺码".appLocalized))
         let values = getAllValues(for: \.sizes)
         options.append(contentsOf: values.map { MergeFilterOption(value: $0, displayName: $0) })
         return options
@@ -3605,7 +3605,7 @@ struct MergeAccessoryFilterSheet: View {
 
     private var lengthOptions: [MergeFilterOption] {
         var options: [MergeFilterOption] = []
-        options.append(MergeFilterOption(value: MergeToAccessorySheet.noLengthMarker, displayName: "无衣长"))
+        options.append(MergeFilterOption(value: MergeToAccessorySheet.noLengthMarker, displayName: "无衣长".appLocalized))
         let values = getAllValues(for: \.length)
         options.append(contentsOf: values.map { MergeFilterOption(value: $0, displayName: $0) })
         return options
@@ -3613,7 +3613,7 @@ struct MergeAccessoryFilterSheet: View {
 
     private var conditionOptions: [MergeFilterOption] {
         var options: [MergeFilterOption] = []
-        options.append(MergeFilterOption(value: MergeToAccessorySheet.noConditionMarker, displayName: "无状态"))
+        options.append(MergeFilterOption(value: MergeToAccessorySheet.noConditionMarker, displayName: "无状态".appLocalized))
         let values = getAllValues(for: \.condition)
         options.append(contentsOf: values.map { MergeFilterOption(value: $0, displayName: $0) })
         return options
@@ -3621,7 +3621,7 @@ struct MergeAccessoryFilterSheet: View {
 
     private var accessoryOptions: [MergeFilterOption] {
         var options: [MergeFilterOption] = []
-        options.append(MergeFilterOption(value: MergeToAccessorySheet.noAccessoryMarker, displayName: "无小物"))
+        options.append(MergeFilterOption(value: MergeToAccessorySheet.noAccessoryMarker, displayName: "无小物".appLocalized))
         let values = getAllValues(for: \.accessories)
         options.append(contentsOf: values.map { MergeFilterOption(value: $0, displayName: $0) })
         return options

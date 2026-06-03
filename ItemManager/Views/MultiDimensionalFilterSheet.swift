@@ -10,8 +10,8 @@ enum FilterMode: String, CaseIterable, Identifiable {
 
     var displayName: String {
         switch self {
-        case .classic: return "经典筛选"
-        case .multiDimensional: return "多维筛选"
+        case .classic: return "经典筛选".appLocalized
+        case .multiDimensional: return "多维筛选".appLocalized
         }
     }
 }
@@ -26,9 +26,9 @@ enum DepositStatusFilter: String, CaseIterable, Identifiable, Hashable, Sendable
 
     var displayName: String {
         switch self {
-        case .all: return "全部"
-        case .owned: return "已拥有/全款"
-        case .depositPlan: return "心愿尾款"
+        case .all: return "全部".appLocalized
+        case .owned: return "已拥有/全款".appLocalized
+        case .depositPlan: return "心愿尾款".appLocalized
         }
     }
 
