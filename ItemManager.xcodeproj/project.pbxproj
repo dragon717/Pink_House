@@ -79,7 +79,7 @@
 		A2AE58962F19377600B4B6EB /* Exceptions for "ItemManager" folder in "ItemManager" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
-				"GenerativeAI-Info.plist",
+				"GenerativeAI-Info.bak.plist",
 				Info.plist,
 			);
 			target = A2AE58722F19377500B4B6EB /* ItemManager */;

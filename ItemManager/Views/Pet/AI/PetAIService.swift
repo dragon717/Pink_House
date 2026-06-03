@@ -417,9 +417,7 @@ class PetAIService: ObservableObject {
     func ensureConfiguration(role: PetRole, petName: String, wardrobeContext: String) {
         if self.apiKey.isEmpty {
             print("⚠️ [PetAIService] API Key is empty. Attempting to reload from AIConfigManager...")
-            // 尝试重新加载配置
-            // 这里我们无法直接获取 PetViewModel 的逻辑 (因为它在 ViewModel 层)
-            // 但我们可以尝试从 ConfigManager 获取 Key
+            AIConfigManager.shared.reloadConfig()
             
             // 读取用户设置的优先级
             let priorityString = UserDefaults.standard.string(forKey: "textModelPriority") ?? "DeepSeek,Minimax"

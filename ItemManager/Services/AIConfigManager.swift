@@ -13,47 +13,64 @@ class AIConfigManager {
     private init() {
         loadConfig()
     }
+
+    func reloadConfig() {
+        apiKey = nil
+        dsApiKey = nil
+        dbApiKey = nil
+        qwenApiKey = nil
+        minimaxApiKey = nil
+        ttsAppId = nil
+        loadConfig()
+    }
     
     private func loadConfig() {
-        // 尝试从 Bundle 读取
-        if let path = Bundle.main.path(forResource: "GenerativeAI-Info", ofType: "plist"),
-           let dict = NSDictionary(contentsOfFile: path) as? [String: Any] {
-            
-            if let key = dict["API_KEY"] as? String, !key.isEmpty {
-                self.apiKey = key.trimmingCharacters(in: .whitespacesAndNewlines)
-            }
-            
-            if let dsKey = dict["DS_API_KEY"] as? String, !dsKey.isEmpty {
-                self.dsApiKey = dsKey.trimmingCharacters(in: .whitespacesAndNewlines)
-            }
-            
-            if let dbKey = dict["DB_API_KEY"] as? String, !dbKey.isEmpty {
-                self.dbApiKey = dbKey.trimmingCharacters(in: .whitespacesAndNewlines)
-            }
-            
-            if let qwenKey = dict["QWEN_API_KEY"] as? String, !qwenKey.isEmpty {
-                self.qwenApiKey = qwenKey.trimmingCharacters(in: .whitespacesAndNewlines)
-            }
-            
-            if let minimaxKey = dict["MINIMAX_API_KEY"] as? String, !minimaxKey.isEmpty {
-                self.minimaxApiKey = minimaxKey.trimmingCharacters(in: .whitespacesAndNewlines)
-            }
-            
-            if let appId = dict["TTS_APP_ID"] as? String, !appId.isEmpty {
-                self.ttsAppId = appId.trimmingCharacters(in: .whitespacesAndNewlines)
-            }
+        guard let url = Bundle.main.url(forResource: "GenerativeAI-Info", withExtension: "plist") else {
+            print("⚠️ GenerativeAI-Info.plist not found in app bundle")
             return
         }
-        
-        // 如果 Bundle 中没有（可能是开发环境未打包进 Bundle），尝试直接读取文件系统（仅限模拟器/调试）
-        #if DEBUG
-        let fileManager = FileManager.default
-        // 假设项目根目录结构，尝试查找
-        // 注意：在真机上这通常无效，但在模拟器或 Mac 开发环境可能有用
-        // 这里主要依赖 Bundle 资源
-        #endif
-        
-        print("⚠️ GenerativeAI-Info.plist not found or API_KEY is empty")
+
+        guard
+            let data = try? Data(contentsOf: url),
+            let dict = try? PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any]
+        else {
+            print("⚠️ GenerativeAI-Info.plist exists but could not be parsed")
+            return
+        }
+
+        apiKey = nonEmptyConfigValue(dict["API_KEY"])
+        dsApiKey = nonEmptyConfigValue(dict["DS_API_KEY"])
+        dbApiKey = nonEmptyConfigValue(dict["DB_API_KEY"])
+        qwenApiKey = nonEmptyConfigValue(dict["QWEN_API_KEY"])
+        minimaxApiKey = nonEmptyConfigValue(dict["MINIMAX_API_KEY"])
+        ttsAppId = nonEmptyConfigValue(dict["TTS_APP_ID"])
+
+        let loadedKeyNames = [
+            ("API_KEY", apiKey),
+            ("DS_API_KEY", dsApiKey),
+            ("DB_API_KEY", dbApiKey),
+            ("QWEN_API_KEY", qwenApiKey),
+            ("MINIMAX_API_KEY", minimaxApiKey),
+            ("TTS_APP_ID", ttsAppId)
+        ]
+            .compactMap { entry -> String? in
+                entry.1 == nil ? nil : entry.0
+            }
+
+        if loadedKeyNames.isEmpty {
+            print("⚠️ GenerativeAI-Info.plist loaded but all AI config values are empty")
+        } else {
+            print("✅ GenerativeAI-Info.plist loaded keys: \(loadedKeyNames.joined(separator: ", "))")
+        }
+    }
+
+    private func nonEmptyConfigValue(_ value: Any?) -> String? {
+        guard let string = value as? String else {
+            return nil
+        }
+
+        let trimmed = string.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
     }
     
     var isAIEnabled: Bool {
