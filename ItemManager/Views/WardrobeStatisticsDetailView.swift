@@ -8,6 +8,32 @@
 import SwiftUI
 import Charts
 
+private func wardrobeStatsDecimalText(_ decimal: Decimal, roundedToWhole: Bool = false) -> String {
+    if roundedToWhole {
+        var value = decimal
+        var rounded = Decimal()
+        NSDecimalRound(&rounded, &value, 0, .plain)
+        return NSDecimalNumber(decimal: rounded).stringValue
+    }
+    return NSDecimalNumber(decimal: decimal).stringValue
+}
+
+private func wardrobeStatsCurrencyText(_ decimal: Decimal, roundedToWhole: Bool = false) -> String {
+    "¥%@".appLocalized(wardrobeStatsDecimalText(decimal, roundedToWhole: roundedToWhole))
+}
+
+private func wardrobeStatsPercentText(_ percent: Int) -> String {
+    "%@%%".appLocalized("\(percent)")
+}
+
+private func wardrobeStatsMonthLabel(for date: Date) -> String {
+    let formatter = DateFormatter()
+    formatter.locale = LanguageManager.shared.locale
+    formatter.calendar = Calendar.current
+    formatter.setLocalizedDateFormatFromTemplate("MMM")
+    return formatter.string(from: date)
+}
+
 struct WardrobeStatisticsDetailView: View {
     let clothings: [Clothing]
     var filterDescription: String? = nil
@@ -53,7 +79,7 @@ struct WardrobeStatisticsDetailView: View {
     @ToolbarContentBuilder
     private var centerToolbarContent: some ToolbarContent {
         ToolbarItem(placement: .principal) {
-            Text("衣橱统计")
+            Text("衣橱统计".appLocalized)
                 .font(.headline)
                 .foregroundStyle(.primary)
                 .themeSkinLegibleText(level: .inline, slot: .statsCard)
@@ -65,12 +91,12 @@ struct WardrobeStatisticsDetailView: View {
         if let filterDescription, !filterDescription.isEmpty {
             ToolbarItem(placement: .topBarTrailing) {
                 HStack(spacing: 8) {
-                    Text("筛选:\(filterDescription)")
+                    Text("筛选:%@".appLocalized(filterDescription))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .themeSkinLegibleText(level: .inline, slot: .statsCard)
                     
-                    Button("清除") {
+                    Button("清除".appLocalized) {
                         onClearFilter?()
                     }
                     .font(.caption)
@@ -120,7 +146,7 @@ struct OverviewStatsCard: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Label("总览统计", systemImage: "chart.pie.fill")
+            Label("总览统计".appLocalized, systemImage: "chart.pie.fill")
                 .font(.headline)
                 .foregroundStyle(.brown)
                 .themeSkinLegibleText(level: .inline, slot: .statsCard)
@@ -128,28 +154,28 @@ struct OverviewStatsCard: View {
             VStack(spacing: 12) {
                 HStack(spacing: 12) {
                     StatBox(title: "总裙装数", value: "\(totalCount)", unit: "件", color: .brown)
-                    StatBox(title: "总裙装价值", value: "¥\(formatWholePrice(dressValue))", unit: "", color: .orange)
+                    StatBox(title: "总裙装价值", value: wardrobeStatsCurrencyText(dressValue, roundedToWhole: true), unit: "", color: .orange)
                 }
                 
                 HStack(spacing: 12) {
                     StatBox(title: "有小物的裙装", value: "\(accessoriesCount)", unit: "件", color: .purple.opacity(0.8))
-                    StatBox(title: "总小物价值", value: "¥\(formatWholePrice(accessoriesValue))", unit: "", color: .pink.opacity(0.8))
+                    StatBox(title: "总小物价值", value: wardrobeStatsCurrencyText(accessoriesValue, roundedToWhole: true), unit: "", color: .pink.opacity(0.8))
                 }
                 
                 HStack {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("总价值")
+                        Text("总价值".appLocalized)
                             .font(.caption)
                             .foregroundStyle(.secondary)
                             .themeSkinLegibleText(level: .inline, slot: .statsCard)
-                        Text("¥\(formatWholePrice(totalValue))")
+                        Text(wardrobeStatsCurrencyText(totalValue, roundedToWhole: true))
                             .font(.title)
                             .fontWeight(.bold)
                             .foregroundStyle(.brown)
                             .themeSkinLegibleText(level: .chip, slot: .statsCard)
                         
                         if totalOriginalPrice > 0 {
-                            Text("总原价(不包含小物和未填写的): ¥\(formatPrice(totalOriginalPrice))")
+                            Text("总原价(不包含小物和未填写的): ¥%@".appLocalized(wardrobeStatsDecimalText(totalOriginalPrice)))
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                                 .themeSkinLegibleText(level: .inline, slot: .statsCard)
@@ -169,18 +195,6 @@ struct OverviewStatsCard: View {
         }
         .padding()
         .themeSkinSectionCard(slot: .statsCard, cornerRadius: 16)
-    }
-    
-    private func formatPrice(_ decimal: Decimal) -> String {
-        let number = NSDecimalNumber(decimal: decimal)
-        return number.stringValue
-    }
-    
-    private func formatWholePrice(_ decimal: Decimal) -> String {
-        var value = decimal
-        var rounded = Decimal()
-        NSDecimalRound(&rounded, &value, 0, .plain)
-        return NSDecimalNumber(decimal: rounded).stringValue
     }
 }
 
@@ -221,6 +235,7 @@ struct StatBox: View {
 // MARK: - 2. 标签分类统计
 struct TagStatsCard: View {
     let clothings: [Clothing]
+    private static let noTagName = "无标签"
     
     struct TagStat: Identifiable {
         let id = UUID()
@@ -251,7 +266,7 @@ struct TagStatsCard: View {
         if !noTagClothings.isEmpty {
             let count = noTagClothings.reduce(0) { $0 + $1.stock }
             let value = noTagClothings.reduce(Decimal(0)) { $0 + $1.inventoryTotalPrice }
-            noTagStat = TagStat(name: "无标签", count: count, value: value)
+            noTagStat = TagStat(name: Self.noTagName, count: count, value: value)
         } else {
             noTagStat = nil
         }
@@ -278,13 +293,13 @@ struct TagStatsCard: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Label("标签分类统计", systemImage: "tag.fill")
+            Label("标签分类统计".appLocalized, systemImage: "tag.fill")
                 .font(.headline)
                 .foregroundStyle(.brown)
                 .themeSkinLegibleText(level: .inline, slot: .statsCard)
             
             if stats.isEmpty {
-                Text("暂无标签数据")
+                Text("暂无标签数据".appLocalized)
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .themeSkinLegibleText(level: .inline, slot: .statsCard)
@@ -294,7 +309,7 @@ struct TagStatsCard: View {
                 VStack(alignment: .leading, spacing: 20) {
                     // Count Stats - 使用滚动条显示所有标签
                     VStack(alignment: .leading, spacing: 12) {
-                        Text("数量统计")
+                        Text("数量统计".appLocalized)
                             .font(.subheadline)
                             .fontWeight(.medium)
                             .themeSkinLegibleText(level: .inline, slot: .statsCard)
@@ -306,11 +321,11 @@ struct TagStatsCard: View {
                             VStack(spacing: 8) {
                                 ForEach(stats) { stat in
                                     StatRow(
-                                        label: stat.name,
+                                        label: localizedTagName(stat.name),
                                         value: "\(stat.count)",
                                         percentage: Double(stat.count) / Double(maxCount),
-                                        displayPercentage: "\(Int(Double(stat.count) / Double(stats.reduce(0) { $0 + $1.count }) * 100))%",
-                                        barColor: stat.name == "无标签" ? .gray.opacity(0.6) : .gray
+                                        displayPercentage: wardrobeStatsPercentText(Int(Double(stat.count) / Double(stats.reduce(0) { $0 + $1.count }) * 100)),
+                                        barColor: stat.name == Self.noTagName ? .gray.opacity(0.6) : .gray
                                     )
                                 }
                             }
@@ -322,7 +337,7 @@ struct TagStatsCard: View {
                     
                     // Value Stats - 使用滚动条显示所有标签
                     VStack(alignment: .leading, spacing: 12) {
-                        Text("价值统计")
+                        Text("价值统计".appLocalized)
                             .font(.subheadline)
                             .fontWeight(.medium)
                             .themeSkinLegibleText(level: .inline, slot: .statsCard)
@@ -337,11 +352,11 @@ struct TagStatsCard: View {
                                     let currentVal = Double(NSDecimalNumber(decimal: stat.value).doubleValue)
                                     
                                     StatRow(
-                                        label: stat.name,
-                                        value: "¥\(NSDecimalNumber(decimal: stat.value).stringValue)",
+                                        label: localizedTagName(stat.name),
+                                        value: wardrobeStatsCurrencyText(stat.value),
                                         percentage: maxVal > 0 ? currentVal / maxVal : 0,
                                         displayPercentage: "",
-                                        barColor: stat.name == "无标签" ? .gray.opacity(0.6) : .gray
+                                        barColor: stat.name == Self.noTagName ? .gray.opacity(0.6) : .gray
                                     )
                                 }
                             }
@@ -354,6 +369,10 @@ struct TagStatsCard: View {
         .padding()
         .themeSkinSectionCard(slot: .statsCard, cornerRadius: 16)
     }
+
+    private func localizedTagName(_ name: String) -> String {
+        name == Self.noTagName ? Self.noTagName.appLocalized : name
+    }
 }
 
 struct HeaderRow: View {
@@ -363,11 +382,11 @@ struct HeaderRow: View {
     
     var body: some View {
         HStack {
-            Text(left)
+            Text(left.appLocalized)
                 .frame(width: 80, alignment: .leading)
             Spacer()
-            Text(right)
-            Text(extra)
+            Text(right.appLocalized)
+            Text(extra.appLocalized)
                 .frame(width: 40, alignment: .trailing)
         }
         .font(.caption)
@@ -465,7 +484,7 @@ struct DepositStatsCard: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Label("心愿尾款统计", systemImage: "list.clipboard.fill")
+            Label("心愿尾款统计".appLocalized, systemImage: "list.clipboard.fill")
                 .font(.headline)
                 .foregroundStyle(.brown)
                 .themeSkinLegibleText(level: .inline, slot: .statsCard)
@@ -473,12 +492,12 @@ struct DepositStatsCard: View {
             VStack(spacing: 12) {
                 HStack(spacing: 12) {
                     StatBox(title: "心愿尾款数量", value: "\(planCount)", unit: "件", color: .brown)
-                    StatBox(title: "总金额", value: "¥\(NSDecimalNumber(decimal: totalAmount).stringValue)", unit: "", color: .green)
+                    StatBox(title: "总金额", value: wardrobeStatsCurrencyText(totalAmount), unit: "", color: .green)
                 }
                 
                 HStack(spacing: 12) {
-                    StatBox(title: "已付定金总额", value: "¥\(NSDecimalNumber(decimal: paidDeposit).stringValue)", unit: "", color: .orange)
-                    StatBox(title: "待付尾款总额", value: "¥\(NSDecimalNumber(decimal: pendingBalance).stringValue)", unit: "", color: .red)
+                    StatBox(title: "已付定金总额", value: wardrobeStatsCurrencyText(paidDeposit), unit: "", color: .orange)
+                    StatBox(title: "待付尾款总额", value: wardrobeStatsCurrencyText(pendingBalance), unit: "", color: .red)
                 }
             }
         }
@@ -536,7 +555,7 @@ struct PurchaseTimeStatsCard: View {
             let count = filtered.reduce(0) { $0 + $1.stock }
             let amount = filtered.reduce(Decimal(0)) { $0 + $1.inventoryTotalPrice }
             
-            let label = "\(components.month ?? 0)月"
+            let label = wardrobeStatsMonthLabel(for: date)
             stats.append(MonthlyStat(date: date, count: count, amount: amount, monthLabel: label))
         }
         
@@ -545,21 +564,21 @@ struct PurchaseTimeStatsCard: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Label("购买时间统计", systemImage: "calendar")
+            Label("购买时间统计".appLocalized, systemImage: "calendar")
                 .font(.headline)
                 .foregroundStyle(.brown)
                 .themeSkinLegibleText(level: .inline, slot: .statsCard)
             
             // This Month
             VStack(alignment: .leading, spacing: 8) {
-                Text("本月购买")
+                Text("本月购买".appLocalized)
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .themeSkinLegibleText(level: .inline, slot: .statsCard)
                 
                 HStack(spacing: 12) {
                     StatBox(title: "数量", value: "\(thisMonthStats.count)", unit: "件", color: .brown)
-                    StatBox(title: "总价值", value: "¥\(NSDecimalNumber(decimal: thisMonthStats.value).stringValue)", unit: "", color: .orange)
+                    StatBox(title: "总价值", value: wardrobeStatsCurrencyText(thisMonthStats.value), unit: "", color: .orange)
                 }
             }
             
@@ -567,31 +586,31 @@ struct PurchaseTimeStatsCard: View {
             
             // Charts
             VStack(alignment: .leading, spacing: 16) {
-                Text("最近12个月购买数量")
+                Text("最近12个月购买数量".appLocalized)
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .themeSkinLegibleText(level: .inline, slot: .statsCard)
                 
                 Chart(last12MonthsStats) { stat in
                     LineMark(
-                        x: .value("月份", stat.monthLabel),
-                        y: .value("数量", stat.count)
+                        x: .value("月份".appLocalized, stat.monthLabel),
+                        y: .value("数量".appLocalized, stat.count)
                     )
                     .foregroundStyle(Color.brown)
                     .symbol(Circle())
                     .interpolationMethod(.catmullRom)
                     
                     AreaMark(
-                        x: .value("月份", stat.monthLabel),
-                        y: .value("数量", stat.count)
+                        x: .value("月份".appLocalized, stat.monthLabel),
+                        y: .value("数量".appLocalized, stat.count)
                     )
                     .foregroundStyle(LinearGradient(colors: [.brown.opacity(0.3), .clear], startPoint: .top, endPoint: .bottom))
                     .interpolationMethod(.catmullRom)
                     
                     if stat.count > 0 {
                         PointMark(
-                            x: .value("月份", stat.monthLabel),
-                            y: .value("数量", stat.count)
+                            x: .value("月份".appLocalized, stat.monthLabel),
+                            y: .value("数量".appLocalized, stat.count)
                         )
                         .annotation(position: .top) {
                             Text("\(stat.count)")
@@ -606,7 +625,7 @@ struct PurchaseTimeStatsCard: View {
                 Divider()
                 
                 HStack {
-                    Text("最近12个月金额")
+                    Text("最近12个月金额".appLocalized)
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                         .themeSkinLegibleText(level: .inline, slot: .statsCard)
@@ -615,7 +634,7 @@ struct PurchaseTimeStatsCard: View {
                     
                     if let selectedMonth,
                        let stat = last12MonthsStats.first(where: { $0.monthLabel == selectedMonth }) {
-                        Text("\(stat.monthLabel): ¥\(NSDecimalNumber(decimal: stat.amount).stringValue)")
+                        Text("%@: ¥%@".appLocalized(stat.monthLabel, wardrobeStatsDecimalText(stat.amount)))
                             .font(.subheadline)
                             .fontWeight(.bold)
                             .foregroundStyle(.orange)
@@ -626,13 +645,13 @@ struct PurchaseTimeStatsCard: View {
                 
                 Chart(last12MonthsStats) { stat in
                     BarMark(
-                        x: .value("月份", stat.monthLabel),
-                        y: .value("金额", NSDecimalNumber(decimal: stat.amount).doubleValue)
+                        x: .value("月份".appLocalized, stat.monthLabel),
+                        y: .value("金额".appLocalized, NSDecimalNumber(decimal: stat.amount).doubleValue)
                     )
                     .foregroundStyle(selectedMonth == stat.monthLabel ? Color.orange : Color.orange.opacity(0.7))
                     .annotation(position: .top) {
                         if selectedMonth == stat.monthLabel {
-                            Text("¥\(NSDecimalNumber(decimal: stat.amount).stringValue)")
+                            Text(wardrobeStatsCurrencyText(stat.amount))
                                 .font(.caption2)
                                 .foregroundStyle(.secondary)
                                 .themeSkinLegibleText(level: .inline, slot: .statsCard)
