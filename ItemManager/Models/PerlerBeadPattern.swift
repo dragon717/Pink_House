@@ -15,7 +15,11 @@ enum PerlerPatternType: String, Codable, CaseIterable, Identifiable {
     case pixelArt = "像素画"
     
     var id: String { self.rawValue }
-    
+
+    var localizedName: String {
+        rawValue.appLocalized
+    }
+
     var icon: String {
         switch self {
         case .perlerBeads: return "circle.grid.2x2"

@@ -2716,6 +2716,42 @@
             "state" : "translated",
             "value" : "%lld 像素"
           }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld ピクセル"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld픽셀"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld pixels"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld Pixel"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld píxeles"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld pixels"
+          }
         }
       }
     },
@@ -2783,6 +2819,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%lld 頁"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld ページ"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld페이지"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld pages"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld Seiten"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld páginas"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld páginas"
           }
         }
       }
@@ -14969,6 +15041,42 @@
             "state" : "translated",
             "value" : "全部刪除"
           }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "すべて削除"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "모두 삭제"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tout supprimer"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Alle löschen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eliminar todo"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Excluir tudo"
+          }
         }
       }
     },
@@ -15022,7 +15130,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Restore"
+            "value" : "Restore All"
           }
         },
         "zh-Hans" : {
@@ -15034,7 +15142,43 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "全部恢復"
+            "value" : "全部復原"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "すべて復元"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "모두 복원"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tout restaurer"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Alle wiederherstellen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Restaurar todo"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Restaurar tudo"
           }
         }
       }
@@ -16677,6 +16821,42 @@
             "state" : "translated",
             "value" : "分類"
           }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "カテゴリ"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "분류"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Catégorie"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kategorie"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Categoría"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Categoria"
+          }
         }
       }
     },
@@ -17395,6 +17575,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "刪除於 %@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ に削除"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@에 삭제됨"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Supprimé le %@"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gelöscht am %@"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eliminado el %@"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Excluído em %@"
           }
         }
       }
@@ -23229,6 +23445,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "回收站"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ゴミ箱"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "휴지통"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Corbeille"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Papierkorb"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Papelera"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lixeira"
           }
         }
       }
@@ -30947,6 +31199,42 @@
             "state" : "translated",
             "value" : "平面"
           }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "平面"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "평면"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Plat"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Flach"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Plano"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Plano"
+          }
         }
       }
     },
@@ -33450,7 +33738,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Permanently Delete"
+            "value" : "Delete Permanently"
           }
         },
         "zh-Hans" : {
@@ -33463,6 +33751,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "徹底刪除"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "完全に削除"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "영구 삭제"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Supprimer définitivement"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Endgültig löschen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eliminar permanentemente"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Excluir permanentemente"
           }
         }
       }
@@ -34668,7 +34992,43 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "還原"
+            "value" : "復原"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "復元"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "복원"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Restaurer"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wiederherstellen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Restaurar"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Restaurar"
           }
         }
       }
@@ -36572,6 +36932,42 @@
             "state" : "translated",
             "value" : "手帳"
           }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "手帳"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "다이어리"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Journal"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Journal"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Diario"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Diário"
+          }
         }
       }
     },
@@ -36593,6 +36989,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "手帳類型"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "手帳タイプ"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "다이어리 유형"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Type de journal"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Journaltyp"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tipo de diario"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tipo de diário"
           }
         }
       }
@@ -36933,7 +37365,43 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "批量刪除"
+            "value" : "批次刪除"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "一括削除"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "일괄 삭제"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Suppression par lot"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stapelweise löschen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eliminar en lote"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Excluir em lote"
           }
         }
       }
@@ -37021,7 +37489,43 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "批量恢復"
+            "value" : "批次復原"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "一括復元"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "일괄 복원"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Restauration par lot"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stapelweise wiederherstellen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Restaurar en lote"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Restaurar em lote"
           }
         }
       }
@@ -37911,7 +38415,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Fuse Beads"
+            "value" : "Perler"
           }
         },
         "zh-Hans" : {
@@ -37924,6 +38428,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "拼豆"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "パーラービーズ"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "펄러비즈"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Perles à repasser"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bügelperlen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cuentas Perler"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Perler"
           }
         }
       }
@@ -46817,6 +47357,42 @@
             "state" : "translated",
             "value" : "模型"
           }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "モデル"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "모델"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Modèle"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Modell"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Modelo"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Modelo"
+          }
         }
       }
     },
@@ -53532,7 +54108,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Delete selected %lld?"
+            "value" : "Are you sure you want to delete the selected %lld items? This action cannot be undone."
           }
         },
         "zh-Hans" : {
@@ -53544,7 +54120,43 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "確定要刪除選中的 %lld 個項目嗎？此操作無法撤銷。"
+            "value" : "確定要刪除選中的 %lld 個項目嗎？此操作無法復原。"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "選択した %lld 件の項目を削除しますか？この操作は元に戻せません。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "선택한 항목 %lld개를 삭제하시겠어요? 이 작업은 되돌릴 수 없습니다."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Voulez-vous supprimer les %lld éléments sélectionnés ? Cette action est irréversible."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Möchtest du die ausgewählten %lld Elemente löschen? Diese Aktion kann nicht rückgängig gemacht werden."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "¿Seguro que quieres eliminar los %lld elementos seleccionados? Esta acción no se puede deshacer."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tem certeza de que deseja excluir os %lld itens selecionados? Esta ação não pode ser desfeita."
           }
         }
       }
@@ -53768,7 +54380,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Do you want to permanently delete?"
+            "value" : "Are you sure you want to delete this permanently? This action cannot be undone."
           }
         },
         "zh-Hans" : {
@@ -53780,7 +54392,43 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "確定要徹底刪除嗎？此操作無法撤銷。"
+            "value" : "確定要徹底刪除嗎？此操作無法復原。"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "完全に削除しますか？この操作は元に戻せません。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "영구 삭제하시겠어요? 이 작업은 되돌릴 수 없습니다."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Voulez-vous supprimer définitivement cet élément ? Cette action est irréversible."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Möchtest du dieses Element endgültig löschen? Diese Aktion kann nicht rückgängig gemacht werden."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "¿Seguro que quieres eliminarlo permanentemente? Esta acción no se puede deshacer."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tem certeza de que deseja excluir permanentemente? Esta ação não pode ser desfeita."
           }
         }
       }
@@ -53790,7 +54438,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Do you want to restore current list?"
+            "value" : "Are you sure you want to restore all items in the current list?"
           }
         },
         "zh-Hans" : {
@@ -53802,7 +54450,43 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "確定要恢復當前列表的所有項目嗎？"
+            "value" : "確定要復原目前列表的所有項目嗎？"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "現在のリストのすべての項目を復元しますか？"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "현재 목록의 모든 항목을 복원하시겠어요?"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Voulez-vous restaurer tous les éléments de la liste actuelle ?"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Möchtest du alle Elemente in der aktuellen Liste wiederherstellen?"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "¿Seguro que quieres restaurar todos los elementos de la lista actual?"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tem certeza de que deseja restaurar todos os itens da lista atual?"
           }
         }
       }
@@ -53812,7 +54496,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Do you want to restore?"
+            "value" : "Are you sure you want to restore this item?"
           }
         },
         "zh-Hans" : {
@@ -53824,7 +54508,43 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "確定要恢復這個項目嗎？"
+            "value" : "確定要復原這個項目嗎？"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この項目を復元しますか？"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이 항목을 복원하시겠어요?"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Voulez-vous restaurer cet élément ?"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Möchtest du dieses Element wiederherstellen?"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "¿Seguro que quieres restaurar este elemento?"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tem certeza de que deseja restaurar este item?"
           }
         }
       }
@@ -53834,7 +54554,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Do you want to restore selected %lld?"
+            "value" : "Are you sure you want to restore the selected %lld items?"
           }
         },
         "zh-Hans" : {
@@ -53846,7 +54566,43 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "確定要恢復選中的 %lld 個項目嗎？"
+            "value" : "確定要復原選中的 %lld 個項目嗎？"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "選択した %lld 件の項目を復元しますか？"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "선택한 항목 %lld개를 복원하시겠어요?"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Voulez-vous restaurer les %lld éléments sélectionnés ?"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Möchtest du die ausgewählten %lld Elemente wiederherstellen?"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "¿Seguro que quieres restaurar los %lld elementos seleccionados?"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tem certeza de que deseja restaurar os %lld itens selecionados?"
           }
         }
       }
@@ -53879,7 +54635,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Do you want to clear current list?"
+            "value" : "Are you sure you want to clear the current list? This action cannot be undone."
           }
         },
         "zh-Hans" : {
@@ -53891,7 +54647,43 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "確定要清空當前列表嗎？此操作無法撤銷。"
+            "value" : "確定要清空目前列表嗎？此操作無法復原。"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "現在のリストを空にしますか？この操作は元に戻せません。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "현재 목록을 비우시겠어요? 이 작업은 되돌릴 수 없습니다."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Voulez-vous vider la liste actuelle ? Cette action est irréversible."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Möchtest du die aktuelle Liste leeren? Diese Aktion kann nicht rückgängig gemacht werden."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "¿Seguro que quieres vaciar la lista actual? Esta acción no se puede deshacer."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tem certeza de que deseja esvaziar a lista atual? Esta ação não pode ser desfeita."
           }
         }
       }
@@ -56579,16 +57371,51 @@
             "state" : "translated",
             "value" : "空間"
           }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "空間"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "공간"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Espace"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Raum"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Espacio"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Espaço"
+          }
         }
       }
     },
     "空间手帐" : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Spatial Journal"
+            "value" : "Space Journal"
           }
         },
         "zh-Hans" : {
@@ -56601,6 +57428,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "空間手帳"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "空間手帳"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "공간 다이어리"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Journal d'espace"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Raumjournal"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Diario espacial"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Diário de espaço"
           }
         }
       }
@@ -61796,7 +62659,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Closet"
+            "value" : "Wardrobe"
           }
         },
         "zh-Hans" : {
@@ -61809,6 +62672,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "衣櫥"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ワードローブ"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "옷장"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Garde-robe"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kleiderschrank"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Armario"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Guarda-roupa"
           }
         }
       }
@@ -98262,6 +99161,644 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Beneficios da loja de skins, relatorios semanais e mais conteudos exclusivos continuarao crescendo."
+          }
+        }
+      }
+    },
+    "未命名书页" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Untitled page"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未命名书页"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未命名書頁"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "無題のページ"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "제목 없는 페이지"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Page sans titre"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unbenannte Seite"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Página sin título"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Página sem título"
+          }
+        }
+      }
+    },
+    "回收站是空的" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recycle Bin is empty"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "回收站是空的"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "回收站是空的"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ゴミ箱は空です"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "휴지통이 비어 있습니다"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La corbeille est vide"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Der Papierkorb ist leer"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La papelera está vacía"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A lixeira está vazia"
+          }
+        }
+      }
+    },
+    "删除的裙装会出现在这里" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Deleted dresses will appear here"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "删除的裙装会出现在这里"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "刪除的裙裝會出現在這裡"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "削除したドレスがここに表示されます"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "삭제한 드레스가 여기에 표시됩니다"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les robes supprimées apparaîtront ici"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gelöschte Kleider erscheinen hier"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Los vestidos eliminados aparecerán aquí"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vestidos excluídos aparecerão aqui"
+          }
+        }
+      }
+    },
+    "删除的手帐和书页会出现在这里" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Deleted journals and pages will appear here"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "删除的手帐和书页会出现在这里"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "刪除的手帳和書頁會出現在這裡"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "削除した手帳とページがここに表示されます"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "삭제한 다이어리와 페이지가 여기에 표시됩니다"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les journaux et pages supprimés apparaîtront ici"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gelöschte Journale und Seiten erscheinen hier"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Los diarios y páginas eliminados aparecerán aquí"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Diários e páginas excluídos aparecerão aqui"
+          }
+        }
+      }
+    },
+    "手帐本" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Journals"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "手帐本"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "手帳本"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "手帳"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "다이어리"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Journaux"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Journale"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Diarios"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Diários"
+          }
+        }
+      }
+    },
+    "单独删除的书页" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Separately deleted pages"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "单独删除的书页"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "單獨刪除的書頁"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "個別に削除したページ"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "별도로 삭제한 페이지"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pages supprimées séparément"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Separat gelöschte Seiten"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Páginas eliminadas por separado"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Páginas excluídas separadamente"
+          }
+        }
+      }
+    },
+    "删除的空间手帐和书页会出现在这里" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Deleted space journals and pages will appear here"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "删除的空间手帐和书页会出现在这里"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "刪除的空間手帳和書頁會出現在這裡"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "削除した空間手帳とページがここに表示されます"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "삭제한 공간 다이어리와 페이지가 여기에 표시됩니다"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les journaux d'espace et pages supprimés apparaîtront ici"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gelöschte Raumjournale und Seiten erscheinen hier"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Los diarios espaciales y sus páginas eliminados aparecerán aquí"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Diários de espaço e páginas excluídos aparecerão aqui"
+          }
+        }
+      }
+    },
+    "单独删除的空间书页" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Separately deleted space pages"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "单独删除的空间书页"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "單獨刪除的空間書頁"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "個別に削除した空間ページ"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "별도로 삭제한 공간 페이지"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pages d'espace supprimées séparément"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Separat gelöschte Raumseiten"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Páginas espaciales eliminadas por separado"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Páginas de espaço excluídas separadamente"
+          }
+        }
+      }
+    },
+    "删除的3D模型会出现在这里" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Deleted 3D models will appear here"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "删除的3D模型会出现在这里"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "刪除的3D模型會出現在這裡"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "削除した3Dモデルがここに表示されます"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "삭제한 3D 모델이 여기에 표시됩니다"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les modèles 3D supprimés apparaîtront ici"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gelöschte 3D-Modelle erscheinen hier"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Los modelos 3D eliminados aparecerán aquí"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Modelos 3D excluídos aparecerão aqui"
+          }
+        }
+      }
+    },
+    "删除的拼豆/像素画会出现在这里" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Deleted Perler/pixel art will appear here"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "删除的拼豆/像素画会出现在这里"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "刪除的拼豆/像素畫會出現在這裡"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "削除したパーラービーズ/ピクセルアートがここに表示されます"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "삭제한 펄러비즈/픽셀아트가 여기에 표시됩니다"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les créations en perles/pixel art supprimées apparaîtront ici"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gelöschte Bügelperlen-/Pixelkunst erscheint hier"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Las creaciones Perler/pixel art eliminadas aparecerán aquí"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Criações Perler/pixel art excluídas aparecerão aqui"
+          }
+        }
+      }
+    },
+    "像素画" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pixel Art"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "像素画"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "像素畫"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ピクセルアート"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "픽셀아트"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pixel art"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pixelkunst"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pixel art"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pixel art"
           }
         }
       }

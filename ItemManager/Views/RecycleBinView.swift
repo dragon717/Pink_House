@@ -8,6 +8,26 @@
 import SwiftUI
 import SwiftData
 
+private func recycleBinPageCountText(_ count: Int) -> String {
+    "%lld 页".appLocalized(Int64(count))
+}
+
+private func recycleBinPixelCountText(_ count: Int) -> String {
+    "%lld 像素".appLocalized(Int64(count))
+}
+
+private func recycleBinDeletedAtText(_ date: Date) -> String {
+    let formatter = DateFormatter()
+    formatter.locale = LanguageManager.shared.locale
+    formatter.dateStyle = .medium
+    formatter.timeStyle = .short
+    return "删除于 %@".appLocalized(formatter.string(from: date))
+}
+
+private var recycleBinUnnamedPageText: String {
+    "未命名书页".appLocalized
+}
+
 struct RecycleBinView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
@@ -98,7 +118,7 @@ struct RecycleBinView: View {
         contentView
             .environment(\.editMode, $editMode)
             .environment(\.containerPalette, recycleBinPalette)
-            .navigationTitle("回收站")
+            .navigationTitle("回收站".appLocalized)
             .navigationBarTitleDisplayMode(.inline)
             .background {
                 LiquidBackground()
@@ -110,47 +130,47 @@ struct RecycleBinView: View {
             .tint(recycleBinPalette.accent)
             .onChange(of: selectedTab) { handleTabChange() }
             .onChange(of: selectedSubTab) { handleSubTabChange() }
-            .alert("彻底删除", isPresented: $showingDeleteAlert) {
-                Button("取消", role: .cancel) { itemToDelete = nil }
-                Button("删除", role: .destructive, action: handleDelete)
+            .alert("彻底删除".appLocalized, isPresented: $showingDeleteAlert) {
+                Button("取消".appLocalized, role: .cancel) { itemToDelete = nil }
+                Button("删除".appLocalized, role: .destructive, action: handleDelete)
             } message: {
-                Text("确定要彻底删除吗？此操作无法撤销。")
+                Text("确定要彻底删除吗？此操作无法撤销。".appLocalized)
             }
-            .alert("全部删除", isPresented: $showingDeleteAllAlert) {
-                Button("取消", role: .cancel) { }
-                Button("删除", role: .destructive, action: deleteAll)
+            .alert("全部删除".appLocalized, isPresented: $showingDeleteAllAlert) {
+                Button("取消".appLocalized, role: .cancel) { }
+                Button("删除".appLocalized, role: .destructive, action: deleteAll)
             } message: {
-                Text("确定要清空当前列表吗？此操作无法撤销。")
+                Text("确定要清空当前列表吗？此操作无法撤销。".appLocalized)
             }
-            .alert("全部恢复", isPresented: $showingRestoreAllAlert) {
-                Button("取消", role: .cancel) { }
-                Button("恢复", action: restoreAll)
+            .alert("全部恢复".appLocalized, isPresented: $showingRestoreAllAlert) {
+                Button("取消".appLocalized, role: .cancel) { }
+                Button("恢复".appLocalized, action: restoreAll)
             } message: {
-                Text("确定要恢复当前列表的所有项目吗？")
+                Text("确定要恢复当前列表的所有项目吗？".appLocalized)
             }
-            .alert("批量删除", isPresented: $showingBatchDeleteAlert) {
-                Button("取消", role: .cancel) { }
-                Button("删除", role: .destructive) {
+            .alert("批量删除".appLocalized, isPresented: $showingBatchDeleteAlert) {
+                Button("取消".appLocalized, role: .cancel) { }
+                Button("删除".appLocalized, role: .destructive) {
                     deleteSelected()
                     editMode = .inactive
                 }
             } message: {
-                Text("确定要删除选中的 \(selectedItems.count) 个项目吗？此操作无法撤销。")
+                Text("确定要删除选中的 %lld 个项目吗？此操作无法撤销。".appLocalized(Int64(selectedItems.count)))
             }
-            .alert("批量恢复", isPresented: $showingBatchRestoreAlert) {
-                Button("取消", role: .cancel) { }
-                Button("恢复") {
+            .alert("批量恢复".appLocalized, isPresented: $showingBatchRestoreAlert) {
+                Button("取消".appLocalized, role: .cancel) { }
+                Button("恢复".appLocalized) {
                     restoreSelected()
                     editMode = .inactive
                 }
             } message: {
-                Text("确定要恢复选中的 \(selectedItems.count) 个项目吗？")
+                Text("确定要恢复选中的 %lld 个项目吗？".appLocalized(Int64(selectedItems.count)))
             }
-            .alert("恢复", isPresented: $showingRestoreAlert) {
-                Button("取消", role: .cancel) { itemToDelete = nil }
-                Button("恢复", action: handleRestore)
+            .alert("恢复".appLocalized, isPresented: $showingRestoreAlert) {
+                Button("取消".appLocalized, role: .cancel) { itemToDelete = nil }
+                Button("恢复".appLocalized, action: handleRestore)
             } message: {
-                Text("确定要恢复这个项目吗？")
+                Text("确定要恢复这个项目吗？".appLocalized)
             }
     }
 
@@ -167,16 +187,16 @@ struct RecycleBinView: View {
     }
 
     private var mainPicker: some View {
-        Picker("分类", selection: $selectedTab) {
-            Text("衣橱")
+        Picker("分类".appLocalized, selection: $selectedTab) {
+            Text("衣橱".appLocalized)
                 .foregroundStyle(recycleBinPalette.primary)
                 .themeSkinLegibleText(level: .inline, slot: .segmentedControl)
                 .tag(0)
-            Text("手帐")
+            Text("手帐".appLocalized)
                 .foregroundStyle(recycleBinPalette.primary)
                 .themeSkinLegibleText(level: .inline, slot: .segmentedControl)
                 .tag(1)
-            Text("拼豆")
+            Text("拼豆".appLocalized)
                 .foregroundStyle(recycleBinPalette.primary)
                 .themeSkinLegibleText(level: .inline, slot: .segmentedControl)
                 .tag(2)
@@ -187,16 +207,16 @@ struct RecycleBinView: View {
     }
 
     private var subTabPicker: some View {
-        Picker("手帐类型", selection: $selectedSubTab) {
-            Text("平面")
+        Picker("手帐类型".appLocalized, selection: $selectedSubTab) {
+            Text("平面".appLocalized)
                 .foregroundStyle(recycleBinPalette.primary)
                 .themeSkinLegibleText(level: .inline, slot: .segmentedControl)
                 .tag(0)
-            Text("空间")
+            Text("空间".appLocalized)
                 .foregroundStyle(recycleBinPalette.primary)
                 .themeSkinLegibleText(level: .inline, slot: .segmentedControl)
                 .tag(1)
-            Text("模型")
+            Text("模型".appLocalized)
                 .foregroundStyle(recycleBinPalette.primary)
                 .themeSkinLegibleText(level: .inline, slot: .segmentedControl)
                 .tag(2)
@@ -237,10 +257,10 @@ struct RecycleBinView: View {
 
     private func emptyState(_ title: String, systemImage: String, description: String) -> some View {
         ContentUnavailableView {
-            Label(title, systemImage: systemImage)
+            Label(title.appLocalized, systemImage: systemImage)
                 .foregroundStyle(recycleBinPalette.primary)
         } description: {
-            Text(description)
+            Text(description.appLocalized)
                 .foregroundStyle(recycleBinPalette.secondary)
         }
         .themeSkinLegibleText(level: .inline, slot: .emptyState)
@@ -248,7 +268,7 @@ struct RecycleBinView: View {
     }
 
     private func sectionHeader(_ title: String) -> some View {
-        Text(title)
+        Text(title.appLocalized)
             .font(.caption.weight(.semibold))
             .foregroundStyle(recycleBinPalette.secondary)
             .themeSkinLegibleText(level: .inline, slot: .sectionCard)
@@ -272,7 +292,7 @@ struct RecycleBinView: View {
             .disabled(selectedItems.isEmpty)
             .foregroundStyle(.red)
 
-            Button("完成") {
+            Button("完成".appLocalized) {
                 withAnimation {
                     editMode = .inactive
                     selectedItems.removeAll()
@@ -290,19 +310,19 @@ struct RecycleBinView: View {
                     editMode = .active
                 }
             } label: {
-                Label("编辑", systemImage: "pencil")
+                Label("编辑".appLocalized, systemImage: "pencil")
             }
 
             Button {
                 showingRestoreAllAlert = true
             } label: {
-                Label("全部恢复", systemImage: "arrow.uturn.backward.circle")
+                Label("全部恢复".appLocalized, systemImage: "arrow.uturn.backward.circle")
             }
 
             Button(role: .destructive) {
                 showingDeleteAllAlert = true
             } label: {
-                Label("全部删除", systemImage: "trash")
+                Label("全部删除".appLocalized, systemImage: "trash")
             }
         } label: {
             Image(systemName: "ellipsis.circle")
@@ -381,7 +401,7 @@ struct RecycleBinView: View {
                                     itemToDelete = clothing
                                     showingRestoreAlert = true
                                 } label: {
-                                    Label("恢复", systemImage: "arrow.uturn.backward")
+                                    Label("恢复".appLocalized, systemImage: "arrow.uturn.backward")
                                 }
                                 .tint(.blue)
                             }
@@ -392,7 +412,7 @@ struct RecycleBinView: View {
                                     itemToDelete = clothing
                                     showingDeleteAlert = true
                                 } label: {
-                                    Label("彻底删除", systemImage: "trash.slash")
+                                    Label("彻底删除".appLocalized, systemImage: "trash.slash")
                                 }
                             }
                         }
@@ -940,7 +960,7 @@ struct DeletedBookRow: View {
 
                         Spacer()
 
-                        Text("\(book.pages?.count ?? 0) 页")
+                        Text(recycleBinPageCountText(book.pages?.count ?? 0))
                             .font(.caption)
                             .foregroundStyle(palette.secondary)
                     }
@@ -976,7 +996,7 @@ struct DeletedBookRow: View {
                             .foregroundStyle(palette.secondary)
                             .padding(.leading, 28)
 
-                        Text(page.note.isEmpty ? "未命名书页" : page.note)
+                        Text(page.note.isEmpty ? recycleBinUnnamedPageText : page.note)
                             .font(.subheadline)
                             .foregroundStyle(palette.primary)
 
@@ -1042,7 +1062,7 @@ struct DeletedModel3DRow: View {
                     .foregroundStyle(palette.primary)
 
                 if let deletedAt = model.deletedAt {
-                    Text("删除于 \(deletedAt.formatted(date: .abbreviated, time: .shortened))")
+                    Text(recycleBinDeletedAtText(deletedAt))
                         .font(.caption)
                         .foregroundStyle(palette.secondary)
                 }
@@ -1107,12 +1127,14 @@ struct DeletedOutfitRow: View {
             }
 
             VStack(alignment: .leading) {
-                Text(outfit.note.isEmpty ? "未命名书页" : outfit.note)
+                Text(outfit.note.isEmpty ? recycleBinUnnamedPageText : outfit.note)
                     .font(.body)
                     .foregroundStyle(palette.primary)
-                Text(outfit.deletedAt?.formatted() ?? "")
-                    .font(.caption)
-                    .foregroundStyle(palette.secondary)
+                if let deletedAt = outfit.deletedAt {
+                    Text(recycleBinDeletedAtText(deletedAt))
+                        .font(.caption)
+                        .foregroundStyle(palette.secondary)
+                }
             }
 
             Spacer()
@@ -1176,7 +1198,7 @@ struct DeletedSpaceBookRow: View {
 
                         Spacer()
 
-                        Text("\(book.pages?.count ?? 0) 页")
+                        Text(recycleBinPageCountText(book.pages?.count ?? 0))
                             .font(.caption)
                             .foregroundStyle(palette.secondary)
                     }
@@ -1212,7 +1234,7 @@ struct DeletedSpaceBookRow: View {
                             .foregroundStyle(palette.secondary)
                             .padding(.leading, 28)
 
-                        Text(page.note.isEmpty ? "未命名书页" : page.note)
+                        Text(page.note.isEmpty ? recycleBinUnnamedPageText : page.note)
                             .font(.subheadline)
                             .foregroundStyle(palette.primary)
 
@@ -1268,12 +1290,14 @@ struct DeletedSpaceOutfitRow: View {
             }
 
             VStack(alignment: .leading) {
-                Text(outfit.note.isEmpty ? "未命名书页" : outfit.note)
+                Text(outfit.note.isEmpty ? recycleBinUnnamedPageText : outfit.note)
                     .font(.body)
                     .foregroundStyle(palette.primary)
-                Text(outfit.deletedAt?.formatted() ?? "")
-                    .font(.caption)
-                    .foregroundStyle(palette.secondary)
+                if let deletedAt = outfit.deletedAt {
+                    Text(recycleBinDeletedAtText(deletedAt))
+                        .font(.caption)
+                        .foregroundStyle(palette.secondary)
+                }
             }
 
             Spacer()
@@ -1340,7 +1364,7 @@ struct DeletedPerlerPatternRow: View {
                     .foregroundStyle(palette.primary)
 
                 HStack(spacing: 8) {
-                    Text(pattern.typeEnum.rawValue)
+                    Text(pattern.typeEnum.localizedName)
                         .font(.caption)
                         .foregroundStyle(palette.accent)
 
@@ -1348,13 +1372,13 @@ struct DeletedPerlerPatternRow: View {
                         .font(.caption)
                         .foregroundStyle(palette.secondary)
 
-                    Text("\(pattern.totalPixels) 像素")
+                    Text(recycleBinPixelCountText(pattern.totalPixels))
                         .font(.caption)
                         .foregroundStyle(palette.secondary)
                 }
 
                 if let deletedAt = pattern.deletedAt {
-                    Text("删除于 \(deletedAt.formatted(date: .abbreviated, time: .shortened))")
+                    Text(recycleBinDeletedAtText(deletedAt))
                         .font(.caption)
                         .foregroundStyle(palette.secondary)
                 }
