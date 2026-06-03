@@ -24,14 +24,15 @@
 | 喵币商店购买提示 | `1d53806` | 已提交 | 喵币商店标题/协议/优惠码/问题反馈、IAP 错误、成功 toast、商品包名与描述 | `xcodebuild` 通过 |
 | VIP 中心兑换界面 | `91365ba` | 已提交 | VIP Center hero、状态、权益、菜单、优惠码/兑换确认、浮动购买栏、VIPManager 计划与结果消息 | `xcodebuild` 通过 |
 | 回收站界面 | `d4a19e2` | 已提交 | 回收站导航、分段、空态、section、行内页数/像素/删除时间、批量删除/恢复 alert | `xcodebuild` 通过 |
+| 衣橱合并目标筛选 | `5a835c7` | 已提交 | 合并为小物目标选择 sheet、筛选 sheet、系统占位 chip、数量格式、共享筛选模式/心愿尾款展示名 | `xcodebuild` 通过 |
 
 ## Subagent 最新盘点
 
 | Subagent | 分工 | 已完成/已验证 | 还没有做 | 需要重点优化 |
 |---|---|---|---|---|
-| Singer | 衣橱/Home/统计/回收站审计 | 已确认 `WardrobeView` 主列表、批量操作、空态、统计入口、卡片价格标签已大量接入 `.appLocalized`；本阶段已提交 `RecycleBinView` 全页固定文案与行内格式 | `HomeView` 顶栏/搜索/排序/布局、更多菜单、引导菜单仍有 rawValue 与插值；合并目标选择 sheet 和统计详情还有月份、轴标题、header、占比等漏点 | 下一刀建议做合并目标选择 sheet、Home 菜单/筛选、统计详情；注意 `SortOption/ViewLayout.rawValue` 不能直接改，需新增 localized title |
-| James | VIP/IAP 购买链路审计 | 已提交 VIP 试用弹窗、喵币商店壳层、IAP 错误/成功提示、商品包名与描述、VIP Center 主体与 VIPManager 结果消息本地化 | VIP 子页仍需继续：`VIPVisualSystem.displayHint(for:)`、`VIPCardSkinSelectionView`、`VIPAppIconSelectionView`、`VIPAppIconManager` 的动态图标名与切换结果 | 下一个 VIP P0 可拆成“卡片皮肤选择页”和“桌面图标选择页”两个小提交，避免和购买链路混在一起 |
-| Carson | 萌宠 prompt/fallback 审计 | 确认萌宠主页壳层已有多阶段提交，并把风险拆成“用户可见 fallback”和“模型 prompt”两类 | P0：`PetGenerativePromptBuilder`、`PetPersonaProfile`、`PetConversationV2Support` role/toolbox、`VisionAnalysisService`、`OutfitSuggestionService` prompt/response、`PetAIService`、`PetChatIntentRouter` 中文 command payload、`PetChatVIPAccessSupport` | 优先让 prompt 与 marker 同源按 locale 生成，JSON/command 保持稳定英文 code；再处理 fallback 文案，最后处理关键词 lexicon |
+| Peirce | Home 顶栏/筛选/菜单审计 | 确认 `SortOption`、`ViewLayout`、`ClothingField` rawValue 都是持久化/偏好边界，不能直接改；应新增 `localizedTitle`/helper | `HomeView` 排序/布局 picker、搜索 prompt、经典筛选、更多/新增引导菜单、解锁动态格式仍需继续 | 下一刀 Home P0 先做 `SortOption/ViewLayout` localized title 和搜索 prompt，再做经典筛选；避免改 rawValue |
+| Hubble | VIP 子页审计 | 确认 VIP Center 主体已完成；子页主要漏点是动态 `Text(String)` 不会走自定义语言 | `VIPVisualSystem.displayHint(for:)`、`VIPCardSkinSelectionView`、`VIPCardView` tag、`VIPAppIconSelectionView`、`VIPAppIconManager` option/result message | 先拆“卡片皮肤选择页”，再拆“桌面图标选择页”；动态名称用 localized helper，不把插值中文写进 alert |
+| Euclid | 萌宠 prompt/fallback 最小切片选择 | 从 P0 prompt/fallback 候选中确认 `PetPersonaProfile.swift` 是最小且收益最高的第一刀 | PromptBuilder marker、PetAIService system prompt、Vision/Outfit prompt、IntentRouter command payload 仍后置 | 下一刀萌宠建议只做 `PetPersonaProfile`：prompt 字段走 `ai.prompt.*`，用户 fallback 走 `pet.chat.fallback.*`，不要混改 marker/JSON/command |
 
 ## UI 美化盘点
 
@@ -50,7 +51,7 @@
 
 ## 下一阶段建议
 
-1. 代码主线继续补 P0 本地化：优先 Home 顶栏/筛选、衣橱合并目标选择 sheet、统计详情、VIP 皮肤/图标子页。
-2. 萌宠国际化单独开 P0 prompt/fallback 线：先处理 PromptBuilder/Persona/PetAIService/Vision/Outfit，再做关键词 lexicon。
+1. 代码主线继续补 P0 本地化：优先 Home 顶栏排序/布局/搜索 prompt、Home 经典筛选、统计详情、VIP 皮肤/图标子页。
+2. 萌宠国际化单独开 P0 prompt/fallback 线：先处理 `PetPersonaProfile.swift`，再处理 PromptBuilder/PetAIService/Vision/Outfit，最后做关键词 lexicon。
 3. UI 美化先从衣橱 P0 开刀：无衣物/筛选无结果空态已完成，下一步复核窄网格 pill 溢出与统计图表主题色。
 4. 小屋美化排 P1：先补素材缺失空态，再处理萌宠/大世界子页的主题按钮与提示面板统一。
