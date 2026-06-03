@@ -79,7 +79,7 @@ struct SeriesSelectorView: View {
                 }
             } label: {
                 HStack {
-                    Text(isExpanded ? "按系列预约 (点我折叠)" : "按系列预约 (点我展开)")
+                    Text((isExpanded ? "按系列预约 (点我折叠)" : "按系列预约 (点我展开)").appLocalized)
                         .font(.subheadline)
                         .foregroundStyle(.primary)
                         .themeSkinLegibleText(level: .inline, slot: .sectionCard)
@@ -94,10 +94,10 @@ struct SeriesSelectorView: View {
                             .themeSkinLegibleSymbol(level: .inline, slot: .sectionCard)
                     }
                     .buttonStyle(.plain)
-                    .alert("系列分类规则", isPresented: $showTips) {
-                        Button("知道了", role: .cancel) { }
+                    .alert("系列分类规则".appLocalized, isPresented: $showTips) {
+                        Button("知道了".appLocalized, role: .cancel) { }
                     } message: {
-                        Text("系统会自动根据商品名称的前 2-4 个字（去除特殊符号）作为系列前缀进行归类。\n\n例如：\n\"少女心愿 连衣裙\"\n\"少女心愿 半裙\"\n\n都会被归类为 \"Pink\" 系列。\n注：同名属于同一款商品。")
+                        Text("系统会自动根据商品名称的前 2-4 个字（去除特殊符号）作为系列前缀进行归类。\n\n例如：\n\"少女心愿 连衣裙\"\n\"少女心愿 半裙\"\n\n都会被归类为 \"Pink\" 系列。\n注：同名属于同一款商品。".appLocalized)
                     }
                     
                     if isAnalyzing {
@@ -130,12 +130,12 @@ struct SeriesSelectorView: View {
                 
                 if seriesList.isEmpty {
                     if isAnalyzing {
-                        Text("正在分析系列...")
+                        Text("正在分析系列...".appLocalized)
                             .foregroundStyle(.secondary)
                             .themeSkinLegibleText(level: .inline, slot: .emptyState)
                             .padding()
                     } else {
-                        Text("暂无系列数据")
+                        Text("暂无系列数据".appLocalized)
                             .foregroundStyle(.secondary)
                             .themeSkinLegibleText(level: .inline, slot: .emptyState)
                             .padding()
@@ -171,7 +171,7 @@ struct SeriesSelectorView: View {
                                         }
                                         .foregroundStyle(isSelected ? .white : .primary)
                                         
-                                        Text("¥\(NSDecimalNumber(decimal: series.totalBalance).stringValue)")
+                                        Text(DepositPlanFormatters.currencyText(series.totalBalance))
                                             .font(.system(size: 10))
                                             .foregroundStyle(isSelected ? .white.opacity(0.9) : (series.totalBalance > 0 ? .orange : .secondary.opacity(0.7)))
                                             .themeSkinLegibleText(level: .inline, slot: .filterChip)
@@ -261,14 +261,14 @@ struct RecentAddedCard: View {
                 Image(systemName: "clock.arrow.circlepath")
                     .foregroundStyle(titleColor)
                     .themeSkinLegibleSymbol(level: .chip, slot: .statsCard, descriptor: activeStatsDescriptor)
-                Text(stats.title)
+                Text(stats.title.appLocalized)
                     .font(.subheadline)
                     .fontWeight(.medium)
                     .foregroundStyle(titleColor)
                     .themeSkinLegibleText(level: .chip, slot: .statsCard, descriptor: activeStatsDescriptor)
                 Spacer()
                 if stats.hasData {
-                    Text("一个月内")
+                    Text("一个月内".appLocalized)
                         .font(.caption)
                         .fontWeight(.semibold)
                         .foregroundStyle(.white)
@@ -294,7 +294,7 @@ struct RecentAddedCard: View {
 
                     DepositStatItem(
                         title: "预约金额",
-                        value: "¥\(NSDecimalNumber(decimal: stats.amount).stringValue)",
+                        value: DepositPlanFormatters.currencyText(stats.amount),
                         valueColor: titleColor,
                         titleColor: supportingTextColor
                     )
@@ -302,7 +302,7 @@ struct RecentAddedCard: View {
                 .padding(.horizontal, 8)
                 .padding(.vertical, 8)
             } else {
-                Text("暂无最近添加")
+                Text("暂无最近添加".appLocalized)
                     .font(.caption)
                     .foregroundStyle(supportingTextColor)
                     .themeSkinLegibleText(level: .inline, slot: .statsCard, descriptor: activeStatsDescriptor)

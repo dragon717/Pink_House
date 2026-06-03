@@ -981,7 +981,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%@ is locked\n%@"
+            "value" : "%@ is not unlocked yet\n%@"
           }
         },
         "zh-Hans" : {
@@ -999,37 +999,37 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%@は未解放です\n%@"
+            "value" : "%@ はまだ解除されていません\n%@"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%@은(는) 아직 잠겨 있어요\n%@"
+            "value" : "%@ 기능은 아직 잠겨 있어요\n%@"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%@ est verrouillé\n%@"
+            "value" : "%@ n'est pas encore debloque\n%@"
           }
         },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%@ ist gesperrt\n%@"
+            "value" : "%@ ist noch nicht freigeschaltet\n%@"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%@ está bloqueado\n%@"
+            "value" : "%@ aun no esta desbloqueado\n%@"
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%@ está bloqueado\n%@"
+            "value" : "%@ ainda nao foi desbloqueado\n%@"
           }
         }
       }
@@ -3471,7 +3471,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "⚠️ Balance payments are gathering ahead!\nTip: hold your wallet tight. Deep breaths will not help; try repeating “beauty is priceless” instead.\n(｡•́ω•̀｡)"
+            "value" : "⚠️ The final-payment army has assembled!\nGentle reminder: hold your wallet tight after looking. Deep breaths will not help as much as repeating \"beauty is priceless\"!\n(｡•́ω•̀｡)"
           }
         },
         "zh-Hans" : {
@@ -3483,7 +3483,43 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "⚠️ 前方尾款大軍已集結！\n溫馨提示：看完請抱緊你的錢包，深呼吸是沒用的，不如默念\"美貌無價\"！\n(｡•́ω•̀｡)"
+            "value" : "⚠️ 前方尾款大軍已集結！\n溫馨提示：看完請抱緊你的錢包，深呼吸是沒用的，不如默念「美貌無價」！\n(｡•́ω•̀｡)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "⚠️ これから残金軍団が集結します！\n見終わったらお財布をぎゅっと抱きしめてね。深呼吸より「かわいさはプライスレス」と唱えるのが効くかも！\n(｡•́ω•̀｡)"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "⚠️ 잔금 군단이 앞에 모였어요!\n다 보고 나면 지갑을 꼭 안아 주세요. 깊게 숨쉬기보다 \"예쁨은 값을 매길 수 없어\"라고 외우는 게 나을지도요!\n(｡•́ω•̀｡)"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "⚠️ L'armee des paiements finaux est rassemblee !\nPetit rappel : serre bien ton portefeuille apres avoir regarde. Respirer profondement aidera moins que repeter \"la beaute n'a pas de prix\" !\n(｡•́ω•̀｡)"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "⚠️ Die Restzahlungs-Armee steht bereit!\nKleiner Hinweis: Halte danach deinen Geldbeutel fest. Tief durchatmen hilft weniger als \"Schönheit ist unbezahlbar\" zu murmeln!\n(｡•́ω•̀｡)"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "⚠️ El ejercito de pagos finales ya esta reunido.\nConsejo cariñoso: abraza fuerte tu billetera despues de mirar. Respirar hondo ayuda menos que repetir \"la belleza no tiene precio\".\n(｡•́ω•̀｡)"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "⚠️ O exercito dos pagamentos finais se reuniu!\nDica carinhosa: abrace bem a carteira depois de olhar. Respirar fundo ajuda menos do que repetir \"beleza nao tem preço\"!\n(｡•́ω•̀｡)"
           }
         }
       }
@@ -7731,7 +7767,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Within one month"
+            "value" : "Within 1 month"
           }
         },
         "zh-Hans" : {
@@ -7744,6 +7780,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "一個月內"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1か月以内"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "한 달 이내"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sur 1 mois"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Innerhalb von 1 Monat"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En 1 mes"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Em 1 mes"
           }
         }
       }
@@ -16807,6 +16879,42 @@
             "state" : "translated",
             "value" : "最近月統計"
           }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "直近月の集計"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "최근 월 통계"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stats du mois recent"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Statistik des letzten Monats"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Estadisticas del mes reciente"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Estatisticas do mes recente"
+          }
         }
       }
     },
@@ -19387,19 +19495,19 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "機能はロックされています"
+            "value" : "機能は未解除"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "기능이 잠겨 있어요"
+            "value" : "기능이 잠겨 있음"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Fonction verrouillée"
+            "value" : "Fonction verrouillee"
           }
         },
         "de" : {
@@ -19411,7 +19519,7 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Función bloqueada"
+            "value" : "Funcion bloqueada"
           }
         },
         "pt-BR" : {
@@ -20987,19 +21095,19 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "解除する"
+            "value" : "解除しに行く"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "잠금 해제"
+            "value" : "잠금 해제하기"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Déverrouiller"
+            "value" : "Debloquer"
           }
         },
         "de" : {
@@ -30190,12 +30298,11 @@
       }
     },
     "已付定金" : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Deposit Paid"
+            "value" : "Paid Deposit"
           }
         },
         "zh-Hans" : {
@@ -30208,6 +30315,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "已付訂金"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "支払い済み予約金"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "지불한 계약금"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Acompte paye"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gezahlte Anzahlung"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Deposito pagado"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sinal pago"
           }
         }
       }
@@ -32368,7 +32511,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Annual (Expand)"
+            "value" : "Annual Reservations (tap to expand)"
           }
         },
         "zh-Hans" : {
@@ -32380,7 +32523,43 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "年度預約 (點我展開)"
+            "value" : "年度預約（點我展開）"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "年間予約（タップで展開）"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "연간 예약 (탭해서 펼치기)"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reservations annuelles (toucher pour ouvrir)"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Jahresreservierungen (zum Aufklappen tippen)"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reservas anuales (toca para desplegar)"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reservas anuais (toque para expandir)"
           }
         }
       }
@@ -32390,7 +32569,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Annual ()"
+            "value" : "Annual Reservations (tap to collapse)"
           }
         },
         "zh-Hans" : {
@@ -32402,7 +32581,43 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "年度預約 (點我折疊)"
+            "value" : "年度預約（點我折疊）"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "年間予約（タップで折りたたむ）"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "연간 예약 (탭해서 접기)"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reservations annuelles (toucher pour replier)"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Jahresreservierungen (zum Einklappen tippen)"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reservas anuales (toca para plegar)"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reservas anuais (toque para recolher)"
           }
         }
       }
@@ -35759,12 +35974,11 @@
       }
     },
     "总件数/款" : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Total Items/Styles"
+            "value" : "Items / Styles"
           }
         },
         "zh-Hans" : {
@@ -35782,37 +35996,37 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "総数/型数"
+            "value" : "点数 / 型数"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "총 개수/스타일"
+            "value" : "총 수량 / 스타일"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Total articles/styles"
+            "value" : "Articles / modeles"
           }
         },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Artikel/Stile gesamt"
+            "value" : "Teile / Modelle"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Total artículos/estilos"
+            "value" : "Piezas / modelos"
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Total de itens/estilos"
+            "value" : "Itens / modelos"
           }
         }
       }
@@ -36195,7 +36409,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Balance"
+            "value" : "Total Pending Final Payment"
           }
         },
         "zh-Hans" : {
@@ -36208,6 +36422,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "總待付尾款"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未払い残金の合計"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "총 남은 잔금"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Solde final total a payer"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Offene Restzahlung gesamt"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pago final pendiente total"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pagamento final pendente total"
           }
         }
       }
@@ -37245,7 +37495,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "I’m Ready!"
+            "value" : "I'm ready!"
           }
         },
         "zh-Hans" : {
@@ -37258,6 +37508,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "我準備好了！"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "準備できた！"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "준비됐어요!"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Je suis prete !"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ich bin bereit!"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "¡Estoy lista!"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Estou pronta!"
           }
         }
       }
@@ -37939,7 +38225,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Got it ～"
+            "value" : "Got it"
           }
         },
         "zh-Hans" : {
@@ -37952,6 +38238,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "我知道啦～"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "わかったよ～"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "알겠어요~"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Compris"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Verstanden"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Entendido"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Entendi"
           }
         }
       }
@@ -40163,7 +40485,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Month View"
+            "value" : "Monthly View"
           }
         },
         "zh-Hans" : {
@@ -40177,6 +40499,42 @@
             "state" : "translated",
             "value" : "按月視圖"
           }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "月別ビュー"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "월별 보기"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vue mensuelle"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Monatsansicht"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vista mensual"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vista mensal"
+          }
         }
       }
     },
@@ -40185,7 +40543,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "View"
+            "value" : "Series View"
           }
         },
         "zh-Hans" : {
@@ -40199,6 +40557,42 @@
             "state" : "translated",
             "value" : "按系列視圖"
           }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "シリーズ別ビュー"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "시리즈별 보기"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vue par serie"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Serienansicht"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vista por serie"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vista por série"
+          }
         }
       }
     },
@@ -40207,7 +40601,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "(Expand)"
+            "value" : "Series Reservations (tap to expand)"
           }
         },
         "zh-Hans" : {
@@ -40219,7 +40613,43 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "按系列預約 (點我展開)"
+            "value" : "按系列預約（點我展開）"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "シリーズ別予約（タップで展開）"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "시리즈별 예약 (탭해서 펼치기)"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reservations par serie (toucher pour ouvrir)"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Serienreservierungen (zum Aufklappen tippen)"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reservas por serie (toca para desplegar)"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reservas por série (toque para expandir)"
           }
         }
       }
@@ -40229,7 +40659,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "()"
+            "value" : "Series Reservations (tap to collapse)"
           }
         },
         "zh-Hans" : {
@@ -40241,7 +40671,43 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "按系列預約 (點我折疊)"
+            "value" : "按系列預約（點我折疊）"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "シリーズ別予約（タップで折りたたむ）"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "시리즈별 예약 (탭해서 접기)"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reservations par serie (toucher pour replier)"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Serienreservierungen (zum Einklappen tippen)"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reservas por serie (toca para plegar)"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reservas por série (toque para recolher)"
           }
         }
       }
@@ -45400,7 +45866,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "No recent add yet"
+            "value" : "No recent additions"
           }
         },
         "zh-Hans" : {
@@ -45413,6 +45879,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "暫無最近添加"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最近追加はありません"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "최근 추가된 항목이 없어요"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucun ajout recent"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keine neuen Eintraege"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No hay agregados recientes"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nenhuma adicao recente"
           }
         }
       }
@@ -45958,7 +46460,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "No data yet"
+            "value" : "No series data yet"
           }
         },
         "zh-Hans" : {
@@ -45970,7 +46472,43 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "暫無系列數據"
+            "value" : "暫無系列資料"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "シリーズデータはまだありません"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "아직 시리즈 데이터가 없어요"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucune donnee de serie pour le moment"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Noch keine Seriendaten"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aun no hay datos de serie"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ainda nao ha dados de série"
           }
         }
       }
@@ -46038,7 +46576,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "No data yet"
+            "value" : "No reservation data yet"
           }
         },
         "zh-Hans" : {
@@ -46050,7 +46588,43 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "暫無預約數據"
+            "value" : "暫無預約資料"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "予約データはまだありません"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "아직 예약 데이터가 없어요"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucune donnee de reservation pour le moment"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Noch keine Reservierungsdaten"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aun no hay datos de reserva"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ainda nao ha dados de reserva"
           }
         }
       }
@@ -49167,7 +49741,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Dress Calendar"
+            "value" : "Dream Dress Calendar"
           }
         },
         "zh-Hans" : {
@@ -49180,6 +49754,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "夢裙日曆"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ドリームドレスカレンダー"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "드림 드레스 캘린더"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Calendrier des robes revees"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Traumkleid-Kalender"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Calendario de vestidos soñados"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Calendário de vestidos dos sonhos"
           }
         }
       }
@@ -49912,7 +50522,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "..."
+            "value" : "Analyzing series..."
           }
         },
         "zh-Hans" : {
@@ -49925,6 +50535,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "正在分析系列..."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "シリーズを分析中..."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "시리즈 분석 중..."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Analyse des series..."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Serien werden analysiert..."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Analizando series..."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Analisando séries..."
           }
         }
       }
@@ -55102,7 +55748,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Unlock \" \"?"
+            "value" : "Ready to unlock the \"Slim Wallet\" challenge?"
           }
         },
         "zh-Hans" : {
@@ -55114,7 +55760,43 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "真的要解鎖\"錢包瘦身\"副本嗎？"
+            "value" : "真的要解鎖「錢包瘦身」副本嗎？"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "本当に「財布スリム化」ステージを解除しますか？"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "정말 \"지갑 다이어트\" 던전을 열까요?"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pret a deverrouiller le defi \"Portefeuille allege\" ?"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die Herausforderung \"Schlanker Geldbeutel\" wirklich freischalten?"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "¿Quieres desbloquear el reto \"Billetera ligera\"?"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quer desbloquear o desafio \"Carteira leve\"?"
           }
         }
       }
@@ -58809,7 +59491,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "View mode"
+            "value" : "View Mode"
           }
         },
         "zh-Hans" : {
@@ -58821,7 +59503,7 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "檢視模式"
+            "value" : "視圖模式"
           }
         },
         "ja" : {
@@ -58839,7 +59521,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Mode d’affichage"
+            "value" : "Mode d'affichage"
           }
         },
         "de" : {
@@ -60719,7 +61401,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Category"
+            "value" : "Series Classification Rules"
           }
         },
         "zh-Hans" : {
@@ -60732,6 +61414,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "系列分類規則"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "シリーズ分類ルール"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "시리즈 분류 규칙"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Regles de classement des series"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Regeln zur Serienklassifizierung"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reglas de clasificacion de series"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Regras de classificacao de séries"
           }
         }
       }
@@ -60786,7 +61504,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "The system automatically uses the first 2-4 characters of the product name, after removing special symbols, as the series prefix.\n\nFor example:\n\"Pink House JSK\"\n\"Pink House Skirt\"\n\nBoth will be grouped into the \"Pink\" series.\nNote: identical names are treated as the same product."
+            "value" : "The system automatically uses the first 2-4 characters of the item name, after removing special symbols, as the series prefix.\n\nFor example:\n\"少女心愿 连衣裙\"\n\"少女心愿 半裙\"\n\nwill both be grouped into the \"Pink\" series.\nNote: identical names are treated as the same item."
           }
         },
         "zh-Hans" : {
@@ -60798,7 +61516,43 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "系統會自動根據商品名稱的前 2-4 個字（去除特殊符號）作為系列前綴進行歸類。\n\n例如：\n\"少女心願 連衣裙\"\n\"少女心願 半裙\"\n\n都會被歸類為 \"Pink\" 系列。\n注：同名屬於同一款商品。"
+            "value" : "系統會自動根據商品名稱的前 2-4 個字（去除特殊符號）作為系列前綴進行歸類。\n\n例如：\n「少女心願 連衣裙」\n「少女心願 半裙」\n\n都會被歸類為「Pink」系列。\n註：同名屬於同一款商品。"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "システムは商品名の先頭2〜4文字（特殊記号を除く）をシリーズ接頭辞として自動分類します。\n\n例：\n「少女心愿 连衣裙」\n「少女心愿 半裙」\n\nはいずれも「Pink」シリーズに分類されます。\n注：同名の商品は同じ商品として扱われます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "시스템은 상품명 앞 2~4글자(특수 기호 제거 후)를 시리즈 접두어로 자동 분류합니다.\n\n예:\n\"少女心愿 连衣裙\"\n\"少女心愿 半裙\"\n\n두 항목 모두 \"Pink\" 시리즈로 분류됩니다.\n참고: 이름이 같으면 같은 상품으로 봅니다."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le systeme utilise automatiquement les 2 a 4 premiers caracteres du nom de l'article, apres suppression des symboles speciaux, comme prefixe de serie.\n\nPar exemple :\n\"少女心愿 连衣裙\"\n\"少女心愿 半裙\"\n\nseront classes dans la serie \"Pink\".\nRemarque : les noms identiques sont consideres comme le meme article."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Das System verwendet automatisch die ersten 2 bis 4 Zeichen des Artikelnamens, nachdem Sonderzeichen entfernt wurden, als Serienpräfix.\n\nBeispiel:\n\"少女心愿 连衣裙\"\n\"少女心愿 半裙\"\n\nwerden beide der Serie \"Pink\" zugeordnet.\nHinweis: Gleiche Namen gelten als derselbe Artikel."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El sistema usa automaticamente los primeros 2 a 4 caracteres del nombre del articulo, tras quitar simbolos especiales, como prefijo de serie.\n\nPor ejemplo:\n\"少女心愿 连衣裙\"\n\"少女心愿 半裙\"\n\nse agruparan en la serie \"Pink\".\nNota: los nombres identicos se tratan como el mismo articulo."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O sistema usa automaticamente os primeiros 2 a 4 caracteres do nome do item, depois de remover simbolos especiais, como prefixo da série.\n\nPor exemplo:\n\"少女心愿 连衣裙\"\n\"少女心愿 半裙\"\n\nserao agrupados na série \"Pink\".\nObservacao: nomes identicos sao tratados como o mesmo item."
           }
         }
       }
@@ -65738,6 +66492,42 @@
             "state" : "translated",
             "value" : "裙裝股市"
           }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ドレス相場"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "드레스 시장"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Marche des robes"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kleidermarkt"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mercado de vestidos"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mercado de vestidos"
+          }
         }
       }
     },
@@ -66973,7 +67763,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "This feature is locked. Complete the required task first."
+            "value" : "This feature is not unlocked yet. Complete the required task first."
           }
         },
         "zh-Hans" : {
@@ -66991,37 +67781,37 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "この機能はまだロックされています。先に必要なタスクを完了してください。"
+            "value" : "この機能はまだ解除されていません。先に対応するタスクを完了してください"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "이 기능은 아직 잠겨 있어요. 먼저 필요한 과제를 완료하세요."
+            "value" : "이 기능은 아직 잠겨 있어요. 먼저 해당 과제를 완료해 주세요."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Cette fonction est verrouillée. Terminez d’abord la tâche requise."
+            "value" : "Cette fonction n'est pas encore debloquee. Termine d'abord la tache requise."
           }
         },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Diese Funktion ist gesperrt. Schließe zuerst die erforderliche Aufgabe ab."
+            "value" : "Diese Funktion ist noch nicht freigeschaltet. Schließe zuerst die passende Aufgabe ab."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Esta función está bloqueada. Completa primero la tarea requerida."
+            "value" : "Esta funcion aun no esta desbloqueada. Completa primero la tarea correspondiente."
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Este recurso está bloqueado. Conclua primeiro a tarefa necessária."
+            "value" : "Este recurso ainda nao foi desbloqueado. Conclua primeiro a tarefa correspondente."
           }
         }
       }
@@ -74487,12 +75277,11 @@
       }
     },
     "预约件数" : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Reservation Count"
+            "value" : "Reserved Items"
           }
         },
         "zh-Hans" : {
@@ -74505,6 +75294,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "預約件數"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "予約点数"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "예약 수량"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Articles reserves"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reservierte Teile"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Piezas reservadas"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Itens reservados"
           }
         }
       }
@@ -74614,7 +75439,6 @@
       }
     },
     "预约金额" : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -74632,6 +75456,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "預約金額"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "予約金額"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "예약 금액"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Montant reserve"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reservierungsbetrag"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Importe de reserva"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Valor da reserva"
           }
         }
       }
@@ -76022,6 +76882,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "馬上來財"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "財運アップ"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "바로 재물운"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fortune"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vermögen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fortuna"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fortuna"
           }
         }
       }
@@ -106036,6 +106932,64 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Edicao sonho"
+          }
+        }
+      }
+    },
+    "最近添加" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recently Added"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最近添加"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最近添加"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最近追加"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "최근 추가"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ajouts recents"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zuletzt hinzugefuegt"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Agregados recientes"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adicionados recentemente"
           }
         }
       }

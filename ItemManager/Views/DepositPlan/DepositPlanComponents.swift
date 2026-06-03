@@ -7,6 +7,42 @@
 
 import SwiftUI
 
+enum DepositPlanFormatters {
+    static func yearText(_ year: Int) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = LanguageManager.shared.locale
+        formatter.setLocalizedDateFormatFromTemplate("y")
+        return formatter.string(from: date(year: year, month: 1))
+    }
+
+    static func monthText(_ month: Int) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = LanguageManager.shared.locale
+        formatter.setLocalizedDateFormatFromTemplate("MMM")
+        return formatter.string(from: date(year: 2024, month: month))
+    }
+
+    static func currencyText(_ amount: Decimal) -> String {
+        let formatter = NumberFormatter()
+        formatter.locale = LanguageManager.shared.locale
+        formatter.numberStyle = .currency
+        formatter.currencyCode = "CNY"
+        formatter.minimumFractionDigits = 0
+        formatter.maximumFractionDigits = 2
+        return formatter.string(from: NSDecimalNumber(decimal: amount))
+            ?? "¥\(NSDecimalNumber(decimal: amount).stringValue)"
+    }
+
+    private static func date(year: Int, month: Int) -> Date {
+        var components = DateComponents()
+        components.calendar = Calendar(identifier: .gregorian)
+        components.year = year
+        components.month = month
+        components.day = 1
+        return components.date ?? Date()
+    }
+}
+
 // MARK: - 总待付尾款卡片
 struct TotalBalanceCard: View {
     let totalBalance: Decimal
@@ -32,7 +68,7 @@ struct TotalBalanceCard: View {
                 } label: {
                     VStack(spacing: 4) {
                         ThemeSkinIconBadge(systemName: "calendar", fallbackColor: .pink, size: 30, symbolSize: 14)
-                        Text("梦裙日历")
+                        Text("梦裙日历".appLocalized)
                             .font(.caption)
                             .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                     }
@@ -51,7 +87,7 @@ struct TotalBalanceCard: View {
                 } label: {
                     VStack(spacing: 4) {
                         ThemeSkinIconBadge(systemName: "dollarsign.circle", fallbackColor: .orange, size: 30, symbolSize: 14)
-                        Text("马上来财")
+                        Text("马上来财".appLocalized)
                             .font(.caption)
                             .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                     }
@@ -70,7 +106,7 @@ struct TotalBalanceCard: View {
                 } label: {
                     VStack(spacing: 4) {
                         ThemeSkinIconBadge(systemName: "chart.line.uptrend.xyaxis", fallbackColor: .blue, size: 30, symbolSize: 14)
-                        Text("裙装股市")
+                        Text("裙装股市".appLocalized)
                             .font(.caption)
                             .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                     }
@@ -82,13 +118,13 @@ struct TotalBalanceCard: View {
             }
             .padding(.horizontal, 8)
             .padding(.top, 12)
-            .alert("功能未解锁", isPresented: $showUnlockAlert) {
+            .alert("功能未解锁".appLocalized, isPresented: $showUnlockAlert) {
                 if let feature = lockedFeature {
                     if feature.isComingSoonFeature {
-                        Button("我知道啦～", role: .cancel) { }
+                        Button("我知道啦～".appLocalized, role: .cancel) { }
                     } else {
-                        Button("取消", role: .cancel) { }
-                        Button("去解锁") {
+                        Button("取消".appLocalized, role: .cancel) { }
+                        Button("去解锁".appLocalized) {
                             NotificationCenter.default.post(
                                 name: .navigateToMagicTasks,
                                 object: nil
@@ -96,7 +132,7 @@ struct TotalBalanceCard: View {
                         }
                     }
                 } else {
-                    Button("取消", role: .cancel) { }
+                    Button("取消".appLocalized, role: .cancel) { }
                 }
             } message: {
                 if let feature = lockedFeature {
@@ -114,7 +150,7 @@ struct TotalBalanceCard: View {
             
             // 标题和按钮（始终显示）
             HStack {
-                Text("总待付尾款")
+                Text("总待付尾款".appLocalized)
                     .font(.subheadline)
                     .foregroundStyle(themeManager.secondaryTextColor)
                     .themeSkinLegibleText(level: .inline, slot: .sectionCard)
@@ -145,7 +181,7 @@ struct TotalBalanceCard: View {
             // 金额显示（仅显示时）
             if isVisible {
                 Button(action: onCountMoney) {
-                    Text("¥\(NSDecimalNumber(decimal: totalBalance).stringValue)")
+                    Text(DepositPlanFormatters.currencyText(totalBalance))
                         .font(.system(size: 36, weight: .bold))
                         .foregroundStyle(Color(hex: "C94C72"))
                         .themeSkinLegibleText(level: .hero, slot: .sectionCard)
@@ -234,7 +270,7 @@ struct DepositStatsView: View {
                 Divider()
                     .frame(height: 30)
                 
-                statItem(title: "已付定金", value: "¥\(NSDecimalNumber(decimal: paidDeposit).stringValue)", valueColor: Color(hex: "FF9800"))
+                statItem(title: "已付定金", value: DepositPlanFormatters.currencyText(paidDeposit), valueColor: Color(hex: "FF9800"))
                 
                 Divider()
                     .frame(height: 30)
@@ -242,7 +278,7 @@ struct DepositStatsView: View {
                 Button {
                     onCountMoney?(pendingBalance)
                 } label: {
-                    statItem(title: "预约金额", value: "¥\(NSDecimalNumber(decimal: pendingBalance).stringValue)", showIcon: true)
+                    statItem(title: "预约金额", value: DepositPlanFormatters.currencyText(pendingBalance), showIcon: true)
                 }
                 .buttonStyle(.plain)
             }
@@ -296,7 +332,7 @@ struct YearSelectorView: View {
             
             Spacer()
             
-            Text("\(String(year))年")
+            Text(DepositPlanFormatters.yearText(year))
                 .font(.title3)
                 .fontWeight(.bold)
                 .foregroundStyle(.primary)
@@ -355,12 +391,12 @@ struct YearStatsCard: View {
                     Divider()
                         .frame(height: 30)
                     
-                    DepositStatItem(title: "已付定金", value: "¥\(NSDecimalNumber(decimal: stats.paidDeposit).stringValue)", valueColor: Color(hex: "FF9800"))
+                    DepositStatItem(title: "已付定金", value: DepositPlanFormatters.currencyText(stats.paidDeposit), valueColor: Color(hex: "FF9800"))
                     
                     Divider()
                         .frame(height: 30)
                     
-                    DepositStatItem(title: "预约金额", value: "¥\(NSDecimalNumber(decimal: stats.pendingBalance).stringValue)", valueColor: Color(hex: "C94C72"))
+                    DepositStatItem(title: "预约金额", value: DepositPlanFormatters.currencyText(stats.pendingBalance), valueColor: Color(hex: "C94C72"))
                 }
                 .padding(.horizontal, 8)
                 .padding(.vertical, 12)

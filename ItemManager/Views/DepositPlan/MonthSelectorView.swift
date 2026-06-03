@@ -138,7 +138,7 @@ struct MonthSelectorView: View {
                 }
             } label: {
                 HStack {
-                    Text(isExpanded ? "年度预约 (点我折叠)" : "年度预约 (点我展开)")
+                    Text((isExpanded ? "年度预约 (点我折叠)" : "年度预约 (点我展开)").appLocalized)
                         .font(.subheadline)
                         .foregroundStyle(.primary)
                         .themeSkinLegibleText(level: .inline, slot: .sectionCard)
@@ -179,7 +179,7 @@ struct MonthSelectorView: View {
                         } label: {
                             VStack(spacing: 4) {
                                 HStack(spacing: 2) {
-                                    Text("\(month)月")
+                                    Text(DepositPlanFormatters.monthText(month))
                                         .font(.caption)
                                         .fontWeight(isSelected ? .bold : .regular)
                                         .foregroundStyle(isSelected ? .white : .primary)
@@ -198,7 +198,7 @@ struct MonthSelectorView: View {
                                 }
                                 
                                 if stats.count > 0 {
-                                    Text("¥\(NSDecimalNumber(decimal: stats.amount).stringValue)")
+                                    Text(DepositPlanFormatters.currencyText(stats.amount))
                                         .font(.system(size: 10))
                                         .foregroundStyle(isSelected ? .white.opacity(0.9) : .orange)
                                         .themeSkinLegibleText(level: .inline, slot: .filterChip)
@@ -291,14 +291,14 @@ struct RecentMonthCard: View {
                 Image(systemName: "calendar.badge.clock")
                     .foregroundStyle(titleColor)
                     .themeSkinLegibleSymbol(level: .chip, slot: .statsCard, descriptor: activeStatsDescriptor)
-                Text("最近月统计")
+                Text("最近月统计".appLocalized)
                     .font(.subheadline)
                     .fontWeight(.medium)
                     .foregroundStyle(titleColor)
                     .themeSkinLegibleText(level: .chip, slot: .statsCard, descriptor: activeStatsDescriptor)
                 Spacer()
                 if stats.hasData {
-                    Text("\(stats.month)月")
+                    Text(DepositPlanFormatters.monthText(stats.month))
                         .font(.caption)
                         .fontWeight(.semibold)
                         .foregroundStyle(.white)
@@ -324,7 +324,7 @@ struct RecentMonthCard: View {
 
                     DepositStatItem(
                         title: "预约金额",
-                        value: "¥\(NSDecimalNumber(decimal: stats.amount).stringValue)",
+                        value: DepositPlanFormatters.currencyText(stats.amount),
                         valueColor: titleColor,
                         titleColor: supportingTextColor
                     )
@@ -332,7 +332,7 @@ struct RecentMonthCard: View {
                 .padding(.horizontal, 8)
                 .padding(.vertical, 8)
             } else {
-                Text("暂无预约数据")
+                Text("暂无预约数据".appLocalized)
                     .font(.caption)
                     .foregroundStyle(supportingTextColor)
                     .themeSkinLegibleText(level: .inline, slot: .statsCard, descriptor: activeStatsDescriptor)

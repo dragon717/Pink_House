@@ -336,11 +336,11 @@ struct DepositPlanView: View {
     
     // 视图模式选择器
     private var viewModePicker: some View {
-        Picker("视图模式", selection: $viewMode) {
-            Text("按月视图")
+        Picker("视图模式".appLocalized, selection: $viewMode) {
+            Text("按月视图".appLocalized)
                 .tag(DepositViewMode.monthly)
                 .foregroundStyle(themeManager.primaryTextColor)
-            Text("按系列视图")
+            Text("按系列视图".appLocalized)
                 .tag(DepositViewMode.series)
                 .foregroundStyle(themeManager.primaryTextColor)
         }
@@ -456,15 +456,15 @@ struct DepositPlanView: View {
                 }
             )
         }
-        .alert("真的要解锁\"钱包瘦身\"副本吗？", isPresented: $showConfirmDialog) {
-            Button("取消", role: .cancel) { }
-            Button("我准备好了！", role: .none) {
+        .alert("真的要解锁\"钱包瘦身\"副本吗？".appLocalized, isPresented: $showConfirmDialog) {
+            Button("取消".appLocalized, role: .cancel) { }
+            Button("我准备好了！".appLocalized, role: .none) {
                 withAnimation {
                     showStats = true
                 }
             }
         } message: {
-            Text("⚠️ 前方尾款大军已集结！\n温馨提示：看完请抱紧你的钱包，深呼吸是没用的，不如默念\"美貌无价\"！\n(｡•́ω•̀｡)")
+            Text("⚠️ 前方尾款大军已集结！\n温馨提示：看完请抱紧你的钱包，深呼吸是没用的，不如默念\"美貌无价\"！\n(｡•́ω•̀｡)".appLocalized)
         }
         .floatingPetHidden(.transactionFlow, isActive: isFloatingPetTransactionActive)
         .floatingPetHidden(.presentationActive, isActive: isFloatingPetPresentationActive)
