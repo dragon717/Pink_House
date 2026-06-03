@@ -45,7 +45,7 @@ struct BookHouseSmallWorldView: View {
             if let unlockFeature = lockedFeature?.unlockFeature {
                 let condition = featureManager.getCondition(for: unlockFeature)
                 let title = lockedFeature?.localizedTitle ?? "该功能".appLocalized
-                Text("「%@」尚未解锁\n%@".appLocalized(title, condition.description))
+                Text("「%@」尚未解锁\n%@".appLocalized(title, condition.localizedDescription))
             } else {
                 Text("该功能尚未解锁，请先完成对应任务".appLocalized)
             }

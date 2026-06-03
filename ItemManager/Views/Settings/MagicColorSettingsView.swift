@@ -113,14 +113,14 @@ struct MagicColorSettingsView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("完成") { dismiss() }
+                    Button("完成".appLocalized) { dismiss() }
                 }
             }
-            .alert("魔法配色未解锁", isPresented: $showUnlockAlert) {
-                Button("知道了", role: .cancel) { }
+            .alert("魔法配色未解锁".appLocalized, isPresented: $showUnlockAlert) {
+                Button("知道了".appLocalized, role: .cancel) { }
             } message: {
                 let condition = unlockManager.getCondition(for: .themeCustomize)
-                Text(condition.description)
+                Text(condition.localizedDescription)
             }
             .onAppear {
                 NotificationCenter.default.post(name: .magicColorSettingsOpened, object: nil)

@@ -101,9 +101,9 @@ struct TotalBalanceCard: View {
             } message: {
                 if let feature = lockedFeature {
                     let condition = featureManager.getCondition(for: feature)
-                    Text("\(feature.displayName) 尚未解锁\n\(condition.description)")
+                    Text("%@ 尚未解锁\n%@".appLocalized(feature.displayName, condition.localizedDescription))
                 } else {
-                    Text("该功能尚未解锁，请先完成对应任务")
+                    Text("该功能尚未解锁，请先完成对应任务".appLocalized)
                 }
             }
             

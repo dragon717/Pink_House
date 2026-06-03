@@ -186,20 +186,20 @@ struct BatchImportView: View {
         .alert(item: $unlockAlertItem) { alert in
             if alert.canUnlock {
                 return Alert(
-                    title: Text("解锁 \(alert.feature.displayName)"),
-                    message: Text("\(alert.condition.description)\n\n确定要解锁吗？"),
-                    primaryButton: .default(Text("解锁")) {
+                    title: Text(alert.unlockTitle),
+                    message: Text(alert.unlockConfirmationMessage),
+                    primaryButton: .default(Text("解锁".appLocalized)) {
                         unlockBatchImportAccess()
                     },
-                    secondaryButton: .cancel(Text("取消")) {
+                    secondaryButton: .cancel(Text("取消".appLocalized)) {
                         dismiss()
                     }
                 )
             } else {
                 return Alert(
-                    title: Text("尚未满足解锁条件"),
-                    message: Text(alert.message ?? alert.condition.description),
-                    dismissButton: .default(Text("知道了")) {
+                    title: Text(alert.blockedTitle),
+                    message: Text(alert.blockedMessage),
+                    dismissButton: .default(Text("知道了".appLocalized)) {
                         dismiss()
                     }
                 )
@@ -256,7 +256,7 @@ struct BatchImportView: View {
                 feature: .batchImport,
                 condition: condition,
                 canUnlock: false,
-                message: "\(type)不足：当前 \(current)，需要 \(required)"
+                message: FeatureUnlockAlert.insufficientResourceMessage(type: type, required: required, current: current)
             )
         }
     }

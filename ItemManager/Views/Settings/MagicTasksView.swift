@@ -334,7 +334,7 @@ struct MagicTaskDetailView: View {
                                         .font(.caption)
                                         .foregroundColor(themeManager.secondaryTextColor)
                                 }
-                                Text(condition.description)
+                                Text(condition.localizedDescription)
                                     .font(.subheadline)
                                     .foregroundColor(themeManager.primaryTextColor)
                             }
@@ -364,7 +364,7 @@ struct MagicTaskDetailView: View {
                     if !isUnlocked && !unlockCheck.met {
                         Section {
                             statusHintTofuBlock(
-                                message: unlockCheck.message ?? "尚未满足解锁条件"
+                                message: unlockCheck.message ?? "尚未满足解锁条件".appLocalized
                             )
                         }
                     }

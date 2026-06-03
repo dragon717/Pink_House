@@ -78,6 +78,28 @@ struct UnlockCondition: Codable, Equatable {
         UnlockCondition(type: "manual", requiredValue: 0, description: description)
     }
 
+    var localizedDescription: String {
+        guard let conditionType = UnlockConditionType(rawValue: type) else {
+            return description.appLocalized
+        }
+
+        switch conditionType {
+        case .free:
+            return "免费使用".appLocalized
+        case .loginDays:
+            return "累计登录 %d 天解锁".appLocalized(requiredValue)
+        case .vip:
+            return "开通VIP即可解锁".appLocalized
+        case .meowCoin:
+            return "累计消费 %d 喵币后解锁".appLocalized(requiredValue)
+        case .clothingCount:
+            return "收集 %d 件衣物解锁".appLocalized(requiredValue)
+        case .petLevel:
+            return "萌宠达到 %d 级解锁".appLocalized(requiredValue)
+        case .manual, .redeemCode:
+            return description.appLocalized
+        }
+    }
 }
 
 // MARK: - 业务系统/功能项定义
@@ -611,7 +633,7 @@ final class FeatureUnlockManager: ObservableObject {
         }
 
         guard let conditionType = UnlockConditionType(rawValue: condition.type) else {
-            return (false, "未知的解锁条件")
+            return (false, "未知的解锁条件".appLocalized)
         }
 
         switch conditionType {
@@ -620,37 +642,37 @@ final class FeatureUnlockManager: ObservableObject {
 
         case .vip:
             let isVIP = VIPManager.shared.isVIP
-            return (isVIP, isVIP ? nil : condition.description)
+            return (isVIP, isVIP ? nil : condition.localizedDescription)
 
         case .meowCoin:
             let totalSpent = StoreManager.synchronizedMeowCoinAccount().totalSpent
             let met = totalSpent >= condition.requiredValue
-            return (met, met ? nil : "累计消费喵币: \(totalSpent)/\(condition.requiredValue)")
+            return (met, met ? nil : "累计消费喵币: %d/%d".appLocalized(totalSpent, condition.requiredValue))
 
         case .clothingCount:
             // 需要通过外部传入或从数据库查询
             let currentCount = getClothingCount()
             let met = currentCount >= condition.requiredValue
-            return (met, met ? nil : "当前衣物: \(currentCount)/\(condition.requiredValue)")
+            return (met, met ? nil : "当前衣物: %d/%d".appLocalized(currentCount, condition.requiredValue))
 
         case .loginDays:
             let currentDays = getLoginDays()
             let met = currentDays >= condition.requiredValue
-            return (met, met ? nil : "累计登录: \(currentDays)/\(condition.requiredValue) 天")
+            return (met, met ? nil : "累计登录: %d/%d 天".appLocalized(currentDays, condition.requiredValue))
 
         case .petLevel:
             // 萌宠等级暂时返回0，因为PetStatus没有level属性
             let currentLevel = 0
             let met = currentLevel >= condition.requiredValue
-            return (met, met ? nil : "萌宠等级: \(currentLevel)/\(condition.requiredValue)")
+            return (met, met ? nil : "萌宠等级: %d/%d".appLocalized(currentLevel, condition.requiredValue))
 
         case .manual:
             // 手动控制，默认不满足
-            return (false, condition.description)
+            return (false, condition.localizedDescription)
 
         case .redeemCode:
             // 历史数据兼容：当前版本不再提供该解锁入口
-            return (false, condition.description)
+            return (false, condition.localizedDescription)
         }
     }
 
@@ -680,11 +702,11 @@ final class FeatureUnlockManager: ObservableObject {
         // 检查条件
         let check = checkUnlockCondition(feature)
         if !check.met {
-            return .conditionNotMet(check.message ?? condition.description)
+            return .conditionNotMet(check.message ?? condition.localizedDescription)
         }
 
         guard UnlockConditionType(rawValue: condition.type) != nil else {
-            return .conditionNotMet("未知的解锁条件")
+            return .conditionNotMet("未知的解锁条件".appLocalized)
         }
 
         // meowCoin 类型表示“累计消费达到条件”后可领取解锁，不在这里再次扣费
@@ -906,6 +928,26 @@ struct FeatureUnlockAlert: Identifiable {
     let condition: UnlockCondition
     let canUnlock: Bool
     let message: String?
+
+    var unlockTitle: String {
+        "解锁 %@".appLocalized(feature.displayName)
+    }
+
+    var unlockConfirmationMessage: String {
+        "%@\n\n确定要解锁吗？".appLocalized(condition.localizedDescription)
+    }
+
+    var blockedTitle: String {
+        "尚未满足解锁条件".appLocalized
+    }
+
+    var blockedMessage: String {
+        message ?? condition.localizedDescription
+    }
+
+    static func insufficientResourceMessage(type: String, required: Int, current: Int) -> String {
+        "%@不足：当前 %d，需要 %d".appLocalized(type.appLocalized, current, required)
+    }
 }
 
 extension FeatureUnlockManager {
@@ -999,18 +1041,18 @@ struct FeatureUnlockButton: View {
         .alert(item: $alertItem) { alert in
             if alert.canUnlock {
                 return Alert(
-                    title: Text("解锁 \(alert.feature.displayName)"),
-                    message: Text("\(alert.condition.description)\n\n确定要解锁吗？"),
-                    primaryButton: .default(Text("解锁")) {
+                    title: Text(alert.unlockTitle),
+                    message: Text(alert.unlockConfirmationMessage),
+                    primaryButton: .default(Text("解锁".appLocalized)) {
                         unlockFeature()
                     },
-                    secondaryButton: .cancel(Text("取消"))
+                    secondaryButton: .cancel(Text("取消".appLocalized))
                 )
             } else {
                 return Alert(
-                    title: Text("尚未满足解锁条件"),
-                    message: Text(alert.message ?? alert.condition.description),
-                    dismissButton: .default(Text("知道了"))
+                    title: Text(alert.blockedTitle),
+                    message: Text(alert.blockedMessage),
+                    dismissButton: .default(Text("知道了".appLocalized))
                 )
             }
         }
@@ -1031,7 +1073,7 @@ struct FeatureUnlockButton: View {
                     .foregroundColor(isUnlocked ? .primary : .secondary)
 
                 if !isUnlocked {
-                    Text(condition.description)
+                    Text(condition.localizedDescription)
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }

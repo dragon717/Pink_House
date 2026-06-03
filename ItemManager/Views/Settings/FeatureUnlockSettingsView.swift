@@ -149,7 +149,7 @@ struct FeatureToggleRow: View {
             return manager.isVisible(feature) ? "已开启" : "已关闭"
         } else {
             let condition = manager.getCondition(for: feature)
-            return "未解锁 · \(condition.description)"
+            return "\("未解锁".appLocalized) · \(condition.localizedDescription)"
         }
     }
 
