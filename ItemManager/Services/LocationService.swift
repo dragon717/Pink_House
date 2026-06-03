@@ -171,6 +171,10 @@ enum Season: String, CaseIterable {
     var displayName: String {
         return "\(rawValue)季"
     }
+
+    var localizedDisplayName: String {
+        displayName.appLocalized
+    }
     
     // 季节对应的推荐色系
     var recommendedColors: [String] {

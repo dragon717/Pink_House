@@ -48594,22 +48594,28 @@
     },
     "未知" : {
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unbekannt"
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Unknown"
           }
         },
-        "zh-Hans" : {
+        "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "未知"
+            "value" : "Desconocido"
           }
         },
-        "zh-Hant" : {
+        "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "未知"
+            "value" : "Inconnu"
           }
         },
         "ja" : {
@@ -48624,28 +48630,22 @@
             "value" : "알 수 없음"
           }
         },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Inconnu"
-          }
-        },
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Unbekannt"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Desconocido"
-          }
-        },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Desconhecido"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未知"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未知"
           }
         }
       }
@@ -83662,25 +83662,25 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "sonnig"
+            "value" : "Sonnig"
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "sunny"
+            "value" : "Sunny"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "soleado"
+            "value" : "Soleado"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ensoleillé"
+            "value" : "Ensoleillé"
           }
         },
         "ja" : {
@@ -83698,7 +83698,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ensolarado"
+            "value" : "Ensolarado"
           }
         },
         "zh-Hans" : {
@@ -83720,25 +83720,25 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "bewölkt"
+            "value" : "Wolkig"
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "cloudy"
+            "value" : "Cloudy"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "nublado"
+            "value" : "Nublado"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "nuageux"
+            "value" : "Nuageux"
           }
         },
         "ja" : {
@@ -83756,7 +83756,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "nublado"
+            "value" : "Nublado"
           }
         },
         "zh-Hans" : {
@@ -83778,25 +83778,25 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "bedeckt"
+            "value" : "Bedeckt"
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "overcast"
+            "value" : "Overcast"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "cubierto"
+            "value" : "Cubierto"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "couvert"
+            "value" : "Couvert"
           }
         },
         "ja" : {
@@ -83814,7 +83814,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "encoberto"
+            "value" : "Encoberto"
           }
         },
         "zh-Hans" : {
@@ -83836,25 +83836,25 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "leichter Regen"
+            "value" : "Leichter Regen"
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "light rain"
+            "value" : "Light rain"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "lluvia ligera"
+            "value" : "Lluvia ligera"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "pluie légère"
+            "value" : "Pluie légère"
           }
         },
         "ja" : {
@@ -83872,7 +83872,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "chuva fraca"
+            "value" : "Chuva fraca"
           }
         },
         "zh-Hans" : {
@@ -83894,31 +83894,31 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "mäßiger Regen"
+            "value" : "Mäßiger Regen"
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "moderate rain"
+            "value" : "Moderate rain"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "lluvia moderada"
+            "value" : "Lluvia moderada"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "pluie modérée"
+            "value" : "Pluie modérée"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "中程度の雨"
+            "value" : "中雨"
           }
         },
         "ko" : {
@@ -83930,7 +83930,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "chuva moderada"
+            "value" : "Chuva moderada"
           }
         },
         "zh-Hans" : {
@@ -83952,25 +83952,25 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "starker Regen"
+            "value" : "Starker Regen"
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "heavy rain"
+            "value" : "Heavy rain"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "lluvia fuerte"
+            "value" : "Lluvia intensa"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "forte pluie"
+            "value" : "Forte pluie"
           }
         },
         "ja" : {
@@ -83988,7 +83988,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "chuva forte"
+            "value" : "Chuva forte"
           }
         },
         "zh-Hans" : {
@@ -84010,25 +84010,25 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Gewitter"
+            "value" : "Gewitterregen"
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "thunderstorm"
+            "value" : "Thunderstorm"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "tormenta"
+            "value" : "Tormenta"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "orage"
+            "value" : "Orage"
           }
         },
         "ja" : {
@@ -84046,7 +84046,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "trovoada"
+            "value" : "Trovoada"
           }
         },
         "zh-Hans" : {
@@ -84074,19 +84074,19 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "snow"
+            "value" : "Snow"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "nieve"
+            "value" : "Nieve"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "neige"
+            "value" : "Neige"
           }
         },
         "ja" : {
@@ -84104,7 +84104,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "neve"
+            "value" : "Neve"
           }
         },
         "zh-Hans" : {
@@ -84132,19 +84132,19 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "fog"
+            "value" : "Fog"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "niebla"
+            "value" : "Niebla"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "brouillard"
+            "value" : "Brouillard"
           }
         },
         "ja" : {
@@ -84162,7 +84162,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "neblina"
+            "value" : "Nevoeiro"
           }
         },
         "zh-Hans" : {
@@ -84190,19 +84190,19 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "spring"
+            "value" : "Spring"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "primavera"
+            "value" : "Primavera"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "printemps"
+            "value" : "Printemps"
           }
         },
         "ja" : {
@@ -84220,7 +84220,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "primavera"
+            "value" : "Primavera"
           }
         },
         "zh-Hans" : {
@@ -84248,19 +84248,19 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "summer"
+            "value" : "Summer"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "verano"
+            "value" : "Verano"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "été"
+            "value" : "Été"
           }
         },
         "ja" : {
@@ -84278,7 +84278,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "verão"
+            "value" : "Verão"
           }
         },
         "zh-Hans" : {
@@ -84306,19 +84306,19 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "autumn"
+            "value" : "Autumn"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "otoño"
+            "value" : "Otoño"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "automne"
+            "value" : "Automne"
           }
         },
         "ja" : {
@@ -84336,7 +84336,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "outono"
+            "value" : "Outono"
           }
         },
         "zh-Hans" : {
@@ -84364,19 +84364,19 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "winter"
+            "value" : "Winter"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "invierno"
+            "value" : "Invierno"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "hiver"
+            "value" : "Hiver"
           }
         },
         "ja" : {
@@ -84394,7 +84394,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "inverno"
+            "value" : "Inverno"
           }
         },
         "zh-Hans" : {
@@ -84422,19 +84422,19 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "sakura pink"
+            "value" : "Sakura pink"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "rosa sakura"
+            "value" : "Rosa sakura"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "rose sakura"
+            "value" : "Rose sakura"
           }
         },
         "ja" : {
@@ -84452,7 +84452,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "rosa sakura"
+            "value" : "Rosa sakura"
           }
         },
         "zh-Hans" : {
@@ -84480,19 +84480,19 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "mint green"
+            "value" : "Mint green"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "verde menta"
+            "value" : "Verde menta"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "vert menthe"
+            "value" : "Vert menthe"
           }
         },
         "ja" : {
@@ -84510,7 +84510,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "verde menta"
+            "value" : "Verde menta"
           }
         },
         "zh-Hans" : {
@@ -84538,19 +84538,19 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "cream white"
+            "value" : "Cream white"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "blanco crema"
+            "value" : "Blanco crema"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "blanc crème"
+            "value" : "Blanc crème"
           }
         },
         "ja" : {
@@ -84568,7 +84568,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "branco creme"
+            "value" : "Branco creme"
           }
         },
         "zh-Hans" : {
@@ -84590,25 +84590,25 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "helles Gelb"
+            "value" : "Zartes Hellgelb"
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "pale yellow"
+            "value" : "Pale yellow"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "amarillo claro"
+            "value" : "Amarillo pálido"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "jaune pâle"
+            "value" : "Jaune pâle"
           }
         },
         "ja" : {
@@ -84620,13 +84620,13 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "연한 노랑"
+            "value" : "연한 옐로"
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "amarelo claro"
+            "value" : "Amarelo pálido"
           }
         },
         "zh-Hans" : {
@@ -84654,19 +84654,19 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "lavender purple"
+            "value" : "Lavender purple"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "lila lavanda"
+            "value" : "Lavanda"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "violet lavande"
+            "value" : "Violet lavande"
           }
         },
         "ja" : {
@@ -84684,7 +84684,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "roxo lavanda"
+            "value" : "Roxo lavanda"
           }
         },
         "zh-Hans" : {
@@ -84712,19 +84712,19 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ocean blue"
+            "value" : "Ocean blue"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "azul océano"
+            "value" : "Azul océano"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "bleu océan"
+            "value" : "Bleu océan"
           }
         },
         "ja" : {
@@ -84742,7 +84742,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "azul oceano"
+            "value" : "Azul oceano"
           }
         },
         "zh-Hans" : {
@@ -84770,19 +84770,19 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "pearl white"
+            "value" : "Pearl white"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "blanco perla"
+            "value" : "Blanco perla"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "blanc perle"
+            "value" : "Blanc perle"
           }
         },
         "ja" : {
@@ -84800,7 +84800,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "branco pérola"
+            "value" : "Branco pérola"
           }
         },
         "zh-Hans" : {
@@ -84828,19 +84828,19 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "sky blue"
+            "value" : "Sky blue"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "azul cielo"
+            "value" : "Azul cielo"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "bleu ciel"
+            "value" : "Bleu ciel"
           }
         },
         "ja" : {
@@ -84858,7 +84858,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "azul céu"
+            "value" : "Azul céu"
           }
         },
         "zh-Hans" : {
@@ -84880,25 +84880,25 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Korallenrosa"
+            "value" : "Korallrosa"
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "coral pink"
+            "value" : "Coral pink"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "rosa coral"
+            "value" : "Rosa coral"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "rose corail"
+            "value" : "Rose corail"
           }
         },
         "ja" : {
@@ -84916,7 +84916,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "rosa coral"
+            "value" : "Rosa coral"
           }
         },
         "zh-Hans" : {
@@ -84944,19 +84944,19 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "caramel brown"
+            "value" : "Caramel brown"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "marrón caramelo"
+            "value" : "Marrón caramelo"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "brun caramel"
+            "value" : "Brun caramel"
           }
         },
         "ja" : {
@@ -84974,7 +84974,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "marrom caramelo"
+            "value" : "Marrom caramelo"
           }
         },
         "zh-Hans" : {
@@ -85002,19 +85002,19 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "maple red"
+            "value" : "Maple red"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "rojo arce"
+            "value" : "Rojo arce"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "rouge érable"
+            "value" : "Rouge érable"
           }
         },
         "ja" : {
@@ -85032,7 +85032,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "vermelho bordo"
+            "value" : "Vermelho bordo"
           }
         },
         "zh-Hans" : {
@@ -85054,25 +85054,25 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Milchteebeige"
+            "value" : "Milchtee-Beige"
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "milk tea beige"
+            "value" : "Milk tea beige"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "beige té con leche"
+            "value" : "Beige té con leche"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "beige thé au lait"
+            "value" : "Beige thé au lait"
           }
         },
         "ja" : {
@@ -85090,7 +85090,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "bege chá com leite"
+            "value" : "Bege chá com leite"
           }
         },
         "zh-Hans" : {
@@ -85118,19 +85118,19 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "apricot"
+            "value" : "Apricot"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "albaricoque"
+            "value" : "Albaricoque"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "abricot"
+            "value" : "Abricot"
           }
         },
         "ja" : {
@@ -85148,7 +85148,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "damasco"
+            "value" : "Damasco"
           }
         },
         "zh-Hans" : {
@@ -85170,31 +85170,31 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Bordeauxrot"
+            "value" : "Bordeaux"
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "burgundy"
+            "value" : "Burgundy"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "burdeos"
+            "value" : "Burdeos"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "bordeaux"
+            "value" : "Bordeaux"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ボルドー"
+            "value" : "バーガンディ"
           }
         },
         "ko" : {
@@ -85206,7 +85206,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "bordô"
+            "value" : "Borgonha"
           }
         },
         "zh-Hans" : {
@@ -85234,19 +85234,19 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "snow white"
+            "value" : "Snow white"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "blanco nieve"
+            "value" : "Blanco nieve"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "blanc neige"
+            "value" : "Blanc neige"
           }
         },
         "ja" : {
@@ -85258,13 +85258,13 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "스노우 화이트"
+            "value" : "눈꽃 화이트"
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "branco neve"
+            "value" : "Branco neve"
           }
         },
         "zh-Hans" : {
@@ -85292,19 +85292,19 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "deep red"
+            "value" : "Deep red"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "rojo profundo"
+            "value" : "Rojo intenso"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "rouge profond"
+            "value" : "Rouge profond"
           }
         },
         "ja" : {
@@ -85322,7 +85322,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "vermelho profundo"
+            "value" : "Vermelho profundo"
           }
         },
         "zh-Hans" : {
@@ -85350,19 +85350,19 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "navy blue"
+            "value" : "Navy"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "azul marino"
+            "value" : "Azul marino"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "bleu marine"
+            "value" : "Bleu marine"
           }
         },
         "ja" : {
@@ -85380,7 +85380,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "azul-marinho"
+            "value" : "Azul-marinho"
           }
         },
         "zh-Hans" : {
@@ -85408,19 +85408,19 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "silver gray"
+            "value" : "Silver gray"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "gris plata"
+            "value" : "Gris plata"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "gris argent"
+            "value" : "Gris argenté"
           }
         },
         "ja" : {
@@ -85438,7 +85438,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "cinza prata"
+            "value" : "Cinza prata"
           }
         },
         "zh-Hans" : {
@@ -85466,19 +85466,19 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "rose pink"
+            "value" : "Rose pink"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "rosa rosa"
+            "value" : "Rosa rosa"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "rose tendre"
+            "value" : "Rose tendre"
           }
         },
         "ja" : {
@@ -85496,7 +85496,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "rosa rosado"
+            "value" : "Rosa rosado"
           }
         },
         "zh-Hans" : {
@@ -114509,6 +114509,2732 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "我把思念裝進夢裡了，等你去打開"
+          }
+        }
+      }
+    },
+    "%@的今日裙装配色" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Heutige Kleider-Farbpalette: %@"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Today's dress color palette: %@"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Paleta de colores del vestido de hoy: %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Palette de couleurs robe du jour : %@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "今日のワンピース配色：%@"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "오늘의 원피스 컬러 팔레트: %@"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Paleta de cores do vestido de hoje: %@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@的今日裙装配色"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@的今日裙裝配色"
+          }
+        }
+      }
+    },
+    "春日" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Frühlingstag"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "spring day"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "día de primavera"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "journée printanière"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "春の日"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "봄날"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "dia de primavera"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "春日"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "春日"
+          }
+        }
+      }
+    },
+    "夏日" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sommertag"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "summer day"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "día de verano"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "journée d'été"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "夏の日"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "여름날"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "dia de verão"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "夏日"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "夏日"
+          }
+        }
+      }
+    },
+    "秋日" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Herbsttag"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "autumn day"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "día de otoño"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "journée d'automne"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "秋の日"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "가을날"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "dia de outono"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "秋日"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "秋日"
+          }
+        }
+      }
+    },
+    "冬日" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wintertag"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "winter day"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "día de invierno"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "journée d'hiver"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "冬の日"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "겨울날"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "dia de inverno"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "冬日"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "冬日"
+          }
+        }
+      }
+    },
+    "甜美" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "süß"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "sweet"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "dulce"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "doux"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "甘め"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "사랑스러운"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "doce"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "甜美"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "甜美"
+          }
+        }
+      }
+    },
+    "优雅" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "elegant"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "elegant"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "elegante"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "élégant"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "上品"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "우아한"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "elegante"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "优雅"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "優雅"
+          }
+        }
+      }
+    },
+    "复古" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "retro"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "retro"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "retro"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "rétro"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "レトロ"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "레트로"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "retrô"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "复古"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "復古"
+          }
+        }
+      }
+    },
+    "清新" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "frisch"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "fresh"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "fresco"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "frais"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "爽やか"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "산뜻한"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "fresco"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "清新"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "清新"
+          }
+        }
+      }
+    },
+    "浪漫" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "romantisch"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "romantic"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "romántico"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "romantique"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ロマンチック"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "로맨틱한"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "romântico"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "浪漫"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "浪漫"
+          }
+        }
+      }
+    },
+    "搭配花朵发饰和蕾丝手套" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mit Blumen-Haarschmuck und Spitzenhandschuhen kombinieren"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pair with floral hair accessories and lace gloves"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Combínalo con adornos florales para el cabello y guantes de encaje"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "À associer avec des accessoires fleuris pour les cheveux et des gants en dentelle"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "花のヘアアクセサリーとレース手袋を合わせて"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "꽃 헤어 장식과 레이스 장갑을 매치해요"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Combine com acessórios florais para cabelo e luvas de renda"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "搭配花朵发饰和蕾丝手套"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "搭配花朵髮飾和蕾絲手套"
+          }
+        }
+      }
+    },
+    "选择草编包和遮阳帽" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Strohtasche und Sonnenhut wählen"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose a straw bag and sun hat"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Elige un bolso de paja y un sombrero para el sol"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choisis un sac en paille et un chapeau de soleil"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "かごバッグと日よけ帽を選んで"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "라탄 가방과 햇빛 가림 모자를 골라요"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Escolha uma bolsa de palha e um chapéu de sol"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "选择草编包和遮阳帽"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "選擇草編包和遮陽帽"
+          }
+        }
+      }
+    },
+    "搭配贝雷帽和围巾" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mit Baskenmütze und Schal kombinieren"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pair with a beret and scarf"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Combínalo con boina y bufanda"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "À associer avec un béret et une écharpe"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ベレー帽とマフラーを合わせて"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "베레모와 스카프를 매치해요"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Combine com boina e cachecol"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "搭配贝雷帽和围巾"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "搭配貝雷帽和圍巾"
+          }
+        }
+      }
+    },
+    "选择毛绒耳罩和保暖手套" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Plüsch-Ohrenschützer und warme Handschuhe wählen"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose plush earmuffs and warm gloves"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Elige orejeras de felpa y guantes abrigados"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choisis des cache-oreilles moelleux et des gants chauds"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ふわふわイヤーマフと暖かい手袋を選んで"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "폭신한 귀마개와 따뜻한 장갑을 골라요"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Escolha protetores de orelha felpudos e luvas quentes"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "选择毛绒耳罩和保暖手套"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "選擇毛絨耳罩和保暖手套"
+          }
+        }
+      }
+    },
+    "佩戴太阳镜和防晒伞" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sonnenbrille und Sonnenschirm tragen"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wear sunglasses and carry a sun umbrella"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Usa gafas de sol y una sombrilla"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Porte des lunettes de soleil et une ombrelle"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "サングラスと日傘を持って"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "선글라스와 양산을 챙겨요"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Use óculos de sol e leve uma sombrinha"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "佩戴太阳镜和防晒伞"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "佩戴太陽眼鏡和防曬傘"
+          }
+        }
+      }
+    },
+    "准备可爱的雨靴和透明雨伞" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Süße Regenstiefel und einen transparenten Regenschirm bereitlegen"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Prepare cute rain boots and a clear umbrella"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Prepara botas de lluvia bonitas y un paraguas transparente"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Prépare de jolies bottes de pluie et un parapluie transparent"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "かわいいレインブーツと透明傘を用意して"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "귀여운 장화와 투명 우산을 준비해요"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Prepare botas de chuva fofas e um guarda-chuva transparente"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "准备可爱的雨靴和透明雨伞"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "準備可愛的雨靴和透明雨傘"
+          }
+        }
+      }
+    },
+    "选择保暖的毛绒包包" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eine warme Plüschtasche wählen"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose a warm plush bag"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Elige un bolso de felpa abrigado"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choisis un sac moelleux et douillet"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "暖かみのあるファーバッグを選んで"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "따뜻한 털 가방을 골라요"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Escolha uma bolsa felpuda e aconchegante"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "选择保暖的毛绒包包"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "選擇保暖的毛絨包包"
+          }
+        }
+      }
+    },
+    "珍珠项链增添优雅气质" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eine Perlenkette sorgt für Eleganz"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A pearl necklace adds an elegant touch"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un collar de perlas añade elegancia"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un collier de perles ajoute une touche d'élégance"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "パールネックレスで上品さをプラス"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "진주 목걸이로 우아함을 더해요"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Um colar de pérolas adiciona elegância"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "珍珠项链增添优雅气质"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "珍珠項鍊增添優雅氣質"
+          }
+        }
+      }
+    },
+    "蝴蝶结发夹点缀发型" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eine Schleifen-Haarspange setzt einen Akzent"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A bow hair clip finishes the hairstyle"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un pasador con lazo adorna el peinado"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Une pince à nœud met la coiffure en valeur"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "リボンヘアクリップで髪型にアクセント"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "리본 머리핀으로 헤어스타일을 포인트 줘요"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Uma presilha de laço dá charme ao penteado"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "蝴蝶结发夹点缀发型"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "蝴蝶結髮夾點綴髮型"
+          }
+        }
+      }
+    },
+    "蕾丝袜搭配小皮鞋" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Spitzensocken mit kleinen Lederschuhen kombinieren"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pair lace socks with small leather shoes"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Combina calcetines de encaje con zapatos de cuero"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Associe des chaussettes en dentelle à de petites chaussures en cuir"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "レースソックスに小さな革靴を合わせて"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "레이스 양말에 작은 가죽 구두를 매치해요"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Combine meias de renda com sapatos de couro"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "蕾丝袜搭配小皮鞋"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "蕾絲襪搭配小皮鞋"
+          }
+        }
+      }
+    },
+    "精致的手提包提升整体感" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eine feine Handtasche rundet den Look ab"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A refined handbag pulls the whole look together"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un bolso delicado completa todo el conjunto"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un sac à main raffiné harmonise l'ensemble"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "上品なハンドバッグで全体を引き締めて"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "섬세한 핸드백으로 전체 룩을 완성해요"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Uma bolsa delicada deixa o look mais completo"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "精致的手提包提升整体感"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "精緻的手提包提升整體感"
+          }
+        }
+      }
+    },
+    "浅灰蓝" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hellgraublau"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Light gray-blue"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Azul gris claro"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bleu gris clair"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ライトグレーブルー"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "연회청색"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Azul acinzentado claro"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "浅灰蓝"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "淺灰藍"
+          }
+        }
+      }
+    },
+    "玫瑰红" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rosenrot"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rose red"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rojo rosa"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rouge rose"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ローズレッド"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "로즈 레드"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vermelho rosa"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "玫瑰红"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "玫瑰紅"
+          }
+        }
+      }
+    },
+    "香槟金" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Champagnergold"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Champagne gold"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dorado champán"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Or champagne"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "シャンパンゴールド"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "샴페인 골드"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dourado champanhe"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "香槟金"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "香檳金"
+          }
+        }
+      }
+    },
+    "浅金色" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hellgold"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Light gold"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dorado claro"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Or clair"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ライトゴールド"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "라이트 골드"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dourado claro"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "浅金色"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "淺金色"
+          }
+        }
+      }
+    },
+    "莫兰迪粉" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Morandi-Rosa"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Morandi pink"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rosa Morandi"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rose Morandi"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "モランディピンク"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "모란디 핑크"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rosa Morandi"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "莫兰迪粉"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "莫蘭迪粉"
+          }
+        }
+      }
+    },
+    "雾霾蓝" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nebelblau"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Haze blue"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Azul bruma"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bleu brume"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ヘイズブルー"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "헤이즈 블루"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Azul névoa"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "雾霾蓝"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "霧霾藍"
+          }
+        }
+      }
+    },
+    "墨绿色" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dunkles Tannengrün"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Deep ink green"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Verde tinta oscuro"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vert encre foncé"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "深い墨グリーン"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "짙은 먹녹색"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Verde tinta profundo"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "墨绿色"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "墨綠色"
+          }
+        }
+      }
+    },
+    "明亮黄" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Leuchtgelb"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bright yellow"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Amarillo brillante"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Jaune vif"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ブライトイエロー"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "밝은 노랑"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Amarelo vivo"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "明亮黄"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "明亮黃"
+          }
+        }
+      }
+    },
+    "冰蓝" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eisblau"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ice blue"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Azul hielo"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bleu glacé"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アイスブルー"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "아이스 블루"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Azul gelo"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "冰蓝"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "冰藍"
+          }
+        }
+      }
+    },
+    "银白" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Silberweiß"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Silver white"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Blanco plata"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Blanc argenté"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "シルバーホワイト"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "실버 화이트"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Branco prateado"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "银白"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "銀白"
+          }
+        }
+      }
+    },
+    "深灰" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dunkelgrau"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dark gray"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gris oscuro"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gris foncé"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ダークグレー"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "다크 그레이"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cinza escuro"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "深灰"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "深灰"
+          }
+        }
+      }
+    },
+    "浅灰" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hellgrau"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Light gray"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gris claro"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gris clair"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ライトグレー"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "라이트 그레이"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cinza claro"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "浅灰"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "淺灰"
+          }
+        }
+      }
+    },
+    "深紫" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dunkelviolett"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Deep purple"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Morado profundo"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Violet profond"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ディープパープル"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "딥 퍼플"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Roxo profundo"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "深紫"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "深紫"
+          }
+        }
+      }
+    },
+    "浅粉" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hellrosa"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Light pink"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rosa claro"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rose clair"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ライトピンク"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "라이트 핑크"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rosa claro"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "浅粉"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "淺粉"
+          }
+        }
+      }
+    },
+    "酒红" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Weinrot"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wine red"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rojo vino"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rouge vin"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ワインレッド"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "와인 레드"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vermelho vinho"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "酒红"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "酒紅"
+          }
+        }
+      }
+    },
+    "墨蓝" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tintenblau"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ink blue"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Azul tinta"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bleu encre"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "インクブルー"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "잉크 블루"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Azul tinta"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "墨蓝"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "墨藍"
+          }
+        }
+      }
+    },
+    "黑色" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Schwarz"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Black"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Negro"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Noir"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "黒"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "검정"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Preto"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "黑色"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "黑色"
+          }
+        }
+      }
+    },
+    "驼色" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Camel"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Camel"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Camel"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Camel"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "キャメル"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "카멜"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Camel"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "驼色"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "駝色"
+          }
+        }
+      }
+    },
+    "橄榄绿" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Olivgrün"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Olive green"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Verde oliva"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vert olive"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "オリーブグリーン"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "올리브 그린"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Verde oliva"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "橄榄绿"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "橄欖綠"
+          }
+        }
+      }
+    },
+    "米色" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Beige"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Beige"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Beige"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Beige"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ベージュ"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "베이지"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bege"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "米色"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "米色"
+          }
+        }
+      }
+    },
+    "淡粉" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zartrosa"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pale pink"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rosa pálido"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rose pâle"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "淡いピンク"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "연분홍"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rosa pálido"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "淡粉"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "淡粉"
+          }
+        }
+      }
+    },
+    "浅紫" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hellviolett"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Light purple"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Morado claro"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Violet clair"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ライトパープル"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "라이트 퍼플"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Roxo claro"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "浅紫"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "淺紫"
+          }
+        }
+      }
+    },
+    "天蓝" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hellblau"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Light blue"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Azul claro"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bleu clair"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ライトブルー"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "연하늘색"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Azul claro"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "天蓝"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "天藍"
+          }
+        }
+      }
+    },
+    "深蓝" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dunkelblau"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Deep blue"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Azul profundo"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bleu profond"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ディープブルー"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "딥 블루"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Azul profundo"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "深蓝"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "深藍"
+          }
+        }
+      }
+    },
+    "墨绿" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tintengrün"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ink green"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Verde tinta"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vert encre"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "墨グリーン"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "먹녹색"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Verde tinta"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "墨绿"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "墨綠"
+          }
+        }
+      }
+    },
+    "白色" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Weiß"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "White"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Blanco"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Blanc"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "白"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "흰색"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Branco"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "白色"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "白色"
           }
         }
       }

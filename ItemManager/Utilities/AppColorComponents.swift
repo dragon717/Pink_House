@@ -85,22 +85,29 @@ struct ColorInfo: Codable, Hashable {
             return AppColorMap.color(for: name)
         }
     }
+
+    var localizedName: String {
+        name.appLocalized
+    }
 }
 
 // MARK: - 颜色卡片组件
 struct ColorCard: View {
     let colorName: String
+    let displayName: String
     let hexColor: String? // AI 生成的颜色会使用 hex
 
     /// 初始化 - 用于本地算法生成的颜色（使用颜色名称）
-    init(colorName: String) {
+    init(colorName: String, displayName: String? = nil) {
         self.colorName = colorName
+        self.displayName = displayName ?? colorName.appLocalized
         self.hexColor = nil
     }
 
     /// 初始化 - 用于 AI 生成的颜色（使用 hex 值）
-    init(colorName: String, hexColor: String) {
+    init(colorName: String, displayName: String? = nil, hexColor: String) {
         self.colorName = colorName
+        self.displayName = displayName ?? colorName.appLocalized
         self.hexColor = hexColor
     }
 
@@ -122,9 +129,11 @@ struct ColorCard: View {
                 .frame(width: 50, height: 50)
                 .shadow(color: color.opacity(0.4), radius: 8, x: 0, y: 4)
 
-            Text(colorName)
+            Text(displayName)
                 .font(.system(size: 13))
                 .foregroundColor(.primary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
         }
         .frame(maxWidth: .infinity)
     }

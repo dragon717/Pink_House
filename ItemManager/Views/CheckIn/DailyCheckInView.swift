@@ -410,7 +410,7 @@ struct DailyCheckInView: View {
                         HStack(spacing: 4) {
                             Image(systemName: weatherIcon(for: weather))
                                 .font(.caption)
-                            Text(weather)
+                            Text(outfit.localizedWeatherText ?? weather)
                                 .font(.caption)
                         }
                         .foregroundColor(.secondary)
@@ -432,7 +432,7 @@ struct DailyCheckInView: View {
                         HStack(spacing: 4) {
                             Image(systemName: "leaf.fill")
                                 .font(.caption)
-                            Text(season)
+                            Text(outfit.localizedSeasonText ?? season)
                                 .font(.caption)
                         }
                         .foregroundColor(.secondary)
@@ -443,9 +443,9 @@ struct DailyCheckInView: View {
                 HStack(spacing: 12) {
                     ForEach(outfit.colors, id: \.self) { colorInfo in
                         if let hex = colorInfo.hex {
-                            ColorCard(colorName: colorInfo.name, hexColor: hex)
+                            ColorCard(colorName: colorInfo.name, displayName: colorInfo.localizedName, hexColor: hex)
                         } else {
-                            ColorCard(colorName: colorInfo.name)
+                            ColorCard(colorName: colorInfo.name, displayName: colorInfo.localizedName)
                         }
                     }
                 }
@@ -461,7 +461,7 @@ struct DailyCheckInView: View {
                                 .foregroundColor(.secondary)
                         }
 
-                        Text(outfit.accessories)
+                        Text(outfit.localizedAccessories)
                             .font(.system(size: 15))
                             .foregroundColor(.primary)
                             .lineSpacing(4)
@@ -871,7 +871,7 @@ struct CheckInShareCardView: View {
                                         .frame(width: 60, height: 60)
                                         .shadow(color: color.opacity(0.4), radius: 8, x: 0, y: 4)
 
-                                    Text(colorInfo.name)
+                                    Text(colorInfo.localizedName)
                                         .font(.system(size: 14))
                                         .foregroundColor(.primary)
                                 }
@@ -884,7 +884,7 @@ struct CheckInShareCardView: View {
                                 .font(.system(size: 14, weight: .medium))
                                 .foregroundColor(.secondary)
 
-                            Text(outfit.accessories)
+                            Text(outfit.localizedAccessories)
                                 .font(.system(size: 13))
                                 .foregroundColor(.primary)
                                 .multilineTextAlignment(.center)

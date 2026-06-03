@@ -35,6 +35,28 @@ struct TodayOutfitColor: Codable {
     var colorNames: [String] {
         return colors.map { $0.name }
     }
+
+    private var usesLocalFallbackCopy: Bool {
+        source == "pet" || source == "local"
+    }
+
+    var localizedAccessories: String {
+        guard usesLocalFallbackCopy else { return accessories }
+        return accessories.dailyCheckInLocalizedListText
+    }
+
+    var localizedDescription: String {
+        guard usesLocalFallbackCopy else { return description }
+        return description.dailyCheckInLocalizedDescriptionText
+    }
+
+    var localizedWeatherText: String? {
+        weather?.appLocalized
+    }
+
+    var localizedSeasonText: String? {
+        season?.appLocalized
+    }
 }
 
 // MARK: - 每日打卡管理器
@@ -1244,7 +1266,52 @@ final class DailyCheckInManager: ObservableObject {
         let styles = ["甜美", "优雅", "复古", "清新", "浪漫"]
         parts.append(styles.randomElement()!)
         
-        return parts.joined(separator: "") + "的今日裙装配色"
+        let moodText = parts.joined(separator: "，")
+        return "%@的今日裙装配色".replacingOccurrences(of: "%@", with: moodText)
+    }
+}
+
+private extension String {
+    var dailyCheckInLocalizedListText: String {
+        let items = split(separator: "，")
+            .map { String($0).trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+
+        guard !items.isEmpty else { return appLocalized }
+        return items.map { $0.appLocalized }.joined(separator: "，".appLocalized)
+    }
+
+    var dailyCheckInLocalizedDescriptionText: String {
+        let sourceSuffix = "的今日裙装配色"
+        guard hasSuffix(sourceSuffix) else { return appLocalized }
+
+        let sourceMood = String(dropLast(sourceSuffix.count))
+        let localizedMood = sourceMood.dailyCheckInLocalizedMoodText
+        return "%@的今日裙装配色".appLocalized(localizedMood)
+    }
+
+    private var dailyCheckInLocalizedMoodText: String {
+        if contains("，") {
+            return dailyCheckInLocalizedListText
+        }
+
+        var remaining = self
+        var parts: [String] = []
+        let knownPrefixes = [
+            ["春日", "夏日", "秋日", "冬日"],
+            ["晴", "多云", "阴", "小雨", "中雨", "大雨", "雷雨", "雪", "雾", "未知"],
+            ["甜美", "优雅", "复古", "清新", "浪漫"]
+        ]
+
+        for candidates in knownPrefixes {
+            if let match = candidates.first(where: { remaining.hasPrefix($0) }) {
+                parts.append(match)
+                remaining.removeFirst(match.count)
+            }
+        }
+
+        guard remaining.isEmpty, !parts.isEmpty else { return appLocalized }
+        return parts.map { $0.appLocalized }.joined(separator: "，".appLocalized)
     }
 }
 

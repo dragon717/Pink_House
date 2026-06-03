@@ -57,6 +57,10 @@ enum WeatherCondition: String, Codable, CaseIterable {
         case .unknown: return "questionmark.circle"
         }
     }
+
+    var localizedDisplayName: String {
+        rawValue.appLocalized
+    }
     
     var color: String {
         switch self {
