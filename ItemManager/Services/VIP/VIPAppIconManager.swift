@@ -11,6 +11,18 @@ struct VIPAppIconOption: Identifiable, Equatable {
     let previewAssetName: String
     let alternateIconName: String?
     let badgeText: String?
+
+    var localizedDisplayName: String {
+        displayName.appLocalized
+    }
+
+    var localizedSubtitle: String {
+        subtitle.appLocalized
+    }
+
+    var localizedBadgeText: String? {
+        badgeText?.appLocalized
+    }
 }
 
 @MainActor
@@ -85,15 +97,15 @@ final class VIPAppIconManager: ObservableObject {
 
     func applyIcon(_ option: VIPAppIconOption) async -> (success: Bool, message: String) {
         guard VIPManager.shared.isVIP else {
-            return (false, "开通 VIP 后，就可以为桌面换上专属图标。")
+            return (false, "开通 VIP 后，就可以为桌面换上专属图标。".appLocalized)
         }
 
         guard supportsAlternateIcons else {
-            return (false, "这台设备暂时不能切换桌面图标。")
+            return (false, "这台设备暂时不能切换桌面图标。".appLocalized)
         }
 
         guard currentIconID != option.id else {
-            return (true, "你已经在使用「\(option.displayName)」了。")
+            return (true, "你已经在使用「%@」了。".appLocalized(option.localizedDisplayName))
         }
 
         isApplying = true
@@ -103,12 +115,12 @@ final class VIPAppIconManager: ObservableObject {
         do {
             try await setAlternateIconName(option.alternateIconName)
             refreshCurrentIcon()
-            return (true, "已切换为「\(option.displayName)」。")
+            return (true, "已切换为「%@」。".appLocalized(option.localizedDisplayName))
         } catch {
             return (false, errorMessage(for: error, option: option))
         }
 #else
-        return (false, "现在暂时不能切换桌面图标。")
+        return (false, "现在暂时不能切换桌面图标。".appLocalized)
 #endif
     }
 
@@ -135,6 +147,6 @@ final class VIPAppIconManager: ObservableObject {
 #endif
 
     private func errorMessage(for error: Error, option: VIPAppIconOption) -> String {
-        "暂时没能换成「\(option.displayName)」，可以稍后再试。"
+        "暂时没能换成「%@」，可以稍后再试。".appLocalized(option.localizedDisplayName)
     }
 }

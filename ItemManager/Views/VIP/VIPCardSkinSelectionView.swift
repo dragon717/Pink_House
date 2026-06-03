@@ -24,7 +24,7 @@ struct VIPCardSkinSelectionView: View {
                 backgroundLayer
 
                 VStack(spacing: 0) {
-                    Text("选择卡片皮肤")
+                    Text("选择卡片皮肤".appLocalized)
                         .font(.headline)
                         .foregroundStyle(titleColor)
                         .padding(.top)
@@ -46,7 +46,7 @@ struct VIPCardSkinSelectionView: View {
                     Button {
                         dismiss()
                     } label: {
-                        Text("完成")
+                        Text("完成".appLocalized)
                             .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(ThemeSkinPrimaryButtonStyle(
@@ -194,9 +194,9 @@ struct VIPCardSkinSelectionView: View {
         VStack(spacing: 8) {
             Image(systemName: "lock.fill")
                 .font(.title2.weight(.bold))
-            Text("购买对应主题后可用")
+            Text("购买对应主题后可用".appLocalized)
                 .font(.caption.weight(.bold))
-            Text("点击前往主题商店")
+            Text("点击前往主题商店".appLocalized)
                 .font(.caption2.weight(.medium))
                 .opacity(0.86)
         }

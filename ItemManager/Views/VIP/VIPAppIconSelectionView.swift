@@ -65,8 +65,8 @@ struct VIPAppIconSelectionView: View {
         .onAppear {
             iconManager.refreshCurrentIcon()
         }
-        .alert("个性图标", isPresented: $showingResultAlert) {
-            Button("知道了", role: .cancel) { }
+        .alert("个性图标".appLocalized, isPresented: $showingResultAlert) {
+            Button("知道了".appLocalized, role: .cancel) { }
         } message: {
             Text(resultMessage)
         }
@@ -134,10 +134,10 @@ struct VIPAppIconSelectionView: View {
     private var topBar: some View {
         HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 4) {
-                Text("个性图标库")
+                Text("个性图标库".appLocalized)
                     .font(.system(size: 24, weight: .bold))
                     .foregroundStyle(primaryTextColor)
-                Text("VIP 专属桌面换装")
+                Text("VIP 专属桌面换装".appLocalized)
                     .font(.system(size: 13, weight: .medium))
                     .foregroundStyle(secondaryTextColor)
             }
@@ -180,12 +180,12 @@ struct VIPAppIconSelectionView: View {
                 Image(systemName: "app.badge.fill")
                     .font(.system(size: 20, weight: .bold))
                     .foregroundStyle(isThemeSkinActive ? accentColor : visualTheme.primaryGlassStyle.iconTint)
-                Text("把喜欢的衣橱风格带到桌面")
+                Text("把喜欢的衣橱风格带到桌面".appLocalized)
                     .font(.system(size: 18, weight: .bold))
                     .foregroundStyle(primaryTextColor)
             }
 
-            Text("为 Pink House 换一枚更贴近心情的图标。经典、礼服、珍珠与月光风格都可以收藏，桌面也能保持你喜欢的样子。")
+            Text("为 Pink House 换一枚更贴近心情的图标。经典、礼服、珍珠与月光风格都可以收藏，桌面也能保持你喜欢的样子。".appLocalized)
                 .font(.system(size: 13, weight: .medium))
                 .foregroundStyle(secondaryTextColor)
                 .fixedSize(horizontal: false, vertical: true)
@@ -203,7 +203,7 @@ struct VIPAppIconSelectionView: View {
                 .font(.system(size: 18, weight: .bold))
                 .foregroundStyle(iconManager.supportsAlternateIcons ? accentColor : Color.orange)
 
-            Text(iconManager.supportsAlternateIcons ? "这台设备可以切换桌面图标。" : "这台设备暂时不能切换桌面图标。")
+            Text(iconManager.supportsAlternateIcons ? "这台设备可以切换桌面图标。".appLocalized : "这台设备暂时不能切换桌面图标。".appLocalized)
                 .font(.system(size: 13, weight: .medium))
                 .foregroundStyle(secondaryTextColor)
 
@@ -231,7 +231,7 @@ struct VIPAppIconSelectionView: View {
                     .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
                     .padding(4)
 
-                if let badgeText = option.badgeText {
+                if let badgeText = option.localizedBadgeText {
                     Text(badgeText)
                         .font(.system(size: 9, weight: .bold))
                         .foregroundStyle(.white)
@@ -248,12 +248,12 @@ struct VIPAppIconSelectionView: View {
 
             VStack(alignment: .leading, spacing: 8) {
                 HStack(spacing: 8) {
-                    Text(option.displayName)
+                    Text(option.localizedDisplayName)
                         .font(.system(size: 17, weight: .bold))
                         .foregroundStyle(primaryTextColor)
 
                     if isCurrent {
-                        Text("当前使用")
+                        Text("当前使用".appLocalized)
                             .font(.system(size: 10, weight: .bold))
                             .foregroundStyle(isThemeSkinActive ? primaryTextColor : Color.black.opacity(0.9))
                             .padding(.horizontal, 8)
@@ -266,7 +266,7 @@ struct VIPAppIconSelectionView: View {
                     }
                 }
 
-                Text(option.subtitle)
+                Text(option.localizedSubtitle)
                     .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(secondaryTextColor)
                     .fixedSize(horizontal: false, vertical: true)
@@ -283,7 +283,7 @@ struct VIPAppIconSelectionView: View {
                             ProgressView()
                                 .tint(isThemeSkinActive ? primaryTextColor : Color.black.opacity(0.9))
                         }
-                        Text(isCurrent ? "已启用" : "切换图标")
+                        Text(isCurrent ? "已启用".appLocalized : "切换图标".appLocalized)
                     }
                     .font(.system(size: 13, weight: .bold))
                     .foregroundStyle(isThemeSkinActive ? primaryTextColor : Color.black.opacity(0.92))

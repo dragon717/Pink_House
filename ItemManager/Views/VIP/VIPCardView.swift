@@ -153,11 +153,11 @@ struct VIPCardView: View {
         }
 
         switch fallbackCardStyle {
-        case .blackGold: return "黑金尊享"
-        case .monicaPink: return "梦幻限定"
-        case .themeSkinAdaptive: return "跟随主题"
-        case .skyConcertTheme: return "天空音乐会"
-        case .swanDreamTheme: return "天鹅入梦"
+        case .blackGold: return "黑金尊享".appLocalized
+        case .monicaPink: return "梦幻限定".appLocalized
+        case .themeSkinAdaptive: return "跟随主题".appLocalized
+        case .skyConcertTheme: return "天空音乐会".appLocalized
+        case .swanDreamTheme: return "天鹅入梦".appLocalized
         }
     }
     
@@ -324,7 +324,7 @@ struct VIPCardView: View {
                         )
                         .shadow(color: .orange.opacity(0.5), radius: 5)
                     
-                    Text("少女心愿 VIP")
+                    Text("少女心愿 VIP".appLocalized)
                         .font(.custom("Zapfino", size: 20))
                         .italic()
                         .foregroundStyle(
@@ -373,7 +373,7 @@ struct VIPCardView: View {
                         .shadow(color: .black.opacity(0.3), radius: 2, x: 1, y: 1)
                         .padding(.horizontal, 24)
                 } else {
-                    Text("加入尊贵会员，解锁专属特权")
+                    Text("加入尊贵会员，解锁专属特权".appLocalized)
                         .font(.subheadline)
                         .foregroundStyle(secondaryBodyTextColor)
                         .padding(.horizontal, 24)

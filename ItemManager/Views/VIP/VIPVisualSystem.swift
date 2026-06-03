@@ -287,15 +287,15 @@ enum VIPThemeSkinSupport {
     static func displayHint(for cardStyle: VIPCardStyle) -> String {
         switch cardStyle {
         case .blackGold:
-            return "经典尊享 · 深色金边"
+            return "经典尊享 · 深色金边".appLocalized
         case .monicaPink:
-            return "默认梦幻粉 · 无主题时回退"
+            return "默认梦幻粉 · 无主题时回退".appLocalized
         case .themeSkinAdaptive:
-            return "随当前启用的天空/天鹅主题自动变化"
+            return "随当前启用的天空/天鹅主题自动变化".appLocalized
         case .skyConcertTheme:
-            return "需拥有天空音乐会主题"
+            return "需拥有天空音乐会主题".appLocalized
         case .swanDreamTheme:
-            return "需拥有天鹅入梦主题"
+            return "需拥有天鹅入梦主题".appLocalized
         }
     }
 }

@@ -597,6 +597,10 @@ enum VIPCardStyle: String, Codable, CaseIterable, Identifiable {
     var id: String { rawValue }
 
     var displayName: String {
+        rawDisplayName.appLocalized
+    }
+
+    private var rawDisplayName: String {
         switch self {
         case .blackGold: return "黑金尊享"
         case .monicaPink: return "莫妮卡粉色萌梦幻"
