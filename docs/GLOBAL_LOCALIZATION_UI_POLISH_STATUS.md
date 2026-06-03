@@ -31,6 +31,7 @@
 | 功能解锁提示 | `8e48603` | 已提交 | Home/批量导入/FeatureUnlockButton 解锁 alert、条件描述、进度 message、MagicTasks/MagicColor/FeatureUnlockSettings/小屋/尾款入口条件展示；保留 Codable description 和测试页 | `xcodebuild` 通过（临时源码快照） |
 | VIP 图标与卡片动态名称 | `e582e6c` | 已提交 | VIPAppIcon option 名称/副标题/badge、切换结果消息、VIPCardStyle displayName、卡片皮肤 hint、VIP 卡片角标；保留 rawValue/option id/alternateIconName | `xcodebuild` 通过（临时源码快照） |
 | 心愿尾款月度与系列选择 | `b29ee98` | 已提交 | DepositPlan 快捷入口/解锁弹窗/钱包提示、月度/系列 selector、最近月/最近添加卡片、年/月/金额格式；补齐 9 语言 | `xcodebuild` 通过（临时源码快照） |
+| 尾款提醒通知流程 | `0bebbec` | 已提交 | DepositNotificationView 导航/权限/设置/记录/测试/诊断文案、DatePicker/time formatter、NotificationManager 正式/测试通知 title/body、支付期/金额短语；保留 payload/UserDefaults/identifier | `xcodebuild` 通过（临时源码快照） |
 
 ## Subagent 最新盘点
 
@@ -47,11 +48,14 @@
 | Schrodinger | 编辑/品牌标签复核 | 确认品牌/标签壳层和删除确认 key 基本已有；用户 brand/tag/option 不应本地化；存储 rawValue 不动 | P0 最明确缺口是 `ClothingEditSections` 的 `裙装名称` key；价格/汇率展示、toast 参数和汇率服务错误需要独立格式化切片 | 下一刀编辑页可先补 `裙装名称` key；金额/汇率另开 formatter，不和品牌/标签管理混改 |
 | Lorentz | 详情/分享/查看器 P1 审计 | 确认详情页主体验不再是 P0 文案阻塞；剩余高收益点集中在 viewer 保存结果、分享卡 chrome、分享卡内容 label | `ImageViewer`/`ChartImageViewer` 的保存结果变量、`ShareCardManager` 的分享标题/准备中/按钮、`ClothingShareCardView` 的 `型色` key 未做 | 先做 viewer 保存结果，再做分享卡 chrome，最后补分享卡内容 label；用户输入/品牌/衣物状态值不翻译 |
 | Huygens | 日历/打卡 P0 审计 | 已派发；本轮两次 `wait_agent` 未返回最终结果，随后关闭，前置状态为 running | 未产出可采纳审计结论，暂不据此改代码或调整优先级 | 下轮重新派发或恢复同类审计，再决定每日打卡/日历是否还有 P0 切片 |
-| Descartes | 日历/打卡 P0 审计 | 确认 `DailyCheckInView` 主 UI 基本已覆盖；DepositPlan 月/系列选择已按 `b29ee98` 落地，补齐 9 语和年/月/金额 formatter | `DepositNotificationView` 仍缺完整壳文案与 time formatter；每日内容生成语言仍需独立切片 | 下一刀日历/打卡 P0 转 `DepositNotificationView`；rawValue/日期存储 key 不动 |
+| Descartes | 日历/打卡 P0 审计 | 确认 `DailyCheckInView` 主 UI 基本已覆盖；DepositPlan 月/系列选择按 `b29ee98` 落地，尾款通知流程按 `0bebbec` 落地 | 每日内容生成语言仍需独立切片；DailyGreeting/DailyCheckIn 的 AI prompt 与 CloudKit 公共内容 locale 维度未处理 | 日历/打卡 P0 下一刀转每日内容 fallback/prompt；rawValue/日期存储 key 不动 |
 | Sartre | 萌宠 fallback/prompt 审计 | 确认 P0 是用户可见 fallback/humanizer 与会生成并同步用户内容的每日 prompt；协议字段和 command id 不翻译 | `PetAIService` 空回复/错误 fallback、`PetPersonaProfile.warmthSuffixes`、`PetResponseHumanizer`、PetChat/Legacy、DailyGreeting/DailyCheckIn 内容生成仍需切片 | 下一刀先做用户可见 fallback，再做每日 AI prompt；`ask:`、command id、JSON schema 和存储字段保持稳定 |
 | Fermat | 萌宠 fallback/prompt 复核 | 明确第一刀应只做用户可见 fallback/humanizer：`PetAIService`、`PetPersonaProfile.warmthSuffixes`、`PetResponseHumanizer`、PetChat/Legacy 共享 fallback、DailyGreeting/DailyCheckIn 本地 fallback | prompt key 化、PetGenerativePromptBuilder、PetConversationV2Support、PetRole、CloudKit 公共内容 locale 维度后置 | key 前缀建议 `pet.ai.fallback.*`、`pet.ai.humanizer.*`、`daily.greeting.*`、`daily.checkin.*`；不翻译 JSON schema、command id、`ask:` 前缀 |
+| Chandrasekhar | 尾款通知服务审计 | 指出正式/测试系统通知 title/body、支付期/金额短语需与 View 同刀处理；已按 `0bebbec` 落地，测试秒数由硬写 5 秒改为动态 `%d` | 复数规则和货币格式仍是后续格式化治理；既有 pending request 语言切换后会因 title/body 变化触发重排属预期 | payload keys、UserDefaults keys、threadIdentifier、`depositPlan`/`test`/`_catchup` identifier token 继续禁止翻译 |
+| Plato | 萌宠 fallback/humanizer 最小切片 | 收窄第一刀到 `PetPersonaProfile.warmthSuffixes`、`PetAIService` user fallback、`PetResponseHumanizer` 输出外壳 | `makeInitialHistory`、`stylePrompt`、`modulePrompts`、JSON 识别 key、command 值、Daily raw 模式后置 | 下一刀只动三文件；不碰 prompt、JSON、command、Daily 内容生成 |
 | Bacon | Settings/Me P1 审计 | 确认实际落点是 `MeView.swift`、`UserProfileEditView.swift`、`PrivacySettingsView.swift`、Refactored settings 子页；Profile 目录不存在 | System/Wardrobe/Magic/PetAI/SmallWorld/Widget/Network settings 仍有大量壳文案；TestEffects 最后 | 下一刀建议 `MeView` 首屏/CloudSyncSheet + `UserProfileEditView` + `PrivacySettingsView`；保留 navigation tag、AppStorage key、URL、用户昵称/邮箱 |
 | Jason | UI 美化静态复核 | 确认衣橱空态已完成；小屋素材基本齐但缺失素材无主题化 fallback；窄网格风险实际在详细列表行 `AttributePill.fixedSize` | 统计图表硬编码色、详情页无图 placeholder/hero offset、编辑页首屏/图片 tile、小屋素材缺失空态仍未做 | UI 下一刀从 `ClothingCard.AttributePill` 溢出开始，再做统计图表主题色；需要窄屏/大字号模拟器验收 |
+| Leibniz | AttributePill 溢出最小修法 | 定位 `AttributePill` 只在 `ClothingRow` 详细列表属性行使用；6 列缩略图和普通网格不走该路径 | 尚未改代码；详细列表长类型/颜色/尺码仍可能横向顶开价格块 | 最小修法：移除 `fixedSize(horizontal: true)`，加 `lineLimit(1)`、`minimumScaleFactor(0.78)`、`truncationMode(.tail)`；必要时给中间列 `minWidth:0,maxWidth:.infinity` |
 
 ## UI 美化盘点
 
@@ -70,9 +74,9 @@
 
 ## 下一阶段建议
 
-1. 日历/打卡 P0 下一刀转 `DepositNotificationView`：导航/权限提示/设置区/记录区/测试提醒文案与时间 formatter。
-2. 萌宠国际化下一刀按 Fermat/Sartre 建议先做用户可见 fallback/humanizer：`PetAIService`、`PetPersonaProfile.warmthSuffixes`、`PetResponseHumanizer`，再扩到 PetChat/Legacy；prompt 与 CloudKit locale 单独切片。
+1. 萌宠国际化下一刀按 Plato/Fermat/Sartre 建议先做用户可见 fallback/humanizer：`PetAIService`、`PetPersonaProfile.warmthSuffixes`、`PetResponseHumanizer`；prompt、JSON、command、Daily raw 内容后置。
+2. 日历/打卡 P0 下一刀转每日内容生成：`DailyGreeting` 本地 fallback、`DailyCheckIn` 本地 fallback/toast，AI prompt 多语言和 CloudKit locale 维度单独切片。
 3. Settings/Me P1 可按 Bacon 建议做 `MeView` 首屏/CloudSyncSheet + `UserProfileEditView` + `PrivacySettingsView`。
 4. 详情页 P1 可接 Lorentz 建议：先 viewer 保存结果，再分享卡 chrome，最后补分享卡内容 label。
 5. 编辑页 P0 仍保留精确小切片：补 `裙装名称` key；金额/汇率另开 formatter。
-6. UI 美化下一刀按 Jason 建议从详细列表 `AttributePill` 溢出开始，再做统计图表主题色；小屋素材缺失空态排 P1。
+6. UI 美化下一刀按 Jason/Leibniz 建议从详细列表 `AttributePill` 溢出开始，再做统计图表主题色；小屋素材缺失空态排 P1。
