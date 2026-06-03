@@ -21,7 +21,11 @@ enum SortOption: String, CaseIterable, Identifiable, Hashable, Sendable {
     case custom = "自定义顺序"
     
     var id: String { rawValue }
-    
+
+    var localizedTitle: String {
+        rawValue.appLocalized
+    }
+
     var sortDescriptors: [SortDescriptor<Clothing>] {
         switch self {
         case .createdAtDesc:
@@ -476,7 +480,11 @@ struct HomeView: View {
         case grid6 = "六列"
         
         var id: String { rawValue }
-        
+
+        var localizedTitle: String {
+            rawValue.appLocalized
+        }
+
         var icon: String {
             switch self {
             case .listBrief: return "list.bullet"
@@ -972,8 +980,8 @@ struct HomeView: View {
 
     private var activeSearchPrompt: String {
         selectedTab == .wardrobe
-            ? "搜索名称、品牌、标签、类型、颜色、尺码、价格范围等..."
-            : "搜索心愿尾款名称、品牌、标签、价格..."
+            ? "搜索名称、品牌、标签、类型、颜色、尺码、价格范围等...".appLocalized
+            : "搜索心愿尾款名称、品牌、标签、价格...".appLocalized
     }
 
     private var wardrobeTopSearchBar: some View {
@@ -998,7 +1006,7 @@ struct HomeView: View {
                     }
             }
 
-            Button("取消") {
+            Button("取消".appLocalized) {
                 activeSearchText.wrappedValue = ""
                 isWardrobeSearchFocused = false
                 isSearchActive = false
@@ -1247,9 +1255,9 @@ struct HomeView: View {
         // menu-perf: wardrobe sort menu
         Menu {
             let _ = MenuPerfSignpost.menuContent("wardrobe.sort")
-            Picker("排序", selection: $sortOption) {
+            Picker("排序".appLocalized, selection: $sortOption) {
                 ForEach(SortOption.allCases) { option in
-                    Text(option.rawValue)
+                    Text(option.localizedTitle)
                         .themeSkinLegibleText(level: .inline, slot: .filterChip)
                         .tag(option)
                 }
@@ -1496,16 +1504,16 @@ struct HomeView: View {
         Menu {
             let _ = MenuPerfSignpost.menuContent("wardrobe.display")
             if selectedTab == .wardrobe {
-                Picker("布局", selection: $viewLayout) {
+                Picker("布局".appLocalized, selection: $viewLayout) {
                     ForEach(ViewLayout.allCases) { layout in
-                        Label(layout.rawValue, systemImage: layout.icon)
+                        Label(layout.localizedTitle, systemImage: layout.icon)
                             .tag(layout)
                     }
                 }
             } else {
-                Picker("布局", selection: $depositDisplayMode) {
+                Picker("布局".appLocalized, selection: $depositDisplayMode) {
                     ForEach(DepositDisplayMode.allCases) { mode in
-                        Label(mode.rawValue, systemImage: mode.icon)
+                        Label(mode.localizedTitle, systemImage: mode.icon)
                             .tag(mode)
                     }
                 }

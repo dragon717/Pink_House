@@ -18,6 +18,11 @@ enum DepositDisplayMode: String, CaseIterable, Identifiable {
     case simple = "简略"
     
     var id: String { rawValue }
+
+    var localizedTitle: String {
+        rawValue.appLocalized
+    }
+
     var icon: String {
         switch self {
         case .detail: return "list.bullet.rectangle.portrait"
