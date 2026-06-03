@@ -30,6 +30,7 @@
 | Home 筛选与菜单入口 | `b1da749` | 已提交 | 经典筛选清除/无标签/无品牌/无类型等展示名、字段名、更多/新增菜单、引导菜单 overlay、社区导入提示；保留 sentinel/rawValue/用户数据 | `xcodebuild` 通过 |
 | 功能解锁提示 | `8e48603` | 已提交 | Home/批量导入/FeatureUnlockButton 解锁 alert、条件描述、进度 message、MagicTasks/MagicColor/FeatureUnlockSettings/小屋/尾款入口条件展示；保留 Codable description 和测试页 | `xcodebuild` 通过（临时源码快照） |
 | VIP 图标与卡片动态名称 | `e582e6c` | 已提交 | VIPAppIcon option 名称/副标题/badge、切换结果消息、VIPCardStyle displayName、卡片皮肤 hint、VIP 卡片角标；保留 rawValue/option id/alternateIconName | `xcodebuild` 通过（临时源码快照） |
+| 心愿尾款月度与系列选择 | `b29ee98` | 已提交 | DepositPlan 快捷入口/解锁弹窗/钱包提示、月度/系列 selector、最近月/最近添加卡片、年/月/金额格式；补齐 9 语言 | `xcodebuild` 通过（临时源码快照） |
 
 ## Subagent 最新盘点
 
@@ -46,8 +47,11 @@
 | Schrodinger | 编辑/品牌标签复核 | 确认品牌/标签壳层和删除确认 key 基本已有；用户 brand/tag/option 不应本地化；存储 rawValue 不动 | P0 最明确缺口是 `ClothingEditSections` 的 `裙装名称` key；价格/汇率展示、toast 参数和汇率服务错误需要独立格式化切片 | 下一刀编辑页可先补 `裙装名称` key；金额/汇率另开 formatter，不和品牌/标签管理混改 |
 | Lorentz | 详情/分享/查看器 P1 审计 | 确认详情页主体验不再是 P0 文案阻塞；剩余高收益点集中在 viewer 保存结果、分享卡 chrome、分享卡内容 label | `ImageViewer`/`ChartImageViewer` 的保存结果变量、`ShareCardManager` 的分享标题/准备中/按钮、`ClothingShareCardView` 的 `型色` key 未做 | 先做 viewer 保存结果，再做分享卡 chrome，最后补分享卡内容 label；用户输入/品牌/衣物状态值不翻译 |
 | Huygens | 日历/打卡 P0 审计 | 已派发；本轮两次 `wait_agent` 未返回最终结果，随后关闭，前置状态为 running | 未产出可采纳审计结论，暂不据此改代码或调整优先级 | 下轮重新派发或恢复同类审计，再决定每日打卡/日历是否还有 P0 切片 |
-| Descartes | 日历/打卡 P0 审计 | 确认 `DailyCheckInView` 主 UI 基本已覆盖；梦裙日历只剩少量尾巴；P0 最大口子在 DepositPlan 月/系列/通知提醒 | `DepositPlanView/Components`、`MonthSelectorView`、`SeriesSelectorView`、`DepositNotificationView` 缺 6 语和 month/year/time formatter；每日内容生成语言仍需独立切片 | 下一刀 P0 推荐 `DepositPlanView + Components + MonthSelector + SeriesSelector`，再做通知页；rawValue/日期存储 key 不动 |
+| Descartes | 日历/打卡 P0 审计 | 确认 `DailyCheckInView` 主 UI 基本已覆盖；DepositPlan 月/系列选择已按 `b29ee98` 落地，补齐 9 语和年/月/金额 formatter | `DepositNotificationView` 仍缺完整壳文案与 time formatter；每日内容生成语言仍需独立切片 | 下一刀日历/打卡 P0 转 `DepositNotificationView`；rawValue/日期存储 key 不动 |
 | Sartre | 萌宠 fallback/prompt 审计 | 确认 P0 是用户可见 fallback/humanizer 与会生成并同步用户内容的每日 prompt；协议字段和 command id 不翻译 | `PetAIService` 空回复/错误 fallback、`PetPersonaProfile.warmthSuffixes`、`PetResponseHumanizer`、PetChat/Legacy、DailyGreeting/DailyCheckIn 内容生成仍需切片 | 下一刀先做用户可见 fallback，再做每日 AI prompt；`ask:`、command id、JSON schema 和存储字段保持稳定 |
+| Fermat | 萌宠 fallback/prompt 复核 | 明确第一刀应只做用户可见 fallback/humanizer：`PetAIService`、`PetPersonaProfile.warmthSuffixes`、`PetResponseHumanizer`、PetChat/Legacy 共享 fallback、DailyGreeting/DailyCheckIn 本地 fallback | prompt key 化、PetGenerativePromptBuilder、PetConversationV2Support、PetRole、CloudKit 公共内容 locale 维度后置 | key 前缀建议 `pet.ai.fallback.*`、`pet.ai.humanizer.*`、`daily.greeting.*`、`daily.checkin.*`；不翻译 JSON schema、command id、`ask:` 前缀 |
+| Bacon | Settings/Me P1 审计 | 确认实际落点是 `MeView.swift`、`UserProfileEditView.swift`、`PrivacySettingsView.swift`、Refactored settings 子页；Profile 目录不存在 | System/Wardrobe/Magic/PetAI/SmallWorld/Widget/Network settings 仍有大量壳文案；TestEffects 最后 | 下一刀建议 `MeView` 首屏/CloudSyncSheet + `UserProfileEditView` + `PrivacySettingsView`；保留 navigation tag、AppStorage key、URL、用户昵称/邮箱 |
+| Jason | UI 美化静态复核 | 确认衣橱空态已完成；小屋素材基本齐但缺失素材无主题化 fallback；窄网格风险实际在详细列表行 `AttributePill.fixedSize` | 统计图表硬编码色、详情页无图 placeholder/hero offset、编辑页首屏/图片 tile、小屋素材缺失空态仍未做 | UI 下一刀从 `ClothingCard.AttributePill` 溢出开始，再做统计图表主题色；需要窄屏/大字号模拟器验收 |
 
 ## UI 美化盘点
 
@@ -56,7 +60,7 @@
 | 小屋主界面 | `SmallWorldView.swift`、`BookHouseSmallWorldView.swift` | 已固定走书本小屋形态 | `.house` 主题背景、舞台氛围、房间/功能物件图片、摆放模式、弹簧动效 | 样式被强制为 `bookHouse`；素材缺失时缺少主题化空态；部分旧小屋组件未接入当前入口 | P1 | 补主题化“小屋素材缺失/空状态”兜底，并核对当前入口实际组件 |
 | 小屋子页：萌宠/大世界 | `PetHomeView.swift`、`BigWorldView.swift` | 功能丰富，视觉体系混用 | 萌宠状态头、底部面板、浮动按钮；大世界航行/签到/分享/彩带动效 | 硬编码颜色和材质较多；主题皮肤覆盖不足；提示层视觉不统一 | P2 | 从萌宠浮动按钮和提示面板开始替换为共享主题按钮/卡片样式 |
 | 衣橱主页导航/工具栏 | `HomeView.swift`、`WardrobeNavigationStyle.swift`、`HomeThemeSkinComponents.swift` | 主入口美化较完整 | 衣橱/存钱计划背景切换、主题化顶部栏、搜索、菜单、时装导航 | 工具栏逻辑密；部分菜单标签和按钮不是统一视觉组件；文本可读性标记效果需复核 | P1 | 给顶部工具栏整理视觉验收清单，统一按钮、菜单标签、搜索态 |
-| 衣橱列表/网格/卡片 | `WardrobeView.swift`、`ClothingCard.swift`、`WardrobeThemeSkinComponents.swift` | 当前最成熟的视觉区域 | 网格/列表切换、统计浮层、选择底栏、拖拽排序、主题衣物卡片、徽标 | 旧 `ClothingListView` 可能与新入口视觉分叉；主衣橱空态不明显；属性 pill 窄网格有溢出风险 | P0 | 确认唯一主入口，并给“无衣物/筛选无结果”接入 `ThemeSkinEmptyStateSurface` |
+| 衣橱列表/网格/卡片 | `WardrobeView.swift`、`ClothingCard.swift`、`WardrobeThemeSkinComponents.swift` | 当前最成熟的视觉区域 | 网格/列表切换、统计浮层、选择底栏、拖拽排序、主题衣物卡片、徽标、无衣物/筛选无结果主题空态 | 旧 `ClothingListView` 可能与新入口视觉分叉；详细列表行 `AttributePill.fixedSize(horizontal: true)` 在长字段/大字号下有溢出风险 | P1 | 修 `AttributePill` 自适应换行/截断，并用窄屏大字号模拟器验收 |
 | 衣橱统计/筛选 | `WardrobeStatisticsDetailView.swift`、`WardrobeView.swift` | 功能完整，视觉仍可统一 | 统计卡、Charts、筛选 sheet、filter chips、清除筛选工具栏 | 图表和金额色仍有硬编码；空态多为纯文字；筛选 sheet 与主题卡片体系不完全一致 | P1 | 把统计图表色改为主题 palette token，并补“暂无统计/暂无筛选结果”主题空态 |
 | 修改/编辑页表单 | `ClothingEditView.swift`、`ClothingEditSections.swift` | 功能强，视觉统一度中等 | 衣橱背景、主题 section card、草稿持久化、取消/保存、防误删、校验 toast | 长表单阅读疲劳；工具栏偏系统文字按钮；输入区、toast、分段控件仍偏系统默认 | P1 | 先美化首屏：图片区、基础信息卡、顶部保存/取消工具栏 |
 | 修改/编辑页图片展示 | `ImagePickerGrid.swift`、`ChartImagePicker.swift` | 交互完整，视觉偏系统控件 | 相册/相机、横向缩略图、主图徽标、删除、拖拽排序、预览、裁剪 | 添加/删除/裁剪控件较灰；无图片时缺少品牌化引导；表图入口发现性一般 | P1 | 把添加 tile、缩略图边框、无图提示抽成主题化媒体控件 |
@@ -66,9 +70,9 @@
 
 ## 下一阶段建议
 
-1. 代码主线继续补 P0 本地化：优先 `DepositPlanView + DepositPlanComponents + MonthSelectorView + SeriesSelectorView`，同时修 month/year formatter；VIP 动态名称和 Home 解锁已完成。
-2. 萌宠国际化下一刀按 Sartre 建议先做用户可见 fallback/humanizer：`PetAIService`、`PetPersonaProfile.warmthSuffixes`、`PetResponseHumanizer`，再扩到 PetChat/Legacy。
-3. 详情页 P1 可接 Lorentz 建议：先 viewer 保存结果，再分享卡 chrome，最后补分享卡内容 label。
-4. 编辑页 P0 仍保留精确小切片：补 `裙装名称` key；金额/汇率另开 formatter。
-5. UI 美化先从衣橱 P0 开刀：无衣物/筛选无结果空态已完成，下一步复核窄网格 pill 溢出与统计图表主题色。
-6. 小屋美化排 P1：先补素材缺失空态，再处理萌宠/大世界子页的主题按钮与提示面板统一。
+1. 日历/打卡 P0 下一刀转 `DepositNotificationView`：导航/权限提示/设置区/记录区/测试提醒文案与时间 formatter。
+2. 萌宠国际化下一刀按 Fermat/Sartre 建议先做用户可见 fallback/humanizer：`PetAIService`、`PetPersonaProfile.warmthSuffixes`、`PetResponseHumanizer`，再扩到 PetChat/Legacy；prompt 与 CloudKit locale 单独切片。
+3. Settings/Me P1 可按 Bacon 建议做 `MeView` 首屏/CloudSyncSheet + `UserProfileEditView` + `PrivacySettingsView`。
+4. 详情页 P1 可接 Lorentz 建议：先 viewer 保存结果，再分享卡 chrome，最后补分享卡内容 label。
+5. 编辑页 P0 仍保留精确小切片：补 `裙装名称` key；金额/汇率另开 formatter。
+6. UI 美化下一刀按 Jason 建议从详细列表 `AttributePill` 溢出开始，再做统计图表主题色；小屋素材缺失空态排 P1。
