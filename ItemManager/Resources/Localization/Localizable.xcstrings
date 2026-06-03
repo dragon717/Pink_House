@@ -1674,7 +1674,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%@ Recommendation"
+            "value" : "%@'s Pick"
           }
         },
         "zh-Hans" : {
@@ -1687,6 +1687,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%@推薦"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@のおすすめ"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 추천"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choisi par %@"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Empfohlen von %@"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recomendado por %@"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recomendado por %@"
           }
         }
       }
@@ -2103,7 +2139,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%@ Outfit Color"
+            "value" : "Outfit Colors for %@"
           }
         },
         "zh-Hans" : {
@@ -2116,6 +2152,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%@穿搭色"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@のコーデカラー"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 코디 색상"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couleurs pour %@"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Outfit-Farben für %@"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Colores de outfit para %@"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cores do look de %@"
           }
         }
       }
@@ -2970,7 +3042,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "• Time is long, but worth the wait."
+            "value" : "• The days are long, but worth the wait."
           }
         },
         "zh-Hans" : {
@@ -2983,6 +3055,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "• 歲月漫長，然而值得等待。"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "• 時は長くても、待つ価値があります。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "• 시간은 길지만, 기다릴 가치가 있어요."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "• Le temps est long, mais il vaut l'attente."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "• Die Zeit ist lang, doch das Warten lohnt sich."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "• El tiempo es largo, pero vale la pena esperar."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "• O tempo é longo, mas a espera vale a pena."
           }
         }
       }
@@ -5239,7 +5347,43 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
+            "value" : "AI 生成"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
             "value" : "AI生成"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI 생성"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Généré par IA"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "KI-generiert"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Generado por IA"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gerado por IA"
           }
         }
       }
@@ -5249,7 +5393,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "AI Outfit Color"
+            "value" : "Generate Colors with AI"
           }
         },
         "zh-Hans" : {
@@ -5261,7 +5405,43 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "AI生成穿搭色"
+            "value" : "AI 生成穿搭色"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AIでカラーを生成"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI로 색상 생성"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Générer avec l'IA"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Farben mit KI generieren"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Generar colores con IA"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gerar cores com IA"
           }
         }
       }
@@ -9397,6 +9577,42 @@
             "state" : "translated",
             "value" : "雲端同步"
           }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "クラウド同期"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "클라우드 동기화"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Synchronisé dans le cloud"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cloud-Sync"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sincronizado en la nube"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sincronizado na nuvem"
+          }
         }
       }
     },
@@ -9842,6 +10058,42 @@
             "state" : "translated",
             "value" : "今日已打卡"
           }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "今日はチェックイン済み"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "오늘 체크인 완료"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Déjà pointé aujourd'hui"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Heute eingecheckt"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Registrado hoy"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Check-in feito hoje"
+          }
         }
       }
     },
@@ -9895,7 +10147,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Today's Outfit Color"
+            "value" : "Today's Outfit Colors"
           }
         },
         "zh-Hans" : {
@@ -9913,7 +10165,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "今日のコーデ色"
+            "value" : "今日のコーデカラー"
           }
         },
         "ko" : {
@@ -9925,25 +10177,25 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Couleur du jour"
+            "value" : "Couleurs du jour"
           }
         },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Outfit-Farbe des Tages"
+            "value" : "Heutige Outfit-Farben"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Color de outfit de hoy"
+            "value" : "Colores de outfit de hoy"
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Cor do look de hoje"
+            "value" : "Cores do look de hoje"
           }
         }
       }
@@ -9953,7 +10205,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Today’s Outfit Color Unlocked"
+            "value" : "Today's outfit colors are unlocked"
           }
         },
         "zh-Hans" : {
@@ -9966,6 +10218,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "今日穿搭色已解鎖"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "今日のコーデカラーを解放しました"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "오늘의 코디 색상이 열렸어요"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les couleurs du jour sont débloquées"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Heutige Outfit-Farben sind freigeschaltet"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Se desbloquearon los colores de hoy"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "As cores do look de hoje foram liberadas"
           }
         }
       }
@@ -15256,7 +15544,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Share Today’s Outfit"
+            "value" : "Share Today's Outfit"
           }
         },
         "zh-Hans" : {
@@ -15269,6 +15557,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "分享今日穿搭"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "今日のコーデを共有"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "오늘의 코디 공유"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Partager le look du jour"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Heutiges Outfit teilen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Compartir outfit de hoy"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Compartilhar look de hoje"
           }
         }
       }
@@ -15434,7 +15758,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Share Outfit Color"
+            "value" : "Share Outfit Colors"
           }
         },
         "zh-Hans" : {
@@ -15447,6 +15771,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "分享穿搭色"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "コーデカラーを共有"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "코디 색상 공유"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Partager les couleurs"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Outfit-Farben teilen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Compartir colores de outfit"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Compartilhar cores do look"
           }
         }
       }
@@ -17433,7 +17793,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "..."
+            "value" : "Loading..."
           }
         },
         "zh-Hans" : {
@@ -17445,7 +17805,43 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "加載中..."
+            "value" : "載入中..."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "読み込み中..."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "불러오는 중..."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chargement..."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wird geladen..."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cargando..."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Carregando..."
           }
         }
       }
@@ -26137,7 +26533,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Accessory Outfit"
+            "value" : "Accessory Pairing"
           }
         },
         "zh-Hans" : {
@@ -26150,6 +26546,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "小物搭配"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "小物コーデ"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "소품 매치"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Accessoires assortis"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Accessoire-Kombi"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Combinación de accesorios"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Combinação de acessórios"
           }
         }
       }
@@ -26418,7 +26850,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Pink House Closet"
+            "value" : "Pink House Wardrobe"
           }
         },
         "zh-Hans" : {
@@ -26431,6 +26863,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "少女心願衣櫥"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ピンクハウス・ワードローブ"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "핑크 하우스 옷장"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Garde-robe Pink House"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pink House Wardrobe"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Armario Pink House"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Guarda-roupa Pink House"
           }
         }
       }
@@ -35017,7 +35485,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Check-in Successful!"
+            "value" : "Check-In Complete!"
           }
         },
         "zh-Hans" : {
@@ -35030,6 +35498,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "打卡成功！"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "チェックイン完了！"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "체크인 성공!"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pointage réussi !"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Check-in erfolgreich!"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "¡Registro completado!"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Check-in concluído!"
           }
         }
       }
@@ -43112,7 +43616,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "This Week Check-in"
+            "value" : "This Week"
           }
         },
         "zh-Hans" : {
@@ -43125,6 +43629,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "本週簽到"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "今週のチェックイン"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이번 주 체크인"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cette semaine"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Diese Woche"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Esta semana"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Esta semana"
           }
         }
       }
@@ -45318,7 +45858,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Today’s Outfit Color..."
+            "value" : "Finding today's outfit colors for you..."
           }
         },
         "zh-Hans" : {
@@ -45331,6 +45871,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "正在為你推薦今日穿搭色..."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "今日のコーデカラーをおすすめ中..."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "오늘의 코디 색상을 추천하는 중..."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recherche des couleurs du jour..."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Heutige Outfit-Farben werden gesucht..."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Buscando los colores de outfit de hoy..."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Buscando as cores do look de hoje..."
           }
         }
       }
@@ -46029,7 +46605,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Daily Check-in"
+            "value" : "Daily Check-In"
           }
         },
         "zh-Hans" : {
@@ -46042,6 +46618,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "每日打卡"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "毎日のチェックイン"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "일일 체크인"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pointage quotidien"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Täglicher Check-in"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Registro diario"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Check-in diário"
           }
         }
       }
@@ -54721,7 +55333,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Outfit Color"
+            "value" : "Outfit Color Pick"
           }
         },
         "zh-Hans" : {
@@ -54734,6 +55346,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "穿搭色推薦"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "コーデカラーのおすすめ"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "코디 색상 추천"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couleurs recommandées"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Outfit-Farbempfehlung"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recomendación de colores"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recomendação de cores"
           }
         }
       }
@@ -54765,7 +55413,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Check-in"
+            "value" : "Check In Now"
           }
         },
         "zh-Hans" : {
@@ -54778,6 +55426,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "立即打卡"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "今すぐチェックイン"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "지금 체크인"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pointer maintenant"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Jetzt einchecken"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Registrar ahora"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fazer check-in agora"
           }
         }
       }
@@ -59121,7 +59805,6 @@
       }
     },
     "萌宠" : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -59139,6 +59822,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "萌寵"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ペット"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "펫"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pet"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Haustier"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mascota"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pet"
           }
         }
       }
@@ -59258,7 +59977,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Pet"
+            "value" : "Pet Pick"
           }
         },
         "zh-Hans" : {
@@ -59271,6 +59990,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "萌寵推薦"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ペットのおすすめ"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "펫 추천"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choisi par le pet"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Haustier-Empfehlung"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recomendación de mascota"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recomendação do pet"
           }
         }
       }
@@ -60940,7 +61695,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Record every lovely day"
+            "value" : "Capture the beauty of every day"
           }
         },
         "zh-Hans" : {
@@ -60953,6 +61708,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "記錄每一天的美好"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "毎日のきらめきを記録"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "매일의 아름다움을 기록하세요"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gardez la beauté de chaque jour"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Halte die Schönheit jedes Tages fest"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Registra la belleza de cada día"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Registre a beleza de cada dia"
           }
         }
       }
@@ -61617,7 +62408,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Date No Outfit Color"
+            "value" : "No outfit color record for this date"
           }
         },
         "zh-Hans" : {
@@ -61630,6 +62421,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "該日期暫無穿搭色記錄"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この日のコーデカラー記録はありません"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이 날짜에는 코디 색상 기록이 없어요"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucune couleur enregistrée pour cette date"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Für dieses Datum gibt es keinen Farbdatensatz"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No hay colores registrados para esta fecha"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Não há registro de cores para esta data"
           }
         }
       }
@@ -89592,6 +90419,180 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Loja de pets %@"
+          }
+        }
+      }
+    },
+    "正在准备分享..." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Preparing share..."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在准备分享..."
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在準備分享..."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "共有を準備しています..."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "공유를 준비 중..."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Préparation du partage..."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Teilen wird vorbereitet..."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Preparando para compartir..."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Preparando compartilhamento..."
+          }
+        }
+      }
+    },
+    "连续打卡 %d 天" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%d-day streak"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "连续打卡 %d 天"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "連續打卡 %d 天"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%d日連続チェックイン"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%d일 연속 체크인"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%d jours de suite"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%d Tage in Folge"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%d días seguidos"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%d dias seguidos"
+          }
+        }
+      }
+    },
+    "累计 %d 天" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Total %d days"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "累计 %d 天"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "累計 %d 天"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "累計%d日"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "누적 %d일"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%d jours au total"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Insgesamt %d Tage"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%d días acumulados"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%d dias no total"
           }
         }
       }

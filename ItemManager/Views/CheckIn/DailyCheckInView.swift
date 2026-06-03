@@ -22,7 +22,12 @@ struct DailyCheckInView: View {
     @State private var isWeekCheckInExpanded = false
     
     // 星期名称
-    private let weekDays = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"]
+    private var weekDays: [String] {
+        let formatter = DateFormatter()
+        formatter.locale = LanguageManager.shared.locale
+        let symbols = formatter.shortStandaloneWeekdaySymbols ?? ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+        return Array(symbols.dropFirst()) + [symbols[0]]
+    }
     
     var body: some View {
         NavigationStack {
@@ -70,15 +75,15 @@ struct DailyCheckInView: View {
                 
                 // 猫爪加载遮罩（分享时显示）
                 if isSharing {
-                    ShareLoadingOverlay(message: "正在准备分享...")
+                    ShareLoadingOverlay(message: "正在准备分享...".appLocalized)
                         .transition(.opacity)
                 }
             }
-            .navigationTitle("每日打卡")
+            .navigationTitle("每日打卡".appLocalized)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("完成") {
+                    Button("完成".appLocalized) {
                         dismiss()
                     }
                 }
@@ -153,7 +158,7 @@ struct DailyCheckInView: View {
             HStack(spacing: 8) {
                 Image(systemName: "flame.fill")
                     .foregroundColor(.orange)
-                Text("连续打卡 \(checkInManager.consecutiveDays) 天")
+                Text("连续打卡 %d 天".appLocalized(checkInManager.consecutiveDays))
                     .font(.system(size: 16, weight: .medium))
                     .foregroundColor(.secondary)
             }
@@ -179,7 +184,7 @@ struct DailyCheckInView: View {
                     .padding(.horizontal, 8)
             } else {
                 // 默认问候语
-                Text("• 岁月漫长，然而值得等待。")
+                Text("• 岁月漫长，然而值得等待。".appLocalized)
                     .font(.system(size: 18, weight: .medium))
                     .foregroundColor(.primary)
                     .multilineTextAlignment(.center)
@@ -194,7 +199,7 @@ struct DailyCheckInView: View {
                     HStack(spacing: 4) {
                         Image(systemName: source == "ai" ? "sparkles" : "pawprint.fill")
                             .font(.caption)
-                        Text(source == "ai" ? "AI生成" : (source == "cloudkit" ? "云端同步" : "萌宠推荐"))
+                        Text(greetingSourceLabel(source))
                             .font(.caption)
                     }
                     .foregroundColor(source == "ai" ? .purple : .orange)
@@ -237,13 +242,13 @@ struct DailyCheckInView: View {
                 }
             } label: {
                 HStack {
-                    Text("本周签到")
+                    Text("本周签到".appLocalized)
                         .font(.system(size: 18, weight: .semibold))
                         .foregroundColor(.primary)
 
                     Spacer()
 
-                    Text("累计 \(checkInManager.totalDays) 天")
+                    Text("累计 %d 天".appLocalized(checkInManager.totalDays))
                         .font(.system(size: 14))
                         .foregroundColor(.secondary)
 
@@ -349,7 +354,7 @@ struct DailyCheckInView: View {
             // 标题行
             HStack {
                 let isToday = Calendar.current.isDateInToday(selectedDate)
-                Text(isToday ? "今日穿搭色" : "\(formatDate(selectedDate))穿搭色")
+                Text(isToday ? "今日穿搭色".appLocalized : "%@穿搭色".appLocalized(formatDate(selectedDate)))
                     .font(.system(size: 20, weight: .semibold))
                     .foregroundColor(.primary)
 
@@ -361,7 +366,7 @@ struct DailyCheckInView: View {
                     HStack(spacing: 4) {
                         Image(systemName: outfit.source == "ai" ? "sparkles" : "pawprint.fill")
                             .font(.caption)
-                        Text("\(outfit.petName ?? "萌宠")推荐")
+                        Text("%@推荐".appLocalized(outfit.petName ?? "萌宠".appLocalized))
                             .font(.caption)
                     }
                     .foregroundColor(outfit.source == "ai" ? .purple : .orange)
@@ -380,7 +385,7 @@ struct DailyCheckInView: View {
                     Spacer()
                     ProgressView()
                         .scaleEffect(0.8)
-                    Text("加载中...")
+                    Text("加载中...".appLocalized)
                         .font(.system(size: 14))
                         .foregroundColor(.secondary)
                     Spacer()
@@ -451,7 +456,7 @@ struct DailyCheckInView: View {
                         HStack {
                             Image(systemName: "sparkle")
                                 .foregroundColor(.pink)
-                            Text("小物搭配")
+                            Text("小物搭配".appLocalized)
                                 .font(.system(size: 14, weight: .medium))
                                 .foregroundColor(.secondary)
                         }
@@ -474,7 +479,7 @@ struct DailyCheckInView: View {
                     Spacer()
                     ProgressView()
                         .scaleEffect(0.8)
-                    Text("正在为你推荐今日穿搭色...")
+                    Text("正在为你推荐今日穿搭色...".appLocalized)
                         .font(.system(size: 14))
                         .foregroundColor(.secondary)
                     Spacer()
@@ -487,7 +492,7 @@ struct DailyCheckInView: View {
                         .font(.system(size: 50))
                         .foregroundColor(.secondary.opacity(0.5))
 
-                    Text("该日期暂无穿搭色记录")
+                    Text("该日期暂无穿搭色记录".appLocalized)
                         .font(.system(size: 15))
                         .foregroundColor(.secondary)
 
@@ -497,7 +502,7 @@ struct DailyCheckInView: View {
                     } label: {
                         HStack(spacing: 6) {
                             Image(systemName: "sparkles")
-                            Text("AI生成穿搭色")
+                            Text("AI生成穿搭色".appLocalized)
                         }
                         .font(.system(size: 15, weight: .medium))
                         .foregroundColor(.white)
@@ -524,7 +529,7 @@ struct DailyCheckInView: View {
     private func formatDate(_ date: Date) -> String {
         let formatter = DateFormatter()
         formatter.locale = LanguageManager.shared.locale
-        formatter.dateFormat = "MM月dd日"
+        formatter.setLocalizedDateFormatFromTemplate("MMMd")
         return formatter.string(from: date)
     }
 
@@ -610,7 +615,7 @@ struct DailyCheckInView: View {
                         .tint(.white)
                 } else {
                     Image(systemName: checkInManager.hasCheckedInToday ? "checkmark.circle.fill" : "hand.tap.fill")
-                    Text(checkInManager.hasCheckedInToday ? "今日已打卡" : "立即打卡")
+                    Text(checkInManager.hasCheckedInToday ? "今日已打卡".appLocalized : "立即打卡".appLocalized)
                         .font(.system(size: 18, weight: .semibold))
                 }
             }
@@ -644,7 +649,7 @@ struct DailyCheckInView: View {
             HStack(spacing: 8) {
                 Image(systemName: "square.and.arrow.up")
                 let isToday = Calendar.current.isDateInToday(selectedDate)
-                Text(isToday ? "分享今日穿搭" : "分享穿搭色")
+                Text(isToday ? "分享今日穿搭".appLocalized : "分享穿搭色".appLocalized)
                     .font(.system(size: 16, weight: .medium))
             }
             .foregroundColor(.pink)
@@ -709,8 +714,19 @@ struct DailyCheckInView: View {
     private var todayDateString: String {
         let formatter = DateFormatter()
         formatter.locale = LanguageManager.shared.locale
-        formatter.dateFormat = "MM月dd日 EEEE"
+        formatter.setLocalizedDateFormatFromTemplate("MMMEd")
         return formatter.string(from: Date())
+    }
+
+    private func greetingSourceLabel(_ source: String) -> String {
+        switch source {
+        case "ai":
+            return "AI生成".appLocalized
+        case "cloudkit":
+            return "云端同步".appLocalized
+        default:
+            return "萌宠推荐".appLocalized
+        }
     }
     
     private func isToday(weekday: Int) -> Bool {
@@ -754,11 +770,11 @@ struct CheckInCelebrationView: View {
                 
                 // 文字
                 VStack(spacing: 8) {
-                    Text("打卡成功！")
+                    Text("打卡成功！".appLocalized)
                         .font(.system(size: 24, weight: .bold))
                         .foregroundColor(.white)
                     
-                    Text("今日穿搭色已解锁")
+                    Text("今日穿搭色已解锁".appLocalized)
                         .font(.system(size: 16))
                         .foregroundColor(.white.opacity(0.8))
                 }
@@ -767,7 +783,7 @@ struct CheckInCelebrationView: View {
                 Button {
                     onComplete()
                 } label: {
-                    Text("知道了")
+                    Text("知道了".appLocalized)
                         .font(.system(size: 16, weight: .medium))
                         .foregroundColor(.pink)
                         .padding(.horizontal, 32)
@@ -813,7 +829,7 @@ struct CheckInShareCardView: View {
                 HStack {
                     Image(systemName: "heart.fill")
                         .foregroundColor(.pink)
-                    Text("少女心愿衣橱")
+                    Text("少女心愿衣橱".appLocalized)
                         .font(.system(size: 18, weight: .semibold))
                         .foregroundColor(.pink)
                 }
@@ -827,7 +843,7 @@ struct CheckInShareCardView: View {
                 if let outfit = outfit {
                     VStack(spacing: 16) {
                         // 标题根据是否是今日动态变化
-                        Text(isToday ? "今日穿搭色" : "穿搭色推荐")
+                        Text(isToday ? "今日穿搭色".appLocalized : "穿搭色推荐".appLocalized)
                             .font(.system(size: 20, weight: .bold))
                             .foregroundColor(.primary)
 
@@ -835,7 +851,7 @@ struct CheckInShareCardView: View {
                         HStack(spacing: 4) {
                             Image(systemName: outfit.source == "ai" ? "sparkles" : "pawprint.fill")
                                 .font(.caption)
-                            Text("\(outfit.petName ?? "萌宠")推荐")
+                            Text("%@推荐".appLocalized(outfit.petName ?? "萌宠".appLocalized))
                                 .font(.caption)
                         }
                         .foregroundColor(outfit.source == "ai" ? .purple : .orange)
@@ -864,7 +880,7 @@ struct CheckInShareCardView: View {
 
                         // 小物搭配
                         VStack(alignment: .leading, spacing: 8) {
-                            Text("小物搭配")
+                            Text("小物搭配".appLocalized)
                                 .font(.system(size: 14, weight: .medium))
                                 .foregroundColor(.secondary)
 
@@ -882,7 +898,7 @@ struct CheckInShareCardView: View {
                     HStack(spacing: 8) {
                         Image(systemName: "flame.fill")
                             .foregroundColor(.orange)
-                        Text("连续打卡 \(consecutiveDays) 天")
+                        Text("连续打卡 %d 天".appLocalized(consecutiveDays))
                             .font(.system(size: 14))
                             .foregroundColor(.secondary)
                     }
@@ -890,7 +906,7 @@ struct CheckInShareCardView: View {
                 }
 
                 // 底部标语
-                Text("记录每一天的美好")
+                Text("记录每一天的美好".appLocalized)
                     .font(.system(size: 12))
                     .foregroundColor(.secondary)
                     .padding(.top, 8)
@@ -908,9 +924,9 @@ struct CheckInShareCardView: View {
         let formatter = DateFormatter()
         formatter.locale = LanguageManager.shared.locale
         if isToday {
-            formatter.dateFormat = "yyyy年MM月dd日"
+            formatter.setLocalizedDateFormatFromTemplate("yMMMd")
         } else {
-            formatter.dateFormat = "yyyy年MM月dd日 EEEE"
+            formatter.setLocalizedDateFormatFromTemplate("yMMMEd")
         }
         return formatter.string(from: date)
     }
@@ -933,7 +949,11 @@ struct CustomCalendarView: View {
     @State private var currentMonth: Date
     
     private let calendar = Calendar.current
-    private let weekDays = ["日", "一", "二", "三", "四", "五", "六"]
+    private var weekDays: [String] {
+        let formatter = DateFormatter()
+        formatter.locale = LanguageManager.shared.locale
+        return formatter.shortStandaloneWeekdaySymbols ?? ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+    }
     
     init(selectedDate: Binding<Date>, checkInManager: DailyCheckInManager, onDateSelected: @escaping (Date) -> Void) {
         self._selectedDate = selectedDate
@@ -1070,7 +1090,7 @@ struct CustomCalendarView: View {
     private var monthYearString: String {
         let formatter = DateFormatter()
         formatter.locale = LanguageManager.shared.locale
-        formatter.dateFormat = "yyyy年MM月"
+        formatter.setLocalizedDateFormatFromTemplate("yMMM")
         return formatter.string(from: currentMonth)
     }
     
