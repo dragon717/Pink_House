@@ -28,7 +28,7 @@ struct GenericFeatureGuideBubbleView: View {
                 Button {
                     onSkip()
                 } label: {
-                    Text("跳过")
+                    Text("跳过".appLocalized)
                         .font(.system(size: 13, weight: .medium))
                         .foregroundStyle(magicPalette.quickOptionText)
                         .padding(.horizontal, 10)
@@ -200,7 +200,7 @@ struct HorizontalSwipeHintView: View {
                 Button {
                     onSkip()
                 } label: {
-                    Text("跳过")
+                    Text("跳过".appLocalized)
                         .font(.system(size: 13, weight: .medium))
                         .foregroundStyle(magicPalette.quickOptionText)
                         .padding(.horizontal, 10)
