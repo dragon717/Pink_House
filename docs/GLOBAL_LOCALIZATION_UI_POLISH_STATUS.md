@@ -16,6 +16,7 @@
 | 设置任务引导卡片 | `477f3c6` | 已提交 | `NewbieGuideSettingsTasks` 的数据备份/iCloud 同步卡片标题、说明、跳过、了解更多、收起、知道了按钮接入 `.appLocalized`，不改任务状态与引导流程 | index 快照增量构建通过；安装并重启 `Codex iPhone 17 Pro`；Computer Use 观察到启动后白屏，日志显示 app 进程存活且无本切片相关崩溃，未触达设置任务卡片 |
 | 引导气泡跳过按钮 | `89d6e9f` | 已提交 | `GenericFeatureGuideBubbleView` 与 `HorizontalSwipeHintView` 的“跳过”按钮接入 `.appLocalized`；默认下滑提示因 catalog 缺 key 留待补 key 阶段 | index 快照增量构建通过；安装并重启 `Codex iPhone 17 Pro`；Computer Use 仍观察到启动后白屏，近一分钟无 crash 日志，未触达目标引导气泡 |
 | 编辑资料界面 | `78a963a` | 已提交 | `UserProfileEditView` 的导航、保存/取消、头像选择、删除头像、删除账号、账号管理、昵称输入、Apple ID 名称格式化接入 `.appLocalized`；不本地化用户昵称和 Apple ID 值 | 单文件审计候选清零，所有 key 已存在；index 快照增量构建通过；安装并重启 `Codex iPhone 17 Pro`；Computer Use 仍观察到启动后白屏，近一分钟无 crash 日志，未触达编辑资料页 |
+| 隐私设置壳层 | `190747f` | 已提交 | `PrivacySettingsView` 的价格显示、权限 section、去设置按钮、导航标题、未知/未开启 fallback 接入 `.appLocalized`；权限状态细节因 catalog 缺 key 留待补齐 | 单文件审计从 27 个候选降至 12 个缺 key 状态文本；index 快照增量构建通过；安装并重启 `Codex iPhone 17 Pro`；Computer Use 仍观察到启动后白屏，未触达隐私设置页 |
 | 萌宠主页控件文案 | `7758721` | 已提交 | 萌宠主页按钮、状态、交互控件 | `xcodebuild` 通过 |
 | 萌宠打工选择页 | `463ca29` | 已提交 | 打工选择、收益/消耗提示 | `xcodebuild` 通过 |
 | 萌宠背包商店面板补充 | `3365393` | 已提交 | 背包/商店面板固定文案 | `xcodebuild` 通过 |
@@ -52,7 +53,7 @@
 - 主 App 9 个 `InfoPlist.strings` 文件均存在且 lint 通过；非中文新增语言权限文案当前复用英文。
 - Widget 本地化落后主 App，目前只看到 `en`、`zh-Hans`、`zh-Hant` 覆盖。
 - 本轮新派发 subagent：Archimedes 负责资源/文档，Hypatia 负责 SwiftUI 视图层，Huygens 负责服务/模型层。三者均只读完成，未修改文件。
-- iCloud 工程路径下 `xcodebuild -list` 与 `xcodebuild build` 会卡在 `NSFileCoordinator coordinateReadingItemAtURL` 递归读工程阶段。当前 workaround：用 `git checkout-index` 把 index 快照导出到 `/private/tmp/pink-house-index-build`，复制 `build/SourcePackages` 到 `/private/tmp/pink-house-sourcepackages`，再从 `/private/tmp` 构建。该方式已用于 `74ce4ac`、`b9a03b5`、`477f3c6`、`89d6e9f` 和 `78a963a`。
+- iCloud 工程路径下 `xcodebuild -list` 与 `xcodebuild build` 会卡在 `NSFileCoordinator coordinateReadingItemAtURL` 递归读工程阶段。当前 workaround：用 `git checkout-index` 把 index 快照导出到 `/private/tmp/pink-house-index-build`，复制 `build/SourcePackages` 到 `/private/tmp/pink-house-sourcepackages`，再从 `/private/tmp` 构建。该方式已用于 `74ce4ac`、`b9a03b5`、`477f3c6`、`89d6e9f`、`78a963a` 和 `190747f`。
 
 ## Subagent 最新盘点
 
