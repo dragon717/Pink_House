@@ -313,7 +313,7 @@ struct WelcomeBubbleView: View {
                 Button {
                     onSkip()
                 } label: {
-                    Text("跳过")
+                    Text("跳过".appLocalized)
                         .font(.system(size: 13, weight: .medium))
                         .foregroundStyle(magicPalette.quickOptionText)
                         .padding(.horizontal, 10)
@@ -332,11 +332,11 @@ struct WelcomeBubbleView: View {
             .padding(.top, 12)
 
             VStack(spacing: 12) {
-                Text("欢迎来到少女心愿衣橱")
+                Text("欢迎来到少女心愿衣橱".appLocalized)
                     .font(.system(size: 17, weight: .bold))
                     .foregroundStyle(magicPalette.primaryText)
 
-                Text("我是你的向导奶茶，让我带你了解一下这个魔法衣橱吧！")
+                Text("我是你的向导奶茶，让我带你了解一下这个魔法衣橱吧！".appLocalized)
                     .font(.system(size: 14))
                     .foregroundStyle(magicPalette.secondaryText)
                     .multilineTextAlignment(.center)
@@ -345,7 +345,7 @@ struct WelcomeBubbleView: View {
                 Button {
                     onStart()
                 } label: {
-                    Text("开始探索")
+                    Text("开始探索".appLocalized)
                         .font(.system(size: 15, weight: .semibold))
                         .foregroundStyle(magicPalette.bubbleUserTextColor)
                         .frame(maxWidth: .infinity)
@@ -394,7 +394,7 @@ struct PointingBubbleView: View {
                 Button {
                     onSkip()
                 } label: {
-                    Text("跳过")
+                    Text("跳过".appLocalized)
                         .font(.system(size: 13, weight: .medium))
                         .foregroundStyle(magicPalette.quickOptionText)
                         .padding(.horizontal, 10)
@@ -413,17 +413,17 @@ struct PointingBubbleView: View {
             .padding(.top, 12)
 
             VStack(spacing: 12) {
-                Text("添加你的第一件裙子")
+                Text("添加你的第一件裙子".appLocalized)
                     .font(.system(size: 17, weight: .bold))
                     .foregroundStyle(magicPalette.primaryText)
 
-                Text("这里是衣橱的手动创建入口，你可以一件一件添加你的裙子。\n\n当然，我们也支持批量创建，一次导入多件衣物，省时省力！")
+                Text("这里是衣橱的手动创建入口，你可以一件一件添加你的裙子。\n\n当然，我们也支持批量创建，一次导入多件衣物，省时省力！".appLocalized)
                     .font(.system(size: 14))
                     .foregroundStyle(magicPalette.secondaryText)
                     .multilineTextAlignment(.center)
                     .lineSpacing(4)
 
-                Text("点击右上角的 + 号试试")
+                Text("点击右上角的 + 号试试".appLocalized)
                     .font(.system(size: 13, weight: .medium))
                     .foregroundStyle(magicPalette.accent)
                     .padding(.top, 4)
@@ -431,7 +431,7 @@ struct PointingBubbleView: View {
                 Button {
                     onComplete()
                 } label: {
-                    Text("知道了")
+                    Text("知道了".appLocalized)
                         .font(.system(size: 15, weight: .semibold))
                         .foregroundStyle(magicPalette.bubbleUserTextColor)
                         .frame(maxWidth: .infinity)
@@ -486,10 +486,10 @@ struct SkipGuideConfirmationView: View {
                     .font(.system(size: 48))
                     .foregroundStyle(.orange)
 
-                Text("跳过新手引导？")
+                Text("跳过新手引导？".appLocalized)
                     .font(.system(size: 18, weight: .bold))
 
-                Text("跳过之后可以随时在设置中重新开启引导")
+                Text("跳过之后可以随时在设置中重新开启引导".appLocalized)
                     .font(.system(size: 14))
                     .foregroundStyle(magicPalette.secondaryText)
                     .multilineTextAlignment(.center)
@@ -498,7 +498,7 @@ struct SkipGuideConfirmationView: View {
                     Button {
                         onCancel()
                     } label: {
-                        Text("继续引导")
+                        Text("继续引导".appLocalized)
                             .font(.system(size: 15, weight: .medium))
                             .foregroundStyle(magicPalette.primaryText)
                             .frame(maxWidth: .infinity)
@@ -510,7 +510,7 @@ struct SkipGuideConfirmationView: View {
                     Button {
                         onConfirm()
                     } label: {
-                        Text("确认跳过")
+                        Text("确认跳过".appLocalized)
                             .font(.system(size: 15, weight: .semibold))
                             .foregroundStyle(magicPalette.bubbleUserTextColor)
                             .frame(maxWidth: .infinity)
