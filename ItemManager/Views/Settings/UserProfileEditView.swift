@@ -54,17 +54,17 @@ struct UserProfileEditView: View {
                     .padding(.horizontal)
                 }
             }
-            .navigationTitle("编辑资料")
+            .navigationTitle("编辑资料".appLocalized)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    Button("取消") {
+                    Button("取消".appLocalized) {
                         dismiss()
                     }
                 }
                 
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("保存") {
+                    Button("保存".appLocalized) {
                         saveProfile()
                     }
                     .fontWeight(.semibold)
@@ -83,30 +83,30 @@ struct UserProfileEditView: View {
             .onChange(of: selectedPhoto) { _, newItem in
                 loadSelectedPhoto(newItem)
             }
-            .confirmationDialog("选择头像", isPresented: $showActionSheet, titleVisibility: .visible) {
-                Button("从相册选择") {
+            .confirmationDialog("选择头像".appLocalized, isPresented: $showActionSheet, titleVisibility: .visible) {
+                Button("从相册选择".appLocalized) {
                     showPhotoPicker = true
                 }
                 
-                Button("拍照") {
+                Button("拍照".appLocalized) {
                     showCamera = true
                 }
                 
                 if authManager.hasCustomAvatar || avatarImage != nil {
-                    Button("删除当前头像", role: .destructive) {
+                    Button("删除当前头像".appLocalized, role: .destructive) {
                         showClearAvatarConfirm = true
                     }
                 }
                 
-                Button("取消", role: .cancel) {}
+                Button("取消".appLocalized, role: .cancel) {}
             }
-            .alert("确认删除", isPresented: $showClearAvatarConfirm) {
-                Button("取消", role: .cancel) {}
-                Button("删除", role: .destructive) {
+            .alert("确认删除".appLocalized, isPresented: $showClearAvatarConfirm) {
+                Button("取消".appLocalized, role: .cancel) {}
+                Button("删除".appLocalized, role: .destructive) {
                     clearAvatar()
                 }
             } message: {
-                Text("确定要删除当前头像吗？")
+                Text("确定要删除当前头像吗？".appLocalized)
             }
             .sheet(isPresented: $showCamera) {
                 CameraPicker(image: $pendingCameraImage)
@@ -138,22 +138,22 @@ struct UserProfileEditView: View {
                 )
             }
             // 账号删除确认弹窗 (第一步)
-            .alert("删除账号", isPresented: $showingDeleteAccountConfirm) {
-                Button("取消", role: .cancel) {}
-                Button("继续", role: .destructive) {
+            .alert("删除账号".appLocalized, isPresented: $showingDeleteAccountConfirm) {
+                Button("取消".appLocalized, role: .cancel) {}
+                Button("继续".appLocalized, role: .destructive) {
                     showingDeleteAccountFinalConfirm = true
                 }
             } message: {
-                Text("删除账号将清除您的登录信息和个性化设置。\n\n您的衣橱数据将保留在设备本地，但 iCloud 同步功能将停止。\n\n此操作无法撤销。")
+                Text("删除账号将清除您的登录信息和个性化设置。\n\n您的衣橱数据将保留在设备本地，但 iCloud 同步功能将停止。\n\n此操作无法撤销。".appLocalized)
             }
             // 账号删除最终确认弹窗 (第二步)
-            .alert("最终确认", isPresented: $showingDeleteAccountFinalConfirm) {
-                Button("取消", role: .cancel) {}
-                Button("确认删除", role: .destructive) {
+            .alert("最终确认".appLocalized, isPresented: $showingDeleteAccountFinalConfirm) {
+                Button("取消".appLocalized, role: .cancel) {}
+                Button("确认删除".appLocalized, role: .destructive) {
                     performDeleteAccount()
                 }
             } message: {
-                Text("您确定要删除账号吗？此操作将立即生效且无法恢复。")
+                Text("您确定要删除账号吗？此操作将立即生效且无法恢复。".appLocalized)
             }
             // 删除中状态
             .overlay {
@@ -165,7 +165,7 @@ struct UserProfileEditView: View {
                         VStack(spacing: 16) {
                             ProgressView()
                                 .scaleEffect(1.5)
-                            Text("正在删除账号...")
+                            Text("正在删除账号...".appLocalized)
                                 .foregroundStyle(.white)
                         }
                     }
@@ -177,7 +177,7 @@ struct UserProfileEditView: View {
     // MARK: - 账号删除区域
     private var deleteAccountSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("账号管理")
+            Text("账号管理".appLocalized)
                 .font(.headline)
                 .foregroundStyle(.primary)
             
@@ -188,7 +188,7 @@ struct UserProfileEditView: View {
                     Image(systemName: "person.crop.circle.badge.xmark")
                         .foregroundStyle(.red)
                     
-                    Text("删除账号")
+                    Text("删除账号".appLocalized)
                         .foregroundStyle(.red)
                     
                     Spacer()
@@ -209,7 +209,7 @@ struct UserProfileEditView: View {
             }
             .buttonStyle(PlainButtonStyle())
             
-            Text("删除账号将移除您的 Apple ID 关联信息，但保留本地数据。")
+            Text("删除账号将移除您的 Apple ID 关联信息，但保留本地数据。".appLocalized)
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .padding(.horizontal, 4)
@@ -299,7 +299,7 @@ struct UserProfileEditView: View {
             }
             .buttonStyle(PlainButtonStyle())
             
-            Text("点击更换头像")
+            Text("点击更换头像".appLocalized)
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
         }
@@ -308,11 +308,11 @@ struct UserProfileEditView: View {
     // MARK: - 昵称区域
     private var nicknameSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("昵称")
+            Text("昵称".appLocalized)
                 .font(.headline)
                 .foregroundStyle(.primary)
             
-            TextField("输入昵称", text: $nickname)
+            TextField("输入昵称".appLocalized, text: $nickname)
                 .font(.body)
                 .padding()
                 .background(
@@ -325,7 +325,7 @@ struct UserProfileEditView: View {
                 )
             
             if !authManager.givenName.isEmpty {
-                Text("Apple ID 名称: \(authManager.givenName)")
+                Text("Apple ID 名称: %@".appLocalized(authManager.givenName))
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .padding(.horizontal, 4)
