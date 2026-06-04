@@ -9,7 +9,7 @@ extension FeatureExperienceGuideOverlay {
                 Button {
                     guideManager.dismissFeatureExperienceGuide()
                 } label: {
-                    Text("跳过")
+                    Text("跳过".appLocalized)
                         .font(.system(size: 13, weight: .medium))
                         .foregroundStyle(magicPalette.quickOptionText)
                         .padding(.horizontal, 10)
@@ -32,17 +32,17 @@ extension FeatureExperienceGuideOverlay {
                     .font(.system(size: 50))
                     .foregroundStyle(magicPalette.accent)
 
-                Text("数据备份")
+                Text("数据备份".appLocalized)
                     .font(.title2)
                     .fontWeight(.bold)
                     .foregroundStyle(magicPalette.primaryText)
 
-                Text("保护你的数据安全")
+                Text("保护你的数据安全".appLocalized)
                     .font(.subheadline)
                     .foregroundStyle(magicPalette.secondaryText)
 
                 if showingFullDescription {
-                    Text("支持本地备份和iCloud云端同步~\n\n本地备份：导出数据文件到本地存储\niCloud同步：在所有Apple设备间自动同步")
+                    Text("支持本地备份和iCloud云端同步~\n\n本地备份：导出数据文件到本地存储\niCloud同步：在所有Apple设备间自动同步".appLocalized)
                         .font(.caption)
                         .foregroundStyle(magicPalette.secondaryText)
                         .multilineTextAlignment(.center)
@@ -56,7 +56,7 @@ extension FeatureExperienceGuideOverlay {
                             showingFullDescription.toggle()
                         }
                     } label: {
-                        Text(showingFullDescription ? "收起" : "了解更多")
+                        Text((showingFullDescription ? "收起" : "了解更多").appLocalized)
                             .font(.subheadline)
                             .foregroundStyle(magicPalette.quickOptionText)
                             .padding(.vertical, 8)
@@ -66,7 +66,7 @@ extension FeatureExperienceGuideOverlay {
                     Button {
                         guideManager.completeFeatureExperienceGuide()
                     } label: {
-                        Text("知道了")
+                        Text("知道了".appLocalized)
                             .font(.subheadline.weight(.semibold))
                             .foregroundStyle(magicPalette.bubbleUserTextColor)
                             .padding(.vertical, 10)
@@ -97,7 +97,7 @@ extension FeatureExperienceGuideOverlay {
                 Button {
                     guideManager.dismissFeatureExperienceGuide()
                 } label: {
-                    Text("跳过")
+                    Text("跳过".appLocalized)
                         .font(.system(size: 13, weight: .medium))
                         .foregroundStyle(magicPalette.quickOptionText)
                         .padding(.horizontal, 10)
@@ -120,17 +120,17 @@ extension FeatureExperienceGuideOverlay {
                     .font(.system(size: 50))
                     .foregroundStyle(magicPalette.accent)
 
-                Text("iCloud云端同步")
+                Text("iCloud云端同步".appLocalized)
                     .font(.title2)
                     .fontWeight(.bold)
                     .foregroundStyle(magicPalette.primaryText)
 
-                Text("数据自动同步到云端")
+                Text("数据自动同步到云端".appLocalized)
                     .font(.subheadline)
                     .foregroundStyle(magicPalette.secondaryText)
 
                 if showingFullDescription {
-                    Text("开启后，你的所有数据将在所有Apple设备间自动同步~\n\n换手机也不用担心数据丢失！")
+                    Text("开启后，你的所有数据将在所有Apple设备间自动同步~\n\n换手机也不用担心数据丢失！".appLocalized)
                         .font(.caption)
                         .foregroundStyle(magicPalette.secondaryText)
                         .multilineTextAlignment(.center)
@@ -144,7 +144,7 @@ extension FeatureExperienceGuideOverlay {
                             showingFullDescription.toggle()
                         }
                     } label: {
-                        Text(showingFullDescription ? "收起" : "了解更多")
+                        Text((showingFullDescription ? "收起" : "了解更多").appLocalized)
                             .font(.subheadline)
                             .foregroundStyle(magicPalette.quickOptionText)
                             .padding(.vertical, 8)
@@ -154,7 +154,7 @@ extension FeatureExperienceGuideOverlay {
                     Button {
                         guideManager.completeFeatureExperienceGuide()
                     } label: {
-                        Text("知道了")
+                        Text("知道了".appLocalized)
                             .font(.subheadline.weight(.semibold))
                             .foregroundStyle(magicPalette.bubbleUserTextColor)
                             .padding(.vertical, 10)
@@ -369,7 +369,7 @@ extension FeatureExperienceGuideOverlay {
             currentStep: step.rawValue,
             totalSteps: WidgetCustomizeGuideStep.allCases.count,
             accent: magicPalette.accent,
-            actionTitle: isLastStep ? "知道了" : nil,
+            actionTitle: isLastStep ? "知道了".appLocalized : nil,
             onSkip: onSkip,
             onAction: isLastStep ? onComplete : nil
         )
