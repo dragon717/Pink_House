@@ -15,12 +15,12 @@ struct PrivacySettingsView: View {
     var body: some View {
         List {
             Section {
-                Toggle("在列表中显示入库价格", isOn: $showPrice)
-                Toggle("在列表中显示原价", isOn: $showOriginalPrice)
+                Toggle("在列表中显示入库价格".appLocalized, isOn: $showPrice)
+                Toggle("在列表中显示原价".appLocalized, isOn: $showOriginalPrice)
             } header: {
-                Text("价格显示")
+                Text("价格显示".appLocalized)
             } footer: {
-                Text("关闭后，衣柜列表将不再显示对应的价格信息，保护您的隐私。")
+                Text("关闭后，衣柜列表将不再显示对应的价格信息，保护您的隐私。".appLocalized)
             }
             
             Section {
@@ -32,7 +32,7 @@ struct PrivacySettingsView: View {
                         .frame(width: 24)
                     
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("照片访问权限")
+                        Text("照片访问权限".appLocalized)
                             .font(.body)
                             .foregroundStyle(.primary)
                         Text(photoStatusText)
@@ -43,7 +43,7 @@ struct PrivacySettingsView: View {
                     Spacer()
                     
                     if showGoToSettings(for: photoAuthStatus) {
-                        Button("去设置") {
+                        Button("去设置".appLocalized) {
                             openSettings()
                         }
                         .font(.caption)
@@ -65,7 +65,7 @@ struct PrivacySettingsView: View {
                         .frame(width: 24)
                     
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("相机访问权限")
+                        Text("相机访问权限".appLocalized)
                             .font(.body)
                             .foregroundStyle(.primary)
                         Text(cameraStatusText)
@@ -76,7 +76,7 @@ struct PrivacySettingsView: View {
                     Spacer()
                     
                     if showGoToSettings(for: cameraAuthStatus) {
-                        Button("去设置") {
+                        Button("去设置".appLocalized) {
                             openSettings()
                         }
                         .font(.caption)
@@ -90,16 +90,16 @@ struct PrivacySettingsView: View {
                 }
                 .padding(.vertical, 4)
             } header: {
-                Text("系统权限")
+                Text("系统权限".appLocalized)
             } footer: {
-                Text("如果您无法使用拍照或选择照片功能，请检查是否允许应用访问相机和照片。")
+                Text("如果您无法使用拍照或选择照片功能，请检查是否允许应用访问相机和照片。".appLocalized)
             }
         }
         .scrollContentBackground(.hidden)
         .background {
             LiquidBackground()
         }
-        .navigationTitle("隐私设置")
+        .navigationTitle("隐私设置".appLocalized)
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {
             checkPermissions()
@@ -140,7 +140,7 @@ struct PrivacySettingsView: View {
         case .notDetermined:
             return "尚未请求权限"
         @unknown default:
-            return "未知状态"
+            return "未知状态".appLocalized
         }
     }
     
@@ -153,7 +153,7 @@ struct PrivacySettingsView: View {
         case .notDetermined:
             return "尚未请求权限"
         @unknown default:
-            return "未知状态"
+            return "未知状态".appLocalized
         }
     }
     
@@ -170,7 +170,7 @@ struct PrivacySettingsView: View {
         case .authorized: return "已开启"
         case .limited: return "受限"
         case .notDetermined: return "未请求"
-        default: return "未开启"
+        default: return "未开启".appLocalized
         }
     }
     
@@ -178,7 +178,7 @@ struct PrivacySettingsView: View {
         switch status {
         case .authorized: return "已开启"
         case .notDetermined: return "未请求"
-        default: return "未开启"
+        default: return "未开启".appLocalized
         }
     }
 }
