@@ -11,6 +11,8 @@
 | 阶段 | Commit | 状态 | 覆盖范围 | 验收 |
 |---|---|---|---|---|
 | 多语言文本审计与验收基线 | `e662dea` | 已提交 | 资源覆盖、subagent 分区审计、高优先级风险池、后续 stage gate | 静态校验通过；文档阶段未跑模拟器 |
+| 萌宠旧版快捷菜单 | `74ce4ac` | 已提交 | `PetChatViewLegacy` 的 AI 搭配/快捷功能菜单与按钮 label 接入 `.appLocalized`；不改 command id、prompt payload、quick outfit 参数 | index 快照构建通过；安装并重启 `Codex iPhone 17 Pro`；Computer Use 观察到每日打卡界面，未进入 Legacy 菜单 |
+| 首次启动引导首屏 | `b9a03b5` | 已提交 | `WelcomeBubbleView`、`PointingBubbleView`、`SkipGuideConfirmationView` 的首屏/跳过确认文案接入 `.appLocalized`，使用既有 key 与英文 fallback | index 快照增量构建通过；安装并重启 `Codex iPhone 17 Pro`；Computer Use 观察到启动页，未强制清数据触发首次引导 |
 | 萌宠主页控件文案 | `7758721` | 已提交 | 萌宠主页按钮、状态、交互控件 | `xcodebuild` 通过 |
 | 萌宠打工选择页 | `463ca29` | 已提交 | 打工选择、收益/消耗提示 | `xcodebuild` 通过 |
 | 萌宠背包商店面板补充 | `3365393` | 已提交 | 背包/商店面板固定文案 | `xcodebuild` 通过 |
@@ -47,7 +49,7 @@
 - 主 App 9 个 `InfoPlist.strings` 文件均存在且 lint 通过；非中文新增语言权限文案当前复用英文。
 - Widget 本地化落后主 App，目前只看到 `en`、`zh-Hans`、`zh-Hant` 覆盖。
 - 本轮新派发 subagent：Archimedes 负责资源/文档，Hypatia 负责 SwiftUI 视图层，Huygens 负责服务/模型层。三者均只读完成，未修改文件。
-- 现有 `PetChatViewLegacy.swift` Legacy 菜单本地化切片已通过静态 diff/key 覆盖检查，但 `xcodebuild -list` 与 `xcodebuild build` 当前在 project 解析阶段卡住，暂未作为代码阶段提交。
+- iCloud 工程路径下 `xcodebuild -list` 与 `xcodebuild build` 会卡在 `NSFileCoordinator coordinateReadingItemAtURL` 递归读工程阶段。当前 workaround：用 `git checkout-index` 把 index 快照导出到 `/private/tmp/pink-house-index-build`，复制 `build/SourcePackages` 到 `/private/tmp/pink-house-sourcepackages`，再从 `/private/tmp` 构建。该方式已用于 `74ce4ac` 和 `b9a03b5`。
 
 ## Subagent 最新盘点
 
