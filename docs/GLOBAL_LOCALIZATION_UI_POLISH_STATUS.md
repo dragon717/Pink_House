@@ -1,13 +1,16 @@
 # 全局多语言与界面美化阶段状态
 
-更新日期：2026-06-03
+更新日期：2026-06-04
 
 ## 多语言推进状态
 
-当前主流语言基线：`en`、`zh-Hans`、`zh-Hant`、`ja`、`ko`、`fr`、`de`、`es`、`pt-BR`。
+当前主 App 声明语言：`en`、`zh-Hans`、`zh-Hant`、`ja`、`ko`、`fr`、`de`、`es`、`pt-BR`。
+
+当前真实完成线：`en`、`zh-Hans`、`zh-Hant`。`ja`、`ko`、`fr`、`de`、`es`、`pt-BR` 已开放入口和部分资源，但截至 2026-06-04 仍有 1744 个 `Localizable.xcstrings` key 缺对应翻译，应按英文 fallback / 待补全状态管理，不能标记为完整全球化完成。
 
 | 阶段 | Commit | 状态 | 覆盖范围 | 验收 |
 |---|---|---|---|---|
+| 多语言文本审计与验收基线 | `e662dea` | 已提交 | 资源覆盖、subagent 分区审计、高优先级风险池、后续 stage gate | 静态校验通过；文档阶段未跑模拟器 |
 | 萌宠主页控件文案 | `7758721` | 已提交 | 萌宠主页按钮、状态、交互控件 | `xcodebuild` 通过 |
 | 萌宠打工选择页 | `463ca29` | 已提交 | 打工选择、收益/消耗提示 | `xcodebuild` 通过 |
 | 萌宠背包商店面板补充 | `3365393` | 已提交 | 背包/商店面板固定文案 | `xcodebuild` 通过 |
@@ -36,6 +39,15 @@
 | 衣橱属性标签溢出修复 | `4fac66f` | 已提交 | `AttributePill` 移除横向 fixedSize，补 `minimumScaleFactor`/tail truncation/tightening，避免详细列表长字段顶开布局 | `xcodebuild` 通过（临时源码快照） |
 | 每日问候本地模板 | `9d4ab3c` | 已提交 | `GreetingTemplates` 60 条本地诗意问候、6 条默认问候、`DailyGreeting.localizedMessages` 展示层本地化；本地缓存保留 raw key，AI/CloudKit 内容不误翻译 | `xcodebuild` 通过（index 源码快照） |
 | 每日打卡本地穿搭色 | `0f1f552` | 已提交 | `DailyCheckInManager` 本地 fallback 的小物/描述展示层本地化，`DailyCheckInView` 天气/季节/颜色/分享卡展示本地化；`ColorInfo`/`ColorCard` 分离 rawName 与 displayName；新增 81 key/9 语言 | `xcodebuild` 通过（index 源码快照） |
+
+## 2026-06-04 审计刷新
+
+- 新增审计文档：`docs/localization/STRING_AUDIT_AND_ACCEPTANCE_2026-06-04.md`。
+- `Localizable.xcstrings` 当前 3090 个 key：`en`、`zh-Hans`、`zh-Hant` 全覆盖；`ja`、`ko`、`fr`、`de`、`es`、`pt-BR` 各缺 1744 个 key。
+- 主 App 9 个 `InfoPlist.strings` 文件均存在且 lint 通过；非中文新增语言权限文案当前复用英文。
+- Widget 本地化落后主 App，目前只看到 `en`、`zh-Hans`、`zh-Hant` 覆盖。
+- 本轮新派发 subagent：Archimedes 负责资源/文档，Hypatia 负责 SwiftUI 视图层，Huygens 负责服务/模型层。三者均只读完成，未修改文件。
+- 现有 `PetChatViewLegacy.swift` Legacy 菜单本地化切片已通过静态 diff/key 覆盖检查，但 `xcodebuild -list` 与 `xcodebuild build` 当前在 project 解析阶段卡住，暂未作为代码阶段提交。
 
 ## Subagent 最新盘点
 
