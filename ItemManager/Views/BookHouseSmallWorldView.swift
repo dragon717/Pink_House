@@ -10,22 +10,39 @@ struct BookHouseSmallWorldView: View {
     @StateObject private var tabNavigationManager = TabNavigationManager.shared
     @StateObject private var featureManager = FeatureUnlockManager.shared
     @StateObject private var layoutStore = BookHouseLayoutStore()
+    @StateObject private var decorationInventoryStore = BookHouseDecorationInventoryStore.shared
 
     @State private var isPlacementMode = false
     @State private var selectedPlacementItem: BookHouseEditableItemSelection?
     @State private var selectedFeatureID: AppFeatureID?
     @State private var lockedFeature: AppFeatureDescriptor?
+    @State private var showDecorationBackpack = false
     @State private var showUnlockAlert = false
+    @State private var showSetUserInitialAlert = false
+    @State private var showUserInitialSavedAlert = false
 
     var body: some View {
         BookHousePrototypeStage(
             rooms: BookHousePrototypeData.rooms,
             layoutStore: layoutStore,
+            decorationInventoryStore: decorationInventoryStore,
             isPlacementMode: $isPlacementMode,
             selectedPlacementItem: $selectedPlacementItem,
             selectedFeatureID: $selectedFeatureID,
-            onResetLayout: resetAllRooms
+            showDecorationBackpack: $showDecorationBackpack,
+            onResetLayout: resetAllRooms,
+            onSetUserInitialLayout: {
+                showSetUserInitialAlert = true
+            }
         )
+        .sheet(isPresented: $showDecorationBackpack) {
+            BookHouseDecorationBackpackSheet(
+                rooms: BookHousePrototypeData.rooms,
+                inventoryStore: decorationInventoryStore
+            )
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
+        }
         .sheet(item: $selectedFeatureID) { featureID in
             let feature = AppFeatureRegistry.descriptor(for: featureID)
             BookHouseFeatureSheet(
@@ -52,6 +69,19 @@ struct BookHouseSmallWorldView: View {
                 Text("该功能尚未解锁，请先完成对应任务".appLocalized)
             }
         }
+        .alert("设置当前小屋摆设为用户初始？".appLocalized, isPresented: $showSetUserInitialAlert) {
+            Button("取消".appLocalized, role: .cancel) { }
+            Button("设置".appLocalized) {
+                setCurrentRoomArrangementAsUserInitial()
+            }
+        } message: {
+            Text("会把当前房间物件的位置、缩放、翻转和背包收纳状态记录为此用户的初始摆设。".appLocalized)
+        }
+        .alert("已设置为用户初始".appLocalized, isPresented: $showUserInitialSavedAlert) {
+            Button("确定".appLocalized, role: .cancel) { }
+        } message: {
+            Text("之后执行恢复默认摆放时，会优先回到这套摆设。".appLocalized)
+        }
         .onDisappear {
             isPlacementMode = false
             selectedPlacementItem = nil
@@ -60,9 +90,13 @@ struct BookHouseSmallWorldView: View {
     }
 
     private func resetAllRooms() {
-        for room in BookHousePrototypeData.rooms {
-            layoutStore.reset(roomID: room.id)
-        }
+        decorationInventoryStore.resetRoomLayoutOverrides()
+    }
+
+    private func setCurrentRoomArrangementAsUserInitial() {
+        layoutStore.saveCurrentArrangementAsUserInitial(rooms: BookHousePrototypeData.rooms)
+        decorationInventoryStore.saveCurrentStoredFeaturesAsUserInitial()
+        showUserInitialSavedAlert = true
     }
 
     private func openFeature(_ feature: AppFeatureDescriptor) {
@@ -90,10 +124,13 @@ struct BookHouseSmallWorldView: View {
 private struct BookHousePrototypeStage: View {
     let rooms: [BookHousePrototypeRoom]
     @ObservedObject var layoutStore: BookHouseLayoutStore
+    @ObservedObject var decorationInventoryStore: BookHouseDecorationInventoryStore
     @Binding var isPlacementMode: Bool
     @Binding var selectedPlacementItem: BookHouseEditableItemSelection?
     @Binding var selectedFeatureID: AppFeatureID?
+    @Binding var showDecorationBackpack: Bool
     let onResetLayout: () -> Void
+    let onSetUserInitialLayout: () -> Void
     @Environment(ThemeManager.self) private var themeManager
     @Environment(\.colorScheme) private var colorScheme
 
@@ -110,12 +147,17 @@ private struct BookHousePrototypeStage: View {
                     roomView(room, in: geometry)
                 }
 
-                BookHouseLayoutControls(
+                BookHouseRoomToolbar(
                     isPlacementMode: $isPlacementMode,
+                    showsPlacementControls: decorationInventoryStore.showsPlacementControls,
+                    onShowBackpack: {
+                        showDecorationBackpack = true
+                    },
                     onResetLayout: {
                         selectedPlacementItem = nil
                         onResetLayout()
-                    }
+                    },
+                    onSetUserInitialLayout: onSetUserInitialLayout
                 )
                 .padding(.top, geometry.safeAreaInsets.top + 82)
                 .padding(.trailing, 18)
@@ -133,6 +175,12 @@ private struct BookHousePrototypeStage: View {
                 selectedPlacementItem = nil
             }
         }
+        .onChange(of: decorationInventoryStore.showsPlacementControls) { _, newValue in
+            if !newValue {
+                isPlacementMode = false
+                selectedPlacementItem = nil
+            }
+        }
     }
 
     @ViewBuilder
@@ -144,6 +192,7 @@ private struct BookHousePrototypeStage: View {
             room: room,
             roomSize: CGSize(width: roomWidth, height: roomHeight),
             layoutStore: layoutStore,
+            decorationInventoryStore: decorationInventoryStore,
             isPlacementMode: isPlacementMode,
             selectedPlacementItem: $selectedPlacementItem,
             selectedFeatureID: $selectedFeatureID
@@ -264,28 +313,44 @@ private struct BookHousePaperTexture: View {
     }
 }
 
-private struct BookHouseLayoutControls: View {
+private struct BookHouseRoomToolbar: View {
     @Binding var isPlacementMode: Bool
+    let showsPlacementControls: Bool
+    let onShowBackpack: () -> Void
     let onResetLayout: () -> Void
+    let onSetUserInitialLayout: () -> Void
     @Environment(ThemeManager.self) private var themeManager
     @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         HStack(spacing: 6) {
-            if isPlacementMode {
+            controlButton(systemImage: "shippingbox.fill", label: "功能装饰背包".appLocalized) {
+                onShowBackpack()
+            }
+
+            if showsPlacementControls && isPlacementMode {
+                #if DEBUG
+                controlButton(systemImage: "bookmark.fill", label: "设置当前小屋摆设为用户初始".appLocalized) {
+                    onSetUserInitialLayout()
+                }
+                .transition(.scale.combined(with: .opacity))
+                #endif
+
                 controlButton(systemImage: "arrow.counterclockwise", label: "恢复默认摆放".appLocalized) {
                     onResetLayout()
                 }
                 .transition(.scale.combined(with: .opacity))
             }
 
-            controlButton(
-                systemImage: isPlacementMode ? "checkmark" : "arrow.up.and.down.and.arrow.left.and.right",
-                label: isPlacementMode ? "完成整理".appLocalized : "整理房间".appLocalized,
-                active: isPlacementMode
-            ) {
-                withAnimation(.spring(response: 0.28, dampingFraction: 0.84)) {
-                    isPlacementMode.toggle()
+            if showsPlacementControls {
+                controlButton(
+                    systemImage: isPlacementMode ? "checkmark" : "arrow.up.and.down.and.arrow.left.and.right",
+                    label: isPlacementMode ? "完成整理".appLocalized : "整理房间".appLocalized,
+                    active: isPlacementMode
+                ) {
+                    withAnimation(.spring(response: 0.28, dampingFraction: 0.84)) {
+                        isPlacementMode.toggle()
+                    }
                 }
             }
         }
@@ -348,6 +413,7 @@ private struct PrototypeBookRoomView: View {
     let room: BookHousePrototypeRoom
     let roomSize: CGSize
     @ObservedObject var layoutStore: BookHouseLayoutStore
+    @ObservedObject var decorationInventoryStore: BookHouseDecorationInventoryStore
     let isPlacementMode: Bool
     @Binding var selectedPlacementItem: BookHouseEditableItemSelection?
     @Binding var selectedFeatureID: AppFeatureID?
@@ -378,14 +444,16 @@ private struct PrototypeBookRoomView: View {
                 .shadow(color: Color(hex: "604A35").opacity(isDark ? 0.34 : 0.24), radius: 16, x: 0, y: 12)
                 .shadow(color: Color.white.opacity(isDark ? 0.02 : (hasThemeSkin ? 0.08 : 0.18)), radius: 5, x: 0, y: -2)
 
-            ForEach(room.decorations) { decoration in
-                BookHouseRoomDecorationView(
-                    decoration: decoration,
-                    roomSize: roomSize
-                )
+            if decorationInventoryStore.showsStaticDecorations {
+                ForEach(room.decorations) { decoration in
+                    BookHouseRoomDecorationView(
+                        decoration: decoration,
+                        roomSize: roomSize
+                    )
+                }
             }
 
-            ForEach(room.items) { item in
+            ForEach(room.items.filter { !decorationInventoryStore.isStored($0.feature.id) }) { item in
                 let selection = BookHouseEditableItemSelection(roomID: room.id, featureID: item.feature.id)
                 let layout = layoutStore.layout(for: item.feature.id, in: room.id, fallback: item.defaultLayout)
 
@@ -410,11 +478,16 @@ private struct PrototypeBookRoomView: View {
                     },
                     onToggleHorizontalFlip: {
                         layoutStore.toggleHorizontalFlip(for: item.feature.id, in: room.id, fallback: item.defaultLayout)
+                    },
+                    onStoreInBackpack: {
+                        selectedPlacementItem = nil
+                        decorationInventoryStore.store(item.feature.id)
                     }
                 )
             }
         }
         .frame(width: roomSize.width, height: roomSize.height)
+        .coordinateSpace(name: "bookHouseRoom")
         .accessibilityElement(children: .contain)
         .accessibilityLabel(room.localizedTitle)
     }
@@ -492,19 +565,6 @@ private struct BookHouseRoomOpulenceOverlay: View {
                     detailOpacity: detailOpacity
                 )
 
-                BookHouseWindowLight(
-                    gold: gold,
-                    isDark: isDark,
-                    detailOpacity: detailOpacity
-                )
-
-                BookHouseArchedWindow(
-                    gold: gold,
-                    isDark: isDark,
-                    detailOpacity: detailOpacity
-                )
-                .frame(width: geometry.size.width * 0.17, height: geometry.size.height * 0.28)
-                .position(x: geometry.size.width * 0.29, y: geometry.size.height * 0.38)
             }
         }
         .allowsHitTesting(false)
@@ -632,112 +692,6 @@ private struct BookHouseCenterSpine: View {
                     .frame(width: w * 0.035, height: w * 0.035)
                     .position(x: w * 0.50, y: h * 0.39)
             }
-        }
-    }
-}
-
-private struct BookHouseWindowLight: View {
-    let gold: Color
-    let isDark: Bool
-    let detailOpacity: Double
-
-    var body: some View {
-        GeometryReader { geometry in
-            let w = geometry.size.width
-            let h = geometry.size.height
-            let lightOpacity = (isDark ? 0.12 : 0.24) * detailOpacity
-
-            ZStack {
-                Path { path in
-                    path.move(to: CGPoint(x: w * 0.25, y: h * 0.40))
-                    path.addLine(to: CGPoint(x: w * 0.58, y: h * 0.63))
-                    path.addLine(to: CGPoint(x: w * 0.47, y: h * 0.73))
-                    path.addLine(to: CGPoint(x: w * 0.20, y: h * 0.51))
-                    path.closeSubpath()
-                }
-                .fill(
-                    LinearGradient(
-                        colors: [
-                            Color.white.opacity(lightOpacity * 1.2),
-                            Color(hex: "FFDCA1").opacity(lightOpacity),
-                            Color.clear
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
-                .blendMode(.screen)
-
-                Path { path in
-                    path.move(to: CGPoint(x: w * 0.31, y: h * 0.49))
-                    path.addLine(to: CGPoint(x: w * 0.54, y: h * 0.66))
-                    path.move(to: CGPoint(x: w * 0.26, y: h * 0.54))
-                    path.addLine(to: CGPoint(x: w * 0.48, y: h * 0.72))
-                }
-                .stroke(gold.opacity((isDark ? 0.10 : 0.18) * detailOpacity), lineWidth: 0.8)
-                .blendMode(.screen)
-            }
-        }
-    }
-}
-
-private struct BookHouseArchedWindow: View {
-    let gold: Color
-    let isDark: Bool
-    let detailOpacity: Double
-
-    var body: some View {
-        GeometryReader { geometry in
-            let w = geometry.size.width
-            let h = geometry.size.height
-            let strokeOpacity = (isDark ? 0.30 : 0.58) * detailOpacity
-
-            ZStack {
-                BookHouseArchedWindowShape()
-                    .fill(
-                        LinearGradient(
-                            colors: [
-                                Color.white.opacity(isDark ? 0.12 : 0.62),
-                                Color(hex: "FFE5B4").opacity(isDark ? 0.08 : 0.36)
-                            ],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-                    )
-
-                BookHouseArchedWindowShape()
-                    .stroke(gold.opacity(strokeOpacity), lineWidth: 1.4)
-
-                Path { path in
-                    path.move(to: CGPoint(x: w * 0.50, y: h * 0.10))
-                    path.addLine(to: CGPoint(x: w * 0.50, y: h * 0.92))
-                    path.move(to: CGPoint(x: w * 0.22, y: h * 0.45))
-                    path.addLine(to: CGPoint(x: w * 0.78, y: h * 0.45))
-                    path.move(to: CGPoint(x: w * 0.22, y: h * 0.66))
-                    path.addLine(to: CGPoint(x: w * 0.78, y: h * 0.66))
-                }
-                .stroke(gold.opacity(strokeOpacity * 0.85), lineWidth: 0.9)
-                .clipShape(BookHouseArchedWindowShape())
-
-                BookHouseArchedWindowShape()
-                    .stroke(Color.white.opacity(isDark ? 0.08 : 0.36), lineWidth: 0.7)
-                    .offset(x: -1, y: -1)
-            }
-        }
-    }
-}
-
-private struct BookHouseArchedWindowShape: Shape {
-    func path(in rect: CGRect) -> Path {
-        Path { path in
-            path.move(to: CGPoint(x: rect.minX + rect.width * 0.12, y: rect.maxY))
-            path.addLine(to: CGPoint(x: rect.minX + rect.width * 0.12, y: rect.minY + rect.height * 0.34))
-            path.addQuadCurve(
-                to: CGPoint(x: rect.maxX - rect.width * 0.12, y: rect.minY + rect.height * 0.34),
-                control: CGPoint(x: rect.midX, y: rect.minY - rect.height * 0.10)
-            )
-            path.addLine(to: CGPoint(x: rect.maxX - rect.width * 0.12, y: rect.maxY))
-            path.closeSubpath()
         }
     }
 }
@@ -932,8 +886,10 @@ private struct PrototypeRoomItemView: View {
     let onMove: (CGPoint) -> Void
     let onScaleChange: (CGFloat) -> Void
     let onToggleHorizontalFlip: () -> Void
+    let onStoreInBackpack: () -> Void
 
     @State private var dragStart: CGPoint?
+    @State private var dragPreviewPosition: CGPoint?
     @State private var resizeStartScale: CGFloat?
     @State private var pinchStartScale: CGFloat?
     @Environment(ThemeManager.self) private var themeManager
@@ -952,7 +908,8 @@ private struct PrototypeRoomItemView: View {
         let scale = BookHouseItemLayout.clampedScale(layout.scale)
         let visualSize = CGSize(width: itemSize.width * scale, height: itemSize.height * scale)
         let frameSize = CGSize(width: max(visualSize.width, 46), height: max(visualSize.height, 46))
-        let controlInset: CGFloat = isPlacementMode && isSelected ? 28 : 0
+        let editorInset: CGFloat = isPlacementMode ? 28 : 0
+        let displayPosition = dragPreviewPosition ?? layout.position
 
         ZStack {
             itemContent(visualSize: visualSize, frameSize: frameSize)
@@ -963,17 +920,15 @@ private struct PrototypeRoomItemView: View {
 
             if isPlacementMode && isSelected {
                 selectedEditor(frameSize: frameSize)
-                    .transition(.scale.combined(with: .opacity))
             }
         }
-        .frame(width: frameSize.width + controlInset * 2, height: frameSize.height + controlInset * 2)
+        .frame(width: frameSize.width + editorInset * 2, height: frameSize.height + editorInset * 2)
         .captureGuideTarget(guideTarget(for: item.feature.id))
         .position(
-            x: layout.position.x * roomSize.width,
-            y: layout.position.y * roomSize.height
+            x: displayPosition.x * roomSize.width,
+            y: displayPosition.y * roomSize.height
         )
-        .zIndex(isSelected ? 20 : Double(layout.position.y * 10))
-        .animation(.spring(response: 0.24, dampingFraction: 0.82), value: isSelected)
+        .zIndex(isSelected ? 20 : Double(displayPosition.y * 10))
         .animation(.spring(response: 0.24, dampingFraction: 0.86), value: layout.scale)
         .animation(.easeInOut(duration: 0.16), value: layout.isHorizontallyFlipped)
         .accessibilityLabel(item.feature.localizedTitle)
@@ -1051,6 +1006,15 @@ private struct PrototypeRoomItemView: View {
                 .gesture(resizeGesture)
                 .accessibilityLabel("缩放大小".appLocalized)
 
+            editorHandle(systemImage: "shippingbox.fill", tint: Color(hex: item.feature.tintHex))
+                .frame(width: frameSize.width, height: frameSize.height, alignment: .topTrailing)
+                .offset(x: 14, y: -14)
+                .onTapGesture {
+                    onSelect()
+                    onStoreInBackpack()
+                }
+                .accessibilityLabel("收进功能装饰背包".appLocalized)
+
             Text("\(Int(round(BookHouseItemLayout.clampedScale(layout.scale) * 100)))%")
                 .font(.system(size: 10, weight: .bold))
                 .foregroundStyle(themeManager.accentTextColor)
@@ -1087,21 +1051,44 @@ private struct PrototypeRoomItemView: View {
     }
 
     private var moveGesture: some Gesture {
-        DragGesture()
+        DragGesture(coordinateSpace: .named("bookHouseRoom"))
             .onChanged { value in
                 guard isPlacementMode else { return }
-                onSelect()
-                let start = dragStart ?? layout.position
-                dragStart = start
-                onMove(
-                    CGPoint(
-                        x: clamp(start.x + value.translation.width / max(1, roomSize.width), 0.12, 0.88),
-                        y: clamp(start.y + value.translation.height / max(1, roomSize.height), 0.18, 0.88)
+                var transaction = Transaction(animation: nil)
+                transaction.disablesAnimations = true
+                withTransaction(transaction) {
+                    if !isSelected {
+                        onSelect()
+                    }
+
+                    let start = dragStart ?? layout.position
+                    dragStart = start
+                    dragPreviewPosition = clampedPosition(
+                        x: start.x + value.translation.width / max(1, roomSize.width),
+                        y: start.y + value.translation.height / max(1, roomSize.height)
                     )
-                )
+                }
             }
-            .onEnded { _ in
-                dragStart = nil
+            .onEnded { value in
+                guard isPlacementMode else {
+                    dragStart = nil
+                    dragPreviewPosition = nil
+                    return
+                }
+
+                let start = dragStart ?? layout.position
+                let finalPosition = clampedPosition(
+                    x: start.x + value.translation.width / max(1, roomSize.width),
+                    y: start.y + value.translation.height / max(1, roomSize.height)
+                )
+
+                var transaction = Transaction(animation: nil)
+                transaction.disablesAnimations = true
+                withTransaction(transaction) {
+                    onMove(finalPosition)
+                    dragStart = nil
+                    dragPreviewPosition = nil
+                }
             }
     }
 
@@ -1146,6 +1133,13 @@ private struct PrototypeRoomItemView: View {
         min(max(value, minValue), maxValue)
     }
 
+    private func clampedPosition(x: CGFloat, y: CGFloat) -> CGPoint {
+        CGPoint(
+            x: clamp(x, 0.12, 0.88),
+            y: clamp(y, 0.18, 0.88)
+        )
+    }
+
     private func guideTarget(for featureID: AppFeatureID) -> GuideTargetKey? {
         switch featureID {
         case .outfitJournal:
@@ -1174,7 +1168,7 @@ private enum BookHousePrototypeData {
             items: [
                 item(.petChat, assetName: "book_house_pet_chat", x: 0.30, y: 0.48, width: 36, height: 34, scale: 0.92),
                 item(.dressStock, assetName: "book_house_dress_stock", x: 0.64, y: 0.39, width: 52, height: 50, scale: 1.02),
-                item(.wardrobe, assetName: "book_house_wardrobe", x: 0.80, y: 0.57, width: 72, height: 107, scale: 1.05),
+                item(.wardrobe, assetName: "book_house_wardrobe", x: 0.80, y: 0.57, width: 72, height: 107, scale: 1.05, isHorizontallyFlipped: true),
                 item(.calendar, assetName: "book_house_calendar", x: 0.58, y: 0.55, width: 48, height: 57, scale: 0.96),
                 item(.petHome, assetName: "book_house_pet_home", x: 0.40, y: 0.50, width: 45, height: 41, scale: 0.98),
                 item(.bigWorld, assetName: "book_house_big_world", x: 0.24, y: 0.70, width: 50, height: 68),
@@ -1383,13 +1377,134 @@ private struct BookHouseFeatureSheet: View {
     }
 }
 
+private struct BookHouseDecorationBackpackSheet: View {
+    let rooms: [BookHousePrototypeRoom]
+    @ObservedObject var inventoryStore: BookHouseDecorationInventoryStore
+    @Environment(\.dismiss) private var dismiss
+    @Environment(ThemeManager.self) private var themeManager
+    @Environment(\.colorScheme) private var colorScheme
+
+    private var items: [BookHouseRoomItem] {
+        rooms.flatMap(\.items)
+    }
+
+    private var featureIDs: [AppFeatureID] {
+        items.map(\.feature.id)
+    }
+
+    private var storedCount: Int {
+        featureIDs.filter { inventoryStore.isStored($0) }.count
+    }
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                LazyVStack(spacing: 10) {
+                    ForEach(items) { item in
+                        row(for: item)
+                    }
+                }
+                .padding(16)
+            }
+            .background(LiquidBackground(themeSkinWallpaperContext: .house).ignoresSafeArea())
+            .navigationTitle("功能装饰背包".appLocalized)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("完成".appLocalized) {
+                        dismiss()
+                    }
+                }
+
+                ToolbarItemGroup(placement: .primaryAction) {
+                    Button {
+                        inventoryStore.restoreAll(featureIDs)
+                    } label: {
+                        Image(systemName: "tray.and.arrow.up.fill")
+                    }
+                    .disabled(storedCount == 0)
+                    .accessibilityLabel("全部摆回房间".appLocalized)
+
+                    Button {
+                        inventoryStore.storeAll(featureIDs)
+                    } label: {
+                        Image(systemName: "shippingbox.fill")
+                    }
+                    .disabled(storedCount == featureIDs.count)
+                    .accessibilityLabel("全部收进背包".appLocalized)
+                }
+            }
+        }
+    }
+
+    private func row(for item: BookHouseRoomItem) -> some View {
+        let isStored = inventoryStore.isStored(item.feature.id)
+
+        return HStack(spacing: 14) {
+            Image(item.assetName)
+                .resizable()
+                .scaledToFit()
+                .frame(width: 54, height: 54)
+                .scaleEffect(x: item.defaultLayout.isHorizontallyFlipped ? -1 : 1, y: 1)
+                .padding(8)
+                .background(.white.opacity(colorScheme == .dark ? 0.12 : 0.76), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .stroke(Color(hex: item.feature.tintHex).opacity(colorScheme == .dark ? 0.24 : 0.16), lineWidth: 1)
+                }
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(item.feature.localizedTitle)
+                    .font(.headline)
+                    .themeSkinLegibleText(level: .inline, slot: .sectionCard)
+                Text(isStored ? "背包中".appLocalized : "房间中".appLocalized)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(isStored ? themeManager.accentTextColor : themeManager.secondaryTextColor)
+            }
+
+            Spacer()
+
+            Button {
+                inventoryStore.toggle(item.feature.id)
+            } label: {
+                Label(
+                    isStored ? "摆回".appLocalized : "收起".appLocalized,
+                    systemImage: isStored ? "tray.and.arrow.up.fill" : "shippingbox.fill"
+                )
+                .labelStyle(.iconOnly)
+                .font(.system(size: 16, weight: .semibold))
+                .frame(width: 38, height: 38)
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(Color(hex: item.feature.tintHex))
+            .background(Color(hex: item.feature.tintHex).opacity(colorScheme == .dark ? 0.20 : 0.12), in: Circle())
+            .accessibilityLabel(isStored ? "摆回%@".appLocalized(item.feature.localizedTitle) : "收起%@".appLocalized(item.feature.localizedTitle))
+        }
+        .padding(12)
+        .themeSkinAdaptiveSectionCard(slot: .sectionCard, cornerRadius: 18, showsDecoration: false) {
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(themeManager.cardBackgroundColor.opacity(colorScheme == .dark ? 0.78 : 0.90))
+                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .stroke(Color.white.opacity(colorScheme == .dark ? 0.14 : 0.62), lineWidth: 1)
+                }
+        }
+    }
+}
+
 private final class BookHouseLayoutStore: ObservableObject {
     @Published private var layouts: [String: StoredLayout] = [:]
 
-    private let defaultsKey = "bookHouse.prototypeItemPositions.v3"
+    private let defaultsKey = BookHouseDecorationInventoryStore.itemLayoutDefaultsKey
+    private var resetObserver: AnyCancellable?
 
     init() {
         load()
+        resetObserver = NotificationCenter.default.publisher(for: .bookHouseLayoutOverridesDidReset)
+            .sink { [weak self] _ in
+                self?.load()
+            }
     }
 
     func layout(for featureID: AppFeatureID, in roomID: String, fallback: BookHouseItemLayout) -> BookHouseItemLayout {
@@ -1427,6 +1542,27 @@ private final class BookHouseLayoutStore: ObservableObject {
         save()
     }
 
+    func saveCurrentArrangementAsUserInitial(rooms: [BookHousePrototypeRoom]) {
+        var snapshot: [String: StoredLayout] = [:]
+
+        for room in rooms {
+            for item in room.items {
+                let currentLayout = layout(for: item.feature.id, in: room.id, fallback: item.defaultLayout)
+                snapshot[key(roomID: room.id, featureID: item.feature.id)] = StoredLayout(
+                    x: currentLayout.position.x,
+                    y: currentLayout.position.y,
+                    scale: currentLayout.scale,
+                    isHorizontallyFlipped: currentLayout.isHorizontallyFlipped
+                )
+            }
+        }
+
+        guard let data = try? JSONEncoder().encode(snapshot) else { return }
+        layouts = snapshot
+        UserDefaults.standard.set(data, forKey: defaultsKey)
+        UserDefaults.standard.set(data, forKey: BookHouseDecorationInventoryStore.userInitialItemLayoutDefaultsKey)
+    }
+
     private func key(roomID: String, featureID: AppFeatureID) -> String {
         "\(roomID)::\(featureID.rawValue)"
     }
@@ -1435,7 +1571,10 @@ private final class BookHouseLayoutStore: ObservableObject {
         guard
             let data = UserDefaults.standard.data(forKey: defaultsKey),
             let decoded = try? JSONDecoder().decode([String: StoredLayout].self, from: data)
-        else { return }
+        else {
+            layouts = [:]
+            return
+        }
 
         layouts = decoded
     }

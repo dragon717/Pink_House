@@ -87,6 +87,12 @@ class BackupService {
         "UserCustomFontFileName",
         "HasRedeemedVIP_Prince",
         "userProfiles", // v1.6: 用户资料（包含所有用户的昵称和头像路径）
+        "bookHouse.prototypeItemPositions.v3", // v1.10+: House 功能装饰位置/缩放/翻转
+        "bookHouse.userInitialItemPositions.v1", // v1.10+: House 用户初始摆设位置/缩放/翻转
+        "bookHouse.featureDecorationBackpack.v1", // v1.10+: House 功能装饰背包收纳状态
+        "bookHouse.userInitialFeatureDecorationBackpack.v1", // v1.10+: House 用户初始摆设背包状态
+        "bookHouse.debug.showsPlacementControls.v1", // v1.10+: House 初始摆放调试开关
+        "bookHouse.debug.showsStaticDecorations.v1", // v1.10+: House 无热区静态装饰调试开关
         "newbieGuide.firstCompletionRewardClaimed" // 新手引导首次完成奖励（永久一次）
     ]
     

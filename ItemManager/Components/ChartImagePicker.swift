@@ -8,6 +8,7 @@
 
 import SwiftUI
 import PhotosUI
+import SwiftData
 
 struct ChartImagePicker: View {
     @Binding var imagePath: String?

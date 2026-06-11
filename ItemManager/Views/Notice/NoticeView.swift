@@ -1,5 +1,6 @@
 import SwiftUI
 import AVKit
+import SwiftData
 
 // MARK: - 公告视图
 // 使用 notice_bg 作为边框，莫妮卡粉背景，圆角矩形

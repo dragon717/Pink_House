@@ -2,6 +2,7 @@ import SwiftUI
 import AVKit
 import Combine
 import UIKit
+import SwiftData
 
 // MARK: - 公告弹窗视图
 // 置于 ZStack 最顶部，下方有灰色蒙版，点击蒙版关闭
