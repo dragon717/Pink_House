@@ -31,6 +31,10 @@ struct SkirtDetailView: View {
         case week = "周K"
         case month = "月K"
         
+        var localizedTitle: String {
+            rawValue.appLocalized
+        }
+
         var days: Int {
             switch self {
             case .day: return 1
@@ -98,7 +102,7 @@ struct SkirtDetailView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("完成") {
+                    Button("完成".appLocalized) {
                         dismiss()
                     }
                     .foregroundStyle(SkirtMarketTheme.primaryPink)
@@ -144,7 +148,7 @@ struct DetailPriceOverviewCard: View {
                 // 实时标签
                 HStack(spacing: 4) {
                     PulsingDot()
-                    Text("实时")
+                    Text("实时".appLocalized)
                         .font(SkirtMarketTheme.captionFont)
                 }
                 .foregroundStyle(SkirtMarketTheme.primaryPink)
@@ -185,7 +189,7 @@ struct DetailPriceOverviewCard: View {
                     Image(systemName: "chart.line.uptrend.xyaxis")
                         .font(.system(size: 40))
                         .foregroundStyle(SkirtMarketTheme.primaryPink.opacity(0.5))
-                    Text("暂无数据")
+                    Text("暂无数据".appLocalized)
                         .font(SkirtMarketTheme.bodyFont)
                         .foregroundStyle(.secondary)
                 }
@@ -216,7 +220,7 @@ struct DetailPriceRangeItem: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text(title)
+            Text(title.appLocalized)
                 .font(SkirtMarketTheme.captionFont)
                 .foregroundStyle(.secondary)
             
@@ -236,13 +240,13 @@ struct DetailKLineChartCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text("价格走势")
+                Text("价格走势".appLocalized)
                     .font(SkirtMarketTheme.subtitleFont)
                     .foregroundStyle(.primary)
                 
                 Spacer()
                 
-                Text(timeRange.rawValue)
+                Text(timeRange.localizedTitle)
                     .font(SkirtMarketTheme.captionFont)
                     .foregroundStyle(.secondary)
                     .padding(.horizontal, 8)
@@ -274,7 +278,7 @@ struct DetailKLineChartCard: View {
                             Image(systemName: "chart.candlestick")
                                 .font(.system(size: 40))
                                 .foregroundStyle(SkirtMarketTheme.primaryPink.opacity(0.5))
-                            Text("数据采集中...")
+                            Text("数据采集中...".appLocalized)
                                 .font(SkirtMarketTheme.captionFont)
                                 .foregroundStyle(.secondary)
                         }
@@ -297,7 +301,7 @@ struct DetailTimeRangeSelector: View {
                         selection = range
                     }
                 }) {
-                    Text(range.rawValue)
+                    Text(range.localizedTitle)
                         .font(SkirtMarketTheme.subtitleFont)
                         .foregroundStyle(selection == range ? .white : .primary)
                         .frame(maxWidth: .infinity)
@@ -319,7 +323,7 @@ struct MarketDetailStatsCard: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("市场统计")
+            Text("市场统计".appLocalized)
                 .font(SkirtMarketTheme.subtitleFont)
                 .foregroundStyle(.primary)
             
@@ -382,7 +386,7 @@ struct DetailStatBox: View {
                 .font(.system(size: 20, weight: .bold))
                 .foregroundStyle(.primary)
             
-            Text(title)
+            Text(title.appLocalized)
                 .font(SkirtMarketTheme.captionFont)
                 .foregroundStyle(.secondary)
         }
@@ -399,7 +403,7 @@ struct PlatformDistributionView: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("平台分布")
+            Text("平台分布".appLocalized)
                 .font(SkirtMarketTheme.captionFont)
                 .foregroundStyle(.secondary)
             
@@ -425,7 +429,7 @@ struct DetailPlatformBadge: View {
                 .fill(color)
                 .frame(width: 6, height: 6)
             
-            Text("\(name) \(count)")
+            Text("\(name.appLocalized) \(count)")
                 .font(SkirtMarketTheme.captionFont)
                 .foregroundStyle(.secondary)
         }
@@ -446,7 +450,7 @@ struct DetailAIAnalysisCard: View {
                 Image(systemName: "brain.head.profile")
                     .foregroundStyle(SkirtMarketTheme.primaryPink)
                 
-                Text("AI 投资建议")
+                Text("AI 投资建议".appLocalized)
                     .font(SkirtMarketTheme.subtitleFont)
                     .foregroundStyle(.primary)
                 
@@ -485,7 +489,7 @@ struct DetailAIAnalysisCard: View {
                     )
                 }
             } else {
-                Text("暂无AI分析数据")
+                Text("暂无AI分析数据".appLocalized)
                     .font(SkirtMarketTheme.bodyFont)
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .center)
@@ -504,7 +508,7 @@ struct DetailAnalysisRow: View {
     
     var body: some View {
         HStack(spacing: 12) {
-            Text(title)
+            Text(title.appLocalized)
                 .font(SkirtMarketTheme.bodyFont)
                 .foregroundStyle(.secondary)
                 .frame(width: 70, alignment: .leading)
@@ -547,14 +551,14 @@ struct ActiveListingsCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text("在售商品 (\(items.count))")
+                Text("在售商品 (%d)".appLocalized(items.count))
                     .font(SkirtMarketTheme.subtitleFont)
                     .foregroundStyle(.primary)
                 
                 Spacer()
                 
                 if items.count > 5 {
-                    Text("查看全部")
+                    Text("查看全部".appLocalized)
                         .font(SkirtMarketTheme.captionFont)
                         .foregroundStyle(SkirtMarketTheme.primaryPink)
                 }
@@ -566,7 +570,7 @@ struct ActiveListingsCard: View {
                         .font(.system(size: 40))
                         .foregroundStyle(SkirtMarketTheme.primaryPink.opacity(0.5))
                     
-                    Text("暂无在售商品")
+                    Text("暂无在售商品".appLocalized)
                         .font(SkirtMarketTheme.bodyFont)
                         .foregroundStyle(.secondary)
                 }
@@ -612,7 +616,7 @@ struct DetailListingRow: View {
                     }
                     
                     if item.hasTags == true {
-                        Label("有吊牌", systemImage: "tag.fill")
+                        Label("有吊牌".appLocalized, systemImage: "tag.fill")
                             .font(SkirtMarketTheme.captionFont)
                             .foregroundStyle(SkirtMarketTheme.gold)
                     }
@@ -719,8 +723,8 @@ struct CandleStickMark: ChartContent {
     var body: some ChartContent {
         // 使用LineMark模拟K线，兼容所有iOS版本
         LineMark(
-            x: .value("时间", timestamp),
-            y: .value("最高", high)
+            x: .value("时间".appLocalized, timestamp),
+            y: .value("最高".appLocalized, high)
         )
         .foregroundStyle(close >= open ? Color.green : Color.red)
         .lineStyle(StrokeStyle(lineWidth: 2))
