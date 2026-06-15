@@ -89,7 +89,7 @@ struct ImageCropView: View {
                             ProgressView()
                                 .tint(.white)
                                 .scaleEffect(1.5)
-                            Text("正在准备图片...")
+                            Text("正在准备图片...".appLocalized)
                                 .foregroundStyle(.white)
                                 .padding(.top)
                         }
@@ -157,7 +157,7 @@ struct ImageCropView: View {
 
                             Spacer()
 
-                            Text("双指缩放，单指拖动")
+                            Text("双指缩放，单指拖动".appLocalized)
                                 .foregroundStyle(.gray)
                                 .padding(.bottom)
                                 .opacity(aspectRatio == nil ? 0 : 1)
@@ -166,11 +166,11 @@ struct ImageCropView: View {
                 }
                 .toolbar {
                     ToolbarItem(placement: .cancellationAction) {
-                        Button("取消", action: onCancel)
+                        Button("取消".appLocalized, action: onCancel)
                             .foregroundStyle(.white)
                     }
                     ToolbarItem(placement: .confirmationAction) {
-                        Button("完成") {
+                        Button("完成".appLocalized) {
                             guard let displayImg = displayedImage else { return }
 
                             let cropSize: CGSize = {

@@ -24,7 +24,7 @@ struct SmallWorldSettingsView: View {
                 HStack {
                     Image(systemName: "book.closed.fill")
                         .foregroundStyle(.purple)
-                    Text("House风格")
+                    Text("House风格".appLocalized)
                     Spacer()
                     Text(SmallWorldStyle.bookHouse.displayName)
                         .foregroundStyle(.secondary)
@@ -36,9 +36,9 @@ struct SmallWorldSettingsView: View {
                 HStack {
                     Image(systemName: "hand.point.up.left.fill")
                         .foregroundStyle(.blue)
-                    Text("自由摆放")
+                    Text("自由摆放".appLocalized)
                     Spacer()
-                    Text(decorationInventoryStore.showsPlacementControls ? "已显示" : "已隐藏")
+                    Text((decorationInventoryStore.showsPlacementControls ? "已显示" : "已隐藏").appLocalized)
                         .foregroundStyle(.secondary)
                 }
                 .adaptiveRow(showDivider: false)
@@ -51,7 +51,7 @@ struct SmallWorldSettingsView: View {
                     HStack {
                         Image(systemName: "tray.and.arrow.up.fill")
                             .foregroundStyle(.pink)
-                        Text("全部摆回房间")
+                        Text("全部摆回房间".appLocalized)
                         Spacer()
                     }
                 }
@@ -63,7 +63,7 @@ struct SmallWorldSettingsView: View {
                     HStack {
                         Image(systemName: "shippingbox.fill")
                             .foregroundStyle(.purple)
-                        Text("全部收进背包")
+                        Text("全部收进背包".appLocalized)
                         Spacer()
                     }
                 }
@@ -75,7 +75,7 @@ struct SmallWorldSettingsView: View {
                     HStack {
                         Image(systemName: "arrow.up.and.down.and.arrow.left.and.right")
                             .foregroundStyle(.blue)
-                        Text("显示整理按钮")
+                        Text("显示整理按钮".appLocalized)
                     }
                 }
                 .adaptiveRow()
@@ -84,7 +84,7 @@ struct SmallWorldSettingsView: View {
                     HStack {
                         Image(systemName: "sparkles.rectangle.stack")
                             .foregroundStyle(.orange)
-                        Text("显示无热区静态装饰")
+                        Text("显示无热区静态装饰".appLocalized)
                     }
                 }
                 .adaptiveRow()
@@ -94,7 +94,7 @@ struct SmallWorldSettingsView: View {
                 } label: {
                     HStack {
                         Image(systemName: "arrow.counterclockwise")
-                        Text("重置 House 初始摆放")
+                        Text("重置 House 初始摆放".appLocalized)
                     }
                 }
                 .adaptiveRow(showDivider: false)
@@ -107,24 +107,24 @@ struct SmallWorldSettingsView: View {
                 } label: {
                     HStack {
                         Image(systemName: "trash")
-                        Text("清理空间缓存")
+                        Text("清理空间缓存".appLocalized)
                     }
                 }
                 .adaptiveRow(showDivider: false)
             }
         }
-        .alert("缓存清理完成", isPresented: $showingClearCacheAlert) {
-            Button("确定", role: .cancel) { }
+        .alert("缓存清理完成".appLocalized, isPresented: $showingClearCacheAlert) {
+            Button("确定".appLocalized, role: .cancel) { }
         } message: {
-            Text("空间缓存已清理。")
+            Text("空间缓存已清理。".appLocalized)
         }
-        .alert("重置 House 初始摆放？", isPresented: $showingResetLayoutAlert) {
-            Button("取消", role: .cancel) { }
-            Button("重置", role: .destructive) {
+        .alert("重置 House 初始摆放？".appLocalized, isPresented: $showingResetLayoutAlert) {
+            Button("取消".appLocalized, role: .cancel) { }
+            Button("重置".appLocalized, role: .destructive) {
                 decorationInventoryStore.resetRoomLayoutOverrides()
             }
         } message: {
-            Text("会恢复到此用户保存的初始摆设；如果尚未保存调试初始值，则恢复到当前内置初始值。")
+            Text("会恢复到此用户保存的初始摆设；如果尚未保存调试初始值，则恢复到当前内置初始值。".appLocalized)
         }
         .onAppear {
             if smallWorldStyle != SmallWorldStyle.bookHouse.rawValue {

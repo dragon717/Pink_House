@@ -85,8 +85,8 @@ struct ImageViewer: View {
                 Spacer()
             }
         }
-        .alert("保存结果", isPresented: $showSaveAlert) {
-            Button("确定", role: .cancel) { }
+        .alert("保存结果".appLocalized, isPresented: $showSaveAlert) {
+            Button("确定".appLocalized, role: .cancel) { }
         } message: {
             Text(saveMessage ?? "")
         }
@@ -102,12 +102,12 @@ struct ImageViewer: View {
                 let saver = ImageSaver()
                 do {
                     try await saver.saveImage(image)
-                    saveMessage = "图片已保存到相册"
+                    saveMessage = "图片已保存到相册".appLocalized
                 } catch {
-                    saveMessage = "保存失败: \(error.localizedDescription)"
+                    saveMessage = "保存失败: %@".appLocalized(error.localizedDescription)
                 }
             } else {
-                saveMessage = "无法加载图片"
+                saveMessage = "无法加载图片".appLocalized
             }
             showSaveAlert = true
             isSaving = false

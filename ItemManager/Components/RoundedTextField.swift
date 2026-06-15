@@ -17,7 +17,7 @@ struct RoundedTextField: View {
         VStack(alignment: .leading, spacing: 8) {
             if !title.isEmpty {
                 HStack(spacing: 4) {
-                    Text(title)
+                    Text(title.appLocalized)
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                     
@@ -29,7 +29,7 @@ struct RoundedTextField: View {
                 .padding(.leading, 4)
             }
             
-            TextField(placeholder, text: $text)
+            TextField(placeholder.appLocalized, text: $text)
                 .padding()
                 .background(Color(uiColor: .secondarySystemBackground))
                 .cornerRadius(12)

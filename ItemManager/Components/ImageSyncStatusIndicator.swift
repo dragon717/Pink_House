@@ -47,21 +47,21 @@ struct ImageSyncStatusIndicator: View {
         Image(systemName: "checkmark.circle.fill")
             .foregroundColor(.green)
             .font(.caption)
-            .help("图片已同步到 iCloud")
+            .help("图片已同步到 iCloud".appLocalized)
     }
     
     private var pendingIcon: some View {
         Image(systemName: "arrow.up.circle")
             .foregroundColor(.orange)
             .font(.caption)
-            .help("图片等待同步")
+            .help("图片等待同步".appLocalized)
     }
     
     private var failedIcon: some View {
         Image(systemName: "exclamationmark.circle.fill")
             .foregroundColor(.red)
             .font(.caption)
-            .help("图片同步失败，点击重试")
+            .help("图片同步失败，点击重试".appLocalized)
             .onTapGesture {
                 Task {
                     await retrySync()
@@ -133,23 +133,23 @@ struct SyncStatusDetailView: View {
     var body: some View {
         NavigationStack {
             List {
-                Section("同步状态") {
+                Section("同步状态".appLocalized) {
                     HStack {
-                        Text("CloudKit 状态")
+                        Text("CloudKit 状态".appLocalized)
                         Spacer()
-                        Text(syncService.isCloudKitAvailable ? "可用" : "不可用")
+                        Text((syncService.isCloudKitAvailable ? "可用" : "不可用").appLocalized)
                             .foregroundColor(syncService.isCloudKitAvailable ? .green : .red)
                     }
                     
                     HStack {
-                        Text("当前状态")
+                        Text("当前状态".appLocalized)
                         Spacer()
                         statusText
                     }
                     
                     if let lastSync = syncService.lastSyncDate {
                         HStack {
-                            Text("上次同步")
+                            Text("上次同步".appLocalized)
                             Spacer()
                             Text(lastSync, style: .relative)
                                 .foregroundColor(.secondary)
@@ -157,33 +157,33 @@ struct SyncStatusDetailView: View {
                     }
                     
                     HStack {
-                        Text("待同步图片")
+                        Text("待同步图片".appLocalized)
                         Spacer()
                         Text("\(syncService.pendingUploadCount)")
                             .foregroundColor(.secondary)
                     }
                 }
                 
-                Section("操作") {
-                    Button("立即同步") {
+                Section("操作".appLocalized) {
+                    Button("立即同步".appLocalized) {
                         Task {
                             await syncService.syncPendingImages()
                         }
                     }
                     .disabled(!syncService.isCloudKitAvailable)
                     
-                    Button("检查 CloudKit 状态") {
+                    Button("检查 CloudKit 状态".appLocalized) {
                         Task {
                             await syncService.checkCloudKitAvailability()
                         }
                     }
                 }
             }
-            .navigationTitle("图片同步")
+            .navigationTitle("图片同步".appLocalized)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("完成") {
+                    Button("完成".appLocalized) {
                         dismiss()
                     }
                 }
@@ -194,17 +194,17 @@ struct SyncStatusDetailView: View {
     private var statusText: some View {
         switch syncService.syncStatus {
         case .idle:
-            return Text("空闲").foregroundColor(.secondary)
+            return Text("空闲".appLocalized).foregroundColor(.secondary)
         case .uploading(let name, let progress):
-            return Text("上传中: \(Int(progress * 100))%").foregroundColor(.blue)
+            return Text("上传中: %d%%".appLocalized(Int(progress * 100))).foregroundColor(.blue)
         case .downloading(let name, let progress):
-            return Text("下载中: \(Int(progress * 100))%").foregroundColor(.blue)
+            return Text("下载中: %d%%".appLocalized(Int(progress * 100))).foregroundColor(.blue)
         case .syncing:
-            return Text("同步中...").foregroundColor(.blue)
+            return Text("同步中...".appLocalized).foregroundColor(.blue)
         case .completed:
-            return Text("完成").foregroundColor(.green)
+            return Text("完成".appLocalized).foregroundColor(.green)
         case .failed:
-            return Text("失败").foregroundColor(.red)
+            return Text("失败".appLocalized).foregroundColor(.red)
         }
     }
 }
