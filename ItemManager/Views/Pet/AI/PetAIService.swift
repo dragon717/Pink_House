@@ -4,18 +4,25 @@ import os.lock
 import UIKit
 
 // AI Provider Enum
-enum AIProvider {
+enum AIProvider: Equatable, Sendable {
     case deepSeek
     case minimax
+
+    var logName: String {
+        switch self {
+        case .deepSeek: return "DeepSeek"
+        case .minimax: return "Minimax"
+        }
+    }
 }
 
 // Minimax API Request/Response Structures (Anthropic Compatible)
-struct MinimaxMessage: Codable {
+struct MinimaxMessage: Codable, Sendable {
     let role: String
     let content: String
 }
 
-struct MinimaxRequest: Codable {
+struct MinimaxRequest: Codable, Sendable {
     let model: String
     let messages: [MinimaxMessage]
     let max_tokens: Int
@@ -23,38 +30,257 @@ struct MinimaxRequest: Codable {
     let system: String?
 }
 
-struct MinimaxResponse: Codable {
+struct MinimaxResponse: Codable, Sendable {
     let content: [MinimaxContentBlock]
 }
 
-struct MinimaxContentBlock: Codable {
+struct MinimaxContentBlock: Codable, Sendable {
     let type: String
     let text: String?
     let thinking: String?
 }
 
 // DeepSeek API Request/Response Structures
-struct DSMessage: Codable {
+struct DSMessage: Codable, Sendable {
     let role: String
     let content: String
 }
 
-struct DSRequest: Codable {
+struct DSRequest: Codable, Sendable {
     let model: String
     let messages: [DSMessage]
     let stream: Bool
 }
 
-struct DSResponse: Codable {
+struct DSResponse: Codable, Sendable {
     let choices: [DSChoice]
 }
 
-struct DSChoice: Codable {
+struct DSChoice: Codable, Sendable {
     let message: DSMessage
 }
 
 // 定义超时错误
-struct TimeoutError: Error {}
+struct TimeoutError: Error, Sendable {}
+
+private let petAIDeepSeekModel = "deepseek-v4-flash"
+private let petAIRequestTimeoutSeconds: TimeInterval = 15
+private let petAIOverallTimeoutNanoseconds: UInt64 = 45 * 1_000_000_000
+private let petAIRetryDelayNanoseconds: UInt64 = 600_000_000
+
+private struct PetAIProviderAttempt: Sendable {
+    let provider: AIProvider
+    let apiKey: String
+}
+
+private func cleanedPetAIAPIKey(_ rawValue: String?) -> String? {
+    guard var cleanKey = rawValue?.trimmingCharacters(in: .whitespacesAndNewlines),
+          !cleanKey.isEmpty else {
+        return nil
+    }
+
+    if cleanKey.lowercased().hasPrefix("bearer ") {
+        cleanKey = String(cleanKey.dropFirst(7)).trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    return cleanKey.isEmpty ? nil : cleanKey
+}
+
+private func makePetAIProviderAttempts(
+    preferredProvider: AIProvider,
+    preferredApiKey: String,
+    dsApiKey: String?,
+    minimaxApiKey: String?,
+    priorityList: [String]
+) -> [PetAIProviderAttempt] {
+    var attempts: [PetAIProviderAttempt] = []
+
+    func append(_ provider: AIProvider, apiKey: String?) {
+        guard let cleanKey = cleanedPetAIAPIKey(apiKey) else { return }
+        guard !attempts.contains(where: { $0.provider == provider }) else { return }
+        attempts.append(PetAIProviderAttempt(provider: provider, apiKey: cleanKey))
+    }
+
+    append(preferredProvider, apiKey: preferredApiKey)
+
+    for model in priorityList {
+        switch model {
+        case "DeepSeek":
+            append(.deepSeek, apiKey: dsApiKey)
+        case "Minimax":
+            append(.minimax, apiKey: minimaxApiKey)
+        default:
+            continue
+        }
+    }
+
+    append(.deepSeek, apiKey: dsApiKey)
+    append(.minimax, apiKey: minimaxApiKey)
+
+    return attempts
+}
+
+private func performPetAIRequest(
+    provider: AIProvider,
+    apiKey: String,
+    text: String,
+    currentHistory: [DSMessage],
+    historyLimit: Int,
+    fallbackUnknownReply: String
+) async throws -> String {
+    switch provider {
+    case .minimax:
+        return try await performMinimaxRequest(
+            apiKey: apiKey,
+            text: text,
+            currentHistory: currentHistory,
+            historyLimit: historyLimit,
+            fallbackUnknownReply: fallbackUnknownReply
+        )
+    case .deepSeek:
+        return try await performDeepSeekRequest(
+            apiKey: apiKey,
+            text: text,
+            currentHistory: currentHistory,
+            historyLimit: historyLimit,
+            fallbackUnknownReply: fallbackUnknownReply
+        )
+    }
+}
+
+private func performMinimaxRequest(
+    apiKey: String,
+    text: String,
+    currentHistory: [DSMessage],
+    historyLimit: Int,
+    fallbackUnknownReply: String
+) async throws -> String {
+    let url = URL(string: "https://api.minimaxi.com/anthropic/v1/messages")!
+    var request = URLRequest(url: url)
+    request.httpMethod = "POST"
+    request.timeoutInterval = petAIRequestTimeoutSeconds
+    request.addValue(apiKey, forHTTPHeaderField: "x-api-key")
+    request.addValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+    request.addValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
+    request.addValue("application/json", forHTTPHeaderField: "Content-Type")
+
+    let systemPrompt = currentHistory.first { $0.role == "system" }?.content
+    var messagesToSend = currentHistory
+        .filter { $0.role != "system" }
+        .suffix(historyLimit)
+        .map { MinimaxMessage(role: $0.role, content: $0.content) }
+
+    messagesToSend.append(MinimaxMessage(role: "user", content: text))
+
+    let body = MinimaxRequest(
+        model: "MiniMax-M2.5",
+        messages: messagesToSend,
+        max_tokens: 1000,
+        stream: false,
+        system: systemPrompt
+    )
+
+    let bodyData = try JSONEncoder().encode(body)
+    print("📡 [PetAIService] Minimax payload bytes: \(bodyData.count)")
+    request.httpBody = bodyData
+
+    let (data, response) = try await URLSession.shared.data(for: request)
+
+    guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+        throw petAIHTTPError(provider: .minimax, response: response, data: data)
+    }
+
+    let mmResponse = try JSONDecoder().decode(MinimaxResponse.self, from: data)
+    let textBlock = mmResponse.content.first { $0.type == "text" }
+    return textBlock?.text ?? fallbackUnknownReply
+}
+
+private func performDeepSeekRequest(
+    apiKey: String,
+    text: String,
+    currentHistory: [DSMessage],
+    historyLimit: Int,
+    fallbackUnknownReply: String
+) async throws -> String {
+    guard let systemMessage = currentHistory.first else {
+        throw NSError(domain: "PetAIService", code: 400, userInfo: [NSLocalizedDescriptionKey: "Missing system prompt"])
+    }
+
+    let url = URL(string: "https://api.deepseek.com/chat/completions")!
+    var request = URLRequest(url: url)
+    request.httpMethod = "POST"
+    request.timeoutInterval = petAIRequestTimeoutSeconds
+    request.addValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+    request.addValue("application/json", forHTTPHeaderField: "Content-Type")
+
+    var historyToSend = currentHistory
+    historyToSend.append(DSMessage(role: "user", content: text))
+    let recentMessages = historyToSend.dropFirst().suffix(historyLimit)
+    let messagesToSend = [systemMessage] + Array(recentMessages)
+
+    let body = DSRequest(model: petAIDeepSeekModel, messages: messagesToSend, stream: false)
+    let bodyData = try JSONEncoder().encode(body)
+    print("📡 [PetAIService] DeepSeek payload bytes: \(bodyData.count)")
+    request.httpBody = bodyData
+
+    let (data, response) = try await URLSession.shared.data(for: request)
+
+    guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+        throw petAIHTTPError(provider: .deepSeek, response: response, data: data)
+    }
+
+    let dsResponse = try JSONDecoder().decode(DSResponse.self, from: data)
+    return dsResponse.choices.first?.message.content ?? fallbackUnknownReply
+}
+
+private func petAIHTTPError(provider: AIProvider, response: URLResponse, data: Data) -> NSError {
+    let statusCode = (response as? HTTPURLResponse)?.statusCode ?? 500
+    let body = String(data: data, encoding: .utf8) ?? "Unknown error"
+    let redactedBody = String(body.prefix(240))
+    return NSError(
+        domain: "\(provider.logName)HTTPError",
+        code: statusCode,
+        userInfo: [NSLocalizedDescriptionKey: "\(provider.logName) HTTP \(statusCode): \(redactedBody)"]
+    )
+}
+
+private func shouldRetryPetAIRequest(after error: Error) -> Bool {
+    if error is CancellationError {
+        return false
+    }
+
+    let nsError = error as NSError
+
+    if nsError.domain == NSURLErrorDomain {
+        switch URLError.Code(rawValue: nsError.code) {
+        case .timedOut,
+             .cannotFindHost,
+             .cannotConnectToHost,
+             .networkConnectionLost,
+             .notConnectedToInternet,
+             .dnsLookupFailed,
+             .secureConnectionFailed,
+             .cannotLoadFromNetwork:
+            return true
+        default:
+            return false
+        }
+    }
+
+    if nsError.domain.hasSuffix("HTTPError") {
+        return nsError.code == 408 || nsError.code == 409 || nsError.code == 425 || nsError.code == 429 || nsError.code >= 500
+    }
+
+    return false
+}
+
+private func petAIErrorSummary(_ error: Error) -> String {
+    let nsError = error as NSError
+    if nsError.domain == NSURLErrorDomain {
+        return "URLError(\(nsError.code)): \(nsError.localizedDescription)"
+    }
+    return "\(nsError.domain)(\(nsError.code)): \(nsError.localizedDescription)"
+}
 
 @MainActor
 class PetAIService: ObservableObject {
@@ -373,11 +599,7 @@ class PetAIService: ObservableObject {
         self.role = role
         self.petName = petName
         
-        // 清洗 API Key (移除可能的 Bearer 前缀和空白)
-        var cleanKey = apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
-        if cleanKey.lowercased().hasPrefix("bearer ") {
-            cleanKey = String(cleanKey.dropFirst(7)).trimmingCharacters(in: .whitespacesAndNewlines)
-        }
+        let cleanKey = cleanedPetAIAPIKey(apiKey) ?? ""
         self.apiKey = cleanKey
         
         self.provider = provider
@@ -519,13 +741,22 @@ class PetAIService: ObservableObject {
         let currentHistory = self.history
         let apiKey = self.apiKey
         let provider = self.provider
+        let priorityString = UserDefaults.standard.string(forKey: "textModelPriority") ?? "DeepSeek,Minimax"
+        let priorityList = priorityString.split(separator: ",").map { String($0).trimmingCharacters(in: .whitespaces) }
+        let providerAttempts = makePetAIProviderAttempts(
+            preferredProvider: provider,
+            preferredApiKey: apiKey,
+            dsApiKey: AIConfigManager.shared.dsApiKey,
+            minimaxApiKey: AIConfigManager.shared.minimaxApiKey,
+            priorityList: priorityList
+        )
         let historyLimit = historyMessageLimit(forPromptLength: text.count)
         let fallbackCharacter: PetCharacter = role == .goldenRetriever ? .maomao : .naicha
         let fallbackUnknownReply = fallbackCharacter.localizedCatchphraseText("（歪头摇尾巴，不知道你在说什么喵...）".appLocalized)
         
-        print("🔍 [PetAIService] 发送请求 - Provider: \(provider)")
-        if apiKey.isEmpty {
-            print("❌ [PetAIService] Error: API Key is empty! Cannot send request.")
+        print("🔍 [PetAIService] 发送请求 - Preferred: \(provider.logName), Attempts: \(providerAttempts.map { $0.provider.logName }.joined(separator: " -> "))")
+        if providerAttempts.isEmpty {
+            print("❌ [PetAIService] Error: API Key is empty for all text providers. Cannot send request.")
             let errorMsg = ChatMessage(
                 text: personaProfile.keyMissingReply,
                 imageName: defaultErrorImageName(),
@@ -535,107 +766,51 @@ class PetAIService: ObservableObject {
             self.saveMessages()
             return errorMsg
         }
-        print("🔑 [PetAIService] API Key ready")
+        print("🔑 [PetAIService] API Key ready for \(providerAttempts.count) provider(s)")
         
         do {
-            // ... (TaskGroup logic)
             // 使用 TaskGroup 实现并发和超时控制，避免 unsafeForcedSync
             let replyContent = try await withThrowingTaskGroup(of: String.self) { group in
-                // 1. 网络请求任务
                 group.addTask {
-                    if provider == .minimax {
-                        // Minimax (Anthropic Compatible)
-                        print("🚀 [PetAIService] Using Minimax (Anthropic) Provider")
-                        // 确保 URL 正确，Minimax 的 Anthropic 兼容接口需要严格匹配
-                        let url = URL(string: "https://api.minimaxi.com/anthropic/v1/messages")!
-                        var request = URLRequest(url: url)
-                        request.httpMethod = "POST"
-                        request.addValue(apiKey, forHTTPHeaderField: "x-api-key")
-                        request.addValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization") // 同时添加 Bearer 头作为兼容
-                        request.addValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
-                        request.addValue("application/json", forHTTPHeaderField: "Content-Type")
-                        
-                        // Extract system prompt
-                        let systemPrompt = currentHistory.first { $0.role == "system" }?.content
-                        
-                        // Filter history (exclude system) and map to MinimaxMessage
-                        // DeepSeek history uses "assistant", Anthropic uses "assistant" too.
-                        var messagesToSend = currentHistory
-                            .filter { $0.role != "system" }
-                            .suffix(historyLimit)
-                            .map { MinimaxMessage(role: $0.role, content: $0.content) }
-                        
-                        messagesToSend.append(MinimaxMessage(role: "user", content: text))
-                        
-                        let body = MinimaxRequest(
-                            model: "MiniMax-M2.5",
-                            messages: messagesToSend,
-                            max_tokens: 1000,
-                            stream: false,
-                            system: systemPrompt // Optional
-                        )
-                        
-                        let bodyData = try JSONEncoder().encode(body)
-                        print("📡 [PetAIService] Minimax payload bytes: \(bodyData.count)")
-                        request.httpBody = bodyData
-                        
-                        let (data, response) = try await URLSession.shared.data(for: request)
-                        
-                        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
-                            let errorMsg = String(data: data, encoding: .utf8) ?? "Unknown error"
-                            print("❌ [PetAIService] Minimax Error: \(errorMsg)")
-                            throw NSError(domain: "MinimaxError", code: (response as? HTTPURLResponse)?.statusCode ?? 500, userInfo: [NSLocalizedDescriptionKey: errorMsg])
+                    var lastError: Error?
+
+                    for attempt in providerAttempts {
+                        let maxAttempts = attempt.provider == provider ? 2 : 1
+
+                        for attemptIndex in 1...maxAttempts {
+                            do {
+                                print("🚀 [PetAIService] Using \(attempt.provider.logName) Provider (attempt \(attemptIndex)/\(maxAttempts))")
+                                return try await performPetAIRequest(
+                                    provider: attempt.provider,
+                                    apiKey: attempt.apiKey,
+                                    text: text,
+                                    currentHistory: currentHistory,
+                                    historyLimit: historyLimit,
+                                    fallbackUnknownReply: fallbackUnknownReply
+                                )
+                            } catch {
+                                lastError = error
+                                print("⚠️ [PetAIService] \(attempt.provider.logName) attempt \(attemptIndex)/\(maxAttempts) failed: \(petAIErrorSummary(error))")
+
+                                guard attemptIndex < maxAttempts,
+                                      shouldRetryPetAIRequest(after: error) else {
+                                    break
+                                }
+
+                                try await Task.sleep(nanoseconds: petAIRetryDelayNanoseconds)
+                            }
                         }
-                        
-                        // print("Minimax Response: \(String(data: data, encoding: .utf8) ?? "")") // Debug log
-                        
-                        let mmResponse = try JSONDecoder().decode(MinimaxResponse.self, from: data)
-                        // Prefer text content
-                        let textBlock = mmResponse.content.first { $0.type == "text" }
-                        return textBlock?.text ?? fallbackUnknownReply
-                        
-                    } else if provider == .deepSeek {
-                        // DeepSeek Logic
-                        print("🚀 [PetAIService] Using DeepSeek Provider")
-                        // 构造请求
-                        // ...
-                        var historyToSend = currentHistory
-                        historyToSend.append(DSMessage(role: "user", content: text))
-                        
-                        let url = URL(string: "https://api.deepseek.com/chat/completions")!
-                        var request = URLRequest(url: url)
-                        request.httpMethod = "POST"
-                        request.addValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
-                        request.addValue("application/json", forHTTPHeaderField: "Content-Type")
-                        
-                        // 只发送最近的 N 条历史
-                        let messagesToSend = [historyToSend.first!] + historyToSend.suffix(historyLimit)
-                        
-                        let body = DSRequest(model: "deepseek-chat", messages: messagesToSend, stream: false)
-                        let bodyData = try JSONEncoder().encode(body)
-                        print("📡 [PetAIService] DeepSeek payload bytes: \(bodyData.count)")
-                        request.httpBody = bodyData
-                        
-                        // 发送请求
-                        let (data, response) = try await URLSession.shared.data(for: request)
-                        
-                        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
-                            let errorMsg = String(data: data, encoding: .utf8) ?? "Unknown error"
-                            print("❌ [PetAIService] DeepSeek Error: \(errorMsg)")
-                            throw NSError(domain: "DeepSeekError", code: (response as? HTTPURLResponse)?.statusCode ?? 500, userInfo: [NSLocalizedDescriptionKey: errorMsg])
-                        }
-                        
-                        // 解析响应
-                        let dsResponse = try JSONDecoder().decode(DSResponse.self, from: data)
-                        return dsResponse.choices.first?.message.content ?? fallbackUnknownReply
-                    } else {
-                        throw NSError(domain: "PetAIService", code: 400, userInfo: [NSLocalizedDescriptionKey: "Unsupported AI Provider: \(provider)"])
                     }
+
+                    throw lastError ?? NSError(
+                        domain: "PetAIService",
+                        code: 500,
+                        userInfo: [NSLocalizedDescriptionKey: "All AI provider attempts failed"]
+                    )
                 }
                 
-                // 2. 超时任务 (30s)
                 group.addTask {
-                    try await Task.sleep(nanoseconds: 30 * 1_000_000_000)
+                    try await Task.sleep(nanoseconds: petAIOverallTimeoutNanoseconds)
                     throw TimeoutError()
                 }
                 
@@ -687,7 +862,7 @@ class PetAIService: ObservableObject {
             return aiMsg
             
         } catch is TimeoutError {
-            print("❌ [Debug] 请求超时 (30s)")
+            print("❌ [Debug] 请求超时 (45s)")
             let errorMsg = ChatMessage(
                 text: personaProfile.timeoutReplies.randomElement() ?? "我稍微卡了一下，换个稳定网络我们再试一次。".appLocalized,
                 imageName: defaultTimeoutImageName(),

@@ -16,6 +16,7 @@ struct PetChatViewLegacy: View {
     @StateObject private var guideManager = AppFirstLaunchGuideManager.shared
     @State private var messages: [PetChatMessage] = []
     @State private var inputText = ""
+    @State private var keyboardOverlap: CGFloat = 0
     @State private var isThinking = false
     @State private var isThinkingLongWait = false
     @State private var thinkingDelayWorkItem: DispatchWorkItem?
@@ -59,6 +60,10 @@ struct PetChatViewLegacy: View {
     private var inputPlaceholder: String {
         let petName = PetDataManager.shared.status.displayName
         return "和%@对话、搜索裙子...".appLocalized(petName)
+    }
+
+    private var petDialogueInputBottomPadding: CGFloat {
+        keyboardOverlap > 0 ? 12 : 80
     }
 
     private var quickMenuOwnedPets: [PetCharacter] {
@@ -382,6 +387,14 @@ struct PetChatViewLegacy: View {
             .onChange(of: messages.count) { _, _ in
                 PetChatTranscriptStore.save(messages: messages)
             }
+            .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillChangeFrameNotification)) { notification in
+                updateKeyboardOverlap(from: notification)
+            }
+            .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in
+                withAnimation(.easeOut(duration: 0.2)) {
+                    keyboardOverlap = 0
+                }
+            }
             .onReceive(petDialogueAmbientTimer) { _ in
                 syncPetDialogueAmbientAction()
             }
@@ -466,8 +479,23 @@ struct PetChatViewLegacy: View {
                 .stroke(inputTokens.containerStroke, lineWidth: 1)
         )
         // 添加底部安全区域间距，避免与底部导航栏重叠
-        .padding(.bottom, 80)
-        .ignoresSafeArea(.keyboard, edges: .bottom)
+        .padding(.bottom, petDialogueInputBottomPadding)
+    }
+
+    private func updateKeyboardOverlap(from notification: Notification) {
+        guard
+            let userInfo = notification.userInfo,
+            let endFrame = userInfo[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect
+        else {
+            return
+        }
+
+        let screenHeight = UIScreen.main.bounds.height
+        let overlap = max(0, screenHeight - endFrame.minY)
+        let duration = userInfo[UIResponder.keyboardAnimationDurationUserInfoKey] as? Double ?? 0.25
+        withAnimation(.easeOut(duration: duration)) {
+            keyboardOverlap = overlap
+        }
     }
 
     @ViewBuilder

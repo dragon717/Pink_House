@@ -4,10 +4,7 @@
 <dict>
     <!-- 隐私清单版本 -->
     <key>NSPrivacyTracking</key>
-    <true/>
-    
-    <key>NSPrivacyTrackingDomains</key>
-    <array/>
+    <false/>
     
     <!-- 收集的数据类型 -->
     <key>NSPrivacyCollectedDataTypes</key>
@@ -61,14 +58,6 @@
                 <string>CA92.1</string>
             </array>
         </dict>
-    </array>
-    
-    <!-- 第三方SDK域名 (AI服务) -->
-    <key>NSPrivacyTrackingDomains</key>
-    <array>
-        <string>api.deepseek.com</string>
-        <string>api.minimaxi.com</string>
-        <string>dashscope.aliyuncs.com</string>
     </array>
 </dict>
 </plist>

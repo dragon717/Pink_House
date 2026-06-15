@@ -311,6 +311,7 @@ struct LegacyTabView: View {
                 Spacer()
                 customTabBar
             }
+            .ignoresSafeArea(.keyboard, edges: .bottom)
         }
         .overlay {
             if !isRouteTransitionCoolingDown {
