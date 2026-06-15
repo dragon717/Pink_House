@@ -189,7 +189,7 @@ struct NoticeCardView: View {
                     .font(.system(size: 40))
                     .foregroundStyle(NoticeConfig.monicaPink)
 
-                Text("公告")
+                Text("公告".appLocalized)
                     .font(.headline)
                     .foregroundStyle(.secondary)
             }

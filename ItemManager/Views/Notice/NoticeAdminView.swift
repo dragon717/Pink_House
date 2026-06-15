@@ -67,11 +67,11 @@ struct NoticeAdminView: View {
                     noPermissionView
                 }
             }
-            .navigationTitle("公告管理")
+            .navigationTitle("公告管理".appLocalized)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("完成") {
+                    Button("完成".appLocalized) {
                         dismiss()
                     }
                 }
@@ -80,24 +80,24 @@ struct NoticeAdminView: View {
                 service.setup(with: modelContext)
                 checkAdminPermission()
             }
-            .alert("提示", isPresented: $showAlert) {
-                Button("确定", role: .cancel) {}
+            .alert("提示".appLocalized, isPresented: $showAlert) {
+                Button("确定".appLocalized, role: .cancel) {}
             } message: {
                 Text(alertMessage)
             }
             .alert(
-                "确认删除公告",
+                "确认删除公告".appLocalized,
                 isPresented: pendingDeleteBinding,
                 presenting: pendingDeleteNotice
             ) { notice in
-                Button("取消", role: .cancel) {
+                Button("取消".appLocalized, role: .cancel) {
                     pendingDeleteNotice = nil
                 }
-                Button("确认删除", role: .destructive) {
+                Button("确认删除".appLocalized, role: .destructive) {
                     performDeleteNotice(notice)
                 }
             } message: { notice in
-                Text("“\(notice.title)” 会被标记为删除并从“现有公告”列表中隐藏。")
+                Text("“%@” 会被标记为删除并从“现有公告”列表中隐藏。".appLocalized(notice.title))
             }
             .overlay {
                 if showPreview, let notice = previewNotice {
@@ -121,7 +121,7 @@ struct NoticeAdminView: View {
         VStack(spacing: 20) {
             ProgressView()
                 .scaleEffect(1.5)
-            Text("检查管理员权限...")
+            Text("检查管理员权限...".appLocalized)
                 .foregroundStyle(.secondary)
         }
     }
@@ -133,17 +133,17 @@ struct NoticeAdminView: View {
                 .font(.system(size: 60))
                 .foregroundStyle(.secondary)
 
-            Text("需要管理员权限")
+            Text("需要管理员权限".appLocalized)
                 .font(.title2)
                 .fontWeight(.semibold)
 
-            Text("只有管理员可以发布公告。\n如果您是管理员，请确保已登录 iCloud 账户。")
+            Text("只有管理员可以发布公告。\n如果您是管理员，请确保已登录 iCloud 账户。".appLocalized)
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal)
 
-            Button("重新检查") {
+            Button("重新检查".appLocalized) {
                 checkAdminPermission()
             }
             .buttonStyle(.borderedProminent)
@@ -183,8 +183,8 @@ struct NoticeAdminView: View {
     }
 
     private var quickModalSection: some View {
-        Section(showAdvancedConfig ? "基础内容" : "快捷发弹窗公告") {
-            TextField("标题", text: $title)
+        Section((showAdvancedConfig ? "基础内容" : "快捷发弹窗公告").appLocalized) {
+            TextField("标题".appLocalized, text: $title)
 
             TextEditor(text: $content)
                 .frame(minHeight: 100)
@@ -201,14 +201,14 @@ struct NoticeAdminView: View {
 
             if !showAdvancedConfig {
                 if editingNotice == nil {
-                    Text("只填标题、正文、内置图片，系统会自动按“已发布 + 弹窗 + 关键”处理。")
+                    Text("只填标题、正文、内置图片，系统会自动按“已发布 + 弹窗 + 关键”处理。".appLocalized)
                         .font(.caption)
                         .foregroundStyle(.secondary)
 
                     quickSubmitButton
                     quickPreviewButton
                 } else {
-                    Text("当前正在编辑已有公告，下面按钮会按当前配置更新，不会强制改成快捷弹窗。")
+                    Text("当前正在编辑已有公告，下面按钮会按当前配置更新，不会强制改成快捷弹窗。".appLocalized)
                         .font(.caption)
                         .foregroundStyle(.secondary)
 
@@ -228,7 +228,7 @@ struct NoticeAdminView: View {
                 }
             } label: {
                 HStack {
-                    Text(showAdvancedConfig ? "收起高级配置" : "切换到高级配置")
+                    Text((showAdvancedConfig ? "收起高级配置" : "切换到高级配置").appLocalized)
                     Spacer()
                     Image(systemName: showAdvancedConfig ? "chevron.up" : "chevron.down")
                         .foregroundStyle(.secondary)
@@ -236,7 +236,7 @@ struct NoticeAdminView: View {
             }
 
             if !showAdvancedConfig {
-                Text("高级配置里可以补摘要、定时、动作、版本范围、优先级和媒体类型。")
+                Text("高级配置里可以补摘要、定时、动作、版本范围、优先级和媒体类型。".appLocalized)
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -244,70 +244,70 @@ struct NoticeAdminView: View {
     }
 
     private var advancedSummarySection: some View {
-        Section("详细介绍") {
-            TextField("摘要（列表可选）", text: $summary)
+        Section("详细介绍".appLocalized) {
+            TextField("摘要（列表可选）".appLocalized, text: $summary)
         }
     }
 
     private var deliverySection: some View {
-        Section("投放规则") {
-            Picker("状态", selection: $status) {
+        Section("投放规则".appLocalized) {
+            Picker("状态".appLocalized, selection: $status) {
                 ForEach(Notice.Status.allCases, id: \.self) { value in
                     Text(label(for: value)).tag(value)
                 }
             }
 
-            Picker("渠道", selection: $channel) {
+            Picker("渠道".appLocalized, selection: $channel) {
                 ForEach(Notice.Channel.allCases, id: \.self) { value in
                     Text(label(for: value)).tag(value)
                 }
             }
 
-            Picker("等级", selection: $severity) {
+            Picker("等级".appLocalized, selection: $severity) {
                 ForEach(Notice.Severity.allCases, id: \.self) { value in
                     Text(label(for: value)).tag(value)
                 }
             }
 
-            Toggle("置顶", isOn: $isPinned)
-            Toggle("需要确认", isOn: $requiresAck)
-            Toggle("静默投放", isOn: $isSilent)
-            TextField("受众", text: $audience)
-            TextField("最低可见版本", text: $minAppVersion)
-            TextField("最高可见版本", text: $maxAppVersion)
+            Toggle("置顶".appLocalized, isOn: $isPinned)
+            Toggle("需要确认".appLocalized, isOn: $requiresAck)
+            Toggle("静默投放".appLocalized, isOn: $isSilent)
+            TextField("受众".appLocalized, text: $audience)
+            TextField("最低可见版本".appLocalized, text: $minAppVersion)
+            TextField("最高可见版本".appLocalized, text: $maxAppVersion)
         }
     }
 
     private var scheduleSection: some View {
-        Section("时间窗") {
-            Toggle("设置发布时间", isOn: $hasPublishAt)
+        Section("时间窗".appLocalized) {
+            Toggle("设置发布时间".appLocalized, isOn: $hasPublishAt)
             if hasPublishAt {
-                DatePicker("发布时间", selection: $publishAt)
+                DatePicker("发布时间".appLocalized, selection: $publishAt)
             }
 
-            Toggle("设置开始时间", isOn: $hasStartAt)
+            Toggle("设置开始时间".appLocalized, isOn: $hasStartAt)
             if hasStartAt {
-                DatePicker("开始时间", selection: $startAt)
+                DatePicker("开始时间".appLocalized, selection: $startAt)
             }
 
-            Toggle("设置结束时间", isOn: $hasEndAt)
+            Toggle("设置结束时间".appLocalized, isOn: $hasEndAt)
             if hasEndAt {
-                DatePicker("结束时间", selection: $endAt)
+                DatePicker("结束时间".appLocalized, selection: $endAt)
             }
         }
     }
 
     private var actionConfigSection: some View {
-        Section("动作") {
-            Picker("动作类型", selection: $actionType) {
+        Section("动作".appLocalized) {
+            Picker("动作类型".appLocalized, selection: $actionType) {
                 ForEach(Notice.ActionType.allCases, id: \.self) { value in
                     Text(label(for: value)).tag(value)
                 }
             }
 
             if actionType != .none {
-                TextField("动作目标", text: $actionTarget)
-                TextField("按钮文案", text: $actionLabel)
+                TextField("动作目标".appLocalized, text: $actionTarget)
+                TextField("按钮文案".appLocalized, text: $actionLabel)
             }
         }
     }
@@ -315,7 +315,7 @@ struct NoticeAdminView: View {
     private var placeholderOverlay: some View {
         Group {
             if content.isEmpty {
-                Text("输入公告内容...")
+                Text("输入公告内容...".appLocalized)
                     .foregroundStyle(.tertiary)
                     .padding(.top, 8)
                     .padding(.leading, 5)
@@ -325,10 +325,10 @@ struct NoticeAdminView: View {
 
     // MARK: - 优先级区域
     private var prioritySection: some View {
-        Section("优先级") {
-            Stepper("优先级: \(priority)", value: $priority, in: 0...100)
+        Section("优先级".appLocalized) {
+            Stepper("优先级: %d".appLocalized(priority), value: $priority, in: 0...100)
 
-            Text("数字越大，排序越靠前")
+            Text("数字越大，排序越靠前".appLocalized)
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
@@ -336,17 +336,17 @@ struct NoticeAdminView: View {
 
     // MARK: - 媒体区域
     private var mediaSection: some View {
-        Section("媒体") {
+        Section("媒体".appLocalized) {
             // 使用自定义按钮代替 Picker
             VStack(alignment: .leading, spacing: 12) {
-                Text("类型")
+                Text("类型".appLocalized)
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
                 HStack(spacing: 12) {
-                    mediaTypeButton(type: .none, label: "无")
-                    mediaTypeButton(type: .image, label: "图片")
-                    mediaTypeButton(type: .video, label: "视频")
+                    mediaTypeButton(type: .none, label: "无".appLocalized)
+                    mediaTypeButton(type: .image, label: "图片".appLocalized)
+                    mediaTypeButton(type: .video, label: "视频".appLocalized)
                 }
             }
 
@@ -387,7 +387,7 @@ struct NoticeAdminView: View {
             showBuiltinImagePicker = true
         } label: {
             HStack {
-                Text("选择内置图片")
+                Text("选择内置图片".appLocalized)
                 Spacer()
                 if selectedImageData != nil || selectedImageName != nil {
                     Image(systemName: "checkmark.circle.fill")
@@ -403,10 +403,10 @@ struct NoticeAdminView: View {
             showBuiltinImagePicker = true
         } label: {
             HStack {
-                Text("选择内置图片")
+                Text("选择内置图片".appLocalized)
                 Spacer()
                 if hasSelectedImage {
-                    Text(selectedImageName ?? "已选择")
+                    Text(selectedImageName ?? "已选择".appLocalized)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -475,7 +475,7 @@ struct NoticeAdminView: View {
                         .tint(.white)
                         .padding(.trailing, 8)
                 }
-                Text("发布弹窗公告")
+                Text("发布弹窗公告".appLocalized)
                     .fontWeight(.semibold)
                 Spacer()
             }
@@ -489,7 +489,7 @@ struct NoticeAdminView: View {
         } label: {
             HStack {
                 Spacer()
-                Text("预览效果")
+                Text("预览效果".appLocalized)
                     .foregroundStyle(.blue)
                 Spacer()
             }
@@ -503,7 +503,7 @@ struct NoticeAdminView: View {
         } label: {
             HStack {
                 Spacer()
-                Text("预览弹窗效果")
+                Text("预览弹窗效果".appLocalized)
                     .foregroundStyle(.blue)
                 Spacer()
             }
@@ -517,7 +517,7 @@ struct NoticeAdminView: View {
             Button(action: cancelEdit) {
                 HStack {
                     Spacer()
-                    Text("取消编辑")
+                    Text("取消编辑".appLocalized)
                         .foregroundStyle(.secondary)
                     Spacer()
                 }
@@ -527,9 +527,9 @@ struct NoticeAdminView: View {
 
     // MARK: - 现有公告列表区域
     private var existingNoticesSection: some View {
-        Section("现有公告") {
+        Section("现有公告".appLocalized) {
             if visibleManagedNotices.isEmpty {
-                Text("暂无公告")
+                Text("暂无公告".appLocalized)
                     .foregroundStyle(.secondary)
             } else {
                 ForEach(visibleManagedNotices, id: \.id) { notice in
@@ -596,7 +596,7 @@ struct NoticeAdminView: View {
             print("   媒体类型: \(mediaType)")
 
             guard service.checkRateLimit() else {
-                alertMessage = "操作太频繁，请稍后再试"
+                alertMessage = "操作太频繁，请稍后再试".appLocalized
                 showAlert = true
                 return
             }
@@ -637,7 +637,7 @@ struct NoticeAdminView: View {
                 }
 
                 await service.updateNotice(editing)
-                alertMessage = service.errorMessage ?? "公告已更新"
+                alertMessage = service.errorMessage ?? updateSuccessMessage
             } else {
                 print("📝 创建新公告...")
 
@@ -697,16 +697,16 @@ struct NoticeAdminView: View {
                 )
 
                 if notice != nil {
-                    alertMessage = mode == .quickModal ? "弹窗公告已发布" : createSuccessMessage
+                    alertMessage = mode == .quickModal ? quickModalSuccessMessage : createSuccessMessage
                 } else if let error = service.errorMessage {
                     alertMessage = error
                 } else {
-                    alertMessage = "保存公告失败"
+                    alertMessage = "保存公告失败".appLocalized
                 }
             }
 
             showAlert = true
-            if alertMessage == createSuccessMessage || alertMessage == "公告已更新" || alertMessage == "弹窗公告已发布" {
+            if alertMessage == createSuccessMessage || alertMessage == updateSuccessMessage || alertMessage == quickModalSuccessMessage {
                 resetForm()
             }
         }
@@ -815,32 +815,40 @@ struct NoticeAdminView: View {
 
     private var submitButtonTitle: String {
         if editingNotice != nil {
-            return "更新公告"
+            return "更新公告".appLocalized
         }
 
         switch status {
         case .draft:
-            return "保存草稿"
+            return "保存草稿".appLocalized
         case .scheduled:
-            return "创建定时公告"
+            return "创建定时公告".appLocalized
         case .published:
-            return "发布公告"
+            return "发布公告".appLocalized
         case .archived:
-            return "保存为归档"
+            return "保存为归档".appLocalized
         }
     }
 
     private var createSuccessMessage: String {
         switch status {
         case .draft:
-            return "草稿已保存"
+            return "草稿已保存".appLocalized
         case .scheduled:
-            return "定时公告已创建"
+            return "定时公告已创建".appLocalized
         case .published:
-            return "公告已发布"
+            return "公告已发布".appLocalized
         case .archived:
-            return "归档公告已保存"
+            return "归档公告已保存".appLocalized
         }
+    }
+
+    private var updateSuccessMessage: String {
+        "公告已更新".appLocalized
+    }
+
+    private var quickModalSuccessMessage: String {
+        "弹窗公告已发布".appLocalized
     }
 
     private func normalizedOptional(_ value: String) -> String? {
@@ -873,49 +881,49 @@ struct NoticeAdminView: View {
 
     private func sourceDisplay(for notice: Notice) -> NoticeSourceDisplay {
         if service.wasFetchedFromCloudThisRun(notice) {
-            return NoticeSourceDisplay(text: "本次已从云同步", tint: .green)
+            return NoticeSourceDisplay(text: "本次已从云同步".appLocalized, tint: .green)
         }
 
         if notice.recordName != nil {
-            return NoticeSourceDisplay(text: "本地缓存", tint: .orange)
+            return NoticeSourceDisplay(text: "本地缓存".appLocalized, tint: .orange)
         }
 
-        return NoticeSourceDisplay(text: "仅本地未同步", tint: .red)
+        return NoticeSourceDisplay(text: "仅本地未同步".appLocalized, tint: .red)
     }
 
     private func label(for status: Notice.Status) -> String {
         switch status {
-        case .draft: return "草稿"
-        case .scheduled: return "定时"
-        case .published: return "已发布"
-        case .archived: return "已归档"
+        case .draft: return "草稿".appLocalized
+        case .scheduled: return "定时".appLocalized
+        case .published: return "已发布".appLocalized
+        case .archived: return "已归档".appLocalized
         }
     }
 
     private func label(for channel: Notice.Channel) -> String {
         switch channel {
-        case .inbox: return "公告中心"
-        case .banner: return "横幅"
-        case .modal: return "弹窗"
-        case .mixed: return "多渠道"
+        case .inbox: return "公告中心".appLocalized
+        case .banner: return "横幅".appLocalized
+        case .modal: return "弹窗".appLocalized
+        case .mixed: return "多渠道".appLocalized
         }
     }
 
     private func label(for severity: Notice.Severity) -> String {
         switch severity {
-        case .info: return "普通"
-        case .important: return "重要"
-        case .critical: return "关键"
+        case .info: return "普通".appLocalized
+        case .important: return "重要".appLocalized
+        case .critical: return "关键".appLocalized
         }
     }
 
     private func label(for actionType: Notice.ActionType) -> String {
         switch actionType {
-        case .none: return "无动作"
+        case .none: return "无动作".appLocalized
         case .deeplink: return "Deeplink"
         case .tab: return "Tab"
-        case .page: return "页面"
-        case .externalURL: return "外链"
+        case .page: return "页面".appLocalized
+        case .externalURL: return "外链".appLocalized
         }
     }
 }
@@ -939,10 +947,10 @@ struct NoticeAdminRow: View {
 
     private var statusLabel: String {
         switch notice.status {
-        case .draft: return "草稿"
-        case .scheduled: return "定时"
-        case .published: return "已发布"
-        case .archived: return "已归档"
+        case .draft: return "草稿".appLocalized
+        case .scheduled: return "定时".appLocalized
+        case .published: return "已发布".appLocalized
+        case .archived: return "已归档".appLocalized
         }
     }
 
@@ -990,11 +998,11 @@ struct NoticeAdminRow: View {
         }
         .swipeActions(edge: .trailing) {
             Button(role: .destructive, action: onDelete) {
-                Label("删除", systemImage: "trash")
+                Label("删除".appLocalized, systemImage: "trash")
             }
 
             Button(action: onEdit) {
-                Label("编辑", systemImage: "pencil")
+                Label("编辑".appLocalized, systemImage: "pencil")
             }
             .tint(.blue)
         }

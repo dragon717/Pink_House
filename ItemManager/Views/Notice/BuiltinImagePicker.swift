@@ -51,17 +51,17 @@ struct BuiltinImagePicker: View {
                 }
                 .padding()
             }
-            .navigationTitle("选择内置图片")
+            .navigationTitle("选择内置图片".appLocalized)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("完成") {
+                    Button("完成".appLocalized) {
                         dismiss()
                     }
                 }
 
                 ToolbarItem(placement: .topBarLeading) {
-                    Button("清除选择") {
+                    Button("清除选择".appLocalized) {
                         selectedImageName = nil
                         selectedImageData = nil
                     }

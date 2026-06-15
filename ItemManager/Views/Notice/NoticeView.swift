@@ -74,12 +74,12 @@ struct NoticeView: View {
     private var textSection: some View {
         VStack(alignment: .center, spacing: 8) {
             HStack(spacing: 6) {
-                NoticeBadge(text: notice.severity.rawValue.uppercased(), color: badgeColor)
+                NoticeBadge(text: severityBadgeText, color: badgeColor)
                 if notice.requiresAck {
-                    NoticeBadge(text: "ACK", color: .orange)
+                    NoticeBadge(text: "需确认".appLocalized, color: .orange)
                 }
                 if notice.isPinned {
-                    NoticeBadge(text: "PIN", color: .pink)
+                    NoticeBadge(text: "置顶".appLocalized, color: .pink)
                 }
             }
 
@@ -128,10 +128,21 @@ struct NoticeView: View {
                     .font(.system(size: 40))
                     .foregroundStyle(NoticeConfig.monicaPink)
                 
-                Text("公告")
+                Text("公告".appLocalized)
                     .font(.headline)
                     .foregroundStyle(.secondary)
             }
+        }
+    }
+
+    private var severityBadgeText: String {
+        switch notice.severity {
+        case .info:
+            return "普通".appLocalized
+        case .important:
+            return "重要".appLocalized
+        case .critical:
+            return "关键".appLocalized
         }
     }
 }
@@ -175,7 +186,7 @@ struct NoticeDetailView: View {
                         .foregroundStyle(.primary)
 
                     if notice.requiresAck, !readStatusService.hasAcknowledgedNotice(notice) {
-                        Button("我已知晓") {
+                        Button("我已知晓".appLocalized) {
                             readStatusService.markAsAcknowledged(notice)
                         }
                         .buttonStyle(.borderedProminent)
@@ -185,7 +196,7 @@ struct NoticeDetailView: View {
             }
             .padding(.vertical)
         }
-        .navigationTitle("公告详情")
+        .navigationTitle("公告详情".appLocalized)
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {
             readStatusService.markAsRead(notice)
@@ -211,7 +222,7 @@ struct NoticeListView: View {
             }
             .padding(.vertical)
         }
-        .navigationTitle("公告中心")
+        .navigationTitle("公告中心".appLocalized)
         .onAppear {
             service.setup(with: modelContext)
         }
@@ -236,12 +247,12 @@ struct EmptyNoticeView: View {
                 .font(.system(size: 60))
                 .foregroundStyle(NoticeConfig.monicaPink.opacity(0.5))
             
-            Text("暂无公告")
+            Text("暂无公告".appLocalized)
                 .font(.title2)
                 .fontWeight(.medium)
                 .foregroundStyle(.secondary)
             
-            Text("稍后再来看看吧~")
+            Text("稍后再来看看吧~".appLocalized)
                 .font(.subheadline)
                 .foregroundStyle(.tertiary)
         }
