@@ -80,24 +80,14 @@ class WealthViewModel {
     // Note: For Gold, this might not be sufficient if we want decimals.
     // We'll add a specific formatted string or value for Gold.
     var totalAmount: Int {
-        let safeBaseAmountCNY = sanitizedBaseAmountCNY
-        switch selectedCurrency {
-        case .rmb:
-            return NSDecimalNumber(decimal: safeBaseAmountCNY).intValue
-        case .jpy:
-            let converted = safeBaseAmountCNY * Decimal(exchangeRateJPY)
-            return NSDecimalNumber(decimal: converted).intValue
-        case .usd:
-            let converted = safeBaseAmountCNY * Decimal(exchangeRateUSD)
-            return NSDecimalNumber(decimal: converted).intValue
-        case .gold:
-            // This is just a placeholder, we won't use this Int for Gold display likely
-            let grams = totalGoldWeightGrams
-            return Int(grams)
-        case .silver:
-            let grams = totalSilverWeightGrams
-            return Int(grams)
-        }
+        Self.displayAmount(
+            baseAmountCNY: sanitizedBaseAmountCNY,
+            currency: selectedCurrency,
+            exchangeRateJPY: exchangeRateJPY,
+            exchangeRateUSD: exchangeRateUSD,
+            goldWeightGrams: totalGoldWeightGrams,
+            silverWeightGrams: totalSilverWeightGrams
+        )
     }
     
     var totalGoldWeightGrams: Double {
@@ -139,20 +129,10 @@ class WealthViewModel {
     }
 
     static func sanitizedWardrobeContribution(for clothing: Clothing) -> Decimal {
-        let safeStock = Decimal(FinancialDataSanitizer.stock(clothing.stock))
-        let safeShippingFee = FinancialDataSanitizer.money(clothing.shippingFee)
-
-        if clothing.isDepositPlan {
-            let safeDeposit = FinancialDataSanitizer.money(clothing.deposit)
-            let safeAccessoryDeposit = FinancialDataSanitizer.money(
-                clothing.accessoryItems?.reduce(Decimal(0)) { $0 + $1.deposit } ?? 0
-            )
-            return ((safeDeposit + safeAccessoryDeposit) * safeStock) + safeShippingFee
-        } else {
-            let safePrice = FinancialDataSanitizer.money(clothing.price)
-            let safeAccessoriesPrice = FinancialDataSanitizer.money(clothing.resolvedAccessoriesPrice)
-            return (safePrice * safeStock) + safeAccessoriesPrice + safeShippingFee
+        if clothing.isFullPaymentReservation {
+            return FinancialDataSanitizer.aggregateMoney(clothing.fullPaymentReservationTotalAmount)
         }
+        return FinancialDataSanitizer.aggregateMoney(clothing.inventoryTotalPrice)
     }
 
     private static func logNegativeFinancialFieldsIfNeeded(_ clothing: Clothing) {
@@ -174,6 +154,46 @@ class WealthViewModel {
             stock=\(clothing.stock), negativeFields=\(negativeFields.joined(separator: ","))
             """
         )
+    }
+
+    static func displayAmount(
+        baseAmountCNY: Decimal,
+        currency: CurrencyType,
+        exchangeRateJPY: Double,
+        exchangeRateUSD: Double,
+        goldWeightGrams: Double = 0,
+        silverWeightGrams: Double = 0
+    ) -> Int {
+        let safeBaseAmountCNY = FinancialDataSanitizer.aggregateMoney(baseAmountCNY)
+        switch currency {
+        case .rmb:
+            return roundedWholeAmount(safeBaseAmountCNY)
+        case .jpy:
+            let converted = safeBaseAmountCNY * Decimal(exchangeRateJPY)
+            return roundedWholeAmount(converted)
+        case .usd:
+            let converted = safeBaseAmountCNY * Decimal(exchangeRateUSD)
+            return roundedWholeAmount(converted)
+        case .gold:
+            // This is just a placeholder, we won't use this Int for Gold display likely
+            return Int(goldWeightGrams)
+        case .silver:
+            return Int(silverWeightGrams)
+        }
+    }
+
+    private static func roundedWholeAmount(_ value: Decimal) -> Int {
+        let rounded = NSDecimalNumber(decimal: value).rounding(
+            accordingToBehavior: NSDecimalNumberHandler(
+                roundingMode: .plain,
+                scale: 0,
+                raiseOnExactness: false,
+                raiseOnOverflow: false,
+                raiseOnUnderflow: false,
+                raiseOnDivideByZero: false
+            )
+        )
+        return rounded.intValue
     }
     
     // Gold Display Logic

@@ -800,14 +800,6 @@ struct ClothingRow: View, Equatable {
         (showOriginalPrice && snapshot.originalPrice > 0) || showPrice || snapshot.stock > 1
     }
 
-    private var rowPriceSurfaceFill: Color {
-        isThemeSkinThemed ? rowAccentColor.opacity(0.12) : rowAccentColor.opacity(0.07)
-    }
-
-    private var rowPriceSurfaceStroke: Color {
-        isThemeSkinThemed ? rowAccentColor.opacity(0.24) : rowAccentColor.opacity(0.14)
-    }
-    
     var body: some View {
         WardrobeThemeClothingCardContainer(
             cornerRadius: 24,
@@ -962,18 +954,6 @@ struct ClothingRow: View, Equatable {
                 }
                 .padding(.horizontal, showsRowPriceInfo ? 8 : 0)
                 .padding(.vertical, showsRowPriceInfo ? 6 : 0)
-                .background(alignment: .trailing) {
-                    if showsRowPriceInfo {
-                        RoundedRectangle(cornerRadius: 10, style: .continuous)
-                            .fill(rowPriceSurfaceFill)
-                    }
-                }
-                .overlay {
-                    if showsRowPriceInfo {
-                        RoundedRectangle(cornerRadius: 10, style: .continuous)
-                            .strokeBorder(rowPriceSurfaceStroke, lineWidth: 0.7)
-                    }
-                }
             }
             .padding(16)
         }

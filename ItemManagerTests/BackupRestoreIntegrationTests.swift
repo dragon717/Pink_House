@@ -84,17 +84,95 @@ final class BackupRestoreIntegrationTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(total, 0, "负金额/负库存导入样本经过来财聚合兜底后不应产生负数")
     }
 
-    func testWealthViewModelClampsNegativeBaseAmountBeforeDisplayAndStackSplitting() {
-        let viewModel = WealthViewModel()
-        viewModel.baseAmountCNY = -123
-        viewModel.selectedCurrency = .rmb
+    func testWealthDisplayAmountClampsNegativeBaseAmount() {
+        XCTAssertEqual(
+            WealthViewModel.displayAmount(
+                baseAmountCNY: -123,
+                currency: .rmb,
+                exchangeRateJPY: 21,
+                exchangeRateUSD: 0.14
+            ),
+            0
+        )
+        XCTAssertEqual(
+            WealthViewModel.displayAmount(
+                baseAmountCNY: -123,
+                currency: .jpy,
+                exchangeRateJPY: 21,
+                exchangeRateUSD: 0.14
+            ),
+            0
+        )
+    }
 
-        XCTAssertEqual(viewModel.totalAmount, 0)
-        XCTAssertTrue(viewModel.calculateStacks().isEmpty)
+    func testWealthAggregateUsesWardrobeTotalValueForReservations() {
+        let owned = Clothing(
+            name: "Owned JSK",
+            price: 100,
+            accessoriesPrice: 20,
+            shippingFee: 10,
+            stock: 2
+        )
+        let finalPayment = Clothing(
+            name: "Final Payment JSK",
+            price: 1_000,
+            deposit: 200,
+            balance: 800,
+            accessoriesPrice: 100,
+            shippingFee: 30,
+            isDepositPlan: true,
+            stock: 2
+        )
+        let fullPaymentReservation = Clothing(
+            name: "Full Payment Reservation OP",
+            price: 1_000,
+            deposit: 1_130,
+            balance: 0,
+            accessoriesPrice: 100,
+            shippingFee: 30,
+            isDepositPlan: true,
+            stock: 2
+        )
 
-        viewModel.selectedCurrency = .jpy
-        XCTAssertEqual(viewModel.totalAmount, 0)
-        XCTAssertTrue(viewModel.calculateStacks().isEmpty)
+        XCTAssertEqual(WealthViewModel.sanitizedWardrobeContribution(for: owned), 230)
+        XCTAssertEqual(WealthViewModel.sanitizedWardrobeContribution(for: finalPayment), 2_130)
+        XCTAssertEqual(WealthViewModel.sanitizedWardrobeContribution(for: fullPaymentReservation), 2_260)
+
+        let total = WealthViewModel.calculateBaseAmountCNY(
+            clothings: [owned, finalPayment, fullPaymentReservation]
+        )
+
+        XCTAssertEqual(total, 4_620)
+    }
+
+    func testWealthDisplayAmountRoundsConvertedCurrencyAmounts() {
+        XCTAssertEqual(
+            WealthViewModel.displayAmount(
+                baseAmountCNY: 99,
+                currency: .rmb,
+                exchangeRateJPY: 22.5,
+                exchangeRateUSD: 0.14
+            ),
+            99
+        )
+        XCTAssertEqual(
+            WealthViewModel.displayAmount(
+                baseAmountCNY: 99,
+                currency: .jpy,
+                exchangeRateJPY: 22.5,
+                exchangeRateUSD: 0.14
+            ),
+            2_228
+        )
+        XCTAssertEqual(
+            WealthViewModel.displayAmount(
+                baseAmountCNY: 99,
+                currency: .usd,
+                exchangeRateJPY: 22.5,
+                exchangeRateUSD: 0.14
+            ),
+            14
+        )
     }
     
     func testFullBackupRestoreCycle() async throws {
