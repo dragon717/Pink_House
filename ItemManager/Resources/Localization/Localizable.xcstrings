@@ -20780,7 +20780,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Choose from Closet"
+            "value" : "Choose from Wardrobe"
           }
         },
         "zh-Hans" : {
@@ -20793,6 +20793,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "從衣櫥選擇"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aus Kleiderschrank wählen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Elegir del armario"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choisir dans la garde-robe"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ワードローブから選択"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "옷장에서 선택"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Escolher do guarda-roupa"
           }
         }
       }
@@ -49627,7 +49663,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Clear Search Filter"
+            "value" : "Try clearing the search text or filters"
           }
         },
         "zh-Hans" : {
@@ -49639,7 +49675,43 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "嘗試清除搜索詞或篩選條件"
+            "value" : "嘗試清除搜尋詞或篩選條件"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Versuche, Suchbegriffe oder Filter zu löschen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Prueba a borrar el texto de búsqueda o los filtros"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Essayez d’effacer la recherche ou les filtres"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "検索語または絞り込み条件をクリアしてみてください"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "검색어 또는 필터를 지워 보세요"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tente limpar a busca ou os filtros"
           }
         }
       }
@@ -71336,7 +71408,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Search Dress Name, Brand, Tag..."
+            "value" : "Search dress name, brand, tag..."
           }
         },
         "zh-Hans" : {
@@ -71349,6 +71421,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "搜索裙裝名稱、品牌、標籤..."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kleidname, Marke oder Tag suchen..."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Buscar nombre, marca o etiqueta del vestido..."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rechercher nom, marque ou tag..."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ドレス名、ブランド、タグを検索..."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "드레스 이름, 브랜드, 태그 검색..."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Buscar nome, marca ou etiqueta do vestido..."
           }
         }
       }
@@ -85789,7 +85897,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "No Dress Item"
+            "value" : "No matching dresses found"
           }
         },
         "zh-Hans" : {
@@ -85802,6 +85910,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "沒有找到符合條件的裙裝"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keine passenden Kleider gefunden"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No se encontraron vestidos coincidentes"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucune robe correspondante trouvée"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "条件に合うドレスが見つかりません"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "조건에 맞는 드레스가 없습니다"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nenhum vestido correspondente encontrado"
           }
         }
       }
@@ -88289,6 +88433,42 @@
             "state" : "translated",
             "value" : "清除品牌篩選"
           }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Markenfilter löschen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Borrar filtro de marca"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Effacer le filtre de marque"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ブランド絞り込みをクリア"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "브랜드 필터 지우기"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Limpar filtro de marca"
+          }
         }
       }
     },
@@ -88436,6 +88616,42 @@
             "state" : "translated",
             "value" : "清除所有篩選"
           }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Alle Filter löschen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Borrar todos los filtros"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Effacer tous les filtres"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "すべての絞り込みをクリア"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "모든 필터 지우기"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Limpar todos os filtros"
+          }
         }
       }
     },
@@ -88457,6 +88673,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "清除標籤篩選"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tag-Filter löschen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Borrar filtro de etiqueta"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Effacer le filtre de tag"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "タグ絞り込みをクリア"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "태그 필터 지우기"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Limpar filtro de etiqueta"
           }
         }
       }
@@ -107148,7 +107400,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Closet No Add Dress Item"
+            "value" : "No dresses have been added to the wardrobe yet"
           }
         },
         "zh-Hans" : {
@@ -107161,6 +107413,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "衣櫥中還沒有添加裙裝"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Noch keine Kleider im Kleiderschrank"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aún no se han agregado vestidos al armario"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucune robe n’a encore été ajoutée à la garde-robe"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ワードローブにドレスがまだ追加されていません"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "옷장에 아직 드레스가 추가되지 않았습니다"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nenhum vestido foi adicionado ao guarda-roupa ainda"
           }
         }
       }
@@ -132032,6 +132320,64 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "虛擬"
+          }
+        }
+      }
+    },
+    "已选 %d" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%d ausgewählt"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%d selected"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%d seleccionados"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%d sélectionné(s)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%d 件選択済み"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%d개 선택됨"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%d selecionado(s)"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已选 %d"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已選 %d"
           }
         }
       }

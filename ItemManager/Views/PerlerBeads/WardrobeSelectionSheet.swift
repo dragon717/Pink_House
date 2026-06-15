@@ -69,11 +69,11 @@ struct WardrobeSelectionSheet: View {
                     clothingGrid
                 }
             }
-            .navigationTitle("从衣橱选择")
+            .navigationTitle("从衣橱选择".appLocalized)
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("取消") {
+                    Button("取消".appLocalized) {
                         dismiss()
                     }
                 }
@@ -87,7 +87,7 @@ struct WardrobeSelectionSheet: View {
             Image(systemName: "magnifyingglass")
                 .foregroundColor(.secondary)
             
-            TextField("搜索裙装名称、品牌、标签...", text: $searchText)
+            TextField("搜索裙装名称、品牌、标签...".appLocalized, text: $searchText)
                 .textFieldStyle(.plain)
             
             if !searchText.isEmpty {
@@ -122,7 +122,7 @@ struct WardrobeSelectionSheet: View {
                         selectedBrandIDs.removeAll()
                         selectedTagIDs.removeAll()
                     } label: {
-                        Label("清除筛选", systemImage: "xmark")
+                        Label("清除筛选".appLocalized, systemImage: "xmark")
                             .font(.caption)
                             .padding(.horizontal, 12)
                             .padding(.vertical, 6)
@@ -143,7 +143,7 @@ struct WardrobeSelectionSheet: View {
             Button(role: .destructive) {
                 selectedBrandIDs.removeAll()
             } label: {
-                Label("清除品牌筛选", systemImage: "xmark")
+                Label("清除品牌筛选".appLocalized, systemImage: "xmark")
             }
             
             Divider()
@@ -153,7 +153,7 @@ struct WardrobeSelectionSheet: View {
                 toggleBrandSelection(ClothingFilterService.noBrandUUID)
             } label: {
                 HStack {
-                    Text("无品牌")
+                    Text("无品牌".appLocalized)
                     Spacer()
                     if selectedBrandIDs.contains(ClothingFilterService.noBrandUUID) {
                         Image(systemName: "checkmark")
@@ -191,11 +191,11 @@ struct WardrobeSelectionSheet: View {
     // 品牌筛选标签文字
     private var brandFilterLabel: String {
         if selectedBrandIDs.isEmpty {
-            return "品牌"
+            return "品牌".appLocalized
         } else if selectedBrandIDs.contains(ClothingFilterService.noBrandUUID) {
-            return "无品牌"
+            return "无品牌".appLocalized
         } else {
-            return "已选 \(selectedBrandIDs.count)"
+            return "已选 %d".appLocalized(selectedBrandIDs.count)
         }
     }
     
@@ -205,7 +205,7 @@ struct WardrobeSelectionSheet: View {
             Button(role: .destructive) {
                 selectedTagIDs.removeAll()
             } label: {
-                Label("清除标签筛选", systemImage: "xmark")
+                Label("清除标签筛选".appLocalized, systemImage: "xmark")
             }
             
             Divider()
@@ -215,7 +215,7 @@ struct WardrobeSelectionSheet: View {
                 toggleTagSelection(ClothingFilterService.noTagUUID)
             } label: {
                 HStack {
-                    Text("无标签")
+                    Text("无标签".appLocalized)
                     Spacer()
                     if selectedTagIDs.contains(ClothingFilterService.noTagUUID) {
                         Image(systemName: "checkmark")
@@ -256,11 +256,11 @@ struct WardrobeSelectionSheet: View {
     // 标签筛选标签文字
     private var tagFilterLabel: String {
         if selectedTagIDs.isEmpty {
-            return "标签"
+            return "标签".appLocalized
         } else if selectedTagIDs.contains(ClothingFilterService.noTagUUID) {
-            return "无标签"
+            return "无标签".appLocalized
         } else {
-            return "已选 \(selectedTagIDs.count)"
+            return "已选 %d".appLocalized(selectedTagIDs.count)
         }
     }
     
@@ -294,13 +294,13 @@ struct WardrobeSelectionSheet: View {
                 .font(.system(size: 60))
                 .foregroundColor(.gray.opacity(0.5))
             
-            Text("没有找到符合条件的裙装")
+            Text("没有找到符合条件的裙装".appLocalized)
                 .font(.title3)
                 .fontWeight(.medium)
                 .foregroundColor(.primary)
             
             if !searchText.isEmpty || !selectedBrandIDs.isEmpty || !selectedTagIDs.isEmpty {
-                Text("尝试清除搜索词或筛选条件")
+                Text("尝试清除搜索词或筛选条件".appLocalized)
                     .font(.subheadline)
                     .foregroundColor(.secondary)
                 
@@ -309,12 +309,12 @@ struct WardrobeSelectionSheet: View {
                     selectedBrandIDs.removeAll()
                     selectedTagIDs.removeAll()
                 } label: {
-                    Text("清除所有筛选")
+                    Text("清除所有筛选".appLocalized)
                         .foregroundColor(.pink)
                 }
                 .padding(.top, 8)
             } else {
-                Text("衣橱中还没有添加裙装")
+                Text("衣橱中还没有添加裙装".appLocalized)
                     .font(.subheadline)
                     .foregroundColor(.secondary)
             }
