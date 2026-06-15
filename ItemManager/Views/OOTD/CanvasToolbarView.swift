@@ -56,7 +56,7 @@ struct CanvasToolbarView: View {
                 ScrollView(.vertical, showsIndicators: false) {
                     VStack(spacing: 16) {
                         // 标题
-                        Text("工具")
+                        Text("工具".appLocalized)
                             .font(.caption)
                             .fontWeight(.medium)
                             .foregroundStyle(.secondary)
@@ -67,7 +67,7 @@ struct CanvasToolbarView: View {
                         // 贴纸库按钮
                         ToolbarButton(
                             icon: isStickerLibraryVisible ? "rectangle.stack.fill" : "rectangle.stack",
-                            label: "贴纸库",
+                            label: "贴纸库".appLocalized,
                             tint: .pink,
                             isEnabled: true
                         ) {
@@ -82,11 +82,11 @@ struct CanvasToolbarView: View {
                             .frame(width: 24)
                         
                         // 翻页控制组
-                        ToolbarButtonGroup(title: "翻页") {
+                        ToolbarButtonGroup(title: "翻页".appLocalized) {
                             // 上一页按钮
                             ToolbarButton(
                                 icon: "chevron.left",
-                                label: "上一张",
+                                label: "上一张".appLocalized,
                                 isEnabled: hasPreviousPage
                             ) {
                                 onPreviousPage()
@@ -101,7 +101,7 @@ struct CanvasToolbarView: View {
                             // 下一页按钮
                             ToolbarButton(
                                 icon: "chevron.right",
-                                label: "下一张",
+                                label: "下一张".appLocalized,
                                 isEnabled: hasNextPage
                             ) {
                                 onNextPage()
@@ -112,10 +112,10 @@ struct CanvasToolbarView: View {
                             .frame(width: 24)
                         
                         // 图层控制组
-                        ToolbarButtonGroup(title: "图层") {
+                        ToolbarButtonGroup(title: "图层".appLocalized) {
                             ToolbarButton(
                                 icon: "arrow.up.to.line",
-                                label: "置顶",
+                                label: "移至顶层".appLocalized,
                                 isEnabled: selectedItem != nil
                             ) {
                                 if let item = selectedItem {
@@ -125,7 +125,7 @@ struct CanvasToolbarView: View {
                             
                             ToolbarButton(
                                 icon: "arrow.up",
-                                label: "上一层",
+                                label: "上一层".appLocalized,
                                 isEnabled: selectedItem != nil
                             ) {
                                 if let item = selectedItem {
@@ -135,7 +135,7 @@ struct CanvasToolbarView: View {
                             
                             ToolbarButton(
                                 icon: "arrow.down",
-                                label: "下一层",
+                                label: "下一层".appLocalized,
                                 isEnabled: selectedItem != nil
                             ) {
                                 if let item = selectedItem {
@@ -145,7 +145,7 @@ struct CanvasToolbarView: View {
                             
                             ToolbarButton(
                                 icon: "arrow.down.to.line",
-                                label: "置底",
+                                label: "置底".appLocalized,
                                 isEnabled: selectedItem != nil
                             ) {
                                 if let item = selectedItem {
@@ -158,10 +158,10 @@ struct CanvasToolbarView: View {
                             .frame(width: 24)
                         
                         // 变换控制组
-                        ToolbarButtonGroup(title: "变换") {
+                        ToolbarButtonGroup(title: "变换".appLocalized) {
                             ToolbarButton(
                                 icon: "arrow.counterclockwise",
-                                label: "重置",
+                                label: "重置".appLocalized,
                                 isEnabled: selectedItem != nil
                             ) {
                                 if let item = selectedItem {
@@ -176,7 +176,7 @@ struct CanvasToolbarView: View {
                         // 删除按钮
                         ToolbarButton(
                             icon: "trash",
-                            label: "删除",
+                            label: "删除".appLocalized,
                             tint: .red,
                             isEnabled: selectedItem != nil
                         ) {
@@ -206,18 +206,18 @@ struct CanvasToolbarView: View {
         .padding(.top, 0)
         .padding(.bottom, 0)
         .padding(.leading, 0)
-        .alert("确认删除", isPresented: $showingDeleteConfirmation) {
-            Button("取消", role: .cancel) {
+        .alert("确认删除".appLocalized, isPresented: $showingDeleteConfirmation) {
+            Button("取消".appLocalized, role: .cancel) {
                 itemToDelete = nil
             }
-            Button("删除", role: .destructive) {
+            Button("删除".appLocalized, role: .destructive) {
                 if let item = itemToDelete {
                     onDelete(item)
                 }
                 itemToDelete = nil
             }
         } message: {
-            Text("确定要删除这个贴纸吗？此操作无法撤销。")
+            Text("确定要删除这个贴纸吗？此操作无法撤销。".appLocalized)
         }
     }
 }

@@ -19,18 +19,18 @@ struct BatchReplaceCutoutView: View {
         NavigationStack {
             VStack {
                 if isLoading {
-                    ProgressView("正在扫描可替换项...")
+                    ProgressView("正在扫描可替换项...".appLocalized)
                 } else if items.isEmpty {
                     ContentUnavailableView(
-                        "没有可替换的项",
+                        "没有可替换的项".appLocalized,
                         systemImage: "photo.on.rectangle.angled",
-                        description: Text("请先执行“批量处理小裙装”以生成抠图，或者所有裙装都已经包含抠图图片。")
+                        description: Text("请先执行“批量处理小裙装”以生成抠图，或者所有裙装都已经包含抠图图片。".appLocalized)
                     )
                 } else {
                     List {
                         Section {
                             HStack {
-                                Text("全选")
+                                Text("全选".appLocalized)
                                 Spacer()
                                 Toggle("", isOn: Binding(
                                     get: { items.allSatisfy { $0.isSelected } },
@@ -58,9 +58,9 @@ struct BatchReplaceCutoutView: View {
                         Divider()
                         HStack {
                             VStack(alignment: .leading) {
-                                Text("已选择 \(items.filter { $0.isSelected }.count) 项")
+                                Text("已选择 %d 项".appLocalized(items.filter { $0.isSelected }.count))
                                     .font(.headline)
-                                Text("将选中的抠图设为首图")
+                                Text("将选中的抠图设为首图".appLocalized)
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                             }
@@ -70,7 +70,7 @@ struct BatchReplaceCutoutView: View {
                             Button(action: {
                                 showingConfirmation = true
                             }) {
-                                Text("确认替换")
+                                Text("确认替换".appLocalized)
                                     .fontWeight(.bold)
                                     .foregroundColor(.white)
                                     .padding(.horizontal, 24)
@@ -85,11 +85,11 @@ struct BatchReplaceCutoutView: View {
                     .background(Color(uiColor: .systemBackground))
                 }
             }
-            .navigationTitle("替换主图")
+            .navigationTitle("替换主图".appLocalized)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    Button("取消") {
+                    Button("取消".appLocalized) {
                         dismiss()
                     }
                 }
@@ -97,11 +97,11 @@ struct BatchReplaceCutoutView: View {
             .onAppear {
                 prepareData()
             }
-            .alert("确认替换", isPresented: $showingConfirmation) {
-                Button("取消", role: .cancel) { }
-                Button("执行", action: performReplacement)
+            .alert("确认替换".appLocalized, isPresented: $showingConfirmation) {
+                Button("取消".appLocalized, role: .cancel) { }
+                Button("执行".appLocalized, action: performReplacement)
             } message: {
-                Text("将把选中的 \(items.filter { $0.isSelected }.count) 个抠图设置为对应裙装的第一张图片（主图）。原图将后移。")
+                Text("将把选中的 %d 个抠图设置为对应裙装的第一张图片（主图）。原图将后移。".appLocalized(items.filter { $0.isSelected }.count))
             }
         }
     }
@@ -249,7 +249,7 @@ struct ReplaceItemRow: View {
             .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.accentColor.opacity(0.3), lineWidth: 1))
             
             VStack(alignment: .leading, spacing: 4) {
-                Text(item.clothing.name.isEmpty ? "未命名" : item.clothing.name)
+                Text(item.clothing.name.isEmpty ? "未命名".appLocalized : item.clothing.name)
                     .font(.subheadline)
                     .fontWeight(.medium)
                     .lineLimit(1)

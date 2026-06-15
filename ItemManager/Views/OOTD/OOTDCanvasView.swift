@@ -251,18 +251,18 @@ struct OOTDCanvasView: View {
         .onTapGesture {
             selectedItemId = nil
         }
-        .alert("确认删除", isPresented: $showingDeleteAlert) {
-            Button("删除", role: .destructive) {
+        .alert("确认删除".appLocalized, isPresented: $showingDeleteAlert) {
+            Button("删除".appLocalized, role: .destructive) {
                 if let item = itemToDelete {
                     deleteItem(item)
                 }
                 itemToDelete = nil
             }
-            Button("取消", role: .cancel) {
+            Button("取消".appLocalized, role: .cancel) {
                 itemToDelete = nil
             }
         } message: {
-            Text("确定要删除这个抠图吗？此操作无法撤销。")
+            Text("确定要删除这个抠图吗？此操作无法撤销。".appLocalized)
         }
         .onAppear {
             print("[OOTD] Canvas appeared with \(outfit.items?.count ?? 0) items")
@@ -503,13 +503,13 @@ struct CanvasItemView: View {
                     .scaledToFit()
             } else if item.cutout == nil {
                 // Data object missing
-                missingPlaceholder(text: "数据丢失")
+                missingPlaceholder(text: "数据丢失".appLocalized)
             } else if isLoading {
                 ProgressView()
                     .frame(width: 50, height: 50)
             } else {
                 // Image file missing
-                missingPlaceholder(text: "图片丢失")
+                missingPlaceholder(text: "图片丢失".appLocalized)
             }
         }
         .frame(width: 200, height: 200) // Base size, adjusted by scale

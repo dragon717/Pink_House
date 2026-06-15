@@ -110,7 +110,7 @@ struct OOTDEditorView: View {
                 mainContentArea(geometry: geometry)
             }
         }
-        .navigationTitle(outfit.note.isEmpty ? "编辑书页" : outfit.note)
+        .navigationTitle(outfit.note.isEmpty ? "编辑书页".appLocalized : outfit.note)
         .navigationBarTitleDisplayMode(.inline)
         .onDisappear {
             isAvatarMotionEnabled = false
@@ -156,7 +156,7 @@ struct OOTDEditorView: View {
                         Button {
                             showingBackgroundSelectionSheet = true
                         } label: {
-                            Label("更换底图", systemImage: "photo")
+                            Label("更换底图".appLocalized, systemImage: "photo")
                         }
 
                         Button {
@@ -165,7 +165,7 @@ struct OOTDEditorView: View {
                             }
                         } label: {
                             Label(
-                                isAvatarMotionEnabled && canAnimateAvatar ? "停止动作" : "让它能动起来",
+                                (isAvatarMotionEnabled && canAnimateAvatar ? "停止动作" : "让它能动起来").appLocalized,
                                 systemImage: isAvatarMotionEnabled && canAnimateAvatar ? "pause.circle" : "play.circle"
                             )
                         }
@@ -174,14 +174,14 @@ struct OOTDEditorView: View {
                         Button {
                             showingSaveToClothingSheet = true
                         } label: {
-                            Label("保存为裙装主图", systemImage: "photo.badge.arrow.down")
+                            Label("保存为裙装主图".appLocalized, systemImage: "photo.badge.arrow.down")
                         }
                         
                         Button {
                             newName = outfit.note
                             showingRenameAlert = true
                         } label: {
-                            Label("重命名", systemImage: "pencil")
+                            Label("重命名".appLocalized, systemImage: "pencil")
                         }
                           
                         Divider()
@@ -189,7 +189,7 @@ struct OOTDEditorView: View {
                         Button(role: .destructive) {
                             showingDeleteAlert = true
                         } label: {
-                            Label("删除", systemImage: "trash")
+                            Label("删除".appLocalized, systemImage: "trash")
                         }
 
                         Divider()
@@ -197,19 +197,19 @@ struct OOTDEditorView: View {
                         Button {
                             showingBatchConfirmation = true
                         } label: {
-                            Label("批量处理小裙装", systemImage: "wand.and.stars")
+                            Label("批量处理小裙装".appLocalized, systemImage: "wand.and.stars")
                         }
                         
                         Button {
                             showingRepairConfirmation = true
                         } label: {
-                            Label("修复数据", systemImage: "hammer")
+                            Label("修复数据".appLocalized, systemImage: "hammer")
                         }
                         
                         Button {
                             showingBatchReplaceSheet = true
                         } label: {
-                            Label("一键替换主图", systemImage: "arrow.triangle.2.circlepath")
+                            Label("一键替换主图".appLocalized, systemImage: "arrow.triangle.2.circlepath")
                         }
                     } label: {
                         Image(systemName: "ellipsis.circle")
@@ -218,17 +218,17 @@ struct OOTDEditorView: View {
             }
         }
         // ... Pickers and Alerts ...
-        .confirmationDialog("选择图片来源", isPresented: $showingActionSheet) {
+        .confirmationDialog("选择图片来源".appLocalized, isPresented: $showingActionSheet) {
             if UIImagePickerController.isSourceTypeAvailable(.camera) {
-                Button("拍照并抠图") {
+                Button("拍照并抠图".appLocalized) {
                     shouldCutoutCameraImage = true
                     showingCamera = true
                 }
             }
-            Button("从图库多选") {
+            Button("从图库多选".appLocalized) {
                 showingMultiPhotoPicker = true
             }
-            Button("取消", role: .cancel) {}
+            Button("取消".appLocalized, role: .cancel) {}
         }
         .fullScreenCover(isPresented: $showingCamera) {
             CameraPicker(image: $cameraImage)
@@ -258,17 +258,17 @@ struct OOTDEditorView: View {
                 onDismiss: { showingShareSheet = false }
             )
         }
-        .alert("重命名", isPresented: $showingRenameAlert) {
-            TextField("名称", text: $newName)
-            Button("取消", role: .cancel) {}
-            Button("确定") {
+        .alert("重命名".appLocalized, isPresented: $showingRenameAlert) {
+            TextField("名称".appLocalized, text: $newName)
+            Button("取消".appLocalized, role: .cancel) {}
+            Button("确定".appLocalized) {
                 outfit.note = newName
                 try? modelContext.save()
             }
         }
-        .alert("确认删除", isPresented: $showingDeleteAlert) {
-            Button("取消", role: .cancel) {}
-            Button("删除", role: .destructive) {
+        .alert("确认删除".appLocalized, isPresented: $showingDeleteAlert) {
+            Button("取消".appLocalized, role: .cancel) {}
+            Button("删除".appLocalized, role: .destructive) {
                 outfit.isDeleted = true
                 outfit.deletedAt = Date()
                 outfit.lastModified = Date()
@@ -283,7 +283,7 @@ struct OOTDEditorView: View {
                 dismiss()
             }
         } message: {
-            Text("确定要删除这张书页吗？")
+            Text("确定要删除这张书页吗？".appLocalized)
         }
         // MARK: - 编辑底图相关 Sheets
         .sheet(isPresented: $showingBackgroundSelectionSheet) {
@@ -316,21 +316,21 @@ struct OOTDEditorView: View {
             backgroundCropperSheet
         }
         // MARK: - 批量处理相关 Alerts & Sheets
-        .alert("批量处理", isPresented: $showingBatchConfirmation) {
-            Button("开始扫描", role: .destructive) {
+        .alert("批量处理".appLocalized, isPresented: $showingBatchConfirmation) {
+            Button("开始扫描".appLocalized, role: .destructive) {
                 processWardrobeSkirts()
             }
-            Button("取消", role: .cancel) {}
+            Button("取消".appLocalized, role: .cancel) {}
         } message: {
-            Text("将扫描衣橱中所有裙装并尝试生成抠图。这可能需要一些时间。")
+            Text("将扫描衣橱中所有裙装并尝试生成抠图。这可能需要一些时间。".appLocalized)
         }
-        .alert("修复数据", isPresented: $showingRepairConfirmation) {
-            Button("开始深度修复") {
+        .alert("修复数据".appLocalized, isPresented: $showingRepairConfirmation) {
+            Button("开始深度修复".appLocalized) {
                 repairMissingCutouts()
             }
-            Button("取消", role: .cancel) {}
+            Button("取消".appLocalized, role: .cancel) {}
         } message: {
-            Text("将扫描所有搭配，尝试通过哈希匹配、关联服饰匹配等方式，找回丢失的图片引用。")
+            Text("将扫描所有搭配，尝试通过哈希匹配、关联服饰匹配等方式，找回丢失的图片引用。".appLocalized)
         }
         .sheet(isPresented: $showingBatchReplaceSheet) {
             BatchReplaceCutoutView()
@@ -666,7 +666,7 @@ struct OOTDEditorView: View {
     
     private func processWardrobeSkirts() {
         isProcessing = true
-        processingMessage = "正在批量处理小裙装..."
+        processingMessage = "正在批量处理小裙装...".appLocalized
         
         Task {
             var count = 0
@@ -683,7 +683,7 @@ struct OOTDEditorView: View {
             for (index, clothing) in itemsToProcess.enumerated() {
                 if index % 5 == 0 {
                     await MainActor.run {
-                        processingMessage = "正在处理 \(index + 1)/\(total)..."
+                        processingMessage = "正在处理 %d/%d...".appLocalized(index + 1, total)
                     }
                 }
                 
@@ -712,7 +712,7 @@ struct OOTDEditorView: View {
     
     private func repairMissingCutouts() {
         isProcessing = true
-        processingMessage = "正在深度修复数据..."
+        processingMessage = "正在深度修复数据...".appLocalized
         
         Task {
             let report = await OOTDDataRepairService.shared.deepRepair(context: modelContext) { message in
