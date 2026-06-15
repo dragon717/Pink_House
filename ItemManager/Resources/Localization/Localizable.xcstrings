@@ -5345,10 +5345,46 @@
     "%d 页" : {
       "extractionState" : "stale",
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%d Seiten"
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "%d pages"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%d páginas"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%d pages"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%d ページ"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%d페이지"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%d páginas"
           }
         },
         "zh-Hans" : {
@@ -15718,10 +15754,46 @@
     },
     "一键替换主图" : {
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hauptbild mit einem Tipp ersetzen"
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Replace Main Image"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reemplazar imagen principal"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remplacer l’image principale"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "メイン画像を一括置換"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "대표 이미지 한 번에 교체"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Substituir imagem principal"
           }
         },
         "zh-Hans" : {
@@ -19340,10 +19412,46 @@
     },
     "人台画布" : {
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mannequin-Leinwand"
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Mannequin Canvas"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lienzo con maniquí"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Canevas mannequin"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "マネキンキャンバス"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "마네킹 캔버스"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tela com manequim"
           }
         },
         "zh-Hans" : {
@@ -25407,10 +25515,46 @@
     },
     "修复数据" : {
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Daten reparieren"
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Data"
+            "value" : "Repair Data"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reparar datos"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Réparer les données"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "データを修復"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "데이터 복구"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reparar dados"
           }
         },
         "zh-Hans" : {
@@ -25422,7 +25566,7 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "修複數據"
+            "value" : "修復資料"
           }
         }
       }
@@ -25627,10 +25771,46 @@
     },
     "修改名称" : {
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Name ändern"
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Change Name"
+            "value" : "Rename"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cambiar nombre"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Renommer"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "名前を変更"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이름 변경"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Renomear"
           }
         },
         "zh-Hans" : {
@@ -25672,10 +25852,46 @@
     },
     "修改封面" : {
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cover ändern"
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Change Cover"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cambiar portada"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Modifier la couverture"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "表紙を変更"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "표지 변경"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Alterar capa"
           }
         },
         "zh-Hans" : {
@@ -30914,10 +31130,46 @@
     },
     "分享成图片" : {
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Als Bild teilen"
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Share as Image"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Compartir como imagen"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Partager comme image"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "画像として共有"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이미지로 공유"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Compartilhar como imagem"
           }
         },
         "zh-Hans" : {
@@ -33929,7 +34181,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Wird geladen..."
+            "value" : "Wird geladen ..."
           }
         },
         "en" : {
@@ -34657,10 +34909,46 @@
     "单列" : {
       "extractionState" : "stale",
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eine Spalte"
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Single Column"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Una columna"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Une colonne"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1列"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1열"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Uma coluna"
           }
         },
         "zh-Hans" : {
@@ -37038,7 +37326,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Alle abwählen"
+            "value" : "Auswahl aufheben"
           }
         },
         "en" : {
@@ -38659,10 +38947,46 @@
     },
     "名称" : {
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Name"
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Name"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nombre"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nom"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "名前"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이름"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nome"
           }
         },
         "zh-Hans" : {
@@ -41476,10 +41800,46 @@
     },
     "图片丢失" : {
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bild fehlt"
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Image"
+            "value" : "Image Missing"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Falta la imagen"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Image manquante"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "画像が見つかりません"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이미지 없음"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Imagem ausente"
           }
         },
         "zh-Hans" : {
@@ -41491,7 +41851,7 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "圖片丟失"
+            "value" : "圖片遺失"
           }
         }
       }
@@ -42014,10 +42374,46 @@
     },
     "在前面新增" : {
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Davor hinzufügen"
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Add Before"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Agregar antes"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ajouter avant"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "前に追加"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "앞에 추가"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adicionar antes"
           }
         },
         "zh-Hans" : {
@@ -42082,10 +42478,46 @@
     },
     "在后面新增" : {
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Danach hinzufügen"
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Add After"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Agregar después"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ajouter après"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "後ろに追加"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "뒤에 추가"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adicionar depois"
           }
         },
         "zh-Hans" : {
@@ -42532,10 +42964,46 @@
     },
     "垃圾篓" : {
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Papierkorb"
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Trash Bin"
+            "value" : "Trash"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Papelera"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Corbeille"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ゴミ箱"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "휴지통"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lixeira"
           }
         },
         "zh-Hans" : {
@@ -47156,10 +47624,46 @@
     },
     "将扫描所有搭配，尝试通过哈希匹配、关联服饰匹配等方式，找回丢失的图片引用。" : {
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Alle Outfits werden gescannt, um fehlende Bildreferenzen über Hash-Abgleich, zugehörige Kleidungsstücke und ähnliche Methoden wiederzufinden."
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Scan,,, Image."
+            "value" : "This will scan all outfits and try to recover missing image references through hash matching, linked clothing matching, and related methods."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Se escanearán todos los conjuntos para intentar recuperar referencias de imagen perdidas mediante coincidencia de hash, prendas vinculadas y métodos similares."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Toutes les tenues seront analysées afin de retrouver les références d’images manquantes via correspondance de hachage, vêtements associés, etc."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "すべてのコーデをスキャンし、ハッシュ照合や関連服の照合などで失われた画像参照の復元を試みます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "모든 코디를 스캔해 해시 매칭, 연결된 의류 매칭 등으로 누락된 이미지 참조를 복구합니다."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Isso vai verificar todos os looks e tentar recuperar referências de imagem ausentes por correspondência de hash, roupas vinculadas e métodos semelhantes."
           }
         },
         "zh-Hans" : {
@@ -47171,17 +47675,53 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "將掃描所有搭配，嘗試通過哈希匹配、關聯服飾匹配等方式，找回丟失的圖片引用。"
+            "value" : "將掃描所有搭配，嘗試透過雜湊比對、關聯服飾比對等方式，找回遺失的圖片引用。"
           }
         }
       }
     },
     "将扫描衣橱中所有裙装并尝试生成抠图。这可能需要一些时间。" : {
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Alle Rockartikel im Kleiderschrank werden gescannt und es wird versucht, Ausschnitte zu erstellen. Das kann etwas dauern."
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Scan Closet Dress Item Generate Cutout. Required Time."
+            "value" : "This will scan all skirt items in your wardrobe and try to generate cutouts. This may take some time."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Se escanearán todas las prendas tipo falda del armario e intentaremos generar recortes. Esto puede tardar un poco."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tous les articles de type jupe de la garde-robe seront analysés pour tenter de générer des découpes. Cela peut prendre un peu de temps."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "クローゼット内のスカート系アイテムをすべてスキャンし、切り抜き生成を試みます。少し時間がかかる場合があります。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "옷장의 모든 스커트 아이템을 스캔하고 오려낸 이미지를 생성합니다. 시간이 조금 걸릴 수 있습니다."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Isso vai verificar todos os itens de saia no guarda-roupa e tentar gerar recortes. Pode levar algum tempo."
           }
         },
         "zh-Hans" : {
@@ -47193,7 +47733,7 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "將掃描衣櫥中所有裙裝並嘗試生成摳圖。這可能需要一些時間。"
+            "value" : "將掃描衣櫥中所有裙裝並嘗試生成去背圖。這可能需要一些時間。"
           }
         }
       }
@@ -52208,10 +52748,46 @@
     "已选择 %d 项" : {
       "extractionState" : "stale",
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%d ausgewählt"
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "%d selected"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%d seleccionados"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%d sélectionné(s)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%d 件を選択中"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%d개 선택됨"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%d selecionado(s)"
           }
         },
         "zh-Hans" : {
@@ -54739,10 +55315,46 @@
     },
     "开始扫描" : {
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Scan starten"
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Start scan"
+            "value" : "Start Scan"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Iniciar escaneo"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Démarrer l’analyse"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "スキャン開始"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "스캔 시작"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Iniciar verificação"
           }
         },
         "zh-Hans" : {
@@ -54887,10 +55499,46 @@
     },
     "开始深度修复" : {
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tiefenreparatur starten"
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Start"
+            "value" : "Start Deep Repair"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Iniciar reparación profunda"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Démarrer la réparation approfondie"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "詳細修復を開始"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "심층 복구 시작"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Iniciar reparo profundo"
           }
         },
         "zh-Hans" : {
@@ -66750,10 +67398,46 @@
     },
     "批量处理" : {
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stapelverarbeitung"
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Batch Process"
+            "value" : "Batch Processing"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Procesamiento por lotes"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Traitement groupé"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "一括処理"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "일괄 처리"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Processamento em lote"
           }
         },
         "zh-Hans" : {
@@ -66772,10 +67456,46 @@
     },
     "批量处理小裙装" : {
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rockartikel stapelweise verarbeiten"
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Batch Process Small Dresses"
+            "value" : "Batch Process Skirt Items"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Procesar faldas por lotes"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Traiter les jupes par lot"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "スカート系アイテムを一括処理"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "스커트 아이템 일괄 처리"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Processar saias em lote"
           }
         },
         "zh-Hans" : {
@@ -66933,10 +67653,46 @@
     },
     "批量添加图片书页" : {
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bildseiten stapelweise hinzufügen"
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Batch Add Image Pages"
+            "value" : "Add Image Pages in Batch"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Agregar páginas de imágenes por lotes"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ajouter des pages image par lot"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "画像ページを一括追加"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이미지 페이지 일괄 추가"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adicionar páginas de imagem em lote"
           }
         },
         "zh-Hans" : {
@@ -66948,17 +67704,53 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "批量添加圖片書頁"
+            "value" : "批量新增圖片書頁"
           }
         }
       }
     },
     "批量编辑" : {
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mehrfach bearbeiten"
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Batch Edit"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Edición por lotes"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Modification groupée"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "一括編集"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "일괄 편집"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Editar em lote"
           }
         },
         "zh-Hans" : {
@@ -66970,7 +67762,7 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "批次編輯"
+            "value" : "批量編輯"
           }
         }
       }
@@ -72612,10 +73404,46 @@
     },
     "新增书页" : {
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Neue Seite"
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Page"
+            "value" : "New Page"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nueva página"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nouvelle page"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新規ページ"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "새 페이지"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nova página"
           }
         },
         "zh-Hans" : {
@@ -87462,10 +88290,46 @@
     },
     "点击右上角的+号新建新的穿搭书页" : {
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tippe oben rechts auf +, um eine neue Outfit-Seite zu erstellen."
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "+ New Page"
+            "value" : "Tap the + in the top right to create a new outfit page."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Toca el + de la esquina superior derecha para crear una nueva página de look."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Touchez le + en haut à droite pour créer une nouvelle page de tenue."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "右上の + をタップして新しいコーデページを作成します。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "오른쪽 위 +를 눌러 새 코디 페이지를 만드세요."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Toque no + no canto superior direito para criar uma nova página de look."
           }
         },
         "zh-Hans" : {
@@ -87477,7 +88341,7 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "點擊右上角的+號新建新的穿搭書頁"
+            "value" : "點擊右上角的 + 號新建新的穿搭書頁"
           }
         }
       }
@@ -92113,10 +92977,46 @@
     "确定要删除选中的 %d 个书页吗？删除后可在回收站中恢复。" : {
       "extractionState" : "stale",
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%d ausgewählte Seiten löschen? Du kannst sie später aus dem Papierkorb wiederherstellen."
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Delete the selected %d pages? They can be restored from the Recycle Bin."
+            "value" : "Delete the %d selected pages? You can restore them from Trash later."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "¿Eliminar las %d páginas seleccionadas? Podrás restaurarlas desde la papelera más tarde."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Supprimer les %d pages sélectionnées ? Vous pourrez les restaurer depuis la corbeille plus tard."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "選択した %d 件のページを削除しますか？あとでゴミ箱から復元できます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "선택한 페이지 %d개를 삭제할까요? 나중에 휴지통에서 복원할 수 있습니다."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Excluir as %d páginas selecionadas? Você poderá restaurá-las da lixeira depois."
           }
         },
         "zh-Hans" : {
@@ -92128,7 +93028,7 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "確定要刪除選中的 %d 個書頁嗎？刪除後可在回收站中復原。"
+            "value" : "確定要刪除選中的 %d 個書頁嗎？刪除後可在回收站中恢復。"
           }
         }
       }
@@ -92341,10 +93241,46 @@
     "确定要复制选中的 %d 个书页吗？" : {
       "extractionState" : "stale",
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%d ausgewählte Seiten kopieren?"
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Copy the selected %d pages?"
+            "value" : "Copy the %d selected pages?"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "¿Copiar las %d páginas seleccionadas?"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copier les %d pages sélectionnées ?"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "選択した %d 件のページをコピーしますか？"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "선택한 페이지 %d개를 복사할까요?"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copiar as %d páginas selecionadas?"
           }
         },
         "zh-Hans" : {
@@ -94294,10 +95230,46 @@
     },
     "确认批量删除" : {
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mehrfachlöschung bestätigen"
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Confirm batch delete"
+            "value" : "Confirm Batch Delete"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Confirmar eliminación por lotes"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Confirmer la suppression groupée"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "一括削除を確認"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "일괄 삭제 확인"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Confirmar exclusão em lote"
           }
         },
         "zh-Hans" : {
@@ -94319,7 +95291,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Stapelkopie bestätigen"
+            "value" : "Mehrfachkopie bestätigen"
           }
         },
         "en" : {
@@ -95000,10 +95972,46 @@
     },
     "视图布局" : {
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ansichtslayout"
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "View Layout"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Diseño de vista"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Disposition de la vue"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "表示レイアウト"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "보기 레이아웃"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Layout da visualização"
           }
         },
         "zh-Hans" : {
@@ -95348,10 +96356,46 @@
     },
     "移动到..." : {
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Verschieben nach ..."
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Move to..."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mover a..."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Déplacer vers..."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "移動先..."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이동 위치..."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mover para..."
           }
         },
         "zh-Hans" : {
@@ -95738,10 +96782,46 @@
     },
     "空白" : {
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Leer"
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Blank"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En blanco"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vide"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "空白"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "빈 페이지"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Em branco"
           }
         },
         "zh-Hans" : {
@@ -95783,10 +96863,46 @@
     },
     "空白画布" : {
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Leere Leinwand"
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Blank Canvas"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lienzo en blanco"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Canevas vierge"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "空白キャンバス"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "빈 캔버스"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tela em branco"
           }
         },
         "zh-Hans" : {
@@ -102624,10 +103740,46 @@
     },
     "自定义图片" : {
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eigenes Bild"
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Custom Image"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Imagen personalizada"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Image personnalisée"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "カスタム画像"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "사용자 지정 이미지"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Imagem personalizada"
           }
         },
         "zh-Hans" : {
@@ -102639,7 +103791,7 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "自定義圖片"
+            "value" : "自訂圖片"
           }
         }
       }
@@ -112606,10 +113758,46 @@
     },
     "还没有穿搭书页" : {
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Noch keine Outfit-Seiten"
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "No Page"
+            "value" : "No outfit pages yet"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aún no hay páginas de looks"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucune page de tenue pour le moment"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "コーデページはまだありません"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "아직 코디 페이지가 없어요"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ainda não há páginas de looks"
           }
         },
         "zh-Hans" : {
@@ -115639,10 +116827,46 @@
     },
     "选择底图新建" : {
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mit Hintergrund erstellen"
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Choose Base Image to Create"
+            "value" : "Create with Background"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Crear con fondo"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Créer avec un fond"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "背景を選んで作成"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "배경 선택해 만들기"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Criar com fundo"
           }
         },
         "zh-Hans" : {
@@ -116893,10 +118117,46 @@
     },
     "重命名" : {
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Umbenennen"
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Rename"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Renombrar"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Renommer"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "名前を変更"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이름 변경"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Renomear"
           }
         },
         "zh-Hans" : {
@@ -116908,17 +118168,53 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "重命名"
+            "value" : "重新命名"
           }
         }
       }
     },
     "重命名手帐" : {
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Journal umbenennen"
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Journal"
+            "value" : "Rename Journal"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Renombrar diario"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Renommer le journal"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ジャーナル名を変更"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "저널 이름 변경"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Renomear diário"
           }
         },
         "zh-Hans" : {
@@ -116930,7 +118226,7 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "重命名手帳"
+            "value" : "重新命名手帳"
           }
         }
       }
@@ -127744,6 +129040,354 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "外部連結"
+          }
+        }
+      }
+    },
+    "确定要删除书页「%@」吗？删除后可在回收站中恢复。" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Seite „%@“ löschen? Du kannst sie später aus dem Papierkorb wiederherstellen."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Delete page “%@”? You can restore it from Trash later."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "¿Eliminar la página “%@”? Podrás restaurarla desde la papelera más tarde."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Supprimer la page « %@ » ? Vous pourrez la restaurer depuis la corbeille plus tard."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ページ「%@」を削除しますか？あとでゴミ箱から復元できます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“%@” 페이지를 삭제할까요? 나중에 휴지통에서 복원할 수 있습니다."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Excluir a página “%@”? Você poderá restaurá-la da lixeira depois."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "确定要删除书页「%@」吗？删除后可在回收站中恢复。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "確定要刪除書頁「%@」嗎？刪除後可在回收站中恢復。"
+          }
+        }
+      }
+    },
+    "确定要删除此书页吗？删除后可在回收站中恢复。" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Diese Seite löschen? Du kannst sie später aus dem Papierkorb wiederherstellen."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Delete this page? You can restore it from Trash later."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "¿Eliminar esta página? Podrás restaurarla desde la papelera más tarde."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Supprimer cette page ? Vous pourrez la restaurer depuis la corbeille plus tard."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このページを削除しますか？あとでゴミ箱から復元できます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이 페이지를 삭제할까요? 나중에 휴지통에서 복원할 수 있습니다."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Excluir esta página? Você poderá restaurá-la da lixeira depois."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "确定要删除此书页吗？删除后可在回收站中恢复。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "確定要刪除此書頁嗎？刪除後可在回收站中恢復。"
+          }
+        }
+      }
+    },
+    "正在添加书页... %d/%d" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Seiten werden hinzugefügt ... %d/%d"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adding pages... %d/%d"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Agregando páginas... %d/%d"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ajout des pages... %d/%d"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ページを追加中... %d/%d"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "페이지 추가 중... %d/%d"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adicionando páginas... %d/%d"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在添加书页... %d/%d"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在新增書頁... %d/%d"
+          }
+        }
+      }
+    },
+    "正在批量处理小裙装..." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rockartikel werden stapelweise verarbeitet ..."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Batch processing skirt items..."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Procesando prendas tipo falda por lotes..."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Traitement groupé des articles de type jupe..."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "スカート系アイテムを一括処理中..."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "스커트 아이템 일괄 처리 중..."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Processando itens de saia em lote..."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在批量处理小裙装..."
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在批量處理小裙裝..."
+          }
+        }
+      }
+    },
+    "正在处理 %d/%d..." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Verarbeitung läuft %d/%d ..."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Processing %d/%d..."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Procesando %d/%d..."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Traitement %d/%d..."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "処理中 %d/%d..."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "처리 중 %d/%d..."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Processando %d/%d..."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在处理 %d/%d..."
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在處理 %d/%d..."
+          }
+        }
+      }
+    },
+    "正在深度修复数据..." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Daten werden tiefgehend repariert ..."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Deep repairing data..."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reparando datos en profundidad..."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Réparation approfondie des données..."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "データを詳細修復中..."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "데이터 심층 복구 중..."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reparando dados profundamente..."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在深度修复数据..."
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在深度修復資料..."
           }
         }
       }

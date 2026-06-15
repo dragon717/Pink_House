@@ -15,9 +15,9 @@ enum GridMode: Int, CaseIterable {
     
     var displayName: String {
         switch self {
-        case .single: return "单列"
-        case .double: return "双列"
-        case .triple: return "三列"
+        case .single: return "单列".appLocalized
+        case .double: return "双列".appLocalized
+        case .triple: return "三列".appLocalized
         }
     }
 }

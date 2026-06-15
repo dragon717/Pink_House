@@ -49,10 +49,10 @@ extension View {
             .fullScreenCover(isPresented: showingBackgroundCropper) {
                 backgroundCropperSheet()
             }
-            .alert("重命名", isPresented: showingRenameAlert) {
-                TextField("名称", text: newPageName)
-                Button("取消", role: .cancel) {}
-                Button("确定") {
+            .alert("重命名".appLocalized, isPresented: showingRenameAlert) {
+                TextField("名称".appLocalized, text: newPageName)
+                Button("取消".appLocalized, role: .cancel) {}
+                Button("确定".appLocalized) {
                     saveRename()
                 }
             }

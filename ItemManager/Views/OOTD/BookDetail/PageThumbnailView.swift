@@ -92,7 +92,7 @@ struct PageThumbnailView: View {
                     .stroke(style: StrokeStyle(lineWidth: 1, dash: [4]))
                     .foregroundStyle(.gray.opacity(0.3))
                     .padding(16)
-                Text("空白")
+                Text("空白".appLocalized)
                     .font(.caption2)
                     .foregroundStyle(.gray)
             }
@@ -102,7 +102,7 @@ struct PageThumbnailView: View {
                 Image(systemName: "photo")
                     .font(.system(size: 40))
                     .foregroundStyle(.gray.opacity(0.3))
-                Text("图片丢失")
+                Text("图片丢失".appLocalized)
                     .font(.caption2)
                     .foregroundStyle(.gray)
                     .offset(y: 24)

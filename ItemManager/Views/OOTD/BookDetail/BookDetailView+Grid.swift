@@ -95,45 +95,45 @@ extension BookDetailView {
             newPageName = page.note
             showingRenameAlert = true
         } label: {
-            Label("修改名称", systemImage: "pencil")
+            Label("修改名称".appLocalized, systemImage: "pencil")
         }
 
         Button {
             duplicatePage(page)
         } label: {
-            Label("复制", systemImage: "doc.on.doc")
+            Label("复制".appLocalized, systemImage: "doc.on.doc")
         }
 
         Button {
             sharePage(page)
         } label: {
-            Label("分享成图片", systemImage: "square.and.arrow.up")
+            Label("分享成图片".appLocalized, systemImage: "square.and.arrow.up")
         }
 
         Button {
             insertPage(after: page)
         } label: {
-            Label("在后面新增", systemImage: "arrow.right.square")
+            Label("在后面新增".appLocalized, systemImage: "arrow.right.square")
         }
 
         Button {
             insertPage(before: page)
         } label: {
-            Label("在前面新增", systemImage: "arrow.left.square")
+            Label("在前面新增".appLocalized, systemImage: "arrow.left.square")
         }
 
         Button {
             pageToMove = page
             showingMoveSheet = true
         } label: {
-            Label("移动到...", systemImage: "folder")
+            Label("移动到...".appLocalized, systemImage: "folder")
         }
 
         Button(role: .destructive) {
             pageToDelete = page
             showingDeleteConfirmation = true
         } label: {
-            Label("删除", systemImage: "trash")
+            Label("删除".appLocalized, systemImage: "trash")
         }
     }
 

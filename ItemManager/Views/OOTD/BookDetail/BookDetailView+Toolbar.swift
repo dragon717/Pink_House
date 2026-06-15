@@ -48,7 +48,7 @@ extension BookDetailView {
 
     private var gridModeMenu: some View {
         Menu {
-            Picker("视图布局", selection: $gridModeValue) {
+            Picker("视图布局".appLocalized, selection: $gridModeValue) {
                 ForEach(GridMode.allCases, id: \.rawValue) { mode in
                     Label(mode.displayName, systemImage: mode.iconName)
                         .tag(mode.rawValue)
@@ -94,13 +94,13 @@ extension BookDetailView {
                     Button {
                         showingCoverPicker = true
                     } label: {
-                        Label("修改封面", systemImage: "photo")
+                        Label("修改封面".appLocalized, systemImage: "photo")
                     }
 
                     Button {
                         showingRenameBookAlert = true
                     } label: {
-                        Label("重命名手帐", systemImage: "pencil")
+                        Label("重命名手帐".appLocalized, systemImage: "pencil")
                     }
 
                     Divider()
@@ -109,7 +109,7 @@ extension BookDetailView {
                         isBatchEditing = true
                         selectedPages.removeAll()
                     } label: {
-                        Label("批量编辑", systemImage: "checkmark.circle")
+                        Label("批量编辑".appLocalized, systemImage: "checkmark.circle")
                     }
 
                     Divider()
@@ -117,7 +117,7 @@ extension BookDetailView {
                     Button {
                         showingTrash = true
                     } label: {
-                        Label("垃圾篓", systemImage: "trash")
+                        Label("垃圾篓".appLocalized, systemImage: "trash")
                     }
 
                     Divider()
@@ -125,19 +125,19 @@ extension BookDetailView {
                     Button {
                         showingBatchConfirmation = true
                     } label: {
-                        Label("批量处理小裙装", systemImage: "wand.and.stars")
+                        Label("批量处理小裙装".appLocalized, systemImage: "wand.and.stars")
                     }
 
                     Button {
                         showingRepairConfirmation = true
                     } label: {
-                        Label("修复数据", systemImage: "hammer")
+                        Label("修复数据".appLocalized, systemImage: "hammer")
                     }
 
                     Button {
                         showingBatchReplaceSheet = true
                     } label: {
-                        Label("一键替换主图", systemImage: "arrow.triangle.2.circlepath")
+                        Label("一键替换主图".appLocalized, systemImage: "arrow.triangle.2.circlepath")
                     }
                 } label: {
                     moreMenuIcon
@@ -160,7 +160,7 @@ extension BookDetailView {
             Button {
                 showingNewPageBackgroundSheet = true
             } label: {
-                Label("选择底图新建", systemImage: "square.on.square")
+                Label("选择底图新建".appLocalized, systemImage: "square.on.square")
             }
 
             Divider()
@@ -168,10 +168,10 @@ extension BookDetailView {
             Button {
                 showingBatchPhotoPicker = true
             } label: {
-                Label("批量添加图片书页", systemImage: "photo.stack")
+                Label("批量添加图片书页".appLocalized, systemImage: "photo.stack")
             }
         } label: {
-            Label("新增书页", systemImage: "doc.badge.plus")
+            Label("新增书页".appLocalized, systemImage: "doc.badge.plus")
         }
     }
 
@@ -195,25 +195,25 @@ extension BookDetailView {
                 submenuDepth: 0,
                 items: [
                     .action(
-                        title: "新增书页",
+                        title: "新增书页".appLocalized,
                         systemImage: "doc.badge.plus",
                         isHighlighted: true,
                         showsChevron: true,
                         action: presentAddPageGuideMenu
                     ),
                     .action(
-                        title: "修改封面",
+                        title: "修改封面".appLocalized,
                         systemImage: "photo",
                         action: { showingCoverPicker = true }
                     ),
                     .action(
-                        title: "重命名手帐",
+                        title: "重命名手帐".appLocalized,
                         systemImage: "pencil",
                         action: { showingRenameBookAlert = true }
                     ),
                     .divider,
                     .action(
-                        title: "批量编辑",
+                        title: "批量编辑".appLocalized,
                         systemImage: "checkmark.circle",
                         action: {
                             isBatchEditing = true
@@ -222,23 +222,23 @@ extension BookDetailView {
                     ),
                     .divider,
                     .action(
-                        title: "垃圾篓",
+                        title: "垃圾篓".appLocalized,
                         systemImage: "trash",
                         action: { showingTrash = true }
                     ),
                     .divider,
                     .action(
-                        title: "批量处理小裙装",
+                        title: "批量处理小裙装".appLocalized,
                         systemImage: "wand.and.stars",
                         action: { showingBatchConfirmation = true }
                     ),
                     .action(
-                        title: "修复数据",
+                        title: "修复数据".appLocalized,
                         systemImage: "hammer",
                         action: { showingRepairConfirmation = true }
                     ),
                     .action(
-                        title: "一键替换主图",
+                        title: "一键替换主图".appLocalized,
                         systemImage: "arrow.triangle.2.circlepath",
                         action: { showingBatchReplaceSheet = true }
                     )
@@ -256,24 +256,24 @@ extension BookDetailView {
                 submenuDepth: 1,
                 items: [
                     .action(
-                        title: "人台画布",
+                        title: "人台画布".appLocalized,
                         systemImage: "tshirt",
                         action: { addNewPage(canvasType: OOTDCanvasType.mannequin, mannequinAssetID: OOTDMannequinBackground.defaultID) }
                     ),
                     .action(
-                        title: "空白画布",
+                        title: "空白画布".appLocalized,
                         systemImage: "square.dashed",
                         isHighlighted: true,
                         action: { addNewPage(canvasType: OOTDCanvasType.blank) }
                     ),
                     .action(
-                        title: "自定义图片",
+                        title: "自定义图片".appLocalized,
                         systemImage: "photo",
                         action: { showingBackgroundPicker = true }
                     ),
                     .divider,
                     .action(
-                        title: "批量添加图片书页",
+                        title: "批量添加图片书页".appLocalized,
                         systemImage: "photo.stack",
                         action: { showingBatchPhotoPicker = true }
                     )

@@ -123,7 +123,7 @@ private struct PagePlaceholderView: View {
             VStack {
                 ProgressView()
                     .scaleEffect(1.5)
-                Text("加载中...")
+                Text("加载中...".appLocalized)
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .padding(.top, 8)

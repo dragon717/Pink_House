@@ -36,9 +36,9 @@ struct BookDetailView: View {
 
     var deleteConfirmationMessage: String {
         if let page = pageToDelete {
-            return "确定要删除书页「\(page.note)」吗？删除后可在回收站中恢复。"
+            return "确定要删除书页「%@」吗？删除后可在回收站中恢复。".appLocalized(page.note)
         } else {
-            return "确定要删除此书页吗？删除后可在回收站中恢复。"
+            return "确定要删除此书页吗？删除后可在回收站中恢复。".appLocalized
         }
     }
 
@@ -134,7 +134,7 @@ struct BookDetailView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
 
         let withNav = mainView
-            .navigationTitle(isBatchEditing ? "已选择 \(selectedPages.count) 项" : book.title)
+            .navigationTitle(isBatchEditing ? "已选择 %d 项".appLocalized(selectedPages.count) : book.title)
             .navigationBarTitleDisplayMode(.inline)
             .toolbarBackground(.visible, for: .navigationBar)
             .toolbar {
@@ -181,31 +181,31 @@ struct BookDetailView: View {
                     }
                 )
             }
-            .alert("确认删除", isPresented: $showingDeleteConfirmation, actions: {
-                Button("取消", role: .cancel) {
+            .alert("确认删除".appLocalized, isPresented: $showingDeleteConfirmation, actions: {
+                Button("取消".appLocalized, role: .cancel) {
                     pageToDelete = nil
                 }
-                Button("删除", role: .destructive) {
+                Button("删除".appLocalized, role: .destructive) {
                     confirmDeletePage()
                 }
             }, message: {
                 Text(deleteConfirmationMessage)
             })
-            .alert("确认批量删除", isPresented: $showingBatchDeleteConfirmation) {
-                Button("取消", role: .cancel) {}
-                Button("删除", role: .destructive) {
+            .alert("确认批量删除".appLocalized, isPresented: $showingBatchDeleteConfirmation) {
+                Button("取消".appLocalized, role: .cancel) {}
+                Button("删除".appLocalized, role: .destructive) {
                     confirmBatchDelete()
                 }
             } message: {
-                Text("确定要删除选中的 \(selectedPages.count) 个书页吗？删除后可在回收站中恢复。")
+                Text("确定要删除选中的 %d 个书页吗？删除后可在回收站中恢复。".appLocalized(selectedPages.count))
             }
-            .alert("确认批量复制", isPresented: $showingBatchCopyConfirmation) {
-                Button("取消", role: .cancel) {}
-                Button("复制") {
+            .alert("确认批量复制".appLocalized, isPresented: $showingBatchCopyConfirmation) {
+                Button("取消".appLocalized, role: .cancel) {}
+                Button("复制".appLocalized) {
                     confirmBatchCopy()
                 }
             } message: {
-                Text("确定要复制选中的 \(selectedPages.count) 个书页吗？")
+                Text("确定要复制选中的 %d 个书页吗？".appLocalized(selectedPages.count))
             }
             .fullScreenCover(isPresented: $showingShareCard) {
                 if let page = pageToShare {
@@ -215,10 +215,10 @@ struct BookDetailView: View {
                     )
                 }
             }
-            .alert("重命名手帐", isPresented: $showingRenameBookAlert) {
-                TextField("名称", text: $renameBookName)
-                Button("取消", role: .cancel) {}
-                Button("保存") {
+            .alert("重命名手帐".appLocalized, isPresented: $showingRenameBookAlert) {
+                TextField("名称".appLocalized, text: $renameBookName)
+                Button("取消".appLocalized, role: .cancel) {}
+                Button("保存".appLocalized) {
                     book.title = renameBookName
                     book.lastModified = Date()
                     try? modelContext.save()
@@ -255,7 +255,7 @@ struct BookDetailView: View {
                             ProgressView(value: Double(batchProcessingProgress), total: Double(batchTotalCount))
                                 .progressViewStyle(CircularProgressViewStyle(tint: .white))
                                 .scaleEffect(1.5)
-                            Text("正在添加书页... \(batchProcessingProgress)/\(batchTotalCount)")
+                            Text("正在添加书页... %d/%d".appLocalized(batchProcessingProgress, batchTotalCount))
                                 .foregroundStyle(.white)
                                 .font(.headline)
                         }
@@ -265,21 +265,21 @@ struct BookDetailView: View {
                     }
                 }
             }
-            .alert("批量处理", isPresented: $showingBatchConfirmation) {
-                Button("开始扫描", role: .destructive) {
+            .alert("批量处理".appLocalized, isPresented: $showingBatchConfirmation) {
+                Button("开始扫描".appLocalized, role: .destructive) {
                     processWardrobeSkirts()
                 }
-                Button("取消", role: .cancel) {}
+                Button("取消".appLocalized, role: .cancel) {}
             } message: {
-                Text("将扫描衣橱中所有裙装并尝试生成抠图。这可能需要一些时间。")
+                Text("将扫描衣橱中所有裙装并尝试生成抠图。这可能需要一些时间。".appLocalized)
             }
-            .alert("修复数据", isPresented: $showingRepairConfirmation) {
-                Button("开始深度修复") {
+            .alert("修复数据".appLocalized, isPresented: $showingRepairConfirmation) {
+                Button("开始深度修复".appLocalized) {
                     repairMissingCutouts()
                 }
-                Button("取消", role: .cancel) {}
+                Button("取消".appLocalized, role: .cancel) {}
             } message: {
-                Text("将扫描所有搭配，尝试通过哈希匹配、关联服饰匹配等方式，找回丢失的图片引用。")
+                Text("将扫描所有搭配，尝试通过哈希匹配、关联服饰匹配等方式，找回丢失的图片引用。".appLocalized)
             }
             .sheet(isPresented: $showingBatchReplaceSheet) {
                 BatchReplaceCutoutView()
@@ -716,7 +716,7 @@ struct BookDetailView: View {
     
     private func processWardrobeSkirts() {
         isProcessing = true
-        processingMessage = "正在批量处理小裙装..."
+        processingMessage = "正在批量处理小裙装...".appLocalized
         
         Task {
             var count = 0
@@ -733,7 +733,7 @@ struct BookDetailView: View {
             for (index, clothing) in itemsToProcess.enumerated() {
                 if index % 5 == 0 {
                     await MainActor.run {
-                        processingMessage = "正在处理 \(index + 1)/\(total)..."
+                        processingMessage = "正在处理 %d/%d...".appLocalized(index + 1, total)
                     }
                 }
                 
@@ -762,7 +762,7 @@ struct BookDetailView: View {
     
     private func repairMissingCutouts() {
         isProcessing = true
-        processingMessage = "正在深度修复数据..."
+        processingMessage = "正在深度修复数据...".appLocalized
         
         Task {
             let report = await OOTDDataRepairService.shared.deepRepair(context: modelContext) { message in
@@ -801,11 +801,11 @@ struct BookDetailView: View {
                         .font(.system(size: 54))
                         .foregroundStyle(.secondary.opacity(0.58))
 
-                    Text("还没有穿搭书页")
+                    Text("还没有穿搭书页".appLocalized)
                         .font(.title3.weight(.semibold))
                         .foregroundStyle(.secondary)
 
-                    Text("点击右上角的+号新建新的穿搭书页")
+                    Text("点击右上角的+号新建新的穿搭书页".appLocalized)
                         .font(.caption)
                         .foregroundStyle(.tertiary)
                 }
@@ -825,7 +825,7 @@ struct BookDetailView: View {
                 Button {
                     toggleSelectAll()
                 } label: {
-                    Text(selectedPages.count == sortedPages.count ? "取消全选" : "全选")
+                    Text((selectedPages.count == sortedPages.count ? "取消全选" : "全选").appLocalized)
                         .font(.system(size: 16, weight: .medium))
                 }
 
@@ -857,7 +857,7 @@ struct BookDetailView: View {
                     isBatchEditing = false
                     selectedPages.removeAll()
                 } label: {
-                    Text("完成")
+                    Text("完成".appLocalized)
                         .font(.system(size: 16, weight: .semibold))
                         .foregroundStyle(.pink)
                 }
