@@ -45,12 +45,12 @@ struct MultiPhotoPickerView: View {
                     selectionView
                 }
             }
-            .navigationTitle("选择照片")
+            .navigationTitle("选择照片".appLocalized)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     if !isProcessing {
-                        Button("取消") {
+                        Button("取消".appLocalized) {
                             dismiss()
                         }
                     }
@@ -86,15 +86,15 @@ struct MultiPhotoPickerView: View {
                         .font(.system(size: 60))
                         .foregroundStyle(.pink)
                     
-                    Text(selectedItems.isEmpty ? "从图库选择" : "已选择 \(selectedItems.count) 张照片")
+                    Text(selectedItems.isEmpty ? "从图库选择".appLocalized : "已选择 %d 张照片".appLocalized(selectedItems.count))
                         .font(.headline)
                     
                     if selectedItems.isEmpty {
-                        Text("最多可选择 \(maxSelectionCount) 张")
+                        Text("最多可选择 %d 张".appLocalized(maxSelectionCount))
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     } else {
-                        Text("点击继续添加更多照片")
+                        Text("点击继续添加更多照片".appLocalized)
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -120,10 +120,10 @@ struct MultiPhotoPickerView: View {
             // 底部操作栏
             bottomActionBar
         }
-        .alert("选择数量限制", isPresented: $showMaxSelectionAlert) {
-            Button("确定", role: .cancel) {}
+        .alert("选择数量限制".appLocalized, isPresented: $showMaxSelectionAlert) {
+            Button("确定".appLocalized, role: .cancel) {}
         } message: {
-            Text("一次最多只能选择 \(maxSelectionCount) 张照片")
+            Text("一次最多只能选择 %d 张照片".appLocalized(maxSelectionCount))
         }
         .onDisappear {
             previewLoadTask?.cancel()
@@ -134,7 +134,7 @@ struct MultiPhotoPickerView: View {
     private var selectedPhotosPreview: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text("已选照片预览")
+                Text("已选照片预览".appLocalized)
                     .font(.subheadline)
                     .fontWeight(.medium)
                     .foregroundStyle(.secondary)
@@ -247,9 +247,9 @@ struct MultiPhotoPickerView: View {
                     .foregroundStyle(.pink)
                 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("批量抠图")
+                    Text("批量抠图".appLocalized)
                         .font(.headline)
-                    Text("选择照片后将自动抠图并添加到画布")
+                    Text("选择照片后将自动抠图并添加到画布".appLocalized)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -261,7 +261,7 @@ struct MultiPhotoPickerView: View {
             
             // 选择数量指示
             HStack {
-                Text("已选择 \(selectedItems.count) 张照片")
+                Text("已选择 %d 张照片".appLocalized(selectedItems.count))
                     .font(.subheadline)
                 
                 Spacer()
@@ -270,7 +270,7 @@ struct MultiPhotoPickerView: View {
                     Button {
                         selectedItems.removeAll()
                     } label: {
-                        Label("清空", systemImage: "xmark.circle")
+                        Label("清空".appLocalized, systemImage: "xmark.circle")
                             .font(.caption)
                     }
                     .buttonStyle(.borderless)
@@ -291,7 +291,7 @@ struct MultiPhotoPickerView: View {
                 Button {
                     selectedItems.removeAll()
                 } label: {
-                    Label("清空", systemImage: "xmark.circle")
+                    Label("清空".appLocalized, systemImage: "xmark.circle")
                         .font(.subheadline)
                 }
                 .buttonStyle(.bordered)
@@ -305,7 +305,7 @@ struct MultiPhotoPickerView: View {
                 } label: {
                     HStack {
                         Image(systemName: "checkmark.circle.fill")
-                        Text("确认选择 (\(selectedItems.count))")
+                        Text("确认选择 (%d)".appLocalized(selectedItems.count))
                     }
                     .font(.headline)
                     .foregroundStyle(.white)
@@ -331,11 +331,11 @@ struct MultiPhotoPickerView: View {
                 .foregroundStyle(.pink.opacity(0.8))
             
             VStack(spacing: 8) {
-                Text("确认抠图 \(selectedItems.count) 张照片？")
+                Text("确认抠图 %d 张照片？".appLocalized(selectedItems.count))
                     .font(.title2)
                     .fontWeight(.semibold)
                 
-                Text("处理过程可能需要一些时间")
+                Text("处理过程可能需要一些时间".appLocalized)
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }
@@ -348,7 +348,7 @@ struct MultiPhotoPickerView: View {
                 } label: {
                     HStack {
                         Image(systemName: "scissors")
-                        Text("开始抠图")
+                        Text("开始抠图".appLocalized)
                     }
                     .font(.headline)
                     .foregroundStyle(.white)
@@ -361,7 +361,7 @@ struct MultiPhotoPickerView: View {
                 Button {
                     showConfirmation = false
                 } label: {
-                    Text("返回修改")
+                    Text("返回修改".appLocalized)
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
@@ -393,7 +393,7 @@ struct MultiPhotoPickerView: View {
                     Text("\(processingProgress)/\(selectedItems.count)")
                         .font(.title2)
                         .fontWeight(.bold)
-                    Text("处理中")
+                    Text("处理中".appLocalized)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -404,7 +404,7 @@ struct MultiPhotoPickerView: View {
                     .font(.headline)
                     .multilineTextAlignment(.center)
                 
-                Text("正在使用 Vision 框架进行智能抠图...")
+                Text("正在使用 Vision 框架进行智能抠图...".appLocalized)
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -429,7 +429,7 @@ struct MultiPhotoPickerView: View {
         for (index, item) in selectedItems.enumerated() {
             await MainActor.run {
                 processingProgress = index
-                processingMessage = "正在处理第 \(index + 1) 张..."
+                processingMessage = "正在处理第 %d 张...".appLocalized(index + 1)
             }
             
             do {
@@ -457,7 +457,7 @@ struct MultiPhotoPickerView: View {
         
         await MainActor.run {
             processingProgress = selectedItems.count
-            processingMessage = "完成！"
+            processingMessage = "完成！".appLocalized
             
             // 短暂延迟后关闭并回调
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
