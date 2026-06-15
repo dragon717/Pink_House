@@ -19,18 +19,18 @@ private enum DataManagementConfirmationAction: String, Identifiable {
     var confirmButtonTitle: String {
         switch self {
         case .exportCSV:
-            return "确认导出"
+            return "确认导出".appLocalized
         case .backupData:
-            return "确认备份"
+            return "确认备份".appLocalized
         }
     }
 
     var message: String {
         switch self {
         case .exportCSV:
-            return "将生成当前数据的 CSV 文件，并打开系统分享面板。确定继续吗？"
+            return "将生成当前数据的 CSV 文件，并打开系统分享面板。确定继续吗？".appLocalized
         case .backupData:
-            return "将把当前数据打包成本地备份文件，过程可能需要一点时间。确定继续吗？"
+            return "将把当前数据打包成本地备份文件，过程可能需要一点时间。确定继续吗？".appLocalized
         }
     }
 }
@@ -69,7 +69,7 @@ struct DataManagementView: View {
                         let config = getFieldConfig(field)
                         HStack {
                             NavigationLink(destination: FieldManagementView(title: config.title, keyPath: config.keyPath, isCommaSeparated: config.isCommaSeparated)) {
-                                Label(config.label, systemImage: config.systemImage)
+                                Label(config.label.appLocalized, systemImage: config.systemImage)
                             }
                             
                             Spacer()
@@ -134,7 +134,7 @@ struct DataManagementView: View {
                     }
                 }
             }
-            .navigationTitle("数据管理")
+            .navigationTitle("数据管理".appLocalized)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     EditButton()
@@ -150,28 +150,28 @@ struct DataManagementView: View {
                     self.restoreURL = url
                     self.showingRestoreAlert = true
                 case .failure(let error):
-                    self.message = "选择文件失败: \(error.localizedDescription)"
+                    self.message = "选择文件失败: %@".appLocalized(error.localizedDescription)
                     self.showingMessage = true
                 }
             }
-            .alert("请再确认一次", isPresented: showingConfirmationAlert, presenting: pendingConfirmationAction) { action in
-                Button("取消", role: .cancel) { }
+            .alert("请再确认一次".appLocalized, isPresented: showingConfirmationAlert, presenting: pendingConfirmationAction) { action in
+                Button("取消".appLocalized, role: .cancel) { }
                 Button(action.confirmButtonTitle) {
                     handleConfirmedAction(action)
                 }
             } message: { action in
                 Text(action.message)
             }
-            .alert("确认恢复数据？", isPresented: $showingRestoreAlert) {
-                Button("取消", role: .cancel) { }
-                Button("确认恢复", role: .destructive) {
+            .alert("确认恢复数据？".appLocalized, isPresented: $showingRestoreAlert) {
+                Button("取消".appLocalized, role: .cancel) { }
+                Button("确认恢复".appLocalized, role: .destructive) {
                     performRestore()
                 }
             } message: {
-                Text("恢复操作将合并或覆盖当前数据。建议先备份当前数据。")
+                Text("恢复操作将合并或覆盖当前数据。建议先备份当前数据。".appLocalized)
             }
-            .alert("提示", isPresented: $showingMessage) {
-                Button("知道啦", role: .cancel) { }
+            .alert("提示".appLocalized, isPresented: $showingMessage) {
+                Button("知道啦".appLocalized, role: .cancel) { }
             } message: {
                 Text(message ?? "")
             }
@@ -225,13 +225,13 @@ struct DataManagementView: View {
     
     private func rebuildSpatialScene() {
         isLoading = true
-        loadingMessage = "正在重建空间场景..."
+        loadingMessage = "正在重建空间场景...".appLocalized
         Task {
             SpatialAssetManager.shared.clearAllCache()
             try? await Task.sleep(nanoseconds: 1_200_000_000)
             await MainActor.run {
                 self.isLoading = false
-                self.message = "已清理空间缓存，进入 House 时自动生效"
+                self.message = "已清理空间缓存，进入 House 时自动生效".appLocalized
                 self.showingMessage = true
             }
         }
@@ -240,7 +240,7 @@ struct DataManagementView: View {
     private func prepareCSVExport() {
         print("DataManagementView: 准备导出 CSV...")
         isLoading = true
-        loadingMessage = "正在生成 CSV..."
+        loadingMessage = "正在生成 CSV...".appLocalized
         
         // 获取 container 用于后台操作
         let container = modelContext.container
@@ -260,7 +260,7 @@ struct DataManagementView: View {
             } catch {
                 print("DataManagementView: CSV 导出错误: \(error)")
                 await MainActor.run {
-                    self.message = "生成 CSV 失败: \(error.localizedDescription)"
+                    self.message = "生成 CSV 失败: %@".appLocalized(error.localizedDescription)
                     self.showingMessage = true
                     self.isLoading = false
                 }
@@ -271,7 +271,7 @@ struct DataManagementView: View {
     private func prepareBackup() {
         print("DataManagementView: 准备备份数据...")
         isLoading = true
-        loadingMessage = "正在打包数据，备份需要时间，耐心等待，不要退出本界面..."
+        loadingMessage = "正在打包数据，备份需要时间，耐心等待，不要退出本界面...".appLocalized
         
         // Catch container on MainActor
         let container = modelContext.container
@@ -302,7 +302,7 @@ struct DataManagementView: View {
             } catch {
                 print("DataManagementView: 备份生成错误: \(error)")
                 await MainActor.run {
-                    self.message = "生成备份失败: \(error.localizedDescription)"
+                    self.message = "生成备份失败: %@".appLocalized(error.localizedDescription)
                     self.showingMessage = true
                     self.isLoading = false
                 }
@@ -320,13 +320,13 @@ struct DataManagementView: View {
         print("DataManagementView: startAccessingSecurityScopedResource: \(canAccess)")
         
         guard canAccess else {
-            message = "无法访问文件 (Security Scoped Access Denied)"
+            message = "无法访问文件 (Security Scoped Access Denied)".appLocalized
             showingMessage = true
             return
         }
         
         isLoading = true
-        loadingMessage = "正在准备恢复数据..."
+        loadingMessage = "正在准备恢复数据...".appLocalized
         
         Task {
             // 确保在任务结束时停止访问资源
@@ -357,21 +357,21 @@ struct DataManagementView: View {
                 print("DataManagementView: Local copy pre-check - Readable: \(isReadable), Size: \(fileSize) bytes")
                 
                 if fileSize < 10 {
-                    message = "数据恢复失败: 备份文件无效或尚未从 iCloud 下载完成。请在 文件 App 中确保已下载该文件。"
+                    message = "数据恢复失败: 备份文件无效或尚未从 iCloud 下载完成。请在 文件 App 中确保已下载该文件。".appLocalized
                     showingMessage = true
                     try? FileManager.default.removeItem(at: tempURL)
                     return
                 }
                 
                 // 在后台服务中进行解压和恢复
-                loadingMessage = "正在恢复数据..."
+                loadingMessage = "正在恢复数据...".appLocalized
                 try await DataTransferService.shared.restoreBackup(from: tempURL, context: modelContext)
                 
                 // 清理临时文件
                 try? FileManager.default.removeItem(at: tempURL)
                 
                 await MainActor.run {
-                    message = "数据恢复成功"
+                    message = "数据恢复成功".appLocalized
                     showingMessage = true
                 }
             } catch {
@@ -380,14 +380,14 @@ struct DataManagementView: View {
                     // 处理不同类型的错误
                     let errorDesc: String
                     if let backupError = error as? BackupService.BackupError {
-                        errorDesc = backupError.errorDescription ?? "未知错误"
+                        errorDesc = backupError.errorDescription ?? "未知错误".appLocalized
                     } else if let partialError = error as? BackupService.RestorePartialFailureError {
                         // 部分恢复失败，显示详细报告
                         errorDesc = partialError.result.errorReport
                     } else {
                         errorDesc = error.localizedDescription
                     }
-                    message = "数据恢复失败: \(errorDesc)"
+                    message = "数据恢复失败: %@".appLocalized(errorDesc)
                     showingMessage = true
                 }
             }

@@ -14,18 +14,18 @@ private enum LocalDataConfirmationAction: String, Identifiable {
     var confirmButtonTitle: String {
         switch self {
         case .exportCSV:
-            return "确认导出"
+            return "确认导出".appLocalized
         case .backupData:
-            return "确认备份"
+            return "确认备份".appLocalized
         }
     }
 
     var message: String {
         switch self {
         case .exportCSV:
-            return "将生成当前数据的 CSV 文件，并打开系统分享面板。确定继续吗？"
+            return "将生成当前数据的 CSV 文件，并打开系统分享面板。确定继续吗？".appLocalized
         case .backupData:
-            return "将把当前数据打包成本地备份文件，过程可能需要一点时间。确定继续吗？"
+            return "将把当前数据打包成本地备份文件，过程可能需要一点时间。确定继续吗？".appLocalized
         }
     }
 }
@@ -152,40 +152,40 @@ struct SystemSettingsView: View {
                 self.restoreURL = url
                 self.showingRestoreAlert = true
             case .failure(let error):
-                self.message = "选择文件失败: \(error.localizedDescription)"
+                self.message = "选择文件失败: %@".appLocalized(error.localizedDescription)
                 self.showingMessage = true
             }
         }
-        .alert("请再确认一次", isPresented: showingExportConfirmationAlert) {
-            Button("取消", role: .cancel) { }
+        .alert("请再确认一次".appLocalized, isPresented: showingExportConfirmationAlert) {
+            Button("取消".appLocalized, role: .cancel) { }
             Button(LocalDataConfirmationAction.exportCSV.confirmButtonTitle) {
                 handleConfirmedAction(.exportCSV)
             }
         } message: {
             Text(LocalDataConfirmationAction.exportCSV.message)
         }
-        .alert("确认恢复数据？", isPresented: $showingRestoreAlert) {
-            Button("取消", role: .cancel) { }
-            Button("确认恢复", role: .destructive) {
+        .alert("确认恢复数据？".appLocalized, isPresented: $showingRestoreAlert) {
+            Button("取消".appLocalized, role: .cancel) { }
+            Button("确认恢复".appLocalized, role: .destructive) {
                 performRestore()
             }
         } message: {
-            Text("恢复操作将合并或覆盖当前数据。建议先备份当前数据。")
+            Text("恢复操作将合并或覆盖当前数据。建议先备份当前数据。".appLocalized)
         }
-        .alert("提示", isPresented: $showingMessage) {
-            Button("确定", role: .cancel) { }
+        .alert("提示".appLocalized, isPresented: $showingMessage) {
+            Button("确定".appLocalized, role: .cancel) { }
         } message: {
             Text(message ?? "")
         }
-        .alert("需要重启", isPresented: $showingRestartAlert) {
-            Button("稍后") { }
+        .alert("需要重启".appLocalized, isPresented: $showingRestartAlert) {
+            Button("稍后".appLocalized) { }
         } message: {
-            Text("语言更改将在下次启动应用时生效。")
+            Text("语言更改将在下次启动应用时生效。".appLocalized)
         }
         .overlay {
             if showingBackupConfirmationDialog {
                 SystemSettingsBackupConfirmationDialog(
-                    title: "请再确认一次",
+                    title: "请再确认一次".appLocalized,
                     message: LocalDataConfirmationAction.backupData.message,
                     confirmTitle: LocalDataConfirmationAction.backupData.confirmButtonTitle,
                     onCancel: { pendingConfirmationAction = nil },
@@ -228,7 +228,7 @@ struct SystemSettingsView: View {
     private func prepareCSVExport() {
         NotificationCenter.default.post(name: .exportCSVTriggered, object: nil)
         isLoading = true
-        loadingMessage = "正在生成 CSV..."
+        loadingMessage = "正在生成 CSV...".appLocalized
         let container = modelContext.container
         Task {
             do {
@@ -241,7 +241,7 @@ struct SystemSettingsView: View {
                 }
             } catch {
                 await MainActor.run {
-                    self.message = "生成 CSV 失败: \(error.localizedDescription)"
+                    self.message = "生成 CSV 失败: %@".appLocalized(error.localizedDescription)
                     self.showingMessage = true
                     self.isLoading = false
                 }
@@ -277,7 +277,7 @@ struct SystemSettingsView: View {
     private func prepareBackup() {
         NotificationCenter.default.post(name: .localBackupTriggered, object: nil)
         isLoading = true
-        loadingMessage = "正在打包数据，备份需要时间，耐心等待，不要退出本界面..."
+        loadingMessage = "正在打包数据，备份需要时间，耐心等待，不要退出本界面...".appLocalized
         let container = modelContext.container
         Task {
             do {
@@ -291,7 +291,7 @@ struct SystemSettingsView: View {
                 }
             } catch {
                 await MainActor.run {
-                    self.message = "生成备份失败: \(error.localizedDescription)"
+                    self.message = "生成备份失败: %@".appLocalized(error.localizedDescription)
                     self.showingMessage = true
                     self.isLoading = false
                 }
@@ -310,13 +310,13 @@ struct SystemSettingsView: View {
         guard let url = restoreURL else { return }
         let canAccess = url.startAccessingSecurityScopedResource()
         guard canAccess else {
-            message = "无法访问文件"
+            message = "无法访问文件".appLocalized
             showingMessage = true
             return
         }
         
         isLoading = true
-        loadingMessage = "正在准备恢复数据..."
+        loadingMessage = "正在准备恢复数据...".appLocalized
         
         Task {
             defer {
@@ -332,12 +332,12 @@ struct SystemSettingsView: View {
                 }
                 try FileManager.default.copyItem(at: url, to: tempURL)
                 
-                loadingMessage = "正在恢复数据..."
+                loadingMessage = "正在恢复数据...".appLocalized
                 try await DataTransferService.shared.restoreBackup(from: tempURL, context: modelContext)
                 try? FileManager.default.removeItem(at: tempURL)
                 
                 await MainActor.run {
-                    message = "数据恢复成功"
+                    message = "数据恢复成功".appLocalized
                     showingMessage = true
                 }
             } catch {
@@ -345,14 +345,14 @@ struct SystemSettingsView: View {
                     // 处理不同类型的错误
                     let errorDesc: String
                     if let backupError = error as? BackupService.BackupError {
-                        errorDesc = backupError.errorDescription ?? "未知错误"
+                        errorDesc = backupError.errorDescription ?? "未知错误".appLocalized
                     } else if let partialError = error as? BackupService.RestorePartialFailureError {
                         // 部分恢复失败，显示详细报告
                         errorDesc = partialError.result.errorReport
                     } else {
                         errorDesc = error.localizedDescription
                     }
-                    message = "数据恢复失败: \(errorDesc)"
+                    message = "数据恢复失败: %@".appLocalized(errorDesc)
                     showingMessage = true
                 }
             }
@@ -389,7 +389,7 @@ private struct SystemSettingsBackupConfirmationDialog: View {
 
                 HStack(spacing: 16) {
                     Button(action: onCancel) {
-                        Text("取消")
+                        Text("取消".appLocalized)
                             .font(.system(size: 16, weight: .semibold))
                             .foregroundStyle(Color.secondary)
                             .frame(maxWidth: .infinity)

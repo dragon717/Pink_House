@@ -54,28 +54,28 @@ struct FieldManagementView: View {
         .background {
             LiquidBackground()
         }
-        .navigationTitle(title)
+        .navigationTitle(title.appLocalized)
         .onAppear {
             loadItems()
         }
-        .alert("修改\(title)", isPresented: $isEditing) {
-            TextField("新名称", text: $editText)
-            Button("取消", role: .cancel) { }
-            Button("保存") {
+        .alert("修改%@".appLocalized(title.appLocalized), isPresented: $isEditing) {
+            TextField("新名称".appLocalized, text: $editText)
+            Button("取消".appLocalized, role: .cancel) { }
+            Button("保存".appLocalized) {
                 if let oldItem = selectedItem {
                     updateItem(oldItem: oldItem, newItem: editText)
                 }
             }
         }
-        .alert("删除", isPresented: $showingDeleteAlert) {
-            Button("取消", role: .cancel) { }
-            Button("删除", role: .destructive) {
+        .alert("删除".appLocalized, isPresented: $showingDeleteAlert) {
+            Button("取消".appLocalized, role: .cancel) { }
+            Button("删除".appLocalized, role: .destructive) {
                 if let item = selectedItem {
                     deleteItem(item)
                 }
             }
         } message: {
-            Text("确定要删除“\(selectedItem ?? "")”吗？\n删除后，所有商品中的该属性将被移除，但商品本身会保留。")
+            Text("确定要删除“%@”吗？\n删除后，所有商品中的该属性将被移除，但商品本身会保留。".appLocalized(selectedItem ?? ""))
         }
     }
     
