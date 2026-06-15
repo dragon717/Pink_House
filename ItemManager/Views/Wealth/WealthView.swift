@@ -221,9 +221,9 @@ struct WealthView: View {
     @ToolbarContentBuilder
     private var centerToolbarContent: some ToolbarContent {
         ToolbarItem(placement: .principal) {
-            Picker("功能", selection: $selectedMainTab) {
+            Picker("功能".appLocalized, selection: $selectedMainTab) {
                 ForEach(WealthMainTab.allCases) { tab in
-                    Text(tab.rawValue).tag(tab)
+                    Text(tab.localizedTitle).tag(tab)
                 }
             }
             .pickerStyle(.segmented)
@@ -257,7 +257,7 @@ struct WealthView: View {
         }
         
         ToolbarItem(placement: .keyboard) {
-            Button("完成") {
+            Button("完成".appLocalized) {
                 UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
             }
         }
@@ -311,6 +311,17 @@ enum WealthMainTab: String, CaseIterable, Identifiable {
     case wealthStorage = "安财"
     
     var id: String { rawValue }
+
+    var localizedTitle: String {
+        switch self {
+        case .divination:
+            "请签".appLocalized
+        case .moneyCounting:
+            "数钱".appLocalized
+        case .wealthStorage:
+            "安财".appLocalized
+        }
+    }
 }
 
 // MARK: - 安财容器视图
@@ -323,9 +334,9 @@ struct WealthStorageContainerView: View {
         GeometryReader { proxy in
             VStack(spacing: 0) {
                 // 子页签选择器
-                Picker("贵金属", selection: $selectedStorageTab) {
+                Picker("贵金属".appLocalized, selection: $selectedStorageTab) {
                     ForEach(StorageTab.allCases) { tab in
-                        Text(tab.rawValue).tag(tab)
+                        Text(tab.localizedTitle).tag(tab)
                     }
                 }
                 .pickerStyle(.segmented)
@@ -385,6 +396,17 @@ enum StorageTab: String, CaseIterable, Identifiable {
     case virtual = "虚拟"
     
     var id: String { rawValue }
+
+    var localizedTitle: String {
+        switch self {
+        case .gold:
+            "黄金".appLocalized
+        case .silver:
+            "白银".appLocalized
+        case .virtual:
+            "虚拟".appLocalized
+        }
+    }
 }
 
 #Preview {
