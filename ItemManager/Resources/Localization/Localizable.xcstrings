@@ -2375,10 +2375,46 @@
     },
     "%@ 是 VIP 权益" : {
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ ist ein VIP-Vorteil"
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "%@ is a VIP benefit"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ es un beneficio VIP"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ est un avantage VIP"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@はVIP特典です"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@은(는) VIP 혜택입니다"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ é um benefício VIP"
           }
         },
         "zh-Hans" : {
@@ -4641,10 +4677,46 @@
     },
     "%@的观察日记" : {
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@s Beobachtungstagebuch"
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "%@'s Observation Diary"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Diario de observación de %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Journal d’observation de %@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@の観察日記"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@의 관찰 일기"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Diário de observação de %@"
           }
         },
         "zh-Hans" : {
@@ -4722,10 +4794,46 @@
     },
     "%@观察日记" : {
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@s Beobachtungstagebuch"
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%@ Observation Diary"
+            "value" : "%@'s Observation Diary"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Diario de observación de %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Journal d’observation de %@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@の観察日記"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 관찰 일기"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Diário de observação de %@"
           }
         },
         "zh-Hans" : {
@@ -10111,10 +10219,46 @@
     },
     "✨ 保存成功！" : {
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "✨ Erfolgreich gespeichert!"
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "✨ Saved!"
+            "value" : "✨ Saved successfully!"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "✨ ¡Guardado correctamente!"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "✨ Enregistré avec succès !"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "✨ 保存しました！"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "✨ 저장 완료!"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "✨ Salvo com sucesso!"
           }
         },
         "zh-Hans" : {
@@ -10126,7 +10270,7 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "✨ 保存成功！"
+            "value" : "✨ 儲存成功！"
           }
         }
       }
@@ -18753,10 +18897,46 @@
     },
     "举报 AI 内容" : {
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI-Inhalt melden"
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Report AI Content"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reportar contenido de AI"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Signaler le contenu AI"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AIコンテンツを報告"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI 콘텐츠 신고"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Denunciar conteúdo de AI"
           }
         },
         "zh-Hans" : {
@@ -18768,17 +18948,53 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "舉報 AI 內容"
+            "value" : "檢舉 AI 內容"
           }
         }
       }
     },
     "举报原因" : {
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Meldegrund"
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Report Reason"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Motivo del reporte"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Motif du signalement"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "報告理由"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "신고 사유"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Motivo da denúncia"
           }
         },
         "zh-Hans" : {
@@ -18790,7 +19006,7 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "舉報原因"
+            "value" : "檢舉原因"
           }
         }
       }
@@ -24041,10 +24257,46 @@
     },
     "你问了%@:" : {
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Du hast %@ gefragt:"
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "You asked %@:"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le preguntaste a %@:"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tu as demandé à %@ :"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@に聞いたこと:"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@에게 물었어요:"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Você perguntou a %@:"
           }
         },
         "zh-Hans" : {
@@ -24056,7 +24308,7 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "你問了%@:"
+            "value" : "你問了%@："
           }
         }
       }
@@ -36781,10 +37033,46 @@
     },
     "去升级VIP" : {
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "VIP upgraden"
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "VIP"
+            "value" : "Upgrade VIP"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mejorar a VIP"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Passer VIP"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "VIPにアップグレード"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "VIP 업그레이드"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fazer upgrade VIP"
           }
         },
         "zh-Hans" : {
@@ -36796,7 +37084,7 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "去升級VIP"
+            "value" : "升級 VIP"
           }
         }
       }
@@ -39623,10 +39911,46 @@
     },
     "名字不能为空哦" : {
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Der Name darf nicht leer sein"
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "cannot be empty."
+            "value" : "Name cannot be empty"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El nombre no puede estar vacío"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le nom ne peut pas être vide"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "名前を空にすることはできません"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이름은 비워 둘 수 없어요"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O nome não pode ficar vazio"
           }
         },
         "zh-Hans" : {
@@ -39638,7 +39962,7 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "名字不能為空哦"
+            "value" : "名字不能空白喔"
           }
         }
       }
@@ -56818,10 +57142,46 @@
     },
     "开始陪伴" : {
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Begleitung starten"
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Start"
+            "value" : "Start Companion"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Empezar compañía"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Commencer l’accompagnement"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "一緒に始める"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "함께 시작하기"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Começar companhia"
           }
         },
         "zh-Hans" : {
@@ -62102,10 +62462,46 @@
     },
     "您的举报将帮助我们改进 AI 内容质量。我们不会将您的个人信息与举报内容关联。" : {
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Deine Meldung hilft uns, die Qualität der AI-Inhalte zu verbessern. Wir verknüpfen deine persönlichen Daten nicht mit dieser Meldung."
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Report AI Content. Info Report Content."
+            "value" : "Your report helps us improve AI content quality. We will not link your personal information to the report."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tu reporte nos ayuda a mejorar la calidad del contenido de AI. No vincularemos tu información personal con el reporte."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ton signalement nous aide à améliorer la qualité du contenu AI. Nous n’associerons pas tes informations personnelles au signalement."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "報告はAIコンテンツ品質の改善に役立ちます。個人情報を報告内容に関連付けることはありません。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "신고는 AI 콘텐츠 품질 개선에 도움이 됩니다. 개인 정보는 신고 내용과 연결하지 않습니다."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sua denúncia nos ajuda a melhorar a qualidade do conteúdo de AI. Não vincularemos suas informações pessoais à denúncia."
           }
         },
         "zh-Hans" : {
@@ -62117,7 +62513,7 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "您的舉報將幫助我們改進 AI 內容質量。我們不會將您的個人信息與舉報內容關聯。"
+            "value" : "你的檢舉將幫助我們改善 AI 內容品質。我們不會將你的個人資訊與檢舉內容關聯。"
           }
         }
       }
@@ -71376,10 +71772,46 @@
     },
     "提交" : {
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Senden"
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Submit"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enviar"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Envoyer"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "送信"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "제출"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enviar"
           }
         },
         "zh-Hans" : {
@@ -73197,10 +73629,46 @@
     },
     "收到啦 💖" : {
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Verstanden 💖"
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "💖"
+            "value" : "Got it 💖"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Entendido 💖"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bien reçu 💖"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "わかったよ 💖"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "알겠어요 💖"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Entendi 💖"
           }
         },
         "zh-Hans" : {
@@ -85223,10 +85691,46 @@
     },
     "欢迎来到温馨小屋" : {
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Willkommen im gemütlichen Häuschen"
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Welcome to the Cozy House"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bienvenida a la casita acogedora"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bienvenue dans la maison douillette"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ぬくもりのおうちへようこそ"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "아늑한 집에 오신 걸 환영해요"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Boas-vindas à casinha aconchegante"
           }
         },
         "zh-Hans" : {
@@ -103698,10 +104202,46 @@
     },
     "给你的第一个伙伴起个名字吧" : {
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gib deinem ersten Begleiter einen Namen"
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Companion"
+            "value" : "Name your first companion"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ponle nombre a tu primer compañero"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Donne un nom à ton premier compagnon"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最初のパートナーに名前をつけましょう"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "첫 번째 친구에게 이름을 지어 주세요"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dê um nome ao seu primeiro companheiro"
           }
         },
         "zh-Hans" : {
@@ -103713,7 +104253,7 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "給你的第一個夥伴起個名字吧"
+            "value" : "幫你的第一位夥伴取個名字吧"
           }
         }
       }
@@ -104245,10 +104785,46 @@
     },
     "继续问问" : {
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Weiter fragen"
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Continue"
+            "value" : "Ask More"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Preguntar más"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Continuer à demander"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "さらに質問"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "더 물어보기"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Perguntar mais"
           }
         },
         "zh-Hans" : {
@@ -112625,10 +113201,46 @@
     },
     "详细描述（可选）" : {
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Detaillierte Beschreibung (optional)"
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Detailed Description (Selectable)"
+            "value" : "Details (Optional)"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Descripción detallada (opcional)"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Description détaillée (facultatif)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "詳細説明（任意）"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "상세 설명(선택 사항)"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Descrição detalhada (opcional)"
           }
         },
         "zh-Hans" : {
@@ -112640,7 +113252,7 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "詳細描述（可選）"
+            "value" : "詳細描述（選填）"
           }
         }
       }
@@ -113467,10 +114079,46 @@
     },
     "请描述您遇到的问题..." : {
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Beschreibe bitte das Problem..."
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Please issue..."
+            "value" : "Describe the issue you encountered..."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Describe el problema que encontraste..."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Décris le problème rencontré..."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "発生した問題を説明してください..."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "겪은 문제를 설명해 주세요..."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Descreva o problema encontrado..."
           }
         },
         "zh-Hans" : {
@@ -113482,7 +114130,7 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "請描述您遇到的問題..."
+            "value" : "請描述你遇到的問題..."
           }
         }
       }
@@ -116558,10 +117206,46 @@
     },
     "输入萌宠名字" : {
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Haustiernamen eingeben"
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Pet"
+            "value" : "Enter pet name"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ingresa el nombre de la mascota"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Saisis le nom du compagnon"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ペットの名前を入力"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "반려 친구 이름 입력"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Digite o nome do pet"
           }
         },
         "zh-Hans" : {
@@ -136650,6 +137334,238 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "已加入「%@」"
+          }
+        }
+      }
+    },
+    "多模态图片分析" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Multimodale Bildanalyse"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Multimodal Image Analysis"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Análisis de imágenes multimodal"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Analyse d’image multimodale"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "マルチモーダル画像分析"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "멀티모달 이미지 분석"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Análise multimodal de imagens"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "多模态图片分析"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "多模態圖片分析"
+          }
+        }
+      }
+    },
+    "不当内容" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unangemessener Inhalt"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Inappropriate content"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Contenido inapropiado"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Contenu inapproprié"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "不適切な内容"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "부적절한 콘텐츠"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Conteúdo inadequado"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "不当内容"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "不當內容"
+          }
+        }
+      }
+    },
+    "内容不准确" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ungenaue Inhalte"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Inaccurate content"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Contenido inexacto"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Contenu inexact"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "内容が不正確"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "부정확한 콘텐츠"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Conteúdo impreciso"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "内容不准确"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "內容不準確"
+          }
+        }
+      }
+    },
+    "有害信息" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Schädliche Informationen"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Harmful information"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Información dañina"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Informations nuisibles"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "有害な情報"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "유해한 정보"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Informações prejudiciais"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "有害信息"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "有害資訊"
           }
         }
       }

@@ -145,7 +145,7 @@ struct OutfitSaveSuccessToast: View {
             .frame(height: 100)
 
             VStack(spacing: 8) {
-                Text("✨ 保存成功！")
+                Text("✨ 保存成功！".appLocalized)
                     .font(.headline)
                     .fontWeight(.bold)
                     .foregroundColor(.primary)

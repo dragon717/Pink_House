@@ -18,7 +18,7 @@ struct PetNamingView: View {
                 
                 // 欢迎标题
                 VStack(spacing: 16) {
-                    Text("欢迎来到温馨小屋")
+                    Text("欢迎来到温馨小屋".appLocalized)
                         .font(.largeTitle)
                         .fontWeight(.bold)
                         .foregroundStyle(
@@ -29,7 +29,7 @@ struct PetNamingView: View {
                             )
                         )
                     
-                    Text("给你的第一个伙伴起个名字吧")
+                    Text("给你的第一个伙伴起个名字吧".appLocalized)
                         .font(.title3)
                         .foregroundStyle(.secondary)
                 }
@@ -55,7 +55,7 @@ struct PetNamingView: View {
                 
                 // 输入框
                 VStack(spacing: 8) {
-                    TextField("输入萌宠名字", text: $inputName)
+                    TextField("输入萌宠名字".appLocalized, text: $inputName)
                         .font(.title2)
                         .multilineTextAlignment(.center)
                         .padding()
@@ -69,7 +69,7 @@ struct PetNamingView: View {
                         .padding(.horizontal, 40)
                     
                     if inputName.isEmpty {
-                        Text("名字不能为空哦")
+                        Text("名字不能为空哦".appLocalized)
                             .font(.caption)
                             .foregroundStyle(.secondary)
                             .opacity(0.8)
@@ -80,7 +80,7 @@ struct PetNamingView: View {
                 
                 // 确认按钮
                 Button(action: confirmName) {
-                    Text("开始陪伴")
+                    Text("开始陪伴".appLocalized)
                         .font(.headline)
                         .fontWeight(.bold)
                         .foregroundColor(.white)

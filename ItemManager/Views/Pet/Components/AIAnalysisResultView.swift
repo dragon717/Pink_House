@@ -51,7 +51,7 @@ struct AIAnalysisResultView: View {
                     // Result Actions
                     HStack(spacing: 20) {
                         Button(action: closeWithAnimation) {
-                            Text("收到啦 💖")
+                            Text("收到啦 💖".appLocalized)
                                 .font(.headline)
                                 .foregroundStyle(.white)
                                 .frame(maxWidth: .infinity)
@@ -78,7 +78,7 @@ struct AIAnalysisResultView: View {
                         }) {
                             HStack {
                                 Image(systemName: "pawprint.fill")
-                                Text("继续问问")
+                                Text("继续问问".appLocalized)
                             }
                             .font(.headline)
                             .foregroundStyle(.pink)
@@ -133,11 +133,11 @@ struct AIAnalysisResultView: View {
                 VIPCenterView()
             }
         }
-        .alert("\(PetChatPremiumFeature.imageAnalysis.title) 是 VIP 权益", isPresented: $showingVIPUpsellAlert) {
-            Button("去升级VIP") {
+        .alert("%@ 是 VIP 权益".appLocalized(PetChatPremiumFeature.imageAnalysis.title.appLocalized), isPresented: $showingVIPUpsellAlert) {
+            Button("去升级VIP".appLocalized) {
                 showingVIPCenter = true
             }
-            Button("稍后", role: .cancel) { }
+            Button("稍后".appLocalized, role: .cancel) { }
         } message: {
             Text(PetChatPremiumFeature.imageAnalysis.upsellText(petName: petName))
         }
@@ -175,7 +175,7 @@ struct AIAnalysisResultView: View {
             HStack {
                 Image(systemName: "sparkles")
                     .foregroundStyle(Color(hex: "FF69B4"))
-                Text("\(petName)观察日记")
+                Text("%@观察日记".appLocalized(petName))
                     .font(.headline)
                     .foregroundStyle(Color(hex: "DB7093"))
                 Image(systemName: "sparkles")
@@ -188,7 +188,7 @@ struct AIAnalysisResultView: View {
     
     private var chatHeaderView: some View {
         HStack {
-            Text("\(petName)的观察日记")
+            Text("%@的观察日记".appLocalized(petName))
                 .font(.headline)
                 .foregroundStyle(.pink)
             Spacer()
@@ -208,7 +208,7 @@ struct AIAnalysisResultView: View {
         VStack(alignment: .leading, spacing: 16) {
             // User Question (Collapsed style)
             HStack {
-                Text("你问了\(petName):")
+                Text("你问了%@:".appLocalized(petName))
                     .font(.caption)
                     .foregroundStyle(.gray)
                 Text(userQuestion)
