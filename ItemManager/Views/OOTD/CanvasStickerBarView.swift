@@ -31,7 +31,7 @@ struct CanvasStickerBarView: View {
                             .font(.caption)
                             .foregroundStyle(.pink)
                         
-                        Text("已添加贴纸")
+                        Text("已添加贴纸".appLocalized)
                             .font(.caption)
                             .fontWeight(.medium)
                             .foregroundStyle(.secondary)
@@ -111,7 +111,7 @@ struct CanvasStickerBarView: View {
                 Image(systemName: "sparkles")
                     .font(.title3)
                     .foregroundStyle(.secondary.opacity(0.5))
-                Text("还没有贴纸")
+                Text("还没有贴纸".appLocalized)
                     .font(.caption)
                     .foregroundStyle(.secondary.opacity(0.7))
             }
@@ -227,7 +227,7 @@ struct StickerThumbnailCell: View {
             Button {
                 onBringToFront()
             } label: {
-                Label("置于顶层", systemImage: "arrow.up.to.line")
+                Label("置于顶层".appLocalized, systemImage: "arrow.up.to.line")
             }
             
             Divider()
@@ -235,7 +235,7 @@ struct StickerThumbnailCell: View {
             Button(role: .destructive) {
                 onDelete()
             } label: {
-                Label("删除", systemImage: "trash")
+                Label("删除".appLocalized, systemImage: "trash")
             }
         }
         .task(id: item.cutout?.imagePath) {

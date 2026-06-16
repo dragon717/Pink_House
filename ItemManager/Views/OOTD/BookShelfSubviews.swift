@@ -170,20 +170,20 @@ struct BookGridView: View {
                         Button {
                             onRename(book)
                         } label: {
-                            Label("重命名", systemImage: "pencil")
+                            Label("重命名".appLocalized, systemImage: "pencil")
                         }
 
                         Button {
                             selectedBookForCover = book
                             showingCoverPicker = true
                         } label: {
-                            Label("修改封面", systemImage: "photo")
+                            Label("修改封面".appLocalized, systemImage: "photo")
                         }
 
                         Button(role: .destructive) {
                             onDelete(book)
                         } label: {
-                            Label("删除手帐", systemImage: "trash")
+                            Label("删除手帐".appLocalized, systemImage: "trash")
                         }
                     }
                 }

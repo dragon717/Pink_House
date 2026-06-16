@@ -159,10 +159,10 @@ struct BookShelfContentView: View {
         }
         .transition(.opacity)
         .opacity(openingBook == nil ? 1 : 0)
-        .alert("重命名手帐", isPresented: $showingRenameBookAlert) {
-            TextField("名称", text: $renameBookName)
-            Button("取消", role: .cancel) { bookToRename = nil }
-            Button("保存") {
+        .alert("重命名手帐".appLocalized, isPresented: $showingRenameBookAlert) {
+            TextField("名称".appLocalized, text: $renameBookName)
+            Button("取消".appLocalized, role: .cancel) { bookToRename = nil }
+            Button("保存".appLocalized) {
                 if let book = bookToRename {
                     book.title = renameBookName
                     book.lastModified = Date()
