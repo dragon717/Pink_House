@@ -93,9 +93,9 @@ struct SyncDetailsView: View {
     var body: some View {
         NavigationStack {
             List {
-                Section("同步状态") {
+                Section("同步状态".appLocalized) {
                     HStack {
-                        Label("状态", systemImage: statusIcon)
+                        Label("状态".appLocalized, systemImage: statusIcon)
                         Spacer()
                         Text(statusText)
                             .foregroundStyle(statusColor)
@@ -103,7 +103,7 @@ struct SyncDetailsView: View {
                     
                     if case .migrating(let progress) = syncManager.syncStatus {
                         VStack(alignment: .leading, spacing: 8) {
-                            Text("数据迁移中...")
+                            Text("数据迁移中...".appLocalized)
                             ProgressView(value: progress)
                             Text("\(Int(progress * 100))%")
                                 .font(.caption)
@@ -113,7 +113,7 @@ struct SyncDetailsView: View {
                     
                     if let lastSync = syncManager.lastSyncTime {
                         HStack {
-                            Label("上次同步", systemImage: "clock")
+                            Label("上次同步".appLocalized, systemImage: "clock")
                             Spacer()
                             Text(lastSync, style: .relative)
                                 .foregroundStyle(.secondary)
@@ -121,21 +121,21 @@ struct SyncDetailsView: View {
                     }
                 }
                 
-                Section("操作") {
+                Section("操作".appLocalized) {
                     Button(action: {
                         Task {
                             await syncManager.triggerSync()
                         }
                     }) {
-                        Label("立即同步", systemImage: "arrow.clockwise")
+                        Label("立即同步".appLocalized, systemImage: "arrow.clockwise")
                     }
                     .disabled(isSyncingOrMigrating)
                     
                     if syncManager.isMigrationCompleted {
                         HStack {
-                            Label("数据迁移", systemImage: "checkmark.circle")
+                            Label("数据迁移".appLocalized, systemImage: "checkmark.circle")
                             Spacer()
-                            Text("已完成")
+                            Text("已完成".appLocalized)
                                 .foregroundStyle(.green)
                         }
                     } else {
@@ -144,22 +144,22 @@ struct SyncDetailsView: View {
                                 await syncManager.performMigration()
                             }
                         }) {
-                            Label("重新迁移数据", systemImage: "arrow.up.arrow.down")
+                            Label("重新迁移数据".appLocalized, systemImage: "arrow.up.arrow.down")
                         }
                     }
                 }
                 
-                Section("说明") {
-                    Text("iCloud 同步可以将您的数据自动备份到云端，并在您的所有设备之间同步。")
+                Section("说明".appLocalized) {
+                    Text("iCloud 同步可以将您的数据自动备份到云端，并在您的所有设备之间同步。".appLocalized)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
             }
-            .navigationTitle("iCloud 同步")
+            .navigationTitle("iCloud 同步".appLocalized)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("完成") {
+                    Button("完成".appLocalized) {
                         dismiss()
                     }
                 }
@@ -180,12 +180,12 @@ struct SyncDetailsView: View {
     
     private var statusText: String {
         switch syncManager.syncStatus {
-        case .notStarted: return "未开始"
-        case .migrating: return "迁移中"
-        case .syncing: return "同步中"
-        case .synced: return "已同步"
-        case .failed: return "失败"
-        case .offline: return "离线"
+        case .notStarted: return "未开始".appLocalized
+        case .migrating: return "迁移中".appLocalized
+        case .syncing: return "同步中".appLocalized
+        case .synced: return "已同步".appLocalized
+        case .failed: return "失败".appLocalized
+        case .offline: return "离线".appLocalized
         }
     }
     

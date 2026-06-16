@@ -13759,7 +13759,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "iCloud Sync automatically backs up your data to the cloud and keeps it in sync across your devices."
+            "value" : "iCloud Sync can automatically back up your data to the cloud and sync it across all your devices."
           }
         },
         "zh-Hans" : {
@@ -13771,7 +13771,43 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "iCloud 同步可以將您的數據自動備份到雲端，並在您的所有設備之間同步。"
+            "value" : "iCloud 同步可以將您的資料自動備份到雲端，並在您的所有裝置之間同步。"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud-Sync kann deine Daten automatisch in der Cloud sichern und auf allen deinen Geräten synchronisieren."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La sincronización con iCloud puede respaldar automáticamente tus datos en la nube y sincronizarlos en todos tus dispositivos."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La synchronisation iCloud peut sauvegarder automatiquement vos données dans le cloud et les synchroniser sur tous vos appareils."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud同期はデータを自動的にクラウドへバックアップし、すべてのデバイス間で同期できます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud 동기화는 데이터를 클라우드에 자동 백업하고 모든 기기에서 동기화할 수 있습니다."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A sincronização do iCloud pode fazer backup automático dos seus dados na nuvem e sincronizá-los em todos os seus dispositivos."
           }
         }
       }
@@ -42077,7 +42113,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "同期状況"
+            "value" : "同期ステータス"
           }
         },
         "ko" : {
@@ -49165,7 +49201,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Falha"
+            "value" : "Falhou"
           }
         },
         "zh-Hans" : {
@@ -56203,7 +56239,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Sync completed"
+            "value" : "Synced"
           }
         },
         "zh-Hans" : {
@@ -56216,6 +56252,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "已同步"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Synchronisiert"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sincronizado"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Synchronisé"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "同期済み"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "동기화됨"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sincronizado"
           }
         }
       }
@@ -56397,7 +56469,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Done completed"
+            "value" : "Completed"
           }
         },
         "zh-Hans" : {
@@ -56410,6 +56482,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "已完成"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abgeschlossen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Completado"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Terminé"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "完了"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "완료됨"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Concluído"
           }
         }
       }
@@ -80038,7 +80146,43 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "數據遷移"
+            "value" : "資料遷移"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Datenmigration"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Migración de datos"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Migration des données"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "データ移行"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "데이터 마이그레이션"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Migração de dados"
           }
         }
       }
@@ -80048,7 +80192,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Data Migration..."
+            "value" : "Migrating data..."
           }
         },
         "zh-Hans" : {
@@ -80060,7 +80204,43 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "數據遷移中..."
+            "value" : "資料遷移中..."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Daten werden migriert..."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Migrando datos..."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Migration des données..."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "データを移行中..."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "데이터 마이그레이션 중..."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Migrando dados..."
           }
         }
       }
@@ -87639,7 +87819,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Not start"
+            "value" : "Not Started"
           }
         },
         "zh-Hans" : {
@@ -87652,6 +87832,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "未開始"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nicht gestartet"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No iniciado"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Non commencé"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未開始"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "시작 전"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Não iniciado"
           }
         }
       }
@@ -99156,7 +99372,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Statut"
+            "value" : "État"
           }
         },
         "ja" : {
@@ -122485,6 +122701,42 @@
             "state" : "translated",
             "value" : "說明"
           }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Beschreibung"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Descripción"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Description"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "説明"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "설명"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Descrição"
+          }
         }
       }
     },
@@ -131897,7 +132149,43 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "重新遷移數據"
+            "value" : "重新遷移資料"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Daten erneut migrieren"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Migrar datos de nuevo"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Migrer à nouveau les données"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "データを再移行"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "데이터 다시 마이그레이션"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Migrar dados novamente"
           }
         }
       }
@@ -139944,6 +140232,180 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "如果在應用程式內開啟後仍無震動，請檢查：\n1. 系統設定 > 聲音與觸感 > 系統觸感回饋 是否開啟\n2. 手機是否處於靜音模式（部分震動在靜音下可能無法運作）"
+          }
+        }
+      }
+    },
+    "迁移中" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Migrating"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Migration läuft"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Migrando"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Migration en cours"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "移行中"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "마이그레이션 중"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Migrando"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "迁移中"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "遷移中"
+          }
+        }
+      }
+    },
+    "同步中" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Syncing"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Synchronisierung läuft"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sincronizando"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Synchronisation en cours"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "同期中"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "동기화 중"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sincronizando"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "同步中"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "同步中"
+          }
+        }
+      }
+    },
+    "离线" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Offline"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Offline"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sin conexión"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hors ligne"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "オフライン"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "오프라인"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Offline"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "离线"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "離線"
           }
         }
       }
