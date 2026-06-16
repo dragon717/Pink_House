@@ -653,7 +653,7 @@ struct PerlerCanvasToolbar: View {
             VStack(spacing: 2) {
                 Image(systemName: isEditMode ? "pencil.circle.fill" : "pencil.circle")
                     .font(.system(size: 22))
-                Text(isEditMode ? "编辑中" : "编辑")
+                Text(isEditMode ? "编辑中".appLocalized : "编辑".appLocalized)
                     .font(.system(size: 9))
             }
             .foregroundColor(isEditMode ? .pink : .primary)
@@ -708,7 +708,7 @@ struct PerlerCanvasToolbar: View {
                                     .offset(x: 8, y: -8)
                             )
                     }
-                    Text("画笔")
+                    Text("画笔".appLocalized)
                         .font(.system(size: 9))
                 }
                 .foregroundColor(toolMode == .brush ? .pink : (isEditMode ? .primary : .gray.opacity(0.5)))
@@ -778,7 +778,7 @@ struct PerlerCanvasToolbar: View {
                     }
                 }
             )
-            .help("点击画布填充连通区域")
+            .help("点击画布填充连通区域".appLocalized)
             
             Divider().frame(height: 24)
             
@@ -787,19 +787,19 @@ struct PerlerCanvasToolbar: View {
                 Button {
                     onSaveToCollection()
                 } label: {
-                    Label("保存到作品集", systemImage: "folder")
+                    Label("保存到作品集".appLocalized, systemImage: "folder")
                 }
                 
                 Button {
                     onSave()
                 } label: {
-                    Label("保存图片", systemImage: "photo")
+                    Label("保存图片".appLocalized, systemImage: "photo")
                 }
             } label: {
                 VStack(spacing: 2) {
                     Image(systemName: "square.and.arrow.down")
                         .font(.system(size: 18, weight: .medium))
-                    Text("保存")
+                    Text("保存".appLocalized)
                         .font(.system(size: 9))
                 }
                 .foregroundColor(.pink)
@@ -865,7 +865,7 @@ struct PerlerToolbarButtonWithLabel: View {
             VStack(spacing: 2) {
                 Image(systemName: icon)
                     .font(.system(size: 18, weight: .medium))
-                Text(label)
+                Text(label.appLocalized)
                     .font(.system(size: 9))
             }
             .foregroundColor(
@@ -1047,11 +1047,11 @@ struct ColorInfoSheet: View {
                     }
                 }
             }
-            .navigationTitle("颜色信息")
+            .navigationTitle("颜色信息".appLocalized)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("完成") {
+                    Button("完成".appLocalized) {
                         dismiss()
                     }
                 }
