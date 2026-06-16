@@ -16,21 +16,21 @@ struct CardStyleSection: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("卡片样式")
+            Text("卡片样式".appLocalized)
                 .font(.headline)
                 .padding(.horizontal, 4)
 
             // 卡片样式选择
             VStack(alignment: .leading, spacing: 12) {
-                Text("卡片背景")
+                Text("卡片背景".appLocalized)
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
 
-                Picker("卡片样式", selection: $cardStyle) {
-                    Text("实色").tag(CardStyle.solid)
-                    Text("半透明").tag(CardStyle.transparent)
-                    Text("全透明").tag(CardStyle.fullyTransparent)
-                    Text("色调").tag(CardStyle.tinted)
+                Picker("卡片样式".appLocalized, selection: $cardStyle) {
+                    Text("实色".appLocalized).tag(CardStyle.solid)
+                    Text("半透明".appLocalized).tag(CardStyle.transparent)
+                    Text("全透明".appLocalized).tag(CardStyle.fullyTransparent)
+                    Text("色调".appLocalized).tag(CardStyle.tinted)
                 }
                 .pickerStyle(.segmented)
                 .onChange(of: cardStyle) { _, newValue in
@@ -41,7 +41,7 @@ struct CardStyleSection: View {
                 if cardStyle == .transparent {
                     VStack(alignment: .leading, spacing: 8) {
                         HStack {
-                            Text("透明度")
+                            Text("透明度".appLocalized)
                                 .font(.caption)
                             Spacer()
                             Text("\(Int(transparentOpacity * 100))%")
@@ -59,7 +59,7 @@ struct CardStyleSection: View {
                 if cardStyle == .tinted {
                     VStack(alignment: .leading, spacing: 8) {
                         HStack {
-                            Text("色调强度")
+                            Text("色调强度".appLocalized)
                                 .font(.caption)
                             Spacer()
                             Text("\(Int(tintOpacity * 100))%")
@@ -78,15 +78,15 @@ struct CardStyleSection: View {
 
             // 裙装填充模式
             VStack(alignment: .leading, spacing: 12) {
-                Text("裙装图片填充")
+                Text("裙装图片填充".appLocalized)
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
 
-                Picker("填充模式", selection: $skirtFillMode) {
-                    Text("实色").tag(SkirtFillMode.solid)
-                    Text("半透明").tag(SkirtFillMode.transparent)
-                    Text("全透明").tag(SkirtFillMode.fullyTransparent)
-                    Text("色调").tag(SkirtFillMode.tinted)
+                Picker("填充模式".appLocalized, selection: $skirtFillMode) {
+                    Text("实色".appLocalized).tag(SkirtFillMode.solid)
+                    Text("半透明".appLocalized).tag(SkirtFillMode.transparent)
+                    Text("全透明".appLocalized).tag(SkirtFillMode.fullyTransparent)
+                    Text("色调".appLocalized).tag(SkirtFillMode.tinted)
                 }
                 .pickerStyle(.segmented)
                 .onChange(of: skirtFillMode) { _, newValue in
@@ -131,7 +131,7 @@ struct ThemePresetButton: View {
                             .stroke(isSelected ? Color.pink : Color.clear, lineWidth: 2)
                     )
 
-                Text(preset.name)
+                Text(preset.localizedName)
                     .font(.caption)
                     .fontWeight(isSelected ? .bold : .regular)
                     .foregroundStyle(isSelected ? .primary : .secondary)
@@ -163,7 +163,7 @@ struct CustomThemeButton: View {
                             .stroke(isSelected ? Color.pink : Color.clear, lineWidth: 2)
                     )
 
-                Text("个性化")
+                Text("个性化".appLocalized)
                     .font(.caption)
                     .fontWeight(isSelected ? .bold : .regular)
                     .foregroundStyle(isSelected ? .primary : .secondary)
@@ -190,11 +190,11 @@ struct ColorInfoCard: View {
                 )
 
             VStack(spacing: 2) {
-                Text(title)
+                Text(title.appLocalized)
                     .font(.caption)
                     .fontWeight(.medium)
 
-                Text(description)
+                Text(description.appLocalized)
                     .font(.caption2)
                     .foregroundColor(.secondary)
                     .lineLimit(1)
@@ -222,7 +222,7 @@ struct CardLegendItem: View {
                     RoundedRectangle(cornerRadius: 4)
                         .stroke(Color.white.opacity(0.2), lineWidth: 1)
                 )
-            Text(label)
+            Text(label.appLocalized)
                 .font(.caption2)
                 .foregroundStyle(.white.opacity(0.8))
         }

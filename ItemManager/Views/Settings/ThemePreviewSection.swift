@@ -74,7 +74,7 @@ struct ThemePreviewSection: View {
         VStack(spacing: 4) {
             // 标签
             HStack {
-                Text("主题预览")
+                Text("主题预览".appLocalized)
                     .font(.caption)
                     .foregroundStyle(textColors.tertiary)
                 Spacer()
@@ -137,12 +137,12 @@ struct ThemePreviewSection: View {
             // 信息区域
             VStack(alignment: .leading, spacing: 6) {
                 // 裙装名称 - 主要文字
-                Text("小裙装名称")
+                Text("小裙装名称".appLocalized)
                     .font(.headline)
                     .foregroundStyle(textColors.primary)
 
                 // 品牌 - 次要文字
-                Text("品牌名称 · 型色")
+                Text("品牌名称 · 型色".appLocalized)
                     .font(.subheadline)
                     .foregroundStyle(textColors.secondary)
 
@@ -157,7 +157,7 @@ struct ThemePreviewSection: View {
                     Spacer()
 
                     // 标签 - 强调色
-                    Text("已拥有")
+                    Text("已拥有".appLocalized)
                         .font(.caption)
                         .foregroundStyle(textColors.accent)
                         .padding(.horizontal, 8)
@@ -171,7 +171,7 @@ struct ThemePreviewSection: View {
                     Image(systemName: "calendar")
                         .font(.caption)
                         .foregroundStyle(textColors.tertiary)
-                    Text("2024-01-01 购买")
+                    Text("2024-01-01 购买".appLocalized)
                         .font(.caption)
                         .foregroundStyle(textColors.tertiary)
                 }
@@ -192,11 +192,11 @@ struct ThemePreviewSection: View {
     // MARK: - 梦幻衣橱模块预览
     private var wardrobeModulePreview: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("梦幻衣橱")
+            Text("梦幻衣橱".appLocalized)
                 .font(.subheadline)
                 .fontWeight(.semibold)
                 .foregroundStyle(textColors.primary)
-            Text("原生顶部栏 · 菜单 · 页签")
+            Text("原生顶部栏 · 菜单 · 页签".appLocalized)
                 .font(.caption2)
                 .foregroundStyle(textColors.secondary)
 
@@ -204,7 +204,7 @@ struct ThemePreviewSection: View {
                 Image(systemName: "arrow.up.arrow.down")
                 Image(systemName: "line.3.horizontal.decrease.circle")
                 Spacer()
-                Text("少女衣橱 / 心愿尾款")
+                Text("少女衣橱 / 心愿尾款".appLocalized)
                     .font(.caption2)
                 Spacer()
                 Image(systemName: "square.grid.2x2")
@@ -236,11 +236,11 @@ struct ThemePreviewSection: View {
     // MARK: - 梦裙日历模块预览
     private var calendarModulePreview: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("梦裙日历")
+            Text("梦裙日历".appLocalized)
                 .font(.subheadline)
                 .fontWeight(.semibold)
                 .foregroundStyle(textColors.primary)
-            Text("筛选按钮 · 分段页签")
+            Text("筛选按钮 · 分段页签".appLocalized)
                 .font(.caption2)
                 .foregroundStyle(textColors.secondary)
 
@@ -255,8 +255,8 @@ struct ThemePreviewSection: View {
                             Capsule()
                                 .fill(cardColors.backgroundRGBA.color.mixed(with: .white, amount: colorScheme == .dark ? 0.08 : 0.18))
                                 .frame(width: 52, height: 22)
-                                .overlay(Text("月").font(.caption2).foregroundStyle(textColors.primary))
-                            Text("年")
+                                .overlay(Text("月".appLocalized).font(.caption2).foregroundStyle(textColors.primary))
+                            Text("年".appLocalized)
                                 .font(.caption2)
                                 .foregroundStyle(textColors.secondary)
                         }
@@ -280,29 +280,29 @@ struct ThemePreviewSection: View {
     // MARK: - 马上来财模块预览
     private var wealthModulePreview: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("马上来财")
+            Text("马上来财".appLocalized)
                 .font(.subheadline)
                 .fontWeight(.semibold)
                 .foregroundStyle(textColors.primary)
-            Text("请签文字色 · 容器系统文字色")
+            Text("请签文字色 · 容器系统文字色".appLocalized)
                 .font(.caption2)
                 .foregroundStyle(textColors.secondary)
 
             VStack(alignment: .leading, spacing: 6) {
-                Text("请签：今日适合温柔俏皮配色")
+                Text("请签：今日适合温柔俏皮配色".appLocalized)
                     .font(.caption)
                     .foregroundStyle(textColors.primary)
                 HStack(spacing: 8) {
-                    Text("请签")
+                    Text("请签".appLocalized)
                         .font(.caption2)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 4)
                         .background(textColors.accent.opacity(colorScheme == .dark ? 0.20 : 0.12))
                         .clipShape(Capsule())
-                    Text("数钱")
+                    Text("数钱".appLocalized)
                         .font(.caption2)
                         .foregroundStyle(textColors.secondary)
-                    Text("安财")
+                    Text("安财".appLocalized)
                         .font(.caption2)
                         .foregroundStyle(textColors.secondary)
                 }
@@ -321,11 +321,11 @@ struct ThemePreviewSection: View {
     // MARK: - 萌宠对话气泡预览
     private var petChatBubblePreview: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("萌宠对话")
+            Text("萌宠对话".appLocalized)
                 .font(.subheadline)
                 .fontWeight(.semibold)
                 .foregroundStyle(textColors.primary)
-            Text("气泡样式 · 快捷选项")
+            Text("气泡样式 · 快捷选项".appLocalized)
                 .font(.caption2)
                 .foregroundStyle(textColors.secondary)
 
@@ -335,7 +335,7 @@ struct ThemePreviewSection: View {
             VStack(spacing: 8) {
                 // 助手气泡（奶茶）- 使用卡片背景色 + 主题色边框
                 HStack {
-                    Text("奶茶：今天想要偏甜美，还是偏通勤呢？")
+                    Text("奶茶：今天想要偏甜美，还是偏通勤呢？".appLocalized)
                         .font(.caption)
                         .foregroundStyle(textColors.primary)
                         .padding(.horizontal, 10)
@@ -361,7 +361,7 @@ struct ThemePreviewSection: View {
                 // 用户气泡
                 HStack {
                     Spacer()
-                    Text("主人：先给我看天气穿搭～")
+                    Text("主人：先给我看天气穿搭～".appLocalized)
                         .font(.caption)
                         .foregroundStyle(textColors.primary)
                         .padding(.horizontal, 10)
@@ -391,7 +391,7 @@ struct ThemePreviewSection: View {
     }
 
     private func petChatPreviewChip(_ text: String, skinTheme: PetChatSkinTheme) -> some View {
-        Text(text)
+        Text(text.appLocalized)
             .font(.caption2)
             .foregroundStyle(skinTheme.resolvedQuickOptionTextColor(themeManager: themeManager, colorScheme: colorScheme))
             .padding(.horizontal, 6)
@@ -416,7 +416,7 @@ struct LegendItem: View {
             Circle()
                 .fill(color)
                 .frame(width: 8, height: 8)
-            Text(label)
+            Text(label.appLocalized)
                 .font(.caption2)
                 .foregroundStyle(.white.opacity(0.8))
         }

@@ -124,7 +124,7 @@ struct CompactColorPickerSheet: View {
                     // 主题相关颜色（如果有）
                     if !themeColors.isEmpty {
                         VStack(alignment: .leading, spacing: 12) {
-                            Text("推荐颜色")
+                            Text("推荐颜色".appLocalized)
                                 .font(.headline)
                                 .padding(.horizontal)
 
@@ -144,7 +144,7 @@ struct CompactColorPickerSheet: View {
 
                     // 预设颜色 - 使用流式布局
                     VStack(alignment: .leading, spacing: 12) {
-                        Text("预设颜色")
+                        Text("预设颜色".appLocalized)
                             .font(.headline)
                             .padding(.horizontal)
 
@@ -163,7 +163,7 @@ struct CompactColorPickerSheet: View {
 
                     // 颜色滑块（HSB 选择器）
                     VStack(alignment: .leading, spacing: 12) {
-                        Text("精细调整")
+                        Text("精细调整".appLocalized)
                             .font(.headline)
                             .padding(.horizontal)
 
@@ -175,17 +175,17 @@ struct CompactColorPickerSheet: View {
                 }
                 .padding(.top)
             }
-            .navigationTitle(title)
+            .navigationTitle(title.appLocalized)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    Button("重置") {
+                    Button("重置".appLocalized) {
                         onReset()
                     }
                 }
 
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("完成") { dismiss() }
+                    Button("完成".appLocalized) { dismiss() }
                 }
             }
         }
@@ -237,7 +237,7 @@ struct ColorSliderSection: View {
             // 色相滑块
             VStack(alignment: .leading, spacing: 6) {
                 HStack {
-                    Text("色相")
+                    Text("色相".appLocalized)
                         .font(.caption)
                     Spacer()
                     Text("\(Int(hue * 360))°")
@@ -285,7 +285,7 @@ struct ColorSliderSection: View {
             // 饱和度滑块
             VStack(alignment: .leading, spacing: 6) {
                 HStack {
-                    Text("饱和度")
+                    Text("饱和度".appLocalized)
                         .font(.caption)
                     Spacer()
                     Text("\(Int(saturation * 100))%")
@@ -328,7 +328,7 @@ struct ColorSliderSection: View {
             // 亮度滑块
             VStack(alignment: .leading, spacing: 6) {
                 HStack {
-                    Text("亮度")
+                    Text("亮度".appLocalized)
                         .font(.caption)
                     Spacer()
                     Text("\(Int(brightness * 100))%")
@@ -410,7 +410,7 @@ struct CompactColorButton: View {
                             .stroke(Color.white.opacity(0.3), lineWidth: 1)
                     )
 
-                Text(title)
+                Text(title.appLocalized)
                     .font(.caption)
                     .foregroundStyle(.primary)
 

@@ -109,7 +109,7 @@ struct MagicColorSettingsView: View {
                     }
                 }
             }
-            .navigationTitle("主题配色")
+            .navigationTitle("主题配色".appLocalized)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
@@ -153,14 +153,14 @@ struct MagicColorSettingsView: View {
     // MARK: - 配色模式页签
     private var colorSchemeModeTabs: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("配色模式")
+            Text("配色模式".appLocalized)
                 .font(.headline)
                 .foregroundStyle(themeManager.primaryTextColor)
                 .padding(.horizontal, 4)
 
-            Picker("配色模式", selection: $selectedTab) {
+            Picker("配色模式".appLocalized, selection: $selectedTab) {
                 ForEach(ColorSchemeMode.allCases, id: \.self) { mode in
-                    Text(mode.displayName).tag(mode)
+                    Text(mode.displayName.appLocalized).tag(mode)
                 }
             }
             .pickerStyle(.segmented)
@@ -228,9 +228,9 @@ struct MagicColorTabContent: View {
                         .clipShape(RoundedRectangle(cornerRadius: 12))
 
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("智能配色已启用")
+                        Text("智能配色已启用".appLocalized)
                             .font(.headline)
-                        Text("根据背景和容器自动调整字体和卡片颜色")
+                        Text("根据背景和容器自动调整字体和卡片颜色".appLocalized)
                             .font(.caption)
                             .foregroundColor(.secondary)
                     }
@@ -246,7 +246,7 @@ struct MagicColorTabContent: View {
 
             // 当前调色板展示 - 字体颜色
             VStack(alignment: .leading, spacing: 12) {
-                Text("字体配色")
+                Text("字体配色".appLocalized)
                     .font(.headline)
                     .padding(.horizontal, 4)
 
@@ -279,7 +279,7 @@ struct MagicColorTabContent: View {
 
             // 卡片背景色展示
             VStack(alignment: .leading, spacing: 12) {
-                Text("卡片背景")
+                Text("卡片背景".appLocalized)
                     .font(.headline)
                     .padding(.horizontal, 4)
 
@@ -287,7 +287,7 @@ struct MagicColorTabContent: View {
                 HStack(spacing: 12) {
                     // 卡片背景色
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("卡片背景色")
+                        Text("卡片背景色".appLocalized)
                             .font(.subheadline)
                             .foregroundStyle(themeManager.primaryTextColor)
 
@@ -299,12 +299,12 @@ struct MagicColorTabContent: View {
                                     .stroke(themeManager.accentTextColor.opacity(0.3), lineWidth: 1)
                             )
                             .overlay(
-                                Text("示例卡片")
+                                Text("示例卡片".appLocalized)
                                     .font(.caption)
                                     .foregroundStyle(themeManager.primaryTextColor)
                             )
 
-                        Text("基于背景色智能生成")
+                        Text("基于背景色智能生成".appLocalized)
                             .font(.caption2)
                             .foregroundStyle(themeManager.secondaryTextColor)
                     }
@@ -312,7 +312,7 @@ struct MagicColorTabContent: View {
 
                     // 强调色
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("强调色")
+                        Text("强调色".appLocalized)
                             .font(.subheadline)
                             .foregroundStyle(themeManager.primaryTextColor)
 
@@ -324,12 +324,12 @@ struct MagicColorTabContent: View {
                                     .stroke(themeManager.accentTextColor.opacity(0.5), lineWidth: 1)
                             )
                             .overlay(
-                                Text("标签/按钮")
+                                Text("标签/按钮".appLocalized)
                                     .font(.caption)
                                     .foregroundStyle(themeManager.accentTextColor)
                             )
 
-                        Text("用于标签和高亮")
+                        Text("用于标签和高亮".appLocalized)
                             .font(.caption2)
                             .foregroundStyle(themeManager.secondaryTextColor)
                     }
@@ -359,7 +359,7 @@ struct CustomColorTabContent: View {
     // MARK: - 预设主题区域
     private var presetThemesSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("预设主题")
+            Text("预设主题".appLocalized)
                 .font(.headline)
                 .padding(.horizontal, 4)
 
@@ -400,7 +400,7 @@ struct PetChatSkinSection: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("萌宠对话皮肤")
+            Text("萌宠对话皮肤".appLocalized)
                 .font(.headline)
                 .foregroundStyle(themeManager.primaryTextColor)
                 .padding(.horizontal, 4)
@@ -425,10 +425,10 @@ struct PetChatSkinSection: View {
                                 .frame(width: 18, height: 18)
 
                             VStack(alignment: .leading, spacing: 2) {
-                                Text(skin.displayName)
+                                Text(skin.displayName.appLocalized)
                                     .font(.subheadline)
                                     .foregroundStyle(themeManager.primaryTextColor)
-                                Text(skin.subtitle)
+                                Text(skin.subtitle.appLocalized)
                                     .font(.caption)
                                     .foregroundStyle(themeManager.secondaryTextColor)
                             }

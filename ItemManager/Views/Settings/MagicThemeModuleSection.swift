@@ -54,7 +54,7 @@ struct MagicThemeModuleSection: View {
         VStack(alignment: .leading, spacing: 16) {
             // 标题和保存按钮区域
             HStack {
-                Text("我的主题方案")
+                Text("我的主题方案".appLocalized)
                     .font(.headline)
 
                 Spacer()
@@ -66,7 +66,7 @@ struct MagicThemeModuleSection: View {
                     HStack(spacing: 4) {
                         Image(systemName: "square.and.arrow.down")
                             .font(.caption)
-                        Text("保存")
+                        Text("保存".appLocalized)
                             .font(.subheadline)
                     }
                     .padding(.horizontal, 12)
@@ -112,7 +112,7 @@ struct MagicThemeModuleSection: View {
                 HStack {
                     Image(systemName: "lock.fill")
                         .foregroundColor(.orange)
-                    Text("解锁后可自定义颜色")
+                    Text("解锁后可自定义颜色".appLocalized)
                         .font(.subheadline)
                         .foregroundColor(.secondary)
                     Spacer()
@@ -139,39 +139,40 @@ struct MagicThemeModuleSection: View {
             )
         }
         // 输入主题名称弹窗
-        .alert("保存主题方案", isPresented: $showNameInputAlert) {
-            TextField("输入主题名称", text: $customThemeName)
-            Button("取消", role: .cancel) {
+        .alert("保存主题方案".appLocalized, isPresented: $showNameInputAlert) {
+            TextField("输入主题名称".appLocalized, text: $customThemeName)
+            Button("取消".appLocalized, role: .cancel) {
                 customThemeName = ""
             }
-            Button("保存") {
+            Button("保存".appLocalized) {
                 let name = customThemeName.trimmingCharacters(in: .whitespacesAndNewlines)
-                pendingThemeName = name.isEmpty ? "我的主题\(Date().formatted(date: .omitted, time: .shortened))" : name
+                let fallbackName = "我的主题 %@".appLocalized(Date().formatted(date: .omitted, time: .shortened))
+                pendingThemeName = name.isEmpty ? fallbackName : name
                 checkAndSave()
             }
         } message: {
-            Text("为当前主题配色方案起个名字")
+            Text("为当前主题配色方案起个名字".appLocalized)
         }
         // 覆盖确认弹窗
-        .alert("主题已存在", isPresented: $showOverwriteAlert) {
-            Button("取消", role: .cancel) { }
-            Button("覆盖", role: .destructive) {
+        .alert("主题已存在".appLocalized, isPresented: $showOverwriteAlert) {
+            Button("取消".appLocalized, role: .cancel) { }
+            Button("覆盖".appLocalized, role: .destructive) {
                 performSave()
             }
         } message: {
-            Text("已存在名为「\(pendingThemeName)」的主题方案，是否覆盖？")
+            Text("已存在名为「%@」的主题方案，是否覆盖？".appLocalized(pendingThemeName))
         }
         // 删除确认弹窗
-        .alert("确认删除", isPresented: $showDeleteConfirmAlert) {
-            Button("取消", role: .cancel) {
+        .alert("确认删除".appLocalized, isPresented: $showDeleteConfirmAlert) {
+            Button("取消".appLocalized, role: .cancel) {
                 pendingDeleteThemeId = nil
                 pendingDeleteThemeName = ""
             }
-            Button("删除", role: .destructive) {
+            Button("删除".appLocalized, role: .destructive) {
                 performDelete()
             }
         } message: {
-            Text("确定要删除主题「\(pendingDeleteThemeName)」吗？此操作不可恢复。")
+            Text("确定要删除主题「%@」吗？此操作不可恢复。".appLocalized(pendingDeleteThemeName))
         }
     }
 
@@ -212,14 +213,14 @@ struct MagicThemeModuleSection: View {
     // MARK: - 自定义颜色区域（紧凑布局）
     private var customColorsSection: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("自定义颜色")
+            Text("自定义颜色".appLocalized)
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .padding(.horizontal, 4)
 
             // 字体配色 - 紧凑网格布局
             VStack(alignment: .leading, spacing: 8) {
-                Text("字体配色")
+                Text("字体配色".appLocalized)
                     .font(.caption)
                     .foregroundStyle(.tertiary)
 
@@ -276,7 +277,7 @@ struct MagicThemeModuleSection: View {
 
             // 卡片配色 - 紧凑网格布局
             VStack(alignment: .leading, spacing: 8) {
-                Text("卡片配色")
+                Text("卡片配色".appLocalized)
                     .font(.caption)
                     .foregroundStyle(.tertiary)
 

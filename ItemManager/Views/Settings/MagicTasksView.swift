@@ -150,7 +150,7 @@ struct MagicTaskRow: View {
                         .font(.system(size: 16, weight: .medium))
                         .foregroundColor(themeManager.primaryTextColor)
 
-                    Text(feature.defaultCondition.description)
+                    Text(manager.getCondition(for: feature).localizedDescription)
                         .font(.caption)
                         .foregroundColor(themeManager.secondaryTextColor)
                         .lineLimit(1)
@@ -290,13 +290,13 @@ struct MagicTaskDetailView: View {
                             LazyVGrid(columns: infoColumns, spacing: 12) {
                                 infoTofuBlock(
                                     title: "任务类型",
-                                    value: conditionType?.displayName ?? "体验任务",
+                                    value: conditionType?.displayName ?? "体验任务".appLocalized,
                                     icon: conditionType?.icon ?? "sparkles"
                                 )
 
                                 infoTofuBlock(
                                     title: "任务状态",
-                                    value: isUnlocked ? "已完成" : "未完成",
+                                    value: isUnlocked ? "已完成".appLocalized : "未完成".appLocalized,
                                     icon: isUnlocked ? "checkmark.circle.fill" : "clock",
                                     emphasized: isUnlocked
                                 )
@@ -305,7 +305,7 @@ struct MagicTaskDetailView: View {
                                    let reward = experienceFishCoinReward {
                                     infoTofuBlock(
                                         title: "任务奖励",
-                                        value: "鱼币 +\(reward)",
+                                        value: "鱼币 +%d".appLocalized(reward),
                                         icon: "sparkles.rectangle.stack.fill",
                                         emphasized: true
                                     )
@@ -315,7 +315,7 @@ struct MagicTaskDetailView: View {
                                    let stepCount = experienceGuideStepCount {
                                     infoTofuBlock(
                                         title: "引导步数",
-                                        value: "\(stepCount) 步",
+                                        value: "%d 步".appLocalized(stepCount),
                                         icon: "figure.walk"
                                     )
                                 }
@@ -443,7 +443,7 @@ struct MagicTaskDetailView: View {
 
         return HStack(spacing: 6) {
             Image(systemName: isUnlocked ? "checkmark.circle.fill" : "lock.fill")
-            Text(isUnlocked ? "已解锁" : "未解锁")
+            Text((isUnlocked ? "已解锁" : "未解锁").appLocalized)
         }
         .font(.caption)
         .fontWeight(.medium)
@@ -475,7 +475,7 @@ struct MagicTaskDetailView: View {
                 Image(systemName: icon)
                     .font(.caption)
                     .foregroundColor(themeManager.accentTextColor)
-                Text(title)
+                Text(title.appLocalized)
                     .font(.caption)
                     .foregroundColor(themeManager.secondaryTextColor)
             }
@@ -501,7 +501,7 @@ struct MagicTaskDetailView: View {
     private func progressTofuBlock(_ progress: (current: Double, total: Double, isCompleted: Bool)) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Text(progress.isCompleted ? "进度已达成" : "进度条")
+                Text((progress.isCompleted ? "进度已达成" : "进度条").appLocalized)
                     .font(.caption)
                     .foregroundColor(themeManager.secondaryTextColor)
                 Spacer()
@@ -569,27 +569,27 @@ struct MagicTaskDetailView: View {
         fallbackMessage: String?
     ) -> String {
         guard let progress else {
-            return fallbackMessage ?? "继续完成任务条件即可解锁。"
+            return fallbackMessage ?? "继续完成任务条件即可解锁。".appLocalized
         }
 
         if progress.isCompleted {
-            return "条件已达成，点击下方“立即解锁”即可完成任务。"
+            return "条件已达成，点击下方“立即解锁”即可完成任务。".appLocalized
         }
 
         let remaining = max(0, Int(ceil(progress.total - progress.current)))
         switch conditionType {
         case .vip:
-            return "开通 VIP 即可完成任务。"
+            return "开通 VIP 即可完成任务。".appLocalized
         case .meowCoin:
-            return "还差 \(remaining) 喵币的累计消费，去其他功能里使用喵币即可继续推进。"
+            return "还差 %d 喵币的累计消费，去其他功能里使用喵币即可继续推进。".appLocalized(remaining)
         case .clothingCount:
-            return "还差 \(remaining) 件衣物，继续录入衣橱即可推进。"
+            return "还差 %d 件衣物，继续录入衣橱即可推进。".appLocalized(remaining)
         case .loginDays:
-            return "再签到 \(remaining) 天即可完成任务。"
+            return "再签到 %d 天即可完成任务。".appLocalized(remaining)
         case .petLevel:
-            return "萌宠等级还差 \(remaining) 级，继续陪伴互动可升级。"
+            return "萌宠等级还差 %d 级，继续陪伴互动可升级。".appLocalized(remaining)
         default:
-            return fallbackMessage ?? "继续完成任务条件即可解锁。"
+            return fallbackMessage ?? "继续完成任务条件即可解锁。".appLocalized
         }
     }
 
@@ -638,7 +638,7 @@ struct MagicTaskDetailView: View {
             HStack(spacing: 8) {
                 Image(systemName: icon)
                     .font(.system(size: 16, weight: .semibold))
-                Text(title)
+                Text(title.appLocalized)
                     .fontWeight(.semibold)
                 Spacer()
                 Image(systemName: "chevron.right")
@@ -693,13 +693,13 @@ struct MagicTaskDetailView: View {
         
         switch result {
         case .success:
-            unlockMessage = "\(feature.displayName) 解锁成功！"
+            unlockMessage = "%@ 解锁成功！".appLocalized(feature.displayName)
         case .alreadyUnlocked:
-            unlockMessage = "\(feature.displayName) 已经解锁了"
+            unlockMessage = "%@ 已经解锁了".appLocalized(feature.displayName)
         case .conditionNotMet(let message):
-            unlockMessage = "解锁失败：\(message)"
+            unlockMessage = "解锁失败：%@".appLocalized(message)
         case .insufficientResource(let type, let required, let current):
-            unlockMessage = "\(type)不足，需要 \(required)，当前只有 \(current)"
+            unlockMessage = "%@不足，需要 %d，当前只有 %d".appLocalized(type.appLocalized, required, current)
         }
         
         showUnlockAlert = true
