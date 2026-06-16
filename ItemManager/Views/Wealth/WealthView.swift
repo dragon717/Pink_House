@@ -115,7 +115,6 @@ struct WealthView: View {
             .toolbarColorScheme(magicPalette.navigationBackground.isDark ? .dark : .light, for: .navigationBar)
             .tint(magicPalette.accent)
             .toolbar {
-                leadingToolbarContent
                 centerToolbarContent
                 trailingToolbarContent
             }
@@ -200,23 +199,6 @@ struct WealthView: View {
     }
     
     // MARK: - Toolbar Content
-    
-    @ToolbarContentBuilder
-    private var leadingToolbarContent: some ToolbarContent {
-        ToolbarItem(placement: .topBarLeading) {
-            Menu {
-                Text(WealthExperienceCopy.pageTitle)
-                    .font(.headline)
-                    .foregroundStyle(themeManager.primaryTextColor)
-                Text(WealthExperienceCopy.pageSubtitle)
-                    .font(.caption)
-                    .foregroundStyle(themeManager.secondaryTextColor)
-            } label: {
-                Text("🐎")
-                    .font(.caption)
-            }
-        }
-    }
     
     @ToolbarContentBuilder
     private var centerToolbarContent: some ToolbarContent {
