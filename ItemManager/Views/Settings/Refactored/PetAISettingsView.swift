@@ -8,7 +8,7 @@ struct PetAISettingsView: View {
                     HStack {
                         Image(systemName: "brain.head.profile")
                             .foregroundStyle(.purple)
-                        Text("模型管理与 API 配置")
+                        Text("模型管理与 API 配置".appLocalized)
                         Spacer()
                     }
                 }
@@ -20,7 +20,7 @@ struct PetAISettingsView: View {
                     HStack {
                         Image(systemName: "speaker.wave.2")
                             .foregroundStyle(.blue)
-                        Text("音量与音效设置")
+                        Text("音量与音效设置".appLocalized)
                     }
                 }
                 .adaptiveRow(showDivider: false)
@@ -31,7 +31,7 @@ struct PetAISettingsView: View {
                     HStack {
                         Image(systemName: "paintpalette.fill")
                             .foregroundStyle(.orange)
-                        Text("主题配色")
+                        Text("主题配色".appLocalized)
                         Spacer()
                     }
                 }
@@ -41,7 +41,7 @@ struct PetAISettingsView: View {
                     HStack {
                         Image(systemName: "sparkles")
                             .foregroundStyle(.pink)
-                        Text("拖拽轨迹与气泡")
+                        Text("拖拽轨迹与气泡".appLocalized)
                         Spacer()
                     }
                 }

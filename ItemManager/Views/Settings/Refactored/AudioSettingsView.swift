@@ -11,10 +11,10 @@ struct AudioSettingsView: View {
                         Image(systemName: "music.note")
                             .foregroundStyle(.pink)
                             .frame(width: 24)
-                        Text("萌宠 BGM: \(Int(audioManager.bgmVolume * 100))%")
+                        Text("萌宠 BGM: %lld%%".appLocalized(Int64(audioManager.bgmVolume * 100)))
                     }
                     Slider(value: $audioManager.bgmVolume, in: 0...1) {
-                        Text("BGM 音量")
+                        Text("BGM 音量".appLocalized)
                     } minimumValueLabel: {
                         Image(systemName: "speaker.fill").font(.caption)
                     } maximumValueLabel: {
