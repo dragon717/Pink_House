@@ -27,6 +27,10 @@ struct DressStockMarketView: View {
         case month = "月K"
         case year = "年K"
         
+        var localizedTitle: String {
+            rawValue.appLocalized
+        }
+
         var days: Int {
             switch self {
             case .day: return 1
@@ -70,7 +74,7 @@ struct DressStockMarketView: View {
                 .padding(.horizontal)
                 .padding(.vertical, 8)
             }
-            .navigationTitle("裙装股市")
+            .navigationTitle("裙装股市".appLocalized)
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
@@ -204,7 +208,7 @@ struct SearchBar: View {
             Image(systemName: "magnifyingglass")
                 .foregroundStyle(.secondary)
             
-            TextField("搜索裙装...", text: $text)
+            TextField("搜索裙装...".appLocalized, text: $text)
                 .textFieldStyle(.plain)
             
             if !text.isEmpty {
@@ -226,7 +230,7 @@ struct MarketPriceOverviewCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text("LO-指数")
+                Text("LO-指数".appLocalized)
                     .font(.system(size: 20, weight: .bold, design: .rounded))
                     .foregroundStyle(.primary)
                 
@@ -235,7 +239,7 @@ struct MarketPriceOverviewCard: View {
                 // 实时标签
                 HStack(spacing: 4) {
                     PulsingDot()
-                    Text("实时")
+                    Text("实时".appLocalized)
                         .font(.system(size: 12, weight: .medium))
                 }
                 .foregroundStyle(Color(hex: "E29399"))
@@ -282,7 +286,7 @@ struct MarketPriceRangeItem: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text(title)
+            Text(title.appLocalized)
                 .font(.system(size: 12, weight: .medium))
                 .foregroundStyle(.secondary)
             
@@ -313,13 +317,13 @@ struct MarketKLineChartCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text("价格走势")
+                Text("价格走势".appLocalized)
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundStyle(.primary)
                 
                 Spacer()
                 
-                Text(selectedTimeRange.rawValue)
+                Text(selectedTimeRange.localizedTitle)
                     .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(.secondary)
                     .padding(.horizontal, 8)
@@ -335,7 +339,7 @@ struct MarketKLineChartCard: View {
                     Image(systemName: "chart.line.uptrend.xyaxis")
                         .font(.system(size: 40))
                         .foregroundStyle(Color(hex: "E29399"))
-                    Text("K线图功能开发中")
+                    Text("K线图功能开发中".appLocalized)
                         .font(.system(size: 14))
                         .foregroundStyle(.secondary)
                 }
@@ -376,7 +380,7 @@ struct MarketTimeRangeSelector: View {
                         selection = range
                     }
                 }) {
-                    Text(range.rawValue)
+                    Text(range.localizedTitle)
                         .font(.system(size: 16, weight: .semibold))
                         .foregroundStyle(selection == range ? .white : .primary)
                         .frame(maxWidth: .infinity)
@@ -398,7 +402,7 @@ struct DressMarketStatsCard: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("市场统计")
+            Text("市场统计".appLocalized)
                 .font(.system(size: 16, weight: .semibold))
                 .foregroundStyle(.primary)
             
@@ -460,7 +464,7 @@ struct DressStatBox: View {
                 .font(.system(size: 20, weight: .bold))
                 .foregroundStyle(.primary)
             
-            Text(title)
+            Text(title.appLocalized)
                 .font(.system(size: 12, weight: .medium))
                 .foregroundStyle(.secondary)
         }
@@ -476,7 +480,7 @@ struct DressStatBox: View {
 struct DressPlatformDistributionCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("平台分布")
+            Text("平台分布".appLocalized)
                 .font(.system(size: 16, weight: .semibold))
                 .foregroundStyle(.primary)
             
@@ -507,7 +511,7 @@ struct DressPlatformBadge: View {
                 .fill(color)
                 .frame(width: 6, height: 6)
             
-            Text("\(name) \(count)")
+            Text("\(name.appLocalized) \(count)")
                 .font(.system(size: 12, weight: .medium))
                 .foregroundStyle(.secondary)
         }
@@ -527,13 +531,13 @@ struct DressAIAnalysisCard: View {
                 Image(systemName: "brain.head.profile")
                     .foregroundStyle(Color(hex: "E29399"))
                 
-                Text("AI 投资建议")
+                Text("AI 投资建议".appLocalized)
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundStyle(.primary)
                 
                 Spacer()
                 
-                Text("买入")
+                Text("买入".appLocalized)
                     .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(.white)
                     .padding(.horizontal, 12)
@@ -564,7 +568,7 @@ struct DressAnalysisRow: View {
     
     var body: some View {
         HStack(spacing: 12) {
-            Text(title)
+            Text(title.appLocalized)
                 .font(.system(size: 14, weight: .regular))
                 .foregroundStyle(.secondary)
                 .frame(width: 70, alignment: .leading)
@@ -608,14 +612,14 @@ struct DressActiveListingsSection: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text("在售商品 (\(items.count))")
+                Text("在售商品 (%d)".appLocalized(items.count))
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundStyle(.primary)
                 
                 Spacer()
                 
                 if items.count > 5 {
-                    Text("查看全部")
+                    Text("查看全部".appLocalized)
                         .font(.system(size: 12, weight: .medium))
                         .foregroundStyle(Color(hex: "E29399"))
                 }
@@ -627,7 +631,7 @@ struct DressActiveListingsSection: View {
                         .font(.system(size: 40))
                         .foregroundStyle(Color(hex: "E29399").opacity(0.5))
                     
-                    Text("暂无在售商品")
+                    Text("暂无在售商品".appLocalized)
                         .font(.system(size: 14, weight: .regular))
                         .foregroundStyle(.secondary)
                 }
@@ -716,10 +720,10 @@ struct DressListingRow: View {
     
     var priceTrendText: String {
         switch item.priceTrend {
-        case "bargain": return "好价"
-        case "fair": return "合理"
-        case "premium": return "溢价"
-        default: return "未知"
+        case "bargain": return "好价".appLocalized
+        case "fair": return "合理".appLocalized
+        case "premium": return "溢价".appLocalized
+        default: return "未知".appLocalized
         }
     }
     
