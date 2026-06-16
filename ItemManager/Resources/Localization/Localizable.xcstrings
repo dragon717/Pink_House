@@ -12881,6 +12881,42 @@
             "state" : "translated",
             "value" : "BGM 音量: %lld%%"
           }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "BGM-Lautstärke: %lld%%"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Volumen BGM: %lld%%"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Volume BGM : %lld%%"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "BGM音量: %lld%%"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "BGM 볼륨: %lld%%"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Volume da BGM: %lld%%"
+          }
         }
       }
     },
@@ -18030,7 +18066,43 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "個性化"
+            "value" : "個人化"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Personalisierung"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Personalización"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Personnalisation"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "カスタマイズ"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "개인화"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Personalização"
           }
         }
       }
@@ -35982,7 +36054,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Go to System Settings"
+            "value" : "Open System Settings"
           }
         },
         "zh-Hans" : {
@@ -35996,6 +36068,42 @@
             "state" : "translated",
             "value" : "前往系統設定"
           }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Systemeinstellungen öffnen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abrir ajustes del sistema"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ouvrir les réglages système"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "システム設定を開く"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "시스템 설정 열기"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abrir ajustes do sistema"
+          }
         }
       }
     },
@@ -36004,7 +36112,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Check haptics in System Settings"
+            "value" : "Open System Settings for haptics"
           }
         },
         "zh-Hans" : {
@@ -36017,6 +36125,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "前往系統設定檢查觸感"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Systemeinstellungen für Haptik öffnen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abrir ajustes del sistema para la vibración"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ouvrir les réglages système des vibrations"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "システム設定で触覚を確認"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "시스템 설정에서 햅틱 확인"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abrir ajustes do sistema para resposta tátil"
           }
         }
       }
@@ -42514,7 +42658,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Enable vibration feedback."
+            "value" : "Enables vibration feedback"
           }
         },
         "zh-Hans" : {
@@ -42527,6 +42671,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "啟用震動回饋"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aktiviert Vibrationsfeedback"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Activa la vibración"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Active les vibrations"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "振動フィードバックを有効にします"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "진동 피드백을 켭니다"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ativa a resposta por vibração"
           }
         }
       }
@@ -59801,7 +59981,43 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "App 音效"
+            "value" : "應用音效"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "App-Sounds"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sonidos de la app"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sons de l’app"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アプリ効果音"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "앱 효과음"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sons do app"
           }
         }
       }
@@ -76153,7 +76369,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Control tap, collision, and interaction sounds."
+            "value" : "Controls tap, collision, and other interaction sounds"
           }
         },
         "zh-Hans" : {
@@ -76167,6 +76383,42 @@
             "state" : "translated",
             "value" : "控制點擊、碰撞等互動音效"
           }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Steuert Tipp-, Kollisions- und andere Interaktionssounds"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Controla sonidos de toques, colisiones y otras interacciones"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Contrôle les sons de toucher, collision et autres interactions"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "タップ、衝突などの操作音を制御します"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "탭, 충돌 등 상호작용 효과음을 제어합니다"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Controla sons de toque, colisão e outras interações"
+          }
         }
       }
     },
@@ -76175,7 +76427,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Control haptics for rolling and collision effects."
+            "value" : "Controls vibration feedback for rolling and collision effects"
           }
         },
         "zh-Hans" : {
@@ -76188,6 +76440,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "控制金豆滾動、碰撞的震動回饋"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Steuert Vibrationsfeedback für Rollen und Kollisionen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Controla la vibración al rodar y chocar"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Contrôle les vibrations lors des roulements et collisions"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "転がりや衝突の振動フィードバックを制御します"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "굴러가거나 충돌할 때의 진동 피드백을 제어합니다"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Controla vibrações ao rolar e colidir"
           }
         }
       }
@@ -77783,7 +78071,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Play scene background music."
+            "value" : "Plays background music for scenes"
           }
         },
         "zh-Hans" : {
@@ -77796,6 +78084,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "播放場景背景音樂"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Spielt Hintergrundmusik für Szenen ab"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reproduce música de fondo en las escenas"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Joue la musique de fond des scènes"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "シーンの背景音楽を再生します"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "장면 배경 음악을 재생합니다"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reproduz música de fundo nas cenas"
           }
         }
       }
@@ -114104,6 +114428,42 @@
             "state" : "translated",
             "value" : "背景音樂"
           }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hintergrundmusik"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Música de fondo"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Musique de fond"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "背景音楽"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "배경 음악"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Música de fundo"
+          }
         }
       }
     },
@@ -119727,6 +120087,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "觸感回饋"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Haptisches Feedback"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Respuesta háptica"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Retour haptique"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "触覚フィードバック"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "햅틱 피드백"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Resposta tátil"
           }
         }
       }
@@ -131872,7 +132268,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Gold & Silver Haptics"
+            "value" : "Coin & Pearl Vibration"
           }
         },
         "zh-Hans" : {
@@ -131885,6 +132281,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "金豆銀珠震動"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Münz- und Perlenvibration"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibración de monedas y perlas"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibration des pièces et perles"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "金豆と銀珠の振動"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "금콩 은구슬 진동"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibração de moedas e pérolas"
           }
         }
       }
@@ -134031,13 +134463,13 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ton und Haptik"
+            "value" : "Sound & Haptik"
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Sound and Haptics"
+            "value" : "Sound & Haptics"
           }
         },
         "es" : {
@@ -134079,7 +134511,7 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "音效與觸覺回饋"
+            "value" : "音效與觸感"
           }
         }
       }
@@ -136991,7 +137423,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Wealth Settings"
+            "value" : "Money Rush Settings"
           }
         },
         "zh-Hans" : {
@@ -137004,6 +137436,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "馬上來財設定"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Geldregen-Einstellungen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ajustes de Money Rush"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Réglages de Money Rush"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "マネーラッシュ設定"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "머니 러시 설정"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Configurações do Money Rush"
           }
         }
       }
@@ -139070,6 +139538,412 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "萌寵形象"
+          }
+        }
+      }
+    },
+    "总开关" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Master Switches"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hauptschalter"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Interruptores principales"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Interrupteurs principaux"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "メインスイッチ"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "전체 스위치"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Controles principais"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "总开关"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "總開關"
+          }
+        }
+      }
+    },
+    "系统触感设置" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "System Haptics Settings"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Systemhaptik-Einstellungen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ajustes hápticos del sistema"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Réglages haptiques du système"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "システム触覚設定"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "시스템 햅틱 설정"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ajustes de resposta tátil do sistema"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "系统触感设置"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "系統觸感設定"
+          }
+        }
+      }
+    },
+    "如果应用内开启后仍无震动，请检查系统设置。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "If vibration still does not work after enabling it in the app, check system settings."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wenn nach dem Aktivieren in der App weiterhin keine Vibration erfolgt, prüfe die Systemeinstellungen."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Si la vibración sigue sin funcionar tras activarla en la app, revisa los ajustes del sistema."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Si les vibrations ne fonctionnent toujours pas après l’activation dans l’app, vérifiez les réglages système."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アプリ内で有効にしても振動しない場合は、システム設定を確認してください。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "앱에서 켠 후에도 진동이 작동하지 않으면 시스템 설정을 확인하세요."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Se a vibração ainda não funcionar após ativá-la no app, verifique os ajustes do sistema."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "如果应用内开启后仍无震动，请检查系统设置。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "如果在應用程式內開啟後仍無震動，請檢查系統設定。"
+          }
+        }
+      }
+    },
+    "纸币与背景样式" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bill & Background Style"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Schein- und Hintergrundstil"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Estilo de billetes y fondo"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Style des billets et de l’arrière-plan"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "紙幣と背景スタイル"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "지폐 및 배경 스타일"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Estilo das notas e do fundo"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "纸币与背景样式"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "紙幣與背景樣式"
+          }
+        }
+      }
+    },
+    "自定义不同面额纸币的显示图片" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Customize the images shown for each bill denomination"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Passe die Bilder für jede Scheinstückelung an"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Personaliza las imágenes de cada denominación de billete"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Personnalisez les images affichées pour chaque valeur de billet"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "各紙幣額面に表示する画像をカスタマイズします"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "각 지폐 단위에 표시할 이미지를 맞춤 설정합니다"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Personalize as imagens de cada valor de nota"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自定义不同面额纸币的显示图片"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自訂不同面額紙幣的顯示圖片"
+          }
+        }
+      }
+    },
+    "系统设置" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "System Settings"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Systemeinstellungen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ajustes del sistema"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Réglages système"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "システム設定"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "시스템 설정"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ajustes do sistema"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "系统设置"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "系統設定"
+          }
+        }
+      }
+    },
+    "如果应用内开启后仍无震动，请检查：\n1. 系统设置 > 声音与触感 > 系统触感反馈 是否开启\n2. 手机是否处于静音模式（部分震动在静音下可能不工作）" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "If vibration still does not work after enabling it in the app, check:\n1. System Settings > Sounds & Haptics > System Haptics is enabled\n2. Whether the phone is in Silent Mode (some vibrations may not work while muted)"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wenn nach dem Aktivieren in der App weiterhin keine Vibration erfolgt, prüfe:\n1. Systemeinstellungen > Töne & Haptik > Systemhaptik ist aktiviert\n2. Ob das Telefon stummgeschaltet ist (einige Vibrationen funktionieren im Stummmodus eventuell nicht)"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Si la vibración sigue sin funcionar tras activarla en la app, revisa:\n1. Ajustes del sistema > Sonidos y vibración > Vibración del sistema está activada\n2. Si el teléfono está en modo silencio (algunas vibraciones pueden no funcionar)"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Si les vibrations ne fonctionnent toujours pas après l’activation dans l’app, vérifiez :\n1. Réglages système > Sons et vibrations > Vibrations système est activé\n2. Si le téléphone est en mode silencieux (certaines vibrations peuvent ne pas fonctionner)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アプリ内で有効にしても振動しない場合は、次を確認してください:\n1. システム設定 > サウンドと触覚 > システムの触覚 がオン\n2. 端末が消音モードかどうか（一部の振動は消音中に動作しない場合があります）"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "앱에서 켠 후에도 진동이 작동하지 않으면 확인하세요:\n1. 시스템 설정 > 사운드 및 햅틱 > 시스템 햅틱이 켜져 있는지\n2. 휴대폰이 무음 모드인지 여부(일부 진동은 무음 상태에서 작동하지 않을 수 있음)"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Se a vibração ainda não funcionar após ativá-la no app, verifique:\n1. Ajustes do sistema > Som e resposta tátil > Resposta tátil do sistema está ativada\n2. Se o telefone está no modo silencioso (algumas vibrações podem não funcionar)"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "如果应用内开启后仍无震动，请检查：\n1. 系统设置 > 声音与触感 > 系统触感反馈 是否开启\n2. 手机是否处于静音模式（部分震动在静音下可能不工作）"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "如果在應用程式內開啟後仍無震動，請檢查：\n1. 系統設定 > 聲音與觸感 > 系統觸感回饋 是否開啟\n2. 手機是否處於靜音模式（部分震動在靜音下可能無法運作）"
           }
         }
       }

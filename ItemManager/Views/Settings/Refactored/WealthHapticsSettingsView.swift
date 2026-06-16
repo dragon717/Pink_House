@@ -13,9 +13,9 @@ struct WealthHapticsSettingsView: View {
                             .frame(width: 24)
 
                         VStack(alignment: .leading) {
-                            Text(WealthExperienceCopy.Settings.paperStyleTitle)
+                            Text(WealthExperienceCopy.Settings.paperStyleTitle.appLocalized)
                                 .foregroundStyle(.primary)
-                            Text(WealthExperienceCopy.Settings.paperStyleDescription)
+                            Text(WealthExperienceCopy.Settings.paperStyleDescription.appLocalized)
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
@@ -31,9 +31,9 @@ struct WealthHapticsSettingsView: View {
                             .foregroundStyle(.brown)
                             .frame(width: 24)
                         VStack(alignment: .leading) {
-                            Text("金豆银珠震动")
+                            Text("金豆银珠震动".appLocalized)
                                 .foregroundStyle(.primary)
-                            Text("控制金豆滚动、碰撞的震动反馈")
+                            Text("控制金豆滚动、碰撞的震动反馈".appLocalized)
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
@@ -48,7 +48,7 @@ struct WealthHapticsSettingsView: View {
                 } label: {
                     HStack {
                         Image(systemName: "gear").foregroundStyle(.blue)
-                        Text("前往系统设置")
+                        Text("前往系统设置".appLocalized)
                         Spacer()
                         Image(systemName: "arrow.up.forward.app").font(.caption).foregroundStyle(.gray)
                     }

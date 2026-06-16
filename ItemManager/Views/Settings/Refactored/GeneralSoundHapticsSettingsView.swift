@@ -15,9 +15,9 @@ struct GeneralSoundHapticsSettingsView: View {
                             .foregroundStyle(.blue)
                             .frame(width: 24)
                         VStack(alignment: .leading) {
-                            Text("应用音效")
+                            Text("应用音效".appLocalized)
                                 .foregroundStyle(.primary)
-                            Text("控制点击、碰撞等互动音效")
+                            Text("控制点击、碰撞等互动音效".appLocalized)
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
@@ -31,9 +31,9 @@ struct GeneralSoundHapticsSettingsView: View {
                             .foregroundStyle(.pink)
                             .frame(width: 24)
                         VStack(alignment: .leading) {
-                            Text("背景音乐")
+                            Text("背景音乐".appLocalized)
                                 .foregroundStyle(.primary)
-                            Text("播放场景背景音乐")
+                            Text("播放场景背景音乐".appLocalized)
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
@@ -47,9 +47,9 @@ struct GeneralSoundHapticsSettingsView: View {
                             .foregroundStyle(.brown)
                             .frame(width: 24)
                         VStack(alignment: .leading) {
-                            Text("触感反馈")
+                            Text("触感反馈".appLocalized)
                                 .foregroundStyle(.primary)
-                            Text("启用震动反馈")
+                            Text("启用震动反馈".appLocalized)
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
@@ -65,10 +65,10 @@ struct GeneralSoundHapticsSettingsView: View {
                         Image(systemName: "music.quarternote.3")
                             .foregroundStyle(.pink)
                             .frame(width: 24)
-                        Text("BGM 音量: \(Int(audioManager.bgmVolume * 100))%")
+                        Text("BGM 音量: %lld%%".appLocalized(Int64(audioManager.bgmVolume * 100)))
                     }
                     Slider(value: $audioManager.bgmVolume, in: 0...1) {
-                        Text("BGM 音量")
+                        Text("BGM 音量".appLocalized)
                     } minimumValueLabel: {
                         Image(systemName: "speaker.fill").font(.caption)
                     } maximumValueLabel: {
@@ -88,7 +88,7 @@ struct GeneralSoundHapticsSettingsView: View {
                     HStack {
                         Image(systemName: "gear")
                             .foregroundStyle(.gray)
-                        Text("前往系统设置检查触感")
+                        Text("前往系统设置检查触感".appLocalized)
                         Spacer()
                         Image(systemName: "arrow.up.forward.app")
                             .font(.caption)
