@@ -87,7 +87,7 @@ private struct CopyToastContent: View {
             }
             
             // 标题
-            Text("已拷贝到剪贴板")
+            Text("已拷贝到剪贴板".appLocalized)
                 .font(.system(size: 17, weight: .semibold))
                 .foregroundStyle(.primary)
             
