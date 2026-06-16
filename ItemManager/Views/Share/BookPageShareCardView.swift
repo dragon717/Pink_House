@@ -50,7 +50,7 @@ struct BookPageShareCardView: View {
                                 Image(systemName: "book.closed")
                                     .font(.system(size: 48))
                                     .foregroundColor(MonicaColors.primaryPink.opacity(0.4))
-                                Text("书页预览")
+                                Text("书页预览".appLocalized)
                                     .font(fontProvider.bodyFont())
                                     .foregroundColor(MonicaColors.mediumText)
                             }

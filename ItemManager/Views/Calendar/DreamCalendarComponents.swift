@@ -522,7 +522,7 @@ struct UnifiedEventsPopup: View {
                 Divider()
                 
                 if groupedClothings.isEmpty {
-                    ContentUnavailableView("无安排", systemImage: "calendar.badge.exclamationmark")
+                    ContentUnavailableView("无安排".appLocalized, systemImage: "calendar.badge.exclamationmark")
                         .frame(height: 300)
                 } else {
                     ScrollView {

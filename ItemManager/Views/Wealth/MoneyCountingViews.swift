@@ -10,7 +10,7 @@ struct MoneyCountingContainerView: View {
     var body: some View {
         VStack(spacing: 0) {
             // 子页签选择器
-            Picker("货币", selection: $viewModel.selectedCurrency) {
+            Picker("货币".appLocalized, selection: $viewModel.selectedCurrency) {
                 Text(CurrencyType.rmb.displayTitle).tag(CurrencyType.rmb)
                 Text(CurrencyType.jpy.displayTitle).tag(CurrencyType.jpy)
                 Text(CurrencyType.usd.displayTitle).tag(CurrencyType.usd)

@@ -16,9 +16,9 @@ struct WardrobeNavigationStyleSelectionView: View {
                 header: "衣橱顶部导航",
                 footer: "经典导航栏保持现有布局；时尚导航栏会将排序/筛选放在左侧，顶部标签切换居中，视图/更多/创建放在右侧。"
             ) {
-                Picker("样式", selection: wardrobeNavigationStyleBinding) {
+                Picker("样式".appLocalized, selection: wardrobeNavigationStyleBinding) {
                     ForEach(WardrobeNavigationStyle.availableStylesForCurrentDevice) { style in
-                        Text(style.displayName).tag(style)
+                        Text(style.displayName.appLocalized).tag(style)
                     }
                 }
                 .pickerStyle(.segmented)
@@ -47,10 +47,10 @@ struct WardrobeNavigationStyleSelectionView: View {
                 .foregroundStyle(.secondary)
             
             VStack(alignment: .leading, spacing: 3) {
-                Text(style.displayName)
+                Text(style.displayName.appLocalized)
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(.primary)
-                Text(style.subtitle)
+                Text(style.subtitle.appLocalized)
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

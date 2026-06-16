@@ -232,7 +232,7 @@ class PetTrailManager: ObservableObject {
                     }
             )
             .overlay(alignment: .top) {
-                Picker("主题", selection: $selectedTheme) {
+                Picker("主题".appLocalized, selection: $selectedTheme) {
                     ForEach(PetTrailTheme.allCases) { theme in
                         Text(theme.displayName).tag(theme)
                     }

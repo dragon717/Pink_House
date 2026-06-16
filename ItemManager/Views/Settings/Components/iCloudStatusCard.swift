@@ -43,7 +43,7 @@ struct iCloudStatusCard: View {
                 }
                 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("iCloud 同步")
+                    Text("iCloud 同步".appLocalized)
                         .font(.headline)
                         .foregroundStyle(themeManager.primaryTextColor)
                         .themeSkinLegibleText(level: .inline, slot: .settingsGridCard, descriptor: themeSkinDescriptor)
