@@ -150,7 +150,7 @@ struct SpaceOutfitPreviewView: View {
                 VStack {
                     ProgressView()
                         .scaleEffect(0.8)
-                    Text("生成预览...")
+                    Text("生成预览...".appLocalized)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .padding(.top, 8)

@@ -84,7 +84,7 @@ struct OOTDDefaultBookView: View {
                         .animation(.spring(response: 0.3, dampingFraction: 0.8), value: showingSuccessToast)
                 }
             }
-            .navigationTitle("魔法贴纸")
+            .navigationTitle("魔法贴纸".appLocalized)
             .navigationBarTitleDisplayMode(.inline)
             .toolbarBackground(.hidden, for: .navigationBar)
         }
@@ -92,7 +92,7 @@ struct OOTDDefaultBookView: View {
             if let bookTitle = notification.userInfo?["bookTitle"] as? String,
                let bookID = notification.userInfo?["bookID"] as? UUID {
                 // 显示成功提示
-                successMessage = "已加入「\(bookTitle)」"
+                successMessage = "已加入「%@」".appLocalized(bookTitle)
                 showingSuccessToast = true
 
                 // 1.5秒后隐藏提示并导航到对应手帐
@@ -184,7 +184,7 @@ private struct AutoCreateBookView: View {
                 .font(.system(size: 60))
                 .foregroundColor(.pink.opacity(0.6))
 
-            Text("正在准备魔法贴纸...")
+            Text("正在准备魔法贴纸...".appLocalized)
                 .font(.title2)
                 .foregroundColor(.primary)
 
@@ -216,7 +216,7 @@ private struct EmptyPageView: View {
                 .font(.system(size: 60))
                 .foregroundColor(.pink.opacity(0.6))
 
-            Text("正在准备新书页...")
+            Text("正在准备新书页...".appLocalized)
                 .font(.title3)
                 .foregroundStyle(.secondary)
 

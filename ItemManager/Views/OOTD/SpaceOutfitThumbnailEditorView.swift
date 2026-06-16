@@ -43,11 +43,11 @@ struct SpaceOutfitThumbnailEditorView: View {
                         .font(.system(size: 48))
                         .foregroundStyle(.secondary)
                     
-                    Text("场景为空")
+                    Text("场景为空".appLocalized)
                         .font(.headline)
                         .foregroundStyle(.secondary)
                     
-                    Text("请先添加3D模型到场景")
+                    Text("请先添加3D模型到场景".appLocalized)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -102,7 +102,7 @@ struct SpaceOutfitThumbnailEditorView: View {
                     
                     Spacer()
                     
-                    Text("设置书页缩略图")
+                    Text("设置书页缩略图".appLocalized)
                         .font(.headline)
                     
                     Spacer()
@@ -133,17 +133,17 @@ struct SpaceOutfitThumbnailEditorView: View {
                 HStack(spacing: 20) {
                     HStack(spacing: 4) {
                         Image(systemName: "hand.tap.fill")
-                        Text("单指旋转")
+                        Text("单指旋转".appLocalized)
                     }
                     
                     HStack(spacing: 4) {
                         Image(systemName: "hand.point.up.braille.fill")
-                        Text("双指移动")
+                        Text("双指移动".appLocalized)
                     }
                     
                     HStack(spacing: 4) {
                         Image(systemName: "arrow.up.and.down.circle.fill")
-                        Text("双指缩放")
+                        Text("双指缩放".appLocalized)
                     }
                 }
                 .font(.caption)
@@ -161,7 +161,7 @@ struct SpaceOutfitThumbnailEditorView: View {
                     } label: {
                         HStack(spacing: 4) {
                             Image(systemName: "arrow.counterclockwise")
-                            Text("重置视角")
+                            Text("重置视角".appLocalized)
                         }
                         .font(.subheadline)
                         .padding(.horizontal, 16)
