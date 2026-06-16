@@ -235,7 +235,7 @@ struct OOTDCutoutListView: View {
                 if isExpanded {
                     // Header
                     HStack {
-                        Text("贴纸库")
+                        Text("贴纸库".appLocalized)
                             .font(.headline)
                         Spacer()
                         
@@ -253,7 +253,7 @@ struct OOTDCutoutListView: View {
                                     }
                                 }
                             }) {
-                                Text(isAllSelected ? "取消全选" : "全选")
+                                Text(isAllSelected ? "取消全选".appLocalized : "全选".appLocalized)
                                     .font(.subheadline)
                             }
                             .padding(.trailing, 8)
@@ -264,7 +264,7 @@ struct OOTDCutoutListView: View {
                                 .foregroundStyle(.secondary)
                                 .monospacedDigit()
                         } else {
-                            Text("共 \(displayItems.count) 个")
+                            Text("共 %d 个".appLocalized(displayItems.count))
                                 .font(.subheadline)
                                 .foregroundStyle(.secondary)
                         }
@@ -275,7 +275,7 @@ struct OOTDCutoutListView: View {
                                 selectedItems.removeAll()
                             }
                         }) {
-                            Text(isEditing ? "完成" : "多选")
+                            Text(isEditing ? "完成".appLocalized : "多选".appLocalized)
                                 .fontWeight(isEditing ? .bold : .regular)
                                 .foregroundColor(isEditing ? .accentColor : .primary)
                         }
@@ -288,7 +288,7 @@ struct OOTDCutoutListView: View {
                     HStack {
                         Image(systemName: "magnifyingglass")
                             .foregroundColor(.gray)
-                        TextField("搜索分类或关联服饰...", text: $searchText)
+                        TextField("搜索分类或关联服饰...".appLocalized, text: $searchText)
                             .textFieldStyle(PlainTextFieldStyle())
                         
                         if !searchText.isEmpty {
@@ -367,7 +367,7 @@ struct OOTDCutoutListView: View {
                                 VStack(spacing: 4) {
                                     Image(systemName: "trash")
                                         .font(.system(size: 20))
-                                    Text("删除")
+                                    Text("删除".appLocalized)
                                         .font(.caption)
                                 }
                                 .foregroundColor(.red)
@@ -381,7 +381,7 @@ struct OOTDCutoutListView: View {
                                 VStack(spacing: 4) {
                                     Image(systemName: "tag")
                                         .font(.system(size: 20))
-                                    Text("分类")
+                                    Text("分类".appLocalized)
                                         .font(.caption)
                                 }
                             }
@@ -396,7 +396,7 @@ struct OOTDCutoutListView: View {
                                 VStack(spacing: 4) {
                                     Image(systemName: "plus.square.on.square")
                                         .font(.system(size: 20))
-                                    Text("添加到画布")
+                                    Text("添加到画布".appLocalized)
                                         .font(.caption)
                                 }
                             }
@@ -450,39 +450,39 @@ struct OOTDCutoutListView: View {
                     }
                 } : nil
         )
-        .alert("提示", isPresented: $showAlert) {
-            Button("确定", role: .cancel) { }
+        .alert("提示".appLocalized, isPresented: $showAlert) {
+            Button("确定".appLocalized, role: .cancel) { }
         } message: {
             Text(alertMessage)
         }
-        .alert("确认删除", isPresented: $showDeleteConfirmation) {
-            Button("删除 \(selectedItems.count) 项", role: .destructive) {
+        .alert("确认删除".appLocalized, isPresented: $showDeleteConfirmation) {
+            Button("删除 %d 项".appLocalized(selectedItems.count), role: .destructive) {
                 batchDelete()
             }
-            Button("取消", role: .cancel) { }
+            Button("取消".appLocalized, role: .cancel) { }
         } message: {
-            Text("确定要删除选中的 \(selectedItems.count) 个抠图吗？此操作无法撤销。")
+            Text("确定要删除选中的 %d 个抠图吗？此操作无法撤销。".appLocalized(selectedItems.count))
         }
-        .alert("确认添加", isPresented: $showAddConfirmation) {
-            Button("添加", role: .none) {
+        .alert("确认添加".appLocalized, isPresented: $showAddConfirmation) {
+            Button("添加".appLocalized, role: .none) {
                 batchAddToCanvas()
             }
-            Button("取消", role: .cancel) { }
+            Button("取消".appLocalized, role: .cancel) { }
         } message: {
-            Text("确定将选中的 \(selectedItems.count) 个抠图添加到当前画布吗？")
+            Text("确定将选中的 %d 个抠图添加到当前画布吗？".appLocalized(selectedItems.count))
         }
-        .alert("确认删除", isPresented: $showSingleDeleteConfirmation) {
-            Button("删除", role: .destructive) {
+        .alert("确认删除".appLocalized, isPresented: $showSingleDeleteConfirmation) {
+            Button("删除".appLocalized, role: .destructive) {
                 if let item = itemToDelete {
                     deleteCutout(item)
                 }
                 itemToDelete = nil
             }
-            Button("取消", role: .cancel) {
+            Button("取消".appLocalized, role: .cancel) {
                 itemToDelete = nil
             }
         } message: {
-            Text("确定要删除这个贴纸吗？此操作无法撤销。")
+            Text("确定要删除这个贴纸吗？此操作无法撤销。".appLocalized)
         }
         .sheet(isPresented: $showBatchCategorySheet) {
             BatchReclassifyView(categories: selectableCategories) { newCategory in
@@ -546,19 +546,19 @@ struct OOTDCutoutListView: View {
                         onSelect(item)
                         withAnimation { isExpanded = false }
                     } label: {
-                        Label("添加到画布", systemImage: "plus.square.on.square")
+                        Label("添加到画布".appLocalized, systemImage: "plus.square.on.square")
                     }
                     
                     Button {
                         reprocessCutout(item)
                     } label: {
-                        Label("重新抠图", systemImage: "arrow.triangle.2.circlepath")
+                        Label("重新抠图".appLocalized, systemImage: "arrow.triangle.2.circlepath")
                     }
                     
                     Button {
                         itemToReclassify = item
                     } label: {
-                        Label("修改分类", systemImage: "tag")
+                        Label("修改分类".appLocalized, systemImage: "tag")
                     }
                     
                     Divider()
@@ -567,7 +567,7 @@ struct OOTDCutoutListView: View {
                         itemToDelete = item
                         showSingleDeleteConfirmation = true
                     } label: {
-                        Label("删除", systemImage: "trash")
+                        Label("删除".appLocalized, systemImage: "trash")
                     }
                 } label: {
                     itemThumbnailView(item)
@@ -626,13 +626,13 @@ struct OOTDCutoutListView: View {
                 selectedItems.removeAll()
                 updateDisplayItems()
             }
-            toastMessage = "已删除 \(itemsToDelete.count) 个贴纸"
+            toastMessage = "已删除 %d 个贴纸".appLocalized(itemsToDelete.count)
             withAnimation { showToast = true }
             DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
                 withAnimation { showToast = false }
             }
         } catch {
-            alertMessage = "批量删除失败，请稍后重试。"
+            alertMessage = "批量删除失败，请稍后重试。".appLocalized
             showAlert = true
         }
     }
@@ -678,7 +678,7 @@ struct OOTDCutoutListView: View {
         }
         
         // Show Toast
-        toastMessage = "已添加 \(itemsToAdd.count) 个贴纸"
+        toastMessage = "已添加 %d 个贴纸".appLocalized(itemsToAdd.count)
         withAnimation {
             showToast = true
         }
@@ -744,7 +744,7 @@ struct OOTDCutoutListView: View {
         guard let clothingID = item.linkedClothingID,
               let clothing = clothingMap[clothingID],
               let firstImagePath = clothing.imagePaths.first else {
-            alertMessage = "找不到关联的原图，无法重新抠图。\n(仅支持通过关联服饰创建的抠图)"
+            alertMessage = "找不到关联的原图，无法重新抠图。\n(仅支持通过关联服饰创建的抠图)".appLocalized
             showAlert = true
             return
         }
@@ -762,11 +762,11 @@ struct OOTDCutoutListView: View {
                     generator.notificationOccurred(.success)
                 } catch {
                     print("Reprocess failed: \(error)")
-                    alertMessage = "重新抠图失败，请稍后重试。"
+                    alertMessage = "重新抠图失败，请稍后重试。".appLocalized
                     showAlert = true
                 }
             } else {
-                alertMessage = "原图文件已丢失。"
+                alertMessage = "原图文件已丢失。".appLocalized
                 showAlert = true
             }
             
@@ -808,7 +808,7 @@ struct OOTDCutoutListView: View {
                         .font(isLandscape && !isExpanded ? .title3 : .title2)
                         .foregroundColor(.blue)
                 }
-                Text("添加")
+                Text("添加".appLocalized)
                     .font(isLandscape && !isExpanded ? .caption2 : .caption2)
                     .foregroundColor(.primary)
             }
@@ -865,7 +865,7 @@ struct CutoutThumbnail: View {
                         .shadow(color: .black.opacity(0.05), radius: 2, x: 0, y: 1)
                         .overlay(alignment: .bottomLeading) {
                             if let category = category {
-                                Text(category)
+                                Text(category.appLocalized)
                                     .font(.system(size: size == 72 ? 8 : 7))
                                     .padding(size == 72 ? 2 : 1)
                                     .background(Color.black.opacity(0.5))
@@ -903,7 +903,7 @@ struct CategoryChip: View {
                 if let icon = icon {
                     Image(systemName: icon)
                 }
-                Text(title)
+                Text(title.appLocalized)
             }
             .font(.caption)
             .fontWeight(isSelected ? .semibold : .regular)
@@ -936,24 +936,24 @@ struct ReclassifyView: View {
         NavigationStack {
             Form {
                 Section {
-                    Picker("选择分类", selection: $selectedCategory) {
+                    Picker("选择分类".appLocalized, selection: $selectedCategory) {
                         ForEach(categories, id: \.self) { category in
-                            Text(category).tag(category)
+                            Text(category.appLocalized).tag(category)
                         }
                     }
                     .pickerStyle(.inline)
                 } header: {
-                    Text("当前分类: \(item.category)")
+                    Text("当前分类: %@".appLocalized(item.category.appLocalized))
                 }
             }
-            .navigationTitle("修改分类")
+            .navigationTitle("修改分类".appLocalized)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("取消") { dismiss() }
+                    Button("取消".appLocalized) { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("确定") {
+                    Button("确定".appLocalized) {
                         onConfirm(selectedCategory)
                     }
                 }
@@ -978,21 +978,21 @@ struct BatchReclassifyView: View {
     var body: some View {
         NavigationStack {
             Form {
-                Picker("选择分类", selection: $selectedCategory) {
+                Picker("选择分类".appLocalized, selection: $selectedCategory) {
                     ForEach(categories, id: \.self) { category in
-                        Text(category).tag(category)
+                        Text(category.appLocalized).tag(category)
                     }
                 }
                 .pickerStyle(.inline)
             }
-            .navigationTitle("批量修改分类")
+            .navigationTitle("批量修改分类".appLocalized)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("取消") { dismiss() }
+                    Button("取消".appLocalized) { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("确定") {
+                    Button("确定".appLocalized) {
                         onConfirm(selectedCategory)
                     }
                 }
