@@ -23,7 +23,7 @@ extension View {
     ) -> some View {
         self
             .sheet(isPresented: showingTrash) {
-                RecycleBinView(initialTab: 1)
+                RecycleBinSheetView(initialTab: 1)
             }
             .photosPicker(isPresented: showingCoverPicker, selection: selectedCoverItem, matching: .images)
             .onChange(of: selectedCoverItem.wrappedValue) { _, newItem in

@@ -284,6 +284,7 @@ struct LegacyTabView: View {
     // 搜索文本状态
     @State private var searchText = ""
     @State private var loadedTabs: Set<Int> = [0]
+    @State private var petChatReturnTab = 0
     @State private var isRouteTransitionCoolingDown = false
     @State private var routeTransitionQuietWorkItem: DispatchWorkItem?
 
@@ -364,6 +365,9 @@ struct LegacyTabView: View {
         }
         .onChange(of: selectedTab) { _, newTab in
             markTabLoaded(newTab)
+            if newTab != 3 {
+                petChatReturnTab = newTab
+            }
             beginRouteTransitionQuietPeriod()
 
             // 发送Tab切换通知，用于新手引导
@@ -427,7 +431,10 @@ struct LegacyTabView: View {
 
             if shouldRenderTab(3) {
                 persistentTabPage(tab: 3) {
-                    PetChatViewLegacy(searchText: $searchText)
+                    PetChatViewLegacy(
+                        searchText: $searchText,
+                        onHide: hidePetChat
+                    )
                 }
             }
         }
@@ -689,6 +696,12 @@ struct LegacyTabView: View {
     private func switchRouteWithoutContentAnimation(_ updates: () -> Void) {
         beginRouteTransitionQuietPeriod()
         performWithoutRouteContentAnimation(updates)
+    }
+
+    private func hidePetChat() {
+        switchRouteWithoutContentAnimation {
+            selectedTab = petChatReturnTab
+        }
     }
 
     private var smallWorldTabTitle: String {

@@ -18,6 +18,18 @@
 
 ## 2. 标准流程
 
+### 2.0 Xcode 27 beta 命令行稳定入口
+
+如果目标是 Xcode 27 beta + `Codex iPhone 17 Pro`，优先使用稳定脚本：
+
+```bash
+tools/xcode/stable_cli_build_and_run.sh
+```
+
+这条入口会显式使用 `/Applications/Xcode-beta.app`、锁定模拟器 UDID、复用 Xcode GUI 成功构建过的干净 `DerivedData/SourcePackages`、限制 `-jobs 5`、180 秒超时终止，并完成 install / terminate / launch。详细规则见 `docs/XCODE27_BETA_CLI_BUILD_BEST_PRACTICES.md`。
+
+注意：不要默认复用仓库里的 `build/SourcePackages`。iCloud 可能生成 `* 2.swift` 重复源码，导致 GRDB 等 SwiftPM 依赖出现重复定义。
+
 ### 2.1 锁定目标
 
 先记录实际验收设备，避免“编译一个模拟器，看另一个模拟器”：

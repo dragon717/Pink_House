@@ -1,234 +1,372 @@
-
 import SwiftUI
 import SwiftData
 
-/// 3D 手帐翻页动画组件
+/// Self-contained opening animation for planar journals.
 struct BookOpeningAnimationView: View {
     let book: BookGroup
-    // 回调：动画完成
     var onAnimationComplete: () -> Void
-    
+
     @Environment(\.modelContext) private var modelContext
-    
-    // 动画状态
-    @State private var isMovingToCenter = false
-    @State private var isOpening = false
-    @State private var pagesFlipped: [Bool] = Array(repeating: false, count: 6)
-    
-    // 书页图片缓存
-    @State private var pageImages: [UIImage?] = Array(repeating: nil, count: 6)
-    // 封面图片缓存 - 确保使用最新数据
-    @State private var coverImage: UIImage? = nil
-    
-    // 配置参数
+
+    @State private var hasEntered = false
+    @State private var coverIsOpen = false
+    @State private var coverIsBehindPages = false
+    @State private var flippedPageCount = 0
+    @State private var paperGlowOpacity: Double = 0
+    @State private var didComplete = false
+    @State private var sequenceTask: Task<Void, Never>?
+    @State private var imageLoadingTask: Task<Void, Never>?
+    @State private var pageImages: [UIImage?] = []
+    @State private var pageImageSources: [String?] = []
+
     private let bookWidth: CGFloat = 200
     private let bookHeight: CGFloat = 280
-    private let coverColor = Color(hex: "8D6E63") // 棕色封面
-    private let pageColor = Color(hex: "F5F5DC") // 米色纸张
-    
+    private let maxPageCount = 6
+    private let imageTargetSize = CGSize(width: 320, height: 448)
+    private let coverOpenAngle: Double = -174
+    private let pageTargetAngles: [Double] = [-162, -156, -150, -144, -138, -132]
+
     var body: some View {
         ZStack {
-            // 背景遮罩
-            Color.black.opacity(0.6)
+            Color.clear
                 .ignoresSafeArea()
-                .opacity(isMovingToCenter ? 1 : 0)
-                .animation(.easeIn(duration: 0.5), value: isMovingToCenter)
-            
-            // 3D 书本容器
-            ZStack {
-                // 1. 封底 (固定不动，或者稍微调整角度)
-                BookCover(book: book, width: bookWidth, height: bookHeight, color: coverColor, image: coverImage)
-                
-                // 2. 书页 (多层)
-                ForEach(0..<6) { index in
-                    BookPage(width: bookWidth - 10, height: bookHeight - 10, color: pageColor, image: pageImages[index])
-                        .rotation3DEffect(
-                            .degrees(pagesFlipped[index] ? -175 + Double.random(in: -5...5) : 0),
-                            axis: (x: 0.0, y: 1.0, z: 0.0),
-                            anchor: .leading,
-                            anchorZ: 0,
-                            perspective: 0.5
-                        )
-                        .offset(x: 5, y: 0) // 稍微向右偏移，居中于封面
-                        .zIndex(Double(6 - index)) // 索引小的在上面
-                }
-                
-                // 3. 封面
-                BookCover(book: book, width: bookWidth, height: bookHeight, color: coverColor, isFront: true, image: coverImage)
-                    .rotation3DEffect(
-                        .degrees(isOpening ? -180 : 0),
-                        axis: (x: 0.0, y: 1.0, z: 0.0),
-                        anchor: .leading,
-                        anchorZ: 0,
-                        perspective: 0.5
-                    )
-                    .zIndex(10)
-            }
-            // 整体变换：移动到中心并放大
-            .scaleEffect(isMovingToCenter ? 1.5 : 0.2)
-            .rotation3DEffect(
-                .degrees(isMovingToCenter ? 0 : 45),
-                axis: (x: 0.0, y: 1.0, z: 0.0)
-            )
-            .offset(y: isMovingToCenter ? 0 : 300) // 从下方飞入
+
+            animatedBook
+                .frame(width: bookWidth, height: bookHeight)
+                .scaleEffect(hasEntered ? 1.18 : 0.68)
+                .rotation3DEffect(
+                    .degrees(hasEntered ? 0 : 22),
+                    axis: (x: 0, y: 1, z: 0),
+                    perspective: 0.55
+                )
+                .offset(y: hasEntered ? -8 : 180)
+                .opacity(hasEntered ? 1 : 0.75)
+                .shadow(color: .black.opacity(hasEntered ? 0.35 : 0.1), radius: 26, x: 0, y: 18)
         }
-        .onAppear {
-            loadPageImages()
-            startAnimationSequence()
+        .ignoresSafeArea()
+        .contentShape(Rectangle())
+        .allowsHitTesting(true)
+        .accessibilityHidden(true)
+        .onAppear(perform: prepareAndStartAnimation)
+        .onDisappear {
+            sequenceTask?.cancel()
+            imageLoadingTask?.cancel()
+            sequenceTask = nil
+            imageLoadingTask = nil
         }
     }
-    
-    private func loadPageImages() {
-        // 保底逻辑：重新从数据库获取最新的书页数据，确保不包含已删除的书页
+
+    private var animatedBook: some View {
+        ZStack(alignment: .leading) {
+            OpeningBookBackCover(width: bookWidth, height: bookHeight)
+                .offset(x: 10)
+                .zIndex(0)
+
+            ForEach(0..<pageImageSources.count, id: \.self) { index in
+                OpeningPaperPage(
+                    index: index,
+                    width: bookWidth - 14,
+                    height: bookHeight - 16,
+                    glowOpacity: paperGlowOpacity,
+                    image: pageImage(at: index)
+                )
+                .offset(x: pageHorizontalOffset(for: index))
+                .rotation3DEffect(
+                    .degrees(pageAngle(for: index)),
+                    axis: (x: 0, y: 1, z: 0),
+                    anchor: .leading,
+                    anchorZ: pageAnchorZ(for: index),
+                    perspective: 0.62
+                )
+                .zIndex(pageZIndex(for: index))
+            }
+
+            OpeningBookFrontCover(book: book, width: bookWidth, height: bookHeight)
+                .rotation3DEffect(
+                    .degrees(coverIsOpen ? coverOpenAngle : 0),
+                    axis: (x: 0, y: 1, z: 0),
+                    anchor: .leading,
+                    perspective: 0.62
+                )
+                .offset(x: coverIsOpen ? 4 : 0)
+                .zIndex(coverZIndex)
+        }
+    }
+
+    private var coverZIndex: Double {
+        coverIsBehindPages ? 4 : 40
+    }
+
+    private func pageAngle(for index: Int) -> Double {
+        guard index < flippedPageCount else { return 0 }
+        return pageTargetAngles[index]
+    }
+
+    private func pageHorizontalOffset(for index: Int) -> CGFloat {
+        let baseOffset = 12 + CGFloat(index) * 1.2
+        guard index < flippedPageCount else { return baseOffset }
+        return baseOffset + 3 + CGFloat(index) * 0.6
+    }
+
+    private func pageAnchorZ(for index: Int) -> CGFloat {
+        guard index < flippedPageCount else { return 0 }
+        return 8 + CGFloat(index) * 0.8
+    }
+
+    private func pageZIndex(for index: Int) -> Double {
+        if index < flippedPageCount {
+            return 20 + Double(index)
+        }
+        return 8 + Double(pageImageSources.count - index)
+    }
+
+    private func pageImage(at index: Int) -> UIImage? {
+        guard pageImages.indices.contains(index) else { return nil }
+        return pageImages[index]
+    }
+
+    @MainActor
+    private func prepareAndStartAnimation() {
+        guard sequenceTask == nil else { return }
+
+        let sources = resolveAnimationPageSources()
+        pageImageSources = sources
+        pageImages = sources.map { cachedAnimationImage(from: $0) }
+
+        imageLoadingTask = Task {
+            await loadAnimationPageImages(sources)
+        }
+        sequenceTask = Task {
+            await runAnimationSequence()
+        }
+    }
+
+    @MainActor
+    private func runAnimationSequence() async {
+        resetAnimationState()
+
+        // Let SwiftUI commit the inserted overlay once before changing state.
+        guard await pause(milliseconds: 90) else { return }
+
+        withAnimation(.spring(response: 0.58, dampingFraction: 0.74)) {
+            hasEntered = true
+        }
+
+        guard await pause(milliseconds: 520) else { return }
+
+        withAnimation(.easeInOut(duration: 0.62)) {
+            coverIsOpen = true
+            paperGlowOpacity = 1
+        }
+
+        guard await pause(milliseconds: 660) else { return }
+        coverIsBehindPages = true
+
+        guard await pause(milliseconds: 120) else { return }
+
+        if !pageImageSources.isEmpty {
+            for page in 1...pageImageSources.count {
+                withAnimation(.interpolatingSpring(stiffness: 190, damping: 23)) {
+                    flippedPageCount = page
+                }
+                guard await pause(milliseconds: 115) else { return }
+            }
+        }
+
+        guard await pause(milliseconds: 330) else { return }
+        completeAnimation()
+    }
+
+    @MainActor
+    private func resetAnimationState() {
+        didComplete = false
+        hasEntered = false
+        coverIsOpen = false
+        coverIsBehindPages = false
+        flippedPageCount = 0
+        paperGlowOpacity = 0
+    }
+
+    @MainActor
+    private func completeAnimation() {
+        guard !didComplete else { return }
+        didComplete = true
+        onAnimationComplete()
+    }
+
+    private func pause(milliseconds: UInt64) async -> Bool {
+        do {
+            try await Task.sleep(nanoseconds: milliseconds * 1_000_000)
+            return !Task.isCancelled
+        } catch {
+            return false
+        }
+    }
+
+    @MainActor
+    private func resolveAnimationPageSources() -> [String?] {
         let bookID = book.id
-        let descriptor = FetchDescriptor<Outfit>(
+        var descriptor = FetchDescriptor<Outfit>(
             predicate: #Predicate { outfit in
-                outfit.book?.id == bookID && outfit.isDeleted == false
+                outfit.book?.id == bookID &&
+                outfit.isDeleted == false &&
+                outfit.deletedAt == nil
             },
-            sortBy: [SortDescriptor(\.createdAt, order: .reverse)]
+            sortBy: [
+                SortDescriptor(\Outfit.sortIndex),
+                SortDescriptor(\Outfit.createdAt)
+            ]
         )
-        
-        let validPages = (try? modelContext.fetch(descriptor)) ?? []
-        
-        // 加载封面图片 - 优先使用用户设置的封面，否则使用第一页的快照
-        if let coverPath = book.coverImage,
-           let image = ImageManager.shared.loadImage(fileName: coverPath) {
-            coverImage = image
-        } else if let firstPage = validPages.first,
-                  firstPage.shouldUseStoredSnapshot,
-                  let snapshotPath = firstPage.snapshotPath,
-                  let image = ImageManager.shared.loadImage(fileName: snapshotPath) {
-            coverImage = image
-        }
-        
-        // 如果没有书页，直接返回
-        if validPages.isEmpty { return }
-        
-        // 填充 6 张图片
-        for i in 0..<6 {
-            // 循环使用书页内容，如果书页少于 6 页
-            let pageIndex = i % validPages.count
-            let page = validPages[pageIndex]
-            
-            if page.shouldUseStoredSnapshot,
-               let snapshotPath = page.snapshotPath,
-               let image = ImageManager.shared.loadImage(fileName: snapshotPath) {
-                pageImages[i] = image
+        descriptor.fetchLimit = maxPageCount
+
+        let pages = (try? modelContext.fetch(descriptor)) ?? []
+        return pages.map { page -> String? in
+            guard page.shouldUseStoredSnapshot,
+                  let snapshotPath = page.snapshotPath,
+                  !snapshotPath.isEmpty else {
+                return nil
             }
+            return snapshotPath
         }
     }
-    
-    private func startAnimationSequence() {
-        // 1. 移动到中心并放大
-        withAnimation(.spring(response: 0.8, dampingFraction: 0.7)) {
-            isMovingToCenter = true
-        }
-        
-        // 2. 打开封面 (延迟 0.6s)
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
-            withAnimation(.easeInOut(duration: 0.8)) {
-                isOpening = true
-            }
-        }
-        
-        // 3. 随机翻页 (延迟 1.2s 开始，每隔 0.15s 翻一页)
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
-            for i in 0..<6 {
-                DispatchQueue.main.asyncAfter(deadline: .now() + Double(i) * 0.15) {
-                    withAnimation(.spring(response: 0.6, dampingFraction: 0.7)) {
-                        pagesFlipped[i] = true
+
+    private func cachedAnimationImage(from source: String?) -> UIImage? {
+        guard let source, !source.isEmpty else { return nil }
+        return ImageManager.shared.cachedImage(fileName: source, targetSize: imageTargetSize)
+    }
+
+    @MainActor
+    private func loadAnimationPageImages(_ pageSources: [String?]) async {
+        let pages = await loadAnimationPageImages(from: pageSources)
+        guard !Task.isCancelled else { return }
+        pageImages = pages
+    }
+
+    private func loadAnimationPageImages(from sources: [String?]) async -> [UIImage?] {
+        var images: [UIImage?] = Array(repeating: nil, count: sources.count)
+        let targetSize = imageTargetSize
+
+        await withTaskGroup(of: (Int, UIImage?).self) { group in
+            for (index, source) in sources.enumerated() {
+                guard let source, !source.isEmpty else { continue }
+
+                group.addTask {
+                    if let cached = await ImageManager.shared.cachedImage(fileName: source, targetSize: targetSize) {
+                        return (index, cached)
                     }
+
+                    let image = await ImageManager.shared.loadImageAsync(
+                        fileName: source,
+                        targetSize: targetSize,
+                        priority: .userInitiated
+                    )
+                    return (index, image)
                 }
             }
+
+            for await (index, image) in group {
+                images[index] = image
+            }
         }
-        
-        // 4. 动画结束，进入列表 (延迟 2.5s)
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
-            onAnimationComplete()
-        }
+
+        return images
     }
 }
 
-// MARK: - Subviews
+// MARK: - Animation Pieces
 
-struct BookCover: View {
+private struct OpeningBookFrontCover: View {
     let book: BookGroup
     let width: CGFloat
     let height: CGFloat
-    let color: Color
-    var isFront: Bool = false
-    var image: UIImage? = nil
-    
+
+    var body: some View {
+        BookCoverVisuals(book: book)
+            .scaleEffect(x: width / 160, y: height / 220, anchor: .center)
+            .frame(width: width, height: height)
+    }
+}
+
+private struct OpeningBookBackCover: View {
+    let width: CGFloat
+    let height: CGFloat
+
+    var body: some View {
+        RoundedRectangle(cornerRadius: 8)
+            .fill(
+                LinearGradient(
+                    colors: [
+                        Color(hex: "6F443D"),
+                        Color(hex: "3F2827")
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            )
+            .overlay(alignment: .leading) {
+                Rectangle()
+                    .fill(Color.black.opacity(0.2))
+                    .frame(width: 24)
+            }
+            .frame(width: width, height: height)
+            .shadow(color: .black.opacity(0.2), radius: 8, x: 4, y: 6)
+    }
+}
+
+private struct OpeningPaperPage: View {
+    let index: Int
+    let width: CGFloat
+    let height: CGFloat
+    let glowOpacity: Double
+    let image: UIImage?
+
     var body: some View {
         ZStack {
-            // Base Cover - 优先使用传入的图片，确保实时更新
-            if let image = image {
+            RoundedRectangle(cornerRadius: 5)
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            Color(hex: "FFF8E6"),
+                            Color(hex: "F2E4C9")
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+
+            if let image {
                 Image(uiImage: image)
                     .resizable()
                     .scaledToFill()
-                    .frame(width: width, height: height)
-                    .clipped()
-                    .cornerRadius(4)
+                    .frame(width: width - 18, height: height - 18)
+                    .clipShape(RoundedRectangle(cornerRadius: 4))
             } else {
-                Rectangle()
-                    .fill(color)
-                    .frame(width: width, height: height)
-                    .cornerRadius(4)
+                VStack(alignment: .leading, spacing: 11) {
+                    ForEach(0..<8, id: \.self) { line in
+                        RoundedRectangle(cornerRadius: 2)
+                            .fill(Color(hex: "B99175").opacity(line == 0 ? 0.3 : 0.18))
+                            .frame(width: lineWidth(for: line), height: line == 0 ? 4 : 2)
+                    }
+                }
+                .padding(.horizontal, 24)
+                .padding(.vertical, 30)
+
+                Circle()
+                    .fill(Color(hex: "EBA7AF").opacity(0.18 + Double(index) * 0.015))
+                    .frame(width: 42, height: 42)
+                    .offset(x: width * 0.27, y: -height * 0.28)
             }
-            
-            // Shadow
-            RoundedRectangle(cornerRadius: 4)
-                .strokeBorder(Color.black.opacity(0.1), lineWidth: 1)
-                .frame(width: width, height: height)
-                .shadow(radius: 5)
-            
-            // 装饰线条 (仅封面)
-            if isFront {
-                Rectangle()
-                    .strokeBorder(Color.white.opacity(0.3), lineWidth: 2)
-                    .frame(width: width - 20, height: height - 20)
-                
-                Text(book.title)
-                    .font(.custom("Didot", size: 24))
-                    .foregroundStyle(.white)
-                    .shadow(color: .black.opacity(0.5), radius: 2, x: 0, y: 1)
-                    .padding()
-                    .multilineTextAlignment(.center)
-            }
-            
-            // 书脊纹理
-            HStack {
-                LinearGradient(colors: [.black.opacity(0.3), .clear], startPoint: .leading, endPoint: .trailing)
-                    .frame(width: 20)
-                Spacer()
-            }
+
+            RoundedRectangle(cornerRadius: 5)
+                .stroke(Color.white.opacity(0.9 * glowOpacity), lineWidth: 1)
         }
         .frame(width: width, height: height)
+        .shadow(color: .black.opacity(0.12), radius: 3, x: 2, y: 2)
     }
-}
 
-struct BookPage: View {
-    let width: CGFloat
-    let height: CGFloat
-    let color: Color
-    var image: UIImage? = nil
-    
-    var body: some View {
-        ZStack {
-            Rectangle()
-                .fill(color)
-                .frame(width: width, height: height)
-                .cornerRadius(2)
-                .shadow(color: .black.opacity(0.1), radius: 1, x: 1, y: 0)
-            
-            if let image = image {
-                Image(uiImage: image)
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: width - 20, height: height - 20)
-                    .clipShape(RoundedRectangle(cornerRadius: 2))
-            }
-        }
+    private func lineWidth(for line: Int) -> CGFloat {
+        let widths: [CGFloat] = [112, 132, 98, 126, 88, 116, 104, 72]
+        return widths[line % widths.count]
     }
 }
 
@@ -236,7 +374,7 @@ struct BookPage: View {
     let config = ModelConfiguration(isStoredInMemoryOnly: true)
     let container = try! ModelContainer(for: BookGroup.self, configurations: config)
     let book = BookGroup(title: "Preview Book")
-    
+
     return BookOpeningAnimationView(book: book) {
         print("Animation Completed")
     }

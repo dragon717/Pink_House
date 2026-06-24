@@ -52,6 +52,8 @@ struct SpaceBookCoverVisuals: View {
     @State private var loadedCoverImage: UIImage?
     @State private var isLoading = true
 
+    private let coverTargetSize = CGSize(width: 180, height: 248)
+
     var body: some View {
         ZStack {
             colorScheme == .dark ? Color(uiColor: .systemGray6) : Color.white
@@ -128,17 +130,28 @@ struct SpaceBookCoverVisuals: View {
         }
     }
 
+    @MainActor
     private func loadCoverImage() async {
         isLoading = true
         defer { isLoading = false }
 
         // 1. 优先加载用户设置的封面图片
-        if let coverPath = book.coverImage {
-            let image = await ImageManager.shared.loadImageAsync(fileName: coverPath)
+        if let coverPath = book.coverImage, !coverPath.isEmpty {
+            if let cached = ImageManager.shared.cachedImage(fileName: coverPath, targetSize: coverTargetSize) {
+                loadedCoverImage = cached
+                return
+            }
+
+            try? await Task.sleep(nanoseconds: 25_000_000)
+            guard !Task.isCancelled else { return }
+
+            let image = await ImageManager.shared.loadImageAsync(
+                fileName: coverPath,
+                targetSize: coverTargetSize,
+                priority: .utility
+            )
             if let image = image {
-                await MainActor.run {
-                    self.loadedCoverImage = image
-                }
+                self.loadedCoverImage = image
                 return
             }
         }
@@ -161,19 +174,27 @@ struct SpaceBookCoverVisuals: View {
         // 3. 如果没有缓存缩略图，查找有snapshotPath的书页
         if let firstPageWithSnapshot = validPages.first(where: { $0.snapshotPath != nil }),
            let snapshotPath = firstPageWithSnapshot.snapshotPath {
-            let image = await ImageManager.shared.loadImageAsync(fileName: snapshotPath)
+            if let cached = ImageManager.shared.cachedImage(fileName: snapshotPath, targetSize: coverTargetSize) {
+                loadedCoverImage = cached
+                return
+            }
+
+            try? await Task.sleep(nanoseconds: 25_000_000)
+            guard !Task.isCancelled else { return }
+
+            let image = await ImageManager.shared.loadImageAsync(
+                fileName: snapshotPath,
+                targetSize: coverTargetSize,
+                priority: .utility
+            )
             if let image = image {
-                await MainActor.run {
-                    self.loadedCoverImage = image
-                }
+                self.loadedCoverImage = image
                 return
             }
         }
         
         // 4. 都没有找到，显示占位符
-        await MainActor.run {
-            self.loadedCoverImage = nil
-        }
+        self.loadedCoverImage = nil
     }
 }
 
@@ -247,6 +268,7 @@ struct SpaceBookOpeningAnimationView: View {
     // 配置参数
     private let bookWidth: CGFloat = 200
     private let bookHeight: CGFloat = 280
+    private let animationImageTargetSize = CGSize(width: 320, height: 448)
 
     var body: some View {
         ZStack {
@@ -296,25 +318,39 @@ struct SpaceBookOpeningAnimationView: View {
             .opacity(isReady ? 1 : 0)
         }
         .task {
-            await preloadAllImages()
+            guard !Task.isCancelled else { return }
             isReady = true
             startAnimationSequence()
+            await preloadAllImages()
         }
     }
 
+    @MainActor
     private func preloadAllImages() async {
         // 并行加载封面和书页图片
         async let coverTask = loadCoverImage()
         async let pagesTask = loadPageImages()
 
-        coverImage = await coverTask
+        let loadedCover = await coverTask
+        guard !Task.isCancelled else { return }
+        coverImage = loadedCover
+
         await pagesTask
     }
 
+    @MainActor
     private func loadCoverImage() async -> UIImage? {
         // 优先加载用户设置的封面图片
         if let coverPath = book.coverImage {
-            if let image = await ImageManager.shared.loadImageAsync(fileName: coverPath) {
+            if let cached = ImageManager.shared.cachedImage(fileName: coverPath, targetSize: animationImageTargetSize) {
+                return cached
+            }
+
+            if let image = await ImageManager.shared.loadImageAsync(
+                fileName: coverPath,
+                targetSize: animationImageTargetSize,
+                priority: .userInitiated
+            ) {
                 return image
             }
         }
@@ -328,37 +364,60 @@ struct SpaceBookOpeningAnimationView: View {
             }
             // 其次使用 snapshotPath
             if let snapshotPath = firstPage.snapshotPath {
-                return await ImageManager.shared.loadImageAsync(fileName: snapshotPath)
+                if let cached = ImageManager.shared.cachedImage(fileName: snapshotPath, targetSize: animationImageTargetSize) {
+                    return cached
+                }
+
+                return await ImageManager.shared.loadImageAsync(
+                    fileName: snapshotPath,
+                    targetSize: animationImageTargetSize,
+                    priority: .userInitiated
+                )
             }
         }
 
         return nil
     }
 
+    @MainActor
     private func loadPageImages() async {
         // 获取书页数据（过滤已删除的，按创建时间倒序）
         let validPages = (book.pages ?? []).filter { !$0.isDeleted }.sorted { $0.createdAt > $1.createdAt }
+        let targetSize = animationImageTargetSize
 
         // 如果没有书页，直接返回
         if validPages.isEmpty { return }
 
+        var snapshotLoads: [(index: Int, path: String)] = []
+        snapshotLoads.reserveCapacity(6)
+
+        for i in 0..<6 {
+            let pageIndex = i % validPages.count
+            let page = validPages[pageIndex]
+
+            if let thumbnail = SpaceOutfitThumbnailCache.shared.getThumbnail(for: page.id) {
+                pageImages[i] = thumbnail
+            } else if let snapshotPath = page.snapshotPath, !snapshotPath.isEmpty {
+                snapshotLoads.append((index: i, path: snapshotPath))
+            }
+        }
+
+        guard !snapshotLoads.isEmpty else { return }
+
         // 并行加载所有书页图片
         await withTaskGroup(of: (Int, UIImage?).self) { group in
-            for i in 0..<6 {
-                let pageIndex = i % validPages.count
-                let page = validPages[pageIndex]
-
+            for load in snapshotLoads {
                 group.addTask {
-                    // 优先使用缩略图缓存（ARView预览）
-                    if let thumbnail = SpaceOutfitThumbnailCache.shared.getThumbnail(for: page.id) {
-                        return (i, thumbnail)
+                    if let cached = await ImageManager.shared.cachedImage(fileName: load.path, targetSize: targetSize) {
+                        return (load.index, cached)
                     }
-                    // 其次使用 snapshotPath
-                    if let snapshotPath = page.snapshotPath {
-                        let image = await ImageManager.shared.loadImageAsync(fileName: snapshotPath)
-                        return (i, image)
-                    }
-                    return (i, nil)
+
+                    let image = await ImageManager.shared.loadImageAsync(
+                        fileName: load.path,
+                        targetSize: targetSize,
+                        priority: .userInitiated
+                    )
+                    return (load.index, image)
                 }
             }
 

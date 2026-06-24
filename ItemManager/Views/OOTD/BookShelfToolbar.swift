@@ -18,78 +18,142 @@ struct BookShelfToolbar: ToolbarContent {
     
     // Custom Sort Editing
     @Binding var isEditing: Bool
+
+    // Batch delete
+    @Binding var isBatchEditingBooks: Bool
+    @Binding var selectedBookIDs: Set<UUID>
+    @Binding var showingBatchDeleteBooksAlert: Bool
+    let books: [BookGroup]
     
     var body: some ToolbarContent {
         // Show mode picker when no book is selected
         if selectedBook == nil && !isSpatialBookSelected {
             ToolbarItem(placement: .principal) {
-                Picker("模式".appLocalized, selection: $viewMode) {
-                    ForEach(BookShelfView.ViewMode.allCases) { mode in
-                        Text(mode.localizedTitle).tag(mode)
+                if isBatchEditingBooks && viewMode == .planar {
+                    Text("已选择 %d 项".appLocalized(selectedBookIDs.count))
+                        .font(.headline)
+                } else {
+                    Picker("模式".appLocalized, selection: $viewMode) {
+                        ForEach(BookShelfView.ViewMode.allCases) { mode in
+                            Text(mode.localizedTitle).tag(mode)
+                        }
                     }
+                    .pickerStyle(.segmented)
+                    .frame(width: 160)
+                    .captureGuideTarget(.spaceBookModeTabs)
                 }
-                .pickerStyle(.segmented)
-                .frame(width: 160)
-                .captureGuideTarget(.spaceBookModeTabs)
             }
         }
         
         // Only show top-level menu in Grid Mode (Planar)
         if viewMode == .planar && selectedBook == nil {
             ToolbarItem(placement: .topBarTrailing) {
-                HStack(spacing: 16) {
-                    // Custom Sort Edit Button
+                if isBatchEditingBooks {
+                    batchEditingControls
+                } else {
+                    normalShelfControls
+                }
+            }
+        }
+    }
+
+    private var normalShelfControls: some View {
+        HStack(spacing: 16) {
+            Button {
+                withAnimation {
+                    isEditing.toggle()
+                    if isEditing {
+                        selectedBookIDs.removeAll()
+                    }
+                }
+            } label: {
+                if isEditing {
+                    Image(systemName: "checkmark.circle")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(.pink)
+                } else {
+                    Image(systemName: "list.number")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(.primary)
+                }
+            }
+
+            Group {
+                if guideManager.shouldUseCustomGuideMenu(for: .ootdShelfMore) {
                     Button {
-                        withAnimation {
-                            isEditing.toggle()
+                        presentGuideMenuForShelfMore()
+                    } label: {
+                        moreMenuIcon
+                    }
+                } else {
+                    Menu {
+                        Button {
+                            createOotdBook()
+                        } label: {
+                            Label("新建手帐".appLocalized, systemImage: "plus.rectangle.on.folder")
+                        }
+
+                        Divider()
+
+                        Button {
+                            beginBatchDelete()
+                        } label: {
+                            Label("批量删除".appLocalized, systemImage: "checkmark.circle")
+                        }
+                        .disabled(books.isEmpty)
+
+                        Button {
+                            showingTrash = true
+                        } label: {
+                            Label("垃圾篓".appLocalized, systemImage: "trash")
                         }
                     } label: {
-                        if isEditing {
-                            Image(systemName: "checkmark.circle")
-                                .font(.system(size: 16, weight: .semibold))
-                                .foregroundStyle(.pink)
-                        } else {
-                            Image(systemName: "list.number")
-                                .font(.system(size: 16, weight: .semibold))
-                                .foregroundStyle(.primary)
-                        }
-                    }
-                    
-                    Group {
-                        if guideManager.shouldUseCustomGuideMenu(for: .ootdShelfMore) {
-                            Button {
-                                presentGuideMenuForShelfMore()
-                            } label: {
-                                moreMenuIcon
+                        moreMenuIcon
+                            .onTapGesture {
+                                notifyShelfMoreMenuOpened()
                             }
-                        } else {
-                            Menu {
-                                Button {
-                                    createOotdBook()
-                                } label: {
-                                    Label("新建手帐".appLocalized, systemImage: "plus.rectangle.on.folder")
-                                }
-
-                                Button {
-                                    showingTrash = true
-                                } label: {
-                                    Label("垃圾篓".appLocalized, systemImage: "trash")
-                                }
-                            } label: {
-                                moreMenuIcon
-                                    .onTapGesture {
-                                        notifyShelfMoreMenuOpened()
-                                    }
-                            }
-                            .simultaneousGesture(
-                                TapGesture().onEnded {
-                                    notifyShelfMoreMenuOpened()
-                                }
-                            )
-                        }
                     }
-                    .captureGuideTarget(.ootdShelfMoreMenuButton)
+                    .simultaneousGesture(
+                        TapGesture().onEnded {
+                            notifyShelfMoreMenuOpened()
+                        }
+                    )
                 }
+            }
+            .captureGuideTarget(.ootdShelfMoreMenuButton)
+        }
+    }
+
+    private var batchEditingControls: some View {
+        HStack(spacing: 16) {
+            Button {
+                toggleSelectAllBooks()
+            } label: {
+                Text((selectedBookIDs.count == books.count ? "取消全选" : "全选").appLocalized)
+                    .font(.system(size: 16, weight: .medium))
+            }
+            .disabled(books.isEmpty)
+
+            Button {
+                if !selectedBookIDs.isEmpty {
+                    showingBatchDeleteBooksAlert = true
+                }
+            } label: {
+                Image(systemName: "trash")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(.red)
+            }
+            .disabled(selectedBookIDs.isEmpty)
+
+            Button {
+                withAnimation {
+                    isBatchEditingBooks = false
+                    selectedBookIDs.removeAll()
+                }
+            } label: {
+                Text("完成".appLocalized)
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(.pink)
             }
         }
     }
@@ -109,6 +173,22 @@ struct BookShelfToolbar: ToolbarContent {
         showingNewBookAlert = true
     }
 
+    private func beginBatchDelete() {
+        withAnimation {
+            isEditing = false
+            isBatchEditingBooks = true
+            selectedBookIDs.removeAll()
+        }
+    }
+
+    private func toggleSelectAllBooks() {
+        if selectedBookIDs.count == books.count {
+            selectedBookIDs.removeAll()
+        } else {
+            selectedBookIDs = Set(books.map(\.id))
+        }
+    }
+
     private func presentGuideMenuForShelfMore() {
         notifyShelfMoreMenuOpened()
         guideManager.presentGuideMenu(
@@ -123,6 +203,12 @@ struct BookShelfToolbar: ToolbarContent {
                         systemImage: "plus.rectangle.on.folder",
                         isHighlighted: true,
                         action: createOotdBook
+                    ),
+                    .divider,
+                    .action(
+                        title: "批量删除".appLocalized,
+                        systemImage: "checkmark.circle",
+                        action: beginBatchDelete
                     ),
                     .action(
                         title: "垃圾篓".appLocalized,

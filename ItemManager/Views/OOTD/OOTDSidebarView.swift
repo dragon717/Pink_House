@@ -209,7 +209,7 @@ struct OOTDSidebarView: View {
                 }
             }
             .sheet(isPresented: $showingTrash) {
-                RecycleBinView() // We need to update this view
+                RecycleBinSheetView()
             }
         }
     }

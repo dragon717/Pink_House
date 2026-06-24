@@ -208,7 +208,7 @@ struct SpaceBookDetailView: View {
                 }
             }
             .sheet(isPresented: $showingTrash) {
-                RecycleBinView(initialTab: 2)
+                RecycleBinSheetView(initialTab: 2)
             }
             .toolbarBackground(.hidden, for: .navigationBar)
             .navigationBarBackButtonHidden(true) // 隐藏系统返回按钮，使用自定义的返回按钮

@@ -30,6 +30,7 @@ import Combine
 @available(iOS 18.0, *)
 struct PetChatView: View {
     @Binding var searchText: String
+    var onHide: () -> Void = { }
     @Environment(\.modelContext) private var modelContext
     @Environment(ThemeManager.self) private var themeManager
     @Environment(\.colorScheme) private var colorScheme
@@ -377,6 +378,18 @@ struct PetChatView: View {
             }
             .navigationTitle("%@的悄悄话".appLocalized(petAI.petName))
             .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button {
+                        onHide()
+                    } label: {
+                        Text("隐藏".appLocalized)
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(themeManager.accentTextColor)
+                    }
+                    .accessibilityLabel("隐藏萌宠对话".appLocalized)
+                }
+            }
             .if(!usesInlinePetSearchInput) { view in
                 view
                     .searchable(

@@ -32,6 +32,7 @@ struct RecycleBinView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     @Environment(ThemeManager.self) private var themeManager
+    private let showCloseButton: Bool
 
     // Wardrobe Query
     @Query(filter: #Predicate<Clothing> { $0.deletedAt != nil && $0.deletionSource == nil }, sort: \Clothing.deletedAt, order: .reverse)
@@ -84,7 +85,8 @@ struct RecycleBinView: View {
     // Recovery/Delete from Trash
     @State private var showingRestoreAlert = false
 
-    init(initialTab: Int = 0) {
+    init(initialTab: Int = 0, showCloseButton: Bool = false) {
+        self.showCloseButton = showCloseButton
         _selectedTab = State(initialValue: initialTab)
     }
 
@@ -245,12 +247,24 @@ struct RecycleBinView: View {
         }
     }
 
+    @ToolbarContentBuilder
     private var trailingToolbar: some ToolbarContent {
         ToolbarItem(placement: .topBarTrailing) {
             if editMode == .active {
                 editModeToolbar
             } else {
                 normalToolbar
+            }
+        }
+        if showCloseButton {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    dismiss()
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 18))
+                        .foregroundStyle(recycleBinPalette.primary)
+                }
             }
         }
     }
@@ -920,6 +934,20 @@ struct RecycleBinView: View {
             }
         }
         selectedItems.removeAll()
+    }
+}
+
+struct RecycleBinSheetView: View {
+    private let initialTab: Int
+
+    init(initialTab: Int = 0) {
+        self.initialTab = initialTab
+    }
+
+    var body: some View {
+        NavigationStack {
+            RecycleBinView(initialTab: initialTab, showCloseButton: true)
+        }
     }
 }
 

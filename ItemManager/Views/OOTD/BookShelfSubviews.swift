@@ -252,27 +252,27 @@ extension View {
 struct BookCoverVisuals: View {
     let book: BookGroup
     @Environment(\.colorScheme) private var colorScheme
-    
-    var coverImage: UIImage? {
+
+    @State private var loadedCoverImage: UIImage?
+    @State private var loadedCoverSource: String?
+
+    private let coverTargetSize = CGSize(width: 180, height: 248)
+
+    private var coverImageSource: String? {
         if let coverPath = book.coverImage,
-           let image = ImageManager.shared.loadImage(fileName: coverPath) {
-            return image
-        }
-        // Fallback to first page
-        if let firstPage = (book.pages ?? []).filter({ !$0.isDeleted }).sorted(by: { $0.createdAt > $1.createdAt }).first,
-           firstPage.shouldUseStoredSnapshot,
-           let snapshotPath = firstPage.snapshotPath,
-           let image = ImageManager.shared.loadImage(fileName: snapshotPath) {
-            return image
+           !coverPath.isEmpty {
+            return coverPath
         }
         return nil
     }
     
     var body: some View {
+        let imageSource = coverImageSource
+
         ZStack {
             colorScheme == .dark ? Color(uiColor: .systemGray6) : Color.white
             
-            if let image = coverImage {
+            if let image = loadedCoverImage {
                 Image(uiImage: image)
                     .resizable()
                     .scaledToFill()
@@ -292,7 +292,7 @@ struct BookCoverVisuals: View {
             }
             
             // Title Overlay if has image
-            if coverImage != nil {
+            if loadedCoverImage != nil {
                 VStack {
                     Spacer()
                     ZStack {
@@ -320,6 +320,36 @@ struct BookCoverVisuals: View {
         .cornerRadius(4, corners: [.topRight, .bottomRight])
         .overlay(ThemeSkinBookCoverFrame(cornerRadius: 4))
         .shadow(color: .black.opacity(colorScheme == .dark ? 0.4 : 0.2), radius: 5, x: 5, y: 5)
+        .task(id: "\(book.id.uuidString)-\(imageSource ?? "placeholder")") {
+            await loadCoverImage(from: imageSource)
+        }
+    }
+
+    @MainActor
+    private func loadCoverImage(from source: String?) async {
+        guard loadedCoverSource != source || loadedCoverImage == nil else { return }
+        loadedCoverSource = source
+
+        guard let source else {
+            loadedCoverImage = nil
+            return
+        }
+
+        if let cached = ImageManager.shared.cachedImage(fileName: source, targetSize: coverTargetSize) {
+            loadedCoverImage = cached
+            return
+        }
+
+        try? await Task.sleep(nanoseconds: 25_000_000)
+        guard !Task.isCancelled else { return }
+
+        let image = await ImageManager.shared.loadImageAsync(
+            fileName: source,
+            targetSize: coverTargetSize,
+            priority: .utility
+        )
+        guard !Task.isCancelled else { return }
+        loadedCoverImage = image
     }
 }
 

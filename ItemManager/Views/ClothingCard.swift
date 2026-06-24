@@ -863,6 +863,7 @@ struct ClothingRow: View, Equatable {
                         .font(.headline)
                         .foregroundStyle(rowPrimaryColor)
                         .themeSkinLegibleText(level: .inline, slot: .wardrobeItemCard, descriptor: wardrobeThemeDescriptor)
+                        .lineLimit(1)
                     
                     // Attribute Display: Type, Color, Size
                     HStack(spacing: 6) {
@@ -876,6 +877,10 @@ struct ClothingRow: View, Equatable {
                             AttributePill(text: snapshot.sizes, icon: "ruler", color: isThemeSkinThemed ? rowAccentColor.opacity(0.82) : palette.tertiary, themeSkinDescriptor: wardrobeThemeDescriptor)
                         }
                     }
+                    .lineLimit(1)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .clipped()
                     
                     if !snapshot.tagNames.isEmpty {
                         HStack(spacing: 4) {
@@ -884,18 +889,27 @@ struct ClothingRow: View, Equatable {
                                     .font(.caption2)
                                     .foregroundStyle(isThemeSkinThemed ? rowSecondaryColor : palette.tertiary)
                                     .themeSkinLegibleText(level: .inline, slot: .wardrobeItemCard, descriptor: wardrobeThemeDescriptor)
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.8)
+                                    .truncationMode(.tail)
+                                    .allowsTightening(true)
                             }
                             if snapshot.tagNames.count > 3 {
-                                Text("...")
+                                Text("+\(snapshot.tagNames.count - 3)")
                                     .font(.caption2)
                                     .foregroundStyle(isThemeSkinThemed ? rowSecondaryColor : palette.tertiary)
                                     .themeSkinLegibleText(level: .inline, slot: .wardrobeItemCard, descriptor: wardrobeThemeDescriptor)
+                                    .lineLimit(1)
+                                    .fixedSize()
                             }
                         }
+                        .lineLimit(1)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .clipped()
                     }
                 }
-                
-                Spacer()
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .clipped()
                 
                 VStack(alignment: .trailing, spacing: 4) {
                     if showOriginalPrice && snapshot.originalPrice > 0 {
@@ -954,7 +968,10 @@ struct ClothingRow: View, Equatable {
                 }
                 .padding(.horizontal, showsRowPriceInfo ? 8 : 0)
                 .padding(.vertical, showsRowPriceInfo ? 6 : 0)
+                .frame(width: 96, alignment: .trailing)
+                .layoutPriority(2)
             }
+            .frame(height: 66)
             .padding(16)
         }
         .padding(.vertical, 4)

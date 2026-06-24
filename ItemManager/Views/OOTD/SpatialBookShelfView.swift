@@ -48,6 +48,11 @@ struct SpatialBookShelfView: View {
     @State private var editableBooks: [SpaceBookGroup] = []
     @State private var draggingItem: SpaceBookGroup?
 
+    // Batch delete
+    @State private var isBatchEditingBooks = false
+    @State private var selectedBookIDs = Set<UUID>()
+    @State private var showingBatchDeleteBooksAlert = false
+
     var body: some View {
         applyPresentationModifiers(
             to: applyLifecycleAndToolbar(
@@ -148,9 +153,15 @@ struct SpatialBookShelfView: View {
         content
         .onChange(of: selectedBook) { _, newValue in
             onSelectionChange?(newValue != nil)
+            if newValue != nil {
+                isBatchEditingBooks = false
+                selectedBookIDs.removeAll()
+            }
         }
         .onChange(of: isEditing) { _, newValue in
             if newValue {
+                isBatchEditingBooks = false
+                selectedBookIDs.removeAll()
                 editableBooks = books
             } else {
                 // Save sort order
@@ -163,6 +174,15 @@ struct SpatialBookShelfView: View {
         .onChange(of: books) { _, newValue in
             if isEditing {
                 editableBooks = newValue
+            }
+            let activeIDs = Set(newValue.map(\.id))
+            selectedBookIDs = selectedBookIDs.intersection(activeIDs)
+        }
+        .onChange(of: isBatchEditingBooks) { _, newValue in
+            if newValue {
+                isEditing = false
+            } else {
+                selectedBookIDs.removeAll()
             }
         }
         .onChange(of: books.count) { _, _ in
@@ -183,7 +203,8 @@ struct SpatialBookShelfView: View {
     private func applyPresentationModifiers<Content: View>(to content: Content) -> some View {
         let withNewBookAlert = applyNewBookAlert(to: content)
         let withDeleteBookAlert = applyDeleteBookAlert(to: withNewBookAlert)
-        let withRenameBookAlert = applyRenameBookAlert(to: withDeleteBookAlert)
+        let withBatchDeleteBooksAlert = applyBatchDeleteBooksAlert(to: withDeleteBookAlert)
+        let withRenameBookAlert = applyRenameBookAlert(to: withBatchDeleteBooksAlert)
         let withTrashSheet = applyTrashSheet(to: withRenameBookAlert)
         return applyCoverPicker(to: withTrashSheet)
     }
@@ -228,6 +249,17 @@ struct SpatialBookShelfView: View {
         }
     }
 
+    private func applyBatchDeleteBooksAlert<Content: View>(to content: Content) -> some View {
+        content.alert("确认批量删除".appLocalized, isPresented: $showingBatchDeleteBooksAlert) {
+            Button("取消".appLocalized, role: .cancel) {}
+            Button("删除".appLocalized, role: .destructive) {
+                confirmBatchDeleteBooks()
+            }
+        } message: {
+            Text("确定要将选中的 %d 个空间手帐及其中书页移入回收站吗？".appLocalized(selectedBookIDs.count))
+        }
+    }
+
     private func applyRenameBookAlert<Content: View>(to content: Content) -> some View {
         content.alert("重命名手帐".appLocalized, isPresented: $showingRenameBookAlert) {
             TextField("名称".appLocalized, text: $renameBookName)
@@ -244,7 +276,7 @@ struct SpatialBookShelfView: View {
 
     private func applyTrashSheet<Content: View>(to content: Content) -> some View {
         content.sheet(isPresented: $showingTrash) {
-            RecycleBinView(initialTab: 2)
+            RecycleBinSheetView(initialTab: 2)
         }
     }
 
@@ -265,48 +297,100 @@ struct SpatialBookShelfView: View {
     private var bookshelfToolbar: some ToolbarContent {
         if selectedBook == nil {
             ToolbarItem(placement: .topBarTrailing) {
-                HStack(spacing: 16) {
+                if isBatchEditingBooks {
+                    batchEditingToolbarControls
+                } else {
+                    normalToolbarControls
+                }
+            }
+        }
+    }
+
+    private var normalToolbarControls: some View {
+        HStack(spacing: 16) {
+            Button {
+                withAnimation {
+                    isEditing.toggle()
+                    if isEditing {
+                        selectedBookIDs.removeAll()
+                    }
+                }
+            } label: {
+                Image(systemName: isEditing ? "checkmark.circle" : "list.number")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(isEditing ? .pink : .primary)
+            }
+
+            Group {
+                if guideManager.shouldUseCustomGuideMenu(for: .spaceBookShelfMore) {
                     Button {
-                        withAnimation {
-                            isEditing.toggle()
+                        presentGuideMenuForSpaceBookShelfMore()
+                    } label: {
+                        Image(systemName: "ellipsis.circle")
+                            .foregroundStyle(.primary)
+                    }
+                } else {
+                    Menu {
+                        Button {
+                            createSpaceBook()
+                        } label: {
+                            Label("新建空间手帐".appLocalized, systemImage: "plus.rectangle.on.folder")
+                        }
+
+                        Divider()
+
+                        Button {
+                            beginBatchDelete()
+                        } label: {
+                            Label("批量删除".appLocalized, systemImage: "checkmark.circle")
+                        }
+                        .disabled(books.isEmpty)
+
+                        Button {
+                            showingTrash = true
+                        } label: {
+                            Label("垃圾篓".appLocalized, systemImage: "trash")
                         }
                     } label: {
-                        Image(systemName: isEditing ? "checkmark.circle" : "list.number")
-                            .font(.system(size: 16, weight: .semibold))
-                            .foregroundStyle(isEditing ? .pink : .primary)
+                        Image(systemName: "ellipsis.circle")
+                            .foregroundStyle(.primary)
                     }
-
-                    Group {
-                        if guideManager.shouldUseCustomGuideMenu(for: .spaceBookShelfMore) {
-                            Button {
-                                presentGuideMenuForSpaceBookShelfMore()
-                            } label: {
-                                Image(systemName: "ellipsis.circle")
-                                    .foregroundStyle(.primary)
-                            }
-                        } else {
-                            Menu {
-                                Button {
-                                    createSpaceBook()
-                                } label: {
-                                    Label("新建空间手帐".appLocalized, systemImage: "plus.rectangle.on.folder")
-                                }
-
-                                Divider()
-
-                                Button {
-                                    showingTrash = true
-                                } label: {
-                                    Label("垃圾篓".appLocalized, systemImage: "trash")
-                                }
-                            } label: {
-                                Image(systemName: "ellipsis.circle")
-                                    .foregroundStyle(.primary)
-                            }
-                        }
-                    }
-                    .captureGuideToolbarIconTarget(.spaceBookShelfMoreMenuButton)
                 }
+            }
+            .captureGuideToolbarIconTarget(.spaceBookShelfMoreMenuButton)
+        }
+    }
+
+    private var batchEditingToolbarControls: some View {
+        HStack(spacing: 16) {
+            Button {
+                toggleSelectAllBooks()
+            } label: {
+                Text((selectedBookIDs.count == books.count ? "取消全选" : "全选").appLocalized)
+                    .font(.system(size: 16, weight: .medium))
+            }
+            .disabled(books.isEmpty)
+
+            Button {
+                if !selectedBookIDs.isEmpty {
+                    showingBatchDeleteBooksAlert = true
+                }
+            } label: {
+                Image(systemName: "trash")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(.red)
+            }
+            .disabled(selectedBookIDs.isEmpty)
+
+            Button {
+                withAnimation {
+                    isBatchEditingBooks = false
+                    selectedBookIDs.removeAll()
+                }
+            } label: {
+                Text("完成".appLocalized)
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(.pink)
             }
         }
     }
@@ -314,6 +398,22 @@ struct SpatialBookShelfView: View {
     private func createSpaceBook() {
         newBookName = ""
         showingNewBookAlert = true
+    }
+
+    private func beginBatchDelete() {
+        withAnimation {
+            isEditing = false
+            isBatchEditingBooks = true
+            selectedBookIDs.removeAll()
+        }
+    }
+
+    private func toggleSelectAllBooks() {
+        if selectedBookIDs.count == books.count {
+            selectedBookIDs.removeAll()
+        } else {
+            selectedBookIDs = Set(books.map(\.id))
+        }
     }
 
     private func presentGuideMenuForSpaceBookShelfMore() {
@@ -332,6 +432,11 @@ struct SpatialBookShelfView: View {
                     ),
                     .divider,
                     .action(
+                        title: "批量删除".appLocalized,
+                        systemImage: "checkmark.circle",
+                        action: beginBatchDelete
+                    ),
+                    .action(
                         title: "垃圾篓".appLocalized,
                         systemImage: "trash",
                         action: { showingTrash = true }
@@ -343,16 +448,20 @@ struct SpatialBookShelfView: View {
 
     @ViewBuilder
     private var bookGridContent: some View {
-        ScrollView {
+        Group {
             if isEditing {
-                // Editing Mode: Draggable Grid
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 160), spacing: 24)], spacing: 32) {
-                    ForEach(editableBooks) { book in
-                        editingBookCell(for: book)
+                ScrollView {
+                    // Editing Mode: Draggable Grid
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 160), spacing: 24)], spacing: 32) {
+                        ForEach(editableBooks) { book in
+                            editingBookCell(for: book)
+                        }
                     }
+                    .padding(24)
+                    .animation(.default, value: editableBooks)
                 }
-                .padding(24)
-                .animation(.default, value: editableBooks)
+            } else if isBatchEditingBooks {
+                batchBookGridContent
             } else {
                 // Normal Mode: Navigation Grid
                 SpaceBookGridView(
@@ -382,6 +491,42 @@ struct SpatialBookShelfView: View {
                 .opacity(openingBook == nil ? 1 : 0)
             }
         }
+    }
+
+    private var batchBookGridContent: some View {
+        ScrollView {
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 160), spacing: 24)], spacing: 32) {
+                ForEach(books) { book in
+                    batchEditingBookCell(for: book)
+                }
+            }
+            .padding(24)
+            .animation(.default, value: selectedBookIDs)
+        }
+    }
+
+    private func batchEditingBookCell(for book: SpaceBookGroup) -> some View {
+        let isSelected = selectedBookIDs.contains(book.id)
+
+        return SpaceBookView(book: book, namespace: animationNamespace)
+            .overlay(alignment: .topLeading) {
+                ThemeSkinSelectionBadge(isSelected: isSelected)
+                    .padding(4)
+            }
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(isSelected ? Color.pink : Color.clear, lineWidth: 3)
+            )
+            .contentShape(Rectangle())
+            .onTapGesture {
+                withAnimation(.spring(response: 0.2)) {
+                    if isSelected {
+                        selectedBookIDs.remove(book.id)
+                    } else {
+                        selectedBookIDs.insert(book.id)
+                    }
+                }
+            }
     }
 
     @ViewBuilder
@@ -439,6 +584,40 @@ struct SpatialBookShelfView: View {
         } catch {
             print("SpatialBookShelfView: Failed to save deletion: \(error)")
         }
+    }
+
+    private func confirmBatchDeleteBooks() {
+        let booksToDelete = books.filter { selectedBookIDs.contains($0.id) }
+        guard !booksToDelete.isEmpty else { return }
+
+        var deletedPageIDs: [UUID] = []
+        let deletionDate = Date()
+
+        for book in booksToDelete {
+            let pages = book.pages ?? []
+            book.isDeleted = true
+            book.deletedAt = deletionDate
+            book.lastModified = deletionDate
+
+            for page in pages {
+                page.isDeleted = true
+                page.deletedAt = deletionDate
+                page.lastModified = deletionDate
+                deletedPageIDs.append(page.id)
+            }
+        }
+
+        do {
+            try modelContext.save()
+            DeleteTracker.shared.recordDeletedSpaceBookGroups(ids: booksToDelete.map(\.id))
+            DeleteTracker.shared.recordDeletedSpaceOutfits(ids: deletedPageIDs)
+        } catch {
+            print("SpatialBookShelfView: Failed to save batch deletion: \(error)")
+        }
+
+        selectedBookIDs.removeAll()
+        isBatchEditingBooks = false
+        publishSpaceBookShelfGuideDataState()
     }
 
     private func handleViewAppear() {

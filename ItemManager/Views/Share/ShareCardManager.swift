@@ -350,60 +350,100 @@ enum ShareContentType {
 }
 
 // MARK: - 翻转动画执行函数
+private final class FlipAnimationDisplayLinkDriver: NSObject {
+    private let totalDegrees: Double
+    private let animationDuration: Double
+    private let updateState: (Double, Double, Bool) -> Void
+    private let showShareButton: () -> Void
+    private let startTime = CACurrentMediaTime()
+    private var displayLink: CADisplayLink?
+
+    init(
+        totalFlips: Int,
+        animationDuration: Double,
+        updateState: @escaping (Double, Double, Bool) -> Void,
+        showShareButton: @escaping () -> Void
+    ) {
+        self.totalDegrees = Double(totalFlips * 180)
+        self.animationDuration = animationDuration
+        self.updateState = updateState
+        self.showShareButton = showShareButton
+        super.init()
+    }
+
+    func start() {
+        let displayLink = CADisplayLink(target: self, selector: #selector(step(_:)))
+        if #available(iOS 15.0, *) {
+            displayLink.preferredFrameRateRange = CAFrameRateRange(minimum: 30, maximum: 60, preferred: 60)
+        } else {
+            displayLink.preferredFramesPerSecond = 60
+        }
+        displayLink.add(to: .main, forMode: .common)
+        self.displayLink = displayLink
+    }
+
+    @objc private func step(_ displayLink: CADisplayLink) {
+        let elapsed = CACurrentMediaTime() - startTime
+        let progress = min(elapsed / animationDuration, 1.0)
+
+        render(progress: progress)
+
+        guard progress >= 1.0 else { return }
+
+        displayLink.invalidate()
+        self.displayLink = nil
+
+        updateState(totalDegrees, 1.0, false)
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [self] in
+            withAnimation(.easeInOut(duration: 0.8)) {
+                updateState(totalDegrees + 360, 1.0, true)
+            }
+
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.9) { [self] in
+                withAnimation(.easeInOut(duration: 0.3)) {
+                    showShareButton()
+                }
+            }
+        }
+    }
+
+    private func render(progress: Double) {
+        // 使用 easeInOut 曲线：由慢到快到慢
+        let easedProgress = progress < 0.5
+            ? 2 * progress * progress
+            : 1 - pow(-2 * progress + 2, 2) / 2
+
+        let currentRotation = totalDegrees * easedProgress
+        let currentFlip = Int(currentRotation / 180)
+        let isFront = currentFlip % 2 == 0
+
+        // 在翻转中间时降低透明度
+        let flipProgress = (currentRotation.truncatingRemainder(dividingBy: 180)) / 180
+        let distanceFromMiddle = abs(flipProgress - 0.5) * 2
+        let currentOpacity = 0.3 + (0.7 * distanceFromMiddle)
+
+        updateState(currentRotation, currentOpacity, isFront)
+    }
+
+    deinit {
+        displayLink?.invalidate()
+    }
+}
+
 func executeFlipAnimation(
     totalFlips: Int = 12,
     animationDuration: Double = 2.0,
     updateState: @escaping (Double, Double, Bool) -> Void,
     showShareButton: @escaping () -> Void
 ) {
-    let totalDegrees = Double(totalFlips * 180)
-    let startTime = Date()
-    let frameInterval: TimeInterval = 1.0 / 60.0 // 60fps
-    var displayLink: Timer?
-    
-    displayLink = Timer.scheduledTimer(withTimeInterval: frameInterval, repeats: true) { timer in
-        let elapsed = Date().timeIntervalSince(startTime)
-        let progress = min(elapsed / animationDuration, 1.0)
-        
-        // 使用 easeInOut 曲线：由慢到快到慢
-        let easeInOutProgress = progress < 0.5
-            ? 2 * progress * progress
-            : 1 - pow(-2 * progress + 2, 2) / 2
-        
-        let currentRotation = totalDegrees * easeInOutProgress
-        let currentFlip = Int(currentRotation / 180)
-        let isFront = currentFlip % 2 == 0
-        
-        // 在翻转中间时降低透明度
-        let flipProgress = (currentRotation.truncatingRemainder(dividingBy: 180)) / 180
-        let distanceFromMiddle = abs(flipProgress - 0.5) * 2
-        let currentOpacity = 0.3 + (0.7 * distanceFromMiddle)
-        
-        // 更新状态
-        updateState(currentRotation, currentOpacity, isFront)
-        
-        if progress >= 1.0 {
-            timer.invalidate()
-            
-            // 在背面停留0.5秒
-            // 12次翻转 = 2160度（6圈整，正面角度），显示背面
-            updateState(totalDegrees, 1.0, false)
-            
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                // 缓慢翻转到正面（再转360度，确保是正面角度2520度）
-                withAnimation(.easeInOut(duration: 0.8)) {
-                    updateState(totalDegrees + 360, 1.0, true)
-                }
-                
-                // 动画完成，显示分享按钮
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.9) {
-                    withAnimation(.easeInOut(duration: 0.3)) {
-                        showShareButton()
-                    }
-                }
-            }
-        }
-    }
+    FlipAnimationDisplayLinkDriver(
+        totalFlips: totalFlips,
+        animationDuration: animationDuration,
+        updateState: updateState,
+        showShareButton: showShareButton
+    )
+    .start()
 }
 
 // MARK: - 裙装分享卡片容器视图（带快速翻转动画）

@@ -23,7 +23,7 @@ struct BookDetailView: View {
     @State private var pages: [Outfit] = []
 
     var sortedPages: [Outfit] {
-        pages.filter { $0.book?.persistentModelID == book.persistentModelID }.sorted {
+        pages.sorted {
             if $0.sortIndex == $1.sortIndex {
                 if $0.createdAt != $1.createdAt {
                     return $0.createdAt < $1.createdAt
@@ -87,7 +87,6 @@ struct BookDetailView: View {
     @State var showingBatchReplaceSheet = false
     @State var isProcessing = false
     @State var processingMessage = ""
-    @Query(filter: #Predicate<Clothing> { $0.deletedAt == nil }) private var allClothing: [Clothing]
     
     // 批量编辑相关状态
     @State var isBatchEditing = false
@@ -298,8 +297,6 @@ struct BookDetailView: View {
             .onAppear {
                 // 每次进入视图时重新获取书页数据
                 loadPages()
-                // 打印当前手帐的书页状态
-                printBookPagesStatus()
                 // 发送通知用于空间手帐前置任务引导（附带书页状态）
                 let hasPages = sortedPages.contains { $0.deletedAt == nil }
                 NotificationCenter.default.post(name: .ootdBookDetailOpened, object: nil, userInfo: ["hasPages": hasPages])
@@ -311,33 +308,14 @@ struct BookDetailView: View {
             }
     }
 
-    // 打印当前手帐的书页状态
-    func printBookPagesStatus() {
-        print("=== 手帐『\(book.title)』书页状态 ===")
-        print("手帐ID: \(book.id)")
-        print("书页数量: \(sortedPages.count)")
-        for page in sortedPages {
-            print("  - 书页: \(page.note), isDeleted: \(page.isDeleted), deletedAt: \(String(describing: page.deletedAt)), book: \(String(describing: page.book?.title ?? "nil"))")
-        }
-        print("========================")
-    }
-
     private func loadPages() {
-        // 先查询所有书页（包括已删除的），用于调试
-        let allDescriptor = FetchDescriptor<Outfit>(sortBy: [SortDescriptor(\Outfit.sortIndex)])
-        do {
-            let allPages = try modelContext.fetch(allDescriptor)
-            print("### LOAD: Total pages in database: \(allPages.count)")
-            for p in allPages {
-                print("### LOAD: Page '\(p.note)' - isDeleted:\(p.isDeleted), deletedAt:\(String(describing: p.deletedAt)), book:\(p.book?.title ?? "nil")")
-            }
-        } catch {
-            print("### LOAD: Failed to fetch all pages: \(error)")
-        }
-
-        // 正常查询只加载未删除的书页
+        let bookID = book.id
         let descriptor = FetchDescriptor<Outfit>(
-            predicate: #Predicate { $0.isDeleted == false },
+            predicate: #Predicate {
+                $0.book?.id == bookID &&
+                $0.isDeleted == false &&
+                $0.deletedAt == nil
+            },
             sortBy: [SortDescriptor(\Outfit.sortIndex)]
         )
         do {
@@ -723,6 +701,10 @@ struct BookDetailView: View {
             let descriptor = FetchDescriptor<CutoutItem>()
             let existingCutouts = (try? modelContext.fetch(descriptor)) ?? []
             let existingPaths = Set(existingCutouts.map { $0.imagePath })
+            let clothingDescriptor = FetchDescriptor<Clothing>(
+                predicate: #Predicate { $0.deletedAt == nil }
+            )
+            let allClothing = (try? modelContext.fetch(clothingDescriptor)) ?? []
 
             let itemsToProcess = allClothing.filter { clothing in
                 !clothing.imagePaths.isEmpty

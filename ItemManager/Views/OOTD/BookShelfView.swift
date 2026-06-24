@@ -45,9 +45,6 @@ struct BookShelfView: View {
     @State var showingNewBookAlert = false
     @State var newBookName = ""
     
-    // Migration
-    @Query(filter: #Predicate<Outfit> { $0.deletedAt == nil && $0.isDeleted == false }) private var allOutfits: [Outfit]
-    
     // Cover Picker
     @State var showingCoverPicker = false
     @State var selectedBookForCover: BookGroup?
@@ -83,6 +80,11 @@ struct BookShelfView: View {
     @State var isEditing = false
     @State var editableBooks: [BookGroup] = []
 
+    // Batch delete
+    @State var isBatchEditingBooks = false
+    @State var selectedBookIDs = Set<UUID>()
+    @State var showingBatchDeleteBooksAlert = false
+
     private var orderedBooks: [BookGroup] {
         books.sorted {
             if $0.sortIndex != $1.sortIndex {
@@ -97,153 +99,240 @@ struct BookShelfView: View {
     
     var body: some View {
         NavigationStack(path: $navigationPath) {
-            BookShelfContentView(
+            applyBookShelfModifiers(to: bookShelfContent)
+        }
+    }
+
+    private var bookShelfContent: some View {
+        BookShelfContentView(
+            viewMode: guardedViewModeBinding,
+            selectedBook: $selectedBook,
+            isSpatialBookSelected: $isSpatialBookSelected,
+            openingBook: $openingBook,
+            bookToDelete: $bookToDelete,
+            showingDeleteBookAlert: $showingDeleteBookAlert,
+            selectedBookForCover: $selectedBookForCover,
+            showingCoverPicker: $showingCoverPicker,
+            books: orderedBooks,
+            namespace: animationNamespace,
+            onBookTap: openBook,
+            onDelete: requestDeleteBook,
+            isEditing: $isEditing,
+            isBatchEditingBooks: $isBatchEditingBooks,
+            selectedBookIDs: $selectedBookIDs
+        )
+        .navigationTitle(navigationTitle)
+        .navigationBarTitleDisplayMode(.inline)
+        .navigationBarBackButtonHidden(hideBackButton)
+        .toolbarBackground(.hidden, for: .navigationBar)
+        .toolbar {
+            BookShelfToolbar(
                 viewMode: guardedViewModeBinding,
                 selectedBook: $selectedBook,
                 isSpatialBookSelected: $isSpatialBookSelected,
-                openingBook: $openingBook,
-                bookToDelete: $bookToDelete,
-                showingDeleteBookAlert: $showingDeleteBookAlert,
-                selectedBookForCover: $selectedBookForCover,
-                showingCoverPicker: $showingCoverPicker,
-                books: orderedBooks,
-                namespace: animationNamespace,
-                onBookTap: { book in
-                    withAnimation {
-                        openingBook = book
-                    }
-                },
-                onDelete: { book in
-                    bookToDelete = book
-                    showingDeleteBookAlert = true
-                },
-                isEditing: $isEditing
+                newBookName: $newBookName,
+                showingNewBookAlert: $showingNewBookAlert,
+                showingTrash: $showingTrash,
+                isEditing: $isEditing,
+                isBatchEditingBooks: $isBatchEditingBooks,
+                selectedBookIDs: $selectedBookIDs,
+                showingBatchDeleteBooksAlert: $showingBatchDeleteBooksAlert,
+                books: orderedBooks
             )
-            .navigationTitle(navigationTitle)
-            .navigationBarTitleDisplayMode(.inline)
-            .navigationBarBackButtonHidden(hideBackButton)
-            .toolbarBackground(.hidden, for: .navigationBar)
-            .toolbar {
-                BookShelfToolbar(
-                    viewMode: guardedViewModeBinding,
-                    selectedBook: $selectedBook,
-                    isSpatialBookSelected: $isSpatialBookSelected,
-                    newBookName: $newBookName,
-                    showingNewBookAlert: $showingNewBookAlert,
-                    showingTrash: $showingTrash,
-                    isEditing: $isEditing
-                )
-            }
-            .alert("新建手帐本".appLocalized, isPresented: $showingNewBookAlert) {
-                TextField("名称".appLocalized, text: $newBookName)
-                Button("取消".appLocalized, role: .cancel) {}
-                Button("创建".appLocalized) {
-                    let maxSortIndex = books.map { $0.sortIndex }.max() ?? -1
-                    let book = BookGroup(
-                        title: newBookName.isEmpty ? "新书本".appLocalized : newBookName,
-                        sortIndex: maxSortIndex + 1
-                    )
-                    book.lastModified = Date()
-                    modelContext.insert(book)
-                    try? modelContext.save()
-                    // 发送通知用于空间手帐引导
-                    NotificationCenter.default.post(name: .ootdBookCreated, object: nil)
-                }
-            }
+        }
+    }
+
+    private func applyBookShelfModifiers<Content: View>(to content: Content) -> some View {
+        let withNavigation = applyNavigationDestinations(to: content)
+        let withPresentation = applyPresentationModifiers(to: withNavigation)
+        return applyLifecycleHandlers(to: withPresentation)
+    }
+
+    private func applyNavigationDestinations<Content: View>(to content: Content) -> some View {
+        content
             .navigationDestination(for: BookGroup.self) { book in
                 BookDetailView(
                     book: book,
                     navigationPath: $navigationPath,
                     isSidebarVisible: .constant(true),
-                    onBack: {
-                        navigationPath.removeLast()
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-                            NotificationCenter.default.post(name: .ootdReturnedToShelfFromDetail, object: nil)
-                            notifyOotdShelfGuideState()
-                        }
-                    }
+                    onBack: handleBookDetailBack
                 )
-                .navigationBarBackButtonHidden(true) // 隐藏系统返回按钮，使用自定义的backButton
+                .navigationBarBackButtonHidden(true)
             }
             .navigationDestination(for: SpaceBookGroup.self) { book in
                 SpaceBookDetailView(book: book, isSidebarVisible: .constant(true))
-                    .navigationBarBackButtonHidden(true) // 隐藏系统返回按钮，使用自定义的返回按钮
+                    .navigationBarBackButtonHidden(true)
             }
             .navigationDestination(for: SpaceOutfit.self) { outfit in
-                if #available(iOS 18.0, *) {
-                    SpatialCanvasEditorView(
-                        spaceOutfit: outfit,
-                        currentBook: outfit.book,  // 传递当前书
-                        onSave: { updatedOutfit in
-                            // 保存后确保数据持久化到磁盘
-                            print("[BookShelf] 编辑器保存回调，outfit.id: \(updatedOutfit.id)")
-                        }
-                    )
-                } else {
-                    SpatialCanvasUnsupportedView()
-                }
+                spatialCanvasDestination(for: outfit)
+            }
+    }
+
+    private func applyPresentationModifiers<Content: View>(to content: Content) -> some View {
+        content
+            .alert("新建手帐本".appLocalized, isPresented: $showingNewBookAlert) {
+                TextField("名称".appLocalized, text: $newBookName)
+                Button("取消".appLocalized, role: .cancel) {}
+                Button("创建".appLocalized, action: createBook)
             }
             .sheet(isPresented: $showingTrash) {
-                RecycleBinView(initialTab: 1)
+                RecycleBinSheetView(initialTab: 1)
             }
             .photosPicker(isPresented: $showingCoverPicker, selection: $selectedCoverItem, matching: .images)
+            .alert("删除手帐".appLocalized, isPresented: $showingDeleteBookAlert) {
+                Button("取消".appLocalized, role: .cancel) { bookToDelete = nil }
+                Button("删除".appLocalized, role: .destructive, action: confirmDeleteBook)
+            } message: {
+                Text("确定要将「%@」移入回收站吗？".appLocalized(bookToDelete?.title ?? "此手帐".appLocalized))
+            }
+            .alert("确认批量删除".appLocalized, isPresented: $showingBatchDeleteBooksAlert) {
+                Button("取消".appLocalized, role: .cancel) {}
+                Button("删除".appLocalized, role: .destructive, action: confirmBatchDeleteBooks)
+            } message: {
+                Text("确定要将选中的 %d 个手帐及其中书页移入回收站吗？".appLocalized(selectedBookIDs.count))
+            }
+    }
+
+    private func applyLifecycleHandlers<Content: View>(to content: Content) -> some View {
+        content
             .onChange(of: selectedCoverItem) { _, newItem in
-                if let newItem, let book = selectedBookForCover {
-                    updateCover(for: book, with: newItem)
-                }
+                handleSelectedCoverItemChange(newItem)
             }
-            .onAppear {
-                if viewMode == .spatial && !FeatureUnlockManager.shared.isUnlocked(.spaceBook) {
-                    viewMode = .planar
-                }
-                performMigration()
-                // 初始化时同步选中状态
-                isBookSelected = selectedBook != nil
-                notifyOotdShelfGuideState()
-            }
+            .onAppear(perform: handleAppear)
             .onReceive(NotificationCenter.default.publisher(for: .ootdRestoreCompleted)) { _ in
-                performMigration(source: "restoreCompleted")
-                notifyOotdShelfGuideState()
+                handleRestoreCompleted()
             }
             .onChange(of: showingNewBookAlert) { _, isVisible in
-                NotificationCenter.default.post(
-                    name: .ootdBookCreationPromptVisibilityChanged,
-                    object: nil,
-                    userInfo: ["isVisible": isVisible]
-                )
+                postBookCreationPromptVisibilityChanged(isVisible: isVisible)
             }
-            .onChange(of: books) { _, _ in
-                notifyOotdShelfGuideState()
+            .onChange(of: books) { _, newBooks in
+                handleBooksChanged(newBooks)
             }
             .onChange(of: selectedBook) { _, newValue in
-                // 同步选中状态到外部
-                isBookSelected = newValue != nil
+                handleSelectedBookChanged(newValue)
             }
             .onChange(of: isSpatialBookSelected) { _, newValue in
-                // 同步空间书选中状态到外部
                 isSpaceBookSelected = newValue
+            }
+            .onChange(of: isEditing) { _, newValue in
+                handleEditingChanged(newValue)
+            }
+            .onChange(of: isBatchEditingBooks) { _, newValue in
+                handleBatchEditingChanged(newValue)
             }
             .onChange(of: navigateToBookID) { _, newBookID in
                 handleNavigateToBookChange(newBookID)
             }
-            .alert("删除手帐".appLocalized, isPresented: $showingDeleteBookAlert) {
-                Button("取消".appLocalized, role: .cancel) { bookToDelete = nil }
-                Button("删除".appLocalized, role: .destructive) {
-                    if let book = bookToDelete {
-                        deleteBook(book)
-                    }
-                    bookToDelete = nil
-                }
-            } message: {
-                Text("确定要将「%@」移入回收站吗？".appLocalized(bookToDelete?.title ?? "此手帐".appLocalized))
-            }
             .onDisappear {
-                NotificationCenter.default.post(
-                    name: .ootdBookCreationPromptVisibilityChanged,
-                    object: nil,
-                    userInfo: ["isVisible": false]
-                )
+                postBookCreationPromptVisibilityChanged(isVisible: false)
             }
+    }
+
+    private func openBook(_ book: BookGroup) {
+        selectedBook = book
+    }
+
+    private func requestDeleteBook(_ book: BookGroup) {
+        bookToDelete = book
+        showingDeleteBookAlert = true
+    }
+
+    private func handleBookDetailBack() {
+        navigationPath.removeLast()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+            NotificationCenter.default.post(name: .ootdReturnedToShelfFromDetail, object: nil)
+            notifyOotdShelfGuideState()
+        }
+    }
+
+    @ViewBuilder
+    private func spatialCanvasDestination(for outfit: SpaceOutfit) -> some View {
+        if #available(iOS 18.0, *) {
+            SpatialCanvasEditorView(
+                spaceOutfit: outfit,
+                currentBook: outfit.book,
+                onSave: { updatedOutfit in
+                    print("[BookShelf] 编辑器保存回调，outfit.id: \(updatedOutfit.id)")
+                }
+            )
+        } else {
+            SpatialCanvasUnsupportedView()
+        }
+    }
+
+    private func createBook() {
+        let maxSortIndex = books.map { $0.sortIndex }.max() ?? -1
+        let book = BookGroup(
+            title: newBookName.isEmpty ? "新书本".appLocalized : newBookName,
+            sortIndex: maxSortIndex + 1
+        )
+        book.lastModified = Date()
+        modelContext.insert(book)
+        try? modelContext.save()
+        NotificationCenter.default.post(name: .ootdBookCreated, object: nil)
+    }
+
+    private func confirmDeleteBook() {
+        if let book = bookToDelete {
+            deleteBook(book)
+        }
+        bookToDelete = nil
+    }
+
+    private func handleSelectedCoverItemChange(_ newItem: PhotosPickerItem?) {
+        if let newItem, let book = selectedBookForCover {
+            updateCover(for: book, with: newItem)
+        }
+    }
+
+    private func handleAppear() {
+        if viewMode == .spatial && !FeatureUnlockManager.shared.isUnlocked(.spaceBook) {
+            viewMode = .planar
+        }
+        repairPlanarOrphansIfNeeded(source: "onAppear")
+        isBookSelected = selectedBook != nil
+        notifyOotdShelfGuideState()
+    }
+
+    private func handleRestoreCompleted() {
+        performMigration(source: "restoreCompleted")
+        notifyOotdShelfGuideState()
+    }
+
+    private func postBookCreationPromptVisibilityChanged(isVisible: Bool) {
+        NotificationCenter.default.post(
+            name: .ootdBookCreationPromptVisibilityChanged,
+            object: nil,
+            userInfo: ["isVisible": isVisible]
+        )
+    }
+
+    private func handleBooksChanged(_ newBooks: [BookGroup]) {
+        notifyOotdShelfGuideState()
+        let activeIDs = Set(newBooks.map(\.id))
+        selectedBookIDs = selectedBookIDs.intersection(activeIDs)
+    }
+
+    private func handleSelectedBookChanged(_ newValue: BookGroup?) {
+        isBookSelected = newValue != nil
+        if newValue != nil {
+            isBatchEditingBooks = false
+            selectedBookIDs.removeAll()
+        }
+    }
+
+    private func handleEditingChanged(_ newValue: Bool) {
+        if newValue {
+            isBatchEditingBooks = false
+            selectedBookIDs.removeAll()
+        }
+    }
+
+    private func handleBatchEditingChanged(_ newValue: Bool) {
+        if newValue {
+            isEditing = false
+        } else {
+            selectedBookIDs.removeAll()
         }
     }
     
@@ -281,27 +370,14 @@ struct BookShelfView: View {
         )
     }
     
-    /// 直接查询获取有效书页数量（避免关系数据延迟加载问题）
-    private func fetchValidPageCount() -> Int {
-        let descriptor = FetchDescriptor<Outfit>(
-            predicate: #Predicate { $0.deletedAt == nil && $0.book?.deletedAt == nil }
-        )
-        do {
-            let pages = try modelContext.fetch(descriptor)
-            return pages.count
-        } catch {
-            print("[BookShelf] Failed to fetch page count: \(error)")
-            return 0
-        }
-    }
-
     /// 检查是否有用户手动创建的非默认手帐
     private func hasUserCreatedBooks() -> Bool {
         let defaultBookTitle = "默认手帐"
         // 查询非默认且未删除的手帐
-        let descriptor = FetchDescriptor<BookGroup>(
+        var descriptor = FetchDescriptor<BookGroup>(
             predicate: #Predicate { $0.deletedAt == nil && $0.title != defaultBookTitle }
         )
+        descriptor.fetchLimit = 1
         do {
             let userBooks = try modelContext.fetch(descriptor)
             return !userBooks.isEmpty
@@ -315,13 +391,14 @@ struct BookShelfView: View {
     private func hasUserCreatedPages() -> Bool {
         let defaultBookTitle = "默认手帐"
         // 查询属于非默认手帐且未删除的书页
-        let descriptor = FetchDescriptor<Outfit>(
+        var descriptor = FetchDescriptor<Outfit>(
             predicate: #Predicate {
                 $0.deletedAt == nil &&
                 $0.book?.deletedAt == nil &&
                 $0.book?.title != defaultBookTitle
             }
         )
+        descriptor.fetchLimit = 1
         do {
             let userPages = try modelContext.fetch(descriptor)
             return !userPages.isEmpty
@@ -351,6 +428,40 @@ struct BookShelfView: View {
             print("BookShelfView: Failed to save deletion: \(error)")
         }
     }
+
+    private func confirmBatchDeleteBooks() {
+        let booksToDelete = orderedBooks.filter { selectedBookIDs.contains($0.id) }
+        guard !booksToDelete.isEmpty else { return }
+
+        var deletedPageIDs: [UUID] = []
+        let deletionDate = Date()
+
+        for book in booksToDelete {
+            let pages = book.pages ?? []
+            book.isDeleted = true
+            book.deletedAt = deletionDate
+            book.lastModified = deletionDate
+
+            for page in pages {
+                page.isDeleted = true
+                page.deletedAt = deletionDate
+                page.lastModified = deletionDate
+                deletedPageIDs.append(page.id)
+            }
+        }
+
+        do {
+            try modelContext.save()
+            DeleteTracker.shared.recordDeletedBookGroups(ids: booksToDelete.map(\.id))
+            DeleteTracker.shared.recordDeletedOutfits(ids: deletedPageIDs)
+        } catch {
+            print("BookShelfView: Failed to save batch deletion: \(error)")
+        }
+
+        selectedBookIDs.removeAll()
+        isBatchEditingBooks = false
+        notifyOotdShelfGuideState()
+    }
     
     private func updateCover(for book: BookGroup, with item: PhotosPickerItem) {
         Task {
@@ -374,10 +485,11 @@ struct BookShelfView: View {
             context: modelContext,
             source: source
         )
+        let orphanOutfits = fetchPlanarOrphanOutfits()
         let orphanReport = OOTDOrphanPageRepairService.repairPlanarOrphans(
             context: modelContext,
             activeBooks: orderedBooks,
-            allOutfits: allOutfits,
+            allOutfits: orphanOutfits,
             source: source
         )
         if identityReport.didChange || orphanReport.movedToDefaultBook > 0 || orphanReport.createdDefaultBook {
@@ -386,23 +498,45 @@ struct BookShelfView: View {
                 source: "\(source)-post-orphan"
             )
         }
-
-        // 打印默认手帐的书页状态
-        printDefaultBookPagesStatus()
     }
 
-    // 打印默认手帐的书页状态
-    func printDefaultBookPagesStatus() {
-        if let defaultBook = books.first(where: { $0.title == "默认手帐" }) {
-            print("=== 默认手帐书页状态 ===")
-            print("手帐ID: \(defaultBook.id)")
-            print("书页数量: \(defaultBook.pages?.count ?? 0)")
-            for page in defaultBook.pages ?? [] {
-                print("  - 书页: \(page.note), isDeleted: \(page.isDeleted), deletedAt: \(String(describing: page.deletedAt))")
-            }
-            print("========================")
+    private func repairPlanarOrphansIfNeeded(source: String) {
+        let orphanOutfits = fetchPlanarOrphanOutfits(fetchLimit: 1)
+        guard !orphanOutfits.isEmpty else { return }
+
+        let repairOutfits = fetchPlanarOrphanOutfits()
+        let orphanReport = OOTDOrphanPageRepairService.repairPlanarOrphans(
+            context: modelContext,
+            activeBooks: orderedBooks,
+            allOutfits: repairOutfits,
+            source: source
+        )
+        if orphanReport.movedToDefaultBook > 0 || orphanReport.createdDefaultBook {
+            notifyOotdShelfGuideState()
         }
     }
+
+    private func fetchPlanarOrphanOutfits(fetchLimit: Int? = nil) -> [Outfit] {
+        var descriptor = FetchDescriptor<Outfit>(
+            predicate: #Predicate {
+                $0.book == nil &&
+                $0.isDeleted == false &&
+                $0.deletedAt == nil
+            },
+            sortBy: [SortDescriptor(\Outfit.createdAt)]
+        )
+        if let fetchLimit {
+            descriptor.fetchLimit = fetchLimit
+        }
+
+        do {
+            return try modelContext.fetch(descriptor)
+        } catch {
+            print("[BookShelf] Failed to fetch orphan OOTD pages: \(error)")
+            return []
+        }
+    }
+
 }
 
 private struct SpatialCanvasUnsupportedView: View {

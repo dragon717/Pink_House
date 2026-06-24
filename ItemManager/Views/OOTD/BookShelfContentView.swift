@@ -31,6 +31,8 @@ struct BookShelfContentView: View {
     
     // Custom Sort Editing
     @Binding var isEditing: Bool
+    @Binding var isBatchEditingBooks: Bool
+    @Binding var selectedBookIDs: Set<UUID>
     @State private var editableBooks: [BookGroup] = []
     @State private var draggingItem: BookGroup?
     
@@ -95,16 +97,14 @@ struct BookShelfContentView: View {
                 // Grid Layout (Bookshelf Mode)
                 bookGridContent
             }
-            
-            // Animation Overlay
+        }
+        .fullScreenCover(isPresented: openingAnimationPresented) {
             if let book = openingBook {
                 BookOpeningAnimationView(book: book) {
-                    withAnimation {
-                        selectedBook = book
-                        openingBook = nil
-                    }
+                    selectedBook = book
+                    openingBook = nil
                 }
-                .zIndex(100)
+                .presentationBackground(.clear)
             }
         }
         .onChange(of: isEditing) { _, newValue in
@@ -125,19 +125,34 @@ struct BookShelfContentView: View {
             }
         }
     }
+
+    private var openingAnimationPresented: Binding<Bool> {
+        Binding(
+            get: { openingBook != nil },
+            set: { isPresented in
+                if !isPresented {
+                    openingBook = nil
+                }
+            }
+        )
+    }
     
     @ViewBuilder
     private var bookGridContent: some View {
-        ScrollView {
+        Group {
             if isEditing {
-                // Editing Mode: Draggable Grid
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 160), spacing: 24)], spacing: 32) {
-                    ForEach(editableBooks, id: \.persistentModelID) { book in
-                        editingBookCell(for: book)
+                ScrollView {
+                    // Editing Mode: Draggable Grid
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 160), spacing: 24)], spacing: 32) {
+                        ForEach(editableBooks, id: \.persistentModelID) { book in
+                            editingBookCell(for: book)
+                        }
                     }
+                    .padding(24)
+                    .animation(.default, value: editableBooks)
                 }
-                .padding(24)
-                .animation(.default, value: editableBooks)
+            } else if isBatchEditingBooks {
+                batchBookGridContent
             } else {
                 // Normal Mode: Navigation Grid
                 BookGridView(
@@ -171,6 +186,42 @@ struct BookShelfContentView: View {
                 bookToRename = nil
             }
         }
+    }
+
+    private var batchBookGridContent: some View {
+        ScrollView {
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 160), spacing: 24)], spacing: 32) {
+                ForEach(books, id: \.persistentModelID) { book in
+                    batchEditingBookCell(for: book)
+                }
+            }
+            .padding(24)
+            .animation(.default, value: selectedBookIDs)
+        }
+    }
+
+    private func batchEditingBookCell(for book: BookGroup) -> some View {
+        let isSelected = selectedBookIDs.contains(book.id)
+
+        return ThreeDBookView(book: book, namespace: namespace)
+            .overlay(alignment: .topLeading) {
+                ThemeSkinSelectionBadge(isSelected: isSelected)
+                    .padding(4)
+            }
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(isSelected ? Color.pink : Color.clear, lineWidth: 3)
+            )
+            .contentShape(Rectangle())
+            .onTapGesture {
+                withAnimation(.spring(response: 0.2)) {
+                    if isSelected {
+                        selectedBookIDs.remove(book.id)
+                    } else {
+                        selectedBookIDs.insert(book.id)
+                    }
+                }
+            }
     }
     
     @ViewBuilder
