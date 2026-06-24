@@ -9,7 +9,7 @@ struct OOTDEditorView: View {
     @Environment(\.dismiss) private var dismiss
     
     // 获取同一本书的所有书页（用于翻页导航）
-    @Query(filter: #Predicate<Outfit> { $0.isDeleted == false }, sort: \Outfit.sortIndex) private var allPages: [Outfit]
+    @Query private var bookPages: [Outfit]
     
     // 页面切换回调
     var onPageChange: ((Outfit) -> Void)?
@@ -41,7 +41,6 @@ struct OOTDEditorView: View {
     @State private var showingBatchConfirmation = false
     @State private var showingRepairConfirmation = false
     @State private var showingBatchReplaceSheet = false
-    @Query(filter: #Predicate<Clothing> { $0.deletedAt == nil }) private var allClothing: [Clothing]
     
     // 编辑底图相关状态
     @State private var showingBackgroundPicker = false
@@ -61,6 +60,26 @@ struct OOTDEditorView: View {
         self.onPageChange = onPageChange
         self.initialToolbarVisible = initialToolbarVisible
         self.initialStickerLibraryVisible = initialStickerLibraryVisible
+        if let bookID = outfit.book?.id {
+            _bookPages = Query(
+                filter: #Predicate<Outfit> { page in
+                    page.book?.id == bookID &&
+                    page.isDeleted == false &&
+                    page.deletedAt == nil
+                },
+                sort: \Outfit.sortIndex
+            )
+        } else {
+            let outfitID = outfit.id
+            _bookPages = Query(
+                filter: #Predicate<Outfit> { page in
+                    page.id == outfitID &&
+                    page.isDeleted == false &&
+                    page.deletedAt == nil
+                },
+                sort: \Outfit.sortIndex
+            )
+        }
         // 初始化 State 值
         _isToolbarVisible = State(initialValue: initialToolbarVisible)
         _isStickerLibraryVisible = State(initialValue: initialStickerLibraryVisible)
@@ -69,11 +88,6 @@ struct OOTDEditorView: View {
     // 当前书页索引
     private var currentPageIndex: Int {
         bookPages.firstIndex { $0.id == outfit.id } ?? 0
-    }
-    
-    // 当前书的所有书页
-    private var bookPages: [Outfit] {
-        allPages.filter { $0.book?.id == outfit.book?.id }
     }
     
     // 是否有上一页
@@ -673,6 +687,10 @@ struct OOTDEditorView: View {
             let descriptor = FetchDescriptor<CutoutItem>()
             let existingCutouts = (try? modelContext.fetch(descriptor)) ?? []
             let existingPaths = Set(existingCutouts.map { $0.imagePath })
+            let clothingDescriptor = FetchDescriptor<Clothing>(
+                predicate: #Predicate { $0.deletedAt == nil }
+            )
+            let allClothing = (try? modelContext.fetch(clothingDescriptor)) ?? []
 
             let itemsToProcess = allClothing.filter { clothing in
                 !clothing.imagePaths.isEmpty

@@ -7,6 +7,15 @@
 - 在进行 iOS 开发时，可以按任务需要运行 `xcodebuild` 构建、测试或模拟器验收；运行后需在结果中记录命令、通过/失败状态和验证边界。若用户明确说本次不跑构建，则遵守该次约束。
 - 进行鸿蒙 / 安卓开发时，用命令行编译。
 
+## Xcode 27 beta / SDK 27
+
+- 使用 Xcode beta 时默认显式设置 `DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer`，不要为单次构建改全局 `xcode-select`。
+- 本机核验时间：2026-06-24。`/Applications/Xcode-beta.app` 为 Xcode 27.0 build `27A5194q`，带 iOS/iPhoneSimulator 27.0 SDK 与 Swift 6.4；当时已安装模拟器 runtime 只有 iOS 17.5 / 18.2 / 18.6 / 26.4 / 26.5，未安装 iOS 27 runtime。
+- Apple 官方 Xcode agent skills 用 Xcode 导出，不把导出副本当长期 source of truth：`DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer xcrun agent skills export --output-dir <dir> --replace-existing`。
+- Xcode 27 导出的官方 skills 包括：`swiftui-whats-new-27`、`swiftui-specialist`、`uikit-app-modernization`、`test-modernizer`、`device-interaction`、`audit-xcode-security-settings`、`c-bounds-safety`。
+- SDK 27 SwiftUI 变更优先查 `swiftui-whats-new-27` / `swiftui-specialist`：尤其是 `@State` macro、`ContentBuilder`、reorderable、AsyncImage 缓存、toolbar、item-binding alert/dialog、swipe actions、Document API。
+- iOS 27 UIKit 适配优先查 `uikit-app-modernization`：不要用 `UIScreen.main`、interface orientation、user interface idiom 做布局依据；优先 scene/window、trait collection、size class、view bounds；用最新 SDK 构建时检查 scene lifecycle。
+
 ## 编码规则
 
 - 始终按 UTF-8 读写和解析文件、命令输出、日志、JSON 与路径，尤其是包含中文的路径。

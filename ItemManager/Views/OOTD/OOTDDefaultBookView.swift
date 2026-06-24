@@ -24,7 +24,7 @@ extension Notification.Name {
 struct OOTDDefaultBookView: View {
     @Environment(\.modelContext) private var modelContext
     @Query(filter: #Predicate<BookGroup> { $0.deletedAt == nil }, sort: \BookGroup.sortIndex, order: .forward) private var books: [BookGroup]
-    @Query(filter: #Predicate<Outfit> { $0.isDeleted == false }, sort: \Outfit.sortIndex) private var allOutfits: [Outfit]
+    @Query private var magicStickerPages: [Outfit]
 
     @State private var navigationPath = NavigationPath()
 
@@ -40,11 +40,22 @@ struct OOTDDefaultBookView: View {
     // 获取魔法贴纸专用书页，不复用默认手帐中的其他书页
     private var magicStickerPage: Outfit? {
         guard let book = defaultBook else { return nil }
-        return allOutfits
+        return magicStickerPages
             .filter { $0.book?.id == book.id }
-            .filter { $0.note == MagicStickerDefaults.pageTitle }
             .sorted { $0.sortIndex < $1.sortIndex }
             .first
+    }
+
+    init() {
+        let pageTitle = MagicStickerDefaults.pageTitle
+        _magicStickerPages = Query(
+            filter: #Predicate<Outfit> { page in
+                page.isDeleted == false &&
+                page.deletedAt == nil &&
+                page.note == pageTitle
+            },
+            sort: \Outfit.sortIndex
+        )
     }
 
     var body: some View {

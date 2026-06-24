@@ -5,12 +5,6 @@ import SwiftData
 struct OOTDCutoutListView: View {
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \CutoutItem.timestamp, order: .reverse) private var cutouts: [CutoutItem]
-    // Fetch all clothings to build a map for lookup (Performance trade-off: Fetching all is better than N+1 queries)
-    @Query(filter: #Predicate<Clothing> { $0.deletedAt == nil }) private var allClothings: [Clothing]
-    
-    private var clothingMap: [UUID: Clothing] {
-        ClothingDuplicateRepairService.preferredMap(from: allClothings)
-    }
     
     @Binding var isExpanded: Bool
     var isLandscape: Bool = false
@@ -79,14 +73,7 @@ struct OOTDCutoutListView: View {
     
     private func updateDisplayItems() {
         var result = cutouts
-        
-        // Use a lightweight lookup for clothing info since we decoupled the relationship
-        // We can't query all clothings every time, so we might need a strategy.
-        // For now, let's fetch all clothings once or rely on an injected map?
-        // Actually, for displayItems, we need to know the linked clothing's name/type.
-        // Since we are inside a View, we can use a Query to get all clothings and build a map.
-        // But @Query is already there in other views. Let's add it here.
-        
+
         // Filter by Category
         if selectedCategory != "全部" {
             result = result.filter { item in
@@ -99,30 +86,26 @@ struct OOTDCutoutListView: View {
                     return true
                 }
                 
-                // 救援逻辑：利用关联服饰的名称/类型修正分类显示
-                // Need to find the clothing by ID
-                if ["小物", "未分类"].contains(item.category), 
-                   let clothingID = item.linkedClothingID,
-                   let clothing = clothingMap[clothingID] {
+                // 救援逻辑：利用 CutoutItem 缓存的服饰名称修正分类显示
+                if ["小物", "未分类"].contains(item.category),
+                   let clothingName = item.clothingName?.lowercased() {
                     
-                    let nameInfo = (clothing.name + clothing.types).lowercased()
-                    
-                    if selectedCategory == "裙装" && (nameInfo.contains("裙") || nameInfo.contains("jsk") || nameInfo.contains("op") || nameInfo.contains("dress")) {
+                    if selectedCategory == "裙装" && (clothingName.contains("裙") || clothingName.contains("jsk") || clothingName.contains("op") || clothingName.contains("dress")) {
                         return true
                     }
-                    if selectedCategory == "外套" && (nameInfo.contains("外套") || nameInfo.contains("开衫") || nameInfo.contains("罩衫") || nameInfo.contains("披肩") || nameInfo.contains("cardigan") || nameInfo.contains("bolero")) {
+                    if selectedCategory == "外套" && (clothingName.contains("外套") || clothingName.contains("开衫") || clothingName.contains("罩衫") || clothingName.contains("披肩") || clothingName.contains("cardigan") || clothingName.contains("bolero")) {
                         return true
                     }
-                    if selectedCategory == "上衣" && (nameInfo.contains("上衣") || nameInfo.contains("内搭") || nameInfo.contains("打底") || nameInfo.contains("短袖") || nameInfo.contains("长袖") || nameInfo.contains("衬衫") || nameInfo.contains("shirt") || nameInfo.contains("blouse") || nameInfo.contains("tee") || nameInfo.contains("top")) {
+                    if selectedCategory == "上衣" && (clothingName.contains("上衣") || clothingName.contains("内搭") || clothingName.contains("打底") || clothingName.contains("短袖") || clothingName.contains("长袖") || clothingName.contains("衬衫") || clothingName.contains("shirt") || clothingName.contains("blouse") || clothingName.contains("tee") || clothingName.contains("top")) {
                         return true
                     }
-                    if selectedCategory == "袜子" && (nameInfo.contains("袜") || nameInfo.contains("sock")) {
+                    if selectedCategory == "袜子" && (clothingName.contains("袜") || clothingName.contains("sock")) {
                         return true
                     }
-                    if selectedCategory == "鞋子" && (nameInfo.contains("鞋") || nameInfo.contains("靴") || nameInfo.contains("shoe") || nameInfo.contains("boot")) {
+                    if selectedCategory == "鞋子" && (clothingName.contains("鞋") || clothingName.contains("靴") || clothingName.contains("shoe") || clothingName.contains("boot")) {
                         return true
                     }
-                    if selectedCategory == "玩偶" && (nameInfo.contains("玩偶") || nameInfo.contains("娃") || nameInfo.contains("toy") || nameInfo.contains("公仔") || nameInfo.contains("手办") || nameInfo.contains("doll") || nameInfo.contains("毛绒") || nameInfo.contains("bear") || nameInfo.contains("rabbit") || nameInfo.contains("熊")) {
+                    if selectedCategory == "玩偶" && (clothingName.contains("玩偶") || clothingName.contains("娃") || clothingName.contains("toy") || clothingName.contains("公仔") || clothingName.contains("手办") || clothingName.contains("doll") || clothingName.contains("毛绒") || clothingName.contains("bear") || clothingName.contains("rabbit") || clothingName.contains("熊")) {
                         return true
                     }
                 }
@@ -145,17 +128,12 @@ struct OOTDCutoutListView: View {
         if !searchText.isEmpty {
             result = result.filter { item in
                 let categoryMatch = item.category.localizedCaseInsensitiveContains(searchText)
-                var clothingNameMatch = false
-                if let clothingID = item.linkedClothingID, let clothing = clothingMap[clothingID] {
-                    clothingNameMatch = clothing.name.localizedCaseInsensitiveContains(searchText)
-                }
+                let clothingNameMatch = item.clothingName?.localizedCaseInsensitiveContains(searchText) ?? false
                 return categoryMatch || clothingNameMatch
             }
         }
         
-        withAnimation {
-            displayItems = result
-        }
+        displayItems = result
     }
     
     // 根据横屏状态和展开状态计算网格列数
@@ -742,8 +720,7 @@ struct OOTDCutoutListView: View {
     private func reprocessCutout(_ item: CutoutItem) {
         // 1. Check if linked clothing exists and has images
         guard let clothingID = item.linkedClothingID,
-              let clothing = clothingMap[clothingID],
-              let firstImagePath = clothing.imagePaths.first else {
+              let firstImagePath = fetchOriginalImagePath(for: clothingID) else {
             alertMessage = "找不到关联的原图，无法重新抠图。\n(仅支持通过关联服饰创建的抠图)".appLocalized
             showAlert = true
             return
@@ -772,6 +749,14 @@ struct OOTDCutoutListView: View {
             
             processingItem = nil
         }
+    }
+
+    private func fetchOriginalImagePath(for clothingID: UUID) -> String? {
+        var descriptor = FetchDescriptor<Clothing>(
+            predicate: #Predicate { $0.id == clothingID && $0.deletedAt == nil }
+        )
+        descriptor.fetchLimit = 1
+        return (try? modelContext.fetch(descriptor))?.first?.imagePaths.first
     }
     
     private func deleteCutout(_ item: CutoutItem) {

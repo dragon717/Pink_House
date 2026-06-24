@@ -229,7 +229,8 @@ struct BookShelfView: View {
     }
 
     private func openBook(_ book: BookGroup) {
-        selectedBook = book
+        guard openingBook == nil else { return }
+        openingBook = book
     }
 
     private func requestDeleteBook(_ book: BookGroup) {

@@ -10,7 +10,6 @@ struct BookDetailView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.colorScheme) private var colorScheme
     @StateObject var guideManager = AppFirstLaunchGuideManager.shared
-    @Query(filter: #Predicate<BookGroup> { $0.deletedAt == nil }) private var allBooks: [BookGroup]
 
     @Binding var isSidebarVisible: Bool
     var onBack: (() -> Void)?
@@ -125,7 +124,6 @@ struct BookDetailView: View {
                         }
                     }
                     .padding()
-                    .animation(.default, value: sortedPages)
                 }
             }
         }

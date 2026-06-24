@@ -6,10 +6,6 @@ struct BatchReplaceCutoutView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
     
-    // Data Source
-    @Query(filter: #Predicate<Clothing> { $0.deletedAt == nil }) private var allClothing: [Clothing]
-    @Query private var allCutouts: [CutoutItem]
-    
     // View State
     @State private var items: [ReplaceableItem] = []
     @State private var isLoading = true
@@ -112,6 +108,11 @@ struct BatchReplaceCutoutView: View {
             // We want the cutout that is linked to the clothing
             
             var candidates: [ReplaceableItem] = []
+            let allCutouts = (try? modelContext.fetch(FetchDescriptor<CutoutItem>())) ?? []
+            let clothingDescriptor = FetchDescriptor<Clothing>(
+                predicate: #Predicate { $0.deletedAt == nil }
+            )
+            let allClothing = (try? modelContext.fetch(clothingDescriptor)) ?? []
             
             // Create a lookup for cutouts by linkedClothing
             let clothingMap = Dictionary(grouping: allCutouts.filter { $0.linkedClothingID != nil }) { $0.linkedClothingID! }

@@ -27,7 +27,7 @@ struct BookShelfContentView: View {
     let onDelete: (BookGroup) -> Void
     
     // Sidebar visibility for planar mode
-    @State private var isSidebarVisible = true
+    @State private var isSidebarVisible = false
     
     // Custom Sort Editing
     @Binding var isEditing: Bool
