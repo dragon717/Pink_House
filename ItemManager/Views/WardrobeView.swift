@@ -522,6 +522,7 @@ struct WardrobeView: View {
     @Binding var isEditing: Bool
     @Environment(\.customBottomFloatingLift) private var customBottomFloatingLift
     @Environment(\.customBottomNavigationAvoidanceInset) private var customBottomNavigationAvoidanceInset
+    @Environment(\.isRoutePageActive) private var isRoutePageActive
     @Environment(\.modelContext) private var modelContext
     @Environment(ThemeManager.self) private var themeManager
     @Environment(\.colorScheme) private var colorScheme
@@ -861,15 +862,21 @@ struct WardrobeView: View {
     }
     
     var body: some View {
-        applyAlerts(to:
-            applySheets(to:
-                applyBottomSelectionBar(to:
-                    applyStateChangeHandlers(to: baseWardrobeView)
+        Group {
+            if isRoutePageActive {
+                applyAlerts(to:
+                    applySheets(to:
+                        applyBottomSelectionBar(to:
+                            applyStateChangeHandlers(to: baseWardrobeView)
+                        )
+                    )
                 )
-            )
-        )
-        .floatingPetHidden(.wardrobeEditing, isActive: isSelectionMode || isEditing)
-        .floatingPetHidden(.presentationActive, isActive: isFloatingPetPresentationActive)
+            } else {
+                Color.clear
+            }
+        }
+        .floatingPetHidden(.wardrobeEditing, isActive: isRoutePageActive && (isSelectionMode || isEditing))
+        .floatingPetHidden(.presentationActive, isActive: isRoutePageActive && isFloatingPetPresentationActive)
     }
 
     private var isFloatingPetPresentationActive: Bool {

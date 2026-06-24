@@ -22,15 +22,7 @@ struct BookDetailView: View {
     @State private var pages: [Outfit] = []
 
     var sortedPages: [Outfit] {
-        pages.sorted {
-            if $0.sortIndex == $1.sortIndex {
-                if $0.createdAt != $1.createdAt {
-                    return $0.createdAt < $1.createdAt
-                }
-                return String(describing: $0.persistentModelID) < String(describing: $1.persistentModelID)
-            }
-            return $0.sortIndex < $1.sortIndex
-        }
+        pages
     }
 
     var deleteConfirmationMessage: String {
@@ -317,12 +309,22 @@ struct BookDetailView: View {
             sortBy: [SortDescriptor(\Outfit.sortIndex)]
         )
         do {
-            pages = try modelContext.fetch(descriptor)
+            pages = try modelContext.fetch(descriptor).sorted(by: stablePageOrder)
             print("BookDetailView: Loaded \(pages.count) pages")
         } catch {
             print("BookDetailView: Failed to load pages: \(error)")
             pages = []
         }
+    }
+
+    private func stablePageOrder(_ lhs: Outfit, _ rhs: Outfit) -> Bool {
+        if lhs.sortIndex == rhs.sortIndex {
+            if lhs.createdAt != rhs.createdAt {
+                return lhs.createdAt < rhs.createdAt
+            }
+            return String(describing: lhs.persistentModelID) < String(describing: rhs.persistentModelID)
+        }
+        return lhs.sortIndex < rhs.sortIndex
     }
     
     private func beginBatchPhotoProcessingIfNeeded() {

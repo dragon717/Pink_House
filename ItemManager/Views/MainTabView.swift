@@ -17,6 +17,10 @@ private struct IsRouteTransitionCoolingDownKey: EnvironmentKey {
     static let defaultValue: Bool = false
 }
 
+private struct IsRoutePageActiveKey: EnvironmentKey {
+    static let defaultValue: Bool = true
+}
+
 enum LegacyCustomTabBarLayout {
     static let barHeight: CGFloat = 56
     static let bottomSpacingWithSafeArea: CGFloat = 2
@@ -46,6 +50,11 @@ extension EnvironmentValues {
     var isRouteTransitionCoolingDown: Bool {
         get { self[IsRouteTransitionCoolingDownKey.self] }
         set { self[IsRouteTransitionCoolingDownKey.self] = newValue }
+    }
+
+    var isRoutePageActive: Bool {
+        get { self[IsRoutePageActiveKey.self] }
+        set { self[IsRoutePageActiveKey.self] = newValue }
     }
 
     var customBottomFloatingLift: CGFloat {
@@ -114,9 +123,14 @@ struct SmallWorldContainerView: View {
     @Binding var homeTab: HomeTab
     @Binding var destination: SmallWorldDestination
     @Binding var isPlayingOpeningAnimation: Bool
+    @Environment(\.isRoutePageActive) private var isRoutePageActive
     
     var body: some View {
-        content
+        if isRoutePageActive {
+            content
+        } else {
+            Color.clear
+        }
     }
     
     @ViewBuilder
@@ -339,6 +353,7 @@ struct LegacyTabView: View {
                     }
                     selectedTab = tab
                 }
+                tabNavigationManager.navigateToTab = nil
             }
         }
         .onReceive(tabNavigationManager.$navigateToHomeTab) { homeTab in
@@ -487,6 +502,7 @@ struct LegacyTabView: View {
         let isActive = isActiveTab(tab)
 
         return content()
+            .environment(\.isRoutePageActive, isActive)
             .environment(\.isSimulationActive, isActive && !isRouteTransitionCoolingDown)
             .environment(\.isRouteTransitionCoolingDown, isRouteTransitionCoolingDown)
             .opacity(isActive ? 1 : 0)
@@ -745,73 +761,78 @@ struct SmallWorldContainerViewLegacy: View {
     @Binding var homeTab: HomeTab
     @Binding var destination: SmallWorldDestination
     @Binding var isPlayingOpeningAnimation: Bool
+    @Environment(\.isRoutePageActive) private var isRoutePageActive
 
     var body: some View {
-        switch destination {
-        case .menu:
-            SmallWorldView(
-                selectedTab: $selectedTab,
-                homeTab: $homeTab,
-                destination: $destination,
-                isPlayingOpeningAnimation: $isPlayingOpeningAnimation
-            )
-        case .ootd:
-            OOTDViewWithBackButtonLegacy(
-                selectedTab: $selectedTab,
-                homeTab: $homeTab,
-                destination: $destination
-            )
-        case .ootdDefaultBook:
-            OOTDDefaultBookViewWithBackButtonLegacy(
-                selectedTab: $selectedTab,
-                homeTab: $homeTab,
-                destination: $destination
-            )
-        case .pet:
-            PetHomeViewWithBackButtonLegacy(
-                selectedTab: $selectedTab,
-                homeTab: $homeTab,
-                destination: $destination
-            )
-        case .wealth(let initialTab):
-            WealthViewWithBackButtonLegacy(
-                selectedTab: $selectedTab,
-                homeTab: $homeTab,
-                destination: $destination,
-                initialTab: initialTab
-            )
-        case .calendar:
-            DreamDressCalendarViewWithBackButtonLegacy(
-                selectedTab: $selectedTab,
-                homeTab: $homeTab,
-                destination: $destination
-            )
-        case .bigWorld:
-            BigWorldViewWithBackButtonLegacy(
-                selectedTab: $selectedTab,
-                homeTab: $homeTab,
-                destination: $destination
-            )
-        case .perler:
-            PerlerBeadPatternListViewWithBackButtonLegacy(
-                selectedTab: $selectedTab,
-                homeTab: $homeTab,
-                destination: $destination
-            )
-        case .recycleBin:
-            RecycleBinViewWithBackButtonLegacy(
-                selectedTab: $selectedTab,
-                homeTab: $homeTab,
-                destination: $destination
-            )
-        case .dressStock:
-            DressStockMarketViewWithBackButtonLegacy(
-                selectedTab: $selectedTab,
-                homeTab: $homeTab,
-                destination: $destination
-            )
-        case .wardrobe, .depositPlan:
-            EmptyView()
+        if isRoutePageActive {
+            switch destination {
+            case .menu:
+                SmallWorldView(
+                    selectedTab: $selectedTab,
+                    homeTab: $homeTab,
+                    destination: $destination,
+                    isPlayingOpeningAnimation: $isPlayingOpeningAnimation
+                )
+            case .ootd:
+                OOTDViewWithBackButtonLegacy(
+                    selectedTab: $selectedTab,
+                    homeTab: $homeTab,
+                    destination: $destination
+                )
+            case .ootdDefaultBook:
+                OOTDDefaultBookViewWithBackButtonLegacy(
+                    selectedTab: $selectedTab,
+                    homeTab: $homeTab,
+                    destination: $destination
+                )
+            case .pet:
+                PetHomeViewWithBackButtonLegacy(
+                    selectedTab: $selectedTab,
+                    homeTab: $homeTab,
+                    destination: $destination
+                )
+            case .wealth(let initialTab):
+                WealthViewWithBackButtonLegacy(
+                    selectedTab: $selectedTab,
+                    homeTab: $homeTab,
+                    destination: $destination,
+                    initialTab: initialTab
+                )
+            case .calendar:
+                DreamDressCalendarViewWithBackButtonLegacy(
+                    selectedTab: $selectedTab,
+                    homeTab: $homeTab,
+                    destination: $destination
+                )
+            case .bigWorld:
+                BigWorldViewWithBackButtonLegacy(
+                    selectedTab: $selectedTab,
+                    homeTab: $homeTab,
+                    destination: $destination
+                )
+            case .perler:
+                PerlerBeadPatternListViewWithBackButtonLegacy(
+                    selectedTab: $selectedTab,
+                    homeTab: $homeTab,
+                    destination: $destination
+                )
+            case .recycleBin:
+                RecycleBinViewWithBackButtonLegacy(
+                    selectedTab: $selectedTab,
+                    homeTab: $homeTab,
+                    destination: $destination
+                )
+            case .dressStock:
+                DressStockMarketViewWithBackButtonLegacy(
+                    selectedTab: $selectedTab,
+                    homeTab: $homeTab,
+                    destination: $destination
+                )
+            case .wardrobe, .depositPlan:
+                EmptyView()
+            }
+        } else {
+            Color.clear
         }
     }
 }

@@ -46,11 +46,11 @@ class TabNavigationManager: ObservableObject {
         case .smallWorld(let smallWorldDestination):
             // 重置内部导航标记，因为这是从外部进入House
             isNavigatingInsideSmallWorld = false
-            navigateToTab = 1
             navigateToSmallWorld = smallWorldDestination
+            navigateToTab = 1
         case .wardrobe(let homeTab):
-            navigateToTab = 0
             navigateToHomeTab = homeTab
+            navigateToTab = 0
         }
     }
 
@@ -69,9 +69,9 @@ class TabNavigationManager: ObservableObject {
     }
 
     func navigateToDepositNotificationClothing(_ clothingID: UUID) {
-        navigateToTab = 0
         navigateToHomeTab = .depositPlan
         navigateToClothingID = clothingID
+        navigateToTab = 0
     }
     
     // 记录从Tab 0进入House时的HomeTab状态

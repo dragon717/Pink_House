@@ -71,7 +71,7 @@ struct SpatialBookShelfView: View {
     }
 
     private var backgroundView: some View {
-        LiquidBackground(themeSkinWallpaperContext: .journal)
+        LiquidBackground(themeSkinWallpaperContext: .journal, includeThemeSkinStickers: false)
             .ignoresSafeArea()
     }
 

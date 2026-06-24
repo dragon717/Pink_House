@@ -566,7 +566,7 @@ struct OOTDEditorView: View {
 
         ZStack {
             // 背景
-            LiquidBackground(themeSkinWallpaperContext: .journal)
+            LiquidBackground(themeSkinWallpaperContext: .journal, includeThemeSkinStickers: false)
                 .ignoresSafeArea()
 
             if isLandscape {

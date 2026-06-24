@@ -404,6 +404,7 @@ private struct FilterSubmenuView: View, Equatable {
 
 struct HomeView: View {
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.isRoutePageActive) private var isRoutePageActive
     @Environment(ThemeManager.self) private var themeManager
     @Environment(\.colorScheme) private var colorScheme
     @ObservedObject private var themeSkinManager = ThemeSkinManager.shared
@@ -411,7 +412,6 @@ struct HomeView: View {
     @StateObject private var tabNavigationManager = TabNavigationManager.shared
     @StateObject private var menuFacetCache = WardrobeMenuFacetCache()
     @StateObject private var draftManager = ClothingEditDraftManager.shared
-    @Query(filter: #Predicate<Clothing> { $0.deletedAt == nil }) private var allClothings: [Clothing]
     @Query(filter: #Predicate<Clothing> { $0.deletedAt == nil && $0.isDepositPlan == true }) private var depositPlanClothings: [Clothing]
     @Query(sort: \Tag.name) private var tags: [Tag]
     @Query(sort: \Brand.name) private var brands: [Brand]
@@ -506,16 +506,21 @@ struct HomeView: View {
         MagicThemeDesignSystem.palette(themeManager: themeManager, colorScheme: colorScheme)
     }
 
-    private var menuFacetSourceKey: WardrobeMenuFacetSourceKey {
-        WardrobeMenuFacetSourceKey(
-            clothings: allClothings.map(WardrobeMenuFacetClothingRow.init),
+    private func makeMenuFacetSourceKey() -> WardrobeMenuFacetSourceKey {
+        let descriptor = FetchDescriptor<Clothing>(
+            predicate: #Predicate { $0.deletedAt == nil }
+        )
+        let clothings = (try? modelContext.fetch(descriptor)) ?? []
+
+        return WardrobeMenuFacetSourceKey(
+            clothings: clothings.map(WardrobeMenuFacetClothingRow.init),
             tags: tags.map { WardrobeMenuFacetNamedRow(id: $0.id, name: $0.name, lastModified: $0.lastModified) },
             brands: brands.map { WardrobeMenuFacetNamedRow(id: $0.id, name: $0.name, lastModified: $0.lastModified) }
         )
     }
 
     private func refreshMenuFacetCache() {
-        menuFacetCache.refresh(from: menuFacetSourceKey)
+        menuFacetCache.refresh(from: makeMenuFacetSourceKey())
     }
 
     private var themedTopBarGroupDescriptor: ThemeSkinDescriptor? {
@@ -602,6 +607,7 @@ struct HomeView: View {
                     )
                     // Force recreation when sortOption changes to ensure proper sorting
                     .id("wardrobe_\(sortOption.id)")
+                    .environment(\.isRoutePageActive, isRoutePageActive && selectedTab == .wardrobe)
                     .opacity(selectedTab == .wardrobe ? 1 : 0)
                     .allowsHitTesting(selectedTab == .wardrobe)
                     .accessibilityHidden(selectedTab != .wardrobe)
@@ -770,7 +776,12 @@ struct HomeView: View {
 
     private func openNotificationClothingDetail(_ clothingID: UUID) {
         let presentDetail = {
-            guard let clothing = allClothings.first(where: { $0.id == clothingID }) else { return }
+            var descriptor = FetchDescriptor<Clothing>(
+                predicate: #Predicate { $0.id == clothingID && $0.deletedAt == nil }
+            )
+            descriptor.fetchLimit = 1
+
+            guard let clothing = (try? modelContext.fetch(descriptor))?.first else { return }
             notificationTargetClothing = clothing
             navigateToNotificationDetail = false
 
@@ -1886,6 +1897,8 @@ struct HomeView: View {
                     names.append("无标签".appLocalized)
                 } else if let tagName = menuFacetCache.tagNameByID[id] {
                     names.append(tagName)
+                } else if let tagName = tags.first(where: { $0.id == id })?.name {
+                    names.append(tagName)
                 }
             }
             if !names.isEmpty { descriptions.append(names.joined(separator: "/")) }
@@ -1898,6 +1911,8 @@ struct HomeView: View {
                 if id == HomeView.noBrandUUID {
                     names.append("无品牌".appLocalized)
                 } else if let brandName = menuFacetCache.brandNameByID[id] {
+                    names.append(brandName)
+                } else if let brandName = brands.first(where: { $0.id == id })?.name {
                     names.append(brandName)
                 }
             }

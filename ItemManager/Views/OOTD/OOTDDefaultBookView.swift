@@ -62,7 +62,7 @@ struct OOTDDefaultBookView: View {
         NavigationStack(path: $navigationPath) {
             ZStack {
                 // 背景
-                LiquidBackground(themeSkinWallpaperContext: .journal)
+                LiquidBackground(themeSkinWallpaperContext: .journal, includeThemeSkinStickers: false)
                     .ignoresSafeArea()
 
                 Group {

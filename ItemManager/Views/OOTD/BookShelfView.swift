@@ -355,7 +355,11 @@ struct BookShelfView: View {
     }
 
     private func notifyOotdShelfGuideState() {
-        AppFirstLaunchGuideManager.shared.requestGuideTargetRecapture()
+        let guideManager = AppFirstLaunchGuideManager.shared
+        guard guideManager.currentFeatureExperienceFeature == .ootd ||
+            guideManager.currentFeatureExperienceFeature == .spaceBook else { return }
+
+        guideManager.requestGuideTargetRecapture()
         let hasUserBooks = hasUserCreatedBooks()
         let hasUserPages = hasUserCreatedPages()
         print("[Guide] BookShelf state notify - hasUserBooks: \(hasUserBooks), hasUserPages: \(hasUserPages), totalBooks: \(books.count)")
