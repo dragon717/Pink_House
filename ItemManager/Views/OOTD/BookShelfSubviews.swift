@@ -138,12 +138,10 @@ struct BookGridView: View {
     var onBookTap: ((BookGroup) -> Void)?
     var openingBook: BookGroup?
     
-    // 第一个非默认手帐（用于新手引导高亮）
-    private var firstNonDefaultBook: BookGroup? {
-        books.first { $0.title != "默认手帐" }
-    }
-
     var body: some View {
+        let firstNonDefaultBookID = books.first { $0.title != "默认手帐" }?.id
+        let firstBookID = books.first?.id
+
         ScrollView {
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 160), spacing: 24)], spacing: 32) {
                 ForEach(books, id: \.persistentModelID) { book in
@@ -165,7 +163,11 @@ struct BookGridView: View {
                         }
                     }
                     .buttonStyle(BouncingButtonStyle())
-                    .captureGuideTarget(guideTargetKey(for: book))
+                    .captureGuideTarget(guideTargetKey(
+                        for: book,
+                        firstNonDefaultBookID: firstNonDefaultBookID,
+                        firstBookID: firstBookID
+                    ))
                     .contextMenu {
                         Button {
                             onRename(book)
@@ -193,13 +195,17 @@ struct BookGridView: View {
     }
 
     /// 根据手帐返回对应的高亮目标键
-    private func guideTargetKey(for book: BookGroup) -> GuideTargetKey? {
+    private func guideTargetKey(
+        for book: BookGroup,
+        firstNonDefaultBookID: UUID?,
+        firstBookID: UUID?
+    ) -> GuideTargetKey? {
         // 第一个非默认手帐（用于 Step 3 引导）
-        if book.persistentModelID == firstNonDefaultBook?.persistentModelID {
+        if book.id == firstNonDefaultBookID {
             return .ootdFirstNonDefaultBookCard
         }
         // 第一个手帐（用于其他场景）
-        if book.persistentModelID == books.first?.persistentModelID {
+        if book.id == firstBookID {
             return .ootdFirstBookCard
         }
         return nil

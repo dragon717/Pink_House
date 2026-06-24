@@ -2541,13 +2541,9 @@ struct WardrobeStatsView: View {
     @AppStorage("showStatsDressValue") private var showDressValue = true
     @AppStorage("showStatsTotalValue") private var showTotalValue = true
     
-    @Environment(\.modelContext) private var modelContext
-    @Query(filter: #Predicate<BookGroup> { $0.deletedAt == nil }, sort: \BookGroup.sortIndex, order: .forward) private var books: [BookGroup]
-    
     @Environment(ThemeManager.self) private var themeManager
     @Environment(\.containerPalette) private var palette
     
-    @StateObject private var tabNavigationManager = TabNavigationManager.shared
     @State private var showDailyCheckIn = false
     
     var styleCount: Int {
@@ -2572,29 +2568,6 @@ struct WardrobeStatsView: View {
         // 四舍五入到个位
         let roundedValue = round(doubleValue)
         return String(format: "%.0f", roundedValue)
-    }
-    
-    // 获取默认手帐，如果没有则创建（只考虑未删除的手帐）
-    var defaultBook: BookGroup {
-        // 只考虑未删除的手帐
-        let activeBooks = books.filter { !$0.isDeleted }
-        if let existingDefault = activeBooks.first(where: { $0.title == "默认手帐" }) {
-            return existingDefault
-        } else if let firstBook = activeBooks.first {
-            return firstBook
-        } else {
-            // 创建默认手帐
-            let newBook = BookGroup(title: "默认手帐")
-            modelContext.insert(newBook)
-            try? modelContext.save()
-            print("WardrobeView: Created new default book")
-            return newBook
-        }
-    }
-    
-    // OOTD 跳转目标 - 从衣橱进入的特殊版本
-    var defaultBookDestination: some View {
-        BookDetailViewFromWardrobe(book: defaultBook)
     }
     
     var body: some View {
@@ -2642,7 +2615,11 @@ struct WardrobeStatsView: View {
 
                     // 穿搭手帐按钮 - 使用主题强调色
                     Button {
-                        tabNavigationManager.navigate(to: .smallWorld(.ootd))
+                        NotificationCenter.default.post(
+                            name: .navigateToSmallWorldDestination,
+                            object: nil,
+                            userInfo: ["destination": SmallWorldDestination.ootd]
+                        )
                     } label: {
                         VStack(spacing: 4) {
                             Image(systemName: "book.closed.fill")

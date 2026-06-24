@@ -166,8 +166,6 @@ struct ThemeSkinStickerWallpaperBackground: View {
     var body: some View {
         GeometryReader { proxy in
             let size = proxy.size
-            let base = renderMode.baseLength(for: size)
-            let placements = Self.patternPlacements(for: layoutPreset, context: context, renderMode: renderMode)
 
             ZStack {
                 if includeBaseFill {
@@ -177,6 +175,9 @@ struct ThemeSkinStickerWallpaperBackground: View {
                 }
 
                 if includeStickers {
+                    let base = renderMode.baseLength(for: size)
+                    let placements = Self.patternPlacements(for: layoutPreset, context: context, renderMode: renderMode)
+
                     ForEach(placements) { placement in
                         if let assetName = assetName(for: placement) {
                             ThemeSkinOptionalFittedAsset(

@@ -30,7 +30,11 @@ struct BookShelfView: View {
 
     private var guardedViewModeBinding: Binding<ViewMode> {
         Binding(
-            get: { viewMode },
+            get: {
+                viewMode == .spatial && !FeatureUnlockManager.shared.isUnlocked(.spaceBook)
+                    ? .planar
+                    : viewMode
+            },
             set: { newValue in
                 if newValue == .spatial && !FeatureUnlockManager.shared.isUnlocked(.spaceBook) {
                     viewMode = .planar
@@ -86,15 +90,7 @@ struct BookShelfView: View {
     @State var showingBatchDeleteBooksAlert = false
 
     private var orderedBooks: [BookGroup] {
-        books.sorted {
-            if $0.sortIndex != $1.sortIndex {
-                return $0.sortIndex < $1.sortIndex
-            }
-            if $0.createdAt != $1.createdAt {
-                return $0.createdAt < $1.createdAt
-            }
-            return String(describing: $0.persistentModelID) < String(describing: $1.persistentModelID)
-        }
+        books
     }
     
     var body: some View {
@@ -287,10 +283,6 @@ struct BookShelfView: View {
     }
 
     private func handleAppear() {
-        if viewMode == .spatial && !FeatureUnlockManager.shared.isUnlocked(.spaceBook) {
-            viewMode = .planar
-        }
-        repairPlanarOrphansIfNeeded(source: "onAppear")
         isBookSelected = selectedBook != nil
         notifyOotdShelfGuideState()
     }
