@@ -7,6 +7,7 @@
 
 import XCTest
 import SwiftData
+import GRDB
 @testable import ItemManager
 
 @MainActor
@@ -224,6 +225,182 @@ final class SkirtMarketTests: XCTestCase {
         XCTAssertEqual(result.aiProcessed, 80)
         XCTAssertEqual(result.cacheHitRate, 0.2)
         XCTAssertEqual(result.aiSavingsRate, 0.2)
+    }
+
+    func testSkirtMarketImportParserExtractsPlatformURLAndPrice() {
+        let taobao = SkirtMarketImportParser.localParse("淘宝 AP 辉夜姬 JSK ¥1580 https://item.taobao.com/item.htm?id=123456")
+        XCTAssertEqual(taobao.platformHint, "taobao")
+        XCTAssertEqual(taobao.sourceURL, "https://item.taobao.com/item.htm?id=123456")
+        XCTAssertEqual(taobao.price, 1580)
+
+        let xianyu = SkirtMarketImportParser.localParse("闲鱼急出 Baby 裙子 价格：880 https://www.goofish.com/item?id=abc")
+        XCTAssertEqual(xianyu.platformHint, "xianyu")
+        XCTAssertEqual(xianyu.price, 880)
+
+        let xhs = SkirtMarketImportParser.localParse("小红书笔记 https://xhslink.com/a1b2c3")
+        XCTAssertEqual(xhs.platformHint, "xiaohongshu")
+    }
+
+    func testParsedItemBuildsTimedPriceEvents() {
+        let capturedAt = Date()
+        var item = ParsedItem.fallback(
+            from: SkirtMarketImportLocalParse(
+                platformHint: "taobao",
+                sourceURL: "https://item.taobao.com/item.htm?id=123456",
+                title: "AP 辉夜姬 JSK",
+                price: 1580
+            ),
+            rawText: "AP 辉夜姬 JSK",
+            capturedAt: capturedAt
+        )
+        item.originalPriceText = "1980"
+        item.depositPriceText = "200"
+        item.balancePriceText = "1380"
+        item.depositDateText = "2026-07-01"
+        item.finalPaymentDateText = "2026-08-01"
+
+        let events = item.priceEvents()
+        XCTAssertEqual(events.map(\.kind), ["current", "original", "deposit", "balance"])
+        XCTAssertTrue(events.allSatisfy { $0.observedAt == capturedAt })
+        XCTAssertNotNil(events.first(where: { $0.kind == "deposit" })?.appliesAt)
+        XCTAssertNotNil(events.first(where: { $0.kind == "balance" })?.appliesAt)
+    }
+
+    func testDeepSeekJSONMapsToRecordableParsedItem() throws {
+        let rawJSON = """
+        {
+          "items": [
+            {
+              "title": "AP 辉夜姬 黑色 JSK",
+              "brand": "Angelic Pretty",
+              "series": "辉夜姬",
+              "category": "jsk",
+              "color": "黑色",
+              "size": "M",
+              "condition": "全新",
+              "is_lolita_related": true,
+              "sale_intent": "reservation",
+              "confidence": 0.92,
+              "missing_fields": [],
+              "price_events": [
+                {"kind": "current", "amount": 1580, "currency": "CNY", "observed_at": "2026-06-25T08:00:00Z", "applies_at": null, "note": null},
+                {"kind": "original", "amount": 1980, "currency": "CNY", "observed_at": "2026-06-25T08:00:00Z", "applies_at": null, "note": null},
+                {"kind": "deposit", "amount": 200, "currency": "CNY", "observed_at": "2026-06-25T08:00:00Z", "applies_at": "2026-07-01", "note": null},
+                {"kind": "balance", "amount": 1380, "currency": "CNY", "observed_at": "2026-06-25T08:00:00Z", "applies_at": "2026-08-01", "note": null}
+              ]
+            }
+          ]
+        }
+        """
+        let response = try JSONDecoder().decode(SkirtMarketDeepSeekResponse.self, from: Data(rawJSON.utf8))
+        let local = SkirtMarketImportParser.localParse("淘宝 AP 辉夜姬 JSK ¥1580 https://item.taobao.com/item.htm?id=123456")
+        let capturedAt = ISO8601DateFormatter().date(from: "2026-06-25T08:00:00Z")!
+        let parsed = ParsedItem.fromAI(response.items[0], local: local, rawText: "raw", rawJSON: rawJSON, capturedAt: capturedAt)
+        let record = parsed.makeGRDBItem()
+
+        XCTAssertEqual(parsed.title, "AP 辉夜姬 黑色 JSK")
+        XCTAssertEqual(record.brand, "Angelic Pretty")
+        XCTAssertEqual(record.cleanedName, "辉夜姬")
+        XCTAssertEqual(record.currentPrice, 1580)
+        XCTAssertEqual(record.originalPrice, 1980)
+        XCTAssertEqual(record.depositPrice, 200)
+        XCTAssertEqual(record.balancePrice, 1380)
+        XCTAssertNotNil(record.depositDate)
+        XCTAssertNotNil(record.finalPaymentDate)
+        XCTAssertEqual(parsed.priceEvents().count, 4)
+    }
+
+    func testGRDBPersistsParsedItemAndPriceEvents() throws {
+        let rawJSON = #"{"items":[]}"#
+        let capturedAt = ISO8601DateFormatter().date(from: "2026-06-25T08:00:00Z")!
+        var parsed = ParsedItem.fallback(
+            from: SkirtMarketImportLocalParse(
+                platformHint: "xianyu",
+                sourceURL: "https://www.goofish.com/item?id=abc",
+                title: "Baby 海月姬 OP",
+                price: 880
+            ),
+            rawText: "闲鱼 Baby 海月姬 OP 价格：880",
+            capturedAt: capturedAt
+        )
+        parsed.brand = "Baby"
+        parsed.series = "海月姬"
+        parsed.originalPriceText = "1680"
+        parsed.rawAnalysisJSON = rawJSON
+
+        let queue = try makeSkirtMarketDatabaseQueue()
+        let record = parsed.makeGRDBItem()
+        let events = parsed.priceEvents()
+
+        try queue.write { db in
+            try record.insert(db)
+            for event in events {
+                try event.insert(db)
+            }
+        }
+
+        let saved = try queue.read { db in
+            try GRDBLolitaItem.fetchByPlatformID(db, platformID: record.platformID)
+        }
+        let savedEvents = try queue.read { db in
+            try GRDBLolitaPriceEvent
+                .filter(Column("platform_id") == record.platformID)
+                .fetchAll(db)
+        }
+
+        XCTAssertEqual(saved?.rawTitle, "Baby 海月姬 OP")
+        XCTAssertEqual(saved?.brand, "Baby")
+        XCTAssertEqual(saved?.currentPrice, 880)
+        XCTAssertEqual(saved?.originalPrice, 1680)
+        XCTAssertEqual(saved?.analysisCapturedAt, capturedAt)
+        XCTAssertEqual(Set(savedEvents.map(\.kind)), Set(["current", "original"]))
+        XCTAssertTrue(savedEvents.allSatisfy { $0.observedAt == capturedAt })
+    }
+
+    private func makeSkirtMarketDatabaseQueue() throws -> DatabaseQueue {
+        let queue = try DatabaseQueue()
+        try queue.write { db in
+            try db.create(table: "lolita_items") { t in
+                t.primaryKey("id", .text)
+                t.column("cloud_kit_record_id", .text)
+                t.column("platform_id", .text).notNull()
+                t.column("platform", .text).notNull()
+                t.column("raw_title", .text).notNull()
+                t.column("cleaned_name", .text)
+                t.column("brand", .text)
+                t.column("current_price", .double).notNull()
+                t.column("currency", .text).notNull().defaults(to: "CNY")
+                t.column("status", .text).notNull().defaults(to: "unknown")
+                t.column("is_deleted", .boolean).notNull().defaults(to: false)
+                t.column("last_updated", .datetime).notNull()
+                t.column("first_seen_at", .datetime).notNull()
+                t.column("sync_status", .text).notNull().defaults(to: "pending")
+                t.column("modified_at", .datetime).notNull()
+                t.column("price_trend", .text).notNull().defaults(to: "unknown")
+                t.column("source_url", .text)
+                t.column("original_price", .double)
+                t.column("deposit_price", .double)
+                t.column("balance_price", .double)
+                t.column("deposit_date", .datetime)
+                t.column("final_payment_date", .datetime)
+                t.column("analysis_captured_at", .datetime)
+                t.column("analysis_confidence", .double)
+                t.column("raw_analysis_json", .text)
+                t.uniqueKey(["platform_id"])
+            }
+
+            try db.create(table: "lolita_price_events") { t in
+                t.primaryKey("id", .text)
+                t.column("platform_id", .text).notNull()
+                t.column("kind", .text).notNull()
+                t.column("amount", .double).notNull()
+                t.column("currency", .text).notNull().defaults(to: "CNY")
+                t.column("observed_at", .datetime).notNull()
+                t.column("applies_at", .datetime)
+                t.column("source", .text).notNull()
+            }
+        }
+        return queue
     }
 }
 

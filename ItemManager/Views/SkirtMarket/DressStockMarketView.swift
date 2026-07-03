@@ -14,8 +14,8 @@ struct DressStockMarketView: View {
     // MARK: - 状态
     
     @StateObject private var itemObserver = GRDBLolitaItemObserver()
-    @State private var showAIParseResult = false
-    @State private var parsedItem: ParsedItem?
+    @State private var showImportSheet = false
+    @State private var importMode: SkirtMarketDeepSeekImportMode = .link
     @State private var isSyncing = false
     @State private var searchKeyword = ""
     @State private var selectedTimeRange: TimeRange = .week
@@ -78,7 +78,19 @@ struct DressStockMarketView: View {
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button(action: { showAIParseResult = true }) {
+                    Menu {
+                        Button {
+                            openImportSheet(mode: .link)
+                        } label: {
+                            Label("粘贴链接/文本", systemImage: "doc.on.clipboard")
+                        }
+
+                        Button {
+                            openImportSheet(mode: .keyword)
+                        } label: {
+                            Label("关键词模式", systemImage: "magnifyingglass")
+                        }
+                    } label: {
                         Image(systemName: "link.badge.plus")
                     }
                 }
@@ -94,33 +106,19 @@ struct DressStockMarketView: View {
             }
         }
         .onAppear {
-            itemObserver.startObservingActive()
             Task {
                 await initializeGRDB()
-                checkClipboard()
+                itemObserver.startObservingActive()
             }
         }
         .onDisappear {
             itemObserver.stopObserving()
         }
-        .sheet(isPresented: $showAIParseResult) {
-            if let parsed = parsedItem {
-                AIParseResultSheet(parsedItem: parsed) { confirmedItem in
-                    Task {
-                        await addParsedItem(confirmedItem)
-                    }
+        .sheet(isPresented: $showImportSheet) {
+            SkirtMarketDeepSeekImportSheet(initialMode: importMode) { confirmedItem in
+                Task {
+                    await addParsedItem(confirmedItem)
                 }
-            } else {
-                ManualAddItemSheet { item in
-                    Task {
-                        await addItem(item)
-                    }
-                }
-            }
-        }
-        .onChange(of: scenePhase) { newPhase in
-            if newPhase == .active {
-                checkClipboard()
             }
         }
     }
@@ -138,9 +136,12 @@ struct DressStockMarketView: View {
         }
     }
     
-    @Environment(\.scenePhase) private var scenePhase
-    
     // MARK: - 方法
+
+    private func openImportSheet(mode: SkirtMarketDeepSeekImportMode) {
+        importMode = mode
+        showImportSheet = true
+    }
     
     private func initializeGRDB() async {
         do {
@@ -172,28 +173,42 @@ struct DressStockMarketView: View {
     }
     
     private func addParsedItem(_ parsed: ParsedItem) async {
-        let item = GRDBLolitaItem(
-            platform: parsed.platform,
-            platformID: parsed.platformID,
-            rawTitle: parsed.title,
-            currentPrice: parsed.price
-        )
-        await addItem(item)
-    }
-    
-    private func checkClipboard() {
-        guard let clipboardString = UIPasteboard.general.string else { return }
-        
-        if let parsed = ShareLinkParser.parse(clipboardString) {
-            let processedKey = "processed_clipboard_\(parsed.url.hashValue)"
-            if UserDefaults.standard.bool(forKey: processedKey) {
-                return
+        let item = parsed.makeGRDBItem()
+        let events = parsed.priceEvents()
+        guard let writer = GRDBManager.shared.writer else { return }
+
+        do {
+            try await writer.write { db in
+                if var existing = try GRDBLolitaItem.fetchByPlatformID(db, platformID: item.platformID) {
+                    existing.rawTitle = item.rawTitle
+                    existing.cleanedName = item.cleanedName
+                    existing.brand = item.brand
+                    existing.currentPrice = item.currentPrice
+                    existing.priceTrend = item.priceTrend
+                    existing.sourceURL = item.sourceURL
+                    existing.originalPrice = item.originalPrice
+                    existing.depositPrice = item.depositPrice
+                    existing.balancePrice = item.balancePrice
+                    existing.depositDate = item.depositDate
+                    existing.finalPaymentDate = item.finalPaymentDate
+                    existing.analysisCapturedAt = item.analysisCapturedAt
+                    existing.analysisConfidence = item.analysisConfidence
+                    existing.rawAnalysisJSON = item.rawAnalysisJSON
+                    existing.lastUpdated = Date()
+                    existing.modifiedAt = Date()
+                    existing.syncStatus = "pending"
+                    try existing.update(db)
+                } else {
+                    try item.insert(db)
+                }
+
+                for event in events {
+                    try event.insert(db)
+                }
             }
-            
-            UserDefaults.standard.set(true, forKey: processedKey)
-            parsedItem = parsed
-            showAIParseResult = true
-            UIPasteboard.general.string = ""
+            print("✅ 添加解析商品成功: \(item.rawTitle)")
+        } catch {
+            print("❌ 添加解析商品失败: \(error)")
         }
     }
 }
@@ -777,372 +792,471 @@ struct PlatformIconView: View {
 
 // MARK: - AI 解析相关
 
-struct ParsedItem {
-    let platform: String
-    let platformID: String
-    let title: String
-    let price: Double
-    let url: String
-    let imageURL: String?
-    let sellerName: String?
-    let rawContent: String
+struct ParsedItem: Identifiable {
+    var id = UUID()
+    var platform: String
+    var platformID: String
+    var title: String
+    var currentPriceText: String
+    var originalPriceText: String
+    var depositPriceText: String
+    var balancePriceText: String
+    var depositDateText: String
+    var finalPaymentDateText: String
+    var url: String
+    var rawContent: String
+    var brand: String?
+    var series: String?
+    var category: String?
+    var color: String?
+    var size: String?
+    var condition: String?
+    var isLolitaRelated: Bool
+    var saleIntent: String?
+    var confidence: Double?
+    var missingFields: [String]
+    var rawAnalysisJSON: String?
+    var capturedAt: Date
+
+    var currentPrice: Double { Double(currentPriceText) ?? 0 }
+    var originalPrice: Double? { Double(originalPriceText) }
+    var depositPrice: Double? { Double(depositPriceText) }
+    var balancePrice: Double? { Double(balancePriceText) }
+    var depositDate: Date? { SkirtMarketImportParser.parseDate(depositDateText) }
+    var finalPaymentDate: Date? { SkirtMarketImportParser.parseDate(finalPaymentDateText) }
+
+    var priceTrend: String {
+        guard let originalPrice, originalPrice > 0, currentPrice > 0 else { return "unknown" }
+        let ratio = currentPrice / originalPrice
+        if ratio < 0.7 { return "bargain" }
+        if ratio > 1.3 { return "premium" }
+        return "fair"
+    }
+
+    func priceEvents() -> [GRDBLolitaPriceEvent] {
+        let source = rawAnalysisJSON == nil ? "local" : "deepseek"
+        let observedAt = capturedAt
+        var events: [GRDBLolitaPriceEvent] = []
+
+        func append(kind: String, amount: Double?, appliesAt: Date? = nil) {
+            guard let amount, amount > 0 else { return }
+            events.append(
+                GRDBLolitaPriceEvent(
+                    platformID: platformID,
+                    kind: kind,
+                    amount: amount,
+                    observedAt: observedAt,
+                    appliesAt: appliesAt,
+                    source: source
+                )
+            )
+        }
+
+        append(kind: "current", amount: currentPrice)
+        append(kind: "original", amount: originalPrice)
+        append(kind: "deposit", amount: depositPrice, appliesAt: depositDate)
+        append(kind: "balance", amount: balancePrice, appliesAt: finalPaymentDate)
+        return events
+    }
+
+    func makeGRDBItem() -> GRDBLolitaItem {
+        GRDBLolitaItem(
+            platform: platform,
+            platformID: platformID,
+            rawTitle: title,
+            cleanedName: series?.isEmpty == false ? series : nil,
+            brand: brand?.isEmpty == false ? brand : nil,
+            currentPrice: currentPrice,
+            priceTrend: priceTrend,
+            sourceURL: url.isEmpty ? nil : url,
+            originalPrice: originalPrice,
+            depositPrice: depositPrice,
+            balancePrice: balancePrice,
+            depositDate: depositDate,
+            finalPaymentDate: finalPaymentDate,
+            analysisCapturedAt: capturedAt,
+            analysisConfidence: confidence,
+            rawAnalysisJSON: rawAnalysisJSON
+        )
+    }
+
+    static func fallback(from local: SkirtMarketImportLocalParse, rawText: String, capturedAt: Date) -> ParsedItem {
+        let platform = local.platformHint
+        let price = local.price.map { Self.priceString($0) } ?? ""
+        return ParsedItem(
+            platform: platform,
+            platformID: SkirtMarketImportParser.platformID(platform: platform, sourceURL: local.sourceURL),
+            title: local.title ?? "待确认商品",
+            currentPriceText: price,
+            originalPriceText: "",
+            depositPriceText: "",
+            balancePriceText: "",
+            depositDateText: "",
+            finalPaymentDateText: "",
+            url: local.sourceURL ?? "",
+            rawContent: rawText,
+            brand: nil,
+            series: nil,
+            category: nil,
+            color: nil,
+            size: nil,
+            condition: nil,
+            isLolitaRelated: true,
+            saleIntent: "unknown",
+            confidence: nil,
+            missingFields: ["deepseek"],
+            rawAnalysisJSON: nil,
+            capturedAt: capturedAt
+        )
+    }
+
+    static func fromAI(
+        _ item: SkirtMarketDeepSeekItem,
+        local: SkirtMarketImportLocalParse,
+        rawText: String,
+        rawJSON: String,
+        capturedAt: Date
+    ) -> ParsedItem {
+        let platform = local.platformHint
+        let events = item.priceEvents
+        let current = events.first(where: { $0.kind == "current" })?.amount ?? local.price
+        let original = events.first(where: { $0.kind == "original" })?.amount
+        let deposit = events.first(where: { $0.kind == "deposit" })?.amount
+        let balance = events.first(where: { $0.kind == "balance" })?.amount
+        let depositDate = events.first(where: { $0.kind == "deposit" })?.appliesAt
+        let balanceDate = events.first(where: { $0.kind == "balance" })?.appliesAt
+
+        return ParsedItem(
+            platform: platform,
+            platformID: SkirtMarketImportParser.platformID(platform: platform, sourceURL: local.sourceURL),
+            title: item.title.isEmpty ? (local.title ?? "待确认商品") : item.title,
+            currentPriceText: current.map(priceString) ?? "",
+            originalPriceText: original.map(priceString) ?? "",
+            depositPriceText: deposit.map(priceString) ?? "",
+            balancePriceText: balance.map(priceString) ?? "",
+            depositDateText: normalizedDateString(depositDate),
+            finalPaymentDateText: normalizedDateString(balanceDate),
+            url: local.sourceURL ?? "",
+            rawContent: rawText,
+            brand: item.brand,
+            series: item.series,
+            category: item.category,
+            color: item.color,
+            size: item.size,
+            condition: item.condition,
+            isLolitaRelated: item.isLolitaRelated,
+            saleIntent: item.saleIntent,
+            confidence: item.confidence,
+            missingFields: item.missingFields,
+            rawAnalysisJSON: rawJSON,
+            capturedAt: capturedAt
+        )
+    }
+
+    private static func normalizedDateString(_ value: String?) -> String {
+        guard let date = SkirtMarketImportParser.parseDate(value) else { return value ?? "" }
+        return SkirtMarketImportParser.dateString(from: date)
+    }
+
+    nonisolated private static func priceString(_ value: Double) -> String {
+        String(format: "%.2f", value)
+    }
 }
 
-// MARK: - AI 解析结果 Sheet
-
-struct AIParseResultSheet: View {
+struct SkirtMarketDeepSeekImportSheet: View {
     @Environment(\.dismiss) private var dismiss
-    
-    let parsedItem: ParsedItem
+    @Environment(ThemeManager.self) private var themeManager
+    @Environment(\.colorScheme) private var colorScheme
+
     let onConfirm: (ParsedItem) -> Void
-    
-    @State private var editedTitle: String
-    @State private var editedPrice: String
-    
-    init(parsedItem: ParsedItem, onConfirm: @escaping (ParsedItem) -> Void) {
-        self.parsedItem = parsedItem
+
+    @State private var mode: SkirtMarketDeepSeekImportMode
+    @State private var linkText = ""
+    @State private var keyword = ""
+    @State private var keywordResultText = ""
+    @State private var drafts: [ParsedItem] = []
+    @State private var selectedDraftIndex = 0
+    @State private var isAnalyzing = false
+    @State private var errorMessage: String?
+
+    init(initialMode: SkirtMarketDeepSeekImportMode, onConfirm: @escaping (ParsedItem) -> Void) {
         self.onConfirm = onConfirm
-        _editedTitle = State(initialValue: parsedItem.title)
-        _editedPrice = State(initialValue: String(format: "%.2f", parsedItem.price))
+        _mode = State(initialValue: initialMode)
     }
-    
+
     var body: some View {
         NavigationStack {
-            Form {
-                Section("识别结果") {
-                    HStack {
-                        Text("平台")
-                        Spacer()
-                        PlatformIconView(platform: parsedItem.platform)
-                        Text(platformDisplayName)
-                            .foregroundStyle(.secondary)
+            ZStack {
+                LiquidBackground(themeSkinWallpaperContext: .wardrobe)
+                    .ignoresSafeArea()
+
+                Form {
+                    Section {
+                        Picker("模式", selection: $mode) {
+                            ForEach(SkirtMarketDeepSeekImportMode.allCases) { mode in
+                                Text(mode.title).tag(mode)
+                            }
+                        }
+                        .pickerStyle(.segmented)
                     }
-                    
-                    HStack {
-                        Text("链接")
-                        Spacer()
-                        Text(parsedItem.url)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                            .frame(maxWidth: 200, alignment: .trailing)
+
+                    if mode == .link {
+                        linkInputSection
+                    } else {
+                        keywordInputSection
+                    }
+
+                    if let errorMessage {
+                        Section {
+                            Text(errorMessage)
+                                .font(.footnote)
+                                .foregroundStyle(.red)
+                        }
+                    }
+
+                    if !drafts.isEmpty {
+                        resultSection
+                        editSection
                     }
                 }
-                
-                Section("商品信息") {
-                    TextField("商品标题", text: $editedTitle)
-                    TextField("价格", text: $editedPrice)
-                        .keyboardType(.decimalPad)
-                }
-                
-                Section("原始内容") {
-                    Text(parsedItem.rawContent)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
+                .scrollContentBackground(.hidden)
             }
-            .navigationTitle("解析分享链接")
+            .navigationTitle("DeepSeek 商品解析")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("取消") { dismiss() }
                 }
-                
+
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("添加") {
-                        let confirmedItem = ParsedItem(
-                            platform: parsedItem.platform,
-                            platformID: parsedItem.platformID,
-                            title: editedTitle,
-                            price: Double(editedPrice) ?? parsedItem.price,
-                            url: parsedItem.url,
-                            imageURL: parsedItem.imageURL,
-                            sellerName: parsedItem.sellerName,
-                            rawContent: parsedItem.rawContent
-                        )
-                        onConfirm(confirmedItem)
+                    Button("添加为裙装") {
+                        onConfirm(selectedDraft)
                         dismiss()
                     }
-                    .disabled(editedTitle.isEmpty)
+                    .disabled(drafts.isEmpty || selectedDraft.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+            }
+            .safeAreaInset(edge: .bottom) {
+                analyzeButton
+                .padding(.horizontal)
+                .padding(.bottom, 8)
+                .background(.bar)
+            }
+            .tint(magicPalette.accent)
+        }
+    }
+
+    private var magicPalette: MagicThemePalette {
+        MagicThemeDesignSystem.palette(themeManager: themeManager, colorScheme: colorScheme)
+    }
+
+    @ViewBuilder
+    private var analyzeButton: some View {
+        let button = Button {
+            Task { await analyze() }
+        } label: {
+            HStack {
+                if isAnalyzing {
+                    ProgressView()
+                }
+                Text(isAnalyzing ? "分析中..." : "DeepSeek 分析")
+                    .font(.headline)
+            }
+            .frame(maxWidth: .infinity)
+            .padding()
+        }
+        .disabled(isAnalyzing || activeRawText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+
+        if #available(iOS 26.0, *) {
+            button.buttonStyle(.glassProminent)
+        } else {
+            button.buttonStyle(.borderedProminent)
+        }
+    }
+
+    private var linkInputSection: some View {
+        Section("链接/粘贴文本") {
+            TextEditor(text: $linkText)
+                .frame(minHeight: 120)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+
+            PasteButton(payloadType: String.self) { values in
+                linkText = values.first ?? linkText
+            }
+        }
+    }
+
+    private var keywordInputSection: some View {
+        Group {
+            Section("关键词") {
+                TextField("例如 AP 辉夜姬 黑色 JSK", text: $keyword)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+            }
+
+            Section("商品/搜索结果文本") {
+                TextEditor(text: $keywordResultText)
+                    .frame(minHeight: 100)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+
+                PasteButton(payloadType: String.self) { values in
+                    keywordResultText = values.first ?? keywordResultText
                 }
             }
         }
     }
-    
-    var platformDisplayName: String {
-        switch parsedItem.platform {
+
+    private var resultSection: some View {
+        Section("识别结果") {
+            if drafts.count > 1 {
+                Picker("商品", selection: $selectedDraftIndex) {
+                    ForEach(drafts.indices, id: \.self) { index in
+                        Text(drafts[index].title).tag(index)
+                    }
+                }
+            }
+
+            HStack {
+                Text("平台")
+                Spacer()
+                PlatformIconView(platform: selectedDraft.platform)
+                Text(platformDisplayName(selectedDraft.platform))
+                    .foregroundStyle(.secondary)
+            }
+
+            if let confidence = selectedDraft.confidence {
+                HStack {
+                    Text("置信度")
+                    Spacer()
+                    Text(String(format: "%.0f%%", confidence * 100))
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            if !selectedDraft.missingFields.isEmpty {
+                Text("缺失：\(selectedDraft.missingFields.joined(separator: "、"))")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private var editSection: some View {
+        Section("保存前确认") {
+            TextField("商品标题", text: selectedDraftBinding.title)
+            TextField("品牌", text: optionalBinding(\.brand))
+            TextField("系列/款名", text: optionalBinding(\.series))
+            TextField("分类", text: optionalBinding(\.category))
+            TextField("颜色", text: optionalBinding(\.color))
+            TextField("尺码", text: optionalBinding(\.size))
+            TextField("成色", text: optionalBinding(\.condition))
+            TextField("当前价", text: selectedDraftBinding.currentPriceText)
+                .keyboardType(.decimalPad)
+            TextField("原价", text: selectedDraftBinding.originalPriceText)
+                .keyboardType(.decimalPad)
+            TextField("定金", text: selectedDraftBinding.depositPriceText)
+                .keyboardType(.decimalPad)
+            TextField("尾款", text: selectedDraftBinding.balancePriceText)
+                .keyboardType(.decimalPad)
+            TextField("定金日期 yyyy-MM-dd", text: selectedDraftBinding.depositDateText)
+            TextField("尾款日期 yyyy-MM-dd", text: selectedDraftBinding.finalPaymentDateText)
+
+            if !selectedDraft.url.isEmpty {
+                Link("打开原链接", destination: URL(string: selectedDraft.url) ?? URL(string: "https://example.com")!)
+            }
+        }
+    }
+
+    private var activeRawText: String {
+        switch mode {
+        case .link:
+            return linkText
+        case .keyword:
+            return [keyword, keywordResultText]
+                .filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+                .joined(separator: "\n\n")
+        }
+    }
+
+    private var selectedDraft: ParsedItem {
+        guard drafts.indices.contains(selectedDraftIndex) else {
+            return ParsedItem.fallback(
+                from: SkirtMarketImportParser.localParse(activeRawText),
+                rawText: activeRawText,
+                capturedAt: Date()
+            )
+        }
+        return drafts[selectedDraftIndex]
+    }
+
+    private var selectedDraftBinding: Binding<ParsedItem> {
+        Binding(
+            get: { selectedDraft },
+            set: { newValue in
+                guard drafts.indices.contains(selectedDraftIndex) else { return }
+                drafts[selectedDraftIndex] = newValue
+            }
+        )
+    }
+
+    private func optionalBinding(_ keyPath: WritableKeyPath<ParsedItem, String?>) -> Binding<String> {
+        Binding(
+            get: { selectedDraft[keyPath: keyPath] ?? "" },
+            set: { newValue in
+                var draft = selectedDraft
+                draft[keyPath: keyPath] = newValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : newValue
+                if drafts.indices.contains(selectedDraftIndex) {
+                    drafts[selectedDraftIndex] = draft
+                }
+            }
+        )
+    }
+
+    private func analyze() async {
+        isAnalyzing = true
+        errorMessage = nil
+        defer { isAnalyzing = false }
+
+        let rawText = activeRawText
+        let capturedAt = Date()
+        let local = SkirtMarketImportParser.localParse(rawText)
+        let input = SkirtMarketDeepSeekInput(
+            mode: mode.rawValue,
+            platformHint: local.platformHint,
+            sourceURL: local.sourceURL,
+            keyword: mode == .keyword ? keyword : nil,
+            capturedAt: SkirtMarketImportParser.isoString(from: capturedAt),
+            rawText: rawText,
+            localParse: local
+        )
+
+        do {
+            let result = try await SkirtMarketDeepSeekImportService.shared.analyze(input: input)
+            drafts = result.items.map {
+                ParsedItem.fromAI($0, local: local, rawText: rawText, rawJSON: result.rawJSON, capturedAt: capturedAt)
+            }
+            if drafts.isEmpty {
+                drafts = [ParsedItem.fallback(from: local, rawText: rawText, capturedAt: capturedAt)]
+                errorMessage = "DeepSeek 未返回商品，已生成本地草稿。"
+            }
+            selectedDraftIndex = 0
+        } catch {
+            drafts = [ParsedItem.fallback(from: local, rawText: rawText, capturedAt: capturedAt)]
+            selectedDraftIndex = 0
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    private func platformDisplayName(_ platform: String) -> String {
+        switch platform {
         case "xianyu": return "闲鱼"
         case "xiaohongshu": return "小红书"
         case "taobao": return "淘宝"
         case "weidian": return "微店"
-        case "douyin": return "抖音"
-        default: return parsedItem.platform
+        default: return platform
         }
-    }
-}
-
-// MARK: - 手动添加商品 Sheet
-
-struct ManualAddItemSheet: View {
-    @Environment(\.dismiss) private var dismiss
-    
-    let onAdd: (GRDBLolitaItem) -> Void
-    
-    @State private var platform = "xianyu"
-    @State private var platformID = ""
-    @State private var rawTitle = ""
-    @State private var currentPrice = ""
-    
-    var body: some View {
-        NavigationStack {
-            Form {
-                Section("基本信息") {
-                    Picker("平台", selection: $platform) {
-                        Text("闲鱼").tag("xianyu")
-                        Text("小红书").tag("xiaohongshu")
-                        Text("淘宝").tag("taobao")
-                        Text("微店").tag("weidian")
-                        Text("抖音").tag("douyin")
-                    }
-                    
-                    TextField("平台商品ID", text: $platformID)
-                    TextField("商品标题", text: $rawTitle)
-                    TextField("价格", text: $currentPrice)
-                        .keyboardType(.decimalPad)
-                }
-            }
-            .navigationTitle("添加商品")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("取消") { dismiss() }
-                }
-                
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("添加") {
-                        if let price = Double(currentPrice), !rawTitle.isEmpty {
-                            let item = GRDBLolitaItem(
-                                platform: platform,
-                                platformID: platformID.isEmpty ? UUID().uuidString : platformID,
-                                rawTitle: rawTitle,
-                                currentPrice: price
-                            )
-                            onAdd(item)
-                            dismiss()
-                        }
-                    }
-                    .disabled(rawTitle.isEmpty || currentPrice.isEmpty)
-                }
-            }
-        }
-    }
-}
-
-// MARK: - 分享链接解析器
-
-enum ShareLinkParser {
-    static func parse(_ text: String) -> ParsedItem? {
-        if let xianyu = parseXianyuLink(text) { return xianyu }
-        if let xiaohongshu = parseXiaohongshuLink(text) { return xiaohongshu }
-        if let taobao = parseTaobaoLink(text) { return taobao }
-        if let weidian = parseWeidianLink(text) { return weidian }
-        if let douyin = parseDouyinLink(text) { return douyin }
-        return nil
-    }
-    
-    private static func parseXianyuLink(_ text: String) -> ParsedItem? {
-        let patterns = [
-            "https://m\\.tb\\.cn/h\\.[a-zA-Z0-9]+",
-            "https://2\\.taobao\\.com/item\\.htm\\?id=\\d+",
-            "闲鱼.*https?://[^\\s]+",
-            "【闲鱼】.*"
-        ]
-        
-        for pattern in patterns {
-            if let regex = try? NSRegularExpression(pattern: pattern, options: []),
-               let match = regex.firstMatch(in: text, options: [], range: NSRange(location: 0, length: text.utf16.count)) {
-                let url = (text as NSString).substring(with: match.range)
-                return ParsedItem(
-                    platform: "xianyu",
-                    platformID: extractItemID(from: url) ?? UUID().uuidString,
-                    title: extractTitle(from: text) ?? "闲鱼商品",
-                    price: extractPrice(from: text) ?? 0,
-                    url: url,
-                    imageURL: nil,
-                    sellerName: nil,
-                    rawContent: text
-                )
-            }
-        }
-        return nil
-    }
-    
-    private static func parseXiaohongshuLink(_ text: String) -> ParsedItem? {
-        let patterns = [
-            "https://www\\.xiaohongshu\\.com/explore/\\w+",
-            "https://xhslink\\.com/\\w+",
-            "小红书.*https?://[^\\s]+",
-            "【小红书】.*"
-        ]
-        
-        for pattern in patterns {
-            if let regex = try? NSRegularExpression(pattern: pattern, options: []),
-               let match = regex.firstMatch(in: text, options: [], range: NSRange(location: 0, length: text.utf16.count)) {
-                let url = (text as NSString).substring(with: match.range)
-                return ParsedItem(
-                    platform: "xiaohongshu",
-                    platformID: extractItemID(from: url) ?? UUID().uuidString,
-                    title: extractTitle(from: text) ?? "小红书商品",
-                    price: extractPrice(from: text) ?? 0,
-                    url: url,
-                    imageURL: nil,
-                    sellerName: nil,
-                    rawContent: text
-                )
-            }
-        }
-        return nil
-    }
-    
-    private static func parseTaobaoLink(_ text: String) -> ParsedItem? {
-        let patterns = [
-            "https://item\\.taobao\\.com/item\\.htm\\?id=\\d+",
-            "https://m\\.tb\\.cn/h\\.[a-zA-Z0-9]+",
-            "淘宝.*https?://[^\\s]+",
-            "【淘宝】.*"
-        ]
-        
-        for pattern in patterns {
-            if let regex = try? NSRegularExpression(pattern: pattern, options: []),
-               let match = regex.firstMatch(in: text, options: [], range: NSRange(location: 0, length: text.utf16.count)) {
-                let url = (text as NSString).substring(with: match.range)
-                return ParsedItem(
-                    platform: "taobao",
-                    platformID: extractItemID(from: url) ?? UUID().uuidString,
-                    title: extractTitle(from: text) ?? "淘宝商品",
-                    price: extractPrice(from: text) ?? 0,
-                    url: url,
-                    imageURL: nil,
-                    sellerName: nil,
-                    rawContent: text
-                )
-            }
-        }
-        return nil
-    }
-    
-    private static func parseWeidianLink(_ text: String) -> ParsedItem? {
-        let patterns = [
-            "https://weidian\\.com/item\\.html\\?itemID=\\d+",
-            "https://k\\.weidian\\.com/\\w+",
-            "微店.*https?://[^\\s]+",
-            "【微店】.*"
-        ]
-        
-        for pattern in patterns {
-            if let regex = try? NSRegularExpression(pattern: pattern, options: []),
-               let match = regex.firstMatch(in: text, options: [], range: NSRange(location: 0, length: text.utf16.count)) {
-                let url = (text as NSString).substring(with: match.range)
-                return ParsedItem(
-                    platform: "weidian",
-                    platformID: extractItemID(from: url) ?? UUID().uuidString,
-                    title: extractTitle(from: text) ?? "微店商品",
-                    price: extractPrice(from: text) ?? 0,
-                    url: url,
-                    imageURL: nil,
-                    sellerName: nil,
-                    rawContent: text
-                )
-            }
-        }
-        return nil
-    }
-    
-    private static func parseDouyinLink(_ text: String) -> ParsedItem? {
-        let patterns = [
-            "https://v\\.douyin\\.com/\\w+",
-            "https://www\\.douyin\\.com/video/\\d+",
-            "抖音.*https?://[^\\s]+",
-            "【抖音】.*"
-        ]
-        
-        for pattern in patterns {
-            if let regex = try? NSRegularExpression(pattern: pattern, options: []),
-               let match = regex.firstMatch(in: text, options: [], range: NSRange(location: 0, length: text.utf16.count)) {
-                let url = (text as NSString).substring(with: match.range)
-                return ParsedItem(
-                    platform: "douyin",
-                    platformID: extractItemID(from: url) ?? UUID().uuidString,
-                    title: extractTitle(from: text) ?? "抖音商品",
-                    price: extractPrice(from: text) ?? 0,
-                    url: url,
-                    imageURL: nil,
-                    sellerName: nil,
-                    rawContent: text
-                )
-            }
-        }
-        return nil
-    }
-    
-    private static func extractItemID(from url: String) -> String? {
-        guard let url = URL(string: url),
-              let components = URLComponents(url: url, resolvingAgainstBaseURL: false) else {
-            return nil
-        }
-        
-        let queryItems = components.queryItems ?? []
-        
-        if let id = queryItems.first(where: { $0.name == "id" })?.value {
-            return id
-        }
-        if let itemID = queryItems.first(where: { $0.name == "itemID" })?.value {
-            return itemID
-        }
-        
-        let path = url.path
-        let pathComponents = path.components(separatedBy: "/")
-        if let lastComponent = pathComponents.last, !lastComponent.isEmpty {
-            return lastComponent
-        }
-        
-        return nil
-    }
-    
-    private static func extractTitle(from text: String) -> String? {
-        let patterns = [
-            "【([^】]+)】",
-            "\\[([^\\]]+)\\]",
-            "《([^》]+)》"
-        ]
-        
-        for pattern in patterns {
-            if let regex = try? NSRegularExpression(pattern: pattern, options: []),
-               let match = regex.firstMatch(in: text, options: [], range: NSRange(location: 0, length: text.utf16.count)) {
-                let title = (text as NSString).substring(with: match.range(at: 1))
-                return title.trimmingCharacters(in: .whitespaces)
-            }
-        }
-        
-        return nil
-    }
-    
-    private static func extractPrice(from text: String) -> Double? {
-        let patterns = [
-            "¥(\\d+(?:\\.\\d+)?)",
-            "(\\d+(?:\\.\\d+)?)元",
-            "价格[:：]\\s*(\\d+(?:\\.\\d+)?)"
-        ]
-        
-        for pattern in patterns {
-            if let regex = try? NSRegularExpression(pattern: pattern, options: []),
-               let match = regex.firstMatch(in: text, options: [], range: NSRange(location: 0, length: text.utf16.count)) {
-                let priceString = (text as NSString).substring(with: match.range(at: 1))
-                return Double(priceString)
-            }
-        }
-        
-        return nil
     }
 }
 

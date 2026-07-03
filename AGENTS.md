@@ -7,6 +7,14 @@
 - 在进行 iOS 开发时，可以按任务需要运行 `xcodebuild` 构建、测试或模拟器验收；运行后需在结果中记录命令、通过/失败状态和验证边界。若用户明确说本次不跑构建，则遵守该次约束。
 - 进行鸿蒙 / 安卓开发时，用命令行编译。
 
+## Subagent 调用规则
+
+- 只有用户明确要求子任务、并行 agent 或分配 subagent 时才调用 `spawn_agent`。
+- `spawn_agent` 不要同时传 `fork_context: true` 和 `agent_type`；完整上下文 fork 会继承父 agent 类型。
+- 需要 `explorer` / `worker` 类型时，用 `fork_context: false` 或省略它，并在 prompt 里显式写仓库路径、只读/写入边界和任务上下文。
+- 需要完整上下文 fork 时，省略 `agent_type`、`model`、`reasoning_effort`。
+- 子 agent 完成后及时 `close_agent`，避免长期占用并发。
+
 ## Xcode 27 beta / SDK 27
 
 - 使用 Xcode beta 时默认显式设置 `DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer`，不要为单次构建改全局 `xcode-select`。

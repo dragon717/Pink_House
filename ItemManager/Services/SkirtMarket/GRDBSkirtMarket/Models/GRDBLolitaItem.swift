@@ -60,11 +60,66 @@ struct GRDBLolitaItem: Codable, FetchableRecord, PersistableRecord, Identifiable
     
     /// 价格趋势: bargain(好价), fair(合理), premium(溢价), unknown(未知)
     var priceTrend: String
+
+    /// 来源链接
+    var sourceURL: String?
+
+    /// 原价
+    var originalPrice: Double?
+
+    /// 定金
+    var depositPrice: Double?
+
+    /// 尾款
+    var balancePrice: Double?
+
+    /// 定金时间
+    var depositDate: Date?
+
+    /// 尾款时间
+    var finalPaymentDate: Date?
+
+    /// AI 分析采集时间
+    var analysisCapturedAt: Date?
+
+    /// AI 置信度
+    var analysisConfidence: Double?
+
+    /// 原始 AI JSON
+    var rawAnalysisJSON: String?
     
     // MARK: - 表名
     
     static var databaseTableName: String {
         "lolita_items"
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case cloudKitRecordID = "cloud_kit_record_id"
+        case platformID = "platform_id"
+        case platform
+        case rawTitle = "raw_title"
+        case cleanedName = "cleaned_name"
+        case brand
+        case currentPrice = "current_price"
+        case currency
+        case status
+        case isDeleted = "is_deleted"
+        case firstSeenAt = "first_seen_at"
+        case lastUpdated = "last_updated"
+        case syncStatus = "sync_status"
+        case modifiedAt = "modified_at"
+        case priceTrend = "price_trend"
+        case sourceURL = "source_url"
+        case originalPrice = "original_price"
+        case depositPrice = "deposit_price"
+        case balancePrice = "balance_price"
+        case depositDate = "deposit_date"
+        case finalPaymentDate = "final_payment_date"
+        case analysisCapturedAt = "analysis_captured_at"
+        case analysisConfidence = "analysis_confidence"
+        case rawAnalysisJSON = "raw_analysis_json"
     }
     
     // MARK: - 初始化
@@ -85,7 +140,16 @@ struct GRDBLolitaItem: Codable, FetchableRecord, PersistableRecord, Identifiable
         lastUpdated: Date = Date(),
         syncStatus: String = "pending",
         modifiedAt: Date = Date(),
-        priceTrend: String = "unknown"
+        priceTrend: String = "unknown",
+        sourceURL: String? = nil,
+        originalPrice: Double? = nil,
+        depositPrice: Double? = nil,
+        balancePrice: Double? = nil,
+        depositDate: Date? = nil,
+        finalPaymentDate: Date? = nil,
+        analysisCapturedAt: Date? = nil,
+        analysisConfidence: Double? = nil,
+        rawAnalysisJSON: String? = nil
     ) {
         self.id = id
         self.cloudKitRecordID = cloudKitRecordID
@@ -103,6 +167,15 @@ struct GRDBLolitaItem: Codable, FetchableRecord, PersistableRecord, Identifiable
         self.syncStatus = syncStatus
         self.modifiedAt = modifiedAt
         self.priceTrend = priceTrend
+        self.sourceURL = sourceURL
+        self.originalPrice = originalPrice
+        self.depositPrice = depositPrice
+        self.balancePrice = balancePrice
+        self.depositDate = depositDate
+        self.finalPaymentDate = finalPaymentDate
+        self.analysisCapturedAt = analysisCapturedAt
+        self.analysisConfidence = analysisConfidence
+        self.rawAnalysisJSON = rawAnalysisJSON
     }
     
     // MARK: - 计算属性
@@ -141,6 +214,63 @@ extension GRDBLolitaItem {
         static let syncStatus = Column("sync_status")
         static let modifiedAt = Column("modified_at")
         static let priceTrend = Column("price_trend")
+        static let sourceURL = Column("source_url")
+        static let originalPrice = Column("original_price")
+        static let depositPrice = Column("deposit_price")
+        static let balancePrice = Column("balance_price")
+        static let depositDate = Column("deposit_date")
+        static let finalPaymentDate = Column("final_payment_date")
+        static let analysisCapturedAt = Column("analysis_captured_at")
+        static let analysisConfidence = Column("analysis_confidence")
+        static let rawAnalysisJSON = Column("raw_analysis_json")
+    }
+}
+
+// MARK: - 价格事件
+
+struct GRDBLolitaPriceEvent: Codable, FetchableRecord, PersistableRecord, Identifiable {
+    var id: String
+    var platformID: String
+    var kind: String
+    var amount: Double
+    var currency: String
+    var observedAt: Date
+    var appliesAt: Date?
+    var source: String
+
+    static var databaseTableName: String {
+        "lolita_price_events"
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case platformID = "platform_id"
+        case kind
+        case amount
+        case currency
+        case observedAt = "observed_at"
+        case appliesAt = "applies_at"
+        case source
+    }
+
+    init(
+        id: String = UUID().uuidString,
+        platformID: String,
+        kind: String,
+        amount: Double,
+        currency: String = "CNY",
+        observedAt: Date,
+        appliesAt: Date? = nil,
+        source: String
+    ) {
+        self.id = id
+        self.platformID = platformID
+        self.kind = kind
+        self.amount = amount
+        self.currency = currency
+        self.observedAt = observedAt
+        self.appliesAt = appliesAt
+        self.source = source
     }
 }
 

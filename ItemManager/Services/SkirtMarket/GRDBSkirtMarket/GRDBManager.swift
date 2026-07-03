@@ -102,9 +102,40 @@ final class GRDBManager {
                 t.column("sync_status", .text).notNull().defaults(to: "pending") // pending, synced, conflict
                 t.column("modified_at", .datetime).notNull()
                 t.column("price_trend", .text).notNull().defaults(to: "unknown") // bargain, fair, premium, unknown
+                t.column("source_url", .text)
+                t.column("original_price", .double)
+                t.column("deposit_price", .double)
+                t.column("balance_price", .double)
+                t.column("deposit_date", .datetime)
+                t.column("final_payment_date", .datetime)
+                t.column("analysis_captured_at", .datetime)
+                t.column("analysis_confidence", .double)
+                t.column("raw_analysis_json", .text)
                 
                 // 索引
                 t.uniqueKey(["platform_id"])
+            }
+
+            try Self.ensureColumn(db, table: "lolita_items", name: "source_url", definition: "TEXT")
+            try Self.ensureColumn(db, table: "lolita_items", name: "original_price", definition: "DOUBLE")
+            try Self.ensureColumn(db, table: "lolita_items", name: "deposit_price", definition: "DOUBLE")
+            try Self.ensureColumn(db, table: "lolita_items", name: "balance_price", definition: "DOUBLE")
+            try Self.ensureColumn(db, table: "lolita_items", name: "deposit_date", definition: "DATETIME")
+            try Self.ensureColumn(db, table: "lolita_items", name: "final_payment_date", definition: "DATETIME")
+            try Self.ensureColumn(db, table: "lolita_items", name: "analysis_captured_at", definition: "DATETIME")
+            try Self.ensureColumn(db, table: "lolita_items", name: "analysis_confidence", definition: "DOUBLE")
+            try Self.ensureColumn(db, table: "lolita_items", name: "raw_analysis_json", definition: "TEXT")
+
+            // 1.1 LolitaPriceEvent 表：每个价格都必须带时间
+            try db.create(table: "lolita_price_events", ifNotExists: true) { t in
+                t.primaryKey("id", .text)
+                t.column("platform_id", .text).notNull()
+                t.column("kind", .text).notNull()
+                t.column("amount", .double).notNull()
+                t.column("currency", .text).notNull().defaults(to: "CNY")
+                t.column("observed_at", .datetime).notNull()
+                t.column("applies_at", .datetime)
+                t.column("source", .text).notNull()
             }
             
             // 2. SkirtStockMetric 表
@@ -173,6 +204,16 @@ final class GRDBManager {
         }
         
         print("✅ 数据库表创建完成")
+    }
+
+    nonisolated private static func ensureColumn(_ db: Database, table: String, name: String, definition: String) throws {
+        let rows = try Row.fetchAll(db, sql: "PRAGMA table_info(\(table))")
+        let exists = rows.contains { row in
+            let columnName: String? = row["name"]
+            return columnName == name
+        }
+        guard !exists else { return }
+        try db.execute(sql: "ALTER TABLE \(table) ADD COLUMN \(name) \(definition)")
     }
     
     // MARK: - 公共方法

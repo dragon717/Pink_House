@@ -13496,6 +13496,12 @@
         }
       }
     },
+    "DeepSeek 分析" : {
+
+    },
+    "DeepSeek 商品解析" : {
+
+    },
     "DS_API_KEY" : {
       "localizations" : {
         "en" : {
@@ -26126,6 +26132,9 @@
         }
       }
     },
+    "例如 AP 辉夜姬 黑色 JSK" : {
+
+    },
     "例如: 90cm" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -26898,6 +26907,9 @@
           }
         }
       }
+    },
+    "保存前确认" : {
+
     },
     "保存后会把这条裙装从「已拥有」切换为「%@」，并将裙装状态改为「%@」。%@" : {
       "extractionState" : "stale",
@@ -31727,6 +31739,12 @@
         }
       }
     },
+    "关键词" : {
+
+    },
+    "关键词模式" : {
+
+    },
     "关闭" : {
       "localizations" : {
         "de" : {
@@ -34159,6 +34177,9 @@
         }
       }
     },
+    "分析中..." : {
+
+    },
     "分段" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -34206,7 +34227,6 @@
       }
     },
     "分类" : {
-      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -38828,7 +38848,6 @@
       }
     },
     "原价" : {
-      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -39238,6 +39257,7 @@
       }
     },
     "原始内容" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -43329,7 +43349,6 @@
       }
     },
     "品牌" : {
-      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -43843,7 +43862,14 @@
         }
       }
     },
+    "商品" : {
+
+    },
+    "商品/搜索结果文本" : {
+
+    },
     "商品信息" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -51474,7 +51500,6 @@
       }
     },
     "定金" : {
-      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -51990,6 +52015,9 @@
           }
         }
       }
+    },
+    "定金日期 yyyy-MM-dd" : {
+
     },
     "实时" : {
       "extractionState" : "stale",
@@ -54683,7 +54711,6 @@
       }
     },
     "尺码" : {
-      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -54978,7 +55005,6 @@
       }
     },
     "尾款" : {
-      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -55435,6 +55461,9 @@
           }
         }
       }
+    },
+    "尾款日期 yyyy-MM-dd" : {
+
     },
     "尾款金额" : {
       "extractionState" : "stale",
@@ -63160,6 +63189,9 @@
         }
       }
     },
+    "当前价" : {
+
+    },
     "当前余额" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -68522,6 +68554,9 @@
           }
         }
       }
+    },
+    "成色" : {
+
     },
     "我" : {
       "localizations" : {
@@ -73978,6 +74013,9 @@
         }
       }
     },
+    "打开原链接" : {
+
+    },
     "打开喵币充值" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -75319,6 +75357,7 @@
       }
     },
     "抖音" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -92507,7 +92546,6 @@
       }
     },
     "模式" : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -97143,6 +97181,9 @@
           }
         }
       }
+    },
+    "添加为裙装" : {
+
     },
     "添加你的第一件裙子" : {
       "extractionState" : "stale",
@@ -111205,6 +111246,9 @@
         }
       }
     },
+    "粘贴链接/文本" : {
+
+    },
     "精力" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -111545,6 +111589,9 @@
           }
         }
       }
+    },
+    "系列/款名" : {
+
     },
     "系列分类规则" : {
       "extractionState" : "stale",
@@ -114860,6 +114907,9 @@
         }
       }
     },
+    "缺失：%@" : {
+
+    },
     "缺少道具" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -115139,6 +115189,9 @@
           }
         }
       }
+    },
+    "置信度" : {
+
     },
     "置底" : {
       "extractionState" : "stale",
@@ -121459,6 +121512,7 @@
       }
     },
     "解析分享链接" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -134420,6 +134474,7 @@
       }
     },
     "链接" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -134440,6 +134495,9 @@
           }
         }
       }
+    },
+    "链接/粘贴文本" : {
+
     },
     "错误" : {
       "extractionState" : "stale",
@@ -138231,7 +138289,6 @@
       }
     },
     "颜色" : {
-      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {

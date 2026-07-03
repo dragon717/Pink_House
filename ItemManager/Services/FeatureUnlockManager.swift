@@ -319,6 +319,10 @@ enum FeatureItem: String, CaseIterable, Identifiable {
     }
 
     var isComingSoonFeature: Bool {
+        #if DEBUG
+        if self == .dressStock { return false }
+        #endif
+
         switch self {
         case .bigWorld, .perler, .dressStock, .networkCommunity:
             return true
@@ -583,6 +587,10 @@ final class FeatureUnlockManager: ObservableObject {
 
     /// 是否已解锁
     func isUnlocked(_ feature: FeatureItem) -> Bool {
+        #if DEBUG
+        if feature == .dressStock { return true }
+        #endif
+
         // 免费功能直接返回true
         let condition = getCondition(for: feature)
         if condition.type == UnlockConditionType.free.rawValue {
@@ -593,6 +601,10 @@ final class FeatureUnlockManager: ObservableObject {
 
     /// 是否显示
     func isVisible(_ feature: FeatureItem) -> Bool {
+        #if DEBUG
+        if feature == .dressStock { return true }
+        #endif
+
         let status = getStatus(for: feature)
         return status.isVisible
     }
