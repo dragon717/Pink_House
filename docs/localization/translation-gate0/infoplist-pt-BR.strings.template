@@ -1,0 +1,9 @@
+"CFBundleDisplayName" = "Pink House";
+"NSCameraUsageDescription" = "O Pink House precisa da câmera para fotos de roupas e scans 3D.";
+"NSLocationWhenInUseUsageDescription" = "O Pink House usa sua localização para sugestões de looks baseadas na região.";
+"NSMicrophoneUsageDescription" = "O Pink House precisa do microfone para interações de voz com o pet e gravação.";
+"NSMotionUsageDescription" = "O Pink House usa dados de movimento para o efeito de parallax 3D.";
+"NSPhotoLibraryAddUsageDescription" = "O Pink House precisa da biblioteca de fotos para salvar imagens.";
+"NSPhotoLibraryUsageDescription" = "O Pink House precisa da biblioteca de fotos para escolher fotos de roupas.";
+"NSSpeechRecognitionUsageDescription" = "O Pink House usa reconhecimento de voz para interações e comandos do pet.";
+"NSWorldSensingUsageDescription" = "O Pink House usa sensores do ambiente para scans 3D de objetos.";

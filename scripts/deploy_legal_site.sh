@@ -59,6 +59,11 @@ curl -fsSIL \"http://127.0.0.1/privacy/\" -H \"Host: ${DOMAIN_PRIMARY}\" >/dev/n
 curl -fsSIL \"http://127.0.0.1/user-agreement/\" -H \"Host: ${DOMAIN_PRIMARY}\" >/dev/null
 curl -fsSIL \"http://127.0.0.1/vip-agreement/\" -H \"Host: ${DOMAIN_PRIMARY}\" >/dev/null
 curl -fsSIL \"http://127.0.0.1/contact/\" -H \"Host: ${DOMAIN_PRIMARY}\" >/dev/null
+curl -fsSIL \"http://127.0.0.1/en/\" -H \"Host: ${DOMAIN_PRIMARY}\" >/dev/null
+curl -fsSIL \"http://127.0.0.1/en/privacy/\" -H \"Host: ${DOMAIN_PRIMARY}\" >/dev/null
+curl -fsSIL \"http://127.0.0.1/en/user-agreement/\" -H \"Host: ${DOMAIN_PRIMARY}\" >/dev/null
+curl -fsSIL \"http://127.0.0.1/en/vip-agreement/\" -H \"Host: ${DOMAIN_PRIMARY}\" >/dev/null
+curl -fsSIL \"http://127.0.0.1/en/contact/\" -H \"Host: ${DOMAIN_PRIMARY}\" >/dev/null
 '"
 
 echo "==> [5/5] 公网 HTTPS 健康检查"
@@ -67,6 +72,11 @@ curl -fsSIL "https://${DOMAIN_PRIMARY}/privacy/" >/dev/null
 curl -fsSIL "https://${DOMAIN_PRIMARY}/user-agreement/" >/dev/null
 curl -fsSIL "https://${DOMAIN_PRIMARY}/vip-agreement/" >/dev/null
 curl -fsSIL "https://${DOMAIN_PRIMARY}/contact/" >/dev/null
+curl -fsSIL "https://${DOMAIN_PRIMARY}/en/" >/dev/null
+curl -fsSIL "https://${DOMAIN_PRIMARY}/en/privacy/" >/dev/null
+curl -fsSIL "https://${DOMAIN_PRIMARY}/en/user-agreement/" >/dev/null
+curl -fsSIL "https://${DOMAIN_PRIMARY}/en/vip-agreement/" >/dev/null
+curl -fsSIL "https://${DOMAIN_PRIMARY}/en/contact/" >/dev/null
 curl -fsSIL "https://${DOMAIN_WWW}/" >/dev/null
 
 echo "✅ 部署完成"
@@ -75,3 +85,8 @@ echo "   - https://${DOMAIN_PRIMARY}/privacy/"
 echo "   - https://${DOMAIN_PRIMARY}/user-agreement/"
 echo "   - https://${DOMAIN_PRIMARY}/vip-agreement/"
 echo "   - https://${DOMAIN_PRIMARY}/contact/"
+echo "   - https://${DOMAIN_PRIMARY}/en/"
+echo "   - https://${DOMAIN_PRIMARY}/en/privacy/"
+echo "   - https://${DOMAIN_PRIMARY}/en/user-agreement/"
+echo "   - https://${DOMAIN_PRIMARY}/en/vip-agreement/"
+echo "   - https://${DOMAIN_PRIMARY}/en/contact/"

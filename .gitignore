@@ -49,3 +49,5 @@ android/build/*
 ItemManager/.DS_Store
 code/*
 asserts/psd/*
+.cursor/*
+
