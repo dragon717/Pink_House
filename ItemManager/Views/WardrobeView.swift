@@ -577,6 +577,7 @@ struct WardrobeView: View {
     @State private var showingDeleteSingleAlert = false
     @State private var itemToCopy: Clothing?
     @State private var showingCopyAlert = false
+    @State private var itemToEdit: Clothing?
     @State private var detailNavigationTarget: Clothing?
     @State private var isShowingDetailNavigation = false
     
@@ -913,6 +914,11 @@ struct WardrobeView: View {
         .navigationDestination(isPresented: $isShowingDetailNavigation) {
             if let detailNavigationTarget {
                 ClothingDetailView(clothing: detailNavigationTarget)
+            }
+        }
+        .sheet(item: $itemToEdit) { clothing in
+            NavigationStack {
+                ClothingEditView(clothing: clothing)
             }
         }
     }
@@ -2339,6 +2345,12 @@ struct WardrobeView: View {
                 openDetailIfPresent(clothingID)
             } label: {
                 Label("查看详情".appLocalized, systemImage: "info.circle")
+            }
+
+            Button {
+                itemToEdit = clothing(with: clothingID)
+            } label: {
+                Label("编辑裙装".appLocalized, systemImage: "pencil")
             }
 
             Divider()
