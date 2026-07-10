@@ -269,14 +269,17 @@ struct BookDetailView: View {
             .onAppear {
                 // 每次进入视图时重新获取书页数据
                 loadPages()
+                #if DEBUG
                 // 打印当前手帐的书页状态
                 printBookPagesStatus()
+                #endif
                 // 发送通知用于空间手帐前置任务引导（附带书页状态）
                 let hasPages = sortedPages.contains { $0.deletedAt == nil }
                 NotificationCenter.default.post(name: .ootdBookDetailOpened, object: nil, userInfo: ["hasPages": hasPages])
             }
     }
 
+    #if DEBUG
     // 打印当前手帐的书页状态
     func printBookPagesStatus() {
         print("=== 手帐『\(book.title)』书页状态 ===")
@@ -287,28 +290,21 @@ struct BookDetailView: View {
         }
         print("========================")
     }
+    #endif
 
     private func loadPages() {
-        // 先查询所有书页（包括已删除的），用于调试
-        let allDescriptor = FetchDescriptor<Outfit>(sortBy: [SortDescriptor(\Outfit.sortIndex)])
-        do {
-            let allPages = try modelContext.fetch(allDescriptor)
-            print("### LOAD: Total pages in database: \(allPages.count)")
-            for p in allPages {
-                print("### LOAD: Page '\(p.note)' - isDeleted:\(p.isDeleted), deletedAt:\(String(describing: p.deletedAt)), book:\(p.book?.title ?? "nil")")
-            }
-        } catch {
-            print("### LOAD: Failed to fetch all pages: \(error)")
-        }
-
-        // 正常查询只加载未删除的书页
+        // 性能优化：只查询当前手帐的未删除书页（原先 fetch 了数据库中所有 Outfit）
+        // 注意：#Predicate 中不能直接引用 self.book，需先取出局部变量
+        let bookID = book.id
         let descriptor = FetchDescriptor<Outfit>(
-            predicate: #Predicate { $0.isDeleted == false },
+            predicate: #Predicate { $0.isDeleted == false && $0.book?.id == bookID },
             sortBy: [SortDescriptor(\Outfit.sortIndex)]
         )
         do {
             pages = try modelContext.fetch(descriptor)
-            print("BookDetailView: Loaded \(pages.count) pages")
+            #if DEBUG
+            print("BookDetailView: Loaded \(pages.count) pages for book '\(book.title)'")
+            #endif
         } catch {
             print("BookDetailView: Failed to load pages: \(error)")
             pages = []

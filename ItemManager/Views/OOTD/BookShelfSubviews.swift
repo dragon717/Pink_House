@@ -259,31 +259,50 @@ extension View {
 struct BookCoverVisuals: View {
     let book: BookGroup
     @Environment(\.colorScheme) private var colorScheme
-    
-    var coverImage: UIImage? {
-        if let coverPath = book.coverImage,
-           let image = ImageManager.shared.loadImage(fileName: coverPath) {
-            return image
+    // 性能优化：封面图改为异步降采样加载（原先在 body 中同步解码全尺寸原图，导致书架进入卡顿）
+    @State private var loadedCoverImage: UIImage?
+    @State private var isLoading = true
+
+    /// 封面显示尺寸（用于降采样，避免解码全尺寸原图）
+    private static let coverTargetSize = CGSize(width: 320, height: 440)
+
+    /// 封面来源标识：封面路径（或回退的首页快照路径）变化时触发重新加载。
+    /// 有自定义封面时直接返回路径，避免在 body 中遍历 book.pages。
+    private var coverSourceKey: String {
+        if let coverPath = book.coverImage {
+            return coverPath
         }
-        // Fallback to first page
-        if let firstPage = (book.pages ?? []).filter({ !$0.isDeleted }).sorted(by: { $0.createdAt > $1.createdAt }).first,
-           let snapshotPath = firstPage.snapshotPath,
-           let image = ImageManager.shared.loadImage(fileName: snapshotPath) {
-            return image
-        }
-        return nil
+        return fallbackSnapshotPath ?? ""
     }
-    
+
+    /// 回退封面：最新一张未删除书页的快照路径（用 max(by:) 避免排序整个数组）
+    private var fallbackSnapshotPath: String? {
+        (book.pages ?? [])
+            .filter { !$0.isDeleted }
+            .max(by: { $0.createdAt < $1.createdAt })?
+            .snapshotPath
+    }
+
     var body: some View {
         ZStack {
             colorScheme == .dark ? Color(uiColor: .systemGray6) : Color.white
             
-            if let image = coverImage {
+            if let image = loadedCoverImage {
                 Image(uiImage: image)
                     .resizable()
                     .scaledToFill()
                     .frame(width: 160, height: 220)
                     .clipped()
+            } else if isLoading {
+                // 加载中状态
+                VStack {
+                    ProgressView()
+                        .scaleEffect(0.8)
+                    Text(book.title)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .padding(.top, 8)
+                }
             } else {
                 VStack {
                     Image(systemName: "book.closed")
@@ -298,7 +317,7 @@ struct BookCoverVisuals: View {
             }
             
             // Title Overlay if has image
-            if coverImage != nil {
+            if loadedCoverImage != nil {
                 VStack {
                     Spacer()
                     ZStack {
@@ -325,6 +344,34 @@ struct BookCoverVisuals: View {
         .background(colorScheme == .dark ? Color(uiColor: .systemGray6) : Color.white)
         .cornerRadius(4, corners: [.topRight, .bottomRight])
         .shadow(color: .black.opacity(colorScheme == .dark ? 0.4 : 0.2), radius: 5, x: 5, y: 5)
+        // 封面路径（含回退的首页快照路径）变化时重新加载
+        .task(id: coverSourceKey) {
+            await loadCoverImage()
+        }
+    }
+
+    private func loadCoverImage() async {
+        isLoading = true
+        defer { isLoading = false }
+
+        // 1. 优先加载用户设置的封面图片（降采样到显示尺寸）
+        if let coverPath = book.coverImage {
+            if let image = await ImageManager.shared.loadImageAsync(fileName: coverPath, targetSize: Self.coverTargetSize) {
+                loadedCoverImage = image
+                return
+            }
+        }
+
+        // 2. 回退到最新一张未删除书页的快照
+        if let snapshotPath = fallbackSnapshotPath {
+            if let image = await ImageManager.shared.loadImageAsync(fileName: snapshotPath, targetSize: Self.coverTargetSize) {
+                loadedCoverImage = image
+                return
+            }
+        }
+
+        // 3. 都没有找到，显示占位符
+        loadedCoverImage = nil
     }
 }
 

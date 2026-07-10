@@ -126,11 +126,14 @@ struct SpaceOutfitPreviewView: View {
     @State private var shouldShowARView = false
     @State private var refreshTrigger = UUID()
     
-    // 性能优化：根据设备内存决定是否使用ARView
+    // 性能优化：列表/网格场景禁用实时 ARView 预览。
+    // 原逻辑在高内存设备上为每个可见书页创建 SpaceOutfitARPreview（RealityKit 每帧渲染），
+    // LazyVGrid 滚动时可同时存在多个 ARView，导致 CPU 持续过高；
+    // 且 captureThumbnail() 为占位实现，缩略图永远不会生成、ARView 也不会被销毁。
+    // 缩略图由编辑器保存/缩略图编辑器生成，并通过 .spaceOutfitThumbnailUpdated 通知刷新。
+    // 编辑器的实时渲染走 SpatialCanvasEditorView 独立视图，不受此开关影响。
     private var useARViewPreview: Bool {
-        let totalMemory = ProcessInfo.processInfo.physicalMemory
-        // 2GB以下设备不使用实时ARView预览
-        return totalMemory > 2 * 1024 * 1024 * 1024
+        return false
     }
     
     var body: some View {
@@ -227,7 +230,20 @@ struct SpaceOutfitPreviewView: View {
             return
         }
         
-        // 2. 加载场景对象
+        // 2. 无缓存缩略图时，回退到已保存的静态快照图片（避免实时渲染）
+        if let snapshotPath = page.snapshotPath,
+           let snapshot = await ImageManager.shared.loadImageAsync(fileName: snapshotPath, targetSize: CGSize(width: 320, height: 440)) {
+            await MainActor.run {
+                self.thumbnailImage = snapshot
+            }
+            return
+        }
+        
+        // 3. 列表场景已禁用实时 ARView 预览（useARViewPreview == false），
+        //    无需加载场景对象，直接显示占位符，等待编辑器生成缩略图后通过通知刷新
+        guard useARViewPreview else { return }
+        
+        // 4. 加载场景对象并显示 ARView（当前不会执行，保留以便日后恢复实时预览）
         let objects = await MainActor.run {
             page.fetchSceneObjects(context: modelContext)
         }
@@ -237,21 +253,12 @@ struct SpaceOutfitPreviewView: View {
         await MainActor.run {
             self.sceneObjects = sceneObjects
             
-            // 3. 如果场景为空，显示占位符
+            // 如果场景为空，显示占位符
             if sceneObjects.isEmpty {
                 return
             }
             
-            // 4. 高内存设备显示ARView，低内存设备直接生成缩略图
-            if useARViewPreview {
-                self.shouldShowARView = true
-            } else {
-                // 低内存设备：异步生成缩略图
-                self.isGeneratingThumbnail = true
-                Task {
-                    await generateThumbnailAsync()
-                }
-            }
+            self.shouldShowARView = true
         }
     }
     

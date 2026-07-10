@@ -242,7 +242,9 @@ struct BookShelfView: View {
         AppFirstLaunchGuideManager.shared.requestGuideTargetRecapture()
         let hasUserBooks = hasUserCreatedBooks()
         let hasUserPages = hasUserCreatedPages()
+        #if DEBUG
         print("[Guide] BookShelf state notify - hasUserBooks: \(hasUserBooks), hasUserPages: \(hasUserPages), totalBooks: \(books.count)")
+        #endif
         NotificationCenter.default.post(
             name: .ootdShelfOpened,
             object: nil,
@@ -270,38 +272,19 @@ struct BookShelfView: View {
     }
 
     /// 检查是否有用户手动创建的非默认手帐
+    /// 性能优化：直接用已有 @Query 结果（books 已过滤 deletedAt == nil）在内存推导，避免额外的数据库查询
     private func hasUserCreatedBooks() -> Bool {
         let defaultBookTitle = "默认手帐"
-        // 查询非默认且未删除的手帐
-        let descriptor = FetchDescriptor<BookGroup>(
-            predicate: #Predicate { $0.deletedAt == nil && $0.title != defaultBookTitle }
-        )
-        do {
-            let userBooks = try modelContext.fetch(descriptor)
-            return !userBooks.isEmpty
-        } catch {
-            print("[BookShelf] Failed to fetch user created books: \(error)")
-            return false
-        }
+        return books.contains { $0.title != defaultBookTitle }
     }
 
     /// 检查用户手动创建的手帐中是否有书页
+    /// 性能优化：直接用已有 @Query 结果（allOutfits 已过滤 deletedAt == nil 且 isDeleted == false）在内存推导
     private func hasUserCreatedPages() -> Bool {
         let defaultBookTitle = "默认手帐"
-        // 查询属于非默认手帐且未删除的书页
-        let descriptor = FetchDescriptor<Outfit>(
-            predicate: #Predicate {
-                $0.deletedAt == nil &&
-                $0.book?.deletedAt == nil &&
-                $0.book?.title != defaultBookTitle
-            }
-        )
-        do {
-            let userPages = try modelContext.fetch(descriptor)
-            return !userPages.isEmpty
-        } catch {
-            print("[BookShelf] Failed to fetch user created pages: \(error)")
-            return false
+        return allOutfits.contains { outfit in
+            guard let book = outfit.book else { return false }
+            return book.deletedAt == nil && book.title != defaultBookTitle
         }
     }
 
@@ -344,36 +327,43 @@ struct BookShelfView: View {
     }
     
     private func performMigration() {
+        // 提前退出：没有任何书页时无需迁移
+        guard !allOutfits.isEmpty else { return }
+
         // 只迁移未删除的孤儿书页，避免已删除的书页被复活
         let orphanOutfits = allOutfits.filter { $0.book == nil && !$0.isDeleted }
 
-        if !orphanOutfits.isEmpty {
-            let defaultBook: BookGroup
-            if let existingDefault = books.first(where: { $0.title == "默认手帐" }) {
-                defaultBook = existingDefault
-            } else if let anyBook = books.first {
-                defaultBook = anyBook
-            } else {
-                defaultBook = BookGroup(title: "默认手帐")
-                modelContext.insert(defaultBook)
-            }
+        // 提前退出：没有孤儿书页时无需迁移，也不触发 save
+        guard !orphanOutfits.isEmpty else { return }
 
-            for outfit in orphanOutfits {
-                outfit.book = defaultBook
-            }
-
-            do {
-                try modelContext.save()
-                print("BookShelfView: Migrated \(orphanOutfits.count) orphan outfits to default book")
-            } catch {
-                print("BookShelfView: Failed to save migration: \(error)")
-            }
+        let defaultBook: BookGroup
+        if let existingDefault = books.first(where: { $0.title == "默认手帐" }) {
+            defaultBook = existingDefault
+        } else if let anyBook = books.first {
+            defaultBook = anyBook
+        } else {
+            defaultBook = BookGroup(title: "默认手帐")
+            modelContext.insert(defaultBook)
         }
 
-        // 打印默认手帐的书页状态
+        for outfit in orphanOutfits {
+            outfit.book = defaultBook
+        }
+
+        do {
+            try modelContext.save()
+            print("BookShelfView: Migrated \(orphanOutfits.count) orphan outfits to default book")
+        } catch {
+            print("BookShelfView: Failed to save migration: \(error)")
+        }
+
+        #if DEBUG
+        // 打印默认手帐的书页状态（仅调试，且仅在实际发生迁移后）
         printDefaultBookPagesStatus()
+        #endif
     }
 
+    #if DEBUG
     // 打印默认手帐的书页状态
     func printDefaultBookPagesStatus() {
         if let defaultBook = books.first(where: { $0.title == "默认手帐" }) {
@@ -386,4 +376,5 @@ struct BookShelfView: View {
             print("========================")
         }
     }
+    #endif
 }

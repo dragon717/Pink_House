@@ -235,6 +235,8 @@ struct SpaceBookOpeningAnimationView: View {
     @State private var isMovingToCenter = false
     @State private var isOpening = false
     @State private var pagesFlipped: [Bool] = Array(repeating: false, count: 6)
+    // 性能优化：固定的翻页随机角度（原先在 body 中每帧调用 Double.random 会导致动画期间重复渲染）
+    @State private var pageFlipAngles: [Double] = (0..<6).map { _ in -175 + Double.random(in: -5...5) }
     @State private var isReady = false
 
     // 书页图片缓存
@@ -262,7 +264,7 @@ struct SpaceBookOpeningAnimationView: View {
                 ForEach(0..<6) { index in
                     SpaceBookPage(width: bookWidth - 10, height: bookHeight - 10, image: pageImages[index])
                         .rotation3DEffect(
-                            .degrees(pagesFlipped[index] ? -175 + Double.random(in: -5...5) : 0),
+                            .degrees(pagesFlipped[index] ? pageFlipAngles[index] : 0),
                             axis: (x: 0.0, y: 1.0, z: 0.0),
                             anchor: .leading,
                             anchorZ: 0,

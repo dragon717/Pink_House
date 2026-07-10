@@ -14,6 +14,10 @@ struct BookOpeningAnimationView: View {
     @State private var isMovingToCenter = false
     @State private var isOpening = false
     @State private var pagesFlipped: [Bool] = Array(repeating: false, count: 6)
+    // 性能优化：固定的翻页随机角度（原先在 body 中每帧调用 Double.random 会导致动画期间重复渲染）
+    @State private var pageFlipAngles: [Double] = (0..<6).map { _ in -175 + Double.random(in: -5...5) }
+    // 图片加载完成后再展示并启动动画
+    @State private var isReady = false
     
     // 书页图片缓存
     @State private var pageImages: [UIImage?] = Array(repeating: nil, count: 6)
@@ -43,7 +47,7 @@ struct BookOpeningAnimationView: View {
                 ForEach(0..<6) { index in
                     BookPage(width: bookWidth - 10, height: bookHeight - 10, color: pageColor, image: pageImages[index])
                         .rotation3DEffect(
-                            .degrees(pagesFlipped[index] ? -175 + Double.random(in: -5...5) : 0),
+                            .degrees(pagesFlipped[index] ? pageFlipAngles[index] : 0),
                             axis: (x: 0.0, y: 1.0, z: 0.0),
                             anchor: .leading,
                             anchorZ: 0,
@@ -71,14 +75,18 @@ struct BookOpeningAnimationView: View {
                 axis: (x: 0.0, y: 1.0, z: 0.0)
             )
             .offset(y: isMovingToCenter ? 0 : 300) // 从下方飞入
+            .opacity(isReady ? 1 : 0)
         }
-        .onAppear {
-            loadPageImages()
+        .task {
+            // 性能优化：先异步加载图片（降采样），加载完成后再启动动画序列
+            // 原先在 onAppear 中同步解码最多 7 张全尺寸原图，会阻塞主线程
+            await loadPageImages()
+            isReady = true
             startAnimationSequence()
         }
     }
     
-    private func loadPageImages() {
+    private func loadPageImages() async {
         // 保底逻辑：重新从数据库获取最新的书页数据，确保不包含已删除的书页
         let bookID = book.id
         let descriptor = FetchDescriptor<Outfit>(
@@ -91,27 +99,39 @@ struct BookOpeningAnimationView: View {
         let validPages = (try? modelContext.fetch(descriptor)) ?? []
         
         // 加载封面图片 - 优先使用用户设置的封面，否则使用第一页的快照
+        let coverTargetSize = CGSize(width: 320, height: 440)
         if let coverPath = book.coverImage,
-           let image = ImageManager.shared.loadImage(fileName: coverPath) {
+           let image = await ImageManager.shared.loadImageAsync(fileName: coverPath, targetSize: coverTargetSize) {
             coverImage = image
         } else if let firstPage = validPages.first,
                   let snapshotPath = firstPage.snapshotPath,
-                  let image = ImageManager.shared.loadImage(fileName: snapshotPath) {
+                  let image = await ImageManager.shared.loadImageAsync(fileName: snapshotPath, targetSize: coverTargetSize) {
             coverImage = image
         }
         
         // 如果没有书页，直接返回
         if validPages.isEmpty { return }
         
-        // 填充 6 张图片
-        for i in 0..<6 {
-            // 循环使用书页内容，如果书页少于 6 页
-            let pageIndex = i % validPages.count
-            let page = validPages[pageIndex]
+        // 并行加载 6 张书页图片（循环使用书页内容，如果书页少于 6 页）
+        let pageTargetSize = CGSize(width: 200, height: 280)
+        await withTaskGroup(of: (Int, UIImage?).self) { group in
+            for i in 0..<6 {
+                let pageIndex = i % validPages.count
+                let snapshotPath = validPages[pageIndex].snapshotPath
+                
+                group.addTask {
+                    guard let snapshotPath = snapshotPath else { return (i, nil) }
+                    let image = await ImageManager.shared.loadImageAsync(fileName: snapshotPath, targetSize: pageTargetSize)
+                    return (i, image)
+                }
+            }
             
-            if let snapshotPath = page.snapshotPath,
-               let image = ImageManager.shared.loadImage(fileName: snapshotPath) {
-                pageImages[i] = image
+            for await (index, image) in group {
+                if let image = image {
+                    await MainActor.run {
+                        self.pageImages[index] = image
+                    }
+                }
             }
         }
     }
