@@ -140,13 +140,17 @@ struct WardrobeView: View {
     
     @ViewBuilder
     private func clothingItemView(clothing: Clothing, firstFilteredID: UUID?) -> some View {
+        // 性能优化：cell 已实现 Equatable，用 .equatable() 让 SwiftUI 在父视图刷新时
+        // 跳过未变化 cell 的 body 重算（选中态勾选/编辑态 UI 在外层包裹，不受影响）。
         if viewLayout == .grid6 {
             guideSelectionAnchor(for: clothing, firstFilteredID: firstFilteredID) {
                 ClothingThumbnail(clothing: clothing)
+                    .equatable()
             }
         } else {
             guideSelectionAnchor(for: clothing, firstFilteredID: firstFilteredID) {
                 ClothingCard(clothing: clothing)
+                    .equatable()
             }
         }
     }
@@ -170,6 +174,9 @@ struct WardrobeView: View {
         }
     }
     
+    // 性能注意：该计算属性对全量数据做 搜索->筛选->排序，开销较大。
+    // body 内已改为在顶部一次性计算并向下传参（见 body），避免同一帧内重复计算；
+    // 此处保留给事件回调（onChange 等）按需调用。
     var filteredClothings: [Clothing] {
         // 使用 ClothingSearchService 进行搜索
         let searchService = ClothingSearchService(clothings: clothings)
@@ -196,23 +203,38 @@ struct WardrobeView: View {
         // Apply sorting based on sortOption
         // Note: @Query doesn't update dynamically when sortOption changes,
         // so we need to sort here explicitly
+        // 性能优化：先一次性抽取排序键再排序（Schwartzian transform），
+        // 把 SwiftData @Model 属性访问从 O(n log n) 次比较降为 O(n) 次抽取，
+        // 排序结果与直接对对象排序完全一致。
         switch sortOption {
         case .custom:
-            return result.sorted { $0.sortIndex < $1.sortIndex }
+            return sortedByKey(result, ascending: true) { $0.sortIndex }
         case .priceAsc:
-            return result.sorted { $0.price < $1.price }
+            return sortedByKey(result, ascending: true) { $0.price }
         case .priceDesc:
-            return result.sorted { $0.price > $1.price }
+            return sortedByKey(result, ascending: false) { $0.price }
         case .nameAsc:
-            return result.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+            let keyed = result.map { (item: $0, key: $0.name) }
+            return keyed.sorted { $0.key.localizedStandardCompare($1.key) == .orderedAscending }.map { $0.item }
         case .nameDesc:
-            return result.sorted { $0.name.localizedStandardCompare($1.name) == .orderedDescending }
+            let keyed = result.map { (item: $0, key: $0.name) }
+            return keyed.sorted { $0.key.localizedStandardCompare($1.key) == .orderedDescending }.map { $0.item }
         case .purchaseDateAsc:
-            return result.sorted { $0.purchaseDate < $1.purchaseDate }
+            return sortedByKey(result, ascending: true) { $0.purchaseDate }
         case .purchaseDateDesc:
-            return result.sorted { $0.purchaseDate > $1.purchaseDate }
+            return sortedByKey(result, ascending: false) { $0.purchaseDate }
         case .createdAtDesc:
-            return result.sorted { $0.createdAt > $1.createdAt }
+            return sortedByKey(result, ascending: false) { $0.createdAt }
+        }
+    }
+    
+    /// 按抽取出的排序键排序，避免排序比较过程中反复访问 SwiftData 属性
+    private func sortedByKey<Key: Comparable>(_ items: [Clothing], ascending: Bool, key: (Clothing) -> Key) -> [Clothing] {
+        let keyed = items.map { (item: $0, key: key($0)) }
+        if ascending {
+            return keyed.sorted { $0.key < $1.key }.map { $0.item }
+        } else {
+            return keyed.sorted { $0.key > $1.key }.map { $0.item }
         }
     }
 
@@ -230,20 +252,26 @@ struct WardrobeView: View {
     }
     
     var body: some View {
-        let base = AnyView(baseWardrobeView)
-        let withStateChanges = AnyView(applyStateChangeHandlers(to: base))
-        let withBottomBar = AnyView(applyBottomSelectionBar(to: withStateChanges))
-        let withSheets = AnyView(applySheets(to: withBottomBar))
-        return AnyView(applyAlerts(to: withSheets))
+        // 性能修复：
+        // 1. filteredClothings 每次 body 求值只计算一次，向下传参，
+        //    避免同一次渲染中（网格/列表/统计区/底部工具栏）重复执行 搜索->筛选->排序；
+        // 2. 去掉原来的 5 层 AnyView 类型擦除，恢复 SwiftUI 的结构化 diff 能力。
+        //    （包含显式 return，body 不走 ViewBuilder，语义与原先一致）
+        let filtered = filteredClothings
+        let base = baseWardrobeView(filtered: filtered)
+        let withStateChanges = applyStateChangeHandlers(to: base)
+        let withBottomBar = applyBottomSelectionBar(to: withStateChanges, filtered: filtered)
+        let withSheets = applySheets(to: withBottomBar)
+        return applyAlerts(to: withSheets)
     }
 
-    private var baseWardrobeView: some View {
+    private func baseWardrobeView(filtered: [Clothing]) -> some View {
         Group {
             switch viewLayout {
             case .listBrief, .listDetailed:
-                listView
+                listView(filtered: filtered)
             case .grid2, .grid3, .grid6:
-                gridWardrobeView
+                gridWardrobeView(filtered: filtered)
             }
         }
         .toolbar {
@@ -291,15 +319,15 @@ struct WardrobeView: View {
             }
     }
 
-    private func applyBottomSelectionBar<Content: View>(to content: Content) -> some View {
+    private func applyBottomSelectionBar<Content: View>(to content: Content, filtered: [Clothing]) -> some View {
         content.safeAreaInset(edge: .bottom) {
             if isSelectionMode {
-                selectionModeBottomBar
+                selectionModeBottomBar(filtered: filtered)
             }
         }
     }
 
-    private var selectionModeBottomBar: some View {
+    private func selectionModeBottomBar(filtered: [Clothing]) -> some View {
         VStack(spacing: 0) {
             Divider()
             HStack {
@@ -409,13 +437,13 @@ struct WardrobeView: View {
                     toggleSelectAll()
                 } label: {
                     VStack(spacing: 4) {
-                        Image(systemName: isAllSelectedInView ? "xmark.circle" : "checkmark.circle")
-                        Text(isAllSelectedInView ? "取消全选" : "全选")
+                        Image(systemName: isAllSelectedInView(in: filtered) ? "xmark.circle" : "checkmark.circle")
+                        Text(isAllSelectedInView(in: filtered) ? "取消全选" : "全选")
                             .font(.caption)
                     }
                     .frame(maxWidth: .infinity)
                 }
-                .disabled(filteredClothings.isEmpty)
+                .disabled(filtered.isEmpty)
             }
             .padding()
             .padding(.bottom, {
@@ -619,15 +647,14 @@ struct WardrobeView: View {
         isEditing || (isSelectionMode && sortOption == .custom)
     }
 
-    private var gridWardrobeView: some View {
+    private func gridWardrobeView(filtered: [Clothing]) -> some View {
         ScrollViewReader { proxy in
-            let filtered = filteredClothings
             let displayed = isReorderTrackingEnabled ? editableClothings : filtered
             let firstFilteredID = filtered.first?.id
             ZStack {
                 ScrollView {
                     VStack(spacing: 8) {
-                        statsSection
+                        statsSection(filtered: filtered)
                             .padding(.horizontal, viewLayout == .grid6 ? 2 : 16)
 
                         LazyVGrid(columns: gridColumns, spacing: viewLayout == .grid6 ? 2 : 16) {
@@ -768,8 +795,8 @@ struct WardrobeView: View {
         }
     }
     
-    private var isAllSelectedInView: Bool {
-        let displayedIDs = Set(filteredClothings.map { $0.id })
+    private func isAllSelectedInView(in filtered: [Clothing]) -> Bool {
+        let displayedIDs = Set(filtered.map { $0.id })
         guard !displayedIDs.isEmpty else { return false }
         return selectedItemIDs.isSuperset(of: displayedIDs)
     }
@@ -1207,7 +1234,7 @@ struct WardrobeView: View {
         }
     }
     
-    private var statsSection: some View {
+    private func statsSection(filtered: [Clothing]) -> some View {
         VStack(spacing: 4) {
             HStack {
                 Spacer()
@@ -1226,7 +1253,7 @@ struct WardrobeView: View {
             }
 
             if showStats {
-                WardrobeStatsView(clothings: filteredClothings,
+                WardrobeStatsView(clothings: filtered,
                                   filterDescription: filterDescription,
                                   onClearFilter: onClearFilter)
                     .transition(.move(edge: .top).combined(with: .opacity))
@@ -1234,12 +1261,12 @@ struct WardrobeView: View {
         }
     }
 
-    private var listView: some View {
+    private func listView(filtered: [Clothing]) -> some View {
         List {
             Section {
-                listContent
+                listContent(filtered: filtered)
             } header: {
-                statsSection
+                statsSection(filtered: filtered)
                     .padding(.horizontal, viewLayout == .grid6 ? 2 : 16)
                     .padding(.vertical, 8)
             }
@@ -1249,8 +1276,8 @@ struct WardrobeView: View {
         .environment(\.editMode, .constant(isEditing ? .active : .inactive))
     }
 
-    private var listContent: some View {
-        ForEach(isEditing ? editableClothings : filteredClothings) { clothing in
+    private func listContent(filtered: [Clothing]) -> some View {
+        ForEach(isEditing ? editableClothings : filtered) { clothing in
             listRow(for: clothing)
         }
         .onMove { from, to in
@@ -1395,16 +1422,24 @@ struct WardrobeStatsView: View {
         clothings.count
     }
     
-    var totalCount: Int {
-        clothings.reduce(0) { $0 + $1.stock }
+    // 性能优化：三项统计合并为一次遍历（原来是 3 次 reduce 各遍历一遍全量数据），
+    // 且"总价值"隐藏时跳过 inventoryTotalPrice（它会触发 accessoryItems 关系懒加载，开销最大）。
+    private struct StatsSummary {
+        var totalCount = 0
+        var dressValue = Decimal(0)
+        var totalValue = Decimal(0)
     }
     
-    var dressValue: Decimal {
-        clothings.reduce(0) { $0 + ($1.price * Decimal($1.stock)) }
-    }
-
-    var totalValue: Decimal {
-        clothings.reduce(Decimal(0)) { $0 + $1.inventoryTotalPrice }
+    private func computeStats(includeTotalValue: Bool) -> StatsSummary {
+        var summary = StatsSummary()
+        for clothing in clothings {
+            summary.totalCount += clothing.stock
+            summary.dressValue += clothing.price * Decimal(clothing.stock)
+            if includeTotalValue {
+                summary.totalValue += clothing.inventoryTotalPrice
+            }
+        }
+        return summary
     }
 
     // 将Decimal格式化为整数（个位精度）的字符串
@@ -1439,19 +1474,21 @@ struct WardrobeStatsView: View {
     }
     
     var body: some View {
-        WardrobeThemeStatsCardContainer {
+        // 一次遍历得到全部统计值；“总价值”隐藏时不触发 accessoryItems 关系加载
+        let stats = computeStats(includeTotalValue: showTotalValue)
+        return WardrobeThemeStatsCardContainer {
             VStack(spacing: 12) {
                 // Main Stats
                 HStack(spacing: 0) {
-                    statItem(title: "总件数/款", value: "\(totalCount)/\(styleCount)", isVisible: $showCountAndStyle)
+                    statItem(title: "总件数/款", value: "\(stats.totalCount)/\(styleCount)", isVisible: $showCountAndStyle)
 
                     Divider()
 
-                    statItem(title: "裙装价值", value: "¥\(formatValue(dressValue))", isVisible: $showDressValue, valueColor: Color(hex: "FF9800"))
+                    statItem(title: "裙装价值", value: "¥\(formatValue(stats.dressValue))", isVisible: $showDressValue, valueColor: Color(hex: "FF9800"))
 
                     Divider()
 
-                    statItem(title: "总价值", value: "¥\(formatValue(totalValue))", isVisible: $showTotalValue)
+                    statItem(title: "总价值", value: "¥\(formatValue(stats.totalValue))", isVisible: $showTotalValue)
                 }
 
                 // Bottom Actions - 三个功能入口

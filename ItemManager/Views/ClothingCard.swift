@@ -23,11 +23,21 @@ import UIKit
 
 struct ClothingCard: View, Equatable {
     static func == (lhs: ClothingCard, rhs: ClothingCard) -> Bool {
+        // 注意：Clothing 是 SwiftData 引用类型，同一条目前后两次求值通常是同一实例。
+        // 条目内容变化由 SwiftData/Observation 触发 cell 自身刷新，不依赖此比较；
+        // 这里的字段比较主要用于实例被替换（如 iCloud 同步）时的兜底，
+        // 需覆盖所有影响卡片显示的字段，避免出现"内容变了但卡片不刷新"。
         guard lhs.clothing.id == rhs.clothing.id else { return false }
         guard lhs.clothing.name == rhs.clothing.name else { return false }
         guard lhs.clothing.originalPrice == rhs.clothing.originalPrice else { return false }
         guard lhs.clothing.price == rhs.clothing.price else { return false }
         guard lhs.clothing.imagePaths == rhs.clothing.imagePaths else { return false }
+        guard lhs.clothing.isDepositPlan == rhs.clothing.isDepositPlan else { return false }
+        guard lhs.clothing.deposit == rhs.clothing.deposit else { return false }
+        guard lhs.clothing.balance == rhs.clothing.balance else { return false }
+        guard lhs.clothing.accessoriesPrice == rhs.clothing.accessoriesPrice else { return false }
+        guard lhs.clothing.model3DPath == rhs.clothing.model3DPath else { return false }
+        guard lhs.clothing.model3DType == rhs.clothing.model3DType else { return false }
         return lhs.clothing.stock == rhs.clothing.stock
     }
     
@@ -182,7 +192,8 @@ struct ClothingCard: View, Equatable {
                             self.image = cached
                             return
                         }
-                        try? await Task.sleep(nanoseconds: 50_000_000)
+                        // 20ms 防抖：快速滑动时 cell 被回收会取消该 task，避免无谓加载
+                        try? await Task.sleep(nanoseconds: 20_000_000)
                         if Task.isCancelled { return }
                         self.image = await ImageManager.shared.loadImageAsync(fileName: imagePath, targetSize: size)
                     } else {
@@ -294,7 +305,8 @@ struct ClothingThumbnail: View, Equatable {
                     self.image = cached
                     return
                 }
-                try? await Task.sleep(nanoseconds: 50_000_000)
+                // 20ms 防抖：快速滑动时 cell 被回收会取消该 task，避免无谓加载
+                try? await Task.sleep(nanoseconds: 20_000_000)
                 if Task.isCancelled { return }
                 self.image = await ImageManager.shared.loadImageAsync(fileName: imagePath, targetSize: size)
             } else {
@@ -419,7 +431,8 @@ struct ClothingRow: View {
                             self.image = cached
                             return
                         }
-                        try? await Task.sleep(nanoseconds: 50_000_000)
+                        // 20ms 防抖：快速滑动时 cell 被回收会取消该 task，避免无谓加载
+                        try? await Task.sleep(nanoseconds: 20_000_000)
                         if Task.isCancelled { return }
                         self.image = await ImageManager.shared.loadImageAsync(fileName: firstPath, targetSize: size)
                     } else {
@@ -570,7 +583,8 @@ struct ClothingRowBrief: View {
                         self.image = cached
                         return
                     }
-                    try? await Task.sleep(nanoseconds: 50_000_000)
+                    // 20ms 防抖：快速滑动时 cell 被回收会取消该 task，避免无谓加载
+                    try? await Task.sleep(nanoseconds: 20_000_000)
                     if Task.isCancelled { return }
                     self.image = await ImageManager.shared.loadImageAsync(fileName: firstPath, targetSize: size)
                 }

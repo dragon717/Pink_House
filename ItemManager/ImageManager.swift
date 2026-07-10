@@ -61,29 +61,32 @@ class ImageManager {
         var limitInMB: Int
         
         if useAggressiveMemoryOptimization {
-            // 积极模式：大幅降低缓存上限，优先保证不崩溃
+            // 积极模式：控制缓存上限防止 OOM，但保证列表滑动的缩略图命中率。
+            // 之前 2GB 机只有 20MB/20 张，列表快速滑动时缓存几乎全 miss，
+            // 每张缩略图（200pt downsample 约 200KB）都要重新读盘解码导致掉帧。
+            // 收到内存警告时仍会清空缓存（见 init 中的 didReceiveMemoryWarningNotification）。
             if totalMemory <= 2 * 1024 * 1024 * 1024 { // <= 2GB (iPhone 8, X, XR, SE2 etc)
-                limitInMB = 20 // 极小缓存，防止OOM
-                memoryCache.countLimit = 20
+                limitInMB = 40
+                memoryCache.countLimit = 60
             } else if totalMemory <= 4 * 1024 * 1024 * 1024 { // <= 4GB (iPhone 11, 12, 13 non-pro)
-                limitInMB = 50
-                memoryCache.countLimit = 40
+                limitInMB = 80
+                memoryCache.countLimit = 120
             } else {
-                limitInMB = 100
-                memoryCache.countLimit = 80
+                limitInMB = 150
+                memoryCache.countLimit = 200
             }
             AppLogger.info("Memory Optimization: Aggressive Mode Enabled (Limit: \(limitInMB)MB)")
         } else {
             // 标准模式：利用更多内存换取流畅度
             if totalMemory <= 2 * 1024 * 1024 * 1024 { // <= 2GB
                 limitInMB = 50
-                memoryCache.countLimit = 50
+                memoryCache.countLimit = 80
             } else if totalMemory <= 4 * 1024 * 1024 * 1024 { // <= 4GB
                 limitInMB = 150
-                memoryCache.countLimit = 100
+                memoryCache.countLimit = 150
             } else {
                 limitInMB = 300
-                memoryCache.countLimit = 200
+                memoryCache.countLimit = 250
             }
             AppLogger.info("Memory Optimization: Standard Mode Enabled (Limit: \(limitInMB)MB)")
         }

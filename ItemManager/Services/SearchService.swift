@@ -84,10 +84,17 @@ class ClothingSearchService: ObservableObject, Searchable {
     func search(query: String, context: SearchContext? = nil) -> [Clothing] {
         guard !query.isEmpty else { return [] }
         
+        // 性能优化：价格范围/库存数字解析只与 query 有关，提到循环外只算一次，
+        // 避免每条数据都做字符串切分/清洗。
+        let priceRange = parsePriceRange(from: query)
+        let searchStock: Int? = {
+            if let value = Int(query.trimmingCharacters(in: .whitespaces)), value > 0 {
+                return value
+            }
+            return nil
+        }()
+        
         return clothings.filter { clothing in
-            // 检查是否包含价格范围搜索
-            let priceRange = parsePriceRange(from: query)
-            
             if let (minPrice, maxPrice) = priceRange {
                 let clothingPrice = NSDecimalNumber(decimal: clothing.price).doubleValue
                 return clothingPrice >= minPrice && clothingPrice <= maxPrice
@@ -106,9 +113,9 @@ class ClothingSearchService: ObservableObject, Searchable {
                 let accessoryMatch = clothing.accessories.localizedCaseInsensitiveContains(query)
                 let noteMatch = clothing.note.localizedCaseInsensitiveContains(query)
                 
-                // 库存数量搜索
+                // 库存数量搜索（searchStock 已在循环外解析）
                 let stockMatch: Bool
-                if let searchStock = Int(query.trimmingCharacters(in: .whitespaces)), searchStock > 0 {
+                if let searchStock = searchStock {
                     stockMatch = clothing.stock == searchStock
                 } else {
                     stockMatch = false
