@@ -356,18 +356,6 @@ struct ClothingCard: View, Equatable {
         isThemeSkinThemed ? SkyConcertThemeSkin.accent(for: wardrobeThemeDescriptor, colorScheme: colorScheme) : palette.accent
     }
 
-    private var showsCompactPriceInfo: Bool {
-        (showOriginalPrice && snapshot.originalPrice > 0 && !snapshot.isDepositPlan) || showPrice
-    }
-
-    private var compactPriceSurfaceFill: Color {
-        isThemeSkinThemed ? themedAccentColor.opacity(0.14) : themedAccentColor.opacity(0.08)
-    }
-
-    private var compactPriceSurfaceStroke: Color {
-        isThemeSkinThemed ? themedAccentColor.opacity(0.28) : themedAccentColor.opacity(0.16)
-    }
-
     private func badgeFillColor(for tint: Color) -> Color {
         isThemeSkinThemed ? tint.opacity(0.18) : tint.opacity(0.88)
     }
@@ -497,6 +485,7 @@ struct ClothingCard: View, Equatable {
                     
                     Spacer(minLength: 4)
                     
+                    // ponytail: no price chip — chip height/tint varied by format; text alone is enough
                     VStack(alignment: .leading, spacing: 2) {
                         if showOriginalPrice && snapshot.originalPrice > 0 && !snapshot.isDepositPlan {
                             Text(wardrobeCurrencyText(label: "原价".appLocalized, amount: snapshot.originalPrice))
@@ -537,21 +526,7 @@ struct ClothingCard: View, Equatable {
                             }
                         }
                     }
-                    .padding(.horizontal, showsCompactPriceInfo ? 6 : 0)
-                    .padding(.vertical, showsCompactPriceInfo ? 5 : 0)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background {
-                        if showsCompactPriceInfo {
-                            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                .fill(compactPriceSurfaceFill)
-                        }
-                    }
-                    .overlay {
-                        if showsCompactPriceInfo {
-                            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                .strokeBorder(compactPriceSurfaceStroke, lineWidth: 0.7)
-                        }
-                    }
+                    .frame(maxWidth: .infinity, minHeight: 34, alignment: .leading)
                 }
                 .padding(.horizontal, 10)
                 .padding(.vertical, 10)
