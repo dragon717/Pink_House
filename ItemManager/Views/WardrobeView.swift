@@ -685,6 +685,9 @@ struct WardrobeView: View {
                         imageTargetSize: wardrobeCellImageTargetSize,
                         themeInputs: wardrobeCellThemeInputs
                     )
+                    // 性能优化：cell 输入均为值类型且 == 覆盖全部字段，
+                    // 用 .equatable() 让父视图刷新时跳过未变化 cell 的 body 重算
+                    .equatable()
                 }
             }
         } else {
@@ -698,6 +701,9 @@ struct WardrobeView: View {
                         imageTargetSize: wardrobeCellImageTargetSize,
                         themeInputs: wardrobeCellThemeInputs
                     )
+                    // 性能优化：cell 输入均为值类型且 == 覆盖全部字段，
+                    // 用 .equatable() 让父视图刷新时跳过未变化 cell 的 body 重算
+                    .equatable()
                 }
             }
         }
@@ -746,6 +752,8 @@ struct WardrobeView: View {
                 wardrobeThemeDescriptor: wardrobeThemeDescriptor,
                 themeInputs: wardrobeCellThemeInputs
             )
+            // 性能优化：cell 输入均为值类型且 == 覆盖全部字段，跳过未变化 cell 的重算
+            .equatable()
         } else {
             ClothingRow(
                 snapshot: snapshot,
@@ -754,6 +762,8 @@ struct WardrobeView: View {
                 wardrobeThemeDescriptor: wardrobeThemeDescriptor,
                 themeInputs: wardrobeCellThemeInputs
             )
+            // 性能优化：cell 输入均为值类型且 == 覆盖全部字段，跳过未变化 cell 的重算
+            .equatable()
         }
     }
 
