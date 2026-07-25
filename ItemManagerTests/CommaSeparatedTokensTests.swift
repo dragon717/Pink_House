@@ -23,9 +23,15 @@ final class CommaSeparatedTokensTests: XCTestCase {
         XCTAssertEqual(CommaSeparatedTokens.toggle("JSK", in: "JSK,OP", allowsMultiple: true), "OP")
         XCTAssertEqual(CommaSeparatedTokens.toggle("长款", in: "短款", allowsMultiple: false), "长款")
         XCTAssertEqual(CommaSeparatedTokens.toggle("长款", in: "长款", allowsMultiple: false), "")
+        // 常用项顺序固定；已选若已在常用里不改变位置
         XCTAssertEqual(
             CommaSeparatedTokens.inlineTags(selected: ["小物"], preferred: ["JSK", "OP", "SK", "小物", "Blouse"], maxCount: 4),
-            ["小物", "JSK", "OP", "SK"]
+            ["JSK", "OP", "SK", "小物"]
+        )
+        // 不在常用前缀里的已选值追加在末尾
+        XCTAssertEqual(
+            CommaSeparatedTokens.inlineTags(selected: ["定制色"], preferred: ["JSK", "OP", "SK"], maxCount: 3),
+            ["JSK", "OP", "SK", "定制色"]
         )
     }
 }

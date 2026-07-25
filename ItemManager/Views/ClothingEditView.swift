@@ -1100,7 +1100,6 @@ struct ClothingEditView: View {
     @State private var showingBrandSelection = false
     @State private var tempSelectedBrand: Brand?
     @State private var activeSelectionField: ClothingField?
-    @State private var showingGenericSelection = false
 
     // 标记是否是通过"保存"按钮离开的
     @State private var isSaving = false
@@ -1374,7 +1373,6 @@ struct ClothingEditView: View {
             sizeChartImagePath: modelBinding(\.sizeChartImagePath),
             deleteChartFileImmediately: !isEditing,
             showingBrandSelection: $showingBrandSelection,
-            showingGenericSelection: $showingGenericSelection,
             activeSelectionField: $activeSelectionField
         )
     }
@@ -1611,15 +1609,13 @@ struct ClothingEditView: View {
         .sheet(isPresented: $showingAddTagSheet) {
             TagSelectionView(selectedTags: modelBinding(\.selectedTags))
         }
-        .sheet(isPresented: $showingGenericSelection) {
-            if let field = activeSelectionField {
-                SimpleStringSelectionView(
-                    title: "选择%@".appLocalized(field.displayName),
-                    options: getAllOptions(for: field),
-                    allowMultiple: isMultiSelect(field),
-                    selection: binding(for: field)
-                )
-            }
+        .sheet(item: $activeSelectionField) { field in
+            SimpleStringSelectionView(
+                title: "选择%@".appLocalized(field.displayName),
+                options: getAllOptions(for: field),
+                allowMultiple: isMultiSelect(field),
+                selection: binding(for: field)
+            )
         }
         .onAppear {
             DraftReliabilitySignpost.editorInit(isEditing: isEditing, continueFromDraft: continueFromDraft, sessionID: editorSessionID)

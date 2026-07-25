@@ -44,14 +44,10 @@ enum CommaSeparatedTokens {
         return tokens.first == token ? "" : token
     }
 
-    /// 行内展示：已选优先，再补常用项，控制在约两行
+    /// 行内展示：常用项顺序固定（点选只改颜色不挪位）；不在常用里的已选值追加在末尾
     static func inlineTags(selected: [String], preferred: [String], maxCount: Int = 10) -> [String] {
-        var result: [String] = []
+        var result = Array(preferred.prefix(maxCount))
         for token in selected where !result.contains(token) {
-            result.append(token)
-        }
-        for token in preferred where !result.contains(token) {
-            if result.count >= maxCount { break }
             result.append(token)
         }
         return result
@@ -80,7 +76,6 @@ struct ClothingBasicInfoView: View {
     
     // UI State
     @Binding var showingBrandSelection: Bool
-    @Binding var showingGenericSelection: Bool
     @Binding var activeSelectionField: ClothingField?
     
     @Query private var brands: [Brand]
@@ -136,7 +131,7 @@ struct ClothingBasicInfoView: View {
             
             ForEach(visibilityManager.fieldOrder, id: \.self) { field in
                 if visibilityManager.isVisible(field) {
-                    buildFieldView(for: field)
+                    inlineFieldRow(for: field)
                 }
             }
             
@@ -165,91 +160,24 @@ struct ClothingBasicInfoView: View {
     }
     
     @ViewBuilder
-    private func buildFieldView(for field: ClothingField) -> some View {
-        // ponytail: inline toggle tags +「更多」sheet; Clothing still stores comma String
-        chipSelectField(for: field)
-    }
-
-    private func chipSelectField(for field: ClothingField) -> some View {
-        let text = binding(for: field)
-        let selected = CommaSeparatedTokens.parse(text.wrappedValue)
-        let selectedSet = Set(selected)
-        let allowsMultiple = fieldAllowsMultiple(field)
-        let inlineTags = CommaSeparatedTokens.inlineTags(
-            selected: selected,
-            preferred: SuggestionManager.shared.orderedDefaults(for: field),
-            maxCount: 10
+    private func inlineFieldRow(for field: ClothingField) -> some View {
+        // ponytail: Equatable 行跳过未改字段的 body；点选不动画、不重排
+        InlineToggleTagsRow(
+            field: field,
+            text: binding(for: field).wrappedValue,
+            textBinding: binding(for: field),
+            preferred: Self.preferredTags(for: field),
+            allowsMultiple: fieldAllowsMultiple(field),
+            sizeChartImagePath: field == .sizes ? $sizeChartImagePath : nil,
+            deleteChartFileImmediately: deleteChartFileImmediately,
+            onMore: { openSelection(for: field) }
         )
-
-        return VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 8) {
-                Text(field.displayName)
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .themeSkinLegibleText(level: .inline, slot: .sectionCard)
-                Spacer()
-                if field == .sizes {
-                    ChartImagePicker(
-                        imagePath: $sizeChartImagePath,
-                        placeholder: "添加表图",
-                        editMode: true,
-                        deleteFileImmediately: deleteChartFileImmediately
-                    )
-                }
-            }
-            .padding(.leading, 4)
-
-            FlowLayout(spacing: 8) {
-                ForEach(inlineTags, id: \.self) { token in
-                    let isOn = selectedSet.contains(token)
-                    Button {
-                        text.wrappedValue = CommaSeparatedTokens.toggle(
-                            token,
-                            in: text.wrappedValue,
-                            allowsMultiple: allowsMultiple
-                        )
-                    } label: {
-                        Text(token)
-                            .font(.subheadline)
-                            .fontWeight(isOn ? .semibold : .regular)
-                            .foregroundStyle(isOn ? Color.white : Color.secondary)
-                            .themeSkinLegibleText(level: .chip, slot: .filterChip)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 6)
-                            .background(isOn ? Color.pink : Color(uiColor: .tertiarySystemFill))
-                            .cornerRadius(16)
-                    }
-                    .buttonStyle(.plain)
-                }
-
-                // 「更多」不是选中态 chip，而是进完整列表
-                Button {
-                    openSelection(for: field)
-                } label: {
-                    HStack(spacing: 2) {
-                        Text("更多".appLocalized)
-                        Image(systemName: "chevron.right")
-                            .font(.caption2.weight(.semibold))
-                    }
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .themeSkinLegibleText(level: .chip, slot: .filterChip)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
-                    .background(Color.clear)
-                    .overlay(
-                        Capsule()
-                            .strokeBorder(Color.secondary.opacity(0.45), lineWidth: 1)
-                    )
-                }
-                .buttonStyle(.plain)
-            }
-        }
+        .equatable()
     }
 
     private func openSelection(for field: ClothingField) {
+        // sheet(item:) 只靠非 nil 打开，避免 isPresented 抢跑导致白 sheet
         activeSelectionField = field
-        showingGenericSelection = true
     }
 
     private func fieldAllowsMultiple(_ field: ClothingField) -> Bool {
@@ -269,6 +197,100 @@ struct ClothingBasicInfoView: View {
         case .length: return $length
         case .condition: return $condition
         case .accessories: return $accessories
+        }
+    }
+
+    private static func preferredTags(for field: ClothingField) -> [String] {
+        // 静态缓存，避免每次 body 重建数组
+        preferredTagsCache[field] ?? {
+            let tags = SuggestionManager.shared.orderedDefaults(for: field)
+            preferredTagsCache[field] = tags
+            return tags
+        }()
+    }
+
+    private static var preferredTagsCache: [ClothingField: [String]] = [:]
+}
+
+/// 单行字段 tag；Equatable 用 text 快照跳过无关刷新
+private struct InlineToggleTagsRow: View, Equatable {
+    let field: ClothingField
+    let text: String
+    @Binding var textBinding: String
+    let preferred: [String]
+    let allowsMultiple: Bool
+    var sizeChartImagePath: Binding<String?>?
+    var deleteChartFileImmediately: Bool = true
+    let onMore: () -> Void
+
+    static func == (lhs: InlineToggleTagsRow, rhs: InlineToggleTagsRow) -> Bool {
+        lhs.field == rhs.field
+            && lhs.text == rhs.text
+            && lhs.allowsMultiple == rhs.allowsMultiple
+            && lhs.preferred == rhs.preferred
+            && lhs.sizeChartImagePath?.wrappedValue == rhs.sizeChartImagePath?.wrappedValue
+    }
+
+    var body: some View {
+        let selected = CommaSeparatedTokens.parse(text)
+        let selectedSet = Set(selected)
+        let tags = CommaSeparatedTokens.inlineTags(selected: selected, preferred: preferred, maxCount: 10)
+
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                Text(field.displayName)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                Spacer()
+                if let sizeChartImagePath {
+                    ChartImagePicker(
+                        imagePath: sizeChartImagePath,
+                        placeholder: "添加表图",
+                        editMode: true,
+                        deleteFileImmediately: deleteChartFileImmediately
+                    )
+                }
+            }
+            .padding(.leading, 4)
+
+            FlowLayout(spacing: 8) {
+                ForEach(tags, id: \.self) { token in
+                    let isOn = selectedSet.contains(token)
+                    Button {
+                        var transaction = Transaction()
+                        transaction.disablesAnimations = true
+                        withTransaction(transaction) {
+                            textBinding = CommaSeparatedTokens.toggle(
+                                token,
+                                in: textBinding,
+                                allowsMultiple: allowsMultiple
+                            )
+                        }
+                    } label: {
+                        Text(token)
+                            .font(.subheadline.weight(isOn ? .semibold : .regular))
+                            .foregroundStyle(isOn ? Color.white : Color.secondary)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .background(isOn ? Color.pink : Color(uiColor: .tertiarySystemFill), in: Capsule())
+                    }
+                    .buttonStyle(.plain)
+                }
+
+                Button(action: onMore) {
+                    HStack(spacing: 2) {
+                        Text("更多".appLocalized)
+                        Image(systemName: "chevron.right")
+                            .font(.caption2.weight(.semibold))
+                    }
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .overlay(Capsule().strokeBorder(Color.secondary.opacity(0.45), lineWidth: 1))
+                }
+                .buttonStyle(.plain)
+            }
         }
     }
 }
