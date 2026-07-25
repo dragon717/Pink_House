@@ -28,33 +28,34 @@ class SuggestionManager {
         seedDefaultData()
     }
     
+    /// 有序常用项（编辑页行内 tag 用；顺序即展示优先级）
+    func orderedDefaults(for field: SuggestionField) -> [String] {
+        switch field {
+        case .name:
+            return []
+        case .brand:
+            return ["Angelic Pretty", "Baby, the Stars Shine Bright", "Innocent World", "Mary Magdalene", "Victorian Maiden", "Alice and the Pirates", "Metamorphose temps de fille", "Moi-même-Moitié", "Juliette et Justine", "Triple Fortune", "表面咒语", "Elpress L", "Honey Honey", "仲夏物语", "古典玩偶", "Lullaby", "NyaNya", "Precious Clove", "Soufflesong", "Tiny Garden"]
+        case .type:
+            return ["JSK", "OP", "SK", "小物", "Blouse", "衬衫", "内搭", "短袖", "长袖", "上衣", "开衫", "半裙", "背带裙", "连衣裙", "外套", "大衣", "斗篷", "南瓜裤", "撑"]
+        case .color:
+            return ["粉色", "白色", "黑色", "酒红", "绀色", "萨克斯蓝", "若草色", "薄荷绿", "薰衣草紫", "巧克力色", "咖啡色", "灰色", "米色", "多色", "生成色"]
+        case .size:
+            return ["XS", "S", "M", "L", "XL", "XXL", "均码", "定制"]
+        case .accessory:
+            return ["KC", "发带", "BNT", "扁帽", "发卡", "边夹", "手袖", "腕饰", "项链", "戒指", "胸针", "包", "袜子", "过膝袜", "连裤袜", "手套", "遮阳伞", "扇子"]
+        case .condition:
+            return ["全新", "仅试穿", "99新", "95新", "9成新", "有瑕疵", "战斗成色", "未到货", "待付尾款"]
+        }
+    }
+
     private func seedDefaultData() {
-        // 常见 Lolita 品牌
-        let brands = ["Angelic Pretty", "Baby, the Stars Shine Bright", "Innocent World", "Mary Magdalene", "Victorian Maiden", "Alice and the Pirates", "Metamorphose temps de fille", "Moi-même-Moitié", "Juliette et Justine", "Triple Fortune", "表面咒语", "Elpress L", "Honey Honey", "仲夏物语", "古典玩偶", "Lullaby", "NyaNya", "Precious Clove", "Soufflesong", "Tiny Garden"]
-        
-        // 常见类型
-        let types = ["JSK", "OP", "SK", "Blouse", "衬衫", "内搭", "短袖", "长袖", "上衣", "开衫", "半裙", "背带裙", "连衣裙", "外套", "大衣", "斗篷", "南瓜裤", "撑"]
-        
-        // 常见颜色
-        let colors = ["粉色", "生成色", "白色", "黑色", "酒红", "绀色", "萨克斯蓝", "若草色", "薄荷绿", "薰衣草紫", "巧克力色", "咖啡色", "灰色", "米色", "多色"]
-        
-        // 常见尺码
-        let sizes = ["XS", "S", "M", "L", "XL", "XXL", "均码", "定制"]
-        
-        // 常见小物
-        let accessories = ["KC", "发带", "BNT", "扁帽", "发卡", "边夹", "手袖", "腕饰", "项链", "戒指", "胸针", "包", "袜子", "过膝袜", "连裤袜", "手套", "遮阳伞", "扇子"]
-        
-        // 常见状态
-        let conditions = ["全新", "仅试穿", "99新", "95新", "9成新", "有瑕疵", "战斗成色", "未到货", "待付尾款"]
-        
         queue.async { [weak self] in
-            guard let self = self else { return }
-            for brand in brands { self.tries[.brand]?.insert(brand) }
-            for type in types { self.tries[.type]?.insert(type) }
-            for color in colors { self.tries[.color]?.insert(color) }
-            for size in sizes { self.tries[.size]?.insert(size) }
-            for accessory in accessories { self.tries[.accessory]?.insert(accessory) }
-            for condition in conditions { self.tries[.condition]?.insert(condition) }
+            guard let self else { return }
+            for field in SuggestionField.allCases {
+                for word in self.orderedDefaults(for: field) {
+                    self.tries[field]?.insert(word)
+                }
+            }
         }
     }
     
@@ -245,28 +246,41 @@ class SuggestionManager {
         }
     }
     
-    // MARK: - 获取所有预设值（用于批量编辑）
+    // MARK: - 获取所有预设值（用于批量编辑 / 编辑页 sheet）
     
+    func getAllTypes() -> [String] {
+        queue.sync { tries[.type]?.getAllWords() ?? [] }
+    }
+
     func getAllColors() -> [String] {
-        return queue.sync {
-            return tries[.color]?.getAllWords() ?? []
-        }
+        queue.sync { tries[.color]?.getAllWords() ?? [] }
     }
     
     func getAllSizes() -> [String] {
-        return queue.sync {
-            return tries[.size]?.getAllWords() ?? []
-        }
+        queue.sync { tries[.size]?.getAllWords() ?? [] }
     }
     
     func getAllAccessories() -> [String] {
-        return queue.sync {
-            return tries[.accessory]?.getAllWords() ?? []
-        }
+        queue.sync { tries[.accessory]?.getAllWords() ?? [] }
+    }
+
+    func getAllConditions() -> [String] {
+        queue.sync { tries[.condition]?.getAllWords() ?? [] }
     }
     
     func getAllLengths() -> [String] {
-        // 衣长从数据库中收集，没有固定预设
-        return ["80cm", "90cm", "100cm", "110cm", "120cm", "短款", "中长款", "长款", "超长款"]
+        ["80cm", "90cm", "100cm", "110cm", "120cm", "短款", "中长款", "长款", "超长款"]
+    }
+
+    /// 编辑页行内 tag 候选（有序）
+    func orderedDefaults(for clothingField: ClothingField) -> [String] {
+        switch clothingField {
+        case .types: return orderedDefaults(for: SuggestionField.type)
+        case .colors: return orderedDefaults(for: SuggestionField.color)
+        case .sizes: return orderedDefaults(for: SuggestionField.size)
+        case .accessories: return orderedDefaults(for: SuggestionField.accessory)
+        case .condition: return orderedDefaults(for: SuggestionField.condition)
+        case .length: return getAllLengths()
+        }
     }
 }

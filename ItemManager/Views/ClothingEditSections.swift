@@ -8,6 +8,56 @@
 import SwiftUI
 import SwiftData
 
+// MARK: - Comma string helpers (edit UI ↔ Clothing storage)
+
+enum CommaSeparatedTokens {
+    static func parse(_ text: String) -> [String] {
+        text.split(separator: ",")
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+    }
+
+    static func join(_ tokens: [String]) -> String {
+        tokens.joined(separator: ",")
+    }
+
+    static func remove(_ token: String, from text: String) -> String {
+        join(parse(text).filter { $0 != token })
+    }
+
+    /// Sheet 多选写回：保留原有顺序，新选项追加在末尾（按名排序仅用于新增段）
+    static func joinPreservingOrder(previous: [String], selected: Set<String>) -> String {
+        let kept = previous.filter { selected.contains($0) }
+        let previousSet = Set(previous)
+        let added = selected.filter { !previousSet.contains($0) }.sorted()
+        return join(kept + added)
+    }
+
+    static func toggle(_ token: String, in text: String, allowsMultiple: Bool) -> String {
+        let tokens = parse(text)
+        if allowsMultiple {
+            if tokens.contains(token) {
+                return remove(token, from: text)
+            }
+            return join(tokens + [token])
+        }
+        return tokens.first == token ? "" : token
+    }
+
+    /// 行内展示：已选优先，再补常用项，控制在约两行
+    static func inlineTags(selected: [String], preferred: [String], maxCount: Int = 10) -> [String] {
+        var result: [String] = []
+        for token in selected where !result.contains(token) {
+            result.append(token)
+        }
+        for token in preferred where !result.contains(token) {
+            if result.count >= maxCount { break }
+            result.append(token)
+        }
+        return result
+    }
+}
+
 // MARK: - Basic Info Section
 
 struct ClothingBasicInfoView: View {
@@ -33,7 +83,6 @@ struct ClothingBasicInfoView: View {
     @Binding var showingGenericSelection: Bool
     @Binding var activeSelectionField: ClothingField?
     
-    @Environment(\.modelContext) private var modelContext
     @Query private var brands: [Brand]
     @ObservedObject private var visibilityManager = FieldVisibilityManager.shared
     @ObservedObject private var networkManager = NetworkSettingsManager.shared
@@ -117,62 +166,109 @@ struct ClothingBasicInfoView: View {
     
     @ViewBuilder
     private func buildFieldView(for field: ClothingField) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-             Text(fieldTitle(for: field).appLocalized)
-                 .font(.subheadline)
-                 .foregroundStyle(.secondary)
-                 .themeSkinLegibleText(level: .inline, slot: .sectionCard)
-                 .padding(.leading, 4)
-            
+        // ponytail: inline toggle tags +「更多」sheet; Clothing still stores comma String
+        chipSelectField(for: field)
+    }
+
+    private func chipSelectField(for field: ClothingField) -> some View {
+        let text = binding(for: field)
+        let selected = CommaSeparatedTokens.parse(text.wrappedValue)
+        let selectedSet = Set(selected)
+        let allowsMultiple = fieldAllowsMultiple(field)
+        let inlineTags = CommaSeparatedTokens.inlineTags(
+            selected: selected,
+            preferred: SuggestionManager.shared.orderedDefaults(for: field),
+            maxCount: 10
+        )
+
+        return VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 8) {
-                Button(action: {
-                    activeSelectionField = field
-                    showingGenericSelection = true
-                }) {
-                    Image(systemName: "list.bullet")
-                        .font(.title3)
-                        .frame(width: 44, height: 44)
-                        .background(Color(uiColor: .tertiarySystemFill))
-                        .cornerRadius(12)
+                Text(field.displayName)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .themeSkinLegibleText(level: .inline, slot: .sectionCard)
+                Spacer()
+                if field == .sizes {
+                    ChartImagePicker(
+                        imagePath: $sizeChartImagePath,
+                        placeholder: "添加表图",
+                        editMode: true,
+                        deleteFileImmediately: deleteChartFileImmediately
+                    )
                 }
-                .buttonStyle(PlainButtonStyle())
-                
-                switch field {
-                case .types:
-                    AutoCompleteTextField(title: "", placeholder: "例如: JSK,OP", text: $types, field: .type)
-                case .colors:
-                    AutoCompleteTextField(title: "", placeholder: "例如: 粉色,白色", text: $colors, field: .color)
-                case .sizes:
-                    HStack(spacing: 8) {
-                        AutoCompleteTextField(title: "", placeholder: "例如: S,M,L", text: $sizes, field: .size)
-                        ChartImagePicker(
-                            imagePath: $sizeChartImagePath,
-                            placeholder: "添加表图",
-                            editMode: true,
-                            deleteFileImmediately: deleteChartFileImmediately
+            }
+            .padding(.leading, 4)
+
+            FlowLayout(spacing: 8) {
+                ForEach(inlineTags, id: \.self) { token in
+                    let isOn = selectedSet.contains(token)
+                    Button {
+                        text.wrappedValue = CommaSeparatedTokens.toggle(
+                            token,
+                            in: text.wrappedValue,
+                            allowsMultiple: allowsMultiple
                         )
+                    } label: {
+                        Text(token)
+                            .font(.subheadline)
+                            .fontWeight(isOn ? .semibold : .regular)
+                            .foregroundStyle(isOn ? Color.white : Color.secondary)
+                            .themeSkinLegibleText(level: .chip, slot: .filterChip)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .background(isOn ? Color.pink : Color(uiColor: .tertiarySystemFill))
+                            .cornerRadius(16)
                     }
-                case .length:
-                    AutoCompleteTextField(title: "", placeholder: "例如: 90cm", text: $length, field: .size)
-                case .condition:
-                    AutoCompleteTextField(title: "", placeholder: "例如: 全新", text: $condition, field: .condition)
-                case .accessories:
-                    AutoCompleteTextField(title: "", placeholder: "例如: BNT,发箍KC", text: $accessories, field: .accessory, externalSearch: { query in
-                        return await SuggestionManager.shared.searchAccessories(query: query, modelContext: modelContext)
-                    })
+                    .buttonStyle(.plain)
                 }
+
+                // 「更多」不是选中态 chip，而是进完整列表
+                Button {
+                    openSelection(for: field)
+                } label: {
+                    HStack(spacing: 2) {
+                        Text("更多".appLocalized)
+                        Image(systemName: "chevron.right")
+                            .font(.caption2.weight(.semibold))
+                    }
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .themeSkinLegibleText(level: .chip, slot: .filterChip)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(Color.clear)
+                    .overlay(
+                        Capsule()
+                            .strokeBorder(Color.secondary.opacity(0.45), lineWidth: 1)
+                    )
+                }
+                .buttonStyle(.plain)
             }
         }
     }
-    
-    private func fieldTitle(for field: ClothingField) -> String {
+
+    private func openSelection(for field: ClothingField) {
+        activeSelectionField = field
+        showingGenericSelection = true
+    }
+
+    private func fieldAllowsMultiple(_ field: ClothingField) -> Bool {
         switch field {
-        case .types: return "类型 (逗号分隔，如: JSK,OP,SK,小物)"
-        case .colors: return "颜色 (逗号分隔，如: 粉色,白色,蓝色)"
-        case .sizes: return "尺码 (逗号分隔，如: S,M,L)"
-        case .length: return "衣长 (如: 90cm, 100cm)"
-        case .condition: return "状态（如: 全新, 95新）"
-        case .accessories: return "小物 (逗号分隔，如: BNT,发箍KC,发带)"
+        case .types, .colors, .sizes, .accessories:
+            return true
+        case .length, .condition:
+            return false
+        }
+    }
+
+    private func binding(for field: ClothingField) -> Binding<String> {
+        switch field {
+        case .types: return $types
+        case .colors: return $colors
+        case .sizes: return $sizes
+        case .length: return $length
+        case .condition: return $condition
+        case .accessories: return $accessories
         }
     }
 }

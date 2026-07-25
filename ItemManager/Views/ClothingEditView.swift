@@ -1614,7 +1614,7 @@ struct ClothingEditView: View {
         .sheet(isPresented: $showingGenericSelection) {
             if let field = activeSelectionField {
                 SimpleStringSelectionView(
-                    title: "选择%@".appLocalized(field.displayName.appLocalized),
+                    title: "选择%@".appLocalized(field.displayName),
                     options: getAllOptions(for: field),
                     allowMultiple: isMultiSelect(field),
                     selection: binding(for: field)
@@ -2498,25 +2498,35 @@ struct ClothingEditView: View {
     }
 
     private func getAllOptions(for field: ClothingField) -> [String] {
-        // Collect all unique values from existing clothings
+        // 衣橱历史 ∪ SuggestionManager 预设（冷库 sheet 也不能空）
         var options: Set<String> = []
         for item in allClothings {
             switch field {
             case .types:
-                options.formUnion(item.types.split(separator: ",").map { $0.trimmingCharacters(in: .whitespacesAndNewlines) })
+                options.formUnion(CommaSeparatedTokens.parse(item.types))
             case .colors:
-                options.formUnion(item.colors.split(separator: ",").map { $0.trimmingCharacters(in: .whitespacesAndNewlines) })
+                options.formUnion(CommaSeparatedTokens.parse(item.colors))
             case .sizes:
-                options.formUnion(item.sizes.split(separator: ",").map { $0.trimmingCharacters(in: .whitespacesAndNewlines) })
+                options.formUnion(CommaSeparatedTokens.parse(item.sizes))
             case .accessories:
-                options.formUnion(item.accessories.split(separator: ",").map { $0.trimmingCharacters(in: .whitespacesAndNewlines) })
+                options.formUnion(CommaSeparatedTokens.parse(item.accessories))
+                // 旧 AutoComplete externalSearch：类型含「小物」的品名也可选
+                if item.types.contains("小物"), !item.name.isEmpty {
+                    options.insert(item.name)
+                }
             case .length:
                 if !item.length.isEmpty { options.insert(item.length) }
             case .condition:
                 if !item.condition.isEmpty { options.insert(item.condition) }
-            default:
-                break
             }
+        }
+        switch field {
+        case .types: options.formUnion(SuggestionManager.shared.getAllTypes())
+        case .colors: options.formUnion(SuggestionManager.shared.getAllColors())
+        case .sizes: options.formUnion(SuggestionManager.shared.getAllSizes())
+        case .accessories: options.formUnion(SuggestionManager.shared.getAllAccessories())
+        case .length: options.formUnion(SuggestionManager.shared.getAllLengths())
+        case .condition: options.formUnion(SuggestionManager.shared.getAllConditions())
         }
         return options.filter { !$0.isEmpty }.sorted()
     }

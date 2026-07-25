@@ -13,11 +13,19 @@ struct SimpleStringSelectionView: View {
     let allowMultiple: Bool
     @Binding var selection: String // For single selection or comma separated string
     @Environment(\.dismiss) private var dismiss
-    
+
     @State private var selectedItems: Set<String> = []
     @State private var newItemName: String = ""
     @State private var isAddingNew: Bool = false
-    
+    @State private var searchText: String = ""
+
+    private var displayOptions: [String] {
+        let all = Array(Set(options).union(selectedItems)).sorted()
+        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else { return all }
+        return all.filter { $0.localizedStandardContains(query) }
+    }
+
     var body: some View {
         NavigationStack {
             List {
@@ -29,31 +37,27 @@ struct SimpleStringSelectionView: View {
                                 .onSubmit {
                                     addNewItem()
                                 }
-                            
+
                             Button("添加".appLocalized) {
                                 addNewItem()
                             }
-                            .disabled(newItemName.isEmpty)
+                            .disabled(newItemName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                         }
                     } else {
-                        Button(action: {
+                        Button {
                             isAddingNew = true
-                        }) {
+                        } label: {
                             Label("添加新选项".appLocalized, systemImage: "plus.circle.fill")
                                 .foregroundStyle(.blue)
                         }
                     }
                 }
-                
+
                 Section {
-                    if options.isEmpty && selectedItems.isEmpty {
-                        Text("暂无选项".appLocalized)
+                    if displayOptions.isEmpty {
+                        Text((options.isEmpty && selectedItems.isEmpty) ? "暂无选项".appLocalized : "无匹配选项".appLocalized)
                             .foregroundStyle(.secondary)
                     } else {
-                        // Merge predefined options with any newly added ones that might not be in the list yet
-                        // (Though in this simplified view we just rely on options passed in + selected items)
-                        let displayOptions = Array(Set(options).union(selectedItems)).sorted()
-                        
                         ForEach(displayOptions, id: \.self) { option in
                             HStack {
                                 Text(option)
@@ -71,7 +75,8 @@ struct SimpleStringSelectionView: View {
                     }
                 }
             }
-            .navigationTitle(title.appLocalized)
+            .searchable(text: $searchText, prompt: Text("搜索".appLocalized))
+            .navigationTitle(title)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -79,7 +84,7 @@ struct SimpleStringSelectionView: View {
                         dismiss()
                     }
                 }
-                
+
                 ToolbarItem(placement: .confirmationAction) {
                     Button("完成".appLocalized) {
                         saveSelection()
@@ -88,21 +93,16 @@ struct SimpleStringSelectionView: View {
                 }
             }
             .onAppear {
-                // Initialize selected items from the binding string
                 if allowMultiple {
-                    let items = selection.split(separator: ",").map {
-                        $0.trimmingCharacters(in: .whitespacesAndNewlines)
-                    }.filter { !$0.isEmpty }
-                    selectedItems = Set(items)
-                } else {
-                    if !selection.isEmpty {
-                        selectedItems = [selection]
-                    }
+                    selectedItems = Set(CommaSeparatedTokens.parse(selection))
+                } else if !selection.isEmpty {
+                    // 单选字段历史数据偶发带逗号时，只取首个 token
+                    selectedItems = Set(CommaSeparatedTokens.parse(selection).prefix(1))
                 }
             }
         }
     }
-    
+
     private func toggleSelection(_ option: String) {
         if allowMultiple {
             if selectedItems.contains(option) {
@@ -112,23 +112,24 @@ struct SimpleStringSelectionView: View {
             }
         } else {
             selectedItems = [option]
-            // For single selection, we could auto-dismiss, but "Done" button is safer for consistency
         }
     }
-    
+
     private func addNewItem() {
-        guard !newItemName.isEmpty else { return }
         let name = newItemName.trimmingCharacters(in: .whitespacesAndNewlines)
-        
-        toggleSelection(name) // Auto select the new item
-        
+        guard !name.isEmpty else { return }
+        toggleSelection(name)
         newItemName = ""
         isAddingNew = false
+        searchText = ""
     }
-    
+
     private func saveSelection() {
         if allowMultiple {
-            selection = selectedItems.sorted().joined(separator: ",")
+            selection = CommaSeparatedTokens.joinPreservingOrder(
+                previous: CommaSeparatedTokens.parse(selection),
+                selected: selectedItems
+            )
         } else {
             selection = selectedItems.first ?? ""
         }
