@@ -54,6 +54,137 @@ enum CommaSeparatedTokens {
     }
 }
 
+// MARK: - Shared read-only / visual tag line (detail + edit styling)
+
+/// 详情只读：只展示已选 tag，空则占位文案。不可点。配色走主题/皮肤。
+struct ClothingFieldTagsShowcase<Trailing: View>: View {
+    let label: String
+    let value: String
+    var emptyText: String = "未填写"
+    @ViewBuilder var trailing: () -> Trailing
+    @Environment(ThemeManager.self) private var themeManager
+
+    init(
+        label: String,
+        value: String,
+        emptyText: String = "未填写",
+        @ViewBuilder trailing: @escaping () -> Trailing = { EmptyView() }
+    ) {
+        self.label = label
+        self.value = value
+        self.emptyText = emptyText
+        self.trailing = trailing
+    }
+
+    var body: some View {
+        let selected = CommaSeparatedTokens.parse(value)
+        let accent = themeManager.accentTextColor
+
+        // 详情：左类别（左对齐）+ 右 tag（右对齐），上对齐
+        HStack(alignment: .top, spacing: 12) {
+            Text(label)
+                .font(.subheadline)
+                .foregroundStyle(themeManager.secondaryTextColor)
+                .themeSkinLegibleText(level: .inline, slot: .sectionCard)
+                .fixedSize(horizontal: true, vertical: false)
+
+            if selected.isEmpty {
+                Text(emptyText.appLocalized)
+                    .font(.subheadline)
+                    .foregroundStyle(themeManager.tertiaryTextColor)
+                    .multilineTextAlignment(.trailing)
+                    .frame(maxWidth: .infinity, alignment: .trailing)
+            } else {
+                TrailingFlowLayout(spacing: 8) {
+                    ForEach(selected, id: \.self) { token in
+                        Text(token)
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(accent)
+                            .themeSkinLegibleText(level: .chip, slot: .filterChip)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .themeSkinAdaptiveSectionCard(slot: .filterChip, cornerRadius: 16, showsDecoration: false) {
+                                Capsule().fill(accent.opacity(0.15))
+                            }
+                            .overlay(
+                                Capsule()
+                                    .strokeBorder(accent.opacity(0.72), lineWidth: 1.2)
+                            )
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .topTrailing)
+            }
+
+            trailing()
+        }
+    }
+}
+
+/// 详情 tag：每行从右往左排，整体右对齐
+private struct TrailingFlowLayout: Layout {
+    var spacing: CGFloat = 8
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let maxWidth = proposal.width ?? 0
+        let result = FlowLines(in: maxWidth, subviews: subviews, spacing: spacing)
+        return CGSize(width: maxWidth > 0 ? maxWidth : result.contentWidth, height: result.height)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        let result = FlowLines(in: bounds.width, subviews: subviews, spacing: spacing)
+        for (index, subview) in subviews.enumerated() {
+            let line = result.lineIndex[index]
+            let lineWidth = result.lineWidths[line]
+            let xOffset = bounds.width - lineWidth
+            let local = result.positions[index]
+            subview.place(
+                at: CGPoint(x: bounds.minX + xOffset + local.x, y: bounds.minY + local.y),
+                proposal: .unspecified
+            )
+        }
+    }
+
+    private struct FlowLines {
+        var positions: [CGPoint] = []
+        var lineIndex: [Int] = []
+        var lineWidths: [CGFloat] = []
+        var height: CGFloat = 0
+        var contentWidth: CGFloat = 0
+
+        init(in maxWidth: CGFloat, subviews: Subviews, spacing: CGFloat) {
+            let limit = maxWidth > 0 ? maxWidth : .greatestFiniteMagnitude
+            var x: CGFloat = 0
+            var y: CGFloat = 0
+            var lineHeight: CGFloat = 0
+            var currentLine = 0
+            var currentLineWidth: CGFloat = 0
+
+            for subview in subviews {
+                let size = subview.sizeThatFits(.unspecified)
+                if x + size.width > limit && x > 0 {
+                    lineWidths.append(currentLineWidth)
+                    contentWidth = max(contentWidth, currentLineWidth)
+                    x = 0
+                    y += lineHeight + spacing
+                    lineHeight = 0
+                    currentLine += 1
+                    currentLineWidth = 0
+                }
+                positions.append(CGPoint(x: x, y: y))
+                lineIndex.append(currentLine)
+                lineHeight = max(lineHeight, size.height)
+                x += size.width + spacing
+                currentLineWidth = x - spacing
+            }
+            if !positions.isEmpty {
+                lineWidths.append(currentLineWidth)
+                contentWidth = max(contentWidth, currentLineWidth)
+            }
+            height = y + lineHeight
+        }
+    }
+}
+
 // MARK: - Basic Info Section
 
 struct ClothingBasicInfoView: View {
@@ -222,6 +353,7 @@ private struct InlineToggleTagsRow: View, Equatable {
     var sizeChartImagePath: Binding<String?>?
     var deleteChartFileImmediately: Bool = true
     let onMore: () -> Void
+    @Environment(ThemeManager.self) private var themeManager
 
     static func == (lhs: InlineToggleTagsRow, rhs: InlineToggleTagsRow) -> Bool {
         lhs.field == rhs.field
@@ -235,12 +367,14 @@ private struct InlineToggleTagsRow: View, Equatable {
         let selected = CommaSeparatedTokens.parse(text)
         let selectedSet = Set(selected)
         let tags = CommaSeparatedTokens.inlineTags(selected: selected, preferred: preferred, maxCount: 10)
+        let accent = themeManager.accentTextColor
 
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 8) {
                 Text(field.displayName)
                     .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(themeManager.secondaryTextColor)
+                    .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                 Spacer()
                 if let sizeChartImagePath {
                     ChartImagePicker(
@@ -269,10 +403,24 @@ private struct InlineToggleTagsRow: View, Equatable {
                     } label: {
                         Text(token)
                             .font(.subheadline.weight(isOn ? .semibold : .regular))
-                            .foregroundStyle(isOn ? Color.white : Color.secondary)
+                            .foregroundStyle(isOn ? accent : themeManager.secondaryTextColor)
+                            .themeSkinLegibleText(level: isOn ? .chip : .inline, slot: .filterChip)
                             .padding(.horizontal, 12)
                             .padding(.vertical, 6)
-                            .background(isOn ? Color.pink : Color(uiColor: .tertiarySystemFill), in: Capsule())
+                            .themeSkinAdaptiveSectionCard(slot: .filterChip, cornerRadius: 16, showsDecoration: false) {
+                                Capsule().fill(
+                                    isOn
+                                        ? accent.opacity(0.15)
+                                        : Color(uiColor: .tertiarySystemFill)
+                                )
+                            }
+                            .overlay(
+                                Capsule()
+                                    .strokeBorder(
+                                        isOn ? accent.opacity(0.72) : themeManager.secondaryTextColor.opacity(0.22),
+                                        lineWidth: isOn ? 1.2 : 0.6
+                                    )
+                            )
                     }
                     .buttonStyle(.plain)
                 }
@@ -284,10 +432,14 @@ private struct InlineToggleTagsRow: View, Equatable {
                             .font(.caption2.weight(.semibold))
                     }
                     .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(themeManager.secondaryTextColor)
+                    .themeSkinLegibleText(level: .inline, slot: .filterChip)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 6)
-                    .overlay(Capsule().strokeBorder(Color.secondary.opacity(0.45), lineWidth: 1))
+                    .overlay(
+                        Capsule()
+                            .strokeBorder(themeManager.secondaryTextColor.opacity(0.45), lineWidth: 1)
+                    )
                 }
                 .buttonStyle(.plain)
             }

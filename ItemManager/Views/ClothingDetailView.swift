@@ -659,57 +659,45 @@ struct ClothingDetailView: View {
     
     @ViewBuilder
     private func buildDetailRow(for field: ClothingField) -> some View {
-        switch field {
-        case .types:
-            InfoRow(label: "类型", value: clothing.types.isEmpty ? "未填写".appLocalized : clothing.types)
-        case .colors:
-            InfoRow(label: "颜色", value: clothing.colors.isEmpty ? "未填写".appLocalized : clothing.colors)
-        case .sizes:
-            // 尺码行特殊处理，显示尺码表缩略图
-            HStack {
-                Image(systemName: "ruler")
-                    .font(.caption)
-                    .foregroundStyle(themeManager.tertiaryTextColor)
-                    .frame(width: 20)
-                
-                Text("尺码".appLocalized)
-                    .font(.subheadline)
-                    .foregroundStyle(themeManager.secondaryTextColor)
-                    .themeSkinLegibleText(level: .inline, slot: .sectionCard)
-                
-                Spacer()
-                
-                // 显示尺码表缩略图（如果有）
-                if let path = clothing.sizeChartImagePath,
-                   let image = ImageManager.shared.loadImage(fileName: path) {
-                    Image(uiImage: image)
-                        .resizable()
-                        .scaledToFill()
-                        .frame(width: 40, height: 40)
-                        .clipShape(RoundedRectangle(cornerRadius: 6))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 6)
-                                .stroke(Color.gray.opacity(0.3), lineWidth: 1)
-                        )
-                        .onTapGesture {
-                            // 点击查看大图
-                            chartImagePathToView = path
-                            showingChartImageViewer = true
-                        }
-                }
-                
-                Text(clothing.sizes.isEmpty ? "未填写".appLocalized : clothing.sizes)
-                    .font(.subheadline)
-                    .foregroundStyle(themeManager.primaryTextColor)
-                    .themeSkinLegibleText(level: .inline, slot: .sectionCard)
+        // ponytail: 与编辑页同行内粉/灰 tag，只读
+        ClothingFieldTagsShowcase(
+            label: field.displayName,
+            value: detailValue(for: field),
+            emptyText: field == .accessories ? "无" : "未填写"
+        ) {
+            if field == .sizes, let path = clothing.sizeChartImagePath {
+                sizeChartThumbnail(path: path)
             }
-            .contentShape(Rectangle())
-        case .length:
-            InfoRow(label: "衣长", value: clothing.length.isEmpty ? "未填写".appLocalized : clothing.length)
-        case .condition:
-            InfoRow(label: "状态", value: clothing.condition)
-        case .accessories:
-            InfoRow(label: "小物", value: clothing.accessories.isEmpty ? "无".appLocalized : clothing.accessories)
+        }
+    }
+
+    private func detailValue(for field: ClothingField) -> String {
+        switch field {
+        case .types: return clothing.types
+        case .colors: return clothing.colors
+        case .sizes: return clothing.sizes
+        case .length: return clothing.length
+        case .condition: return clothing.condition
+        case .accessories: return clothing.accessories
+        }
+    }
+
+    @ViewBuilder
+    private func sizeChartThumbnail(path: String) -> some View {
+        if let image = ImageManager.shared.loadImage(fileName: path) {
+            Image(uiImage: image)
+                .resizable()
+                .scaledToFill()
+                .frame(width: 40, height: 40)
+                .clipShape(RoundedRectangle(cornerRadius: 6))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 6)
+                        .stroke(Color.gray.opacity(0.3), lineWidth: 1)
+                )
+                .onTapGesture {
+                    chartImagePathToView = path
+                    showingChartImageViewer = true
+                }
         }
     }
     
