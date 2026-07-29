@@ -296,13 +296,12 @@ enum FeatureItem: String, CaseIterable, Identifiable {
     // 是否默认隐藏
     var isHiddenByDefault: Bool {
         switch self {
-        case .bigWorld, .perler, .dressStock:
-            return true // 世界书、拼豆工坊、裙装股市默认隐藏
-        case .networkCommunity:
+        case .bigWorld, .perler, .dressStock, .spaceBook, .networkCommunity:
+            // ponytail: ship-hide unfinished pages; remove from set when ready to ship
             return true
         case .magicTasks:
             return false
-        case .filterClassic, .privacyDisplay, .tagBrandFieldDisplay, .spaceBook, .batchEdit, .localFileBackupRestore, .exportCSV, .cloudFileBackupRestore, .customColorPersonalization:
+        case .filterClassic, .privacyDisplay, .tagBrandFieldDisplay, .batchEdit, .localFileBackupRestore, .exportCSV, .cloudFileBackupRestore, .customColorPersonalization:
             return false  // 这些功能默认显示，作为魔法任务可获取鱼币
         default:
             return false
@@ -311,7 +310,7 @@ enum FeatureItem: String, CaseIterable, Identifiable {
 
     var isPublicUnlockTask: Bool {
         switch self {
-        case .bigWorld, .perler, .dressStock, .networkCommunity:
+        case .bigWorld, .perler, .dressStock, .spaceBook, .networkCommunity:
             return false
         default:
             return true
@@ -319,12 +318,8 @@ enum FeatureItem: String, CaseIterable, Identifiable {
     }
 
     var isComingSoonFeature: Bool {
-        #if DEBUG
-        if self == .dressStock { return false }
-        #endif
-
         switch self {
-        case .bigWorld, .perler, .dressStock, .networkCommunity:
+        case .bigWorld, .perler, .dressStock, .spaceBook, .networkCommunity:
             return true
         default:
             return false
@@ -524,7 +519,7 @@ final class FeatureUnlockManager: ObservableObject {
             } else if feature == .themeCustomize {
                 // 魔法配色的喵币任务改为“累计消费”，强制覆盖旧版本的即时扣费文案/配置
                 unlockConditions[feature.rawValue] = defaultCondition
-            } else if [.bigWorld, .perler, .dressStock, .networkCommunity, .magicTasks].contains(feature) {
+            } else if [.bigWorld, .perler, .dressStock, .spaceBook, .networkCommunity, .magicTasks].contains(feature) {
                 // 对已下线/调整为正式能力的功能，强制覆盖历史条件配置
                 unlockConditions[feature.rawValue] = defaultCondition
             }
@@ -545,6 +540,13 @@ final class FeatureUnlockManager: ObservableObject {
                 }
 
                 featureStatuses[feature.rawValue] = status
+            }
+
+            // ponytail: force-hide ship-hidden features every launch so old DEBUG/user toggles don't leak
+            if feature.isHiddenByDefault {
+                var hiddenStatus = getStatus(for: feature)
+                hiddenStatus.isVisible = false
+                featureStatuses[feature.rawValue] = hiddenStatus
             }
 
             if feature == .pet {
@@ -587,10 +589,6 @@ final class FeatureUnlockManager: ObservableObject {
 
     /// 是否已解锁
     func isUnlocked(_ feature: FeatureItem) -> Bool {
-        #if DEBUG
-        if feature == .dressStock { return true }
-        #endif
-
         // 免费功能直接返回true
         let condition = getCondition(for: feature)
         if condition.type == UnlockConditionType.free.rawValue {
@@ -601,10 +599,6 @@ final class FeatureUnlockManager: ObservableObject {
 
     /// 是否显示
     func isVisible(_ feature: FeatureItem) -> Bool {
-        #if DEBUG
-        if feature == .dressStock { return true }
-        #endif
-
         let status = getStatus(for: feature)
         return status.isVisible
     }
@@ -1011,7 +1005,10 @@ extension SmallWorldDestination {
 
     /// 检查该目的地是否可以访问
     var canAccess: Bool {
-        guard let feature = featureItem else { return true }
+        guard let feature = featureItem else {
+            // .menu = House 小屋入口
+            return !AppFeatureID.house.isShipHidden
+        }
         return FeatureUnlockManager.shared.canAccess(feature)
     }
 }

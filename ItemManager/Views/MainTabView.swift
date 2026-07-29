@@ -855,7 +855,12 @@ struct SmallWorldBackButtonLegacy: View {
                     homeTab = .depositPlan
                     selectedTab = 0
                 case .smallWorld:
-                    onBackToMenu()
+                    if AppFeatureID.house.isShipHidden {
+                        homeTab = .wardrobe
+                        selectedTab = 0
+                    } else {
+                        onBackToMenu()
+                    }
                 }
             }
         } label: {
@@ -973,7 +978,12 @@ struct MagicStickerBackButtonLegacy: View {
                 homeTab = .depositPlan
                 selectedTab = 0
             case .smallWorld:
-                destination = .menu
+                if AppFeatureID.house.isShipHidden {
+                    homeTab = .wardrobe
+                    selectedTab = 0
+                } else {
+                    destination = .menu
+                }
             }
         }
     }
@@ -1512,8 +1522,13 @@ struct SmallWorldBackButton: View {
                     homeTab = .depositPlan
                     selectedTab = 0
                 case .smallWorld:
-                    // 返回House菜单
-                    onBackToMenu()
+                    // 小屋下线时退回衣橱，避免回到 House 菜单
+                    if AppFeatureID.house.isShipHidden {
+                        homeTab = .wardrobe
+                        selectedTab = 0
+                    } else {
+                        onBackToMenu()
+                    }
                 }
             }
         } label: {
@@ -1645,7 +1660,12 @@ struct MagicStickerBackButton: View {
                 homeTab = .depositPlan
                 selectedTab = 0
             case .smallWorld:
-                destination = .menu
+                if AppFeatureID.house.isShipHidden {
+                    homeTab = .wardrobe
+                    selectedTab = 0
+                } else {
+                    destination = .menu
+                }
             }
         }
     }

@@ -18,6 +18,16 @@ enum AppFeatureID: String, CaseIterable, Identifiable, Codable, Hashable {
     case recycleBin
 
     var id: String { rawValue }
+
+    /// ponytail: unfinished pages hidden from UI; remove cases when ready to ship
+    var isShipHidden: Bool {
+        switch self {
+        case .house, .perler, .dressStock, .bigWorld:
+            return true
+        default:
+            return false
+        }
+    }
 }
 
 enum AppFeatureSurface: String, Codable, Hashable {
@@ -45,6 +55,12 @@ struct AppFeatureDescriptor: Identifiable {
     var isUnlocked: Bool {
         guard let unlockFeature else { return true }
         return FeatureUnlockManager.shared.isUnlocked(unlockFeature)
+    }
+
+    var isAvailableInUI: Bool {
+        if id.isShipHidden { return false }
+        guard let unlockFeature else { return true }
+        return FeatureUnlockManager.shared.isVisible(unlockFeature)
     }
 
     var localizedTitle: String {
@@ -209,7 +225,7 @@ enum AppFeatureRegistry {
     }
 
     static var bottomDockFeatures: [AppFeatureDescriptor] {
-        all.filter { $0.surfaces.contains(.bottomDock) }
+        all.filter { $0.surfaces.contains(.bottomDock) && $0.isAvailableInUI }
     }
 
     static var unlockedBottomDockFeatures: [AppFeatureDescriptor] {
@@ -226,8 +242,8 @@ final class BottomDockSettingsManager: ObservableObject {
 
     private let layoutUserDefaultsKey = "bottomDockLayout.v2"
     private let legacyUserDefaultsKey = "bottomDockSelectedFeature.v1"
-    private let defaultFeatureIDs: [AppFeatureID] = [.wardrobe, .house, .me, .petChat]
-    private let requiredFeatureIDs: [AppFeatureID] = [.house, .me]
+    private let defaultFeatureIDs: [AppFeatureID] = [.wardrobe, .depositPlan, .me, .petChat]
+    private let requiredFeatureIDs: [AppFeatureID] = [.me]
 
     private init() {
         if let savedIDs = Self.loadLayout(from: layoutUserDefaultsKey) {
@@ -273,7 +289,7 @@ final class BottomDockSettingsManager: ObservableObject {
     func feature(at slotIndex: Int) -> AppFeatureDescriptor {
         let featureID = featureID(at: slotIndex)
         let descriptor = AppFeatureRegistry.descriptor(for: featureID)
-        guard descriptor.surfaces.contains(.bottomDock), descriptor.isUnlocked else {
+        guard descriptor.surfaces.contains(.bottomDock), descriptor.isAvailableInUI, descriptor.isUnlocked else {
             return AppFeatureRegistry.descriptor(for: defaultFeatureIDs[min(slotIndex, defaultFeatureIDs.count - 1)])
         }
         return descriptor
@@ -289,7 +305,7 @@ final class BottomDockSettingsManager: ObservableObject {
 
     func setFeature(_ featureID: AppFeatureID, at slotIndex: Int) {
         let descriptor = AppFeatureRegistry.descriptor(for: featureID)
-        guard descriptor.surfaces.contains(.bottomDock), descriptor.isUnlocked else { return }
+        guard descriptor.surfaces.contains(.bottomDock), descriptor.isAvailableInUI, descriptor.isUnlocked else { return }
         guard selectedFeatureIDs.indices.contains(slotIndex) else { return }
 
         var nextIDs = selectedFeatureIDs
@@ -366,6 +382,8 @@ final class BottomDockSettingsManager: ObservableObject {
 
     private static func isBottomDockFeature(_ featureID: AppFeatureID) -> Bool {
         let descriptor = AppFeatureRegistry.descriptor(for: featureID)
-        return descriptor.surfaces.contains(.bottomDock) && descriptor.isUnlocked
+        return descriptor.surfaces.contains(.bottomDock)
+            && descriptor.isAvailableInUI
+            && descriptor.isUnlocked
     }
 }

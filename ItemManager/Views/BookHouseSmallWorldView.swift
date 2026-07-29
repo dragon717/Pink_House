@@ -453,7 +453,11 @@ private struct PrototypeBookRoomView: View {
                 }
             }
 
-            ForEach(room.items.filter { !decorationInventoryStore.isStored($0.feature.id) }) { item in
+            ForEach(room.items.filter {
+                !$0.feature.id.isShipHidden
+                    && $0.feature.isAvailableInUI
+                    && !decorationInventoryStore.isStored($0.feature.id)
+            }) { item in
                 let selection = BookHouseEditableItemSelection(roomID: room.id, featureID: item.feature.id)
                 let layout = layoutStore.layout(for: item.feature.id, in: room.id, fallback: item.defaultLayout)
 
@@ -1385,7 +1389,7 @@ private struct BookHouseDecorationBackpackSheet: View {
     @Environment(\.colorScheme) private var colorScheme
 
     private var items: [BookHouseRoomItem] {
-        rooms.flatMap(\.items)
+        rooms.flatMap(\.items).filter { !$0.feature.id.isShipHidden && $0.feature.isAvailableInUI }
     }
 
     private var featureIDs: [AppFeatureID] {

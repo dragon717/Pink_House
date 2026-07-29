@@ -22,7 +22,7 @@ enum FavoriteMenuItem: String, CaseIterable, Identifiable {
     // 实验室-菜单设置中"清除常用菜单历史，恢复到默认"使用的配置
     // 当前默认：House、回收站
     static var defaultFavoriteItems: [FavoriteMenuItem] {
-        [.smallWorld, .recycleBin]
+        [.recycleBin]
     }
     
     var id: String { rawValue }
@@ -83,6 +83,25 @@ enum FavoriteMenuItem: String, CaseIterable, Identifiable {
     var isSmallWorldFeature: Bool {
         destination != nil
     }
+
+    /// ponytail: ship-hide unfinished menu entries with AppFeatureID.isShipHidden
+    var isAvailableInUI: Bool {
+        switch self {
+        case .smallWorld:
+            return !AppFeatureID.house.isShipHidden
+        case .dressStock:
+            return !AppFeatureID.dressStock.isShipHidden
+                && FeatureUnlockManager.shared.isVisible(.dressStock)
+        case .perler:
+            return !AppFeatureID.perler.isShipHidden
+                && FeatureUnlockManager.shared.isVisible(.perler)
+        case .bigWorld:
+            return !AppFeatureID.bigWorld.isShipHidden
+                && FeatureUnlockManager.shared.isVisible(.bigWorld)
+        default:
+            return true
+        }
+    }
     
     // 检查功能是否已解锁
     var isUnlocked: Bool {
@@ -137,13 +156,13 @@ class FavoriteMenuSettings {
     
     // 获取可用的所有功能项
     static var allAvailableItems: [FavoriteMenuItem] {
-        FavoriteMenuItem.allCases
+        FavoriteMenuItem.allCases.filter(\.isAvailableInUI)
     }
     
     // 默认选中的功能（用于初始化时无保存数据的情况）
     // 注意：这里用于初始化无保存数据时的默认选项
     static var defaultItems: [FavoriteMenuItem] {
-        [.smallWorld, .recycleBin]
+        [.recycleBin]
     }
 }
 
@@ -163,13 +182,13 @@ final class FavoriteMenuSettingsManager: ObservableObject {
     func loadSettings() {
         if let savedIDs = UserDefaults.standard.stringArray(forKey: userDefaultsKey) {
             selectedItems = savedIDs.compactMap { FavoriteMenuItem(rawValue: $0) }
-                .filter { $0.isUnlocked } // 过滤掉未解锁的功能
+                .filter { $0.isUnlocked && $0.isAvailableInUI }
             // 确保至少有一个选中项
             if selectedItems.isEmpty {
-                selectedItems = FavoriteMenuSettings.defaultItems.filter { $0.isUnlocked }
+                selectedItems = FavoriteMenuSettings.defaultItems.filter { $0.isUnlocked && $0.isAvailableInUI }
             }
         } else {
-            selectedItems = FavoriteMenuSettings.defaultItems.filter { $0.isUnlocked }
+            selectedItems = FavoriteMenuSettings.defaultItems.filter { $0.isUnlocked && $0.isAvailableInUI }
         }
     }
     
@@ -180,7 +199,7 @@ final class FavoriteMenuSettingsManager: ObservableObject {
     
     func addItem(_ item: FavoriteMenuItem) {
         // 未解锁的功能不能加入常用菜单
-        guard item.isUnlocked else { return }
+        guard item.isUnlocked, item.isAvailableInUI else { return }
         if !selectedItems.contains(item) && selectedItems.count < 5 {
             selectedItems.append(item)
             saveSettings()
@@ -191,7 +210,7 @@ final class FavoriteMenuSettingsManager: ObservableObject {
         selectedItems.removeAll { $0 == item }
         // 确保至少保留一个
         if selectedItems.isEmpty {
-            selectedItems = [.smallWorld]
+            selectedItems = FavoriteMenuSettings.defaultItems.filter { $0.isAvailableInUI }
         }
         saveSettings()
     }

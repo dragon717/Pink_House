@@ -152,16 +152,17 @@ struct MeView: View {
                         .captureGuideTarget(.wardrobeSettingsEntry)
                         
                         // House
-                        NavigationLink(destination: SmallWorldSettingsView()) {
-                            SettingsGridItem(
-                                title: "House",
-                                subtitle: "风格 · 场景 · 3D",
-                                icon: "house.fill",
-                                iconColor: .indigo
-                            )
-                        }
-                        .buttonStyle(PlainButtonStyle())
-                        
+                        if !AppFeatureID.house.isShipHidden {
+                            NavigationLink(destination: SmallWorldSettingsView()) {
+                                SettingsGridItem(
+                                    title: "House",
+                                    subtitle: "风格 · 场景 · 3D",
+                                    icon: "house.fill",
+                                    iconColor: .indigo
+                                )
+                            }
+                            .buttonStyle(PlainButtonStyle())
+                        } 
                         NavigationLink(destination: PetAISettingsView()) {
                             SettingsGridItem(
                                 title: "智能萌宠",

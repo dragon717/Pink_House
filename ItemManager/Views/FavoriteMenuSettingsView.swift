@@ -28,7 +28,7 @@ struct FavoriteMenuSettingsView: View {
                         Text("底部导航".appLocalized)
                             .foregroundColor(themeManager.secondaryTextColor)
                     } footer: {
-                        Text("四个位置都可以调整；选择已在其他位置使用的入口时，会自动互换。系统会保留「House」和「我」入口，避免房间和设置页失联。".appLocalized)
+                        Text("四个位置都可以调整；选择已在其他位置使用的入口时，会自动互换。系统会保留「我」入口，避免设置页失联。".appLocalized)
                             .foregroundColor(themeManager.secondaryTextColor)
                     }
                 }

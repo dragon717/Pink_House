@@ -32,7 +32,7 @@ struct BookShelfToolbar: ToolbarContent {
                 if isBatchEditingBooks && viewMode == .planar {
                     Text("已选择 %d 项".appLocalized(selectedBookIDs.count))
                         .font(.headline)
-                } else {
+                } else if FeatureUnlockManager.shared.isVisible(.spaceBook) {
                     Picker("模式".appLocalized, selection: $viewMode) {
                         ForEach(BookShelfView.ViewMode.allCases) { mode in
                             Text(mode.localizedTitle).tag(mode)

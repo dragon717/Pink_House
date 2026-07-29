@@ -130,7 +130,6 @@ extension FeatureUnlockManager {
         .filterClassic,
         .privacyDisplay,
         .tagBrandFieldDisplay,
-        .spaceBook,
         .batchEdit,
         .localFileBackupRestore,
         .exportCSV,
@@ -149,7 +148,6 @@ extension FeatureUnlockManager {
         .ootdDefaultBook,
         .calendar,
         .batchImport,
-        .spaceBook
     ]
 
     func canStartPreUnlockGuide(for feature: FeatureItem) -> Bool {

@@ -31,15 +31,20 @@ struct BookShelfView: View {
     private var guardedViewModeBinding: Binding<ViewMode> {
         Binding(
             get: {
-                viewMode == .spatial && !FeatureUnlockManager.shared.isUnlocked(.spaceBook)
-                    ? .planar
-                    : viewMode
+                guard FeatureUnlockManager.shared.isVisible(.spaceBook),
+                      FeatureUnlockManager.shared.isUnlocked(.spaceBook) else {
+                    return .planar
+                }
+                return viewMode
             },
             set: { newValue in
-                if newValue == .spatial && !FeatureUnlockManager.shared.isUnlocked(.spaceBook) {
-                    viewMode = .planar
-                    ToastManager.shared.showWarning("请先完成「空间手帐」任务，再进入「空间」页签".appLocalized)
-                    return
+                if newValue == .spatial {
+                    guard FeatureUnlockManager.shared.isVisible(.spaceBook) else { return }
+                    if !FeatureUnlockManager.shared.isUnlocked(.spaceBook) {
+                        viewMode = .planar
+                        ToastManager.shared.showWarning("请先完成「空间手帐」任务，再进入「空间」页签".appLocalized)
+                        return
+                    }
                 }
                 viewMode = newValue
             }
@@ -96,6 +101,11 @@ struct BookShelfView: View {
     var body: some View {
         NavigationStack(path: $navigationPath) {
             applyBookShelfModifiers(to: bookShelfContent)
+        }
+        .onAppear {
+            if !FeatureUnlockManager.shared.isVisible(.spaceBook), viewMode == .spatial {
+                viewMode = .planar
+            }
         }
     }
 

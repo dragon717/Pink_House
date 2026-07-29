@@ -26,6 +26,11 @@ struct SmallWorldView: View {
             if smallWorldStyle != SmallWorldStyle.bookHouse.rawValue {
                 smallWorldStyle = SmallWorldStyle.bookHouse.rawValue
             }
+            // ponytail: ship-hide House room; bounce to wardrobe if somehow opened
+            if AppFeatureID.house.isShipHidden {
+                homeTab = .wardrobe
+                selectedTab = 0
+            }
         }
     }
 }
