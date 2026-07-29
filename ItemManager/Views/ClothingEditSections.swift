@@ -210,6 +210,7 @@ struct ClothingBasicInfoView: View {
     @Binding var activeSelectionField: ClothingField?
     
     @Query private var brands: [Brand]
+    @Query(filter: #Predicate<Clothing> { $0.deletedAt == nil }) private var allClothings: [Clothing]
     @ObservedObject private var visibilityManager = FieldVisibilityManager.shared
     @ObservedObject private var networkManager = NetworkSettingsManager.shared
     
@@ -292,12 +293,12 @@ struct ClothingBasicInfoView: View {
     
     @ViewBuilder
     private func inlineFieldRow(for field: ClothingField) -> some View {
-        // ponytail: Equatable 行跳过未改字段的 body；点选不动画、不重排
+        // ponytail: 行内 tag 只用来自衣橱/当前值，不灌预设硬编码
         InlineToggleTagsRow(
             field: field,
             text: binding(for: field).wrappedValue,
             textBinding: binding(for: field),
-            preferred: Self.preferredTags(for: field),
+            preferred: userTags(for: field),
             allowsMultiple: fieldAllowsMultiple(field),
             sizeChartImagePath: field == .sizes ? $sizeChartImagePath : nil,
             deleteChartFileImmediately: deleteChartFileImmediately,
@@ -331,16 +332,34 @@ struct ClothingBasicInfoView: View {
         }
     }
 
-    private static func preferredTags(for field: ClothingField) -> [String] {
-        // 静态缓存，避免每次 body 重建数组
-        preferredTagsCache[field] ?? {
-            let tags = SuggestionManager.shared.orderedDefaults(for: field)
-            preferredTagsCache[field] = tags
-            return tags
-        }()
+    /// 用户衣橱里出现过的值（先到先得，最多 10 个），不含预设种子
+    private func userTags(for field: ClothingField) -> [String] {
+        var ordered: [String] = []
+        var seen = Set<String>()
+        for item in allClothings {
+            for token in tokens(on: item, field: field) where seen.insert(token).inserted {
+                ordered.append(token)
+                if ordered.count >= 10 { return ordered }
+            }
+        }
+        return ordered
     }
 
-    private static var preferredTagsCache: [ClothingField: [String]] = [:]
+    private func tokens(on item: Clothing, field: ClothingField) -> [String] {
+        switch field {
+        case .types: return CommaSeparatedTokens.parse(item.types)
+        case .colors: return CommaSeparatedTokens.parse(item.colors)
+        case .sizes: return CommaSeparatedTokens.parse(item.sizes)
+        case .length: return item.length.isEmpty ? [] : [item.length]
+        case .condition: return item.condition.isEmpty ? [] : [item.condition]
+        case .accessories:
+            var result = CommaSeparatedTokens.parse(item.accessories)
+            if item.types.contains("小物"), !item.name.isEmpty {
+                result.append(item.name)
+            }
+            return result
+        }
+    }
 }
 
 /// 单行字段 tag；Equatable 用 text 快照跳过无关刷新

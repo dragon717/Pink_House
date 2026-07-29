@@ -1323,7 +1323,7 @@ struct HomeView: View {
             Image(systemName: "line.3.horizontal.decrease.circle")
                 .font(.system(size: 12))
                 .foregroundStyle(topBarIconForeground)
-                .symbolVariant(selectedTagIDs.isEmpty && selectedBrandIDs.isEmpty && selectedTypes.isEmpty && selectedColors.isEmpty && selectedSizes.isEmpty && selectedLengths.isEmpty && selectedConditions.isEmpty && selectedAccessories.isEmpty ? .none : .fill)
+                .symbolVariant(selectedTagIDs.isEmpty && selectedBrandIDs.isEmpty && selectedTypes.isEmpty && selectedColors.isEmpty && selectedSizes.isEmpty && selectedLengths.isEmpty && selectedConditions.isEmpty && selectedAccessories.isEmpty && depositStatusFilter == .all ? .none : .fill)
         }
     }
     
@@ -1332,6 +1332,29 @@ struct HomeView: View {
         // menu-perf: wardrobe classic filter menu
         Menu {
             let _ = MenuPerfSignpost.menuContent("wardrobe.filter")
+
+            // 状态：全部 / 已拥有 / 全款预约 / 心愿尾款
+            Menu {
+                let _ = MenuPerfSignpost.menuContent("wardrobe.filter.deposit_status")
+                ForEach(DepositStatusFilter.allCases) { filter in
+                    Button {
+                        depositStatusFilter = filter
+                    } label: {
+                        HStack {
+                            Text(filter.displayName)
+                            if depositStatusFilter == filter {
+                                Image(systemName: "checkmark")
+                            }
+                        }
+                    }
+                }
+            } label: {
+                Label(
+                    depositStatusFilter == .all ? "状态".appLocalized : depositStatusFilter.displayName,
+                    systemImage: depositStatusFilter.iconName
+                )
+            }
+
             // Tags Filter
             // menu-perf: wardrobe tag filter submenu
             Menu {
@@ -1953,6 +1976,10 @@ struct HomeView: View {
         if !selectedAccessories.isEmpty {
             let names = selectedAccessories.map { $0 == HomeView.noAccessoryMarker ? "无小物".appLocalized : $0 }
             descriptions.append(names.joined(separator: "/"))
+        }
+
+        if depositStatusFilter != .all {
+            descriptions.append(depositStatusFilter.displayName)
         }
         
         if descriptions.isEmpty { return nil }

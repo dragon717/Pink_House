@@ -2494,7 +2494,7 @@ struct ClothingEditView: View {
     }
 
     private func getAllOptions(for field: ClothingField) -> [String] {
-        // 衣橱历史 ∪ SuggestionManager 预设（冷库 sheet 也不能空）
+        // ponytail: sheet 选项只来自衣橱用户数据 + 当前已选，不灌预设硬编码
         var options: Set<String> = []
         for item in allClothings {
             switch field {
@@ -2506,7 +2506,6 @@ struct ClothingEditView: View {
                 options.formUnion(CommaSeparatedTokens.parse(item.sizes))
             case .accessories:
                 options.formUnion(CommaSeparatedTokens.parse(item.accessories))
-                // 旧 AutoComplete externalSearch：类型含「小物」的品名也可选
                 if item.types.contains("小物"), !item.name.isEmpty {
                     options.insert(item.name)
                 }
@@ -2516,14 +2515,7 @@ struct ClothingEditView: View {
                 if !item.condition.isEmpty { options.insert(item.condition) }
             }
         }
-        switch field {
-        case .types: options.formUnion(SuggestionManager.shared.getAllTypes())
-        case .colors: options.formUnion(SuggestionManager.shared.getAllColors())
-        case .sizes: options.formUnion(SuggestionManager.shared.getAllSizes())
-        case .accessories: options.formUnion(SuggestionManager.shared.getAllAccessories())
-        case .length: options.formUnion(SuggestionManager.shared.getAllLengths())
-        case .condition: options.formUnion(SuggestionManager.shared.getAllConditions())
-        }
+        options.formUnion(CommaSeparatedTokens.parse(binding(for: field).wrappedValue))
         return options.filter { !$0.isEmpty }.sorted()
     }
 

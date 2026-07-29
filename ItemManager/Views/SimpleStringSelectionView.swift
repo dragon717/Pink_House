@@ -20,10 +20,20 @@ struct SimpleStringSelectionView: View {
     @State private var searchText: String = ""
 
     private var displayOptions: [String] {
-        let all = Array(Set(options).union(selectedItems)).sorted()
+        let all = Set(options).union(selectedItems)
         let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !query.isEmpty else { return all }
-        return all.filter { $0.localizedStandardContains(query) }
+        let filtered = query.isEmpty
+            ? all
+            : all.filter { $0.localizedStandardContains(query) }
+
+        // 已选置顶；其余按当前语言字典序（中文按拼音/笔画等系统标准）
+        let selected = filtered
+            .filter { selectedItems.contains($0) }
+            .sorted { $0.localizedStandardCompare($1) == .orderedAscending }
+        let rest = filtered
+            .filter { !selectedItems.contains($0) }
+            .sorted { $0.localizedStandardCompare($1) == .orderedAscending }
+        return selected + rest
     }
 
     var body: some View {

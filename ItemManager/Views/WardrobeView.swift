@@ -271,6 +271,8 @@ private enum WardrobeFilterEngine {
         switch rawValue {
         case "owned":
             return !snapshot.isDepositPlan
+        case "fullPaymentReservation":
+            return snapshot.isFullPaymentReservation
         case "depositPlan":
             return snapshot.isDepositPlan && !snapshot.isFullPaymentReservation
         default:
@@ -3003,12 +3005,14 @@ struct MergeToAccessorySheet: View {
             }
         }
 
-        // 心愿尾款筛选
+        // 状态筛选：已拥有 / 全款预约 / 心愿尾款
         switch depositStatusFilter {
         case .all:
             break
         case .owned:
             result = result.filter { !$0.isDepositPlan }
+        case .fullPaymentReservation:
+            result = result.filter(\.isFullPaymentReservation)
         case .depositPlan:
             result = result.filter { $0.isFinalPaymentPlan }
         }
@@ -3263,7 +3267,7 @@ struct MergeAccessoryFilterSheet: View {
 
                 ToolbarItem(placement: .topBarTrailing) {
                     HStack(spacing: 12) {
-                        // 心愿尾款筛选
+                        // 状态筛选
                         // menu-perf: merge target deposit status menu
                         Menu {
                             let _ = MenuPerfSignpost.menuContent("wardrobe.merge.deposit_status")
@@ -3282,9 +3286,9 @@ struct MergeAccessoryFilterSheet: View {
                             }
                         } label: {
                             HStack(spacing: 4) {
-                                Image(systemName: depositStatusFilter == .all ? "heart" : "heart.fill")
+                                Image(systemName: depositStatusFilter.iconName)
                                 if depositStatusFilter != .all {
-                                    Text((depositStatusFilter == .owned ? "已拥有" : "心愿").appLocalized)
+                                    Text(depositStatusFilter.displayName)
                                         .font(.caption)
                                         .themeSkinLegibleText(level: .inline, slot: .filterChip)
                                 }

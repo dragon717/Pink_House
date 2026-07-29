@@ -165,6 +165,8 @@ class ClothingFilterService {
             return true
         case .owned:
             return !clothing.isDepositPlan
+        case .fullPaymentReservation:
+            return clothing.isFullPaymentReservation
         case .depositPlan:
             return clothing.isFinalPaymentPlan
         }

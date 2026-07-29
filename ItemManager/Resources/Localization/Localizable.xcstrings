@@ -100242,7 +100242,6 @@
       }
     },
     "状态" : {
-      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {

@@ -16,10 +16,11 @@ enum FilterMode: String, CaseIterable, Identifiable {
     }
 }
 
-// MARK: - 心愿尾款筛选状态
+// MARK: - 衣橱状态筛选
 enum DepositStatusFilter: String, CaseIterable, Identifiable, Hashable, Sendable {
     case all = "all"
     case owned = "owned"
+    case fullPaymentReservation = "fullPaymentReservation"
     case depositPlan = "depositPlan"
 
     var id: String { rawValue }
@@ -27,7 +28,8 @@ enum DepositStatusFilter: String, CaseIterable, Identifiable, Hashable, Sendable
     var displayName: String {
         switch self {
         case .all: return "全部".appLocalized
-        case .owned: return "已拥有/全款".appLocalized
+        case .owned: return "已拥有".appLocalized
+        case .fullPaymentReservation: return "全款预约".appLocalized
         case .depositPlan: return "心愿尾款".appLocalized
         }
     }
@@ -36,6 +38,7 @@ enum DepositStatusFilter: String, CaseIterable, Identifiable, Hashable, Sendable
         switch self {
         case .all: return "heart"
         case .owned: return "checkmark.seal"
+        case .fullPaymentReservation: return "creditcard"
         case .depositPlan: return "heart.fill"
         }
     }
@@ -255,7 +258,7 @@ struct MultiDimensionalFilterSheet: View {
         visibilityManager.fieldOrder.filter { visibilityManager.isVisible($0) }
     }
 
-    // MARK: - 心愿尾款筛选
+    // MARK: - 状态筛选
     private var depositStatusSelector: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 8) {
@@ -263,7 +266,7 @@ struct MultiDimensionalFilterSheet: View {
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundStyle(depositStatusFilter == .all ? magicPalette.secondaryText : magicPalette.accent)
 
-                Text("心愿尾款")
+                Text("状态")
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(magicPalette.primaryText)
                     .themeSkinLegibleText(level: .inline, slot: .filterSheet)
