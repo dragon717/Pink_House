@@ -746,6 +746,31 @@ final class ClothingEditDraftManager: ObservableObject {
         }
     }
 
+    /// 磁盘读草稿放到后台，避免打开编辑页时主线程硬卡。
+    func loadDraftAsync() async -> ClothingEditDraft? {
+        guard useFilesystemDrafts else {
+            return loadLegacyDraft()
+        }
+        do {
+            let draft = try await Task.detached(priority: .userInitiated) {
+                try ClothingDraftFileStore.shared.loadCreateDraft()
+            }.value
+            guard let draft else {
+                print("DraftManager: No draft data found in file store")
+                DraftReliabilitySignpost.draftLoad(scope: "create", source: "none", draftID: nil, imageCount: 0)
+                return nil
+            }
+            DraftReliabilitySignpost.draftLoad(scope: "create", source: "file_create", draftID: draft.id, imageCount: draft.imagePaths.count)
+            print("DraftManager: Loaded draft with ID: \(draft.id), images: \(draft.imagePaths.count)")
+            return draft
+        } catch {
+            DraftReliabilitySignpost.draftLoad(scope: "create", source: "file_decode_failed", draftID: nil, imageCount: 0)
+            AppLogger.error("DraftReliability: Failed to decode create draft: \(error)")
+            print("DraftManager: Failed to decode draft data: \(error)")
+            return nil
+        }
+    }
+
     func loadDraftID() -> UUID? {
         guard useFilesystemDrafts else {
             return loadLegacyDraftID()
@@ -855,6 +880,37 @@ final class ClothingEditDraftManager: ObservableObject {
         }
         do {
             guard let draft = try fileStore.loadEditingDraft(for: clothingID) else {
+                print("DraftManager: No editing draft found for clothing: \(clothingID)")
+                DraftReliabilitySignpost.draftLoad(scope: "edit", source: "none", draftID: nil, imageCount: 0)
+                return nil
+            }
+            currentEditingDrafts[clothingID] = draft
+            DraftReliabilitySignpost.draftLoad(scope: "edit", source: "file_editing", draftID: draft.id, imageCount: draft.imagePaths.count)
+            print("DraftManager: Loaded persisted editing draft for clothing: \(clothingID), images: \(draft.imagePaths.count)")
+            return draft
+        } catch {
+            DraftReliabilitySignpost.draftLoad(scope: "edit", source: "file_decode_failed", draftID: nil, imageCount: 0)
+            AppLogger.error("DraftReliability: Failed to decode editing draft for \(clothingID): \(error)")
+            print("DraftManager: Failed to decode editing draft for clothing: \(clothingID): \(error)")
+            return nil
+        }
+    }
+
+    func loadEditingDraftAsync(for clothingID: UUID) async -> ClothingEditDraft? {
+        if let draft = currentEditingDrafts[clothingID] {
+            print("DraftManager: Loaded in-memory editing draft for clothing: \(clothingID), images: \(draft.imagePaths.count)")
+            DraftReliabilitySignpost.draftLoad(scope: "edit", source: "memory_currentDraft", draftID: draft.id, imageCount: draft.imagePaths.count)
+            return draft
+        }
+
+        guard useFilesystemDrafts else {
+            return loadLegacyEditingDraft(for: clothingID)
+        }
+        do {
+            let draft = try await Task.detached(priority: .userInitiated) {
+                try ClothingDraftFileStore.shared.loadEditingDraft(for: clothingID)
+            }.value
+            guard let draft else {
                 print("DraftManager: No editing draft found for clothing: \(clothingID)")
                 DraftReliabilitySignpost.draftLoad(scope: "edit", source: "none", draftID: nil, imageCount: 0)
                 return nil
@@ -1114,6 +1170,7 @@ struct ClothingEditView: View {
     @State private var editorSessionID = UUID()
     @State private var hasUserTouchedAnyField = false
     @State private var isReadyForUserDraftChanges = false
+    @State private var isEditorContentReady = false
     @State private var suppressNextDraftObservationAsSystemChange = false
     @State private var programmaticDraftObservationKey: DraftObservationKey?
 
@@ -1521,24 +1578,29 @@ struct ClothingEditView: View {
                 .ignoresSafeArea()
                 .environment(\.containerPalette, containerPalette)
 
-            ScrollView {
-                VStack(spacing: 24) {
-                    // MARK: - 裙装信息
-                    basicInfoSection
+            if isEditorContentReady {
+                ScrollView {
+                    VStack(spacing: 24) {
+                        // MARK: - 裙装信息
+                        basicInfoSection
 
-                    // MARK: - 标签分类
-                    tagsSection
+                        // MARK: - 标签分类
+                        tagsSection
 
-                    // MARK: - 购买信息
-                    purchaseInfoSection
+                        // MARK: - 购买信息
+                        purchaseInfoSection
 
-                    // MARK: - 价格信息
-                    priceSection
+                        // MARK: - 价格信息
+                        priceSection
 
-                    // MARK: - 备注
-                    noteSection
+                        // MARK: - 备注
+                        noteSection
+                    }
+                    .padding()
                 }
-                .padding()
+            } else {
+                // ponytail: reuse share cat-paw overlay while draft/images warm on background
+                ShareLoadingOverlay(message: editorPreparingMessage)
             }
 
             // Toast 提示层
@@ -1547,6 +1609,7 @@ struct ClothingEditView: View {
         .navigationTitle((isEditing ? "编辑" : "手动创建").appLocalized)
         .navigationBarTitleDisplayMode(.inline)
         .userActivity(ClothingEditUserActivity.activityType) { activity in
+            guard isEditorContentReady else { return }
             ClothingEditUserActivity.configure(
                 activity,
                 payload: ClothingEditUserActivityPayload(
@@ -1582,7 +1645,7 @@ struct ClothingEditView: View {
                 Button("保存".appLocalized) {
                     handleSaveTapped()
                 }
-                .disabled(name.isEmpty)
+                .disabled(!isEditorContentReady || name.isEmpty)
             }
         }
         .alert("确认切换预约状态？".appLocalized, isPresented: $showingOwnedToReservationConfirmation) {
@@ -1620,10 +1683,12 @@ struct ClothingEditView: View {
         .onAppear {
             DraftReliabilitySignpost.editorInit(isEditing: isEditing, continueFromDraft: continueFromDraft, sessionID: editorSessionID)
             draftManager.registerActiveEditor(editorSessionID)
-            initializeEditorIfNeeded()
             if originalPriceRateUpdatedAt == nil {
                 Task { await refreshJPYRateForEditor(force: false) }
             }
+        }
+        .task(id: editorSessionID) {
+            await prepareEditorContentIfNeeded()
         }
         .onChange(of: imagePaths) { oldValue, newValue in
             print("ClothingEditView: imagePaths changed from \(oldValue.count) to \(newValue.count) images")
@@ -1808,56 +1873,142 @@ struct ClothingEditView: View {
         draftManager.cancelPendingDraftPersistence(for: clothing?.id)
     }
 
-    private func initializeEditorIfNeeded() {
-        print("ClothingEditView: onAppear triggered, isEditing: \(isEditing), draftID: \(draftID), continueFromDraft: \(continueFromDraft), hasInitializedEditor: \(editModel.hasInitializedEditor)")
+    private var editorPreparingMessage: String {
+        if isEditing {
+            return "正在加载...".appLocalized
+        }
+        if continueFromDraft {
+            return "正在恢复未保存内容...".appLocalized
+        }
+        return "正在打开...".appLocalized
+    }
 
-        // 防止多次处理草稿逻辑
+    private func prepareEditorContentIfNeeded() async {
+        print("ClothingEditView: prepare triggered, isEditing: \(isEditing), draftID: \(draftID), continueFromDraft: \(continueFromDraft), hasInitializedEditor: \(editModel.hasInitializedEditor)")
+
         guard !editModel.hasInitializedEditor else {
             print("ClothingEditView: Draft already processed, skipping")
+            isEditorContentReady = true
             isReadyForUserDraftChanges = true
             return
         }
-        isReadyForUserDraftChanges = false
-        editModel.hasInitializedEditor = true
 
-        // 加载自动补全数据
-        SuggestionManager.shared.loadDataAndBuildIndex(modelContext: modelContext)
+        isReadyForUserDraftChanges = false
+        // 先让猫爪动画上屏，再做 IO / 解码，避免 sheet 打开瞬间硬卡。
+        await Task.yield()
+
+        var draftToRestore: ClothingEditDraft?
+        var clothingGridPaths: [String] = []
+        var clothingChartPaths: [String] = []
 
         if let c = clothing {
-            // 编辑模式：先从数据库加载，再覆盖未保存的编辑草稿。
-            loadFromClothing(c)
+            clothingGridPaths = c.imagePaths
+            if let sizeChartImagePath = c.sizeChartImagePath {
+                clothingChartPaths.append(sizeChartImagePath)
+            }
+            if let priceChartImagePath = c.priceChartImagePath {
+                clothingChartPaths.append(priceChartImagePath)
+            }
             if let activityDraft {
                 print("ClothingEditView: Restoring editing draft from NSUserActivity for clothing: \(c.id)")
-                restoreFromDraft(activityDraft)
-            } else if let editDraft = draftManager.loadEditingDraft(for: c.id) {
+                draftToRestore = activityDraft
+            } else if let editDraft = await draftManager.loadEditingDraftAsync(for: c.id) {
                 print("ClothingEditView: Restoring editing draft for clothing: \(c.id)")
-                restoreFromDraft(editDraft)
+                draftToRestore = editDraft
+            }
+        } else if let activityDraft {
+            print("ClothingEditView: Restoring create draft from NSUserActivity with \(activityDraft.imagePaths.count) images")
+            draftToRestore = activityDraft
+        } else if continueFromDraft, let persistedDraft = await draftManager.loadDraftAsync() {
+            print("ClothingEditView: Found persisted draft with \(persistedDraft.imagePaths.count) images")
+            draftToRestore = persistedDraft
+        } else if let inMemoryDraft = draftManager.currentDraft {
+            // 手动创建入口会清掉旧持久草稿；这里仅恢复本次正在编辑的内存快照，
+            // 避免下拉通知栏/失活导致 SwiftUI 重建后表单回到空白。
+            print("ClothingEditView: Restoring in-memory draft with \(inMemoryDraft.imagePaths.count) images")
+            draftToRestore = inMemoryDraft
+        } else {
+            print("ClothingEditView: No draft found to restore")
+        }
+
+        let pathsToWarm = draftImagePathsForWarmup(draftToRestore)
+        await warmupEditorImages(
+            gridFileNames: pathsToWarm.grid + clothingGridPaths,
+            chartFileNames: pathsToWarm.charts + clothingChartPaths
+        )
+
+        guard !Task.isCancelled else { return }
+
+        editModel.hasInitializedEditor = true
+
+        if let c = clothing {
+            loadFromClothing(c)
+            if let draftToRestore {
+                restoreFromDraft(draftToRestore)
             }
         } else {
-            if let activityDraft {
-                print("ClothingEditView: Restoring create draft from NSUserActivity with \(activityDraft.imagePaths.count) images")
-                restoreFromDraft(activityDraft)
-            } else if continueFromDraft, let persistedDraft = draftManager.loadDraft() {
-                print("ClothingEditView: Found persisted draft with \(persistedDraft.imagePaths.count) images")
-                restoreFromDraft(persistedDraft)
-            } else if let inMemoryDraft = draftManager.currentDraft {
-                // 手动创建入口会清掉旧持久草稿；这里仅恢复本次正在编辑的内存快照，
-                // 避免下拉通知栏/失活导致 SwiftUI 重建后表单回到空白。
-                print("ClothingEditView: Restoring in-memory draft with \(inMemoryDraft.imagePaths.count) images")
-                restoreFromDraft(inMemoryDraft)
-            } else {
-                print("ClothingEditView: No draft found to restore")
+            if let draftToRestore {
+                restoreFromDraft(draftToRestore)
             }
             applyInitialValuesIfNeeded()
         }
 
-        // 更新当前草稿到管理器（用于失活/后台保存）
         updateCurrentDraft()
         hasUserTouchedAnyField = false
         programmaticDraftObservationKey = draftObservationKey
-        Task { @MainActor in
-            await Task.yield()
-            isReadyForUserDraftChanges = true
+        isEditorContentReady = true
+
+        // 自动补全索引可延后，不挡首帧表单。
+        Task(priority: .utility) {
+            SuggestionManager.shared.loadDataAndBuildIndex(modelContext: modelContext)
+        }
+
+        await Task.yield()
+        isReadyForUserDraftChanges = true
+    }
+
+    private func draftImagePathsForWarmup(_ draft: ClothingEditDraft?) -> (grid: [String], charts: [String]) {
+        guard let draft else { return ([], []) }
+        var grid = draft.imagePaths
+        for accessory in draft.accessoryList {
+            grid.append(contentsOf: accessory.imagePaths ?? [])
+        }
+        var charts: [String] = []
+        if let sizeChartImagePath = draft.sizeChartImagePath {
+            charts.append(sizeChartImagePath)
+        }
+        if let priceChartImagePath = draft.priceChartImagePath {
+            charts.append(priceChartImagePath)
+        }
+        return (grid, charts)
+    }
+
+    private func warmupEditorImages(gridFileNames: [String], chartFileNames: [String]) async {
+        let gridTarget = CGSize(width: 100, height: 100)
+        let chartTarget = CGSize(width: 80, height: 80)
+        let gridUnique = Array(Set(gridFileNames.filter { !$0.isEmpty }))
+        let chartUnique = Array(Set(chartFileNames.filter { !$0.isEmpty }))
+        guard !gridUnique.isEmpty || !chartUnique.isEmpty else { return }
+
+        await withTaskGroup(of: Void.self) { group in
+            for fileName in gridUnique {
+                group.addTask {
+                    _ = await ImageManager.shared.loadImageAsync(
+                        fileName: fileName,
+                        targetSize: gridTarget,
+                        priority: .utility
+                    )
+                }
+            }
+            for fileName in chartUnique {
+                group.addTask {
+                    _ = await ImageManager.shared.loadImageAsync(
+                        fileName: fileName,
+                        targetSize: chartTarget,
+                        priority: .utility
+                    )
+                }
+            }
         }
     }
 
