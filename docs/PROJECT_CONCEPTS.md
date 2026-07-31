@@ -11,6 +11,7 @@
     - **录入**: 添加裙装，记录定金、尾款、排期。
     - **心愿尾款 (Deposit Plan)**: 针对预售款裙装的资金规划功能，帮助用户计算未来需要支付的尾款总额。
     - **裙装广场**: (预留) 分享和展示裙装的公共区域。
+    - **梦裙时光馆 (Time Hall)**: 品牌档案馆藏。V1 本地 Bundle（编年史 / 风格浪花）；用户上传 → CloudKit Public 见 `docs/TIME_HALL_CLOUDKIT_UPLOAD_PLAN.md`。
 
 ### 1.2 萌宠互动 (Pet Interaction)
 不仅是电子宠物，更是用户的“衣橱管家”和“贴心闺蜜”。

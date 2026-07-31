@@ -1920,6 +1920,26 @@
         }
       }
     },
+    "%@ · %lld" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ · %2$lld"
+          }
+        }
+      }
+    },
+    "%@ · %lld · %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ · %2$lld · %3$@"
+          }
+        }
+      }
+    },
     "%@ · 手动" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -5863,6 +5883,16 @@
         }
       }
     },
+    "%lld · %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld · %2$@"
+          }
+        }
+      }
+    },
     "%lld / %lld" : {
       "localizations" : {
         "en" : {
@@ -5906,6 +5936,9 @@
           }
         }
       }
+    },
+    "%lld Dresses" : {
+
     },
     "%lld 个新任务" : {
       "localizations" : {
@@ -6156,6 +6189,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%lld 顆拼豆"
+          }
+        }
+      }
+    },
+    "%lld 馆藏 · %lld 辑" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld 馆藏 · %2$lld 辑"
           }
         }
       }

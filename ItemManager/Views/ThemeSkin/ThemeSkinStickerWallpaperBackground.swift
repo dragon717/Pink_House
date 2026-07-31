@@ -11,6 +11,7 @@ enum ThemeSkinWallpaperContext: String, CaseIterable, Identifiable, Hashable {
     case me
     case petChat
     case themeDetail
+    case timeHall
 
     var id: String { rawValue }
 
@@ -25,6 +26,7 @@ enum ThemeSkinWallpaperContext: String, CaseIterable, Identifiable, Hashable {
         case .me: return "我的".appLocalized
         case .petChat: return "萌宠对话".appLocalized
         case .themeDetail: return "主题设置".appLocalized
+        case .timeHall: return "时光馆".appLocalized
         }
     }
 
@@ -39,6 +41,7 @@ enum ThemeSkinWallpaperContext: String, CaseIterable, Identifiable, Hashable {
         case .me: return 6
         case .petChat: return 7
         case .themeDetail: return 8
+        case .timeHall: return 9
         }
     }
 
@@ -53,6 +56,7 @@ enum ThemeSkinWallpaperContext: String, CaseIterable, Identifiable, Hashable {
         case .me: return -0.018
         case .petChat: return 0.052
         case .themeDetail: return -0.036
+        case .timeHall: return 0.028
         }
     }
 
@@ -67,6 +71,7 @@ enum ThemeSkinWallpaperContext: String, CaseIterable, Identifiable, Hashable {
         case .me: return 0.024
         case .petChat: return 0.014
         case .themeDetail: return -0.022
+        case .timeHall: return -0.02
         }
     }
 
@@ -81,13 +86,14 @@ enum ThemeSkinWallpaperContext: String, CaseIterable, Identifiable, Hashable {
         case .me: return -4
         case .petChat: return 10
         case .themeDetail: return -8
+        case .timeHall: return 5
         }
     }
 
     var opacityMultiplier: Double {
         switch self {
         case .general, .themeDetail: return 1
-        case .wardrobe, .journal: return 0.96
+        case .wardrobe, .journal, .timeHall: return 0.96
         case .depositPlan, .wealth: return 0.9
         case .house: return 0.82
         case .me: return 0.88
@@ -129,6 +135,7 @@ enum ThemeSkinWallpaperContext: String, CaseIterable, Identifiable, Hashable {
         case .me: return 0.09
         case .petChat: return 0.08
         case .themeDetail: return 0.13
+        case .timeHall: return 0.09
         }
     }
 }

@@ -392,6 +392,7 @@ struct LegacyTabView: View {
             case 1: tabName = "smallWorld"
             case 2: tabName = "me"
             case 3: tabName = "petChat"
+            case 4: tabName = "timeHall"
             default: tabName = "unknown"
             }
             NotificationCenter.default.post(
@@ -450,6 +451,15 @@ struct LegacyTabView: View {
                         searchText: $searchText,
                         onHide: hidePetChat
                     )
+                }
+            }
+
+            if shouldRenderTab(4) {
+                persistentTabPage(tab: 4) {
+                    NavigationStack {
+                        TimeHallView()
+                            .toolbarBackground(.hidden, for: .navigationBar)
+                    }
                 }
             }
         }
@@ -659,7 +669,7 @@ struct LegacyTabView: View {
         switch feature.id {
         case .wardrobe, .depositPlan:
             return .wardrobe
-        case .house, .petHome, .magicSticker, .outfitJournal, .wealth, .calendar, .bigWorld, .perler, .dressStock, .recycleBin:
+        case .house, .petHome, .magicSticker, .outfitJournal, .wealth, .calendar, .bigWorld, .perler, .dressStock, .recycleBin, .timeHall:
             return .house
         case .me:
             return .me

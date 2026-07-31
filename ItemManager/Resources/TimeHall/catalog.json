@@ -1,0 +1,89 @@
+{
+  "version": 1,
+  "source": "https://pinkhouse-webshop.jp/pinkhouse/news/806?news_tag_id=1",
+  "title": "梦裙时光馆",
+  "subtitle": "PINK HOUSE 档案馆藏",
+  "heroImage": "hero.jpg",
+  "heroCaption": "Archive Print Semi-Order · Autumn 2024",
+  "heroBody": "秋季店铺焕新纪念企划：精选档案印花半定制，每一条裙摆都是时光的注脚。",
+  "collections": [
+    {
+      "id": "archive_print_2024_autumn",
+      "year": 2024,
+      "season": "autumn",
+      "seasonLabel": "秋",
+      "title": "アーカイブプリントセミオーダー",
+      "titleZH": "档案印花半定制",
+      "summary": "店舗リニューアル記念のアーカイブプリント。店頭限定カラーで蘇るクラシックモチーフ。",
+      "summaryZH": "店铺焕新纪念档案印花。以限店配色重现经典图案。",
+      "heroImage": "hero.jpg",
+      "dressIds": ["trump_black", "teddy_rose", "raspberry_fest", "neko_kinari"]
+    }
+  ],
+  "dresses": [
+    {
+      "id": "trump_black",
+      "name": "カラートランプクロ",
+      "nameZH": "彩色扑克黑",
+      "brand": "PINK HOUSE",
+      "year": 2024,
+      "season": "autumn",
+      "storeLimit": "池袋東武店限定",
+      "storeLimitZH": "池袋东武店限定",
+      "styles": ["Classic", "Card", "Black"],
+      "stylesZH": ["经典", "扑克", "黑色"],
+      "coverImage": "trump_look.JPG",
+      "gallery": ["trump_look.JPG", "trump_fabric.JPG"],
+      "note": "本体価格：ロングワンピース ¥130,000 / ミディワンピース ¥56,000。画像は出来上がりイメージです。",
+      "noteZH": "参考价：长款连衣裙 ¥130,000 / 中长连衣裙 ¥56,000。图片为成品示意。"
+    },
+    {
+      "id": "teddy_rose",
+      "name": "テディベアローズキナリ",
+      "nameZH": "泰迪熊玫瑰本白",
+      "brand": "PINK HOUSE",
+      "year": 2024,
+      "season": "autumn",
+      "storeLimit": "ＪＲ名古屋高島屋限定",
+      "storeLimitZH": "JR名古屋高岛屋限定",
+      "styles": ["Sweet", "Teddy", "Rose"],
+      "stylesZH": ["甜美", "泰迪", "玫瑰"],
+      "coverImage": "teddy_look.JPG",
+      "gallery": ["teddy_look.JPG", "teddy_fabric.JPG"],
+      "note": "本体価格：ロングワンピース ¥130,000 / ミディワンピース ¥56,000。画像は出来上がりイメージです。",
+      "noteZH": "参考价：长款连衣裙 ¥130,000 / 中长连衣裙 ¥56,000。图片为成品示意。"
+    },
+    {
+      "id": "raspberry_fest",
+      "name": "ラズベリーフェストクロ",
+      "nameZH": "覆盆子庆典黑",
+      "brand": "PINK HOUSE",
+      "year": 2024,
+      "season": "autumn",
+      "storeLimit": "鹿児島山形屋限定",
+      "storeLimitZH": "鹿儿岛山形屋限定",
+      "styles": ["Floral", "Berry", "Black"],
+      "stylesZH": ["花卉", "莓果", "黑色"],
+      "coverImage": "raspberry_look.JPG",
+      "gallery": ["raspberry_look.JPG", "raspberry_fabric.JPG"],
+      "note": "本体価格：ロングワンピース ¥130,000 / ミディワンピース ¥56,000。画像は出来上がりイメージです。",
+      "noteZH": "参考价：长款连衣裙 ¥130,000 / 中长连衣裙 ¥56,000。图片为成品示意。"
+    },
+    {
+      "id": "neko_kinari",
+      "name": "ネコキナリ",
+      "nameZH": "猫咪本白",
+      "brand": "PINK HOUSE",
+      "year": 2024,
+      "season": "autumn",
+      "storeLimit": "横浜ランドマーク店限定",
+      "storeLimitZH": "横滨 Landmark 店限定",
+      "styles": ["Cat", "Sweet", "Ivory"],
+      "stylesZH": ["猫咪", "甜美", "本白"],
+      "coverImage": "neko_look.JPG",
+      "gallery": ["neko_look.JPG", "neko_fabric.JPG"],
+      "note": "本体価格：ロングワンピース ¥130,000 / ミディワンピース ¥56,000。画像は出来上がりイメージです。",
+      "noteZH": "参考价：长款连衣裙 ¥130,000 / 中长连衣裙 ¥56,000。图片为成品示意。"
+    }
+  ]
+}

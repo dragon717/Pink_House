@@ -8,6 +8,7 @@ enum AppFeatureID: String, CaseIterable, Identifiable, Codable, Hashable {
     case me
     case petHome
     case petChat
+    case timeHall
     case magicSticker
     case outfitJournal
     case wealth
@@ -135,6 +136,16 @@ enum AppFeatureRegistry {
             surfaces: [.bottomDock, .petPhone]
         ),
         AppFeatureDescriptor(
+            id: .timeHall,
+            title: "时光馆",
+            subtitle: "梦裙编年史与风格浪花",
+            systemImage: "books.vertical.fill",
+            tintHex: "#E8B4B8",
+            route: .tab(4),
+            unlockFeature: nil,
+            surfaces: [.bottomDock]
+        ),
+        AppFeatureDescriptor(
             id: .magicSticker,
             title: "魔法贴纸",
             subtitle: "默认贴纸页与手帐创作",
@@ -240,14 +251,31 @@ final class BottomDockSettingsManager: ObservableObject {
 
     @Published private(set) var selectedFeatureIDs: [AppFeatureID]
 
-    private let layoutUserDefaultsKey = "bottomDockLayout.v2"
+    private let layoutUserDefaultsKey = "bottomDockLayout.v3"
+    private let legacyLayoutUserDefaultsKey = "bottomDockLayout.v2"
     private let legacyUserDefaultsKey = "bottomDockSelectedFeature.v1"
-    private let defaultFeatureIDs: [AppFeatureID] = [.wardrobe, .depositPlan, .me, .petChat]
+    private let defaultFeatureIDs: [AppFeatureID] = [.wardrobe, .depositPlan, .timeHall, .me]
     private let requiredFeatureIDs: [AppFeatureID] = [.me]
 
+    /// 参考 ThemeManager.app_theme_version：改此常量即强制重写底部导航默认布局
+    private static let forcedLayoutVersionKey = "bottom_dock_layout_version"
+    private static let targetVersion = "3.2"
+
     private init() {
+        if Self.shouldForceDefaultLayout() {
+            selectedFeatureIDs = Self.sanitizedLayout(defaultFeatureIDs, defaultFeatureIDs: defaultFeatureIDs, requiredFeatureIDs: requiredFeatureIDs)
+            saveLayout()
+            UserDefaults.standard.set(Self.targetVersion, forKey: Self.forcedLayoutVersionKey)
+            print("🧭 [BottomDock] 版本变化 → 强制默认：衣橱 / 心愿尾款 / 时光馆 / 我")
+            return
+        }
+
         if let savedIDs = Self.loadLayout(from: layoutUserDefaultsKey) {
             selectedFeatureIDs = Self.sanitizedLayout(savedIDs, defaultFeatureIDs: defaultFeatureIDs, requiredFeatureIDs: requiredFeatureIDs)
+        } else if let legacyIDs = Self.loadLayout(from: legacyLayoutUserDefaultsKey) {
+            // ponytail: one-shot migrate old default petChat slot → timeHall
+            let migrated = legacyIDs.map { $0 == .petChat ? AppFeatureID.timeHall : $0 }
+            selectedFeatureIDs = Self.sanitizedLayout(migrated, defaultFeatureIDs: defaultFeatureIDs, requiredFeatureIDs: requiredFeatureIDs)
         } else if let legacyID = Self.loadLegacyFeature(from: legacyUserDefaultsKey) {
             var migrated = defaultFeatureIDs
             migrated[Self.slotCount - 1] = legacyID
@@ -256,6 +284,10 @@ final class BottomDockSettingsManager: ObservableObject {
             selectedFeatureIDs = Self.sanitizedLayout(defaultFeatureIDs, defaultFeatureIDs: defaultFeatureIDs, requiredFeatureIDs: requiredFeatureIDs)
         }
         saveLayout()
+    }
+
+    private static func shouldForceDefaultLayout() -> Bool {
+        UserDefaults.standard.string(forKey: forcedLayoutVersionKey) != targetVersion
     }
 
     var selectedFeatureID: AppFeatureID {
@@ -368,7 +400,7 @@ final class BottomDockSettingsManager: ObservableObject {
         }
 
         while result.count < slotCount {
-            result.append(.petChat)
+            result.append(.timeHall)
         }
 
         for requiredFeatureID in requiredFeatureIDs where !result.contains(requiredFeatureID) {
