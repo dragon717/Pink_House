@@ -92,29 +92,63 @@ struct TimeHallView: View {
                 }
             }
             Spacer(minLength: 8)
-            HStack(spacing: 8) {
-                if mode == .styleSpray {
-                    styleFilterMenu
-                }
-                treasureButton
-            }
+            headerActions
         }
         .padding(.horizontal, 20)
         .padding(.top, 12)
         .padding(.bottom, 8)
     }
 
-    /// Apple HIG: bordered control; title stays「珍藏」, only symbol flips when active.
+    /// Prefer the full label, then collapse to familiar symbols when the title area needs the width.
+    /// This lets Dynamic Type and localized titles keep a single, tappable 44 pt control.
+    @ViewBuilder
+    private var headerActions: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 8) {
+                if mode == .styleSpray {
+                    styleFilterMenu
+                }
+                treasureButton
+            }
+
+            HStack(spacing: 8) {
+                if mode == .styleSpray {
+                    styleFilterMenuCompact
+                }
+                treasureButtonCompact
+            }
+        }
+    }
+
+    /// Apple HIG: bordered capsule with a stable, single-line label.
     private var treasureButton: some View {
         Button {
             showTreasuresOnly.toggle()
         } label: {
             Label("珍藏".appLocalized, systemImage: showTreasuresOnly ? "heart.fill" : "heart")
                 .labelStyle(.titleAndIcon)
+                .lineLimit(1)
+                .fixedSize(horizontal: true, vertical: false)
         }
         .buttonStyle(.bordered)
         .controlSize(.regular)
+        .buttonBorderShape(.capsule)
         .tint(showTreasuresOnly ? .pink : nil)
+        .accessibilityLabel("珍藏".appLocalized)
+        .accessibilityValue(showTreasuresOnly ? "已开启".appLocalized : "已关闭".appLocalized)
+    }
+
+    private var treasureButtonCompact: some View {
+        Button {
+            showTreasuresOnly.toggle()
+        } label: {
+            Image(systemName: showTreasuresOnly ? "heart.fill" : "heart")
+        }
+        .buttonStyle(.bordered)
+        .controlSize(.small)
+        .buttonBorderShape(.circle)
+        .tint(showTreasuresOnly ? .pink : nil)
+        .frame(width: 44, height: 44)
         .accessibilityLabel("珍藏".appLocalized)
         .accessibilityValue(showTreasuresOnly ? "已开启".appLocalized : "已关闭".appLocalized)
     }
@@ -122,27 +156,7 @@ struct TimeHallView: View {
     /// Apple HIG: `Menu` for filter choices; idle title「筛选」, selected title = tag only (stable min width).
     private var styleFilterMenu: some View {
         Menu {
-            Button {
-                selectedStyle = nil
-            } label: {
-                if selectedStyle == nil {
-                    Label("全部风格".appLocalized, systemImage: "checkmark")
-                } else {
-                    Text("全部风格".appLocalized)
-                }
-            }
-            Divider()
-            ForEach(store.styleBubbles()) { bubble in
-                Button {
-                    selectedStyle = bubble.label
-                } label: {
-                    if selectedStyle == bubble.label {
-                        Label(bubble.label, systemImage: "checkmark")
-                    } else {
-                        Text(bubble.label)
-                    }
-                }
-            }
+            styleFilterMenuContent
         } label: {
             // Idle: 筛选 + icon. Selected: tag name only (HIG Menu trigger stays bordered/.regular).
             Group {
@@ -158,7 +172,48 @@ struct TimeHallView: View {
         }
         .buttonStyle(.bordered)
         .controlSize(.regular)
+        .buttonBorderShape(.capsule)
         .tint(selectedStyle != nil ? .pink : nil)
+        .accessibilityLabel("筛选".appLocalized)
+        .accessibilityValue(selectedStyle ?? "全部风格".appLocalized)
+    }
+
+    @ViewBuilder
+    private var styleFilterMenuContent: some View {
+        Button {
+            selectedStyle = nil
+        } label: {
+            if selectedStyle == nil {
+                Label("全部风格".appLocalized, systemImage: "checkmark")
+            } else {
+                Text("全部风格".appLocalized)
+            }
+        }
+        Divider()
+        ForEach(store.styleBubbles()) { bubble in
+            Button {
+                selectedStyle = bubble.label
+            } label: {
+                if selectedStyle == bubble.label {
+                    Label(bubble.label, systemImage: "checkmark")
+                } else {
+                    Text(bubble.label)
+                }
+            }
+        }
+    }
+
+    private var styleFilterMenuCompact: some View {
+        Menu {
+            styleFilterMenuContent
+        } label: {
+            Image(systemName: "line.3.horizontal.decrease")
+        }
+        .buttonStyle(.bordered)
+        .controlSize(.small)
+        .buttonBorderShape(.circle)
+        .tint(selectedStyle != nil ? .pink : nil)
+        .frame(width: 44, height: 44)
         .accessibilityLabel("筛选".appLocalized)
         .accessibilityValue(selectedStyle ?? "全部风格".appLocalized)
     }
