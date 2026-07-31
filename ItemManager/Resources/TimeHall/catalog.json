@@ -1,89 +1,2359 @@
 {
-  "version": 1,
-  "source": "https://pinkhouse-webshop.jp/pinkhouse/news/806?news_tag_id=1",
+  "version": 3,
+  "source": "https://pinkhouse-webshop.jp/pinkhouse/catalog",
   "title": "梦裙时光馆",
-  "subtitle": "PINK HOUSE 档案馆藏",
-  "heroImage": "hero.jpg",
-  "heroCaption": "Archive Print Semi-Order · Autumn 2024",
-  "heroBody": "秋季店铺焕新纪念企划：精选档案印花半定制，每一条裙摆都是时光的注脚。",
-  "collections": [
+  "subtitle": "PINK HOUSE · 1972–至今 · 真实目录与故事档案",
+  "heroImage": "ph-2024-spring-cover.jpg",
+  "heroCaption": "从 1972 出发，收藏每一年的浪漫",
+  "heroBody": "官网有图就展示真实 Catalogue；尚无可靠图片的年份以故事卡保留位置，并明确标注档案待补证。",
+  "scope": {
+    "startYear": 1972,
+    "endYear": null,
+    "labelZH": "1972–至今",
+    "sampleYears": [
+      2022,
+      2024
+    ]
+  },
+  "catalogues": [
     {
-      "id": "archive_print_2024_autumn",
+      "id": "pink-house-2024-spring",
       "year": 2024,
+      "season": "spring",
+      "seasonLabel": "春",
+      "title": "PINK HOUSE 2024 Spring",
+      "titleZH": "PINK HOUSE 2024 春季目录",
+      "summaryZH": "以小紫罗兰、铃兰、奶油苏打与牧场绵羊为线索，抽取 10 件裙装和 5 件小物作为春季样板。",
+      "sourceURL": "https://pinkhouse-webshop.jp/pinkhouse/catalog/detail/113",
+      "pageCount": 31,
+      "itemIds": [
+        "ph24s-d01",
+        "ph24s-d02",
+        "ph24s-d03",
+        "ph24s-d04",
+        "ph24s-d05",
+        "ph24s-d06",
+        "ph24s-d07",
+        "ph24s-d08",
+        "ph24s-d09",
+        "ph24s-d10",
+        "ph24s-a01",
+        "ph24s-a02",
+        "ph24s-a03",
+        "ph24s-a04",
+        "ph24s-a05"
+      ],
+      "coverImage": "ph-2024-spring-cover.jpg",
+      "imageSourceURL": "https://pinkhouse-webshop.jp/photo/catalog/113/113_1700.jpg"
+    },
+    {
+      "id": "pink-house-2022-autumn",
+      "year": 2022,
       "season": "autumn",
       "seasonLabel": "秋",
-      "title": "アーカイブプリントセミオーダー",
-      "titleZH": "档案印花半定制",
-      "summary": "店舗リニューアル記念のアーカイブプリント。店頭限定カラーで蘇るクラシックモチーフ。",
-      "summaryZH": "店铺焕新纪念档案印花。以限店配色重现经典图案。",
-      "heroImage": "hero.jpg",
-      "dressIds": ["trump_black", "teddy_rose", "raspberry_fest", "neko_kinari"]
+      "title": "PINK HOUSE 2022 Autumn",
+      "titleZH": "PINK HOUSE 2022 秋季目录",
+      "summaryZH": "从永恒玫瑰、盛放圆点、蓬松猫咪、彼得兔与圣诞玫瑰中抽取 10 件裙装和 5 件小物。",
+      "sourceURL": "https://pinkhouse-webshop.jp/pinkhouse/catalog/detail/89",
+      "pageCount": 31,
+      "itemIds": [
+        "ph22a-d01",
+        "ph22a-d02",
+        "ph22a-d03",
+        "ph22a-d04",
+        "ph22a-d05",
+        "ph22a-d06",
+        "ph22a-d07",
+        "ph22a-d08",
+        "ph22a-d09",
+        "ph22a-d10",
+        "ph22a-a01",
+        "ph22a-a02",
+        "ph22a-a03",
+        "ph22a-a04",
+        "ph22a-a05"
+      ],
+      "coverImage": "ph-2022-autumn-cover.jpg",
+      "imageSourceURL": "https://pinkhouse-webshop.jp/photo/catalog/89/89_1417.jpg"
     }
   ],
-  "dresses": [
+  "items": [
     {
-      "id": "trump_black",
-      "name": "カラートランプクロ",
-      "nameZH": "彩色扑克黑",
+      "id": "ph24s-d01",
+      "canonicalKey": "pink-house|2024-spring|リトルヴァイオレットプリントワンピース",
+      "kind": "dress",
+      "category": "ワンピース",
+      "categoryZH": "OP 连衣裙",
+      "name": "リトルヴァイオレットプリントワンピース",
+      "nameZH": "小紫罗兰印花连衣裙",
       "brand": "PINK HOUSE",
       "year": 2024,
-      "season": "autumn",
-      "storeLimit": "池袋東武店限定",
-      "storeLimitZH": "池袋东武店限定",
-      "styles": ["Classic", "Card", "Black"],
-      "stylesZH": ["经典", "扑克", "黑色"],
-      "coverImage": "trump_look.JPG",
-      "gallery": ["trump_look.JPG", "trump_fabric.JPG"],
-      "note": "本体価格：ロングワンピース ¥130,000 / ミディワンピース ¥56,000。画像は出来上がりイメージです。",
-      "noteZH": "参考价：长款连衣裙 ¥130,000 / 中长连衣裙 ¥56,000。图片为成品示意。"
+      "season": "spring",
+      "catalogueID": "pink-house-2024-spring",
+      "cataloguePage": 1,
+      "priceJPY": 46750,
+      "listingStatus": "outlet_as_observed",
+      "styles": [
+        "violet",
+        "floral",
+        "layered"
+      ],
+      "stylesZH": [
+        "紫罗兰",
+        "花卉",
+        "层叠"
+      ],
+      "coverImage": "ph-2024-spring-p01.jpg",
+      "gallery": [
+
+      ],
+      "sourceURL": "https://pinkhouse-webshop.jp/pinkhouse/catalog/detail/113",
+      "observedAt": "2026-07-31",
+      "datePrecision": "season",
+      "noteZH": "官方目录第 1 页；价格为页面当前展示的含税价格。",
+      "imageSourceURL": "https://pinkhouse-webshop.jp/photo/catalog/113/113_1701.jpg"
     },
     {
-      "id": "teddy_rose",
-      "name": "テディベアローズキナリ",
-      "nameZH": "泰迪熊玫瑰本白",
+      "id": "ph24s-d02",
+      "canonicalKey": "pink-house|2024-spring|ストライプ使いノースリーブフリルワンピース",
+      "kind": "dress",
+      "category": "ワンピース",
+      "categoryZH": "无袖 OP",
+      "name": "ストライプ使いノースリーブフリルワンピース",
+      "nameZH": "条纹拼接无袖荷叶边连衣裙",
       "brand": "PINK HOUSE",
       "year": 2024,
-      "season": "autumn",
-      "storeLimit": "ＪＲ名古屋高島屋限定",
-      "storeLimitZH": "JR名古屋高岛屋限定",
-      "styles": ["Sweet", "Teddy", "Rose"],
-      "stylesZH": ["甜美", "泰迪", "玫瑰"],
-      "coverImage": "teddy_look.JPG",
-      "gallery": ["teddy_look.JPG", "teddy_fabric.JPG"],
-      "note": "本体価格：ロングワンピース ¥130,000 / ミディワンピース ¥56,000。画像は出来上がりイメージです。",
-      "noteZH": "参考价：长款连衣裙 ¥130,000 / 中长连衣裙 ¥56,000。图片为成品示意。"
+      "season": "spring",
+      "catalogueID": "pink-house-2024-spring",
+      "cataloguePage": 3,
+      "priceJPY": 66000,
+      "listingStatus": "outlet_as_observed",
+      "styles": [
+        "stripe",
+        "frill",
+        "sleeveless"
+      ],
+      "stylesZH": [
+        "条纹",
+        "荷叶边",
+        "无袖"
+      ],
+      "coverImage": "ph-2024-spring-p03.jpg",
+      "gallery": [
+
+      ],
+      "sourceURL": "https://pinkhouse-webshop.jp/pinkhouse/catalog/detail/113",
+      "observedAt": "2026-07-31",
+      "datePrecision": "season",
+      "noteZH": "官方目录第 3 页；价格为页面当前展示的含税价格。",
+      "imageSourceURL": "https://pinkhouse-webshop.jp/photo/catalog/113/113_1703.jpg"
     },
     {
-      "id": "raspberry_fest",
-      "name": "ラズベリーフェストクロ",
-      "nameZH": "覆盆子庆典黑",
+      "id": "ph24s-d03",
+      "canonicalKey": "pink-house|2024-spring|リトルヴァイオレットプリントミディワンピース",
+      "kind": "dress",
+      "category": "ミディワンピース",
+      "categoryZH": "中长 OP",
+      "name": "リトルヴァイオレットプリントミディワンピース",
+      "nameZH": "小紫罗兰印花中长连衣裙",
       "brand": "PINK HOUSE",
       "year": 2024,
-      "season": "autumn",
-      "storeLimit": "鹿児島山形屋限定",
-      "storeLimitZH": "鹿儿岛山形屋限定",
-      "styles": ["Floral", "Berry", "Black"],
-      "stylesZH": ["花卉", "莓果", "黑色"],
-      "coverImage": "raspberry_look.JPG",
-      "gallery": ["raspberry_look.JPG", "raspberry_fabric.JPG"],
-      "note": "本体価格：ロングワンピース ¥130,000 / ミディワンピース ¥56,000。画像は出来上がりイメージです。",
-      "noteZH": "参考价：长款连衣裙 ¥130,000 / 中长连衣裙 ¥56,000。图片为成品示意。"
+      "season": "spring",
+      "catalogueID": "pink-house-2024-spring",
+      "cataloguePage": 4,
+      "priceJPY": 23760,
+      "listingStatus": "outlet_as_observed",
+      "styles": [
+        "violet",
+        "floral",
+        "midi"
+      ],
+      "stylesZH": [
+        "紫罗兰",
+        "花卉",
+        "中长"
+      ],
+      "coverImage": "ph-2024-spring-p04.jpg",
+      "gallery": [
+
+      ],
+      "sourceURL": "https://pinkhouse-webshop.jp/pinkhouse/catalog/detail/113",
+      "observedAt": "2026-07-31",
+      "datePrecision": "season",
+      "noteZH": "官方目录第 4 页；与长款同主题，按名称与页码独立建档。",
+      "imageSourceURL": "https://pinkhouse-webshop.jp/photo/catalog/113/113_1704.jpg"
     },
     {
-      "id": "neko_kinari",
-      "name": "ネコキナリ",
-      "nameZH": "猫咪本白",
+      "id": "ph24s-d04",
+      "canonicalKey": "pink-house|2024-spring|すずらんプリントノースリーブワンピース",
+      "kind": "dress",
+      "category": "ワンピース",
+      "categoryZH": "无袖 OP",
+      "name": "すずらんプリントノースリーブワンピース",
+      "nameZH": "铃兰印花无袖连衣裙",
       "brand": "PINK HOUSE",
       "year": 2024,
+      "season": "spring",
+      "catalogueID": "pink-house-2024-spring",
+      "cataloguePage": 7,
+      "priceJPY": 46750,
+      "listingStatus": "outlet_as_observed",
+      "styles": [
+        "lily-of-the-valley",
+        "floral",
+        "sleeveless"
+      ],
+      "stylesZH": [
+        "铃兰",
+        "花卉",
+        "无袖"
+      ],
+      "coverImage": "ph-2024-spring-p07.jpg",
+      "gallery": [
+
+      ],
+      "sourceURL": "https://pinkhouse-webshop.jp/pinkhouse/catalog/detail/113",
+      "observedAt": "2026-07-31",
+      "datePrecision": "season",
+      "noteZH": "官方目录第 7 页；铃兰主题裙装。",
+      "imageSourceURL": "https://pinkhouse-webshop.jp/photo/catalog/113/113_1707.jpg"
+    },
+    {
+      "id": "ph24s-d05",
+      "canonicalKey": "pink-house|2024-spring|すずらん刺繍シフォンジョーゼットワンピース",
+      "kind": "dress",
+      "category": "ワンピース",
+      "categoryZH": "刺绣 OP",
+      "name": "すずらん刺繍シフォンジョーゼットワンピース",
+      "nameZH": "铃兰刺绣雪纺乔其纱连衣裙",
+      "brand": "PINK HOUSE",
+      "year": 2024,
+      "season": "spring",
+      "catalogueID": "pink-house-2024-spring",
+      "cataloguePage": 8,
+      "priceJPY": 24200,
+      "listingStatus": "outlet_as_observed",
+      "styles": [
+        "lily-of-the-valley",
+        "embroidery",
+        "chiffon"
+      ],
+      "stylesZH": [
+        "铃兰",
+        "刺绣",
+        "雪纺"
+      ],
+      "coverImage": "ph-2024-spring-p08.jpg",
+      "gallery": [
+
+      ],
+      "sourceURL": "https://pinkhouse-webshop.jp/pinkhouse/catalog/detail/113",
+      "observedAt": "2026-07-31",
+      "datePrecision": "season",
+      "noteZH": "官方目录第 8 页；名称明确记录刺绣与乔其纱工艺。",
+      "imageSourceURL": "https://pinkhouse-webshop.jp/photo/catalog/113/113_1708.jpg"
+    },
+    {
+      "id": "ph24s-d06",
+      "canonicalKey": "pink-house|2024-spring|ローンキャミソールワンピース",
+      "kind": "dress",
+      "category": "キャミソールワンピース",
+      "categoryZH": "吊带 OP / JSK 待复核",
+      "name": "ローンキャミソールワンピース",
+      "nameZH": "细棉布吊带连衣裙",
+      "brand": "PINK HOUSE",
+      "year": 2024,
+      "season": "spring",
+      "catalogueID": "pink-house-2024-spring",
+      "cataloguePage": 8,
+      "priceJPY": 13750,
+      "listingStatus": "outlet_as_observed",
+      "styles": [
+        "lawn",
+        "camisole",
+        "layering"
+      ],
+      "stylesZH": [
+        "细棉布",
+        "吊带",
+        "叠穿"
+      ],
+      "coverImage": "ph-2024-spring-p08.jpg",
+      "gallery": [
+
+      ],
+      "sourceURL": "https://pinkhouse-webshop.jp/pinkhouse/catalog/detail/113",
+      "observedAt": "2026-07-31",
+      "datePrecision": "season",
+      "noteZH": "官方目录第 8 页；Lolita 子型需结合实物结构人工复核。",
+      "imageSourceURL": "https://pinkhouse-webshop.jp/photo/catalog/113/113_1708.jpg"
+    },
+    {
+      "id": "ph24s-d07",
+      "canonicalKey": "pink-house|2024-spring|マーブルローズプリントワンピース",
+      "kind": "dress",
+      "category": "ワンピース",
+      "categoryZH": "OP 连衣裙",
+      "name": "マーブルローズプリントワンピース",
+      "nameZH": "大理石玫瑰印花连衣裙",
+      "brand": "PINK HOUSE",
+      "year": 2024,
+      "season": "spring",
+      "catalogueID": "pink-house-2024-spring",
+      "cataloguePage": 10,
+      "priceJPY": 66000,
+      "listingStatus": "outlet_as_observed",
+      "styles": [
+        "marble-rose",
+        "floral",
+        "print"
+      ],
+      "stylesZH": [
+        "大理石玫瑰",
+        "花卉",
+        "印花"
+      ],
+      "coverImage": "ph-2024-spring-p10.jpg",
+      "gallery": [
+
+      ],
+      "sourceURL": "https://pinkhouse-webshop.jp/pinkhouse/catalog/detail/113",
+      "observedAt": "2026-07-31",
+      "datePrecision": "season",
+      "noteZH": "官方目录第 10 页；同主题袜子作为独立小物存在，但未重复收入样板。",
+      "imageSourceURL": "https://pinkhouse-webshop.jp/photo/catalog/113/113_1710.jpg"
+    },
+    {
+      "id": "ph24s-d08",
+      "canonicalKey": "pink-house|2024-spring|クリームソーダプリントフリルワンピース",
+      "kind": "dress",
+      "category": "ワンピース",
+      "categoryZH": "荷叶边 OP",
+      "name": "クリームソーダプリントフリルワンピース",
+      "nameZH": "奶油苏打印花荷叶边连衣裙",
+      "brand": "PINK HOUSE",
+      "year": 2024,
+      "season": "spring",
+      "catalogueID": "pink-house-2024-spring",
+      "cataloguePage": 11,
+      "priceJPY": 66000,
+      "listingStatus": "outlet_as_observed",
+      "styles": [
+        "cream-soda",
+        "frill",
+        "print"
+      ],
+      "stylesZH": [
+        "奶油苏打",
+        "荷叶边",
+        "印花"
+      ],
+      "coverImage": "ph-2024-spring-p11.jpg",
+      "gallery": [
+
+      ],
+      "sourceURL": "https://pinkhouse-webshop.jp/pinkhouse/catalog/detail/113",
+      "observedAt": "2026-07-31",
+      "datePrecision": "season",
+      "noteZH": "官方目录第 11 页；奶油苏打主题核心裙装。",
+      "imageSourceURL": "https://pinkhouse-webshop.jp/photo/catalog/113/113_1711.jpg"
+    },
+    {
+      "id": "ph24s-d09",
+      "canonicalKey": "pink-house|2024-spring|ひつじプリントミディワンピース",
+      "kind": "dress",
+      "category": "ミディワンピース",
+      "categoryZH": "中长 OP",
+      "name": "ひつじプリントミディワンピース",
+      "nameZH": "牧场绵羊印花中长连衣裙",
+      "brand": "PINK HOUSE",
+      "year": 2024,
+      "season": "spring",
+      "catalogueID": "pink-house-2024-spring",
+      "cataloguePage": 21,
+      "priceJPY": 28600,
+      "listingStatus": "outlet_as_observed",
+      "styles": [
+        "sheep",
+        "pastoral",
+        "midi"
+      ],
+      "stylesZH": [
+        "绵羊",
+        "牧歌",
+        "中长"
+      ],
+      "coverImage": "ph-2024-spring-p21.jpg",
+      "gallery": [
+
+      ],
+      "sourceURL": "https://pinkhouse-webshop.jp/pinkhouse/catalog/detail/113",
+      "observedAt": "2026-07-31",
+      "datePrecision": "season",
+      "noteZH": "官方目录第 21 页；与长款为同主题不同设计。",
+      "imageSourceURL": "https://pinkhouse-webshop.jp/photo/catalog/113/113_1721.jpg"
+    },
+    {
+      "id": "ph24s-d10",
+      "canonicalKey": "pink-house|2024-spring|ひつじプリントワンピース",
+      "kind": "dress",
+      "category": "ワンピース",
+      "categoryZH": "长款 OP",
+      "name": "ひつじプリントワンピース",
+      "nameZH": "牧场绵羊印花连衣裙",
+      "brand": "PINK HOUSE",
+      "year": 2024,
+      "season": "spring",
+      "catalogueID": "pink-house-2024-spring",
+      "cataloguePage": 21,
+      "priceJPY": 53350,
+      "listingStatus": "outlet_as_observed",
+      "styles": [
+        "sheep",
+        "pastoral",
+        "long"
+      ],
+      "stylesZH": [
+        "绵羊",
+        "牧歌",
+        "长款"
+      ],
+      "coverImage": "ph-2024-spring-p21.jpg",
+      "gallery": [
+
+      ],
+      "sourceURL": "https://pinkhouse-webshop.jp/pinkhouse/catalog/detail/113",
+      "observedAt": "2026-07-31",
+      "datePrecision": "season",
+      "noteZH": "官方目录第 21 页；长款与中长款价格和名称不同，不作重复合并。",
+      "imageSourceURL": "https://pinkhouse-webshop.jp/photo/catalog/113/113_1721.jpg"
+    },
+    {
+      "id": "ph24s-a01",
+      "canonicalKey": "pink-house|2024-spring|ヴァイレットブーケコサージュ",
+      "kind": "accessory",
+      "category": "コサージュ",
+      "categoryZH": "胸花",
+      "name": "ヴァイレットブーケコサージュ",
+      "nameZH": "紫罗兰花束胸花",
+      "brand": "PINK HOUSE",
+      "year": 2024,
+      "season": "spring",
+      "catalogueID": "pink-house-2024-spring",
+      "cataloguePage": 1,
+      "priceJPY": 15400,
+      "listingStatus": "catalogue",
+      "styles": [
+        "violet",
+        "corsage",
+        "floral"
+      ],
+      "stylesZH": [
+        "紫罗兰",
+        "胸花",
+        "花卉"
+      ],
+      "coverImage": "ph-2024-spring-p01.jpg",
+      "gallery": [
+
+      ],
+      "sourceURL": "https://pinkhouse-webshop.jp/pinkhouse/catalog/detail/113",
+      "observedAt": "2026-07-31",
+      "datePrecision": "season",
+      "noteZH": "官方目录第 1 页；同一商品在多页造型中重复出现，样板只保留一条。",
+      "imageSourceURL": "https://pinkhouse-webshop.jp/photo/catalog/113/113_1701.jpg"
+    },
+    {
+      "id": "ph24s-a02",
+      "canonicalKey": "pink-house|2024-spring|リトルヴァイオレット柄ソックス",
+      "kind": "accessory",
+      "category": "ソックス",
+      "categoryZH": "袜子",
+      "name": "リトルヴァイオレット柄ソックス",
+      "nameZH": "小紫罗兰图案袜",
+      "brand": "PINK HOUSE",
+      "year": 2024,
+      "season": "spring",
+      "catalogueID": "pink-house-2024-spring",
+      "cataloguePage": 1,
+      "priceJPY": 990,
+      "listingStatus": "outlet_as_observed",
+      "styles": [
+        "violet",
+        "socks",
+        "floral"
+      ],
+      "stylesZH": [
+        "紫罗兰",
+        "袜子",
+        "花卉"
+      ],
+      "coverImage": "ph-2024-spring-p01.jpg",
+      "gallery": [
+
+      ],
+      "sourceURL": "https://pinkhouse-webshop.jp/pinkhouse/catalog/detail/113",
+      "observedAt": "2026-07-31",
+      "datePrecision": "season",
+      "noteZH": "官方目录第 1 页；多页重复展示按 canonicalKey 去重。",
+      "imageSourceURL": "https://pinkhouse-webshop.jp/photo/catalog/113/113_1701.jpg"
+    },
+    {
+      "id": "ph24s-a03",
+      "canonicalKey": "pink-house|2024-spring|ローンフリルハートポシェット",
+      "kind": "accessory",
+      "category": "ポシェット",
+      "categoryZH": "斜挎包",
+      "name": "ローンフリルハートポシェット",
+      "nameZH": "细棉布荷叶边心形斜挎包",
+      "brand": "PINK HOUSE",
+      "year": 2024,
+      "season": "spring",
+      "catalogueID": "pink-house-2024-spring",
+      "cataloguePage": 1,
+      "priceJPY": 11000,
+      "listingStatus": "outlet_as_observed",
+      "styles": [
+        "heart",
+        "frill",
+        "pochette"
+      ],
+      "stylesZH": [
+        "爱心",
+        "荷叶边",
+        "斜挎包"
+      ],
+      "coverImage": "ph-2024-spring-p01.jpg",
+      "gallery": [
+
+      ],
+      "sourceURL": "https://pinkhouse-webshop.jp/pinkhouse/catalog/detail/113",
+      "observedAt": "2026-07-31",
+      "datePrecision": "season",
+      "noteZH": "官方目录第 1 页；配套心形小包。",
+      "imageSourceURL": "https://pinkhouse-webshop.jp/photo/catalog/113/113_1701.jpg"
+    },
+    {
+      "id": "ph24s-a04",
+      "canonicalKey": "pink-house|2024-spring|ひつじプリントバッグ",
+      "kind": "accessory",
+      "category": "バッグ",
+      "categoryZH": "包",
+      "name": "ひつじプリントバッグ",
+      "nameZH": "绵羊印花包",
+      "brand": "PINK HOUSE",
+      "year": 2024,
+      "season": "spring",
+      "catalogueID": "pink-house-2024-spring",
+      "cataloguePage": 6,
+      "priceJPY": 9350,
+      "listingStatus": "outlet_as_observed",
+      "styles": [
+        "sheep",
+        "pastoral",
+        "bag"
+      ],
+      "stylesZH": [
+        "绵羊",
+        "牧歌",
+        "包"
+      ],
+      "coverImage": "ph-2024-spring-p06.jpg",
+      "gallery": [
+
+      ],
+      "sourceURL": "https://pinkhouse-webshop.jp/pinkhouse/catalog/detail/113",
+      "observedAt": "2026-07-31",
+      "datePrecision": "season",
+      "noteZH": "官方目录第 6 页；牧场绵羊系列配套包。",
+      "imageSourceURL": "https://pinkhouse-webshop.jp/photo/catalog/113/113_1706.jpg"
+    },
+    {
+      "id": "ph24s-a05",
+      "canonicalKey": "pink-house|2024-spring|すずらんモチーフニットカーディガン",
+      "kind": "accessory",
+      "category": "カーディガン",
+      "categoryZH": "开衫",
+      "name": "すずらんモチーフニットカーディガン",
+      "nameZH": "铃兰图案针织开衫",
+      "brand": "PINK HOUSE",
+      "year": 2024,
+      "season": "spring",
+      "catalogueID": "pink-house-2024-spring",
+      "cataloguePage": 7,
+      "priceJPY": 26400,
+      "listingStatus": "outlet_as_observed",
+      "styles": [
+        "lily-of-the-valley",
+        "knit",
+        "cardigan"
+      ],
+      "stylesZH": [
+        "铃兰",
+        "针织",
+        "开衫"
+      ],
+      "coverImage": "ph-2024-spring-p07.jpg",
+      "gallery": [
+
+      ],
+      "sourceURL": "https://pinkhouse-webshop.jp/pinkhouse/catalog/detail/113",
+      "observedAt": "2026-07-31",
+      "datePrecision": "season",
+      "noteZH": "官方目录第 7 页；铃兰裙装的配套开衫。",
+      "imageSourceURL": "https://pinkhouse-webshop.jp/photo/catalog/113/113_1707.jpg"
+    },
+    {
+      "id": "ph22a-d01",
+      "canonicalKey": "pink-house|2022-autumn|ローズチュールレース使いパッチワーク風ワンピース",
+      "kind": "dress",
+      "category": "ワンピース",
+      "categoryZH": "拼布风 OP",
+      "name": "ローズチュールレース使いパッチワーク風ワンピース",
+      "nameZH": "玫瑰薄纱蕾丝拼布风连衣裙",
+      "brand": "PINK HOUSE",
+      "year": 2022,
       "season": "autumn",
-      "storeLimit": "横浜ランドマーク店限定",
-      "storeLimitZH": "横滨 Landmark 店限定",
-      "styles": ["Cat", "Sweet", "Ivory"],
-      "stylesZH": ["猫咪", "甜美", "本白"],
-      "coverImage": "neko_look.JPG",
-      "gallery": ["neko_look.JPG", "neko_fabric.JPG"],
-      "note": "本体価格：ロングワンピース ¥130,000 / ミディワンピース ¥56,000。画像は出来上がりイメージです。",
-      "noteZH": "参考价：长款连衣裙 ¥130,000 / 中长连衣裙 ¥56,000。图片为成品示意。"
+      "catalogueID": "pink-house-2022-autumn",
+      "cataloguePage": 1,
+      "priceJPY": 60500,
+      "listingStatus": "outlet_as_observed",
+      "styles": [
+        "rose",
+        "tulle-lace",
+        "patchwork"
+      ],
+      "stylesZH": [
+        "玫瑰",
+        "薄纱蕾丝",
+        "拼布"
+      ],
+      "coverImage": "ph-2022-autumn-p01.jpg",
+      "gallery": [
+
+      ],
+      "sourceURL": "https://pinkhouse-webshop.jp/pinkhouse/catalog/detail/89",
+      "observedAt": "2026-07-31",
+      "datePrecision": "season",
+      "noteZH": "官方目录第 1 页；名称记录薄纱蕾丝与拼布风格。",
+      "imageSourceURL": "https://pinkhouse-webshop.jp/photo/catalog/89/89_1418.jpg"
+    },
+    {
+      "id": "ph22a-d02",
+      "canonicalKey": "pink-house|2022-autumn|エターナルローズプリントワンピース",
+      "kind": "dress",
+      "category": "ワンピース",
+      "categoryZH": "OP 连衣裙",
+      "name": "エターナルローズプリントワンピース",
+      "nameZH": "永恒玫瑰印花连衣裙",
+      "brand": "PINK HOUSE",
+      "year": 2022,
+      "season": "autumn",
+      "catalogueID": "pink-house-2022-autumn",
+      "cataloguePage": 2,
+      "priceJPY": 66000,
+      "listingStatus": "outlet_as_observed",
+      "styles": [
+        "eternal-rose",
+        "floral",
+        "print"
+      ],
+      "stylesZH": [
+        "永恒玫瑰",
+        "花卉",
+        "印花"
+      ],
+      "coverImage": "ph-2022-autumn-p02.jpg",
+      "gallery": [
+
+      ],
+      "sourceURL": "https://pinkhouse-webshop.jp/pinkhouse/catalog/detail/89",
+      "observedAt": "2026-07-31",
+      "datePrecision": "season",
+      "noteZH": "官方目录第 2 页；永恒玫瑰主题核心裙装。",
+      "imageSourceURL": "https://pinkhouse-webshop.jp/photo/catalog/89/89_1419.jpg"
+    },
+    {
+      "id": "ph22a-d03",
+      "canonicalKey": "pink-house|2022-autumn|ブルーミングドットプリントフリルワンピース",
+      "kind": "dress",
+      "category": "ワンピース",
+      "categoryZH": "荷叶边 OP",
+      "name": "ブルーミングドットプリントフリルワンピース",
+      "nameZH": "盛放圆点印花荷叶边连衣裙",
+      "brand": "PINK HOUSE",
+      "year": 2022,
+      "season": "autumn",
+      "catalogueID": "pink-house-2022-autumn",
+      "cataloguePage": 5,
+      "priceJPY": 66000,
+      "listingStatus": "outlet_as_observed",
+      "styles": [
+        "blooming-dot",
+        "frill",
+        "print"
+      ],
+      "stylesZH": [
+        "盛放圆点",
+        "荷叶边",
+        "印花"
+      ],
+      "coverImage": "ph-2022-autumn-p05.jpg",
+      "gallery": [
+
+      ],
+      "sourceURL": "https://pinkhouse-webshop.jp/pinkhouse/catalog/detail/89",
+      "observedAt": "2026-07-31",
+      "datePrecision": "season",
+      "noteZH": "官方目录第 5 页；与同主题中长款区分建档。",
+      "imageSourceURL": "https://pinkhouse-webshop.jp/photo/catalog/89/89_1422.jpg"
+    },
+    {
+      "id": "ph22a-d04",
+      "canonicalKey": "pink-house|2022-autumn|ローズ刺繍入りフリルワンピース",
+      "kind": "dress",
+      "category": "ワンピース",
+      "categoryZH": "刺绣荷叶边 OP",
+      "name": "ローズ刺繍入りフリルワンピース",
+      "nameZH": "玫瑰刺绣荷叶边连衣裙",
+      "brand": "PINK HOUSE",
+      "year": 2022,
+      "season": "autumn",
+      "catalogueID": "pink-house-2022-autumn",
+      "cataloguePage": 6,
+      "priceJPY": 41250,
+      "listingStatus": "outlet_as_observed",
+      "styles": [
+        "rose",
+        "embroidery",
+        "frill"
+      ],
+      "stylesZH": [
+        "玫瑰",
+        "刺绣",
+        "荷叶边"
+      ],
+      "coverImage": "ph-2022-autumn-p06.jpg",
+      "gallery": [
+
+      ],
+      "sourceURL": "https://pinkhouse-webshop.jp/pinkhouse/catalog/detail/89",
+      "observedAt": "2026-07-31",
+      "datePrecision": "season",
+      "noteZH": "官方目录第 6 页；名称明确记录玫瑰刺绣。",
+      "imageSourceURL": "https://pinkhouse-webshop.jp/photo/catalog/89/89_1423.jpg"
+    },
+    {
+      "id": "ph22a-d05",
+      "canonicalKey": "pink-house|2022-autumn|スカーレットキャンドルプリントワンピース",
+      "kind": "dress",
+      "category": "ワンピース",
+      "categoryZH": "OP 连衣裙",
+      "name": "スカーレットキャンドルプリントワンピース",
+      "nameZH": "绯红烛光印花连衣裙",
+      "brand": "PINK HOUSE",
+      "year": 2022,
+      "season": "autumn",
+      "catalogueID": "pink-house-2022-autumn",
+      "cataloguePage": 8,
+      "priceJPY": 34320,
+      "listingStatus": "outlet_as_observed",
+      "styles": [
+        "scarlet-candle",
+        "print",
+        "autumn"
+      ],
+      "stylesZH": [
+        "绯红烛光",
+        "印花",
+        "秋日"
+      ],
+      "coverImage": "ph-2022-autumn-p08.jpg",
+      "gallery": [
+
+      ],
+      "sourceURL": "https://pinkhouse-webshop.jp/pinkhouse/catalog/detail/89",
+      "observedAt": "2026-07-31",
+      "datePrecision": "season",
+      "noteZH": "官方目录第 8 页；绯红烛光主题。",
+      "imageSourceURL": "https://pinkhouse-webshop.jp/photo/catalog/89/89_1425.jpg"
+    },
+    {
+      "id": "ph22a-d06",
+      "canonicalKey": "pink-house|2022-autumn|フラッフィ―・キティーズプリントワンピース",
+      "kind": "dress",
+      "category": "ワンピース",
+      "categoryZH": "OP 连衣裙",
+      "name": "フラッフィ―・キティーズプリントワンピース",
+      "nameZH": "蓬松猫咪印花连衣裙",
+      "brand": "PINK HOUSE",
+      "year": 2022,
+      "season": "autumn",
+      "catalogueID": "pink-house-2022-autumn",
+      "cataloguePage": 9,
+      "priceJPY": 42900,
+      "listingStatus": "outlet_as_observed",
+      "styles": [
+        "fluffy-kitties",
+        "cat",
+        "print"
+      ],
+      "stylesZH": [
+        "蓬松猫咪",
+        "猫咪",
+        "印花"
+      ],
+      "coverImage": "ph-2022-autumn-p09.jpg",
+      "gallery": [
+
+      ],
+      "sourceURL": "https://pinkhouse-webshop.jp/pinkhouse/catalog/detail/89",
+      "observedAt": "2026-07-31",
+      "datePrecision": "season",
+      "noteZH": "官方目录第 9 页；猫咪主题裙装。",
+      "imageSourceURL": "https://pinkhouse-webshop.jp/photo/catalog/89/89_1426.jpg"
+    },
+    {
+      "id": "ph22a-d07",
+      "canonicalKey": "pink-house|2022-autumn|PETER RABBIT(TM) HOOD DRESS",
+      "kind": "dress",
+      "category": "HOOD DRESS",
+      "categoryZH": "兜帽 OP",
+      "name": "PETER RABBIT(TM) HOOD DRESS",
+      "nameZH": "彼得兔兜帽连衣裙",
+      "brand": "PINK HOUSE",
+      "year": 2022,
+      "season": "autumn",
+      "catalogueID": "pink-house-2022-autumn",
+      "cataloguePage": 11,
+      "priceJPY": 101200,
+      "listingStatus": "catalogue",
+      "styles": [
+        "peter-rabbit",
+        "hood",
+        "collaboration"
+      ],
+      "stylesZH": [
+        "彼得兔",
+        "兜帽",
+        "联名"
+      ],
+      "coverImage": "ph-2022-autumn-p11.jpg",
+      "gallery": [
+
+      ],
+      "sourceURL": "https://pinkhouse-webshop.jp/pinkhouse/catalog/detail/89",
+      "observedAt": "2026-07-31",
+      "datePrecision": "season",
+      "noteZH": "官方目录第 11 页；联名名称按目录原文保留。",
+      "imageSourceURL": "https://pinkhouse-webshop.jp/photo/catalog/89/89_1428.jpg"
+    },
+    {
+      "id": "ph22a-d08",
+      "canonicalKey": "pink-house|2022-autumn|ペチコート付きティアードワンピース",
+      "kind": "dress",
+      "category": "ティアードワンピース",
+      "categoryZH": "层叠 OP",
+      "name": "ペチコート付きティアードワンピース",
+      "nameZH": "附衬裙层叠连衣裙",
+      "brand": "PINK HOUSE",
+      "year": 2022,
+      "season": "autumn",
+      "catalogueID": "pink-house-2022-autumn",
+      "cataloguePage": 12,
+      "priceJPY": 35200,
+      "listingStatus": "catalogue",
+      "styles": [
+        "tiered",
+        "petticoat",
+        "layered"
+      ],
+      "stylesZH": [
+        "层叠",
+        "衬裙",
+        "叠穿"
+      ],
+      "coverImage": "ph-2022-autumn-p12.jpg",
+      "gallery": [
+
+      ],
+      "sourceURL": "https://pinkhouse-webshop.jp/pinkhouse/catalog/detail/89",
+      "observedAt": "2026-07-31",
+      "datePrecision": "season",
+      "noteZH": "官方目录第 12 页；商品名称明确包含衬裙。",
+      "imageSourceURL": "https://pinkhouse-webshop.jp/photo/catalog/89/89_1429.jpg"
+    },
+    {
+      "id": "ph22a-d09",
+      "canonicalKey": "pink-house|2022-autumn|クリスマスローズプリントワンピース",
+      "kind": "dress",
+      "category": "ワンピース",
+      "categoryZH": "OP 连衣裙",
+      "name": "クリスマスローズプリントワンピース",
+      "nameZH": "圣诞玫瑰印花连衣裙",
+      "brand": "PINK HOUSE",
+      "year": 2022,
+      "season": "autumn",
+      "catalogueID": "pink-house-2022-autumn",
+      "cataloguePage": 13,
+      "priceJPY": 31350,
+      "listingStatus": "outlet_as_observed",
+      "styles": [
+        "christmas-rose",
+        "floral",
+        "print"
+      ],
+      "stylesZH": [
+        "圣诞玫瑰",
+        "花卉",
+        "印花"
+      ],
+      "coverImage": "ph-2022-autumn-p13.jpg",
+      "gallery": [
+
+      ],
+      "sourceURL": "https://pinkhouse-webshop.jp/pinkhouse/catalog/detail/89",
+      "observedAt": "2026-07-31",
+      "datePrecision": "season",
+      "noteZH": "官方目录第 13 页；与中长款是不同命名和价格的设计。",
+      "imageSourceURL": "https://pinkhouse-webshop.jp/photo/catalog/89/89_1430.jpg"
+    },
+    {
+      "id": "ph22a-d10",
+      "canonicalKey": "pink-house|2022-autumn|リサイクルウーリッシュツイルジャンパースカート",
+      "kind": "dress",
+      "category": "ジャンパースカート",
+      "categoryZH": "JSK 背心裙",
+      "name": "リサイクルウーリッシュツイルジャンパースカート",
+      "nameZH": "再生毛感斜纹背心裙",
+      "brand": "PINK HOUSE",
+      "year": 2022,
+      "season": "autumn",
+      "catalogueID": "pink-house-2022-autumn",
+      "cataloguePage": 18,
+      "priceJPY": 36300,
+      "listingStatus": "catalogue",
+      "styles": [
+        "jsk",
+        "twill",
+        "layering"
+      ],
+      "stylesZH": [
+        "JSK",
+        "斜纹",
+        "叠穿"
+      ],
+      "coverImage": "ph-2022-autumn-p18.jpg",
+      "gallery": [
+
+      ],
+      "sourceURL": "https://pinkhouse-webshop.jp/pinkhouse/catalog/detail/89",
+      "observedAt": "2026-07-31",
+      "datePrecision": "season",
+      "noteZH": "官方目录第 18 页；官方名称明确为ジャンパースカート。",
+      "imageSourceURL": "https://pinkhouse-webshop.jp/photo/catalog/89/89_1435.jpg"
+    },
+    {
+      "id": "ph22a-a01",
+      "canonicalKey": "pink-house|2022-autumn|ローズモチーフパッチワーク風ニットカーディガン",
+      "kind": "accessory",
+      "category": "カーディガン",
+      "categoryZH": "开衫",
+      "name": "ローズモチーフパッチワーク風ニットカーディガン",
+      "nameZH": "玫瑰图案拼布风针织开衫",
+      "brand": "PINK HOUSE",
+      "year": 2022,
+      "season": "autumn",
+      "catalogueID": "pink-house-2022-autumn",
+      "cataloguePage": 2,
+      "priceJPY": 23100,
+      "listingStatus": "outlet_as_observed",
+      "styles": [
+        "rose",
+        "patchwork",
+        "cardigan"
+      ],
+      "stylesZH": [
+        "玫瑰",
+        "拼布",
+        "开衫"
+      ],
+      "coverImage": "ph-2022-autumn-p02.jpg",
+      "gallery": [
+
+      ],
+      "sourceURL": "https://pinkhouse-webshop.jp/pinkhouse/catalog/detail/89",
+      "observedAt": "2026-07-31",
+      "datePrecision": "season",
+      "noteZH": "官方目录第 2 页；玫瑰主题配套针织开衫。",
+      "imageSourceURL": "https://pinkhouse-webshop.jp/photo/catalog/89/89_1419.jpg"
+    },
+    {
+      "id": "ph22a-a02",
+      "canonicalKey": "pink-house|2022-autumn|エターナルローズコサージュ",
+      "kind": "accessory",
+      "category": "コサージュ",
+      "categoryZH": "胸花",
+      "name": "エターナルローズコサージュ",
+      "nameZH": "永恒玫瑰胸花",
+      "brand": "PINK HOUSE",
+      "year": 2022,
+      "season": "autumn",
+      "catalogueID": "pink-house-2022-autumn",
+      "cataloguePage": 2,
+      "priceJPY": 7040,
+      "listingStatus": "outlet_as_observed",
+      "styles": [
+        "eternal-rose",
+        "corsage",
+        "floral"
+      ],
+      "stylesZH": [
+        "永恒玫瑰",
+        "胸花",
+        "花卉"
+      ],
+      "coverImage": "ph-2022-autumn-p02.jpg",
+      "gallery": [
+
+      ],
+      "sourceURL": "https://pinkhouse-webshop.jp/pinkhouse/catalog/detail/89",
+      "observedAt": "2026-07-31",
+      "datePrecision": "season",
+      "noteZH": "官方目录多页重复出现；以主题、年份和名称去重为一件。",
+      "imageSourceURL": "https://pinkhouse-webshop.jp/photo/catalog/89/89_1419.jpg"
+    },
+    {
+      "id": "ph22a-a03",
+      "canonicalKey": "pink-house|2022-autumn|ロゴ刺繍入りバッグ",
+      "kind": "accessory",
+      "category": "バッグ",
+      "categoryZH": "包",
+      "name": "ロゴ刺繍入りバッグ",
+      "nameZH": "Logo 刺绣包",
+      "brand": "PINK HOUSE",
+      "year": 2022,
+      "season": "autumn",
+      "catalogueID": "pink-house-2022-autumn",
+      "cataloguePage": 6,
+      "priceJPY": 12100,
+      "listingStatus": "outlet_as_observed",
+      "styles": [
+        "logo",
+        "embroidery",
+        "bag"
+      ],
+      "stylesZH": [
+        "Logo",
+        "刺绣",
+        "包"
+      ],
+      "coverImage": "ph-2022-autumn-p06.jpg",
+      "gallery": [
+
+      ],
+      "sourceURL": "https://pinkhouse-webshop.jp/pinkhouse/catalog/detail/89",
+      "observedAt": "2026-07-31",
+      "datePrecision": "season",
+      "noteZH": "官方目录第 6 页；同一名称在后续造型页出现时不重复建档。",
+      "imageSourceURL": "https://pinkhouse-webshop.jp/photo/catalog/89/89_1423.jpg"
+    },
+    {
+      "id": "ph22a-a04",
+      "canonicalKey": "pink-house|2022-autumn|フラッフィ―・キティーズモチーフソックス",
+      "kind": "accessory",
+      "category": "ソックス",
+      "categoryZH": "袜子",
+      "name": "フラッフィ―・キティーズモチーフソックス",
+      "nameZH": "蓬松猫咪图案袜",
+      "brand": "PINK HOUSE",
+      "year": 2022,
+      "season": "autumn",
+      "catalogueID": "pink-house-2022-autumn",
+      "cataloguePage": 10,
+      "priceJPY": 990,
+      "listingStatus": "outlet_as_observed",
+      "styles": [
+        "fluffy-kitties",
+        "cat",
+        "socks"
+      ],
+      "stylesZH": [
+        "蓬松猫咪",
+        "猫咪",
+        "袜子"
+      ],
+      "coverImage": "ph-2022-autumn-p10.jpg",
+      "gallery": [
+
+      ],
+      "sourceURL": "https://pinkhouse-webshop.jp/pinkhouse/catalog/detail/89",
+      "observedAt": "2026-07-31",
+      "datePrecision": "season",
+      "noteZH": "官方目录第 10 页；猫咪主题配套袜。",
+      "imageSourceURL": "https://pinkhouse-webshop.jp/photo/catalog/89/89_1427.jpg"
+    },
+    {
+      "id": "ph22a-a05",
+      "canonicalKey": "pink-house|2022-autumn|PETER RABBIT? CARDIGAN",
+      "kind": "accessory",
+      "category": "カーディガン",
+      "categoryZH": "开衫",
+      "name": "PETER RABBIT? CARDIGAN",
+      "nameZH": "彼得兔开衫",
+      "brand": "PINK HOUSE",
+      "year": 2022,
+      "season": "autumn",
+      "catalogueID": "pink-house-2022-autumn",
+      "cataloguePage": 11,
+      "priceJPY": 52800,
+      "listingStatus": "catalogue",
+      "styles": [
+        "peter-rabbit",
+        "cardigan",
+        "collaboration"
+      ],
+      "stylesZH": [
+        "彼得兔",
+        "开衫",
+        "联名"
+      ],
+      "coverImage": "ph-2022-autumn-p11.jpg",
+      "gallery": [
+
+      ],
+      "sourceURL": "https://pinkhouse-webshop.jp/pinkhouse/catalog/detail/89",
+      "observedAt": "2026-07-31",
+      "datePrecision": "season",
+      "noteZH": "官方目录第 11 页；官网源码原文即显示为 PETER RABBIT? CARDIGAN，问号按来源保留。",
+      "imageSourceURL": "https://pinkhouse-webshop.jp/photo/catalog/89/89_1428.jpg"
+    }
+  ],
+  "timelineYears": [
+    {
+      "year": 1972,
+      "kind": "milestone",
+      "titleZH": "PINK HOUSE 诞生",
+      "storyZH": "设计师金子功创立 PINK HOUSE。官方品牌史将古董抽屉、衬裙般的层叠穿法与当时黑色 Mode 潮流并置，构成品牌最初的浪漫语言。",
+      "evidenceLevel": "officialHistory",
+      "sourceURLs": [
+        "https://www.melrose.co.jp/about-history/"
+      ],
+      "catalogueIDs": [
+
+      ]
+    },
+    {
+      "year": 1973,
+      "kind": "archiveGap",
+      "titleZH": "诞生期衣橱 · 档案待补",
+      "storyZH": "这是 PINK HOUSE 诞生后的早期年份。官网当前在线 Catalogue 索引尚未覆盖本年；本馆先保留时间位置，等待可核验的实物目录、品牌出版物或授权照片补证。",
+      "evidenceLevel": "archiveGap",
+      "sourceURLs": [
+
+      ],
+      "catalogueIDs": [
+
+      ]
+    },
+    {
+      "year": 1974,
+      "kind": "archiveGap",
+      "titleZH": "诞生期衣橱 · 档案待补",
+      "storyZH": "这是 PINK HOUSE 诞生后的早期年份。官网当前在线 Catalogue 索引尚未覆盖本年；本馆先保留时间位置，等待可核验的实物目录、品牌出版物或授权照片补证。",
+      "evidenceLevel": "archiveGap",
+      "sourceURLs": [
+
+      ],
+      "catalogueIDs": [
+
+      ]
+    },
+    {
+      "year": 1975,
+      "kind": "archiveGap",
+      "titleZH": "诞生期衣橱 · 档案待补",
+      "storyZH": "这是 PINK HOUSE 诞生后的早期年份。官网当前在线 Catalogue 索引尚未覆盖本年；本馆先保留时间位置，等待可核验的实物目录、品牌出版物或授权照片补证。",
+      "evidenceLevel": "archiveGap",
+      "sourceURLs": [
+
+      ],
+      "catalogueIDs": [
+
+      ]
+    },
+    {
+      "year": 1976,
+      "kind": "archiveGap",
+      "titleZH": "诞生期衣橱 · 档案待补",
+      "storyZH": "这是 PINK HOUSE 诞生后的早期年份。官网当前在线 Catalogue 索引尚未覆盖本年；本馆先保留时间位置，等待可核验的实物目录、品牌出版物或授权照片补证。",
+      "evidenceLevel": "archiveGap",
+      "sourceURLs": [
+
+      ],
+      "catalogueIDs": [
+
+      ]
+    },
+    {
+      "year": 1977,
+      "kind": "archiveGap",
+      "titleZH": "诞生期衣橱 · 档案待补",
+      "storyZH": "这是 PINK HOUSE 诞生后的早期年份。官网当前在线 Catalogue 索引尚未覆盖本年；本馆先保留时间位置，等待可核验的实物目录、品牌出版物或授权照片补证。",
+      "evidenceLevel": "archiveGap",
+      "sourceURLs": [
+
+      ],
+      "catalogueIDs": [
+
+      ]
+    },
+    {
+      "year": 1978,
+      "kind": "archiveGap",
+      "titleZH": "诞生期衣橱 · 档案待补",
+      "storyZH": "这是 PINK HOUSE 诞生后的早期年份。官网当前在线 Catalogue 索引尚未覆盖本年；本馆先保留时间位置，等待可核验的实物目录、品牌出版物或授权照片补证。",
+      "evidenceLevel": "archiveGap",
+      "sourceURLs": [
+
+      ],
+      "catalogueIDs": [
+
+      ]
+    },
+    {
+      "year": 1979,
+      "kind": "archiveGap",
+      "titleZH": "诞生期衣橱 · 档案待补",
+      "storyZH": "这是 PINK HOUSE 诞生后的早期年份。官网当前在线 Catalogue 索引尚未覆盖本年；本馆先保留时间位置，等待可核验的实物目录、品牌出版物或授权照片补证。",
+      "evidenceLevel": "archiveGap",
+      "sourceURLs": [
+
+      ],
+      "catalogueIDs": [
+
+      ]
+    },
+    {
+      "year": 1980,
+      "kind": "archiveGap",
+      "titleZH": "浪漫衣橱展开 · 档案待补",
+      "storyZH": "品牌在八十年代持续展开层叠、印花与成套搭配的世界。官网当前在线 Catalogue 索引尚未覆盖本年，因此以故事卡保留位置，不使用推测图片代替史料。",
+      "evidenceLevel": "archiveGap",
+      "sourceURLs": [
+
+      ],
+      "catalogueIDs": [
+
+      ]
+    },
+    {
+      "year": 1981,
+      "kind": "archiveGap",
+      "titleZH": "浪漫衣橱展开 · 档案待补",
+      "storyZH": "品牌在八十年代持续展开层叠、印花与成套搭配的世界。官网当前在线 Catalogue 索引尚未覆盖本年，因此以故事卡保留位置，不使用推测图片代替史料。",
+      "evidenceLevel": "archiveGap",
+      "sourceURLs": [
+
+      ],
+      "catalogueIDs": [
+
+      ]
+    },
+    {
+      "year": 1982,
+      "kind": "milestone",
+      "titleZH": "PINK HOUSE 独立启程",
+      "storyZH": "官方公司沿革记载，株式会社ピンクハウス在这一年成立，品牌进入独立发展的阶段。",
+      "evidenceLevel": "officialHistory",
+      "sourceURLs": [
+        "https://www.melrose.co.jp/about-history/"
+      ],
+      "catalogueIDs": [
+
+      ]
+    },
+    {
+      "year": 1983,
+      "kind": "milestone",
+      "titleZH": "INGEBORG 诞生",
+      "storyZH": "金子功创立 INGEBORG。它与 PINK HOUSE 一同构成更宽广的浪漫衣橱谱系，也记录了品牌家族在成熟风格方向的展开。",
+      "evidenceLevel": "officialHistory",
+      "sourceURLs": [
+        "https://www.melrose.co.jp/about-history/"
+      ],
+      "catalogueIDs": [
+
+      ]
+    },
+    {
+      "year": 1984,
+      "kind": "archiveGap",
+      "titleZH": "浪漫衣橱展开 · 档案待补",
+      "storyZH": "品牌在八十年代持续展开层叠、印花与成套搭配的世界。官网当前在线 Catalogue 索引尚未覆盖本年，因此以故事卡保留位置，不使用推测图片代替史料。",
+      "evidenceLevel": "archiveGap",
+      "sourceURLs": [
+
+      ],
+      "catalogueIDs": [
+
+      ]
+    },
+    {
+      "year": 1985,
+      "kind": "milestone",
+      "titleZH": "KARL HELMUT 诞生",
+      "storyZH": "由 PINK HOUSE 延伸的男装 KARL HELMUT 诞生，品牌的印花、叙事与层搭美学由此拓展到新的服装领域。",
+      "evidenceLevel": "officialHistory",
+      "sourceURLs": [
+        "https://www.melrose.co.jp/about-history/"
+      ],
+      "catalogueIDs": [
+
+      ]
+    },
+    {
+      "year": 1986,
+      "kind": "archiveGap",
+      "titleZH": "浪漫衣橱展开 · 档案待补",
+      "storyZH": "品牌在八十年代持续展开层叠、印花与成套搭配的世界。官网当前在线 Catalogue 索引尚未覆盖本年，因此以故事卡保留位置，不使用推测图片代替史料。",
+      "evidenceLevel": "archiveGap",
+      "sourceURLs": [
+
+      ],
+      "catalogueIDs": [
+
+      ]
+    },
+    {
+      "year": 1987,
+      "kind": "archiveGap",
+      "titleZH": "浪漫衣橱展开 · 档案待补",
+      "storyZH": "品牌在八十年代持续展开层叠、印花与成套搭配的世界。官网当前在线 Catalogue 索引尚未覆盖本年，因此以故事卡保留位置，不使用推测图片代替史料。",
+      "evidenceLevel": "archiveGap",
+      "sourceURLs": [
+
+      ],
+      "catalogueIDs": [
+
+      ]
+    },
+    {
+      "year": 1988,
+      "kind": "archiveGap",
+      "titleZH": "浪漫衣橱展开 · 档案待补",
+      "storyZH": "品牌在八十年代持续展开层叠、印花与成套搭配的世界。官网当前在线 Catalogue 索引尚未覆盖本年，因此以故事卡保留位置，不使用推测图片代替史料。",
+      "evidenceLevel": "archiveGap",
+      "sourceURLs": [
+
+      ],
+      "catalogueIDs": [
+
+      ]
+    },
+    {
+      "year": 1989,
+      "kind": "archiveGap",
+      "titleZH": "浪漫衣橱展开 · 档案待补",
+      "storyZH": "品牌在八十年代持续展开层叠、印花与成套搭配的世界。官网当前在线 Catalogue 索引尚未覆盖本年，因此以故事卡保留位置，不使用推测图片代替史料。",
+      "evidenceLevel": "archiveGap",
+      "sourceURLs": [
+
+      ],
+      "catalogueIDs": [
+
+      ]
+    },
+    {
+      "year": 1990,
+      "kind": "archiveGap",
+      "titleZH": "九十年代记忆 · 档案待补",
+      "storyZH": "这一年属于许多收藏者熟悉的九十年代衣橱，但官网当前在线 Catalogue 索引尚未覆盖。待实物目录页或带出处的藏品图出现后，再补成真实图像档案。",
+      "evidenceLevel": "archiveGap",
+      "sourceURLs": [
+
+      ],
+      "catalogueIDs": [
+
+      ]
+    },
+    {
+      "year": 1991,
+      "kind": "archiveGap",
+      "titleZH": "九十年代记忆 · 档案待补",
+      "storyZH": "这一年属于许多收藏者熟悉的九十年代衣橱，但官网当前在线 Catalogue 索引尚未覆盖。待实物目录页或带出处的藏品图出现后，再补成真实图像档案。",
+      "evidenceLevel": "archiveGap",
+      "sourceURLs": [
+
+      ],
+      "catalogueIDs": [
+
+      ]
+    },
+    {
+      "year": 1992,
+      "kind": "archiveGap",
+      "titleZH": "九十年代记忆 · 档案待补",
+      "storyZH": "这一年属于许多收藏者熟悉的九十年代衣橱，但官网当前在线 Catalogue 索引尚未覆盖。待实物目录页或带出处的藏品图出现后，再补成真实图像档案。",
+      "evidenceLevel": "archiveGap",
+      "sourceURLs": [
+
+      ],
+      "catalogueIDs": [
+
+      ]
+    },
+    {
+      "year": 1993,
+      "kind": "archiveGap",
+      "titleZH": "九十年代记忆 · 档案待补",
+      "storyZH": "这一年属于许多收藏者熟悉的九十年代衣橱，但官网当前在线 Catalogue 索引尚未覆盖。待实物目录页或带出处的藏品图出现后，再补成真实图像档案。",
+      "evidenceLevel": "archiveGap",
+      "sourceURLs": [
+
+      ],
+      "catalogueIDs": [
+
+      ]
+    },
+    {
+      "year": 1994,
+      "kind": "archiveGap",
+      "titleZH": "九十年代记忆 · 档案待补",
+      "storyZH": "这一年属于许多收藏者熟悉的九十年代衣橱，但官网当前在线 Catalogue 索引尚未覆盖。待实物目录页或带出处的藏品图出现后，再补成真实图像档案。",
+      "evidenceLevel": "archiveGap",
+      "sourceURLs": [
+
+      ],
+      "catalogueIDs": [
+
+      ]
+    },
+    {
+      "year": 1995,
+      "kind": "archiveGap",
+      "titleZH": "九十年代记忆 · 档案待补",
+      "storyZH": "这一年属于许多收藏者熟悉的九十年代衣橱，但官网当前在线 Catalogue 索引尚未覆盖。待实物目录页或带出处的藏品图出现后，再补成真实图像档案。",
+      "evidenceLevel": "archiveGap",
+      "sourceURLs": [
+
+      ],
+      "catalogueIDs": [
+
+      ]
+    },
+    {
+      "year": 1996,
+      "kind": "archiveGap",
+      "titleZH": "九十年代记忆 · 档案待补",
+      "storyZH": "这一年属于许多收藏者熟悉的九十年代衣橱，但官网当前在线 Catalogue 索引尚未覆盖。待实物目录页或带出处的藏品图出现后，再补成真实图像档案。",
+      "evidenceLevel": "archiveGap",
+      "sourceURLs": [
+
+      ],
+      "catalogueIDs": [
+
+      ]
+    },
+    {
+      "year": 1997,
+      "kind": "archiveGap",
+      "titleZH": "九十年代记忆 · 档案待补",
+      "storyZH": "这一年属于许多收藏者熟悉的九十年代衣橱，但官网当前在线 Catalogue 索引尚未覆盖。待实物目录页或带出处的藏品图出现后，再补成真实图像档案。",
+      "evidenceLevel": "archiveGap",
+      "sourceURLs": [
+
+      ],
+      "catalogueIDs": [
+
+      ]
+    },
+    {
+      "year": 1998,
+      "kind": "archiveGap",
+      "titleZH": "九十年代记忆 · 档案待补",
+      "storyZH": "这一年属于许多收藏者熟悉的九十年代衣橱，但官网当前在线 Catalogue 索引尚未覆盖。待实物目录页或带出处的藏品图出现后，再补成真实图像档案。",
+      "evidenceLevel": "archiveGap",
+      "sourceURLs": [
+
+      ],
+      "catalogueIDs": [
+
+      ]
+    },
+    {
+      "year": 1999,
+      "kind": "archiveGap",
+      "titleZH": "九十年代记忆 · 档案待补",
+      "storyZH": "这一年属于许多收藏者熟悉的九十年代衣橱，但官网当前在线 Catalogue 索引尚未覆盖。待实物目录页或带出处的藏品图出现后，再补成真实图像档案。",
+      "evidenceLevel": "archiveGap",
+      "sourceURLs": [
+
+      ],
+      "catalogueIDs": [
+
+      ]
+    },
+    {
+      "year": 2000,
+      "kind": "archiveGap",
+      "titleZH": "千禧衣橱 · 档案待补",
+      "storyZH": "品牌跨入新世纪的这一年，官网当前在线 Catalogue 索引仍没有可核验图片。本卡只标记年代位置与取证状态，不虚构具体款式。",
+      "evidenceLevel": "archiveGap",
+      "sourceURLs": [
+
+      ],
+      "catalogueIDs": [
+
+      ]
+    },
+    {
+      "year": 2001,
+      "kind": "archiveGap",
+      "titleZH": "千禧衣橱 · 档案待补",
+      "storyZH": "品牌跨入新世纪的这一年，官网当前在线 Catalogue 索引仍没有可核验图片。本卡只标记年代位置与取证状态，不虚构具体款式。",
+      "evidenceLevel": "archiveGap",
+      "sourceURLs": [
+
+      ],
+      "catalogueIDs": [
+
+      ]
+    },
+    {
+      "year": 2002,
+      "kind": "archiveGap",
+      "titleZH": "千禧衣橱 · 档案待补",
+      "storyZH": "品牌跨入新世纪的这一年，官网当前在线 Catalogue 索引仍没有可核验图片。本卡只标记年代位置与取证状态，不虚构具体款式。",
+      "evidenceLevel": "archiveGap",
+      "sourceURLs": [
+
+      ],
+      "catalogueIDs": [
+
+      ]
+    },
+    {
+      "year": 2003,
+      "kind": "archiveGap",
+      "titleZH": "千禧衣橱 · 档案待补",
+      "storyZH": "品牌跨入新世纪的这一年，官网当前在线 Catalogue 索引仍没有可核验图片。本卡只标记年代位置与取证状态，不虚构具体款式。",
+      "evidenceLevel": "archiveGap",
+      "sourceURLs": [
+
+      ],
+      "catalogueIDs": [
+
+      ]
+    },
+    {
+      "year": 2004,
+      "kind": "milestone",
+      "titleZH": "公司体系重组",
+      "storyZH": "官方公司沿革记载，株式会社ピンクハウス与ジェディックス合并并重组。这里记录的是经营体系的变化，不代表设计档案在这一年中断。",
+      "evidenceLevel": "officialHistory",
+      "sourceURLs": [
+        "https://www.melrose.co.jp/about-history/"
+      ],
+      "catalogueIDs": [
+
+      ]
+    },
+    {
+      "year": 2005,
+      "kind": "archiveGap",
+      "titleZH": "千禧衣橱 · 档案待补",
+      "storyZH": "品牌跨入新世纪的这一年，官网当前在线 Catalogue 索引仍没有可核验图片。本卡只标记年代位置与取证状态，不虚构具体款式。",
+      "evidenceLevel": "archiveGap",
+      "sourceURLs": [
+
+      ],
+      "catalogueIDs": [
+
+      ]
+    },
+    {
+      "year": 2006,
+      "kind": "archiveGap",
+      "titleZH": "千禧衣橱 · 档案待补",
+      "storyZH": "品牌跨入新世纪的这一年，官网当前在线 Catalogue 索引仍没有可核验图片。本卡只标记年代位置与取证状态，不虚构具体款式。",
+      "evidenceLevel": "archiveGap",
+      "sourceURLs": [
+
+      ],
+      "catalogueIDs": [
+
+      ]
+    },
+    {
+      "year": 2007,
+      "kind": "archiveGap",
+      "titleZH": "千禧衣橱 · 档案待补",
+      "storyZH": "品牌跨入新世纪的这一年，官网当前在线 Catalogue 索引仍没有可核验图片。本卡只标记年代位置与取证状态，不虚构具体款式。",
+      "evidenceLevel": "archiveGap",
+      "sourceURLs": [
+
+      ],
+      "catalogueIDs": [
+
+      ]
+    },
+    {
+      "year": 2008,
+      "kind": "archiveGap",
+      "titleZH": "千禧衣橱 · 档案待补",
+      "storyZH": "品牌跨入新世纪的这一年，官网当前在线 Catalogue 索引仍没有可核验图片。本卡只标记年代位置与取证状态，不虚构具体款式。",
+      "evidenceLevel": "archiveGap",
+      "sourceURLs": [
+
+      ],
+      "catalogueIDs": [
+
+      ]
+    },
+    {
+      "year": 2009,
+      "kind": "archiveGap",
+      "titleZH": "千禧衣橱 · 档案待补",
+      "storyZH": "品牌跨入新世纪的这一年，官网当前在线 Catalogue 索引仍没有可核验图片。本卡只标记年代位置与取证状态，不虚构具体款式。",
+      "evidenceLevel": "archiveGap",
+      "sourceURLs": [
+
+      ],
+      "catalogueIDs": [
+
+      ]
+    },
+    {
+      "year": 2010,
+      "kind": "archiveGap",
+      "titleZH": "在线档案前夜 · 档案待补",
+      "storyZH": "距离官网现存 Catalogue 档案不远的这一年，目前仍缺少官方在线图片。本馆以故事卡衔接时间线，等待纸本目录或授权图像补证。",
+      "evidenceLevel": "archiveGap",
+      "sourceURLs": [
+
+      ],
+      "catalogueIDs": [
+
+      ]
+    },
+    {
+      "year": 2011,
+      "kind": "milestone",
+      "titleZH": "回归 MELROSE",
+      "storyZH": "官方公司沿革记载，PINK HOUSE 在离开 22 年后重新回到 MELROSE 体系，品牌历史进入新的承接阶段。",
+      "evidenceLevel": "officialHistory",
+      "sourceURLs": [
+        "https://www.melrose.co.jp/about-history/"
+      ],
+      "catalogueIDs": [
+
+      ]
+    },
+    {
+      "year": 2012,
+      "kind": "archiveGap",
+      "titleZH": "在线档案前夜 · 档案待补",
+      "storyZH": "距离官网现存 Catalogue 档案不远的这一年，目前仍缺少官方在线图片。本馆以故事卡衔接时间线，等待纸本目录或授权图像补证。",
+      "evidenceLevel": "archiveGap",
+      "sourceURLs": [
+
+      ],
+      "catalogueIDs": [
+
+      ]
+    },
+    {
+      "year": 2013,
+      "kind": "archiveGap",
+      "titleZH": "在线档案前夜 · 档案待补",
+      "storyZH": "距离官网现存 Catalogue 档案不远的这一年，目前仍缺少官方在线图片。本馆以故事卡衔接时间线，等待纸本目录或授权图像补证。",
+      "evidenceLevel": "archiveGap",
+      "sourceURLs": [
+
+      ],
+      "catalogueIDs": [
+
+      ]
+    },
+    {
+      "year": 2014,
+      "kind": "archiveGap",
+      "titleZH": "在线档案前夜 · 档案待补",
+      "storyZH": "距离官网现存 Catalogue 档案不远的这一年，目前仍缺少官方在线图片。本馆以故事卡衔接时间线，等待纸本目录或授权图像补证。",
+      "evidenceLevel": "archiveGap",
+      "sourceURLs": [
+
+      ],
+      "catalogueIDs": [
+
+      ]
+    },
+    {
+      "year": 2015,
+      "kind": "officialArchive",
+      "titleZH": "2015 官方 Catalogue 档案",
+      "storyZH": "PINK HOUSE 官网 Catalogue 索引收录本年 4 本目录。下方封面均保存自官方图片地址，可继续打开原始 Catalogue 核对。",
+      "evidenceLevel": "officialCatalogue",
+      "sourceURLs": [
+        "https://pinkhouse-webshop.jp/pinkhouse/catalog"
+      ],
+      "catalogueIDs": [
+        "official-catalog-61",
+        "official-catalog-63",
+        "official-catalog-65",
+        "official-catalog-67"
+      ]
+    },
+    {
+      "year": 2016,
+      "kind": "officialArchive",
+      "titleZH": "2016 官方 Catalogue 档案",
+      "storyZH": "PINK HOUSE 官网 Catalogue 索引收录本年 4 本目录。下方封面均保存自官方图片地址，可继续打开原始 Catalogue 核对。",
+      "evidenceLevel": "officialCatalogue",
+      "sourceURLs": [
+        "https://pinkhouse-webshop.jp/pinkhouse/catalog"
+      ],
+      "catalogueIDs": [
+        "official-catalog-53",
+        "official-catalog-55",
+        "official-catalog-57",
+        "official-catalog-59"
+      ]
+    },
+    {
+      "year": 2017,
+      "kind": "officialArchive",
+      "titleZH": "2017 官方 Catalogue 档案",
+      "storyZH": "PINK HOUSE 官网 Catalogue 索引收录本年 4 本目录。下方封面均保存自官方图片地址，可继续打开原始 Catalogue 核对。",
+      "evidenceLevel": "officialCatalogue",
+      "sourceURLs": [
+        "https://pinkhouse-webshop.jp/pinkhouse/catalog"
+      ],
+      "catalogueIDs": [
+        "official-catalog-43",
+        "official-catalog-46",
+        "official-catalog-48",
+        "official-catalog-86"
+      ]
+    },
+    {
+      "year": 2018,
+      "kind": "officialArchive",
+      "titleZH": "2018 官方 Catalogue 档案",
+      "storyZH": "PINK HOUSE 官网 Catalogue 索引收录本年 3 本目录。下方封面均保存自官方图片地址，可继续打开原始 Catalogue 核对。",
+      "evidenceLevel": "officialCatalogue",
+      "sourceURLs": [
+        "https://pinkhouse-webshop.jp/pinkhouse/catalog"
+      ],
+      "catalogueIDs": [
+        "official-catalog-34",
+        "official-catalog-37",
+        "official-catalog-39"
+      ]
+    },
+    {
+      "year": 2019,
+      "kind": "officialArchive",
+      "titleZH": "2019 官方 Catalogue 档案",
+      "storyZH": "PINK HOUSE 官网 Catalogue 索引收录本年 4 本目录。下方封面均保存自官方图片地址，可继续打开原始 Catalogue 核对。",
+      "evidenceLevel": "officialCatalogue",
+      "sourceURLs": [
+        "https://pinkhouse-webshop.jp/pinkhouse/catalog"
+      ],
+      "catalogueIDs": [
+        "official-catalog-25",
+        "official-catalog-27",
+        "official-catalog-29",
+        "official-catalog-32"
+      ]
+    },
+    {
+      "year": 2020,
+      "kind": "officialArchive",
+      "titleZH": "2020 官方 Catalogue 档案",
+      "storyZH": "PINK HOUSE 官网 Catalogue 索引收录本年 5 本目录。下方封面均保存自官方图片地址，可继续打开原始 Catalogue 核对。",
+      "evidenceLevel": "officialCatalogue",
+      "sourceURLs": [
+        "https://pinkhouse-webshop.jp/pinkhouse/catalog"
+      ],
+      "catalogueIDs": [
+        "official-catalog-2",
+        "official-catalog-12",
+        "official-catalog-14",
+        "official-catalog-16",
+        "official-catalog-18"
+      ]
+    },
+    {
+      "year": 2021,
+      "kind": "officialArchive",
+      "titleZH": "2021 官方 Catalogue 档案",
+      "storyZH": "PINK HOUSE 官网 Catalogue 索引收录本年 4 本目录。下方封面均保存自官方图片地址，可继续打开原始 Catalogue 核对。",
+      "evidenceLevel": "officialCatalogue",
+      "sourceURLs": [
+        "https://pinkhouse-webshop.jp/pinkhouse/catalog"
+      ],
+      "catalogueIDs": [
+        "official-catalog-9",
+        "official-catalog-1",
+        "official-catalog-5",
+        "official-catalog-7"
+      ]
+    },
+    {
+      "year": 2022,
+      "kind": "milestone",
+      "titleZH": "50 周年纪念",
+      "storyZH": "PINK HOUSE 迎来品牌诞生 50 周年。官网发布周年专题，并在东京举办纪念展，让历代服装与图案以实体档案的方式重新相遇。",
+      "evidenceLevel": "officialHistory",
+      "sourceURLs": [
+        "https://pinkhouse-webshop.jp/pinkhouse/contents/50thaniv_pinkhouse",
+        "https://pinkhouse-webshop.jp/pinkhouse/news/286"
+      ],
+      "catalogueIDs": [
+        "official-catalog-89",
+        "official-catalog-83",
+        "official-catalog-78",
+        "official-catalog-70"
+      ]
+    },
+    {
+      "year": 2023,
+      "kind": "milestone",
+      "titleZH": "TIMELESS PINK HOUSE",
+      "storyZH": "表参道旗舰店 TIMELESS PINK HOUSE 与线上虚拟空间共同展开：历史档案、当季服装与未来体验被放进同一个持续更新的品牌空间。",
+      "evidenceLevel": "officialHistory",
+      "sourceURLs": [
+        "https://pinkhouse-webshop.jp/pinkhouse/contents/TPH",
+        "https://pinkhouse-webshop.jp/pinkhouse/news/601",
+        "https://www.melrose.co.jp/50th/melrose_monobooks_pinkhouse/"
+      ],
+      "catalogueIDs": [
+        "official-catalog-108",
+        "official-catalog-106",
+        "official-catalog-100",
+        "official-catalog-95"
+      ]
+    },
+    {
+      "year": 2024,
+      "kind": "officialArchive",
+      "titleZH": "2024 官方 Catalogue 档案",
+      "storyZH": "PINK HOUSE 官网 Catalogue 索引收录本年 4 本目录。下方封面均保存自官方图片地址，可继续打开原始 Catalogue 核对。",
+      "evidenceLevel": "officialCatalogue",
+      "sourceURLs": [
+        "https://pinkhouse-webshop.jp/pinkhouse/catalog"
+      ],
+      "catalogueIDs": [
+        "official-catalog-120",
+        "official-catalog-117",
+        "official-catalog-113",
+        "official-catalog-111"
+      ]
+    },
+    {
+      "year": 2025,
+      "kind": "officialArchive",
+      "titleZH": "2025 官方 Catalogue 档案",
+      "storyZH": "PINK HOUSE 官网 Catalogue 索引收录本年 4 本目录。下方封面均保存自官方图片地址，可继续打开原始 Catalogue 核对。",
+      "evidenceLevel": "officialCatalogue",
+      "sourceURLs": [
+        "https://pinkhouse-webshop.jp/pinkhouse/catalog"
+      ],
+      "catalogueIDs": [
+        "official-catalog-130",
+        "official-catalog-128",
+        "official-catalog-124",
+        "official-catalog-122"
+      ]
+    },
+    {
+      "year": 2026,
+      "kind": "officialArchive",
+      "titleZH": "2026 官方 Catalogue 档案",
+      "storyZH": "PINK HOUSE 官网 Catalogue 索引收录本年 3 本目录。下方封面均保存自官方图片地址，可继续打开原始 Catalogue 核对。",
+      "evidenceLevel": "officialCatalogue",
+      "sourceURLs": [
+        "https://pinkhouse-webshop.jp/pinkhouse/catalog"
+      ],
+      "catalogueIDs": [
+        "official-catalog-137",
+        "official-catalog-136",
+        "official-catalog-132"
+      ]
+    }
+  ],
+  "archiveCatalogues": [
+    {
+      "id": "official-catalog-137",
+      "officialID": 137,
+      "year": 2026,
+      "title": "PINK HOUSE 2026 Summer",
+      "seasonLabelZH": "夏",
+      "sourceURL": "https://pinkhouse-webshop.jp/pinkhouse/catalog/detail/137",
+      "coverImage": "archive-catalog-137.jpg",
+      "imageSourceURL": "https://pinkhouse-webshop.jp/photo/catalog/137/s-137.jpg"
+    },
+    {
+      "id": "official-catalog-136",
+      "officialID": 136,
+      "year": 2026,
+      "title": "PINK HOUSE 2026 Spring",
+      "seasonLabelZH": "春",
+      "sourceURL": "https://pinkhouse-webshop.jp/pinkhouse/catalog/detail/136",
+      "coverImage": "archive-catalog-136.jpg",
+      "imageSourceURL": "https://pinkhouse-webshop.jp/photo/catalog/136/s-136.jpg"
+    },
+    {
+      "id": "official-catalog-132",
+      "officialID": 132,
+      "year": 2026,
+      "title": "PINK HOUSE 2026 Early Spring",
+      "seasonLabelZH": "早春",
+      "sourceURL": "https://pinkhouse-webshop.jp/pinkhouse/catalog/detail/132",
+      "coverImage": "archive-catalog-132.jpg",
+      "imageSourceURL": "https://pinkhouse-webshop.jp/photo/catalog/132/s-132.jpg"
+    },
+    {
+      "id": "official-catalog-130",
+      "officialID": 130,
+      "year": 2025,
+      "title": "PINK HOUSE 2025 Autumn",
+      "seasonLabelZH": "秋",
+      "sourceURL": "https://pinkhouse-webshop.jp/pinkhouse/catalog/detail/130",
+      "coverImage": "archive-catalog-130.jpg",
+      "imageSourceURL": "https://pinkhouse-webshop.jp/photo/catalog/130/s-130.jpg"
+    },
+    {
+      "id": "official-catalog-128",
+      "officialID": 128,
+      "year": 2025,
+      "title": "PINK HOUSE 2025 Summer",
+      "seasonLabelZH": "夏",
+      "sourceURL": "https://pinkhouse-webshop.jp/pinkhouse/catalog/detail/128",
+      "coverImage": "archive-catalog-128.jpg",
+      "imageSourceURL": "https://pinkhouse-webshop.jp/photo/catalog/128/s-128.jpg"
+    },
+    {
+      "id": "official-catalog-124",
+      "officialID": 124,
+      "year": 2025,
+      "title": "PINK HOUSE 2025 Spring",
+      "seasonLabelZH": "春",
+      "sourceURL": "https://pinkhouse-webshop.jp/pinkhouse/catalog/detail/124",
+      "coverImage": "archive-catalog-124.jpg",
+      "imageSourceURL": "https://pinkhouse-webshop.jp/photo/catalog/124/s-124.jpg"
+    },
+    {
+      "id": "official-catalog-122",
+      "officialID": 122,
+      "year": 2025,
+      "title": "PINK HOUSE 2025 Early Spring",
+      "seasonLabelZH": "早春",
+      "sourceURL": "https://pinkhouse-webshop.jp/pinkhouse/catalog/detail/122",
+      "coverImage": "archive-catalog-122.jpg",
+      "imageSourceURL": "https://pinkhouse-webshop.jp/photo/catalog/122/s-122.jpg"
+    },
+    {
+      "id": "official-catalog-120",
+      "officialID": 120,
+      "year": 2024,
+      "title": "PINK HOUSE 2024 Autumn",
+      "seasonLabelZH": "秋",
+      "sourceURL": "https://pinkhouse-webshop.jp/pinkhouse/catalog/detail/120",
+      "coverImage": "archive-catalog-120.jpg",
+      "imageSourceURL": "https://pinkhouse-webshop.jp/photo/catalog/120/s-120.jpg"
+    },
+    {
+      "id": "official-catalog-117",
+      "officialID": 117,
+      "year": 2024,
+      "title": "PINK HOUSE 2024 Summer",
+      "seasonLabelZH": "夏",
+      "sourceURL": "https://pinkhouse-webshop.jp/pinkhouse/catalog/detail/117",
+      "coverImage": "archive-catalog-117.jpg",
+      "imageSourceURL": "https://pinkhouse-webshop.jp/photo/catalog/117/s-117.jpg"
+    },
+    {
+      "id": "official-catalog-113",
+      "officialID": 113,
+      "year": 2024,
+      "title": "PINK HOUSE 2024 Spring",
+      "seasonLabelZH": "春",
+      "sourceURL": "https://pinkhouse-webshop.jp/pinkhouse/catalog/detail/113",
+      "coverImage": "archive-catalog-113.jpg",
+      "imageSourceURL": "https://pinkhouse-webshop.jp/photo/catalog/113/s-113.jpg"
+    },
+    {
+      "id": "official-catalog-111",
+      "officialID": 111,
+      "year": 2024,
+      "title": "PINKHOUSE 2024 Early Spring",
+      "seasonLabelZH": "早春",
+      "sourceURL": "https://pinkhouse-webshop.jp/pinkhouse/catalog/detail/111",
+      "coverImage": "archive-catalog-111.jpg",
+      "imageSourceURL": "https://pinkhouse-webshop.jp/photo/catalog/111/s-111.jpg"
+    },
+    {
+      "id": "official-catalog-108",
+      "officialID": 108,
+      "year": 2023,
+      "title": "PINKHOUSE 2023 Autumn",
+      "seasonLabelZH": "秋",
+      "sourceURL": "https://pinkhouse-webshop.jp/pinkhouse/catalog/detail/108",
+      "coverImage": "archive-catalog-108.jpg",
+      "imageSourceURL": "https://pinkhouse-webshop.jp/photo/catalog/108/s-108.jpg"
+    },
+    {
+      "id": "official-catalog-106",
+      "officialID": 106,
+      "year": 2023,
+      "title": "PINK HOUSE 2023 Summer",
+      "seasonLabelZH": "夏",
+      "sourceURL": "https://pinkhouse-webshop.jp/pinkhouse/catalog/detail/106",
+      "coverImage": "archive-catalog-106.jpg",
+      "imageSourceURL": "https://pinkhouse-webshop.jp/photo/catalog/106/s-106.jpg"
+    },
+    {
+      "id": "official-catalog-100",
+      "officialID": 100,
+      "year": 2023,
+      "title": "PINK HOUSE 2023 Spring",
+      "seasonLabelZH": "春",
+      "sourceURL": "https://pinkhouse-webshop.jp/pinkhouse/catalog/detail/100",
+      "coverImage": "archive-catalog-100.jpg",
+      "imageSourceURL": "https://pinkhouse-webshop.jp/photo/catalog/100/s-100.jpg"
+    },
+    {
+      "id": "official-catalog-95",
+      "officialID": 95,
+      "year": 2023,
+      "title": "PINK HOUSE 2023 Early Spring",
+      "seasonLabelZH": "早春",
+      "sourceURL": "https://pinkhouse-webshop.jp/pinkhouse/catalog/detail/95",
+      "coverImage": "archive-catalog-95.jpg",
+      "imageSourceURL": "https://pinkhouse-webshop.jp/photo/catalog/95/s-95.jpg"
+    },
+    {
+      "id": "official-catalog-89",
+      "officialID": 89,
+      "year": 2022,
+      "title": "PINK HOUSE 2022 Autumn",
+      "seasonLabelZH": "秋",
+      "sourceURL": "https://pinkhouse-webshop.jp/pinkhouse/catalog/detail/89",
+      "coverImage": "archive-catalog-89.jpg",
+      "imageSourceURL": "https://pinkhouse-webshop.jp/photo/catalog/89/s-89.jpg"
+    },
+    {
+      "id": "official-catalog-83",
+      "officialID": 83,
+      "year": 2022,
+      "title": "PINK HOUSE 2022 Summer",
+      "seasonLabelZH": "夏",
+      "sourceURL": "https://pinkhouse-webshop.jp/pinkhouse/catalog/detail/83",
+      "coverImage": "archive-catalog-83.jpg",
+      "imageSourceURL": "https://pinkhouse-webshop.jp/photo/catalog/83/s-83.jpg"
+    },
+    {
+      "id": "official-catalog-78",
+      "officialID": 78,
+      "year": 2022,
+      "title": "PINK HOUSE 2022 Spring",
+      "seasonLabelZH": "春",
+      "sourceURL": "https://pinkhouse-webshop.jp/pinkhouse/catalog/detail/78",
+      "coverImage": "archive-catalog-78.jpg",
+      "imageSourceURL": "https://pinkhouse-webshop.jp/photo/catalog/78/s-78.jpg"
+    },
+    {
+      "id": "official-catalog-70",
+      "officialID": 70,
+      "year": 2022,
+      "title": "PINK HOUSE 2022 Ealry Spring",
+      "seasonLabelZH": "春",
+      "sourceURL": "https://pinkhouse-webshop.jp/pinkhouse/catalog/detail/70",
+      "coverImage": "archive-catalog-70.jpg",
+      "imageSourceURL": "https://pinkhouse-webshop.jp/photo/catalog/70/s-70.jpg"
+    },
+    {
+      "id": "official-catalog-9",
+      "officialID": 9,
+      "year": 2021,
+      "title": "PINK HOUSE 2021 Autumn",
+      "seasonLabelZH": "秋",
+      "sourceURL": "https://pinkhouse-webshop.jp/pinkhouse/catalog/detail/9",
+      "coverImage": "archive-catalog-9.jpg",
+      "imageSourceURL": "https://pinkhouse-webshop.jp/photo/catalog/9/s-9.jpg"
+    },
+    {
+      "id": "official-catalog-1",
+      "officialID": 1,
+      "year": 2021,
+      "title": "PINK HOUSE 2021 Summer",
+      "seasonLabelZH": "夏",
+      "sourceURL": "https://pinkhouse-webshop.jp/pinkhouse/catalog/detail/1",
+      "coverImage": "archive-catalog-1.jpg",
+      "imageSourceURL": "https://pinkhouse-webshop.jp/photo/catalog/1/s-1.jpg"
+    },
+    {
+      "id": "official-catalog-5",
+      "officialID": 5,
+      "year": 2021,
+      "title": "PINK HOUSE 2021 Spring",
+      "seasonLabelZH": "春",
+      "sourceURL": "https://pinkhouse-webshop.jp/pinkhouse/catalog/detail/5",
+      "coverImage": "archive-catalog-5.jpg",
+      "imageSourceURL": "https://pinkhouse-webshop.jp/photo/catalog/5/s-5.jpg"
+    },
+    {
+      "id": "official-catalog-7",
+      "officialID": 7,
+      "year": 2021,
+      "title": "PINKHOUSE 2021 Early Spring",
+      "seasonLabelZH": "早春",
+      "sourceURL": "https://pinkhouse-webshop.jp/pinkhouse/catalog/detail/7",
+      "coverImage": "archive-catalog-7.jpg",
+      "imageSourceURL": "https://pinkhouse-webshop.jp/photo/catalog/7/s-7.jpg"
+    },
+    {
+      "id": "official-catalog-2",
+      "officialID": 2,
+      "year": 2020,
+      "title": "PINK HOUSE 2020 Autumn",
+      "seasonLabelZH": "秋",
+      "sourceURL": "https://pinkhouse-webshop.jp/pinkhouse/catalog/detail/2",
+      "coverImage": "archive-catalog-2.jpg",
+      "imageSourceURL": "https://pinkhouse-webshop.jp/photo/catalog/2/s-2.jpg"
+    },
+    {
+      "id": "official-catalog-12",
+      "officialID": 12,
+      "year": 2020,
+      "title": "PINK HOUSE 2020 Summer",
+      "seasonLabelZH": "夏",
+      "sourceURL": "https://pinkhouse-webshop.jp/pinkhouse/catalog/detail/12",
+      "coverImage": "archive-catalog-12.jpg",
+      "imageSourceURL": "https://pinkhouse-webshop.jp/photo/catalog/12/s-12.jpg"
+    },
+    {
+      "id": "official-catalog-14",
+      "officialID": 14,
+      "year": 2020,
+      "title": "PINK HOUSE 2020 Spring",
+      "seasonLabelZH": "春",
+      "sourceURL": "https://pinkhouse-webshop.jp/pinkhouse/catalog/detail/14",
+      "coverImage": "archive-catalog-14.jpg",
+      "imageSourceURL": "https://pinkhouse-webshop.jp/photo/catalog/14/s-14.jpg"
+    },
+    {
+      "id": "official-catalog-16",
+      "officialID": 16,
+      "year": 2020,
+      "title": "PINK HOUSE 2020 Early Spring",
+      "seasonLabelZH": "早春",
+      "sourceURL": "https://pinkhouse-webshop.jp/pinkhouse/catalog/detail/16",
+      "coverImage": "archive-catalog-16.jpg",
+      "imageSourceURL": "https://pinkhouse-webshop.jp/photo/catalog/16/s-16.jpg"
+    },
+    {
+      "id": "official-catalog-18",
+      "officialID": 18,
+      "year": 2020,
+      "title": "PINK HOUSE 2020 Heart Berry Rabbit",
+      "seasonLabelZH": "Heart Berry Rabbit 特别册",
+      "sourceURL": "https://pinkhouse-webshop.jp/pinkhouse/catalog/detail/18",
+      "coverImage": "archive-catalog-18.jpg",
+      "imageSourceURL": "https://pinkhouse-webshop.jp/photo/catalog/18/s-18.jpg"
+    },
+    {
+      "id": "official-catalog-25",
+      "officialID": 25,
+      "year": 2019,
+      "title": "PINK HOUSE 2019 Autumn",
+      "seasonLabelZH": "秋",
+      "sourceURL": "https://pinkhouse-webshop.jp/pinkhouse/catalog/detail/25",
+      "coverImage": "archive-catalog-25.jpg",
+      "imageSourceURL": "https://pinkhouse-webshop.jp/photo/catalog/25/s-25.jpg"
+    },
+    {
+      "id": "official-catalog-27",
+      "officialID": 27,
+      "year": 2019,
+      "title": "PINK HOUSE 2019 Summer",
+      "seasonLabelZH": "夏",
+      "sourceURL": "https://pinkhouse-webshop.jp/pinkhouse/catalog/detail/27",
+      "coverImage": "archive-catalog-27.jpg",
+      "imageSourceURL": "https://pinkhouse-webshop.jp/photo/catalog/27/s-27.jpg"
+    },
+    {
+      "id": "official-catalog-29",
+      "officialID": 29,
+      "year": 2019,
+      "title": "PINK HOUSE 2019 Spring",
+      "seasonLabelZH": "春",
+      "sourceURL": "https://pinkhouse-webshop.jp/pinkhouse/catalog/detail/29",
+      "coverImage": "archive-catalog-29.jpg",
+      "imageSourceURL": "https://pinkhouse-webshop.jp/photo/catalog/29/s-29.jpg"
+    },
+    {
+      "id": "official-catalog-32",
+      "officialID": 32,
+      "year": 2019,
+      "title": "PINK HOUSE 2019 Early Spring",
+      "seasonLabelZH": "早春",
+      "sourceURL": "https://pinkhouse-webshop.jp/pinkhouse/catalog/detail/32",
+      "coverImage": "archive-catalog-32.jpg",
+      "imageSourceURL": "https://pinkhouse-webshop.jp/photo/catalog/32/s-32.jpg"
+    },
+    {
+      "id": "official-catalog-34",
+      "officialID": 34,
+      "year": 2018,
+      "title": "PINK HOUSE 2018 Spring",
+      "seasonLabelZH": "春",
+      "sourceURL": "https://pinkhouse-webshop.jp/pinkhouse/catalog/detail/34",
+      "coverImage": "archive-catalog-34.jpg",
+      "imageSourceURL": "https://pinkhouse-webshop.jp/photo/catalog/34/s-34.jpg"
+    },
+    {
+      "id": "official-catalog-37",
+      "officialID": 37,
+      "year": 2018,
+      "title": "PINK HOUSE 2018 Summer",
+      "seasonLabelZH": "夏",
+      "sourceURL": "https://pinkhouse-webshop.jp/pinkhouse/catalog/detail/37",
+      "coverImage": "archive-catalog-37.jpg",
+      "imageSourceURL": "https://pinkhouse-webshop.jp/photo/catalog/37/s-37.jpg"
+    },
+    {
+      "id": "official-catalog-39",
+      "officialID": 39,
+      "year": 2018,
+      "title": "PINK HOUSE 2018 Autumn",
+      "seasonLabelZH": "秋",
+      "sourceURL": "https://pinkhouse-webshop.jp/pinkhouse/catalog/detail/39",
+      "coverImage": "archive-catalog-39.jpg",
+      "imageSourceURL": "https://pinkhouse-webshop.jp/photo/catalog/39/s-39.jpg"
+    },
+    {
+      "id": "official-catalog-43",
+      "officialID": 43,
+      "year": 2017,
+      "title": "PINK HOUSE 2017 Spring",
+      "seasonLabelZH": "春",
+      "sourceURL": "https://pinkhouse-webshop.jp/pinkhouse/catalog/detail/43",
+      "coverImage": "archive-catalog-43.jpg",
+      "imageSourceURL": "https://pinkhouse-webshop.jp/photo/catalog/43/s-43.jpg"
+    },
+    {
+      "id": "official-catalog-46",
+      "officialID": 46,
+      "year": 2017,
+      "title": "PINK HOUSE 2017 Summer",
+      "seasonLabelZH": "夏",
+      "sourceURL": "https://pinkhouse-webshop.jp/pinkhouse/catalog/detail/46",
+      "coverImage": "archive-catalog-46.jpg",
+      "imageSourceURL": "https://pinkhouse-webshop.jp/photo/catalog/46/s-46.jpg"
+    },
+    {
+      "id": "official-catalog-48",
+      "officialID": 48,
+      "year": 2017,
+      "title": "PINK HOUSE 2017 Autumn",
+      "seasonLabelZH": "秋",
+      "sourceURL": "https://pinkhouse-webshop.jp/pinkhouse/catalog/detail/48",
+      "coverImage": "archive-catalog-48.jpg",
+      "imageSourceURL": "https://pinkhouse-webshop.jp/photo/catalog/48/s-48.jpg"
+    },
+    {
+      "id": "official-catalog-86",
+      "officialID": 86,
+      "year": 2017,
+      "title": "PINK HOUSE 2017 Winter",
+      "seasonLabelZH": "冬",
+      "sourceURL": "https://pinkhouse-webshop.jp/pinkhouse/catalog/detail/86",
+      "coverImage": "archive-catalog-86.jpg",
+      "imageSourceURL": "https://pinkhouse-webshop.jp/photo/catalog/86/s-86.jpg"
+    },
+    {
+      "id": "official-catalog-53",
+      "officialID": 53,
+      "year": 2016,
+      "title": "PINK HOUSE 2016 Spring",
+      "seasonLabelZH": "春",
+      "sourceURL": "https://pinkhouse-webshop.jp/pinkhouse/catalog/detail/53",
+      "coverImage": "archive-catalog-53.jpg",
+      "imageSourceURL": "https://pinkhouse-webshop.jp/photo/catalog/53/s-53.jpg"
+    },
+    {
+      "id": "official-catalog-55",
+      "officialID": 55,
+      "year": 2016,
+      "title": "PINK HOUSE 2016 Summer",
+      "seasonLabelZH": "夏",
+      "sourceURL": "https://pinkhouse-webshop.jp/pinkhouse/catalog/detail/55",
+      "coverImage": "archive-catalog-55.jpg",
+      "imageSourceURL": "https://pinkhouse-webshop.jp/photo/catalog/55/s-55.jpg"
+    },
+    {
+      "id": "official-catalog-57",
+      "officialID": 57,
+      "year": 2016,
+      "title": "PINK HOUSE 2016 Autumn",
+      "seasonLabelZH": "秋",
+      "sourceURL": "https://pinkhouse-webshop.jp/pinkhouse/catalog/detail/57",
+      "coverImage": "archive-catalog-57.jpg",
+      "imageSourceURL": "https://pinkhouse-webshop.jp/photo/catalog/57/s-57.jpg"
+    },
+    {
+      "id": "official-catalog-59",
+      "officialID": 59,
+      "year": 2016,
+      "title": "PINK HOUSE 2016 Winter",
+      "seasonLabelZH": "冬",
+      "sourceURL": "https://pinkhouse-webshop.jp/pinkhouse/catalog/detail/59",
+      "coverImage": "archive-catalog-59.jpg",
+      "imageSourceURL": "https://pinkhouse-webshop.jp/photo/catalog/59/s-59.jpg"
+    },
+    {
+      "id": "official-catalog-61",
+      "officialID": 61,
+      "year": 2015,
+      "title": "PINK HOUSE 2015 Spring",
+      "seasonLabelZH": "春",
+      "sourceURL": "https://pinkhouse-webshop.jp/pinkhouse/catalog/detail/61",
+      "coverImage": "archive-catalog-61.jpg",
+      "imageSourceURL": "https://pinkhouse-webshop.jp/photo/catalog/61/s-61.jpg"
+    },
+    {
+      "id": "official-catalog-63",
+      "officialID": 63,
+      "year": 2015,
+      "title": "PINK HOUSE 2015 Summer",
+      "seasonLabelZH": "夏",
+      "sourceURL": "https://pinkhouse-webshop.jp/pinkhouse/catalog/detail/63",
+      "coverImage": "archive-catalog-63.jpg",
+      "imageSourceURL": "https://pinkhouse-webshop.jp/photo/catalog/63/s-63.jpg"
+    },
+    {
+      "id": "official-catalog-65",
+      "officialID": 65,
+      "year": 2015,
+      "title": "PINK HOUSE 2015 Autumn",
+      "seasonLabelZH": "秋",
+      "sourceURL": "https://pinkhouse-webshop.jp/pinkhouse/catalog/detail/65",
+      "coverImage": "archive-catalog-65.jpg",
+      "imageSourceURL": "https://pinkhouse-webshop.jp/photo/catalog/65/s-65.jpg"
+    },
+    {
+      "id": "official-catalog-67",
+      "officialID": 67,
+      "year": 2015,
+      "title": "PINK HOUSE 2015 Winter",
+      "seasonLabelZH": "冬",
+      "sourceURL": "https://pinkhouse-webshop.jp/pinkhouse/catalog/detail/67",
+      "coverImage": "archive-catalog-67.jpg",
+      "imageSourceURL": "https://pinkhouse-webshop.jp/photo/catalog/67/s-67.jpg"
     }
   ]
 }

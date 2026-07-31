@@ -1920,22 +1920,22 @@
         }
       }
     },
-    "%@ · %lld" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "%1$@ · %2$lld"
-          }
-        }
-      }
-    },
     "%@ · %lld · %@" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "%1$@ · %2$lld · %3$@"
+          }
+        }
+      }
+    },
+    "%@ · %lld · ¥%@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ · %2$lld · ¥%3$@"
           }
         }
       }
@@ -2312,6 +2312,12 @@
           }
         }
       }
+    },
+    "%@ 图录" : {
+
+    },
+    "%@ 图录封面" : {
+
     },
     "%@ 尚未解锁\n%@" : {
       "extractionState" : "stale",
@@ -5883,12 +5889,12 @@
         }
       }
     },
-    "%lld · %@" : {
+    "%lld · %@ · %lld 页" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "new",
-            "value" : "%1$lld · %2$@"
+            "value" : "%1$lld · %2$@ · %3$lld 页"
           }
         }
       }
@@ -5937,8 +5943,15 @@
         }
       }
     },
-    "%lld Dresses" : {
-
+    "%lld %@，%@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld %2$@，%3$@"
+          }
+        }
+      }
     },
     "%lld 个新任务" : {
       "localizations" : {
@@ -6066,6 +6079,16 @@
         }
       }
     },
+    "%lld 年 · %lld 份图录 · %lld 件馆藏" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld 年 · %2$lld 份图录 · %3$lld 件馆藏"
+          }
+        }
+      }
+    },
     "%lld 张" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -6111,6 +6134,9 @@
           }
         }
       }
+    },
+    "%lld 本" : {
+
     },
     "%lld 页" : {
       "extractionState" : "stale",
@@ -6189,16 +6215,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%lld 顆拼豆"
-          }
-        }
-      }
-    },
-    "%lld 馆藏 · %lld 辑" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "%1$lld 馆藏 · %2$lld 辑"
           }
         }
       }
@@ -28371,6 +28387,9 @@
         }
       }
     },
+    "倒序" : {
+
+    },
     "倾听中..." : {
       "extractionState" : "stale",
       "localizations" : {
@@ -37798,6 +37817,9 @@
         }
       }
     },
+    "升序" : {
+
+    },
     "升级为 VIP，解锁更完整的智能体验" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -45569,6 +45591,9 @@
         }
       }
     },
+    "图录第 %lld 页" : {
+
+    },
     "图标切换 · 专属收藏" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -46026,6 +46051,9 @@
           }
         }
       }
+    },
+    "图片来自图录第 %lld 页；同页展品会共享这张原图。" : {
+
     },
     "图片等待同步" : {
       "extractionState" : "stale",
@@ -60227,6 +60255,9 @@
           }
         }
       }
+    },
+    "年份浏览" : {
+
     },
     "年度" : {
       "extractionState" : "stale",
@@ -74433,6 +74464,9 @@
           }
         }
       }
+    },
+    "打开资料页" : {
+
     },
     "执行" : {
       "extractionState" : "stale",
@@ -90840,6 +90874,12 @@
         }
       }
     },
+    "查看图录" : {
+
+    },
+    "查看图录原图" : {
+
+    },
     "查看大图" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -91901,6 +91941,9 @@
           }
         }
       }
+    },
+    "样板 %lld 件" : {
+
     },
     "核心信息" : {
       "localizations" : {
@@ -103126,6 +103169,9 @@
           }
         }
       }
+    },
+    "相关资料 %lld" : {
+
     },
     "相机" : {
       "extractionState" : "stale",
@@ -131801,6 +131847,9 @@
         }
       }
     },
+    "选择年份" : {
+
+    },
     "选择底图新建" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -133917,6 +133966,9 @@
           }
         }
       }
+    },
+    "重点商品样板" : {
+
     },
     "重置" : {
       "localizations" : {
@@ -139257,6 +139309,9 @@
           }
         }
       }
+    },
+    "馆藏图录" : {
+
     },
     "首充双倍" : {
       "extractionState" : "stale",
