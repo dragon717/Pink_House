@@ -325,6 +325,14 @@ def build_catalog(dresses: list[dict]) -> dict:
 
 
 def main() -> int:
+    if "--allow-legacy-v2" not in sys.argv:
+        print(
+            "[blocked] This historical scraper emits destructive Time Hall V2 data. "
+            "Use the V3 batch importers documented in tools/time_hall/README.md.",
+            file=sys.stderr,
+        )
+        return 2
+    sys.argv.remove("--allow-legacy-v2")
     IMG_DIR.mkdir(parents=True, exist_ok=True)
     OUT_DIR.mkdir(parents=True, exist_ok=True)
 

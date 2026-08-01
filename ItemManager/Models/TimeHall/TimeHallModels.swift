@@ -13,6 +13,13 @@ struct TimeHallCatalogDTO: Codable, Sendable {
   let archiveCatalogues: [TimeHallArchiveCatalogueDTO]
   let catalogues: [TimeHallCatalogueDTO]
   let items: [TimeHallItemDTO]
+  let commerceSnapshots: [TimeHallCommerceSnapshotDTO]
+  let commerceItems: [TimeHallCommerceItemDTO]
+  let coordinates: [TimeHallCoordinateDTO]
+  let stories: [TimeHallStoryDTO]
+  let events: [TimeHallEventDTO]
+  let historyEntries: [TimeHallHistoryEntryDTO]
+  let importBatches: [TimeHallImportBatchDTO]
 }
 
 struct TimeHallCatalogScopeDTO: Codable, Equatable, Sendable {
@@ -29,9 +36,9 @@ enum TimeHallYearRecordKind: String, Codable, Sendable {
 
   var labelZH: String {
     switch self {
-    case .milestone: return "品牌纪事"
-    case .officialArchive: return "官网目录"
-    case .archiveGap: return "故事卡片"
+    case .milestone: return "品牌纪事".appLocalized
+    case .officialArchive: return "官网目录".appLocalized
+    case .archiveGap: return "故事卡片".appLocalized
     }
   }
 
@@ -51,9 +58,9 @@ enum TimeHallEvidenceLevel: String, Codable, Sendable {
 
   var labelZH: String {
     switch self {
-    case .officialHistory: return "官方品牌史"
-    case .officialCatalogue: return "官网 Catalogue"
-    case .archiveGap: return "档案待补证"
+    case .officialHistory: return "官方品牌史".appLocalized
+    case .officialCatalogue: return "官网 Catalogue".appLocalized
+    case .archiveGap: return "档案待补证".appLocalized
     }
   }
 }
@@ -95,20 +102,176 @@ struct TimeHallCatalogueDTO: Codable, Identifiable, Hashable, Sendable {
   let itemIds: [String]
 }
 
+struct TimeHallImportBatchDTO: Codable, Identifiable, Hashable, Sendable {
+  let id: String
+  let order: Int
+  let kind: String
+  let titleZH: String
+  let importedAt: String
+  let sourceURLs: [String]
+  let catalogueIDs: [String]
+  let commerceSnapshotIDs: [String]
+  let coordinateIDs: [String]
+  let storyIDs: [String]
+  let eventIDs: [String]
+  let historyEntryIDs: [String]
+  let itemCount: Int
+}
+
+enum TimeHallCommerceSource: String, Codable, CaseIterable, Sendable {
+  case current
+  case outlet
+
+  var labelZH: String {
+    switch self {
+    case .current: return "当前商品".appLocalized
+    case .outlet: return "OUTLET"
+    }
+  }
+}
+
+struct TimeHallCommerceSnapshotDTO: Codable, Identifiable, Hashable, Sendable {
+  let id: String
+  let titleZH: String
+  let observedAt: String
+  let sourceURLs: [String]
+  let itemIDs: [String]
+  let currentItemIDs: [String]
+  let outletItemIDs: [String]
+}
+
+struct TimeHallCommerceItemDTO: Codable, Identifiable, Hashable, Sendable {
+  let id: String
+  let productCode: String
+  let kind: TimeHallItemKind
+  let category: String
+  let categoryZH: String
+  let name: String
+  let nameZH: String
+  let brand: String
+  let sourceKind: TimeHallCommerceSource
+  let regularPriceJPY: Int
+  let salePriceJPY: Int?
+  let listingStatus: String
+  let description: String
+  let colors: [String]
+  let sizes: [String]
+  let material: String?
+  let countryOfOrigin: String?
+  let styles: [String]
+  let stylesZH: [String]
+  let coverImage: String
+  let detailImage: String?
+  let imageSourceURLs: [String]
+  let productPageURL: String
+  let observedAt: String
+}
+
+struct TimeHallCoordinateDTO: Codable, Identifiable, Hashable, Sendable {
+  let id: String
+  let officialID: Int
+  let title: String
+  let publishedOn: String?
+  let coordinatePoint: String
+  let sourceURL: String
+  let coverImage: String
+  let imageSourceURL: String
+  let productCodes: [String]
+  let linkedCommerceItemIDs: [String]
+  let unlinkedItemNames: [String]
+  let observedAt: String
+}
+
+enum TimeHallStoryKind: String, Codable, CaseIterable, Sendable {
+  case feature
+  case craft
+
+  var labelZH: String {
+    switch self {
+    case .feature: return "官方专题".appLocalized
+    case .craft: return "制作工艺".appLocalized
+    }
+  }
+
+  var symbolName: String {
+    switch self {
+    case .feature: return "sparkles.rectangle.stack"
+    case .craft: return "paintbrush.pointed.fill"
+    }
+  }
+}
+
+struct TimeHallStoryDTO: Codable, Identifiable, Hashable, Sendable {
+  let id: String
+  let kind: TimeHallStoryKind
+  let title: String
+  let publishedOn: String?
+  let summary: String
+  let content: String
+  let sourceURL: String
+  let coverImage: String
+  let imageSourceURLs: [String]
+  let productCodes: [String]
+  let linkedCommerceItemIDs: [String]
+  let observedAt: String
+}
+
+enum TimeHallEventKind: String, Codable, CaseIterable, Sendable {
+  case information
+  case event
+
+  var labelZH: String {
+    switch self {
+    case .information: return "资讯".appLocalized
+    case .event: return "活动".appLocalized
+    }
+  }
+}
+
+struct TimeHallEventDTO: Codable, Identifiable, Hashable, Sendable {
+  let id: String
+  let officialID: Int
+  let kind: TimeHallEventKind
+  let title: String
+  let publishedOn: String
+  let summary: String
+  let content: String
+  let sourceURL: String
+  let coverImage: String
+  let imageSourceURLs: [String]
+  let productCodes: [String]
+  let linkedCommerceItemIDs: [String]
+  let observedAt: String
+}
+
+struct TimeHallHistoryEntryDTO: Codable, Identifiable, Hashable, Sendable {
+  let id: String
+  let year: Int
+  let title: String
+  let content: String
+  let sourceURL: String
+  let coverImage: String?
+  let imageSourceURL: String?
+  let observedAt: String
+}
+
 enum TimeHallItemKind: String, Codable, CaseIterable, Sendable {
   case dress
+  case clothing
   case accessory
 
   var labelZH: String {
     switch self {
-    case .dress: return "裙装"
-    case .accessory: return "小物"
+    case .dress: return "裙装".appLocalized
+    case .clothing: return "服装".appLocalized
+    case .accessory: return "小物".appLocalized
     }
   }
 
   var symbolName: String {
     switch self {
     case .dress: return "tshirt.fill"
+    case .clothing: return "tshirt.fill"
     case .accessory: return "handbag.fill"
     }
   }
@@ -138,6 +301,9 @@ struct TimeHallItemDTO: Codable, Identifiable, Hashable, Sendable {
   let observedAt: String
   let datePrecision: String
   let noteZH: String
+  let productCode: String?
+  let productPageURL: String?
+  let cataloguePages: [Int]?
 }
 
 struct TimeHallStyleBubble: Identifiable, Hashable {
@@ -148,14 +314,30 @@ struct TimeHallStyleBubble: Identifiable, Hashable {
 
 struct TimeHallValidationReport: Equatable, Sendable {
   let dressCount: Int
+  let clothingCount: Int
   let accessoryCount: Int
   let catalogueCount: Int
   let timelineYearCount: Int
   let archiveCatalogueCount: Int
+  let commerceSnapshotCount: Int
+  let commerceItemCount: Int
+  let coordinateCount: Int
+  let storyCount: Int
+  let eventCount: Int
+  let historyEntryCount: Int
+  let importBatchCount: Int
   let catalogErrors: [String]
   let duplicateItemIDs: [String]
   let duplicateCatalogueIDs: [String]
   let duplicateArchiveCatalogueIDs: [String]
+  let duplicateImportBatchIDs: [String]
+  let duplicateCommerceSnapshotIDs: [String]
+  let duplicateCommerceItemIDs: [String]
+  let duplicateCommerceProductCodes: [String]
+  let duplicateCoordinateIDs: [String]
+  let duplicateStoryIDs: [String]
+  let duplicateEventIDs: [String]
+  let duplicateHistoryEntryIDs: [String]
   let duplicateTimelineYears: [Int]
   let duplicateCanonicalKeys: [String]
   let duplicateCatalogueItemIDs: [String]
@@ -163,19 +345,29 @@ struct TimeHallValidationReport: Equatable, Sendable {
   let orphanItemIDs: [String]
   let invalidCatalogueIDs: [String]
   let invalidArchiveCatalogueIDs: [String]
+  let invalidImportBatchIDs: [String]
+  let invalidCommerceSnapshotIDs: [String]
+  let invalidCommerceItemIDs: [String]
+  let invalidCoordinateIDs: [String]
+  let invalidStoryIDs: [String]
+  let invalidEventIDs: [String]
+  let invalidHistoryEntryIDs: [String]
   let invalidTimelineYears: [Int]
   let invalidItemIDs: [String]
 
-  var isSampleValid: Bool {
-    dressCount == 20
-      && accessoryCount == 10
-      && catalogueCount == 2
-      && timelineYearCount == 55
-      && archiveCatalogueCount == 47
-      && catalogErrors.isEmpty
+  var isCatalogValid: Bool {
+    catalogErrors.isEmpty
       && duplicateItemIDs.isEmpty
       && duplicateCatalogueIDs.isEmpty
       && duplicateArchiveCatalogueIDs.isEmpty
+      && duplicateImportBatchIDs.isEmpty
+      && duplicateCommerceSnapshotIDs.isEmpty
+      && duplicateCommerceItemIDs.isEmpty
+      && duplicateCommerceProductCodes.isEmpty
+      && duplicateCoordinateIDs.isEmpty
+      && duplicateStoryIDs.isEmpty
+      && duplicateEventIDs.isEmpty
+      && duplicateHistoryEntryIDs.isEmpty
       && duplicateTimelineYears.isEmpty
       && duplicateCanonicalKeys.isEmpty
       && duplicateCatalogueItemIDs.isEmpty
@@ -183,6 +375,13 @@ struct TimeHallValidationReport: Equatable, Sendable {
       && orphanItemIDs.isEmpty
       && invalidCatalogueIDs.isEmpty
       && invalidArchiveCatalogueIDs.isEmpty
+      && invalidImportBatchIDs.isEmpty
+      && invalidCommerceSnapshotIDs.isEmpty
+      && invalidCommerceItemIDs.isEmpty
+      && invalidCoordinateIDs.isEmpty
+      && invalidStoryIDs.isEmpty
+      && invalidEventIDs.isEmpty
+      && invalidHistoryEntryIDs.isEmpty
       && invalidTimelineYears.isEmpty
       && invalidItemIDs.isEmpty
   }

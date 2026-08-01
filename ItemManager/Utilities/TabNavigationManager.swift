@@ -29,6 +29,7 @@ class TabNavigationManager: ObservableObject {
     @Published var navigateToHomeTab: HomeTab?
     @Published var navigateToSmallWorld: SmallWorldDestination?
     @Published var navigateToClothingID: UUID?
+    @Published var pendingWardrobeCreationDraft: ClothingEditDraft?
     
     // 记录进入House前的来源，用于智能返回
     // 当用户从Tab 0（衣橱/心愿尾款）跳转到House时，记录当时的HomeTab
@@ -73,6 +74,12 @@ class TabNavigationManager: ObservableObject {
         navigateToClothingID = clothingID
         navigateToTab = 0
     }
+
+    /// 切回衣橱并用外部资料打开现有的手动创建页。
+    func presentWardrobeCreation(with draft: ClothingEditDraft) {
+        navigate(to: .wardrobe(.wardrobe))
+        pendingWardrobeCreationDraft = draft
+    }
     
     // 记录从Tab 0进入House时的HomeTab状态
     func recordEnteringSmallWorldFromHomeTab(_ homeTab: HomeTab) {
@@ -101,5 +108,6 @@ class TabNavigationManager: ObservableObject {
         navigateToHomeTab = nil
         navigateToSmallWorld = nil
         navigateToClothingID = nil
+        pendingWardrobeCreationDraft = nil
     }
 }

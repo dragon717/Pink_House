@@ -733,6 +733,10 @@ struct HomeView: View {
                 guard selectedTab == .wardrobe else { return }
                 presentWardrobeManualCreate()
             }
+            .onReceive(tabNavigationManager.$pendingWardrobeCreationDraft) { draft in
+                guard let draft else { return }
+                presentWardrobeManualCreate(prefilledWith: draft)
+            }
             .onReceive(NotificationCenter.default.publisher(for: .guideRequestWardrobeBatchImport)) { _ in
                 guard selectedTab == .wardrobe else { return }
                 presentBatchImport()
@@ -1701,6 +1705,15 @@ struct HomeView: View {
         pendingActivityDraft = nil
         continueFromDraft = false
         showingAddSheet = true
+    }
+
+    private func presentWardrobeManualCreate(prefilledWith draft: ClothingEditDraft) {
+        draftManager.clearDraft()
+        selectedTab = .wardrobe
+        pendingActivityDraft = draft
+        continueFromDraft = false
+        showingAddSheet = true
+        tabNavigationManager.pendingWardrobeCreationDraft = nil
     }
 
     private func continueClothingEditUserActivity(_ activity: NSUserActivity) {

@@ -2,7 +2,7 @@ import Combine
 import Foundation
 import UIKit
 
-/// Local-only V1 catalog. CloudKit public upload is documented in docs/TIME_HALL_CLOUDKIT_UPLOAD_PLAN.md.
+/// Local V3 batch catalog. CloudKit public upload is documented in docs/TIME_HALL_CLOUDKIT_UPLOAD_PLAN.md.
 @MainActor
 final class TimeHallCatalogStore: ObservableObject {
   static let shared = TimeHallCatalogStore()
@@ -11,14 +11,30 @@ final class TimeHallCatalogStore: ObservableObject {
   @Published private(set) var treasuredIDs: Set<String> = []
   @Published private(set) var validationReport = TimeHallValidationReport(
     dressCount: 0,
+    clothingCount: 0,
     accessoryCount: 0,
     catalogueCount: 0,
     timelineYearCount: 0,
     archiveCatalogueCount: 0,
+    commerceSnapshotCount: 0,
+    commerceItemCount: 0,
+    coordinateCount: 0,
+    storyCount: 0,
+    eventCount: 0,
+    historyEntryCount: 0,
+    importBatchCount: 0,
     catalogErrors: [],
     duplicateItemIDs: [],
     duplicateCatalogueIDs: [],
     duplicateArchiveCatalogueIDs: [],
+    duplicateImportBatchIDs: [],
+    duplicateCommerceSnapshotIDs: [],
+    duplicateCommerceItemIDs: [],
+    duplicateCommerceProductCodes: [],
+    duplicateCoordinateIDs: [],
+    duplicateStoryIDs: [],
+    duplicateEventIDs: [],
+    duplicateHistoryEntryIDs: [],
     duplicateTimelineYears: [],
     duplicateCanonicalKeys: [],
     duplicateCatalogueItemIDs: [],
@@ -26,6 +42,13 @@ final class TimeHallCatalogStore: ObservableObject {
     orphanItemIDs: [],
     invalidCatalogueIDs: [],
     invalidArchiveCatalogueIDs: [],
+    invalidImportBatchIDs: [],
+    invalidCommerceSnapshotIDs: [],
+    invalidCommerceItemIDs: [],
+    invalidCoordinateIDs: [],
+    invalidStoryIDs: [],
+    invalidEventIDs: [],
+    invalidHistoryEntryIDs: [],
     invalidTimelineYears: [],
     invalidItemIDs: []
   )
@@ -51,12 +74,55 @@ final class TimeHallCatalogStore: ObservableObject {
     items.filter { $0.kind == .accessory }
   }
 
+  var clothing: [TimeHallItemDTO] {
+    items.filter { $0.kind == .clothing }
+  }
+
   var catalogues: [TimeHallCatalogueDTO] {
     catalog?.catalogues ?? []
   }
 
   var archiveCatalogues: [TimeHallArchiveCatalogueDTO] {
     catalog?.archiveCatalogues ?? []
+  }
+
+  var importBatches: [TimeHallImportBatchDTO] {
+    (catalog?.importBatches ?? []).sorted { $0.order < $1.order }
+  }
+
+  var commerceSnapshots: [TimeHallCommerceSnapshotDTO] {
+    (catalog?.commerceSnapshots ?? []).sorted { $0.observedAt > $1.observedAt }
+  }
+
+  var commerceItems: [TimeHallCommerceItemDTO] {
+    catalog?.commerceItems ?? []
+  }
+
+  var coordinates: [TimeHallCoordinateDTO] {
+    catalog?.coordinates ?? []
+  }
+
+  var stories: [TimeHallStoryDTO] {
+    (catalog?.stories ?? []).sorted {
+      ($0.publishedOn ?? "") > ($1.publishedOn ?? "")
+    }
+  }
+
+  var events: [TimeHallEventDTO] {
+    (catalog?.events ?? []).sorted { $0.publishedOn > $1.publishedOn }
+  }
+
+  func events(for year: Int) -> [TimeHallEventDTO] {
+    events.filter { $0.publishedOn.hasPrefix("\(year)-") }
+  }
+
+  func historyEntries(for year: Int) -> [TimeHallHistoryEntryDTO] {
+    (catalog?.historyEntries ?? []).filter { $0.year == year }
+  }
+
+  func commerceItems(in snapshot: TimeHallCommerceSnapshotDTO) -> [TimeHallCommerceItemDTO] {
+    let itemByID = Dictionary(uniqueKeysWithValues: commerceItems.map { ($0.id, $0) })
+    return snapshot.itemIDs.compactMap { itemByID[$0] }
   }
 
   var timelineYears: [TimeHallYearRecordDTO] {
@@ -168,13 +234,14 @@ final class TimeHallCatalogStore: ObservableObject {
       let report = Self.validate(decoded)
       catalog = decoded
       validationReport = report
-      if report.isSampleValid {
+      if report.isCatalogValid {
         print(
-          "✅ TimeHallCatalogStore: 55 years + 47 official catalogues + 30 sample items validated")
+          "✅ TimeHallCatalogStore: \(decoded.timelineYears.count) years + \(decoded.archiveCatalogues.count) official catalogues + \(decoded.items.count) catalogue items + \(decoded.commerceItems.count) commerce items across \(decoded.importBatches.count) batches validated"
+        )
       } else {
-        print("❌ TimeHallCatalogStore: sample validation failed \(report)")
+        print("❌ TimeHallCatalogStore: catalog validation failed \(report)")
       }
-      assert(report.isSampleValid, "TimeHall sample catalog must pass count and dedup validation")
+      assert(report.isCatalogValid, "TimeHall catalog must pass integrity and dedup validation")
     } catch {
       print("❌ TimeHallCatalogStore: decode failed \(error)")
     }
@@ -184,6 +251,14 @@ final class TimeHallCatalogStore: ObservableObject {
     let duplicateItemIDs = duplicateValues(catalog.items.map(\.id))
     let duplicateCatalogueIDs = duplicateValues(catalog.catalogues.map(\.id))
     let duplicateArchiveCatalogueIDs = duplicateValues(catalog.archiveCatalogues.map(\.id))
+    let duplicateImportBatchIDs = duplicateValues(catalog.importBatches.map(\.id))
+    let duplicateCommerceSnapshotIDs = duplicateValues(catalog.commerceSnapshots.map(\.id))
+    let duplicateCommerceItemIDs = duplicateValues(catalog.commerceItems.map(\.id))
+    let duplicateCommerceProductCodes = duplicateValues(catalog.commerceItems.map(\.productCode))
+    let duplicateCoordinateIDs = duplicateValues(catalog.coordinates.map(\.id))
+    let duplicateStoryIDs = duplicateValues(catalog.stories.map(\.id))
+    let duplicateEventIDs = duplicateValues(catalog.events.map(\.id))
+    let duplicateHistoryEntryIDs = duplicateValues(catalog.historyEntries.map(\.id))
     let duplicateTimelineYears = Dictionary(grouping: catalog.timelineYears.map(\.year), by: { $0 })
       .filter { $0.value.count > 1 }
       .map(\.key)
@@ -208,6 +283,9 @@ final class TimeHallCatalogStore: ObservableObject {
     if Array(Set(catalog.scope.sampleYears)).sorted() != actualSampleYears {
       catalogErrors.append("sampleYears")
     }
+    if catalog.catalogues.isEmpty { catalogErrors.append("catalogues") }
+    if catalog.items.isEmpty { catalogErrors.append("items") }
+    if catalog.importBatches.isEmpty { catalogErrors.append("importBatches") }
 
     let expectedTimelineYears = Array(1972...2026)
     if catalog.timelineYears.map(\.year).sorted() != expectedTimelineYears {
@@ -231,6 +309,183 @@ final class TimeHallCatalogStore: ObservableObject {
           && isOfficialURL(catalogue.sourceURL)
           && isOfficialImageURL(catalogue.imageSourceURL)
         return isValid ? nil : catalogue.id
+      }
+    ).sorted()
+
+    let deepCatalogueIDs = Set(catalog.catalogues.map(\.id))
+    let deepCatalogueByID = Dictionary(
+      catalog.catalogues.map { ($0.id, $0) },
+      uniquingKeysWith: { first, _ in first }
+    )
+    let commerceSnapshotIDs = Set(catalog.commerceSnapshots.map(\.id))
+    let coordinateIDs = Set(catalog.coordinates.map(\.id))
+    let storyIDs = Set(catalog.stories.map(\.id))
+    let eventIDs = Set(catalog.events.map(\.id))
+    let historyEntryIDs = Set(catalog.historyEntries.map(\.id))
+    let commerceSnapshotByID = Dictionary(
+      catalog.commerceSnapshots.map { ($0.id, $0) },
+      uniquingKeysWith: { first, _ in first }
+    )
+    let invalidImportBatchIDs = Set(
+      catalog.importBatches.compactMap { batch -> String? in
+        let catalogueItemIDs = batch.catalogueIDs.flatMap { deepCatalogueByID[$0]?.itemIds ?? [] }
+        let commerceItemIDs = batch.commerceSnapshotIDs.flatMap {
+          commerceSnapshotByID[$0]?.itemIDs ?? []
+        }
+        let referencedCoordinateIDs = batch.coordinateIDs.filter { coordinateIDs.contains($0) }
+        let referencedStoryIDs = batch.storyIDs.filter { storyIDs.contains($0) }
+        let referencedEventIDs = batch.eventIDs.filter { eventIDs.contains($0) }
+        let referencedHistoryEntryIDs = batch.historyEntryIDs.filter {
+          historyEntryIDs.contains($0)
+        }
+        let referencedItemCount = Set(
+          catalogueItemIDs + commerceItemIDs + referencedCoordinateIDs + referencedStoryIDs
+            + referencedEventIDs
+            + referencedHistoryEntryIDs
+        ).count
+        let ownsSupportedContent =
+          !batch.catalogueIDs.isEmpty || !batch.commerceSnapshotIDs.isEmpty
+          || !batch.coordinateIDs.isEmpty || !batch.storyIDs.isEmpty || !batch.eventIDs.isEmpty
+          || !batch.historyEntryIDs.isEmpty
+        let isValid =
+          !batch.id.isEmpty
+          && batch.order > 0
+          && !batch.kind.isEmpty
+          && !batch.titleZH.isEmpty
+          && isISODate(batch.importedAt)
+          && !batch.sourceURLs.isEmpty
+          && batch.sourceURLs.allSatisfy(isOfficialSourceURL)
+          && ownsSupportedContent
+          && Set(batch.catalogueIDs).isSubset(of: deepCatalogueIDs)
+          && Set(batch.commerceSnapshotIDs).isSubset(of: commerceSnapshotIDs)
+          && Set(batch.coordinateIDs).isSubset(of: coordinateIDs)
+          && Set(batch.storyIDs).isSubset(of: storyIDs)
+          && Set(batch.eventIDs).isSubset(of: eventIDs)
+          && Set(batch.historyEntryIDs).isSubset(of: historyEntryIDs)
+          && batch.itemCount == referencedItemCount
+        return isValid ? nil : batch.id
+      }
+    ).sorted()
+
+    let commerceItemIDs = Set(catalog.commerceItems.map(\.id))
+    let invalidCommerceSnapshotIDs = Set(
+      catalog.commerceSnapshots.compactMap { snapshot -> String? in
+        let ids = Set(snapshot.itemIDs)
+        let currentIDs = Set(snapshot.currentItemIDs)
+        let outletIDs = Set(snapshot.outletItemIDs)
+        let isValid =
+          !snapshot.id.isEmpty
+          && !snapshot.titleZH.isEmpty
+          && isISODate(snapshot.observedAt)
+          && !snapshot.sourceURLs.isEmpty
+          && snapshot.sourceURLs.allSatisfy(isOfficialSourceURL)
+          && !ids.isEmpty
+          && ids == currentIDs.union(outletIDs)
+          && currentIDs.isDisjoint(with: outletIDs)
+          && ids.isSubset(of: commerceItemIDs)
+        return isValid ? nil : snapshot.id
+      }
+    ).sorted()
+
+    let invalidCommerceItemIDs = Set(
+      catalog.commerceItems.compactMap { item -> String? in
+        let priceIsValid =
+          item.regularPriceJPY > 0
+          && (item.salePriceJPY.map { $0 > 0 && $0 <= item.regularPriceJPY } ?? true)
+        let isValid =
+          !item.id.isEmpty
+          && !item.productCode.isEmpty
+          && !item.category.isEmpty
+          && !item.categoryZH.isEmpty
+          && !item.name.isEmpty
+          && !item.nameZH.isEmpty
+          && item.brand == "PINK HOUSE"
+          && !item.listingStatus.isEmpty
+          && !item.styles.isEmpty
+          && !item.stylesZH.isEmpty
+          && !item.coverImage.isEmpty
+          && !item.imageSourceURLs.isEmpty
+          && item.imageSourceURLs.allSatisfy(isOfficialCommerceImageURL)
+          && isOfficialURL(item.productPageURL)
+          && isISODate(item.observedAt)
+          && priceIsValid
+        return isValid ? nil : item.id
+      }
+    ).sorted()
+
+    let invalidCoordinateIDs = Set(
+      catalog.coordinates.compactMap { coordinate -> String? in
+        let publishedOnIsValid = coordinate.publishedOn.map(isISODate) ?? true
+        let isValid =
+          coordinate.id == "coordinate-\(coordinate.officialID)"
+          && coordinate.officialID > 0
+          && !coordinate.title.isEmpty
+          && !coordinate.coordinatePoint.isEmpty
+          && isOfficialURL(coordinate.sourceURL)
+          && isOfficialCoordinateImageURL(coordinate.imageSourceURL)
+          && !coordinate.coverImage.isEmpty
+          && Set(coordinate.linkedCommerceItemIDs).isSubset(of: commerceItemIDs)
+          && publishedOnIsValid
+          && isISODate(coordinate.observedAt)
+        return isValid ? nil : coordinate.id
+      }
+    ).sorted()
+
+    let invalidStoryIDs = Set(
+      catalog.stories.compactMap { story -> String? in
+        let publishedOnIsValid = story.publishedOn.map(isISODate) ?? true
+        let isValid =
+          !story.id.isEmpty
+          && !story.title.isEmpty
+          && !story.summary.isEmpty
+          && !story.content.isEmpty
+          && isOfficialSourceURL(story.sourceURL)
+          && !story.coverImage.isEmpty
+          && !story.imageSourceURLs.isEmpty
+          && story.imageSourceURLs.allSatisfy(isOfficialStoryImageURL)
+          && Set(story.linkedCommerceItemIDs).isSubset(of: commerceItemIDs)
+          && publishedOnIsValid
+          && isISODate(story.observedAt)
+        return isValid ? nil : story.id
+      }
+    ).sorted()
+
+    let invalidEventIDs = Set(
+      catalog.events.compactMap { event -> String? in
+        let isValid =
+          event.id == "news-\(event.officialID)"
+          && event.officialID > 0
+          && !event.title.isEmpty
+          && isISODate(event.publishedOn)
+          && !event.summary.isEmpty
+          && !event.content.isEmpty
+          && isOfficialURL(event.sourceURL)
+          && !event.coverImage.isEmpty
+          && !event.imageSourceURLs.isEmpty
+          && event.imageSourceURLs.allSatisfy(isOfficialNewsImageURL)
+          && Set(event.linkedCommerceItemIDs).isSubset(of: commerceItemIDs)
+          && isISODate(event.observedAt)
+        return isValid ? nil : event.id
+      }
+    ).sorted()
+
+    let invalidHistoryEntryIDs = Set(
+      catalog.historyEntries.compactMap { entry -> String? in
+        let imagePairIsValid: Bool
+        if let coverImage = entry.coverImage, let imageSourceURL = entry.imageSourceURL {
+          imagePairIsValid = !coverImage.isEmpty && isOfficialHistoryImageURL(imageSourceURL)
+        } else {
+          imagePairIsValid = entry.coverImage == nil && entry.imageSourceURL == nil
+        }
+        let isValid =
+          !entry.id.isEmpty
+          && (1972...2026).contains(entry.year)
+          && !entry.title.isEmpty
+          && !entry.content.isEmpty
+          && isOfficialSourceURL(entry.sourceURL)
+          && imagePairIsValid
+          && isISODate(entry.observedAt)
+        return isValid ? nil : entry.id
       }
     ).sorted()
 
@@ -310,9 +565,18 @@ final class TimeHallCatalogStore: ObservableObject {
           && item.sourceURL == catalogue.sourceURL
           && catalogue.itemIds.contains(item.id)
           && (1...catalogue.pageCount).contains(item.cataloguePage)
+        let cataloguePagesAreValid =
+          item.cataloguePages.map {
+            !$0.isEmpty
+              && $0.contains(item.cataloguePage)
+              && $0.allSatisfy { (1...catalogue.pageCount).contains($0) }
+          } ?? true
+        let productPageIsValid = item.productPageURL.map(isOfficialURL) ?? true
         let isValid =
           hasCoreFields
           && matchesCatalogue
+          && cataloguePagesAreValid
+          && productPageIsValid
           && item.canonicalKey == expectedCanonicalKey
           && item.priceJPY > 0
           && item.datePrecision == "season"
@@ -328,14 +592,30 @@ final class TimeHallCatalogStore: ObservableObject {
     let referencedIDs = Set(allReferencedIDs)
     return TimeHallValidationReport(
       dressCount: catalog.items.filter { $0.kind == .dress }.count,
+      clothingCount: catalog.items.filter { $0.kind == .clothing }.count,
       accessoryCount: catalog.items.filter { $0.kind == .accessory }.count,
       catalogueCount: catalog.catalogues.count,
       timelineYearCount: catalog.timelineYears.count,
       archiveCatalogueCount: catalog.archiveCatalogues.count,
+      commerceSnapshotCount: catalog.commerceSnapshots.count,
+      commerceItemCount: catalog.commerceItems.count,
+      coordinateCount: catalog.coordinates.count,
+      storyCount: catalog.stories.count,
+      eventCount: catalog.events.count,
+      historyEntryCount: catalog.historyEntries.count,
+      importBatchCount: catalog.importBatches.count,
       catalogErrors: catalogErrors.sorted(),
       duplicateItemIDs: duplicateItemIDs,
       duplicateCatalogueIDs: duplicateCatalogueIDs,
       duplicateArchiveCatalogueIDs: duplicateArchiveCatalogueIDs,
+      duplicateImportBatchIDs: duplicateImportBatchIDs,
+      duplicateCommerceSnapshotIDs: duplicateCommerceSnapshotIDs,
+      duplicateCommerceItemIDs: duplicateCommerceItemIDs,
+      duplicateCommerceProductCodes: duplicateCommerceProductCodes,
+      duplicateCoordinateIDs: duplicateCoordinateIDs,
+      duplicateStoryIDs: duplicateStoryIDs,
+      duplicateEventIDs: duplicateEventIDs,
+      duplicateHistoryEntryIDs: duplicateHistoryEntryIDs,
       duplicateTimelineYears: duplicateTimelineYears,
       duplicateCanonicalKeys: duplicateKeys,
       duplicateCatalogueItemIDs: duplicateValues(allReferencedIDs),
@@ -343,6 +623,13 @@ final class TimeHallCatalogStore: ObservableObject {
       orphanItemIDs: Array(itemIDs.subtracting(referencedIDs)).sorted(),
       invalidCatalogueIDs: invalidCatalogueIDs,
       invalidArchiveCatalogueIDs: invalidArchiveCatalogueIDs,
+      invalidImportBatchIDs: invalidImportBatchIDs,
+      invalidCommerceSnapshotIDs: invalidCommerceSnapshotIDs,
+      invalidCommerceItemIDs: invalidCommerceItemIDs,
+      invalidCoordinateIDs: invalidCoordinateIDs,
+      invalidStoryIDs: invalidStoryIDs,
+      invalidEventIDs: invalidEventIDs,
+      invalidHistoryEntryIDs: invalidHistoryEntryIDs,
       invalidTimelineYears: invalidTimelineYears,
       invalidItemIDs: invalidItemIDs
     )
@@ -373,6 +660,48 @@ final class TimeHallCatalogStore: ObservableObject {
       && url.host == "pinkhouse-webshop.jp"
       && url.path.hasPrefix("/photo/catalog/")
       && url.pathExtension.lowercased() == "jpg"
+  }
+
+  nonisolated private static func isOfficialCommerceImageURL(_ value: String) -> Bool {
+    guard let url = URL(string: value) else { return false }
+    return url.scheme == "https"
+      && url.host == "pinkhouse-webshop.jp"
+      && url.path.hasPrefix("/photo/")
+      && url.pathExtension.lowercased() == "jpg"
+  }
+
+  nonisolated private static func isOfficialCoordinateImageURL(_ value: String) -> Bool {
+    guard let url = URL(string: value) else { return false }
+    return url.scheme == "https"
+      && url.host == "pinkhouse-webshop.jp"
+      && url.path.hasPrefix("/photo/coordinate/")
+      && url.pathExtension.lowercased() == "jpg"
+  }
+
+  nonisolated private static func isOfficialStoryImageURL(_ value: String) -> Bool {
+    guard let url = URL(string: value), url.scheme == "https", let host = url.host else {
+      return false
+    }
+    if host == "pinkhouse-webshop.jp" {
+      return url.path.hasPrefix("/photo/")
+    }
+    return host == "www.melrose.co.jp"
+      && url.path.hasPrefix("/wp-content/themes/melrose/assets/images/50th/")
+  }
+
+  nonisolated private static func isOfficialNewsImageURL(_ value: String) -> Bool {
+    guard let url = URL(string: value) else { return false }
+    return url.scheme == "https"
+      && url.host == "pinkhouse-webshop.jp"
+      && url.path.hasPrefix("/photo/news/")
+      && ["jpg", "jpeg", "png", "webp"].contains(url.pathExtension.lowercased())
+  }
+
+  nonisolated private static func isOfficialHistoryImageURL(_ value: String) -> Bool {
+    guard let url = URL(string: value) else { return false }
+    return url.scheme == "https"
+      && url.host == "www.melrose.co.jp"
+      && url.path.hasPrefix("/wp-content/themes/melrose/assets/images/about/history/")
   }
 
   nonisolated private static func isISODate(_ value: String) -> Bool {

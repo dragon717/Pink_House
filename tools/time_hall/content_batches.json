@@ -1,0 +1,78 @@
+{
+  "schemaVersion": 1,
+  "batches": [
+    {
+      "id": "catalogue-2026-summer",
+      "order": 1,
+      "kind": "catalogue",
+      "status": "ready",
+      "titleZH": "第一批·2026 Summer 完整目录",
+      "sourceURLs": [
+        "https://pinkhouse-webshop.jp/pinkhouse/catalog/detail/137"
+      ],
+      "catalogues": [
+        {
+          "officialID": 137,
+          "catalogueID": "pink-house-2026-summer",
+          "year": 2026,
+          "season": "summer",
+          "seasonLabel": "夏",
+          "coverImage": "archive-catalog-137.jpg",
+          "summaryZH": "完整收录官方 2026 Summer 目录的页面造型、商品名、价格与可用商品链接。"
+        }
+      ]
+    },
+    {
+      "id": "commerce-current-outlet",
+      "order": 2,
+      "kind": "commerceSnapshot",
+      "status": "ready",
+      "titleZH": "第二批·当前商品与 OUTLET 快照",
+      "sourceURLs": [
+        "https://pinkhouse-webshop.jp/item?brand_label_codes=10",
+        "https://pinkhouse-webshop.jp/outlet?brand_label_codes=10"
+      ]
+    },
+    {
+      "id": "coordinate-current",
+      "order": 3,
+      "kind": "coordinate",
+      "status": "ready",
+      "titleZH": "第三批·官方搭配关系",
+      "sourceURLs": [
+        "https://pinkhouse-webshop.jp/pinkhouse/coordinate"
+      ]
+    },
+    {
+      "id": "feature-craft",
+      "order": 4,
+      "kind": "story",
+      "status": "ready",
+      "titleZH": "第四批·印花专题与制作工艺",
+      "sourceURLs": [
+        "https://pinkhouse-webshop.jp/pinkhouse/contents",
+        "https://www.melrose.co.jp/50th/melrose_monobooks_pinkhouse/"
+      ]
+    },
+    {
+      "id": "news-timeline",
+      "order": 5,
+      "kind": "news",
+      "status": "ready",
+      "titleZH": "第五批·发售、联名与限定事件",
+      "sourceURLs": [
+        "https://pinkhouse-webshop.jp/pinkhouse/news"
+      ]
+    },
+    {
+      "id": "history-evidence",
+      "order": 6,
+      "kind": "history",
+      "status": "ready",
+      "titleZH": "第六批·品牌历史补证",
+      "sourceURLs": [
+        "https://www.melrose.co.jp/about-history/"
+      ]
+    }
+  ]
+}

@@ -1940,6 +1940,27 @@
         }
       }
     },
+    "%@ · %lld 件" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ · %2$lld items"
+          }
+        }
+      }
+    },
+    "%@ · %lld 件目录馆藏 · %lld 件官方商品" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ · %2$lld 件目录馆藏 · %3$lld 件官方商品"
+          }
+        }
+      }
+    },
     "%@ · 手动" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -2547,6 +2568,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%@ 項組件可單獨開關"
+          }
+        }
+      }
+    },
+    "%@，%@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@，%2$@"
           }
         }
       }
@@ -5943,16 +5974,6 @@
         }
       }
     },
-    "%lld %@，%@" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "%1$lld %2$@，%3$@"
-          }
-        }
-      }
-    },
     "%lld 个新任务" : {
       "localizations" : {
         "en" : {
@@ -6020,6 +6041,9 @@
         }
       }
     },
+    "%lld 件" : {
+
+    },
     "%lld 像素" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -6079,12 +6103,29 @@
         }
       }
     },
-    "%lld 年 · %lld 份图录 · %lld 件馆藏" : {
+    "%lld 套" : {
+
+    },
+    "%lld 套造型 · 按官网新着顺" : {
+
+    },
+    "%lld 幅·%lld 件" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "new",
-            "value" : "%1$lld 年 · %2$lld 份图录 · %3$lld 件馆藏"
+            "value" : "%1$lld 幅·%2$lld 件"
+          }
+        }
+      }
+    },
+    "%lld 年 · %lld 份图录 · %lld 件馆藏 · %lld 批入馆" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld years · %2$lld catalogues · %3$lld items · %4$lld batches"
           }
         }
       }
@@ -6137,6 +6178,16 @@
     },
     "%lld 本" : {
 
+    },
+    "%lld 篇专题 · %lld 篇工艺档案" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld 篇专题 · %2$lld 篇工艺档案"
+          }
+        }
+      }
     },
     "%lld 页" : {
       "extractionState" : "stale",
@@ -14627,6 +14678,9 @@
         }
       }
     },
+    "PINK HOUSE 当前商品与 OUTLET" : {
+
+    },
     "PostScript: %@" : {
       "localizations" : {
         "en" : {
@@ -18239,6 +18293,29 @@
         }
       }
     },
+    "专题" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Features"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "专题"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "專題"
+          }
+        }
+      }
+    },
     "世界书" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -20685,6 +20762,9 @@
           }
         }
       }
+    },
+    "产地：%@" : {
+
     },
     "京都·千本鸟居" : {
       "extractionState" : "stale",
@@ -30909,6 +30989,9 @@
         }
       }
     },
+    "全部搭配" : {
+
+    },
     "全部摆回房间" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -32959,6 +33042,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "最近12個月金額"
+          }
+        }
+      }
+    },
+    "最近入馆 · 第 %lld 批" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Latest import · Batch %lld"
           }
         }
       }
@@ -36095,6 +36189,29 @@
         }
       }
     },
+    "制作工艺" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Craft"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "制作工艺"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "製作工藝"
+          }
+        }
+      }
+    },
     "刷新" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -37302,6 +37419,65 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "加入聯網社區"
+          }
+        }
+      }
+    },
+    "加入衣橱" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zum Kleiderschrank hinzufügen"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add to Wardrobe"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Añadir al armario"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ajouter à la garde-robe"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ワードローブに追加"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "옷장에 추가"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adicionar ao guarda-roupa"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "加入衣橱"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "加入衣櫥"
           }
         }
       }
@@ -43728,6 +43904,29 @@
         }
       }
     },
+    "品牌纪事" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Brand History"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "品牌纪事"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "品牌紀事"
+          }
+        }
+      }
+    },
     "品牌颜色" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -43783,6 +43982,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "品牌顏色"
+          }
+        }
+      }
+    },
+    "品番 %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Product no. %@"
           }
         }
       }
@@ -45591,9 +45800,6 @@
         }
       }
     },
-    "图录第 %lld 页" : {
-
-    },
     "图标切换 · 专属收藏" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -46052,9 +46258,6 @@
         }
       }
     },
-    "图片来自图录第 %lld 页；同页展品会共享这张原图。" : {
-
-    },
     "图片等待同步" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -46259,6 +46462,29 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "圖紙設置"
+          }
+        }
+      }
+    },
+    "图鉴" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Illustrated Guide"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "图鉴"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "圖鑑"
           }
         }
       }
@@ -51370,6 +51596,271 @@
         }
       }
     },
+    "完整目录" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Complete Catalogues"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "完整目录"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "完整目錄"
+          }
+        }
+      }
+    },
+    "官方 Coordinate 搭配档案" : {
+
+    },
+    "官方 Feature 与制作工艺" : {
+
+    },
+    "官方专题" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Official Feature"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "官方专题"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "官方專題"
+          }
+        }
+      }
+    },
+    "官方历史原文" : {
+
+    },
+    "官方原文已收录" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Official text archived"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "官方原文已收录"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "官方原文已收錄"
+          }
+        }
+      }
+    },
+    "官方品牌史" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Official Brand History"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "官方品牌史"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "官方品牌史"
+          }
+        }
+      }
+    },
+    "官方商品" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Official Products"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "官方商品"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "官方商品"
+          }
+        }
+      }
+    },
+    "官方商品资料" : {
+
+    },
+    "官方搭配" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Official Look"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "官方搭配"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "官方搭配"
+          }
+        }
+      }
+    },
+    "官方日文介绍" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Official Japanese Description"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "官方日文介绍"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "官方日文介紹"
+          }
+        }
+      }
+    },
+    "官方日文原文" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Official Japanese Text"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "官方日文原文"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "官方日文原文"
+          }
+        }
+      }
+    },
+    "官方日文搭配记录" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Official Japanese Styling Notes"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "官方日文搭配记录"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "官方日文搭配記錄"
+          }
+        }
+      }
+    },
+    "官网 Catalogue" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Official Catalogue"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "官网 Catalogue"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "官網 Catalogue"
+          }
+        }
+      }
+    },
+    "官网目录" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Official Catalogue"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "官网目录"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "官網目錄"
+          }
+        }
+      }
+    },
     "定" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -54781,6 +55272,9 @@
         }
       }
     },
+    "尺寸：%@" : {
+
+    },
     "尺码" : {
       "localizations" : {
         "de" : {
@@ -56406,6 +56900,40 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "已允許"
+          }
+        }
+      }
+    },
+    "已入馆完整目录" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Imported Catalogues"
+          }
+        }
+      }
+    },
+    "已关联图鉴商品" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Linked Atlas Products"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已关联图鉴商品"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已關聯圖鑑商品"
           }
         }
       }
@@ -63602,6 +64130,39 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "目前分類：%@"
+          }
+        }
+      }
+    },
+    "当前商品" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Current"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "当前商品"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "當前商品"
+          }
+        }
+      }
+    },
+    "当前商品 %lld 件 · OUTLET %lld 件" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "当前商品 %1$lld 件 · OUTLET %2$lld 件"
           }
         }
       }
@@ -78440,6 +79001,29 @@
         }
       }
     },
+    "搜索裙装、专题、品番" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Search dresses, features, or product codes"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "搜索裙装、专题、品番"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "搜尋裙裝、專題、品番"
+          }
+        }
+      }
+    },
     "搜索裙装、品牌、标签、类型、颜色、尺码、价格..." : {
       "localizations" : {
         "en" : {
@@ -78634,6 +79218,52 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "搜尋裙裝名稱或品牌"
+          }
+        }
+      }
+    },
+    "搭配" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Looks"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "搭配"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "搭配"
+          }
+        }
+      }
+    },
+    "搭配单品" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Items in This Look"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "搭配单品"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "搭配單品"
           }
         }
       }
@@ -80551,6 +81181,29 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "改名項圈需要 %d %@，你現在%@不夠，先帶你去 Apple 原生儲值～"
+          }
+        }
+      }
+    },
+    "故事卡片" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Story"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "故事卡片"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "故事卡片"
           }
         }
       }
@@ -85991,6 +86644,9 @@
         }
       }
     },
+    "暂无官方商品" : {
+
+    },
     "暂无已发送的提醒" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -90164,6 +90820,9 @@
         }
       }
     },
+    "材质：%@" : {
+
+    },
     "条件已达成，点击下方“立即解锁”即可完成任务。" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -90792,6 +91451,9 @@
         }
       }
     },
+    "查看 Melrose 官方沿革" : {
+
+    },
     "查看全部" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -90961,6 +91623,22 @@
           }
         }
       }
+    },
+    "查看官方专题页" : {
+
+    },
+    "查看官方商品页" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "View Official Product Page"
+          }
+        }
+      }
+    },
+    "查看官方搭配页" : {
+
     },
     "查看待补尾款与提醒" : {
       "extractionState" : "stale",
@@ -91942,9 +92620,6 @@
         }
       }
     },
-    "样板 %lld 件" : {
-
-    },
     "核心信息" : {
       "localizations" : {
         "en" : {
@@ -92090,6 +92765,29 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "桌子"
+          }
+        }
+      }
+    },
+    "档案待补证" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Needs Verification"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "档案待补证"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "檔案待補證"
           }
         }
       }
@@ -92300,6 +92998,29 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "夢裙日曆"
+          }
+        }
+      }
+    },
+    "梦裙时光馆" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dream Dress Time Hall"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "梦裙时光馆"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "夢裙時光館"
           }
         }
       }
@@ -95879,6 +96600,29 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "法國·香波堡"
+          }
+        }
+      }
+    },
+    "活动" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Event"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "活动"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "活動"
           }
         }
       }
@@ -102876,6 +103620,29 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "皮革"
+          }
+        }
+      }
+    },
+    "目录馆藏" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Catalogue"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "目录馆藏"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "目錄館藏"
           }
         }
       }
@@ -114606,6 +115373,29 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "緩慢向右移動，保持物體在中心"
+          }
+        }
+      }
+    },
+    "编年史" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chronicle"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "编年史"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "編年史"
           }
         }
       }
@@ -127344,6 +128134,29 @@
         }
       }
     },
+    "资讯" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "News"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "资讯"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "資訊"
+          }
+        }
+      }
+    },
     "起飞" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -133967,9 +134780,6 @@
         }
       }
     },
-    "重点商品样板" : {
-
-    },
     "重置" : {
       "localizations" : {
         "de" : {
@@ -138624,6 +139434,9 @@
         }
       }
     },
+    "颜色：%@" : {
+
+    },
     "颜色信息" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -139310,8 +140123,41 @@
         }
       }
     },
+    "馆藏 %lld 件" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld items"
+          }
+        }
+      }
+    },
     "馆藏图录" : {
 
+    },
+    "馆藏详情" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Catalogue Item"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "馆藏详情"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "館藏詳情"
+          }
+        }
+      }
     },
     "首充双倍" : {
       "extractionState" : "stale",
