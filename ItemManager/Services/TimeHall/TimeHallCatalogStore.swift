@@ -65,6 +65,25 @@ final class TimeHallCatalogStore: ObservableObject {
     treasuredIDs = Set(UserDefaults.standard.stringArray(forKey: treasureKey) ?? [])
   }
 
+  func bundledCatalog(named resourceName: String) -> TimeHallCatalogDTO? {
+    let candidates: [URL?] = [
+      Bundle.main.url(forResource: resourceName, withExtension: "json", subdirectory: "TimeHall"),
+      Bundle.main.url(
+        forResource: resourceName, withExtension: "json", subdirectory: "Resources/TimeHall"),
+      Bundle.main.url(forResource: resourceName, withExtension: "json"),
+    ]
+    guard let url = candidates.compactMap({ $0 }).first else {
+      print("❌ TimeHallCatalogStore: \(resourceName).json missing")
+      return nil
+    }
+    do {
+      return try JSONDecoder().decode(TimeHallCatalogDTO.self, from: Data(contentsOf: url))
+    } catch {
+      print("❌ TimeHallCatalogStore: \(resourceName).json decode failed \(error)")
+      return nil
+    }
+  }
+
   var items: [TimeHallItemDTO] {
     catalog?.items ?? []
   }

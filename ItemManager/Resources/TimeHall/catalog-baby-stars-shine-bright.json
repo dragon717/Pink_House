@@ -1,0 +1,97 @@
+{
+  "version": 3,
+  "source": "https://www.babyssb.co.jp/brand/",
+  "title": "BABY, THE STARS SHINE BRIGHT",
+  "subtitle": "细腻优雅的永恒洛丽塔衣橱",
+  "heroImage": "brand-baby-hero.png",
+  "heroCaption": "让蕾丝与荷叶边唤回成为公主的喜悦",
+  "heroBody": "BABY, THE STARS SHINE BRIGHT 追求细腻、优雅而完整的洛丽塔风格。品牌从少女时代对蕾丝与荷叶边的欢喜出发，以裙装、上衣和丰富配饰组成整体搭配；旗下 ALICE and the PIRATES 则加入海盗、哥特与王子风格。",
+  "scope": {
+    "startYear": 1990,
+    "endYear": null,
+    "labelZH": "1990–至今",
+    "sampleYears": [1990, 2004, 2026]
+  },
+  "timelineYears": [
+    {
+      "year": 1990,
+      "kind": "milestone",
+      "titleZH": "品牌启程",
+      "storyZH": "官网公司沿革记载，BABY, THE STARS SHINE BRIGHT 品牌于 1990 年开始发展。",
+      "evidenceLevel": "officialHistory",
+      "sourceURLs": ["https://www.babyssb.co.jp/brand/"],
+      "catalogueIDs": []
+    },
+    {
+      "year": 2004,
+      "kind": "milestone",
+      "titleZH": "ALICE and the PIRATES 诞生",
+      "storyZH": "品牌于 2004 年推出 ALICE and the PIRATES，以爱丽丝误入海盗世界为想象起点，拓展更成熟的洛丽塔、哥特与王子造型。",
+      "evidenceLevel": "officialHistory",
+      "sourceURLs": ["https://www.babyssb.co.jp/brand/"],
+      "catalogueIDs": []
+    },
+    {
+      "year": 2026,
+      "kind": "milestone",
+      "titleZH": "持续发布品牌新作",
+      "storyZH": "官网沿革记录了 2026 年品牌新作发布与相关活动，品牌世界仍通过时装展示和完整搭配持续展开。",
+      "evidenceLevel": "officialHistory",
+      "sourceURLs": ["https://www.babyssb.co.jp/brand/"],
+      "catalogueIDs": []
+    }
+  ],
+  "archiveCatalogues": [],
+  "catalogues": [],
+  "items": [],
+  "commerceSnapshots": [],
+  "commerceItems": [],
+  "coordinates": [],
+  "stories": [
+    {
+      "id": "baby-concept",
+      "kind": "feature",
+      "title": "永恒而细腻的洛丽塔",
+      "publishedOn": null,
+      "summary": "从童年穿上公主裙的纯粹喜悦出发。",
+      "content": "品牌将柔和、精致与端庄的裙装视作少女心的具象表达，并以服装、头饰、包袋、袜履等完整单品，帮助穿着者完成协调统一的造型。",
+      "sourceURL": "https://www.babyssb.co.jp/brand/",
+      "coverImage": "brand-baby-hero.png",
+      "imageSourceURLs": ["https://www.babyssb.co.jp/wp-content/themes/babyssbThema/inc/images/ogp.png"],
+      "productCodes": [],
+      "linkedCommerceItemIDs": [],
+      "observedAt": "2026-08-09"
+    },
+    {
+      "id": "baby-pirates",
+      "kind": "feature",
+      "title": "ALICE and the PIRATES",
+      "publishedOn": null,
+      "summary": "海盗世界、哥特气息与王子装的另一条线。",
+      "content": "这一支线把海盗的自由感、华丽装饰与成熟氛围结合起来，既包含更大人感的洛丽塔与庄严哥特，也延伸至夹克、长裤和礼帽构成的王子风格。",
+      "sourceURL": "https://www.babyssb.co.jp/brand/",
+      "coverImage": "brand-baby-pirates.png",
+      "imageSourceURLs": ["https://www.babyssb.co.jp/wp-content/uploads/2021/12/image-5.png"],
+      "productCodes": [],
+      "linkedCommerceItemIDs": [],
+      "observedAt": "2026-08-09"
+    },
+    {
+      "id": "baby-categories",
+      "kind": "craft",
+      "title": "完整的协调体系",
+      "publishedOn": null,
+      "summary": "从主裙、衬衫到裙撑和头饰均有对应分类。",
+      "content": "官方商店按印花吊带裙、连衣裙、半身裙、衬衫、针织、外套、裤装、裙撑、头饰、包袋、袜子与鞋履等分类，让不同系列能组成层次清晰的全身搭配。",
+      "sourceURL": "https://store.babyssb.co.jp/en",
+      "coverImage": "brand-baby-hero.png",
+      "imageSourceURLs": ["https://www.babyssb.co.jp/wp-content/themes/babyssbThema/inc/images/ogp.png"],
+      "productCodes": [],
+      "linkedCommerceItemIDs": [],
+      "observedAt": "2026-08-09"
+    }
+  ],
+  "events": [],
+  "historyEntries": [],
+  "importBatches": []
+}

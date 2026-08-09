@@ -1,0 +1,79 @@
+{
+  "version": 3,
+  "source": "https://angelicpretty.com/",
+  "title": "Angelic Pretty",
+  "subtitle": "甜美洛丽塔的梦幻衣橱",
+  "heroImage": "brand-angelic-pretty-hero.jpg",
+  "heroCaption": "把绘本般的公主梦想穿进日常",
+  "heroBody": "Angelic Pretty 以蕾丝、荷叶边与蝴蝶结描绘甜美洛丽塔世界。官网强调，即使长大也要珍惜憧憬公主的心情，并通过完整单品与原创印花系列，让穿着者自由组合自己的梦幻造型。",
+  "scope": {
+    "startYear": 2026,
+    "endYear": 2026,
+    "labelZH": "官网理念与当季系列",
+    "sampleYears": [2026]
+  },
+  "timelineYears": [
+    {
+      "year": 2026,
+      "kind": "officialArchive",
+      "titleZH": "Into a Dream 春季系列",
+      "storyZH": "官网 2026 春季系列以“Into a Dream”为主题，并以 Lovely & POP、Dear Princess 等方向呈现甜美、活泼与公主感并存的造型。",
+      "evidenceLevel": "officialCatalogue",
+      "sourceURLs": ["https://angelicpretty.com/Page/collection2026spring.aspx"],
+      "catalogueIDs": []
+    }
+  ],
+  "archiveCatalogues": [],
+  "catalogues": [],
+  "items": [],
+  "commerceSnapshots": [],
+  "commerceItems": [],
+  "coordinates": [],
+  "stories": [
+    {
+      "id": "angelic-pretty-concept",
+      "kind": "feature",
+      "title": "品牌理念",
+      "publishedOn": null,
+      "summary": "以绘本公主般的甜美想象为核心。",
+      "content": "品牌用蕾丝、荷叶边与蝴蝶结表达少女时代对“可爱”的直率向往；服装并非只为特殊场合，而是把仍然珍藏的梦带回日常。",
+      "sourceURL": "https://angelicpretty.com/",
+      "coverImage": "brand-angelic-pretty-hero.jpg",
+      "imageSourceURLs": ["https://angelicpretty.com/Contents/Feature/concept.jpg"],
+      "productCodes": [],
+      "linkedCommerceItemIDs": [],
+      "observedAt": "2026-08-09"
+    },
+    {
+      "id": "angelic-pretty-categories",
+      "kind": "feature",
+      "title": "从裙装到完整搭配",
+      "publishedOn": null,
+      "summary": "官网分类覆盖裙装、上衣、外套与配饰。",
+      "content": "除连衣裙、吊带裙与半身裙外，官网还提供衬衫、针织衫、外套、头饰、包袋、裙撑、袜履与雨伞等分类，支持从主裙到小物的整体协调。",
+      "sourceURL": "https://angelicpretty.com/",
+      "coverImage": "brand-angelic-pretty-collection.jpg",
+      "imageSourceURLs": ["https://angelicpretty.com/Contents/Feature/26s_01.jpg"],
+      "productCodes": [],
+      "linkedCommerceItemIDs": [],
+      "observedAt": "2026-08-09"
+    },
+    {
+      "id": "angelic-pretty-original-prints",
+      "kind": "craft",
+      "title": "原创印花系列",
+      "publishedOn": null,
+      "summary": "以主题化印花持续扩展品牌世界。",
+      "content": "官网将原创印花单独整理为系列入口，甜点、动物、嘉年华与梦境等主题在裙装和配套小物之间延展，使每一季都具有清晰的故事感。",
+      "sourceURL": "https://angelicpretty.com/",
+      "coverImage": "brand-angelic-pretty-collection.jpg",
+      "imageSourceURLs": ["https://angelicpretty.com/Contents/Feature/26s_01.jpg"],
+      "productCodes": [],
+      "linkedCommerceItemIDs": [],
+      "observedAt": "2026-08-09"
+    }
+  ],
+  "events": [],
+  "historyEntries": [],
+  "importBatches": []
+}

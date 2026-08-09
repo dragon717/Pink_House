@@ -1,0 +1,97 @@
+{
+  "version": 3,
+  "source": "https://juliette-et-justine.com/zh-cn/pages/about",
+  "title": "Juliette et Justine",
+  "subtitle": "与艺术同行的古典优雅",
+  "heroImage": "brand-juliette-hero.jpg",
+  "heroCaption": "让裙装唤回只属于你的光彩",
+  "heroBody": "Juliette et Justine 将裙装视作连接穿着者与艺术的媒介。品牌从经典绘画汲取主题，以女性化、优雅的轮廓承载独特印花，并坚持由日本职人按需制作，让每件作品保留细节与时间感。",
+  "scope": {
+    "startYear": 2001,
+    "endYear": null,
+    "labelZH": "2001–至今",
+    "sampleYears": [2001, 2012, 2015, 2018]
+  },
+  "timelineYears": [
+    {
+      "year": 2001,
+      "kind": "milestone",
+      "titleZH": "品牌创立",
+      "storyZH": "官方品牌史记载，Juliette et Justine 于 2001 年启动。",
+      "evidenceLevel": "officialHistory",
+      "sourceURLs": ["https://juliette-et-justine.com/en/pages/about"],
+      "catalogueIDs": []
+    },
+    {
+      "year": 2012,
+      "kind": "milestone",
+      "titleZH": "走向海外舞台",
+      "storyZH": "2012 年品牌受邀参加伦敦活动并举办时装秀；此后又在欧洲、北美与亚洲参与展示和活动。",
+      "evidenceLevel": "officialHistory",
+      "sourceURLs": ["https://juliette-et-justine.com/en/pages/about"],
+      "catalogueIDs": []
+    },
+    {
+      "year": 2015,
+      "kind": "milestone",
+      "titleZH": "艺术馆特别展出",
+      "storyZH": "官方历史记录，品牌作品于 2015 年在檀香山艺术博物馆特别展出，延续服装与艺术对话的路径。",
+      "evidenceLevel": "officialHistory",
+      "sourceURLs": ["https://juliette-et-justine.com/en/pages/about"],
+      "catalogueIDs": []
+    }
+  ],
+  "archiveCatalogues": [],
+  "catalogues": [],
+  "items": [],
+  "commerceSnapshots": [],
+  "commerceItems": [],
+  "coordinates": [],
+  "stories": [
+    {
+      "id": "juliette-concept",
+      "kind": "feature",
+      "title": "找回真实的自己",
+      "publishedOn": null,
+      "summary": "以裙装唤起穿着者内在、不可替代的美。",
+      "content": "品牌希望穿着者在镜中重新看见自己的光彩，并把每个人视作独特的“生活艺术”。这种自由而细腻的美，不追随单一流行，而强调优雅地表达自我。",
+      "sourceURL": "https://juliette-et-justine.com/zh-cn/pages/about",
+      "coverImage": "brand-juliette-hero.jpg",
+      "imageSourceURLs": ["https://juliette-et-justine.com/cdn/shop/files/about_header_cover.jpg?v=1686551915"],
+      "productCodes": [],
+      "linkedCommerceItemIDs": [],
+      "observedAt": "2026-08-09"
+    },
+    {
+      "id": "juliette-design",
+      "kind": "feature",
+      "title": "与艺术同行的设计",
+      "publishedOn": null,
+      "summary": "经典绘画、独特印花与女性化轮廓相互叠合。",
+      "content": "品牌借用经时间沉淀的绘画作为创作母题，并通过细致版型形成优雅轮廓。CrazyElegance、FantasyElegance 与 TimelessElegance 共同构成其古典而不受年龄限制的风格。",
+      "sourceURL": "https://juliette-et-justine.com/en/pages/about",
+      "coverImage": "brand-juliette-craft.jpg",
+      "imageSourceURLs": ["https://juliette-et-justine.com/cdn/shop/files/about_slide_01.jpg?v=1686728598"],
+      "productCodes": [],
+      "linkedCommerceItemIDs": [],
+      "observedAt": "2026-08-09"
+    },
+    {
+      "id": "juliette-craft",
+      "kind": "craft",
+      "title": "按需制作与日本职人",
+      "publishedOn": null,
+      "summary": "以受注方式保留品质，也减少不必要的生产。",
+      "content": "官网说明，裙装由日本经验丰富的职人逐件制作；印花与缝制均重视稳定和细节。按需生产既适应难以量产的工艺，也把作品交给真正需要它的人。",
+      "sourceURL": "https://juliette-et-justine.com/en/pages/about",
+      "coverImage": "brand-juliette-craft.jpg",
+      "imageSourceURLs": ["https://juliette-et-justine.com/cdn/shop/files/about_slide_01.jpg?v=1686728598"],
+      "productCodes": [],
+      "linkedCommerceItemIDs": [],
+      "observedAt": "2026-08-09"
+    }
+  ],
+  "events": [],
+  "historyEntries": [],
+  "importBatches": []
+}

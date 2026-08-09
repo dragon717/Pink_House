@@ -1,0 +1,88 @@
+{
+  "version": 3,
+  "source": "https://www.wunderwelt.jp/zh/pages/fleur",
+  "title": "Wunderwelt FLEUR",
+  "subtitle": "汇集 Gothic 与 Lolita 新作的官方授权平台",
+  "heroImage": "brand-wunderwelt-fleur-hero.png",
+  "heroCaption": "在同一座线上衣橱里发现不同品牌",
+  "heroBody": "Wunderwelt FLEUR 是面向日本及海外顾客的 Gothic 与 Lolita 新商品平台。它汇集官方授权品牌与原创商品，覆盖甜系、哥特、古典、公主与王子等多种风格，并与 Wunderwelt 的中古流通和服务体系相连。",
+  "scope": {
+    "startYear": 2016,
+    "endYear": null,
+    "labelZH": "2016–至今",
+    "sampleYears": [2016, 2026]
+  },
+  "timelineYears": [
+    {
+      "year": 2016,
+      "kind": "milestone",
+      "titleZH": "Wunderwelt FLEUR 开张",
+      "storyZH": "Wunderwelt 官方中文媒体记录，FLEUR 于 2016 年 7 月作为可向海外销售人气 Gothic 与 Lolita 品牌新品的精品网店开张。",
+      "evidenceLevel": "officialHistory",
+      "sourceURLs": ["https://libre.wunderwelt.jp/zh/9183/"],
+      "catalogueIDs": []
+    },
+    {
+      "year": 2026,
+      "kind": "officialArchive",
+      "titleZH": "持续扩展多品牌新作",
+      "storyZH": "当前官网以新着、品牌排行与推荐内容组织商品，持续呈现多个 Gothic、Lolita 与古典风格品牌。",
+      "evidenceLevel": "officialCatalogue",
+      "sourceURLs": ["https://www.wunderwelt.jp/zh/pages/fleur"],
+      "catalogueIDs": []
+    }
+  ],
+  "archiveCatalogues": [],
+  "catalogues": [],
+  "items": [],
+  "commerceSnapshots": [],
+  "commerceItems": [],
+  "coordinates": [],
+  "stories": [
+    {
+      "id": "wunderwelt-fleur-platform",
+      "kind": "feature",
+      "title": "官方授权多品牌新作",
+      "publishedOn": null,
+      "summary": "FLEUR 的核心是集中呈现多个品牌的新商品。",
+      "content": "官网把新着、品牌排行与推荐作为主要入口，既收录日本品牌，也代理海外品牌。它不是单一服装品牌，而是一座持续更新的 Gothic 与 Lolita 线上精品店。",
+      "sourceURL": "https://www.wunderwelt.jp/zh/pages/fleur",
+      "coverImage": "brand-wunderwelt-fleur-hero.png",
+      "imageSourceURLs": ["https://www.wunderwelt.jp/cdn/shop/files/ogp_14ed06fd-8191-4b28-974b-969a94d8cbcd.png?v=1632711604"],
+      "productCodes": [],
+      "linkedCommerceItemIDs": [],
+      "observedAt": "2026-08-09"
+    },
+    {
+      "id": "wunderwelt-fleur-styles",
+      "kind": "feature",
+      "title": "跨风格的品牌入口",
+      "publishedOn": null,
+      "summary": "甜系、哥特、古典与王子风格都能在此找到。",
+      "content": "Wunderwelt 官网将甜系、哥特系、古典系、蒸汽朋克、公主系、王子系与民族风等纳入同一平台，并提供中文与英文服务，让不同地区的爱好者浏览和购买。",
+      "sourceURL": "https://www.wunderwelt.jp/zh/pages/about",
+      "coverImage": "brand-wunderwelt-fleur-hero.png",
+      "imageSourceURLs": ["https://www.wunderwelt.jp/cdn/shop/files/ogp_14ed06fd-8191-4b28-974b-969a94d8cbcd.png?v=1632711604"],
+      "productCodes": [],
+      "linkedCommerceItemIDs": [],
+      "observedAt": "2026-08-09"
+    },
+    {
+      "id": "wunderwelt-fleur-original",
+      "kind": "craft",
+      "title": "原创基础单品",
+      "publishedOn": null,
+      "summary": "除代理品牌外，平台也提供自己的裙撑等基础单品。",
+      "content": "FLEUR 的商品入口中可见 Wunderwelt 原创裙撑等基础搭配单品，与代理品牌的裙装和配饰共同构成一站式选择。档案仅概括类别，不摘录具体商品宣传文案。",
+      "sourceURL": "https://www.wunderwelt.jp/zh/pages/fleur",
+      "coverImage": "brand-wunderwelt-fleur-original.jpg",
+      "imageSourceURLs": ["https://www.wunderwelt.jp/cdn/shop/files/OriginalPetticoat.jpg?v=1632110689"],
+      "productCodes": [],
+      "linkedCommerceItemIDs": [],
+      "observedAt": "2026-08-09"
+    }
+  ],
+  "events": [],
+  "historyEntries": [],
+  "importBatches": []
+}
