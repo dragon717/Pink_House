@@ -41,6 +41,22 @@ private enum TimeHallMerchant: String, CaseIterable, Identifiable {
   }
 }
 
+private enum TimeHallScrollRange: Equatable {
+  case top
+  case middle
+  case collapsed
+
+  init(distance: CGFloat) {
+    if distance <= 16 {
+      self = .top
+    } else if distance >= 88 {
+      self = .collapsed
+    } else {
+      self = .middle
+    }
+  }
+}
+
 private enum TimeHallStoreTheme: String, CaseIterable, Identifiable {
   case omotesando
   case nagoya
@@ -202,8 +218,7 @@ struct TimeHallView: View {
   @State private var showTreasuresOnly = false
   @State private var searchText = ""
   @State private var isTimelineAscending = false
-  @State private var headerCollapseProgress: CGFloat = 0
-  @State private var headerDragStartProgress: CGFloat?
+  @State private var isHeaderCollapsed = false
 
   private var palette: MagicThemePalette {
     MagicThemeDesignSystem.palette(themeManager: themeManager, colorScheme: colorScheme)
@@ -306,7 +321,9 @@ struct TimeHallView: View {
       guard isActive else { return }
       carouselMerchant = .pinkHouse
       activeMerchant = nil
+      isHeaderCollapsed = false
     }
+    .toolbar(.hidden, for: .navigationBar)
   }
 
   private var pinkHouseHall: some View {
@@ -315,24 +332,16 @@ struct TimeHallView: View {
 
       VStack(spacing: 0) {
         header
-        modePicker
-          .padding(.horizontal, 20)
-          .padding(.bottom, 8 * (1 - headerCollapseProgress))
-          .frame(height: 48 * (1 - headerCollapseProgress), alignment: .top)
-          .opacity(1 - headerCollapseProgress)
-          .clipped()
+        ZStack(alignment: .top) {
+          archiveScrollView
 
-        Group {
-          switch mode {
-          case .chronicle:
-            chronicleContent
-          case .styleSpray:
-            styleSprayContent
-          case .story:
-            storyContent
-          case .coordinate:
-            coordinateContent
-          }
+          expandedArchiveHeader
+            .frame(height: 88, alignment: .top)
+            .opacity(isHeaderCollapsed ? 0 : 1)
+            .scaleEffect(isHeaderCollapsed ? 0.98 : 1, anchor: .top)
+            .allowsHitTesting(!isHeaderCollapsed)
+            .accessibilityHidden(isHeaderCollapsed)
+            .animation(.easeOut(duration: 0.16), value: isHeaderCollapsed)
         }
       }
     }
@@ -345,6 +354,45 @@ struct TimeHallView: View {
     .sheet(item: $detailStory) { story in
       TimeHallStoryDetailView(story: story)
     }
+  }
+
+  @ViewBuilder
+  private var archiveScrollView: some View {
+    if #available(iOS 18.0, *) {
+      archiveScrollViewBody
+        .onScrollGeometryChange(for: TimeHallScrollRange.self) { geometry in
+          TimeHallScrollRange(
+            distance: geometry.contentOffset.y + geometry.contentInsets.top
+          )
+        } action: { _, range in
+          handleScrollRange(range)
+        }
+    } else {
+      archiveScrollViewBody
+    }
+  }
+
+  private var archiveScrollViewBody: some View {
+    ScrollView {
+      if #unavailable(iOS 18.0) {
+        scrollThresholdObserver
+      }
+
+      Group {
+        switch mode {
+        case .chronicle:
+          chronicleContent
+        case .styleSpray:
+          styleSprayContent
+        case .story:
+          storyContent
+        case .coordinate:
+          coordinateContent
+        }
+      }
+      .padding(.top, 88)
+    }
+    .scrollIndicators(.hidden)
   }
 
   private var merchantSelection: some View {
@@ -371,9 +419,11 @@ struct TimeHallView: View {
   }
 
   private var merchantSelectionPortrait: some View {
-    VStack(spacing: 14) {
+    VStack(spacing: 16) {
       Spacer(minLength: 12)
-      HStack(alignment: .top, spacing: 8) {
+      merchantSelectionIntroduction
+
+      HStack(alignment: .center, spacing: 8) {
         merchantSelectionHeading
           .frame(maxWidth: .infinity)
         storeThemeMenu
@@ -399,13 +449,15 @@ struct TimeHallView: View {
   }
 
   private func merchantSelectionLandscape(size: CGSize) -> some View {
-    VStack(spacing: 4) {
-      HStack(alignment: .top, spacing: 8) {
+    VStack(spacing: 8) {
+      merchantSelectionIntroductionCompact
+
+      HStack(alignment: .center, spacing: 8) {
         VStack(alignment: .leading, spacing: 2) {
-          Text("选择商家".appLocalized)
-            .font(.system(.title2, design: .serif).weight(.semibold))
+          Text("选择品牌".appLocalized)
+            .font(.system(.headline, design: .serif).weight(.semibold))
             .foregroundStyle(palette.primaryText)
-          Text("左右滑动查看已接入的品牌档案".appLocalized)
+          Text("左右滑动，进入想翻阅的品牌档案".appLocalized)
             .font(.caption)
             .foregroundStyle(palette.secondaryText)
         }
@@ -445,15 +497,41 @@ struct TimeHallView: View {
     .padding(.vertical, 8)
   }
 
-  private var merchantSelectionHeading: some View {
+  private var merchantSelectionIntroduction: some View {
     VStack(spacing: 6) {
-      Text("选择商家".appLocalized)
+      Text("梦裙时光馆".appLocalized)
         .font(.system(.largeTitle, design: .serif).weight(.semibold))
         .foregroundStyle(palette.primaryText)
-      Text("左右滑动查看已接入的品牌档案".appLocalized)
+      Text("在这里翻阅品牌的编年史、图鉴、专题与搭配".appLocalized)
         .font(.subheadline)
+        .multilineTextAlignment(.center)
         .foregroundStyle(palette.secondaryText)
     }
+  }
+
+  private var merchantSelectionIntroductionCompact: some View {
+    VStack(alignment: .leading, spacing: 3) {
+      Text("梦裙时光馆".appLocalized)
+        .font(.system(.title, design: .serif).weight(.semibold))
+        .foregroundStyle(palette.primaryText)
+      Text("在这里翻阅品牌的编年史、图鉴、专题与搭配".appLocalized)
+        .font(.caption)
+        .foregroundStyle(palette.secondaryText)
+    }
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .padding(.horizontal, 12)
+  }
+
+  private var merchantSelectionHeading: some View {
+    VStack(alignment: .leading, spacing: 3) {
+      Text("选择品牌".appLocalized)
+        .font(.system(.title2, design: .serif).weight(.semibold))
+        .foregroundStyle(palette.primaryText)
+      Text("左右滑动，进入想翻阅的品牌档案".appLocalized)
+        .font(.caption)
+        .foregroundStyle(palette.secondaryText)
+    }
+    .frame(maxWidth: .infinity, alignment: .leading)
   }
 
   private func merchantCard(_ merchant: TimeHallMerchant) -> some View {
@@ -497,7 +575,7 @@ struct TimeHallView: View {
 
         Button {
           guard merchant.isAvailable else { return }
-          headerCollapseProgress = 0
+          isHeaderCollapsed = false
           activeMerchant = merchant
         } label: {
           Label(
@@ -616,58 +694,65 @@ struct TimeHallView: View {
     .disabled(!isEnabled)
   }
 
-  private var headerCollapseGesture: some Gesture {
-    DragGesture(minimumDistance: 8)
-      .onChanged { value in
-        guard abs(value.translation.height) > abs(value.translation.width) else { return }
-        if headerDragStartProgress == nil {
-          headerDragStartProgress = headerCollapseProgress
-        }
-        let start = headerDragStartProgress ?? headerCollapseProgress
-        headerCollapseProgress = min(max(start - value.translation.height / 72, 0), 1)
-      }
-      .onEnded { value in
-        guard let start = headerDragStartProgress else { return }
-        let predicted = min(max(start - value.predictedEndTranslation.height / 72, 0), 1)
-        withAnimation(.snappy) {
-          headerCollapseProgress = predicted >= 0.5 ? 1 : 0
-        }
-        headerDragStartProgress = nil
-      }
+  private var scrollThresholdObserver: some View {
+    ScrollViewThresholdObserver { scrollDistance in
+      handleScrollRange(TimeHallScrollRange(distance: scrollDistance))
+    }
+    .frame(width: 1, height: 1)
+    .opacity(0)
+    .accessibilityHidden(true)
+  }
+
+  private func handleScrollRange(_ range: TimeHallScrollRange) {
+    let shouldCollapse: Bool?
+    switch range {
+    case .top: shouldCollapse = false
+    case .middle: shouldCollapse = nil
+    case .collapsed: shouldCollapse = true
+    }
+    guard let shouldCollapse, shouldCollapse != isHeaderCollapsed else { return }
+    isHeaderCollapsed = shouldCollapse
   }
 
   private var header: some View {
-    VStack(alignment: .leading, spacing: 3) {
-      HStack {
-        Button {
-          carouselMerchant = .pinkHouse
-          headerCollapseProgress = 0
-          activeMerchant = nil
-        } label: {
-          Label("Pink House", systemImage: "chevron.left")
-            .font(.subheadline.weight(.semibold))
-            .padding(.horizontal, 2)
-            .frame(minHeight: 44)
-        }
-        .buttonStyle(.bordered)
-        .buttonBorderShape(.capsule)
-        .tint(Color.pink)
-        .accessibilityLabel("返回品牌选择，当前 Pink House")
+    HStack(spacing: 8) {
+      Button {
+        carouselMerchant = .pinkHouse
+        isHeaderCollapsed = false
+        activeMerchant = nil
+      } label: {
+        Label("选择品牌".appLocalized, systemImage: "chevron.left")
+          .font(.caption.weight(.semibold))
+          .frame(height: 30)
+      }
+      .buttonStyle(.bordered)
+      .buttonBorderShape(.capsule)
+      .controlSize(.small)
+      .tint(Color.pink)
+      .accessibilityLabel("返回品牌选择，当前 Pink House")
 
-        Spacer(minLength: 8)
-        ViewThatFits(in: .horizontal) {
-          treasureButton
-          treasureButtonCompact
-        }
+      Text(TimeHallMerchant.pinkHouse.name)
+        .font(.subheadline.weight(.semibold))
+        .foregroundStyle(palette.primaryText)
+        .lineLimit(1)
+
+      if isHeaderCollapsed {
+        collapsedModeMenu
       }
 
+      Spacer(minLength: 0)
+      treasureButtonCompact
+    }
+    .padding(.horizontal, 12)
+    .padding(.bottom, 4)
+  }
+
+  private var expandedArchiveHeader: some View {
+    VStack(alignment: .leading, spacing: 0) {
       VStack(alignment: .leading, spacing: 3) {
-        Text((store.catalog?.title ?? "梦裙时光馆").appLocalized)
-          .font(.system(.title, design: .serif).weight(.semibold))
+        Text(store.catalog?.subtitle ?? "PINK HOUSE · 1972–至今 · 真实目录与故事档案")
+          .font(.subheadline.weight(.semibold))
           .foregroundStyle(palette.primaryText)
-        Text(store.catalog?.subtitle ?? "")
-          .font(.caption)
-          .foregroundStyle(palette.secondaryText)
         if !store.items.isEmpty || !store.commerceItems.isEmpty {
           Text(
             "\(store.catalog?.scope.labelZH ?? "1972–至今") · \(magazinePageCount) 幅编年史杂志内页 · \(store.commerceItems.count) 件官方商品"
@@ -676,32 +761,39 @@ struct TimeHallView: View {
           .foregroundStyle(palette.secondaryText.opacity(0.85))
         }
       }
-      .frame(height: 70 * (1 - headerCollapseProgress), alignment: .top)
-      .scaleEffect(y: 1 - headerCollapseProgress, anchor: .top)
-      .opacity(1 - headerCollapseProgress)
-      .clipped()
+      .frame(height: 40, alignment: .top)
+      .padding(.horizontal, 20)
+
+      modePicker
+        .padding(.horizontal, 20)
+        .padding(.bottom, 8)
+        .frame(height: 48, alignment: .top)
     }
-    .padding(.horizontal, 20)
-    .padding(.top, 8 - 4 * headerCollapseProgress)
-    .padding(.bottom, 6 - 4 * headerCollapseProgress)
   }
 
-  /// Apple HIG: bordered capsule with a stable, single-line label.
-  private var treasureButton: some View {
-    Button {
-      showTreasuresOnly.toggle()
+  private var collapsedModeMenu: some View {
+    Menu {
+      ForEach(TimeHallMode.allCases) { item in
+        Button {
+          mode = item
+        } label: {
+          Label(item.title, systemImage: mode == item ? "checkmark.circle.fill" : "circle")
+        }
+      }
     } label: {
-      Label("珍藏".appLocalized, systemImage: showTreasuresOnly ? "heart.fill" : "heart")
-        .labelStyle(.titleAndIcon)
-        .lineLimit(1)
-        .fixedSize(horizontal: true, vertical: false)
+      HStack(spacing: 4) {
+        Text(mode.title)
+        Image(systemName: "chevron.down")
+          .font(.caption2)
+      }
+      .font(.caption.weight(.semibold))
+      .foregroundStyle(Color.pink)
+      .padding(.horizontal, 9)
+      .frame(height: 28)
+      .background(Color.pink.opacity(0.12), in: Capsule())
     }
-    .buttonStyle(.bordered)
-    .controlSize(.regular)
-    .buttonBorderShape(.capsule)
-    .tint(showTreasuresOnly ? .pink : nil)
-    .accessibilityLabel("珍藏".appLocalized)
-    .accessibilityValue(showTreasuresOnly ? "已开启".appLocalized : "已关闭".appLocalized)
+    .accessibilityLabel("切换品牌档案页签".appLocalized)
+    .accessibilityValue(mode.title)
   }
 
   private var treasureButtonCompact: some View {
@@ -711,10 +803,10 @@ struct TimeHallView: View {
       Image(systemName: showTreasuresOnly ? "heart.fill" : "heart")
     }
     .buttonStyle(.bordered)
-    .controlSize(.regular)
+    .controlSize(.small)
     .buttonBorderShape(.circle)
     .tint(showTreasuresOnly ? .pink : nil)
-    .frame(width: 44, height: 44)
+    .frame(width: 32, height: 32)
     .accessibilityLabel("珍藏".appLocalized)
     .accessibilityValue(showTreasuresOnly ? "已开启".appLocalized : "已关闭".appLocalized)
   }
@@ -723,7 +815,7 @@ struct TimeHallView: View {
     HStack(spacing: 0) {
       ForEach(TimeHallMode.allCases) { item in
         Button {
-          withAnimation(.snappy) { mode = item }
+          mode = item
         } label: {
           Text(item.title)
             .font(.subheadline.weight(mode == item ? .semibold : .regular))
@@ -744,23 +836,19 @@ struct TimeHallView: View {
   }
 
   private var chronicleContent: some View {
-    ScrollView {
-      VStack(alignment: .leading, spacing: 20) {
-        searchField
-        yearRail
-        catalogueSection
-        if !itemsForActiveYear.isEmpty {
-          magazinePageGrid(title: "编年史杂志内页".appLocalized, items: itemsForActiveYear)
-        }
-        archiveCatalogueSection
-        yearStoryCard
-        historyEvidenceSection
+    VStack(alignment: .leading, spacing: 20) {
+      searchField
+      yearRail
+      catalogueSection
+      if !itemsForActiveYear.isEmpty {
+        magazinePageGrid(title: "编年史杂志内页".appLocalized, items: itemsForActiveYear)
       }
-      .padding(.horizontal, 20)
-      .padding(.bottom, 120)
+      archiveCatalogueSection
+      yearStoryCard
+      historyEvidenceSection
     }
-    .scrollIndicators(.hidden)
-    .simultaneousGesture(headerCollapseGesture)
+    .padding(.horizontal, 20)
+    .padding(.bottom, 120)
   }
 
   private var itemsForActiveYear: [TimeHallItemDTO] {
@@ -895,7 +983,7 @@ struct TimeHallView: View {
         }
       }
       .accessibilityElement(children: .contain)
-      .accessibilityLabel("\(record.year) \(record.titleZH)")
+      .accessibilityLabel("\(String(record.year)) \(record.titleZH)")
     }
   }
 
@@ -974,7 +1062,7 @@ struct TimeHallView: View {
 
             VStack(alignment: .leading, spacing: 8) {
               HStack {
-                Text("\(catalogue.year) · \(catalogue.seasonLabel) · \(catalogue.pageCount) 页")
+                Text("\(String(catalogue.year)) · \(catalogue.seasonLabel) · \(catalogue.pageCount) 页")
                   .font(.caption.weight(.semibold))
                   .foregroundStyle(Color.pink)
                 Spacer()
@@ -1040,23 +1128,18 @@ struct TimeHallView: View {
   }
 
   private var styleSprayContent: some View {
-    ScrollView {
-      VStack(alignment: .leading, spacing: 18) {
-        searchField
-        commerceSnapshotCard
-        commerceSourcePicker
-        commerceItemGrid
-      }
-      .padding(.horizontal, 20)
-      .padding(.bottom, 120)
+    VStack(alignment: .leading, spacing: 18) {
+      searchField
+      commerceSnapshotCard
+      commerceSourcePicker
+      commerceItemGrid
     }
-    .scrollIndicators(.hidden)
-    .simultaneousGesture(headerCollapseGesture)
+    .padding(.horizontal, 20)
+    .padding(.bottom, 120)
   }
 
   private var storyContent: some View {
-    ScrollView {
-      VStack(alignment: .leading, spacing: 18) {
+    VStack(alignment: .leading, spacing: 18) {
         searchField
         GlassCard(cornerRadius: 22, padding: 16) {
           VStack(alignment: .leading, spacing: 7) {
@@ -1104,16 +1187,13 @@ struct TimeHallView: View {
             .buttonStyle(.plain)
           }
         }
-      }
-      .padding(.horizontal, 20)
-      .padding(.bottom, 120)
     }
-    .scrollIndicators(.hidden)
+    .padding(.horizontal, 20)
+    .padding(.bottom, 120)
   }
 
   private var coordinateContent: some View {
-    ScrollView {
-      VStack(alignment: .leading, spacing: 18) {
+    VStack(alignment: .leading, spacing: 18) {
         searchField
         GlassCard(cornerRadius: 22, padding: 16) {
           VStack(alignment: .leading, spacing: 7) {
@@ -1163,11 +1243,9 @@ struct TimeHallView: View {
             .buttonStyle(.plain)
           }
         }
-      }
-      .padding(.horizontal, 20)
-      .padding(.bottom, 120)
     }
-    .scrollIndicators(.hidden)
+    .padding(.horizontal, 20)
+    .padding(.bottom, 120)
   }
 
   @ViewBuilder
@@ -1346,7 +1424,7 @@ private struct TimeHallMagazinePageCard: View {
         .padding(8)
       }
 
-      Text("\(item.year) \(TimeHallSeason(rawValue: item.season)?.labelZH ?? item.season) · 第 \(item.cataloguePage) 页")
+      Text("\(String(item.year)) \(TimeHallSeason(rawValue: item.season)?.labelZH ?? item.season) · 第 \(item.cataloguePage) 页")
         .font(.subheadline.weight(.semibold))
         .foregroundStyle(palette.primaryText)
         .lineLimit(1)
@@ -1358,7 +1436,7 @@ private struct TimeHallMagazinePageCard: View {
         .foregroundStyle(palette.secondaryText)
     }
     .accessibilityElement(children: .combine)
-    .accessibilityLabel("\(item.year) 年第 \(item.cataloguePage) 页编年史官方杂志内页")
+    .accessibilityLabel("\(String(item.year)) 年第 \(item.cataloguePage) 页编年史官方杂志内页")
   }
 }
 
@@ -1571,7 +1649,7 @@ struct TimeHallItemDetailView: View {
                 .foregroundStyle(palette.secondaryText)
             }
             Text(
-              "\(item.brand) · \(item.year) · \(TimeHallSeason(rawValue: item.season)?.labelZH ?? item.season)"
+              "\(item.brand) · \(String(item.year)) · \(TimeHallSeason(rawValue: item.season)?.labelZH ?? item.season)"
             )
             .font(.footnote.weight(.medium))
             .foregroundStyle(Color.pink)
@@ -2201,10 +2279,11 @@ struct TimeHallBundleImage: View {
   let fileName: String?
   var placeholderSystemImage = "tshirt.fill"
   @ObservedObject private var store = TimeHallCatalogStore.shared
+  @State private var image: UIImage?
 
   var body: some View {
     Group {
-      if let image = store.image(named: fileName) {
+      if let image {
         Image(uiImage: image)
           .resizable()
       } else {
@@ -2214,7 +2293,11 @@ struct TimeHallBundleImage: View {
             Image(systemName: placeholderSystemImage)
               .foregroundStyle(Color.pink.opacity(0.5))
           }
+        }
       }
+    .task(id: fileName) {
+      image = nil
+      image = await store.loadImage(named: fileName)
     }
   }
 }

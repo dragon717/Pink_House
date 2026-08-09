@@ -396,7 +396,7 @@ private final class WardrobeStatsAutoCollapseCoordinator {
     }
 }
 
-private struct WardrobeStatsScrollObserver: UIViewRepresentable {
+struct ScrollViewThresholdObserver: UIViewRepresentable {
     var onScroll: (CGFloat) -> Void
 
     func makeCoordinator() -> Coordinator {
@@ -2067,7 +2067,7 @@ struct WardrobeView: View {
     }
 
     private func statsScrollObserver() -> some View {
-        WardrobeStatsScrollObserver { scrollDistance in
+        ScrollViewThresholdObserver { scrollDistance in
             handleStatsScrollDistance(scrollDistance)
         }
         .frame(width: 1, height: 1)

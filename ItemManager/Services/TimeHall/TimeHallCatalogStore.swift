@@ -1,5 +1,6 @@
 import Combine
 import Foundation
+import ImageIO
 import UIKit
 
 /// Local V3 batch catalog. CloudKit public upload is documented in docs/TIME_HALL_CLOUDKIT_UPLOAD_PLAN.md.
@@ -58,6 +59,8 @@ final class TimeHallCatalogStore: ObservableObject {
   private let imageCache = NSCache<NSString, UIImage>()
 
   private init() {
+    imageCache.countLimit = 96
+    imageCache.totalCostLimit = 80 * 1024 * 1024
     loadCatalog()
     treasuredIDs = Set(UserDefaults.standard.stringArray(forKey: treasureKey) ?? [])
   }
@@ -188,6 +191,30 @@ final class TimeHallCatalogStore: ObservableObject {
     if let cached = imageCache.object(forKey: fileName as NSString) {
       return cached
     }
+    guard let url = imageURL(named: fileName), let image = UIImage(contentsOfFile: url.path) else {
+      return nil
+    }
+    imageCache.setObject(image, forKey: fileName as NSString)
+    return image
+  }
+
+  func loadImage(named fileName: String?) async -> UIImage? {
+    guard let fileName, !fileName.isEmpty else { return nil }
+    let cacheKey = fileName as NSString
+    if let cached = imageCache.object(forKey: cacheKey) {
+      return cached
+    }
+    guard let url = imageURL(named: fileName) else { return nil }
+    let image = await Task.detached(priority: .userInitiated) {
+      TimeHallImageDownsampler.load(url: url, maxPixelDimension: 1200)
+    }.value
+    guard let image, !Task.isCancelled else { return nil }
+    let cost = image.cgImage.map { $0.bytesPerRow * $0.height } ?? 0
+    imageCache.setObject(image, forKey: cacheKey, cost: cost)
+    return image
+  }
+
+  private func imageURL(named fileName: String) -> URL? {
     let ns = fileName as NSString
     let base = ns.deletingPathExtension
     let ext = ns.pathExtension.isEmpty ? nil : ns.pathExtension
@@ -199,23 +226,10 @@ final class TimeHallCatalogStore: ObservableObject {
       Bundle.main.url(forResource: base, withExtension: ext),
       Bundle.main.url(forResource: fileName, withExtension: nil),
     ]
-    for url in candidates.compactMap({ $0 }) {
-      if let image = UIImage(contentsOfFile: url.path) {
-        imageCache.setObject(image, forKey: fileName as NSString)
-        return image
-      }
-    }
-    if let urls = Bundle.main.urls(forResourcesWithExtension: ext, subdirectory: nil),
-      let match = urls.first(where: {
+    return candidates.compactMap { $0 }.first
+      ?? Bundle.main.urls(forResourcesWithExtension: ext, subdirectory: nil)?.first {
         $0.lastPathComponent.caseInsensitiveCompare(fileName) == .orderedSame
-      })
-    {
-      if let image = UIImage(contentsOfFile: match.path) {
-        imageCache.setObject(image, forKey: fileName as NSString)
-        return image
       }
-    }
-    return nil
   }
 
   private func loadCatalog() {
@@ -711,5 +725,25 @@ final class TimeHallCatalogStore: ObservableObject {
     formatter.dateFormat = "yyyy-MM-dd"
     formatter.isLenient = false
     return formatter.date(from: value) != nil
+  }
+}
+
+private enum TimeHallImageDownsampler {
+  nonisolated static func load(
+    url: URL,
+    maxPixelDimension: CGFloat
+  ) -> UIImage? {
+    let sourceOptions = [kCGImageSourceShouldCache: false] as CFDictionary
+    guard let source = CGImageSourceCreateWithURL(url as CFURL, sourceOptions) else { return nil }
+    let options: [CFString: Any] = [
+      kCGImageSourceCreateThumbnailFromImageAlways: true,
+      kCGImageSourceCreateThumbnailWithTransform: true,
+      kCGImageSourceShouldCacheImmediately: true,
+      kCGImageSourceThumbnailMaxPixelSize: maxPixelDimension,
+    ]
+    guard let image = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary) else {
+      return nil
+    }
+    return UIImage(cgImage: image)
   }
 }
