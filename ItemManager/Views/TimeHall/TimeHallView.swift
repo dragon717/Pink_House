@@ -12,28 +12,91 @@ enum TimeHallMode: String, CaseIterable, Identifiable {
   var title: String {
     switch self {
     case .chronicle: return "编年史".appLocalized
-    case .styleSpray: return "图鉴".appLocalized
+    case .styleSpray: return "图鉴手册".appLocalized
     case .story: return "专题".appLocalized
     case .coordinate: return "搭配".appLocalized
     }
   }
 }
 
-enum TimeHallIllustrationSection: String, CaseIterable, Identifiable {
-  case catalogue
-  case commerce
+private enum TimeHallMerchant: String, CaseIterable, Identifiable {
+  case pinkHouse
+  case ap
+
+  var id: String { rawValue }
+  var isAvailable: Bool { self == .pinkHouse }
+
+  var name: String {
+    switch self {
+    case .pinkHouse: return "Pink House"
+    case .ap: return "A.P."
+    }
+  }
+
+  var subtitle: String {
+    switch self {
+    case .pinkHouse: return "编年史杂志与官方商品档案".appLocalized
+    case .ap: return "品牌档案卡位已预留".appLocalized
+    }
+  }
+}
+
+private enum TimeHallStoreTheme: String, CaseIterable, Identifiable {
+  case omotesando
+  case nagoya
+  case kagoshima
 
   var id: String { rawValue }
 
   var title: String {
     switch self {
-    case .catalogue: return "目录馆藏".appLocalized
-    case .commerce: return "官方商品".appLocalized
+    case .omotesando: return "Timeless 表参道"
+    case .nagoya: return "名古屋松坂屋"
+    case .kagoshima: return "鹿儿岛山形屋"
     }
+  }
+
+  var location: String {
+    switch self {
+    case .omotesando: return "东京 · 神宫前"
+    case .nagoya: return "名古屋 · 松坂屋本馆 5F"
+    case .kagoshima: return "鹿儿岛 · 山形屋1号馆 4F"
+    }
+  }
+
+  var assetName: String {
+    switch self {
+    case .omotesando: return "time_hall_store_omotesando"
+    case .nagoya: return "time_hall_store_nagoya"
+    case .kagoshima: return "time_hall_store_kagoshima"
+    }
+  }
+
+  var accent: Color {
+    switch self {
+    case .omotesando: return Color(red: 0.73, green: 0.24, blue: 0.32)
+    case .nagoya: return Color(red: 0.52, green: 0.08, blue: 0.16)
+    case .kagoshima: return Color(red: 0.44, green: 0.29, blue: 0.20)
+    }
+  }
+
+  var colors: [Color] {
+    switch self {
+    case .omotesando:
+      return [Color(red: 0.98, green: 0.91, blue: 0.82), Color(red: 0.80, green: 0.90, blue: 0.82)]
+    case .nagoya:
+      return [Color(red: 0.98, green: 0.86, blue: 0.88), Color(red: 0.73, green: 0.25, blue: 0.31)]
+    case .kagoshima:
+      return [Color(red: 0.93, green: 0.85, blue: 0.72), Color(red: 0.74, green: 0.87, blue: 0.82)]
+    }
+  }
+
+  var imageScale: CGFloat {
+    self == .omotesando ? 1.28 : 1.52
   }
 }
 
-private struct TimeHallItemImageGroup: Identifiable {
+private struct TimeHallMagazinePageGroup: Identifiable {
   let id: String
   let items: [TimeHallItemDTO]
 
@@ -127,13 +190,14 @@ extension TimeHallStoryDTO {
 struct TimeHallView: View {
   @Environment(ThemeManager.self) private var themeManager
   @Environment(\.colorScheme) private var colorScheme
+  @Environment(\.isRoutePageActive) private var isRoutePageActive
   @ObservedObject private var store = TimeHallCatalogStore.shared
 
+  @State private var carouselMerchant: TimeHallMerchant = .pinkHouse
+  @State private var storeTheme: TimeHallStoreTheme = .omotesando
+  @State private var activeMerchant: TimeHallMerchant?
   @State private var mode: TimeHallMode = .chronicle
-  @State private var illustrationSection: TimeHallIllustrationSection = .catalogue
   @State private var selectedYear: Int?
-  @State private var selectedStyle: String?
-  @State private var detailItem: TimeHallItemDTO?
   @State private var detailCommerceItem: TimeHallCommerceItemDTO?
   @State private var detailCoordinate: TimeHallCoordinateDTO?
   @State private var detailStory: TimeHallStoryDTO?
@@ -148,6 +212,10 @@ struct TimeHallView: View {
 
   private var activeYear: Int {
     selectedYear ?? orderedTimelineYears.first ?? 2024
+  }
+
+  private var magazinePageCount: Int {
+    Set(store.items.compactMap(\.coverImage)).count
   }
 
   private var orderedTimelineYears: [Int] {
@@ -189,11 +257,6 @@ struct TimeHallView: View {
     if let commerceSource {
       list = list.filter { $0.sourceKind == commerceSource }
     }
-    if let selectedStyle {
-      list = list.filter {
-        $0.stylesZH.contains(selectedStyle) || $0.styles.contains(selectedStyle)
-      }
-    }
     if showTreasuresOnly {
       list = list.filter { store.isTreasured($0.id) }
     }
@@ -233,6 +296,21 @@ struct TimeHallView: View {
   }
 
   var body: some View {
+    Group {
+      if activeMerchant == .pinkHouse {
+        pinkHouseHall
+      } else {
+        merchantSelection
+      }
+    }
+    .onChange(of: isRoutePageActive) { _, isActive in
+      guard isActive else { return }
+      carouselMerchant = .pinkHouse
+      activeMerchant = nil
+    }
+  }
+
+  private var pinkHouseHall: some View {
     ZStack {
       LiquidBackground(themeSkinWallpaperContext: .timeHall)
 
@@ -256,9 +334,6 @@ struct TimeHallView: View {
         }
       }
     }
-    .sheet(item: $detailItem) { item in
-      TimeHallItemDetailView(item: item)
-    }
     .sheet(item: $detailCommerceItem) { item in
       TimeHallCommerceItemDetailView(item: item)
     }
@@ -270,9 +345,191 @@ struct TimeHallView: View {
     }
   }
 
+  private var merchantSelection: some View {
+    ZStack {
+      LiquidBackground(themeSkinWallpaperContext: .timeHall)
+      LinearGradient(colors: storeTheme.colors, startPoint: .topLeading, endPoint: .bottomTrailing)
+        .opacity(0.22)
+        .ignoresSafeArea()
+
+      VStack(spacing: 14) {
+        Spacer(minLength: 54)
+
+        VStack(spacing: 6) {
+          Text("选择商家".appLocalized)
+            .font(.system(.largeTitle, design: .serif).weight(.semibold))
+            .foregroundStyle(palette.primaryText)
+          Text("左右滑动查看已接入的品牌档案".appLocalized)
+            .font(.subheadline)
+            .foregroundStyle(palette.secondaryText)
+        }
+
+        TabView(selection: $carouselMerchant) {
+          ForEach(TimeHallMerchant.allCases) { merchant in
+            merchantCard(merchant)
+              .padding(.horizontal, 8)
+              .tag(merchant)
+          }
+        }
+        .tabViewStyle(.page(indexDisplayMode: .always))
+        .indexViewStyle(.page(backgroundDisplayMode: .always))
+        .frame(maxWidth: 520, maxHeight: 390)
+
+        merchantCarouselNavigation
+
+        Text(
+          carouselMerchant.isAvailable
+            ? "默认商家 · \(storeTheme.location)" : "敬请期待".appLocalized
+        )
+          .font(.caption.weight(.medium))
+          .foregroundStyle(palette.secondaryText)
+
+        Spacer(minLength: 82)
+      }
+      .padding(.horizontal, 20)
+
+      storeThemeMenu
+        .padding(.top, 12)
+        .padding(.trailing, 20)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+    }
+  }
+
+  private func merchantCard(_ merchant: TimeHallMerchant) -> some View {
+    GlassCard(cornerRadius: 30, padding: 20) {
+      VStack(spacing: 14) {
+        if merchant == .pinkHouse {
+          themedStorefront
+        } else {
+          Image(systemName: "sparkles.rectangle.stack")
+            .font(.system(size: 42, weight: .semibold))
+            .foregroundStyle(palette.secondaryText)
+            .frame(maxWidth: .infinity)
+            .frame(height: 142)
+            .background(Color.pink.opacity(0.06), in: RoundedRectangle(cornerRadius: 22))
+        }
+
+        VStack(spacing: 7) {
+          Text(merchant.name)
+            .font(.system(.title, design: .serif).weight(.bold))
+            .foregroundStyle(palette.primaryText)
+          if merchant == .pinkHouse {
+            Text(storeTheme.title)
+              .font(.caption.weight(.semibold))
+              .foregroundStyle(storeTheme.accent)
+          }
+          Text(merchant.subtitle)
+            .font(.subheadline)
+            .multilineTextAlignment(.center)
+            .foregroundStyle(palette.secondaryText)
+        }
+
+        Button {
+          guard merchant.isAvailable else { return }
+          activeMerchant = merchant
+        } label: {
+          Label(
+            merchant.isAvailable ? "进入 \(merchant.name)" : "暂未开放",
+            systemImage: merchant.isAvailable ? "arrow.right.circle.fill" : "lock.fill"
+          )
+          .frame(maxWidth: .infinity)
+          .padding(.vertical, 4)
+        }
+        .buttonStyle(.borderedProminent)
+        .buttonBorderShape(.capsule)
+        .tint(merchant.isAvailable ? storeTheme.accent : .gray)
+        .disabled(!merchant.isAvailable)
+      }
+    }
+    .animation(.snappy, value: storeTheme)
+  }
+
+  private var themedStorefront: some View {
+    ZStack {
+      RoundedRectangle(cornerRadius: 22, style: .continuous)
+        .fill(LinearGradient(colors: storeTheme.colors, startPoint: .topLeading, endPoint: .bottomTrailing))
+
+      Circle()
+        .fill(.white.opacity(0.36))
+        .frame(width: 120, height: 120)
+        .offset(x: 112, y: -54)
+
+      TimelineView(.animation(minimumInterval: 1 / 30)) { context in
+        let wave = CGFloat(sin(context.date.timeIntervalSinceReferenceDate * 1.4))
+        Image(storeTheme.assetName)
+          .resizable()
+          .scaledToFit()
+          .padding(8)
+          .scaleEffect(storeTheme.imageScale)
+          .offset(y: wave * 3)
+          .shadow(color: storeTheme.accent.opacity(0.28), radius: 10, y: 6)
+      }
+    }
+    .frame(height: 142)
+    .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+    .overlay {
+      RoundedRectangle(cornerRadius: 22, style: .continuous)
+        .stroke(.white.opacity(0.62), lineWidth: 1)
+    }
+    .accessibilityLabel("\(storeTheme.title)门店主题")
+  }
+
+  private var storeThemeMenu: some View {
+    Menu {
+      ForEach(TimeHallStoreTheme.allCases) { theme in
+        Button {
+          withAnimation(.snappy) { storeTheme = theme }
+        } label: {
+          Label(theme.title, systemImage: storeTheme == theme ? "checkmark.circle.fill" : "storefront")
+        }
+      }
+    } label: {
+      Label("换皮肤".appLocalized, systemImage: "paintpalette.fill")
+        .font(.subheadline.weight(.semibold))
+    }
+    .buttonStyle(.bordered)
+    .buttonBorderShape(.capsule)
+    .tint(storeTheme.accent)
+    .accessibilityLabel("切换门店主题".appLocalized)
+    .accessibilityValue(storeTheme.title)
+  }
+
+  private var merchantCarouselNavigation: some View {
+    HStack(spacing: 10) {
+      merchantNavigationButton(title: "前往上一家店铺", systemImage: "chevron.left", offset: -1)
+      merchantNavigationButton(title: "前往下一家店铺", systemImage: "chevron.right", offset: 1)
+    }
+  }
+
+  private func merchantNavigationButton(title: String, systemImage: String, offset: Int) -> some View {
+    let merchants = TimeHallMerchant.allCases
+    let index = merchants.firstIndex(of: carouselMerchant) ?? 0
+    let targetIndex = index + offset
+    let isEnabled = merchants.indices.contains(targetIndex)
+
+    return Button {
+      guard isEnabled else { return }
+      withAnimation(.snappy) { carouselMerchant = merchants[targetIndex] }
+    } label: {
+      Label(title.appLocalized, systemImage: systemImage)
+        .font(.caption.weight(.semibold))
+        .lineLimit(1)
+        .minimumScaleFactor(0.78)
+        .frame(maxWidth: .infinity)
+        .frame(minHeight: 36)
+    }
+    .buttonStyle(.borderedProminent)
+    .buttonBorderShape(.capsule)
+    .tint(isEnabled ? storeTheme.accent : .gray)
+    .disabled(!isEnabled)
+  }
+
   private var header: some View {
     HStack(alignment: .center, spacing: 12) {
       VStack(alignment: .leading, spacing: 4) {
+        Label("Pink House", systemImage: "storefront.fill")
+          .font(.caption.weight(.semibold))
+          .foregroundStyle(Color.pink)
         Text((store.catalog?.title ?? "梦裙时光馆").appLocalized)
           .font(.system(.largeTitle, design: .serif).weight(.semibold))
           .foregroundStyle(palette.primaryText)
@@ -281,7 +538,7 @@ struct TimeHallView: View {
           .foregroundStyle(palette.secondaryText)
         if !store.items.isEmpty || !store.commerceItems.isEmpty {
           Text(
-            "\(store.catalog?.scope.labelZH ?? "1972–至今") · \(store.items.count) 件目录馆藏 · \(store.commerceItems.count) 件官方商品"
+            "\(store.catalog?.scope.labelZH ?? "1972–至今") · \(magazinePageCount) 幅编年史杂志内页 · \(store.commerceItems.count) 件官方商品"
           )
           .font(.caption)
           .foregroundStyle(palette.secondaryText.opacity(0.85))
@@ -299,18 +556,21 @@ struct TimeHallView: View {
   /// This lets Dynamic Type and localized titles keep a single, tappable 44 pt control.
   @ViewBuilder
   private var headerActions: some View {
-    ViewThatFits(in: .horizontal) {
-      HStack(spacing: 8) {
-        if mode == .styleSpray && illustrationSection == .catalogue {
-          styleFilterMenu
-        }
-        treasureButton
+    HStack(spacing: 8) {
+      Button {
+        carouselMerchant = .pinkHouse
+        activeMerchant = nil
+      } label: {
+        Image(systemName: "storefront")
       }
+      .buttonStyle(.bordered)
+      .controlSize(.regular)
+      .buttonBorderShape(.circle)
+      .frame(width: 44, height: 44)
+      .accessibilityLabel("切换商家".appLocalized)
 
-      HStack(spacing: 8) {
-        if mode == .styleSpray && illustrationSection == .catalogue {
-          styleFilterMenuCompact
-        }
+      ViewThatFits(in: .horizontal) {
+        treasureButton
         treasureButtonCompact
       }
     }
@@ -349,71 +609,6 @@ struct TimeHallView: View {
     .accessibilityValue(showTreasuresOnly ? "已开启".appLocalized : "已关闭".appLocalized)
   }
 
-  /// Apple HIG: `Menu` for filter choices; idle title「筛选」, selected title = tag only (stable min width).
-  private var styleFilterMenu: some View {
-    Menu {
-      styleFilterMenuContent
-    } label: {
-      // Idle: 筛选 + icon. Selected: tag name only (HIG Menu trigger stays bordered/.regular).
-      Group {
-        if let selectedStyle {
-          Text(selectedStyle)
-            .lineLimit(1)
-        } else {
-          Label("筛选".appLocalized, systemImage: "line.3.horizontal.decrease")
-            .labelStyle(.titleAndIcon)
-        }
-      }
-      .frame(minWidth: 72, alignment: .center)
-    }
-    .buttonStyle(.bordered)
-    .controlSize(.regular)
-    .buttonBorderShape(.capsule)
-    .tint(selectedStyle != nil ? .pink : nil)
-    .accessibilityLabel("筛选".appLocalized)
-    .accessibilityValue(selectedStyle ?? "全部风格".appLocalized)
-  }
-
-  @ViewBuilder
-  private var styleFilterMenuContent: some View {
-    Button {
-      selectedStyle = nil
-    } label: {
-      if selectedStyle == nil {
-        Label("全部风格".appLocalized, systemImage: "checkmark")
-      } else {
-        Text("全部风格".appLocalized)
-      }
-    }
-    Divider()
-    ForEach(store.styleBubbles()) { bubble in
-      Button {
-        selectedStyle = bubble.label
-      } label: {
-        if selectedStyle == bubble.label {
-          Label(bubble.label, systemImage: "checkmark")
-        } else {
-          Text(bubble.label)
-        }
-      }
-    }
-  }
-
-  private var styleFilterMenuCompact: some View {
-    Menu {
-      styleFilterMenuContent
-    } label: {
-      Image(systemName: "line.3.horizontal.decrease")
-    }
-    .buttonStyle(.bordered)
-    .controlSize(.regular)
-    .buttonBorderShape(.circle)
-    .tint(selectedStyle != nil ? .pink : nil)
-    .frame(width: 44, height: 44)
-    .accessibilityLabel("筛选".appLocalized)
-    .accessibilityValue(selectedStyle ?? "全部风格".appLocalized)
-  }
-
   private var modePicker: some View {
     HStack(spacing: 0) {
       ForEach(TimeHallMode.allCases) { item in
@@ -445,7 +640,7 @@ struct TimeHallView: View {
         yearRail
         catalogueSection
         if !itemsForActiveYear.isEmpty {
-          itemGrid(title: "馆藏精选".appLocalized, items: itemsForActiveYear)
+          magazinePageGrid(title: "编年史杂志内页".appLocalized, items: itemsForActiveYear)
         }
         archiveCatalogueSection
         yearStoryCard
@@ -599,7 +794,7 @@ struct TimeHallView: View {
     if !catalogues.isEmpty {
       VStack(alignment: .leading, spacing: 12) {
         HStack {
-          Text("馆藏图录")
+          Text("官网杂志封面")
             .font(.system(.title3, design: .serif).weight(.semibold))
             .foregroundStyle(palette.primaryText)
           Spacer()
@@ -633,13 +828,13 @@ struct TimeHallView: View {
                     .font(.caption.weight(.medium))
                     .foregroundStyle(palette.primaryText)
                     .lineLimit(2)
-                  Label("查看图录", systemImage: "arrow.up.right.square")
+                  Label("查看官网杂志", systemImage: "arrow.up.right.square")
                     .font(.caption2)
                     .foregroundStyle(palette.secondaryText)
                 }
               }
               .buttonStyle(.plain)
-              .accessibilityLabel("\(catalogue.title) 图录")
+              .accessibilityLabel("\(catalogue.title) 杂志封面")
             }
           }
         }
@@ -650,7 +845,7 @@ struct TimeHallView: View {
   private var catalogueSection: some View {
     VStack(alignment: .leading, spacing: 12) {
       if !store.catalogues(for: activeYear).isEmpty {
-        Text("完整目录".appLocalized)
+        Text("完整杂志目录".appLocalized)
           .font(.system(.title3, design: .serif).weight(.semibold))
           .foregroundStyle(palette.primaryText)
       }
@@ -664,7 +859,7 @@ struct TimeHallView: View {
             .frame(width: 92, height: 132)
             .clipped()
             .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-            .accessibilityLabel("\(catalogue.titleZH) 图录封面")
+            .accessibilityLabel("\(catalogue.titleZH) 杂志封面")
 
             VStack(alignment: .leading, spacing: 8) {
               HStack {
@@ -672,7 +867,7 @@ struct TimeHallView: View {
                   .font(.caption.weight(.semibold))
                   .foregroundStyle(Color.pink)
                 Spacer()
-                Text("馆藏 \(catalogue.itemIds.count) 件")
+                Text("内页 \(Set(store.items(in: catalogue).compactMap(\.coverImage)).count) 幅")
                   .font(.caption.monospacedDigit())
                   .foregroundStyle(palette.secondaryText)
               }
@@ -685,7 +880,7 @@ struct TimeHallView: View {
                 .fixedSize(horizontal: false, vertical: true)
               if let url = URL(string: catalogue.sourceURL) {
                 Link(destination: url) {
-                  Label("查看图录", systemImage: "arrow.up.right.square")
+                  Label("查看官网杂志", systemImage: "arrow.up.right.square")
                     .font(.footnote.weight(.medium))
                 }
               }
@@ -737,48 +932,14 @@ struct TimeHallView: View {
     ScrollView {
       VStack(alignment: .leading, spacing: 18) {
         searchField
-        illustrationSectionPicker
-        switch illustrationSection {
-        case .catalogue:
-          itemGrid(
-            title: selectedStyle.map { "「\($0)」目录馆藏".appLocalized }
-              ?? "目录馆藏".appLocalized,
-            items: selectedStyle.map {
-              store.items(withStyle: $0).filter { filteredItems.contains($0) }
-            } ?? filteredItems
-          )
-        case .commerce:
-          commerceSnapshotCard
-          commerceSourcePicker
-          commerceItemGrid
-        }
+        commerceSnapshotCard
+        commerceSourcePicker
+        commerceItemGrid
       }
       .padding(.horizontal, 20)
       .padding(.bottom, 120)
     }
     .scrollIndicators(.hidden)
-  }
-
-  private var illustrationSectionPicker: some View {
-    HStack(spacing: 8) {
-      ForEach(TimeHallIllustrationSection.allCases) { section in
-        let selected = illustrationSection == section
-        Button {
-          withAnimation(.snappy) {
-            illustrationSection = section
-            if section == .commerce { selectedStyle = nil }
-          }
-        } label: {
-          Text(section.title)
-            .font(.subheadline.weight(selected ? .semibold : .regular))
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 9)
-            .foregroundStyle(selected ? .white : palette.primaryText)
-            .background(selected ? Color.pink : Color.primary.opacity(0.06), in: Capsule())
-        }
-        .buttonStyle(.plain)
-      }
-    }
   }
 
   private var storyContent: some View {
@@ -976,7 +1137,10 @@ struct TimeHallView: View {
     HStack(spacing: 8) {
       Image(systemName: "magnifyingglass")
         .foregroundStyle(palette.secondaryText)
-      TextField("搜索裙装、专题、品番".appLocalized, text: $searchText)
+      TextField(
+        mode == .chronicle ? "搜索编年史资料".appLocalized : "搜索商品、品番".appLocalized,
+        text: $searchText
+      )
         .textInputAutocapitalization(.never)
         .disableAutocorrection(true)
     }
@@ -985,7 +1149,7 @@ struct TimeHallView: View {
     .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
   }
 
-  private func itemGrid(title: String, items: [TimeHallItemDTO]) -> some View {
+  private func magazinePageGrid(title: String, items: [TimeHallItemDTO]) -> some View {
     let groups = groupedItemsByImage(items)
     return VStack(alignment: .leading, spacing: 12) {
       HStack {
@@ -993,15 +1157,13 @@ struct TimeHallView: View {
           .font(.system(.title3, design: .serif).weight(.semibold))
           .foregroundStyle(palette.primaryText)
         Spacer()
-        if groups.count != items.count {
-          Text("\(groups.count) 幅·\(items.count) 件")
-            .font(.caption.monospacedDigit())
-            .foregroundStyle(palette.secondaryText)
-        }
+        Text("\(groups.count) 幅")
+          .font(.caption.monospacedDigit())
+          .foregroundStyle(palette.secondaryText)
       }
 
       if items.isEmpty {
-        Text("暂无馆藏".appLocalized)
+        Text("暂无杂志内页".appLocalized)
           .font(.subheadline)
           .foregroundStyle(palette.secondaryText)
           .frame(maxWidth: .infinity)
@@ -1012,16 +1174,14 @@ struct TimeHallView: View {
           spacing: 14
         ) {
           ForEach(groups) { group in
-            TimeHallItemCard(item: group.primaryItem, groupedItemCount: group.items.count) {
-              detailItem = group.primaryItem
-            }
+            TimeHallMagazinePageCard(group: group)
           }
         }
       }
     }
   }
 
-  private func groupedItemsByImage(_ items: [TimeHallItemDTO]) -> [TimeHallItemImageGroup] {
+  private func groupedItemsByImage(_ items: [TimeHallItemDTO]) -> [TimeHallMagazinePageGroup] {
     var order: [String] = []
     var values: [String: [TimeHallItemDTO]] = [:]
     for item in items {
@@ -1031,15 +1191,13 @@ struct TimeHallView: View {
     }
     return order.compactMap { key in
       guard let groupItems = values[key] else { return nil }
-      return TimeHallItemImageGroup(id: key, items: groupItems)
+      return TimeHallMagazinePageGroup(id: key, items: groupItems)
     }
   }
 }
 
-struct TimeHallItemCard: View {
-  let item: TimeHallItemDTO
-  var groupedItemCount = 1
-  let onTap: () -> Void
+private struct TimeHallMagazinePageCard: View {
+  let group: TimeHallMagazinePageGroup
   @ObservedObject private var store = TimeHallCatalogStore.shared
   @Environment(ThemeManager.self) private var themeManager
   @Environment(\.colorScheme) private var colorScheme
@@ -1048,53 +1206,47 @@ struct TimeHallItemCard: View {
     MagicThemeDesignSystem.palette(themeManager: themeManager, colorScheme: colorScheme)
   }
 
+  private var item: TimeHallItemDTO { group.primaryItem }
+
   var body: some View {
-    Button(action: onTap) {
-      VStack(alignment: .leading, spacing: 8) {
-        ZStack(alignment: .topTrailing) {
-          TimeHallBundleImage(
-            fileName: item.coverImage,
-            placeholderSystemImage: item.kind.symbolName
-          )
-          .scaledToFill()
-          .frame(maxWidth: .infinity)
-          .frame(height: 180)
-          .clipped()
-          .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-
-          Button {
-            store.toggleTreasure(item.id)
-          } label: {
-            Image(systemName: store.isTreasured(item.id) ? "heart.fill" : "heart")
-              .font(.footnote.weight(.semibold))
-              .foregroundStyle(store.isTreasured(item.id) ? Color.pink : .white)
-              .padding(8)
-              .background(.ultraThinMaterial, in: Circle())
-          }
-          .buttonStyle(.plain)
-          .padding(8)
-        }
-
-        Text(
-          groupedItemCount > 1
-            ? "图录第 \(item.cataloguePage) 页 · \(groupedItemCount) 件" : item.displayName
+    VStack(alignment: .leading, spacing: 8) {
+      ZStack(alignment: .topTrailing) {
+        TimeHallBundleImage(
+          fileName: item.coverImage,
+          placeholderSystemImage: "book.pages.fill"
         )
+        .scaledToFill()
+        .frame(maxWidth: .infinity)
+        .frame(height: 180)
+        .clipped()
+        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+
+        Button {
+          store.toggleTreasure(item.id)
+        } label: {
+          Image(systemName: store.isTreasured(item.id) ? "heart.fill" : "heart")
+            .font(.footnote.weight(.semibold))
+            .foregroundStyle(store.isTreasured(item.id) ? Color.pink : .white)
+            .padding(8)
+            .background(.ultraThinMaterial, in: Circle())
+        }
+        .buttonStyle(.plain)
+        .padding(8)
+      }
+
+      Text("\(item.year) \(TimeHallSeason(rawValue: item.season)?.labelZH ?? item.season) · 第 \(item.cataloguePage) 页")
         .font(.subheadline.weight(.semibold))
         .foregroundStyle(palette.primaryText)
         .lineLimit(1)
-        HStack(spacing: 5) {
-          Text(item.kind.labelZH)
-          Text("·")
-          Text(item.displayCategory)
-        }
+      Text("编年史官方杂志内页")
         .font(.caption2.weight(.medium))
         .foregroundStyle(Color.pink)
-        Text("\(item.brand) · \(item.year) · ¥\(item.priceJPY.formatted())")
-          .font(.caption)
-          .foregroundStyle(palette.secondaryText)
-      }
+      Text("PINK HOUSE 官方目录")
+        .font(.caption)
+        .foregroundStyle(palette.secondaryText)
     }
-    .buttonStyle(.plain)
+    .accessibilityElement(children: .combine)
+    .accessibilityLabel("\(item.year) 年第 \(item.cataloguePage) 页编年史官方杂志内页")
   }
 }
 

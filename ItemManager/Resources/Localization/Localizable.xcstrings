@@ -1930,16 +1930,6 @@
         }
       }
     },
-    "%@ · %lld · ¥%@" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "%1$@ · %2$lld · ¥%3$@"
-          }
-        }
-      }
-    },
     "%@ · %lld 件" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -1951,12 +1941,12 @@
         }
       }
     },
-    "%@ · %lld 件目录馆藏 · %lld 件官方商品" : {
+    "%@ · %lld 幅编年史杂志内页 · %lld 件官方商品" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "new",
-            "value" : "%1$@ · %2$lld 件目录馆藏 · %3$lld 件官方商品"
+            "value" : "%1$@ · %2$lld 幅编年史杂志内页 · %3$lld 件官方商品"
           }
         }
       }
@@ -2334,12 +2324,6 @@
         }
       }
     },
-    "%@ 图录" : {
-
-    },
-    "%@ 图录封面" : {
-
-    },
     "%@ 尚未解锁\n%@" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -2502,6 +2486,9 @@
           }
         }
       }
+    },
+    "%@ 杂志封面" : {
+
     },
     "%@ 笔" : {
       "extractionState" : "stale",
@@ -5121,6 +5108,9 @@
         }
       }
     },
+    "%@门店主题" : {
+
+    },
     "%@需要 %d+，当前 %d" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -5974,6 +5964,16 @@
         }
       }
     },
+    "%lld %@ · 第 %lld 页" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld %2$@ · 第 %3$lld 页"
+          }
+        }
+      }
+    },
     "%lld 个新任务" : {
       "localizations" : {
         "en" : {
@@ -6109,15 +6109,8 @@
     "%lld 套造型 · 按官网新着顺" : {
 
     },
-    "%lld 幅·%lld 件" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "%1$lld 幅·%2$lld 件"
-          }
-        }
-      }
+    "%lld 幅" : {
+
     },
     "%lld 年 · %lld 份图录 · %lld 件馆藏 · %lld 批入馆" : {
       "extractionState" : "stale",
@@ -6126,6 +6119,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%1$lld years · %2$lld catalogues · %3$lld items · %4$lld batches"
+          }
+        }
+      }
+    },
+    "%lld 年第 %lld 页编年史官方杂志内页" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld 年第 %2$lld 页编年史官方杂志内页"
           }
         }
       }
@@ -14619,6 +14622,9 @@
         }
       }
     },
+    "Pink House" : {
+
+    },
     "Pink House IAP 问题反馈" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -14677,6 +14683,9 @@
           }
         }
       }
+    },
+    "PINK HOUSE 官方目录" : {
+
     },
     "PINK HOUSE 当前商品与 OUTLET" : {
 
@@ -32169,6 +32178,9 @@
           }
         }
       }
+    },
+    "内页 %lld 幅" : {
+
     },
     "再检查一下" : {
       "extractionState" : "stale",
@@ -51837,6 +51849,9 @@
           }
         }
       }
+    },
+    "官网杂志封面" : {
+
     },
     "官网目录" : {
       "extractionState" : "stale",
@@ -87549,6 +87564,9 @@
         }
       }
     },
+    "暂未开放" : {
+
+    },
     "更多" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -91536,9 +91554,6 @@
         }
       }
     },
-    "查看图录" : {
-
-    },
     "查看图录原图" : {
 
     },
@@ -91638,6 +91653,9 @@
       }
     },
     "查看官方搭配页" : {
+
+    },
+    "查看官网杂志" : {
 
     },
     "查看待补尾款与提醒" : {
@@ -115400,6 +115418,9 @@
         }
       }
     },
+    "编年史官方杂志内页" : {
+
+    },
     "编辑" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -131339,6 +131360,9 @@
         }
       }
     },
+    "进入 %@" : {
+
+    },
     "进入功能" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -140124,6 +140148,7 @@
       }
     },
     "馆藏 %lld 件" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -140132,9 +140157,6 @@
           }
         }
       }
-    },
-    "馆藏图录" : {
-
     },
     "馆藏详情" : {
       "extractionState" : "stale",
