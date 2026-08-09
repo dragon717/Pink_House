@@ -1802,6 +1802,26 @@
         }
       }
     },
+    "%@ · %@ · %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ · %2$@ · %3$@"
+          }
+        }
+      }
+    },
+    "%@ · %@ · %lld 页" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ · %2$@ · %3$lld 页"
+          }
+        }
+      }
+    },
     "%@ · %@休息中" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -1916,16 +1936,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%@ · %d%@"
-          }
-        }
-      }
-    },
-    "%@ · %lld · %@" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "%1$@ · %2$lld · %3$@"
           }
         }
       }
@@ -2124,6 +2134,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%@ · 自動"
+          }
+        }
+      }
+    },
+    "%@ %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ %2$@"
+          }
+        }
+      }
+    },
+    "%@ %@ · 第 %lld 页" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ %2$@ · 第 %3$lld 页"
           }
         }
       }
@@ -2402,6 +2432,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%@ 已經解鎖了"
+          }
+        }
+      }
+    },
+    "%@ 年第 %lld 页编年史官方杂志内页" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ 年第 %2$lld 页编年史官方杂志内页"
           }
         }
       }
@@ -5910,16 +5950,6 @@
         }
       }
     },
-    "%lld · %@ · %lld 页" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "%1$lld · %2$@ · %3$lld 页"
-          }
-        }
-      }
-    },
     "%lld / %lld" : {
       "localizations" : {
         "en" : {
@@ -5960,16 +5990,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%1$lld %2$@"
-          }
-        }
-      }
-    },
-    "%lld %@ · 第 %lld 页" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "%1$lld %2$@ · 第 %3$lld 页"
           }
         }
       }
@@ -6119,16 +6139,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%1$lld years · %2$lld catalogues · %3$lld items · %4$lld batches"
-          }
-        }
-      }
-    },
-    "%lld 年第 %lld 页编年史官方杂志内页" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "%1$lld 年第 %2$lld 页编年史官方杂志内页"
           }
         }
       }
