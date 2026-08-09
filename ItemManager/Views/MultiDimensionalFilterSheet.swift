@@ -22,6 +22,7 @@ enum DepositStatusFilter: String, CaseIterable, Identifiable, Hashable, Sendable
     case owned = "owned"
     case fullPaymentReservation = "fullPaymentReservation"
     case depositPlan = "depositPlan"
+    case sold = "sold"
 
     var id: String { rawValue }
 
@@ -31,6 +32,7 @@ enum DepositStatusFilter: String, CaseIterable, Identifiable, Hashable, Sendable
         case .owned: return "已拥有".appLocalized
         case .fullPaymentReservation: return "全款预约".appLocalized
         case .depositPlan: return "心愿尾款".appLocalized
+        case .sold: return "已售出".appLocalized
         }
     }
 
@@ -40,6 +42,7 @@ enum DepositStatusFilter: String, CaseIterable, Identifiable, Hashable, Sendable
         case .owned: return "checkmark.seal"
         case .fullPaymentReservation: return "creditcard"
         case .depositPlan: return "heart.fill"
+        case .sold: return "tag.slash"
         }
     }
 }

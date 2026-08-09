@@ -105,7 +105,7 @@ final class BackupRestoreIntegrationTests: XCTestCase {
         )
     }
 
-    func testWealthAggregateUsesWardrobeTotalValueForReservations() {
+    func testWealthAggregateCountsOnlyPaidWardrobeValue() {
         let owned = Clothing(
             name: "Owned JSK",
             price: 100,
@@ -133,16 +133,18 @@ final class BackupRestoreIntegrationTests: XCTestCase {
             isDepositPlan: true,
             stock: 2
         )
+        let sold = Clothing(name: "Sold OP", price: 5_000, stock: 1, status: .offShelf)
 
         XCTAssertEqual(WealthViewModel.sanitizedWardrobeContribution(for: owned), 230)
-        XCTAssertEqual(WealthViewModel.sanitizedWardrobeContribution(for: finalPayment), 2_130)
+        XCTAssertEqual(WealthViewModel.sanitizedWardrobeContribution(for: finalPayment), 400)
         XCTAssertEqual(WealthViewModel.sanitizedWardrobeContribution(for: fullPaymentReservation), 2_260)
+        XCTAssertEqual(WealthViewModel.sanitizedWardrobeContribution(for: sold), 0)
 
         let total = WealthViewModel.calculateBaseAmountCNY(
-            clothings: [owned, finalPayment, fullPaymentReservation]
+            clothings: [owned, finalPayment, fullPaymentReservation, sold]
         )
 
-        XCTAssertEqual(total, 4_620)
+        XCTAssertEqual(total, 2_890)
     }
 
     func testWealthDisplayAmountRoundsConvertedCurrencyAmounts() {

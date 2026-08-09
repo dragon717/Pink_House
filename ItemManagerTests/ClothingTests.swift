@@ -69,6 +69,7 @@ final class ClothingTests: XCTestCase {
             balance: 800,
             isDepositPlan: true
         )
+        let sold = Clothing(name: "Sold OP", price: 1000, status: .offShelf)
 
         XCTAssertEqual(owned.reservationKind, .owned)
         XCTAssertFalse(owned.isFinalPaymentPlan)
@@ -77,6 +78,25 @@ final class ClothingTests: XCTestCase {
         XCTAssertFalse(fullPayment.isFinalPaymentPlan)
         XCTAssertEqual(finalPayment.reservationKind, .depositPlan)
         XCTAssertTrue(finalPayment.isFinalPaymentPlan)
+        XCTAssertEqual(sold.reservationKind, .sold)
+        XCTAssertEqual(sold.wardrobeValueAmount, 0)
+    }
+
+    func testWardrobeStatusFilterSeparatesSoldFromOwned() {
+        let owned = Clothing(name: "Owned OP")
+        let sold = Clothing(name: "Sold OP", status: .offShelf)
+
+        let soldResult = ClothingFilterService.filter(
+            [owned, sold],
+            config: .init(depositStatusFilter: .sold)
+        )
+        let ownedResult = ClothingFilterService.filter(
+            [owned, sold],
+            config: .init(depositStatusFilter: .owned)
+        )
+
+        XCTAssertEqual(soldResult.map(\.id), [sold.id])
+        XCTAssertEqual(ownedResult.map(\.id), [owned.id])
     }
 
     func testOutfitRecommendabilityExcludesReservationsAndPendingFulfillment() throws {

@@ -1093,6 +1093,8 @@ struct ClothingPurchaseInfoView: View {
             return "全款预约：进入预约列表，只显示全款预约日期和全款金额。".appLocalized
         case .depositPlan:
             return "定金尾款：进入心愿尾款，可设置定金日期和预计尾款时间。".appLocalized
+        case .sold:
+            return "已售出：保留在衣橱记录中，但不计入总价值。".appLocalized
         }
     }
     
@@ -1116,6 +1118,7 @@ struct ClothingPurchaseInfoView: View {
                     }
                 }
                 .pickerStyle(.segmented)
+                .tint(reservationKind == .sold ? Color.red.opacity(0.22) : Color.accentColor)
 
                 Text(reservationHint)
                     .font(.caption)
@@ -1123,7 +1126,7 @@ struct ClothingPurchaseInfoView: View {
                     .themeSkinLegibleText(level: .inline, slot: .sectionCard)
                 
                 switch reservationKind {
-                case .owned:
+                case .owned, .sold:
                     EmptyView()
                 case .fullPaymentReservation:
                     VStack(alignment: .leading, spacing: 12) {

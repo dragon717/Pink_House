@@ -57,6 +57,7 @@ struct WardrobeCellSnapshot: Identifiable, Equatable, Sendable {
     let stock: Int
     let isDepositPlan: Bool
     let isFullPaymentReservation: Bool
+    let isSold: Bool
     let totalDeposit: Decimal
     let totalBalance: Decimal
     let fullPaymentReservationTotalAmount: Decimal
@@ -83,6 +84,7 @@ struct WardrobeCellSnapshot: Identifiable, Equatable, Sendable {
         self.stock = clothing.stock
         self.isDepositPlan = clothing.isDepositPlan
         self.isFullPaymentReservation = clothing.isFullPaymentReservation
+        self.isSold = clothing.reservationKind == .sold
         self.totalDeposit = clothing.wardrobeListTotalDeposit
         self.totalBalance = clothing.wardrobeListTotalBalance
         self.fullPaymentReservationTotalAmount = clothing.wardrobeListFullPaymentReservationTotalAmount
@@ -422,7 +424,14 @@ struct ClothingCard: View, Equatable {
                         .padding(8)
                     }
                     
-                    if snapshot.isDepositPlan {
+                    if snapshot.isSold {
+                        wardrobeCellBadge(
+                            text: "已售出".appLocalized,
+                            tint: Color.red.opacity(0.6),
+                            icon: "tag.slash.fill"
+                        )
+                        .padding(8)
+                    } else if snapshot.isDepositPlan {
                         wardrobeCellBadge(
                             text: snapshot.isFullPaymentReservation ? "全款预约".appLocalized : "心愿尾款".appLocalized,
                             tint: Color(hex: "7A5A54"),
@@ -820,14 +829,14 @@ struct ClothingRow: View, Equatable {
                     }
                 }
                 .overlay(alignment: .topTrailing) {
-                    if snapshot.isDepositPlan {
-                        Text(snapshot.isFullPaymentReservation ? "全款".appLocalized : "尾款".appLocalized)
+                    if snapshot.isSold || snapshot.isDepositPlan {
+                        Text(snapshot.isSold ? "已售出".appLocalized : (snapshot.isFullPaymentReservation ? "全款".appLocalized : "尾款".appLocalized))
                             .font(.system(size: 10, weight: .bold))
                             .foregroundStyle(.white)
                             .themeSkinLegibleText(level: .chip, slot: .discountBadge, descriptor: wardrobeThemeDescriptor)
                             .padding(.horizontal, 4)
                             .padding(.vertical, 2)
-                            .background(isThemeSkinThemed ? rowAccentColor : Color.pink)
+                            .background(snapshot.isSold ? Color.red.opacity(0.6) : (isThemeSkinThemed ? rowAccentColor : Color.pink))
                             .clipShape(RoundedRectangle(cornerRadius: 4))
                             .offset(x: 4, y: -4)
                     }
@@ -895,7 +904,12 @@ struct ClothingRow: View, Equatable {
                     }
                     
                     if showPrice {
-                        if snapshot.isDepositPlan {
+                        if snapshot.isSold {
+                            Text("已售出".appLocalized)
+                                .font(.caption)
+                                .bold()
+                                .foregroundStyle(Color.red.opacity(0.72))
+                        } else if snapshot.isDepositPlan {
                             if snapshot.isFullPaymentReservation {
                                 Text("全款预约".appLocalized)
                                     .font(.caption2)
@@ -1121,7 +1135,12 @@ struct ClothingRowBrief: View, Equatable {
                 }
 
                 if showPrice {
-                    if snapshot.isDepositPlan {
+                    if snapshot.isSold {
+                        Text("已售出".appLocalized)
+                            .font(.caption)
+                            .bold()
+                            .foregroundStyle(Color.red.opacity(0.72))
+                    } else if snapshot.isDepositPlan {
                         Text(snapshot.isFullPaymentReservation
                              ? wardrobeCurrencyText(label: "全款".appLocalized, amount: snapshot.fullPaymentReservationTotalAmount)
                              : wardrobeDepositPlanSummary(deposit: snapshot.totalDeposit, balance: snapshot.totalBalance))

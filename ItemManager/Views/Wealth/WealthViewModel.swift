@@ -129,10 +129,7 @@ class WealthViewModel {
     }
 
     static func sanitizedWardrobeContribution(for clothing: Clothing) -> Decimal {
-        if clothing.isFullPaymentReservation {
-            return FinancialDataSanitizer.aggregateMoney(clothing.fullPaymentReservationTotalAmount)
-        }
-        return FinancialDataSanitizer.aggregateMoney(clothing.inventoryTotalPrice)
+        FinancialDataSanitizer.aggregateMoney(clothing.wardrobeValueAmount)
     }
 
     private static func logNegativeFinancialFieldsIfNeeded(_ clothing: Clothing) {

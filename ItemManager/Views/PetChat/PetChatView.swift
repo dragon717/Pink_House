@@ -1419,7 +1419,7 @@ struct PetChatView: View {
     }
 
     private func handleMoneyCounterPanel(currency: CurrencyType = .rmb) {
-        let totalValue = clothings.reduce(Decimal(0)) { $0 + $1.inventoryTotalPrice }
+        let totalValue = clothings.reduce(Decimal(0)) { $0 + $1.wardrobeValueAmount }
         let widget = makeMoneyCounterWidget(totalValue: totalValue, currency: currency)
         messages.append(
             PetChatMessage(
@@ -1513,17 +1513,17 @@ struct PetChatView: View {
             return
         }
         if command == "pet_money_counter" || command == "open_money_counting" {
-            let totalValue = clothings.reduce(Decimal(0)) { $0 + $1.inventoryTotalPrice }
+            let totalValue = clothings.reduce(Decimal(0)) { $0 + $1.wardrobeValueAmount }
             replaceWidgets(in: messageID, with: [makeMoneyCounterWidget(totalValue: totalValue, currency: .rmb)])
             return
         }
         if command == "pet_money_counter_jpy" {
-            let totalValue = clothings.reduce(Decimal(0)) { $0 + $1.inventoryTotalPrice }
+            let totalValue = clothings.reduce(Decimal(0)) { $0 + $1.wardrobeValueAmount }
             replaceWidgets(in: messageID, with: [makeMoneyCounterWidget(totalValue: totalValue, currency: .jpy)])
             return
         }
         if command == "pet_money_counter_usd" {
-            let totalValue = clothings.reduce(Decimal(0)) { $0 + $1.inventoryTotalPrice }
+            let totalValue = clothings.reduce(Decimal(0)) { $0 + $1.wardrobeValueAmount }
             replaceWidgets(in: messageID, with: [makeMoneyCounterWidget(totalValue: totalValue, currency: .usd)])
             return
         }
@@ -2415,7 +2415,7 @@ struct PetChatView: View {
 
         // 计算统计数据
         let totalCount = clothings.reduce(0) { $0 + $1.stock }
-        let totalValue = clothings.reduce(Decimal(0)) { $0 + $1.inventoryTotalPrice }
+        let totalValue = clothings.reduce(Decimal(0)) { $0 + $1.wardrobeValueAmount }
         let mostExpensiveItem = clothings.max(by: { $0.inventoryTotalPrice < $1.inventoryTotalPrice })
         let depositPlans = clothings.filter { $0.isFinalPaymentPlan }
         let totalDeposit = depositPlans.reduce(Decimal(0)) { $0 + ($1.deposit * Decimal($1.stock)) }
@@ -2533,7 +2533,7 @@ struct PetChatView: View {
 
         // 计算完整的衣橱统计数据
         let totalCount = clothings.reduce(0) { $0 + $1.stock }
-        let totalValue = clothings.reduce(Decimal(0)) { $0 + $1.inventoryTotalPrice }
+        let totalValue = clothings.reduce(Decimal(0)) { $0 + $1.wardrobeValueAmount }
         let depositPlans = clothings.filter { $0.isFinalPaymentPlan }
         let totalDeposit = depositPlans.reduce(Decimal(0)) { $0 + ($1.deposit * Decimal($1.stock)) }
         let totalBalance = depositPlans.reduce(Decimal(0)) { $0 + ($1.balance * Decimal($1.stock)) }

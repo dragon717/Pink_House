@@ -50,7 +50,7 @@ class WardrobeContextManager {
 
         // 1. 基础统计
         let totalCount = clothings.reduce(0) { $0 + $1.stock }
-        let totalValue = clothings.reduce(Decimal(0)) { $0 + $1.inventoryTotalPrice }
+        let totalValue = clothings.reduce(Decimal(0)) { $0 + $1.wardrobeValueAmount }
 
         // 2. 最贵单品 (包含小物)
         let mostExpensiveItem = clothings.max(by: { $0.inventoryTotalPrice < $1.inventoryTotalPrice })

@@ -61,7 +61,7 @@ struct ClothingEditDraft: Codable {
     let purchaseDate: Date
     let depositDate: Date
     let isDepositPlan: Bool
-    let reservationKindRawValue: String? // v1.14+ 三态预约模式，旧草稿按 isDepositPlan/deposit/balance 推导
+    let reservationKindRawValue: String? // v1.14+ 衣橱状态，旧草稿按 isDepositPlan/deposit/balance 推导
     let finalPaymentDate: Date
     let finalPaymentEndDate: Date
     let note: String
@@ -1388,7 +1388,7 @@ struct ClothingEditView: View {
         get { editModel.reservationKind }
         nonmutating set {
             editModel.reservationKind = newValue
-            editModel.isDepositPlan = newValue != .owned
+            editModel.isDepositPlan = newValue == .fullPaymentReservation || newValue == .depositPlan
         }
     }
 
@@ -1795,7 +1795,7 @@ struct ClothingEditView: View {
     private var ownedToReservationTransitionKindNeedingConfirmation: ClothingReservationKind? {
         guard isEditing,
               originalReservationKind == .owned,
-              reservationKind != .owned else {
+              reservationKind == .fullPaymentReservation || reservationKind == .depositPlan else {
             return nil
         }
         return reservationKind
@@ -1812,6 +1812,8 @@ struct ClothingEditView: View {
             detailHint = "详情页会显示「待签收」状态。".appLocalized
         case .depositPlan:
             detailHint = "详情页会显示「尾款付清」按钮。".appLocalized
+        case .sold:
+            detailHint = ""
         }
 
         return "保存后会把这条裙装从「已拥有」切换为「%@」，并将裙装状态改为「%@」。%@".appLocalized(
@@ -2514,7 +2516,7 @@ struct ClothingEditView: View {
     }
 
     private func applyReservationKindChange(from oldValue: ClothingReservationKind, to newValue: ClothingReservationKind) {
-        isDepositPlan = newValue != .owned
+        isDepositPlan = newValue == .fullPaymentReservation || newValue == .depositPlan
         // Preserve in-progress price input while users compare reservation tabs.
         // Save-time mapping still decides which amounts are persisted for each mode.
         guard isReadyForUserDraftChanges,
@@ -2696,7 +2698,7 @@ struct ClothingEditView: View {
         updateTotalPrice()
 
         let finalReservationKind = reservationKind
-        let finalIsDepositPlan = finalReservationKind != .owned
+        let finalIsDepositPlan = finalReservationKind == .fullPaymentReservation || finalReservationKind == .depositPlan
         let finalFullPaymentUnitAmount = fullPaymentReservationUnitAmount
         if finalReservationKind == .fullPaymentReservation, finalFullPaymentUnitAmount <= 0 {
             showToastMessage("全款预约需要先填写裙装总价、小物或邮费".appLocalized, type: .error)
@@ -2712,7 +2714,7 @@ struct ClothingEditView: View {
         let finalBalance: Double
         var finalPriceTotal = priceTotal
         switch finalReservationKind {
-        case .owned:
+        case .owned, .sold:
             finalDeposit = 0
             finalBalance = 0
         case .fullPaymentReservation:
@@ -2837,6 +2839,7 @@ struct ClothingEditView: View {
             c.purchaseDate = purchaseDate
             c.depositDate = finalDepositDate
             c.isDepositPlan = finalIsDepositPlan
+            c.status = finalReservationKind == .sold ? .offShelf : .onShelf
             c.finalPaymentDate = finalPaymentStartDate
             c.finalPaymentEndDate = finalPaymentEndDateValue
             if !finalIsDepositPlan {
@@ -2909,7 +2912,8 @@ struct ClothingEditView: View {
                 finalPaymentDate: finalPaymentStartDate,
                 finalPaymentEndDate: finalPaymentEndDateValue,
                 note: note,
-                stock: sanitizedStock(stock)
+                stock: sanitizedStock(stock),
+                status: finalReservationKind == .sold ? .offShelf : .onShelf
             )
 
             // 保存表图字段
@@ -2967,6 +2971,8 @@ private extension ClothingReservationKind {
             return "未到货"
         case .depositPlan:
             return "待付尾款"
+        case .sold:
+            return nil
         }
     }
 }

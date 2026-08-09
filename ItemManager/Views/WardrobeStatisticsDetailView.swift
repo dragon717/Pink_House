@@ -132,7 +132,7 @@ struct OverviewStatsCard: View {
     }
     
     var totalValue: Decimal {
-        clothings.reduce(Decimal(0)) { $0 + $1.inventoryTotalPrice }
+        clothings.reduce(Decimal(0)) { $0 + $1.wardrobeValueAmount }
     }
     
     var totalOriginalPrice: Decimal {
@@ -251,7 +251,7 @@ struct TagStatsCard: View {
         // Handle Tags (先处理有标签的)
         for clothing in clothings {
             guard let tags = clothing.tags, !tags.isEmpty else { continue }
-            let itemValue = clothing.inventoryTotalPrice
+            let itemValue = clothing.wardrobeValueAmount
             
             // 如果一个物品有多个标签，每个标签都计数
             for tag in tags {
@@ -265,7 +265,7 @@ struct TagStatsCard: View {
         var noTagStat: TagStat?
         if !noTagClothings.isEmpty {
             let count = noTagClothings.reduce(0) { $0 + $1.stock }
-            let value = noTagClothings.reduce(Decimal(0)) { $0 + $1.inventoryTotalPrice }
+            let value = noTagClothings.reduce(Decimal(0)) { $0 + $1.wardrobeValueAmount }
             noTagStat = TagStat(name: Self.noTagName, count: count, value: value)
         } else {
             noTagStat = nil
@@ -524,7 +524,7 @@ struct PurchaseTimeStatsCard: View {
         }
         
         let count = filtered.reduce(0) { $0 + $1.stock }
-        let value = filtered.reduce(Decimal(0)) { $0 + $1.inventoryTotalPrice }
+        let value = filtered.reduce(Decimal(0)) { $0 + $1.wardrobeValueAmount }
         return (count, value)
     }
     
@@ -553,7 +553,7 @@ struct PurchaseTimeStatsCard: View {
             }
             
             let count = filtered.reduce(0) { $0 + $1.stock }
-            let amount = filtered.reduce(Decimal(0)) { $0 + $1.inventoryTotalPrice }
+            let amount = filtered.reduce(Decimal(0)) { $0 + $1.wardrobeValueAmount }
             
             let label = wardrobeStatsMonthLabel(for: date)
             stats.append(MonthlyStat(date: date, count: count, amount: amount, monthLabel: label))

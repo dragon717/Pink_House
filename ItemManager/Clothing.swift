@@ -51,6 +51,7 @@ enum ClothingReservationKind: String, Codable, CaseIterable, Identifiable {
     case owned = "owned"
     case fullPaymentReservation = "full_payment_reservation"
     case depositPlan = "deposit_plan"
+    case sold = "sold"
 
     var id: String { rawValue }
 
@@ -59,6 +60,7 @@ enum ClothingReservationKind: String, Codable, CaseIterable, Identifiable {
         case .owned: return "已拥有"
         case .fullPaymentReservation: return "全款预约"
         case .depositPlan: return "定金尾款"
+        case .sold: return "已售出"
         }
     }
 }
@@ -301,18 +303,20 @@ final class Clothing {
     }
 
     var reservationKind: ClothingReservationKind {
+        guard status != .offShelf else { return .sold }
         guard isDepositPlan else { return .owned }
         return isFullPaymentReservation ? .fullPaymentReservation : .depositPlan
     }
 
     var isFullPaymentReservation: Bool {
-        isDepositPlan
+        status != .offShelf
+            && isDepositPlan
             && FinancialDataSanitizer.money(deposit) > 0
             && FinancialDataSanitizer.money(balance) == 0
     }
 
     var isFinalPaymentPlan: Bool {
-        isDepositPlan && !isFullPaymentReservation
+        status != .offShelf && isDepositPlan && !isFullPaymentReservation
     }
 
     var reservationGroupingDate: Date? {
@@ -323,6 +327,8 @@ final class Clothing {
             return depositDate
         case .depositPlan:
             return finalPaymentDate
+        case .sold:
+            return nil
         }
     }
 
@@ -340,6 +346,20 @@ final class Clothing {
 
     var reservationPaidAmount: Decimal {
         isFullPaymentReservation ? 0 : totalDeposit
+    }
+
+    /// 衣橱“总价值”统一口径：已拥有计完整价格，预约只计已付款，已售出不计。
+    var wardrobeValueAmount: Decimal {
+        switch reservationKind {
+        case .owned:
+            return inventoryTotalPrice
+        case .fullPaymentReservation:
+            return fullPaymentReservationTotalAmount
+        case .depositPlan:
+            return totalDeposit
+        case .sold:
+            return 0
+        }
     }
 
     var reservationListAmount: Decimal {
@@ -389,6 +409,19 @@ extension Clothing {
 
     var wardrobeListFullPaymentReservationTotalAmount: Decimal {
         isFullPaymentReservation ? wardrobeListTotalDeposit : 0
+    }
+
+    var wardrobeListValueAmount: Decimal {
+        switch reservationKind {
+        case .owned:
+            return wardrobeListInventoryTotalPrice
+        case .fullPaymentReservation:
+            return wardrobeListFullPaymentReservationTotalAmount
+        case .depositPlan:
+            return wardrobeListTotalDeposit
+        case .sold:
+            return 0
+        }
     }
 }
 

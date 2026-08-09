@@ -78,10 +78,11 @@ private struct WardrobeClothingSnapshot: Sendable {
     let accessories: String
     let note: String
     let price: Decimal
-    let inventoryTotalPrice: Decimal
+    let wardrobeValueAmount: Decimal
     let stock: Int
     let isDepositPlan: Bool
     let isFullPaymentReservation: Bool
+    let isSold: Bool
     let sortIndex: Int
     let purchaseDate: Date
     let createdAt: Date
@@ -106,10 +107,11 @@ private struct WardrobeClothingSnapshot: Sendable {
         self.accessories = clothing.accessories
         self.note = clothing.note
         self.price = clothing.price
-        self.inventoryTotalPrice = clothing.wardrobeListInventoryTotalPrice
+        self.wardrobeValueAmount = clothing.wardrobeListValueAmount
         self.stock = clothing.stock
         self.isDepositPlan = clothing.isDepositPlan
         self.isFullPaymentReservation = clothing.isFullPaymentReservation
+        self.isSold = clothing.reservationKind == .sold
         self.sortIndex = clothing.sortIndex
         self.purchaseDate = clothing.purchaseDate
         self.createdAt = clothing.createdAt
@@ -270,11 +272,13 @@ private enum WardrobeFilterEngine {
     private nonisolated static func matchesDepositStatus(_ snapshot: WardrobeClothingSnapshot, rawValue: String) -> Bool {
         switch rawValue {
         case "owned":
-            return !snapshot.isDepositPlan
+            return !snapshot.isDepositPlan && !snapshot.isSold
         case "fullPaymentReservation":
             return snapshot.isFullPaymentReservation
         case "depositPlan":
             return snapshot.isDepositPlan && !snapshot.isFullPaymentReservation
+        case "sold":
+            return snapshot.isSold
         default:
             return true
         }
@@ -306,7 +310,7 @@ private enum WardrobeFilterEngine {
             partial.styleCount += 1
             partial.totalCount += snapshot.stock
             partial.dressValue += snapshot.price * Decimal(snapshot.stock)
-            partial.totalValue += snapshot.inventoryTotalPrice
+            partial.totalValue += snapshot.wardrobeValueAmount
         }
     }
 
@@ -3005,16 +3009,18 @@ struct MergeToAccessorySheet: View {
             }
         }
 
-        // 状态筛选：已拥有 / 全款预约 / 心愿尾款
+        // 状态筛选：已拥有 / 全款预约 / 心愿尾款 / 已售出
         switch depositStatusFilter {
         case .all:
             break
         case .owned:
-            result = result.filter { !$0.isDepositPlan }
+            result = result.filter { $0.reservationKind == .owned }
         case .fullPaymentReservation:
             result = result.filter(\.isFullPaymentReservation)
         case .depositPlan:
             result = result.filter { $0.isFinalPaymentPlan }
+        case .sold:
+            result = result.filter { $0.reservationKind == .sold }
         }
 
         return result

@@ -164,11 +164,13 @@ class ClothingFilterService {
         case .all:
             return true
         case .owned:
-            return !clothing.isDepositPlan
+            return clothing.reservationKind == .owned
         case .fullPaymentReservation:
             return clothing.isFullPaymentReservation
         case .depositPlan:
             return clothing.isFinalPaymentPlan
+        case .sold:
+            return clothing.reservationKind == .sold
         }
     }
     
