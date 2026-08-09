@@ -110659,6 +110659,16 @@
         }
       }
     },
+    "第 %lld 页，共 %lld 页" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "第 %1$lld 页，共 %2$lld 页"
+          }
+        }
+      }
+    },
     "第 %lld/%lld 期" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -129338,6 +129348,9 @@
           }
         }
       }
+    },
+    "返回品牌选择，当前 Pink House" : {
+
     },
     "返回始发地" : {
       "localizations" : {

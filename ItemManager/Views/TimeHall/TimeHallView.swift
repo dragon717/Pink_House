@@ -91,9 +91,6 @@ private enum TimeHallStoreTheme: String, CaseIterable, Identifiable {
     }
   }
 
-  var imageScale: CGFloat {
-    self == .omotesando ? 1.28 : 1.52
-  }
 }
 
 private struct TimeHallMagazinePageGroup: Identifiable {
@@ -205,6 +202,8 @@ struct TimeHallView: View {
   @State private var showTreasuresOnly = false
   @State private var searchText = ""
   @State private var isTimelineAscending = false
+  @State private var headerCollapseProgress: CGFloat = 0
+  @State private var headerDragStartProgress: CGFloat?
 
   private var palette: MagicThemePalette {
     MagicThemeDesignSystem.palette(themeManager: themeManager, colorScheme: colorScheme)
@@ -318,7 +317,10 @@ struct TimeHallView: View {
         header
         modePicker
           .padding(.horizontal, 20)
-          .padding(.bottom, 10)
+          .padding(.bottom, 8 * (1 - headerCollapseProgress))
+          .frame(height: 48 * (1 - headerCollapseProgress), alignment: .top)
+          .opacity(1 - headerCollapseProgress)
+          .clipped()
 
         Group {
           switch mode {
@@ -346,72 +348,141 @@ struct TimeHallView: View {
   }
 
   private var merchantSelection: some View {
-    ZStack {
-      LiquidBackground(themeSkinWallpaperContext: .timeHall)
-      LinearGradient(colors: storeTheme.colors, startPoint: .topLeading, endPoint: .bottomTrailing)
-        .opacity(0.22)
-        .ignoresSafeArea()
+    GeometryReader { proxy in
+      ZStack {
+        LiquidBackground(themeSkinWallpaperContext: .timeHall)
+        LinearGradient(colors: storeTheme.colors, startPoint: .topLeading, endPoint: .bottomTrailing)
+          .opacity(0.34)
+          .ignoresSafeArea()
 
-      VStack(spacing: 14) {
-        Spacer(minLength: 54)
+        Circle()
+          .fill(storeTheme.accent.opacity(0.08))
+          .frame(width: 360, height: 360)
+          .blur(radius: 46)
+          .offset(x: -180, y: -250)
 
-        VStack(spacing: 6) {
+        if proxy.size.width > proxy.size.height {
+          merchantSelectionLandscape(size: proxy.size)
+        } else {
+          merchantSelectionPortrait
+        }
+      }
+    }
+  }
+
+  private var merchantSelectionPortrait: some View {
+    VStack(spacing: 14) {
+      Spacer(minLength: 12)
+      HStack(alignment: .top, spacing: 8) {
+        merchantSelectionHeading
+          .frame(maxWidth: .infinity)
+        storeThemeMenu
+      }
+
+      TabView(selection: $carouselMerchant) {
+        ForEach(TimeHallMerchant.allCases) { merchant in
+          merchantCard(merchant)
+            .padding(.horizontal, 8)
+            .tag(merchant)
+        }
+      }
+      .tabViewStyle(.page(indexDisplayMode: .never))
+      .frame(maxWidth: 620, maxHeight: 410)
+
+      merchantPageIndicator
+      merchantCarouselNavigation
+      merchantSelectionFooter
+
+      Spacer(minLength: 82)
+    }
+    .padding(.horizontal, 20)
+  }
+
+  private func merchantSelectionLandscape(size: CGSize) -> some View {
+    VStack(spacing: 4) {
+      HStack(alignment: .top, spacing: 8) {
+        VStack(alignment: .leading, spacing: 2) {
           Text("选择商家".appLocalized)
-            .font(.system(.largeTitle, design: .serif).weight(.semibold))
+            .font(.system(.title2, design: .serif).weight(.semibold))
             .foregroundStyle(palette.primaryText)
           Text("左右滑动查看已接入的品牌档案".appLocalized)
-            .font(.subheadline)
+            .font(.caption)
             .foregroundStyle(palette.secondaryText)
         }
+        storeThemeMenu
+        Spacer(minLength: 0)
+      }
+      .padding(.horizontal, 12)
+
+      HStack(spacing: 12) {
+        Color.clear
+          .frame(width: max(48, size.width * 0.08))
 
         TabView(selection: $carouselMerchant) {
           ForEach(TimeHallMerchant.allCases) { merchant in
-            merchantCard(merchant)
-              .padding(.horizontal, 8)
+            merchantVisual(merchant, imageWidthRatio: 0.96)
+              .padding(.vertical, 8)
               .tag(merchant)
           }
         }
-        .tabViewStyle(.page(indexDisplayMode: .always))
-        .indexViewStyle(.page(backgroundDisplayMode: .always))
-        .frame(maxWidth: 520, maxHeight: 390)
+        .tabViewStyle(.page(indexDisplayMode: .never))
+        .frame(width: size.width * 0.62)
+        .frame(maxHeight: .infinity)
 
-        merchantCarouselNavigation
-
-        Text(
-          carouselMerchant.isAvailable
-            ? "默认商家 · \(storeTheme.location)" : "敬请期待".appLocalized
-        )
-          .font(.caption.weight(.medium))
-          .foregroundStyle(palette.secondaryText)
-
-        Spacer(minLength: 82)
+        VStack(spacing: 8) {
+          Spacer(minLength: 0)
+          merchantInfo(carouselMerchant, compact: true)
+          merchantPageIndicator
+          merchantCarouselNavigation
+          merchantSelectionFooter
+          Spacer(minLength: 0)
+        }
+        .frame(maxWidth: .infinity)
       }
-      .padding(.horizontal, 20)
+      .padding(.horizontal, 12)
+      .padding(.bottom, 54)
+    }
+    .padding(.vertical, 8)
+  }
 
-      storeThemeMenu
-        .padding(.top, 12)
-        .padding(.trailing, 20)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+  private var merchantSelectionHeading: some View {
+    VStack(spacing: 6) {
+      Text("选择商家".appLocalized)
+        .font(.system(.largeTitle, design: .serif).weight(.semibold))
+        .foregroundStyle(palette.primaryText)
+      Text("左右滑动查看已接入的品牌档案".appLocalized)
+        .font(.subheadline)
+        .foregroundStyle(palette.secondaryText)
     }
   }
 
   private func merchantCard(_ merchant: TimeHallMerchant) -> some View {
-    GlassCard(cornerRadius: 30, padding: 20) {
-      VStack(spacing: 14) {
-        if merchant == .pinkHouse {
-          themedStorefront
-        } else {
-          Image(systemName: "sparkles.rectangle.stack")
-            .font(.system(size: 42, weight: .semibold))
-            .foregroundStyle(palette.secondaryText)
-            .frame(maxWidth: .infinity)
-            .frame(height: 142)
-            .background(Color.pink.opacity(0.06), in: RoundedRectangle(cornerRadius: 22))
-        }
+    VStack(spacing: 18) {
+      merchantVisual(merchant)
+        .frame(height: 210)
+      merchantInfo(merchant)
+    }
+    .frame(maxWidth: .infinity, maxHeight: .infinity)
+    .animation(.snappy, value: storeTheme)
+  }
 
-        VStack(spacing: 7) {
+  @ViewBuilder
+  private func merchantVisual(_ merchant: TimeHallMerchant, imageWidthRatio: CGFloat = 0.82) -> some View {
+    if merchant == .pinkHouse {
+      themedStorefront(imageWidthRatio: imageWidthRatio)
+    } else {
+      Image(systemName: "sparkles.rectangle.stack")
+        .font(.system(size: 76, weight: .semibold))
+        .foregroundStyle(palette.secondaryText.opacity(0.55))
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+  }
+
+  private func merchantInfo(_ merchant: TimeHallMerchant, compact: Bool = false) -> some View {
+    VStack(spacing: compact ? 8 : 12) {
+        VStack(spacing: 6) {
           Text(merchant.name)
-            .font(.system(.title, design: .serif).weight(.bold))
+            .font(.system(compact ? .title2 : .title, design: .serif).weight(.bold))
             .foregroundStyle(palette.primaryText)
           if merchant == .pinkHouse {
             Text(storeTheme.title)
@@ -419,13 +490,14 @@ struct TimeHallView: View {
               .foregroundStyle(storeTheme.accent)
           }
           Text(merchant.subtitle)
-            .font(.subheadline)
+            .font(compact ? .caption : .subheadline)
             .multilineTextAlignment(.center)
             .foregroundStyle(palette.secondaryText)
         }
 
         Button {
           guard merchant.isAvailable else { return }
+          headerCollapseProgress = 0
           activeMerchant = merchant
         } label: {
           Label(
@@ -440,36 +512,31 @@ struct TimeHallView: View {
         .tint(merchant.isAvailable ? storeTheme.accent : .gray)
         .disabled(!merchant.isAvailable)
       }
-    }
-    .animation(.snappy, value: storeTheme)
+      .padding(compact ? 12 : 18)
+      .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 26, style: .continuous))
+      .overlay {
+        RoundedRectangle(cornerRadius: 26, style: .continuous)
+          .stroke(.white.opacity(0.66), lineWidth: 1)
+      }
+      .shadow(color: .black.opacity(0.14), radius: 16, y: 10)
+      .padding(.horizontal, compact ? 0 : 14)
   }
 
-  private var themedStorefront: some View {
-    ZStack {
-      RoundedRectangle(cornerRadius: 22, style: .continuous)
-        .fill(LinearGradient(colors: storeTheme.colors, startPoint: .topLeading, endPoint: .bottomTrailing))
-
-      Circle()
-        .fill(.white.opacity(0.36))
-        .frame(width: 120, height: 120)
-        .offset(x: 112, y: -54)
-
+  private func themedStorefront(imageWidthRatio: CGFloat) -> some View {
+    GeometryReader { proxy in
       TimelineView(.animation(minimumInterval: 1 / 30)) { context in
         let wave = CGFloat(sin(context.date.timeIntervalSinceReferenceDate * 1.4))
         Image(storeTheme.assetName)
           .resizable()
           .scaledToFit()
-          .padding(8)
-          .scaleEffect(storeTheme.imageScale)
+          .frame(width: proxy.size.width * imageWidthRatio, height: proxy.size.height * 0.96)
+          .position(x: proxy.size.width / 2, y: proxy.size.height / 2)
           .offset(y: wave * 3)
-          .shadow(color: storeTheme.accent.opacity(0.28), radius: 10, y: 6)
+          .shadow(color: .black.opacity(0.2), radius: 14, y: 9)
+          .shadow(color: storeTheme.accent.opacity(0.12), radius: 18, y: 6)
+          .id(storeTheme)
+          .transition(.opacity.combined(with: .scale(scale: 0.94)))
       }
-    }
-    .frame(height: 142)
-    .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
-    .overlay {
-      RoundedRectangle(cornerRadius: 22, style: .continuous)
-        .stroke(.white.opacity(0.62), lineWidth: 1)
     }
     .accessibilityLabel("\(storeTheme.title)门店主题")
   }
@@ -484,11 +551,14 @@ struct TimeHallView: View {
         }
       }
     } label: {
-      Label("换皮肤".appLocalized, systemImage: "paintpalette.fill")
-        .font(.subheadline.weight(.semibold))
+      Image(systemName: "paintpalette.fill")
+        .font(.caption.weight(.semibold))
+        .frame(width: 32, height: 32)
     }
     .buttonStyle(.bordered)
-    .buttonBorderShape(.capsule)
+    .buttonBorderShape(.circle)
+    .controlSize(.small)
+    .frame(width: 44, height: 44)
     .tint(storeTheme.accent)
     .accessibilityLabel("切换门店主题".appLocalized)
     .accessibilityValue(storeTheme.title)
@@ -496,9 +566,31 @@ struct TimeHallView: View {
 
   private var merchantCarouselNavigation: some View {
     HStack(spacing: 10) {
-      merchantNavigationButton(title: "前往上一家店铺", systemImage: "chevron.left", offset: -1)
-      merchantNavigationButton(title: "前往下一家店铺", systemImage: "chevron.right", offset: 1)
+      merchantNavigationButton(title: "上一家", systemImage: "chevron.left", offset: -1)
+      merchantNavigationButton(title: "下一家", systemImage: "chevron.right", offset: 1)
     }
+  }
+
+  private var merchantPageIndicator: some View {
+    HStack(spacing: 7) {
+      ForEach(TimeHallMerchant.allCases) { merchant in
+        Circle()
+          .fill(merchant == carouselMerchant ? storeTheme.accent : palette.secondaryText.opacity(0.28))
+          .frame(width: merchant == carouselMerchant ? 8 : 6, height: merchant == carouselMerchant ? 8 : 6)
+      }
+    }
+    .frame(height: 8)
+    .accessibilityElement(children: .ignore)
+    .accessibilityLabel("第 \((TimeHallMerchant.allCases.firstIndex(of: carouselMerchant) ?? 0) + 1) 页，共 \(TimeHallMerchant.allCases.count) 页")
+  }
+
+  private var merchantSelectionFooter: some View {
+    Text(
+      carouselMerchant.isAvailable
+        ? storeTheme.location : "敬请期待".appLocalized
+    )
+    .font(.caption.weight(.medium))
+    .foregroundStyle(palette.secondaryText)
   }
 
   private func merchantNavigationButton(title: String, systemImage: String, offset: Int) -> some View {
@@ -524,17 +616,57 @@ struct TimeHallView: View {
     .disabled(!isEnabled)
   }
 
+  private var headerCollapseGesture: some Gesture {
+    DragGesture(minimumDistance: 8)
+      .onChanged { value in
+        guard abs(value.translation.height) > abs(value.translation.width) else { return }
+        if headerDragStartProgress == nil {
+          headerDragStartProgress = headerCollapseProgress
+        }
+        let start = headerDragStartProgress ?? headerCollapseProgress
+        headerCollapseProgress = min(max(start - value.translation.height / 72, 0), 1)
+      }
+      .onEnded { value in
+        guard let start = headerDragStartProgress else { return }
+        let predicted = min(max(start - value.predictedEndTranslation.height / 72, 0), 1)
+        withAnimation(.snappy) {
+          headerCollapseProgress = predicted >= 0.5 ? 1 : 0
+        }
+        headerDragStartProgress = nil
+      }
+  }
+
   private var header: some View {
-    HStack(alignment: .center, spacing: 12) {
-      VStack(alignment: .leading, spacing: 4) {
-        Label("Pink House", systemImage: "storefront.fill")
-          .font(.caption.weight(.semibold))
-          .foregroundStyle(Color.pink)
+    VStack(alignment: .leading, spacing: 3) {
+      HStack {
+        Button {
+          carouselMerchant = .pinkHouse
+          headerCollapseProgress = 0
+          activeMerchant = nil
+        } label: {
+          Label("Pink House", systemImage: "chevron.left")
+            .font(.subheadline.weight(.semibold))
+            .padding(.horizontal, 2)
+            .frame(minHeight: 44)
+        }
+        .buttonStyle(.bordered)
+        .buttonBorderShape(.capsule)
+        .tint(Color.pink)
+        .accessibilityLabel("返回品牌选择，当前 Pink House")
+
+        Spacer(minLength: 8)
+        ViewThatFits(in: .horizontal) {
+          treasureButton
+          treasureButtonCompact
+        }
+      }
+
+      VStack(alignment: .leading, spacing: 3) {
         Text((store.catalog?.title ?? "梦裙时光馆").appLocalized)
-          .font(.system(.largeTitle, design: .serif).weight(.semibold))
+          .font(.system(.title, design: .serif).weight(.semibold))
           .foregroundStyle(palette.primaryText)
         Text(store.catalog?.subtitle ?? "")
-          .font(.subheadline)
+          .font(.caption)
           .foregroundStyle(palette.secondaryText)
         if !store.items.isEmpty || !store.commerceItems.isEmpty {
           Text(
@@ -544,36 +676,14 @@ struct TimeHallView: View {
           .foregroundStyle(palette.secondaryText.opacity(0.85))
         }
       }
-      Spacer(minLength: 8)
-      headerActions
+      .frame(height: 70 * (1 - headerCollapseProgress), alignment: .top)
+      .scaleEffect(y: 1 - headerCollapseProgress, anchor: .top)
+      .opacity(1 - headerCollapseProgress)
+      .clipped()
     }
     .padding(.horizontal, 20)
-    .padding(.top, 12)
-    .padding(.bottom, 8)
-  }
-
-  /// Prefer the full label, then collapse to familiar symbols when the title area needs the width.
-  /// This lets Dynamic Type and localized titles keep a single, tappable 44 pt control.
-  @ViewBuilder
-  private var headerActions: some View {
-    HStack(spacing: 8) {
-      Button {
-        carouselMerchant = .pinkHouse
-        activeMerchant = nil
-      } label: {
-        Image(systemName: "storefront")
-      }
-      .buttonStyle(.bordered)
-      .controlSize(.regular)
-      .buttonBorderShape(.circle)
-      .frame(width: 44, height: 44)
-      .accessibilityLabel("切换商家".appLocalized)
-
-      ViewThatFits(in: .horizontal) {
-        treasureButton
-        treasureButtonCompact
-      }
-    }
+    .padding(.top, 8 - 4 * headerCollapseProgress)
+    .padding(.bottom, 6 - 4 * headerCollapseProgress)
   }
 
   /// Apple HIG: bordered capsule with a stable, single-line label.
@@ -650,6 +760,7 @@ struct TimeHallView: View {
       .padding(.bottom, 120)
     }
     .scrollIndicators(.hidden)
+    .simultaneousGesture(headerCollapseGesture)
   }
 
   private var itemsForActiveYear: [TimeHallItemDTO] {
@@ -940,6 +1051,7 @@ struct TimeHallView: View {
       .padding(.bottom, 120)
     }
     .scrollIndicators(.hidden)
+    .simultaneousGesture(headerCollapseGesture)
   }
 
   private var storyContent: some View {
