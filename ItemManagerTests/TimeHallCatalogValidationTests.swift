@@ -55,9 +55,11 @@ final class TimeHallCatalogValidationTests: XCTestCase {
         [catalog.heroImage].compactMap { $0 }
           + catalog.catalogues.map(\.coverImage)
           + catalog.items.compactMap(\.coverImage)
+          + catalog.commerceItems.map(\.coverImage)
           + catalog.coordinates.map(\.coverImage)
           + catalog.stories.map(\.coverImage)
       )
+      XCTAssertTrue(catalog.commerceItems.allSatisfy { !$0.coverImage.isEmpty }, resourceName)
       for imageName in imageNames {
         XCTAssertNotNil(imageURL(named: imageName), "Missing \(resourceName) image: \(imageName)")
       }

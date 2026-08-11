@@ -214,16 +214,21 @@ def enrich(entry: dict) -> dict:
     return result
 
 
-def save_image(source_url: str, destination: Path) -> None:
+def save_image(
+    source_url: str,
+    destination: Path,
+    max_width: int = MAX_IMAGE_WIDTH,
+    jpeg_quality: int = JPEG_QUALITY,
+) -> None:
     if Image is None:
         raise RuntimeError("Pillow is required to materialize commerce images")
     with Image.open(BytesIO(fetch(source_url))) as opened:
         image = opened.convert("RGB")
-        if image.width > MAX_IMAGE_WIDTH:
-            height = round(image.height * MAX_IMAGE_WIDTH / image.width)
-            image = image.resize((MAX_IMAGE_WIDTH, height), Image.Resampling.LANCZOS)
+        if image.width > max_width:
+            height = round(image.height * max_width / image.width)
+            image = image.resize((max_width, height), Image.Resampling.LANCZOS)
         destination.parent.mkdir(parents=True, exist_ok=True)
-        image.save(destination, "JPEG", quality=JPEG_QUALITY, optimize=True, progressive=True)
+        image.save(destination, "JPEG", quality=jpeg_quality, optimize=True, progressive=True)
 
 
 def main() -> int:

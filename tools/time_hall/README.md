@@ -66,6 +66,31 @@ Importer 会：
 - 生成独立 `commerceSnapshots` / `commerceItems`，不伪装成 Catalogue 展品。
 - 只替换本批次拥有的快照与商品，并通过原子替换写入 `catalog.json`。
 
+## 四个品牌官网商品
+
+```bash
+python3 tools/time_hall/import_curated_commerce.py --dry-run
+python3 tools/time_hall/import_curated_commerce.py
+```
+
+已有商品元数据、只需补齐或续传本地封面时：
+
+```bash
+python3 tools/time_hall/import_curated_commerce.py --images-only
+```
+
+采集边界均为官网目前仍公开可枚举的在售、售罄或预约商品页：Angelic Pretty
+逐页读取官方 Product List；BABY（含 ALICE and the PIRATES）与 Juliette et
+Justine 读取各自官方商城全商品；Wunderwelt 只读取 FLEUR 官方授权新品集合，
+不混入 USED 二手总库。官网已经删除或从未公开索引的旧商品无法据实补造。
+
+品牌资料依据分别为 [Angelic Pretty 官网与 2026 Spring Collection](https://angelicpretty.com/Page/collection2026spring.aspx)、
+[BABY 官方品牌页](https://www.babyssb.co.jp/brand/)、
+[Juliette et Justine 官方介绍](https://juliette-et-justine.com/zh-cn/pages/about) 与
+[Wunderwelt FLEUR 官方介绍](https://libre.wunderwelt.jp/zh/9183/)。导入器保留商品页、
+原图 URL、采集日、价格和库存状态；每件商品的首张官方图压缩到最大 600px 后写入
+App Bundle，已存在的封面会跳过，详情页其余图片仍按需读取官方 HTTPS 地址。
+
 ## Coordinate 批次
 
 ```bash

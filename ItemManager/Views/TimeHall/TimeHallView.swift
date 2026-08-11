@@ -288,6 +288,10 @@ extension TimeHallCommerceItemDTO {
   fileprivate var displayStyles: [String] {
     TimeHallDisplayLanguage.usesChinese ? stylesZH : styles
   }
+
+  fileprivate var listingLabelZH: String {
+    listingStatus == "sold_out" ? "官网售罄".appLocalized : sourceKind.labelZH
+  }
 }
 
 extension TimeHallCoordinateDTO {
@@ -322,6 +326,7 @@ struct TimeHallView: View {
   @State private var curatedCatalog: TimeHallCatalogDTO?
   @State private var mode: TimeHallMode = .chronicle
   @State private var selectedYear: Int?
+  @State private var detailItem: TimeHallItemDTO?
   @State private var detailCommerceItem: TimeHallCommerceItemDTO?
   @State private var detailCoordinate: TimeHallCoordinateDTO?
   @State private var detailStory: TimeHallStoryDTO?
@@ -465,6 +470,9 @@ struct TimeHallView: View {
     .sheet(item: $detailCommerceItem) { item in
       TimeHallCommerceItemDetailView(item: item)
     }
+    .sheet(item: $detailItem) { item in
+      TimeHallItemDetailView(item: item)
+    }
     .sheet(item: $detailCoordinate) { coordinate in
       TimeHallCoordinateDetailView(coordinate: coordinate)
     }
@@ -502,6 +510,18 @@ struct TimeHallView: View {
         }
       }
     }
+    .sheet(item: $detailCommerceItem) { item in
+      TimeHallCommerceItemDetailView(item: item)
+    }
+    .sheet(item: $detailItem) { item in
+      TimeHallItemDetailView(item: item)
+    }
+    .sheet(item: $detailCoordinate) { coordinate in
+      TimeHallCoordinateDetailView(coordinate: coordinate)
+    }
+    .sheet(item: $detailStory) { story in
+      TimeHallStoryDetailView(story: story)
+    }
   }
 
   private func curatedBrandHeader(_ merchant: TimeHallMerchant) -> some View {
@@ -532,17 +552,7 @@ struct TimeHallView: View {
       }
 
       Spacer(minLength: 0)
-
-      if let url = URL(string: merchant.officialURL) {
-        Link(destination: url) {
-          Image(systemName: "safari")
-            .frame(width: 30, height: 30)
-        }
-        .buttonStyle(.bordered)
-        .buttonBorderShape(.circle)
-        .controlSize(.small)
-        .accessibilityLabel("打开品牌官网".appLocalized)
-      }
+      treasureButtonCompact
     }
     .padding(.horizontal, 12)
     .padding(.bottom, 4)
@@ -615,142 +625,105 @@ struct TimeHallView: View {
   }
 
   private func curatedChronicle(_ catalog: TimeHallCatalogDTO) -> some View {
-    VStack(alignment: .leading, spacing: 14) {
-      curatedSectionTitle("品牌编年史", detail: catalog.scope.labelZH)
-      ForEach(catalog.timelineYears.sorted { $0.year < $1.year }) { record in
-        GlassCard(cornerRadius: 22, padding: 16) {
-          VStack(alignment: .leading, spacing: 8) {
-            Text(String(record.year))
-              .font(.caption.monospacedDigit().weight(.bold))
-              .foregroundStyle(Color.pink)
-            Text(record.titleZH)
-              .font(.headline)
-              .foregroundStyle(palette.primaryText)
-            Text(record.storyZH)
-              .font(.subheadline)
-              .foregroundStyle(palette.secondaryText)
-              .fixedSize(horizontal: false, vertical: true)
-            if let source = record.sourceURLs.first, let url = URL(string: source) {
-              Link("查看官方资料".appLocalized, destination: url)
-                .font(.caption.weight(.semibold))
-            }
-          }
-          .frame(maxWidth: .infinity, alignment: .leading)
-        }
+    let activeYear = curatedActiveYear(catalog)
+    let items = filteredCuratedItems(catalog).filter { $0.year == activeYear }
+    return VStack(alignment: .leading, spacing: 20) {
+      searchField
+      curatedYearRail(catalog, activeYear: activeYear)
+      curatedCatalogueSection(catalog, activeYear: activeYear)
+      if !items.isEmpty {
+        curatedItemGrid(title: "官方图鉴单品", items: items)
       }
+      curatedYearStoryCard(catalog, activeYear: activeYear)
     }
   }
 
   private func curatedAtlas(_ catalog: TimeHallCatalogDTO) -> some View {
-    VStack(alignment: .leading, spacing: 14) {
-      curatedSectionTitle("官网图鉴手册", detail: catalog.scope.labelZH)
-      ForEach(catalog.catalogues.sorted { ($0.year, $0.season) < ($1.year, $1.season) }) { catalogue in
-        let catalogueItems = catalogue.itemIds.compactMap { itemID in
-          catalog.items.first { $0.id == itemID }
-        }
-        GlassCard(cornerRadius: 22, padding: 0) {
-          VStack(alignment: .leading, spacing: 0) {
-            TimeHallBundleImage(fileName: catalogue.coverImage, placeholderSystemImage: "book.closed.fill")
-              .scaledToFill()
-              .frame(maxWidth: .infinity)
-              .frame(height: 180)
-              .clipped()
-            VStack(alignment: .leading, spacing: 8) {
-              Text("\(String(catalogue.year)) · \(catalogue.seasonLabel)")
-                .font(.caption.weight(.bold))
-                .foregroundStyle(Color.pink)
-              Text(catalogue.titleZH)
-                .font(.system(.title3, design: .serif).weight(.semibold))
-                .foregroundStyle(palette.primaryText)
-              Text(catalogue.summaryZH)
-                .font(.subheadline)
-                .foregroundStyle(palette.secondaryText)
-                .fixedSize(horizontal: false, vertical: true)
-              Divider()
-              if catalogueItems.isEmpty {
-                Text("官网未公开可稳定逐项核对的商品清单，保留目录层级。".appLocalized)
-                  .font(.caption)
-                  .foregroundStyle(palette.secondaryText)
-              } else {
-                ForEach(catalogueItems) { item in
-                  VStack(alignment: .leading, spacing: 3) {
-                    HStack(alignment: .firstTextBaseline) {
-                      Text(item.nameZH)
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(palette.primaryText)
-                      Spacer(minLength: 8)
-                      if item.priceJPY > 0 {
-                        Text("¥\(item.priceJPY.formatted())")
-                          .font(.caption.monospacedDigit().weight(.semibold))
-                          .foregroundStyle(Color.pink)
-                      }
-                    }
-                    Text("\(item.categoryZH) · \(item.noteZH)")
-                      .font(.caption)
-                      .foregroundStyle(palette.secondaryText)
-                      .fixedSize(horizontal: false, vertical: true)
-                  }
-                }
-              }
-              if let url = URL(string: catalogue.sourceURL) {
-                Link("查看官网目录".appLocalized, destination: url)
-                  .font(.caption.weight(.semibold))
-              }
-            }
-            .padding(16)
+    let items = filteredCuratedItems(catalog)
+    let commerceItems = filteredCuratedCommerceItems(catalog)
+    return VStack(alignment: .leading, spacing: 18) {
+      searchField
+      GlassCard(cornerRadius: 22, padding: 16) {
+        VStack(alignment: .leading, spacing: 8) {
+          Label("官方图鉴资料", systemImage: "book.closed.fill")
+            .font(.headline)
+            .foregroundStyle(Color.pink)
+          Text(catalog.subtitle)
+            .font(.system(.title3, design: .serif).weight(.semibold))
+            .foregroundStyle(palette.primaryText)
+          Text("收录 \(catalog.catalogues.count) 份目录 · \(catalog.commerceItems.count) 件官网公开商品")
+            .font(.subheadline)
+            .foregroundStyle(palette.secondaryText)
+          if let url = URL(string: catalog.source) {
+            Link("查看品牌官网".appLocalized, destination: url)
+              .font(.caption.weight(.semibold))
           }
         }
+      }
+      if commerceItems.isEmpty {
+        curatedItemGrid(title: "全部图鉴", items: items)
+      } else {
+        curatedCommerceGrid(items: commerceItems)
       }
     }
   }
 
   private func curatedStories(_ catalog: TimeHallCatalogDTO) -> some View {
-    VStack(alignment: .leading, spacing: 14) {
-      curatedSectionTitle("官方珍选", detail: "仅收录官网可验证的专题、新闻、专栏与 Lookbook")
-      if catalog.stories.isEmpty {
-        GlassCard(cornerRadius: 22, padding: 16) {
-          ContentUnavailableView(
-            "暂无官网珍选档案".appLocalized,
-            systemImage: "sparkles.rectangle.stack",
-            description: Text("官网未提供可核验的专题或精选内容，因此不自行创作。".appLocalized)
+    let stories = filteredCuratedStories(catalog)
+    return VStack(alignment: .leading, spacing: 18) {
+      searchField
+      GlassCard(cornerRadius: 22, padding: 16) {
+        VStack(alignment: .leading, spacing: 7) {
+          Label("官方 Feature 与制作工艺", systemImage: "sparkles.rectangle.stack")
+            .font(.headline)
+            .foregroundStyle(Color.pink)
+          Text(
+            "\(catalog.stories.filter { $0.kind == .feature }.count) 篇专题 · \(catalog.stories.filter { $0.kind == .craft }.count) 篇工艺档案"
           )
+          .font(.system(.title3, design: .serif).weight(.semibold))
+          .foregroundStyle(palette.primaryText)
         }
+      }
+      if stories.isEmpty {
+        curatedEmptyState(
+          "暂无官网珍选档案",
+          systemImage: "sparkles.rectangle.stack",
+          description: "官网未提供可核验的专题或精选内容。"
+        )
       } else {
-        ForEach(catalog.stories) { story in
-          GlassCard(cornerRadius: 24, padding: 0) {
-            VStack(alignment: .leading, spacing: 0) {
-              TimeHallBundleImage(
-                fileName: story.coverImage,
-                placeholderSystemImage: story.kind.symbolName
-              )
-              .scaledToFill()
-              .frame(maxWidth: .infinity)
-              .frame(height: 180)
-              .clipped()
-
-              VStack(alignment: .leading, spacing: 9) {
-                Label(story.kind.labelZH, systemImage: story.kind.symbolName)
-                  .font(.caption.weight(.bold))
-                  .foregroundStyle(Color.pink)
-                Text(story.title)
-                  .font(.system(.title3, design: .serif).weight(.semibold))
-                  .foregroundStyle(palette.primaryText)
-                Text(story.summary)
-                  .font(.subheadline.weight(.medium))
-                  .foregroundStyle(palette.primaryText)
-                Text(story.content)
-                  .font(.body)
-                  .foregroundStyle(palette.secondaryText)
-                  .fixedSize(horizontal: false, vertical: true)
-                if let url = URL(string: story.sourceURL) {
-                  Link(destination: url) {
-                    Label("查看官方来源".appLocalized, systemImage: "arrow.up.right.square")
-                      .font(.caption.weight(.semibold))
+        LazyVGrid(
+          columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)],
+          spacing: 16
+        ) {
+          ForEach(stories) { story in
+            Button {
+              detailStory = story
+            } label: {
+              VStack(alignment: .leading, spacing: 8) {
+                Color.clear
+                  .aspectRatio(1, contentMode: .fit)
+                  .overlay {
+                    TimeHallBundleImage(
+                      fileName: story.coverImage,
+                      placeholderSystemImage: story.kind.symbolName
+                    )
+                    .scaledToFill()
                   }
-                }
+                  .clipped()
+                .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                Text(story.kind.labelZH)
+                  .font(.caption2.weight(.bold))
+                  .foregroundStyle(story.kind == .craft ? Color.orange : Color.pink)
+                Text(story.displayTitle)
+                  .font(.subheadline.weight(.semibold))
+                  .foregroundStyle(palette.primaryText)
+                  .lineLimit(2)
+                Text(story.publishedOn ?? "官方工艺档案")
+                  .font(.caption2.monospacedDigit())
+                  .foregroundStyle(palette.secondaryText)
               }
-              .padding(18)
             }
+            .buttonStyle(.plain)
           }
         }
       }
@@ -759,38 +732,149 @@ struct TimeHallView: View {
 
   @ViewBuilder
   private func curatedCoordinates(_ catalog: TimeHallCatalogDTO) -> some View {
-    VStack(alignment: .leading, spacing: 14) {
-      curatedSectionTitle("官方搭配", detail: "仅呈现官网已有 Lookbook、时装秀或搭配资料")
-      if catalog.coordinates.isEmpty {
-        GlassCard(cornerRadius: 22, padding: 16) {
-          ContentUnavailableView(
-            "暂无官网搭配档案".appLocalized,
-            systemImage: "person.crop.rectangle.stack",
-            description: Text("官网未提供可核验的专题搭配，因此不自行创作。".appLocalized)
-          )
+    let coordinates = filteredCuratedCoordinates(catalog)
+    VStack(alignment: .leading, spacing: 18) {
+      searchField
+      GlassCard(cornerRadius: 22, padding: 16) {
+        VStack(alignment: .leading, spacing: 7) {
+          Label("官方 Coordinate 搭配档案", systemImage: "person.crop.rectangle.stack")
+            .font(.headline)
+            .foregroundStyle(Color.pink)
+          Text("\(catalog.coordinates.count) 套造型 · 按官网资料呈现")
+            .font(.system(.title3, design: .serif).weight(.semibold))
+            .foregroundStyle(palette.primaryText)
         }
+      }
+      HStack {
+        Text("全部搭配")
+          .font(.system(.title3, design: .serif).weight(.semibold))
+          .foregroundStyle(palette.primaryText)
+        Spacer()
+        Text("\(coordinates.count) 套")
+          .font(.caption.monospacedDigit())
+          .foregroundStyle(palette.secondaryText)
+      }
+      if coordinates.isEmpty {
+        curatedEmptyState(
+          "暂无官网搭配档案",
+          systemImage: "person.crop.rectangle.stack",
+          description: "官网未提供可核验的专题搭配。"
+        )
       } else {
-        ForEach(catalog.coordinates) { coordinate in
-          GlassCard(cornerRadius: 22, padding: 0) {
-            VStack(alignment: .leading, spacing: 0) {
-              TimeHallBundleImage(fileName: coordinate.coverImage, placeholderSystemImage: "person.crop.rectangle.stack")
+        LazyVGrid(
+          columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)],
+          spacing: 16
+        ) {
+          ForEach(coordinates) { coordinate in
+            Button {
+              detailCoordinate = coordinate
+            } label: {
+              VStack(alignment: .leading, spacing: 8) {
+                TimeHallBundleImage(
+                  fileName: coordinate.coverImage,
+                  placeholderSystemImage: "person.crop.rectangle.stack"
+                )
                 .scaledToFill()
                 .frame(maxWidth: .infinity)
-                .frame(height: 190)
+                .frame(height: 220)
                 .clipped()
-              VStack(alignment: .leading, spacing: 8) {
-                Text(coordinate.title)
-                  .font(.headline)
+                .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                Text(coordinate.displayTitle)
+                  .font(.caption.weight(.semibold))
                   .foregroundStyle(palette.primaryText)
-                Text(coordinate.coordinatePoint)
+                  .lineLimit(2)
+              }
+            }
+            .buttonStyle(.plain)
+          }
+        }
+      }
+    }
+  }
+
+  private func curatedActiveYear(_ catalog: TimeHallCatalogDTO) -> Int {
+    let years = catalog.timelineYears.map(\.year)
+    if let selectedYear, years.contains(selectedYear) { return selectedYear }
+    return years.sorted(by: isTimelineAscending ? (<) : (>)).first ?? catalog.scope.startYear
+  }
+
+  private func curatedYearRail(_ catalog: TimeHallCatalogDTO, activeYear: Int) -> some View {
+    let years = catalog.timelineYears.map(\.year).sorted(by: isTimelineAscending ? (<) : (>))
+    return VStack(alignment: .leading, spacing: 10) {
+      HStack {
+        Text("年份浏览")
+          .font(.system(.headline, design: .serif).weight(.semibold))
+          .foregroundStyle(palette.primaryText)
+        Spacer()
+        Menu {
+          ForEach(years, id: \.self) { year in
+            Button(String(year)) { selectedYear = year }
+          }
+        } label: {
+          Label("选择年份", systemImage: "calendar")
+            .font(.footnote.weight(.medium))
+        }
+        Menu {
+          Button("升序") { isTimelineAscending = true }
+          Button("倒序") { isTimelineAscending = false }
+        } label: {
+          Label(isTimelineAscending ? "升序" : "倒序", systemImage: "arrow.up.arrow.down")
+            .font(.footnote.weight(.medium))
+        }
+      }
+      ScrollView(.horizontal, showsIndicators: false) {
+        HStack(spacing: 10) {
+          ForEach(years, id: \.self) { year in
+            let record = catalog.timelineYears.first { $0.year == year }
+            let itemCount = catalog.items.filter { $0.year == year }.count
+            yearButton(
+              year,
+              subtitle: itemCount > 0 ? "\(itemCount) 件" : (record?.kind.labelZH ?? ""),
+              activeYear: activeYear
+            )
+          }
+        }
+      }
+    }
+  }
+
+  @ViewBuilder
+  private func curatedCatalogueSection(_ catalog: TimeHallCatalogDTO, activeYear: Int) -> some View {
+    let catalogues = catalog.catalogues.filter { $0.year == activeYear }
+    if !catalogues.isEmpty {
+      VStack(alignment: .leading, spacing: 12) {
+        Text("完整杂志目录".appLocalized)
+          .font(.system(.title3, design: .serif).weight(.semibold))
+          .foregroundStyle(palette.primaryText)
+        ForEach(catalogues) { catalogue in
+          GlassCard(cornerRadius: 22, padding: 16) {
+            HStack(alignment: .top, spacing: 12) {
+              TimeHallBundleImage(
+                fileName: catalogue.coverImage,
+                placeholderSystemImage: "book.closed.fill"
+              )
+              .scaledToFill()
+              .frame(width: 92, height: 132)
+              .clipped()
+              .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+              VStack(alignment: .leading, spacing: 8) {
+                Text("\(String(catalogue.year)) · \(catalogue.seasonLabel)")
+                  .font(.caption.weight(.semibold))
+                  .foregroundStyle(Color.pink)
+                Text(catalogue.titleZH)
+                  .font(.system(.title3, design: .serif).weight(.semibold))
+                  .foregroundStyle(palette.primaryText)
+                Text(catalogue.summaryZH)
                   .font(.subheadline)
                   .foregroundStyle(palette.secondaryText)
-                if let url = URL(string: coordinate.sourceURL) {
-                  Link("查看官方搭配".appLocalized, destination: url)
-                    .font(.caption.weight(.semibold))
+                  .fixedSize(horizontal: false, vertical: true)
+                if let url = URL(string: catalogue.sourceURL) {
+                  Link(destination: url) {
+                    Label("查看官网杂志", systemImage: "arrow.up.right.square")
+                      .font(.footnote.weight(.medium))
+                  }
                 }
               }
-              .padding(16)
             }
           }
         }
@@ -798,15 +882,161 @@ struct TimeHallView: View {
     }
   }
 
-  private func curatedSectionTitle(_ title: String, detail: String) -> some View {
-    VStack(alignment: .leading, spacing: 4) {
-      Text(title.appLocalized)
-        .font(.system(.title2, design: .serif).weight(.semibold))
-        .foregroundStyle(palette.primaryText)
-      Text(detail)
-        .font(.caption)
-        .foregroundStyle(palette.secondaryText)
-        .fixedSize(horizontal: false, vertical: true)
+  @ViewBuilder
+  private func curatedYearStoryCard(_ catalog: TimeHallCatalogDTO, activeYear: Int) -> some View {
+    if let record = catalog.timelineYears.first(where: { $0.year == activeYear }) {
+      GlassCard(cornerRadius: 24, padding: 18) {
+        VStack(alignment: .leading, spacing: 12) {
+          HStack(alignment: .top, spacing: 12) {
+            Image(systemName: record.kind.symbolName)
+              .font(.title2.weight(.semibold))
+              .foregroundStyle(Color.pink)
+              .frame(width: 46, height: 46)
+              .background(Color.pink.opacity(0.12), in: Circle())
+            VStack(alignment: .leading, spacing: 4) {
+              Text(String(record.year))
+                .font(.caption.monospacedDigit().weight(.bold))
+                .foregroundStyle(Color.pink)
+              Text(record.titleZH)
+                .font(.system(.title2, design: .serif).weight(.semibold))
+                .foregroundStyle(palette.primaryText)
+            }
+            Spacer()
+          }
+          Text(record.storyZH)
+            .font(.body)
+            .foregroundStyle(palette.secondaryText)
+            .fixedSize(horizontal: false, vertical: true)
+          if let source = record.sourceURLs.first, let url = URL(string: source) {
+            Link("查看官方资料".appLocalized, destination: url)
+              .font(.caption.weight(.semibold))
+          }
+        }
+      }
+    }
+  }
+
+  private func curatedItemGrid(title: String, items: [TimeHallItemDTO]) -> some View {
+    VStack(alignment: .leading, spacing: 12) {
+      HStack {
+        Text(title.appLocalized)
+          .font(.system(.title3, design: .serif).weight(.semibold))
+          .foregroundStyle(palette.primaryText)
+        Spacer()
+        Text("\(items.count) 件")
+          .font(.caption.monospacedDigit())
+          .foregroundStyle(palette.secondaryText)
+      }
+      if items.isEmpty {
+        Text("暂无官方商品".appLocalized)
+          .font(.subheadline)
+          .foregroundStyle(palette.secondaryText)
+          .frame(maxWidth: .infinity)
+          .padding(.vertical, 40)
+      } else {
+        LazyVGrid(
+          columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)],
+          spacing: 14
+        ) {
+          ForEach(items) { item in
+            TimeHallCatalogItemCard(item: item) {
+              detailItem = item
+            }
+          }
+        }
+      }
+    }
+  }
+
+  private func filteredCuratedItems(_ catalog: TimeHallCatalogDTO) -> [TimeHallItemDTO] {
+    var items = catalog.items
+    if showTreasuresOnly {
+      items = items.filter { store.isTreasured($0.id) }
+    }
+    guard !searchText.isEmpty else { return items }
+    let query = searchText.lowercased()
+    return items.filter {
+      $0.name.lowercased().contains(query)
+        || $0.nameZH.lowercased().contains(query)
+        || $0.categoryZH.lowercased().contains(query)
+        || $0.stylesZH.joined().lowercased().contains(query)
+        || ($0.productCode?.lowercased().contains(query) ?? false)
+    }
+  }
+
+  private func filteredCuratedCommerceItems(
+    _ catalog: TimeHallCatalogDTO
+  ) -> [TimeHallCommerceItemDTO] {
+    var items = catalog.commerceItems
+    if showTreasuresOnly {
+      items = items.filter { store.isTreasured($0.id) }
+    }
+    guard !searchText.isEmpty else { return items }
+    let query = searchText.lowercased()
+    return items.filter {
+      $0.name.lowercased().contains(query)
+        || $0.brand.lowercased().contains(query)
+        || $0.productCode.lowercased().contains(query)
+        || $0.categoryZH.lowercased().contains(query)
+        || $0.stylesZH.joined().lowercased().contains(query)
+    }
+  }
+
+  private func curatedCommerceGrid(items: [TimeHallCommerceItemDTO]) -> some View {
+    VStack(alignment: .leading, spacing: 12) {
+      HStack {
+        Text("全部官网商品".appLocalized)
+          .font(.system(.title3, design: .serif).weight(.semibold))
+          .foregroundStyle(palette.primaryText)
+        Spacer()
+        Text("\(items.count) 件")
+          .font(.caption.monospacedDigit())
+          .foregroundStyle(palette.secondaryText)
+      }
+      LazyVGrid(
+        columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)],
+        spacing: 14
+      ) {
+        ForEach(items) { item in
+          TimeHallCommerceItemCard(item: item) {
+            detailCommerceItem = item
+          }
+        }
+      }
+    }
+  }
+
+  private func filteredCuratedStories(_ catalog: TimeHallCatalogDTO) -> [TimeHallStoryDTO] {
+    guard !searchText.isEmpty else { return catalog.stories }
+    let query = searchText.lowercased()
+    return catalog.stories.filter {
+      $0.title.lowercased().contains(query)
+        || $0.summary.lowercased().contains(query)
+        || $0.content.lowercased().contains(query)
+    }
+  }
+
+  private func filteredCuratedCoordinates(_ catalog: TimeHallCatalogDTO) -> [TimeHallCoordinateDTO] {
+    guard !searchText.isEmpty else { return catalog.coordinates }
+    let query = searchText.lowercased()
+    return catalog.coordinates.filter {
+      $0.title.lowercased().contains(query)
+        || $0.coordinatePoint.lowercased().contains(query)
+        || $0.unlinkedItemNames.joined().lowercased().contains(query)
+    }
+  }
+
+  private func curatedEmptyState(
+    _ title: String,
+    systemImage: String,
+    description: String
+  ) -> some View {
+    GlassCard(cornerRadius: 22, padding: 16) {
+      ContentUnavailableView(
+        title.appLocalized,
+        systemImage: systemImage,
+        description: Text(description.appLocalized)
+      )
     }
   }
 
@@ -1363,7 +1593,8 @@ struct TimeHallView: View {
             let archiveCount = store.archiveCatalogues(for: year).count
             yearButton(
               year,
-              subtitle: timelineSubtitle(record: record, archiveCount: archiveCount)
+              subtitle: timelineSubtitle(record: record, archiveCount: archiveCount),
+              activeYear: activeYear
             )
           }
         }
@@ -1375,7 +1606,7 @@ struct TimeHallView: View {
     archiveCount > 0 ? "\(archiveCount) 份" : (record?.kind.labelZH ?? "")
   }
 
-  private func yearButton(_ year: Int, subtitle: String) -> some View {
+  private func yearButton(_ year: Int, subtitle: String, activeYear: Int) -> some View {
     let selected = year == activeYear
     return Button {
       withAnimation(.snappy) { selectedYear = year }
@@ -1632,14 +1863,16 @@ struct TimeHallView: View {
               detailStory = story
             } label: {
               VStack(alignment: .leading, spacing: 8) {
-                TimeHallBundleImage(
-                  fileName: story.coverImage,
-                  placeholderSystemImage: story.kind.symbolName
-                )
-                .scaledToFill()
-                .frame(maxWidth: .infinity)
-                .frame(height: 170)
-                .clipped()
+                Color.clear
+                  .aspectRatio(1, contentMode: .fit)
+                  .overlay {
+                    TimeHallBundleImage(
+                      fileName: story.coverImage,
+                      placeholderSystemImage: story.kind.symbolName
+                    )
+                    .scaledToFill()
+                  }
+                  .clipped()
                 .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
                 Text(story.kind.labelZH)
                   .font(.caption2.weight(.bold))
@@ -1943,7 +2176,8 @@ private enum TimeHallWardrobeDraftBuilder {
   static func makeDraft(
     for item: TimeHallCommerceItemDTO,
     store: TimeHallCatalogStore,
-    modelContext: ModelContext
+    modelContext: ModelContext,
+    prefetchedImage: UIImage? = nil
   ) -> ClothingEditDraft {
     let noteLines = compactNoteLines(
       productCode: item.productCode,
@@ -1961,7 +2195,8 @@ private enum TimeHallWardrobeDraftBuilder {
       colors: item.colors.joined(separator: ", "),
       sizes: item.sizes.joined(separator: ", "),
       originalPriceJPY: item.regularPriceJPY,
-      imageName: item.coverImage,
+      imageName: item.coverImage.isEmpty ? nil : item.coverImage,
+      prefetchedImage: prefetchedImage,
       note: noteLines,
       store: store,
       modelContext: modelContext
@@ -1976,13 +2211,14 @@ private enum TimeHallWardrobeDraftBuilder {
     sizes: String,
     originalPriceJPY: Int,
     imageName: String?,
+    prefetchedImage: UIImage? = nil,
     note: String,
     store: TimeHallCatalogStore,
     modelContext: ModelContext
   ) -> ClothingEditDraft {
     let now = Date()
     let imagePaths: [String]
-    if let image = store.image(named: imageName),
+    if let image = prefetchedImage ?? store.image(named: imageName),
       let fileName = ImageManager.shared.saveImage(image, context: modelContext)
     {
       imagePaths = [fileName]
@@ -2051,11 +2287,15 @@ private enum TimeHallWardrobeDraftBuilder {
 }
 
 private struct TimeHallAddToWardrobeButton: View {
+  var isLoading = false
   let action: () -> Void
 
   var body: some View {
     Button(action: action) {
-      Label("加入衣橱".appLocalized, systemImage: "plus.circle.fill")
+      Label(
+        isLoading ? "正在准备图片…".appLocalized : "加入衣橱".appLocalized,
+        systemImage: isLoading ? "hourglass" : "plus.circle.fill"
+      )
         .font(.subheadline.weight(.semibold))
         .frame(maxWidth: .infinity)
         .padding(.vertical, 11)
@@ -2063,6 +2303,7 @@ private struct TimeHallAddToWardrobeButton: View {
     .buttonStyle(.borderedProminent)
     .buttonBorderShape(.capsule)
     .tint(.pink)
+    .disabled(isLoading)
   }
 }
 
@@ -2126,8 +2367,8 @@ struct TimeHallItemDetailView: View {
               Label(item.kind.labelZH, systemImage: item.kind.symbolName)
               Text(item.displayCategory)
               Spacer()
-              Text("¥\(item.priceJPY.formatted())")
-                .fontWeight(.semibold)
+              Text(item.priceJPY > 0 ? "¥\(item.priceJPY.formatted())" : "价格未公开".appLocalized)
+                .fontWeight(item.priceJPY > 0 ? .semibold : .regular)
             }
             .font(.subheadline)
 
@@ -2217,6 +2458,7 @@ struct TimeHallItemDetailView: View {
 
   private var cataloguePageLabel: String {
     let pages = item.cataloguePages ?? [item.cataloguePage]
+    guard pages.allSatisfy({ $0 > 0 }) else { return "官网系列档案".appLocalized }
     if pages.count == 1 {
       return "图录第 \(pages[0]) 页"
     }
@@ -2236,8 +2478,8 @@ struct TimeHallItemDetailView: View {
   }
 }
 
-struct TimeHallCommerceItemCard: View {
-  let item: TimeHallCommerceItemDTO
+private struct TimeHallCatalogItemCard: View {
+  let item: TimeHallItemDTO
   let onTap: () -> Void
   @ObservedObject private var store = TimeHallCatalogStore.shared
   @Environment(ThemeManager.self) private var themeManager
@@ -2252,7 +2494,8 @@ struct TimeHallCommerceItemCard: View {
       VStack(alignment: .leading, spacing: 8) {
         ZStack(alignment: .topTrailing) {
           TimeHallBundleImage(
-            fileName: item.coverImage, placeholderSystemImage: item.kind.symbolName
+            fileName: item.coverImage,
+            placeholderSystemImage: item.kind.symbolName
           )
           .scaledToFill()
           .frame(maxWidth: .infinity)
@@ -2273,7 +2516,63 @@ struct TimeHallCommerceItemCard: View {
           .padding(8)
         }
 
-        Text(item.sourceKind.labelZH)
+        Text("\(String(item.year)) · \(TimeHallSeason(rawValue: item.season)?.labelZH ?? item.season)")
+          .font(.caption2.weight(.bold))
+          .foregroundStyle(Color.pink)
+        Text(item.displayName)
+          .font(.subheadline.weight(.semibold))
+          .foregroundStyle(palette.primaryText)
+          .lineLimit(2)
+        Text("\(item.kind.labelZH) · \(item.displayCategory)")
+          .font(.caption2)
+          .foregroundStyle(palette.secondaryText)
+        if item.priceJPY > 0 {
+          Text("¥\(item.priceJPY.formatted())")
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(palette.primaryText)
+        }
+      }
+    }
+    .buttonStyle(.plain)
+  }
+}
+
+struct TimeHallCommerceItemCard: View {
+  let item: TimeHallCommerceItemDTO
+  let onTap: () -> Void
+  @ObservedObject private var store = TimeHallCatalogStore.shared
+  @Environment(ThemeManager.self) private var themeManager
+  @Environment(\.colorScheme) private var colorScheme
+
+  private var palette: MagicThemePalette {
+    MagicThemeDesignSystem.palette(themeManager: themeManager, colorScheme: colorScheme)
+  }
+
+  var body: some View {
+    Button(action: onTap) {
+      VStack(alignment: .leading, spacing: 8) {
+        ZStack(alignment: .topTrailing) {
+          TimeHallCommerceImage(item: item, index: 0)
+          .scaledToFill()
+          .frame(maxWidth: .infinity)
+          .frame(height: 180)
+          .clipped()
+          .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+
+          Button {
+            store.toggleTreasure(item.id)
+          } label: {
+            Image(systemName: store.isTreasured(item.id) ? "heart.fill" : "heart")
+              .font(.footnote.weight(.semibold))
+              .foregroundStyle(store.isTreasured(item.id) ? Color.pink : .white)
+              .padding(8)
+              .background(.ultraThinMaterial, in: Circle())
+          }
+          .buttonStyle(.plain)
+          .padding(8)
+        }
+
+        Text(item.listingLabelZH)
           .font(.caption2.weight(.bold))
           .foregroundStyle(item.sourceKind == .outlet ? Color.orange : Color.pink)
         Text(item.displayName)
@@ -2284,7 +2583,10 @@ struct TimeHallCommerceItemCard: View {
           .font(.caption2)
           .foregroundStyle(palette.secondaryText)
         HStack(spacing: 6) {
-          if let salePrice = item.salePriceJPY {
+          if item.regularPriceJPY == 0 {
+            Text("价格未公开".appLocalized)
+              .foregroundStyle(palette.secondaryText)
+          } else if let salePrice = item.salePriceJPY {
             Text("¥\(item.regularPriceJPY.formatted())")
               .strikethrough()
               .foregroundStyle(palette.secondaryText)
@@ -2310,15 +2612,14 @@ struct TimeHallCommerceItemDetailView: View {
   @Environment(\.modelContext) private var modelContext
   @Environment(ThemeManager.self) private var themeManager
   @Environment(\.colorScheme) private var colorScheme
+  @State private var isAddingToWardrobe = false
 
   private var palette: MagicThemePalette {
     MagicThemeDesignSystem.palette(themeManager: themeManager, colorScheme: colorScheme)
   }
 
-  private var bundledImages: [String] {
-    [item.coverImage, item.detailImage].compactMap { $0 }.reduce(into: []) { result, name in
-      if !result.contains(name) { result.append(name) }
-    }
+  private var imageCount: Int {
+    max(item.coverImage.isEmpty ? 0 : 1, min(2, item.imageSourceURLs.count))
   }
 
   var body: some View {
@@ -2326,8 +2627,8 @@ struct TimeHallCommerceItemDetailView: View {
       ScrollView {
         VStack(alignment: .leading, spacing: 18) {
           TabView {
-            ForEach(bundledImages, id: \.self) { fileName in
-              TimeHallBundleImage(fileName: fileName, placeholderSystemImage: item.kind.symbolName)
+            ForEach(0..<max(imageCount, 1), id: \.self) { index in
+              TimeHallCommerceImage(item: item, index: index)
                 .scaledToFit()
                 .frame(maxWidth: .infinity)
                 .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
@@ -2338,7 +2639,7 @@ struct TimeHallCommerceItemDetailView: View {
           .frame(height: 420)
 
           VStack(alignment: .leading, spacing: 12) {
-            Text(item.sourceKind.labelZH)
+            Text(item.listingLabelZH)
               .font(.caption.weight(.bold))
               .foregroundStyle(item.sourceKind == .outlet ? Color.orange : Color.pink)
             Text(item.displayName)
@@ -2360,7 +2661,7 @@ struct TimeHallCommerceItemDetailView: View {
             }
             .font(.subheadline)
 
-            TimeHallAddToWardrobeButton(action: addToWardrobe)
+            TimeHallAddToWardrobeButton(isLoading: isAddingToWardrobe, action: addToWardrobe)
 
             detailFacts
 
@@ -2428,7 +2729,10 @@ struct TimeHallCommerceItemDetailView: View {
 
   @ViewBuilder
   private var commercePrice: some View {
-    if let salePrice = item.salePriceJPY {
+    if item.regularPriceJPY == 0 {
+      Text("价格未公开".appLocalized)
+        .foregroundStyle(palette.secondaryText)
+    } else if let salePrice = item.salePriceJPY {
       VStack(alignment: .trailing, spacing: 2) {
         Text("¥\(item.regularPriceJPY.formatted())").strikethrough()
           .foregroundStyle(palette.secondaryText)
@@ -2462,13 +2766,27 @@ struct TimeHallCommerceItemDetailView: View {
   }
 
   private func addToWardrobe() {
-    let draft = TimeHallWardrobeDraftBuilder.makeDraft(
-      for: item,
-      store: store,
-      modelContext: modelContext
-    )
-    dismiss()
-    DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+    isAddingToWardrobe = true
+    Task {
+      let remoteImage: UIImage?
+      if item.coverImage.isEmpty,
+        let source = item.imageSourceURLs.first,
+        let url = URL(string: source),
+        let (data, _) = try? await URLSession.shared.data(from: url)
+      {
+        remoteImage = UIImage(data: data)
+      } else {
+        remoteImage = nil
+      }
+      let draft = TimeHallWardrobeDraftBuilder.makeDraft(
+        for: item,
+        store: store,
+        modelContext: modelContext,
+        prefetchedImage: remoteImage
+      )
+      isAddingToWardrobe = false
+      dismiss()
+      try? await Task.sleep(for: .milliseconds(350))
       tabNavigationManager.presentWardrobeCreation(with: draft)
     }
   }
@@ -2768,5 +3086,45 @@ struct TimeHallBundleImage: View {
       image = nil
       image = await store.loadImage(named: fileName)
     }
+  }
+}
+
+private struct TimeHallCommerceImage: View {
+  let item: TimeHallCommerceItemDTO
+  let index: Int
+
+  private var bundledName: String? {
+    switch index {
+    case 0: return item.coverImage.isEmpty ? nil : item.coverImage
+    case 1: return item.detailImage
+    default: return nil
+    }
+  }
+
+  var body: some View {
+    if let bundledName {
+      TimeHallBundleImage(fileName: bundledName, placeholderSystemImage: item.kind.symbolName)
+    } else if item.imageSourceURLs.indices.contains(index),
+      let url = URL(string: item.imageSourceURLs[index])
+    {
+      AsyncImage(url: url) { phase in
+        if let image = phase.image {
+          image.resizable()
+        } else {
+          commercePlaceholder
+        }
+      }
+    } else {
+      commercePlaceholder
+    }
+  }
+
+  private var commercePlaceholder: some View {
+    RoundedRectangle(cornerRadius: 16, style: .continuous)
+      .fill(Color.pink.opacity(0.12))
+      .overlay {
+        Image(systemName: item.kind.symbolName)
+          .foregroundStyle(Color.pink.opacity(0.5))
+      }
   }
 }
