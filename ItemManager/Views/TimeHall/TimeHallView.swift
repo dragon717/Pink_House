@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import Translation
 
 enum TimeHallMode: String, CaseIterable, Identifiable {
   case chronicle
@@ -2613,6 +2614,8 @@ struct TimeHallCommerceItemDetailView: View {
   @Environment(ThemeManager.self) private var themeManager
   @Environment(\.colorScheme) private var colorScheme
   @State private var isAddingToWardrobe = false
+  @State private var isShowingTranslation = false
+  @State private var translatedDescription: String?
 
   private var palette: MagicThemePalette {
     MagicThemeDesignSystem.palette(themeManager: themeManager, colorScheme: colorScheme)
@@ -2678,14 +2681,20 @@ struct TimeHallCommerceItemDetailView: View {
             }
 
             if !item.description.isEmpty {
-              Text(
-                TimeHallDisplayLanguage.usesChinese
-                  ? "官方日文介绍".appLocalized : "官方介绍".appLocalized
-              )
-              .font(.headline)
-              .foregroundStyle(palette.primaryText)
+              HStack {
+                Text("商品介绍".appLocalized)
+                  .font(.headline)
+                  .foregroundStyle(palette.primaryText)
+                Spacer()
+                Button {
+                  isShowingTranslation = true
+                } label: {
+                  Label("翻译".appLocalized, systemImage: "translate")
+                }
+                .font(.subheadline.weight(.semibold))
+              }
               .padding(.top, 4)
-              Text(item.description)
+              Text(translatedDescription ?? item.description)
                 .font(.body)
                 .foregroundStyle(palette.secondaryText)
                 .fixedSize(horizontal: false, vertical: true)
@@ -2708,6 +2717,11 @@ struct TimeHallCommerceItemDetailView: View {
       }
       .background(
         LiquidBackground(themeSkinWallpaperContext: .timeHall, includeThemeSkinStickers: false)
+      )
+      .translationPresentation(
+        isPresented: $isShowingTranslation,
+        text: item.description,
+        replacementAction: { translatedDescription = $0 }
       )
       .navigationTitle("商品详情".appLocalized)
       .navigationBarTitleDisplayMode(.inline)
