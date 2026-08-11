@@ -96,9 +96,9 @@ private enum TimeHallScrollRange: Equatable {
 }
 
 private enum TimeHallStoreTheme: String, CaseIterable, Identifiable {
+  case kagoshima
   case omotesando
   case nagoya
-  case kagoshima
   case angelicPrettyTokyo
   case angelicPrettyOsaka
   case angelicPrettyParis
@@ -317,7 +317,7 @@ struct TimeHallView: View {
   @ObservedObject private var store = TimeHallCatalogStore.shared
 
   @State private var carouselMerchant: TimeHallMerchant = .pinkHouse
-  @State private var storeTheme: TimeHallStoreTheme = .omotesando
+  @State private var storeTheme: TimeHallStoreTheme = .kagoshima
   @State private var activeMerchant: TimeHallMerchant?
   @State private var curatedCatalog: TimeHallCatalogDTO?
   @State private var mode: TimeHallMode = .chronicle
