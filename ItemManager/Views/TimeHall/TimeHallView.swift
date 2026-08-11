@@ -141,7 +141,7 @@ private enum TimeHallStoreTheme: String, CaseIterable, Identifiable {
     }
   }
 
-  var assetName: String {
+  var storeImageName: String? {
     switch self {
     case .omotesando: return "time_hall_store_omotesando"
     case .nagoya: return "time_hall_store_nagoya"
@@ -152,8 +152,7 @@ private enum TimeHallStoreTheme: String, CaseIterable, Identifiable {
     case .babyHonten: return "store-baby-honten.png"
     case .babyOsaka: return "store-baby-osaka.png"
     case .babyYokohama: return "store-baby-yokohama.png"
-    case .julietteOnline: return "brand-juliette-hero.jpg"
-    case .wunderweltOnline: return "brand-wunderwelt-fleur-hero.png"
+    case .julietteOnline, .wunderweltOnline: return nil
     }
   }
 
@@ -1015,6 +1014,9 @@ struct TimeHallView: View {
           Text(merchant.name)
             .font(.system(compact ? .title2 : .title, design: .serif).weight(.bold))
             .foregroundStyle(palette.primaryText)
+            .lineLimit(1)
+            .minimumScaleFactor(0.5)
+            .multilineTextAlignment(.center)
           Text(theme.title)
             .font(.caption.weight(.semibold))
             .foregroundStyle(theme.accent)
@@ -1037,8 +1039,11 @@ struct TimeHallView: View {
           activeMerchant = merchant
         } label: {
           Label("进入 \(merchant.name)", systemImage: "arrow.right.circle.fill")
-          .frame(maxWidth: .infinity)
-          .padding(.vertical, 4)
+            .lineLimit(2)
+            .minimumScaleFactor(0.72)
+            .multilineTextAlignment(.center)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 4)
         }
         .buttonStyle(.borderedProminent)
         .buttonBorderShape(.capsule)
@@ -1068,10 +1073,16 @@ struct TimeHallView: View {
 
   @ViewBuilder
   private func storefrontImage(_ theme: TimeHallStoreTheme) -> some View {
-    if theme.merchant == .pinkHouse {
-      Image(theme.assetName).resizable()
+    if let storeImageName = theme.storeImageName {
+      if theme.merchant == .pinkHouse {
+        Image(storeImageName).resizable()
+      } else {
+        TimeHallBundleImage(fileName: storeImageName, placeholderSystemImage: "storefront")
+      }
+    } else if let coverImage = theme.merchant.coverImage {
+      TimeHallBundleImage(fileName: coverImage, placeholderSystemImage: "storefront")
     } else {
-      TimeHallBundleImage(fileName: theme.assetName, placeholderSystemImage: "storefront")
+      TimeHallBundleImage(fileName: nil, placeholderSystemImage: "storefront")
     }
   }
 

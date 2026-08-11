@@ -60,7 +60,7 @@ struct TotalBalanceCard: View {
     
     var body: some View {
         VStack(spacing: 0) {
-            // 三个功能入口（放在最上方）
+            // 功能入口（放在最上方）
             HStack(spacing: 0) {
                 // 梦裙日历
                 Button {
@@ -78,6 +78,25 @@ struct TotalBalanceCard: View {
                 }
                 .buttonStyle(.plain)
                 
+                Divider()
+                    .frame(height: 30)
+
+                // 萌宠管家
+                Button {
+                    tabNavigationManager.navigate(to: .petChat)
+                } label: {
+                    VStack(spacing: 4) {
+                        ThemeSkinIconBadge(systemName: "pawprint.fill", fallbackColor: Color(hex: "FF7F50"), size: 30, symbolSize: 14)
+                        Text("萌宠管家".appLocalized)
+                            .font(.caption)
+                            .themeSkinLegibleText(level: .inline, slot: .sectionCard)
+                    }
+                    .foregroundStyle(Color(hex: "FF7F50"))
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 8)
+                }
+                .buttonStyle(.plain)
+
                 Divider()
                     .frame(height: 30)
                 

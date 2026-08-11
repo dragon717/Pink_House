@@ -1,5 +1,6 @@
 import CryptoKit
 import XCTest
+import UIKit
 
 @testable import ItemManager
 
@@ -70,7 +71,13 @@ final class TimeHallCatalogValidationTests: XCTestCase {
       "store-baby-osaka.png",
       "store-baby-yokohama.png",
     ] {
-      XCTAssertNotNil(imageURL(named: imageName), "Missing storefront image: \(imageName)")
+      let url = imageURL(named: imageName)
+      XCTAssertNotNil(url, "Missing storefront image: \(imageName)")
+      let alphaInfo = url.flatMap { UIImage(contentsOfFile: $0.path)?.cgImage?.alphaInfo }
+      XCTAssertTrue(
+        [.first, .last, .premultipliedFirst, .premultipliedLast].contains(alphaInfo),
+        "Storefront image must contain alpha: \(imageName)"
+      )
     }
   }
 
