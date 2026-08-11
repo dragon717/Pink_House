@@ -9,8 +9,8 @@
   "scope": {
     "startYear": 2001,
     "endYear": null,
-    "labelZH": "2001–至今",
-    "sampleYears": [2001, 2012, 2015, 2018]
+    "labelZH": "官网可核验范围：2001 起品牌史、官网 Archives 精选旧作与当前系列；Archives 明示为代表作精选，并非历年全部商品",
+    "sampleYears": [2001, 2012, 2013, 2015, 2017, 2018, 2019, 2026]
   },
   "timelineYears": [
     {
@@ -32,6 +32,15 @@
       "catalogueIDs": []
     },
     {
+      "year": 2013,
+      "kind": "milestone",
+      "titleZH": "欧洲图录与北美活动",
+      "storyZH": "官方品牌史记录 2013 年在德国罗滕堡拍摄图录，并参加多伦多 Anime North 等海外活动。",
+      "evidenceLevel": "officialHistory",
+      "sourceURLs": ["https://juliette-et-justine.com/zh-cn/pages/about"],
+      "catalogueIDs": []
+    },
+    {
       "year": 2015,
       "kind": "milestone",
       "titleZH": "艺术馆特别展出",
@@ -39,11 +48,113 @@
       "evidenceLevel": "officialHistory",
       "sourceURLs": ["https://juliette-et-justine.com/en/pages/about"],
       "catalogueIDs": []
+    },
+    {
+      "year": 2017,
+      "kind": "milestone",
+      "titleZH": "欧洲与上海持续展出",
+      "storyZH": "官方品牌史记录品牌在荷兰与上海参与活动和展示，继续让古典绘画主题裙装进入海外场景。",
+      "evidenceLevel": "officialHistory",
+      "sourceURLs": ["https://juliette-et-justine.com/zh-cn/pages/about"],
+      "catalogueIDs": []
+    },
+    {
+      "year": 2018,
+      "kind": "milestone",
+      "titleZH": "巴黎、广州与上海活动",
+      "storyZH": "官网按年份列出巴黎、广州与上海等活动，呈现品牌在亚洲和欧洲的持续交流。",
+      "evidenceLevel": "officialHistory",
+      "sourceURLs": ["https://juliette-et-justine.com/zh-cn/pages/about"],
+      "catalogueIDs": []
+    },
+    {
+      "year": 2019,
+      "kind": "milestone",
+      "titleZH": "上海茶会",
+      "storyZH": "官方品牌史将 2019 年上海茶会列入沿革，延续服装展示与社群活动并行的路径。",
+      "evidenceLevel": "officialHistory",
+      "sourceURLs": ["https://juliette-et-justine.com/zh-cn/pages/about"],
+      "catalogueIDs": []
+    },
+    {
+      "year": 2026,
+      "kind": "officialArchive",
+      "titleZH": "官网精选旧作与当前系列",
+      "storyZH": "官网 Archives 仅收录一组选定代表作，Current Collection 则呈现当前作品；两者共同构成现阶段可验证的图鉴范围。",
+      "evidenceLevel": "officialCatalogue",
+      "sourceURLs": ["https://juliette-et-justine.com/zh-cn/collections/archives", "https://juliette-et-justine.com/zh-cn/collections/new"],
+      "catalogueIDs": ["juliette-archives", "juliette-current"]
     }
   ],
   "archiveCatalogues": [],
-  "catalogues": [],
-  "items": [],
+  "catalogues": [
+    {
+      "id": "juliette-archives", "year": 2026, "season": "archive", "seasonLabel": "官网精选档案",
+      "title": "Archives", "titleZH": "官网 Archives 代表作精选",
+      "summaryZH": "官网明确将此页定位为过往代表作精选，目前可核验 Éclat、Rossignol、La Dame、Encadreur、Pointe、Corradini 等作品；原始发布年份与全部旧作并未公开。",
+      "sourceURL": "https://juliette-et-justine.com/zh-cn/collections/archives", "coverImage": "brand-juliette-hero.jpg",
+      "imageSourceURL": "https://juliette-et-justine.com/zh-cn/collections/archives", "pageCount": 0,
+      "itemIds": ["juliette-archive-eclat", "juliette-archive-rossignol", "juliette-archive-la-dame", "juliette-archive-encadreur", "juliette-archive-pointe", "juliette-archive-corradini"]
+    },
+    {
+      "id": "juliette-current", "year": 2026, "season": "current", "seasonLabel": "当前系列",
+      "title": "Current Collection", "titleZH": "当前官方系列",
+      "summaryZH": "官网当前系列延续古典绘画、独特印花与女性化轮廓；商品会随受注与库存变化，本档案不将其视为历史全集。",
+      "sourceURL": "https://juliette-et-justine.com/zh-cn/collections/new", "coverImage": "brand-juliette-craft.jpg",
+      "imageSourceURL": "https://juliette-et-justine.com/zh-cn/collections/new", "pageCount": 0, "itemIds": []
+    },
+    {
+      "id": "juliette-art-column", "year": 2026, "season": "editorial", "seasonLabel": "艺术专栏",
+      "title": "Art Column", "titleZH": "作品与绘画出处专栏",
+      "summaryZH": "官方 Art Column 以具体裙装为入口说明画作、艺术家与图像细节，是连接产品资料与艺术史背景的可验证图鉴补充。",
+      "sourceURL": "https://juliette-et-justine.com/zh-cn/blogs/art-column", "coverImage": "brand-juliette-craft.jpg",
+      "imageSourceURL": "https://juliette-et-justine.com/zh-cn/blogs/art-column", "pageCount": 0, "itemIds": []
+    }
+  ],
+  "items": [
+    {
+      "id": "juliette-archive-eclat", "canonicalKey": "juliette|archives|eclat", "kind": "dress", "category": "archive-dress", "categoryZH": "档案裙装",
+      "name": "Éclat", "nameZH": "Éclat", "brand": "Juliette et Justine", "year": 2026, "season": "archive", "catalogueID": "juliette-archives", "cataloguePage": 0,
+      "priceJPY": 0, "listingStatus": "officialArchiveSelection", "styles": ["classic-lolita"], "stylesZH": ["古典洛丽塔"], "coverImage": null, "gallery": [],
+      "imageSourceURL": "https://juliette-et-justine.com/zh-cn/collections/archives", "sourceURL": "https://juliette-et-justine.com/zh-cn/collections/archives",
+      "observedAt": "2026-08-11", "datePrecision": "observed", "noteZH": "官网 Archives 当前点名的代表作；原始发布年份与历史价格未公开。", "productCode": null, "productPageURL": null, "cataloguePages": null
+    },
+    {
+      "id": "juliette-archive-rossignol", "canonicalKey": "juliette|archives|rossignol", "kind": "dress", "category": "archive-dress", "categoryZH": "档案裙装",
+      "name": "Rossignol", "nameZH": "Rossignol", "brand": "Juliette et Justine", "year": 2026, "season": "archive", "catalogueID": "juliette-archives", "cataloguePage": 0,
+      "priceJPY": 0, "listingStatus": "officialArchiveSelection", "styles": ["classic-lolita"], "stylesZH": ["古典洛丽塔"], "coverImage": null, "gallery": [],
+      "imageSourceURL": "https://juliette-et-justine.com/zh-cn/collections/archives", "sourceURL": "https://juliette-et-justine.com/zh-cn/collections/archives",
+      "observedAt": "2026-08-11", "datePrecision": "observed", "noteZH": "官网 Archives 当前点名的代表作；原始发布年份与历史价格未公开。", "productCode": null, "productPageURL": null, "cataloguePages": null
+    },
+    {
+      "id": "juliette-archive-la-dame", "canonicalKey": "juliette|archives|la-dame", "kind": "dress", "category": "archive-dress", "categoryZH": "档案裙装",
+      "name": "La Dame", "nameZH": "La Dame", "brand": "Juliette et Justine", "year": 2026, "season": "archive", "catalogueID": "juliette-archives", "cataloguePage": 0,
+      "priceJPY": 0, "listingStatus": "officialArchiveSelection", "styles": ["classic-lolita"], "stylesZH": ["古典洛丽塔"], "coverImage": null, "gallery": [],
+      "imageSourceURL": "https://juliette-et-justine.com/zh-cn/collections/archives", "sourceURL": "https://juliette-et-justine.com/zh-cn/collections/archives",
+      "observedAt": "2026-08-11", "datePrecision": "observed", "noteZH": "官网 Archives 当前点名的代表作；原始发布年份与历史价格未公开。", "productCode": null, "productPageURL": null, "cataloguePages": null
+    },
+    {
+      "id": "juliette-archive-encadreur", "canonicalKey": "juliette|archives|encadreur", "kind": "dress", "category": "archive-dress", "categoryZH": "档案裙装",
+      "name": "Encadreur", "nameZH": "Encadreur", "brand": "Juliette et Justine", "year": 2026, "season": "archive", "catalogueID": "juliette-archives", "cataloguePage": 0,
+      "priceJPY": 0, "listingStatus": "officialArchiveSelection", "styles": ["classic-lolita"], "stylesZH": ["古典洛丽塔"], "coverImage": null, "gallery": [],
+      "imageSourceURL": "https://juliette-et-justine.com/zh-cn/collections/archives", "sourceURL": "https://juliette-et-justine.com/zh-cn/collections/archives",
+      "observedAt": "2026-08-11", "datePrecision": "observed", "noteZH": "官网 Archives 当前点名的代表作；原始发布年份与历史价格未公开。", "productCode": null, "productPageURL": null, "cataloguePages": null
+    },
+    {
+      "id": "juliette-archive-pointe", "canonicalKey": "juliette|archives|pointe", "kind": "dress", "category": "archive-dress", "categoryZH": "档案裙装",
+      "name": "Pointe", "nameZH": "Pointe", "brand": "Juliette et Justine", "year": 2026, "season": "archive", "catalogueID": "juliette-archives", "cataloguePage": 0,
+      "priceJPY": 0, "listingStatus": "officialArchiveSelection", "styles": ["classic-lolita"], "stylesZH": ["古典洛丽塔"], "coverImage": null, "gallery": [],
+      "imageSourceURL": "https://juliette-et-justine.com/zh-cn/collections/archives", "sourceURL": "https://juliette-et-justine.com/zh-cn/collections/archives",
+      "observedAt": "2026-08-11", "datePrecision": "observed", "noteZH": "官网 Archives 当前点名的代表作；原始发布年份与历史价格未公开。", "productCode": null, "productPageURL": null, "cataloguePages": null
+    },
+    {
+      "id": "juliette-archive-corradini", "canonicalKey": "juliette|archives|corradini", "kind": "dress", "category": "archive-dress", "categoryZH": "档案裙装",
+      "name": "Corradini", "nameZH": "Corradini", "brand": "Juliette et Justine", "year": 2026, "season": "archive", "catalogueID": "juliette-archives", "cataloguePage": 0,
+      "priceJPY": 0, "listingStatus": "officialArchiveSelection", "styles": ["classic-lolita"], "stylesZH": ["古典洛丽塔"], "coverImage": null, "gallery": [],
+      "imageSourceURL": "https://juliette-et-justine.com/zh-cn/collections/archives", "sourceURL": "https://juliette-et-justine.com/zh-cn/collections/archives",
+      "observedAt": "2026-08-11", "datePrecision": "observed", "noteZH": "官网 Archives 当前点名的代表作；原始发布年份与历史价格未公开。", "productCode": null, "productPageURL": null, "cataloguePages": null
+    }
+  ],
   "commerceSnapshots": [],
   "commerceItems": [],
   "coordinates": [],
@@ -86,6 +197,34 @@
       "sourceURL": "https://juliette-et-justine.com/en/pages/about",
       "coverImage": "brand-juliette-craft.jpg",
       "imageSourceURLs": ["https://juliette-et-justine.com/cdn/shop/files/about_slide_01.jpg?v=1686728598"],
+      "productCodes": [],
+      "linkedCommerceItemIDs": [],
+      "observedAt": "2026-08-09"
+    },
+    {
+      "id": "juliette-wunderkammer-column",
+      "kind": "feature",
+      "title": "Wunderkammer 艺术专栏",
+      "publishedOn": null,
+      "summary": "从官方裙装图像回到画作与收藏文化的出处。",
+      "content": "官方 Art Column 以 Wunderkammer 相关作品为入口，说明图像主题与艺术背景；本档案只做中文提要，并保留官网原文入口。",
+      "sourceURL": "https://juliette-et-justine.com/en/blogs/art-column/wunderkammer-art-cloumn",
+      "coverImage": "brand-juliette-craft.jpg",
+      "imageSourceURLs": ["https://juliette-et-justine.com/en/blogs/art-column/wunderkammer-art-cloumn"],
+      "productCodes": [],
+      "linkedCommerceItemIDs": [],
+      "observedAt": "2026-08-09"
+    },
+    {
+      "id": "juliette-sauveur-column",
+      "kind": "feature",
+      "title": "Robe du Sauveur 艺术专栏",
+      "publishedOn": null,
+      "summary": "以官方专栏核对裙装采用的宗教绘画图像与细节。",
+      "content": "官网专栏围绕 Robe du Sauveur 的图像来源展开，展示品牌如何把绘画叙事转化为服装印花；这里不复制商品长文，只保留原创中文转述。",
+      "sourceURL": "https://juliette-et-justine.com/en/blogs/art-column/robe-du-sauveurjsk-art-cloumn",
+      "coverImage": "brand-juliette-hero.jpg",
+      "imageSourceURLs": ["https://juliette-et-justine.com/en/blogs/art-column/robe-du-sauveurjsk-art-cloumn"],
       "productCodes": [],
       "linkedCommerceItemIDs": [],
       "observedAt": "2026-08-09"

@@ -19,10 +19,10 @@ extension EnvironmentValues {
 
 struct WealthView: View {
     @State private var viewModel = WealthViewModel()
-    @Query(filter: #Predicate<Clothing> { $0.deletedAt == nil }) private var allClothings: [Clothing]
     @ObservedObject private var hapticManager = HapticEngineManager.shared
     @ObservedObject private var soundManager = SoundManager.shared
     @StateObject private var mediaStateManager = MediaStateManager.shared
+    @Environment(\.modelContext) private var modelContext
     @Environment(ThemeManager.self) private var themeManager
     @Environment(\.colorScheme) private var colorScheme
 
@@ -30,7 +30,7 @@ struct WealthView: View {
     var initialTab: WealthMainTab? = nil
 
     // 主页面签选择
-    @State private var selectedMainTab: WealthMainTab = .divination
+    @State private var selectedMainTab: WealthMainTab = .moneyCounting
     
     // 用于控制物理模拟的激活状态
     private var isWealthStorageActive: Bool {
@@ -49,12 +49,6 @@ struct WealthView: View {
     
     @State private var moneyCountingState: MoneyCountingState?
     
-    private var calculatedTotalAmount: Decimal {
-        WealthViewModel.calculateBaseAmountCNY(
-            clothings: allClothings
-        )
-    }
-
     private var magicPalette: MagicThemePalette {
         MagicThemeDesignSystem.palette(themeManager: themeManager, colorScheme: colorScheme)
     }
@@ -167,6 +161,9 @@ struct WealthView: View {
                     }
                     .store(in: &cancellables)
             }
+            .task {
+                await updateAmount()
+            }
             .onDisappear {
                 lockOrientation(isLocked: false)
                 stopEffects()
@@ -191,9 +188,6 @@ struct WealthView: View {
                         selectedMainTab = tab
                     }
                 }
-            }
-            .onChange(of: allClothings) { _, _ in
-                updateAmount()
             }
         }
     }
@@ -246,7 +240,7 @@ struct WealthView: View {
     }
     
     private func handleOnAppear() {
-        updateAmount()
+        viewModel.baseAmountCNY = WidgetDataManager.shared.load().totalPrice
         Task {
             await viewModel.fetchExchangeRate()
         }
@@ -266,10 +260,15 @@ struct WealthView: View {
         hapticManager.stopHaptics()
     }
     
-    private func updateAmount() {
-        let total = calculatedTotalAmount
-        print("💰 updateAmount: allClothings.count=\(allClothings.count), total=\(total)")
-        viewModel.baseAmountCNY = total
+    private func updateAmount() async {
+        let loader = WealthAmountLoader(modelContainer: modelContext.container)
+        do {
+            let total = try await loader.loadBaseAmountCNY()
+            guard !Task.isCancelled else { return }
+            viewModel.baseAmountCNY = total
+        } catch {
+            AppLogger.error("WealthView: failed to refresh wardrobe amount: \(error)")
+        }
     }
     
     private func lockOrientation(isLocked: Bool) {

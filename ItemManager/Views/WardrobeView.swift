@@ -107,7 +107,7 @@ private struct WardrobeClothingSnapshot: Sendable {
         self.accessories = clothing.accessories
         self.note = clothing.note
         self.price = clothing.price
-        self.wardrobeValueAmount = clothing.wardrobeListValueAmount
+        self.wardrobeValueAmount = WealthViewModel.sanitizedWardrobeContribution(for: clothing)
         self.stock = clothing.stock
         self.isDepositPlan = clothing.isDepositPlan
         self.isFullPaymentReservation = clothing.isFullPaymentReservation
@@ -586,6 +586,10 @@ struct WardrobeView: View {
     @State private var itemToEdit: Clothing?
     @State private var detailNavigationTarget: Clothing?
     @State private var isShowingDetailNavigation = false
+    @State private var itemToMarkSold: Clothing?
+    @State private var showingMarkSoldAlert = false
+    @State private var itemToMarkFinalPaymentPaid: Clothing?
+    @State private var showingMarkFinalPaymentPaidAlert = false
     
     // Auto-scroll
     @State private var visibleItemIDs: Set<UUID> = []
@@ -912,7 +916,9 @@ struct WardrobeView: View {
             showingMergeConfirmation ||
             showingDeleteAfterMergeConfirmation ||
             showingDeleteSingleAlert ||
-            showingCopyAlert
+            showingCopyAlert ||
+            showingMarkSoldAlert ||
+            showingMarkFinalPaymentPaidAlert
     }
 
     private var baseWardrobeView: some View {
@@ -1320,6 +1326,34 @@ struct WardrobeView: View {
                     Text("确定要复制「%@」吗？".appLocalized(item.name))
                 }
             }
+            .alert("确认标记出售？".appLocalized, isPresented: $showingMarkSoldAlert) {
+                Button("取消".appLocalized, role: .cancel) {
+                    itemToMarkSold = nil
+                }
+                Button("标记出售".appLocalized, role: .destructive) {
+                    if let item = itemToMarkSold {
+                        markAsSold(item)
+                    }
+                }
+            } message: {
+                if let item = itemToMarkSold {
+                    Text("确定要将「%@」标记为已售出吗？".appLocalized(item.name))
+                }
+            }
+            .alert("确认已付尾款？".appLocalized, isPresented: $showingMarkFinalPaymentPaidAlert) {
+                Button("取消".appLocalized, role: .cancel) {
+                    itemToMarkFinalPaymentPaid = nil
+                }
+                Button("已付尾款".appLocalized) {
+                    if let item = itemToMarkFinalPaymentPaid {
+                        markFinalPaymentPaid(item)
+                    }
+                }
+            } message: {
+                if let item = itemToMarkFinalPaymentPaid {
+                    Text("确认后会把「%@」的剩余尾款记为已支付，并恢复为普通已购裙装。".appLocalized(item.name))
+                }
+            }
             .alert("确认合并".appLocalized, isPresented: $showingMergeConfirmation) {
                 Button("取消".appLocalized, role: .cancel) {
                     targetClothingForMerge = nil
@@ -1536,12 +1570,6 @@ struct WardrobeView: View {
         clothings.first { $0.id == id }
     }
 
-    private func openDetailIfPresent(_ id: UUID) {
-        if let clothing = clothing(with: id) {
-            openDetail(clothing)
-        }
-    }
-    
     private func deleteSelectedItems() {
         let itemsToDelete = clothings.filter { selectedItemIDs.contains($0.id) }
 
@@ -2345,7 +2373,7 @@ struct WardrobeView: View {
         }
     }
 
-    // MARK: keep this closure dependency-free for menu-perf
+    // MARK: - Context Menu
     @ViewBuilder
     private func contextMenuItems(for snapshot: WardrobeCellSnapshot) -> some View {
         let clothingID = snapshot.id
@@ -2358,15 +2386,31 @@ struct WardrobeView: View {
             }
 
             Button {
-                openDetailIfPresent(clothingID)
-            } label: {
-                Label("查看详情".appLocalized, systemImage: "info.circle")
-            }
-
-            Button {
                 itemToEdit = clothing(with: clothingID)
             } label: {
                 Label("编辑裙装".appLocalized, systemImage: "pencil")
+            }
+
+            if !snapshot.isSold {
+                Menu {
+                    Button(role: .destructive) {
+                        itemToMarkSold = clothing(with: clothingID)
+                        showingMarkSoldAlert = itemToMarkSold != nil
+                    } label: {
+                        Label("标记出售".appLocalized, systemImage: "tag.slash")
+                    }
+
+                    if snapshot.isDepositPlan && !snapshot.isFullPaymentReservation && snapshot.totalBalance > 0 {
+                        Button {
+                            itemToMarkFinalPaymentPaid = clothing(with: clothingID)
+                            showingMarkFinalPaymentPaidAlert = itemToMarkFinalPaymentPaid != nil
+                        } label: {
+                            Label("已付尾款".appLocalized, systemImage: "checkmark.seal")
+                        }
+                    }
+                } label: {
+                    Label("快捷操作".appLocalized, systemImage: "bolt")
+                }
             }
 
             Divider()
@@ -2384,6 +2428,57 @@ struct WardrobeView: View {
             } label: {
                 Label("删除".appLocalized, systemImage: "trash")
             }
+        }
+    }
+
+    private func markAsSold(_ item: Clothing) {
+        let now = Date()
+        item.status = .offShelf
+        item.updatedAt = now
+        item.lastModified = now
+
+        do {
+            try modelContext.save()
+            NotificationManager.shared.cancelNotification(for: item)
+            NotificationManager.shared.scheduleNotification(for: item, modelContext: modelContext)
+            NotificationCenter.default.post(name: .depositPlanDataDidChange, object: item.id)
+            Task { await SharedPersistence.shared.syncWidgetData(reason: "wardrobe-quick-mark-sold") }
+            updateClothingCountCache()
+            ToastManager.shared.showSuccess("已标记为已售出".appLocalized)
+        } catch {
+            print("WardrobeView: Failed to mark clothing as sold: \(error)")
+            ToastManager.shared.showError("标记出售失败，请稍后再试".appLocalized)
+        }
+        itemToMarkSold = nil
+    }
+
+    private func markFinalPaymentPaid(_ item: Clothing) {
+        defer { itemToMarkFinalPaymentPaid = nil }
+        do {
+            guard let result = try WealthSavingLedger.recordFinalPayment(
+                amount: WealthSavingLedger.unpaidFinalPaymentAmount(for: item),
+                for: item,
+                context: modelContext
+            ) else { return }
+
+            if item.price == 0 {
+                item.price = item.deposit + item.balance
+                try modelContext.save()
+            }
+
+            if result.paidOff {
+                NotificationManager.shared.cancelNotification(for: item)
+                NotificationManager.shared.handlePaymentConfirmed(for: item.id, modelContext: modelContext)
+                NotificationManager.shared.scheduleNotification(for: item, modelContext: modelContext)
+                NotificationManager.shared.updateApplicationBadge(modelContext: modelContext)
+                NotificationCenter.default.post(name: .depositPlanDataDidChange, object: item.id)
+                Task { await SharedPersistence.shared.syncWidgetData(reason: "wardrobe-quick-final-payment-paid") }
+                RewardManager.shared.triggerReward(type: .payBalance)
+                ToastManager.shared.showSuccess("已标记为已付尾款".appLocalized)
+            }
+        } catch {
+            print("WardrobeView: Failed to record final payment: \(error)")
+            ToastManager.shared.showError("尾款记录失败，请稍后再试".appLocalized)
         }
     }
 

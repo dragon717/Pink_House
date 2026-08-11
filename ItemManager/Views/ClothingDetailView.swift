@@ -19,6 +19,8 @@ struct ClothingDetailView: View {
     @State private var showingDeleteAlert = false
     @State private var showingFinalPaymentSheet = false
     @State private var showingFullPaymentReceiptAlert = false
+    @State private var showingMarkSoldAlert = false
+    @State private var showingMarkFinalPaymentPaidAlert = false
     @State private var showCelebration = false
     @State private var currentImageIndex = 0
     @State private var showingShareSheet = false
@@ -259,6 +261,22 @@ struct ClothingDetailView: View {
         } message: {
             Text("确认后会把这条全款预约移入已拥有，并将「未到货」状态改回「全新」。".appLocalized)
         }
+        .alert("确认标记出售？".appLocalized, isPresented: $showingMarkSoldAlert) {
+            Button("取消".appLocalized, role: .cancel) { }
+            Button("标记出售".appLocalized, role: .destructive) {
+                markAsSold()
+            }
+        } message: {
+            Text("确定要将「%@」标记为已售出吗？".appLocalized(clothing.name))
+        }
+        .alert("确认已付尾款？".appLocalized, isPresented: $showingMarkFinalPaymentPaidAlert) {
+            Button("取消".appLocalized, role: .cancel) { }
+            Button("已付尾款".appLocalized) {
+                recordFinalPayment(amount: WealthSavingLedger.unpaidFinalPaymentAmount(for: clothing))
+            }
+        } message: {
+            Text("确认后会把剩余尾款记为已支付，并恢复为普通已购裙装。".appLocalized)
+        }
         .onAppear {
             // 进入详情页时，若定金和尾款 存在，自动重算总价并保存
             if clothing.reservationKind == .depositPlan && (clothing.deposit > 0 || clothing.balance > 0) {
@@ -327,6 +345,26 @@ struct ClothingDetailView: View {
         Task { await SharedPersistence.shared.syncWidgetData(reason: "full-payment-received") }
         updateClothingCountCache()
         ToastManager.shared.showSuccess("已签收，已移入已拥有".appLocalized)
+    }
+
+    private func markAsSold() {
+        let now = Date()
+        clothing.status = .offShelf
+        clothing.updatedAt = now
+        clothing.lastModified = now
+
+        do {
+            try modelContext.save()
+            NotificationManager.shared.cancelNotification(for: clothing)
+            NotificationManager.shared.scheduleNotification(for: clothing, modelContext: modelContext)
+            NotificationCenter.default.post(name: .depositPlanDataDidChange, object: clothing.id)
+            Task { await SharedPersistence.shared.syncWidgetData(reason: "detail-quick-mark-sold") }
+            updateClothingCountCache()
+            ToastManager.shared.showSuccess("已标记为已售出".appLocalized)
+        } catch {
+            print("ClothingDetailView: Failed to mark clothing as sold: \(error)")
+            ToastManager.shared.showError("标记出售失败，请稍后再试".appLocalized)
+        }
     }
 
     private func shouldResetConditionAfterReceipt(_ condition: String) -> Bool {
@@ -633,6 +671,32 @@ struct ClothingDetailView: View {
                 }
                 
                 Spacer()
+
+                if clothing.reservationKind != .sold {
+                    Menu {
+                        Button(role: .destructive) {
+                            showingMarkSoldAlert = true
+                        } label: {
+                            Label("标记出售".appLocalized, systemImage: "tag.slash")
+                        }
+
+                        if WealthSavingLedger.shouldShowFinalPaymentPayoffAction(for: clothing) {
+                            Button {
+                                showingMarkFinalPaymentPaidAlert = true
+                            } label: {
+                                Label("已付尾款".appLocalized, systemImage: "checkmark.seal")
+                            }
+                        }
+                    } label: {
+                        Label("快捷操作".appLocalized, systemImage: "bolt")
+                            .font(.caption.weight(.semibold))
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 6)
+                            .background(themeManager.accentTextColor.opacity(0.1))
+                            .clipShape(Capsule())
+                    }
+                    .foregroundStyle(themeManager.accentTextColor)
+                }
             }
         }
         .padding()

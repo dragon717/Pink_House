@@ -5,6 +5,27 @@ import SwiftData
 
 @MainActor
 final class ClothingAccessoryTests: XCTestCase {
+    func testWardrobeValueIncludesNestedAccessoryPaymentsByReservationKind() {
+        let owned = Clothing(name: "已拥有", price: 500)
+        owned.accessoryItems = [
+            AccessoryItem(name: "小物", price: 100, deposit: 30, balance: 70)
+        ]
+
+        let depositPlan = Clothing(name: "心愿尾款", price: 500, deposit: 200, balance: 300, isDepositPlan: true)
+        depositPlan.accessoryItems = [
+            AccessoryItem(name: "小物", price: 100, deposit: 30, balance: 70)
+        ]
+
+        let fullPayment = Clothing(name: "全款预约", price: 500, deposit: 500, balance: 0, isDepositPlan: true)
+        fullPayment.accessoryItems = [
+            AccessoryItem(name: "小物", price: 100, deposit: 30, balance: 70)
+        ]
+
+        XCTAssertEqual(owned.wardrobeValueAmount, 600)
+        XCTAssertEqual(depositPlan.wardrobeValueAmount, 230)
+        XCTAssertEqual(fullPayment.wardrobeValueAmount, 600)
+    }
+
     var container: ModelContainer!
     var context: ModelContext!
     

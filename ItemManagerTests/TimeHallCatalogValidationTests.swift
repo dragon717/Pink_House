@@ -4,6 +4,76 @@ import XCTest
 @testable import ItemManager
 
 final class TimeHallCatalogValidationTests: XCTestCase {
+  func testTimeHallUsesSharedFourTabMapping() {
+    XCTAssertEqual(TimeHallMode.allCases.map(\.rawValue), [
+      "chronicle", "styleSpray", "story", "coordinate",
+    ])
+    XCTAssertEqual(TimeHallMode.allCases.map(\.title), [
+      "编年史".appLocalized,
+      "图鉴手册".appLocalized,
+      "珍选".appLocalized,
+      "搭配".appLocalized,
+    ])
+  }
+
+  func testCuratedBrandCatalogsDecodeAndBundleTheirImages() throws {
+    let resourceNames = [
+      "catalog-angelic-pretty",
+      "catalog-baby-stars-shine-bright",
+      "catalog-juliette-et-justine",
+      "catalog-wunderwelt-fleur",
+    ]
+
+    for resourceName in resourceNames {
+      let catalog = try loadCatalog(named: resourceName)
+      let catalogueIDs = Set(catalog.catalogues.map(\.id))
+      let itemIDs = Set(catalog.items.map(\.id))
+
+      XCTAssertFalse(catalog.timelineYears.isEmpty, resourceName)
+      XCTAssertFalse(catalog.catalogues.isEmpty, resourceName)
+      XCTAssertFalse(catalog.items.isEmpty, resourceName)
+      XCTAssertFalse(catalog.scope.labelZH.isEmpty, resourceName)
+      XCTAssertTrue(
+        Set(catalog.timelineYears.flatMap(\.catalogueIDs)).isSubset(of: catalogueIDs),
+        resourceName
+      )
+      XCTAssertTrue(
+        Set(catalog.catalogues.flatMap(\.itemIds)).isSubset(of: itemIDs),
+        resourceName
+      )
+      XCTAssertTrue(
+        Set(catalog.items.map(\.catalogueID)).isSubset(of: catalogueIDs),
+        resourceName
+      )
+      XCTAssertTrue(
+        itemIDs.isSubset(of: Set(catalog.catalogues.flatMap(\.itemIds))),
+        resourceName
+      )
+
+      let imageNames = Set(
+        [catalog.heroImage].compactMap { $0 }
+          + catalog.catalogues.map(\.coverImage)
+          + catalog.items.compactMap(\.coverImage)
+          + catalog.coordinates.map(\.coverImage)
+          + catalog.stories.map(\.coverImage)
+      )
+      for imageName in imageNames {
+        XCTAssertNotNil(imageURL(named: imageName), "Missing \(resourceName) image: \(imageName)")
+      }
+    }
+
+    for imageName in [
+      "store-angelic-pretty-tokyo.png",
+      "store-angelic-pretty-osaka.png",
+      "store-angelic-pretty-paris.png",
+      "store-baby-honten.png",
+      "store-baby-osaka.png",
+      "store-baby-yokohama.png",
+    ] {
+      XCTAssertNotNil(imageURL(named: imageName), "Missing storefront image: \(imageName)")
+    }
+  }
+
   func testBundledCatalogHasExpectedSixBatchesAndPassesIntegrityChecks() throws {
     let catalog = try loadCatalog()
     let report = TimeHallCatalogStore.validate(catalog)
@@ -236,11 +306,11 @@ final class TimeHallCatalogValidationTests: XCTestCase {
     XCTAssertEqual(current.catalogueIDs.count, 3)
   }
 
-  private func loadCatalog() throws -> TimeHallCatalogDTO {
+  private func loadCatalog(named resourceName: String = "catalog") throws -> TimeHallCatalogDTO {
     let candidates = [
-      Bundle.main.url(forResource: "catalog", withExtension: "json", subdirectory: "TimeHall"),
-      Bundle.main.url(forResource: "catalog", withExtension: "json"),
-      Bundle(for: Self.self).url(forResource: "catalog", withExtension: "json"),
+      Bundle.main.url(forResource: resourceName, withExtension: "json", subdirectory: "TimeHall"),
+      Bundle.main.url(forResource: resourceName, withExtension: "json"),
+      Bundle(for: Self.self).url(forResource: resourceName, withExtension: "json"),
     ]
     let url = try XCTUnwrap(candidates.compactMap { $0 }.first)
     return try JSONDecoder().decode(TimeHallCatalogDTO.self, from: Data(contentsOf: url))

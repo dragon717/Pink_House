@@ -9,8 +9,8 @@
   "scope": {
     "startYear": 1990,
     "endYear": null,
-    "labelZH": "1990–至今",
-    "sampleYears": [1990, 2004, 2026]
+    "labelZH": "官网可核验范围：1990 起品牌沿革、官网点名的代表系列与当前在线目录；官网未提供逐年完整历史商品库",
+    "sampleYears": [1990, 1999, 2004, 2005, 2006, 2012, 2018, 2026]
   },
   "timelineYears": [
     {
@@ -18,6 +18,15 @@
       "kind": "milestone",
       "titleZH": "品牌启程",
       "storyZH": "官网公司沿革记载，BABY, THE STARS SHINE BRIGHT 品牌于 1990 年开始发展。",
+      "evidenceLevel": "officialHistory",
+      "sourceURLs": ["https://www.babyssb.co.jp/brand/"],
+      "catalogueIDs": []
+    },
+    {
+      "year": 1999,
+      "kind": "milestone",
+      "titleZH": "首家直营店开业",
+      "storyZH": "官方沿革记录品牌于 1999 年开设首家直营店，品牌世界从产品线延伸到实体空间。",
       "evidenceLevel": "officialHistory",
       "sourceURLs": ["https://www.babyssb.co.jp/brand/"],
       "catalogueIDs": []
@@ -32,18 +41,122 @@
       "catalogueIDs": []
     },
     {
-      "year": 2026,
+      "year": 2005,
+      "kind": "officialArchive",
+      "titleZH": "Sugar Bouquet 代表系列",
+      "storyZH": "官方沿革点名 Sugar Bouquet 系列，作为品牌早期原创印花与甜美花束主题的可验证节点。",
+      "evidenceLevel": "officialHistory",
+      "sourceURLs": ["https://www.babyssb.co.jp/brand/"],
+      "catalogueIDs": ["baby-2005-sugar-bouquet"]
+    },
+    {
+      "year": 2006,
       "kind": "milestone",
+      "titleZH": "巴黎海外店开业",
+      "storyZH": "官方沿革记录 2006 年在巴黎开设首家海外店，品牌开始以实体据点进入海外市场。",
+      "evidenceLevel": "officialHistory",
+      "sourceURLs": ["https://www.babyssb.co.jp/brand/"],
+      "catalogueIDs": []
+    },
+    {
+      "year": 2012,
+      "kind": "milestone",
+      "titleZH": "进入博物馆与海外文化展览",
+      "storyZH": "官方沿革记录品牌服装进入海外博物馆及文化展示语境，体现洛丽塔服饰作为日本街头时尚与设计文化的一部分被介绍。",
+      "evidenceLevel": "officialHistory",
+      "sourceURLs": ["https://www.babyssb.co.jp/brand/"],
+      "catalogueIDs": []
+    },
+    {
+      "year": 2018,
+      "kind": "milestone",
+      "titleZH": "公司三十周年活动",
+      "storyZH": "官方沿革以三十周年活动回顾 BABY 与 ALICE and the PIRATES 的发展，并持续通过时装秀发布系列。",
+      "evidenceLevel": "officialHistory",
+      "sourceURLs": ["https://www.babyssb.co.jp/brand/"],
+      "catalogueIDs": []
+    },
+    {
+      "year": 2026,
+      "kind": "officialArchive",
       "titleZH": "持续发布品牌新作",
       "storyZH": "官网沿革记录了 2026 年品牌新作发布与相关活动，品牌世界仍通过时装展示和完整搭配持续展开。",
       "evidenceLevel": "officialHistory",
       "sourceURLs": ["https://www.babyssb.co.jp/brand/"],
-      "catalogueIDs": []
+      "catalogueIDs": ["baby-current", "baby-pirates-current"]
     }
   ],
   "archiveCatalogues": [],
-  "catalogues": [],
-  "items": [],
+  "catalogues": [
+    {
+      "id": "baby-2005-sugar-bouquet", "year": 2005, "season": "archive", "seasonLabel": "历史系列",
+      "title": "Sugar Bouquet", "titleZH": "Sugar Bouquet 代表系列",
+      "summaryZH": "官网品牌史明确点名的早期系列节点；官方未公开完整逐款目录，因此这里只保留系列层级资料。",
+      "sourceURL": "https://www.babyssb.co.jp/brand/", "coverImage": "brand-baby-hero.png",
+      "imageSourceURL": "https://www.babyssb.co.jp/brand/", "pageCount": 0, "itemIds": ["baby-2005-sugar-bouquet-series"]
+    },
+    {
+      "id": "baby-pirates-2004", "year": 2004, "season": "archive", "seasonLabel": "支线创立",
+      "title": "ALICE and the PIRATES", "titleZH": "ALICE and the PIRATES",
+      "summaryZH": "2004 年创立的品牌支线，官网将其定位为更成熟的洛丽塔、哥特与王子风格；历史商品未形成公开完整目录。",
+      "sourceURL": "https://www.babyssb.co.jp/brand/", "coverImage": "brand-baby-pirates.png",
+      "imageSourceURL": "https://www.babyssb.co.jp/wp-content/uploads/2021/12/image-5.png", "pageCount": 0, "itemIds": ["baby-2004-alice-and-the-pirates-line"]
+    },
+    {
+      "id": "baby-current", "year": 2026, "season": "current", "seasonLabel": "当前官网",
+      "title": "BABY Current Collection", "titleZH": "BABY 当前官方商品目录",
+      "summaryZH": "官网当前可浏览印花吊带裙、连衣裙、半身裙、上衣、外套、头饰、包袋、袜履等分类；库存会变化，档案不宣称覆盖历史全部商品。",
+      "sourceURL": "https://store.babyssb.co.jp/en/collections/baby-the-stars-shine-bright", "coverImage": "brand-baby-hero.png",
+      "imageSourceURL": "https://www.babyssb.co.jp/wp-content/themes/babyssbThema/inc/images/ogp.png", "pageCount": 0, "itemIds": ["baby-current-princess-drop-ribbon-clip"]
+    },
+    {
+      "id": "baby-pirates-current", "year": 2026, "season": "current", "seasonLabel": "当前官网",
+      "title": "ALICE and the PIRATES Current Collection", "titleZH": "ALICE and the PIRATES 当前目录",
+      "summaryZH": "当前官方商店中的支线目录，覆盖裙装、外套、裤装、礼帽与配饰等；仅代表官网在架商品范围。",
+      "sourceURL": "https://store.babyssb.co.jp/en/collections/alice-and-the-pirates", "coverImage": "brand-baby-pirates.png",
+      "imageSourceURL": "https://www.babyssb.co.jp/wp-content/uploads/2021/12/image-5.png", "pageCount": 0, "itemIds": ["baby-pirates-current-checkmate-chris-tshirt"]
+    }
+  ],
+  "items": [
+    {
+      "id": "baby-2005-sugar-bouquet-series", "canonicalKey": "baby|2005|sugar-bouquet-series", "kind": "clothing",
+      "category": "official-series", "categoryZH": "官方系列", "name": "Sugar Bouquet", "nameZH": "Sugar Bouquet 代表系列",
+      "brand": "BABY, THE STARS SHINE BRIGHT", "year": 2005, "season": "archive", "catalogueID": "baby-2005-sugar-bouquet", "cataloguePage": 0,
+      "priceJPY": 0, "listingStatus": "officialHistory", "styles": ["sweet-lolita"], "stylesZH": ["甜系洛丽塔"],
+      "coverImage": null, "gallery": [], "imageSourceURL": "https://www.babyssb.co.jp/brand/", "sourceURL": "https://www.babyssb.co.jp/brand/",
+      "observedAt": "2026-08-11", "datePrecision": "year", "noteZH": "官网品牌史点名的系列；未公开完整逐款清单与历史价格。",
+      "productCode": null, "productPageURL": null, "cataloguePages": null
+    },
+    {
+      "id": "baby-2004-alice-and-the-pirates-line", "canonicalKey": "baby|2004|alice-and-the-pirates-line", "kind": "clothing",
+      "category": "brand-line", "categoryZH": "品牌支线", "name": "ALICE and the PIRATES", "nameZH": "ALICE and the PIRATES 支线",
+      "brand": "ALICE and the PIRATES", "year": 2004, "season": "archive", "catalogueID": "baby-pirates-2004", "cataloguePage": 0,
+      "priceJPY": 0, "listingStatus": "officialHistory", "styles": ["gothic-lolita", "ouji"], "stylesZH": ["哥特洛丽塔", "王子风"],
+      "coverImage": null, "gallery": [], "imageSourceURL": "https://www.babyssb.co.jp/wp-content/uploads/2021/12/image-5.png", "sourceURL": "https://www.babyssb.co.jp/brand/",
+      "observedAt": "2026-08-11", "datePrecision": "year", "noteZH": "官网可核验的 2004 年支线节点；不冒充单件商品或完整历史目录。",
+      "productCode": null, "productPageURL": null, "cataloguePages": null
+    },
+    {
+      "id": "baby-current-princess-drop-ribbon-clip", "canonicalKey": "baby|2026|b50ha728", "kind": "accessory",
+      "category": "hair-clip", "categoryZH": "发饰", "name": "Princess Drop Satin Ribbon Clip", "nameZH": "Princess Drop 缎带蝴蝶结夹",
+      "brand": "BABY, THE STARS SHINE BRIGHT", "year": 2026, "season": "current", "catalogueID": "baby-current", "cataloguePage": 0,
+      "priceJPY": 6380, "listingStatus": "currentOfficialStore", "styles": ["sweet-lolita"], "stylesZH": ["甜系洛丽塔"],
+      "coverImage": null, "gallery": [], "imageSourceURL": "https://store.babyssb.co.jp/en/collections/baby-the-stars-shine-bright",
+      "sourceURL": "https://store.babyssb.co.jp/en/collections/baby-the-stars-shine-bright", "observedAt": "2026-08-11", "datePrecision": "observed",
+      "noteZH": "当前官网目录可核验单品；价格与库存会变化。", "productCode": "B50HA728",
+      "productPageURL": "https://store.babyssb.co.jp/en/collections/baby-the-stars-shine-bright", "cataloguePages": null
+    },
+    {
+      "id": "baby-pirates-current-checkmate-chris-tshirt", "canonicalKey": "baby|2026|p22cs703", "kind": "clothing",
+      "category": "t-shirt", "categoryZH": "上衣", "name": "Checkmate Chris Print Big T-Shirt", "nameZH": "Checkmate Chris 印花宽松 T 恤",
+      "brand": "ALICE and the PIRATES", "year": 2026, "season": "current", "catalogueID": "baby-pirates-current", "cataloguePage": 0,
+      "priceJPY": 9020, "listingStatus": "currentOfficialStore", "styles": ["gothic-lolita"], "stylesZH": ["哥特洛丽塔"],
+      "coverImage": null, "gallery": [], "imageSourceURL": "https://store.babyssb.co.jp/en/collections/all-products",
+      "sourceURL": "https://store.babyssb.co.jp/en/collections/alice-and-the-pirates", "observedAt": "2026-08-11", "datePrecision": "observed",
+      "noteZH": "当前官方商店可核验单品；价格与库存会变化。", "productCode": "P22CS703",
+      "productPageURL": "https://store.babyssb.co.jp/en/collections/all-products", "cataloguePages": null
+    }
+  ],
   "commerceSnapshots": [],
   "commerceItems": [],
   "coordinates": [],

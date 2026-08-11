@@ -1,6 +1,7 @@
 
 import SwiftUI
 import Observation
+import SwiftData
 
 enum CurrencyType: String, CaseIterable, Identifiable {
     case rmb = "人民币"
@@ -110,7 +111,7 @@ class WealthViewModel {
         return sanitized
     }
 
-    static func calculateBaseAmountCNY(
+    nonisolated static func calculateBaseAmountCNY(
         clothings: [Clothing],
         wealthSavingEntries _: [WealthSavingEntry] = []
     ) -> Decimal {
@@ -128,11 +129,11 @@ class WealthViewModel {
         return sanitizedTotal
     }
 
-    static func sanitizedWardrobeContribution(for clothing: Clothing) -> Decimal {
+    nonisolated static func sanitizedWardrobeContribution(for clothing: Clothing) -> Decimal {
         FinancialDataSanitizer.aggregateMoney(clothing.wardrobeValueAmount)
     }
 
-    private static func logNegativeFinancialFieldsIfNeeded(_ clothing: Clothing) {
+    nonisolated private static func logNegativeFinancialFieldsIfNeeded(_ clothing: Clothing) {
         let negativeFields = [
             clothing.price < 0 ? "price" : nil,
             clothing.deposit < 0 ? "deposit" : nil,
@@ -437,5 +438,17 @@ class WealthViewModel {
         }
         print("💰 calculateStacks: result.count=\(result.count)")
         return result
+    }
+}
+
+@ModelActor
+actor WealthAmountLoader {
+    func loadBaseAmountCNY() throws -> Decimal {
+        let descriptor = FetchDescriptor<Clothing>(
+            predicate: #Predicate { $0.deletedAt == nil }
+        )
+        return WealthViewModel.calculateBaseAmountCNY(
+            clothings: try modelContext.fetch(descriptor)
+        )
     }
 }

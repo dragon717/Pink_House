@@ -13,7 +13,7 @@ enum TimeHallMode: String, CaseIterable, Identifiable {
     switch self {
     case .chronicle: return "编年史".appLocalized
     case .styleSpray: return "图鉴手册".appLocalized
-    case .story: return "专题".appLocalized
+    case .story: return "珍选".appLocalized
     case .coordinate: return "搭配".appLocalized
     }
   }
@@ -99,6 +99,14 @@ private enum TimeHallStoreTheme: String, CaseIterable, Identifiable {
   case omotesando
   case nagoya
   case kagoshima
+  case angelicPrettyTokyo
+  case angelicPrettyOsaka
+  case angelicPrettyParis
+  case babyHonten
+  case babyOsaka
+  case babyYokohama
+  case julietteOnline
+  case wunderweltOnline
 
   var id: String { rawValue }
 
@@ -107,6 +115,14 @@ private enum TimeHallStoreTheme: String, CaseIterable, Identifiable {
     case .omotesando: return "Timeless 表参道"
     case .nagoya: return "名古屋松坂屋"
     case .kagoshima: return "鹿儿岛山形屋"
+    case .angelicPrettyTokyo: return "东京店"
+    case .angelicPrettyOsaka: return "大阪店"
+    case .angelicPrettyParis: return "巴黎店"
+    case .babyHonten: return "原宿本店"
+    case .babyOsaka: return "大阪店"
+    case .babyYokohama: return "横滨店"
+    case .julietteOnline: return "官方线上商店"
+    case .wunderweltOnline: return "FLEUR 官方线上店"
     }
   }
 
@@ -115,6 +131,13 @@ private enum TimeHallStoreTheme: String, CaseIterable, Identifiable {
     case .omotesando: return "东京 · 神宫前"
     case .nagoya: return "名古屋 · 松坂屋本馆 5F"
     case .kagoshima: return "鹿儿岛 · 山形屋1号馆 4F"
+    case .angelicPrettyTokyo: return "东京 · 官方店铺资料"
+    case .angelicPrettyOsaka: return "大阪 · 西心斋桥"
+    case .angelicPrettyParis: return "巴黎 · Rue Saint-Roch"
+    case .babyHonten: return "东京 · 神宫前"
+    case .babyOsaka: return "大阪 · 西心斋桥"
+    case .babyYokohama: return "横滨 · VIVRE 3F"
+    case .julietteOnline, .wunderweltOnline: return "线上专营 · 官网访问"
     }
   }
 
@@ -123,7 +146,43 @@ private enum TimeHallStoreTheme: String, CaseIterable, Identifiable {
     case .omotesando: return "time_hall_store_omotesando"
     case .nagoya: return "time_hall_store_nagoya"
     case .kagoshima: return "time_hall_store_kagoshima"
+    case .angelicPrettyTokyo: return "store-angelic-pretty-tokyo.png"
+    case .angelicPrettyOsaka: return "store-angelic-pretty-osaka.png"
+    case .angelicPrettyParis: return "store-angelic-pretty-paris.png"
+    case .babyHonten: return "store-baby-honten.png"
+    case .babyOsaka: return "store-baby-osaka.png"
+    case .babyYokohama: return "store-baby-yokohama.png"
+    case .julietteOnline: return "brand-juliette-hero.jpg"
+    case .wunderweltOnline: return "brand-wunderwelt-fleur-hero.png"
     }
+  }
+
+  var merchant: TimeHallMerchant {
+    switch self {
+    case .omotesando, .nagoya, .kagoshima: return .pinkHouse
+    case .angelicPrettyTokyo, .angelicPrettyOsaka, .angelicPrettyParis: return .angelicPretty
+    case .babyHonten, .babyOsaka, .babyYokohama: return .babyStarsShineBright
+    case .julietteOnline: return .julietteEtJustine
+    case .wunderweltOnline: return .wunderweltFleur
+    }
+  }
+
+  var sourceURL: String {
+    switch self {
+    case .omotesando, .nagoya, .kagoshima: return "https://pinkhouse-webshop.jp/"
+    case .angelicPrettyTokyo: return "https://angelicpretty.com/Page/shop_harajuku.aspx"
+    case .angelicPrettyOsaka: return "https://angelicpretty.com/Page/shop_osaka.aspx"
+    case .angelicPrettyParis: return "https://angelicpretty-paris.com/gb/page/7-the-angelic-pretty-paris-shop"
+    case .babyHonten: return "https://www.babyssb.co.jp/locations/honten/"
+    case .babyOsaka: return "https://www.babyssb.co.jp/locations/osaka/"
+    case .babyYokohama: return "https://www.babyssb.co.jp/locations/yokohama_baby/"
+    case .julietteOnline: return "https://juliette-et-justine.com/zh-cn"
+    case .wunderweltOnline: return "https://www.wunderwelt.jp/zh/pages/fleur"
+    }
+  }
+
+  static func themes(for merchant: TimeHallMerchant) -> [Self] {
+    allCases.filter { $0.merchant == merchant }
   }
 
   var accent: Color {
@@ -131,6 +190,12 @@ private enum TimeHallStoreTheme: String, CaseIterable, Identifiable {
     case .omotesando: return Color(red: 0.73, green: 0.24, blue: 0.32)
     case .nagoya: return Color(red: 0.52, green: 0.08, blue: 0.16)
     case .kagoshima: return Color(red: 0.44, green: 0.29, blue: 0.20)
+    case .angelicPrettyTokyo, .angelicPrettyOsaka, .angelicPrettyParis:
+      return Color(red: 0.88, green: 0.34, blue: 0.59)
+    case .babyHonten, .babyOsaka, .babyYokohama:
+      return Color(red: 0.62, green: 0.12, blue: 0.25)
+    case .julietteOnline: return Color(red: 0.40, green: 0.28, blue: 0.22)
+    case .wunderweltOnline: return Color(red: 0.30, green: 0.20, blue: 0.42)
     }
   }
 
@@ -142,6 +207,14 @@ private enum TimeHallStoreTheme: String, CaseIterable, Identifiable {
       return [Color(red: 0.98, green: 0.86, blue: 0.88), Color(red: 0.73, green: 0.25, blue: 0.31)]
     case .kagoshima:
       return [Color(red: 0.93, green: 0.85, blue: 0.72), Color(red: 0.74, green: 0.87, blue: 0.82)]
+    case .angelicPrettyTokyo, .angelicPrettyOsaka, .angelicPrettyParis:
+      return [Color(red: 1.00, green: 0.90, blue: 0.95), Color(red: 0.95, green: 0.82, blue: 0.91)]
+    case .babyHonten, .babyOsaka, .babyYokohama:
+      return [Color(red: 0.99, green: 0.91, blue: 0.91), Color(red: 0.91, green: 0.79, blue: 0.78)]
+    case .julietteOnline:
+      return [Color(red: 0.94, green: 0.89, blue: 0.82), Color(red: 0.83, green: 0.76, blue: 0.66)]
+    case .wunderweltOnline:
+      return [Color(red: 0.91, green: 0.87, blue: 0.96), Color(red: 0.79, green: 0.73, blue: 0.88)]
     }
   }
 
@@ -365,6 +438,9 @@ struct TimeHallView: View {
       curatedCatalog = nil
       isHeaderCollapsed = false
     }
+    .onChange(of: carouselMerchant) { _, merchant in
+      storeTheme = TimeHallStoreTheme.themes(for: merchant).first ?? .omotesando
+    }
     .toolbar(.hidden, for: .navigationBar)
   }
 
@@ -404,10 +480,16 @@ struct TimeHallView: View {
 
       VStack(spacing: 0) {
         curatedBrandHeader(merchant)
-
-        ScrollView {
+        ZStack(alignment: .top) {
           if let catalog = curatedCatalog {
-            curatedBrandContent(catalog)
+            curatedArchiveScrollView(catalog)
+            curatedExpandedArchiveHeader(catalog)
+              .frame(height: 88, alignment: .top)
+              .opacity(isHeaderCollapsed ? 0 : 1)
+              .scaleEffect(isHeaderCollapsed ? 0.98 : 1, anchor: .top)
+              .allowsHitTesting(!isHeaderCollapsed)
+              .accessibilityHidden(isHeaderCollapsed)
+              .animation(.easeOut(duration: 0.16), value: isHeaderCollapsed)
           } else {
             GlassCard(cornerRadius: 24, padding: 20) {
               ContentUnavailableView(
@@ -419,7 +501,6 @@ struct TimeHallView: View {
             .padding(20)
           }
         }
-        .scrollIndicators(.hidden)
       }
     }
   }
@@ -428,6 +509,7 @@ struct TimeHallView: View {
     HStack(spacing: 8) {
       Button {
         carouselMerchant = merchant
+        isHeaderCollapsed = false
         activeMerchant = nil
         curatedCatalog = nil
       } label: {
@@ -446,6 +528,10 @@ struct TimeHallView: View {
         .lineLimit(1)
         .minimumScaleFactor(0.72)
 
+      if isHeaderCollapsed {
+        collapsedModeMenu
+      }
+
       Spacer(minLength: 0)
 
       if let url = URL(string: merchant.officialURL) {
@@ -463,105 +549,266 @@ struct TimeHallView: View {
     .padding(.bottom, 4)
   }
 
-  private func curatedBrandContent(_ catalog: TimeHallCatalogDTO) -> some View {
-    VStack(alignment: .leading, spacing: 20) {
-      GlassCard(cornerRadius: 26, padding: 0) {
-        VStack(alignment: .leading, spacing: 0) {
-          TimeHallBundleImage(fileName: catalog.heroImage, placeholderSystemImage: "sparkles")
-            .scaledToFill()
-            .frame(maxWidth: .infinity)
-            .frame(height: 220)
-            .clipped()
-
-          VStack(alignment: .leading, spacing: 10) {
-            Text(catalog.title)
-              .font(.system(.title, design: .serif).weight(.bold))
-              .foregroundStyle(palette.primaryText)
-            Text(catalog.heroCaption)
-              .font(.headline)
-              .foregroundStyle(Color.pink)
-            Text(catalog.heroBody)
-              .font(.body)
-              .foregroundStyle(palette.secondaryText)
-              .fixedSize(horizontal: false, vertical: true)
-          }
-          .padding(18)
+  @ViewBuilder
+  private func curatedArchiveScrollView(_ catalog: TimeHallCatalogDTO) -> some View {
+    if #available(iOS 18.0, *) {
+      curatedArchiveScrollViewBody(catalog)
+        .onScrollGeometryChange(for: TimeHallScrollRange.self) { geometry in
+          TimeHallScrollRange(
+            distance: geometry.contentOffset.y + geometry.contentInsets.top
+          )
+        } action: { _, range in
+          handleScrollRange(range)
         }
-      }
+    } else {
+      curatedArchiveScrollViewBody(catalog)
+    }
+  }
 
-      if !catalog.timelineYears.isEmpty {
-        Text("品牌纪事".appLocalized)
-          .font(.system(.title2, design: .serif).weight(.semibold))
+  private func curatedArchiveScrollViewBody(_ catalog: TimeHallCatalogDTO) -> some View {
+    ScrollView {
+      if #unavailable(iOS 18.0) {
+        scrollThresholdObserver
+      }
+      curatedBrandContent(catalog)
+        .padding(.top, 88)
+    }
+    .scrollIndicators(.hidden)
+  }
+
+  private func curatedExpandedArchiveHeader(_ catalog: TimeHallCatalogDTO) -> some View {
+    VStack(alignment: .leading, spacing: 0) {
+      VStack(alignment: .leading, spacing: 3) {
+        Text(catalog.subtitle)
+          .font(.subheadline.weight(.semibold))
           .foregroundStyle(palette.primaryText)
-
-        ForEach(catalog.timelineYears.sorted { $0.year < $1.year }) { record in
-          GlassCard(cornerRadius: 22, padding: 16) {
-            VStack(alignment: .leading, spacing: 8) {
-              Text(String(record.year))
-                .font(.caption.monospacedDigit().weight(.bold))
-                .foregroundStyle(Color.pink)
-              Text(record.titleZH)
-                .font(.headline)
-                .foregroundStyle(palette.primaryText)
-              Text(record.storyZH)
-                .font(.subheadline)
-                .foregroundStyle(palette.secondaryText)
-                .fixedSize(horizontal: false, vertical: true)
-              if let source = record.sourceURLs.first, let url = URL(string: source) {
-                Link("查看官方资料".appLocalized, destination: url)
-                  .font(.caption.weight(.semibold))
-              }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-          }
-        }
+        Text(catalog.scope.labelZH)
+          .font(.caption)
+          .foregroundStyle(palette.secondaryText.opacity(0.85))
+          .lineLimit(2)
       }
+      .frame(height: 40, alignment: .top)
+      .padding(.horizontal, 20)
 
-      Text("理念与风格".appLocalized)
-        .font(.system(.title2, design: .serif).weight(.semibold))
-        .foregroundStyle(palette.primaryText)
+      modePicker
+        .padding(.horizontal, 20)
+        .padding(.bottom, 8)
+        .frame(height: 48, alignment: .top)
+    }
+  }
 
-      ForEach(catalog.stories) { story in
-        GlassCard(cornerRadius: 24, padding: 0) {
-          VStack(alignment: .leading, spacing: 0) {
-            TimeHallBundleImage(
-              fileName: story.coverImage,
-              placeholderSystemImage: story.kind.symbolName
-            )
-            .scaledToFill()
-            .frame(maxWidth: .infinity)
-            .frame(height: 180)
-            .clipped()
-
-            VStack(alignment: .leading, spacing: 9) {
-              Label(story.kind.labelZH, systemImage: story.kind.symbolName)
-                .font(.caption.weight(.bold))
-                .foregroundStyle(Color.pink)
-              Text(story.title)
-                .font(.system(.title3, design: .serif).weight(.semibold))
-                .foregroundStyle(palette.primaryText)
-              Text(story.summary)
-                .font(.subheadline.weight(.medium))
-                .foregroundStyle(palette.primaryText)
-              Text(story.content)
-                .font(.body)
-                .foregroundStyle(palette.secondaryText)
-                .fixedSize(horizontal: false, vertical: true)
-              if let url = URL(string: story.sourceURL) {
-                Link(destination: url) {
-                  Label("查看官方来源".appLocalized, systemImage: "arrow.up.right.square")
-                    .font(.caption.weight(.semibold))
-                }
-              }
-            }
-            .padding(18)
-          }
-        }
+  private func curatedBrandContent(_ catalog: TimeHallCatalogDTO) -> some View {
+    Group {
+      switch mode {
+      case .chronicle:
+        curatedChronicle(catalog)
+      case .styleSpray:
+        curatedAtlas(catalog)
+      case .story:
+        curatedStories(catalog)
+      case .coordinate:
+        curatedCoordinates(catalog)
       }
     }
     .padding(.horizontal, 20)
     .padding(.bottom, 120)
     .containerRelativeFrame(.horizontal, alignment: .leading)
+  }
+
+  private func curatedChronicle(_ catalog: TimeHallCatalogDTO) -> some View {
+    VStack(alignment: .leading, spacing: 14) {
+      curatedSectionTitle("品牌编年史", detail: catalog.scope.labelZH)
+      ForEach(catalog.timelineYears.sorted { $0.year < $1.year }) { record in
+        GlassCard(cornerRadius: 22, padding: 16) {
+          VStack(alignment: .leading, spacing: 8) {
+            Text(String(record.year))
+              .font(.caption.monospacedDigit().weight(.bold))
+              .foregroundStyle(Color.pink)
+            Text(record.titleZH)
+              .font(.headline)
+              .foregroundStyle(palette.primaryText)
+            Text(record.storyZH)
+              .font(.subheadline)
+              .foregroundStyle(palette.secondaryText)
+              .fixedSize(horizontal: false, vertical: true)
+            if let source = record.sourceURLs.first, let url = URL(string: source) {
+              Link("查看官方资料".appLocalized, destination: url)
+                .font(.caption.weight(.semibold))
+            }
+          }
+          .frame(maxWidth: .infinity, alignment: .leading)
+        }
+      }
+    }
+  }
+
+  private func curatedAtlas(_ catalog: TimeHallCatalogDTO) -> some View {
+    VStack(alignment: .leading, spacing: 14) {
+      curatedSectionTitle("官网图鉴手册", detail: catalog.scope.labelZH)
+      ForEach(catalog.catalogues.sorted { ($0.year, $0.season) < ($1.year, $1.season) }) { catalogue in
+        let catalogueItems = catalogue.itemIds.compactMap { itemID in
+          catalog.items.first { $0.id == itemID }
+        }
+        GlassCard(cornerRadius: 22, padding: 0) {
+          VStack(alignment: .leading, spacing: 0) {
+            TimeHallBundleImage(fileName: catalogue.coverImage, placeholderSystemImage: "book.closed.fill")
+              .scaledToFill()
+              .frame(maxWidth: .infinity)
+              .frame(height: 180)
+              .clipped()
+            VStack(alignment: .leading, spacing: 8) {
+              Text("\(String(catalogue.year)) · \(catalogue.seasonLabel)")
+                .font(.caption.weight(.bold))
+                .foregroundStyle(Color.pink)
+              Text(catalogue.titleZH)
+                .font(.system(.title3, design: .serif).weight(.semibold))
+                .foregroundStyle(palette.primaryText)
+              Text(catalogue.summaryZH)
+                .font(.subheadline)
+                .foregroundStyle(palette.secondaryText)
+                .fixedSize(horizontal: false, vertical: true)
+              Divider()
+              if catalogueItems.isEmpty {
+                Text("官网未公开可稳定逐项核对的商品清单，保留目录层级。".appLocalized)
+                  .font(.caption)
+                  .foregroundStyle(palette.secondaryText)
+              } else {
+                ForEach(catalogueItems) { item in
+                  VStack(alignment: .leading, spacing: 3) {
+                    HStack(alignment: .firstTextBaseline) {
+                      Text(item.nameZH)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(palette.primaryText)
+                      Spacer(minLength: 8)
+                      if item.priceJPY > 0 {
+                        Text("¥\(item.priceJPY.formatted())")
+                          .font(.caption.monospacedDigit().weight(.semibold))
+                          .foregroundStyle(Color.pink)
+                      }
+                    }
+                    Text("\(item.categoryZH) · \(item.noteZH)")
+                      .font(.caption)
+                      .foregroundStyle(palette.secondaryText)
+                      .fixedSize(horizontal: false, vertical: true)
+                  }
+                }
+              }
+              if let url = URL(string: catalogue.sourceURL) {
+                Link("查看官网目录".appLocalized, destination: url)
+                  .font(.caption.weight(.semibold))
+              }
+            }
+            .padding(16)
+          }
+        }
+      }
+    }
+  }
+
+  private func curatedStories(_ catalog: TimeHallCatalogDTO) -> some View {
+    VStack(alignment: .leading, spacing: 14) {
+      curatedSectionTitle("官方珍选", detail: "仅收录官网可验证的专题、新闻、专栏与 Lookbook")
+      if catalog.stories.isEmpty {
+        GlassCard(cornerRadius: 22, padding: 16) {
+          ContentUnavailableView(
+            "暂无官网珍选档案".appLocalized,
+            systemImage: "sparkles.rectangle.stack",
+            description: Text("官网未提供可核验的专题或精选内容，因此不自行创作。".appLocalized)
+          )
+        }
+      } else {
+        ForEach(catalog.stories) { story in
+          GlassCard(cornerRadius: 24, padding: 0) {
+            VStack(alignment: .leading, spacing: 0) {
+              TimeHallBundleImage(
+                fileName: story.coverImage,
+                placeholderSystemImage: story.kind.symbolName
+              )
+              .scaledToFill()
+              .frame(maxWidth: .infinity)
+              .frame(height: 180)
+              .clipped()
+
+              VStack(alignment: .leading, spacing: 9) {
+                Label(story.kind.labelZH, systemImage: story.kind.symbolName)
+                  .font(.caption.weight(.bold))
+                  .foregroundStyle(Color.pink)
+                Text(story.title)
+                  .font(.system(.title3, design: .serif).weight(.semibold))
+                  .foregroundStyle(palette.primaryText)
+                Text(story.summary)
+                  .font(.subheadline.weight(.medium))
+                  .foregroundStyle(palette.primaryText)
+                Text(story.content)
+                  .font(.body)
+                  .foregroundStyle(palette.secondaryText)
+                  .fixedSize(horizontal: false, vertical: true)
+                if let url = URL(string: story.sourceURL) {
+                  Link(destination: url) {
+                    Label("查看官方来源".appLocalized, systemImage: "arrow.up.right.square")
+                      .font(.caption.weight(.semibold))
+                  }
+                }
+              }
+              .padding(18)
+            }
+          }
+        }
+      }
+    }
+  }
+
+  @ViewBuilder
+  private func curatedCoordinates(_ catalog: TimeHallCatalogDTO) -> some View {
+    VStack(alignment: .leading, spacing: 14) {
+      curatedSectionTitle("官方搭配", detail: "仅呈现官网已有 Lookbook、时装秀或搭配资料")
+      if catalog.coordinates.isEmpty {
+        GlassCard(cornerRadius: 22, padding: 16) {
+          ContentUnavailableView(
+            "暂无官网搭配档案".appLocalized,
+            systemImage: "person.crop.rectangle.stack",
+            description: Text("官网未提供可核验的专题搭配，因此不自行创作。".appLocalized)
+          )
+        }
+      } else {
+        ForEach(catalog.coordinates) { coordinate in
+          GlassCard(cornerRadius: 22, padding: 0) {
+            VStack(alignment: .leading, spacing: 0) {
+              TimeHallBundleImage(fileName: coordinate.coverImage, placeholderSystemImage: "person.crop.rectangle.stack")
+                .scaledToFill()
+                .frame(maxWidth: .infinity)
+                .frame(height: 190)
+                .clipped()
+              VStack(alignment: .leading, spacing: 8) {
+                Text(coordinate.title)
+                  .font(.headline)
+                  .foregroundStyle(palette.primaryText)
+                Text(coordinate.coordinatePoint)
+                  .font(.subheadline)
+                  .foregroundStyle(palette.secondaryText)
+                if let url = URL(string: coordinate.sourceURL) {
+                  Link("查看官方搭配".appLocalized, destination: url)
+                    .font(.caption.weight(.semibold))
+                }
+              }
+              .padding(16)
+            }
+          }
+        }
+      }
+    }
+  }
+
+  private func curatedSectionTitle(_ title: String, detail: String) -> some View {
+    VStack(alignment: .leading, spacing: 4) {
+      Text(title.appLocalized)
+        .font(.system(.title2, design: .serif).weight(.semibold))
+        .foregroundStyle(palette.primaryText)
+      Text(detail)
+        .font(.caption)
+        .foregroundStyle(palette.secondaryText)
+        .fixedSize(horizontal: false, vertical: true)
+    }
   }
 
   @ViewBuilder
@@ -634,7 +881,7 @@ struct TimeHallView: View {
       HStack(alignment: .center, spacing: 8) {
         merchantSelectionHeading
           .frame(maxWidth: .infinity)
-        if carouselMerchant == .pinkHouse {
+        if TimeHallStoreTheme.themes(for: carouselMerchant).count > 1 {
           storeThemeMenu
         }
       }
@@ -671,7 +918,7 @@ struct TimeHallView: View {
             .font(.caption)
             .foregroundStyle(palette.secondaryText)
         }
-        if carouselMerchant == .pinkHouse {
+        if TimeHallStoreTheme.themes(for: carouselMerchant).count > 1 {
           storeThemeMenu
         }
         Spacer(minLength: 0)
@@ -714,7 +961,7 @@ struct TimeHallView: View {
       Text("梦裙时光馆".appLocalized)
         .font(.system(.largeTitle, design: .serif).weight(.semibold))
         .foregroundStyle(palette.primaryText)
-      Text("在这里翻阅品牌的编年史、图鉴、专题与搭配".appLocalized)
+      Text("在这里翻阅品牌的编年史、图鉴、珍选与搭配".appLocalized)
         .font(.subheadline)
         .multilineTextAlignment(.center)
         .foregroundStyle(palette.secondaryText)
@@ -726,7 +973,7 @@ struct TimeHallView: View {
       Text("梦裙时光馆".appLocalized)
         .font(.system(.title, design: .serif).weight(.semibold))
         .foregroundStyle(palette.primaryText)
-      Text("在这里翻阅品牌的编年史、图鉴、专题与搭配".appLocalized)
+      Text("在这里翻阅品牌的编年史、图鉴、珍选与搭配".appLocalized)
         .font(.caption)
         .foregroundStyle(palette.secondaryText)
     }
@@ -758,36 +1005,34 @@ struct TimeHallView: View {
 
   @ViewBuilder
   private func merchantVisual(_ merchant: TimeHallMerchant, imageWidthRatio: CGFloat = 0.82) -> some View {
-    if merchant == .pinkHouse {
-      themedStorefront(imageWidthRatio: imageWidthRatio)
-    } else {
-      TimeHallBundleImage(fileName: merchant.coverImage, placeholderSystemImage: "sparkles.rectangle.stack")
-        .scaledToFit()
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-        .shadow(color: .black.opacity(0.16), radius: 14, y: 8)
-    }
+    themedStorefront(theme: theme(for: merchant), imageWidthRatio: imageWidthRatio)
   }
 
   private func merchantInfo(_ merchant: TimeHallMerchant, compact: Bool = false) -> some View {
-    VStack(spacing: compact ? 8 : 12) {
+    let theme = theme(for: merchant)
+    return VStack(spacing: compact ? 8 : 12) {
         VStack(spacing: 6) {
           Text(merchant.name)
             .font(.system(compact ? .title2 : .title, design: .serif).weight(.bold))
             .foregroundStyle(palette.primaryText)
-          if merchant == .pinkHouse {
-            Text(storeTheme.title)
-              .font(.caption.weight(.semibold))
-              .foregroundStyle(storeTheme.accent)
-          }
+          Text(theme.title)
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(theme.accent)
           Text(merchant.subtitle)
             .font(compact ? .caption : .subheadline)
             .multilineTextAlignment(.center)
             .foregroundStyle(palette.secondaryText)
+          if let url = URL(string: theme.sourceURL) {
+            Link(destination: url) {
+              Label(theme.merchant == .julietteEtJustine || theme.merchant == .wunderweltFleur ? "访问线上据点" : "查看门店资料", systemImage: "arrow.up.right.square")
+                .font(.caption.weight(.semibold))
+            }
+          }
         }
 
         Button {
           isHeaderCollapsed = false
+          mode = .chronicle
           curatedCatalog = merchant.catalogResourceName.flatMap(store.bundledCatalog(named:))
           activeMerchant = merchant
         } label: {
@@ -797,40 +1042,47 @@ struct TimeHallView: View {
         }
         .buttonStyle(.borderedProminent)
         .buttonBorderShape(.capsule)
-        .tint(storeTheme.accent)
+        .tint(theme.accent)
       }
-      .padding(compact ? 12 : 18)
-      .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 26, style: .continuous))
-      .overlay {
-        RoundedRectangle(cornerRadius: 26, style: .continuous)
-          .stroke(.white.opacity(0.66), lineWidth: 1)
-      }
-      .shadow(color: .black.opacity(0.14), radius: 16, y: 10)
+      .padding(compact ? 8 : 12)
       .padding(.horizontal, compact ? 0 : 14)
   }
 
-  private func themedStorefront(imageWidthRatio: CGFloat) -> some View {
+  private func themedStorefront(theme: TimeHallStoreTheme, imageWidthRatio: CGFloat) -> some View {
     GeometryReader { proxy in
       TimelineView(.animation(minimumInterval: 1 / 30)) { context in
         let wave = CGFloat(sin(context.date.timeIntervalSinceReferenceDate * 1.4))
-        Image(storeTheme.assetName)
-          .resizable()
+        storefrontImage(theme)
           .scaledToFit()
           .frame(width: proxy.size.width * imageWidthRatio, height: proxy.size.height * 0.96)
           .position(x: proxy.size.width / 2, y: proxy.size.height / 2)
           .offset(y: wave * 3)
           .shadow(color: .black.opacity(0.2), radius: 14, y: 9)
-          .shadow(color: storeTheme.accent.opacity(0.12), radius: 18, y: 6)
-          .id(storeTheme)
+          .shadow(color: theme.accent.opacity(0.12), radius: 18, y: 6)
+          .id(theme)
           .transition(.opacity.combined(with: .scale(scale: 0.94)))
       }
     }
-    .accessibilityLabel("\(storeTheme.title)门店主题")
+    .accessibilityLabel("\(theme.title)门店主题")
+  }
+
+  @ViewBuilder
+  private func storefrontImage(_ theme: TimeHallStoreTheme) -> some View {
+    if theme.merchant == .pinkHouse {
+      Image(theme.assetName).resizable()
+    } else {
+      TimeHallBundleImage(fileName: theme.assetName, placeholderSystemImage: "storefront")
+    }
+  }
+
+  private func theme(for merchant: TimeHallMerchant) -> TimeHallStoreTheme {
+    if merchant == carouselMerchant, storeTheme.merchant == merchant { return storeTheme }
+    return TimeHallStoreTheme.themes(for: merchant).first ?? .omotesando
   }
 
   private var storeThemeMenu: some View {
     Menu {
-      ForEach(TimeHallStoreTheme.allCases) { theme in
+      ForEach(TimeHallStoreTheme.themes(for: carouselMerchant)) { theme in
         Button {
           withAnimation(.snappy) { storeTheme = theme }
         } label: {
@@ -872,10 +1124,7 @@ struct TimeHallView: View {
   }
 
   private var merchantSelectionFooter: some View {
-    Text(
-      carouselMerchant == .pinkHouse
-        ? storeTheme.location : "官网资料整理 · 中文档案".appLocalized
-    )
+    Text(storeTheme.location)
     .font(.caption.weight(.medium))
     .foregroundStyle(palette.secondaryText)
   }

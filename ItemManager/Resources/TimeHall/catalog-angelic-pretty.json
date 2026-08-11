@@ -7,12 +7,48 @@
   "heroCaption": "把绘本般的公主梦想穿进日常",
   "heroBody": "Angelic Pretty 以蕾丝、荷叶边与蝴蝶结描绘甜美洛丽塔世界。官网强调，即使长大也要珍惜憧憬公主的心情，并通过完整单品与原创印花系列，让穿着者自由组合自己的梦幻造型。",
   "scope": {
-    "startYear": 2026,
-    "endYear": 2026,
-    "labelZH": "官网理念与当季系列",
-    "sampleYears": [2026]
+    "startYear": 2009,
+    "endYear": null,
+    "labelZH": "官网可核验范围：官方合作与二十周年专题、2022 秋至今的官网季节目录；官网未提供可核验创立史，本档案不代表全部历史商品",
+    "sampleYears": [2009, 2021, 2022, 2025, 2026]
   },
   "timelineYears": [
+    {
+      "year": 2009,
+      "kind": "milestone",
+      "titleZH": "首次 PULLIP 合作",
+      "storyZH": "官方复刻专题确认，Angelic Pretty 与 PULLIP 的首次合作人偶 Sfoglia 于 2009 年发布。",
+      "evidenceLevel": "officialCatalogue",
+      "sourceURLs": ["https://angelicpretty.com/Page/Feature/pullip2025.aspx"],
+      "catalogueIDs": []
+    },
+    {
+      "year": 2021,
+      "kind": "milestone",
+      "titleZH": "二十周年品牌回顾",
+      "storyZH": "官方二十周年专题以品牌书、历代原创印花与代表性裙装回顾二十年创作，为早期系列提供官方回顾入口。",
+      "evidenceLevel": "officialCatalogue",
+      "sourceURLs": ["https://angelicpretty.com/Page/Feature/FeaturePage020.aspx"],
+      "catalogueIDs": []
+    },
+    {
+      "year": 2022,
+      "kind": "officialArchive",
+      "titleZH": "官网季节目录现存起点",
+      "storyZH": "官网 Collection Archive 目前可连续追溯至 2022 秋、冬系列；更早商品仅以二十周年回顾等专题为线索，不能视为完整目录。",
+      "evidenceLevel": "officialCatalogue",
+      "sourceURLs": ["https://angelicpretty.com/Page/collection2022autamn.aspx"],
+      "catalogueIDs": ["ap-2022-autumn"]
+    },
+    {
+      "year": 2025,
+      "kind": "officialArchive",
+      "titleZH": "Doll House 与季节 LOOK",
+      "storyZH": "2025 年官方时装秀与季节 LOOK 持续以原创印花、主裙和配套小物构成完整造型。",
+      "evidenceLevel": "officialCatalogue",
+      "sourceURLs": ["https://angelicpretty.com/Page/2025springcollection.aspx", "https://angelicpretty.com/Page/collection2025Autumn.aspx"],
+      "catalogueIDs": ["ap-2025-autumn"]
+    },
     {
       "year": 2026,
       "kind": "officialArchive",
@@ -20,15 +56,128 @@
       "storyZH": "官网 2026 春季系列以“Into a Dream”为主题，并以 Lovely & POP、Dear Princess 等方向呈现甜美、活泼与公主感并存的造型。",
       "evidenceLevel": "officialCatalogue",
       "sourceURLs": ["https://angelicpretty.com/Page/collection2026spring.aspx"],
-      "catalogueIDs": []
+      "catalogueIDs": ["ap-2026-spring", "ap-2026-summer"]
     }
   ],
   "archiveCatalogues": [],
-  "catalogues": [],
-  "items": [],
+  "catalogues": [
+    {
+      "id": "ap-2022-autumn", "year": 2022, "season": "autumn", "seasonLabel": "秋",
+      "title": "2022 Autumn Collection", "titleZH": "2022 秋季官网目录",
+      "summaryZH": "官网现存季节目录起点之一，收录 Mystic Rosary、Happy Treat Party、Vintage Toys 等系列及配套小物。",
+      "sourceURL": "https://angelicpretty.com/Page/collection2022autamn.aspx", "coverImage": "brand-angelic-pretty-collection.jpg",
+      "imageSourceURL": "https://angelicpretty.com/Page/collection2022autamn.aspx", "pageCount": 0, "itemIds": ["ap-2022-happy-treat-party-op"]
+    },
+    {
+      "id": "ap-2023-autumn", "year": 2023, "season": "autumn", "seasonLabel": "秋",
+      "title": "2023 Autumn Collection", "titleZH": "2023 秋季官网目录",
+      "summaryZH": "官网目录可核验 Cinema Doll、Magical Milk Cats 等系列及裙装、首饰、袜履的协调组合。",
+      "sourceURL": "https://angelicpretty.com/Page/collection2023autumn.aspx", "coverImage": "brand-angelic-pretty-collection.jpg",
+      "imageSourceURL": "https://angelicpretty.com/Page/collection2023autumn.aspx", "pageCount": 0, "itemIds": ["ap-2023-magical-milk-cats-op"]
+    },
+    {
+      "id": "ap-2024-autumn", "year": 2024, "season": "autumn", "seasonLabel": "秋",
+      "title": "2024 Autumn Collection", "titleZH": "2024 秋季 LOOK",
+      "summaryZH": "官方 LOOK 展示 Princess Puppy、Sweet Actress 等系列如何由主裙、衬衫、首饰、袜履与裙撑组成全身造型。",
+      "sourceURL": "https://angelicpretty.com/Page/collection2024autumn.aspx", "coverImage": "brand-angelic-pretty-collection.jpg",
+      "imageSourceURL": "https://angelicpretty.com/Page/collection2024autumn.aspx", "pageCount": 0, "itemIds": ["ap-2024-princess-puppy-jsk"]
+    },
+    {
+      "id": "ap-2025-autumn", "year": 2025, "season": "autumn", "seasonLabel": "秋",
+      "title": "2025 Autumn Collection", "titleZH": "2025 秋季 LOOK",
+      "summaryZH": "官方模特 LOOK 收录 Dreamy Balloon 等系列，保留从主裙到发饰、袖饰、袜履与鞋的可验证搭配结构。",
+      "sourceURL": "https://angelicpretty.com/Page/collection2025Autumn.aspx", "coverImage": "brand-angelic-pretty-collection.jpg",
+      "imageSourceURL": "https://angelicpretty.com/Page/collection2025Autumn.aspx", "pageCount": 0, "itemIds": ["ap-2025-dreamy-balloon-op"]
+    },
+    {
+      "id": "ap-2026-spring", "year": 2026, "season": "spring", "seasonLabel": "春",
+      "title": "Into a Dream", "titleZH": "2026 春季 Into a Dream",
+      "summaryZH": "官方春季系列按 Lovely & POP、Dear Princess、Garden Party 与 Into a Dream 等章节呈现 48 套造型与 6 组原创印花。",
+      "sourceURL": "https://angelicpretty.com/Page/collection2026spring.aspx", "coverImage": "brand-angelic-pretty-collection.jpg",
+      "imageSourceURL": "https://angelicpretty.com/Contents/Feature/26s_01.jpg", "pageCount": 0, "itemIds": ["ap-2026-into-a-dream-carnival-dress-set"]
+    },
+    {
+      "id": "ap-2026-summer", "year": 2026, "season": "summer", "seasonLabel": "夏",
+      "title": "2026 Summer Collection", "titleZH": "2026 夏季官网目录",
+      "summaryZH": "官网当前季节归档的最新节点；本档案只记录官网公开系列，不把动态在售目录称作完整历史商品库。",
+      "sourceURL": "https://angelicpretty.com/Page/collection2026summer.aspx", "coverImage": "brand-angelic-pretty-collection.jpg",
+      "imageSourceURL": "https://angelicpretty.com/Page/collection2026summer.aspx", "pageCount": 0, "itemIds": ["ap-2026-delicious-lemonade-op"]
+    }
+  ],
+  "items": [
+    {
+      "id": "ap-2022-happy-treat-party-op", "canonicalKey": "angelic-pretty|2022|happy-treat-party-op", "kind": "dress",
+      "category": "one-piece", "categoryZH": "连衣裙", "name": "Happy Treat Party One Piece", "nameZH": "Happy Treat Party 连衣裙",
+      "brand": "Angelic Pretty", "year": 2022, "season": "autumn", "catalogueID": "ap-2022-autumn", "cataloguePage": 0,
+      "priceJPY": 36080, "listingStatus": "officialArchive", "styles": ["sweet-lolita"], "stylesZH": ["甜系洛丽塔"],
+      "coverImage": null, "gallery": [], "imageSourceURL": "https://angelicpretty.com/Page/collection2022autamn.aspx",
+      "sourceURL": "https://angelicpretty.com/Page/collection2022autamn.aspx", "observedAt": "2026-08-11", "datePrecision": "collection",
+      "noteZH": "官网 2022 秋季目录可核验单品；只代表现存官方目录范围。", "productCode": null, "productPageURL": null, "cataloguePages": null
+    },
+    {
+      "id": "ap-2023-magical-milk-cats-op", "canonicalKey": "angelic-pretty|2023|magical-milk-cats-op", "kind": "dress",
+      "category": "one-piece", "categoryZH": "连衣裙", "name": "Magical Milk Cats One Piece", "nameZH": "Magical Milk Cats 连衣裙",
+      "brand": "Angelic Pretty", "year": 2023, "season": "autumn", "catalogueID": "ap-2023-autumn", "cataloguePage": 0,
+      "priceJPY": 37400, "listingStatus": "officialArchive", "styles": ["sweet-lolita"], "stylesZH": ["甜系洛丽塔"],
+      "coverImage": null, "gallery": [], "imageSourceURL": "https://angelicpretty.com/Page/collection2023autumn.aspx",
+      "sourceURL": "https://angelicpretty.com/Page/collection2023autumn.aspx", "observedAt": "2026-08-11", "datePrecision": "collection",
+      "noteZH": "官网 2023 秋季目录可核验单品；只代表现存官方目录范围。", "productCode": null, "productPageURL": null, "cataloguePages": null
+    },
+    {
+      "id": "ap-2024-princess-puppy-jsk", "canonicalKey": "angelic-pretty|2024|princess-puppy-jsk", "kind": "dress",
+      "category": "jumper-skirt", "categoryZH": "吊带裙", "name": "Princess Puppy Tiered Jumper Skirt", "nameZH": "Princess Puppy 分层吊带裙",
+      "brand": "Angelic Pretty", "year": 2024, "season": "autumn", "catalogueID": "ap-2024-autumn", "cataloguePage": 0,
+      "priceJPY": 60500, "listingStatus": "officialArchive", "styles": ["sweet-lolita"], "stylesZH": ["甜系洛丽塔"],
+      "coverImage": null, "gallery": [], "imageSourceURL": "https://angelicpretty.com/Page/collection2024autumn.aspx",
+      "sourceURL": "https://angelicpretty.com/Page/collection2024autumn.aspx", "observedAt": "2026-08-11", "datePrecision": "collection",
+      "noteZH": "官网 2024 秋季 LOOK 可核验单品；只代表现存官方目录范围。", "productCode": null, "productPageURL": null, "cataloguePages": null
+    },
+    {
+      "id": "ap-2025-dreamy-balloon-op", "canonicalKey": "angelic-pretty|2025|dreamy-balloon-op", "kind": "dress",
+      "category": "one-piece", "categoryZH": "连衣裙", "name": "Dreamy Balloon One Piece", "nameZH": "Dreamy Balloon 连衣裙",
+      "brand": "Angelic Pretty", "year": 2025, "season": "autumn", "catalogueID": "ap-2025-autumn", "cataloguePage": 0,
+      "priceJPY": 46200, "listingStatus": "officialArchive", "styles": ["sweet-lolita"], "stylesZH": ["甜系洛丽塔"],
+      "coverImage": null, "gallery": [], "imageSourceURL": "https://angelicpretty.com/Page/collection2025Autumn.aspx",
+      "sourceURL": "https://angelicpretty.com/Page/collection2025Autumn.aspx", "observedAt": "2026-08-11", "datePrecision": "collection",
+      "noteZH": "官网 2025 秋季 LOOK 可核验单品；只代表现存官方目录范围。", "productCode": null, "productPageURL": null, "cataloguePages": null
+    },
+    {
+      "id": "ap-2026-into-a-dream-carnival-dress-set", "canonicalKey": "angelic-pretty|2026|into-a-dream-carnival-dress-set", "kind": "dress",
+      "category": "dress-set", "categoryZH": "礼服套装", "name": "Into a Dream Carnival Dress Set", "nameZH": "Into a Dream Carnival 礼服套装",
+      "brand": "Angelic Pretty", "year": 2026, "season": "spring", "catalogueID": "ap-2026-spring", "cataloguePage": 0,
+      "priceJPY": 275000, "listingStatus": "officialArchive", "styles": ["princess-lolita"], "stylesZH": ["公主系洛丽塔"],
+      "coverImage": null, "gallery": [], "imageSourceURL": "https://angelicpretty.com/Page/collection2026spring.aspx",
+      "sourceURL": "https://angelicpretty.com/Page/collection2026spring.aspx", "observedAt": "2026-08-11", "datePrecision": "collection",
+      "noteZH": "官网 2026 春季 LOOK 可核验的半帽与礼服两件套。", "productCode": null, "productPageURL": null, "cataloguePages": null
+    },
+    {
+      "id": "ap-2026-delicious-lemonade-op", "canonicalKey": "angelic-pretty|2026|delicious-lemonade-op", "kind": "dress",
+      "category": "one-piece", "categoryZH": "连衣裙", "name": "Delicious Lemonade One Piece", "nameZH": "Delicious Lemonade 连衣裙",
+      "brand": "Angelic Pretty", "year": 2026, "season": "summer", "catalogueID": "ap-2026-summer", "cataloguePage": 0,
+      "priceJPY": 46200, "listingStatus": "officialArchive", "styles": ["sweet-lolita"], "stylesZH": ["甜系洛丽塔"],
+      "coverImage": null, "gallery": [], "imageSourceURL": "https://angelicpretty.com/Page/collection2026summer.aspx",
+      "sourceURL": "https://angelicpretty.com/Page/collection2026summer.aspx", "observedAt": "2026-08-11", "datePrecision": "collection",
+      "noteZH": "官网 2026 夏季 LOOK 可核验单品；只代表当前官方目录范围。", "productCode": null, "productPageURL": null, "cataloguePages": null
+    }
+  ],
   "commerceSnapshots": [],
   "commerceItems": [],
-  "coordinates": [],
+  "coordinates": [
+    {
+      "id": "ap-look-2025-autumn", "officialID": 202501, "title": "2025 秋季官方 LOOK", "publishedOn": "2025",
+      "coordinatePoint": "以 Dreamy Balloon 主裙为中心，官网同时列出发饰、袖饰、袜履、鞋与裙撑，呈现完整甜美轮廓。",
+      "sourceURL": "https://angelicpretty.com/Page/collection2025Autumn.aspx", "coverImage": "brand-angelic-pretty-collection.jpg",
+      "imageSourceURL": "https://angelicpretty.com/Page/collection2025Autumn.aspx", "productCodes": [], "linkedCommerceItemIDs": [],
+      "unlinkedItemNames": ["Dreamy Balloon 系列"], "observedAt": "2026-08-09"
+    },
+    {
+      "id": "ap-look-2026-spring", "officialID": 202601, "title": "Into a Dream 官方造型", "publishedOn": "2026",
+      "coordinatePoint": "官方春季系列以四个风格章节组织完整造型，体现甜美、古典公主感与花园派对方向。",
+      "sourceURL": "https://angelicpretty.com/Page/collection2026spring.aspx", "coverImage": "brand-angelic-pretty-collection.jpg",
+      "imageSourceURL": "https://angelicpretty.com/Contents/Feature/26s_01.jpg", "productCodes": [], "linkedCommerceItemIDs": [],
+      "unlinkedItemNames": ["Into a Dream"], "observedAt": "2026-08-09"
+    }
+  ],
   "stories": [
     {
       "id": "angelic-pretty-concept",

@@ -337,7 +337,11 @@ final class Clothing {
     }
 
     var fullPaymentReservationTotalAmount: Decimal {
-        isFullPaymentReservation ? totalDeposit : 0
+        guard isFullPaymentReservation else { return 0 }
+        let accessoryBalance = accessoryItems?.reduce(Decimal(0)) {
+            $0 + FinancialDataSanitizer.money($1.balance)
+        } ?? 0
+        return totalDeposit + accessoryBalance * Decimal(stock)
     }
 
     var pendingFinalPaymentAmount: Decimal {

@@ -7,12 +7,21 @@
   "heroCaption": "在同一座线上衣橱里发现不同品牌",
   "heroBody": "Wunderwelt FLEUR 是面向日本及海外顾客的 Gothic 与 Lolita 新商品平台。它汇集官方授权品牌与原创商品，覆盖甜系、哥特、古典、公主与王子等多种风格，并与 Wunderwelt 的中古流通和服务体系相连。",
   "scope": {
-    "startYear": 2016,
+    "startYear": 2014,
     "endYear": null,
-    "labelZH": "2016–至今",
-    "sampleYears": [2016, 2026]
+    "labelZH": "官网可核验范围：2014 线上店起点、2016 FLEUR 开张与当前多品牌/原创品类；动态商城不等同于完整历史商品档案",
+    "sampleYears": [2014, 2016, 2026]
   },
   "timelineYears": [
+    {
+      "year": 2014,
+      "kind": "milestone",
+      "titleZH": "Wunderwelt 线上店开张",
+      "storyZH": "官方 FAQ 记载 Wunderwelt 于 2014 年 10 月作为线上商店开始运营，并明确目前没有实体店。",
+      "evidenceLevel": "officialHistory",
+      "sourceURLs": ["https://www.wunderwelt.jp/zh/pages/faq"],
+      "catalogueIDs": ["wunderwelt-2014-online"]
+    },
     {
       "year": 2016,
       "kind": "milestone",
@@ -20,7 +29,7 @@
       "storyZH": "Wunderwelt 官方中文媒体记录，FLEUR 于 2016 年 7 月作为可向海外销售人气 Gothic 与 Lolita 品牌新品的精品网店开张。",
       "evidenceLevel": "officialHistory",
       "sourceURLs": ["https://libre.wunderwelt.jp/zh/9183/"],
-      "catalogueIDs": []
+      "catalogueIDs": ["wunderwelt-fleur-2016"]
     },
     {
       "year": 2026,
@@ -29,12 +38,60 @@
       "storyZH": "当前官网以新着、品牌排行与推荐内容组织商品，持续呈现多个 Gothic、Lolita 与古典风格品牌。",
       "evidenceLevel": "officialCatalogue",
       "sourceURLs": ["https://www.wunderwelt.jp/zh/pages/fleur"],
-      "catalogueIDs": []
+      "catalogueIDs": ["wunderwelt-fleur-current", "wunderwelt-original"]
     }
   ],
   "archiveCatalogues": [],
-  "catalogues": [],
-  "items": [],
+  "catalogues": [
+    {
+      "id": "wunderwelt-2014-online", "year": 2014, "season": "launch", "seasonLabel": "线上店起点",
+      "title": "Wunderwelt Online Shop", "titleZH": "二手洛丽塔线上流通平台",
+      "summaryZH": "官方 FAQ 可核验 2014 年 10 月开店；早期核心为线上流通，官网未提供逐年完整商品快照。",
+      "sourceURL": "https://www.wunderwelt.jp/zh/pages/faq", "coverImage": "brand-wunderwelt-fleur-hero.png",
+      "imageSourceURL": "https://www.wunderwelt.jp/zh/pages/faq", "pageCount": 0, "itemIds": []
+    },
+    {
+      "id": "wunderwelt-fleur-2016", "year": 2016, "season": "launch", "seasonLabel": "FLEUR 开张",
+      "title": "Wunderwelt FLEUR", "titleZH": "官方授权新品精品网店",
+      "summaryZH": "官方中文媒体记录 FLEUR 于 2016 年 7 月开张，面向海外提供 Gothic 与 Lolita 品牌新品。",
+      "sourceURL": "https://libre.wunderwelt.jp/zh/9183/", "coverImage": "brand-wunderwelt-fleur-hero.png",
+      "imageSourceURL": "https://www.wunderwelt.jp/cdn/shop/files/ogp_14ed06fd-8191-4b28-974b-969a94d8cbcd.png?v=1632711604", "pageCount": 0, "itemIds": []
+    },
+    {
+      "id": "wunderwelt-fleur-current", "year": 2026, "season": "current", "seasonLabel": "当前多品牌目录",
+      "title": "FLEUR Current Collection", "titleZH": "FLEUR 当前官方授权目录",
+      "summaryZH": "当前官网按新着、品牌与风格组织授权新品；品类与库存持续变化，本档案只描述官网现存范围。",
+      "sourceURL": "https://www.wunderwelt.jp/zh/collections/fleur", "coverImage": "brand-wunderwelt-fleur-hero.png",
+      "imageSourceURL": "https://www.wunderwelt.jp/zh/collections/fleur", "pageCount": 0, "itemIds": ["wunderwelt-fleur-current-cross-crown-jsk"]
+    },
+    {
+      "id": "wunderwelt-original", "year": 2026, "season": "current", "seasonLabel": "原创基础单品",
+      "title": "Wunderwelt Original", "titleZH": "Wunderwelt 原创裙撑等基础单品",
+      "summaryZH": "官网可核验原创裙撑等基础搭配品类；不把当前商品页扩张为早期至今的完整自有品牌目录。",
+      "sourceURL": "https://www.wunderwelt.jp/zh/pages/fleur", "coverImage": "brand-wunderwelt-fleur-original.jpg",
+      "imageSourceURL": "https://www.wunderwelt.jp/cdn/shop/files/OriginalPetticoat.jpg?v=1632110689", "pageCount": 0, "itemIds": ["wunderwelt-original-marshmallow-petticoat"]
+    }
+  ],
+  "items": [
+    {
+      "id": "wunderwelt-fleur-current-cross-crown-jsk", "canonicalKey": "wunderwelt-fleur|2026|cross-crown-jsk", "kind": "dress",
+      "category": "jumper-skirt", "categoryZH": "吊带裙", "name": "Moi-même-Moitié Cross Crown Embroidered Jumper Skirt", "nameZH": "Moi-même-Moitié Cross Crown 十字皇冠刺绣吊带裙",
+      "brand": "Moi-même-Moitié", "year": 2026, "season": "current", "catalogueID": "wunderwelt-fleur-current", "cataloguePage": 0,
+      "priceJPY": 49500, "listingStatus": "currentAuthorizedStore", "styles": ["gothic-lolita"], "stylesZH": ["哥特洛丽塔"],
+      "coverImage": null, "gallery": [], "imageSourceURL": "https://www.wunderwelt.jp/zh/collections/fleur", "sourceURL": "https://www.wunderwelt.jp/zh/collections/fleur",
+      "observedAt": "2026-08-11", "datePrecision": "observed", "noteZH": "FLEUR 当前官方授权目录排名中可核验单品；库存与价格会变化。",
+      "productCode": null, "productPageURL": "https://www.wunderwelt.jp/zh/collections/fleur", "cataloguePages": null
+    },
+    {
+      "id": "wunderwelt-original-marshmallow-petticoat", "canonicalKey": "wunderwelt|2026|original-marshmallow-petticoat", "kind": "accessory",
+      "category": "petticoat", "categoryZH": "裙撑", "name": "Wunderwelt Original Marshmallow Petticoat", "nameZH": "Wunderwelt 原创棉花糖打底裙撑",
+      "brand": "Wunderwelt Original", "year": 2026, "season": "current", "catalogueID": "wunderwelt-original", "cataloguePage": 0,
+      "priceJPY": 5050, "listingStatus": "currentOfficialStore", "styles": ["lolita-foundation"], "stylesZH": ["洛丽塔基础搭配"],
+      "coverImage": null, "gallery": [], "imageSourceURL": "https://www.wunderwelt.jp/cdn/shop/files/OriginalPetticoat.jpg?v=1632110689", "sourceURL": "https://www.wunderwelt.jp/zh/pages/fleur",
+      "observedAt": "2026-08-11", "datePrecision": "observed", "noteZH": "官网当前原创商品入口可核验单品；库存与折扣会变化。",
+      "productCode": null, "productPageURL": "https://www.wunderwelt.jp/zh/collections/fleur", "cataloguePages": null
+    }
+  ],
   "commerceSnapshots": [],
   "commerceItems": [],
   "coordinates": [],

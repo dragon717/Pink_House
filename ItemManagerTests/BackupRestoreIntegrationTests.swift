@@ -147,6 +147,26 @@ final class BackupRestoreIntegrationTests: XCTestCase {
         XCTAssertEqual(total, 2_890)
     }
 
+    func testWealthAmountLoaderFetchesNestedAccessoryPayments() async throws {
+        let clothing = Clothing(
+            name: "Full Payment Reservation OP",
+            price: 500,
+            deposit: 500,
+            balance: 0,
+            isDepositPlan: true
+        )
+        clothing.accessoryItems = [
+            AccessoryItem(name: "Bonnet", price: 100, deposit: 30, balance: 70)
+        ]
+        context.insert(clothing)
+        try context.save()
+
+        let loader = WealthAmountLoader(modelContainer: container)
+        let total = try await loader.loadBaseAmountCNY()
+
+        XCTAssertEqual(total, 600)
+    }
+
     func testWealthDisplayAmountRoundsConvertedCurrencyAmounts() {
         XCTAssertEqual(
             WealthViewModel.displayAmount(
