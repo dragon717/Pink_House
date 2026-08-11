@@ -1,6 +1,5 @@
 import SwiftUI
 import SwiftData
-import Translation
 
 enum TimeHallMode: String, CaseIterable, Identifiable {
   case chronicle
@@ -254,6 +253,20 @@ private enum TimeHallDisplayLanguage {
 
   static func officialTitle(_ value: String) -> String {
     usesChinese ? "官方日文标题：\(value)" : value
+  }
+}
+
+private enum TimeHallProductDescriptionLanguage: String, CaseIterable, Identifiable {
+  case japanese
+  case chinese
+
+  var id: String { rawValue }
+
+  var title: String {
+    switch self {
+    case .japanese: return "日文"
+    case .chinese: return "中文"
+    }
   }
 }
 
@@ -2614,8 +2627,7 @@ struct TimeHallCommerceItemDetailView: View {
   @Environment(ThemeManager.self) private var themeManager
   @Environment(\.colorScheme) private var colorScheme
   @State private var isAddingToWardrobe = false
-  @State private var isShowingTranslation = false
-  @State private var translatedDescription: String?
+  @State private var descriptionLanguage: TimeHallProductDescriptionLanguage = .chinese
 
   private var palette: MagicThemePalette {
     MagicThemeDesignSystem.palette(themeManager: themeManager, colorScheme: colorScheme)
@@ -2686,18 +2698,22 @@ struct TimeHallCommerceItemDetailView: View {
                   .font(.headline)
                   .foregroundStyle(palette.primaryText)
                 Spacer()
-                Button {
-                  isShowingTranslation = true
-                } label: {
-                  Label("翻译".appLocalized, systemImage: "translate")
+                Picker("商品介绍语言", selection: $descriptionLanguage) {
+                  ForEach(TimeHallProductDescriptionLanguage.allCases) { language in
+                    Text(language.title).tag(language)
+                  }
                 }
-                .font(.subheadline.weight(.semibold))
+                .labelsHidden()
+                .pickerStyle(.segmented)
+                .frame(width: 150)
               }
               .padding(.top, 4)
-              Text(translatedDescription ?? item.description)
-                .font(.body)
-                .foregroundStyle(palette.secondaryText)
-                .fixedSize(horizontal: false, vertical: true)
+
+              productDescriptionText(
+                descriptionLanguage == .chinese
+                  ? item.descriptionZH.flatMap { $0.isEmpty ? nil : $0 } ?? item.description
+                  : item.description
+              )
             }
 
             if let url = URL(string: item.productPageURL) {
@@ -2718,11 +2734,6 @@ struct TimeHallCommerceItemDetailView: View {
       .background(
         LiquidBackground(themeSkinWallpaperContext: .timeHall, includeThemeSkinStickers: false)
       )
-      .translationPresentation(
-        isPresented: $isShowingTranslation,
-        text: item.description,
-        replacementAction: { translatedDescription = $0 }
-      )
       .navigationTitle("商品详情".appLocalized)
       .navigationBarTitleDisplayMode(.inline)
       .toolbar {
@@ -2739,6 +2750,13 @@ struct TimeHallCommerceItemDetailView: View {
         }
       }
     }
+  }
+
+  private func productDescriptionText(_ text: String) -> some View {
+    Text(text)
+      .font(.body)
+      .foregroundStyle(palette.secondaryText)
+      .fixedSize(horizontal: false, vertical: true)
   }
 
   @ViewBuilder

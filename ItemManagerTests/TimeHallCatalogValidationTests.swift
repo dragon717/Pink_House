@@ -60,6 +60,10 @@ final class TimeHallCatalogValidationTests: XCTestCase {
           + catalog.stories.map(\.coverImage)
       )
       XCTAssertTrue(catalog.commerceItems.allSatisfy { !$0.coverImage.isEmpty }, resourceName)
+      XCTAssertTrue(
+        catalog.commerceItems.allSatisfy { $0.description.isEmpty || !($0.descriptionZH ?? "").isEmpty },
+        resourceName
+      )
       for imageName in imageNames {
         XCTAssertNotNil(imageURL(named: imageName), "Missing \(resourceName) image: \(imageName)")
       }

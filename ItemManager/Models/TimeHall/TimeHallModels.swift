@@ -154,6 +154,7 @@ struct TimeHallCommerceItemDTO: Codable, Identifiable, Hashable, Sendable {
   let salePriceJPY: Int?
   let listingStatus: String
   let description: String
+  let descriptionZH: String?
   let colors: [String]
   let sizes: [String]
   let material: String?

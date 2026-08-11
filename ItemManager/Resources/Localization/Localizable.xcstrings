@@ -44161,7 +44161,11 @@
     "商品" : {
 
     },
+    "商品/搜索结果文本" : {
+
+    },
     "商品介绍" : {
+      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -44219,7 +44223,7 @@
         }
       }
     },
-    "商品/搜索结果文本" : {
+    "商品介绍语言" : {
 
     },
     "商品信息" : {
@@ -116325,6 +116329,7 @@
       }
     },
     "翻译" : {
+      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {

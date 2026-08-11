@@ -345,6 +345,14 @@ def write_catalog(key: str, config: dict, items: list[dict], dry_run: bool) -> N
         return
     path = CATALOG_DIR / config["catalog"]
     catalog = json.loads(path.read_text(encoding="utf-8"))
+    previous_items = {item["id"]: item for item in catalog.get("commerceItems", [])}
+    for item in items:
+        previous = previous_items.get(item["id"], {})
+        item["descriptionZH"] = (
+            previous.get("descriptionZH", "")
+            if previous.get("description") == item["description"]
+            else ""
+        )
     old_snapshots = {value["id"] for value in catalog.get("commerceSnapshots", [])}
     old_ids = {
         value

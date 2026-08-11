@@ -71,6 +71,7 @@ Importer 会：
 ```bash
 python3 tools/time_hall/import_curated_commerce.py --dry-run
 python3 tools/time_hall/import_curated_commerce.py
+python3 tools/time_hall/translate_catalog_descriptions.py
 ```
 
 已有商品元数据、只需补齐或续传本地封面时：
@@ -90,6 +91,8 @@ Justine 读取各自官方商城全商品；Wunderwelt 只读取 FLEUR 官方授
 [Wunderwelt FLEUR 官方介绍](https://libre.wunderwelt.jp/zh/9183/)。导入器保留商品页、
 原图 URL、采集日、价格和库存状态；每件商品的首张官方图压缩到最大 600px 后写入
 App Bundle，已存在的封面会跳过，详情页其余图片仍按需读取官方 HTTPS 地址。
+中文正文由 macOS 已下载的 Apple 日文/简体中文翻译语言包生成；官网原文未变化时，
+重新采集会保留已有中文正文。
 
 ## Coordinate 批次
 
