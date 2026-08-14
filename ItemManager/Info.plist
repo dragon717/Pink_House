@@ -2,17 +2,12 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>UIBackgroundModes</key>
-	<array>
-		<string>remote-notification</string>
-		<string>fetch</string>
-	</array>
+	<key>ARKit</key>
+	<true/>
 	<key>BGTaskSchedulerPermittedIdentifiers</key>
 	<array>
 		<string>com.yourapp.skirtmarket.fetch</string>
 	</array>
-	<key>CFBundleDevelopmentRegion</key>
-	<string>zh-Hans</string>
 	<key>CFBundleLocalizations</key>
 	<array>
 		<string>zh-Hans</string>
@@ -25,29 +20,15 @@
 		<string>es</string>
 		<string>pt-BR</string>
 	</array>
-	<key>NSCameraUsageDescription</key>
-	<string>Pink House needs camera access to take clothing photos and perform 3D scans.</string>
-	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>Pink House uses your location to provide location-based outfit recommendations.</string>
-	<key>NSMicrophoneUsageDescription</key>
-	<string>Pink House needs microphone access for pet voice interactions and recording features.</string>
-	<key>NSMotionUsageDescription</key>
-	<string>Pink House uses motion data to power the 3D parallax background effect.</string>
-	<key>NSPhotoLibraryAddUsageDescription</key>
-	<string>Pink House needs photo library access to save images.</string>
-	<key>NSPhotoLibraryUsageDescription</key>
-	<string>Pink House needs photo library access to choose clothing photos.</string>
-	<key>NSSpeechRecognitionUsageDescription</key>
-	<string>Pink House uses speech recognition to convert voice to text for pet voice interactions and commands.</string>
-	<key>NSWorldSensingUsageDescription</key>
-	<string>Pink House uses world sensing to perform 3D object scans.</string>
-	<key>ARKit</key>
-	<true/>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsArbitraryLoads</key>
 		<true/>
 	</dict>
+	<key>NSUserActivityTypes</key>
+	<array>
+		<string>com.itemmanager.clothing.editing</string>
+	</array>
 	<key>UIAppFonts</key>
 	<array>
 		<string>asserts/XCDUANZHUANGSONGTI.ttf</string>
@@ -57,11 +38,10 @@
 		<string>asserts/KouzanMouhituFont.ttf</string>
 		<string>asserts/临海隶书.ttf</string>
 	</array>
-	<key>ITSAppUsesNonExemptEncryption</key>
-	<false/>
-	<key>NSUserActivityTypes</key>
+	<key>UIBackgroundModes</key>
 	<array>
-		<string>com.itemmanager.clothing.editing</string>
+		<string>remote-notification</string>
+		<string>fetch</string>
 	</array>
 </dict>
 </plist>

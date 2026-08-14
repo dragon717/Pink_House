@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate bundled Simplified Chinese product descriptions with Apple Translation."""
+"""Generate bundled Simplified Chinese product names and descriptions."""
 
 from __future__ import annotations
 
@@ -9,11 +9,13 @@ import os
 import subprocess
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
+from typing import Optional
 
 
 PROJ = Path(__file__).resolve().parents[2]
 CATALOG_DIR = PROJ / "ItemManager" / "Resources" / "TimeHall"
 CATALOGS = {
+    "pink-house": "catalog.json",
     "angelic-pretty": "catalog-angelic-pretty.json",
     "baby": "catalog-baby-stars-shine-bright.json",
     "juliette": "catalog-juliette-et-justine.json",
@@ -23,10 +25,43 @@ TRANSLATOR = Path(__file__).with_suffix(".swift")
 
 
 def normalize_translation(text: str) -> str:
-    return (
-        text.replace("[比赛]", "[蕾丝]")
-        .replace("布鲁玛", "南瓜裤")
-        .replace("宽（100%棉）", "平纹棉布（100%棉）")
+    replacements = {
+        "[比赛]": "[蕾丝]",
+        "布鲁玛": "南瓜裤",
+        "宽（100%棉）": "平纹棉布（100%棉）",
+        "跳线裙": "吊带裙",
+        "优惠券对象外": "不适用优惠券",
+        "魔法少女まどか☆マギカ": "魔法少女小圆",
+        "魔法少女まどか☆魔法少女 海贼王": "魔法少女小圆 连衣裙",
+        "ブラウス": "衬衫",
+        "ジャンパースカート": "吊带裙",
+        "ワンピース": "连衣裙",
+        "オーバーニー": "过膝袜",
+        "セットアップスカート": "套装半身裙",
+        "すみれれ刺繍": "紫罗兰刺绣",
+        "すみれ刺繍": "紫罗兰刺绣",
+        "エプロン": "围裙",
+        "ロング丈": "长款",
+        "レギュラー丈": "常规款",
+        "青い鳥": "青鸟",
+        "売マッチの少女": "卖火柴的小女孩",
+        "卖マッチの少女": "卖火柴的小女孩",
+        "植物のように": "如植物般",
+        "光的明灭を繰り返し": "反复明灭",
+        "连衣裙は唯一無二の存在感を显る": "连衣裙呈现独一无二的存在感",
+        "メリー蝴蝶结": "Merry 蝴蝶结",
+    }
+    for source, replacement in replacements.items():
+        text = text.replace(source, replacement)
+    return text
+
+
+def needs_chinese(source: str, translated: Optional[str]) -> bool:
+    if not source:
+        return False
+    return not translated or translated == source or any(
+        "\u3041" <= character <= "\u3096" or "\u30a1" <= character <= "\u30fa"
+        for character in translated
     )
 
 
@@ -69,7 +104,7 @@ def main() -> int:
 
     if args.self_check:
         assert TRANSLATOR.exists() and set(CATALOGS) == {
-            "angelic-pretty", "baby", "juliette", "wunderwelt"
+            "pink-house", "angelic-pretty", "baby", "juliette", "wunderwelt"
         }
         print("self-check: PASS")
         return 0
@@ -81,9 +116,19 @@ def main() -> int:
         catalog = json.loads((CATALOG_DIR / filename).read_text(encoding="utf-8"))
         catalogs[brand] = catalog
         pending_by_brand[brand] = []
+        for group in ("items", "commerceItems"):
+            for item in catalog[group]:
+                if args.force or needs_chinese(item["name"], item.get("nameZH")):
+                    pending_by_brand[brand].append({
+                        "id": f"{group}|{item['id']}|nameZH",
+                        "text": item["name"],
+                    })
         for item in catalog["commerceItems"]:
-            if item["description"] and (args.force or not item.get("descriptionZH")):
-                pending_by_brand[brand].append({"id": item["id"], "text": item["description"]})
+            if args.force or needs_chinese(item["description"], item.get("descriptionZH")):
+                pending_by_brand[brand].append({
+                    "id": f"commerceItems|{item['id']}|descriptionZH",
+                    "text": item["description"],
+                })
 
     if not any(pending_by_brand.values()):
         print("all requested descriptions are already translated")
@@ -110,9 +155,15 @@ def main() -> int:
 
     for brand, filename in brands.items():
         catalog = catalogs[brand]
+        for group in ("items", "commerceItems"):
+            for item in catalog[group]:
+                key = f"{group}|{item['id']}|nameZH"
+                if key in translated:
+                    item["nameZH"] = translated[key]
         for item in catalog["commerceItems"]:
-            if item["id"] in translated:
-                item["descriptionZH"] = translated[item["id"]]
+            key = f"commerceItems|{item['id']}|descriptionZH"
+            if key in translated:
+                item["descriptionZH"] = translated[key]
             else:
                 item.setdefault("descriptionZH", "")
         path = CATALOG_DIR / filename
@@ -122,7 +173,7 @@ def main() -> int:
             encoding="utf-8",
         )
         temporary.replace(path)
-        print(f"{brand}: descriptions updated")
+        print(f"{brand}: product localization updated")
     return 0
 
 

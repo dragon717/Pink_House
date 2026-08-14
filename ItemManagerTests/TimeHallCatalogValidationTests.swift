@@ -17,6 +17,19 @@ final class TimeHallCatalogValidationTests: XCTestCase {
     ])
   }
 
+  func testTimeHallProductLocalizationFollowsAppLanguage() {
+    XCTAssertEqual(
+      TimeHallDisplayLanguage.localized(
+        japanese: "日本語", chinese: "中文", localeIdentifier: "zh-Hans"),
+      "中文"
+    )
+    XCTAssertEqual(
+      TimeHallDisplayLanguage.localized(
+        japanese: "日本語", chinese: "中文", localeIdentifier: "ja"),
+      "日本語"
+    )
+  }
+
   func testCuratedBrandCatalogsDecodeAndBundleTheirImages() throws {
     let resourceNames = [
       "catalog-angelic-pretty",
@@ -33,6 +46,8 @@ final class TimeHallCatalogValidationTests: XCTestCase {
       XCTAssertFalse(catalog.timelineYears.isEmpty, resourceName)
       XCTAssertFalse(catalog.catalogues.isEmpty, resourceName)
       XCTAssertFalse(catalog.items.isEmpty, resourceName)
+      XCTAssertTrue(catalog.items.allSatisfy { !($0.coverImage ?? "").isEmpty }, resourceName)
+      XCTAssertTrue(catalog.items.allSatisfy { !$0.name.isEmpty && !$0.nameZH.isEmpty }, resourceName)
       XCTAssertFalse(catalog.scope.labelZH.isEmpty, resourceName)
       XCTAssertTrue(
         Set(catalog.timelineYears.flatMap(\.catalogueIDs)).isSubset(of: catalogueIDs),
@@ -60,6 +75,7 @@ final class TimeHallCatalogValidationTests: XCTestCase {
           + catalog.stories.map(\.coverImage)
       )
       XCTAssertTrue(catalog.commerceItems.allSatisfy { !$0.coverImage.isEmpty }, resourceName)
+      XCTAssertTrue(catalog.commerceItems.allSatisfy { !$0.name.isEmpty && !$0.nameZH.isEmpty }, resourceName)
       XCTAssertTrue(
         catalog.commerceItems.allSatisfy { $0.description.isEmpty || !($0.descriptionZH ?? "").isEmpty },
         resourceName
@@ -109,6 +125,11 @@ final class TimeHallCatalogValidationTests: XCTestCase {
     XCTAssertNil(catalog.scope.endYear)
     XCTAssertEqual(catalog.timelineYears.map(\.year).sorted(), Array(1972...2026))
     XCTAssertEqual(Set(catalog.archiveCatalogues.map(\.year)), Set(2015...2026))
+    XCTAssertTrue(catalog.items.allSatisfy { !$0.name.isEmpty && !$0.nameZH.isEmpty })
+    XCTAssertTrue(catalog.commerceItems.allSatisfy { !$0.name.isEmpty && !$0.nameZH.isEmpty })
+    XCTAssertTrue(
+      catalog.commerceItems.allSatisfy { $0.description.isEmpty || !($0.descriptionZH ?? "").isEmpty }
+    )
   }
 
   func testDuplicateIdentityFailsValidation() throws {

@@ -71,8 +71,10 @@ Importer 会：
 ```bash
 python3 tools/time_hall/import_curated_commerce.py --dry-run
 python3 tools/time_hall/import_curated_commerce.py
-python3 tools/time_hall/translate_catalog_descriptions.py
+/usr/bin/python3 tools/time_hall/translate_catalog_descriptions.py
 ```
+
+翻译脚本保留官方日文原文，并生成随 App 语言切换的中文商品名与商品介绍。
 
 已有商品元数据、只需补齐或续传本地封面时：
 

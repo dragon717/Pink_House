@@ -226,20 +226,26 @@ private struct TimeHallMagazinePageGroup: Identifiable {
   var primaryItem: TimeHallItemDTO { items[0] }
 }
 
-private enum TimeHallDisplayLanguage {
-  static var usesChinese: Bool {
-    LanguageManager.shared.localeIdentifier.hasPrefix("zh")
+enum TimeHallDisplayLanguage {
+  static func usesJapanese(localeIdentifier: String = LanguageManager.shared.localeIdentifier) -> Bool {
+    localeIdentifier.hasPrefix("ja")
   }
 
-  static func productName(
-    chinese: String,
-    official: String,
-    categoryZH: String,
-    identifier: String
+  static var usesChinese: Bool {
+    !usesJapanese()
+  }
+
+  static func localized(
+    japanese: String,
+    chinese: String?,
+    localeIdentifier: String = LanguageManager.shared.localeIdentifier
   ) -> String {
-    guard usesChinese else { return official }
-    let hasJapaneseKana = chinese.range(of: #"[ぁ-ゖァ-ヺ]"#, options: .regularExpression) != nil
-    return hasJapaneseKana ? "\(categoryZH) · \(identifier)" : chinese
+    guard !usesJapanese(localeIdentifier: localeIdentifier) else { return japanese }
+    return chinese.flatMap { $0.isEmpty ? nil : $0 } ?? japanese
+  }
+
+  static func productName(chinese: String, official: String) -> String {
+    localized(japanese: official, chinese: chinese)
   }
 
   static func archiveTitle(kind: String, date: String?, official: String) -> String {
@@ -256,28 +262,9 @@ private enum TimeHallDisplayLanguage {
   }
 }
 
-private enum TimeHallProductDescriptionLanguage: String, CaseIterable, Identifiable {
-  case japanese
-  case chinese
-
-  var id: String { rawValue }
-
-  var title: String {
-    switch self {
-    case .japanese: return "日文"
-    case .chinese: return "中文"
-    }
-  }
-}
-
 extension TimeHallItemDTO {
   fileprivate var displayName: String {
-    TimeHallDisplayLanguage.productName(
-      chinese: nameZH,
-      official: name,
-      categoryZH: categoryZH,
-      identifier: productCode ?? "图录第 \(cataloguePage) 页"
-    )
+    TimeHallDisplayLanguage.productName(chinese: nameZH, official: name)
   }
 
   fileprivate var displayCategory: String {
@@ -287,12 +274,7 @@ extension TimeHallItemDTO {
 
 extension TimeHallCommerceItemDTO {
   fileprivate var displayName: String {
-    TimeHallDisplayLanguage.productName(
-      chinese: nameZH,
-      official: name,
-      categoryZH: categoryZH,
-      identifier: productCode
-    )
+    TimeHallDisplayLanguage.productName(chinese: nameZH, official: name)
   }
 
   fileprivate var displayCategory: String {
@@ -301,6 +283,10 @@ extension TimeHallCommerceItemDTO {
 
   fileprivate var displayStyles: [String] {
     TimeHallDisplayLanguage.usesChinese ? stylesZH : styles
+  }
+
+  fileprivate var displayDescription: String {
+    TimeHallDisplayLanguage.localized(japanese: description, chinese: descriptionZH)
   }
 
   fileprivate var listingLabelZH: String {
@@ -2627,7 +2613,6 @@ struct TimeHallCommerceItemDetailView: View {
   @Environment(ThemeManager.self) private var themeManager
   @Environment(\.colorScheme) private var colorScheme
   @State private var isAddingToWardrobe = false
-  @State private var descriptionLanguage: TimeHallProductDescriptionLanguage = .chinese
 
   private var palette: MagicThemePalette {
     MagicThemeDesignSystem.palette(themeManager: themeManager, colorScheme: colorScheme)
@@ -2692,28 +2677,15 @@ struct TimeHallCommerceItemDetailView: View {
               }
             }
 
-            if !item.description.isEmpty {
+            if !item.displayDescription.isEmpty {
               HStack {
                 Text("商品介绍".appLocalized)
                   .font(.headline)
                   .foregroundStyle(palette.primaryText)
-                Spacer()
-                Picker("商品介绍语言", selection: $descriptionLanguage) {
-                  ForEach(TimeHallProductDescriptionLanguage.allCases) { language in
-                    Text(language.title).tag(language)
-                  }
-                }
-                .labelsHidden()
-                .pickerStyle(.segmented)
-                .frame(width: 150)
               }
               .padding(.top, 4)
 
-              productDescriptionText(
-                descriptionLanguage == .chinese
-                  ? item.descriptionZH.flatMap { $0.isEmpty ? nil : $0 } ?? item.description
-                  : item.description
-              )
+              productDescriptionText(item.displayDescription)
             }
 
             if let url = URL(string: item.productPageURL) {
