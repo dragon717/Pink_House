@@ -42,10 +42,7 @@ struct DreamDressDetectiveView: View {
         }
 
         if !candidates.isEmpty {
-          DreamDressDetectiveResultsSection(candidates: candidates) { verified in
-            guard let index = candidates.firstIndex(where: { $0.id == verified.id }) else { return }
-            candidates[index] = verified
-          }
+          DreamDressDetectiveResultsSection(candidates: candidates)
         }
       }
       .padding(.horizontal, 20)
@@ -65,13 +62,41 @@ struct DreamDressDetectiveView: View {
     do {
       let found = try await DreamDressDetectiveService.shared.investigate(input)
       candidates = Array(found.prefix(5))
-      phase = .completed
       if candidates.isEmpty {
         errorMessage = DreamDressDetectiveError.noResults.localizedDescription
+      } else {
+        phase = .structuring
+        await retryMissingCandidates()
       }
+      phase = .completed
     } catch {
       phase = .idle
       errorMessage = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+    }
+  }
+
+  private func retryMissingCandidates() async {
+    for index in candidates.indices {
+      for attempt in 1...2 {
+        let candidate = candidates[index]
+        guard candidate.imageURL == nil || candidate.availability == .unknown else { break }
+#if DEBUG
+        print("[DreamDressDetective] auto_retry_start attempt=\(attempt) url=\(candidate.sourceURL.absoluteString)")
+#endif
+        guard let page = await DreamDressDynamicPageLoader.load(url: candidate.sourceURL) else {
+#if DEBUG
+          print("[DreamDressDetective] auto_retry_empty attempt=\(attempt) url=\(candidate.sourceURL.absoluteString)")
+#endif
+          continue
+        }
+        candidates[index] = candidate.enrichedFromRenderedPage(
+          imageURL: page.imageURL,
+          availability: page.availability
+        )
+#if DEBUG
+        print("[DreamDressDetective] auto_retry_finish attempt=\(attempt) image=\(page.imageURL != nil) status=\(page.availability.rawValue)")
+#endif
+      }
     }
   }
 }
@@ -178,7 +203,6 @@ private struct DreamDressDetectiveErrorCard: View {
 
 private struct DreamDressDetectiveResultsSection: View {
   let candidates: [DreamDressCandidate]
-  let onVerified: (DreamDressCandidate) -> Void
 
   var body: some View {
     VStack(alignment: .leading, spacing: 10) {
@@ -190,7 +214,7 @@ private struct DreamDressDetectiveResultsSection: View {
         .foregroundStyle(.secondary)
 
       ForEach(candidates) { candidate in
-        DreamDressDetectiveCandidateCard(candidate: candidate, onVerified: onVerified)
+        DreamDressDetectiveCandidateCard(candidate: candidate)
       }
     }
   }
@@ -198,7 +222,6 @@ private struct DreamDressDetectiveResultsSection: View {
 
 private struct DreamDressDetectiveCandidateCard: View {
   let candidate: DreamDressCandidate
-  let onVerified: (DreamDressCandidate) -> Void
   @Environment(\.modelContext) private var modelContext
   @State private var isAddingToWardrobe = false
   @State private var wardrobeDraft: ClothingEditDraft?
@@ -264,17 +287,6 @@ private struct DreamDressDetectiveCandidateCard: View {
             activityDraft: wardrobeDraft
           )
         }
-      }
-    }
-    .task(id: candidate.id) {
-      var verified = candidate
-      for _ in 0..<2 where verified.imageURL == nil || verified.availability == .unknown {
-        guard let page = await DreamDressDynamicPageLoader.load(url: candidate.sourceURL) else { continue }
-        verified = verified.enrichedFromRenderedPage(
-          imageURL: page.imageURL,
-          availability: page.availability
-        )
-        onVerified(verified)
       }
     }
   }

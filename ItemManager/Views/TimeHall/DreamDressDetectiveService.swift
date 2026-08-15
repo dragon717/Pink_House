@@ -615,10 +615,10 @@ final class DreamDressDynamicPageLoader: NSObject, WKNavigationDelegate {
             }
             var request = URLRequest(url: Self.renderURL(for: url))
             request.cachePolicy = .reloadIgnoringLocalCacheData
-            request.timeoutInterval = 30
+            request.timeoutInterval = 75
             webView.load(request)
             timeoutTask = Task { [weak self] in
-                try? await Task.sleep(for: .seconds(30))
+                try? await Task.sleep(for: .seconds(75))
                 self?.finish(nil)
             }
         }
@@ -634,6 +634,10 @@ final class DreamDressDynamicPageLoader: NSObject, WKNavigationDelegate {
     }
 
     func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: any Error) {
+        guard (error as NSError).code != NSURLErrorCancelled else { return }
+#if DEBUG
+        print("[DreamDressDetective] render_navigation_failed error=\(error.localizedDescription)")
+#endif
         finish(nil)
     }
 
@@ -642,6 +646,10 @@ final class DreamDressDynamicPageLoader: NSObject, WKNavigationDelegate {
         didFailProvisionalNavigation navigation: WKNavigation!,
         withError error: any Error
     ) {
+        guard (error as NSError).code != NSURLErrorCancelled else { return }
+#if DEBUG
+        print("[DreamDressDetective] render_provisional_failed error=\(error.localizedDescription)")
+#endif
         finish(nil)
     }
 
@@ -657,7 +665,6 @@ final class DreamDressDynamicPageLoader: NSObject, WKNavigationDelegate {
         }
         guard DreamDressDetectiveService.isAllowedHTTPSURL(url) else {
             decisionHandler(.cancel)
-            finish(nil)
             return
         }
         decisionHandler(.allow)
@@ -760,7 +767,7 @@ final class DreamDressDynamicPageLoader: NSObject, WKNavigationDelegate {
                 self?.finish(nil)
                 return
             }
-            if (page.imageURL == nil || page.availability == .unknown), captureAttempt < 12 {
+            if (page.imageURL == nil || page.availability == .unknown), captureAttempt < 36 {
                 captureAttempt += 1
                 Task { [weak self] in
                     try? await Task.sleep(for: .seconds(2))
@@ -910,25 +917,11 @@ final class DreamDressDetectiveService: @unchecked Sendable {
     private func enrich(_ candidates: [DreamDressCandidate]) async -> [DreamDressCandidate] {
         var results: [DreamDressCandidate] = []
         for candidate in candidates {
-            let staticCandidate: DreamDressCandidate
             if let page = try? await fetch(url: candidate.sourceURL) {
-                staticCandidate = DreamDressHTMLParser.enrich(candidate, html: page.text, baseURL: page.url)
+                results.append(DreamDressHTMLParser.enrich(candidate, html: page.text, baseURL: page.url))
             } else {
-                staticCandidate = candidate
+                results.append(candidate)
             }
-            guard staticCandidate.imageURL == nil || staticCandidate.availability == .unknown,
-                  Self.isCommercePlatformURL(candidate.sourceURL),
-                  let rendered = await DreamDressDynamicPageLoader.load(url: candidate.sourceURL) else {
-                results.append(staticCandidate)
-                continue
-            }
-#if DEBUG
-            print("[DreamDressDetective] rendered host=\(candidate.sourceURL.host ?? "unknown") image=\(rendered.imageURL != nil) status=\(rendered.availability.rawValue)")
-#endif
-            results.append(staticCandidate.enrichedFromRenderedPage(
-                imageURL: rendered.imageURL,
-                availability: rendered.availability
-            ))
         }
         return results
     }
