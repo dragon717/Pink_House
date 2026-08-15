@@ -273,6 +273,7 @@ final class SkirtMarketDeepSeekImportService {
                 .init(role: "user", content: userPayload)
             ],
             responseFormat: .init(type: "json_object"),
+            thinking: .init(type: "disabled"),
             stream: false,
             temperature: 0.1,
             maxTokens: 1800
@@ -314,8 +315,9 @@ final class SkirtMarketDeepSeekImportService {
     - 不联网，不假装已访问链接。
     - 不猜价格、不猜日期；看不出就填 null，并把字段名写入 missing_fields。
     - 价格必须放入 price_events，每个价格都有 observed_at；定金/尾款如有时间，写 applies_at。
-    - Lolita 判断覆盖 AP、Angelic Pretty、Baby、AATP、Meta、IW、VM、古典玩偶，以及 OP、JSK、SK、小物、包、鞋等语义。
-    - 如果不是 Lolita 相关，is_lolita_related=false，仍返回可确认的字段。
+    - Lolita 判断覆盖 AP、Angelic Pretty、Baby、AATP、Meta、IW、VM、古典玩偶，以及 OP、JSK、SK、小物、袜子、包、丝带、鞋等语义。
+    - 只有页面证据明确描述具体洛丽塔商品时 is_lolita_related 才能为 true；品牌介绍、公司主页、直播、粉丝社群、论坛、资讯和社交页面必须为 false，category 必须为 other。
+    - 不得把用户输入的品牌名或关键词当成页面证据；如果不是 Lolita 相关，is_lolita_related=false，仍返回可确认的字段。
 
     输出格式：
     {
@@ -324,7 +326,7 @@ final class SkirtMarketDeepSeekImportService {
           "title": "string",
           "brand": "string|null",
           "series": "string|null",
-          "category": "jsk|op|sk|blouse|accessory|bag|shoes|other",
+          "category": "jsk|op|sk|blouse|accessory|bag|shoes|socks|ribbon|headdress|other",
           "color": "string|null",
           "size": "string|null",
           "condition": "string|null",
@@ -358,9 +360,14 @@ private struct SkirtMarketDeepSeekChatRequest: Codable {
         var type: String
     }
 
+    struct Thinking: Codable {
+        var type: String
+    }
+
     var model: String
     var messages: [Message]
     var responseFormat: ResponseFormat
+    var thinking: Thinking
     var stream: Bool
     var temperature: Double
     var maxTokens: Int
@@ -369,6 +376,7 @@ private struct SkirtMarketDeepSeekChatRequest: Codable {
         case model
         case messages
         case responseFormat = "response_format"
+        case thinking
         case stream
         case temperature
         case maxTokens = "max_tokens"
