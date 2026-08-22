@@ -12,7 +12,7 @@ enum DreamDressDetectivePhase: String, Equatable {
     case completed = "侦查完成"
 }
 
-nonisolated enum DreamDressEvidenceType: String, Equatable, Sendable {
+nonisolated enum DreamDressEvidenceType: String, Codable, Equatable, Sendable {
     case webSearch = "平台搜索"
     case jsonLD = "JSON-LD Product"
     case openGraph = "OpenGraph"
@@ -21,7 +21,7 @@ nonisolated enum DreamDressEvidenceType: String, Equatable, Sendable {
     case aiStructured = "DeepSeek 结构化"
 }
 
-nonisolated enum DreamDressAvailability: String, Equatable, Sendable {
+nonisolated enum DreamDressAvailability: String, Codable, Equatable, Sendable {
     case available = "在售"
     case sold = "已售出"
     case delisted = "已下架"
@@ -51,7 +51,27 @@ struct DreamDressDetectiveInput: Equatable {
     }
 }
 
-nonisolated struct DreamDressCandidate: Identifiable, Equatable, Sendable {
+nonisolated struct DreamDressInvestigationResult: Codable, Sendable {
+    let foundCount: Int
+    let allCandidates: [DreamDressCandidate]
+    let validCandidates: [DreamDressCandidate]
+    let cachedAt: Date
+    let sourceUpdatedAt: Date?
+    let isFromCache: Bool
+
+    func loadedFromCache() -> Self {
+        Self(
+            foundCount: foundCount,
+            allCandidates: allCandidates,
+            validCandidates: validCandidates,
+            cachedAt: cachedAt,
+            sourceUpdatedAt: sourceUpdatedAt,
+            isFromCache: true
+        )
+    }
+}
+
+nonisolated struct DreamDressCandidate: Codable, Identifiable, Equatable, Sendable {
     let id: String
     let title: String
     let brand: String?
@@ -159,7 +179,8 @@ enum DreamDressProductMatcher {
         "jsk", "op", "sk", "blouse", "accessory", "bag", "shoes", "socks", "ribbon", "headdress"
     ]
     private static let productTerms = [
-        "连衣裙", "連衣裙", "吊带裙", "吊帶裙", "半身裙", "裙装", "裙裝", "洋装", "洋裝",
+        "连衣裙", "連衣裙", "连身裙", "連身裙", "吊带裙", "吊帶裙", "背带裙", "背帶裙",
+        "连体裤", "連身褲", "半身裙", "裙装", "裙裝", "洋装", "洋裝", "dress", "skirt",
         "洛丽塔裙", "洛麗塔裙", "lo裙", "ワンピース", "ジャンパースカート", "スカート",
         "one piece", "one-piece", "jumperskirt",
         "小物", "袜子", "襪子", "ソックス", "靴下", "stocking", "tights", "socks",
@@ -171,7 +192,8 @@ enum DreamDressProductMatcher {
     private static let lolitaTerms = ["lolita", "洛丽塔", "洛麗塔", "ロリータ"]
     private static let knownLolitaBrands = [
         "angelic pretty", "baby, the stars shine bright", "alice and the pirates",
-        "juliette et justine", "wunderwelt", "innocent world", "victorian maiden"
+        "juliette et justine", "wunderwelt", "innocent world", "victorian maiden",
+        "pink house", "pinkhouse", "ピンクハウス"
     ]
 
     static func acceptsAIItem(isLolitaRelated: Bool, category: String?) -> Bool {
@@ -206,10 +228,24 @@ enum DreamDressProductMatcher {
             || knownLolitaBrands.contains(where: pageText.contains)
         guard pageHasProduct, pageHasLolita else { return false }
 
+        let normalizedPageText = normalizedSearchText(pageEvidence)
         let hints = [input.brandName, input.productName]
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }
+            .flatMap { [normalizedSearchText($0)] + searchAliases(for: $0).map(normalizedSearchText) }
             .filter { !$0.isEmpty }
-        return hints.isEmpty || hints.contains(where: pageText.contains)
+        return hints.isEmpty || hints.contains(where: normalizedPageText.contains)
+    }
+
+    nonisolated static func searchAliases(for value: String) -> [String] {
+        normalizedSearchText(value) == "pinkhouse" ? ["ピンクハウス"] : []
+    }
+
+    nonisolated static func normalizedSearchText(_ value: String) -> String {
+        value
+            .folding(options: [.caseInsensitive, .diacriticInsensitive, .widthInsensitive], locale: nil)
+            .unicodeScalars
+            .filter { CharacterSet.alphanumerics.contains($0) }
+            .map(String.init)
+            .joined()
     }
 
     private static func containsLolitaCategoryToken(in text: String) -> Bool {
@@ -498,7 +534,7 @@ nonisolated enum DreamDressHTMLParser {
         return regex.stringByReplacingMatches(in: text, options: [], range: range, withTemplate: replacement)
     }
 
-    private static func decodeEntities(_ value: String) -> String {
+    static func decodeEntities(_ value: String) -> String {
         value
             .replacingOccurrences(of: "&amp;", with: "&")
             .replacingOccurrences(of: "&quot;", with: "\"")
@@ -839,7 +875,27 @@ final class DreamDressDetectiveService: @unchecked Sendable {
     static let shared = DreamDressDetectiveService()
 
     private let maximumResponseBytes = 1_500_000
+    private let maximumImageBytes = 12_000_000
+    private let cacheFreshness: TimeInterval = 6 * 60 * 60
     private let session: URLSession
+
+    private struct SourceValidator: Codable, Sendable {
+        let url: URL
+        let eTag: String?
+        let lastModified: String?
+        let sourceUpdatedAt: Date?
+    }
+
+    private struct CacheEntry: Codable, Sendable {
+        let result: DreamDressInvestigationResult
+        var lastCheckedAt: Date
+        let validator: SourceValidator?
+    }
+
+    private struct SearchOutcome: Sendable {
+        let candidates: [DreamDressCandidate]
+        let validator: SourceValidator?
+    }
 
     private init() {
         let configuration = URLSessionConfiguration.ephemeral
@@ -880,38 +936,265 @@ final class DreamDressDetectiveService: @unchecked Sendable {
         (try? validateURL(url)) != nil
     }
 
-    func investigate(_ input: DreamDressDetectiveInput) async throws -> [DreamDressCandidate] {
+    nonisolated static func cacheKey(for input: DreamDressDetectiveInput) -> String {
+        let normalized = [input.brandName, input.productName, input.productURL]
+            .map(DreamDressProductMatcher.normalizedSearchText)
+            .joined(separator: "|")
+        return "dream_dress_detective.cache.v1."
+            + Data(normalized.utf8).base64EncodedString()
+    }
+
+    nonisolated static func isCacheFresh(
+        lastCheckedAt: Date,
+        now: Date = Date(),
+        freshness: TimeInterval = 6 * 60 * 60
+    ) -> Bool {
+        now.timeIntervalSince(lastCheckedAt) < freshness
+    }
+
+    private func cachedResult(forKey key: String) async -> DreamDressInvestigationResult? {
+        guard let data = UserDefaults.standard.data(forKey: key),
+              var entry = try? JSONDecoder().decode(CacheEntry.self, from: data)
+        else { return nil }
+        if Self.isCacheFresh(lastCheckedAt: entry.lastCheckedAt, freshness: cacheFreshness) {
+            return entry.result.loadedFromCache()
+        }
+        guard let validator = entry.validator,
+              await sourceIsUnchanged(validator) else { return nil }
+        entry.lastCheckedAt = Date()
+        saveCache(entry, forKey: key)
+        return entry.result.loadedFromCache()
+    }
+
+    private func saveCache(_ entry: CacheEntry, forKey key: String) {
+        // ponytail: per-query UserDefaults cache; add file-backed LRU only if real usage grows enough to matter.
+        guard let data = try? JSONEncoder().encode(entry) else { return }
+        UserDefaults.standard.set(data, forKey: key)
+    }
+
+    private func sourceIsUnchanged(_ validator: SourceValidator) async -> Bool {
+        var request = URLRequest(url: validator.url)
+        request.timeoutInterval = 8
+        request.cachePolicy = .reloadIgnoringLocalCacheData
+        if let eTag = validator.eTag { request.setValue(eTag, forHTTPHeaderField: "If-None-Match") }
+        if let lastModified = validator.lastModified {
+            request.setValue(lastModified, forHTTPHeaderField: "If-Modified-Since")
+        }
+        guard validator.eTag != nil || validator.lastModified != nil,
+              let (_, response) = try? await data(for: request),
+              let http = response as? HTTPURLResponse else { return false }
+        if http.statusCode == 304 { return true }
+        guard (200..<300).contains(http.statusCode) else { return false }
+        return validator.eTag.map { http.value(forHTTPHeaderField: "ETag") == $0 }
+            ?? validator.lastModified.map { http.value(forHTTPHeaderField: "Last-Modified") == $0 }
+            ?? false
+    }
+
+    nonisolated private static func httpDate(_ value: String?) -> Date? {
+        guard let value else { return nil }
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(secondsFromGMT: 0)
+        formatter.dateFormat = "EEE',' dd MMM yyyy HH':'mm':'ss z"
+        return formatter.date(from: value)
+    }
+
+    func investigate(
+        _ input: DreamDressDetectiveInput,
+        forceRefresh: Bool = false
+    ) async throws -> DreamDressInvestigationResult {
         try Self.validate(input)
-        let rawURL = input.productURL.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !rawURL.isEmpty {
-            guard let url = URL(string: rawURL) else { throw DreamDressDetectiveError.invalidURL }
-            return try await investigate(url: url, input: input)
+        let cacheKey = Self.cacheKey(for: input)
+        if !forceRefresh, let cached = await cachedResult(forKey: cacheKey) {
+            return cached
         }
 
-        let hits = try await searchProductHits(for: input)
-        let candidates = hits.compactMap { hit -> DreamDressCandidate? in
-            let inputBrand = nonEmpty(input.brandName)
+        let rawURL = input.productURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        let outcome: SearchOutcome
+        if !rawURL.isEmpty {
+            guard let url = URL(string: rawURL) else { throw DreamDressDetectiveError.invalidURL }
+            outcome = SearchOutcome(
+                candidates: try await investigate(url: url, input: input),
+                validator: nil
+            )
+        } else {
+            outcome = try await searchCandidates(for: input)
+        }
+
+        let found = Array(unique(outcome.candidates).prefix(20))
+        guard !found.isEmpty else { throw DreamDressDetectiveError.noResults }
+        let valid = await candidatesWithValidImages(found)
+        let now = Date()
+#if DEBUG
+        print("[DreamDressDetective] found=\(found.count) valid_images=\(valid.count)")
+#endif
+        let result = DreamDressInvestigationResult(
+            foundCount: found.count,
+            allCandidates: found,
+            validCandidates: valid.enumerated().sorted {
+                ($0.element.availability.sortPriority, $0.offset)
+                    < ($1.element.availability.sortPriority, $1.offset)
+            }.map(\.element),
+            cachedAt: now,
+            sourceUpdatedAt: outcome.validator?.sourceUpdatedAt,
+            isFromCache: false
+        )
+        saveCache(
+            CacheEntry(result: result, lastCheckedAt: now, validator: outcome.validator),
+            forKey: cacheKey
+        )
+        return result
+    }
+
+    private func searchCandidates(for input: DreamDressDetectiveInput) async throws -> SearchOutcome {
+        var candidates: [DreamDressCandidate] = []
+        let apiKey = AIConfigManager.shared.dsApiKey?.trimmingCharacters(in: .whitespacesAndNewlines)
+        var lastSearchError: Error?
+        for (index, query) in Self.searchQueries(for: input).enumerated()
+        where (index < 4 || candidates.count < 20) && apiKey?.isEmpty == false {
+            do {
+                let hits = try await searchProductHits(query: query, apiKey: apiKey!)
+                candidates.append(contentsOf: makeCandidates(from: hits, input: input).prefix(5))
+                candidates = uniqueBySourceURL(candidates)
+            } catch {
+                lastSearchError = error
+            }
+        }
+        let hasMultiPlatformSearchResults = !candidates.isEmpty
+        let direct = candidates.count < 20 ? try? await yahooAuctionCandidates(for: input) : nil
+        candidates.append(contentsOf: direct?.candidates ?? [])
+        candidates = uniqueBySourceURL(candidates)
+#if DEBUG
+        print("[DreamDressDetective] accepted=\(candidates.count)")
+#endif
+        guard !candidates.isEmpty else {
+            if let lastSearchError { throw lastSearchError }
+            if apiKey?.isEmpty != false {
+                throw DreamDressDetectiveError.service("缺少 DS_API_KEY，无法联网搜索商品。")
+            }
+            throw DreamDressDetectiveError.noResults
+        }
+        return SearchOutcome(
+            candidates: candidates,
+            // Aggregated platforms have no shared revision; they use TTL + manual refresh.
+            validator: hasMultiPlatformSearchResults ? nil : direct?.validator
+        )
+    }
+
+    private func yahooAuctionCandidates(for input: DreamDressDetectiveInput) async throws -> SearchOutcome {
+        let rawName = [input.brandName, input.productName]
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+            .joined(separator: " ")
+        guard rawName.range(of: #"[A-Za-z぀-ヿ]"#, options: .regularExpression) != nil else {
+            return SearchOutcome(candidates: [], validator: nil)
+        }
+        let name = DreamDressProductMatcher.searchAliases(for: rawName).first ?? rawName
+        var components = URLComponents(string: "https://auctions.yahoo.co.jp/search/search")!
+        components.queryItems = [URLQueryItem(name: "p", value: "\(name) (スカート OR ワンピース)")]
+        guard let url = components.url else { return SearchOutcome(candidates: [], validator: nil) }
+        let page = try await fetch(url: url)
+        return SearchOutcome(
+            candidates: Array(Self.yahooAuctionCandidates(from: page.text, input: input).prefix(10)),
+            validator: page.validator
+        )
+    }
+
+    nonisolated static func yahooAuctionCandidates(
+        from html: String,
+        input: DreamDressDetectiveInput
+    ) -> [DreamDressCandidate] {
+        let pattern = #"data-auction-id="([A-Za-z0-9]+)"[\s\S]{0,1200}?data-auction-title="([^"]+)"[\s\S]{0,1200}?data-auction-img="([^"]+)"[\s\S]{0,1200}?data-auction-price="([0-9]*)""#
+        guard let regex = try? NSRegularExpression(pattern: pattern) else { return [] }
+        let range = NSRange(html.startIndex..., in: html)
+        var seen = Set<String>()
+        return regex.matches(in: html, range: range).compactMap { match in
+            func capture(_ index: Int) -> String? {
+                guard let range = Range(match.range(at: index), in: html) else { return nil }
+                return DreamDressHTMLParser.decodeEntities(String(html[range]))
+            }
+            guard let id = capture(1), seen.insert(id).inserted,
+                  let title = capture(2),
+                  let image = capture(3), let imageURL = URL(string: image),
+                  let sourceURL = URL(string: "https://auctions.yahoo.co.jp/jp/auction/\(id)")
+            else { return nil }
+            let price = capture(4).flatMap { $0.isEmpty ? nil : "¥\($0)" }
             let candidate = DreamDressCandidate(
-                title: hit.title,
-                brand: inputBrand.flatMap { hit.title.localizedCaseInsensitiveContains($0) ? $0 : nil },
-                price: nil,
-                availability: DreamDressHTMLParser.availability(in: hit.title),
-                sourceURL: hit.url,
+                title: title,
+                brand: nil,
+                price: price,
+                imageURL: imageURL,
+                availability: .unknown,
+                sourceURL: sourceURL,
                 evidenceType: .webSearch
             )
-            return DreamDressProductMatcher.accepts(candidate, input: input, pageEvidence: hit.title)
+            return DreamDressProductMatcher.accepts(candidate, input: input, pageEvidence: title)
                 ? candidate
                 : nil
+        }.prefix(20).map { $0 }
+    }
+
+    private func candidatesWithValidImages(_ candidates: [DreamDressCandidate]) async -> [DreamDressCandidate] {
+        var valid = await withTaskGroup(of: (Int, DreamDressCandidate?).self) { group in
+            for (index, candidate) in candidates.enumerated() {
+                group.addTask { [self] in
+                    let enriched: DreamDressCandidate
+                    if candidate.imageURL != nil {
+                        enriched = candidate
+                    } else if let page = try? await fetch(url: candidate.sourceURL) {
+                        enriched = DreamDressHTMLParser.enrich(candidate, html: page.text, baseURL: page.url)
+                    } else {
+                        return (index, nil)
+                    }
+                    guard let imageURL = enriched.imageURL,
+                          await isValidProductImage(at: imageURL) else { return (index, nil) }
+                    return (index, enriched)
+                }
+            }
+            var valid: [(Int, DreamDressCandidate)] = []
+            for await (index, candidate) in group {
+                if let candidate { valid.append((index, candidate)) }
+            }
+            return valid.sorted { $0.0 < $1.0 }.map(\.1)
         }
-#if DEBUG
-        print("[DreamDressDetective] platform_hits=\(hits.count) accepted=\(candidates.count)")
-#endif
-        guard !candidates.isEmpty else { throw DreamDressDetectiveError.noResults }
-        let enriched = await enrich(Array(unique(candidates).prefix(5)))
-        return enriched.enumerated().sorted {
-            ($0.element.availability.sortPriority, $0.offset)
-                < ($1.element.availability.sortPriority, $1.offset)
-        }.map(\.element)
+
+        let validIDs = Set(valid.map(\.id))
+        var renderedHosts = Set<String>()
+        let dynamicCandidates = candidates
+            .filter {
+                !validIDs.contains($0.id)
+                    && Self.isCommercePlatformURL($0.sourceURL)
+                    && renderedHosts.insert($0.sourceURL.host?.lowercased() ?? "").inserted
+            }
+            .prefix(4)
+        for candidate in dynamicCandidates {
+            guard let page = await DreamDressDynamicPageLoader.load(url: candidate.sourceURL),
+                  let imageURL = page.imageURL,
+                  await isValidProductImage(at: imageURL) else { continue }
+            valid.append(candidate.enrichedFromRenderedPage(
+                imageURL: imageURL,
+                availability: page.availability
+            ))
+        }
+
+        let order = Dictionary(uniqueKeysWithValues: candidates.enumerated().map { ($0.element.id, $0.offset) })
+        return valid.sorted { order[$0.id, default: .max] < order[$1.id, default: .max] }
+    }
+
+    private func isValidProductImage(at url: URL) async -> Bool {
+        guard Self.isAllowedHTTPSURL(url) else { return false }
+        var request = URLRequest(url: url)
+        request.timeoutInterval = 12
+        request.cachePolicy = .returnCacheDataElseLoad
+        guard let (data, response) = try? await data(for: request),
+              data.count <= maximumImageBytes,
+              let http = response as? HTTPURLResponse,
+              (200..<300).contains(http.statusCode),
+              http.mimeType?.lowercased().hasPrefix("image/") == true,
+              let image = UIImage(data: data),
+              image.size.width >= 200,
+              image.size.height >= 200 else { return false }
+        return true
     }
 
     private func enrich(_ candidates: [DreamDressCandidate]) async -> [DreamDressCandidate] {
@@ -1025,6 +1308,7 @@ final class DreamDressDetectiveService: @unchecked Sendable {
         let text: String
         let isHTML: Bool
         let metadata: String
+        let validator: SourceValidator
     }
 
     private func fetch(url: URL) async throws -> FetchedPage {
@@ -1066,7 +1350,13 @@ final class DreamDressDetectiveService: @unchecked Sendable {
             url: finalURL,
             text: text,
             isHTML: isHTML || (!isJSON && text.trimmingCharacters(in: .whitespacesAndNewlines).hasPrefix("<")),
-            metadata: String(text.prefix(2_000))
+            metadata: String(text.prefix(2_000)),
+            validator: SourceValidator(
+                url: finalURL,
+                eTag: httpResponse.value(forHTTPHeaderField: "ETag"),
+                lastModified: httpResponse.value(forHTTPHeaderField: "Last-Modified"),
+                sourceUpdatedAt: Self.httpDate(httpResponse.value(forHTTPHeaderField: "Last-Modified"))
+            )
         )
     }
 
@@ -1075,38 +1365,72 @@ final class DreamDressDetectiveService: @unchecked Sendable {
         let url: URL
     }
 
-    private func searchProductHits(for input: DreamDressDetectiveInput) async throws -> [WebSearchHit] {
-        guard let apiKey = AIConfigManager.shared.dsApiKey?.trimmingCharacters(in: .whitespacesAndNewlines),
-              !apiKey.isEmpty else {
-            throw DreamDressDetectiveError.service("缺少 DS_API_KEY，无法联网搜索商品。")
+    nonisolated static func searchQueries(for input: DreamDressDetectiveInput) -> [String] {
+        [input.brandName, input.productName].flatMap { value -> [String] in
+            let variants = queryVariants(for: value)
+            guard !variants.isEmpty else { return [] }
+            let terms = variants.map { variant in
+                variant.contains(where: \.isWhitespace) ? "\"\(variant)\"" : variant
+            }
+            let expression = terms.count == 1 ? terms[0] : "(\(terms.joined(separator: " OR ")))"
+            return [
+                "\(expression) 闲鱼 goofish 二手 在售 裙",
+                "\(expression) 淘宝 天猫 商品 价格 详情 裙",
+                "\(expression) 小红书 出物 穿搭 裙",
+                "\(expression) 抖音商城 今日头条 商品 价格 裙",
+                "\(expression) 裙 连衣裙 スカート ワンピース 二手 中古",
+                "\(expression) Mercari メルカリ 中古 スカート ワンピース",
+                "\(expression) Yahoo!オークション ヤフオク 中古 スカート ワンピース",
+                "\(expression) 楽天市場 公式 通販 スカート ワンピース"
+            ]
         }
-        let brand = nonEmpty(input.brandName) ?? ""
-        let product = nonEmpty(input.productName) ?? ""
-        if !brand.isEmpty, !product.isEmpty {
-            let brandHits = try? await resilientSearchProductHits(query: brand, apiKey: apiKey)
-            if let brandHits, !brandHits.isEmpty { return brandHits }
-            return try await resilientSearchProductHits(query: product, apiKey: apiKey)
-        }
-        return try await resilientSearchProductHits(query: brand.isEmpty ? product : brand, apiKey: apiKey)
     }
 
-    private func resilientSearchProductHits(query: String, apiKey: String) async throws -> [WebSearchHit] {
-        let hits = try await searchProductHits(query: query, apiKey: apiKey)
-        if !hits.isEmpty { return hits }
-        return try await searchProductHits(query: "\(query) 闲鱼 洛丽塔", apiKey: apiKey)
+    nonisolated static func queryVariants(for value: String) -> [String] {
+        let original = value
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .replacingOccurrences(of: "\"", with: " ")
+            .split(whereSeparator: { $0.isWhitespace })
+            .joined(separator: " ")
+        guard !original.isEmpty else { return [] }
+        let compact = replacingMatches(#"[\s_\-]+"#, in: original, with: "")
+        let camelSpaced = replacingMatches(#"([a-z0-9])([A-Z])"#, in: original, with: "$1 $2")
+        let mixedSpaced = replacingMatches(
+            #"(?<=[\p{Han}])(?=[A-Za-z0-9])|(?<=[A-Za-z0-9])(?=[\p{Han}])"#,
+            in: original,
+            with: " "
+        )
+        var seen = Set<String>()
+        return ([original, compact, camelSpaced, mixedSpaced] + DreamDressProductMatcher.searchAliases(for: original))
+            .filter { !$0.isEmpty && seen.insert($0.lowercased()).inserted }
+            .prefix(4)
+            .map { String($0.prefix(80)) }
+    }
+
+    nonisolated static func price(in text: String) -> String? {
+        for pattern in [
+            #"(?:¥|￥|RMB|CNY|JPY)\s*[0-9][0-9,.]*"#,
+            #"[0-9][0-9,.]*\s*(?:元|円)"#
+        ] {
+            guard let range = text.range(of: pattern, options: [.regularExpression, .caseInsensitive]) else {
+                continue
+            }
+            return String(text[range]).trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        return nil
     }
 
     private func searchProductHits(query: String, apiKey: String) async throws -> [WebSearchHit] {
         let prompt = """
-        请用 web_search 搜索“\(query) site:goofish.com/item”。
-        只查真实商品或出售帖，不要猜测网址；调用方会直接读取搜索工具结果。
+        请用 web_search 搜索“\(query)”。
+        优先返回带公开商品主图的原平台 HTTPS 商品详情页；尽可能返回多个不同商品，不要返回文章、搜索列表或猜测网址。
         """
         let requestBody: [String: Any] = [
             "model": "deepseek-v4-flash",
-            "max_tokens": 1_000,
+            "max_tokens": 256,
             "stream": false,
             "thinking": ["type": "disabled"],
-            "tools": [["type": "web_search_20260209", "name": "web_search", "max_uses": 3]],
+            "tools": [["type": "web_search_20260209", "name": "web_search", "max_uses": 1]],
             "messages": [["role": "user", "content": prompt]]
         ]
         var request = URLRequest(url: URL(string: "https://api.deepseek.com/anthropic/v1/messages")!)
@@ -1126,7 +1450,7 @@ final class DreamDressDetectiveService: @unchecked Sendable {
             .filter { hit in !rejectedTitles.contains(where: hit.title.contains) }
             .map { WebSearchHit(title: $0.title, url: $0.url) }
 #if DEBUG
-        print("[DreamDressDetective] response_bytes=\(data.count) commerce_hits=\(hits.count)")
+        print("[DreamDressDetective] query=\(query) response_bytes=\(data.count) product_hits=\(hits.count)")
 #endif
         return hits
     }
@@ -1140,12 +1464,46 @@ final class DreamDressDetectiveService: @unchecked Sendable {
         var results: [(title: String, url: URL)] = []
         collectWebSearchResults(from: object, into: &results)
         var seen = Set<String>()
-        return results.filter { result in
-            guard isCommercePlatformURL(result.url),
-                  seen.insert(result.url.absoluteString).inserted
-            else { return false }
-            return true
+        return results.compactMap { result in
+            let url = canonicalSearchResultURL(result.url)
+            guard isSearchResultURL(url),
+                  seen.insert(url.absoluteString).inserted
+            else { return nil }
+            return (result.title, url)
         }
+    }
+
+    nonisolated private static func canonicalSearchResultURL(_ url: URL) -> URL {
+        guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
+              let host = components.host?.lowercased() else { return url }
+        let path = components.path.lowercased()
+        let itemCode = components.queryItems?
+            .first(where: { ["itemcode", "aid"].contains($0.name.lowercased()) })?.value ?? ""
+        let validItemCode = itemCode.range(of: #"^[A-Za-z][0-9]+$"#, options: .regularExpression) != nil
+
+        if host == "zenmarket.jp", validItemCode {
+            if path.hasSuffix("/mercariproduct.aspx") {
+                return URL(string: "https://jp.mercari.com/item/\(itemCode)")!
+            }
+            if path.hasSuffix("/auction.aspx") {
+                return URL(string: "https://auctions.yahoo.co.jp/jp/auction/\(itemCode)")!
+            }
+        }
+        if ["j-subculture.com", "www.j-subculture.com"].contains(host),
+           let rawTarget = components.queryItems?.first(where: { $0.name == "shopping_url" })?.value,
+           let target = URL(string: rawTarget),
+           isSearchResultURL(target) {
+            return target
+        }
+        if ["letao.com.hk", "www.letao.com.hk"].contains(host), validItemCode {
+            if components.queryItems?.first(where: { $0.name == "domain" })?.value == "mercari" {
+                return URL(string: "https://jp.mercari.com/item/\(itemCode)")!
+            }
+            if path.hasSuffix("/auctions/item.php") {
+                return URL(string: "https://auctions.yahoo.co.jp/jp/auction/\(itemCode)")!
+            }
+        }
+        return url
     }
 
     nonisolated private static func collectWebSearchResults(
@@ -1193,7 +1551,7 @@ final class DreamDressDetectiveService: @unchecked Sendable {
         }
         if host == "www.douyin.com" {
             return segments.count == 2
-                && ["video", "note"].contains(segments[0])
+                && ["video", "note", "shipin"].contains(segments[0])
                 && segments[1].allSatisfy(\.isNumber)
         }
         if host == "haohuo.jinritemai.com" {
@@ -1202,6 +1560,49 @@ final class DreamDressDetectiveService: @unchecked Sendable {
         }
         if host == "weidian.com" || host == "www.weidian.com" {
             return path == "/item.html" && numericID("itemID")
+        }
+        return false
+    }
+
+    nonisolated static func isSearchResultURL(_ url: URL) -> Bool {
+        if isCommercePlatformURL(url) { return true }
+        guard isAllowedHTTPSURL(url),
+              let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
+              let host = components.host?.lowercased() else { return false }
+        let path = components.path.lowercased()
+        let segments = path.split(separator: "/")
+        if host == "wiki.smzdm.com" {
+            return segments.count == 2 && segments[0] == "p" && !segments[1].isEmpty
+        }
+        if host == "qiandao.com" || host == "www.qiandao.com" {
+            guard path == "/spu",
+                  let id = components.queryItems?.first(where: { $0.name == "id" })?.value
+            else { return false }
+            return !id.isEmpty && id.allSatisfy(\.isNumber)
+        }
+        if host == "lolitalibrary.com" || host == "www.lolitalibrary.com" {
+            return segments.count == 3
+                && segments[0] == "library"
+                && segments[1] == "detail"
+                && segments[2].allSatisfy(\.isNumber)
+        }
+        if host == "pinkhouse-webshop.jp" {
+            return segments.count >= 4 && segments.prefix(2) == ["item", "pinkhouse"]
+        }
+        if host == "jp.mercari.com" {
+            return segments.count == 2 && segments[0] == "item" && !segments[1].isEmpty
+        }
+        if host == "item.rakuten.co.jp" {
+            return segments.count == 2 && segments.allSatisfy { !$0.isEmpty }
+        }
+        if host == "auctions.yahoo.co.jp" {
+            return segments.count == 3 && segments.prefix(2) == ["jp", "auction"] && !segments[2].isEmpty
+        }
+        if host == "paypayfleamarket.yahoo.co.jp" {
+            return segments.count == 2 && segments[0] == "item" && !segments[1].isEmpty
+        }
+        if host == "wunderwelt.jp" || host == "www.wunderwelt.jp" {
+            return segments.count == 2 && segments[0] == "products" && !segments[1].isEmpty
         }
         return false
     }
@@ -1234,9 +1635,37 @@ final class DreamDressDetectiveService: @unchecked Sendable {
         return trimmed.isEmpty ? nil : trimmed
     }
 
+    private func makeCandidates(
+        from hits: [WebSearchHit],
+        input: DreamDressDetectiveInput
+    ) -> [DreamDressCandidate] {
+        let inputBrand = nonEmpty(input.brandName)
+        return hits.compactMap { hit in
+            let candidate = DreamDressCandidate(
+                title: hit.title,
+                brand: inputBrand.flatMap {
+                    DreamDressProductMatcher.normalizedSearchText(hit.title)
+                        .contains(DreamDressProductMatcher.normalizedSearchText($0)) ? $0 : nil
+                },
+                price: Self.price(in: hit.title),
+                availability: DreamDressHTMLParser.availability(in: hit.title),
+                sourceURL: hit.url,
+                evidenceType: .webSearch
+            )
+            return DreamDressProductMatcher.accepts(candidate, input: input, pageEvidence: hit.title)
+                ? candidate
+                : nil
+        }
+    }
+
     private func unique(_ candidates: [DreamDressCandidate]) -> [DreamDressCandidate] {
         var seen = Set<String>()
         return candidates.filter { seen.insert($0.id).inserted }
+    }
+
+    private func uniqueBySourceURL(_ candidates: [DreamDressCandidate]) -> [DreamDressCandidate] {
+        var seen = Set<URL>()
+        return candidates.filter { seen.insert($0.sourceURL).inserted }
     }
 
     nonisolated private static func isSafeHost(_ host: String) -> Bool {
@@ -1263,6 +1692,15 @@ final class DreamDressDetectiveService: @unchecked Sendable {
         if first == 172 && (16...31).contains(second) { return false }
         if first == 100 && (64...127).contains(second) { return false }
         return true
+    }
+
+    nonisolated private static func replacingMatches(_ pattern: String, in text: String, with replacement: String) -> String {
+        guard let regex = try? NSRegularExpression(pattern: pattern) else { return text }
+        return regex.stringByReplacingMatches(
+            in: text,
+            range: NSRange(text.startIndex..., in: text),
+            withTemplate: replacement
+        )
     }
 }
 

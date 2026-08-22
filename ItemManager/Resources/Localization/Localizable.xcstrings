@@ -6485,6 +6485,16 @@
         }
       }
     },
+    "%lld候选 · %lld有效" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld候选 · %2$lld有效"
+          }
+        }
+      }
+    },
     "%lld喵币" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -60671,6 +60681,9 @@
         }
       }
     },
+    "平台数据时间：%@" : {
+
+    },
     "平衡" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -87845,6 +87858,9 @@
         }
       }
     },
+    "更新于 %@" : {
+
+    },
     "更新公告" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -90471,6 +90487,9 @@
           }
         }
       }
+    },
+    "本地缓存 · %@" : {
+
     },
     "本地能力依然可用，涉及第三方模型和 API 的智能能力会在开通后完整开放。" : {
       "extractionState" : "stale",
