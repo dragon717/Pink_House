@@ -37,41 +37,67 @@ class SharePreviewItem: NSObject, UIActivityItemSource {
     }
 }
 
-// MARK: - 猫爪加载动画视图
+// MARK: - 加载动画视图
 struct CatPawLoadingView: View {
-    @State private var rotation: Double = 0
-    @State private var scale: CGFloat = 1.0
-    @State private var opacity: Double = 1.0
-    @State private var breatheScale: CGFloat = 1.0
-    @State private var glowOpacity: Double = 0.5
-    
     let message: String
-    
+    let title: String
+    let detail: String?
+    let estimatedSeconds: ClosedRange<Int>?
+    let systemImage: String
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var isAnimating = false
+    @State private var ringRotation = 0.0
+    @State private var startedAt = Date()
+
+    init(
+        message: String,
+        title: String = "正在努力处理中".appLocalized,
+        detail: String? = nil,
+        estimatedSeconds: ClosedRange<Int>? = nil,
+        systemImage: String = "pawprint.fill"
+    ) {
+        self.message = message
+        self.title = title
+        self.detail = detail
+        self.estimatedSeconds = estimatedSeconds
+        self.systemImage = systemImage
+    }
+
     var body: some View {
-        VStack(spacing: 24) {
-            // 猫爪旋转动画 - 带呼吸效果
+        VStack(spacing: 18) {
             ZStack {
-                // 外发光圈 - 呼吸效果
                 Circle()
-                    .fill(MonicaColors.primaryPink.opacity(glowOpacity * 0.3))
-                    .frame(width: 120, height: 120)
-                    .scaleEffect(breatheScale)
-                
-                // 外圈装饰 - 脉冲效果
+                    .fill(MonicaColors.primaryPink.opacity(0.12))
+                    .frame(width: 112, height: 112)
+                    .scaleEffect(isAnimating && !reduceMotion ? 1.08 : 1)
+
                 Circle()
-                    .stroke(MonicaColors.primaryPink.opacity(0.4), lineWidth: 2)
-                    .frame(width: 100, height: 100)
-                    .scaleEffect(scale)
-                
-                // 内圈装饰
+                    .stroke(MonicaColors.primaryPink.opacity(0.16), lineWidth: 7)
+                    .frame(width: 92, height: 92)
+
                 Circle()
-                    .stroke(MonicaColors.lightPink.opacity(0.6), lineWidth: 1)
-                    .frame(width: 80, height: 80)
-                    .scaleEffect(scale * 0.9)
-                
-                // 猫爪图标 - 使用 pawprint.fill
-                Image(systemName: "pawprint.fill")
-                    .font(.system(size: 50, weight: .bold))
+                    .trim(from: 0.06, to: 0.78)
+                    .stroke(
+                        AngularGradient(
+                            colors: [MonicaColors.primaryPink, MonicaColors.lightPink, MonicaColors.primaryPink],
+                            center: .center
+                        ),
+                        style: StrokeStyle(lineWidth: 7, lineCap: .round)
+                    )
+                    .frame(width: 92, height: 92)
+                    .rotationEffect(.degrees(reduceMotion ? 0 : ringRotation))
+
+                Circle()
+                    .stroke(
+                        MonicaColors.primaryPink.opacity(0.45),
+                        style: StrokeStyle(lineWidth: 1.5, dash: [3, 7])
+                    )
+                    .frame(width: 72, height: 72)
+                    .rotationEffect(.degrees(isAnimating && !reduceMotion ? -360 : 0))
+
+                Image(systemName: systemImage)
+                    .font(.system(size: 34, weight: .semibold))
                     .foregroundStyle(
                         LinearGradient(
                             colors: [MonicaColors.primaryPink, MonicaColors.lightPink],
@@ -79,67 +105,107 @@ struct CatPawLoadingView: View {
                             endPoint: .bottomTrailing
                         )
                     )
-                    .rotationEffect(.degrees(rotation))
-                    .shadow(color: MonicaColors.primaryPink.opacity(glowOpacity), radius: 15, x: 0, y: 5)
-                    .scaleEffect(breatheScale)
+                    .scaleEffect(isAnimating && !reduceMotion ? 1.08 : 1)
+                    .shadow(color: MonicaColors.primaryPink.opacity(0.35), radius: 10, y: 4)
             }
-            
-            // 加载文字 - 带呼吸效果
-            Text(message)
-                .font(.system(size: 16, weight: .medium))
-                .foregroundColor(MonicaColors.mediumText)
-                .opacity(opacity)
-                .scaleEffect(breatheScale)
+
+            VStack(spacing: 6) {
+                Text(title)
+                    .font(.headline)
+                    .foregroundStyle(.primary)
+
+                Text(message)
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(MonicaColors.primaryPink)
+
+                if let detail {
+                    Text(detail)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                }
+            }
+
+            if let estimatedSeconds {
+                TimelineView(.periodic(from: startedAt, by: 1)) { context in
+                    HStack(spacing: 12) {
+                        Label(
+                            "通常约 \(estimatedSeconds.lowerBound)–\(estimatedSeconds.upperBound) 秒".appLocalized,
+                            systemImage: "clock"
+                        )
+                        Text("已等待 \(max(0, Int(context.date.timeIntervalSince(startedAt)))) 秒".appLocalized)
+                            .monospacedDigit()
+                    }
+                    .font(.caption2.weight(.medium))
+                    .foregroundStyle(.secondary)
+                }
+            }
+
+            HStack(spacing: 7) {
+                ForEach(0..<3, id: \.self) { index in
+                    Circle()
+                        .fill(MonicaColors.primaryPink)
+                        .frame(width: 6, height: 6)
+                        .scaleEffect(isAnimating && !reduceMotion ? 1 : 0.55)
+                        .opacity(isAnimating && !reduceMotion ? 1 : 0.35)
+                        .animation(
+                            reduceMotion
+                                ? nil
+                                : .easeInOut(duration: 0.55)
+                                    .repeatForever(autoreverses: true)
+                                    .delay(Double(index) * 0.16),
+                            value: isAnimating
+                        )
+                }
+            }
         }
         .onAppear {
-            // 旋转动画
-            withAnimation(.linear(duration: 1.5).repeatForever(autoreverses: false)) {
-                rotation = 360
-            }
-            
-            // 脉冲缩放动画
-            withAnimation(.easeInOut(duration: 1).repeatForever(autoreverses: true)) {
-                scale = 1.1
-            }
-            
-            // 文字闪烁动画
-            withAnimation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true)) {
-                opacity = 0.6
-            }
-            
-            // 呼吸动画 - 整体缩放
-            withAnimation(.easeInOut(duration: 2).repeatForever(autoreverses: true)) {
-                breatheScale = 1.08
-            }
-            
-            // 发光呼吸动画
+            startedAt = Date()
             withAnimation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true)) {
-                glowOpacity = 0.8
+                isAnimating = true
+            }
+            withAnimation(.spring(response: 1.35, dampingFraction: 0.78).repeatForever(autoreverses: false)) {
+                ringRotation = 360
             }
         }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel([title, message, detail].compactMap { $0 }.joined(separator: "，"))
     }
 }
 
 // MARK: - 分享加载遮罩
 struct ShareLoadingOverlay: View {
     let message: String
-    
+    var title: String = "正在努力处理中".appLocalized
+    var detail: String?
+    var estimatedSeconds: ClosedRange<Int>?
+    var systemImage: String = "pawprint.fill"
+
     var body: some View {
         ZStack {
-            // 半透明背景
-            Color.black.opacity(0.4)
+            Color.black.opacity(0.32)
                 .ignoresSafeArea()
-            
-            // 加载内容
-            VStack(spacing: 24) {
-                CatPawLoadingView(message: message)
-            }
-            .padding(40)
-            .background(
-                RoundedRectangle(cornerRadius: 20)
-                    .fill(.ultraThinMaterial)
-                    .shadow(color: Color.black.opacity(0.2), radius: 20, x: 0, y: 10)
+
+            CatPawLoadingView(
+                message: message,
+                title: title,
+                detail: detail,
+                estimatedSeconds: estimatedSeconds,
+                systemImage: systemImage
             )
+            .frame(maxWidth: 300)
+            .padding(.horizontal, 28)
+            .padding(.vertical, 30)
+            .background(
+                RoundedRectangle(cornerRadius: 28, style: .continuous)
+                    .fill(.regularMaterial)
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 28, style: .continuous)
+                            .stroke(Color.white.opacity(0.45), lineWidth: 1)
+                    }
+                    .shadow(color: Color.black.opacity(0.18), radius: 24, y: 12)
+            )
+            .padding(.horizontal, 30)
         }
         .transition(.opacity)
     }

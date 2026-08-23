@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import WebKit
 
 private enum DreamDressScrollRange: Equatable {
   case top
@@ -17,6 +18,19 @@ private enum DreamDressScrollRange: Equatable {
   }
 }
 
+enum DreamDressResultFilter: String, CaseIterable, Identifiable {
+  case unsold = "未售出"
+  case sold = "已售出"
+  case unverified = "未验证"
+
+  var id: Self { self }
+
+  func includes(_ candidate: DreamDressCandidate, verifiedIDs: Set<String>) -> Bool {
+    guard verifiedIDs.contains(candidate.id) else { return self == .unverified }
+    return self == (candidate.availability == .sold ? .sold : .unsold)
+  }
+}
+
 struct DreamDressDetectiveView: View {
   @State private var brandName = ""
   @State private var productName = ""
@@ -30,9 +44,18 @@ struct DreamDressDetectiveView: View {
   @State private var isFromCache = false
   @State private var errorMessage: String?
   @State private var isSearchCollapsed = false
-  @State private var areUnverifiedCandidatesExpanded = false
+  @State private var resultFilter: DreamDressResultFilter = .unsold
+  @State private var hasMoreCandidates = false
+  @State private var isLoadingMoreCandidates = false
+  @State private var investigationID = UUID()
+  @State private var investigationTask: Task<Void, Never>?
+  @State private var loadMoreTask: Task<Void, Never>?
+  @State private var scrollTargetCandidateID: String?
+  @State private var newCandidateNoticeTask: Task<Void, Never>?
+  @State private var newCandidateNoticeCount = 0
+  @State private var isNewCandidateNoticeExpanded = false
 
-  @ScaledMetric(relativeTo: .body) private var expandedSearchHeight: CGFloat = 326
+  @ScaledMetric(relativeTo: .body) private var expandedSearchHeight: CGFloat = 354
 
   private var input: DreamDressDetectiveInput {
     DreamDressDetectiveInput(
@@ -64,27 +87,56 @@ struct DreamDressDetectiveView: View {
         .accessibilityHidden(!isSearchCollapsed)
         .animation(.easeOut(duration: 0.16), value: isSearchCollapsed)
         .zIndex(2)
+
+      if isInvestigating && foundCount > 0 {
+        DreamDressSearchProgressPill(
+          newCandidateCount: newCandidateNoticeCount,
+          isExpanded: isNewCandidateNoticeExpanded
+        )
+        .padding(.horizontal, 20)
+        .padding(.top, 66)
+        .zIndex(3)
+      }
     }
     .overlay {
-      if isInvestigating {
-        ShareLoadingOverlay(message: phase.rawValue)
+      if isInvestigating && foundCount == 0 {
+        ShareLoadingOverlay(
+          message: phase.rawValue,
+          title: "小侦探正在搜索".appLocalized,
+          detail: "正在核对商品页面、价格与图片，请稍候。".appLocalized,
+          estimatedSeconds: 20...60,
+          systemImage: "magnifyingglass"
+        )
       }
     }
   }
 
-  @ViewBuilder
   private var detectiveScrollView: some View {
-    if #available(iOS 18.0, *) {
-      detectiveScrollViewBody
-        .onScrollGeometryChange(for: DreamDressScrollRange.self) { geometry in
-          DreamDressScrollRange(
-            distance: geometry.contentOffset.y + geometry.contentInsets.top
-          )
-        } action: { _, range in
-          handleScrollRange(range)
+    ScrollViewReader { proxy in
+      Group {
+        if #available(iOS 18.0, *) {
+          detectiveScrollViewBody
+            .onScrollGeometryChange(for: DreamDressScrollRange.self) { geometry in
+              DreamDressScrollRange(
+                distance: geometry.contentOffset.y + geometry.contentInsets.top
+              )
+            } action: { _, range in
+              handleScrollRange(range)
+            }
+        } else {
+          detectiveScrollViewBody
         }
-    } else {
-      detectiveScrollViewBody
+      }
+      .onChange(of: scrollTargetCandidateID) { _, candidateID in
+        guard let candidateID else { return }
+        Task { @MainActor in
+          await Task.yield()
+          withAnimation(.easeOut(duration: 0.25)) {
+            proxy.scrollTo(candidateID, anchor: .center)
+          }
+          scrollTargetCandidateID = nil
+        }
+      }
     }
   }
 
@@ -112,8 +164,12 @@ struct DreamDressDetectiveView: View {
             cachedAt: cachedAt,
             sourceUpdatedAt: sourceUpdatedAt,
             isFromCache: isFromCache,
-            areUnverifiedCandidatesExpanded: $areUnverifiedCandidatesExpanded,
-            onRefresh: { startInvestigation(forceRefresh: true) }
+            filter: resultFilter,
+            hasMore: hasMoreCandidates,
+            isLoadingMore: isLoadingMoreCandidates,
+            onRefresh: { startInvestigation(forceRefresh: true) },
+            onLoadMore: loadMoreCandidates,
+            onCandidateUpdated: updateCandidate
           )
         }
       }
@@ -147,25 +203,29 @@ struct DreamDressDetectiveView: View {
 
   private var compactSearchChrome: some View {
     GlassCard(cornerRadius: 18, padding: 10) {
-      HStack(spacing: 10) {
-        Image(systemName: "magnifyingglass")
-          .foregroundStyle(Color.pink)
-
-        VStack(alignment: .leading, spacing: 1) {
-          Text("梦裙侦探".appLocalized)
-            .font(.subheadline.weight(.semibold))
-          Text(compactSearchSummary)
-            .font(.caption)
-            .foregroundStyle(.secondary)
-            .lineLimit(1)
+      if phase == .completed && foundCount > 0 {
+        Picker("筛选候选".appLocalized, selection: $resultFilter) {
+          ForEach(DreamDressResultFilter.allCases) { filter in
+            Text(filter.rawValue.appLocalized).tag(filter)
+          }
         }
-
-        Spacer(minLength: 8)
-
-        if foundCount > 0 {
-          Text("\(foundCount)候选 · \(candidates.count)有效")
-            .font(.caption2.weight(.semibold))
+        .pickerStyle(.segmented)
+        .accessibilityIdentifier("dreamDressDetective.resultFilter")
+      } else {
+        HStack(spacing: 10) {
+          Image(systemName: "magnifyingglass")
             .foregroundStyle(Color.pink)
+
+          VStack(alignment: .leading, spacing: 1) {
+            Text("梦裙侦探".appLocalized)
+              .font(.subheadline.weight(.semibold))
+            Text(compactSearchSummary)
+              .font(.caption)
+              .foregroundStyle(.secondary)
+              .lineLimit(1)
+          }
+
+          Spacer(minLength: 8)
         }
       }
     }
@@ -195,10 +255,22 @@ struct DreamDressDetectiveView: View {
 
   private func startInvestigation(forceRefresh: Bool = false) {
     UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
-    Task { await investigate(forceRefresh: forceRefresh) }
+    investigationTask?.cancel()
+    loadMoreTask?.cancel()
+    newCandidateNoticeTask?.cancel()
+    isNewCandidateNoticeExpanded = false
+    let rawURL = productURL.trimmingCharacters(in: .whitespacesAndNewlines)
+    if !rawURL.isEmpty, let normalizedURL = DreamDressDetectiveService.productURL(from: rawURL) {
+      productURL = normalizedURL.absoluteString
+    }
+    let requestID = UUID()
+    investigationID = requestID
+    investigationTask = Task {
+      await investigate(forceRefresh: forceRefresh, requestID: requestID)
+    }
   }
 
-  private func investigate(forceRefresh: Bool) async {
+  private func investigate(forceRefresh: Bool, requestID: UUID) async {
     if !forceRefresh {
       allCandidates = []
       candidates = []
@@ -206,29 +278,121 @@ struct DreamDressDetectiveView: View {
       cachedAt = nil
       sourceUpdatedAt = nil
       isFromCache = false
+      hasMoreCandidates = false
     }
+    isLoadingMoreCandidates = false
     errorMessage = nil
-    areUnverifiedCandidatesExpanded = false
+    if !forceRefresh { resultFilter = .unsold }
     phase = productURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
       ? .planning
       : .fetching
 
     do {
-      let result = try await DreamDressDetectiveService.shared.investigate(
+      let page = try await DreamDressDetectiveService.shared.investigatePage(
         input,
-        forceRefresh: forceRefresh
+        requestedCount: DreamDressPagination.pageSize,
+        forceRefresh: forceRefresh,
+        onCandidatesFound: { discovered in
+          guard requestID == investigationID else { return }
+          applyDiscovered(discovered)
+        }
       )
-      foundCount = result.foundCount
-      allCandidates = result.allCandidates
-      candidates = result.validCandidates
-      cachedAt = result.cachedAt
-      sourceUpdatedAt = result.sourceUpdatedAt
-      isFromCache = result.isFromCache
+      guard requestID == investigationID else { return }
+      apply(page)
       phase = .completed
     } catch {
+      guard requestID == investigationID else { return }
       phase = .idle
       errorMessage = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
     }
+  }
+
+  private func loadMoreCandidates() {
+    guard phase == .completed, hasMoreCandidates, !isLoadingMoreCandidates else { return }
+    let requestedInput = input
+    let requestedCount = foundCount + DreamDressPagination.pageSize
+    let requestID = investigationID
+    isLoadingMoreCandidates = true
+    loadMoreTask = Task {
+      defer {
+        if requestID == investigationID {
+          isLoadingMoreCandidates = false
+          loadMoreTask = nil
+        }
+      }
+      do {
+        let page = try await DreamDressDetectiveService.shared.investigatePage(
+          requestedInput,
+          requestedCount: requestedCount,
+          onCandidatesFound: { discovered in
+            guard requestID == investigationID, requestedInput == input else { return }
+            applyDiscovered(discovered)
+          }
+        )
+        guard requestID == investigationID, requestedInput == input else { return }
+        apply(page)
+      } catch {
+        guard requestID == investigationID else { return }
+        errorMessage = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+      }
+    }
+  }
+
+  private func apply(_ page: DreamDressInvestigationPage) {
+    let result = page.result
+    foundCount = result.foundCount
+    allCandidates = result.allCandidates
+    candidates = result.validCandidates
+    cachedAt = result.cachedAt
+    sourceUpdatedAt = result.sourceUpdatedAt
+    isFromCache = result.isFromCache
+    hasMoreCandidates = page.hasMore
+  }
+
+  private func applyDiscovered(_ discovered: [DreamDressCandidate]) {
+    let previousIDs = Set(allCandidates.map(\.id))
+    let existing = Dictionary(uniqueKeysWithValues: allCandidates.map { ($0.id, $0) })
+    allCandidates = discovered.map { incoming in
+      guard let current = existing[incoming.id] else { return incoming }
+      return current.enriched(
+        imageURL: incoming.imageURL,
+        availability: incoming.availability == .unknown ? current.availability : incoming.availability,
+        brand: incoming.brand,
+        category: incoming.category,
+        price: incoming.price,
+        details: incoming.details
+      )
+    }
+    let currentIDs = Set(allCandidates.map(\.id))
+    candidates.removeAll { !currentIDs.contains($0.id) }
+    foundCount = allCandidates.count
+    let addedCount = currentIDs.subtracting(previousIDs).count
+    if addedCount > 0 { showNewCandidateNotice(count: addedCount) }
+  }
+
+  private func showNewCandidateNotice(count: Int) {
+    newCandidateNoticeTask?.cancel()
+    newCandidateNoticeCount = count
+    isNewCandidateNoticeExpanded = true
+    newCandidateNoticeTask = Task {
+      try? await Task.sleep(nanoseconds: 2_200_000_000)
+      guard !Task.isCancelled else { return }
+      isNewCandidateNoticeExpanded = false
+    }
+  }
+
+  private func updateCandidate(_ updated: DreamDressCandidate) {
+    guard let index = allCandidates.firstIndex(where: { $0.id == updated.id }) else { return }
+    allCandidates[index] = updated
+
+    if let validIndex = candidates.firstIndex(where: { $0.id == updated.id }) {
+      candidates[validIndex] = updated
+    } else if updated.imageURL != nil {
+      candidates.append(updated)
+      let order = Dictionary(uniqueKeysWithValues: allCandidates.enumerated().map { ($0.element.id, $0.offset) })
+      candidates.sort { order[$0.id, default: .max] < order[$1.id, default: .max] }
+    }
+    scrollTargetCandidateID = updated.id
   }
 
 }
@@ -273,7 +437,7 @@ private struct DreamDressDetectiveInputSection: View {
 
           PasteButton(payloadType: String.self) { values in
             if let value = values.first {
-              productURL = value
+              productURL = DreamDressDetectiveService.productURL(from: value)?.absoluteString ?? value
             }
           }
           .labelStyle(.iconOnly)
@@ -321,6 +485,39 @@ private struct DreamDressDetectiveActionSection: View {
   }
 }
 
+private struct DreamDressSearchProgressPill: View {
+  let newCandidateCount: Int
+  let isExpanded: Bool
+
+  var body: some View {
+    HStack(spacing: 8) {
+      ProgressView()
+        .controlSize(.small)
+        .tint(.pink)
+
+      if isExpanded {
+        Text("发现 \(newCandidateCount) 个新商品，向下滑查看".appLocalized)
+          .font(.caption.weight(.semibold))
+          .foregroundStyle(Color.pink)
+          .lineLimit(1)
+          .transition(.opacity.combined(with: .move(edge: .trailing)))
+      }
+    }
+    .padding(.horizontal, isExpanded ? 14 : 12)
+    .frame(height: 42)
+    .background(.regularMaterial, in: Capsule())
+    .overlay(Capsule().stroke(Color.pink.opacity(0.35), lineWidth: 1))
+    .shadow(color: Color.black.opacity(0.08), radius: 8, y: 3)
+    .frame(maxWidth: .infinity, alignment: .trailing)
+    .animation(.spring(response: 0.3, dampingFraction: 0.85), value: isExpanded)
+    .accessibilityLabel(
+      isExpanded
+        ? "发现 \(newCandidateCount) 个新商品，向下滑查看".appLocalized
+        : "小侦探正在搜索".appLocalized
+    )
+  }
+}
+
 private struct DreamDressDetectiveErrorCard: View {
   let message: String
 
@@ -340,30 +537,39 @@ private struct DreamDressDetectiveResultsSection: View {
   let cachedAt: Date?
   let sourceUpdatedAt: Date?
   let isFromCache: Bool
-  @Binding var areUnverifiedCandidatesExpanded: Bool
+  let filter: DreamDressResultFilter
+  let hasMore: Bool
+  let isLoadingMore: Bool
   let onRefresh: () -> Void
+  let onLoadMore: () -> Void
+  let onCandidateUpdated: (DreamDressCandidate) -> Void
 
-  private var unverifiedCandidates: [DreamDressCandidate] {
-    let validIDs = Set(validCandidates.map(\.id))
-    return allCandidates.filter { !validIDs.contains($0.id) }
+  private var verifiedIDs: Set<String> {
+    Set(validCandidates.map(\.id))
+  }
+
+  private var filteredCandidates: [DreamDressCandidate] {
+    allCandidates.filter { filter.includes($0, verifiedIDs: verifiedIDs) }
   }
 
   var body: some View {
     LazyVStack(alignment: .leading, spacing: 10) {
       HStack(alignment: .firstTextBaseline, spacing: 8) {
-        Text("找到 \(foundCount) 个候选，\(validCandidates.count) 个有效".appLocalized)
+        Text("找到 \(foundCount) 个候选，\(validCandidates.count) 个图片已验证".appLocalized)
           .font(.system(.title3, design: .serif).weight(.semibold))
         Spacer(minLength: 4)
         Button(action: onRefresh) {
-          Label("刷新".appLocalized, systemImage: "arrow.clockwise")
+          Label("重新侦查".appLocalized, systemImage: "arrow.clockwise")
         }
         .font(.caption.weight(.semibold))
+        .fixedSize(horizontal: true, vertical: false)
         .buttonStyle(.bordered)
         .buttonBorderShape(.capsule)
+        .disabled(isLoadingMore)
         .accessibilityIdentifier("dreamDressDetective.refresh")
       }
 
-      Text("已验证商品优先展示；可展开查看图片未验证的候选。".appLocalized)
+      Text("图片已验证商品优先展示；其余候选来自公开索引，可能过期。".appLocalized)
         .font(.caption)
         .foregroundStyle(.secondary)
 
@@ -383,50 +589,60 @@ private struct DreamDressDetectiveResultsSection: View {
           .foregroundStyle(.secondary)
       }
 
-      ForEach(validCandidates) { candidate in
-        DreamDressDetectiveCandidateCard(candidate: candidate, isImageVerified: true)
+      if filteredCandidates.isEmpty {
+        Text("暂无\(filter.rawValue)候选".appLocalized)
+          .font(.subheadline)
+          .foregroundStyle(.secondary)
+          .frame(maxWidth: .infinity)
+          .padding(.vertical, 24)
+      } else {
+        ForEach(filteredCandidates) { candidate in
+          DreamDressDetectiveCandidateCard(
+            candidate: candidate,
+            isImageVerified: verifiedIDs.contains(candidate.id),
+            onCandidateUpdated: onCandidateUpdated
+          )
+            .id(candidate.id)
+            .onAppear { prefetchIfNeeded(candidateID: candidate.id) }
+        }
       }
 
-      if !unverifiedCandidates.isEmpty {
-        Button {
-          areUnverifiedCandidatesExpanded.toggle()
-        } label: {
-          HStack {
-            Label(
-              areUnverifiedCandidatesExpanded
-                ? "收起未验证候选".appLocalized
-                : "查看 \(unverifiedCandidates.count) 个未验证候选".appLocalized,
-              systemImage: "shippingbox"
-            )
-            Spacer()
-            Image(systemName: areUnverifiedCandidatesExpanded ? "chevron.up" : "chevron.down")
-          }
-          .font(.subheadline.weight(.semibold))
-          .frame(maxWidth: .infinity)
-          .padding(.vertical, 10)
+      if isLoadingMore {
+        HStack(spacing: 8) {
+          ProgressView()
+          Text("后台继续查找…".appLocalized)
+            .font(.caption)
+            .foregroundStyle(.secondary)
         }
-        .buttonStyle(.bordered)
-        .buttonBorderShape(.capsule)
-        .tint(Color.pink)
-        .accessibilityIdentifier("dreamDressDetective.unverifiedCandidates")
-
-        if areUnverifiedCandidatesExpanded {
-          ForEach(unverifiedCandidates) { candidate in
-            DreamDressDetectiveCandidateCard(candidate: candidate, isImageVerified: false)
-          }
-        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 8)
+        .accessibilityIdentifier("dreamDressDetective.loadingMore")
       }
     }
+  }
+
+  private func prefetchIfNeeded(candidateID: String) {
+    guard let visibleIndex = allCandidates.firstIndex(where: { $0.id == candidateID }) else { return }
+    guard hasMore,
+          DreamDressPagination.shouldPrefetch(
+            visibleIndex: visibleIndex,
+            totalCount: allCandidates.count
+          )
+    else { return }
+    onLoadMore()
   }
 }
 
 private struct DreamDressDetectiveCandidateCard: View {
   let candidate: DreamDressCandidate
   let isImageVerified: Bool
+  let onCandidateUpdated: (DreamDressCandidate) -> Void
   @Environment(\.modelContext) private var modelContext
-  @State private var isAddingToWardrobe = false
   @State private var wardrobeDraft: ClothingEditDraft?
   @State private var isShowingWardrobeCreation = false
+  @State private var isShowingWebVerification = false
+  @State private var remoteImage: UIImage?
+  @State private var isLoadingImage = false
 
   var body: some View {
     GlassCard(cornerRadius: 16, padding: 14) {
@@ -464,6 +680,17 @@ private struct DreamDressDetectiveCandidateCard: View {
             .foregroundStyle(.orange)
         }
 
+        if candidate.imageURL == nil || candidate.price == nil {
+          Button {
+            isShowingWebVerification = true
+          } label: {
+            Label("验证网页以获取图片和价格".appLocalized, systemImage: "hand.draw")
+          }
+          .font(.caption.weight(.semibold))
+          .buttonStyle(.bordered)
+          .buttonBorderShape(.capsule)
+        }
+
         Link(destination: candidate.sourceURL) {
           Label(candidate.sourceURL.absoluteString, systemImage: "arrow.up.right.square")
             .font(.caption)
@@ -471,17 +698,16 @@ private struct DreamDressDetectiveCandidateCard: View {
         }
 
         Button {
-          Task { await addToWardrobe() }
+          addToWardrobe()
         } label: {
           Label(
-            isAddingToWardrobe ? "准备图片…".appLocalized : "用此商品创建裙装".appLocalized,
+            "用此商品创建裙装".appLocalized,
             systemImage: "plus.circle.fill"
           )
           .frame(maxWidth: .infinity)
         }
         .buttonStyle(.borderedProminent)
         .buttonBorderShape(.capsule)
-        .disabled(isAddingToWardrobe)
         .accessibilityIdentifier("dreamDressDetective.addToWardrobe")
       }
     }
@@ -496,18 +722,22 @@ private struct DreamDressDetectiveCandidateCard: View {
         }
       }
     }
+    .sheet(isPresented: $isShowingWebVerification) {
+      DreamDressWebVerificationSheet(candidate: candidate, onCompleted: onCandidateUpdated)
+    }
   }
 
   @ViewBuilder
   private var candidateImage: some View {
     if let imageURL = candidate.imageURL {
-      AsyncImage(url: imageURL) { phase in
-        switch phase {
-        case .success(let image):
-          image.resizable().scaledToFill()
-        case .empty:
+      Group {
+        if let remoteImage {
+          Image(uiImage: remoteImage)
+            .resizable()
+            .scaledToFill()
+        } else if isLoadingImage {
           ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
-        default:
+        } else {
           imagePlaceholder
         }
       }
@@ -515,6 +745,14 @@ private struct DreamDressDetectiveCandidateCard: View {
       .frame(height: 190)
       .clipped()
       .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+      .task(id: imageURL) {
+        isLoadingImage = true
+        remoteImage = await DreamDressDetectiveService.shared.productImage(
+          at: imageURL,
+          referer: candidate.sourceURL
+        )
+        isLoadingImage = false
+      }
     } else {
       imagePlaceholder
         .frame(maxWidth: .infinity)
@@ -554,38 +792,32 @@ private struct DreamDressDetectiveCandidateCard: View {
     }
   }
 
-  @MainActor
-  private func addToWardrobe() async {
-    isAddingToWardrobe = true
-    let image: UIImage?
-    if let imageURL = candidate.imageURL,
-       let (data, response) = try? await URLSession.shared.data(from: imageURL),
-       data.count <= 12_000_000,
-       (response as? HTTPURLResponse)?.statusCode == 200 {
-      image = UIImage(data: data)
-    } else {
-      image = nil
-    }
-
-    let imagePaths = image.flatMap { ImageManager.shared.saveImage($0, context: modelContext) }.map { [$0] } ?? []
-    let amount = candidate.price.flatMap(Self.priceAmount) ?? 0
-    let isJPY = candidate.price?.uppercased().contains("JPY") == true
+  private func addToWardrobe() {
+    let imagePaths = remoteImage.flatMap { ImageManager.shared.saveImage($0, context: modelContext) }.map { [$0] } ?? []
+    let amount = candidate.price.flatMap(DreamDressDetectiveService.priceAmount) ?? 0
+    let currency = candidate.price.flatMap {
+      DreamDressDetectiveService.priceCurrency(for: $0, sourceURL: candidate.sourceURL)
+    } ?? .cny
+    let details = candidate.details ?? DreamDressProductDetails.extract(
+      from: candidate.title,
+      category: candidate.category
+    )
     let now = Date()
     let draft = ClothingEditDraft(
       name: candidate.title,
       brandName: candidate.brand ?? "",
       types: Self.wardrobeType(for: candidate),
-      colors: "",
-      sizes: "",
-      length: "",
-      condition: "",
-      accessories: "",
+      colors: details?.colors.joined(separator: ", ") ?? "",
+      sizes: details?.sizes.joined(separator: ", ") ?? "",
+      length: details?.length ?? "",
+      condition: details?.condition ?? "",
+      accessories: details?.accessories.joined(separator: ", ") ?? "",
       imagePaths: imagePaths,
       isShared: false,
-      originalPrice: isJPY ? 0 : amount,
-      originalPriceJPY: isJPY ? amount : nil,
-      originalPriceCurrencyCode: isJPY ? ClothingPriceCurrency.jpy.rawValue : ClothingPriceCurrency.cny.rawValue,
-      priceTotal: 0,
+      originalPrice: currency == .cny ? amount : 0,
+      originalPriceJPY: currency == .jpy ? amount : nil,
+      originalPriceCurrencyCode: currency.rawValue,
+      priceTotal: currency == .cny ? amount : 0,
       deposit: 0,
       balance: 0,
       accessoriesPrice: 0,
@@ -599,19 +831,17 @@ private struct DreamDressDetectiveCandidateCard: View {
       note: "商品链接：\(candidate.sourceURL.absoluteString)\n检索状态：\(candidate.availability.rawValue)",
       accessoryList: []
     )
-    isAddingToWardrobe = false
     wardrobeDraft = draft
     isShowingWardrobeCreation = true
   }
 
-  private static func priceAmount(_ value: String) -> Double? {
-    guard let range = value.range(of: #"\d+(?:\.\d+)?"#, options: .regularExpression) else { return nil }
-    return Double(value[range])
-  }
-
   private static func wardrobeType(for candidate: DreamDressCandidate) -> String {
+    if let types = candidate.details?.types, !types.isEmpty {
+      return types.joined(separator: ", ")
+    }
     if let category = candidate.category?.trimmingCharacters(in: .whitespacesAndNewlines), !category.isEmpty {
-      return category.uppercased()
+      let inferred = DreamDressProductDetails.extract(from: category, category: category)?.types ?? []
+      return inferred.isEmpty ? category.uppercased() : inferred.joined(separator: ", ")
     }
     let title = candidate.title.lowercased()
     for token in ["jsk", "op", "sk"] where title.range(of: "(?<![a-z])\(token)(?![a-z])", options: .regularExpression) != nil {
@@ -621,6 +851,130 @@ private struct DreamDressDetectiveCandidateCard: View {
     if title.contains("包") || title.contains("bag") { return "包" }
     if title.contains("丝带") || title.contains("蝴蝶结") || title.contains("ribbon") { return "小物" }
     return "裙装"
+  }
+}
+
+private struct DreamDressWebVerificationSheet: View {
+  @Environment(\.dismiss) private var dismiss
+  let candidate: DreamDressCandidate
+  let onCompleted: (DreamDressCandidate) -> Void
+  @State private var captureRequestID: UUID?
+  @State private var isCapturing = false
+  @State private var errorMessage: String?
+
+  var body: some View {
+    NavigationStack {
+      DreamDressWebVerificationView(
+        url: DreamDressDynamicPageLoader.renderURL(for: candidate.sourceURL),
+        captureRequestID: captureRequestID,
+        onCapture: finishCapture
+      )
+        .navigationTitle("验证商品网页".appLocalized)
+        .navigationBarTitleDisplayMode(.inline)
+        .safeAreaInset(edge: .bottom) {
+          if let errorMessage {
+            Text(errorMessage)
+              .font(.caption)
+              .foregroundStyle(.red)
+              .padding(.horizontal)
+              .padding(.vertical, 8)
+              .frame(maxWidth: .infinity)
+              .background(.regularMaterial)
+          }
+        }
+        .toolbar {
+          ToolbarItem(placement: .confirmationAction) {
+            Button {
+              errorMessage = nil
+              isCapturing = true
+              captureRequestID = UUID()
+            } label: {
+              if isCapturing {
+                ProgressView()
+              } else {
+                Text("读取当前网页".appLocalized)
+              }
+            }
+            .disabled(isCapturing)
+          }
+        }
+    }
+  }
+
+  private func finishCapture(_ page: DreamDressRenderedPage?) {
+    isCapturing = false
+    guard let page else {
+      errorMessage = "暂未读取到商品信息，请等待网页加载完成后重试。".appLocalized
+      return
+    }
+    let updated = candidate.enrichedFromRenderedPage(
+      imageURL: page.imageURL,
+      availability: page.availability,
+      price: DreamDressDetectiveService.price(in: page.visibleText),
+      details: DreamDressProductDetails.extract(
+        from: "\(page.title ?? candidate.title) \(String(page.visibleText.prefix(2_000)))",
+        category: candidate.category
+      )
+    )
+    onCompleted(updated)
+    dismiss()
+  }
+}
+
+private struct DreamDressWebVerificationView: UIViewRepresentable {
+  let url: URL
+  let captureRequestID: UUID?
+  let onCapture: (DreamDressRenderedPage?) -> Void
+
+  func makeCoordinator() -> Coordinator { Coordinator(onCapture: onCapture) }
+
+  func makeUIView(context: Context) -> WKWebView {
+    let configuration = WKWebViewConfiguration()
+    configuration.websiteDataStore = .default()
+    configuration.defaultWebpagePreferences.allowsContentJavaScript = true
+    configuration.userContentController.addUserScript(WKUserScript(
+      source: DreamDressDynamicPageLoader.networkCaptureScript,
+      injectionTime: .atDocumentStart,
+      forMainFrameOnly: false
+    ))
+    let webView = WKWebView(frame: .zero, configuration: configuration)
+    webView.navigationDelegate = context.coordinator
+    webView.customUserAgent = DreamDressDetectiveService.browserUserAgent
+    webView.load(URLRequest(url: url))
+    return webView
+  }
+
+  func updateUIView(_ webView: WKWebView, context: Context) {
+    guard let captureRequestID,
+          captureRequestID != context.coordinator.lastCaptureRequestID else { return }
+    context.coordinator.lastCaptureRequestID = captureRequestID
+    webView.evaluateJavaScript(DreamDressDynamicPageLoader.pageCaptureScript) { value, _ in
+      context.coordinator.onCapture(
+        DreamDressDynamicPageLoader.parseCapture(value, finalURL: webView.url)
+      )
+    }
+  }
+
+  final class Coordinator: NSObject, WKNavigationDelegate {
+    var lastCaptureRequestID: UUID?
+    let onCapture: (DreamDressRenderedPage?) -> Void
+
+    init(onCapture: @escaping (DreamDressRenderedPage?) -> Void) {
+      self.onCapture = onCapture
+    }
+
+    func webView(
+      _ webView: WKWebView,
+      decidePolicyFor navigationAction: WKNavigationAction,
+      decisionHandler: @escaping @MainActor @Sendable (WKNavigationActionPolicy) -> Void
+    ) {
+      guard let url = navigationAction.request.url,
+            DreamDressDetectiveService.isAllowedHTTPSURL(url) else {
+        decisionHandler(.cancel)
+        return
+      }
+      decisionHandler(.allow)
+    }
   }
 }
 

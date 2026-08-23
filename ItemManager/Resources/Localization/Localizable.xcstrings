@@ -6485,16 +6485,6 @@
         }
       }
     },
-    "%lld候选 · %lld有效" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "%1$lld候选 · %2$lld有效"
-          }
-        }
-      }
-    },
     "%lld喵币" : {
       "extractionState" : "stale",
       "localizations" : {
