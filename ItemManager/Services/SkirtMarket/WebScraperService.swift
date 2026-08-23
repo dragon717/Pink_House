@@ -124,91 +124,10 @@ final class WebScraperService {
     // MARK: - 闲鱼抓取
     
     /// 抓取闲鱼搜索结果
-    /// 注意：闲鱼的反爬非常严格，这里提供的是基本框架
     private func scrapeXianyu(keyword: String, page: Int) async -> ScrapingResult {
-        // 构建搜索URL
-        let encodedKeyword = keyword.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? keyword
-        let urlString = "https://s.2.taobao.com/list/?q=\(encodedKeyword)&page=\(page)"
-        
-        guard let url = URL(string: urlString) else {
-            return .failure(.invalidURL)
-        }
-        
-        var request = URLRequest(url: url)
-        request.httpMethod = "GET"
-        request.setValue(randomUserAgent(), forHTTPHeaderField: "User-Agent")
-        request.setValue("text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8", forHTTPHeaderField: "Accept")
-        request.setValue("zh-CN,zh;q=0.9", forHTTPHeaderField: "Accept-Language")
-        
-        do {
-            let (data, response) = try await session.data(for: request)
-            
-            // 检查响应状态
-            guard let httpResponse = response as? HTTPURLResponse else {
-                return .failure(.unknown)
-            }
-            
-            // 处理各种状态码
-            switch httpResponse.statusCode {
-            case 200:
-                // 解析HTML
-                return await parseXianyuHTML(data: data, keyword: keyword)
-            case 403:
-                return .failure(.blocked("IP被禁止访问"))
-            case 429:
-                return .rateLimited(retryAfter: 60)
-            case 503:
-                // 可能是验证码页面
-                if let html = String(data: data, encoding: .utf8),
-                   html.contains("验证码") || html.contains("captcha") {
-                    return .failure(.captchaRequired)
-                }
-                return .failure(.blocked("服务不可用"))
-            default:
-                return .failure(.unknown)
-            }
-            
-        } catch {
-            return .failure(.networkError(error))
-        }
-    }
-    
-    /// 解析闲鱼HTML
-    private func parseXianyuHTML(data: Data, keyword: String) async -> ScrapingResult {
-        // 这里应该使用SwiftSoup或类似库解析HTML
-        // 由于HTML解析比较复杂，这里提供基本框架
-        
-        guard let html = String(data: data, encoding: .utf8) else {
-            return .failure(.parsingError("无法解码HTML"))
-        }
-        
-        // 检查是否需要登录
-        if html.contains("登录") && html.contains("密码") {
-            return .failure(.loginRequired)
-        }
-        
-        // 检查是否被反爬
-        if html.contains("访问过于频繁") || html.contains("系统繁忙") {
-            return .failure(.blocked("访问过于频繁"))
-        }
-        
-        // TODO: 使用正则表达式或HTML解析库提取商品信息
-        // 这里返回模拟数据作为示例
-        var items: [LolitaItem] = []
-        
-        // 模拟解析结果
-        for i in 0..<10 {
-            let item = LolitaItem(
-                platform: .xianyu,
-                platformItemId: "xianyu_\(Int.random(in: 100000...999999))",
-                rawTitle: "\(keyword) \(i+1)号商品",
-                currentPrice: Double.random(in: 100...5000)
-            )
-            item.originalURL = "https://2.taobao.com/item.htm?id=\(item.platformItemId)"
-            items.append(item)
-        }
-        
-        return .success(items)
+        _ = keyword
+        _ = page
+        return .failure(.blocked("闲鱼商品搜索请使用梦裙侦探"))
     }
     
     /// 抓取闲鱼商品详情

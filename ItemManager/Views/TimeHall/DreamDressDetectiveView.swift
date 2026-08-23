@@ -3,6 +3,8 @@ import SwiftData
 import WebKit
 
 private enum DreamDressScrollRange: Equatable {
+  static let collapseDistance: CGFloat = 88
+
   case top
   case middle
   case collapsed
@@ -10,7 +12,7 @@ private enum DreamDressScrollRange: Equatable {
   init(distance: CGFloat) {
     if distance <= 16 {
       self = .top
-    } else if distance >= 88 {
+    } else if distance >= Self.collapseDistance {
       self = .collapsed
     } else {
       self = .middle
@@ -19,6 +21,7 @@ private enum DreamDressScrollRange: Equatable {
 }
 
 enum DreamDressResultFilter: String, CaseIterable, Identifiable {
+  case all = "全部"
   case unsold = "未售出"
   case sold = "已售出"
   case unverified = "未验证"
@@ -26,12 +29,19 @@ enum DreamDressResultFilter: String, CaseIterable, Identifiable {
   var id: Self { self }
 
   func includes(_ candidate: DreamDressCandidate, verifiedIDs: Set<String>) -> Bool {
+    if self == .all { return true }
     guard verifiedIDs.contains(candidate.id) else { return self == .unverified }
     return self == (candidate.availability == .sold ? .sold : .unsold)
   }
 }
 
 struct DreamDressDetectiveView: View {
+  let onOpenTimeHallItem: (TimeHallCommerceItemDTO) -> Void
+
+  init(onOpenTimeHallItem: @escaping (TimeHallCommerceItemDTO) -> Void = { _ in }) {
+    self.onOpenTimeHallItem = onOpenTimeHallItem
+  }
+
   @State private var brandName = ""
   @State private var productName = ""
   @State private var productURL = ""
@@ -44,7 +54,7 @@ struct DreamDressDetectiveView: View {
   @State private var isFromCache = false
   @State private var errorMessage: String?
   @State private var isSearchCollapsed = false
-  @State private var resultFilter: DreamDressResultFilter = .unsold
+  @State private var resultFilter: DreamDressResultFilter = .all
   @State private var hasMoreCandidates = false
   @State private var isLoadingMoreCandidates = false
   @State private var investigationID = UUID()
@@ -141,43 +151,52 @@ struct DreamDressDetectiveView: View {
   }
 
   private var detectiveScrollViewBody: some View {
-    ScrollView {
-      if #unavailable(iOS 18.0) {
-        ScrollViewThresholdObserver { distance in
-          handleScrollRange(DreamDressScrollRange(distance: distance))
-        }
-        .frame(width: 1, height: 1)
-        .opacity(0)
-        .accessibilityHidden(true)
-      }
+    GeometryReader { viewport in
+      ScrollView {
+        VStack(spacing: 0) {
+          if #unavailable(iOS 18.0) {
+            ScrollViewThresholdObserver { distance in
+              handleScrollRange(DreamDressScrollRange(distance: distance))
+            }
+            .frame(width: 1, height: 1)
+            .opacity(0)
+            .accessibilityHidden(true)
+          }
 
-      VStack(alignment: .leading, spacing: 16) {
-        if let errorMessage {
-          DreamDressDetectiveErrorCard(message: errorMessage)
-        }
+          VStack(alignment: .leading, spacing: 16) {
+            if let errorMessage {
+              DreamDressDetectiveErrorCard(message: errorMessage)
+            }
 
-        if foundCount > 0 {
-          DreamDressDetectiveResultsSection(
-            foundCount: foundCount,
-            allCandidates: allCandidates,
-            validCandidates: candidates,
-            cachedAt: cachedAt,
-            sourceUpdatedAt: sourceUpdatedAt,
-            isFromCache: isFromCache,
-            filter: resultFilter,
-            hasMore: hasMoreCandidates,
-            isLoadingMore: isLoadingMoreCandidates,
-            onRefresh: { startInvestigation(forceRefresh: true) },
-            onLoadMore: loadMoreCandidates,
-            onCandidateUpdated: updateCandidate
-          )
+            if foundCount > 0 {
+              DreamDressDetectiveResultsSection(
+                foundCount: foundCount,
+                allCandidates: allCandidates,
+                validCandidates: candidates,
+                cachedAt: cachedAt,
+                sourceUpdatedAt: sourceUpdatedAt,
+                isFromCache: isFromCache,
+                filter: resultFilter,
+                hasMore: hasMoreCandidates,
+                isLoadingMore: isLoadingMoreCandidates,
+                onRefresh: { startInvestigation(forceRefresh: true) },
+                onLoadMore: loadMoreCandidates,
+                onCandidateUpdated: updateCandidate,
+                onOpenTimeHallItem: onOpenTimeHallItem
+              )
+            }
+          }
+          .padding(.horizontal, 20)
+          .padding(.top, expandedSearchHeight)
+          .padding(.bottom, 32)
         }
+        .frame(
+          minHeight: viewport.size.height + DreamDressScrollRange.collapseDistance,
+          alignment: .top
+        )
       }
-      .padding(.horizontal, 20)
-      .padding(.top, expandedSearchHeight)
-      .padding(.bottom, 32)
+      .scrollIndicators(.hidden)
     }
-    .scrollIndicators(.hidden)
   }
 
   private var expandedSearchChrome: some View {
@@ -282,7 +301,7 @@ struct DreamDressDetectiveView: View {
     }
     isLoadingMoreCandidates = false
     errorMessage = nil
-    if !forceRefresh { resultFilter = .unsold }
+    if !forceRefresh { resultFilter = .all }
     phase = productURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
       ? .planning
       : .fetching
@@ -476,7 +495,7 @@ private struct DreamDressDetectiveActionSection: View {
       .disabled(!isEnabled || isInvestigating)
       .accessibilityIdentifier("dreamDressDetective.start")
 
-      if phase != .idle {
+      if phase != .idle && phase != .completed {
         Text(phase.rawValue)
           .font(.caption)
           .foregroundStyle(.secondary)
@@ -543,6 +562,7 @@ private struct DreamDressDetectiveResultsSection: View {
   let onRefresh: () -> Void
   let onLoadMore: () -> Void
   let onCandidateUpdated: (DreamDressCandidate) -> Void
+  let onOpenTimeHallItem: (TimeHallCommerceItemDTO) -> Void
 
   private var verifiedIDs: Set<String> {
     Set(validCandidates.map(\.id))
@@ -573,6 +593,15 @@ private struct DreamDressDetectiveResultsSection: View {
         .font(.caption)
         .foregroundStyle(.secondary)
 
+      if allCandidates.contains(where: { $0.evidenceType == .officialCatalog }) {
+        HStack(spacing: 12) {
+          Link("PINK HOUSE 官网".appLocalized, destination: URL(string: "https://pinkhouse-webshop.jp/")!)
+          Link("官方淘宝店".appLocalized, destination: URL(string: "https://pinkhouse.taobao.com/")!)
+        }
+        .font(.caption.weight(.semibold))
+        .accessibilityIdentifier("dreamDressDetective.officialLinks")
+      }
+
       if let cachedAt {
         Label {
           Text(isFromCache ? "本地缓存 · \(cachedAt.formatted(date: .abbreviated, time: .shortened))" : "更新于 \(cachedAt.formatted(date: .abbreviated, time: .shortened))")
@@ -600,7 +629,8 @@ private struct DreamDressDetectiveResultsSection: View {
           DreamDressDetectiveCandidateCard(
             candidate: candidate,
             isImageVerified: verifiedIDs.contains(candidate.id),
-            onCandidateUpdated: onCandidateUpdated
+            onCandidateUpdated: onCandidateUpdated,
+            onOpenTimeHallItem: onOpenTimeHallItem
           )
             .id(candidate.id)
             .onAppear { prefetchIfNeeded(candidateID: candidate.id) }
@@ -637,6 +667,8 @@ private struct DreamDressDetectiveCandidateCard: View {
   let candidate: DreamDressCandidate
   let isImageVerified: Bool
   let onCandidateUpdated: (DreamDressCandidate) -> Void
+  let onOpenTimeHallItem: (TimeHallCommerceItemDTO) -> Void
+  @ObservedObject private var timeHallStore = TimeHallCatalogStore.shared
   @Environment(\.modelContext) private var modelContext
   @State private var wardrobeDraft: ClothingEditDraft?
   @State private var isShowingWardrobeCreation = false
@@ -655,6 +687,12 @@ private struct DreamDressDetectiveCandidateCard: View {
 
         if let brand = candidate.brand, !brand.isEmpty {
           Label(brand, systemImage: "tag")
+            .font(.subheadline)
+            .foregroundStyle(.secondary)
+        }
+
+        if let category = candidate.category, !category.isEmpty {
+          Label(category, systemImage: "square.grid.2x2")
             .font(.subheadline)
             .foregroundStyle(.secondary)
         }
@@ -695,6 +733,20 @@ private struct DreamDressDetectiveCandidateCard: View {
           Label(candidate.sourceURL.absoluteString, systemImage: "arrow.up.right.square")
             .font(.caption)
             .lineLimit(2)
+        }
+
+        if let timeHallItem = candidate.timeHallCommerceItemID.flatMap({ id in
+          timeHallStore.commerceItems.first(where: { $0.id == id })
+        }) {
+          Button {
+            onOpenTimeHallItem(timeHallItem)
+          } label: {
+            Label("在时光馆查看".appLocalized, systemImage: "clock.arrow.circlepath")
+              .frame(maxWidth: .infinity)
+          }
+          .buttonStyle(.bordered)
+          .buttonBorderShape(.capsule)
+          .accessibilityIdentifier("dreamDressDetective.openTimeHallItem")
         }
 
         Button {
@@ -753,11 +805,15 @@ private struct DreamDressDetectiveCandidateCard: View {
         )
         isLoadingImage = false
       }
+      .allowsHitTesting(false)
+      .accessibilityHidden(true)
     } else {
       imagePlaceholder
         .frame(maxWidth: .infinity)
         .frame(height: 150)
         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
     }
   }
 
@@ -947,20 +1003,85 @@ private struct DreamDressWebVerificationView: UIViewRepresentable {
   func updateUIView(_ webView: WKWebView, context: Context) {
     guard let captureRequestID,
           captureRequestID != context.coordinator.lastCaptureRequestID else { return }
-    context.coordinator.lastCaptureRequestID = captureRequestID
-    webView.evaluateJavaScript(DreamDressDynamicPageLoader.pageCaptureScript) { value, _ in
-      context.coordinator.onCapture(
-        DreamDressDynamicPageLoader.parseCapture(value, finalURL: webView.url)
-      )
-    }
+    context.coordinator.requestCapture(captureRequestID, from: webView)
+  }
+
+  static func dismantleUIView(_ webView: WKWebView, coordinator: Coordinator) {
+    webView.stopLoading()
+    webView.navigationDelegate = nil
   }
 
   final class Coordinator: NSObject, WKNavigationDelegate {
     var lastCaptureRequestID: UUID?
+    private var pendingCaptureRequestID: UUID?
+    private var isPageReady = false
+    private var retryCount = 0
     let onCapture: (DreamDressRenderedPage?) -> Void
 
     init(onCapture: @escaping (DreamDressRenderedPage?) -> Void) {
       self.onCapture = onCapture
+    }
+
+    func requestCapture(_ requestID: UUID, from webView: WKWebView) {
+      lastCaptureRequestID = requestID
+      pendingCaptureRequestID = requestID
+      retryCount = 0
+      if isPageReady {
+        captureIfReady(from: webView)
+      } else if !webView.isLoading {
+        webView.reload()
+      }
+    }
+
+    private func captureIfReady(from webView: WKWebView) {
+      guard isPageReady, let requestID = pendingCaptureRequestID else { return }
+      pendingCaptureRequestID = nil
+      webView.evaluateJavaScript(DreamDressDynamicPageLoader.pageCaptureScript) {
+        [weak self, weak webView] value, error in
+        guard let self else { return }
+        if error != nil, retryCount == 0, let webView {
+          retryCount = 1
+          pendingCaptureRequestID = requestID
+          isPageReady = false
+          webView.reload()
+          return
+        }
+        onCapture(DreamDressDynamicPageLoader.parseCapture(value, finalURL: webView?.url))
+      }
+    }
+
+    func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
+      isPageReady = false
+    }
+
+    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+      isPageReady = true
+      captureIfReady(from: webView)
+    }
+
+    func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: any Error) {
+      finishPendingCapture()
+    }
+
+    func webView(
+      _ webView: WKWebView,
+      didFailProvisionalNavigation navigation: WKNavigation!,
+      withError error: any Error
+    ) {
+      finishPendingCapture()
+    }
+
+    func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
+      isPageReady = false
+      if pendingCaptureRequestID != nil {
+        webView.reload()
+      }
+    }
+
+    private func finishPendingCapture() {
+      guard pendingCaptureRequestID != nil else { return }
+      pendingCaptureRequestID = nil
+      onCapture(nil)
     }
 
     func webView(

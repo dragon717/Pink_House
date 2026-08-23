@@ -32,7 +32,7 @@ enum TaskStatus: String, Codable, CaseIterable {
 
 /// 任务类型
 enum TaskType: String, Codable, CaseIterable {
-    case search = "search"           // 关键词搜索
+    case search = "search"           // 仅供历史存档解码，不再创建或执行
     case detail = "detail"           // 商品详情
     case userItems = "userItems"     // 用户所有商品
     case comment = "comment"       // 采集评论

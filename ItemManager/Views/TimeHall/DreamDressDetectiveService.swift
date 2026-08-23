@@ -13,6 +13,7 @@ enum DreamDressDetectivePhase: String, Equatable {
 }
 
 nonisolated enum DreamDressEvidenceType: String, Codable, Equatable, Sendable {
+    case officialCatalog = "品牌官网"
     case webSearch = "平台搜索"
     case jsonLD = "JSON-LD Product"
     case openGraph = "OpenGraph"
@@ -272,6 +273,7 @@ nonisolated struct DreamDressCandidate: Codable, Identifiable, Equatable, Sendab
     let availability: DreamDressAvailability
     let sourceURL: URL
     let evidenceType: DreamDressEvidenceType
+    let timeHallCommerceItemID: String?
 
     init(
         title: String,
@@ -282,7 +284,8 @@ nonisolated struct DreamDressCandidate: Codable, Identifiable, Equatable, Sendab
         imageURL: URL? = nil,
         availability: DreamDressAvailability = .unknown,
         sourceURL: URL,
-        evidenceType: DreamDressEvidenceType
+        evidenceType: DreamDressEvidenceType,
+        timeHallCommerceItemID: String? = nil
     ) {
         self.title = title
         self.brand = brand
@@ -293,6 +296,7 @@ nonisolated struct DreamDressCandidate: Codable, Identifiable, Equatable, Sendab
         self.availability = availability
         self.sourceURL = sourceURL
         self.evidenceType = evidenceType
+        self.timeHallCommerceItemID = timeHallCommerceItemID
         id = "\(title.lowercased())|\(sourceURL.absoluteString)"
     }
 
@@ -313,7 +317,8 @@ nonisolated struct DreamDressCandidate: Codable, Identifiable, Equatable, Sendab
             imageURL: self.imageURL ?? imageURL,
             availability: availability,
             sourceURL: sourceURL,
-            evidenceType: evidenceType
+            evidenceType: evidenceType,
+            timeHallCommerceItemID: timeHallCommerceItemID
         )
     }
 
@@ -332,7 +337,8 @@ nonisolated struct DreamDressCandidate: Codable, Identifiable, Equatable, Sendab
             imageURL: imageURL ?? self.imageURL,
             availability: availability == .unknown ? self.availability : availability,
             sourceURL: sourceURL,
-            evidenceType: evidenceType
+            evidenceType: evidenceType,
+            timeHallCommerceItemID: timeHallCommerceItemID
         )
     }
 }
@@ -391,7 +397,7 @@ nonisolated enum DreamDressProductMatcher {
         "洛丽塔裙", "洛麗塔裙", "lo裙", "ワンピース", "ジャンパースカート", "スカート",
         "one piece", "one-piece", "jumperskirt",
         "小物", "袜子", "襪子", "ソックス", "靴下", "stocking", "tights", "socks",
-        "包包", "小包", "手提包", "斜挎包", "バッグ", "ポシェット", "handbag", "shoulder bag", "tote bag",
+        "包包", "小包", "手提包", "斜挎包", "大脸包", "兔包", "バッグ", "ポシェット", "handbag", "shoulder bag", "tote bag",
         "丝带", "絲帶", "リボン", "ribbon", "蝴蝶结", "蝴蝶結", "发饰", "髮飾", "ヘアアクセサリー",
         "胸针", "胸針", "brooch", "blouse", "ブラウス", "鞋", "シューズ", "shoes"
     ]
@@ -442,6 +448,7 @@ nonisolated enum DreamDressProductMatcher {
         let pageHasLolita = lolitaTerms.contains(where: pageText.contains)
             || containsLolitaCategoryToken(in: pageText)
             || knownLolitaBrands.contains(where: pageText.contains)
+            || isMatchingGoofishListing && ["大脸包", "兔包"].contains(where: pageText.contains)
         guard pageHasProduct, pageHasLolita else { return false }
 
         let normalizedPageText = normalizedSearchText(pageEvidence)
@@ -482,12 +489,10 @@ nonisolated enum DreamDressHTMLParser {
         if candidates.isEmpty, let fallback = metadataCandidate(in: html, baseURL: baseURL) {
             candidates = [fallback]
         }
-        let metadata = metaAttributes(in: html)
-        let metadataImageURL = metadataImageURL(metadata, baseURL: baseURL)
         let pageAvailability = availability(in: visibleEvidence(from: html))
         return unique(candidates).prefix(5).map { candidate in
             candidate.enriched(
-                imageURL: metadataImageURL,
+                imageURL: nil,
                 availability: resolvedAvailability(candidate.availability, pageAvailability)
             )
         }
@@ -495,7 +500,7 @@ nonisolated enum DreamDressHTMLParser {
 
     static func enrich(_ candidate: DreamDressCandidate, html: String, baseURL: URL) -> DreamDressCandidate {
         let parsed = parse(html: html, baseURL: baseURL)
-        let parsedCandidate = parsed.first
+        let parsedCandidate = matchingCandidate(for: candidate, in: parsed)
         let parsedAvailability = parsed
             .map(\.availability)
             .first(where: { $0 != .unknown }) ?? availability(in: visibleEvidence(from: html))
@@ -510,6 +515,23 @@ nonisolated enum DreamDressHTMLParser {
                 category: parsedCandidate?.category
             )
         )
+    }
+
+    private static func matchingCandidate(
+        for candidate: DreamDressCandidate,
+        in parsed: [DreamDressCandidate]
+    ) -> DreamDressCandidate? {
+        let expectedTitle = DreamDressProductMatcher.normalizedSearchText(candidate.title)
+        if let titleMatch = parsed.first(where: {
+            let title = DreamDressProductMatcher.normalizedSearchText($0.title)
+            return min(expectedTitle.count, title.count) >= 8
+                && (expectedTitle.contains(title) || title.contains(expectedTitle))
+        }) {
+            return titleMatch
+        }
+        return parsed.count == 1
+            && parsed[0].evidenceType != .jsonLD
+            && parsed[0].sourceURL == candidate.sourceURL ? parsed[0] : nil
     }
 
     static func availability(in evidence: String) -> DreamDressAvailability {
@@ -802,26 +824,50 @@ nonisolated enum DreamDressHTMLParser {
     }
 }
 
-struct DreamDressRenderedPage: Sendable {
+nonisolated struct DreamDressRenderedPage: Sendable {
     let title: String?
     let visibleText: String
     let imageURL: URL?
     let availability: DreamDressAvailability
     let finalURL: URL?
+    let goofishSearchItems: [DreamDressGoofishSearchItem]
+    let xiaohongshuSearchItems: [DreamDressXiaohongshuSearchItem]
+    let isBlocked: Bool
 
     init(
         title: String?,
         visibleText: String,
         imageURL: URL?,
         availability: DreamDressAvailability,
-        finalURL: URL? = nil
+        finalURL: URL? = nil,
+        goofishSearchItems: [DreamDressGoofishSearchItem] = [],
+        xiaohongshuSearchItems: [DreamDressXiaohongshuSearchItem] = [],
+        isBlocked: Bool = false
     ) {
         self.title = title
         self.visibleText = visibleText
         self.imageURL = imageURL
         self.availability = availability
         self.finalURL = finalURL
+        self.goofishSearchItems = goofishSearchItems
+        self.xiaohongshuSearchItems = xiaohongshuSearchItems
+        self.isBlocked = isBlocked
     }
+}
+
+nonisolated struct DreamDressGoofishSearchItem: Equatable, Sendable {
+    let itemID: String
+    let title: String
+    let price: String?
+    let imageURL: URL?
+}
+
+nonisolated struct DreamDressXiaohongshuSearchItem: Equatable, Sendable {
+    let noteID: String
+    let title: String
+    let text: String
+    let imageURL: URL?
+    let xsecToken: String?
 }
 
 /// 动态平台只在静态 HTML 缺少图片或状态时渲染；Cookie 仅在 App WebKit 内持久化，不读取 Safari 登录态。
@@ -878,10 +924,22 @@ final class DreamDressDynamicPageLoader: NSObject, WKNavigationDelegate {
     static let networkCaptureScript = #"""
     (() => {
       window.__dreamDressResponses = [];
+      window.__dreamDressSearchResponses = [];
       const record = value => {
         try {
           const text = typeof value === 'string' ? value : JSON.stringify(value);
-          if (text && text.includes('itemDO') && text.length <= 1500000) {
+          if (text && text.includes('resultList') && text.length <= 1500000) {
+            if (!window.__dreamDressSearchResponses.includes(text)) {
+              window.__dreamDressSearchResponses.push(text);
+              if (window.__dreamDressSearchResponses.length > 3) {
+                window.__dreamDressSearchResponses.shift();
+              }
+            }
+          }
+          if (text && (
+            text.includes('itemDO') || text.includes('note_card') ||
+            text.includes('RGV587_ERROR') || text.includes('FAIL_SYS_USER_VALIDATE') || text.includes('bxpunish')
+          ) && text.length <= 1500000) {
             window.__dreamDressResponses.push(text);
           }
         } catch (_) {}
@@ -998,23 +1056,39 @@ final class DreamDressDynamicPageLoader: NSObject, WKNavigationDelegate {
             return value;
           };
           const captured = window.__dreamDressResponses || [];
-          let platformItem = null;
-          const findItem = value => {
-            if (!value || typeof value !== 'object') return null;
-            if (value.itemDO && typeof value.itemDO === 'object') return value.itemDO;
-            for (const child of Object.values(value)) {
-              const found = findItem(child);
-              if (found) return found;
-            }
-            return null;
+          const goofishSearchResponses = window.__dreamDressSearchResponses || [];
+          const goofishDOMItems = Array.from(document.querySelectorAll('a[href*="/item?id="]')).map(anchor => {
+            const url = new URL(anchor.href, location.href);
+            const titleNode = anchor.querySelector('[class*="wrap-title"], [class*="main-title"]');
+            const image = anchor.querySelector('img[class*="feeds-image"], img');
+            return {
+              itemId: url.searchParams.get('id') || '',
+              title: clean(titleNode?.getAttribute('title') || titleNode?.innerText || ''),
+              price: clean([
+                anchor.querySelector('[class*="sign"]')?.innerText,
+                anchor.querySelector('[class*="number"]')?.innerText,
+                anchor.querySelector('[class*="decimal"]')?.innerText
+              ].filter(Boolean).join('')),
+              picUrl: normalizeURL(image?.currentSrc || image?.src || '')
+            };
+          }).filter(item => item.itemId && item.title);
+          const platformItems = [];
+          const collectItems = value => {
+            if (!value || typeof value !== 'object') return;
+            if (value.itemDO && typeof value.itemDO === 'object') platformItems.push(value.itemDO);
+            if (value.note_card && typeof value.note_card === 'object') platformItems.push({
+              ...value.note_card,
+              note_id: value.note_card.note_id || value.note_id || value.id || '',
+              xsec_token: value.note_card.xsec_token || value.xsec_token || ''
+            });
+            for (const child of Object.values(value)) collectItems(child);
           };
           for (const raw of captured) {
             try {
               const start = raw.indexOf('{');
               const end = raw.lastIndexOf('}');
               if (start < 0 || end <= start) continue;
-              platformItem = findItem(JSON.parse(raw.slice(start, end + 1)));
-              if (platformItem) break;
+              collectItems(JSON.parse(raw.slice(start, end + 1)));
             } catch (_) {}
           }
           const elements = Array.from(document.querySelectorAll('body *')).filter(element => {
@@ -1022,17 +1096,6 @@ final class DreamDressDynamicPageLoader: NSObject, WKNavigationDelegate {
             const rect = element.getBoundingClientRect();
             return rect.bottom > 0 && rect.top < topLimit;
           });
-          const statusPriority = [
-            '商品已下架', '已下架', '宝贝不存在', '商品不存在',
-            '已售出', '已卖出', '卖掉了', '交易成功',
-            '暂时缺货', '已售罄', '无货',
-            '立即购买', '立即下单', '我想要', '加入购物车', '在线', '在售'
-          ];
-          const shortTexts = elements.map(element => clean(element.innerText))
-            .filter(text => text.length > 0 && text.length <= 24);
-          const status = clean(platformItem?.itemStatusStr) ||
-            statusPriority.find(token => shortTexts.some(text => text === token || text.includes(token))) || '';
-
           const titleCandidates = elements.filter(element => {
             const text = clean(element.innerText);
             if (text.length < 4 || text.length > 180) return false;
@@ -1044,30 +1107,83 @@ final class DreamDressDynamicPageLoader: NSObject, WKNavigationDelegate {
             return { text: clean(element.innerText), score: fontSize * 10000 + rect.width * rect.height - Math.max(rect.top, 0) };
           }).sort((a, b) => b.score - a.score);
 
-          const imageCandidates = Array.from(document.images).filter(image => {
-            if (!visible(image)) return false;
-            const rect = image.getBoundingClientRect();
-            const source = image.dataset.src || image.dataset.original || image.currentSrc || image.src || '';
-            return source.startsWith('https://') && rect.bottom > 0 && rect.top < topLimit &&
-              rect.width >= 120 && rect.height >= 120 && image.naturalWidth >= 160 && image.naturalHeight >= 160;
-          }).map(image => {
-            const rect = image.getBoundingClientRect();
-            return {
-              url: image.dataset.src || image.dataset.original || image.currentSrc || image.src,
-              score: rect.width * rect.height + image.naturalWidth * image.naturalHeight * 0.01 - Math.max(rect.top, 0)
-            };
-          }).sort((a, b) => b.score - a.score);
+          const normalizeText = value => clean(value).toLowerCase().replace(/[^\p{L}\p{N}]/gu, '');
+          const pageTitle = normalizeText(document.title || titleCandidates[0]?.text || '');
+          const pageIDs = [
+            new URL(location.href).searchParams.get('id'),
+            ...location.pathname.split('/').filter(Boolean)
+          ].filter(Boolean);
+          const platformItem = platformItems.find(item => {
+            const itemTitle = normalizeText(item?.title || item?.itemTitle || item?.display_title || item?.desc || '');
+            const itemID = String(item?.itemId || item?.id || item?.itemID || item?.note_id || '');
+            return (Math.min(pageTitle.length, itemTitle.length) >= 4 &&
+              (pageTitle.includes(itemTitle) || itemTitle.includes(pageTitle))) ||
+              (itemID && pageIDs.includes(itemID));
+          }) || null;
 
-          const platformImages = Array.isArray(platformItem?.imageInfos)
-            ? platformItem.imageInfos.map(image => normalizeURL(image?.url || image?.imageUrl || '')).filter(Boolean)
-            : [];
+          const statusPriority = [
+            '商品已下架', '已下架', '宝贝不存在', '商品不存在',
+            '已售出', '已卖出', '卖掉了', '交易成功',
+            '暂时缺货', '已售罄', '无货',
+            '立即购买', '立即下单', '我想要', '加入购物车', '在线', '在售'
+          ];
+          const shortTexts = elements.map(element => clean(element.innerText))
+            .filter(text => text.length > 0 && text.length <= 24);
+          const status = clean(platformItem?.itemStatusStr) ||
+            statusPriority.find(token => shortTexts.some(text => text === token || text.includes(token))) || '';
+
+          const imageURLs = item => [
+            ...(Array.isArray(item?.imageInfos) ? item.imageInfos : []),
+            item?.cover,
+            ...(Array.isArray(item?.image_list) ? item.image_list : [])
+          ].flatMap(image => [
+            image?.url, image?.imageUrl, image?.url_default, image?.url_pre,
+            ...(Array.isArray(image?.info_list) ? image.info_list.map(info => info?.url) : [])
+          ]).map(normalizeURL).filter(Boolean);
+          const platformImages = imageURLs(platformItem);
+          const xiaohongshuItems = platformItems.filter(item => item?.note_id).map(item => ({
+            note_id: String(item.note_id),
+            title: clean(item.display_title || item.title || ''),
+            text: clean(item.desc || '').slice(0, 4000),
+            image_url: imageURLs(item)[0] || '',
+            xsec_token: clean(item.xsec_token || '').slice(0, 512)
+          }));
+          const platformText = clean([
+            platformItem?.display_title, platformItem?.title, platformItem?.itemTitle, platformItem?.desc
+          ].filter(Boolean).join(' '));
+          const blockedText = clean(`${captured.join(' ')} ${goofishSearchResponses.join(' ')} ${document.body?.innerText || ''}`).toLowerCase();
+          const isBlocked = [
+            'rgv587_error', 'fail_sys_user_validate', 'bxpunish',
+            'captcha', 'x5sec', '验证后继续'
+          ].some(token => blockedText.includes(token));
 
           return JSON.stringify({
-            title: clean(platformItem?.title || platformItem?.itemTitle) || titleCandidates[0]?.text || document.title || '',
-            visibleText: clean(document.body?.innerText).slice(0, 120000),
-            imageURL: platformImages[0] || normalizeURL(imageCandidates[0]?.url || ''),
-            status
+            title: clean(platformItem?.display_title || platformItem?.title || platformItem?.itemTitle) || titleCandidates[0]?.text || document.title || '',
+            visibleText: clean(`${platformText} ${document.body?.innerText || ''}`).slice(0, 120000),
+            imageURL: platformImages[0] || '',
+            imageSource: platformImages[0] ? 'product' : '',
+            platformItem,
+            status,
+            goofishSearchResponses,
+            goofishDOMItems,
+            xiaohongshuItems,
+            isBlocked
           });
+        })()
+        """#
+
+    static let advanceGoofishSearchPageScript = #"""
+        (() => {
+          const next = Array.from(document.querySelectorAll('button')).find(button =>
+            !button.disabled && (
+              (button.innerText || '').trim() === '下一页' ||
+              (button.getAttribute('aria-label') || '').includes('下一页') ||
+              button.querySelector('[class*="arrow-right"]')
+            )
+          );
+          if (!next) return false;
+          next.click();
+          return true;
         })()
         """#
 
@@ -1078,7 +1194,28 @@ final class DreamDressDynamicPageLoader: NSObject, WKNavigationDelegate {
                 self?.finish(nil)
                 return
             }
-            if page.imageURL == nil, captureAttempt < 5 {
+            if Self.isGoofishSearchURL(page.finalURL),
+               !page.isBlocked,
+               captureAttempt < 2 {
+                webView.evaluateJavaScript(Self.advanceGoofishSearchPageScript) { [weak self] advanced, _ in
+                    guard let self else { return }
+                    guard advanced as? Bool == true else {
+                        finish(page)
+                        return
+                    }
+                    captureAttempt += 1
+                    Task { [weak self] in
+                        try? await Task.sleep(for: .seconds(2))
+                        self?.capturePage()
+                    }
+                }
+                return
+            }
+            if page.imageURL == nil,
+               page.goofishSearchItems.isEmpty,
+               page.xiaohongshuSearchItems.isEmpty,
+               !page.isBlocked,
+               captureAttempt < 5 {
                 captureAttempt += 1
                 Task { [weak self] in
                     try? await Task.sleep(for: .seconds(2))
@@ -1102,32 +1239,243 @@ final class DreamDressDynamicPageLoader: NSObject, WKNavigationDelegate {
                     visibleText: page.visibleText,
                     imageURL: page.imageURL,
                     availability: DreamDressHTMLParser.availability(in: ocrText),
-                    finalURL: page.finalURL
+                    finalURL: page.finalURL,
+                    goofishSearchItems: page.goofishSearchItems,
+                    xiaohongshuSearchItems: page.xiaohongshuSearchItems,
+                    isBlocked: page.isBlocked
                 ))
             }
         }
     }
 
-    static func parseCapture(_ value: Any?, finalURL: URL? = nil) -> DreamDressRenderedPage? {
+    nonisolated static func parseCapture(_ value: Any?, finalURL: URL? = nil) -> DreamDressRenderedPage? {
         guard let json = value as? String,
               let data = json.data(using: .utf8),
               let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
         else { return nil }
-        let imageURL = (object["imageURL"] as? String).flatMap(URL.init(string:)).flatMap {
-            DreamDressDetectiveService.isAllowedHTTPSURL($0) ? $0 : nil
-        }
-        let visibleText = object["visibleText"] as? String ?? ""
+        let xiaohongshuNote = xiaohongshuNote(from: object["platformItem"])
+        let imageURL = xiaohongshuNote?.imageURL ?? (object["imageSource"] as? String == "product"
+            ? (object["imageURL"] as? String).flatMap(URL.init(string:)).flatMap {
+                DreamDressDetectiveService.isAllowedHTTPSURL($0) ? $0 : nil
+            }
+            : nil)
+        let visibleText = [xiaohongshuNote?.text, object["visibleText"] as? String]
+            .compactMap { $0 }
+            .joined(separator: " ")
         let statusText = object["status"] as? String ?? ""
         let statusAvailability = DreamDressHTMLParser.availability(in: statusText)
+        let goofishSearchResponses = object["goofishSearchResponses"] ?? object["goofishSearchResponse"]
+        var seenGoofishItemIDs = Set<String>()
+        let goofishSearchItems = (
+            goofishSearchItems(fromMTopResponse: goofishSearchResponses)
+                + goofishSearchItems(fromRawItems: object["goofishDOMItems"] as? [[String: Any]] ?? [])
+        ).filter { seenGoofishItemIDs.insert($0.itemID).inserted }
         return DreamDressRenderedPage(
-            title: (object["title"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines),
+            title: xiaohongshuNote?.title
+                ?? (object["title"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines),
             visibleText: visibleText,
             imageURL: imageURL,
             availability: statusAvailability == .unknown
                 ? DreamDressHTMLParser.availability(in: visibleText)
                 : statusAvailability,
-            finalURL: finalURL
+            finalURL: finalURL,
+            goofishSearchItems: goofishSearchItems,
+            xiaohongshuSearchItems: xiaohongshuSearchItems(from: object["xiaohongshuItems"]),
+            isBlocked: object["isBlocked"] as? Bool == true || goofishMTopIsBlocked(goofishSearchResponses)
         )
+    }
+
+    nonisolated static func isGoofishSearchURL(_ url: URL?) -> Bool {
+        guard let url, let host = url.host?.lowercased() else { return false }
+        return (host == "goofish.com" || host == "www.goofish.com") && url.path == "/search"
+    }
+
+    nonisolated static func xiaohongshuSearchItems(from value: Any?) -> [DreamDressXiaohongshuSearchItem] {
+        guard let values = value as? [[String: Any]] else { return [] }
+        var seen = Set<String>()
+        return values.compactMap { item in
+            guard let noteID = scalarString(item["note_id"]),
+                  noteID.count == 24,
+                  noteID.allSatisfy(\.isHexDigit),
+                  seen.insert(noteID).inserted,
+                  let title = scalarString(item["title"]),
+                  !title.isEmpty else { return nil }
+            return DreamDressXiaohongshuSearchItem(
+                noteID: noteID,
+                title: title,
+                text: scalarString(item["text"]) ?? "",
+                imageURL: platformImageURL(from: item["image_url"]),
+                xsecToken: scalarString(item["xsec_token"]).map { String($0.prefix(512)) }
+            )
+        }
+    }
+
+    nonisolated static func goofishSearchItems(fromMTopResponse value: Any?) -> [DreamDressGoofishSearchItem] {
+        var items: [[String: Any]] = []
+        for object in goofishMTopObjects(value) where
+            object["api"] as? String == "mtop.taobao.idlemtopsearch.pc.search"
+                && mtopReturnValues(object).contains(where: { $0.uppercased().hasPrefix("SUCCESS") }) {
+            if let responseData = object["data"] {
+                collectGoofishSearchItems(from: responseData, into: &items)
+            }
+        }
+        return goofishSearchItems(fromRawItems: items)
+    }
+
+    nonisolated private static func goofishSearchItems(
+        fromRawItems items: [[String: Any]]
+    ) -> [DreamDressGoofishSearchItem] {
+        var seen = Set<String>()
+        return items.compactMap { item in
+            guard let itemID = scalarString(item["itemId"] ?? item["id"]),
+                  !itemID.isEmpty,
+                  itemID.allSatisfy({ $0.isASCII && $0.isNumber }),
+                  seen.insert(itemID).inserted,
+                  let title = scalarString(item["title"] ?? (item["titleSummary"] as? [String: Any])?["text"]),
+                  !title.isEmpty
+            else { return nil }
+            return DreamDressGoofishSearchItem(
+                itemID: itemID,
+                title: title,
+                price: goofishPrice(
+                    item["price"] ?? item["priceInfo"],
+                    prefix: scalarString(item["priceText"]),
+                    unit: scalarString(item["priceUnit"])
+                ),
+                imageURL: platformImageURL(
+                    from: item["picUrl"] ?? item["mainPicUrl"] ?? item["imageUrl"]
+                        ?? (item["mainPicInfo"] as? [String: Any])?["url"]
+                )
+            )
+        }
+    }
+
+    nonisolated static func goofishMTopIsBlocked(_ value: Any?) -> Bool {
+        goofishMTopObjects(value).contains { object in
+            let returns = mtopReturnValues(object).joined(separator: " ").lowercased()
+            if ["rgv587_error", "fail_sys_user_validate", "x5sec", "bxpunish"]
+                .contains(where: returns.contains) {
+                return true
+            }
+            guard let data = object["data"] as? [String: Any],
+                  let rawURL = data["url"] as? String,
+                  let host = URL(string: rawURL)?.host?.lowercased() else { return false }
+            return host == "passport.goofish.com" || host.hasSuffix(".passport.goofish.com")
+        }
+    }
+
+    nonisolated private static func goofishMTopObjects(_ value: Any?) -> [[String: Any]] {
+        if let values = value as? [Any] {
+            return values.flatMap(goofishMTopObjects)
+        }
+        if let object = value as? [String: Any] { return [object] }
+        guard let raw = value as? String,
+              let start = raw.firstIndex(of: "{"),
+              let end = raw.lastIndex(of: "}"),
+              start <= end,
+              let data = String(raw[start...end]).data(using: .utf8)
+        else { return [] }
+        return (try? JSONSerialization.jsonObject(with: data) as? [String: Any]).map { [$0] } ?? []
+    }
+
+    nonisolated private static func mtopReturnValues(_ object: [String: Any]) -> [String] {
+        if let values = object["ret"] as? [String] { return values }
+        if let value = object["ret"] as? String { return [value] }
+        return []
+    }
+
+    nonisolated private static func collectGoofishSearchItems(
+        from value: Any,
+        into items: inout [[String: Any]]
+    ) {
+        if let values = value as? [Any] {
+            values.forEach { collectGoofishSearchItems(from: $0, into: &items) }
+            return
+        }
+        guard let dictionary = value as? [String: Any] else { return }
+        if let resultList = dictionary["resultList"] as? [[String: Any]] {
+            for result in resultList {
+                let data = result["data"] as? [String: Any] ?? [:]
+                let nestedItem = ((data["item"] as? [String: Any])?["main"] as? [String: Any])?["exContent"]
+                    as? [String: Any]
+                if let item = nestedItem ?? (!data.isEmpty ? data : result["cardData"] as? [String: Any]) {
+                    items.append(item)
+                }
+            }
+        }
+        dictionary.values.forEach { collectGoofishSearchItems(from: $0, into: &items) }
+    }
+
+    nonisolated private static func scalarString(_ value: Any?) -> String? {
+        let string: String?
+        if let value = value as? String {
+            string = value
+        } else if let value = value as? NSNumber {
+            string = value.stringValue
+        } else if let value = value as? [String: Any] {
+            string = ["text", "value", "priceText", "price", "amount", "integer"]
+                .lazy.compactMap { scalarString(value[$0]) }.first
+        } else {
+            string = nil
+        }
+        let trimmed = string?.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed?.isEmpty == false ? trimmed : nil
+    }
+
+    nonisolated private static func goofishPrice(
+        _ value: Any?,
+        prefix: String?,
+        unit: String?
+    ) -> String? {
+        guard let amount = scalarString(value) else { return nil }
+        let price = [prefix, amount, unit].compactMap { $0 }.joined()
+        return price.range(of: #"[¥￥元]|CNY|RMB"#, options: [.regularExpression, .caseInsensitive]) == nil
+            ? "¥\(price)"
+            : price
+    }
+
+    nonisolated private static func platformImageURL(from value: Any?) -> URL? {
+        guard var raw = scalarString(value) else { return nil }
+        if raw.hasPrefix("//") { raw = "https:\(raw)" }
+        if raw.hasPrefix("http://") { raw = "https://" + raw.dropFirst(7) }
+        guard let url = URL(string: raw),
+              DreamDressDetectiveService.isAllowedHTTPSURL(url) else { return nil }
+        return url
+    }
+
+    private struct XiaohongshuNote {
+        let title: String?
+        let text: String
+        let imageURL: URL?
+    }
+
+    nonisolated private static func xiaohongshuNote(from value: Any?) -> XiaohongshuNote? {
+        guard let note = value as? [String: Any], note["note_id"] as? String != nil else { return nil }
+        let string: (String) -> String? = { key in
+            guard let value = note[key] as? String else { return nil }
+            let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+            return trimmed.isEmpty ? nil : trimmed
+        }
+        let title = string("display_title") ?? string("title")
+        let text = [title, string("desc")].compactMap { $0 }.joined(separator: " ")
+        let imageValues = [note["cover"]].compactMap { $0 } + (note["image_list"] as? [Any] ?? [])
+        let imageURL = imageValues.lazy.compactMap(xiaohongshuImageURL).first
+        return XiaohongshuNote(title: title, text: text, imageURL: imageURL)
+    }
+
+    nonisolated private static func xiaohongshuImageURL(from value: Any?) -> URL? {
+        guard let image = value as? [String: Any] else { return nil }
+        let infoURLs = (image["info_list"] as? [[String: Any]])?.compactMap { $0["url"] as? String } ?? []
+        let rawURLs = [image["url_default"], image["url_pre"], image["url"], image["imageUrl"]]
+            .compactMap { $0 as? String } + infoURLs
+        return rawURLs.lazy
+            .compactMap { raw -> URL? in
+                let secure = raw.hasPrefix("http://") ? "https://" + raw.dropFirst(7) : raw
+                guard let url = URL(string: String(secure)),
+                      DreamDressDetectiveService.isAllowedHTTPSURL(url) else { return nil }
+                return url
+            }
+            .first
     }
 
     private static func recognizedText(in image: UIImage) -> String {
@@ -1254,7 +1602,7 @@ final class DreamDressDetectiveService: @unchecked Sendable {
         let normalized = [input.brandName, input.productName, normalizedURL]
             .map(DreamDressProductMatcher.normalizedSearchText)
             .joined(separator: "|")
-        return "dream_dress_detective.cache.v3."
+        return "dream_dress_detective.cache.v7."
             + Data(normalized.utf8).base64EncodedString()
     }
 
@@ -1372,7 +1720,8 @@ final class DreamDressDetectiveService: @unchecked Sendable {
 
         let cached = forceRefresh ? nil : await cachedEntry(forKey: cacheKey)
         if let cached,
-           (cached.result.allCandidates.count >= requestedCount || cached.isExhausted == true) {
+           (requestedCount <= max(DreamDressPagination.pageSize, cached.result.allCandidates.count)
+             || cached.isExhausted == true) {
             return DreamDressInvestigationPage(
                 result: cached.result.limited(to: requestedCount, isFromCache: true),
                 hasMore: cached.result.allCandidates.count > requestedCount || cached.isExhausted != true
@@ -1458,6 +1807,17 @@ final class DreamDressDetectiveService: @unchecked Sendable {
         var nextQueryIndex = min(max(0, startingAt), queries.count)
         let initialCount = candidates.count
         let pageEndIndex = min(nextQueryIndex + DreamDressPagination.queriesPerPage, queries.count)
+        if candidates.isEmpty {
+            async let officialCatalog = Self.officialCatalogCandidates(for: input)
+            async let goofish = goofishCandidates(for: input)
+            async let xiaohongshu = xiaohongshuCandidates(for: input)
+            let direct = await (officialCatalog, goofish, xiaohongshu)
+            candidates.append(contentsOf: direct.0 + direct.1 + direct.2)
+            candidates = uniqueBySourceURL(candidates)
+            if !candidates.isEmpty {
+                await onCandidatesFound?(candidates)
+            }
+        }
         if apiKey?.isEmpty == false {
             while candidates.count < minimumCount, nextQueryIndex < queries.count {
                 if nextQueryIndex >= pageEndIndex, candidates.count > initialCount { break }
@@ -1515,6 +1875,146 @@ final class DreamDressDetectiveService: @unchecked Sendable {
             didSearchYahoo: didSearchYahoo,
             isExhausted: nextQueryIndex >= queries.count && didSearchYahoo
         )
+    }
+
+    private func goofishCandidates(for input: DreamDressDetectiveInput) async -> [DreamDressCandidate] {
+        guard let url = Self.goofishSearchURL(for: input),
+              let page = await DreamDressDynamicPageLoader.load(url: url, usesOCR: false),
+              !page.isBlocked else { return [] }
+        return Self.goofishCandidates(from: page.goofishSearchItems, input: input)
+    }
+
+    private func xiaohongshuCandidates(for input: DreamDressDetectiveInput) async -> [DreamDressCandidate] {
+        guard let url = Self.xiaohongshuSearchURL(for: input),
+              let page = await DreamDressDynamicPageLoader.load(url: url, usesOCR: false),
+              !page.isBlocked else { return [] }
+        return Self.xiaohongshuCandidates(from: page.xiaohongshuSearchItems, input: input)
+    }
+
+    @MainActor
+    static func officialCatalogCandidates(
+        for input: DreamDressDetectiveInput,
+        limit: Int = 8
+    ) -> [DreamDressCandidate] {
+        let aliases: Set<String> = ["pinkhouse", "ピンクハウス"]
+        let brand = DreamDressProductMatcher.normalizedSearchText(input.brandName)
+        let product = DreamDressProductMatcher.normalizedSearchText(input.productName)
+        guard aliases.contains(brand) || aliases.contains(product) else { return [] }
+        let productQuery = aliases.contains(product) ? "" : product
+
+        return TimeHallCatalogStore.shared.commerceItems.lazy.compactMap { item in
+            guard item.sourceKind == .current,
+                  let sourceURL = URL(string: item.productPageURL),
+                  let imageURL = item.imageSourceURLs.first.flatMap(URL.init(string:))
+            else { return nil }
+            let evidence = [
+                item.brand, item.name, item.nameZH, item.category, item.categoryZH,
+                item.colors.joined(separator: " "), item.sizes.joined(separator: " ")
+            ].joined(separator: " ")
+            guard productQuery.isEmpty
+                    || DreamDressProductMatcher.normalizedSearchText(evidence).contains(productQuery)
+            else { return nil }
+            let candidate = DreamDressCandidate(
+                title: item.nameZH.isEmpty ? item.name : item.nameZH,
+                brand: item.brand,
+                category: item.categoryZH.isEmpty ? item.category : item.categoryZH,
+                price: "JP¥\((item.salePriceJPY ?? item.regularPriceJPY).formatted())",
+                details: DreamDressProductDetails.extract(from: evidence),
+                imageURL: imageURL,
+                availability: item.listingStatus == "in_stock" ? .available : .sold,
+                sourceURL: sourceURL,
+                evidenceType: .officialCatalog,
+                timeHallCommerceItemID: item.id
+            )
+            return DreamDressProductMatcher.accepts(candidate, input: input, pageEvidence: evidence)
+                ? candidate : nil
+        }.prefix(max(0, limit)).map { $0 }
+    }
+
+    nonisolated static func goofishSearchURL(for input: DreamDressDetectiveInput) -> URL? {
+        let keyword = [input.brandName, input.productName]
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+            .joined(separator: " ")
+        guard !keyword.isEmpty else { return nil }
+        var components = URLComponents(string: "https://www.goofish.com/search")!
+        components.queryItems = [URLQueryItem(name: "q", value: keyword)]
+        return components.url
+    }
+
+    nonisolated static func goofishCandidates(
+        from items: [DreamDressGoofishSearchItem],
+        input: DreamDressDetectiveInput
+    ) -> [DreamDressCandidate] {
+        let inputBrand = input.brandName.trimmingCharacters(in: .whitespacesAndNewlines)
+        return items.lazy.compactMap { item in
+            guard let sourceURL = URL(string: "https://www.goofish.com/item?id=\(item.itemID)") else { return nil }
+            let brand = !inputBrand.isEmpty
+                && DreamDressProductMatcher.normalizedSearchText(item.title)
+                    .contains(DreamDressProductMatcher.normalizedSearchText(inputBrand)) ? inputBrand : nil
+            let candidate = DreamDressCandidate(
+                title: item.title,
+                brand: brand,
+                price: item.price,
+                details: DreamDressProductDetails.extract(from: item.title),
+                imageURL: item.imageURL,
+                availability: .unknown,
+                sourceURL: sourceURL,
+                evidenceType: .webSearch
+            )
+            return DreamDressProductMatcher.accepts(candidate, input: input, pageEvidence: item.title)
+                ? candidate
+                : nil
+        }.prefix(30).map { $0 }
+    }
+
+    nonisolated static func xiaohongshuSearchURL(for input: DreamDressDetectiveInput) -> URL? {
+        let keyword = ([input.brandName, input.productName] + ["洛丽塔 裙"])
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+            .joined(separator: " ")
+        guard keyword != "洛丽塔 裙" else { return nil }
+        var components = URLComponents(string: "https://www.xiaohongshu.com/search_result/")!
+        components.queryItems = [
+            URLQueryItem(name: "keyword", value: keyword),
+            URLQueryItem(name: "source", value: "web_search_result_notes")
+        ]
+        return components.url
+    }
+
+    nonisolated static func xiaohongshuCandidates(
+        from items: [DreamDressXiaohongshuSearchItem],
+        input: DreamDressDetectiveInput
+    ) -> [DreamDressCandidate] {
+        let inputBrand = input.brandName.trimmingCharacters(in: .whitespacesAndNewlines)
+        return items.prefix(30).compactMap { item in
+            var components = URLComponents(string: "https://www.xiaohongshu.com/explore/\(item.noteID)")!
+            if let token = item.xsecToken, !token.isEmpty {
+                components.queryItems = [
+                    URLQueryItem(name: "xsec_token", value: token),
+                    URLQueryItem(name: "xsec_source", value: "pc_search")
+                ]
+            }
+            guard let sourceURL = components.url else { return nil }
+            let evidence = "\(item.title) \(item.text)"
+            let normalizedEvidence = DreamDressProductMatcher.normalizedSearchText(evidence)
+            let brand = !inputBrand.isEmpty
+                && normalizedEvidence.contains(DreamDressProductMatcher.normalizedSearchText(inputBrand))
+                ? inputBrand : nil
+            let candidate = DreamDressCandidate(
+                title: item.title,
+                brand: brand,
+                price: price(in: evidence),
+                details: DreamDressProductDetails.extract(from: evidence),
+                imageURL: item.imageURL,
+                availability: DreamDressHTMLParser.availability(in: evidence),
+                sourceURL: sourceURL,
+                evidenceType: .webSearch
+            )
+            return DreamDressProductMatcher.accepts(candidate, input: input, pageEvidence: evidence)
+                ? candidate
+                : nil
+        }
     }
 
     private func yahooAuctionCandidates(for input: DreamDressDetectiveInput) async throws -> SearchOutcome {
@@ -1945,9 +2445,10 @@ final class DreamDressDetectiveService: @unchecked Sendable {
             return [
                 "\(expression) 裙 连衣裙 スカート ワンピース 二手 中古",
                 "\(expression) 淘宝 天猫 商品 价格 详情 裙",
+                "\(expression) momo 大脸包 兔包 包包 闲鱼 goofish 二手 在售",
                 "\(expression) 闲鱼 goofish 二手 在售",
+                "site:xiaohongshu.com/explore \(expression) 洛丽塔 Lolita 裙 出物 穿搭",
                 "site:goofish.com/item \(expression)",
-                "\(expression) 小红书 出物 穿搭 裙",
                 "\(expression) 抖音商城 今日头条 商品 价格 裙",
                 "\(expression) Mercari メルカリ 中古 スカート ワンピース",
                 "\(expression) Yahoo!オークション ヤフオク 中古 スカート ワンピース",
@@ -1986,6 +2487,15 @@ final class DreamDressDetectiveService: @unchecked Sendable {
                 continue
             }
             return String(text[range]).trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        if let range = text.range(
+            of: #"(?:仅出|出物|出|售价|现价|到手价|转让价|包邮价)\s*[:：]?\s*[0-9][0-9,.]*"#,
+            options: .regularExpression
+        ) {
+            let matched = text[range]
+            if let amount = matched.range(of: #"[0-9][0-9,.]*"#, options: .regularExpression) {
+                return "￥\(matched[amount])"
+            }
         }
         return nil
     }

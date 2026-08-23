@@ -20,9 +20,7 @@ final class URLSchemeHandler {
     /// 支持的Action
     enum Action: String {
         case importItem = "import"     // 导入商品
-        case addTask = "addtask"       // 添加任务
         case openItem = "item"         // 打开商品详情
-        case search = "search"         // 搜索
     }
     
     private init() {}
@@ -56,12 +54,8 @@ final class URLSchemeHandler {
         switch action {
         case .importItem:
             return handleImportItem(parameters: parameters)
-        case .addTask:
-            return handleAddTask(parameters: parameters)
         case .openItem:
             return handleOpenItem(parameters: parameters)
-        case .search:
-            return handleSearch(parameters: parameters)
         }
     }
     
@@ -120,30 +114,6 @@ final class URLSchemeHandler {
         }
     }
     
-    /// 处理添加任务
-    private func handleAddTask(parameters: [String: String]) -> Bool {
-        print("📝 处理添加任务")
-        
-        guard let keyword = parameters["keyword"],
-              let platformString = parameters["platform"],
-              let platform = PlatformType(rawValue: platformString) else {
-            print("❌ 缺少必要参数")
-            return false
-        }
-        
-        // 创建任务
-        Task {
-            await TaskDispatcher.shared.createTask(
-                type: .search,
-                platform: platform,
-                keyword: keyword,
-                priority: 8  // 来自快捷指令的任务优先级较高
-            )
-        }
-        
-        return true
-    }
-    
     /// 处理打开商品
     private func handleOpenItem(parameters: [String: String]) -> Bool {
         print("📱 处理打开商品")
@@ -156,23 +126,6 @@ final class URLSchemeHandler {
         NotificationCenter.default.post(
             name: .shouldOpenItemDetail,
             object: platformID
-        )
-        
-        return true
-    }
-    
-    /// 处理搜索
-    private func handleSearch(parameters: [String: String]) -> Bool {
-        print("🔍 处理搜索")
-        
-        guard let keyword = parameters["keyword"] else {
-            return false
-        }
-        
-        // 发送通知，让UI执行搜索
-        NotificationCenter.default.post(
-            name: .shouldPerformSearch,
-            object: keyword
         )
         
         return true
@@ -313,9 +266,6 @@ extension Notification.Name {
     
     /// 应该打开商品详情
     static let shouldOpenItemDetail = Notification.Name("shouldOpenItemDetail")
-    
-    /// 应该执行搜索
-    static let shouldPerformSearch = Notification.Name("shouldPerformSearch")
 }
 
 // MARK: - 使用示例

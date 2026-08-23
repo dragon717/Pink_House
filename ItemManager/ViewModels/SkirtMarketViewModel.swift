@@ -178,24 +178,6 @@ final class SkirtMarketViewModel: ObservableObject {
     
     // MARK: - 数据操作
     
-    /// 创建搜索任务
-    func createSearchTask(platform: PlatformType, keyword: String, priority: Int = 5) async {
-        await TaskDispatcher.shared.createTask(
-            type: .search,
-            platform: platform,
-            keyword: keyword,
-            priority: priority
-        )
-    }
-    
-    /// 批量创建搜索任务
-    func createBatchSearchTasks(keywords: [String], platform: PlatformType) async {
-        await TaskDispatcher.shared.createSearchTasks(
-            keywords: keywords,
-            platform: platform
-        )
-    }
-    
     /// 刷新索引缓存
     func refreshIndexCache() async {
         await SkirtIndexCache.shared.refreshCache()

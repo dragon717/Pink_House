@@ -350,20 +350,8 @@ final class TaskDispatcher: ObservableObject {
     
     /// 执行搜索任务
     private func performSearchTask(_ task: MonitorTask) async -> TaskResult {
-        guard let keyword = task.keyword else {
-            return .failure("缺少关键词")
-        }
-        
-        print("🔍 搜索: \(keyword) on \(task.platform.rawValue)")
-        
-        // 这里调用实际的抓取逻辑
-        // 暂时返回模拟结果
-        let mockItems = await mockFetchItems(platform: task.platform, keyword: keyword)
-        
-        // 处理抓取到的商品
-        let (totalCount, newCount) = await processFetchedItems(mockItems)
-        
-        return .success(itemsFound: totalCount, itemsNew: newCount)
+        _ = task
+        return .failure("裙装股市不提供商品搜索，请使用梦裙侦探")
     }
     
     /// 执行详情任务
@@ -434,63 +422,6 @@ final class TaskDispatcher: ObservableObject {
         await MainActor.run {
             self.currentTasks.removeAll { $0.taskID == task.taskID }
         }
-    }
-    
-    // MARK: - 数据处理
-    
-    /// 处理抓取到的商品
-    private func processFetchedItems(_ items: [LolitaItem]) async -> (total: Int, new: Int) {
-        guard let context = context else { return (0, 0) }
-        
-        var newCount = 0
-        
-        // 获取所有现有商品（简化谓词）
-        let allDescriptor = FetchDescriptor<LolitaItem>()
-        let allItems = (try? context.fetch(allDescriptor)) ?? []
-        
-        for item in items {
-            // 在内存中检查是否已存在
-            let existing = allItems.first { $0.platformID == item.platformID }
-            
-            if let existing = existing {
-                // 更新现有记录
-                existing.currentPrice = item.currentPrice
-                existing.status = item.status
-                existing.lastUpdated = Date()
-            } else {
-                // 新记录
-                item.collectorDeviceId = currentNodeId
-                item.collectorNodeName = currentNodeName
-                context.insert(item)
-                newCount += 1
-            }
-        }
-        
-        try? context.save()
-        return (items.count, newCount)
-    }
-    
-    /// 模拟抓取（实际项目中替换为真实抓取逻辑）
-    private func mockFetchItems(platform: PlatformType, keyword: String) async -> [LolitaItem] {
-        // 模拟网络延迟
-        try? await Task.sleep(nanoseconds: 1_000_000_000)
-        
-        // 返回模拟数据
-        var items: [LolitaItem] = []
-        
-        for i in 0..<5 {
-            let item = LolitaItem(
-                platform: platform,
-                platformItemId: "mock_\(i)_\(Int.random(in: 1000...9999))",
-                rawTitle: "\(keyword) 第\(i+1)件",
-                currentPrice: Double.random(in: 100...2000)
-            )
-            item.brand = "测试品牌"
-            item.status = .onSale
-            items.append(item)
-        }
-        
-        return items
     }
     
     // MARK: - 节点统计更新
@@ -618,6 +549,10 @@ final class TaskDispatcher: ObservableObject {
         url: String? = nil,
         priority: Int = 5
     ) async {
+        guard type != .search else {
+            print("⛔️ 裙装股市不创建搜索任务，请使用梦裙侦探")
+            return
+        }
         guard let context = context else { return }
         
         let task = MonitorTask(
@@ -635,17 +570,6 @@ final class TaskDispatcher: ObservableObject {
         print("📝 创建任务: \(task.taskDescription)")
     }
     
-    /// 批量创建搜索任务
-    func createSearchTasks(keywords: [String], platform: PlatformType) async {
-        for keyword in keywords {
-            await createTask(
-                type: .search,
-                platform: platform,
-                keyword: keyword,
-                priority: 5
-            )
-        }
-    }
 }
 
 // MARK: - 任务结果枚举
@@ -695,11 +619,6 @@ class AppDelegate: NSObject, UIApplicationDelegate {
             await SkirtMarketPersistenceV2.shared.configure()
             await TaskDispatcher.shared.start()
             
-            // 创建一些示例任务
-            await TaskDispatcher.shared.createSearchTasks(
-                keywords: ["AP 辉夜姬", "Baby 铭记", "古典玩偶"],
-                platform: .xianyu
-            )
         }
         
         return true

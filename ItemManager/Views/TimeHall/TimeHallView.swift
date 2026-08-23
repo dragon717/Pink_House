@@ -452,6 +452,9 @@ struct TimeHallView: View {
         merchantSelection
       }
     }
+    .sheet(item: $detailCommerceItem) { item in
+      TimeHallCommerceItemDetailView(item: item)
+    }
     .onChange(of: isRoutePageActive) { _, isActive in
       guard isActive else { return }
       carouselMerchant = .pinkHouse
@@ -475,7 +478,9 @@ struct TimeHallView: View {
           .padding(.top, 12)
           .padding(.bottom, 8)
 
-        DreamDressDetectiveView()
+        DreamDressDetectiveView { item in
+          detailCommerceItem = item
+        }
           .frame(maxWidth: .infinity, maxHeight: .infinity)
       }
     }
@@ -499,9 +504,6 @@ struct TimeHallView: View {
             .animation(.easeOut(duration: 0.16), value: isHeaderCollapsed)
         }
       }
-    }
-    .sheet(item: $detailCommerceItem) { item in
-      TimeHallCommerceItemDetailView(item: item)
     }
     .sheet(item: $detailItem) { item in
       TimeHallItemDetailView(item: item)
@@ -542,9 +544,6 @@ struct TimeHallView: View {
           }
         }
       }
-    }
-    .sheet(item: $detailCommerceItem) { item in
-      TimeHallCommerceItemDetailView(item: item)
     }
     .sheet(item: $detailItem) { item in
       TimeHallItemDetailView(item: item)

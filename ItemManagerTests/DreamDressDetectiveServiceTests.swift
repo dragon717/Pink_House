@@ -18,6 +18,7 @@ final class DreamDressDetectiveServiceTests: XCTestCase {
     XCTAssertEqual(result.allCandidates.count, result.foundCount)
     XCTAssertGreaterThan(result.validCandidates.count, 1)
     XCTAssertTrue(result.validCandidates.allSatisfy { $0.imageURL != nil })
+    XCTAssertTrue(result.allCandidates.contains { $0.evidenceType == .officialCatalog })
     XCTAssertFalse(result.isFromCache)
 
     let cached = try await DreamDressDetectiveService.shared.investigate(
@@ -25,6 +26,45 @@ final class DreamDressDetectiveServiceTests: XCTestCase {
     )
     XCTAssertTrue(cached.isFromCache)
     XCTAssertEqual(cached.validCandidates, result.validCandidates)
+  }
+
+  @MainActor
+  func testPinkHouseReusesBundledOfficialCatalog() {
+    let candidates = DreamDressDetectiveService.officialCatalogCandidates(
+      for: DreamDressDetectiveInput(brandName: "Pink House", productName: "", productURL: "")
+    )
+
+    XCTAssertEqual(candidates.count, 8)
+    XCTAssertTrue(candidates.allSatisfy { $0.brand == "PINK HOUSE" })
+    XCTAssertTrue(candidates.allSatisfy { $0.evidenceType == .officialCatalog })
+    XCTAssertTrue(candidates.allSatisfy { $0.sourceURL.host == "pinkhouse-webshop.jp" })
+    XCTAssertTrue(candidates.allSatisfy { $0.category?.isEmpty == false })
+    XCTAssertTrue(candidates.allSatisfy { $0.imageURL != nil && $0.price?.hasPrefix("JP¥") == true })
+    XCTAssertTrue(candidates.allSatisfy { candidate in
+      TimeHallCatalogStore.shared.commerceItems.contains {
+        $0.id == candidate.timeHallCommerceItemID && $0.productPageURL == candidate.sourceURL.absoluteString
+      }
+    })
+  }
+
+  @MainActor
+  func testLiveGoofishFindsZhongxiaWuyuMomoBag() async throws {
+    guard ProcessInfo.processInfo.environment["RUN_DREAM_DRESS_LIVE"] == "1" else {
+      throw XCTSkip("Set RUN_DREAM_DRESS_LIVE=1 for the opt-in network test.")
+    }
+
+    let result = try await DreamDressDetectiveService.shared.investigate(
+      DreamDressDetectiveInput(brandName: "仲夏物语", productName: "", productURL: ""),
+      forceRefresh: true
+    )
+    let titles = result.allCandidates.map(\.title)
+    XCTAssertTrue(
+      titles.contains {
+        let title = DreamDressProductMatcher.normalizedSearchText($0)
+        return title.contains("仲夏物语momo大脸包")
+      },
+      "未找到红框商品，当前侦探标题：\(titles)"
+    )
   }
 
   func testYahooAuctionSearchPageExtractsDistinctProductsWithImages() {
@@ -193,6 +233,204 @@ final class DreamDressDetectiveServiceTests: XCTestCase {
     XCTAssertEqual(DreamDressHTMLParser.availability(in: "在线"), .available)
     XCTAssertLessThan(DreamDressAvailability.available.sortPriority, DreamDressAvailability.unknown.sortPriority)
     XCTAssertLessThan(DreamDressAvailability.unknown.sortPriority, DreamDressAvailability.sold.sortPriority)
+  }
+
+  func testEnrichmentNeverBorrowsRecommendationImage() {
+    let sourceURL = URL(string: "https://wiki.smzdm.com/p/vmqnxdp/")!
+    let candidate = DreamDressCandidate(
+      title: "仲夏物语 Lolita洛丽塔 软妹风 天使花束 女士JSK无袖连衣裙 Y04303 蓝色 S",
+      brand: "仲夏物语",
+      price: "¥499",
+      sourceURL: sourceURL,
+      evidenceType: .webSearch
+    )
+    let html = """
+    <meta property="og:image" content="https://cdn.example.com/recommendation.jpg">
+    <script type="application/ld+json">
+    [
+      {
+        "@type":"Product",
+        "name":"仲夏物语 Lolita洛丽塔 软妹风 面包坊下午茶 女士SK半裙",
+        "image":"https://cdn.example.com/recommendation.jpg"
+      },
+      {
+        "@type":"Product",
+        "name":"仲夏物语 Lolita洛丽塔 软妹风 天使花束 女士JSK无袖连衣裙 Y04303 蓝色 S"
+      }
+    ]
+    </script>
+    """
+
+    let enriched = DreamDressHTMLParser.enrich(candidate, html: html, baseURL: sourceURL)
+
+    XCTAssertNil(enriched.imageURL)
+  }
+
+  @MainActor
+  func testRenderedCaptureRejectsUnattributedImage() {
+    let imageURL = "https://cdn.example.com/product.jpg"
+    let unattributed = #"{"title":"目标商品","visibleText":"","imageURL":"https://cdn.example.com/recommendation.jpg","status":""}"#
+    let product = #"{"title":"目标商品","visibleText":"","imageURL":"\#(imageURL)","imageSource":"product","status":""}"#
+    let xiaohongshu = #"{"title":"","visibleText":"登录后查看","imageURL":"","status":"","platformItem":{"note_id":"68ac7320000000001b0322ed","display_title":"仲夏物语 天使花束 JSK","desc":"全新 S码 ￥499","cover":{"url_default":"http://sns-webpic-qc.xhscdn.com/product.jpg"}}}"#
+
+    XCTAssertNil(DreamDressDynamicPageLoader.parseCapture(unattributed)?.imageURL)
+    XCTAssertEqual(DreamDressDynamicPageLoader.parseCapture(product)?.imageURL?.absoluteString, imageURL)
+    let note = DreamDressDynamicPageLoader.parseCapture(xiaohongshu)
+    XCTAssertEqual(note?.title, "仲夏物语 天使花束 JSK")
+    XCTAssertTrue(note?.visibleText.contains("全新 S码 ￥499") == true)
+    XCTAssertEqual(note?.imageURL?.absoluteString, "https://sns-webpic-qc.xhscdn.com/product.jpg")
+    XCTAssertTrue(DreamDressDynamicPageLoader.networkCaptureScript.contains("note_card"))
+  }
+
+  @MainActor
+  func testGoofishSearchMTopParsesCurrentResultShapesAndDeduplicates() throws {
+    let response = #"""
+    mtopjsonp1({
+      "api":"mtop.taobao.idlemtopsearch.pc.search",
+      "ret":["SUCCESS::调用成功"],
+      "data":{"resultList":[
+        {"data":{"id":"1001","title":"仲夏物语 Lolita JSK","picUrl":"//img.alicdn.com/one.jpg","price":"399","priceText":"¥"}},
+        {"data":{"item":{"main":{"exContent":{"itemId":"1002","title":"Pink House 连衣裙","picUrl":"https://img.alicdn.com/two.jpg","price":{"price":"688"}}}}}},
+        {"data":{"item":{"main":{"exContent":{"itemId":"1001","title":"重复商品","picUrl":"https://img.alicdn.com/duplicate.jpg","price":"1"}}}}}
+      ]}
+    })
+    """#
+    let secondPage = #"{"api":"mtop.taobao.idlemtopsearch.pc.search","ret":["SUCCESS::调用成功"],"data":{"resultList":[{"data":{"id":"1003","title":"Pink House 格纹 OP","mainPicUrl":"https://img.alicdn.com/three.jpg","priceInfo":{"priceText":"799"}}},{"data":{"id":"1001","title":"跨页重复商品","price":"1"}}]}}"#
+
+    let items = DreamDressDynamicPageLoader.goofishSearchItems(fromMTopResponse: [response, secondPage])
+
+    XCTAssertEqual(items.count, 3)
+    let first = try XCTUnwrap(items.first)
+    let second = try XCTUnwrap(items.dropFirst().first)
+    XCTAssertEqual(first.itemID, "1001")
+    XCTAssertEqual(first.price, "¥399")
+    XCTAssertEqual(first.imageURL?.absoluteString, "https://img.alicdn.com/one.jpg")
+    XCTAssertEqual(second.price, "¥688")
+    XCTAssertEqual(items.last?.price, "¥799")
+    XCTAssertEqual(items.last?.imageURL?.absoluteString, "https://img.alicdn.com/three.jpg")
+    XCTAssertTrue(DreamDressDynamicPageLoader.networkCaptureScript.contains("resultList"))
+    XCTAssertTrue(DreamDressDynamicPageLoader.advanceGoofishSearchPageScript.contains("arrow-right"))
+    XCTAssertTrue(DreamDressDynamicPageLoader.isGoofishSearchURL(URL(string: "https://www.goofish.com/search?q=Pink%20House")))
+  }
+
+  func testGoofishMTopSeparatesChallengeFromBusinessFailure() {
+    let challenge = #"{"api":"mtop.taobao.idlemtopsearch.pc.search","ret":["RGV587_ERROR::验证失败"],"data":{"url":"https://passport.goofish.com/mini_login.htm"}}"#
+    let businessFailure = #"{"api":"mtop.taobao.idlemtopsearch.pc.search","ret":["FAIL_BIZ_ITEM_DEL_NOT_FOUND::商品不存在"],"data":{}}"#
+
+    XCTAssertTrue(DreamDressDynamicPageLoader.goofishMTopIsBlocked([businessFailure, challenge]))
+    XCTAssertFalse(DreamDressDynamicPageLoader.goofishMTopIsBlocked(businessFailure))
+    XCTAssertTrue(DreamDressDynamicPageLoader.goofishSearchItems(fromMTopResponse: challenge).isEmpty)
+    XCTAssertTrue(DreamDressDynamicPageLoader.goofishSearchItems(fromMTopResponse: businessFailure).isEmpty)
+    let capture = #"{"title":"","visibleText":"","imageURL":"","status":"","isBlocked":false,"goofishSearchResponse":\#(String(reflecting: challenge))}"#
+    XCTAssertTrue(DreamDressDynamicPageLoader.parseCapture(capture)?.isBlocked == true)
+  }
+
+  @MainActor
+  func testSkirtMarketURLSchemeDoesNotExposeSearchActions() {
+    XCTAssertNil(URLSchemeHandler.Action(rawValue: "search"))
+    XCTAssertNil(URLSchemeHandler.Action(rawValue: "addtask"))
+  }
+
+  func testGoofishSearchItemsBecomeCanonicalMatchedCandidates() {
+    let noise = (0..<30).map {
+      DreamDressGoofishSearchItem(
+        itemID: "\(2000 + $0)",
+        title: "普通手机配件 \($0)",
+        price: "¥1",
+        imageURL: nil
+      )
+    }
+    let items = noise + [
+      DreamDressGoofishSearchItem(
+        itemID: "1002",
+        title: "Pink House 蝴蝶结连衣裙",
+        price: "¥688",
+        imageURL: URL(string: "https://img.alicdn.com/two.jpg")
+      )
+    ]
+    let input = DreamDressDetectiveInput(brandName: "Pink House", productName: "", productURL: "")
+
+    let candidates = DreamDressDetectiveService.goofishCandidates(from: items, input: input)
+
+    XCTAssertEqual(candidates.count, 1)
+    XCTAssertEqual(candidates[0].brand, "Pink House")
+    XCTAssertEqual(candidates[0].sourceURL.absoluteString, "https://www.goofish.com/item?id=1002")
+    XCTAssertEqual(
+      DreamDressDetectiveService.goofishSearchURL(for: input)?.absoluteString,
+      "https://www.goofish.com/search?q=Pink%20House"
+    )
+  }
+
+  func testGoofishKeepsZhongxiaWuyuMomoBagWithImageAndPrice() throws {
+    let response = #"{"api":"mtop.taobao.idlemtopsearch.pc.search","ret":["SUCCESS::调用成功"],"data":{"resultList":[{"data":{"item":{"main":{"exContent":{"itemId":"1006","title":"仲夏物语momo大脸包 199","picUrl":"//img.alicdn.com/momo.jpg","price":"199"}}}}}]}}"#
+    let items = DreamDressDynamicPageLoader.goofishSearchItems(fromMTopResponse: response)
+    let candidates = DreamDressDetectiveService.goofishCandidates(
+      from: items,
+      input: DreamDressDetectiveInput(brandName: "仲夏物语", productName: "", productURL: "")
+    )
+    XCTAssertEqual(items.count, 1)
+    let candidate = try XCTUnwrap(candidates.first)
+
+    XCTAssertEqual(candidate.title, "仲夏物语momo大脸包 199")
+    XCTAssertEqual(candidate.brand, "仲夏物语")
+    XCTAssertEqual(candidate.price, "¥199")
+    XCTAssertEqual(candidate.imageURL?.absoluteString, "https://img.alicdn.com/momo.jpg")
+  }
+
+  @MainActor
+  func testRenderedCaptureKeepsGoofishDOMCardWhenMTopIsUnavailable() throws {
+    let capture = #"{"title":"仲夏物语_闲鱼","visibleText":"","imageURL":"","status":"","goofishDOMItems":[{"itemId":"1006","title":"仲夏物语momo大脸包 199","price":"¥199","picUrl":"//img.alicdn.com/momo.jpg"}]}"#
+    let page = try XCTUnwrap(DreamDressDynamicPageLoader.parseCapture(capture))
+    let item = try XCTUnwrap(page.goofishSearchItems.first)
+
+    XCTAssertEqual(item.title, "仲夏物语momo大脸包 199")
+    XCTAssertEqual(item.price, "¥199")
+    XCTAssertEqual(item.imageURL?.absoluteString, "https://img.alicdn.com/momo.jpg")
+    XCTAssertTrue(DreamDressDynamicPageLoader.pageCaptureScript.contains("img[class*=\"feeds-image\"], img"))
+  }
+
+  func testXiaohongshuSearchNotesBecomeCanonicalMatchedCandidates() throws {
+    let rawItems: [[String: Any]] = [
+      [
+        "note_id": "68ac7320000000001b0322ed",
+        "title": "仲夏物语 天使花束 Lolita JSK",
+        "text": "全新 S码 仅出 499 包邮",
+        "image_url": "http://sns-webpic-qc.xhscdn.com/product.jpg",
+        "xsec_token": "test+/token"
+      ],
+      [
+        "note_id": "68ac7320000000001b0322ed",
+        "title": "重复笔记"
+      ],
+      [
+        "note_id": "68ac7320000000001b0322ee",
+        "title": "仲夏物语直播粉丝群",
+        "text": "品牌交流社群"
+      ]
+    ]
+    let items = DreamDressDynamicPageLoader.xiaohongshuSearchItems(from: rawItems)
+    let input = DreamDressDetectiveInput(brandName: "仲夏物语", productName: "", productURL: "")
+    let candidates = DreamDressDetectiveService.xiaohongshuCandidates(from: items, input: input)
+
+    XCTAssertEqual(items.count, 2)
+    let candidate = try XCTUnwrap(candidates.first)
+    XCTAssertEqual(candidates.count, 1)
+    XCTAssertEqual(candidate.brand, "仲夏物语")
+    XCTAssertEqual(candidate.price, "￥499")
+    XCTAssertEqual(candidate.imageURL?.absoluteString, "https://sns-webpic-qc.xhscdn.com/product.jpg")
+    XCTAssertEqual(candidate.sourceURL.path, "/explore/68ac7320000000001b0322ed")
+    XCTAssertEqual(
+      URLComponents(url: candidate.sourceURL, resolvingAgainstBaseURL: false)?
+        .queryItems?.first(where: { $0.name == "xsec_token" })?.value,
+      "test+/token"
+    )
+    let searchURL = try XCTUnwrap(DreamDressDetectiveService.xiaohongshuSearchURL(for: input))
+    XCTAssertTrue(searchURL.absoluteString.contains("/search_result/?"))
+    XCTAssertEqual(
+      URLComponents(url: searchURL, resolvingAgainstBaseURL: false)?
+        .queryItems?.first(where: { $0.name == "keyword" })?.value,
+      "仲夏物语 洛丽塔 裙"
+    )
   }
 
   func testMetadataSourceURLFallsBackWhenUnsafe() {
@@ -373,9 +611,10 @@ final class DreamDressDetectiveServiceTests: XCTestCase {
       [
         "仲夏物语 裙 连衣裙 スカート ワンピース 二手 中古",
         "仲夏物语 淘宝 天猫 商品 价格 详情 裙",
+        "仲夏物语 momo 大脸包 兔包 包包 闲鱼 goofish 二手 在售",
         "仲夏物语 闲鱼 goofish 二手 在售",
+        "site:xiaohongshu.com/explore 仲夏物语 洛丽塔 Lolita 裙 出物 穿搭",
         "site:goofish.com/item 仲夏物语",
-        "仲夏物语 小红书 出物 穿搭 裙",
         "仲夏物语 抖音商城 今日头条 商品 价格 裙",
         "仲夏物语 Mercari メルカリ 中古 スカート ワンピース",
         "仲夏物语 Yahoo!オークション ヤフオク 中古 スカート ワンピース",
@@ -385,7 +624,7 @@ final class DreamDressDetectiveServiceTests: XCTestCase {
     let pinkHouseQueries = DreamDressDetectiveService.searchQueries(
       for: DreamDressDetectiveInput(brandName: "Pink House", productName: "", productURL: "")
     )
-    XCTAssertEqual(pinkHouseQueries.count, 9)
+    XCTAssertEqual(pinkHouseQueries.count, 10)
     XCTAssertTrue(
       pinkHouseQueries.contains(
         "site:goofish.com/item (\"Pink House\" OR PinkHouse OR ピンクハウス)"
@@ -687,7 +926,8 @@ final class DreamDressDetectiveServiceTests: XCTestCase {
     ]
     let verifiedIDs = Set(candidates.prefix(2).map(\.id))
 
-    for filter in DreamDressResultFilter.allCases {
+    XCTAssertEqual(candidates.filter { DreamDressResultFilter.all.includes($0, verifiedIDs: verifiedIDs) }.count, 3)
+    for filter in [DreamDressResultFilter.unsold, .sold, .unverified] {
       XCTAssertEqual(candidates.filter { filter.includes($0, verifiedIDs: verifiedIDs) }.count, 1)
     }
   }

@@ -47,7 +47,6 @@ struct CatPawLoadingView: View {
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var isAnimating = false
-    @State private var ringRotation = 0.0
     @State private var startedAt = Date()
 
     init(
@@ -76,25 +75,33 @@ struct CatPawLoadingView: View {
                     .stroke(MonicaColors.primaryPink.opacity(0.16), lineWidth: 7)
                     .frame(width: 92, height: 92)
 
-                Circle()
-                    .trim(from: 0.06, to: 0.78)
-                    .stroke(
-                        AngularGradient(
-                            colors: [MonicaColors.primaryPink, MonicaColors.lightPink, MonicaColors.primaryPink],
-                            center: .center
-                        ),
-                        style: StrokeStyle(lineWidth: 7, lineCap: .round)
-                    )
-                    .frame(width: 92, height: 92)
-                    .rotationEffect(.degrees(reduceMotion ? 0 : ringRotation))
+                TimelineView(.animation(minimumInterval: 1 / 60, paused: reduceMotion)) { context in
+                    let elapsed = max(0, context.date.timeIntervalSince(startedAt))
+                    let progress = elapsed.truncatingRemainder(dividingBy: 1.35) / 1.35
+                    let rotation = UnitCurve.easeInOut.value(at: progress) * 360
 
-                Circle()
-                    .stroke(
-                        MonicaColors.primaryPink.opacity(0.45),
-                        style: StrokeStyle(lineWidth: 1.5, dash: [3, 7])
-                    )
-                    .frame(width: 72, height: 72)
-                    .rotationEffect(.degrees(isAnimating && !reduceMotion ? -360 : 0))
+                    ZStack {
+                        Circle()
+                            .trim(from: 0.06, to: 0.78)
+                            .stroke(
+                                AngularGradient(
+                                    colors: [MonicaColors.primaryPink, MonicaColors.lightPink, MonicaColors.primaryPink],
+                                    center: .center
+                                ),
+                                style: StrokeStyle(lineWidth: 7, lineCap: .round)
+                            )
+                            .frame(width: 92, height: 92)
+                            .rotationEffect(.degrees(rotation))
+
+                        Circle()
+                            .stroke(
+                                MonicaColors.primaryPink.opacity(0.45),
+                                style: StrokeStyle(lineWidth: 1.5, dash: [3, 7])
+                            )
+                            .frame(width: 72, height: 72)
+                            .rotationEffect(.degrees(-rotation * 0.65))
+                    }
+                }
 
                 Image(systemName: systemImage)
                     .font(.system(size: 34, weight: .semibold))
@@ -163,9 +170,6 @@ struct CatPawLoadingView: View {
             startedAt = Date()
             withAnimation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true)) {
                 isAnimating = true
-            }
-            withAnimation(.spring(response: 1.35, dampingFraction: 0.78).repeatForever(autoreverses: false)) {
-                ringRotation = 360
             }
         }
         .accessibilityElement(children: .combine)
