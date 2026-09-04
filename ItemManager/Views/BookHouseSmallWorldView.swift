@@ -1171,14 +1171,11 @@ private enum BookHousePrototypeData {
             ],
             items: [
                 item(.petChat, assetName: "book_house_pet_chat", x: 0.30, y: 0.48, width: 36, height: 34, scale: 0.92),
-                item(.dressStock, assetName: "book_house_dress_stock", x: 0.64, y: 0.39, width: 52, height: 50, scale: 1.02),
                 item(.wardrobe, assetName: "book_house_wardrobe", x: 0.80, y: 0.57, width: 72, height: 107, scale: 1.05, isHorizontallyFlipped: true),
                 item(.calendar, assetName: "book_house_calendar", x: 0.58, y: 0.55, width: 48, height: 57, scale: 0.96),
                 item(.petHome, assetName: "book_house_pet_home", x: 0.40, y: 0.50, width: 45, height: 41, scale: 0.98),
-                item(.bigWorld, assetName: "book_house_big_world", x: 0.24, y: 0.70, width: 50, height: 68),
                 item(.magicSticker, assetName: "book_house_magic_sticker", x: 0.36, y: 0.79, width: 44, height: 35, scale: 0.94, isHorizontallyFlipped: true),
                 item(.wealth, assetName: "book_house_wealth", x: 0.51, y: 0.72, width: 78, height: 75, scale: 1.12),
-                item(.perler, assetName: "book_house_perler", x: 0.61, y: 0.83, width: 42, height: 38, scale: 0.92),
                 item(.depositPlan, assetName: "book_house_deposit_plan", x: 0.72, y: 0.82, width: 56, height: 50, scale: 1.04),
                 item(.outfitJournal, assetName: "book_house_outfit_journal", x: 0.47, y: 0.87, width: 48, height: 33, scale: 0.94),
                 item(.recycleBin, assetName: "book_house_recycle_bin", x: 0.25, y: 0.85, width: 42, height: 46, scale: 0.86, isHorizontallyFlipped: true)

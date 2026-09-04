@@ -33,7 +33,6 @@ final class BackupRestoreIntegrationTests: XCTestCase {
             SpaceOutfit.self,
             SceneObjectData.self,
             Model3D.self,
-            PerlerBeadPattern.self,
             Notice.self,
             ClothingImageSyncRecord.self,
             DepositNotificationRecord.self,
@@ -510,7 +509,6 @@ final class BackupRestoreIntegrationTests: XCTestCase {
             model3Ds: [],
             userProfile: nil,
             userAvatarFile: nil,
-            perlerBeadPatterns: [],
             featureStatuses: nil,
             unlockConditions: nil,
             checkInRecords: nil,
@@ -522,8 +520,7 @@ final class BackupRestoreIntegrationTests: XCTestCase {
             bookGroupCount: bookGroups.count,
             spaceBookGroupCount: 0,
             spaceOutfitCount: 0,
-            model3DCount: 0,
-            perlerBeadPatternCount: 0
+            model3DCount: 0
         )
     }
 

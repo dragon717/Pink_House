@@ -12,10 +12,7 @@ enum FavoriteMenuItem: String, CaseIterable, Identifiable {
     case fashionJournal = "穿搭手帐"
     case smallWorld = "House"
     case wealth = "来财"
-    case dressStock = "裙装股市"
-    case perler = "拼豆工坊"
     case calendar = "梦裙日历"
-    case bigWorld = "世界书"
     case recycleBin = "回收站"
     
     // MARK: - 默认常用菜单配置
@@ -36,10 +33,7 @@ enum FavoriteMenuItem: String, CaseIterable, Identifiable {
         case .fashionJournal: return "book.closed.fill"
         case .smallWorld: return "house.fill"
         case .wealth: return "yensign.circle.fill"
-        case .dressStock: return "chart.line.uptrend.xyaxis"
-        case .perler: return "circle.grid.2x2.fill"
         case .calendar: return "calendar"
-        case .bigWorld: return "globe.asia.australia"
         case .recycleBin: return "trash.fill"
         }
     }
@@ -53,10 +47,7 @@ enum FavoriteMenuItem: String, CaseIterable, Identifiable {
         case .fashionJournal: return "#FF85C1"
         case .smallWorld: return "#87CEEB"
         case .wealth: return "#FFD700"
-        case .dressStock: return "#FF6B9D"
-        case .perler: return "#FF8C94"
         case .calendar: return "#DDA0DD"
-        case .bigWorld: return "#87CEEB"
         case .recycleBin: return "#808080"
         }
     }
@@ -71,10 +62,7 @@ enum FavoriteMenuItem: String, CaseIterable, Identifiable {
         case .fashionJournal: return .ootd
         case .smallWorld: return .menu
         case .wealth: return .wealth(nil)
-        case .dressStock: return .dressStock
-        case .perler: return .perler
         case .calendar: return .calendar
-        case .bigWorld: return .bigWorld
         case .recycleBin: return .recycleBin
         }
     }
@@ -89,15 +77,6 @@ enum FavoriteMenuItem: String, CaseIterable, Identifiable {
         switch self {
         case .smallWorld:
             return !AppFeatureID.house.isShipHidden
-        case .dressStock:
-            return !AppFeatureID.dressStock.isShipHidden
-                && FeatureUnlockManager.shared.isVisible(.dressStock)
-        case .perler:
-            return !AppFeatureID.perler.isShipHidden
-                && FeatureUnlockManager.shared.isVisible(.perler)
-        case .bigWorld:
-            return !AppFeatureID.bigWorld.isShipHidden
-                && FeatureUnlockManager.shared.isVisible(.bigWorld)
         default:
             return true
         }
@@ -123,14 +102,8 @@ enum FavoriteMenuItem: String, CaseIterable, Identifiable {
             return true
         case .wealth:
             featureItem = .wealth
-        case .dressStock:
-            featureItem = .dressStock
-        case .perler:
-            featureItem = .perler
         case .calendar:
             featureItem = .calendar
-        case .bigWorld:
-            featureItem = .bigWorld
         case .recycleBin:
             featureItem = .recycleBin
         }

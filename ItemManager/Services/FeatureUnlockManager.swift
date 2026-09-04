@@ -114,10 +114,7 @@ enum FeatureItem: String, CaseIterable, Identifiable {
     case ootdDefaultBook = "ootdDefaultBook"
     case wealth = "wealth"
     case calendar = "calendar"
-    case bigWorld = "bigWorld"
-    case perler = "perler"
     case recycleBin = "recycleBin"
-    case dressStock = "dressStock"
 
     // 设置中的子功能
     case dataBackup = "dataBackup"
@@ -155,10 +152,7 @@ enum FeatureItem: String, CaseIterable, Identifiable {
         case .ootdDefaultBook: return "魔法贴纸".appLocalized
         case .wealth: return "来财".appLocalized
         case .calendar: return "梦裙日历".appLocalized
-        case .bigWorld: return "世界书".appLocalized
-        case .perler: return "拼豆工坊".appLocalized
         case .recycleBin: return "回收站".appLocalized
-        case .dressStock: return "裙装股市".appLocalized
         case .dataBackup: return "数据备份".appLocalized
         case .cloudSync: return "iCloud同步".appLocalized
         case .batchImport: return "批量导入".appLocalized
@@ -200,10 +194,7 @@ enum FeatureItem: String, CaseIterable, Identifiable {
         case .ootdDefaultBook: return "book.pages.fill"
         case .wealth: return "yensign.circle.fill"
         case .calendar: return "calendar"
-        case .bigWorld: return "globe.asia.australia"
-        case .perler: return "circle.grid.2x2.fill"
         case .recycleBin: return "trash.fill"
-        case .dressStock: return "chart.line.uptrend.xyaxis"
         case .dataBackup: return "arrow.clockwise.icloud.fill"
         case .cloudSync: return "icloud.fill"
         case .batchImport: return "square.and.arrow.down.on.square.fill"
@@ -252,12 +243,6 @@ enum FeatureItem: String, CaseIterable, Identifiable {
             return .loginDays(2)
         case .calendar:
             return .clothingCount(10)
-        case .bigWorld:
-            return .manual(description: "仍在认真开发和内测中，敬请期待～")
-        case .perler:
-            return .manual(description: "仍在认真开发和内测中，敬请期待～")
-        case .dressStock:
-            return .manual(description: "仍在认真开发和内测中，敬请期待～")
         case .dataBackup, .cloudSync:
             return .free()
         case .batchImport:
@@ -296,7 +281,7 @@ enum FeatureItem: String, CaseIterable, Identifiable {
     // 是否默认隐藏
     var isHiddenByDefault: Bool {
         switch self {
-        case .bigWorld, .perler, .dressStock, .spaceBook, .networkCommunity:
+        case .spaceBook, .networkCommunity:
             // ponytail: ship-hide unfinished pages; remove from set when ready to ship
             return true
         case .magicTasks:
@@ -310,7 +295,7 @@ enum FeatureItem: String, CaseIterable, Identifiable {
 
     var isPublicUnlockTask: Bool {
         switch self {
-        case .bigWorld, .perler, .dressStock, .spaceBook, .networkCommunity:
+        case .spaceBook, .networkCommunity:
             return false
         default:
             return true
@@ -319,7 +304,7 @@ enum FeatureItem: String, CaseIterable, Identifiable {
 
     var isComingSoonFeature: Bool {
         switch self {
-        case .bigWorld, .perler, .dressStock, .spaceBook, .networkCommunity:
+        case .spaceBook, .networkCommunity:
             return true
         default:
             return false
@@ -336,10 +321,7 @@ enum FeatureItem: String, CaseIterable, Identifiable {
         case .ootdDefaultBook: return .ootdDefaultBook
         case .wealth: return .wealth(nil)
         case .calendar: return .calendar
-        case .bigWorld: return .bigWorld
-        case .perler: return .perler
         case .recycleBin: return .recycleBin
-        case .dressStock: return .dressStock
         default: return nil
         }
     }
@@ -519,7 +501,7 @@ final class FeatureUnlockManager: ObservableObject {
             } else if feature == .themeCustomize {
                 // 魔法配色的喵币任务改为“累计消费”，强制覆盖旧版本的即时扣费文案/配置
                 unlockConditions[feature.rawValue] = defaultCondition
-            } else if [.bigWorld, .perler, .dressStock, .spaceBook, .networkCommunity, .magicTasks].contains(feature) {
+            } else if [.spaceBook, .networkCommunity, .magicTasks].contains(feature) {
                 // 对已下线/调整为正式能力的功能，强制覆盖历史条件配置
                 unlockConditions[feature.rawValue] = defaultCondition
             }
@@ -983,10 +965,7 @@ extension SmallWorldDestination {
         case .ootdDefaultBook: return .ootdDefaultBook
         case .wealth(_): return .wealth
         case .calendar: return .calendar
-        case .bigWorld: return .bigWorld
-        case .perler: return .perler
         case .recycleBin: return .recycleBin
-        case .dressStock: return .dressStock
         case .menu: return nil
         }
     }

@@ -85,9 +85,6 @@ struct BackupManifest: Codable {
     let userProfile: UserProfileDTO?
     let userAvatarFile: String?
     
-    // Version 1.7: Perler Bead Patterns (拼豆/像素画)
-    let perlerBeadPatterns: [PerlerBeadPatternDTO]?
-    
     // Version 1.8: Magic Tasks (魔法任务解锁状态)
     let featureStatuses: [FeatureStatusDTO]? // v1.8+ 魔法任务解锁状态
     let unlockConditions: [UnlockConditionDTO]? // v1.8+ 魔法任务解锁条件配置
@@ -107,7 +104,6 @@ struct BackupManifest: Codable {
     let spaceBookGroupCount: Int?
     let spaceOutfitCount: Int?
     let model3DCount: Int?
-    let perlerBeadPatternCount: Int?
     
     // MARK: - 编码/解码处理
     
@@ -142,7 +138,6 @@ struct BackupManifest: Codable {
         case model3Ds
         case userProfile
         case userAvatarFile
-        case perlerBeadPatterns
         case featureStatuses
         case unlockConditions
         case checkInRecords
@@ -155,7 +150,6 @@ struct BackupManifest: Codable {
         case spaceBookGroupCount
         case spaceOutfitCount
         case model3DCount
-        case perlerBeadPatternCount
     }
     
     init(
@@ -187,7 +181,6 @@ struct BackupManifest: Codable {
         model3Ds: [Model3DDTO]?,
         userProfile: UserProfileDTO?,
         userAvatarFile: String?,
-        perlerBeadPatterns: [PerlerBeadPatternDTO]?,
         featureStatuses: [FeatureStatusDTO]?,
         unlockConditions: [UnlockConditionDTO]?,
         checkInRecords: [CheckInRecordDTO]?,
@@ -199,8 +192,7 @@ struct BackupManifest: Codable {
         bookGroupCount: Int?,
         spaceBookGroupCount: Int?,
         spaceOutfitCount: Int?,
-        model3DCount: Int?,
-        perlerBeadPatternCount: Int?
+        model3DCount: Int?
     ) {
         self.formatVersion = formatVersion
         self.timestamp = timestamp
@@ -230,7 +222,6 @@ struct BackupManifest: Codable {
         self.model3Ds = model3Ds
         self.userProfile = userProfile
         self.userAvatarFile = userAvatarFile
-        self.perlerBeadPatterns = perlerBeadPatterns
         self.featureStatuses = featureStatuses
         self.unlockConditions = unlockConditions
         self.checkInRecords = checkInRecords
@@ -243,7 +234,6 @@ struct BackupManifest: Codable {
         self.spaceBookGroupCount = spaceBookGroupCount
         self.spaceOutfitCount = spaceOutfitCount
         self.model3DCount = model3DCount
-        self.perlerBeadPatternCount = perlerBeadPatternCount
     }
     
     init(from decoder: Decoder) throws {
@@ -286,7 +276,6 @@ struct BackupManifest: Codable {
         self.model3Ds = try container.decodeIfPresent([Model3DDTO].self, forKey: .model3Ds)
         self.userProfile = try container.decodeIfPresent(UserProfileDTO.self, forKey: .userProfile)
         self.userAvatarFile = try container.decodeIfPresent(String.self, forKey: .userAvatarFile)
-        self.perlerBeadPatterns = try container.decodeIfPresent([PerlerBeadPatternDTO].self, forKey: .perlerBeadPatterns)
         self.featureStatuses = try container.decodeIfPresent([FeatureStatusDTO].self, forKey: .featureStatuses)
         self.unlockConditions = try container.decodeIfPresent([UnlockConditionDTO].self, forKey: .unlockConditions)
         self.checkInRecords = try container.decodeIfPresent([CheckInRecordDTO].self, forKey: .checkInRecords)
@@ -299,7 +288,6 @@ struct BackupManifest: Codable {
         self.spaceBookGroupCount = try container.decodeIfPresent(Int.self, forKey: .spaceBookGroupCount)
         self.spaceOutfitCount = try container.decodeIfPresent(Int.self, forKey: .spaceOutfitCount)
         self.model3DCount = try container.decodeIfPresent(Int.self, forKey: .model3DCount)
-        self.perlerBeadPatternCount = try container.decodeIfPresent(Int.self, forKey: .perlerBeadPatternCount)
     }
     
     func encode(to encoder: Encoder) throws {
@@ -332,7 +320,6 @@ struct BackupManifest: Codable {
         try container.encodeIfPresent(model3Ds, forKey: .model3Ds)
         try container.encodeIfPresent(userProfile, forKey: .userProfile)
         try container.encodeIfPresent(userAvatarFile, forKey: .userAvatarFile)
-        try container.encodeIfPresent(perlerBeadPatterns, forKey: .perlerBeadPatterns)
         try container.encodeIfPresent(featureStatuses, forKey: .featureStatuses)
         try container.encodeIfPresent(unlockConditions, forKey: .unlockConditions)
         try container.encodeIfPresent(checkInRecords, forKey: .checkInRecords)
@@ -345,7 +332,6 @@ struct BackupManifest: Codable {
         try container.encodeIfPresent(spaceBookGroupCount, forKey: .spaceBookGroupCount)
         try container.encodeIfPresent(spaceOutfitCount, forKey: .spaceOutfitCount)
         try container.encodeIfPresent(model3DCount, forKey: .model3DCount)
-        try container.encodeIfPresent(perlerBeadPatternCount, forKey: .perlerBeadPatternCount)
     }
     
     /// 转换旧版本字符串版本号为整数版本
@@ -632,26 +618,6 @@ struct SceneObjectDataDTO: Codable {
     let colorA: Double
     let sortIndex: Int
     let model3DID: UUID? // Reference to Model3D if applicable
-}
-
-// MARK: - Perler Bead Pattern DTO (v1.7)
-
-struct PerlerBeadPatternDTO: Codable {
-    let id: UUID
-    let name: String
-    let patternType: String
-    let resolution: Int
-    let paletteSize: Int
-    let canvasStyle: String
-    let pixelData: [Int]
-    let paletteSortOrder: String
-    let thumbnailPath: String?
-    let isDeleted: Bool? // v1.7+ 软删除标记，老版本备份可能不存在
-    let deletedAt: Date? // v1.7+ 删除时间，老版本备份可能不存在
-    let createdAt: Date
-    let updatedAt: Date
-    let lastModified: Date?
-    let sortIndex: Int
 }
 
 // MARK: - Magic Tasks DTO (v1.8)

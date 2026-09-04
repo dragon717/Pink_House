@@ -327,6 +327,7 @@
       }
     },
     "·" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -1538,6 +1539,7 @@
       }
     },
     "***" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -2159,6 +2161,7 @@
       }
     },
     "%@ %lld" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -2818,6 +2821,7 @@
       }
     },
     "%@%%" : {
+      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -2898,6 +2902,7 @@
       }
     },
     "%@°%@, %@°%@" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -6265,6 +6270,7 @@
       }
     },
     "%lld 颗拼豆" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -6464,6 +6470,7 @@
       }
     },
     "%lld×%lld" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -6532,6 +6539,7 @@
       }
     },
     "%lld颗" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -10353,6 +10361,7 @@
       }
     },
     "✦ 茶会物语 ✦" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -11109,6 +11118,7 @@
       }
     },
     "¥%lld" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -11374,6 +11384,7 @@
       }
     },
     "1,258.36" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -11396,6 +11407,7 @@
       }
     },
     "2.35%" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -11576,6 +11588,7 @@
       }
     },
     "32 min" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -11621,6 +11634,7 @@
       }
     },
     "215 km" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -13202,6 +13216,7 @@
       }
     },
     "BOARDING PASS" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -13542,6 +13557,7 @@
       }
     },
     "DATE" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -13622,12 +13638,6 @@
         }
       }
     },
-    "DeepSeek 分析" : {
-
-    },
-    "DeepSeek 商品解析" : {
-
-    },
     "DS_API_KEY" : {
       "localizations" : {
         "en" : {
@@ -13651,6 +13661,7 @@
       }
     },
     "FLIGHT" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -14303,6 +14314,7 @@
       }
     },
     "JavaScript代码" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -14443,6 +14455,7 @@
       }
     },
     "LO-%lld" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -14524,6 +14537,7 @@
       }
     },
     "LOLITA AIR" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -14569,6 +14583,7 @@
       }
     },
     "Lv" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -14767,6 +14782,7 @@
       }
     },
     "SEAT" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -14834,6 +14850,7 @@
       }
     },
     "T2航站楼" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -15613,6 +15630,7 @@
       }
     },
     "x%lld" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -16868,6 +16886,7 @@
       }
     },
     "上一步" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -17393,6 +17412,7 @@
       }
     },
     "下一步" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -22318,6 +22338,7 @@
       }
     },
     "从衣橱添加" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -22760,6 +22781,7 @@
       }
     },
     "价格" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -26246,6 +26268,7 @@
       }
     },
     "使用颜色" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -26289,9 +26312,6 @@
           }
         }
       }
-    },
-    "例如 AP 辉夜姬 黑色 JSK" : {
-
     },
     "例如: 90cm" : {
       "extractionState" : "stale",
@@ -26707,6 +26727,7 @@
       }
     },
     "保存" : {
+      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -26906,6 +26927,7 @@
       }
     },
     "保存修改" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -26987,6 +27009,7 @@
       }
     },
     "保存到作品集" : {
+      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -27045,6 +27068,7 @@
       }
     },
     "保存到相册" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -27065,9 +27089,6 @@
           }
         }
       }
-    },
-    "保存前确认" : {
-
     },
     "保存后会把这条裙装从「已拥有」切换为「%@」，并将裙装状态改为「%@」。%@" : {
       "extractionState" : "stale",
@@ -27129,6 +27150,7 @@
       }
     },
     "保存后可以在拼豆工坊列表中查看和管理" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -27151,6 +27173,7 @@
       }
     },
     "保存图案" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -28863,6 +28886,7 @@
       }
     },
     "像素风格" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -30706,6 +30730,7 @@
       }
     },
     "全选" : {
+      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -31903,12 +31928,6 @@
         }
       }
     },
-    "关键词" : {
-
-    },
-    "关键词模式" : {
-
-    },
     "关闭" : {
       "localizations" : {
         "de" : {
@@ -32556,6 +32575,7 @@
       }
     },
     "最多 %lld 色" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -33853,6 +33873,7 @@
       }
     },
     "减少颜色数量会自动将超出范围的颜色设为空白" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -33978,6 +33999,7 @@
       }
     },
     "分享PDF（矢量图）" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -34081,6 +34103,7 @@
       }
     },
     "分享图片" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -34185,6 +34208,7 @@
       }
     },
     "分享打卡" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -34230,6 +34254,7 @@
       }
     },
     "分享登机牌" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -34355,9 +34380,6 @@
         }
       }
     },
-    "分析中..." : {
-
-    },
     "分段" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -34405,6 +34427,7 @@
       }
     },
     "分类" : {
+      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -34531,6 +34554,7 @@
       }
     },
     "分辨率" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -36856,6 +36880,7 @@
       }
     },
     "剩余飞行时间" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -36878,6 +36903,7 @@
       }
     },
     "剩余飞行距离" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -37528,6 +37554,7 @@
       }
     },
     "加载中..." : {
+      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -39008,6 +39035,7 @@
       }
     },
     "即将前往" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -39111,6 +39139,7 @@
       }
     },
     "原价" : {
+      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -40220,6 +40249,7 @@
       }
     },
     "参加了%@" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -40311,6 +40341,7 @@
       }
     },
     "双击重置" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -41034,6 +41065,7 @@
       }
     },
     "取消全选" : {
+      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -42694,6 +42726,7 @@
       }
     },
     "同步删除状态" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -43612,6 +43645,7 @@
       }
     },
     "品牌" : {
+      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -44137,6 +44171,7 @@
       }
     },
     "商务舱" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -44157,12 +44192,6 @@
           }
         }
       }
-    },
-    "商品" : {
-
-    },
-    "商品/搜索结果文本" : {
-
     },
     "商品介绍" : {
       "extractionState" : "stale",
@@ -44306,6 +44335,7 @@
       }
     },
     "商品列表" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -44387,6 +44417,7 @@
       }
     },
     "商品标题" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -46481,6 +46512,7 @@
       }
     },
     "图片转拼豆/像素画" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -46526,6 +46558,7 @@
       }
     },
     "图纸设置" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -46594,6 +46627,7 @@
       }
     },
     "圆形拼豆，带中心孔效果" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -47477,6 +47511,7 @@
       }
     },
     "基本信息" : {
+      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -47779,6 +47814,7 @@
       }
     },
     "填充当前颜色" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -48428,6 +48464,7 @@
       }
     },
     "复制" : {
+      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -50080,6 +50117,7 @@
       }
     },
     "头等舱" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -50561,6 +50599,7 @@
       }
     },
     "好啦" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -52149,6 +52188,7 @@
       }
     },
     "定金" : {
+      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -52664,9 +52704,6 @@
           }
         }
       }
-    },
-    "定金日期 yyyy-MM-dd" : {
-
     },
     "实时" : {
       "extractionState" : "stale",
@@ -55363,6 +55400,7 @@
 
     },
     "尺码" : {
+      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -55657,6 +55695,7 @@
       }
     },
     "尾款" : {
+      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -56114,9 +56153,6 @@
         }
       }
     },
-    "尾款日期 yyyy-MM-dd" : {
-
-    },
     "尾款金额" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -56223,6 +56259,7 @@
       }
     },
     "展示参考线" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -56245,6 +56282,7 @@
       }
     },
     "展示图像尺寸" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -56267,6 +56305,7 @@
       }
     },
     "展示网格" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -56289,6 +56328,7 @@
       }
     },
     "展示耗材" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -56311,6 +56351,7 @@
       }
     },
     "展示色号" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -56333,6 +56374,7 @@
       }
     },
     "展示行列标签" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -56355,6 +56397,7 @@
       }
     },
     "展示颗粒数" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -57508,6 +57551,7 @@
       }
     },
     "已同步" : {
+      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -57648,6 +57692,7 @@
       }
     },
     "已复制" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -59436,6 +59481,7 @@
       }
     },
     "已选座位" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -60089,6 +60135,7 @@
       }
     },
     "市场指数" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -60111,6 +60158,7 @@
       }
     },
     "市场指数视图" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -60569,6 +60617,7 @@
       }
     },
     "平台" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -60650,6 +60699,7 @@
       }
     },
     "平台商品ID" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -60670,9 +60720,6 @@
           }
         }
       }
-    },
-    "平台数据时间：%@" : {
-
     },
     "平衡" : {
       "extractionState" : "stale",
@@ -61552,6 +61599,7 @@
       }
     },
     "座位号: %@" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -61633,6 +61681,7 @@
       }
     },
     "建议多准备 10-20% 的拼豆数量，以防制作过程中的损耗" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -63881,9 +63930,6 @@
         }
       }
     },
-    "当前价" : {
-
-    },
     "当前余额" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -65114,6 +65160,7 @@
       }
     },
     "当前配置" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -66008,6 +66055,7 @@
       }
     },
     "微店" : {
+      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -67216,6 +67264,7 @@
       }
     },
     "总像素数" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -68569,6 +68618,7 @@
       }
     },
     "您的作品尚未保存，返回将丢失当前编辑内容。" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -69279,9 +69329,6 @@
           }
         }
       }
-    },
-    "成色" : {
-
     },
     "我" : {
       "localizations" : {
@@ -74181,6 +74228,7 @@
       }
     },
     "所需材料" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -74285,6 +74333,7 @@
       }
     },
     "手动安装指南" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -74576,6 +74625,7 @@
       }
     },
     "打卡成功！" : {
+      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -74737,9 +74787,6 @@
           }
         }
       }
-    },
-    "打开原链接" : {
-
     },
     "打开喵币充值" : {
       "extractionState" : "stale",
@@ -75095,6 +75142,7 @@
       }
     },
     "打开舷窗" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -76004,6 +76052,7 @@
       }
     },
     "把照片变成拼豆图案" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -77011,6 +77060,7 @@
       }
     },
     "拼豆图纸" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -77033,6 +77083,7 @@
       }
     },
     "拼豆工坊" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -78861,6 +78912,7 @@
       }
     },
     "搜索图案" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -79802,6 +79854,7 @@
       }
     },
     "操作" : {
+      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -82769,6 +82822,7 @@
       }
     },
     "新建画布" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -83133,6 +83187,7 @@
       }
     },
     "方形像素，适合头像制作" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -84037,6 +84092,7 @@
       }
     },
     "无法生成预览" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -86664,6 +86720,7 @@
       }
     },
     "暂无商品" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -86947,6 +87004,7 @@
       }
     },
     "暂无材料" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -87847,9 +87905,6 @@
           }
         }
       }
-    },
-    "更新于 %@" : {
-
     },
     "更新公告" : {
       "extractionState" : "stale",
@@ -90478,9 +90533,6 @@
         }
       }
     },
-    "本地缓存 · %@" : {
-
-    },
     "本地能力依然可用，涉及第三方模型和 API 的智能能力会在开通后完整开放。" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -90905,6 +90957,7 @@
       }
     },
     "材料清单" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -91277,6 +91330,7 @@
       }
     },
     "枚徽章" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -91932,6 +91986,7 @@
       }
     },
     "查看详情" : {
+      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -92672,6 +92727,7 @@
       }
     },
     "样式" : {
+      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -93253,6 +93309,7 @@
       }
     },
     "检票成功" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -93462,6 +93519,7 @@
       }
     },
     "模式" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -93902,6 +93960,7 @@
       }
     },
     "欢迎搭乘 LOLITA AIR" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -94651,6 +94710,7 @@
       }
     },
     "正在同步..." : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -95174,6 +95234,7 @@
       }
     },
     "正在检票..." : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -95396,6 +95457,7 @@
       }
     },
     "正在生成拼豆图案..." : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -95485,6 +95547,7 @@
       }
     },
     "正在登机..." : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -95738,6 +95801,7 @@
       }
     },
     "步骤 %lld / %lld" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -96014,6 +96078,7 @@
       }
     },
     "水印设置" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -97666,6 +97731,7 @@
       }
     },
     "淘宝" : {
+      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -98121,9 +98187,6 @@
         }
       }
     },
-    "添加为裙装" : {
-
-    },
     "添加你的第一件裙子" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -98230,6 +98293,7 @@
       }
     },
     "添加商品" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -99012,6 +99076,7 @@
       }
     },
     "清空画布" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -100148,6 +100213,7 @@
       }
     },
     "点击右上角 + 号新增拼豆/像素画" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -100170,6 +100236,7 @@
       }
     },
     "点击右上角 + 添加商品" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -102763,6 +102830,7 @@
       }
     },
     "生成" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -103008,6 +103076,7 @@
       }
     },
     "生成预览中..." : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -103340,6 +103409,7 @@
       }
     },
     "画布是空的，开始创作吧！" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -103362,6 +103432,7 @@
       }
     },
     "画布样式" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -103885,6 +103956,7 @@
       }
     },
     "直接返回" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -105115,6 +105187,7 @@
       }
     },
     "确定要删除「%@」吗？删除后可以在回收站中恢复。" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -105923,6 +105996,7 @@
       }
     },
     "确定要删除选中的 %lld 个图案吗？删除后可以在回收站中恢复。" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -106049,6 +106123,7 @@
       }
     },
     "确定要复制「%@」吗？" : {
+      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -107012,6 +107087,7 @@
       }
     },
     "确定选座" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -107785,6 +107861,7 @@
       }
     },
     "确认复制" : {
+      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -108662,6 +108739,7 @@
       }
     },
     "确认返回？" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -108981,6 +109059,7 @@
       }
     },
     "视图" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -111799,6 +111878,7 @@
       }
     },
     "类型" : {
+      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -112220,9 +112300,6 @@
         }
       }
     },
-    "粘贴链接/文本" : {
-
-    },
     "精力" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -112563,9 +112640,6 @@
           }
         }
       }
-    },
-    "系列/款名" : {
-
     },
     "系列分类规则" : {
       "extractionState" : "stale",
@@ -114255,6 +114329,7 @@
       }
     },
     "经济舱" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -114808,6 +114883,7 @@
       }
     },
     "统计信息" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -114912,6 +114988,7 @@
       }
     },
     "继续" : {
+      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -115075,6 +115152,7 @@
       }
     },
     "继续探索" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -115723,6 +115801,7 @@
       }
     },
     "编辑名称" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -115906,9 +115985,6 @@
           }
         }
       }
-    },
-    "缺失：%@" : {
-
     },
     "缺少道具" : {
       "extractionState" : "stale",
@@ -116190,9 +116266,6 @@
         }
       }
     },
-    "置信度" : {
-
-    },
     "置底" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -116453,6 +116526,7 @@
       }
     },
     "耗材对照" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -118368,6 +118442,7 @@
       }
     },
     "自由绘制" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -118390,6 +118465,7 @@
       }
     },
     "舱位" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -118584,6 +118660,7 @@
       }
     },
     "节点监控" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -118606,6 +118683,7 @@
       }
     },
     "节点监控视图" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -118697,6 +118775,7 @@
       }
     },
     "茶会专机" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -118788,6 +118867,7 @@
       }
     },
     "茶会徽章墙" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -121705,6 +121785,7 @@
       }
     },
     "裁剪与设置" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -122385,6 +122466,7 @@
       }
     },
     "裙装股市" : {
+      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -123432,6 +123514,7 @@
       }
     },
     "设置" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -123984,6 +124067,7 @@
 
     },
     "识别结果" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -126844,6 +126928,7 @@
       }
     },
     "调整颜色数量" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -129074,6 +129159,7 @@
       }
     },
     "输入名称" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -129155,6 +129241,7 @@
       }
     },
     "输入新名称" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -129200,6 +129287,7 @@
       }
     },
     "输入水印文字" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -129506,6 +129594,7 @@
 
     },
     "返回始发地" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -129620,6 +129709,7 @@
       }
     },
     "还没有拼豆/像素画" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -132081,6 +132171,7 @@
       }
     },
     "选择" : {
+      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -132244,6 +132335,7 @@
       }
     },
     "选择一种方式开始创作吧" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -133622,6 +133714,7 @@
       }
     },
     "选择裁剪比例" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -135590,9 +135683,6 @@
         }
       }
     },
-    "链接/粘贴文本" : {
-
-    },
     "错误" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -135934,6 +136024,7 @@
       }
     },
     "闲鱼" : {
+      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -136096,6 +136187,7 @@
       }
     },
     "限制颜色数量可以简化制作难度，降低材料成本" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -138559,6 +138651,7 @@
       }
     },
     "预览" : {
+      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -138862,6 +138955,7 @@
       }
     },
     "预计到达时间: %@" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -139002,6 +139096,7 @@
       }
     },
     "预计生成" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -139339,6 +139434,7 @@
       }
     },
     "颗" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -139383,6 +139479,7 @@
       }
     },
     "颜色" : {
+      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -139687,6 +139784,7 @@
       }
     },
     "颜色数量" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -139768,6 +139866,7 @@
       }
     },
     "颜色限制" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -140023,6 +140122,7 @@
       }
     },
     "飞行中" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {

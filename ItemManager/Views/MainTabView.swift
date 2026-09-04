@@ -215,34 +215,6 @@ struct SmallWorldContainerView: View {
                     destination: $destination
                 )
             }
-        case .bigWorld:
-            if #available(iOS 18.0, *) {
-                BigWorldViewWithBackButton(
-                    selectedTab: $selectedTab,
-                    homeTab: $homeTab,
-                    destination: $destination
-                )
-            } else {
-                BigWorldViewWithBackButtonLegacy(
-                    selectedTab: $selectedTab,
-                    homeTab: $homeTab,
-                    destination: $destination
-                )
-            }
-        case .perler:
-            if #available(iOS 18.0, *) {
-                PerlerBeadPatternListViewWithBackButton(
-                    selectedTab: $selectedTab,
-                    homeTab: $homeTab,
-                    destination: $destination
-                )
-            } else {
-                PerlerBeadPatternListViewWithBackButtonLegacy(
-                    selectedTab: $selectedTab,
-                    homeTab: $homeTab,
-                    destination: $destination
-                )
-            }
         case .recycleBin:
             if #available(iOS 18.0, *) {
                 RecycleBinViewWithBackButton(
@@ -252,20 +224,6 @@ struct SmallWorldContainerView: View {
                 )
             } else {
                 RecycleBinViewWithBackButtonLegacy(
-                    selectedTab: $selectedTab,
-                    homeTab: $homeTab,
-                    destination: $destination
-                )
-            }
-        case .dressStock:
-            if #available(iOS 18.0, *) {
-                DressStockMarketViewWithBackButton(
-                    selectedTab: $selectedTab,
-                    homeTab: $homeTab,
-                    destination: $destination
-                )
-            } else {
-                DressStockMarketViewWithBackButtonLegacy(
                     selectedTab: $selectedTab,
                     homeTab: $homeTab,
                     destination: $destination
@@ -669,7 +627,7 @@ struct LegacyTabView: View {
         switch feature.id {
         case .wardrobe, .depositPlan:
             return .wardrobe
-        case .house, .petHome, .magicSticker, .outfitJournal, .wealth, .calendar, .bigWorld, .perler, .dressStock, .recycleBin, .timeHall:
+        case .house, .petHome, .magicSticker, .outfitJournal, .wealth, .calendar, .recycleBin, .timeHall:
             return .house
         case .me:
             return .me
@@ -732,35 +690,29 @@ struct LegacyTabView: View {
 
     private var smallWorldTabTitle: String {
         switch smallWorldDestination {
-        case .bigWorld: return "世界书".appLocalized
         case .calendar: return "梦裙日历".appLocalized
         case .wealth(_): return "来财".appLocalized
         case .pet: return petDataManager.status.displayName
         case .ootd: return "穿搭手帐".appLocalized
         case .ootdDefaultBook: return "魔法贴纸".appLocalized
         case .menu: return "House".appLocalized
-        case .perler: return "拼豆工坊".appLocalized
         case .wardrobe: return "衣橱".appLocalized
         case .depositPlan: return "心愿尾款".appLocalized
         case .recycleBin: return "回收站".appLocalized
-        case .dressStock: return "裙子股市".appLocalized
         }
     }
 
     private var smallWorldTabIcon: String {
         switch smallWorldDestination {
-        case .bigWorld: return "globe.asia.australia"
         case .calendar: return "calendar"
         case .wealth(_): return "yensign.circle"
         case .pet: return "pawprint"
         case .ootd: return "book.pages"
         case .ootdDefaultBook: return "book.pages"
         case .menu: return "house.fill"
-        case .perler: return "circle.grid.2x2"
         case .wardrobe: return "cabinet.fill"
         case .depositPlan: return "tag.fill"
         case .recycleBin: return "trash.fill"
-        case .dressStock: return "chart.line.uptrend.xyaxis"
         }
     }
 }
@@ -814,26 +766,8 @@ struct SmallWorldContainerViewLegacy: View {
                     homeTab: $homeTab,
                     destination: $destination
                 )
-            case .bigWorld:
-                BigWorldViewWithBackButtonLegacy(
-                    selectedTab: $selectedTab,
-                    homeTab: $homeTab,
-                    destination: $destination
-                )
-            case .perler:
-                PerlerBeadPatternListViewWithBackButtonLegacy(
-                    selectedTab: $selectedTab,
-                    homeTab: $homeTab,
-                    destination: $destination
-                )
             case .recycleBin:
                 RecycleBinViewWithBackButtonLegacy(
-                    selectedTab: $selectedTab,
-                    homeTab: $homeTab,
-                    destination: $destination
-                )
-            case .dressStock:
-                DressStockMarketViewWithBackButtonLegacy(
                     selectedTab: $selectedTab,
                     homeTab: $homeTab,
                     destination: $destination
@@ -1134,44 +1068,6 @@ struct DreamDressCalendarViewWithBackButtonLegacy: View {
     }
 }
 
-struct BigWorldViewWithBackButtonLegacy: View {
-    @Binding var selectedTab: Int
-    @Binding var homeTab: HomeTab
-    @Binding var destination: SmallWorldDestination
-
-    var body: some View {
-        BigWorldView()
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    SmallWorldBackButtonLegacy(
-                        selectedTab: $selectedTab,
-                        homeTab: $homeTab,
-                        onBackToMenu: { destination = .menu }
-                    )
-                }
-            }
-    }
-}
-
-struct PerlerBeadPatternListViewWithBackButtonLegacy: View {
-    @Binding var selectedTab: Int
-    @Binding var homeTab: HomeTab
-    @Binding var destination: SmallWorldDestination
-
-    var body: some View {
-        PerlerBeadPatternListView()
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    SmallWorldBackButtonLegacy(
-                        selectedTab: $selectedTab,
-                        homeTab: $homeTab,
-                        onBackToMenu: { destination = .menu }
-                    )
-                }
-            }
-    }
-}
-
 struct RecycleBinViewWithBackButtonLegacy: View {
     @Binding var selectedTab: Int
     @Binding var homeTab: HomeTab
@@ -1179,25 +1075,6 @@ struct RecycleBinViewWithBackButtonLegacy: View {
 
     var body: some View {
         RecycleBinView()
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    SmallWorldBackButtonLegacy(
-                        selectedTab: $selectedTab,
-                        homeTab: $homeTab,
-                        onBackToMenu: { destination = .menu }
-                    )
-                }
-            }
-    }
-}
-
-struct DressStockMarketViewWithBackButtonLegacy: View {
-    @Binding var selectedTab: Int
-    @Binding var homeTab: HomeTab
-    @Binding var destination: SmallWorldDestination
-
-    var body: some View {
-        DressStockMarketView()
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     SmallWorldBackButtonLegacy(
@@ -1828,52 +1705,6 @@ struct DreamDressCalendarViewWithBackButton: View {
     }
 }
 
-// MARK: - BigWorldView 带返回按钮
-@available(iOS 18.0, *)
-struct BigWorldViewWithBackButton: View {
-    @Binding var selectedTab: Int
-    @Binding var homeTab: HomeTab
-    @Binding var destination: SmallWorldDestination
-    
-    var body: some View {
-        BigWorldView()
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    SmallWorldBackButton(
-                        selectedTab: $selectedTab,
-                        homeTab: $homeTab,
-                        onBackToMenu: {
-                            destination = .menu
-                        }
-                    )
-                }
-            }
-    }
-}
-
-// MARK: - PerlerBeadPatternListView 带返回按钮
-@available(iOS 18.0, *)
-struct PerlerBeadPatternListViewWithBackButton: View {
-    @Binding var selectedTab: Int
-    @Binding var homeTab: HomeTab
-    @Binding var destination: SmallWorldDestination
-    
-    var body: some View {
-        PerlerBeadPatternListView()
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    SmallWorldBackButton(
-                        selectedTab: $selectedTab,
-                        homeTab: $homeTab,
-                        onBackToMenu: {
-                            destination = .menu
-                        }
-                    )
-                }
-            }
-    }
-}
-
 // MARK: - RecycleBinView 带返回按钮
 @available(iOS 18.0, *)
 struct RecycleBinViewWithBackButton: View {
@@ -1883,30 +1714,6 @@ struct RecycleBinViewWithBackButton: View {
     
     var body: some View {
         RecycleBinView()
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    SmallWorldBackButton(
-                        selectedTab: $selectedTab,
-                        homeTab: $homeTab,
-                        onBackToMenu: {
-                            destination = .menu
-                        }
-                    )
-                }
-            }
-    }
-}
-
-// MARK: - DressStockMarketView 带返回按钮
-@available(iOS 18.0, *)
-struct DressStockMarketViewWithBackButton: View {
-    @Binding var selectedTab: Int
-    @Binding var homeTab: HomeTab
-    @Binding var destination: SmallWorldDestination
-    
-    var body: some View {
-        // 使用整合版 DressStockMarketView（包含价格概览、K线图、市场统计、AI解析等）
-        DressStockMarketView()
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     SmallWorldBackButton(

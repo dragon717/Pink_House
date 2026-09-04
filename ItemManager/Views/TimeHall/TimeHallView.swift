@@ -19,20 +19,6 @@ enum TimeHallMode: String, CaseIterable, Identifiable {
   }
 }
 
-private enum TimeHallEntryTab: String, CaseIterable, Identifiable {
-  case timeHall
-  case detective
-
-  var id: String { rawValue }
-
-  var title: String {
-    switch self {
-    case .timeHall: return "梦裙时光馆".appLocalized
-    case .detective: return "梦裙侦探".appLocalized
-    }
-  }
-}
-
 private enum TimeHallMerchant: String, CaseIterable, Identifiable {
   case pinkHouse
   case angelicPretty
@@ -338,7 +324,6 @@ struct TimeHallView: View {
   @State private var storeTheme: TimeHallStoreTheme = .kagoshima
   @State private var activeMerchant: TimeHallMerchant?
   @State private var curatedCatalog: TimeHallCatalogDTO?
-  @State private var entryTab: TimeHallEntryTab = .timeHall
   @State private var mode: TimeHallMode = .chronicle
   @State private var selectedYear: Int?
   @State private var detailItem: TimeHallItemDTO?
@@ -442,9 +427,7 @@ struct TimeHallView: View {
 
   var body: some View {
     Group {
-      if entryTab == .detective {
-        detectivePage
-      } else if activeMerchant == .pinkHouse {
+      if activeMerchant == .pinkHouse {
         pinkHouseHall
       } else if let activeMerchant {
         curatedBrandHall(activeMerchant)
@@ -466,24 +449,6 @@ struct TimeHallView: View {
       storeTheme = TimeHallStoreTheme.themes(for: merchant).first ?? .omotesando
     }
     .toolbar(.hidden, for: .navigationBar)
-  }
-
-  private var detectivePage: some View {
-    ZStack {
-      LiquidBackground(themeSkinWallpaperContext: .timeHall)
-
-      VStack(spacing: 0) {
-        entryTabPicker
-          .padding(.horizontal, 20)
-          .padding(.top, 12)
-          .padding(.bottom, 8)
-
-        DreamDressDetectiveView { item in
-          detailCommerceItem = item
-        }
-          .frame(maxWidth: .infinity, maxHeight: .infinity)
-      }
-    }
   }
 
   private var pinkHouseHall: some View {
@@ -1219,7 +1184,6 @@ struct TimeHallView: View {
 
   private var merchantSelectionIntroduction: some View {
     VStack(spacing: 6) {
-      entryTabPicker
       Text("在这里翻阅品牌的编年史、图鉴、珍选与搭配".appLocalized)
         .font(.subheadline)
         .multilineTextAlignment(.center)
@@ -1229,24 +1193,12 @@ struct TimeHallView: View {
 
   private var merchantSelectionIntroductionCompact: some View {
     VStack(alignment: .leading, spacing: 3) {
-      entryTabPicker
       Text("在这里翻阅品牌的编年史、图鉴、珍选与搭配".appLocalized)
         .font(.caption)
         .foregroundStyle(palette.secondaryText)
     }
     .frame(maxWidth: .infinity, alignment: .leading)
     .padding(.horizontal, 12)
-  }
-
-  private var entryTabPicker: some View {
-    Picker("梦裙入口".appLocalized, selection: $entryTab) {
-      ForEach(TimeHallEntryTab.allCases) { tab in
-        Text(tab.title).tag(tab)
-      }
-    }
-    .pickerStyle(.segmented)
-    .accessibilityLabel("梦裙入口".appLocalized)
-    .accessibilityIdentifier("timeHall.entryTab")
   }
 
   private var merchantSelectionHeading: some View {

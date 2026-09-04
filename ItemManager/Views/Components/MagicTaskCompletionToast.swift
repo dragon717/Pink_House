@@ -609,7 +609,7 @@ extension View {
             Spacer()
             
             Button("添加测试任务") {
-                let features: [FeatureItem] = [.pet, .bigWorld, .perler, .dressStock, .ootd]
+                let features: [FeatureItem] = [.pet, .ootd]
                 if let randomFeature = features.randomElement() {
                     MagicTaskCompletionManager.shared.addCompletion(feature: randomFeature)
                 }

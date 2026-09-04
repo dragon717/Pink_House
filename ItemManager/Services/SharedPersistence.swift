@@ -154,7 +154,6 @@ class SharedContainer {
                     SceneObjectData.self,
                     Model3D.self,
                     StoredImage.self,
-                    PerlerBeadPattern.self,
                     Notice.self,
                     ClothingImageSyncRecord.self,
                     DepositNotificationRecord.self,

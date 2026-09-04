@@ -13,9 +13,6 @@ enum AppFeatureID: String, CaseIterable, Identifiable, Codable, Hashable {
     case outfitJournal
     case wealth
     case calendar
-    case bigWorld
-    case perler
-    case dressStock
     case recycleBin
 
     var id: String { rawValue }
@@ -23,7 +20,7 @@ enum AppFeatureID: String, CaseIterable, Identifiable, Codable, Hashable {
     /// ponytail: unfinished pages hidden from UI; remove cases when ready to ship
     var isShipHidden: Bool {
         switch self {
-        case .house, .perler, .dressStock, .bigWorld:
+        case .house:
             return true
         default:
             return false
@@ -183,36 +180,6 @@ enum AppFeatureRegistry {
             tintHex: "#DDA0DD",
             route: .smallWorld(.calendar),
             unlockFeature: .calendar,
-            surfaces: [.bottomDock, .houseRoom, .petPhone]
-        ),
-        AppFeatureDescriptor(
-            id: .bigWorld,
-            title: "世界书",
-            subtitle: "旅行式收藏世界",
-            systemImage: "globe.asia.australia",
-            tintHex: "#87CEEB",
-            route: .smallWorld(.bigWorld),
-            unlockFeature: .bigWorld,
-            surfaces: [.bottomDock, .houseRoom, .petPhone]
-        ),
-        AppFeatureDescriptor(
-            id: .perler,
-            title: "拼豆工坊",
-            subtitle: "像素图与拼豆创作",
-            systemImage: "circle.grid.2x2.fill",
-            tintHex: "#FF8C94",
-            route: .smallWorld(.perler),
-            unlockFeature: .perler,
-            surfaces: [.bottomDock, .houseRoom, .petPhone]
-        ),
-        AppFeatureDescriptor(
-            id: .dressStock,
-            title: "裙装股市",
-            subtitle: "行情、观察与情报",
-            systemImage: "chart.line.uptrend.xyaxis",
-            tintHex: "#FF6B9D",
-            route: .smallWorld(.dressStock),
-            unlockFeature: .dressStock,
             surfaces: [.bottomDock, .houseRoom, .petPhone]
         ),
         AppFeatureDescriptor(

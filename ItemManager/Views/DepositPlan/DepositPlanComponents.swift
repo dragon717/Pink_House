@@ -116,26 +116,6 @@ struct TotalBalanceCard: View {
                 }
                 .buttonStyle(.plain)
 
-                if FeatureUnlockManager.shared.isVisible(.dressStock) {
-                    Divider()
-                        .frame(height: 30)
-
-                    // 裙装股市
-                    Button {
-                        handleQuickAccess(.dressStock)
-                    } label: {
-                        VStack(spacing: 4) {
-                            ThemeSkinIconBadge(systemName: "chart.line.uptrend.xyaxis", fallbackColor: .blue, size: 30, symbolSize: 14)
-                            Text("裙装股市".appLocalized)
-                                .font(.caption)
-                                .themeSkinLegibleText(level: .inline, slot: .sectionCard)
-                        }
-                        .foregroundStyle(.blue)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 8)
-                    }
-                    .buttonStyle(.plain)
-                }
             }
             .padding(.horizontal, 8)
             .padding(.top, 12)

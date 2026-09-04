@@ -42,7 +42,6 @@ final class DeleteTracker {
     private let deletedSpaceBookGroupsKey = "deletedSpaceBookGroups_local"
     private let deletedSpaceOutfitsKey = "deletedSpaceOutfits_local"
     private let deletedModel3DsKey = "deletedModel3Ds_local"
-    private let deletedPerlerPatternsKey = "deletedPerlerPatterns_local"
 
     private var allDeleteRecordKeys: [String] {
         [
@@ -51,8 +50,7 @@ final class DeleteTracker {
             deletedBookGroupsKey,
             deletedSpaceBookGroupsKey,
             deletedSpaceOutfitsKey,
-            deletedModel3DsKey,
-            deletedPerlerPatternsKey
+            deletedModel3DsKey
         ]
     }
 
@@ -151,10 +149,6 @@ final class DeleteTracker {
         recordDeletes(ids: [id], key: deletedModel3DsKey, typeName: "3D model")
     }
 
-    func recordDeletedPerlerPattern(id: UUID) {
-        recordDeletes(ids: [id], key: deletedPerlerPatternsKey, typeName: "perler pattern")
-    }
-
     /// 记录删除 - 存储 UUID 和删除时间戳
     private func recordDeletes(ids: [UUID], key: String, typeName: String, clothingDeletionSource: String? = nil) {
         guard !ids.isEmpty else { return }
@@ -204,10 +198,6 @@ final class DeleteTracker {
 
     func getDeletedModel3DRecords() -> [UUID: Date] {
         return getDeletedDates(for: deletedModel3DsKey)
-    }
-
-    func getDeletedPerlerPatternRecords() -> [UUID: Date] {
-        return getDeletedDates(for: deletedPerlerPatternsKey)
     }
 
     /// 获取删除记录 [UUID: 删除时间戳]
@@ -468,41 +458,6 @@ final class DeleteTracker {
         }
     }
 
-    @discardableResult
-    func applyDeletedPerlerPatterns(context: ModelContext, clearRecords: Bool = true) -> ApplyResult {
-        applyDeletedItems(
-            context: context,
-            key: deletedPerlerPatternsKey,
-            typeName: "perler pattern",
-            clearRecords: clearRecords,
-            fetchItems: { context, ids in
-                let descriptor = FetchDescriptor<PerlerBeadPattern>(
-                    predicate: #Predicate<PerlerBeadPattern> { ids.contains($0.id) }
-                )
-                return try context.fetch(descriptor)
-            }
-        ) { (item: PerlerBeadPattern, deleteTime: Date) -> Bool in
-            let itemName = item.name
-            let itemModifiedTime = item.lastModified
-            let isAlreadyDeleted = item.isDeleted
-            
-            let timeDiff = deleteTime.timeIntervalSince(itemModifiedTime)
-            print("DeleteTracker: [\(itemName)] deleteTime:\(deleteTime), lastModified:\(itemModifiedTime), diff:\(timeDiff)s, isDeleted:\(isAlreadyDeleted)")
-
-            // 策略：如果项目在删除记录中，强制删除（不管时间戳）
-            // 因为 iCloud 同步可能会在 DeleteTracker 之前更新 lastModified
-            if !isAlreadyDeleted {
-                item.isDeleted = true
-                item.deletedAt = deleteTime
-                item.lastModified = Date()
-                print("DeleteTracker: ✓ Force deleted '\(itemName)' (in delete record)")
-                return true
-            } else {
-                print("DeleteTracker: ✓ Already deleted '\(itemName)'")
-                return false
-            }
-        }
-    }
 
     /// 通用的应用删除方法
     /// 注意：此方法在 iCloud 同步期间可能被调用，需要处理对象上下文失效的情况
@@ -611,8 +566,6 @@ final class DeleteTracker {
             return spaceOutfit.id
         } else if let model3D = item as? Model3D {
             return model3D.id
-        } else if let perlerPattern = item as? PerlerBeadPattern {
-            return perlerPattern.id
         }
         return nil
     }
@@ -705,10 +658,6 @@ final class DeleteTracker {
         clearDeletedItems(key: deletedModel3DsKey, typeName: "3D model")
     }
 
-    func clearDeletedPerlerPatterns() {
-        clearDeletedItems(key: deletedPerlerPatternsKey, typeName: "perler pattern")
-    }
-
     private func clearDeletedItems(key: String, typeName: String) {
         userDefaults.removeObject(forKey: key)
         if key == deletedClothingsKey {
@@ -744,10 +693,6 @@ final class DeleteTracker {
         removeDeletedID(id: id, key: deletedModel3DsKey, typeName: "3D model")
     }
 
-    func removeDeletedPerlerPattern(id: UUID) {
-        removeDeletedID(id: id, key: deletedPerlerPatternsKey, typeName: "perler pattern")
-    }
-
     private func removeDeletedID(id: UUID, key: String, typeName: String) {
         var records = getDeletedRecords(for: key)
         records.removeValue(forKey: id.uuidString)
@@ -781,7 +726,6 @@ final class DeleteTracker {
         result.merge(applyDeletedModel3Ds(context: context, clearRecords: clearRecords))
         result.merge(applyDeletedBookGroups(context: context, clearRecords: clearRecords))
         result.merge(applyDeletedSpaceBookGroups(context: context, clearRecords: clearRecords))
-        result.merge(applyDeletedPerlerPatterns(context: context, clearRecords: clearRecords))
 
         print("DeleteTracker: Finished applying deletes, pending=\(result.pendingRecordCount), matched=\(result.matchedRecordCount), changed=\(result.changedCount)")
         return result
@@ -797,8 +741,7 @@ final class DeleteTracker {
             "deletedOutfits_v2",
             "deletedClothings_v2",
             "deletedBookGroups_v2",
-            "deletedModel3Ds_v2",
-            "deletedPerlerPatterns_v2"
+            "deletedModel3Ds_v2"
         ]
 
         for key in oldKeys {

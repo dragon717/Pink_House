@@ -7,8 +7,6 @@
 
 import SwiftUI
 import SwiftData
-import BackgroundTasks
-import CloudKit
 import os
 
 class AppDelegate: NSObject, UIApplicationDelegate {
@@ -19,9 +17,6 @@ class AppDelegate: NSObject, UIApplicationDelegate {
     }
     
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
-        // 注册裙装股市后台任务
-        registerSkirtMarketBackgroundTask()
-        
         // 注册内存警告通知
         NotificationCenter.default.addObserver(
             forName: UIApplication.didReceiveMemoryWarningNotification,
@@ -35,32 +30,6 @@ class AppDelegate: NSObject, UIApplicationDelegate {
         return true
     }
     
-    // MARK: - 后台任务注册
-    
-    private func registerSkirtMarketBackgroundTask() {
-        BGTaskScheduler.shared.register(
-            forTaskWithIdentifier: "com.yourapp.skirtmarket.fetch",
-            using: nil
-        ) { task in
-            self.handleSkirtMarketBackgroundTask(task as! BGAppRefreshTask)
-        }
-        print("✅ 后台任务已注册: com.yourapp.skirtmarket.fetch")
-    }
-    
-    private func handleSkirtMarketBackgroundTask(_ task: BGAppRefreshTask) {
-        task.expirationHandler = {
-            print("⏰ 后台任务即将过期")
-        }
-        
-        Task {
-            // 执行裙装股市的后台任务
-            await TaskDispatcher.shared.checkAndClaimTasks()
-            task.setTaskCompleted(success: true)
-            
-            // 调度下一次任务
-            TaskDispatcher.shared.scheduleBackgroundTask()
-        }
-    }
 }
 
 @main
@@ -215,8 +184,6 @@ struct MainContentView: View {
             if newPhase == .background || newPhase == .inactive {
                 Task {
                     await SharedPersistence.shared.syncWidgetData(reason: "scene-background")
-                    // 调度裙装股市后台任务
-                    TaskDispatcher.shared.scheduleBackgroundTask()
                 }
             } else if newPhase == .active {
                 // 从后台回到前台时检查是否需要打卡
@@ -260,15 +227,6 @@ struct MainContentView: View {
         
         // 0.6 Validate Model3D references integrity
         await Model3DValidationService.shared.validateIfNeeded(modelContainer: SharedPersistence.shared.sharedModelContainer)
-        
-        // 0.7 裙装股市功能 - 使用 GRDB 版本（完全独立于 SwiftData）
-        do {
-            try await GRDBManager.shared.initialize()
-            await SyncEngine.shared.configure()
-            print("✅ 裙装股市功能已启用（GRDB 版本）")
-        } catch {
-            print("❌ 裙装股市初始化失败: \(error)")
-        }
         
         // 0.8 刷新魔法任务进度（开屏关键路径仅使用缓存，避免 iOS 17.x SwiftData fetchCount/CoreData 崩溃）
         FeatureUnlockManager.shared.refreshMagicTaskProgress(modelContext: nil, refreshClothingCount: false)

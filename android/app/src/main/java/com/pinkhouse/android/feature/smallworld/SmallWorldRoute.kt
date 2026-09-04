@@ -27,20 +27,17 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Book
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Flight
 import androidx.compose.material.icons.filled.Inventory2
 import androidx.compose.material.icons.filled.LocalOffer
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Paid
 import androidx.compose.material.icons.filled.Pets
-import androidx.compose.material.icons.filled.PieChart
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -84,28 +81,22 @@ enum class SmallWorldDestination(
 ) {
     Menu("House", "房间入口与功能总览", Icons.Filled.AutoAwesome, "入口汇总、背景切换和房间导航。"),
     SmallWorld("小世界", "房间样式、宠物动画与天气入口", Icons.Filled.AutoAwesome, "切换房间风格，点按场景里的入口。"),
-    BigWorld("世界书", "旅行、徽章、航线与世界设定", Icons.Filled.Flight, "旅行故事与徽章收藏正在准备中。"),
     CheckIn("每日打卡", "签到、问候语与今日穿搭色", Icons.Filled.CheckCircle, "记录今天的心情和穿搭灵感。"),
     Calendar("梦裙日历", "尾款与穿搭日程", Icons.Filled.CalendarMonth, "查看定金、尾款和入手日程。"),
     NoticeCenter("通知中心", "公告、提醒与待确认消息", Icons.Filled.Notifications, "查看最新公告和需要确认的消息。"),
     Wealth("来财", "财富记录与数钱", Icons.Filled.Paid, "记录资产和数钱小工具。"),
     Ootd("穿搭手帐", "记录每日搭配", Icons.Filled.Book, "保存每日穿搭灵感和搭配记录。"),
-    Perler("拼豆工坊", "像素图纸与工坊", Icons.Filled.PieChart, "整理拼豆图纸和制作计划。"),
-    DressStock("裙子股市", "监控裙装行情", Icons.AutoMirrored.Filled.TrendingUp, "关注心仪裙装的价格和热度。"),
     RecycleBin("回收站", "恢复、清空与历史项", Icons.Filled.Delete, "找回最近移入回收站的衣物。"),
     DepositPlan("心愿尾款", "按月与按系列查看待付尾款", Icons.Filled.LocalOffer, "查看待付尾款和付款安排。"),
 }
 
 private val houseMenuEntries = listOf(
     SmallWorldDestination.SmallWorld,
-    SmallWorldDestination.BigWorld,
     SmallWorldDestination.CheckIn,
     SmallWorldDestination.Calendar,
     SmallWorldDestination.NoticeCenter,
     SmallWorldDestination.Wealth,
     SmallWorldDestination.Ootd,
-    SmallWorldDestination.Perler,
-    SmallWorldDestination.DressStock,
     SmallWorldDestination.RecycleBin,
     SmallWorldDestination.DepositPlan,
 )

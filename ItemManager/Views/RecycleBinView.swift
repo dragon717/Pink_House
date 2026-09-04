@@ -12,10 +12,6 @@ private func recycleBinPageCountText(_ count: Int) -> String {
     "%lld 页".appLocalized(Int64(count))
 }
 
-private func recycleBinPixelCountText(_ count: Int) -> String {
-    "%lld 像素".appLocalized(Int64(count))
-}
-
 private func recycleBinDeletedAtText(_ date: Date) -> String {
     let formatter = DateFormatter()
     formatter.locale = LanguageManager.shared.locale
@@ -56,10 +52,6 @@ struct RecycleBinView: View {
     @Query(filter: #Predicate<Model3D> { $0.isDeleted == true }, sort: \Model3D.deletedAt, order: .reverse)
     private var deletedModel3Ds: [Model3D]
 
-    // Perler Bead Pattern Query
-    @Query(filter: #Predicate<PerlerBeadPattern> { $0.isDeleted == true }, sort: \PerlerBeadPattern.deletedAt, order: .reverse)
-    private var deletedPatterns: [PerlerBeadPattern]
-
     // Filter out outfits that belong to deleted books (to avoid duplicates in the list)
     var isolatedDeletedOutfits: [Outfit] {
         allDeletedOutfits.filter { $0.book == nil || $0.book?.deletedAt == nil }
@@ -75,7 +67,7 @@ struct RecycleBinView: View {
     @State private var editMode: EditMode = .inactive
 
     // Alerts
-    @State private var itemToDelete: Any? // Can be Clothing, BookGroup, Outfit, Model3D, or PerlerBeadPattern
+    @State private var itemToDelete: Any? // Can be Clothing, BookGroup, Outfit, or Model3D
     @State private var showingDeleteAlert = false
     @State private var showingDeleteAllAlert = false
     @State private var showingRestoreAllAlert = false
@@ -90,7 +82,7 @@ struct RecycleBinView: View {
         _selectedTab = State(initialValue: initialTab)
     }
 
-    // Tab indices: 0=Wardrobe, 1=手帐(包含平面/空间/模型), 2=PerlerBeads
+    // Tab indices: 0=Wardrobe, 1=手帐(包含平面/空间/模型)
 
     private var recycleBinPalette: AdaptivePaletteV2 {
         AdaptivePaletteV2.generate(
@@ -198,10 +190,6 @@ struct RecycleBinView: View {
                 .foregroundStyle(recycleBinPalette.primary)
                 .themeSkinLegibleText(level: .inline, slot: .segmentedControl)
                 .tag(1)
-            Text("拼豆".appLocalized)
-                .foregroundStyle(recycleBinPalette.primary)
-                .themeSkinLegibleText(level: .inline, slot: .segmentedControl)
-                .tag(2)
         }
         .pickerStyle(.segmented)
         .environment(\.colorScheme, recycleBinColorScheme)
@@ -241,8 +229,6 @@ struct RecycleBinView: View {
                 } else {
                     model3DList
                 }
-            } else {
-                perlerBeadsList
             }
         }
     }
@@ -370,8 +356,6 @@ struct RecycleBinView: View {
             permanentlyDeleteSpaceOutfit(spaceOutfit)
         } else if let model3D = itemToDelete as? Model3D {
             permanentlyDeleteModel3D(model3D)
-        } else if let pattern = itemToDelete as? PerlerBeadPattern {
-            permanentlyDeletePerlerPattern(pattern)
         }
         itemToDelete = nil
     }
@@ -389,8 +373,6 @@ struct RecycleBinView: View {
             restoreSpaceOutfit(spaceOutfit)
         } else if let model3D = itemToDelete as? Model3D {
             restoreModel3D(model3D)
-        } else if let pattern = itemToDelete as? PerlerBeadPattern {
-            restorePerlerPattern(pattern)
         }
         itemToDelete = nil
     }
@@ -551,29 +533,6 @@ struct RecycleBinView: View {
                     })
                     .listRowBackground(Color.clear)
                     .tag(model.id)
-                }
-            }
-        }
-        .scrollContentBackground(.hidden)
-    }
-
-    // MARK: - Perler Beads View
-
-    var perlerBeadsList: some View {
-        List(selection: $selectedItems) {
-            if deletedPatterns.isEmpty {
-                emptyState("回收站是空的", systemImage: "circle.grid.2x2", description: "删除的拼豆/像素画会出现在这里")
-            } else {
-                ForEach(deletedPatterns) { pattern in
-                    DeletedPerlerPatternRow(pattern: pattern, isEditing: editMode == .active, onRestore: {
-                        itemToDelete = pattern
-                        showingRestoreAlert = true
-                    }, onDelete: {
-                        itemToDelete = pattern
-                        showingDeleteAlert = true
-                    })
-                    .listRowBackground(Color.clear)
-                    .tag(pattern.id)
                 }
             }
         }
@@ -748,18 +707,6 @@ struct RecycleBinView: View {
         DeleteTracker.shared.removeDeletedModel3D(id: model.id)
     }
 
-    private func restorePerlerPattern(_ pattern: PerlerBeadPattern) {
-        withAnimation {
-            pattern.isDeleted = false
-            pattern.deletedAt = nil
-            pattern.updatedAt = Date()
-            pattern.lastModified = Date()
-        }
-        // 从 DeleteTracker 中移除删除记录，防止被再次删除
-        DeleteTracker.shared.removeDeletedPerlerPattern(id: pattern.id)
-        saveRestoreState("拼豆图案「\(pattern.name)」")
-    }
-
     private func saveRestoreState(_ label: String) {
         do {
             modelContext.processPendingChanges()
@@ -768,22 +715,6 @@ struct RecycleBinView: View {
         } catch {
             print("RecycleBinView: 恢复\(label)保存失败: \(error)")
         }
-    }
-
-    private func permanentlyDeletePerlerPattern(_ pattern: PerlerBeadPattern) {
-        withAnimation {
-            // 删除缩略图
-            if let thumbnailPath = pattern.thumbnailPath {
-                ImageManager.shared.deleteImage(fileName: thumbnailPath, context: modelContext)
-            }
-
-            // 删除数据库记录
-            modelContext.delete(pattern)
-
-            print("[RecycleBin] 彻底删除 PerlerPattern: \(pattern.name) (ID: \(pattern.id))")
-        }
-        // 从 DeleteTracker 中移除删除记录，因为项目已被彻底删除
-        DeleteTracker.shared.removeDeletedPerlerPattern(id: pattern.id)
     }
 
     // MARK: - Batch Actions
@@ -813,10 +744,6 @@ struct RecycleBinView: View {
                     restoreModel3D(model)
                 }
             }
-        } else {
-            for pattern in deletedPatterns {
-                restorePerlerPattern(pattern)
-            }
         }
     }
 
@@ -844,10 +771,6 @@ struct RecycleBinView: View {
                 for model in deletedModel3Ds {
                     permanentlyDeleteModel3D(model)
                 }
-            }
-        } else {
-            for pattern in deletedPatterns {
-                permanentlyDeletePerlerPattern(pattern)
             }
         }
     }
@@ -885,11 +808,6 @@ struct RecycleBinView: View {
                     restoreModel3D(model)
                 }
             }
-        } else {
-            let patternsToRestore = deletedPatterns.filter { selectedItems.contains($0.id) }
-            for pattern in patternsToRestore {
-                restorePerlerPattern(pattern)
-            }
         }
         selectedItems.removeAll()
     }
@@ -926,11 +844,6 @@ struct RecycleBinView: View {
                 for model in modelsToDelete {
                     permanentlyDeleteModel3D(model)
                 }
-            }
-        } else {
-            let patternsToDelete = deletedPatterns.filter { selectedItems.contains($0.id) }
-            for pattern in patternsToDelete {
-                permanentlyDeletePerlerPattern(pattern)
             }
         }
         selectedItems.removeAll()
@@ -1341,93 +1254,6 @@ struct DeletedSpaceOutfitRow: View {
                     Button(action: onDelete) {
                         Image(systemName: "trash")
                             .foregroundStyle(.red)
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-        }
-        .padding()
-        .background(cardBackground)
-        .cornerRadius(12)
-    }
-}
-
-// MARK: - DeletedPerlerPatternRow
-
-struct DeletedPerlerPatternRow: View {
-    let pattern: PerlerBeadPattern
-    var isEditing: Bool = false
-    let onRestore: () -> Void
-    let onDelete: () -> Void
-
-    @Environment(\.containerPalette) private var palette
-    @Environment(ThemeManager.self) private var themeManager
-
-    private var cardBackground: Color {
-        themeManager.backgroundColor.isDark ? .white.opacity(0.12) : .white.opacity(0.74)
-    }
-
-    var body: some View {
-        HStack {
-            // 缩略图
-            if let thumbnailPath = pattern.thumbnailPath,
-               let uiImage = ImageManager.shared.loadImage(fileName: thumbnailPath) {
-                Image(uiImage: uiImage)
-                    .resizable()
-                    .scaledToFill()
-                    .frame(width: 50, height: 50)
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
-            } else {
-                Image(systemName: pattern.typeEnum.icon)
-                    .font(.system(size: 24))
-                    .foregroundStyle(palette.secondary)
-                    .frame(width: 50, height: 50)
-                    .background(Color.gray.opacity(0.2))
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
-            }
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text(pattern.name)
-                    .font(.headline)
-                    .foregroundStyle(palette.primary)
-
-                HStack(spacing: 8) {
-                    Text(pattern.typeEnum.localizedName)
-                        .font(.caption)
-                        .foregroundStyle(palette.accent)
-
-                    Text("·")
-                        .font(.caption)
-                        .foregroundStyle(palette.secondary)
-
-                    Text(recycleBinPixelCountText(pattern.totalPixels))
-                        .font(.caption)
-                        .foregroundStyle(palette.secondary)
-                }
-
-                if let deletedAt = pattern.deletedAt {
-                    Text(recycleBinDeletedAtText(deletedAt))
-                        .font(.caption)
-                        .foregroundStyle(palette.secondary)
-                }
-            }
-
-            Spacer()
-
-            // Actions
-            if !isEditing {
-                HStack(spacing: 16) {
-                    Button(action: onRestore) {
-                        Image(systemName: "arrow.uturn.backward.circle.fill")
-                            .foregroundStyle(palette.accent)
-                            .font(.title3)
-                    }
-                    .buttonStyle(.plain)
-
-                    Button(action: onDelete) {
-                        Image(systemName: "trash.circle.fill")
-                            .foregroundStyle(.red)
-                            .font(.title3)
                     }
                     .buttonStyle(.plain)
                 }
