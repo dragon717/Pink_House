@@ -112,11 +112,14 @@ struct OverviewStatsCard: View {
     let clothings: [Clothing]
     
     var totalCount: Int {
-        clothings.reduce(0) { $0 + $1.stock }
+        clothings.reduce(0) { partial, clothing in
+            guard clothing.reservationKind != .sold else { return partial }
+            return partial + clothing.stock
+        }
     }
-    
+
     var dressValue: Decimal {
-        clothings.reduce(0) { $0 + ($1.price * Decimal($1.stock)) }
+        clothings.reduce(Decimal(0)) { $0 + $1.dressValueAmount }
     }
     
     var accessoriesCount: Int {

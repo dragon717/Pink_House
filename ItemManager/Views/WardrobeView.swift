@@ -79,6 +79,7 @@ private struct WardrobeClothingSnapshot: Sendable {
     let note: String
     let price: Decimal
     let wardrobeValueAmount: Decimal
+    let dressValueAmount: Decimal
     let stock: Int
     let isDepositPlan: Bool
     let isFullPaymentReservation: Bool
@@ -108,6 +109,7 @@ private struct WardrobeClothingSnapshot: Sendable {
         self.note = clothing.note
         self.price = clothing.price
         self.wardrobeValueAmount = WealthViewModel.sanitizedWardrobeContribution(for: clothing)
+        self.dressValueAmount = WealthViewModel.sanitizedDressValueContribution(for: clothing)
         self.stock = clothing.stock
         self.isDepositPlan = clothing.isDepositPlan
         self.isFullPaymentReservation = clothing.isFullPaymentReservation
@@ -307,9 +309,10 @@ private enum WardrobeFilterEngine {
 
     private nonisolated static func statsSummary(for snapshots: [WardrobeClothingSnapshot]) -> WardrobeStatsSummary {
         snapshots.reduce(into: WardrobeStatsSummary.empty) { partial, snapshot in
+            guard !snapshot.isSold else { return }
             partial.styleCount += 1
             partial.totalCount += snapshot.stock
-            partial.dressValue += snapshot.price * Decimal(snapshot.stock)
+            partial.dressValue += snapshot.dressValueAmount
             partial.totalValue += snapshot.wardrobeValueAmount
         }
     }

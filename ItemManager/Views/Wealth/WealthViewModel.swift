@@ -133,6 +133,10 @@ class WealthViewModel {
         FinancialDataSanitizer.aggregateMoney(clothing.wardrobeValueAmount)
     }
 
+    nonisolated static func sanitizedDressValueContribution(for clothing: Clothing) -> Decimal {
+        FinancialDataSanitizer.aggregateMoney(clothing.dressValueAmount)
+    }
+
     nonisolated private static func logNegativeFinancialFieldsIfNeeded(_ clothing: Clothing) {
         let negativeFields = [
             clothing.price < 0 ? "price" : nil,

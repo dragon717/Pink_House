@@ -1,0 +1,9 @@
+{
+  "id" : "66cc8690-3332-4175-9d95-ad4b1c291e07",
+  "targets" : [
+    {
+      "id" : "1f69dc6c-233f-4832-90f3-b17f708ad6f0",
+      "name" : "ItemManager"
+    }
+  ]
+}

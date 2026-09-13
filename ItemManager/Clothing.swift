@@ -366,6 +366,21 @@ final class Clothing {
         }
     }
 
+    /// 衣橱“裙装价值”统一口径：只统计裙装本身，不含小物与邮费。
+    /// 已拥有（含已付清尾款）计完整裙装价；定金/预约阶段只计已付的裙装定金；已售出不计。
+    var dressValueAmount: Decimal {
+        switch reservationKind {
+        case .owned:
+            return FinancialDataSanitizer.money(price)
+                * Decimal(FinancialDataSanitizer.stock(stock))
+        case .fullPaymentReservation, .depositPlan:
+            return FinancialDataSanitizer.money(deposit)
+                * Decimal(FinancialDataSanitizer.stock(stock))
+        case .sold:
+            return 0
+        }
+    }
+
     var reservationListAmount: Decimal {
         isFullPaymentReservation ? fullPaymentReservationTotalAmount : pendingFinalPaymentAmount
     }

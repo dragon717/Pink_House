@@ -138,9 +138,8 @@ class ImageSaver: NSObject {
 
 struct ZoomableImageView: UIViewRepresentable {
     let imagePath: String
-    
+
     func makeUIView(context: Context) -> UIScrollView {
-        print("[ZoomableImageView] makeUIView called, imagePath: \(imagePath)")
         let scrollView = UIScrollView()
         scrollView.delegate = context.coordinator
         scrollView.maximumZoomScale = 5.0
@@ -149,61 +148,87 @@ struct ZoomableImageView: UIViewRepresentable {
         scrollView.showsVerticalScrollIndicator = false
         scrollView.backgroundColor = .black
         scrollView.contentInsetAdjustmentBehavior = .never
-        
+        scrollView.bouncesZoom = false
+
         let imageView = UIImageView()
         imageView.contentMode = .scaleAspectFit
-        imageView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
-        imageView.frame = scrollView.bounds
-        
+        imageView.backgroundColor = .clear
+        // 用 Auto Layout 而不是 autoresizingMask：
+        // 旧实现 `imageView.frame = scrollView.bounds` 在 makeUIView 时
+        // 把 frame 设成 (0,0,0,0)，依赖 SwiftUI 后续 layout 把 imageView
+        // 撑大。如果 image 是异步加载完才赋到 imageView 上的，首帧 layout
+        // 已经过去，imageView 在 (0,0) 状态下被 setNeedsDisplay → 黑屏，
+        // 直到下一次 bounds 变化才重绘。
+        // 用 layout guide + width/height constraints 后，imageView 从第
+        // 一次 layout pass 起就是正确的尺寸。
+        imageView.translatesAutoresizingMaskIntoConstraints = false
+
         scrollView.addSubview(imageView)
         context.coordinator.imageView = imageView
-        
+
+        let frameGuide = scrollView.frameLayoutGuide
+        let contentGuide = scrollView.contentLayoutGuide
+        NSLayoutConstraint.activate([
+            imageView.leadingAnchor.constraint(equalTo: contentGuide.leadingAnchor),
+            imageView.trailingAnchor.constraint(equalTo: contentGuide.trailingAnchor),
+            imageView.topAnchor.constraint(equalTo: contentGuide.topAnchor),
+            imageView.bottomAnchor.constraint(equalTo: contentGuide.bottomAnchor),
+            imageView.widthAnchor.constraint(equalTo: frameGuide.widthAnchor),
+            imageView.heightAnchor.constraint(equalTo: frameGuide.heightAnchor),
+        ])
+
+        // 父级缩略图（ChartImagePicker / sizeChartThumbnail）通常已经在
+        // 内存 cache 里同步加载过这张图，这里同步取出直接 set，避免异步
+        // loadImageAsync 走磁盘/iCloud 时的黑屏窗口。
+        if let image = ImageManager.shared.loadImage(fileName: imagePath) {
+            imageView.image = image
+            context.coordinator.currentPath = imagePath
+        }
+
         let doubleTap = UITapGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.handleDoubleTap(_:)))
         doubleTap.numberOfTapsRequired = 2
         scrollView.addGestureRecognizer(doubleTap)
-        
+
         return scrollView
     }
-    
+
     func updateUIView(_ uiView: UIScrollView, context: Context) {
-        print("[ZoomableImageView] updateUIView called, imagePath: \(imagePath), currentPath: \(context.coordinator.currentPath ?? "nil")")
         if context.coordinator.currentPath != imagePath {
-            print("[ZoomableImageView] Path changed, loading image...")
             context.coordinator.currentPath = imagePath
             uiView.zoomScale = 1.0
-            
+
+            // 快路径：缓存命中就同步 set，避免 async set 跟 layout 抢时序。
+            if let image = ImageManager.shared.loadImage(fileName: imagePath) {
+                context.coordinator.imageView?.image = image
+                return
+            }
+
+            // 慢路径：磁盘 / iCloud 下载，仍交给异步加载。
             Task {
-                print("[ZoomableImageView] Task started for: \(imagePath)")
                 if let image = await ImageManager.shared.loadImageAsync(fileName: imagePath) {
-                    print("[ZoomableImageView] Image loaded successfully")
                     await MainActor.run {
                         context.coordinator.imageView?.image = image
-                        print("[ZoomableImageView] Image set to imageView")
                     }
-                } else {
-                    print("[ZoomableImageView] Image load failed!")
                 }
             }
-        } else {
-            print("[ZoomableImageView] Path unchanged, skipping load")
         }
     }
-    
+
     func makeCoordinator() -> Coordinator {
         Coordinator()
     }
-    
+
     class Coordinator: NSObject, UIScrollViewDelegate {
         var imageView: UIImageView?
         var currentPath: String?
-        
+
         func viewForZooming(in scrollView: UIScrollView) -> UIView? {
             return imageView
         }
-        
+
         @objc func handleDoubleTap(_ gesture: UITapGestureRecognizer) {
             guard let scrollView = gesture.view as? UIScrollView else { return }
-            
+
             if scrollView.zoomScale > 1 {
                 scrollView.setZoomScale(1, animated: true)
             } else {
