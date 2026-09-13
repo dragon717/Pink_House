@@ -1,0 +1,91 @@
+# 时光馆内容来源、允许用途与责任人配置
+#
+# 对应 docs/Pink_House_TimeHall_Static_CloudKit_Design.md §8.3。
+#
+# ⚠️ 默认禁止发布：
+#   只有 permissionStatus 明确为 approved，且 allowedContentTypes 非空时，
+#   build_release.py 才会把该来源的内容纳入发布产物。
+#   permissionStatus 的其他任何取值（含拼写错误）都按「未批准」处理。
+#
+# ⚠️ 授权证明与联系人**不随公共 JSON 发布**：
+#   rightsEvidenceRef / reviewOwner 只留在本文件与私有审计记录里。
+#
+# 本文件由 publication/sources_loader.py 的一个严格子集解析器读取，
+# 只支持：整行注释、键值对、缩进列表、列表元素的内联键值对。
+# 出现无法识别的语法会直接报错，不会静默忽略。
+
+release:
+  channel: catalog-v1
+  schemaVersion: 1
+
+# 单个数据包与媒体的上限，必须与客户端 TimeHallCacheLimits 对齐
+limits:
+  maxPackCompressedBytes: 16777216
+  maxPackUncompressedBytes: 67108864
+  maxMediaBytes: 8388608
+
+brands:
+  - sourceID: pink-house-official
+    brandID: pink-house
+    displayName: PINK HOUSE
+    resourceName: catalog
+    sourceTimeZone: Asia/Tokyo
+    sourceCoverage: currentlyEnumerable
+    coverageDescription: 官网当前仍可枚举的目录、商品与资讯
+    permissionStatus: pending_review
+    allowedContentTypes: []
+    allowedTerritories: []
+    rightsEvidenceRef: internal-reference-only
+    reviewOwner: operator-alias
+
+  - sourceID: angelic-pretty-official
+    brandID: angelic-pretty
+    displayName: Angelic Pretty
+    resourceName: catalog-angelic-pretty
+    sourceTimeZone: Asia/Tokyo
+    sourceCoverage: curatedSelection
+    coverageDescription: 运营整理的精选收录，非官网全量
+    permissionStatus: pending_review
+    allowedContentTypes: []
+    allowedTerritories: []
+    rightsEvidenceRef: internal-reference-only
+    reviewOwner: operator-alias
+
+  - sourceID: baby-ssb-official
+    brandID: baby-the-stars-shine-bright
+    displayName: BABY, THE STARS SHINE BRIGHT
+    resourceName: catalog-baby-stars-shine-bright
+    sourceTimeZone: Asia/Tokyo
+    sourceCoverage: curatedSelection
+    coverageDescription: 运营整理的精选收录，非官网全量
+    permissionStatus: pending_review
+    allowedContentTypes: []
+    allowedTerritories: []
+    rightsEvidenceRef: internal-reference-only
+    reviewOwner: operator-alias
+
+  - sourceID: juliette-et-justine-official
+    brandID: juliette-et-justine
+    displayName: Juliette et Justine
+    resourceName: catalog-juliette-et-justine
+    sourceTimeZone: Asia/Tokyo
+    sourceCoverage: curatedSelection
+    coverageDescription: 运营整理的精选收录，非官网全量
+    permissionStatus: pending_review
+    allowedContentTypes: []
+    allowedTerritories: []
+    rightsEvidenceRef: internal-reference-only
+    reviewOwner: operator-alias
+
+  - sourceID: moi-meme-moitie-official
+    brandID: moi-meme-moitie
+    displayName: Moi-même-Moitié
+    resourceName: catalog-wunderwelt-fleur
+    sourceTimeZone: Asia/Tokyo
+    sourceCoverage: curatedSelection
+    coverageDescription: 运营整理的精选收录，非官网全量
+    permissionStatus: pending_review
+    allowedContentTypes: []
+    allowedTerritories: []
+    rightsEvidenceRef: internal-reference-only
+    reviewOwner: operator-alias

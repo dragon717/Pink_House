@@ -25,7 +25,9 @@ CATALOG_PATH = PROJ / "ItemManager" / "Resources" / "TimeHall" / "catalog.json"
 IMAGE_DIR = CATALOG_PATH.parent / "images"
 BATCHES_PATH = PROJ / "tools" / "time_hall" / "content_batches.json"
 USER_AGENT = "PinkHouseTimeHallImporter/3.0 (+local app catalog)"
-SSL_CONTEXT = ssl._create_unverified_context()
+# 必须验证证书：证书或抓取失败应中止对应批次，
+# 不能以「不验证证书」维持发布成功（docs/Pink_House_TimeHall_Static_CloudKit_Design.md §1.2 G / §17.5）。
+SSL_CONTEXT = ssl.create_default_context()
 
 
 def fetch(url: str) -> bytes:

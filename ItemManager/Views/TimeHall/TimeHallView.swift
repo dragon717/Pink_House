@@ -449,6 +449,12 @@ struct TimeHallView: View {
       storeTheme = TimeHallStoreTheme.themes(for: merchant).first ?? .omotesando
     }
     .toolbar(.hidden, for: .navigationBar)
+    // 首屏不等它（§15.3）：先把 Bundle 快照铺满，再在后台确认线上版本。
+    // 内部受 `TimeHallRuntimeConfiguration.isCloudSyncEnabled` 与
+    // `didStartCloudRefresh` 双重保护，开关关闭时不会发出任何请求。
+    .task {
+      store.startCloudRefreshIfNeeded()
+    }
   }
 
   private var pinkHouseHall: some View {

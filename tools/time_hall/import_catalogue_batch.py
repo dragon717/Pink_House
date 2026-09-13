@@ -38,16 +38,12 @@ JPEG_QUALITY = 80
 
 def fetch(url: str) -> bytes:
     request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
+    # 必须验证证书。证书链或抓取失败时中止该批次，不再退回「不验证证书」的降级路径：
+    # 以忽略证书维持发布成功会让整条流水线的来源可信性失效。
+    # 见 docs/Pink_House_TimeHall_Static_CloudKit_Design.md §1.2 G / §17.5。
     context = ssl.create_default_context()
-    try:
-        with urllib.request.urlopen(request, timeout=45, context=context) as response:
-            return response.read()
-    except Exception:
-        # The local Python installation can lack the macOS trust-chain bridge.
-        with urllib.request.urlopen(
-            request, timeout=45, context=ssl._create_unverified_context()
-        ) as response:
-            return response.read()
+    with urllib.request.urlopen(request, timeout=45, context=context) as response:
+        return response.read()
 
 
 def clean_text(raw: str) -> str:

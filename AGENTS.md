@@ -2,6 +2,12 @@
 
 > 本文件由 Codex CLI 自动注入。其他 LLM agent 也按这里的硬约束执行。
 
+> ⚠️ **开发机器（2026-09-14 用户确认）**：iOS / Swift 开发在**本机工作区**进行
+> `/Users/sangyu/develop/Pink_House`（remote `git@github.com:dragon717/Pink_House.git`）。
+> 下文「仓库 source of truth」一节里的 `/Users/muniao/Library/Mobile Documents/...` 是**另一台机器**的路径，
+> 在本机（sangyu）不存在，**不要按它去读写文件**。
+> 注意：本文件由 Codex 自动注入，重新生成会覆盖这段说明，发现消失请重新补上。
+
 ## 本地开发偏好
 
 - 在进行 iOS 开发时，可以按任务需要运行 `xcodebuild` 构建、测试或模拟器验收；运行后需在结果中记录命令、通过/失败状态和验证边界。若用户明确说本次不跑构建，则遵守该次约束。

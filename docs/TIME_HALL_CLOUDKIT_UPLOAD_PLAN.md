@@ -1,6 +1,33 @@
 # 梦裙时光馆 · CloudKit 公共库用户上传方案（V2）
 
-> 状态：**仅文档，V1 未实现上传**。V1 为 Bundle 本地馆藏（`ItemManager/Resources/TimeHall/`）。
+> ## ⚠️ 本文档已被取代，仅作历史参考
+>
+> **不要按本文实现新功能。** 本文的核心前提是「**用户**可上传裙装图文到公共库」，
+> 该方向已被明确否决——普通用户对公共库**零写权限**是现行设计的硬约束。
+>
+> 现行权威设计：`docs/Pink_House_TimeHall_Static_CloudKit_Design.md`
+> （静态内容 + CloudKit 公共内容库 + 本地可清理缓存，生产通道与消费通道分离）。
+>
+> 现行实现与操作手册：
+>
+> | 内容 | 位置 |
+> |---|---|
+> | 发布协议与分层 DTO | `ItemManager/Models/TimeHall/TimeHallPublicationModels.swift` |
+> | 三层校验 | `ItemManager/Services/TimeHall/TimeHallPublicationValidator.swift` |
+> | 只读 Reader（类型层面无写能力） | `ItemManager/Services/TimeHall/TimeHallPublicCloudReader.swift` |
+> | 本地缓存与清理 | `TimeHallPackCache.swift` / `TimeHallMediaCache.swift` |
+> | Mac 发布流水线 | `tools/time_hall/publication/`（见其中 `README.md`） |
+> | Record Type 与 Security Role 配置 | `tools/time_hall/publication/README.md` 的「CloudKit Console 前置」 |
+>
+> 本文中**仍然有效**的部分：容器选择（`iCloud.bugod2.ItemManager`）、
+> `CKAsset` + `desiredKeys` 的取数思路。**已失效**的部分：`TimeHallEntry` 这个
+> 用户投稿 Record Type、管理员 allowlist 作为唯一权限手段、以及「用户上传」整条链路。
+>
+> 保留原因：记录方案演进，避免重新提出「让用户写入公共库」的设计。
+
+---
+
+> 状态（原文）：**仅文档，V1 未实现上传**。V1 为 Bundle 本地馆藏（`ItemManager/Resources/TimeHall/`）。
 > 目标：用户可上传裙装图文，写入 Apple CloudKit **Public Database**，全用户可读；调试链路复杂，先落版本管理。
 
 ## 1. 与现有能力的关系

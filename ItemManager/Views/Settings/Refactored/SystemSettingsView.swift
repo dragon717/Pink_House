@@ -131,6 +131,11 @@ struct SystemSettingsView: View {
             
             // MARK: - 存储与性能
             AdaptiveSection(header: "存储与性能") {
+                NavigationLink(destination: TimeHallCacheSettingsView()) {
+                    Label("时光馆下载缓存", systemImage: "square.stack.3d.up")
+                }
+                .adaptiveRow()
+                
                 Toggle(isOn: $useAggressiveMemoryOptimization) {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("积极内存优化")
