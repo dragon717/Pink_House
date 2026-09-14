@@ -166,6 +166,83 @@ struct TimeHallCommerceItemDTO: Codable, Identifiable, Hashable, Sendable {
   let imageSourceURLs: [String]
   let productPageURL: String
   let observedAt: String
+
+  // MARK: - 淘宝式商品规格（全部可选，旧 JSON 无此键时按 nil 解码）
+
+  /// 价格表：按规格（尺码 / 颜色）区分的价格档。
+  /// 详情页底部「价格表」由它渲染；为 nil 时回退到
+  /// `regularPriceJPY` / `salePriceJPY` 单档，不显示价格表。
+  let priceTiers: [TimeHallPriceTier]?
+
+  /// 尺码表。来源见 `TimeHallSizeChartParser`：优先从已抓取的
+  /// `description` / `descriptionZH` 文本解析，缺失时由人工录入写入。
+  let sizeChart: TimeHallSizeChart?
+}
+
+// MARK: - 价格表 / 尺码表（第二步：淘宝式商品功能）
+
+/// 价格表的一档。`size` / `color` 至少有一个非空，用于与详情页
+/// 的颜色行、尺码行选中态联动。
+struct TimeHallPriceTier: Codable, Hashable, Sendable {
+  let label: String
+  let size: String?
+  let color: String?
+  let regularPriceJPY: Int
+  let salePriceJPY: Int?
+  /// 定金。三坑/Lolita 常见「定金 + 尾款」两段计价。
+  let depositJPY: Int?
+  /// 尾款。
+  let balanceJPY: Int?
+  /// 币种代码，缺省按 JPY 处理（历史数据均为日元）。
+  let currency: String?
+  let sourceURL: String?
+  let noteZH: String?
+}
+
+/// 尺码表的一行。
+struct TimeHallSizeRow: Codable, Hashable, Sendable, Identifiable {
+  /// 尺码标签，如 "S" / "M" / "0" / "FREE"。
+  let label: String
+  /// 与 `TimeHallSizeChart.columns[1...]` 逐项对齐。
+  let values: [String]
+
+  var id: String { label }
+
+  /// 从已解析的数据建一行；`values` 不足时用 "—" 补齐，保证与表头等宽。
+  init(label: String, values: [String]) {
+    self.label = label
+    self.values = values
+  }
+
+  // `values` 需要按表头补齐，故保留可变入口给解析器使用。
+  init(label: String, values: [String], alignTo columnCount: Int) {
+    self.label = label
+    var padded = values
+    if padded.count < columnCount {
+      padded.append(contentsOf: Array(repeating: "—", count: columnCount - padded.count))
+    } else if padded.count > columnCount {
+      padded = Array(padded.prefix(columnCount))
+    }
+    self.values = padded
+  }
+}
+
+/// 尺码表。`columns[0]` 约定为尺码标签列，`rows[].values` 与其后各列对齐。
+struct TimeHallSizeChart: Codable, Hashable, Sendable {
+  /// 单位，如 "cm" / "inch"。
+  let unit: String
+  /// 表头，首项为尺码标签列名（如 "尺码"）。
+  let columns: [String]
+  let rows: [TimeHallSizeRow]
+  let sourceURL: String?
+  /// true 表示来自创作者人工录入，false/nil 表示从公开文本解析。
+  let isManuallyEntered: Bool?
+  let noteZH: String?
+
+  /// 是否是一张「可用」的尺码表：至少要有一行、且行内有值列。
+  var isUsable: Bool {
+    !rows.isEmpty && columns.count >= 2
+  }
 }
 
 struct TimeHallCoordinateDTO: Codable, Identifiable, Hashable, Sendable {

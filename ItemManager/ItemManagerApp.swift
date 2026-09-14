@@ -133,7 +133,12 @@ struct MainContentView: View {
         .onAppear {
             guard !didStartLaunchFlow else { return }
             didStartLaunchFlow = true
-            
+
+            // 启动即把本机 iCloud 用户标识与创作者白名单判定打进日志。
+            // 排查「为什么这台设备看不到运营上传入口」时，在 Xcode 控制台搜索
+            // `CreatorGate` 就能看到：本机 key、白名单、是否命中、判定结果。
+            Task { _ = await NoticeCloudKitService.shared.creatorGate() }
+
             if let url = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: WidgetDataManager.appGroupIdentifier) {
                 print("App Group Container URL: \(url.path)")
             } else {

@@ -19,12 +19,15 @@ enum TimeHallMode: String, CaseIterable, Identifiable {
   }
 }
 
-private enum TimeHallMerchant: String, CaseIterable, Identifiable {
+enum TimeHallMerchant: String, CaseIterable, Identifiable {
   case pinkHouse
   case angelicPretty
   case babyStarsShineBright
   case julietteEtJustine
   case wunderweltFleur
+  /// 国牌，数据来源与上面五个日牌不同：没有官网 catalogue 管道，
+  /// 走 Bundle 种子 + CloudKit 创作者补充，页面见 MidsummerBrandView。
+  case midsummerTale
 
   var id: String { rawValue }
 
@@ -35,6 +38,7 @@ private enum TimeHallMerchant: String, CaseIterable, Identifiable {
     case .babyStarsShineBright: return "BABY, THE STARS SHINE BRIGHT"
     case .julietteEtJustine: return "Juliette et Justine"
     case .wunderweltFleur: return "Wunderwelt FLEUR"
+    case .midsummerTale: return "仲夏物语"
     }
   }
 
@@ -45,12 +49,14 @@ private enum TimeHallMerchant: String, CaseIterable, Identifiable {
     case .babyStarsShineBright: return "细腻优雅的永恒洛丽塔衣橱".appLocalized
     case .julietteEtJustine: return "与艺术同行的古典优雅".appLocalized
     case .wunderweltFleur: return "官方授权多品牌新商品平台".appLocalized
+    case .midsummerTale: return "国牌原创 · 上新系列档案".appLocalized
     }
   }
 
+  /// 仲夏物语没有 Bundle catalogue，数据由 MidsummerStore 提供。
   var catalogResourceName: String? {
     switch self {
-    case .pinkHouse: return nil
+    case .pinkHouse, .midsummerTale: return nil
     case .angelicPretty: return "catalog-angelic-pretty"
     case .babyStarsShineBright: return "catalog-baby-stars-shine-bright"
     case .julietteEtJustine: return "catalog-juliette-et-justine"
@@ -60,7 +66,7 @@ private enum TimeHallMerchant: String, CaseIterable, Identifiable {
 
   var coverImage: String? {
     switch self {
-    case .pinkHouse: return nil
+    case .pinkHouse, .midsummerTale: return nil
     case .angelicPretty: return "brand-angelic-pretty-hero.jpg"
     case .babyStarsShineBright: return "brand-baby-hero.png"
     case .julietteEtJustine: return "brand-juliette-hero.jpg"
@@ -75,8 +81,12 @@ private enum TimeHallMerchant: String, CaseIterable, Identifiable {
     case .babyStarsShineBright: return "https://store.babyssb.co.jp/en"
     case .julietteEtJustine: return "https://juliette-et-justine.com/zh-cn"
     case .wunderweltFleur: return "https://www.wunderwelt.jp/zh/pages/fleur"
+    case .midsummerTale: return "https://weibo.com/u/5902942009"
     }
   }
+
+  /// 该品牌是否走独立的品牌页（而非通用 catalogue 版式）。
+  var usesDedicatedBrandPage: Bool { self == .midsummerTale }
 }
 
 private enum TimeHallScrollRange: Equatable {
@@ -429,10 +439,19 @@ struct TimeHallView: View {
     Group {
       if activeMerchant == .pinkHouse {
         pinkHouseHall
+      } else if activeMerchant == .midsummerTale {
+        // 仲夏物语走独立品牌页：布局参考淘宝品牌页（左年份栏 + 系列筛选 + 商品卡片）
+        MidsummerBrandView(onClose: {
+          isHeaderCollapsed = false
+          activeMerchant = nil
+          curatedCatalog = nil
+        })
       } else if let activeMerchant {
         curatedBrandHall(activeMerchant)
       } else {
-        merchantSelection
+        // 主页参考图一：品牌列表（方形缩略图 + 名称 + 「N件新品｜N天前加入」 + 进店）。
+        // 旧的左右滑动轮播选品牌页（`merchantSelection`）不再作为主页使用。
+        brandListHome
       }
     }
     .sheet(item: $detailCommerceItem) { item in
@@ -1080,6 +1099,54 @@ struct TimeHallView: View {
       .padding(.top, 88)
     }
     .scrollIndicators(.hidden)
+  }
+
+  // MARK: - 主页（参考图一：品牌列表）
+  //
+  // 图一范式 = 「关注店铺列表」。与旧的 `merchantSelection`（左右滑动轮播）相比，
+  // 这里把「选品牌」变成「浏览自己已添加的品牌 + 搜索 + 筛选」：
+  //   · 每个品牌一行，方形缩略图 + 名称 + 「N件新品｜N天前加入」 + 「进店」 + 「⋯」
+  //   · 上下滑动浏览
+  //   · 顶部搜索框 + 筛选条（全部／有上新／国牌／日牌）
+  // 旧轮播实现保留在文件里但不再作为主页渲染，便于对照与回退。
+
+  /// 元数据种子只读一次：文件随包分发且进程内不变。
+  private static let brandMetaCatalog = TimeHallBrandMetaSeed.load()
+
+  private var brandListings: [TimeHallBrandListing] {
+    TimeHallBrandListingsBuilder.makeListings(
+      merchants: TimeHallMerchant.allCases,
+      metaCatalog: Self.brandMetaCatalog,
+      inStockCount: { TimeHallBrandStockCounter.shared.inStockCount(for: $0) }
+    )
+  }
+
+  private var brandListHome: some View {
+    ZStack {
+      LiquidBackground(themeSkinWallpaperContext: .timeHall)
+      TimeHallBrandListHome(
+        listings: brandListings,
+        onEnter: { enterBrand(id: $0) },
+        onOpenWebsite: { openBrandWebsite(id: $0) }
+      )
+    }
+  }
+
+  private func enterBrand(id: String) {
+    guard let merchant = TimeHallMerchant(rawValue: id) else { return }
+    // 记下真实进入时间：主页的「N 天前加入」据此变化，而不是永远停在种子日期。
+    TimeHallBrandFollowStore.shared.markFollowed(id)
+    isHeaderCollapsed = false
+    mode = .chronicle
+    curatedCatalog = merchant.catalogResourceName.flatMap(store.bundledCatalog(named:))
+    activeMerchant = merchant
+  }
+
+  private func openBrandWebsite(id: String) {
+    guard let merchant = TimeHallMerchant(rawValue: id),
+      let url = URL(string: merchant.officialURL)
+    else { return }
+    UIApplication.shared.open(url)
   }
 
   private var merchantSelection: some View {
@@ -2140,7 +2207,11 @@ private struct TimeHallMagazinePageCard: View {
 }
 
 @MainActor
-private enum TimeHallWardrobeDraftBuilder {
+/// 把馆藏 / 商品条目转成衣橱草稿。
+///
+/// 从 `private` 提升为 internal：`TimeHallWardrobeQuickInserter`（一键入库形态）
+/// 需要复用它，保证两条路径的字段映射完全一致。
+enum TimeHallWardrobeDraftBuilder {
   static func makeDraft(
     for item: TimeHallItemDTO,
     store: TimeHallCatalogStore,
@@ -2304,6 +2375,23 @@ private struct TimeHallAddToWardrobeButton: View {
   }
 }
 
+/// 一键入库失败时压在封面上的橙色胶囊。
+///
+/// 卡片上原本只在失败时写日志，界面上毫无变化——使用者看到的就是「点了没反应」。
+/// 失败必须和成功一样显眼，否则「点了没反应」这个观感永远修不掉。
+private struct TimeHallInsertFailureCapsule: View {
+  var body: some View {
+    Text("加入失败，请重试".appLocalized)
+      .font(.caption2.weight(.semibold))
+      .foregroundStyle(.white)
+      .padding(.horizontal, 7)
+      .padding(.vertical, 3)
+      .background(Color.orange.opacity(0.95), in: Capsule())
+      .padding(8)
+      .transition(.opacity)
+  }
+}
+
 struct TimeHallItemDetailView: View {
   let item: TimeHallItemDTO
   @ObservedObject private var store = TimeHallCatalogStore.shared
@@ -2312,6 +2400,11 @@ struct TimeHallItemDetailView: View {
   @Environment(\.modelContext) private var modelContext
   @Environment(ThemeManager.self) private var themeManager
   @Environment(\.colorScheme) private var colorScheme
+
+  /// 形态 A（一键入库）进行中：图片落盘需要一点时间
+  @State private var isAddingToWardrobe = false
+  /// 形态 A 完成后的提示文案
+  @State private var quickInsertMessage: String?
 
   private var palette: MagicThemePalette {
     MagicThemeDesignSystem.palette(themeManager: themeManager, colorScheme: colorScheme)
@@ -2392,7 +2485,20 @@ struct TimeHallItemDetailView: View {
               }
             }
 
-            TimeHallAddToWardrobeButton(action: addToWardrobe)
+            VStack(spacing: 8) {
+              TimeHallWardrobeInsertButtons(
+                isBusy: isAddingToWardrobe,
+                onQuickInsert: quickInsertToWardrobe,
+                onOpenEditor: addToWardrobe
+              )
+
+              if let quickInsertMessage {
+                Text(quickInsertMessage)
+                  .font(.caption)
+                  .foregroundStyle(.secondary)
+                  .transition(.opacity)
+              }
+            }
 
             if let imageURL = URL(string: item.imageSourceURL) {
               Link(destination: imageURL) {
@@ -2462,6 +2568,7 @@ struct TimeHallItemDetailView: View {
     return "图录出现页：\(pages.map(String.init).joined(separator: "、"))"
   }
 
+  /// 形态 B：跳衣橱编辑页并预填（原有行为）。
   private func addToWardrobe() {
     let draft = TimeHallWardrobeDraftBuilder.makeDraft(
       for: item,
@@ -2473,6 +2580,27 @@ struct TimeHallItemDetailView: View {
       tabNavigationManager.presentWardrobeCreation(with: draft)
     }
   }
+
+  /// 形态 A：不打开编辑页，直接落库。完成后弹一条就地提示，不打断浏览。
+  private func quickInsertToWardrobe() {
+    guard !isAddingToWardrobe else { return }
+    isAddingToWardrobe = true
+    let draft = TimeHallWardrobeDraftBuilder.makeDraft(
+      for: item,
+      store: store,
+      modelContext: modelContext
+    )
+    do {
+      let clothing = try TimeHallWardrobeQuickInserter.insert(
+        draft: draft,
+        modelContext: modelContext
+      )
+      quickInsertMessage = "已加入衣橱：\(clothing.name)"
+    } catch {
+      quickInsertMessage = "加入失败：" + error.localizedDescription
+    }
+    isAddingToWardrobe = false
+  }
 }
 
 private struct TimeHallCatalogItemCard: View {
@@ -2481,56 +2609,134 @@ private struct TimeHallCatalogItemCard: View {
   @ObservedObject private var store = TimeHallCatalogStore.shared
   @Environment(ThemeManager.self) private var themeManager
   @Environment(\.colorScheme) private var colorScheme
+  @Environment(\.modelContext) private var modelContext
+
+  /// 卡片上的形态 A（一键入库）状态
+  @State private var isInsertingToWardrobe = false
+  @State private var didInsertToWardrobe = false
 
   private var palette: MagicThemePalette {
     MagicThemeDesignSystem.palette(themeManager: themeManager, colorScheme: colorScheme)
   }
 
-  var body: some View {
-    Button(action: onTap) {
-      VStack(alignment: .leading, spacing: 8) {
-        ZStack(alignment: .topTrailing) {
-          TimeHallBundleImage(
-            fileName: item.coverImage,
-            placeholderSystemImage: item.kind.symbolName
-          )
-          .scaledToFill()
-          .frame(maxWidth: .infinity)
-          .frame(height: 180)
-          .clipped()
-          .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+  /// 形态 A：不打开编辑页，直接在卡片上入库。
+  ///
+  /// 这张卡在此之前**完全没有加入衣橱的入口**——Pink House 与其余日牌的「编年史 / 图鉴」
+  /// 区块都用它，所以那些页面里每个馆藏单品都是「看得到、存不下来」。
+  private func quickInsertToWardrobe() {
+    guard !isInsertingToWardrobe else { return }
+    isInsertingToWardrobe = true
+    Task {
+      do {
+        _ = try TimeHallWardrobeQuickInserter.insert(
+          item: item,
+          store: store,
+          modelContext: modelContext
+        )
+        didInsertToWardrobe = true
+      } catch {
+        AppLogger.error("TimeHall 卡片一键入库失败：\(error.localizedDescription)")
+        didInsertFailed = true
+      }
+      isInsertingToWardrobe = false
+    }
+  }
 
+  /// 失败也要看得见：原来失败只写日志，卡片上不显示任何东西，
+  /// 使用者看到的就是「点了没反应」——正是本轮要消灭的观感。
+  @State private var didInsertFailed = false
+
+  var body: some View {
+    // 与 `TimeHallCommerceItemCard` 同因同修：外层 Button 套内层 Button 会让整卡点击失效
+    // （点卡片打不开详情页），改用 contentShape + onTapGesture。
+    VStack(alignment: .leading, spacing: 8) {
+      ZStack(alignment: .topTrailing) {
+        TimeHallBundleImage(
+          fileName: item.coverImage,
+          placeholderSystemImage: item.kind.symbolName
+        )
+        .scaledToFill()
+        .frame(maxWidth: .infinity)
+        .frame(height: 180)
+        .clipped()
+        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+
+        Button {
+          store.toggleTreasure(item.id)
+        } label: {
+          Image(systemName: store.isTreasured(item.id) ? "heart.fill" : "heart")
+            .font(.footnote.weight(.semibold))
+            .foregroundStyle(store.isTreasured(item.id) ? Color.pink : .white)
+            .padding(8)
+            // `.ultraThinMaterial` 在浅色商品图上等于白图标压白底，收藏态根本看不见。
+            .background(Color.black.opacity(0.38), in: Circle())
+            .shadow(color: .black.opacity(0.20), radius: 3, y: 1)
+        }
+        .buttonStyle(.plain)
+        .padding(8)
+        .accessibilityLabel(store.isTreasured(item.id) ? "取消收藏".appLocalized : "收藏".appLocalized)
+      }
+      // 「每个商品上提供直接添加到衣橱的入口」：左上角一点即入橱。
+      // 与 `TimeHallCommerceItemCard` 用完全相同的实底样式与圆角位置，避免两处观感不一致。
+      //
+      // 反馈胶囊紧跟在按钮正下方（而不是压在图底）：图底常被悬浮 dock 挡住，
+      // 「最后一个可见卡片」的反馈就会看不见——观感又回到「点了没反应」。
+      .overlay(alignment: .topLeading) {
+        VStack(alignment: .leading, spacing: 6) {
           Button {
-            store.toggleTreasure(item.id)
+            quickInsertToWardrobe()
           } label: {
-            Image(systemName: store.isTreasured(item.id) ? "heart.fill" : "heart")
-              .font(.footnote.weight(.semibold))
-              .foregroundStyle(store.isTreasured(item.id) ? Color.pink : .white)
-              .padding(8)
-              .background(.ultraThinMaterial, in: Circle())
+            Image(
+              systemName: didInsertToWardrobe
+                ? "checkmark.circle.fill"
+                : (isInsertingToWardrobe
+                  ? "hourglass" : TimeHallWardrobeInsertMode.quickInsert.symbolName)
+            )
+            .font(.footnote.weight(.bold))
+            .foregroundStyle(.white)
+            .padding(8)
+            .background(Color.pink, in: Circle())
+            .overlay { Circle().stroke(Color.white.opacity(0.9), lineWidth: 1) }
+            .shadow(color: .black.opacity(0.22), radius: 3, y: 1)
           }
           .buttonStyle(.plain)
-          .padding(8)
-        }
+          .disabled(isInsertingToWardrobe)
+          .accessibilityLabel(TimeHallWardrobeInsertMode.quickInsert.title)
+          .accessibilityHint(TimeHallWardrobeInsertMode.quickInsert.hint)
 
-        Text("\(String(item.year)) · \(TimeHallSeason(rawValue: item.season)?.labelZH ?? item.season)")
-          .font(.caption2.weight(.bold))
-          .foregroundStyle(Color.pink)
-        Text(item.displayName)
-          .font(.subheadline.weight(.semibold))
-          .foregroundStyle(palette.primaryText)
-          .lineLimit(2)
-        Text("\(item.kind.labelZH) · \(item.displayCategory)")
-          .font(.caption2)
-          .foregroundStyle(palette.secondaryText)
-        if item.priceJPY > 0 {
-          Text("¥\(item.priceJPY.formatted())")
-            .font(.caption.weight(.semibold))
-            .foregroundStyle(palette.primaryText)
+          if didInsertToWardrobe {
+            Text("已加入衣橱".appLocalized)
+              .font(.caption2.weight(.semibold))
+              .foregroundStyle(.white)
+              .padding(.horizontal, 7)
+              .padding(.vertical, 3)
+              .background(Color.pink.opacity(0.92), in: Capsule())
+              .transition(.opacity)
+          } else if didInsertFailed {
+            TimeHallInsertFailureCapsule()
+          }
         }
+        .padding(8)
+      }
+
+      Text("\(String(item.year)) · \(TimeHallSeason(rawValue: item.season)?.labelZH ?? item.season)")
+        .font(.caption2.weight(.bold))
+        .foregroundStyle(Color.pink)
+      Text(item.displayName)
+        .font(.subheadline.weight(.semibold))
+        .foregroundStyle(palette.primaryText)
+        .lineLimit(2)
+      Text("\(item.kind.labelZH) · \(item.displayCategory)")
+        .font(.caption2)
+        .foregroundStyle(palette.secondaryText)
+      if item.priceJPY > 0 {
+        Text("¥\(item.priceJPY.formatted())")
+          .font(.caption.weight(.semibold))
+          .foregroundStyle(palette.primaryText)
       }
     }
-    .buttonStyle(.plain)
+    .contentShape(Rectangle())
+    .onTapGesture(perform: onTap)
   }
 }
 
@@ -2540,64 +2746,150 @@ struct TimeHallCommerceItemCard: View {
   @ObservedObject private var store = TimeHallCatalogStore.shared
   @Environment(ThemeManager.self) private var themeManager
   @Environment(\.colorScheme) private var colorScheme
+  @Environment(\.modelContext) private var modelContext
+
+  /// 卡片上的形态 A（一键入库）状态
+  @State private var isInsertingToWardrobe = false
+  @State private var didInsertToWardrobe = false
+  /// 失败可见化：原来失败只写日志，卡片上毫无变化，观感等于「点了没反应」。
+  @State private var didInsertFailed = false
 
   private var palette: MagicThemePalette {
     MagicThemeDesignSystem.palette(themeManager: themeManager, colorScheme: colorScheme)
   }
 
-  var body: some View {
-    Button(action: onTap) {
-      VStack(alignment: .leading, spacing: 8) {
-        ZStack(alignment: .topTrailing) {
-          TimeHallCommerceImage(item: item, index: 0)
-          .scaledToFill()
-          .frame(maxWidth: .infinity)
-          .frame(height: 180)
-          .clipped()
-          .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+  /// 形态 A：不打开编辑页，直接在卡片上入库。
+  private func quickInsertToWardrobe() {
+    guard !isInsertingToWardrobe else { return }
+    isInsertingToWardrobe = true
+    Task {
+      let draft = TimeHallWardrobeDraftBuilder.makeDraft(
+        for: item,
+        store: store,
+        modelContext: modelContext
+      )
+      do {
+        _ = try TimeHallWardrobeQuickInserter.insert(
+          draft: draft,
+          modelContext: modelContext
+        )
+        didInsertToWardrobe = true
+      } catch {
+        AppLogger.error("TimeHall 卡片一键入库失败：\(error.localizedDescription)")
+        didInsertFailed = true
+      }
+      isInsertingToWardrobe = false
+    }
+  }
 
+  var body: some View {
+    // 注意：这里**不能**用「外层 Button 包住内容 + 内层再放 Button」的写法。
+    // SwiftUI 里嵌套 Button 是未定义行为：内层按钮会吃掉点击，外层整卡点击变得不稳定
+    // （表现为「点卡片打不开详情页」，于是详情页里的『加入并编辑』永远看不到）。
+    // 因此改成 contentShape + onTapGesture 承担整卡点击，内层功能按钮仍是真 Button。
+    VStack(alignment: .leading, spacing: 8) {
+      ZStack(alignment: .topTrailing) {
+        TimeHallCommerceImage(item: item, index: 0)
+        .scaledToFill()
+        .frame(maxWidth: .infinity)
+        .frame(height: 180)
+        .clipped()
+        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+
+        Button {
+          store.toggleTreasure(item.id)
+        } label: {
+          Image(systemName: store.isTreasured(item.id) ? "heart.fill" : "heart")
+            .font(.footnote.weight(.semibold))
+            .foregroundStyle(store.isTreasured(item.id) ? Color.pink : .white)
+            .padding(8)
+            // 原来用 `.ultraThinMaterial`：浅色模式下是「白色图标 + 浅色半透明底」，
+            // 压在浅色商品图（白/浅粉底居多）上几乎不可见。改成深色实底保证对比度。
+            .background(Color.black.opacity(0.38), in: Circle())
+            .shadow(color: .black.opacity(0.20), radius: 3, y: 1)
+        }
+        .buttonStyle(.plain)
+        .padding(8)
+        .accessibilityLabel(store.isTreasured(item.id) ? "取消收藏".appLocalized : "收藏".appLocalized)
+      }
+      // 「每个商品上提供直接添加到衣橱的入口」：卡片左上角一点即入橱（形态 A）。
+      // 形态 B（跳编辑页）留在详情页，避免卡片上按钮过密。
+      //
+      // 同一坑：图标原来是「白色 + `.ultraThinMaterial`」，在浅底商品图上等于隐形，
+      // 使用者反馈「看不到入口」即是此因。改为粉色实心圆底 + 白图标 + 细描边 + 投影。
+      //
+      // 反馈胶囊紧跟在按钮正下方（而不是压在图底）：图底常被悬浮 dock 挡住。
+      .overlay(alignment: .topLeading) {
+        VStack(alignment: .leading, spacing: 6) {
           Button {
-            store.toggleTreasure(item.id)
+            quickInsertToWardrobe()
           } label: {
-            Image(systemName: store.isTreasured(item.id) ? "heart.fill" : "heart")
-              .font(.footnote.weight(.semibold))
-              .foregroundStyle(store.isTreasured(item.id) ? Color.pink : .white)
-              .padding(8)
-              .background(.ultraThinMaterial, in: Circle())
+            Image(
+              systemName: didInsertToWardrobe
+                ? "checkmark.circle.fill"
+                : (isInsertingToWardrobe
+                  ? "hourglass" : TimeHallWardrobeInsertMode.quickInsert.symbolName)
+            )
+            .font(.footnote.weight(.bold))
+            .foregroundStyle(.white)
+            .padding(8)
+            .background(Color.pink, in: Circle())
+            .overlay {
+              Circle().stroke(Color.white.opacity(0.9), lineWidth: 1)
+            }
+            .shadow(color: .black.opacity(0.22), radius: 3, y: 1)
           }
           .buttonStyle(.plain)
-          .padding(8)
-        }
+          .disabled(isInsertingToWardrobe)
+          .accessibilityLabel(TimeHallWardrobeInsertMode.quickInsert.title)
+          .accessibilityHint(TimeHallWardrobeInsertMode.quickInsert.hint)
 
-        Text(item.listingLabelZH)
-          .font(.caption2.weight(.bold))
-          .foregroundStyle(item.sourceKind == .outlet ? Color.orange : Color.pink)
-        Text(item.displayName)
-          .font(.subheadline.weight(.semibold))
-          .foregroundStyle(palette.primaryText)
-          .lineLimit(2)
-        Text("\(item.kind.labelZH) · \(item.displayCategory)")
-          .font(.caption2)
-          .foregroundStyle(palette.secondaryText)
-        HStack(spacing: 6) {
-          if item.regularPriceJPY == 0 {
-            Text("价格未公开".appLocalized)
-              .foregroundStyle(palette.secondaryText)
-          } else if let salePrice = item.salePriceJPY {
-            Text("¥\(item.regularPriceJPY.formatted())")
-              .strikethrough()
-              .foregroundStyle(palette.secondaryText)
-            Text("¥\(salePrice.formatted())")
-              .foregroundStyle(Color.orange)
-          } else {
-            Text("¥\(item.regularPriceJPY.formatted())")
-              .foregroundStyle(palette.primaryText)
+          if didInsertToWardrobe {
+            Text("已加入衣橱".appLocalized)
+              .font(.caption2.weight(.semibold))
+              .foregroundStyle(.white)
+              .padding(.horizontal, 7)
+              .padding(.vertical, 3)
+              .background(Color.pink.opacity(0.92), in: Capsule())
+              .transition(.opacity)
+          } else if didInsertFailed {
+            TimeHallInsertFailureCapsule()
           }
         }
-        .font(.caption.weight(.semibold))
+        .padding(8)
       }
+
+      Text(item.listingLabelZH)
+        .font(.caption2.weight(.bold))
+        .foregroundStyle(item.sourceKind == .outlet ? Color.orange : Color.pink)
+      Text(item.displayName)
+        .font(.subheadline.weight(.semibold))
+        .foregroundStyle(palette.primaryText)
+        .lineLimit(2)
+      Text("\(item.kind.labelZH) · \(item.displayCategory)")
+        .font(.caption2)
+        .foregroundStyle(palette.secondaryText)
+      HStack(spacing: 6) {
+        if item.regularPriceJPY == 0 {
+          Text("价格未公开".appLocalized)
+            .foregroundStyle(palette.secondaryText)
+        } else if let salePrice = item.salePriceJPY {
+          Text("¥\(item.regularPriceJPY.formatted())")
+            .strikethrough()
+            .foregroundStyle(palette.secondaryText)
+          Text("¥\(salePrice.formatted())")
+            .foregroundStyle(Color.orange)
+        } else {
+          Text("¥\(item.regularPriceJPY.formatted())")
+            .foregroundStyle(palette.primaryText)
+        }
+      }
+      .font(.caption.weight(.semibold))
     }
-    .buttonStyle(.plain)
+    .contentShape(Rectangle())
+    .onTapGesture(perform: onTap)
+    .accessibilityElement(children: .contain)
+    .accessibilityAction(named: Text("查看详情".appLocalized)) { onTap() }
   }
 }
 
@@ -2610,6 +2902,8 @@ struct TimeHallCommerceItemDetailView: View {
   @Environment(ThemeManager.self) private var themeManager
   @Environment(\.colorScheme) private var colorScheme
   @State private var isAddingToWardrobe = false
+  /// 形态 A（一键入库）完成后的就地提示
+  @State private var quickInsertMessage: String?
 
   private var palette: MagicThemePalette {
     MagicThemeDesignSystem.palette(themeManager: themeManager, colorScheme: colorScheme)
@@ -2658,7 +2952,20 @@ struct TimeHallCommerceItemDetailView: View {
             }
             .font(.subheadline)
 
-            TimeHallAddToWardrobeButton(isLoading: isAddingToWardrobe, action: addToWardrobe)
+            VStack(spacing: 8) {
+              TimeHallWardrobeInsertButtons(
+                isBusy: isAddingToWardrobe,
+                onQuickInsert: quickInsertToWardrobe,
+                onOpenEditor: addToWardrobe
+              )
+
+              if let quickInsertMessage {
+                Text(quickInsertMessage)
+                  .font(.caption)
+                  .foregroundStyle(.secondary)
+                  .transition(.opacity)
+              }
+            }
 
             detailFacts
 
@@ -2766,29 +3073,54 @@ struct TimeHallCommerceItemDetailView: View {
     .foregroundStyle(palette.secondaryText)
   }
 
+  /// 图片预取 + 草稿构造：两种加入形态共用，避免两套映射走偏。
+  private func makeDraftWithRemoteImage() async -> ClothingEditDraft {
+    let remoteImage: UIImage?
+    if item.coverImage.isEmpty,
+      let source = item.imageSourceURLs.first,
+      let url = URL(string: source),
+      let (data, _) = try? await URLSession.shared.data(from: url)
+    {
+      remoteImage = UIImage(data: data)
+    } else {
+      remoteImage = nil
+    }
+    return TimeHallWardrobeDraftBuilder.makeDraft(
+      for: item,
+      store: store,
+      modelContext: modelContext,
+      prefetchedImage: remoteImage
+    )
+  }
+
+  /// 形态 B：跳衣橱编辑页并预填（原有行为）。
   private func addToWardrobe() {
     isAddingToWardrobe = true
     Task {
-      let remoteImage: UIImage?
-      if item.coverImage.isEmpty,
-        let source = item.imageSourceURLs.first,
-        let url = URL(string: source),
-        let (data, _) = try? await URLSession.shared.data(from: url)
-      {
-        remoteImage = UIImage(data: data)
-      } else {
-        remoteImage = nil
-      }
-      let draft = TimeHallWardrobeDraftBuilder.makeDraft(
-        for: item,
-        store: store,
-        modelContext: modelContext,
-        prefetchedImage: remoteImage
-      )
+      let draft = await makeDraftWithRemoteImage()
       isAddingToWardrobe = false
       dismiss()
       try? await Task.sleep(for: .milliseconds(350))
       tabNavigationManager.presentWardrobeCreation(with: draft)
+    }
+  }
+
+  /// 形态 A：不打开编辑页，直接落库。留在当前页并就地提示。
+  private func quickInsertToWardrobe() {
+    guard !isAddingToWardrobe else { return }
+    isAddingToWardrobe = true
+    Task {
+      let draft = await makeDraftWithRemoteImage()
+      do {
+        let clothing = try TimeHallWardrobeQuickInserter.insert(
+          draft: draft,
+          modelContext: modelContext
+        )
+        quickInsertMessage = "已加入衣橱：\(clothing.name)"
+      } catch {
+        quickInsertMessage = "加入失败：" + error.localizedDescription
+      }
+      isAddingToWardrobe = false
     }
   }
 }

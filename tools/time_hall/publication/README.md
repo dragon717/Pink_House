@@ -46,6 +46,18 @@ catalog*.json（已审核输入）
 
 ## 快速演练（不需要凭证、不联网）
 
+**最省事的方式：一条命令跑完全链路 21 项断言。**
+
+```bash
+cd /Users/sangyu/develop/Pink_House
+bash tools/time_hall/publication/drill_offline.sh
+```
+
+覆盖：构建 → 自检 → dry-run 无副作用 → 发布 → 回读 → 4 条拒绝路径（重复发布号 / 回滚号不递增 / localFixture 发 CloudKit / 篡改分片）→ 回滚 → 再发布。
+成功标志是 `通过 21 项，失败 0 项`。加 `--verbose` 看每步完整输出，加 `--keep` 保留工作目录与日志。
+
+如果你想逐步手动跑、观察每一步之间发生了什么，用下面的分步版本：
+
 ```bash
 cd tools/time_hall/publication
 PY=python3
@@ -93,7 +105,7 @@ security add-generic-password -s PinkHouseTimeHallPublisher -a containerID -w 'i
 开发环境可改用环境变量指向的 JSON 文件（会在输出里明确警告）：
 
 ```bash
-export PINK_HOUSE_TIMEFIELD_CREDENTIAL_FILE=/path/to/dev-credentials.json
+export PINK_HOUSE_TIMEHALL_CREDENTIAL_FILE=/path/to/dev-credentials.json
 # {"keyID":"...","privateKey":"-----BEGIN PRIVATE KEY-----\n...","containerID":"iCloud.bugod2.ItemManager"}
 ```
 

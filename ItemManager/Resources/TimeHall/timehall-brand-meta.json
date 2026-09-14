@@ -1,0 +1,85 @@
+{
+  "version": 1,
+  "generatedAt": "2026-09-14",
+  "note": "时光馆品牌列表页的静态元数据。addedAt 一律取自对应 catalog 的 observedAt（抓取观测日），是可核验的真实日期，不臆造。newItemCount 为 0 表示当前没有可核验的上新数据，界面会退化为显示真实的在售件数；一旦 newItemCount > 0，必须同时填写 newItemCountSource 说明口径，否则单测会失败。",
+  "brands": [
+    {
+      "merchantID": "pinkHouse",
+      "displayName": "Pink House",
+      "subtitle": "编年史杂志与官方商品档案",
+      "region": "jp",
+      "channel": "official",
+      "hasDedicatedPage": false,
+      "thumbnailImage": null,
+      "addedAt": "2026-08-01",
+      "latestListingAt": null,
+      "newItemCount": 0,
+      "newItemCountSource": ""
+    },
+    {
+      "merchantID": "angelicPretty",
+      "displayName": "Angelic Pretty",
+      "subtitle": "甜美洛丽塔的梦幻衣橱",
+      "region": "jp",
+      "channel": "official",
+      "hasDedicatedPage": false,
+      "thumbnailImage": "brand-angelic-pretty-hero.jpg",
+      "addedAt": "2026-08-11",
+      "latestListingAt": null,
+      "newItemCount": 0,
+      "newItemCountSource": ""
+    },
+    {
+      "merchantID": "babyStarsShineBright",
+      "displayName": "BABY, THE STARS SHINE BRIGHT",
+      "subtitle": "细腻优雅的永恒洛丽塔衣橱",
+      "region": "jp",
+      "channel": "official",
+      "hasDedicatedPage": false,
+      "thumbnailImage": "brand-baby-hero.png",
+      "addedAt": "2026-08-11",
+      "latestListingAt": null,
+      "newItemCount": 0,
+      "newItemCountSource": ""
+    },
+    {
+      "merchantID": "julietteEtJustine",
+      "displayName": "Juliette et Justine",
+      "subtitle": "与艺术同行的古典优雅",
+      "region": "jp",
+      "channel": "official",
+      "hasDedicatedPage": false,
+      "thumbnailImage": "brand-juliette-hero.jpg",
+      "addedAt": "2026-08-11",
+      "latestListingAt": null,
+      "newItemCount": 0,
+      "newItemCountSource": ""
+    },
+    {
+      "merchantID": "wunderweltFleur",
+      "displayName": "Wunderwelt FLEUR",
+      "subtitle": "官方授权多品牌新商品平台",
+      "region": "jp",
+      "channel": "aggregator",
+      "hasDedicatedPage": false,
+      "thumbnailImage": "brand-wunderwelt-fleur-hero.png",
+      "addedAt": "2026-08-11",
+      "latestListingAt": null,
+      "newItemCount": 0,
+      "newItemCountSource": ""
+    },
+    {
+      "merchantID": "midsummerTale",
+      "displayName": "仲夏物语",
+      "subtitle": "国牌原创 · 上新系列档案",
+      "region": "cn",
+      "channel": "independent",
+      "hasDedicatedPage": true,
+      "thumbnailImage": null,
+      "addedAt": "2026-09-14",
+      "latestListingAt": null,
+      "newItemCount": 8,
+      "newItemCountSource": "仲夏物语种子数据 2026 年 3 个上新系列（小熊博物馆系列、三丽鸥家族合作、樱花小羊）合计 8 件单品"
+    }
+  ]
+}

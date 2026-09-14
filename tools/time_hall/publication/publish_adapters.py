@@ -39,7 +39,7 @@ from typing import Any, Dict, List, Optional
 from protocol import ProtocolError, RELEASE_RECORD_NAME, canonical_json_bytes, sha256_hex
 
 KEYCHAIN_SERVICE = "PinkHouseTimeHallPublisher"
-CREDENTIAL_ENV_VAR = "PINK_HOUSE_TIMEFIELD_CREDENTIAL_FILE"
+CREDENTIAL_ENV_VAR = "PINK_HOUSE_TIMEHALL_CREDENTIAL_FILE"
 
 
 class CredentialError(Exception):

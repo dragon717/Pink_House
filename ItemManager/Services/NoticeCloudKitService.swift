@@ -87,28 +87,79 @@ class NoticeCloudKitService: ObservableObject {
 
     private init() {}
 
-    // MARK: - 检查是否为管理员
-    func isAdmin() async -> Bool {
+    // MARK: - 创作者 / 运营白名单判定
+    //
+    // 三态而不是布尔，是因为「取不到 iCloud 身份」和「取到了但不在名单里」
+    // 必须区别对待：
+    //   · denied      —— 明确的「你不是运营」。上传入口**一律不显示**，
+    //                    本机的「创作者模式」开关也不能把它撬开（这是使用者的明确要求）。
+    //   · unresolved  —— 模拟器 / 未登录 iCloud / 网络失败，身份根本取不到。
+    //                    这种情况不能等同于「不是运营」，否则内容维护者在模拟器上
+    //                    永远没有入口；此时允许「创作者模式」开关解界面闸门。
+    //   · allowed     —— 在白名单里，正常显示。
+    //
+    // ⚠️ 这一层只是**界面闸门**，不是安全边界：真正的写入权限在 CloudKit Console
+    // 的 Security Roles。非白名单账号即使绕过界面，也照样写不进去。
+
+    /// Xcode 控制台里搜这个关键词就能看到白名单判定全过程。
+    nonisolated static let creatorGateLogTag = "CreatorGate"
+
+    nonisolated enum CreatorGate: Equatable, Sendable {
+        case allowed
+        case denied
+        case unresolved(reason: String)
+
+        var isDefinitelyNotOperator: Bool { self == .denied }
+    }
+
+    /// 判定当前 iCloud 账户是否在创作者 / 运营白名单里，并把过程打进日志。
+    ///
+    /// 日志格式固定为 `🔑 [CreatorGate] …`，在 Xcode 控制台过滤 `CreatorGate` 即可：
+    /// ```
+    /// 🔑 [CreatorGate] 本机 iCloud 用户标识 = _819804d902cb79c2d6e4bf736ed6c50b
+    /// 🔑 [CreatorGate] 白名单           = ["_819804d9…"]
+    /// 🔑 [CreatorGate] 命中白名单        = true
+    /// 🔑 [CreatorGate] 判定结果          = allowed
+    /// ```
+    func creatorGate() async -> CreatorGate {
         do {
             let recordID = try await container.userRecordID()
-            // TODO: 配置时取消注释下面这行来获取你的 iCloud ID
-            // print("🔑 当前用户 iCloud ID: \(recordID.recordName)")
-            return adminIDs.contains(recordID.recordName)
+            let key = recordID.recordName
+            let matched = adminIDs.contains(key)
+
+            print("🔑 [\(Self.creatorGateLogTag)] 本机 iCloud 用户标识 = \(key)")
+            print("🔑 [\(Self.creatorGateLogTag)] 白名单            = \(adminIDs)")
+            print("🔑 [\(Self.creatorGateLogTag)] 命中白名单        = \(matched)")
+            print("🔑 [\(Self.creatorGateLogTag)] 判定结果          = \(matched ? "allowed" : "denied")")
+
+            return matched ? .allowed : .denied
         } catch {
-            print("检查管理员权限失败: \(error)")
-            return false
+            let reason = (error as NSError).localizedDescription
+            print("⚠️ [\(Self.creatorGateLogTag)] 取不到 iCloud 用户标识：\(reason)")
+            print("⚠️ [\(Self.creatorGateLogTag)] 判定结果 = unresolved（模拟器 / 未登录 iCloud / 网络不通都会走到这里）")
+            print("⚠️ [\(Self.creatorGateLogTag)] 此时只有本机「创作者模式」开关能解界面闸门；真实写入仍需 CloudKit 角色授权")
+            return .unresolved(reason: reason)
         }
+    }
+
+    // MARK: - 检查是否为管理员
+    func isAdmin() async -> Bool {
+        // 只有「明确在白名单里」才算管理员。
+        // 以前这里把「取不到身份」也当成 false，于是模拟器上永远没有入口；
+        // 现在入口显示改由 `creatorGate()` 三态决定，这个布尔语义保持严格。
+        await creatorGate() == .allowed
     }
 
     // MARK: - 获取当前用户 iCloud ID（用于配置管理员）
     func getCurrentUserID() async -> String? {
         do {
             let recordID = try await container.userRecordID()
-            print("🔑 当前用户 iCloud ID: \(recordID.recordName)")
-            print("📋 请复制上面的 ID 添加到 adminIDs 数组中")
+            print("🔑 [\(Self.creatorGateLogTag)] 本机 iCloud 用户标识 = \(recordID.recordName)")
+            print("📋 [\(Self.creatorGateLogTag)] 想把它加进白名单，复制上面的值，"
+                + "追加到 NoticeCloudKitService.adminIDs（同时记得在 CloudKit Console 授权该角色）")
             return recordID.recordName
         } catch {
-            print("❌ 获取用户 ID 失败: \(error)")
+            print("❌ [\(Self.creatorGateLogTag)] 获取用户 ID 失败: \(error)")
             return nil
         }
     }

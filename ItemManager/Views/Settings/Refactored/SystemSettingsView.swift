@@ -33,6 +33,7 @@ private enum LocalDataConfirmationAction: String, Identifiable {
 struct SystemSettingsView: View {
     @Environment(\.modelContext) private var modelContext
     @State private var languageManager = LanguageManager.shared
+    @State private var creatorMode = CreatorMode.shared
     @AppStorage("useAggressiveMemoryOptimization") private var useAggressiveMemoryOptimization = true
     
     // Backup & Restore State
@@ -146,6 +147,35 @@ struct SystemSettingsView: View {
                     }
                 }
                 .adaptiveRow(showDivider: false)
+            }
+
+            // MARK: - 创作者
+            //
+            // 仲夏物语的「上传上新」入口原本只对 CloudKit 白名单里的 iCloud 账户可见，
+            // 判定依赖 `userRecordID()`——模拟器/未登录 iCloud 时取不到，入口永远不出现。
+            // 这个开关把「界面显示入口」独立出来，让内容维护者能在任意设备上补齐缺项。
+            AdaptiveSection(header: "创作者") {
+                Toggle(isOn: Binding(
+                    get: { creatorMode.isEnabled },
+                    set: { creatorMode.setEnabled($0) }
+                )) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("创作者模式")
+                            .font(.body)
+                        Text("开启后，仲夏物语品牌页右上角出现「上传上新」入口，可补充缺失的系列与单品资料（日期、价格、尺码、配色、封面图）。\n\n注意：若本机 iCloud 账户已明确判定为「不在运营白名单里」，入口一律不显示，这个开关也不会把它打开——白名单才是入口的硬闸门。开关只在「取不到 iCloud 身份」时（模拟器、未登录 iCloud）用来放行界面。\n\n调试：在 Xcode 控制台搜索 CreatorGate 可看到本机的 iCloud 用户标识与判定结果。")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                .adaptiveRow()
+                .accessibilityIdentifier("settings-creator-mode-toggle")
+
+                Text("该开关只决定入口是否显示。能否真正写入线上内容库，取决于当前 iCloud 账户是否已在 CloudKit 创作者名单中；未获授权的提交会失败并给出提示。")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .adaptiveRow(showDivider: false)
             }
         }
         .sheet(isPresented: $showingShareSheet) {

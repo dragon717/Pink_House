@@ -52,3 +52,5 @@ asserts/psd/*
 .cursor/*
 
 .playwright-cli/*
+output/*
+

@@ -1,0 +1,490 @@
+import Foundation
+
+// MARK: - 仲夏物语（Midsummer Tale）· 数据模型
+//
+// 背景：仲夏物语是**国牌**，与时光馆已有五个日牌不同——没有官网 catalogue 管道，
+// 公开信息散落在淘宝 / 微博 / 小红书，且天然不完整（见 docs/MIDSUMMER_TALE_BRAND_PAGE.md）。
+//
+// 因此本模块的数据有三个来源，按优先级合并：
+//   1. CloudKit 公共库（创作者在上传入口补充的条目，始终优先）
+//   2. Bundle 种子 `midsummer-series.json`（离线兜底与首屏）
+//   3. 无（未登录 iCloud、断网、库里还没有数据 → 仍然显示 Bundle 内容，不白屏）
+//
+// 所有类型 `nonisolated`：与 TimeHall 侧一致，避免默认 MainActor 隔离带来的跨 actor 告警。
+
+// MARK: - 上新阶段
+
+/// 三坑「上新」不是单点上架，而是 3-6 个月的时间线（见 docs/品牌上新资讯功能方案.md §1）。
+nonisolated enum MidsummerStage: String, Codable, CaseIterable, Sendable {
+  case preview      // 图透
+  case deposit      // 定金
+  case balance      // 尾款
+  case shipping     // 出货
+  case restock      // 再贩
+  case inStock      // 现货
+
+  var labelZH: String {
+    switch self {
+    case .preview: return "图透"
+    case .deposit: return "定金"
+    case .balance: return "尾款"
+    case .shipping: return "出货"
+    case .restock: return "再贩"
+    case .inStock: return "现货"
+    }
+  }
+
+  var symbolName: String {
+    switch self {
+    case .preview: return "sparkles"
+    case .deposit: return "hand.raised.fill"
+    case .balance: return "creditcard.fill"
+    case .shipping: return "shippingbox.fill"
+    case .restock: return "arrow.clockwise"
+    case .inStock: return "bag.fill"
+    }
+  }
+}
+
+// MARK: - 单品类型
+
+/// Lolita 的品类缩写。界面按此分组与着色，不要改成自由字符串。
+nonisolated enum MidsummerItemKind: String, Codable, CaseIterable, Sendable {
+  case op           // 有袖连衣裙
+  case jsk          // 无袖连衣裙
+  case skirt        // 半裙
+  case blouse       // 衬衫 / 内搭
+  case accessory    // 小物
+  case set          // 套装
+
+  var labelZH: String {
+    switch self {
+    case .op: return "OP 有袖连衣裙"
+    case .jsk: return "JSK 无袖连衣裙"
+    case .skirt: return "SK 半裙"
+    case .blouse: return "衬衫内搭"
+    case .accessory: return "小物"
+    case .set: return "套装"
+    }
+  }
+
+  /// 卡片上的短标签，例如 `OP` / `JSK`。
+  var shortLabel: String {
+    switch self {
+    case .op: return "OP"
+    case .jsk: return "JSK"
+    case .skirt: return "SK"
+    case .blouse: return "衬衫"
+    case .accessory: return "小物"
+    case .set: return "套装"
+    }
+  }
+
+  /// 从淘宝标题里的关键词推断类型；识别不到返回 nil，由调用方决定兜底。
+  static func infer(fromName name: String) -> MidsummerItemKind? {
+    let lowered = name.lowercased()
+    // 先判组合词，避免「op罩裙jsk」这类混写被首个命中规则吃掉
+    if lowered.contains("围裙") || lowered.contains("罩裙") { return .skirt }
+    if lowered.contains("jsk") { return .jsk }
+    if lowered.contains("op") { return .op }
+    if lowered.contains("sk") || lowered.contains("半裙") { return .skirt }
+    if lowered.contains("衬衫") || lowered.contains("内搭") || lowered.contains("开衫") {
+      return .blouse
+    }
+    if lowered.contains("边夹") || lowered.contains("发夹") || lowered.contains("kc")
+      || lowered.contains("项链") || lowered.contains("胸针") || lowered.contains("帽")
+    {
+      return .accessory
+    }
+    return nil
+  }
+}
+
+// MARK: - 规格（仿淘宝 SKU）
+
+/// 规格组的**角色**：决定该组的选中值落到衣橱的哪个字段。
+///
+/// 之所以要显式声明而不是靠名字猜：创作者上传时可能写「配色」「颜色分类」「Colors」，
+/// 靠关键词匹配会漏。字段缺省时才退化为关键词推断（见 `resolvedRole`）。
+nonisolated enum MidsummerSpecRole: String, Codable, CaseIterable, Sendable {
+  /// 款式 / 版型。一个淘宝链接里常有多款（印花SK / 段段JSK / 无腰OP / 内搭 …），
+  /// 它们不是「颜色」也不是「尺码」，所以单独成一类：决定入库名称里的款名。
+  case variant
+  case color
+  case size
+  /// 其它规格（如「配件」），只进规格备注，不映射到配色/尺码字段
+  case other
+}
+
+/// 一个规格组，例如「颜色分类」「尺码」。
+nonisolated struct MidsummerSpecGroup: Codable, Identifiable, Hashable, Sendable {
+  let id: String
+  let name: String
+  /// 缺省时按 `name` 关键词推断
+  let role: MidsummerSpecRole?
+  let options: [MidsummerSpecOption]
+
+  var resolvedRole: MidsummerSpecRole {
+    if let role { return role }
+    let lowered = name.lowercased()
+    if lowered.contains("尺码") || lowered.contains("尺寸") || lowered.contains("码")
+      || lowered.contains("size")
+    {
+      return .size
+    }
+    if lowered.contains("款式") || lowered.contains("版型") || lowered.contains("款型") {
+      return .variant
+    }
+    if lowered.contains("颜色") || lowered.contains("配色") || lowered.contains("色")
+      || lowered.contains("color")
+    {
+      return .color
+    }
+    return .other
+  }
+}
+
+/// 组内一个选项，例如「Sk粉色」。
+nonisolated struct MidsummerSpecOption: Codable, Identifiable, Hashable, Sendable {
+  let id: String
+  let name: String
+  /// 该选项自己的图。可以是 `Assets.xcassets` 里的名字，也可以是 `http(s)` 图链。
+  /// `nil` / 空串 = 无图，界面按「SKU 组合图 → 其它已选选项的图 → 单品封面」的顺序回退。
+  let image: String?
+}
+
+/// 一条具体可入库的规格组合。
+///
+/// 没有 SKU 表时（`item.skus` 为空），所有组合都视为合法——这覆盖了
+/// 「只有规格组、还没整理出组合表」的常见中间状态。
+nonisolated struct MidsummerSKU: Codable, Identifiable, Hashable, Sendable {
+  let id: String
+  /// `groupID -> optionID`
+  let options: [String: String]
+  /// 组合图。优先级**高于**单个选项的图，用于「内搭奶白色S1粉色」这类跨组组合的专属图。
+  let image: String?
+  /// 该组合的逐款价（元）。`nil` 表示沿用单品价格。
+  let price: Int?
+  /// 逐款价的**口径**。
+  ///
+  /// 归集商品（一个淘宝链接含多款）把逐款价全放在 SKU 表里，于是单品层的
+  /// `priceKind` 覆盖不到它们——同一个「有价必须自报口径」的规则就漏了个口子。
+  /// 以前只能靠 `priceNote` 用文字交代「这些数字其实是尾款」，
+  /// 现在口径跟数字放在一起，界面也就能直接显示「尾款 ¥160–400」而不是裸区间。
+  let priceKind: MidsummerPriceKind?
+
+  init(
+    id: String,
+    options: [String: String],
+    image: String? = nil,
+    price: Int? = nil,
+    priceKind: MidsummerPriceKind? = nil
+  ) {
+    self.id = id
+    self.options = options
+    self.image = image
+    self.price = price
+    self.priceKind = priceKind
+  }
+}
+
+// MARK: - 价格口径
+//
+// 背景（这是价格问题的**根因**，不是补数据能解决的）：
+// 以前只有一个 `price: Int?`，于是同一个字段被用来装现货价、第三方参考价、
+// 甚至尾款——「同一个 ¥320 到底是定金还是全款」无法回答；系列层的价格区间还是
+// **手写**的，与单品价格是两份数据，改一处忘一处。
+//
+// 现在两条硬规则：
+//   1. 任何落到 `price` / `balance` / `deposit` 的数字，必须自报**口径**（本枚举）
+//      与**采集日期**；出处复用已有的 `sourceURL`（合规必填）。
+//   2. 系列 / 商品的价格区间一律**派生**，不再存储。
+//      改一个单品价，上面的区间自动跟着走，不存在「忘了同步」。
+
+/// 一个价格的来源口径。
+nonisolated enum MidsummerPriceKind: String, Codable, CaseIterable, Sendable {
+  /// 电商商品页直读（淘宝 / 天猫商品页本身）
+  case shop
+  /// 第三方图鉴 / 比价站 / 榜单给出的参考价
+  case reference
+  /// 尾款口径。
+  ///
+  /// 单独成一类的原因和「定金分列」一样：来源给的是**尾款**时，
+  /// 把它塞进「现货价」会让使用者按全款估预算。归集商品的逐款价尤其常见——
+  /// 一个系列里不同款的尾款本来就不同（¥160 / ¥400），只能逐款标注。
+  case balance
+
+  var labelZH: String {
+    switch self {
+    case .shop: return "商品页价"
+    case .reference: return "参考价"
+    case .balance: return "尾款"
+    }
+  }
+}
+
+// MARK: - 单品
+
+nonisolated struct MidsummerItemDTO: Codable, Identifiable, Hashable, Sendable {
+  let id: String
+  let seriesID: String
+  let name: String
+  let kind: MidsummerItemKind
+  /// 现货 / 参考价（元）。预售期一般为空，用 deposit / balance 表示。
+  let price: Int?
+  /// 定金（元）
+  let deposit: Int?
+  /// 尾款（元）
+  let balance: Int?
+  /// `price` 的口径。填了 `price` 就必须填它——否则界面只能猜这个数字是什么。
+  let priceKind: MidsummerPriceKind?
+  /// 价格采集日期 `yyyy-MM-dd`。价格会变，没有采集日的价格无法判断是否过期。
+  let priceCapturedOn: String?
+  /// 价格口径说明 / 多来源冲突时的取舍理由。界面会如实展示。
+  let priceNote: String?
+  let sizes: [String]
+  let colors: [String]
+  let coverImage: String?
+  let itemURL: String?
+  /// 原文出处，合规必填（Apple 5.2）
+  let sourceURL: String
+  /// 资料存疑或待补时的说明，界面会如实展示
+  let note: String?
+
+  /// 规格组（颜色分类 / 尺码 / …）。`nil` 或空数组表示该单品没有可选规格，
+  /// 此时详情页的「一键入库」不必让使用者做选择，直接按单品信息入库。
+  let specGroups: [MidsummerSpecGroup]?
+  /// SKU 组合表。为空表示不做组合约束（任意搭配都合法）。
+  let skus: [MidsummerSKU]?
+
+  /// 该商品包含的款式数。有 `variant` 规格组时 = 该组选项数；否则就是 1 款。
+  /// 归集后的商品（如「樱花小羊」一个链接含 9 款）靠它把「几款」讲清楚。
+  var variantCount: Int {
+    let variantGroup = (specGroups ?? []).first { $0.resolvedRole == .variant }
+    guard let variantGroup, !variantGroup.options.isEmpty else { return 1 }
+    return variantGroup.options.count
+  }
+
+  /// 非定金口径的价格：优先参考价 / 现货价，其次尾款。
+  ///
+  /// 定金**不**参与，它是另一个维度（见 `depositRange`）——
+  /// 把 388 的预约定金和 499 的现货价混成一个「¥388–499 区间」正是以前的口径错误。
+  var primaryPrice: Int? { price ?? balance }
+
+  /// 该单品全部可核验的「非定金」价格，含 SKU 表里的逐款价。
+  ///
+  /// 这是价格区间派生的**唯一数据源**：改一个单品价，商品与系列的区间一起变，
+  /// 不存在两份数据要对齐。
+  var effectivePrices: [Int] {
+    let base = primaryPrice
+    return ([base] + (skus ?? []).map { $0.price ?? base }).compactMap { $0 }
+  }
+
+  /// 逐款价的口径——只有当 SKU 表里的口径**完全一致**时才给出，否则返回 nil。
+  ///
+  /// 不一致（同一个链接里有参考价也有尾款）时不硬选一个：那正是「同一个区间
+  /// 混了两种钱」的老问题。此时界面退回不带前缀的裸区间，细节交给 `priceNote`。
+  var variantPriceKind: MidsummerPriceKind? {
+    let kinds = Set((skus ?? []).compactMap { $0.priceKind })
+    return kinds.count == 1 ? kinds.first : nil
+  }
+
+  /// 该单品自己有价吗（`price` / `deposit` / `balance` 任一非空）。
+  /// 与 `hasPrice` 的区别：后者把 SKU 逐款价也算进来。
+  var hasItemLevelPrice: Bool {
+    price != nil || deposit != nil || balance != nil
+  }
+
+  /// 派生价格区间（元）。只有 SKU 表带价时也能得出区间。
+  var priceRange: (min: Int, max: Int)? {
+    let values = effectivePrices
+    guard let low = values.min(), let high = values.max() else { return nil }
+    return (low, high)
+  }
+
+  /// 该单品自己的定金（元）。定金与「参考价 / 现货价」是两个维度，分开统计。
+  var effectiveDeposits: [Int] { deposit.map { [$0] } ?? [] }
+
+  /// 价格展示：定金口径优先（预售期最常见），其次「参考价 / 现货价」区间。
+  ///
+  /// 归集商品（价格全在 SKU 表里，`price` 为 nil）会显示成 `¥199–699` 而不是
+  /// 「价格待补充」——这是派生区间带来的直接收益。
+  var priceText: String {
+    if let deposit, let balance {
+      return "定金 ¥\(deposit) · 尾款 ¥\(balance)"
+    }
+    if let deposit { return "定金 ¥\(deposit)" }
+    if let range = priceRange {
+      return range.min == range.max ? "¥\(range.min)" : "¥\(range.min)–\(range.max)"
+    }
+    if let balance { return "尾款 ¥\(balance)" }
+    return "价格待补充"
+  }
+
+  /// 带口径前缀的价格文案，用于详情页（`参考价 ¥329`）。
+  ///
+  /// 只在展示的是「参考价 / 现货价 / 尾款」时才加前缀：定金 / 尾款 已经有自己的说法
+  /// （`定金 ¥388`、`尾款 ¥400`），再加「参考价」就是第二重口径错误。
+  ///
+  /// 口径的取法：单品自己的 `priceKind` 优先；单品没有（价格全在 SKU 表的归集商品）
+  /// 时退到 `variantPriceKind`——这样「尾款 ¥160–400」才说得出口，
+  /// 而不是把一个尾款区间伪装成现货价。
+  var priceTextWithKind: String {
+    guard deposit == nil, balance == nil, let range = priceRange else { return priceText }
+    let amount = range.min == range.max ? "¥\(range.min)" : "¥\(range.min)–\(range.max)"
+    guard let kind = priceKind ?? variantPriceKind else { return amount }
+    return "\(kind.labelZH) \(amount)"
+  }
+
+  /// 该单品是否已有任何可核验价格（含 SKU 逐款价）。
+  /// 归集商品的 `price` 为 nil、价格全在 SKU 表里，用这个判断才不会误报「缺价格」。
+  var hasPrice: Bool { !effectivePrices.isEmpty || deposit != nil }
+
+  var sizesText: String {
+    sizes.isEmpty ? "尺码待补充" : sizes.joined(separator: " / ")
+  }
+}
+
+// MARK: - 系列
+
+nonisolated struct MidsummerSeriesDTO: Codable, Identifiable, Hashable, Sendable {
+  let id: String
+  let name: String
+  let year: Int
+  /// 上新日期，`yyyy-MM-dd`
+  let launchedOn: String
+  let stage: MidsummerStage
+  let coverImage: String?
+  /// ⚠️ 价格区间**不再存储**，一律由 `priceRange` 从单品（含 SKU 表）派生。
+  ///
+  /// 旧字段 `priceMin` / `priceMax` 已移除：它们与单品价格是两份数据，
+  /// 改一处忘一处，是「价格数据缺失或错误」的直接来源。
+  ///
+  /// 定金是另一个维度：来源常以价格带形式给出（「定金 7-139 元」），
+  /// 无法归到某一个单品上，所以这里保留一对**显式**的定金区间，
+  /// 但必须同时写 `priceSource` 说明出处。
+  let depositMin: Int?
+  let depositMax: Int?
+  /// 价格口径与出处说明（例如「定金牌榜价带；逐款参考价见图鉴条目」）
+  let priceSource: String?
+  /// 系列内可选的尺码并集
+  let sizes: [String]
+  let colors: [String]
+  let summary: String?
+  /// 该系列的原文出处（微博上新贴 / 淘宝新品页）
+  let sourceURL: String
+  /// `public` = 公开渠道整理；`editorial` = 创作者上传补充
+  let sourceKind: String
+  /// 是否来自可核验的公开来源。false 表示信息待创作者校正。
+  let verified: Bool
+  let items: [MidsummerItemDTO]
+
+  /// 派生价格区间：取全系列单品（含每个 SKU 的逐款价）的「参考价 / 现货价」极值。
+  var priceRange: (min: Int, max: Int)? {
+    let values = items.flatMap(\.effectivePrices)
+    guard let low = values.min(), let high = values.max() else { return nil }
+    return (low, high)
+  }
+
+  /// 派生定金区间：显式标注的定金区间优先（来源价带口径），否则取单品定金极值。
+  var depositRange: (min: Int, max: Int)? {
+    if let low = depositMin, let high = depositMax {
+      return (min(low, high), max(low, high))
+    }
+    let values = items.flatMap(\.effectiveDeposits)
+    guard let low = values.min(), let high = values.max() else { return nil }
+    return (low, high)
+  }
+
+  /// 价格区间文案：`¥119–699`，单值退化为 `¥119`，空缺返回待补充。
+  var priceRangeText: String {
+    guard let range = priceRange else { return "价格待补充" }
+    return range.min == range.max ? "¥\(range.min)" : "¥\(range.min)–\(range.max)"
+  }
+
+  /// 定金文案：`定金 ¥7–139`；无定金口径时返回 nil。
+  /// 与 `priceRangeText` **分列**——把定金和全款混成一个区间正是以前的口径错误。
+  var depositRangeText: String? {
+    guard let range = depositRange else { return nil }
+    return range.min == range.max ? "定金 ¥\(range.min)" : "定金 ¥\(range.min)–\(range.max)"
+  }
+
+  var sizesText: String {
+    sizes.isEmpty ? "尺码待补充" : sizes.joined(separator: " / ")
+  }
+
+  /// `2024.02.09`
+  var launchDateText: String {
+    launchedOn.replacingOccurrences(of: "-", with: ".")
+  }
+
+  /// 该系列是否已有任何可核验价格（含 SKU 逐款价）。
+  var hasPrice: Bool { priceRange != nil || depositRange != nil }
+
+  /// 款式总数：每个单品按自身的款式数累加。
+  /// 归集过的商品（一个淘宝链接含多款）在这里会贡献多款，而不是被算成 1 款。
+  var variantCount: Int { items.reduce(0) { $0 + $1.variantCount } }
+
+  /// `3 个商品 · 含 9 个款式`；没有多款商品时退化成 `3 款单品`。
+  var itemCountText: String {
+    let variants = variantCount
+    if variants > items.count {
+      return "\(items.count) 个商品 · 含 \(variants) 个款式"
+    }
+    return "\(items.count) 款单品"
+  }
+}
+
+// MARK: - 品牌目录
+
+nonisolated struct MidsummerCatalogDTO: Codable, Sendable {
+  let brandID: String
+  let brandName: String
+  let brandNameEN: String
+  /// 品牌实际成立时间。注意：用户口述为 2023 年，公开工商/百科资料为 2017-04-06，
+  /// 这里以可核验来源为准，并在界面与文档中如实说明（见交付说明）。
+  let foundedOn: String
+  let company: String
+  let positioning: String
+  let officialShopURL: String
+  let weiboURL: String
+  /// 版权与资料完整性说明，界面顶部会展示。
+  let disclaimer: String
+  let series: [MidsummerSeriesDTO]
+
+  /// 年份倒序（新的在前），与图一的年份导航一致。
+  var years: [Int] {
+    Array(Set(series.map(\.year))).sorted(by: >)
+  }
+
+  func series(inYear year: Int) -> [MidsummerSeriesDTO] {
+    series
+      .filter { $0.year == year }
+      .sorted { $0.launchedOn > $1.launchedOn }
+  }
+
+  func series(withID id: String) -> MidsummerSeriesDTO? {
+    series.first { $0.id == id }
+  }
+
+  /// 全部单品（跨系列），品牌页的商品卡片流用它。
+  var allItems: [(series: MidsummerSeriesDTO, item: MidsummerItemDTO)] {
+    series.flatMap { series in series.items.map { (series, $0) } }
+  }
+}
+
+// MARK: - 年份导航条目（图一左侧）
+
+nonisolated struct MidsummerYearEntry: Identifiable, Hashable, Sendable {
+  let year: Int
+  /// 该年份是否有「新品预约」，决定副标题（图一里 2026/2025/2024 写的是「新品预约」）
+  let hasPreorder: Bool
+  let seriesCount: Int
+
+  var id: Int { year }
+
+  /// 图一左栏文案：「2026年 新品预约」/「2023年 新品」
+  var title: String { "\(year)年" }
+
+  var subtitle: String { hasPreorder ? "新品预约" : "新品" }
+}
