@@ -1,0 +1,8 @@
+# 登录态文件，含个人账号凭证，禁止提交
+cookies/
+config.json
+
+# Python
+__pycache__/
+*.pyc
+.venv/

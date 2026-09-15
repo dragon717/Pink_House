@@ -1,0 +1,73 @@
+{
+  "seriesName": "JK制服",
+  "sourceKind": "editorial",
+  "note": "由 scrapers 管线自动生成，运营者导入时核对尺码表候选图",
+  "items": [
+    {
+      "name": "花千猪原创 圣研高西装 学院风校供感jk制服三粒扣款秋冬百搭外套",
+      "kind": "SK",
+      "price": 173,
+      "deposit": null,
+      "balance": null,
+      "priceKind": "shop",
+      "sizes": [],
+      "sizeChartImages": [],
+      "itemURL": "https://item.taobao.com/item.htm?id=683832679481",
+      "sourceURL": "https://item.taobao.com/item.htm?id=683832679481",
+      "note": "来源：淘宝详情页自动采集，价格尺码待运营者核对"
+    },
+    {
+      "name": "【夏日和风铃】三粒扣西服/ 原创JK制服日式制服套装/日系学院风",
+      "kind": "套装",
+      "price": 177,
+      "deposit": null,
+      "balance": null,
+      "priceKind": "shop",
+      "sizes": [],
+      "sizeChartImages": [],
+      "itemURL": "https://item.taobao.com/item.htm?id=655712638750",
+      "sourceURL": "https://item.taobao.com/item.htm?id=655712638750",
+      "note": "来源：淘宝详情页自动采集，价格尺码待运营者核对"
+    },
+    {
+      "name": "【小金扣】肥糕家原创JK制服格裙校供感学院风百褶裙",
+      "kind": "SK",
+      "price": 118,
+      "deposit": null,
+      "balance": null,
+      "priceKind": "shop",
+      "sizes": [],
+      "sizeChartImages": [],
+      "itemURL": "https://item.taobao.com/item.htm?id=758476417526",
+      "sourceURL": "https://item.taobao.com/item.htm?id=758476417526",
+      "note": "来源：淘宝详情页自动采集，价格尺码待运营者核对"
+    },
+    {
+      "name": "早早/松德绫一jk原创百褶格裙格雷系水手领马甲原创连帽衬衫蕾丝",
+      "kind": "衬衫",
+      "price": 15,
+      "deposit": null,
+      "balance": null,
+      "priceKind": "shop",
+      "sizes": [],
+      "sizeChartImages": [],
+      "itemURL": "https://item.taobao.com/item.htm?id=1067272750135",
+      "sourceURL": "https://item.taobao.com/item.htm?id=1067272750135",
+      "note": "来源：淘宝详情页自动采集，价格尺码待运营者核对"
+    },
+    {
+      "name": "夏季学院风套装裙jk制服粉色条纹衬衣灰色马甲百褶裙毕业季三件套",
+      "kind": "套装",
+      "price": 95,
+      "deposit": null,
+      "balance": null,
+      "priceKind": "shop",
+      "sizes": [],
+      "sizeChartImages": [],
+      "itemURL": "https://item.taobao.com/item.htm?id=797155462369",
+      "sourceURL": "https://item.taobao.com/item.htm?id=797155462369",
+      "note": "来源：淘宝详情页自动采集，价格尺码待运营者核对"
+    }
+  ],
+  "skippedUnnamed": 0
+}

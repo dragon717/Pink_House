@@ -1,3 +1,4 @@
+import PhotosUI
 import SwiftData
 import SwiftUI
 
@@ -655,6 +656,28 @@ struct MidsummerItemDetailSheet: View {
   /// 抽屉的入库意图：详情页两个按钮共用同一个面板，只是主按钮的去向不同
   @State private var drawerIntent: MidsummerWardrobeInsertIntent = .quickInsert
 
+  // 单品图补录（对齐千牛发布路径：主图宫格，最多 5 张，第 1 张为主图；运营者白名单门控）：
+  // 本弹层里的 `item` 是值拷贝，保存后用 `uploadedImageNames` 乐观回显，
+  // 背后列表交给 `refreshFromCloud()` 全量刷新。
+  @State private var supplementPhotoItem: [PhotosPickerItem] = []
+  @State private var isUploadingItemImage = false
+  @State private var uploadedImageNames: [String]?
+  @State private var itemImageMessage: String?
+
+  /// 单品图片上限（与千牛发布宝贝一致：5 张，第 1 张为主图）
+  private static let maxItemImages = 5
+
+  /// 展示/编辑中的图片名列表：本会话已保存的 > 云端已回填的（主图 + 附图，按序）。
+  private var workingImageNames: [String] {
+    if let uploadedImageNames { return uploadedImageNames }
+    return ([item.coverImage] + (item.galleryImageNames ?? [])).compactMap { $0 }
+  }
+
+  /// 图片名 → 本地 UIImage（供整条重写时把已有图一并带上）。
+  private func loadImages(_ names: [String]) -> [UIImage] {
+    names.compactMap { ImageManager.shared.loadImage(fileName: $0) }
+  }
+
   /// 形态 A：一键入库。
   ///
   /// 与淘宝「加入购物车」一致：点按钮先**选规格**，不直接落库。
@@ -709,9 +732,11 @@ struct MidsummerItemDetailSheet: View {
     NavigationStack {
       ScrollView {
         VStack(alignment: .leading, spacing: 14) {
-          MidsummerCoverView(imageName: series.coverImage, series: series)
-            .frame(height: 200)
-            .frame(maxWidth: .infinity)
+          MidsummerCoverView(
+            imageName: workingImageNames.first ?? series.coverImage, series: series
+          )
+          .frame(height: 200)
+          .frame(maxWidth: .infinity)
 
           VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 6) {
@@ -744,6 +769,8 @@ struct MidsummerItemDetailSheet: View {
               labeledRow("配色", value: item.colors.joined(separator: " / "))
             }
             labeledRow("尺码", value: item.sizesText)
+            sizeChartSection
+            itemImageSection
             if MidsummerSpecResolver.hasSpecs(item) {
               labeledRow("可选规格", value: MidsummerSpecResolver.groups(of: item).map(\.name).joined(separator: " / "))
             }
@@ -827,6 +854,12 @@ struct MidsummerItemDetailSheet: View {
           Button("完成") { dismiss() }
         }
       }
+      .onChange(of: supplementPhotoItem) { _, newValue in
+        guard !newValue.isEmpty else { return }
+        let picked = newValue
+        supplementPhotoItem = []
+        Task { await appendItemImages(picked) }
+      }
     }
     // 规格抽屉：覆盖在整个详情页之上（含导航栏），与淘宝「加入购物车」面板一致。
     // 用 `if` 而不是「常驻 + 位移」，是为了让**没展开时这些按钮根本不在层级里**——
@@ -879,6 +912,196 @@ struct MidsummerItemDetailSheet: View {
         }
       }
       .frame(maxWidth: .infinity, alignment: .leading)
+    }
+  }
+
+  /// 单品尺码表（双方案设计 §一.2 / §四）：
+  /// 有图 → 折叠面板展开即看；无图 → 如实标注「待补充」，不虚构数据。
+  /// 图片来源两处：淘宝详情页自动采集（scrapers/ 管线，经 CloudKit 下发）或运营者补录上传，
+  /// 两者最终都落在 `MidsummerItemDTO.sizeChartImageName` 这一个字段上。
+  @ViewBuilder
+  private var sizeChartSection: some View {
+    let chartName = item.sizeChartImageName
+      .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+      .flatMap { $0.isEmpty ? nil : $0 }
+    DisclosureGroup {
+      if let chartName, let image = ImageManager.shared.loadImage(fileName: chartName) {
+        Image(uiImage: image)
+          .resizable()
+          .scaledToFit()
+          .frame(maxWidth: .infinity)
+          .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+          .accessibilityIdentifier("midsummer-item-sizechart-image")
+      } else {
+        Label("尺码表待补充——运营者可在补录入口上传", systemImage: "ruler")
+          .font(.system(size: 11))
+          .foregroundStyle(MidsummerTheme.secondaryText)
+          .padding(.vertical, 4)
+          .accessibilityIdentifier("midsummer-item-sizechart-missing")
+      }
+    } label: {
+      Text("单品尺码表")
+        .font(.system(size: 12, weight: .medium))
+        .foregroundStyle(MidsummerTheme.primaryText)
+    }
+    .accessibilityIdentifier("midsummer-item-sizechart")
+  }
+
+  /// 单品图宫格 + 运营者补录入口（对齐千牛发布路径）。
+  ///
+  /// 展示：主图（第 1 张，带角标）+ 附图按序宫格；无图时如实标注「待补充」，
+  /// 且**始终保留上传位**。运营者（`MidsummerStore.shared.isAdminUser`）可
+  /// 多选追加（最多补到 5 张）、单张删除，保存走 `publish(item:images:)`
+  /// 以单品 id 为 recordID 整条重写——DTO 字段齐全，不会覆盖丢失已有数据。
+  private var itemImageSection: some View {
+    VStack(alignment: .leading, spacing: 8) {
+      Text("单品图片")
+        .font(.system(size: 12, weight: .medium))
+        .foregroundStyle(MidsummerTheme.primaryText)
+
+      let names = workingImageNames
+      if names.isEmpty {
+        Label("单品图待补充——运营者可在下方上传", systemImage: "photo")
+          .font(.system(size: 11))
+          .foregroundStyle(MidsummerTheme.secondaryText)
+          .padding(.vertical, 4)
+          .accessibilityIdentifier("midsummer-item-image-missing")
+      } else {
+        LazyVGrid(columns: [GridItem(.adaptive(minimum: 88), spacing: 8)], spacing: 8) {
+          ForEach(names.indices, id: \.self) { index in
+            ZStack(alignment: .topTrailing) {
+              Group {
+                if let image = ImageManager.shared.loadImage(fileName: names[index]) {
+                  Image(uiImage: image)
+                    .resizable()
+                    .scaledToFill()
+                } else {
+                  MidsummerCoverView(imageName: names[index], series: nil)
+                }
+              }
+              .frame(height: 88)
+              .frame(maxWidth: .infinity)
+              .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+              .accessibilityIdentifier("midsummer-item-image-\(index)")
+
+              if MidsummerStore.shared.isAdminUser, !isUploadingItemImage {
+                Button {
+                  Task { await deleteItemImage(at: index) }
+                } label: {
+                  Image(systemName: "xmark.circle.fill")
+                    .font(.system(size: 16))
+                    .foregroundStyle(.white)
+                    .shadow(radius: 2)
+                }
+                .accessibilityIdentifier("midsummer-item-image-delete-\(index)")
+              }
+            }
+            .overlay(alignment: .bottomLeading) {
+              if index == 0 {
+                Text("主图")
+                  .font(.system(size: 9, weight: .semibold))
+                  .foregroundStyle(.white)
+                  .padding(.horizontal, 5)
+                  .padding(.vertical, 2)
+                  .background(MidsummerTheme.brandOrange)
+                  .clipShape(Capsule())
+                  .padding(4)
+              }
+            }
+          }
+        }
+      }
+
+      if MidsummerStore.shared.isAdminUser {
+        PhotosPicker(
+          selection: $supplementPhotoItem,
+          maxSelectionCount: Self.maxItemImages - names.count,
+          matching: .images
+        ) {
+          HStack {
+            Label(
+              names.isEmpty ? "补录单品图" : "追加图片（还可传 \(Self.maxItemImages - names.count) 张）",
+              systemImage: "plus.square.on.square"
+            )
+            .font(.system(size: 12, weight: .medium))
+            .foregroundStyle(MidsummerTheme.brandOrange)
+            Spacer()
+            if isUploadingItemImage {
+              ProgressView()
+            }
+          }
+        }
+        .disabled(isUploadingItemImage || names.count >= Self.maxItemImages)
+        .accessibilityIdentifier("midsummer-item-image-supplement")
+      }
+
+      if let itemImageMessage {
+        Text(itemImageMessage)
+          .font(.system(size: 10))
+          .foregroundStyle(
+            itemImageMessage.hasPrefix("已") ? MidsummerTheme.freshGreen : MidsummerTheme.brandOrange)
+          .fixedSize(horizontal: false, vertical: true)
+      }
+    }
+  }
+
+  /// 追加图片：新图先落盘（与 fetch 侧 copyItemCoverAsset 同一命名空间），
+  /// 再把「已有图 + 新图」按千牛宫格顺序整条重写。
+  private func appendItemImages(_ pickerItems: [PhotosPickerItem]) async {
+    guard !pickerItems.isEmpty, !isUploadingItemImage else { return }
+    isUploadingItemImage = true
+    defer {
+      isUploadingItemImage = false
+      itemImageMessage = nil
+    }
+
+    do {
+      var names = workingImageNames
+      let stamp = Int(Date().timeIntervalSince1970)
+      for (offset, pickerItem) in pickerItems.prefix(Self.maxItemImages - names.count).enumerated() {
+        guard let data = try await pickerItem.loadTransferable(type: Data.self),
+          let image = UIImage(data: data),
+          let jpeg = image.jpegData(compressionQuality: 0.85)
+        else {
+          itemImageMessage = "有图片读取失败，其余图片已保存。"
+          continue
+        }
+        let fileName = "midsummer-item-\(item.id)-new-\(stamp)-\(offset).jpg"
+        let destination = ImageManager.shared.imagesDirectory.appendingPathComponent(fileName)
+        try jpeg.write(to: destination, options: .atomic)
+        names.append(fileName)
+      }
+
+      // 整条重写：已有图（本地读回）+ 新图一并按序上传，主图始终是第 1 张。
+      try await MidsummerCloudService.shared.publish(
+        item: item, images: loadImages(names), sizeChartImage: nil)
+      uploadedImageNames = names
+      itemImageMessage = "已上传，其他用户刷新后可见。"
+      Task { await MidsummerStore.shared.refreshFromCloud() }
+    } catch {
+      itemImageMessage = "上传失败：\(error.localizedDescription)"
+    }
+  }
+
+  /// 删除单张图：从宫格移除后整条重写（主图位顺移，与千牛删除主图格一致）。
+  private func deleteItemImage(at index: Int) async {
+    guard workingImageNames.indices.contains(index), !isUploadingItemImage else { return }
+    isUploadingItemImage = true
+    defer {
+      isUploadingItemImage = false
+      itemImageMessage = nil
+    }
+
+    var names = workingImageNames
+    names.remove(at: index)
+    do {
+      try await MidsummerCloudService.shared.publish(
+        item: item, images: loadImages(names), sizeChartImage: nil)
+      uploadedImageNames = names
+      itemImageMessage = names.isEmpty ? "已清空单品图。" : "已删除，其他用户刷新后可见。"
+      Task { await MidsummerStore.shared.refreshFromCloud() }
+    } catch {
+      itemImageMessage = "删除失败：\(error.localizedDescription)"
     }
   }
 

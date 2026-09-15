@@ -1,0 +1,7 @@
+{
+  "_comment": "复制为 config.json 后填写。storage_state 由 scrapers/login_helper.py 生成。",
+  "storage_state": {
+    "taobao": "scrapers/cookies/taobao_state.json",
+    "xianyu": "scrapers/cookies/xianyu_state.json"
+  }
+}

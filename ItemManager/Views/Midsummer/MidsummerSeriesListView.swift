@@ -213,6 +213,8 @@ struct MidsummerSeriesDetailView: View {
   @State private var insertingItemID: String?
   @State private var insertedItemIDs: Set<String> = []
   @State private var insertToast: String?
+  /// 运营者补录（尺码表 / 价格表）：白名单门控，见 summaryCard 里的入口按钮
+  @State private var showingSupplement = false
 
   private var series: MidsummerSeriesDTO? { store.series(withID: seriesID) }
   private var brandName: String { store.catalog?.brandName ?? "仲夏物语" }
@@ -222,6 +224,7 @@ struct MidsummerSeriesDetailView: View {
       if let series {
         VStack(alignment: .leading, spacing: 0) {
           summaryCard(series)
+          priceTableSection(series)
           itemsSection(series)
           MidsummerDataNote(store: store)
         }
@@ -258,6 +261,13 @@ struct MidsummerSeriesDetailView: View {
     .sheet(item: $detailItem) { item in
       if let series {
         MidsummerItemDetailSheet(series: series, item: item, brandName: brandName)
+      }
+    }
+    // 运营者补录：沿用投稿表单的补录模式（existingSeries 非空即补录），
+    // 白名单门控在按钮与表单内各有一道（isAdminUser / CloudKit 角色双重保险）。
+    .sheet(isPresented: $showingSupplement) {
+      if let series {
+        MidsummerContributeView(store: store, existingSeries: series)
       }
     }
   }
@@ -368,6 +378,25 @@ struct MidsummerSeriesDetailView: View {
             .foregroundStyle(MidsummerTheme.brandOrange)
         }
       }
+
+      // 运营者补充上传入口（方案设计 docs/上新咨询双方案设计.md §五）：
+      // 尺码表 / 价格表优先来自淘宝详情页采集，缺项时由白名单运营者在此补录。
+      if store.isAdminUser {
+        Button {
+          showingSupplement = true
+        } label: {
+          Label("补录尺码表 / 价格表", systemImage: "square.and.pencil")
+            .font(.system(size: 12, weight: .medium))
+            .foregroundStyle(MidsummerTheme.brandOrange)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 9)
+            .background(MidsummerTheme.orangeSurface)
+            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("series-supplement-button")
+        .accessibilityLabel("补录尺码表或价格表")
+      }
     }
     .padding(14)
     .themeSkinAdaptiveSectionCard(
@@ -393,6 +422,128 @@ struct MidsummerSeriesDetailView: View {
         .fixedSize(horizontal: false, vertical: true)
       Spacer(minLength: 0)
     }
+  }
+
+  // MARK: 价格总表（方案一必含资料，docs/上新咨询双方案设计.md §四）
+  //
+  // 按 2026-09-15 定的价格归类分三组：现货价 / 全款预约 / 定金尾款预约。
+  // 数据不另存——全部从单品 price/deposit/balance/priceKind 派生，与卡片口径同源。
+
+  private func priceTableSection(_ series: MidsummerSeriesDTO) -> some View {
+    let groups = priceGroups(series)
+    return VStack(alignment: .leading, spacing: 10) {
+      HStack(spacing: 6) {
+        Text("价格总表")
+          .font(.system(size: 14, weight: .semibold))
+          .foregroundStyle(MidsummerTheme.primaryText)
+        Text("按购买方式分组")
+          .font(.system(size: 10))
+          .foregroundStyle(MidsummerTheme.secondaryText)
+        Spacer(minLength: 0)
+      }
+
+      if groups.isEmpty {
+        Text("暂无可核验价格")
+          .font(.system(size: 12))
+          .foregroundStyle(MidsummerTheme.secondaryText)
+      } else {
+        ForEach(groups, id: \.header) { group in
+          VStack(alignment: .leading, spacing: 4) {
+            Text(group.header)
+              .font(.system(size: 11, weight: .semibold))
+              .foregroundStyle(MidsummerTheme.brandOrange)
+            ForEach(group.rows, id: \.name) { row in
+              HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text(row.name)
+                  .font(.system(size: 12))
+                  .foregroundStyle(MidsummerTheme.primaryText)
+                  .lineLimit(1)
+                Spacer(minLength: 8)
+                Text(row.amount)
+                  .font(.system(size: 12, weight: .semibold).monospacedDigit())
+                  .foregroundStyle(MidsummerTheme.priceRed)
+                  .lineLimit(1)
+              }
+            }
+          }
+          .padding(.vertical, 4)
+          if group.header != groups.last?.header {
+            Rectangle()
+              .fill(MidsummerTheme.divider)
+              .frame(height: 0.5)
+          }
+        }
+      }
+
+      Text("口径：现货价即买即得；全款预约一次付清；定金尾款预约需付两次。价格为采集时点数据，以商品页为准。")
+        .font(.system(size: 10))
+        .foregroundStyle(MidsummerTheme.secondaryText)
+        .fixedSize(horizontal: false, vertical: true)
+    }
+    .padding(12)
+    .themeSkinAdaptiveSectionCard(
+      slot: MidsummerThemeSlot.card,
+      cornerRadius: 14,
+      showsDecoration: true
+    ) {
+      MidsummerTheme.surface
+    }
+    .padding(.horizontal, 12)
+    .padding(.top, 10)
+    .accessibilityIdentifier("series-price-table")
+  }
+
+  private struct PriceRow {
+    let name: String
+    let amount: String
+  }
+
+  private struct PriceGroup {
+    let header: String
+    let rows: [PriceRow]
+  }
+
+  /// 单品 → 价格归类。判定顺序：有定金+尾款 → 定金尾款预约；只有定金 → 全款预约
+  /// （与衣橱 `isFullPaymentReservation` 的派生口径一致）；无预约款但有价 → 现货价。
+  private func priceGroups(_ series: MidsummerSeriesDTO) -> [PriceGroup] {
+    var spot: [PriceRow] = []
+    var fullPreorder: [PriceRow] = []
+    var depositBalance: [PriceRow] = []
+    for item in series.items {
+      switch (item.deposit, item.balance) {
+      case (let deposit?, let balance?):
+        depositBalance.append(
+          PriceRow(name: item.name, amount: "定金 ¥\(deposit) · 尾款 ¥\(balance)"))
+      case (let deposit?, nil):
+        fullPreorder.append(PriceRow(name: item.name, amount: "全款 ¥\(deposit)"))
+      case (nil, let balance?):
+        // 只有尾款没有定金：仍属预约链路，但单独标口径，不伪装成现货价。
+        depositBalance.append(PriceRow(name: item.name, amount: "尾款 ¥\(balance)"))
+      case (nil, nil):
+        if let range = item.priceRange {
+          let kindSuffix: String
+          switch item.priceKind ?? item.variantPriceKind {
+          case .shop: kindSuffix = "（商品页价）"
+          case .reference: kindSuffix = "（参考价）"
+          case .balance, nil: kindSuffix = ""
+          }
+          spot.append(
+            PriceRow(
+              name: item.name,
+              amount: range.min == range.max
+                ? "¥\(range.min)\(kindSuffix)" : "¥\(range.min)–\(range.max)\(kindSuffix)"))
+        }
+      }
+    }
+    var groups: [PriceGroup] = []
+    if !spot.isEmpty { groups.append(PriceGroup(header: "现货价", rows: spot)) }
+    if !fullPreorder.isEmpty {
+      groups.append(PriceGroup(header: "预约价 · 全款预约", rows: fullPreorder))
+    }
+    if !depositBalance.isEmpty {
+      groups.append(PriceGroup(header: "预约价 · 定金尾款预约", rows: depositBalance))
+    }
+    return groups
   }
 
   // MARK: 单品列表
@@ -439,7 +590,8 @@ struct MidsummerSeriesDetailView: View {
     // 同一个坑：外层 Button 套内层 Button 会让「加入衣橱」和整行点击互相打架。
     // 整行点击交给 contentShape + onTapGesture，入库按钮保持真 Button。
     HStack(alignment: .top, spacing: 12) {
-      MidsummerCoverView(imageName: series.coverImage, series: nil, cornerRadius: 8)
+      // 单品图优先：每个单品展示**自己的**图；该单品没传图时才回退系列封面。
+      MidsummerCoverView(imageName: item.coverImage ?? series.coverImage, series: nil, cornerRadius: 8)
         .frame(width: 84, height: 84)
 
       VStack(alignment: .leading, spacing: 4) {

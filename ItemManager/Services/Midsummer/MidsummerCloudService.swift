@@ -77,9 +77,21 @@ final class MidsummerCloudService {
       let itemRecords =
         (try? await fetchRecords(recordType: RecordType.item, sortedBy: "publishedAt")) ?? []
 
-      let itemsBySeries = Dictionary(grouping: itemRecords.compactMap(Self.makeItem(from:))) {
-        $0.seriesID
-      }
+      let itemsBySeries = Dictionary(
+        grouping: itemRecords.compactMap { record -> MidsummerItemDTO? in
+          // 图片资产随查询已下载到本地临时目录（CKAsset.fileURL），
+          // 复制进 Images 目录后只存文件名——显示与一键入库共用这一个名字。
+          let sizeChartName = copySizeChartAsset(from: record)
+          let coverName = copyItemCoverAsset(from: record)
+          let galleryNames = copyItemGalleryAssets(from: record)
+          return Self.makeItem(
+            from: record,
+            sizeChartImageName: sizeChartName,
+            coverImageName: coverName,
+            galleryImageNames: galleryNames
+          )
+        }
+      ) { $0.seriesID }
       let series = seriesRecords.compactMap { record -> MidsummerSeriesDTO? in
         let seriesID = record["seriesID"] as? String ?? record.recordID.recordName
         return Self.makeSeries(from: record, items: itemsBySeries[seriesID] ?? [])
@@ -140,7 +152,13 @@ final class MidsummerCloudService {
     try await save(record)
   }
 
-  func publish(item: MidsummerItemDTO, coverImage: UIImage?) async throws {
+  /// 发布单品（对齐千牛发布路径：每个单品最多 5 张主图宫格）。
+  ///
+  /// - `images[0]` 是**主图**，写 `coverImage` 资产；`images[1..<5]` 写 `galleryImage2..5`。
+  /// - 以单品 id 为 recordID 整条重写，DTO 字段齐全，重复发布不会丢已有数据。
+  func publish(item: MidsummerItemDTO, images: [UIImage], sizeChartImage: UIImage? = nil)
+    async throws
+  {
     let record = CKRecord(recordType: RecordType.item, recordID: CKRecord.ID(recordName: item.id))
     record["itemID"] = item.id as CKRecordValue
     record["seriesID"] = item.seriesID as CKRecordValue
@@ -159,8 +177,18 @@ final class MidsummerCloudService {
     if let value = item.priceNote { record["priceNote"] = value as CKRecordValue }
     if let url = item.itemURL { record["itemURL"] = url as CKRecordValue }
     if let createdBy = await currentUserID() { record["createdBy"] = createdBy as CKRecordValue }
-    if let image = coverImage, let asset = Self.makeAsset(from: image, name: "\(item.id)-cover") {
-      record["coverImage"] = asset
+
+    // 主图 + 附图：与千牛主图宫格一一对应（第 1 格 = coverImage，第 2–5 格 = galleryImage2..5）。
+    for (offset, image) in images.prefix(5).enumerated() {
+      let assetName = offset == 0 ? "\(item.id)-cover" : "\(item.id)-gallery\(offset + 1)"
+      let field = offset == 0 ? "coverImage" : "galleryImage\(offset + 1)"
+      if let asset = Self.makeAsset(from: image, name: assetName) {
+        record[field] = asset
+      }
+    }
+    // 尺码表图片（双方案设计 §四：尺码表是系列页一等公民）。运营者补录时随单品一起上传。
+    if let image = sizeChartImage, let asset = Self.makeAsset(from: image, name: "\(item.id)-sizechart") {
+      record["sizeChartImage"] = asset
     }
     try await save(record)
   }
@@ -204,7 +232,12 @@ final class MidsummerCloudService {
     )
   }
 
-  private nonisolated static func makeItem(from record: CKRecord) -> MidsummerItemDTO? {
+  private nonisolated static func makeItem(
+    from record: CKRecord,
+    sizeChartImageName: String? = nil,
+    coverImageName: String? = nil,
+    galleryImageNames: [String]? = nil
+  ) -> MidsummerItemDTO? {
     guard let itemID = record["itemID"] as? String,
       let seriesID = record["seriesID"] as? String,
       let name = record["name"] as? String,
@@ -224,16 +257,92 @@ final class MidsummerCloudService {
       priceNote: (record["priceNote"] as? String).flatMap { $0.isEmpty ? nil : $0 },
       sizes: record["sizes"] as? [String] ?? [],
       colors: record["colors"] as? [String] ?? [],
-      coverImage: nil,
+      coverImage: coverImageName,
+      galleryImageNames: galleryImageNames,
       itemURL: record["itemURL"] as? String,
       sourceURL: record["sourceURL"] as? String ?? "",
       note: (record["note"] as? String).flatMap { $0.isEmpty ? nil : $0 },
       // 规格尚未接入上传表单：CloudKit 侧仍按「无规格」处理，
       // 由 Bundle 种子 `midsummer-series.json` 提供规格组与 SKU 组合。
       // 见 docs/MIDSUMMER_TALE_SPEC_SELECTION.md「规格数据的三个来源」。
+      sizeChartImageName: sizeChartImageName,
       specGroups: nil,
       skus: nil
     )
+  }
+
+  /// 把随查询下载的尺码表资产（CKAsset 临时文件）复制进 ImageManager 的 Images 目录，
+  /// 返回本地文件名。没有资产或复制失败都返回 nil——界面按「待补充」如实展示。
+  ///
+  /// 文件名带时间戳避免同名覆盖；命名空间 `midsummer-sizechart-` 与衣橱手动上传的图区分。
+  private func copySizeChartAsset(from record: CKRecord) -> String? {
+    guard let asset = record["sizeChartImage"] as? CKAsset,
+      let fileURL = asset.fileURL,
+      FileManager.default.fileExists(atPath: fileURL.path)
+    else { return nil }
+
+    let fileName = "midsummer-sizechart-\(record.recordID.recordName)-\(Int(Date().timeIntervalSince1970)).jpg"
+    let destination = ImageManager.shared.imagesDirectory.appendingPathComponent(fileName)
+    do {
+      if FileManager.default.fileExists(atPath: destination.path) {
+        try FileManager.default.removeItem(at: destination)
+      }
+      try FileManager.default.copyItem(at: fileURL, to: destination)
+      return fileName
+    } catch {
+      print("⚠️ [Midsummer] 尺码表图复制失败：\(error.localizedDescription)")
+      return nil
+    }
+  }
+
+  /// 把随查询下载的**单品图**资产（CKAsset 临时文件）复制进 ImageManager 的 Images 目录，
+  /// 返回本地文件名。没有资产或复制失败都返回 nil——界面回退系列封面并如实标注「待补充」。
+  ///
+  /// 命名空间 `midsummer-item-` 与尺码表（`midsummer-sizechart-`）、衣橱手动上传的图区分；
+  /// 文件名带时间戳，运营者更换图片后旧文件自然不再被引用。
+  private func copyItemCoverAsset(from record: CKRecord) -> String? {
+    guard let asset = record["coverImage"] as? CKAsset,
+      let fileURL = asset.fileURL,
+      FileManager.default.fileExists(atPath: fileURL.path)
+    else { return nil }
+
+    let fileName = "midsummer-item-\(record.recordID.recordName)-\(Int(Date().timeIntervalSince1970)).jpg"
+    let destination = ImageManager.shared.imagesDirectory.appendingPathComponent(fileName)
+    do {
+      if FileManager.default.fileExists(atPath: destination.path) {
+        try FileManager.default.removeItem(at: destination)
+      }
+      try FileManager.default.copyItem(at: fileURL, to: destination)
+      return fileName
+    } catch {
+      print("⚠️ [Midsummer] 单品图复制失败：\(error.localizedDescription)")
+      return nil
+    }
+  }
+
+  /// 把随查询下载的**单品附图**（galleryImage2..5，千牛宫格第 2–5 格）复制进 Images 目录，
+  /// 按槽位顺序返回文件名；缺失或复制失败的槽位自动跳过。
+  private func copyItemGalleryAssets(from record: CKRecord) -> [String] {
+    (2...5).compactMap { slot in
+      guard let asset = record["galleryImage\(slot)"] as? CKAsset,
+        let fileURL = asset.fileURL,
+        FileManager.default.fileExists(atPath: fileURL.path)
+      else { return nil }
+
+      let fileName =
+        "midsummer-item-\(record.recordID.recordName)-\(slot)-\(Int(Date().timeIntervalSince1970)).jpg"
+      let destination = ImageManager.shared.imagesDirectory.appendingPathComponent(fileName)
+      do {
+        if FileManager.default.fileExists(atPath: destination.path) {
+          try FileManager.default.removeItem(at: destination)
+        }
+        try FileManager.default.copyItem(at: fileURL, to: destination)
+        return fileName
+      } catch {
+        print("⚠️ [Midsummer] 单品附图复制失败：\(error.localizedDescription)")
+        return nil
+      }
+    }
   }
 
   // MARK: - 图片

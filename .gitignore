@@ -54,3 +54,4 @@ asserts/psd/*
 .playwright-cli/*
 output/*
 
+scrapers/assets/*

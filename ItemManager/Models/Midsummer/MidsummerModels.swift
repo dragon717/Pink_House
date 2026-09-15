@@ -244,12 +244,24 @@ nonisolated struct MidsummerItemDTO: Codable, Identifiable, Hashable, Sendable {
   let priceNote: String?
   let sizes: [String]
   let colors: [String]
+  /// 主图（本地文件名）。对齐千牛发布路径：每个单品的第一张图为**主图**，
+  /// 列表行 / 详情页顶部 / 一键入库都以它为准。
   let coverImage: String?
+  /// 附图（第 2–5 张，本地文件名，不含主图）。对齐千牛「主图 5 张」宫格：
+  /// 主图存 `coverImage`，其余图按顺序存这里。
+  /// 旧记录 / 旧种子没有此字段，解码自动为 nil（向后兼容）。
+  var galleryImageNames: [String]? = nil
   let itemURL: String?
   /// 原文出处，合规必填（Apple 5.2）
   let sourceURL: String
   /// 资料存疑或待补时的说明，界面会如实展示
   let note: String?
+
+  /// 尺码表图片的本地文件名（`ImageManager` Images 目录内）。
+  /// `nil` / 空 = 尺码表待补充——界面如实标注，不虚构数据（docs/上新咨询双方案设计.md §四）。
+  /// 旧 Bundle 种子与旧 CloudKit 记录没有此字段，解码时自动为 nil（向后兼容）；
+  /// 用 `var` + 默认值是为了让成员初始化器带默认参数，既有构造点无需改动。
+  var sizeChartImageName: String? = nil
 
   /// 规格组（颜色分类 / 尺码 / …）。`nil` 或空数组表示该单品没有可选规格，
   /// 此时详情页的「一键入库」不必让使用者做选择，直接按单品信息入库。

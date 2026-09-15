@@ -1,18 +1,26 @@
 import PhotosUI
 import SwiftUI
 
-// MARK: - 创作者自主上传入口
+// MARK: - 创作者自主上传入口（千牛「发布宝贝」式分步流程）
 //
-// 用户明确要求：「网络信息可能不完整，因此必须额外提供一个供创作者自主上传上新信息的入口」。
+// 用户要求：严格参照千牛后台商家「发布宝贝」的完整流程——分步填写、
+// 每步校验、底部固定操作栏、存草稿、发布成功页。
 //
 // 两种模式：
-//   1. 新建系列  —— 从零录入一个上新系列（含单品）
-//   2. 补录单品  —— 为已有系列补齐缺失的款 / 价格 / 尺码（`existingSeries` 非空时）
+//   1. 新建系列  —— 走完整四步：类目与信息 → 系列主图 → 单品与价格 → 预览提交
+//   2. 补录单品  —— 系列已存在，直接从「单品与价格」步骤进入（等价于千牛的「编辑宝贝」）
+//
+// 千牛流程要点 → 本页步骤的对应：
+//   千牛第 1 步「选择类目」        → 步骤①：上新阶段（类目的等价物）+ 标题（系列名）
+//   千牛第 3 步「基本信息/属性」    → 步骤①：日期、定金区间、尺码配色、简介、原文出处
+//   千牛第 4 步「上传图片」        → 步骤②：系列封面（主图位，白底/方图建议）
+//   千牛第 5 步「设置 SKU」        → 步骤③：每个单品一张 SKU 卡（款名/类型/价格/主图宫格/尺码表）
+//   千牛「提交审核」+ 成功页       → 步骤④：预览汇总 → 提交 → 发布成功页（继续发布 / 完成）
 //
 // 合规约束（见 docs/品牌上新资讯_开发规格.md §7）：
-//   • 入口只对 admin 可见（`isAdmin()` 门控，非 admin 打开 App 完全看不到）
+//   • 入口只对 admin 可见（`isAdminUser` 门控，非 admin 打开 App 完全看不到）
 //   • 原文出处 sourceURL 必填 —— Apple 5.2 要求可溯源
-//   • 封面图长边压到 1200px 再上传，避免吃爆 CloudKit 配额
+//   • 图片长边压到 1200px 再上传，避免吃爆 CloudKit 配额
 //   • App 内不做任何爬取，图片由创作者本地选取
 
 struct MidsummerContributeView: View {
@@ -22,200 +30,141 @@ struct MidsummerContributeView: View {
 
   @Environment(\.dismiss) private var dismiss
 
-  // 系列字段
-  @State private var seriesName = ""
-  @State private var hasLaunchDate = true
-  @State private var launchDate = Date()
-  @State private var stage: MidsummerStage = .deposit
+  // MARK: 步骤状态
+
+  private enum WizardStep: Int, CaseIterable, Hashable {
+    /// 千牛第 1 步：选择类目 + 基本信息与属性
+    case basics = 0
+    /// 千牛第 4 步：上传图片（这里是系列封面位）
+    case cover = 1
+    /// 千牛第 5 步：设置 SKU（单品与价格）
+    case items = 2
+    /// 千牛「提交」前的确认 + 成功页入口
+    case review = 3
+
+    var title: String {
+      switch self {
+      case .basics: return "类目与信息"
+      case .cover: return "系列主图"
+      case .items: return "单品与价格"
+      case .review: return "预览提交"
+      }
+    }
+
+    var stepTitle: String {
+      switch self {
+      case .basics: return "① 选择类目与基本信息"
+      case .cover: return "② 上传系列主图"
+      case .items: return "③ 设置单品与价格（SKU）"
+      case .review: return "④ 预览与提交"
+      }
+    }
+  }
+
+  /// 补录模式跳过系列级步骤（千牛「编辑宝贝」直接进商品内容）。
+  private var visibleSteps: [WizardStep] {
+    isSupplementMode ? [.items, .review] : WizardStep.allCases
+  }
+
+  @State private var step: WizardStep = .basics
+  /// 当前步骤的校验红字（千牛：必填项不满足时红字提示，不跳步）
+  @State private var stepError: String?
+
+  // MARK: 系列字段（步骤①）
+  // 注意：这批字段不能标 private——同文件的 DraftSnapshot（存草稿）要直接读写它们。
+
+  @State var seriesName = ""
+  @State var hasLaunchDate = true
+  @State var launchDate = Date()
+  @State var stage: MidsummerStage = .deposit
   /// 定金区间。价格区间**不在这里填**——它由单品价格自动派生（见 buildSeries）。
-  @State private var depositMinText = ""
-  @State private var depositMaxText = ""
-  @State private var selectedSizes: Set<String> = ["S", "M", "L", "XL"]
-  @State private var colorsText = ""
-  @State private var summaryText = ""
-  @State private var sourceURLText = ""
+  @State var depositMinText = ""
+  @State var depositMaxText = ""
+  @State var selectedSizes: Set<String> = ["S", "M", "L", "XL"]
+  @State var colorsText = ""
+  @State var summaryText = ""
+  @State var sourceURLText = ""
 
-  // 单品
-  @State private var draftItems: [DraftItem] = [DraftItem()]
+  // MARK: 单品（步骤③）
 
-  // 封面图
+  @State var draftItems: [DraftItem] = [DraftItem()]
+
+  // MARK: 系列主图（步骤②）
+
   @State private var photoItem: PhotosPickerItem?
   @State private var coverImage: UIImage?
 
-  // 提交状态
+  // MARK: 提交状态
+
   @State private var isSubmitting = false
   @State private var errorMessage: String?
   @State private var didSucceed = false
+  /// 逐单品上传进度（千牛发布路径：每传完一个单品推进一格）
+  @State private var uploadStatusText: String?
+
+  // MARK: 草稿（千牛「存草稿」）
+
+  @State private var savedDraft: DraftSnapshot?
+  @State private var draftMessage: String?
 
   private let presetSizes = ["XS", "S", "M", "L", "XL", "均码", "定制"]
   private var isSupplementMode: Bool { existingSeries != nil }
 
+  // MARK: - Body
+
   var body: some View {
     NavigationStack {
-      Form {
-        // 权限提示：入口现在由「创作者模式」解锁，但**能否写入**仍由 CloudKit 的角色决定。
-        // 不把这件事说在前面，使用者会在填完一整页之后才吃到失败，且不知道为什么。
-        if !store.isAdminUser {
-          Section {
-            Label {
-              Text("当前 iCloud 账户不在创作者名单中")
-                .font(.system(size: 13, weight: .medium))
-            } icon: {
-              Image(systemName: "exclamationmark.triangle.fill")
-                .foregroundStyle(MidsummerTheme.brandOrange)
-            }
-          } footer: {
-            Text(
-              "你仍可以填写并尝试提交。若提示「当前账号没有上传权限」，"
-                + "说明该账户尚未被授予写入权限 —— 把它的 iCloud 账户 ID 加入 CloudKit 的"
-                + "创作者角色后即可发布（参见 docs/MIDSUMMER_TALE_CLOUDKIT_SETUP.md）。"
-            )
-          }
-        }
-
-        if isSupplementMode, let existingSeries {
-          Section {
-            LabeledContent("系列", value: existingSeries.name)
-            LabeledContent("当前收录", value: existingSeries.itemCountText)
-            if existingSeries.launchedOn.isEmpty {
-              Label("该系列上新日期待补充", systemImage: "exclamationmark.triangle")
-                .font(.caption)
-                .foregroundStyle(MidsummerTheme.brandOrange)
-            }
-          } header: {
-            Text("补录目标")
-          } footer: {
-            Text("提交后该系列会立即更新，无需等待云端同步。")
-          }
+      VStack(spacing: 0) {
+        if didSucceed {
+          successPage
         } else {
-          Section {
-            TextField("系列名，例如「小熊博物馆系列」", text: $seriesName)
-          } header: {
-            Text("系列名")
-          }
-        }
+          wizardHeader
+          Rectangle().fill(MidsummerTheme.divider).frame(height: 0.5)
 
-        Section {
-          Toggle("已知上新日期", isOn: $hasLaunchDate)
-          if hasLaunchDate {
-            DatePicker("上新日期", selection: $launchDate, displayedComponents: .date)
-              .environment(\.locale, Locale(identifier: "zh_CN"))
-          }
-          Picker("上新阶段", selection: $stage) {
-            ForEach(MidsummerStage.allCases, id: \.self) { stage in
-              Label(stage.labelZH, systemImage: stage.symbolName).tag(stage)
-            }
-          }
-        } header: {
-          Text("时间与阶段")
-        } footer: {
-          Text("公开渠道常常查不到确切日期，此时关闭上方开关即可——界面会显示「上新日期待补充」。")
-        }
-
-        Section {
-          HStack {
-            TextField("最低", text: $depositMinText).keyboardType(.numberPad)
-            Text("–").foregroundStyle(MidsummerTheme.secondaryText)
-            TextField("最高", text: $depositMaxText).keyboardType(.numberPad)
-            Text("元").font(.caption).foregroundStyle(MidsummerTheme.secondaryText)
-          }
-        } header: {
-          Text("定金区间（元）")
-        } footer: {
-          Text(
-            "定金常以价格带形式公布（如「定金 7-139 元」），无法归到某一个单品上，所以单独填在这里。"
-              + "\n\n参考价 / 现货价的区间**不用填**：它由下方每个单品的价格自动算出，"
-              + "改一个单品价，区间会跟着变，不需要两处对齐。"
-          )
-        }
-
-        Section {
-          sizeChips
-          TextField("配色，用顿号或逗号分隔，例如「粉色、蓝色」", text: $colorsText)
-        } header: {
-          Text("尺码与配色")
-        }
-
-        Section {
-          TextEditor(text: $summaryText)
-            .frame(minHeight: 72)
-            .font(.system(size: 14))
-        } header: {
-          Text("系列简介（可选）")
-        } footer: {
-          Text("写清版型、柄图或联名背景，方便其他人检索。请用自己的话概括，不要直接粘贴店铺文案。")
-        }
-
-        itemsSection
-
-        Section {
-          PhotosPicker(selection: $photoItem, matching: .images) {
-            HStack {
-              Label("选择封面图", systemImage: "photo")
-              Spacer()
-              if coverImage != nil {
-                Text("已选择").font(.caption).foregroundStyle(MidsummerTheme.freshGreen)
+          ScrollView {
+            VStack(alignment: .leading, spacing: 12) {
+              stepTitleRow
+              if let stepError {
+                // 千牛式校验红字：必须能被看见，且带定位词（缺哪一步的哪一项）
+                Label(stepError, systemImage: "exclamationmark.circle.fill")
+                  .font(.system(size: 12, weight: .medium))
+                  .foregroundStyle(MidsummerTheme.priceRed)
+                  .padding(10)
+                  .frame(maxWidth: .infinity, alignment: .leading)
+                  .background(MidsummerTheme.orangeSurface)
+                  .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                  .accessibilityIdentifier("midsummer-step-error")
               }
+              stepContent
             }
+            .padding(.horizontal, 12)
+            .padding(.top, 12)
+            .padding(.bottom, 16)
           }
-          if let coverImage {
-            Image(uiImage: coverImage)
-              .resizable()
-              .scaledToFill()
-              .frame(height: 140)
-              .frame(maxWidth: .infinity)
-              .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-          }
-        } header: {
-          Text("封面图（可选）")
-        } footer: {
-          Text("上传后会自动压缩到长边 1200px。请只上传你有权使用的图片。")
-        }
-
-        Section {
-          TextField("原文链接（微博 / 淘宝 / 小红书）", text: $sourceURLText)
-            .keyboardType(.URL)
-            .textInputAutocapitalization(.never)
-            .autocorrectionDisabled()
-        } header: {
-          Text("原文出处（必填）")
-        } footer: {
-          Text("必填：内容需要可溯源，这也是商店审核的要求。请勿填写短链或无法访问的地址。")
-        }
-
-        Section {
-          Button {
-            Task { await submit() }
-          } label: {
-            HStack {
-              Spacer()
-              if isSubmitting {
-                ProgressView().padding(.trailing, 6)
-              }
-              Text(isSubmitting ? "正在上传…" : "提交到线上内容库")
-                .font(.system(size: 15, weight: .semibold))
-              Spacer()
-            }
-          }
-          .disabled(isSubmitting)
-        } footer: {
-          Text("提交后会写入 CloudKit 公共库（iCloud.bugod2.ItemManager），其他用户刷新即可看到。")
+          .scrollDismissesKeyboard(.interactively)
         }
       }
-      .navigationTitle(isSupplementMode ? "补录单品" : "上传上新")
+      .background(MidsummerTheme.pageBackground)
       .navigationBarTitleDisplayMode(.inline)
       .toolbar {
         ToolbarItem(placement: .topBarLeading) {
           Button("取消") { dismiss() }
         }
+        ToolbarItem(placement: .topBarTrailing) {
+          // 千牛「存草稿」：只对新建模式开放（补录有明确目标，无需草稿）
+          if !isSupplementMode && !didSucceed {
+            Button("存草稿") { saveDraft() }
+              .disabled(isSubmitting)
+          }
+        }
+      }
+      .safeAreaInset(edge: .bottom) {
+        if !didSucceed {
+          bottomBar
+        }
       }
       .onChange(of: photoItem) { _, newValue in
         Task { await loadPhoto(newValue) }
-      }
-      .alert("已提交", isPresented: $didSucceed) {
-        Button("好") { dismiss() }
-      } message: {
-        Text("内容已写入公共库，其他用户刷新后即可看到。")
       }
       .alert(
         "上传失败",
@@ -228,7 +177,754 @@ struct MidsummerContributeView: View {
       } message: {
         Text(errorMessage ?? "")
       }
-      .onAppear(perform: prefill)
+      .onAppear {
+        prefill()
+        if isSupplementMode {
+          step = .items
+        }
+        savedDraft = DraftSnapshot.load()
+      }
+    }
+  }
+
+  // MARK: 步骤条（千牛发布页顶部的分步导航）
+
+  private var wizardHeader: some View {
+    HStack(alignment: .center, spacing: 0) {
+      ForEach(Array(visibleSteps.enumerated()), id: \.offset) { pair in
+        let index = pair.offset
+        let wizardStep = pair.element
+        let isCurrent = wizardStep == step
+        let isDone = wizardStep.rawValue < step.rawValue
+
+        if index > 0 {
+          Rectangle()
+            .fill(
+              wizardStep.rawValue <= step.rawValue
+                ? MidsummerTheme.brandOrange : MidsummerTheme.divider
+            )
+            .frame(height: 1.5)
+            .frame(maxWidth: .infinity)
+        }
+
+        Button {
+          // 只允许往回点（千牛同理：前进必须过校验，回退随意）
+          if wizardStep.rawValue < step.rawValue {
+            withAnimation(.snappy(duration: 0.18)) {
+              step = wizardStep
+              stepError = nil
+            }
+          }
+        } label: {
+          HStack(spacing: 5) {
+            ZStack {
+              Circle()
+                .fill(
+                  isCurrent || isDone
+                    ? MidsummerTheme.brandOrange : MidsummerTheme.subtleFill
+                )
+                .frame(width: 22, height: 22)
+              if isDone {
+                Image(systemName: "checkmark")
+                  .font(.system(size: 10, weight: .bold))
+                  .foregroundStyle(MidsummerTheme.onAccent)
+              } else {
+                Text("\(wizardStep.rawValue + 1)")
+                  .font(.system(size: 11, weight: .semibold))
+                  .foregroundStyle(
+                    isCurrent ? MidsummerTheme.onAccent : MidsummerTheme.secondaryText)
+              }
+            }
+            Text(wizardStep.title)
+              .font(.system(size: 11, weight: isCurrent ? .semibold : .regular))
+              .foregroundStyle(isCurrent ? MidsummerTheme.brandOrange : MidsummerTheme.secondaryText)
+          }
+          .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(wizardStep.rawValue > step.rawValue)
+        .accessibilityIdentifier("midsummer-step-\(wizardStep.rawValue)")
+      }
+    }
+    .padding(.horizontal, 12)
+    .padding(.vertical, 10)
+    .background(MidsummerTheme.surface)
+  }
+
+  private var stepTitleRow: some View {
+    Text(step.stepTitle)
+      .font(.system(size: 16, weight: .semibold))
+      .foregroundStyle(MidsummerTheme.primaryText)
+      .frame(maxWidth: .infinity, alignment: .leading)
+  }
+
+  // MARK: 步骤内容分发
+
+  @ViewBuilder
+  private var stepContent: some View {
+    switch step {
+    case .basics:
+      basicsStep
+    case .cover:
+      coverStep
+    case .items:
+      itemsStep
+    case .review:
+      reviewStep
+    }
+  }
+
+  // MARK: 底部固定操作栏（千牛发布页底部：上一步 / 下一步 / 提交）
+
+  private var bottomBar: some View {
+    VStack(spacing: 0) {
+      Rectangle().fill(MidsummerTheme.divider).frame(height: 0.5)
+      HStack(spacing: 10) {
+        if canGoBack {
+          Button {
+            goBack()
+          } label: {
+            Text("上一步")
+              .font(.system(size: 14, weight: .medium))
+              .foregroundStyle(MidsummerTheme.primaryText)
+              .frame(height: 42)
+              .frame(width: 96)
+              .background(MidsummerTheme.subtleFill)
+              .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+          }
+          .disabled(isSubmitting)
+          .accessibilityIdentifier("midsummer-step-back")
+        }
+
+        Button {
+          advance()
+        } label: {
+          HStack {
+            if isSubmitting {
+              ProgressView()
+                .tint(MidsummerTheme.onAccent)
+                .padding(.trailing, 6)
+            }
+            Text(primaryActionTitle)
+              .font(.system(size: 15, weight: .semibold))
+          }
+          .foregroundStyle(MidsummerTheme.onAccent)
+          .frame(height: 42)
+          .frame(maxWidth: .infinity)
+          .background(
+            isSubmitting ? MidsummerTheme.brandOrange.opacity(0.6) : MidsummerTheme.brandOrange
+          )
+          .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+          .themeSkinLegibleText(level: .hero, slot: MidsummerThemeSlot.primaryButton)
+        }
+        .disabled(isSubmitting)
+        .accessibilityIdentifier("midsummer-step-next")
+      }
+      .padding(.horizontal, 12)
+      .padding(.vertical, 10)
+      .background(MidsummerTheme.surface)
+    }
+  }
+
+  private var primaryActionTitle: String {
+    if isSubmitting { return "正在上传…" }
+    guard let last = visibleSteps.last else { return "提交宝贝信息" }
+    return step == last ? "提交宝贝信息" : "下一步"
+  }
+
+  /// 千牛交互：「下一步」先校验当前步，不满足则红字提示、不跳步。
+  private func advance() {
+    guard !isSubmitting else { return }
+    if let failure = validateCurrentStep() {
+      stepError = failure.message
+      return
+    }
+    stepError = nil
+    guard let index = visibleSteps.firstIndex(of: step) else { return }
+    if index + 1 < visibleSteps.count {
+      withAnimation(.snappy(duration: 0.18)) {
+        step = visibleSteps[index + 1]
+      }
+    } else {
+      Task { await submit() }
+    }
+  }
+
+  private var canGoBack: Bool {
+    guard let index = visibleSteps.firstIndex(of: step) else { return false }
+    return index > 0
+  }
+
+  private func goBack() {
+    guard let index = visibleSteps.firstIndex(of: step), index > 0 else { return }
+    withAnimation(.snappy(duration: 0.18)) {
+      step = visibleSteps[index - 1]
+      stepError = nil
+    }
+  }
+
+  private func validateCurrentStep() -> MidsummerContributeFailure? {
+    switch step {
+    case .basics:
+      // 与整页提交同一套校验器的分步版：只查本步的两个必填
+      return MidsummerContributionValidator.validateSeriesName(seriesName)
+        ?? MidsummerContributionValidator.validateSourceURL(sourceURLText)
+    case .cover, .review:
+      return nil
+    case .items:
+      return MidsummerContributionValidator.validateItems(draftItems.map(\.name))
+    }
+  }
+
+  // MARK: 步骤① 类目与基本信息（千牛：选择类目 + 基本信息属性）
+
+  private var basicsStep: some View {
+    VStack(alignment: .leading, spacing: 12) {
+      if let savedDraft {
+        draftRestoreBanner(savedDraft)
+      }
+
+      // —— 千牛「选择类目」：上新阶段是本业务里类目的等价物，选错会影响系列页的展示位
+      wizardCard("选择上新阶段（类目）", hint: "选错阶段会让系列出现在错误的时间线上，提交前可随时回来改。") {
+        LazyVGrid(columns: [GridItem(.adaptive(minimum: 88), spacing: 8)], spacing: 8) {
+          ForEach(MidsummerStage.allCases, id: \.self) { candidate in
+            let on = candidate == stage
+            Button {
+              stage = candidate
+            } label: {
+              HStack(spacing: 4) {
+                Image(systemName: on ? "checkmark.circle.fill" : candidate.symbolName)
+                  .font(.system(size: 11))
+                Text(candidate.labelZH)
+                  .font(.system(size: 12, weight: on ? .semibold : .regular))
+                  .lineLimit(1)
+              }
+              .foregroundStyle(on ? MidsummerTheme.brandOrange : MidsummerTheme.secondaryText)
+              .frame(maxWidth: .infinity)
+              .padding(.vertical, 9)
+              .background(on ? MidsummerTheme.orangeSurface : MidsummerTheme.subtleFill)
+              .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("midsummer-stage-option-\(candidate.rawValue)")
+          }
+        }
+      }
+
+      // —— 千牛「商品标题」：系列名 + 字数计数
+      wizardCard("系列标题", hint: "相当于宝贝标题，30 字以内。写清系列主题，方便其他人检索。") {
+        TextField("系列名，例如「小熊博物馆系列」", text: $seriesName)
+          .font(.system(size: 14))
+          .padding(10)
+          .background(MidsummerTheme.subtleFill)
+          .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+          .accessibilityIdentifier("midsummer-series-name")
+
+        HStack {
+          Toggle("已知上新日期", isOn: $hasLaunchDate)
+            .font(.system(size: 13))
+          if hasLaunchDate {
+            Spacer()
+            DatePicker("", selection: $launchDate, displayedComponents: .date)
+              .labelsHidden()
+              .environment(\.locale, Locale(identifier: "zh_CN"))
+          }
+        }
+        if hasLaunchDate == false {
+          Text("公开渠道常常查不到确切日期，关闭后界面会显示「上新日期待补充」。")
+            .font(.system(size: 11))
+            .foregroundStyle(MidsummerTheme.secondaryText)
+        }
+      }
+
+      // —— 千牛「销售属性 / 价格」：定金区间 + 尺码配色
+      wizardCard("规格与价格属性", hint: "参考价 / 现货价的区间不用填：由步骤③每个单品的价格自动算出。") {
+        HStack {
+          Text("定金区间")
+            .font(.system(size: 12))
+            .foregroundStyle(MidsummerTheme.secondaryText)
+          TextField("最低", text: $depositMinText)
+            .keyboardType(.numberPad)
+            .multilineTextAlignment(.center)
+            .font(.system(size: 13))
+            .padding(.vertical, 6)
+            .background(MidsummerTheme.subtleFill)
+            .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+          Text("–").foregroundStyle(MidsummerTheme.secondaryText)
+          TextField("最高", text: $depositMaxText)
+            .keyboardType(.numberPad)
+            .multilineTextAlignment(.center)
+            .font(.system(size: 13))
+            .padding(.vertical, 6)
+            .background(MidsummerTheme.subtleFill)
+            .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+          Text("元").font(.system(size: 11)).foregroundStyle(MidsummerTheme.secondaryText)
+        }
+
+        sizeChips
+
+        TextField("配色，用顿号或逗号分隔，例如「粉色、蓝色」", text: $colorsText)
+          .font(.system(size: 13))
+          .padding(10)
+          .background(MidsummerTheme.subtleFill)
+          .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+      }
+
+      // —— 千牛「详情描述」：简介
+      wizardCard("系列简介（可选）", hint: "写清版型、柄图或联名背景。请用自己的话概括，不要直接粘贴店铺文案。") {
+        TextEditor(text: $summaryText)
+          .frame(minHeight: 68)
+          .font(.system(size: 13))
+          .scrollContentBackground(.hidden)
+          .padding(8)
+          .background(MidsummerTheme.subtleFill)
+          .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+      }
+
+      // —— 原文出处（合规必填，Apple 5.2）
+      wizardCard("原文出处（必填）", hint: "内容需要可溯源，这也是商店审核的要求。请勿填写短链或无法访问的地址。") {
+        TextField("原文链接（微博 / 淘宝 / 小红书）", text: $sourceURLText)
+          .keyboardType(.URL)
+          .textInputAutocapitalization(.never)
+          .autocorrectionDisabled()
+          .font(.system(size: 13))
+          .padding(10)
+          .background(MidsummerTheme.subtleFill)
+          .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+          .accessibilityIdentifier("midsummer-source-url")
+      }
+    }
+  }
+
+  // MARK: 步骤② 系列主图（千牛：上传主图，第 1 张为主图）
+
+  private var coverStep: some View {
+    VStack(alignment: .leading, spacing: 12) {
+      wizardCard("系列主图", hint: "用作系列页封面：建议正方形、清晰无水印、只上传你有权使用的图。上传后自动压缩到长边 1200px。") {
+        ZStack(alignment: .topTrailing) {
+          PhotosPicker(selection: $photoItem, matching: .images) {
+            if let coverImage {
+              Image(uiImage: coverImage)
+                .resizable()
+                .scaledToFill()
+                .frame(height: 200)
+                .frame(maxWidth: .infinity)
+                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            } else {
+              VStack(spacing: 8) {
+                Image(systemName: "camera")
+                  .font(.system(size: 26, weight: .light))
+                Text("上传主图（封面）")
+                  .font(.system(size: 13, weight: .medium))
+                Text("点击从相册选取")
+                  .font(.system(size: 10))
+                  .foregroundStyle(MidsummerTheme.secondaryText)
+              }
+              .foregroundStyle(MidsummerTheme.secondaryText)
+              .frame(height: 200)
+              .frame(maxWidth: .infinity)
+              .background(MidsummerTheme.subtleFill)
+              .overlay(
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                  .strokeBorder(MidsummerTheme.divider, style: StrokeStyle(lineWidth: 1, dash: [5]))
+              )
+              .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            }
+          }
+          .accessibilityIdentifier("midsummer-cover-picker")
+
+          if coverImage != nil {
+            Button {
+              coverImage = nil
+              photoItem = nil
+            } label: {
+              Image(systemName: "xmark.circle.fill")
+                .font(.system(size: 18))
+                .foregroundStyle(MidsummerTheme.primaryText)
+                .shadow(radius: 2)
+                .padding(6)
+            }
+            .accessibilityIdentifier("midsummer-cover-remove")
+          }
+        }
+      }
+
+      // —— 单品预告：提醒下一步要做什么（千牛主图 → SKU 的顺序）
+      wizardCard("下一步预告", hint: nil) {
+        Label("进入下一步后，为每个单品单独设置 5 张主图宫格、价格与尺码表。", systemImage: "arrow.right.circle")
+          .font(.system(size: 12))
+          .foregroundStyle(MidsummerTheme.secondaryText)
+      }
+    }
+  }
+
+  // MARK: 步骤③ 单品与价格（千牛：设置 SKU）
+
+  private var itemsStep: some View {
+    VStack(alignment: .leading, spacing: 12) {
+      if isSupplementMode, let existingSeries {
+        wizardCard("补录目标", hint: "提交后该系列会立即更新，无需等待云端同步。") {
+          LabeledContent("系列", value: existingSeries.name)
+          LabeledContent("当前收录", value: existingSeries.itemCountText)
+          if existingSeries.launchedOn.isEmpty {
+            Label("该系列上新日期待补充", systemImage: "exclamationmark.triangle")
+              .font(.system(size: 12))
+              .foregroundStyle(MidsummerTheme.brandOrange)
+          }
+        }
+      }
+
+      ForEach($draftItems) { $item in
+        itemCard(item: $item)
+      }
+      .onDelete { draftItems.remove(atOffsets: $0) }
+
+      Button {
+        draftItems.append(DraftItem(inheritingSizesFrom: selectedSizes))
+      } label: {
+        Label("添加一个单品", systemImage: "plus.circle")
+          .font(.system(size: 14, weight: .medium))
+          .foregroundStyle(MidsummerTheme.brandOrange)
+          .frame(maxWidth: .infinity)
+          .frame(height: 44)
+          .background(MidsummerTheme.orangeSurface)
+          .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+      }
+      .accessibilityIdentifier("midsummer-add-item")
+    }
+  }
+
+  /// 单张 SKU 卡（千牛：每个 SKU 独立的名称 / 价格 / 图片块）
+  private func itemCard(item: Binding<DraftItem>) -> some View {
+    VStack(alignment: .leading, spacing: 10) {
+      HStack {
+        Text("单品")
+          .font(.system(size: 13, weight: .semibold))
+          .foregroundStyle(MidsummerTheme.brandOrange)
+        Spacer()
+        if !isSupplementMode && draftItems.count > 1 {
+          Button {
+            if let index = draftItems.firstIndex(where: { $0.id == item.wrappedValue.id }) {
+              _ = draftItems.remove(at: index)
+            }
+          } label: {
+            Label("删除", systemImage: "trash")
+              .font(.system(size: 11))
+              .foregroundStyle(MidsummerTheme.secondaryText)
+          }
+        }
+      }
+
+      // SKU 名称（千牛：SKU 名称）
+      TextField("款名，例如「樱花小羊 SK」", text: item.name)
+        .font(.system(size: 14, weight: .medium))
+        .padding(10)
+        .background(MidsummerTheme.subtleFill)
+        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .accessibilityIdentifier("midsummer-item-name-\(item.wrappedValue.id)")
+
+      // SKU 规格（千牛：规格属性）
+      Picker("类型", selection: item.kind) {
+        ForEach(MidsummerItemKind.allCases, id: \.self) { kind in
+          Text(kind.shortLabel).tag(kind)
+        }
+      }
+      .pickerStyle(.segmented)
+
+      // SKU 价格（千牛：一口价 / 促销价，这里按本业务口径拆为现货价 / 定金 / 尾款）
+      HStack(spacing: 8) {
+        priceField("现货价", text: item.priceText)
+        priceField("定金", text: item.depositText)
+        priceField("尾款", text: item.balanceText)
+      }
+
+      if Int(item.wrappedValue.priceText) != nil {
+        Picker("价格口径", selection: item.priceKind) {
+          ForEach(MidsummerPriceKind.allCases, id: \.self) { kind in
+            Text(kind.labelZH).tag(kind)
+          }
+        }
+        .pickerStyle(.segmented)
+        .font(.system(size: 12))
+      }
+
+      TextField("备注（价格差异、批次、待补项说明）", text: item.noteText)
+        .font(.system(size: 12))
+        .padding(10)
+        .background(MidsummerTheme.subtleFill)
+        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+
+      // 单品主图宫格（千牛发布路径）：**每个单品一个独立宫格**，互不共用。
+      // 第 1 格主图 → 列表行 / 详情页 / 一键入库；2–5 格附图。
+      itemImageGrid(item: item)
+
+      if let pickError = item.wrappedValue.itemImageLoadError {
+        Text(pickError)
+          .font(.system(size: 10))
+          .foregroundStyle(MidsummerTheme.brandOrange)
+      }
+
+      // 尺码表上传（双方案设计 §五 使用方式）：复用封面图的 PhotosPicker + 1200px 压缩管线
+      //（压缩在 MidsummerCloudService.makeAsset 统一做）。淘宝采集不到尺码表时由此补齐。
+      PhotosPicker(selection: item.sizeChartPhotoItem, matching: .images) {
+        HStack {
+          Label("单品尺码表图（可选）", systemImage: "ruler")
+            .font(.system(size: 12))
+          Spacer()
+          if item.wrappedValue.sizeChartImage != nil {
+            Text("已选择")
+              .font(.system(size: 11))
+              .foregroundStyle(MidsummerTheme.freshGreen)
+          }
+        }
+      }
+      .accessibilityIdentifier("draft-item-sizechart-picker-\(item.wrappedValue.id)")
+
+      if let sizeChartImage = item.wrappedValue.sizeChartImage {
+        Image(uiImage: sizeChartImage)
+          .resizable()
+          .scaledToFit()
+          .frame(maxHeight: 120)
+          .frame(maxWidth: .infinity)
+          .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+      }
+
+      if let pickError = item.wrappedValue.sizeChartLoadError {
+        Text(pickError)
+          .font(.system(size: 10))
+          .foregroundStyle(MidsummerTheme.brandOrange)
+      }
+    }
+    .onChange(of: item.wrappedValue.itemAddPhotoItem) { _, newValue in
+      loadDraftImage(newValue, failureMessage: "单品图片读取失败，请换一张试试。") { image, failure in
+        item.wrappedValue.itemImageLoadError = failure
+        guard let image else { return }
+        guard item.wrappedValue.itemImages.count < DraftItem.maxImages else { return }
+        item.wrappedValue.itemImages.append(image)
+      }
+      item.wrappedValue.itemAddPhotoItem = nil
+    }
+    .onChange(of: item.wrappedValue.itemReplacePhotoItem) { _, newValue in
+      loadDraftImage(newValue, failureMessage: "单品图片读取失败，请换一张试试。") { image, failure in
+        item.wrappedValue.itemImageLoadError = failure
+        guard let image, let index = item.wrappedValue.itemReplaceIndex,
+          item.wrappedValue.itemImages.indices.contains(index)
+        else { return }
+        item.wrappedValue.itemImages[index] = image
+      }
+      item.wrappedValue.itemReplaceIndex = nil
+      item.wrappedValue.itemReplacePhotoItem = nil
+    }
+    .onChange(of: item.wrappedValue.sizeChartPhotoItem) { _, newValue in
+      loadDraftImage(newValue, failureMessage: "尺码表图读取失败，请换一张试试。") { image, failure in
+        item.wrappedValue.sizeChartImage = image
+        item.wrappedValue.sizeChartLoadError = failure
+      }
+    }
+    .padding(14)
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .themeSkinAdaptiveSectionCard(
+      slot: MidsummerThemeSlot.card,
+      cornerRadius: 14,
+      showsDecoration: true
+    ) {
+      MidsummerTheme.surface
+    }
+  }
+
+  private func priceField(_ placeholder: String, text: Binding<String>) -> some View {
+    VStack(alignment: .leading, spacing: 3) {
+      Text(placeholder)
+        .font(.system(size: 10))
+        .foregroundStyle(MidsummerTheme.secondaryText)
+      TextField("0", text: text)
+        .keyboardType(.numberPad)
+        .multilineTextAlignment(.center)
+        .font(.system(size: 14, weight: .medium))
+        .padding(.vertical, 7)
+        .background(MidsummerTheme.subtleFill)
+        .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+    }
+    .frame(maxWidth: .infinity)
+  }
+
+  // MARK: 步骤④ 预览与提交（千牛：提交前确认）
+
+  private var reviewStep: some View {
+    VStack(alignment: .leading, spacing: 12) {
+      wizardCard("系列预览", hint: "提交前最后确认。价格区间由单品自动派生，无需在此填写。") {
+        LabeledContent("系列名", value: displayName)
+        LabeledContent("上新阶段", value: stage.labelZH)
+        LabeledContent(
+          "上新日期",
+          value: hasLaunchDate
+            ? Self.dateText(launchDate) : "待补充")
+        if Int(depositMinText) != nil || Int(depositMaxText) != nil {
+          LabeledContent("定金区间", value: "\(depositMinText)-\(depositMaxText) 元")
+        }
+        LabeledContent("可用尺码", value: selectedSizes.sorted().joined(separator: " / "))
+        if !colorsText.trimmingCharacters(in: .whitespaces).isEmpty {
+          LabeledContent("配色", value: colorsText)
+        }
+        LabeledContent("原文出处", value: sourceURLText)
+          .lineLimit(1)
+      }
+
+      wizardCard("单品清单（\(namedItemsCount) 个）", hint: nil) {
+        ForEach(draftItems.filter { !$0.name.trimmingCharacters(in: .whitespaces).isEmpty }) { item in
+          HStack(spacing: 10) {
+            if let image = item.itemImages.first {
+              Image(uiImage: image)
+                .resizable()
+                .scaledToFill()
+                .frame(width: 44, height: 44)
+                .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+            } else {
+              Image(systemName: "photo")
+                .font(.system(size: 14))
+                .foregroundStyle(MidsummerTheme.secondaryText)
+                .frame(width: 44, height: 44)
+                .background(MidsummerTheme.subtleFill)
+                .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+            }
+            VStack(alignment: .leading, spacing: 3) {
+              Text(item.name)
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(MidsummerTheme.primaryText)
+              Text(item.priceSummary)
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(MidsummerTheme.priceRed)
+            }
+            Spacer()
+            Text(item.kind.shortLabel)
+              .font(.system(size: 10))
+              .foregroundStyle(MidsummerTheme.secondaryText)
+          }
+          .padding(.vertical, 2)
+        }
+        if namedItemsCount == 0 {
+          Text("还没有填了款名的单品——回到上一步添加。")
+            .font(.system(size: 12))
+            .foregroundStyle(MidsummerTheme.secondaryText)
+        }
+      }
+
+      if let uploadStatusText {
+        Text(uploadStatusText)
+          .font(.system(size: 11))
+          .foregroundStyle(MidsummerTheme.secondaryText)
+          .frame(maxWidth: .infinity, alignment: .center)
+          .accessibilityIdentifier("midsummer-upload-status")
+      }
+    }
+  }
+
+  private var displayName: String {
+    isSupplementMode ? (existingSeries?.name ?? "") : seriesName
+  }
+
+  private var namedItemsCount: Int {
+    draftItems.filter {
+      !$0.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }.count
+  }
+
+  // MARK: 发布成功页（千牛：发布成功 → 继续发布 / 查看宝贝）
+
+  private var successPage: some View {
+    VStack(spacing: 18) {
+      Spacer()
+      Image(systemName: "checkmark.circle.fill")
+        .font(.system(size: 64))
+        .foregroundStyle(MidsummerTheme.freshGreen)
+      Text("发布成功")
+        .font(.system(size: 20, weight: .semibold))
+        .foregroundStyle(MidsummerTheme.primaryText)
+      Text(
+        isSupplementMode
+          ? "单品已写入「\(existingSeries?.name ?? "")」，其他用户刷新后即可看到。"
+          : "系列已写入公共库，其他用户刷新后即可看到。"
+      )
+      .font(.system(size: 13))
+      .foregroundStyle(MidsummerTheme.secondaryText)
+      .multilineTextAlignment(.center)
+      .padding(.horizontal, 32)
+
+      VStack(spacing: 10) {
+        Button {
+          // 千牛成功页的「继续发布」：回到第一步，保留尺码选择
+          withAnimation(.snappy(duration: 0.18)) {
+            didSucceed = false
+            uploadStatusText = nil
+            seriesName = ""
+            summaryText = ""
+            colorsText = ""
+            depositMinText = ""
+            depositMaxText = ""
+            sourceURLText = ""
+            coverImage = nil
+            photoItem = nil
+            draftItems = [DraftItem(inheritingSizesFrom: selectedSizes)]
+            step = isSupplementMode ? .items : .basics
+          }
+        } label: {
+          Text("继续发布下一个")
+            .font(.system(size: 15, weight: .semibold))
+            .foregroundStyle(MidsummerTheme.onAccent)
+            .frame(height: 44)
+            .frame(maxWidth: .infinity)
+            .background(MidsummerTheme.brandOrange)
+            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        }
+        .accessibilityIdentifier("midsummer-publish-again")
+
+        Button {
+          dismiss()
+        } label: {
+          Text("完成")
+            .font(.system(size: 15, weight: .medium))
+            .foregroundStyle(MidsummerTheme.primaryText)
+            .frame(height: 44)
+            .frame(maxWidth: .infinity)
+            .background(MidsummerTheme.subtleFill)
+            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        }
+        .accessibilityIdentifier("midsummer-publish-done")
+      }
+      .padding(.horizontal, 24)
+      Spacer()
+      Spacer()
+    }
+    .frame(maxWidth: .infinity, maxHeight: .infinity)
+    .background(MidsummerTheme.pageBackground)
+  }
+
+  // MARK: 通用卡片（千牛发布页的白色分区卡）
+
+  private func wizardCard(
+    _ title: String,
+    hint: String?,
+    @ViewBuilder content: () -> some View
+  ) -> some View {
+    VStack(alignment: .leading, spacing: 10) {
+      Text(title)
+        .font(.system(size: 14, weight: .semibold))
+        .foregroundStyle(MidsummerTheme.primaryText)
+      content()
+      if let hint {
+        Text(hint)
+          .font(.system(size: 11))
+          .foregroundStyle(MidsummerTheme.secondaryText)
+      }
+    }
+    .padding(14)
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .themeSkinAdaptiveSectionCard(
+      slot: MidsummerThemeSlot.card,
+      cornerRadius: 14,
+      showsDecoration: true
+    ) {
+      MidsummerTheme.surface
     }
   }
 
@@ -261,56 +957,144 @@ struct MidsummerContributeView: View {
     }
   }
 
-  // MARK: 单品录入
+  // MARK: 草稿（千牛「存草稿」）
 
-  private var itemsSection: some View {
-    Section {
-      ForEach($draftItems) { $item in
-        VStack(alignment: .leading, spacing: 8) {
-          TextField("款名，例如「樱花小羊 SK」", text: $item.name)
-            .font(.system(size: 14, weight: .medium))
+  private func saveDraft() {
+    let snapshot = DraftSnapshot(from: self)
+    snapshot.save()
+    savedDraft = snapshot
+    withAnimation(.snappy(duration: 0.15)) { draftMessage = "草稿已保存，下次打开可恢复。" }
+    Task {
+      try? await Task.sleep(nanoseconds: 1_800_000_000)
+      withAnimation(.snappy(duration: 0.15)) { draftMessage = nil }
+    }
+  }
 
-          Picker("类型", selection: $item.kind) {
-            ForEach(MidsummerItemKind.allCases, id: \.self) { kind in
-              Text(kind.shortLabel).tag(kind)
-            }
-          }
-          .pickerStyle(.segmented)
-
-          HStack(spacing: 8) {
-            TextField("定金", text: $item.depositText).keyboardType(.numberPad)
-            TextField("尾款", text: $item.balanceText).keyboardType(.numberPad)
-            TextField("现货价", text: $item.priceText).keyboardType(.numberPad)
-          }
-          .font(.system(size: 13))
-          .textFieldStyle(.roundedBorder)
-
-          if Int(item.priceText) != nil {
-            Picker("价格口径", selection: $item.priceKind) {
-              ForEach(MidsummerPriceKind.allCases, id: \.self) { kind in
-                Text(kind.labelZH).tag(kind)
-              }
-            }
-            .pickerStyle(.segmented)
-            .font(.system(size: 12))
-          }
-
-          TextField("备注（价格差异、批次、待补项说明）", text: $item.noteText)
-            .font(.system(size: 12))
+  private func draftRestoreBanner(_ snapshot: DraftSnapshot) -> some View {
+    VStack(alignment: .leading, spacing: 8) {
+      if let draftMessage {
+        Text(draftMessage)
+          .font(.system(size: 11))
+          .foregroundStyle(MidsummerTheme.freshGreen)
+      }
+      HStack {
+        Label("检测到 \(Self.dateText(snapshot.savedAt)) 保存的草稿", systemImage: "doc.text")
+          .font(.system(size: 12))
+          .foregroundStyle(MidsummerTheme.primaryText)
+        Spacer()
+        Button("恢复") {
+          snapshot.restore(into: self)
+          savedDraft = nil
         }
-        .padding(.vertical, 2)
+        .font(.system(size: 12, weight: .semibold))
+        .foregroundStyle(MidsummerTheme.brandOrange)
+        Button("丢弃", role: .destructive) {
+          DraftSnapshot.clear()
+          savedDraft = nil
+        }
+        .font(.system(size: 12))
+        .foregroundStyle(MidsummerTheme.secondaryText)
       }
-      .onDelete { draftItems.remove(atOffsets: $0) }
+    }
+    .padding(10)
+    .background(MidsummerTheme.orangeSurface)
+    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+  }
 
-      Button {
-        draftItems.append(DraftItem(inheritingSizesFrom: selectedSizes))
-      } label: {
-        Label("添加一个单品", systemImage: "plus.circle")
+  // MARK: 单品主图宫格（对齐千牛「发布宝贝」主图位）
+
+  private static let gridColumns = [GridItem(.adaptive(minimum: 88), spacing: 8)]
+
+  /// 千牛式主图宫格：第 1 格主图（带「主图」角标），2–5 格附图可「设为主图」，
+  /// 每格右上角 × 删除，点图片本体重传替换；未满 5 张时末尾显示「+」添加格。
+  private func itemImageGrid(item: Binding<DraftItem>) -> some View {
+    LazyVGrid(columns: Self.gridColumns, alignment: .leading, spacing: 8) {
+      ForEach(item.wrappedValue.itemImages.indices, id: \.self) { index in
+        itemImageCell(item: item, index: index)
       }
-    } header: {
-      Text("单品（可多条）")
-    } footer: {
-      Text("单品尺码默认沿用上面的「可用尺码」，如需单独设置可在系列提交后再补录。")
+      if item.wrappedValue.itemImages.count < DraftItem.maxImages {
+        PhotosPicker(selection: item.itemAddPhotoItem, matching: .images) {
+          VStack(spacing: 3) {
+            Image(systemName: "plus")
+              .font(.system(size: 18, weight: .medium))
+            Text("添加主图")
+              .font(.system(size: 10))
+            Text("\(item.wrappedValue.itemImages.count)/\(DraftItem.maxImages)")
+              .font(.system(size: 9))
+              .foregroundStyle(MidsummerTheme.secondaryText)
+          }
+          .foregroundStyle(MidsummerTheme.secondaryText)
+          .frame(height: 88)
+          .frame(maxWidth: .infinity)
+          .background(MidsummerTheme.subtleFill)
+          .overlay(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+              .strokeBorder(MidsummerTheme.divider, style: StrokeStyle(lineWidth: 1, dash: [4]))
+          )
+          .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        }
+        .accessibilityIdentifier("draft-item-image-add-\(item.wrappedValue.id)")
+      }
+    }
+  }
+
+  /// 单个主图格：点图 = 替换；右上角 × 删除；非主图提供「设为主图」（移到第 1 格）。
+  private func itemImageCell(item: Binding<DraftItem>, index: Int) -> some View {
+    ZStack(alignment: .topTrailing) {
+      PhotosPicker(selection: item.itemReplacePhotoItem, matching: .images) {
+        Image(uiImage: item.wrappedValue.itemImages[index])
+          .resizable()
+          .scaledToFill()
+          .frame(height: 88)
+          .frame(maxWidth: .infinity)
+          .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+      }
+      .simultaneousGesture(
+        // 点图替换：先记录格位，选择器回值后按 `itemReplaceIndex` 精确替换。
+        TapGesture().onEnded { item.wrappedValue.itemReplaceIndex = index }
+      )
+      .accessibilityIdentifier("draft-item-image-cell-\(item.wrappedValue.id)-\(index)")
+
+      // 删除（千牛主图格右上角的 ×）
+      Button {
+        _ = item.wrappedValue.itemImages.remove(at: index)
+        item.wrappedValue.itemImageLoadError = nil
+      } label: {
+        Image(systemName: "xmark.circle.fill")
+          .font(.system(size: 16))
+          .foregroundStyle(.white)
+          .shadow(radius: 2)
+      }
+      .accessibilityIdentifier("draft-item-image-delete-\(item.wrappedValue.id)-\(index)")
+    }
+    .overlay(alignment: .bottomLeading) {
+      if index == 0 {
+        Text("主图")
+          .font(.system(size: 9, weight: .semibold))
+          .foregroundStyle(.white)
+          .padding(.horizontal, 5)
+          .padding(.vertical, 2)
+          .background(MidsummerTheme.brandOrange)
+          .clipShape(Capsule())
+          .padding(4)
+      } else {
+        Button {
+          withAnimation(.snappy(duration: 0.16)) {
+            let image = item.wrappedValue.itemImages.remove(at: index)
+            item.wrappedValue.itemImages.insert(image, at: 0)
+          }
+        } label: {
+          Text("设为主图")
+            .font(.system(size: 9, weight: .medium))
+            .foregroundStyle(.white)
+            .padding(.horizontal, 5)
+            .padding(.vertical, 2)
+            .background(.black.opacity(0.55))
+            .clipShape(Capsule())
+            .padding(4)
+        }
+        .accessibilityIdentifier("draft-item-image-setmain-\(item.wrappedValue.id)-\(index)")
+      }
     }
   }
 
@@ -351,6 +1135,30 @@ struct MidsummerContributeView: View {
     }
   }
 
+  /// 读取单品图片 / 尺码表图的通用加载器。与封面图同一条读取路径（Data → UIImage），
+  /// 但失败只写回单条单品的提示，不打断整张表单。
+  /// 两类图片各用各的 picker 与字段——入口独立、互不共用。
+  private func loadDraftImage(
+    _ pickerItem: PhotosPickerItem?,
+    failureMessage: String,
+    apply: @escaping (UIImage?, String?) -> Void
+  ) {
+    guard let pickerItem else { return }
+    Task {
+      do {
+        if let data = try await pickerItem.loadTransferable(type: Data.self),
+          let image = UIImage(data: data)
+        {
+          apply(image, nil)
+        } else {
+          apply(nil, failureMessage)
+        }
+      } catch {
+        apply(nil, failureMessage)
+      }
+    }
+  }
+
   // MARK: 提交
 
   private func submit() async {
@@ -368,22 +1176,41 @@ struct MidsummerContributeView: View {
     }
 
     let trimmedSource = sourceURLText.trimmingCharacters(in: .whitespacesAndNewlines)
-    let validItems = draftItems.compactMap { $0.makeItem(seriesID: "", sizes: Array(selectedSizes)) }
-      .filter { !$0.name.isEmpty }
+    // 单品 DTO 与草稿一一配对：主图宫格和尺码表图都存在草稿上（UI 对象），
+    // 提交时各自随**对应的那一个**单品上传——不共享、不串位。
+    let itemDraftPairs: [(item: MidsummerItemDTO, images: [UIImage], sizeChartImage: UIImage?)] =
+      draftItems
+      .compactMap { draft in
+        guard let dto = draft.makeItem(seriesID: "", sizes: Array(selectedSizes)) else { return nil }
+        return (dto, draft.itemImages, draft.sizeChartImage)
+      }
+      .filter { !$0.item.name.isEmpty }
 
     isSubmitting = true
-    defer { isSubmitting = false }
+    defer {
+      isSubmitting = false
+      uploadStatusText = nil
+    }
 
     do {
-      let series = buildSeries(sourceURL: trimmedSource, items: validItems)
+      let series = buildSeries(sourceURL: trimmedSource, items: itemDraftPairs.map(\.item))
       try await MidsummerCloudService.shared.publish(series: series, coverImage: coverImage)
 
-      for item in series.items {
-        try await MidsummerCloudService.shared.publish(item: item, coverImage: nil)
+      // 千牛发布路径：逐单品上传，宫格图随单品走（第 1 张主图 + 附图）。
+      for (index, pair) in itemDraftPairs.enumerated() {
+        uploadStatusText =
+          pair.images.isEmpty
+          ? "正在上传单品（\(index + 1)/\(itemDraftPairs.count)）：\(pair.item.name)"
+          : "正在上传单品图片 \(index + 1)/\(itemDraftPairs.count)（\(pair.item.name)，\(pair.images.count) 张）…"
+        try await MidsummerCloudService.shared.publish(
+          item: pair.item, images: pair.images, sizeChartImage: pair.sizeChartImage)
       }
 
       // 乐观更新：不等下一次云端刷新，界面立刻显示
       store.applyUploaded(series: series)
+      // 发布成功后清掉草稿（千牛：发布成功草稿即失效）
+      DraftSnapshot.clear()
+      savedDraft = nil
       didSucceed = true
     } catch let error as MidsummerUploadError {
       errorMessage = error.errorDescription
@@ -462,6 +1289,13 @@ struct MidsummerContributeView: View {
       items: mergedItems
     )
   }
+
+  private static func dateText(_ date: Date) -> String {
+    let formatter = DateFormatter()
+    formatter.dateFormat = "M月d日"
+    formatter.locale = Locale(identifier: "zh_CN")
+    return formatter.string(from: date)
+  }
 }
 
 // MARK: - 提交校验（抽出来是为了能被单测直接覆盖）
@@ -483,25 +1317,22 @@ nonisolated enum MidsummerContributeFailure: Equatable {
     case .invalidSourceURL:
       return "请填写有效的原文链接（需以 http:// 或 https:// 开头）。"
     case .noItems:
-      return "请至少填写一个单品——系列页需要展示图片、价格与尺码。"
+      // 文案必须与真实校验一致：本条只查「款名非空」。
+      // 旧文案"需要展示图片、价格与尺码"让人以为漏了图价码，实际那些根本不在校验里。
+      return "请至少填写一个单品的款名——款名为空的单品不会被保存。价格与尺码可在提交后补录。"
     }
   }
 }
 
 nonisolated enum MidsummerContributionValidator {
-  static func validate(
-    isSupplementMode: Bool,
-    seriesName: String,
-    sourceURLText: String,
-    itemNames: [String]
-  ) -> MidsummerContributeFailure? {
-    // 补录模式沿用已有系列名，不要求重填
-    if !isSupplementMode,
-      seriesName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-    {
-      return .missingSeriesName
-    }
+  /// 分步校验①：系列名（千牛第 1 步必填项）
+  static func validateSeriesName(_ seriesName: String) -> MidsummerContributeFailure? {
+    seriesName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+      ? .missingSeriesName : nil
+  }
 
+  /// 分步校验②：原文出处（合规必填，Apple 5.2）
+  static func validateSourceURL(_ sourceURLText: String) -> MidsummerContributeFailure? {
     let raw = sourceURLText.trimmingCharacters(in: .whitespacesAndNewlines)
     guard let url = URL(string: raw),
       let scheme = url.scheme?.lowercased(),
@@ -510,15 +1341,141 @@ nonisolated enum MidsummerContributionValidator {
     else {
       return .invalidSourceURL
     }
+    return nil
+  }
 
+  /// 分步校验③：至少一个有款名的单品（千牛 SKU 步骤）
+  static func validateItems(_ itemNames: [String]) -> MidsummerContributeFailure? {
     let hasNamedItem = itemNames.contains {
       !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
-    if !isSupplementMode && !hasNamedItem {
-      return .noItems
+    return hasNamedItem ? nil : .noItems
+  }
+
+  static func validate(
+    isSupplementMode: Bool,
+    seriesName: String,
+    sourceURLText: String,
+    itemNames: [String]
+  ) -> MidsummerContributeFailure? {
+    // 补录模式沿用已有系列名，不要求重填
+    if !isSupplementMode {
+      if let failure = validateSeriesName(seriesName) {
+        return failure
+      }
+    }
+
+    if let failure = validateSourceURL(sourceURLText) {
+      return failure
+    }
+
+    if !isSupplementMode {
+      if let failure = validateItems(itemNames) {
+        return failure
+      }
     }
 
     return nil
+  }
+}
+
+// MARK: - 草稿快照（千牛「存草稿」）
+//
+// 只存文字字段——UIImage 不进 UserDefaults（会撑爆），图片属于「未完成状态」，
+// 恢复后重新选即可，与千牛的草稿体验一致（草稿不保存未上传完的图片）。
+
+struct DraftSnapshot: Codable {
+  var savedAt: Date
+  var seriesName: String
+  var hasLaunchDate: Bool
+  var launchDate: Date
+  var stageRaw: String
+  var depositMinText: String
+  var depositMaxText: String
+  var selectedSizes: [String]
+  var colorsText: String
+  var summaryText: String
+  var sourceURLText: String
+  var items: [ItemSnapshot]
+
+  struct ItemSnapshot: Codable {
+    var name: String
+    var kindRaw: String
+    var depositText: String
+    var balanceText: String
+    var priceText: String
+    var priceKindRaw: String
+    var noteText: String
+    var sizes: [String]
+  }
+
+  static let key = "midsummer.publish.draft"
+
+  static func load() -> DraftSnapshot? {
+    guard let data = UserDefaults.standard.data(forKey: key) else { return nil }
+    return try? JSONDecoder().decode(DraftSnapshot.self, from: data)
+  }
+
+  static func clear() {
+    UserDefaults.standard.removeObject(forKey: key)
+  }
+
+  init(from view: MidsummerContributeView) {
+    savedAt = Date()
+    seriesName = view.seriesName
+    hasLaunchDate = view.hasLaunchDate
+    launchDate = view.launchDate
+    stageRaw = view.stage.rawValue
+    depositMinText = view.depositMinText
+    depositMaxText = view.depositMaxText
+    selectedSizes = Array(view.selectedSizes)
+    colorsText = view.colorsText
+    summaryText = view.summaryText
+    sourceURLText = view.sourceURLText
+    items = view.draftItems.map { item in
+      ItemSnapshot(
+        name: item.name,
+        kindRaw: item.kind.rawValue,
+        depositText: item.depositText,
+        balanceText: item.balanceText,
+        priceText: item.priceText,
+        priceKindRaw: item.priceKind.rawValue,
+        noteText: item.noteText,
+        sizes: item.sizes
+      )
+    }
+  }
+
+  func save() {
+    if let data = try? JSONEncoder().encode(self) {
+      UserDefaults.standard.set(data, forKey: Self.key)
+    }
+  }
+
+  /// 把快照写回视图状态。由 MidsummerContributeView 在主 actor 上调用。
+  func restore(into view: MidsummerContributeView) {
+    view.seriesName = seriesName
+    view.hasLaunchDate = hasLaunchDate
+    view.launchDate = launchDate
+    view.stage = MidsummerStage(rawValue: stageRaw) ?? .deposit
+    view.depositMinText = depositMinText
+    view.depositMaxText = depositMaxText
+    view.selectedSizes = Set(selectedSizes)
+    view.colorsText = colorsText
+    view.summaryText = summaryText
+    view.sourceURLText = sourceURLText
+    view.draftItems = items.map { snapshot in
+      var item = DraftItem()
+      item.name = snapshot.name
+      item.kind = MidsummerItemKind(rawValue: snapshot.kindRaw) ?? .op
+      item.depositText = snapshot.depositText
+      item.balanceText = snapshot.balanceText
+      item.priceText = snapshot.priceText
+      item.priceKind = MidsummerPriceKind(rawValue: snapshot.priceKindRaw) ?? .reference
+      item.noteText = snapshot.noteText
+      item.sizes = snapshot.sizes
+      return item
+    }
   }
 }
 
@@ -536,11 +1493,47 @@ struct DraftItem: Identifiable {
   var priceKind: MidsummerPriceKind = .reference
   var noteText = ""
   var sizes: [String] = []
+  // MARK: 单品主图宫格（对齐千牛发布路径）
+  //
+  // 千牛「发布宝贝」：每个商品一个 5 格主图位，**第一格为主图**，逐格添加、
+  // 单格删除、点图重传、可设主图，满 5 格后添加位消失。这里按同一交互实现：
+  //
+  /// 主图宫格：最多 5 张，`itemImages[0]` 为主图（列表行 / 详情页 / 一键入库都以它为准）。
+  var itemImages: [UIImage] = []
+  /// 「+」添加格的选择器暂存
+  var itemAddPhotoItem: PhotosPickerItem?
+  /// 点已有图 → 替换该格的选择器暂存（宫格内每格共用一个绑定，靠 `itemReplaceIndex` 区分格位）
+  var itemReplacePhotoItem: PhotosPickerItem?
+  /// 待替换的格位下标（点图时先记录，选择器回值后按它替换）
+  var itemReplaceIndex: Int?
+  /// 图片读取失败的提示（单条单品一行，不弹全局 alert）
+  var itemImageLoadError: String?
+  /// 单品主图上限（与千牛发布宝贝一致：5 张，第 1 张为主图）
+  static let maxImages = 5
+  /// 尺码表图选择器的暂存（双方案设计 §五：补录动作①「拍照/选图传尺码表」）。
+  /// 不进 DTO：`PhotosPickerItem` 是 UI 对象；提交时把 `sizeChartImage` 随单品一起上传。
+  var sizeChartPhotoItem: PhotosPickerItem?
+  var sizeChartImage: UIImage?
+  /// 尺码表图读取失败的提示（单条单品一行，不弹全局 alert）
+  var sizeChartLoadError: String?
 
   init() {}
 
   init(inheritingSizesFrom sizes: Set<String>) {
     self.sizes = Array(sizes).sorted()
+  }
+
+  /// 预览/提交用的价格摘要（现货价 > 定金+尾款 > 提示待填）
+  var priceSummary: String {
+    if let price = Int(priceText) {
+      return "¥\(price)"
+    }
+    let deposit = Int(depositText), balance = Int(balanceText)
+    if deposit != nil || balance != nil {
+      let parts = [deposit.map { "定金 \($0)" }, balance.map { "尾款 \($0)" }].compactMap { $0 }
+      return parts.joined(separator: " + ")
+    }
+    return "价格待填"
   }
 
   func makeItem(seriesID: String, sizes fallbackSizes: [String]) -> MidsummerItemDTO? {

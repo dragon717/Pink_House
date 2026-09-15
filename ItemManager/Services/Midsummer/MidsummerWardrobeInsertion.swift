@@ -70,6 +70,12 @@ enum MidsummerWardrobeDraftBuilder {
       ?? item.deposit ?? item.balance ?? 0
     let isDepositPlan = item.deposit != nil
 
+    // 尺码表随单品入库（双方案设计 §四.2）：`Clothing.sizeChartImagePath` 字段已存在，
+    // 衣橱侧零改动——草稿带上文件名，落库由 `TimeHallWardrobeQuickInserter` 统一写。
+    let sizeChartName = item.sizeChartImageName
+      .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+      .flatMap { $0.isEmpty ? nil : $0 }
+
     return ClothingEditDraft(
       name: MidsummerSpecResolver.displayName(item, selection: selection),
       brandName: brandName,
@@ -97,7 +103,8 @@ enum MidsummerWardrobeDraftBuilder {
       finalPaymentDate: now,
       finalPaymentEndDate: now,
       note: noteLines.joined(separator: "\n"),
-      accessoryList: []
+      accessoryList: [],
+      sizeChartImagePath: sizeChartName
     )
   }
 }

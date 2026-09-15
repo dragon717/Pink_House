@@ -1,0 +1,42 @@
+[
+  {
+    "run_id": "20260915_021633_xianyu_JK制服",
+    "platform": "xianyu",
+    "keyword": "JK制服",
+    "collected_at": "2026-09-15T02:18:48",
+    "item_count": 5,
+    "items_json": "data/runs/20260915_021633_xianyu_JK制服/items.json"
+  },
+  {
+    "run_id": "20260915_021855_taobao_JK制服",
+    "platform": "taobao",
+    "keyword": "JK制服",
+    "collected_at": "2026-09-15T02:21:13",
+    "item_count": 5,
+    "items_json": "data/runs/20260915_021855_taobao_JK制服/items.json"
+  },
+  {
+    "run_id": "20260915_022216_taobao_洛丽塔",
+    "platform": "taobao",
+    "keyword": "洛丽塔",
+    "collected_at": "2026-09-15T02:23:44",
+    "item_count": 3,
+    "items_json": "data/runs/20260915_022216_taobao_洛丽塔/items.json"
+  },
+  {
+    "run_id": "20260915_022401_xianyu_洛丽塔",
+    "platform": "xianyu",
+    "keyword": "洛丽塔",
+    "collected_at": "2026-09-15T02:25:22",
+    "item_count": 3,
+    "items_json": "data/runs/20260915_022401_xianyu_洛丽塔/items.json"
+  },
+  {
+    "run_id": "20260915_022820_xianyu_水手服",
+    "platform": "xianyu",
+    "keyword": "水手服",
+    "collected_at": "2026-09-15T02:29:44",
+    "item_count": 3,
+    "items_json": "data/runs/20260915_022820_xianyu_水手服/items.json"
+  }
+]
