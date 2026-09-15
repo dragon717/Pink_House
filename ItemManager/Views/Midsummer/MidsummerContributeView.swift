@@ -92,7 +92,8 @@ struct MidsummerContributeView: View {
   // MARK: 系列主图（步骤②）
 
   @State private var photoItem: PhotosPickerItem?
-  @State private var coverImage: UIImage?
+  // 不标 private：同文件的 DraftSnapshot（存草稿）要写入恢复后的封面。
+  @State var coverImage: UIImage?
 
   // MARK: 提交状态
 
@@ -160,7 +161,19 @@ struct MidsummerContributeView: View {
       }
       .safeAreaInset(edge: .bottom) {
         if !didSucceed {
-          bottomBar
+          VStack(spacing: 0) {
+            // 草稿反馈必须全局可见：千牛在任意步骤都能点「存草稿」，
+            // 提示若只画在某一步的内容区里，其他步骤点了就像没反应。
+            if let draftMessage {
+              Text(draftMessage)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(MidsummerTheme.freshGreen)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 6)
+                .background(MidsummerTheme.orangeSurface)
+            }
+            bottomBar
+          }
         }
       }
       .onChange(of: photoItem) { _, newValue in
@@ -960,6 +973,8 @@ struct MidsummerContributeView: View {
   // MARK: 草稿（千牛「存草稿」）
 
   private func saveDraft() {
+    // 草稿同时只保存一份：先把上一份草稿引用的图片文件清掉，再落新的。
+    DraftSnapshot.purgeDraftFiles(of: DraftSnapshot.load())
     let snapshot = DraftSnapshot(from: self)
     snapshot.save()
     savedDraft = snapshot
@@ -972,11 +987,6 @@ struct MidsummerContributeView: View {
 
   private func draftRestoreBanner(_ snapshot: DraftSnapshot) -> some View {
     VStack(alignment: .leading, spacing: 8) {
-      if let draftMessage {
-        Text(draftMessage)
-          .font(.system(size: 11))
-          .foregroundStyle(MidsummerTheme.freshGreen)
-      }
       HStack {
         Label("检测到 \(Self.dateText(snapshot.savedAt)) 保存的草稿", systemImage: "doc.text")
           .font(.system(size: 12))
@@ -989,6 +999,7 @@ struct MidsummerContributeView: View {
         .font(.system(size: 12, weight: .semibold))
         .foregroundStyle(MidsummerTheme.brandOrange)
         Button("丢弃", role: .destructive) {
+          DraftSnapshot.purgeDraftFiles(of: snapshot)
           DraftSnapshot.clear()
           savedDraft = nil
         }
@@ -1193,22 +1204,46 @@ struct MidsummerContributeView: View {
     }
 
     do {
-      let series = buildSeries(sourceURL: trimmedSource, items: itemDraftPairs.map(\.item))
-      try await MidsummerCloudService.shared.publish(series: series, coverImage: coverImage)
+      // buildSeries 会为每个单品生成真正的 id / seriesID（补录时沿用已有系列 id），
+      // 并把带 id 的新单品一并返回——上传必须用这批 DTO。
+      // itemDraftPairs 里的 DTO id 还是空串，直接传会触发
+      // CKException 'recordName can not be empty' 闪退。
+      let (series, newItems) =
+        buildSeries(sourceURL: trimmedSource, items: itemDraftPairs.map(\.item))
+      let uploadedCoverName = try await MidsummerCloudService.shared.publish(
+        series: series, coverImage: coverImage)
 
       // 千牛发布路径：逐单品上传，宫格图随单品走（第 1 张主图 + 附图）。
-      for (index, pair) in itemDraftPairs.enumerated() {
+      // zip 保证「带 id 的 DTO ↔ 草稿里的图片」按顺序一一配对，不串位。
+      let uploadPairs: [(item: MidsummerItemDTO, images: [UIImage], sizeChartImage: UIImage?)] =
+        zip(newItems, itemDraftPairs).map { dto, draft in
+          (item: dto, images: draft.images, sizeChartImage: draft.sizeChartImage)
+        }
+      var publishedItems: [MidsummerItemDTO] = []
+      for (index, upload) in uploadPairs.enumerated() {
         uploadStatusText =
-          pair.images.isEmpty
-          ? "正在上传单品（\(index + 1)/\(itemDraftPairs.count)）：\(pair.item.name)"
-          : "正在上传单品图片 \(index + 1)/\(itemDraftPairs.count)（\(pair.item.name)，\(pair.images.count) 张）…"
-        try await MidsummerCloudService.shared.publish(
-          item: pair.item, images: pair.images, sizeChartImage: pair.sizeChartImage)
+          upload.images.isEmpty
+          ? "正在上传单品（\(index + 1)/\(uploadPairs.count)）：\(upload.item.name)"
+          : "正在上传单品图片 \(index + 1)/\(uploadPairs.count)（\(upload.item.name)，\(upload.images.count) 张）…"
+        let published = try await MidsummerCloudService.shared.publish(
+          item: upload.item, images: upload.images, sizeChartImage: upload.sizeChartImage)
+        // 上传时图片已落盘（midsummer-upload- 命名空间），把文件名回填进 DTO，
+        // 乐观更新后详情页/列表行立刻有图，不用等云端刷新。
+        publishedItems.append(
+          Self.itemWithUploadedImages(upload.item, uploaded: published))
       }
 
-      // 乐观更新：不等下一次云端刷新，界面立刻显示
-      store.applyUploaded(series: series)
-      // 发布成功后清掉草稿（千牛：发布成功草稿即失效）
+      // 乐观更新：不等下一次云端刷新，界面立刻显示（封面/单品图都已回填）
+      let historyCount = series.items.count - newItems.count
+      let patchedSeries = Self.seriesWithUploadedImages(
+        series,
+        coverImageName: uploadedCoverName,
+        newItems: publishedItems,
+        historyCount: historyCount
+      )
+      store.applyUploaded(series: patchedSeries)
+      // 发布成功后清掉草稿（千牛：发布成功草稿即失效），草稿图片一并清理
+      DraftSnapshot.purgeDraftFiles(of: DraftSnapshot.load())
       DraftSnapshot.clear()
       savedDraft = nil
       didSucceed = true
@@ -1219,7 +1254,11 @@ struct MidsummerContributeView: View {
     }
   }
 
-  private func buildSeries(sourceURL: String, items: [MidsummerItemDTO]) -> MidsummerSeriesDTO {
+  /// 组装系列 DTO。返回值第二个元素是**本次新提交的单品**（已分配 id / seriesID），
+  /// 上传循环必须用它们，而不是 submit 里草稿原始 DTO（那些 id 是空串）。
+  private func buildSeries(sourceURL: String, items: [MidsummerItemDTO])
+    -> (series: MidsummerSeriesDTO, newItems: [MidsummerItemDTO])
+  {
     let formatter = DateFormatter()
     formatter.dateFormat = "yyyy-MM-dd"
     formatter.locale = Locale(identifier: "en_US_POSIX")
@@ -1264,7 +1303,7 @@ struct MidsummerContributeView: View {
     // 补录模式下沿用原系列已有单品，避免整体替换把历史款抹掉
     let mergedItems = (base?.items ?? []) + attachedItems
 
-    return MidsummerSeriesDTO(
+    let series = MidsummerSeriesDTO(
       id: id,
       name: base?.name ?? seriesName.trimmingCharacters(in: .whitespacesAndNewlines),
       year: year,
@@ -1287,6 +1326,63 @@ struct MidsummerContributeView: View {
       sourceKind: "editorial",
       verified: true,
       items: mergedItems
+    )
+    return (series, attachedItems)
+  }
+
+  /// 把上传返回的本地图片文件名回填进单品 DTO（乐观更新用）。
+  private nonisolated static func itemWithUploadedImages(
+    _ item: MidsummerItemDTO, uploaded: MidsummerPublishedImages
+  ) -> MidsummerItemDTO {
+    MidsummerItemDTO(
+      id: item.id,
+      seriesID: item.seriesID,
+      name: item.name,
+      kind: item.kind,
+      price: item.price,
+      deposit: item.deposit,
+      balance: item.balance,
+      priceKind: item.priceKind,
+      priceCapturedOn: item.priceCapturedOn,
+      priceNote: item.priceNote,
+      sizes: item.sizes,
+      colors: item.colors,
+      coverImage: uploaded.coverImageName ?? item.coverImage,
+      galleryImageNames: uploaded.galleryImageNames.isEmpty
+        ? item.galleryImageNames : uploaded.galleryImageNames,
+      itemURL: item.itemURL,
+      sourceURL: item.sourceURL,
+      note: item.note,
+      sizeChartImageName: uploaded.sizeChartImageName ?? item.sizeChartImageName,
+      specGroups: item.specGroups,
+      skus: item.skus
+    )
+  }
+
+  /// 用回填后的单品与封面文件名重建系列 DTO（乐观更新用）。
+  private nonisolated static func seriesWithUploadedImages(
+    _ series: MidsummerSeriesDTO,
+    coverImageName: String?,
+    newItems: [MidsummerItemDTO],
+    historyCount: Int
+  ) -> MidsummerSeriesDTO {
+    MidsummerSeriesDTO(
+      id: series.id,
+      name: series.name,
+      year: series.year,
+      launchedOn: series.launchedOn,
+      stage: series.stage,
+      coverImage: coverImageName ?? series.coverImage,
+      depositMin: series.depositMin,
+      depositMax: series.depositMax,
+      priceSource: series.priceSource,
+      sizes: series.sizes,
+      colors: series.colors,
+      summary: series.summary,
+      sourceURL: series.sourceURL,
+      sourceKind: series.sourceKind,
+      verified: series.verified,
+      items: Array(series.items.prefix(historyCount)) + newItems
     )
   }
 
@@ -1381,8 +1477,9 @@ nonisolated enum MidsummerContributionValidator {
 
 // MARK: - 草稿快照（千牛「存草稿」）
 //
-// 只存文字字段——UIImage 不进 UserDefaults（会撑爆），图片属于「未完成状态」，
-// 恢复后重新选即可，与千牛的草稿体验一致（草稿不保存未上传完的图片）。
+// 文字字段进 UserDefaults；图片（UIImage）不进 UserDefaults（会撑爆）——
+// 落盘到 ImageManager 的 Images 目录（命名空间 `midsummer-draft-`），快照只存文件名。
+// 草稿**同时只保存一份**：同一个 key，且保存新草稿前先清掉上一份引用的图片文件。
 
 struct DraftSnapshot: Codable {
   var savedAt: Date
@@ -1396,6 +1493,7 @@ struct DraftSnapshot: Codable {
   var colorsText: String
   var summaryText: String
   var sourceURLText: String
+  var coverFile: String?
   var items: [ItemSnapshot]
 
   struct ItemSnapshot: Codable {
@@ -1407,9 +1505,48 @@ struct DraftSnapshot: Codable {
     var priceKindRaw: String
     var noteText: String
     var sizes: [String]
+    /// 主图宫格（第 1 张 = 主图）落盘后的文件名。optional + 默认 nil：旧草稿可照常解码。
+    var imageFiles: [String]? = nil
+    var sizeChartFile: String? = nil
   }
 
   static let key = "midsummer.publish.draft"
+
+  /// 草稿图片统一放 ImageManager 的 Images 目录，与正式图同目录、前缀区分。
+  /// ImageManager 是 @MainActor，这组助手一并标 MainActor（调用方都在视图按钮/提交路径上）。
+  @MainActor private static func draftImageURL(_ name: String) -> URL {
+    ImageManager.shared.imagesDirectory.appendingPathComponent(name)
+  }
+
+  /// 草稿图片落盘，返回文件名（失败返回 nil，文字字段照常保存）。
+  @MainActor private static func saveDraftImage(_ image: UIImage, suffix: String) -> String? {
+    guard let jpeg = image.jpegData(compressionQuality: 0.85) else { return nil }
+    let name = "midsummer-draft-\(UUID().uuidString)-\(suffix).jpg"
+    do {
+      try jpeg.write(to: draftImageURL(name), options: .atomic)
+      return name
+    } catch {
+      print("⚠️ [Midsummer] 草稿图片落盘失败：\(error.localizedDescription)")
+      return nil
+    }
+  }
+
+  @MainActor private static func loadDraftImage(_ name: String?) -> UIImage? {
+    guard let name else { return nil }
+    guard let data = try? Data(contentsOf: draftImageURL(name)) else { return nil }
+    return UIImage(data: data)
+  }
+
+  /// 删除一份草稿引用的全部图片文件。
+  /// 「只保存一份」的另一半：换新草稿 / 丢弃 / 发布成功时都必须先清旧文件。
+  @MainActor static func purgeDraftFiles(of snapshot: DraftSnapshot?) {
+    guard let snapshot else { return }
+    var names = snapshot.items.flatMap { ($0.imageFiles ?? []) + [$0.sizeChartFile].compactMap { $0 } }
+    if let cover = snapshot.coverFile { names.append(cover) }
+    for name in names {
+      try? FileManager.default.removeItem(at: draftImageURL(name))
+    }
+  }
 
   static func load() -> DraftSnapshot? {
     guard let data = UserDefaults.standard.data(forKey: key) else { return nil }
@@ -1420,7 +1557,7 @@ struct DraftSnapshot: Codable {
     UserDefaults.standard.removeObject(forKey: key)
   }
 
-  init(from view: MidsummerContributeView) {
+  @MainActor init(from view: MidsummerContributeView) {
     savedAt = Date()
     seriesName = view.seriesName
     hasLaunchDate = view.hasLaunchDate
@@ -1432,6 +1569,7 @@ struct DraftSnapshot: Codable {
     colorsText = view.colorsText
     summaryText = view.summaryText
     sourceURLText = view.sourceURLText
+    coverFile = view.coverImage.flatMap { Self.saveDraftImage($0, suffix: "cover") }
     items = view.draftItems.map { item in
       ItemSnapshot(
         name: item.name,
@@ -1441,7 +1579,11 @@ struct DraftSnapshot: Codable {
         priceText: item.priceText,
         priceKindRaw: item.priceKind.rawValue,
         noteText: item.noteText,
-        sizes: item.sizes
+        sizes: item.sizes,
+        imageFiles: item.itemImages.enumerated().compactMap { offset, image in
+          Self.saveDraftImage(image, suffix: "img\(offset)")
+        },
+        sizeChartFile: item.sizeChartImage.flatMap { Self.saveDraftImage($0, suffix: "sizechart") }
       )
     }
   }
@@ -1452,8 +1594,8 @@ struct DraftSnapshot: Codable {
     }
   }
 
-  /// 把快照写回视图状态。由 MidsummerContributeView 在主 actor 上调用。
-  func restore(into view: MidsummerContributeView) {
+  /// 把快照写回视图状态（含图片：从磁盘读回 UIImage）。主 actor 上调用。
+  @MainActor func restore(into view: MidsummerContributeView) {
     view.seriesName = seriesName
     view.hasLaunchDate = hasLaunchDate
     view.launchDate = launchDate
@@ -1464,6 +1606,7 @@ struct DraftSnapshot: Codable {
     view.colorsText = colorsText
     view.summaryText = summaryText
     view.sourceURLText = sourceURLText
+    view.coverImage = Self.loadDraftImage(coverFile)
     view.draftItems = items.map { snapshot in
       var item = DraftItem()
       item.name = snapshot.name
@@ -1474,6 +1617,8 @@ struct DraftSnapshot: Codable {
       item.priceKind = MidsummerPriceKind(rawValue: snapshot.priceKindRaw) ?? .reference
       item.noteText = snapshot.noteText
       item.sizes = snapshot.sizes
+      item.itemImages = (snapshot.imageFiles ?? []).compactMap { Self.loadDraftImage($0) }
+      item.sizeChartImage = Self.loadDraftImage(snapshot.sizeChartFile)
       return item
     }
   }

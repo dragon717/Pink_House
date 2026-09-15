@@ -126,15 +126,24 @@ final class MidsummerCloudService {
 
   // MARK: - 写入（创作者上传）
 
-  func publish(series: MidsummerSeriesDTO, coverImage: UIImage?) async throws {
+  /// 发布系列。返回系列封面的本地文件名（乐观更新用；没传图返回 nil）。
+  @discardableResult
+  func publish(series: MidsummerSeriesDTO, coverImage: UIImage?) async throws -> String? {
+    // recordName 为空串会抛 ObjC 异常 CKException（Swift catch 拦不住，直接闪退），
+    // 这里提前拦成可捕获的错误。
+    guard !series.id.isEmpty else {
+      throw MidsummerUploadError.other("系列 id 为空，无法上传，请重新进入发布页再试。")
+    }
     let record = CKRecord(recordType: RecordType.series, recordID: CKRecord.ID(recordName: series.id))
     record["seriesID"] = series.id as CKRecordValue
     record["name"] = series.name as CKRecordValue
     record["year"] = series.year as CKRecordValue
     record["launchedOn"] = series.launchedOn as CKRecordValue
     record["stage"] = series.stage.rawValue as CKRecordValue
-    record["sizes"] = series.sizes as CKRecordValue
-    record["colors"] = series.colors as CKRecordValue
+    // CloudKit 不允许用空列表初始化新字段（"cannot use an empty list"），
+    // 所以列表字段只在非空时写入；读取侧 `?? []` 兜底。
+    if !series.sizes.isEmpty { record["sizes"] = series.sizes as CKRecordValue }
+    if !series.colors.isEmpty { record["colors"] = series.colors as CKRecordValue }
     record["summary"] = (series.summary ?? "") as CKRecordValue
     record["sourceURL"] = series.sourceURL as CKRecordValue
     record["sourceKind"] = "editorial" as CKRecordValue
@@ -146,26 +155,36 @@ final class MidsummerCloudService {
     if let value = series.depositMax { record["depositMax"] = value as CKRecordValue }
     if let value = series.priceSource { record["priceSource"] = value as CKRecordValue }
     if let createdBy = await currentUserID() { record["createdBy"] = createdBy as CKRecordValue }
-    if let image = coverImage, let asset = Self.makeAsset(from: image, name: "\(series.id)-cover") {
-      record["coverImage"] = asset
+    var localCoverName: String?
+    if let image = coverImage, let made = Self.makeAsset(from: image, name: "\(series.id)-cover") {
+      record["coverImage"] = made.asset
+      localCoverName = made.localName
     }
     try await save(record)
+    return localCoverName
   }
 
   /// 发布单品（对齐千牛发布路径：每个单品最多 5 张主图宫格）。
   ///
   /// - `images[0]` 是**主图**，写 `coverImage` 资产；`images[1..<5]` 写 `galleryImage2..5`。
   /// - 以单品 id 为 recordID 整条重写，DTO 字段齐全，重复发布不会丢已有数据。
+  /// - 返回各图落盘后的**本地文件名**，调用方回填 DTO 做乐观更新（界面立刻有图）。
+  @discardableResult
   func publish(item: MidsummerItemDTO, images: [UIImage], sizeChartImage: UIImage? = nil)
-    async throws
+    async throws -> MidsummerPublishedImages
   {
+    // 同 publish(series:)：空 recordName 会抛 ObjC 异常直接闪退，提前拦住。
+    guard !item.id.isEmpty, !item.seriesID.isEmpty else {
+      throw MidsummerUploadError.other("单品 id 未生成，无法上传，请重新进入发布页再试。")
+    }
     let record = CKRecord(recordType: RecordType.item, recordID: CKRecord.ID(recordName: item.id))
     record["itemID"] = item.id as CKRecordValue
     record["seriesID"] = item.seriesID as CKRecordValue
     record["name"] = item.name as CKRecordValue
     record["kind"] = item.kind.rawValue as CKRecordValue
-    record["sizes"] = item.sizes as CKRecordValue
-    record["colors"] = item.colors as CKRecordValue
+    // 同上：空列表不能写（CloudKit 限制），读取侧 `?? []` 兜底。
+    if !item.sizes.isEmpty { record["sizes"] = item.sizes as CKRecordValue }
+    if !item.colors.isEmpty { record["colors"] = item.colors as CKRecordValue }
     record["sourceURL"] = item.sourceURL as CKRecordValue
     record["note"] = (item.note ?? "") as CKRecordValue
     record["publishedAt"] = Date() as CKRecordValue
@@ -179,18 +198,34 @@ final class MidsummerCloudService {
     if let createdBy = await currentUserID() { record["createdBy"] = createdBy as CKRecordValue }
 
     // 主图 + 附图：与千牛主图宫格一一对应（第 1 格 = coverImage，第 2–5 格 = galleryImage2..5）。
+    var uploadedCoverName: String?
+    var uploadedGalleryNames: [String] = []
     for (offset, image) in images.prefix(5).enumerated() {
       let assetName = offset == 0 ? "\(item.id)-cover" : "\(item.id)-gallery\(offset + 1)"
       let field = offset == 0 ? "coverImage" : "galleryImage\(offset + 1)"
-      if let asset = Self.makeAsset(from: image, name: assetName) {
-        record[field] = asset
+      if let made = Self.makeAsset(from: image, name: assetName) {
+        record[field] = made.asset
+        if offset == 0 {
+          uploadedCoverName = made.localName
+        } else {
+          uploadedGalleryNames.append(made.localName)
+        }
       }
     }
     // 尺码表图片（双方案设计 §四：尺码表是系列页一等公民）。运营者补录时随单品一起上传。
-    if let image = sizeChartImage, let asset = Self.makeAsset(from: image, name: "\(item.id)-sizechart") {
-      record["sizeChartImage"] = asset
+    var uploadedSizeChartName: String?
+    if let image = sizeChartImage,
+      let made = Self.makeAsset(from: image, name: "\(item.id)-sizechart")
+    {
+      record["sizeChartImage"] = made.asset
+      uploadedSizeChartName = made.localName
     }
     try await save(record)
+    return MidsummerPublishedImages(
+      coverImageName: uploadedCoverName,
+      galleryImageNames: uploadedGalleryNames,
+      sizeChartImageName: uploadedSizeChartName
+    )
   }
 
   private func save(_ record: CKRecord) async throws {
@@ -347,8 +382,13 @@ final class MidsummerCloudService {
 
   // MARK: - 图片
 
-  /// CKAsset 只吃文件 URL，因此先把压缩后的图写到临时目录。
-  private nonisolated static func makeAsset(from image: UIImage, name: String) -> CKAsset? {
+  /// CKAsset 只吃文件 URL：压缩后的图写到临时目录供 CKAsset 引用，
+  /// **同时在 ImageManager 的 Images 目录落一份持久副本**（命名空间 `midsummer-upload-`）。
+  /// 返回本地文件名给调用方回填 DTO——发布页乐观更新立刻有图，不用等云端刷新回填。
+  /// （类是 @MainActor，本方法保持 MainActor 隔离以访问 ImageManager；调用方均在类内。）
+  private static func makeAsset(from image: UIImage, name: String)
+    -> (asset: CKAsset, localName: String)?
+  {
     let maxEdge: CGFloat = 1200
     let scale = min(1, maxEdge / max(image.size.width, image.size.height))
     let target = CGSize(width: image.size.width * scale, height: image.size.height * scale)
@@ -356,20 +396,31 @@ final class MidsummerCloudService {
     let resized = renderer.image { _ in image.draw(in: CGRect(origin: .zero, size: target)) }
     guard let data = resized.jpegData(compressionQuality: 0.82) else { return nil }
 
-    let url = FileManager.default.temporaryDirectory
+    let localName = "midsummer-upload-\(name)-\(Int(Date().timeIntervalSince1970)).jpg"
+    let persistentURL = ImageManager.shared.imagesDirectory.appendingPathComponent(localName)
+    let tempURL = FileManager.default.temporaryDirectory
       .appendingPathComponent(name)
       .appendingPathExtension("jpg")
     do {
-      try data.write(to: url, options: .atomic)
+      try data.write(to: persistentURL, options: .atomic)
+      try data.write(to: tempURL, options: .atomic)
     } catch {
-      print("⚠️ [Midsummer] 封面写入临时文件失败：\(error.localizedDescription)")
+      print("⚠️ [Midsummer] 图片落盘失败：\(error.localizedDescription)")
       return nil
     }
-    return CKAsset(fileURL: url)
+    return (CKAsset(fileURL: tempURL), localName)
   }
 }
 
 // MARK: - 上传错误
+
+/// 发布单品后返回的**本地**图片文件名（ImageManager Images 目录内）。
+/// 调用方回填 DTO 后做乐观更新——不等云端刷新，发布页/详情页立刻能显示图。
+nonisolated struct MidsummerPublishedImages {
+  var coverImageName: String?
+  var galleryImageNames: [String]
+  var sizeChartImageName: String?
+}
 
 nonisolated enum MidsummerUploadError: LocalizedError {
   case notAuthenticated
