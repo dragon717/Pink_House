@@ -516,6 +516,14 @@ struct MidsummerSpecGroupsSection: View {
           .foregroundStyle(MidsummerTheme.primaryText)
           .themeSkinLegibleText(level: .inline, slot: MidsummerThemeSlot.specDrawer)
 
+        // 淘宝商品页口径：组名后带选项总数（「颜色分类（16）」）
+        if group.options.count > 1 {
+          Text("(\(group.options.count))")
+            .font(.system(size: 11))
+            .foregroundStyle(MidsummerTheme.secondaryText)
+            .themeSkinLegibleText(level: .inline, slot: MidsummerThemeSlot.specDrawer)
+        }
+
         if let picked = selection[group.id],
           let name = MidsummerSpecResolver.option(picked, in: group)?.name
         {
@@ -569,12 +577,22 @@ struct MidsummerSpecGroupsSection: View {
     )
   }
 
+  /// 该选项自身的挂牌价：取 SKU 表里命中该选项的第一条带价组合。
+  /// 淘宝口径下同组合各尺码同价，取第一条即可；无价返回 nil（不显示价格行）。
+  private func optionPrice(group: MidsummerSpecGroup, option: MidsummerSpecOption) -> Int? {
+    (item.skus ?? []).first {
+      $0.options[group.id] == option.id && $0.price != nil
+    }?.price
+  }
+
   private func isSelected(group: MidsummerSpecGroup, option: MidsummerSpecOption) -> Bool {
     selection[group.id] == option.id
   }
 
   private func thumbnailCell(group: MidsummerSpecGroup, option: MidsummerSpecOption) -> some View {
     let selected = isSelected(group: group, option: option)
+    // 淘宝商品页口径：每个颜色分类选项卡直接带自己的挂牌价（同组合各尺码同价）。
+    let optionPrice = optionPrice(group: group, option: option)
     return Button {
       onPick(group.id, option.id)
     } label: {
@@ -588,6 +606,15 @@ struct MidsummerSpecGroupsSection: View {
           .lineLimit(1)
           .minimumScaleFactor(0.75)
           .padding(.horizontal, 2)
+
+        if let optionPrice {
+          Text("¥\(optionPrice)")
+            .font(.system(size: 9, weight: .medium))
+            .foregroundStyle(MidsummerTheme.priceRed)
+            .lineLimit(1)
+            .minimumScaleFactor(0.75)
+            .padding(.horizontal, 2)
+        }
       }
       .padding(3)
       // 与 `MultiDimensionalFilterSheet` 的筛选 chip 完全同构：

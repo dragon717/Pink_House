@@ -644,11 +644,18 @@ struct MidsummerContributeView: View {
       }
       .pickerStyle(.segmented)
 
-      // SKU 价格（千牛：一口价 / 促销价，这里按本业务口径拆为现货价 / 定金 / 尾款）
-      HStack(spacing: 8) {
-        priceField("现货价", text: item.priceText)
-        priceField("定金", text: item.depositText)
-        priceField("尾款", text: item.balanceText)
+      // SKU 价格（千牛：一口价 / 促销价）。价格三档齐全、按需选填：
+      // 现货价（即买即得）/ 预约价（全款预约一次付清）/ 定金 + 尾款（分两次付）。
+      // 每档都在表单里露出，避免「只能填现货价和定金尾款、漏掉预约价」。
+      VStack(spacing: 8) {
+        HStack(spacing: 8) {
+          priceField("现货价", text: item.priceText)
+          priceField("预约价（全款预约）", text: item.preorderPriceText)
+        }
+        HStack(spacing: 8) {
+          priceField("定金", text: item.depositText)
+          priceField("尾款", text: item.balanceText)
+        }
       }
 
       if Int(item.wrappedValue.priceText) != nil {
@@ -1340,6 +1347,7 @@ struct MidsummerContributeView: View {
       name: item.name,
       kind: item.kind,
       price: item.price,
+      preorderPrice: item.preorderPrice,
       deposit: item.deposit,
       balance: item.balance,
       priceKind: item.priceKind,
@@ -1354,6 +1362,7 @@ struct MidsummerContributeView: View {
       sourceURL: item.sourceURL,
       note: item.note,
       sizeChartImageName: uploaded.sizeChartImageName ?? item.sizeChartImageName,
+      variantImageNames: uploaded.variantImageNames.isEmpty ? item.variantImageNames : uploaded.variantImageNames,
       specGroups: item.specGroups,
       skus: item.skus
     )
@@ -1502,6 +1511,8 @@ struct DraftSnapshot: Codable {
     var depositText: String
     var balanceText: String
     var priceText: String
+    /// 预约价文本。optional：旧草稿 JSON 没有这个 key，缺省解码为 nil（向后兼容）。
+    var preorderPriceText: String? = nil
     var priceKindRaw: String
     var noteText: String
     var sizes: [String]
@@ -1577,6 +1588,7 @@ struct DraftSnapshot: Codable {
         depositText: item.depositText,
         balanceText: item.balanceText,
         priceText: item.priceText,
+        preorderPriceText: item.preorderPriceText,
         priceKindRaw: item.priceKind.rawValue,
         noteText: item.noteText,
         sizes: item.sizes,
@@ -1633,6 +1645,9 @@ struct DraftItem: Identifiable {
   var depositText = ""
   var balanceText = ""
   var priceText = ""
+  /// 预约价（全款预约，元）。与现货价 / 定金尾款并列的第三档价格，
+  /// 按商品实际经营方式选填——字段必须齐全，数字不强制三档全填。
+  var preorderPriceText = ""
   /// `priceText` 的口径。填了价就必须选一个——否则界面只能猜这个数字是什么，
   /// 这也是价格数据「看起来有、实际不可信」的根源之一。
   var priceKind: MidsummerPriceKind = .reference
@@ -1668,7 +1683,7 @@ struct DraftItem: Identifiable {
     self.sizes = Array(sizes).sorted()
   }
 
-  /// 预览/提交用的价格摘要（现货价 > 定金+尾款 > 提示待填）
+  /// 预览/提交用的价格摘要（现货价 > 定金+尾款 > 预约价 > 提示待填）
   var priceSummary: String {
     if let price = Int(priceText) {
       return "¥\(price)"
@@ -1677,6 +1692,9 @@ struct DraftItem: Identifiable {
     if deposit != nil || balance != nil {
       let parts = [deposit.map { "定金 \($0)" }, balance.map { "尾款 \($0)" }].compactMap { $0 }
       return parts.joined(separator: " + ")
+    }
+    if let preorder = Int(preorderPriceText) {
+      return "预约价 ¥\(preorder)"
     }
     return "价格待填"
   }

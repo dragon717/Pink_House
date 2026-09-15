@@ -185,8 +185,10 @@ struct MidsummerCoverView: View {
             placeholder
           }
         }
-      } else if let imageName, !imageName.isEmpty, UIImage(named: imageName) != nil {
-        Image(imageName).resizable().scaledToFill()
+      } else if let imageName, !imageName.isEmpty,
+        let resolved = Self.resolvedImage(named: imageName)
+      {
+        Image(uiImage: resolved).resizable().scaledToFill()
       } else {
         placeholder
       }
@@ -201,6 +203,15 @@ struct MidsummerCoverView: View {
   private var remoteURL: URL? {
     guard let imageName, imageName.hasPrefix("http") else { return nil }
     return URL(string: imageName)
+  }
+
+  /// 封面名解析：先按资源名找（Asset Catalog / Bundle 内置文件），
+  /// 再回退 `ImageManager` 的 Images 目录（种子图导入件、云端上传的本地文件名）。
+  /// 两条路都落空才渲染水印占位——种子图导入是启动后的异步任务，
+  /// 兜底保证首启的短暂窗口内也不会白屏。
+  @MainActor
+  private static func resolvedImage(named name: String) -> UIImage? {
+    UIImage(named: name) ?? ImageManager.shared.loadImage(fileName: name)
   }
 
   /// 无图时的示意底：柔和粉色渐变 + 品牌水印，视觉上接近参考图里的图注样式。

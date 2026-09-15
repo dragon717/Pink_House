@@ -85,6 +85,13 @@ final class MidsummerStore: ObservableObject {
   init(bundle: Bundle = .main) {
     seed = MidsummerSeedCatalog.load(bundle: bundle)
     recomputeCatalog()
+    // 随包种子图 → 用户 Images 目录（幂等，后台执行不阻塞首屏）。
+    // 导入完成后 nudge 一次：若视图在拷贝完成前已经渲染过封面/缩略图，
+    // 让它们重新取图，避免首启停在占位图上。
+    Task { [weak self] in
+      await MidsummerSeedImageImporter.importIfNeeded()
+      self?.objectWillChange.send()
+    }
   }
 
   // MARK: - 投影

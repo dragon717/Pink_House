@@ -84,11 +84,13 @@ final class MidsummerCloudService {
           let sizeChartName = copySizeChartAsset(from: record)
           let coverName = copyItemCoverAsset(from: record)
           let galleryNames = copyItemGalleryAssets(from: record)
+          let variantNames = copyVariantImageAssets(from: record)
           return Self.makeItem(
             from: record,
             sizeChartImageName: sizeChartName,
             coverImageName: coverName,
-            galleryImageNames: galleryNames
+            galleryImageNames: galleryNames,
+            variantImageNames: variantNames
           )
         }
       ) { $0.seriesID }
@@ -167,11 +169,18 @@ final class MidsummerCloudService {
   /// 发布单品（对齐千牛发布路径：每个单品最多 5 张主图宫格）。
   ///
   /// - `images[0]` 是**主图**，写 `coverImage` 资产；`images[1..<5]` 写 `galleryImage2..5`。
+  /// - `variantImages` 是**款式对应图**（`款式名 → 图`，图2「粉色JSK / 粉色OP」样式）：
+  ///   与主图宫格分开存，按传入顺序写 `variantImage1..8` 资产槽，
+  ///   `款式名 → 槽位字段` 的映射序列化进 `variantImageMap` 字符串字段。
   /// - 以单品 id 为 recordID 整条重写，DTO 字段齐全，重复发布不会丢已有数据。
+  ///   因此调用方传 `variantImages` 时必须带上**全部**款式图（已有 + 新增），
+  ///   只传增量会把其余款式图整条抹掉。
   /// - 返回各图落盘后的**本地文件名**，调用方回填 DTO 做乐观更新（界面立刻有图）。
   @discardableResult
-  func publish(item: MidsummerItemDTO, images: [UIImage], sizeChartImage: UIImage? = nil)
-    async throws -> MidsummerPublishedImages
+  func publish(
+    item: MidsummerItemDTO, images: [UIImage], sizeChartImage: UIImage? = nil,
+    variantImages: [(name: String, image: UIImage)] = []
+  ) async throws -> MidsummerPublishedImages
   {
     // 同 publish(series:)：空 recordName 会抛 ObjC 异常直接闪退，提前拦住。
     guard !item.id.isEmpty, !item.seriesID.isEmpty else {
@@ -220,13 +229,39 @@ final class MidsummerCloudService {
       record["sizeChartImage"] = made.asset
       uploadedSizeChartName = made.localName
     }
+    // 款式对应图：每个款式一张专属图，图和款式一一对应（不是堆进主图宫格）。
+    // 槽位按传入顺序分配 `variantImage1..8`；映射（款式名 → 槽位字段）序列化成
+    // JSON 存进字符串字段 `variantImageMap`，读取侧按它把资产还原成字典。
+    var uploadedVariantNames: [String: String] = [:]
+    if !variantImages.isEmpty {
+      var map: [String: String] = [:]
+      for (index, entry) in variantImages.prefix(Self.maxVariantImageSlots).enumerated() {
+        let field = "variantImage\(index + 1)"
+        guard let made = Self.makeAsset(from: entry.image, name: "\(item.id)-\(field)") else {
+          continue
+        }
+        record[field] = made.asset
+        map[entry.name] = field
+        uploadedVariantNames[entry.name] = made.localName
+      }
+      if let data = try? JSONEncoder().encode(map),
+        let json = String(data: data, encoding: .utf8)
+      {
+        record["variantImageMap"] = json as CKRecordValue
+      }
+    }
     try await save(record)
     return MidsummerPublishedImages(
       coverImageName: uploadedCoverName,
       galleryImageNames: uploadedGalleryNames,
-      sizeChartImageName: uploadedSizeChartName
+      sizeChartImageName: uploadedSizeChartName,
+      variantImageNames: uploadedVariantNames
     )
   }
+
+  /// 款式对应图的资产槽上限。一个淘宝链接里的款式很少超过 8 个；
+  /// 超出的款式图会被跳过（界面仍展示款式名，只是没有图位）。
+  nonisolated static let maxVariantImageSlots = 8
 
   private func save(_ record: CKRecord) async throws {
     do {
@@ -271,7 +306,8 @@ final class MidsummerCloudService {
     from record: CKRecord,
     sizeChartImageName: String? = nil,
     coverImageName: String? = nil,
-    galleryImageNames: [String]? = nil
+    galleryImageNames: [String]? = nil,
+    variantImageNames: [String: String]? = nil
   ) -> MidsummerItemDTO? {
     guard let itemID = record["itemID"] as? String,
       let seriesID = record["seriesID"] as? String,
@@ -285,6 +321,7 @@ final class MidsummerCloudService {
       name: name,
       kind: (record["kind"] as? String).flatMap(MidsummerItemKind.init(rawValue:)) ?? .op,
       price: record["price"] as? Int,
+      preorderPrice: record["preorderPrice"] as? Int,
       deposit: record["deposit"] as? Int,
       balance: record["balance"] as? Int,
       priceKind: (record["priceKind"] as? String).flatMap(MidsummerPriceKind.init(rawValue:)),
@@ -301,6 +338,7 @@ final class MidsummerCloudService {
       // 由 Bundle 种子 `midsummer-series.json` 提供规格组与 SKU 组合。
       // 见 docs/MIDSUMMER_TALE_SPEC_SELECTION.md「规格数据的三个来源」。
       sizeChartImageName: sizeChartImageName,
+      variantImageNames: variantImageNames,
       specGroups: nil,
       skus: nil
     )
@@ -380,6 +418,39 @@ final class MidsummerCloudService {
     }
   }
 
+  /// 把随查询下载的**款式对应图**（variantImage1..8 + variantImageMap 映射）复制进 Images 目录，
+  /// 返回 `款式名 → 本地文件名`。映射缺失 / 解析失败 / 资产缺失都按缺图处理，
+  /// 不影响其余字段——界面按「款式图待补充」如实展示。
+  private func copyVariantImageAssets(from record: CKRecord) -> [String: String]? {
+    guard let json = record["variantImageMap"] as? String,
+      let data = json.data(using: .utf8),
+      let map = try? JSONDecoder().decode([String: String].self, from: data),
+      !map.isEmpty
+    else { return nil }
+
+    var result: [String: String] = [:]
+    for (variantName, field) in map {
+      guard let asset = record[field] as? CKAsset,
+        let fileURL = asset.fileURL,
+        FileManager.default.fileExists(atPath: fileURL.path)
+      else { continue }
+
+      let fileName =
+        "midsummer-item-\(record.recordID.recordName)-\(field)-\(Int(Date().timeIntervalSince1970)).jpg"
+      let destination = ImageManager.shared.imagesDirectory.appendingPathComponent(fileName)
+      do {
+        if FileManager.default.fileExists(atPath: destination.path) {
+          try FileManager.default.removeItem(at: destination)
+        }
+        try FileManager.default.copyItem(at: fileURL, to: destination)
+        result[variantName] = fileName
+      } catch {
+        print("⚠️ [Midsummer] 款式图「\(variantName)」复制失败：\(error.localizedDescription)")
+      }
+    }
+    return result.isEmpty ? nil : result
+  }
+
   // MARK: - 图片
 
   /// CKAsset 只吃文件 URL：压缩后的图写到临时目录供 CKAsset 引用，
@@ -420,6 +491,8 @@ nonisolated struct MidsummerPublishedImages {
   var coverImageName: String?
   var galleryImageNames: [String]
   var sizeChartImageName: String?
+  /// 款式对应图：`款式名 → 本地文件名`（未传款式图时为空字典）。
+  var variantImageNames: [String: String] = [:]
 }
 
 nonisolated enum MidsummerUploadError: LocalizedError {

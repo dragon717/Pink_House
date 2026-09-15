@@ -132,7 +132,7 @@ final class MidsummerPriceIntegrityTests: XCTestCase {
     XCTAssertEqual(sakura.items.count, 1, "同一淘宝链接下的多款必须归集为一个商品")
     let product = try XCTUnwrap(sakura.items.first)
 
-    XCTAssertEqual(product.variantCount, 9, "樱花小羊同一个链接内含 9 款")
+    XCTAssertEqual(product.variantCount, 16, "樱花小羊同一个链接内含 16 个颜色分类选项")
     XCTAssertNotNil(
       product.itemURL,
       "归集商品必须留下那个唯一的商品链接，否则「统一到一个链接」无从体现"
@@ -142,17 +142,17 @@ final class MidsummerPriceIntegrityTests: XCTestCase {
       "归集商品必须用「款式」组把多款区分开"
     )
 
-    // 逐款参考价必须落在 SKU 表里，且区间由它派生
+    // 逐款商品页价必须落在 SKU 表里，且区间由它派生（淘宝采集 2026-09-16）
     let prices = Set((product.skus ?? []).compactMap(\.price))
     XCTAssertTrue(
-      prices.isSuperset(of: [199, 209, 219, 269, 329, 399, 499, 699]),
-      "逐款参考价缺失或写错：实际 \(prices.sorted())"
+      prices.isSuperset(of: [119, 229, 279, 359, 369, 399, 449, 599, 699, 999]),
+      "逐款商品页价缺失或写错：实际 \(prices.sorted())"
     )
-    XCTAssertEqual(product.priceRange?.min, 199)
-    XCTAssertEqual(product.priceRange?.max, 699)
-    XCTAssertEqual(product.priceText, "¥199–699")
-    XCTAssertEqual(sakura.priceRangeText, "¥199–699", "系列区间应派生自商品")
-    XCTAssertEqual(sakura.depositRangeText, "定金 ¥7–139", "定金口径单独登记")
+    XCTAssertEqual(product.priceRange?.min, 119)
+    XCTAssertEqual(product.priceRange?.max, 999)
+    XCTAssertEqual(product.priceText, "¥119–999")
+    XCTAssertEqual(sakura.priceRangeText, "¥119–999", "系列区间应派生自商品")
+    XCTAssertNil(sakura.depositRangeText, "淘宝链接未给定金口径，不得虚构定金区间")
   }
 
   func testConsolidatedProductVariantOptionsMatchSKUTable() throws {

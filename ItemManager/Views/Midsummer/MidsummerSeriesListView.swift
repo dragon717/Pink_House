@@ -504,7 +504,8 @@ struct MidsummerSeriesDetailView: View {
   }
 
   /// 单品 → 价格归类。判定顺序：有定金+尾款 → 定金尾款预约；只有定金 → 全款预约
-  /// （与衣橱 `isFullPaymentReservation` 的派生口径一致）；无预约款但有价 → 现货价。
+  /// （旧数据把全款预约价存在 deposit 里，与衣橱 `isFullPaymentReservation` 派生口径一致）；
+  /// 显式填了 `preorderPrice` → 预约价（全款预约）；有现货价 → 现货价。
   private func priceGroups(_ series: MidsummerSeriesDTO) -> [PriceGroup] {
     var spot: [PriceRow] = []
     var fullPreorder: [PriceRow] = []
@@ -520,7 +521,10 @@ struct MidsummerSeriesDetailView: View {
         // 只有尾款没有定金：仍属预约链路，但单独标口径，不伪装成现货价。
         depositBalance.append(PriceRow(name: item.name, amount: "尾款 ¥\(balance)"))
       case (nil, nil):
-        if let range = item.priceRange {
+        // 显式预约价优先归「全款预约」组，不再靠「只有定金」猜口径。
+        if let preorder = item.preorderPrice {
+          fullPreorder.append(PriceRow(name: item.name, amount: "预约价 ¥\(preorder)"))
+        } else if let range = item.priceRange {
           let kindSuffix: String
           switch item.priceKind ?? item.variantPriceKind {
           case .shop: kindSuffix = "（商品页价）"

@@ -663,6 +663,11 @@ struct MidsummerItemDetailSheet: View {
   @State private var isUploadingItemImage = false
   @State private var uploadedImageNames: [String]?
   @State private var itemImageMessage: String?
+  // 款式对应图（图2「粉色JSK / 粉色OP」样式）：每款一个独立图位，图与款式一一对应。
+  @State private var uploadedVariantImageNames: [String: String]?
+  /// 正在为哪个款式选图（单个 PhotosPicker 供全部款式共用，靠它区分目标款式）
+  @State private var variantPickerTarget: String?
+  @State private var variantPhotoItem: PhotosPickerItem?
 
   /// 单品图片上限（与千牛发布宝贝一致：5 张，第 1 张为主图）
   private static let maxItemImages = 5
@@ -758,10 +763,6 @@ struct MidsummerItemDetailSheet: View {
               .font(.system(size: 15, weight: .semibold))
               .foregroundStyle(MidsummerTheme.priceRed)
 
-            // 价格的可信度信息：口径 + 采集日 + 口径说明。
-            // 没有这三样，使用者无法判断「这个数字是不是现在还有效」。
-            priceProvenanceCaption
-
             if item.variantCount > 1 {
               labeledRow("包含款式", value: "\(item.variantCount) 款（同一商品链接内可选）")
             }
@@ -770,6 +771,7 @@ struct MidsummerItemDetailSheet: View {
             }
             labeledRow("尺码", value: item.sizesText)
             sizeChartSection
+            variantImageSection
             itemImageSection
             if MidsummerSpecResolver.hasSpecs(item) {
               labeledRow("可选规格", value: MidsummerSpecResolver.groups(of: item).map(\.name).joined(separator: " / "))
@@ -828,15 +830,6 @@ struct MidsummerItemDetailSheet: View {
               .padding(.top, 2)
             }
 
-            if let source = URL(string: item.sourceURL), !item.sourceURL.isEmpty {
-              Link(destination: source) {
-                Label("查看原文出处", systemImage: "arrow.up.right.square")
-                  .font(.system(size: 12, weight: .medium))
-                  .foregroundStyle(MidsummerTheme.brandOrange)
-              }
-              .padding(.top, 2)
-            }
-
             Text("本页仅作衣橱搭配参考，不提供购买。")
               .font(.system(size: 10))
               .foregroundStyle(MidsummerTheme.secondaryText)
@@ -859,6 +852,12 @@ struct MidsummerItemDetailSheet: View {
         let picked = newValue
         supplementPhotoItem = []
         Task { await appendItemImages(picked) }
+      }
+      .onChange(of: variantPhotoItem) { _, newValue in
+        guard let newValue, let target = variantPickerTarget else { return }
+        variantPhotoItem = nil
+        variantPickerTarget = nil
+        Task { await uploadVariantImage(newValue, for: target) }
       }
     }
     // 规格抽屉：覆盖在整个详情页之上（含导航栏），与淘宝「加入购物车」面板一致。
@@ -885,33 +884,6 @@ struct MidsummerItemDetailSheet: View {
         )
         .transition(.opacity)
       }
-    }
-  }
-
-  /// 价格来源说明：口径 + 采集日 + 口径备注。
-  /// 没有这三样，「这个价格是不是现在还有效」就无从判断——也是价格数据不可信的根源。
-  @ViewBuilder
-  private var priceProvenanceCaption: some View {
-    let parts: [String] = [
-      item.priceKind?.labelZH,
-      item.priceCapturedOn.map { "采集于 \($0)" },
-    ].compactMap { $0 }
-
-    if !parts.isEmpty || item.priceNote != nil {
-      VStack(alignment: .leading, spacing: 2) {
-        if !parts.isEmpty {
-          Text(parts.joined(separator: " · "))
-            .font(.system(size: 10))
-            .foregroundStyle(MidsummerTheme.secondaryText)
-        }
-        if let priceNote = item.priceNote, !priceNote.isEmpty {
-          Text(priceNote)
-            .font(.system(size: 10))
-            .foregroundStyle(MidsummerTheme.secondaryText)
-            .fixedSize(horizontal: false, vertical: true)
-        }
-      }
-      .frame(maxWidth: .infinity, alignment: .leading)
     }
   }
 
@@ -945,6 +917,129 @@ struct MidsummerItemDetailSheet: View {
         .foregroundStyle(MidsummerTheme.primaryText)
     }
     .accessibilityIdentifier("midsummer-item-sizechart")
+  }
+
+  // MARK: 款式对应图（图2「粉色JSK / 粉色OP」样式）
+
+  /// 展示/编辑中的款式图：本会话已保存的 > 云端已回填的。
+  private var workingVariantImages: [String: String] {
+    if let uploadedVariantImageNames { return uploadedVariantImageNames }
+    return item.variantImageNames ?? [:]
+  }
+
+  /// 款式名列表（图位的分组依据）：
+  /// 1. 有「款式」规格组 → 选项名（如「印花JSK」）；
+  /// 2. 没有规格组但有颜色分类 → 「颜色 + 类型短标」（如「粉色OP」——图2 的对应方式）；
+  ///    单品自身 colors 为空时回退系列级颜色分类（上新表单把颜色填在系列步骤①）；
+  /// 3. 都没有 → 不展示该区块，单品图只有整条宫格。
+  private var variantKeys: [String] {
+    if let groups = item.specGroups,
+      let variant = groups.first(where: { $0.resolvedRole == .variant && !$0.options.isEmpty })
+    {
+      return variant.options.map(\.name)
+    }
+    let colors = item.colors.isEmpty ? series.colors : item.colors
+    guard !colors.isEmpty else { return [] }
+    return colors.map { "\($0)\(item.kind.shortLabel)" }
+  }
+
+  /// 款式对应图区块：每个款式一个独立图位（图 + 补录/更换/删除入口），
+  /// 与下方整条单品共用的主图宫格是两个维度——图必须**归属到具体款式**，
+  /// 而不是把所有图堆进同一个宫格。
+  @ViewBuilder
+  private var variantImageSection: some View {
+    let keys = variantKeys
+    let extraKeys = workingVariantImages.keys.filter { !keys.contains($0) }.sorted()
+    let allKeys = keys + extraKeys
+    if !allKeys.isEmpty {
+      VStack(alignment: .leading, spacing: 8) {
+        Text("款式对应图")
+          .font(.system(size: 12, weight: .medium))
+          .foregroundStyle(MidsummerTheme.primaryText)
+        Text("每款一张专属图，与款式一一对应；不会混入下方整条商品的主图宫格。")
+          .font(.system(size: 10))
+          .foregroundStyle(MidsummerTheme.secondaryText)
+
+        ForEach(allKeys, id: \.self) { key in
+          variantImageRow(key)
+        }
+      }
+    }
+  }
+
+  private func variantImageRow(_ variant: String) -> some View {
+    let imageFile = workingVariantImages[variant]
+    return HStack(alignment: .center, spacing: 10) {
+      Group {
+        if let imageFile, let image = ImageManager.shared.loadImage(fileName: imageFile) {
+          Image(uiImage: image)
+            .resizable()
+            .scaledToFill()
+        } else {
+          ZStack {
+            MidsummerTheme.subtleFill
+            Image(systemName: "photo")
+              .font(.system(size: 18, weight: .light))
+              .foregroundStyle(MidsummerTheme.secondaryText)
+          }
+        }
+      }
+      .frame(width: 56, height: 56)
+      .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+      .accessibilityIdentifier("midsummer-variant-image-\(variant)")
+
+      VStack(alignment: .leading, spacing: 4) {
+        Text(variant)
+          .font(.system(size: 12, weight: .semibold))
+          .foregroundStyle(MidsummerTheme.primaryText)
+        if imageFile == nil {
+          Text("款式图待补充")
+            .font(.system(size: 10))
+            .foregroundStyle(MidsummerTheme.secondaryText)
+        }
+        if MidsummerStore.shared.isAdminUser {
+          HStack(spacing: 12) {
+            PhotosPicker(
+              selection: Binding(
+                get: { variantPickerTarget == variant ? variantPhotoItem : nil },
+                set: { newValue in
+                  variantPickerTarget = variant
+                  variantPhotoItem = newValue
+                }
+              ),
+              matching: .images
+            ) {
+              Label(
+                imageFile == nil ? "补录款式图" : "更换",
+                systemImage: imageFile == nil ? "photo.badge.plus" : "arrow.2.squarepath"
+              )
+              .font(.system(size: 11, weight: .medium))
+              .foregroundStyle(MidsummerTheme.brandOrange)
+            }
+            .disabled(isUploadingItemImage)
+            .accessibilityIdentifier("midsummer-variant-image-pick-\(variant)")
+
+            if imageFile != nil {
+              Button {
+                Task { await deleteVariantImage(variant) }
+              } label: {
+                Label("删除", systemImage: "trash")
+                  .font(.system(size: 11))
+                  .foregroundStyle(MidsummerTheme.secondaryText)
+              }
+              .disabled(isUploadingItemImage)
+              .accessibilityIdentifier("midsummer-variant-image-delete-\(variant)")
+            }
+
+            if isUploadingItemImage {
+              ProgressView()
+            }
+          }
+        }
+      }
+      Spacer(minLength: 0)
+    }
+    .padding(.vertical, 2)
   }
 
   /// 单品图宫格 + 运营者补录入口（对齐千牛发布路径）。
@@ -1099,6 +1194,84 @@ struct MidsummerItemDetailSheet: View {
         item: item, images: loadImages(names), sizeChartImage: nil)
       uploadedImageNames = names
       itemImageMessage = names.isEmpty ? "已清空单品图。" : "已删除，其他用户刷新后可见。"
+      Task { await MidsummerStore.shared.refreshFromCloud() }
+    } catch {
+      itemImageMessage = "删除失败：\(error.localizedDescription)"
+    }
+  }
+
+  /// 上传/更换某个款式的对应图。
+  ///
+  /// publish 是整条重写：主图宫格 + **全部**款式图必须一并带上，缺一即被抹掉。
+  /// 槽位顺序 = 款式名顺序（variantKeys 优先，历史遗留 key 排尾），保证重复上传时
+  /// 同一款式稳定落在同一资产槽，不会互相串位。
+  private func uploadVariantImage(_ pickerItem: PhotosPickerItem, for variant: String) async {
+    guard !isUploadingItemImage else { return }
+    isUploadingItemImage = true
+    defer { isUploadingItemImage = false }
+
+    do {
+      guard let data = try await pickerItem.loadTransferable(type: Data.self),
+        let image = UIImage(data: data)
+      else {
+        itemImageMessage = "图片读取失败，请换一张试试。"
+        return
+      }
+
+      let orderedKeys =
+        variantKeys
+        + workingVariantImages.keys.filter { !variantKeys.contains($0) }.sorted()
+      var entries: [(name: String, image: UIImage)] = []
+      for key in orderedKeys {
+        if key == variant {
+          entries.append((key, image))
+        } else if let fileName = workingVariantImages[key],
+          let existing = ImageManager.shared.loadImage(fileName: fileName)
+        {
+          entries.append((key, existing))
+        }
+      }
+
+      let published = try await MidsummerCloudService.shared.publish(
+        item: item,
+        images: loadImages(workingImageNames),
+        sizeChartImage: nil,
+        variantImages: entries
+      )
+      uploadedVariantImageNames = published.variantImageNames
+      itemImageMessage = "已上传「\(variant)」款式图，其他用户刷新后可见。"
+      Task { await MidsummerStore.shared.refreshFromCloud() }
+    } catch {
+      itemImageMessage = "上传失败：\(error.localizedDescription)"
+    }
+  }
+
+  /// 删除某个款式的对应图：同样整条重写，只是该款式不再带图。
+  private func deleteVariantImage(_ variant: String) async {
+    guard workingVariantImages[variant] != nil, !isUploadingItemImage else { return }
+    isUploadingItemImage = true
+    defer { isUploadingItemImage = false }
+
+    do {
+      let orderedKeys =
+        variantKeys
+        + workingVariantImages.keys.filter { !variantKeys.contains($0) }.sorted()
+      let entries: [(name: String, image: UIImage)] = orderedKeys.compactMap { key in
+        guard key != variant,
+          let fileName = workingVariantImages[key],
+          let existing = ImageManager.shared.loadImage(fileName: fileName)
+        else { return nil }
+        return (key, existing)
+      }
+
+      let published = try await MidsummerCloudService.shared.publish(
+        item: item,
+        images: loadImages(workingImageNames),
+        sizeChartImage: nil,
+        variantImages: entries
+      )
+      uploadedVariantImageNames = published.variantImageNames
+      itemImageMessage = "已删除「\(variant)」款式图。"
       Task { await MidsummerStore.shared.refreshFromCloud() }
     } catch {
       itemImageMessage = "删除失败：\(error.localizedDescription)"

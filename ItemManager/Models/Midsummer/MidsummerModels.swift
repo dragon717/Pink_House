@@ -232,6 +232,14 @@ nonisolated struct MidsummerItemDTO: Codable, Identifiable, Hashable, Sendable {
   let kind: MidsummerItemKind
   /// 现货 / 参考价（元）。预售期一般为空，用 deposit / balance 表示。
   let price: Int?
+  /// 预约价（全款预约，元）。
+  ///
+  /// 单独成档的原因：三坑上新常用三种购买方式并存——现货（即买即得）、
+  /// 全款预约（一次付清）、定金尾款预约（付两次）。全款预约的金额既不是
+  /// 现货价也不是定金，以前只能塞进 `deposit` 冒充「定金」，价格总表
+  /// 「预约价 · 全款预约」分组因此只能靠「只有定金」猜出来。
+  /// 旧记录没有此字段，解码自动为 nil（向后兼容）。
+  var preorderPrice: Int? = nil
   /// 定金（元）
   let deposit: Int?
   /// 尾款（元）
@@ -262,6 +270,16 @@ nonisolated struct MidsummerItemDTO: Codable, Identifiable, Hashable, Sendable {
   /// 旧 Bundle 种子与旧 CloudKit 记录没有此字段，解码时自动为 nil（向后兼容）；
   /// 用 `var` + 默认值是为了让成员初始化器带默认参数，既有构造点无需改动。
   var sizeChartImageName: String? = nil
+
+  /// 款式对应图：`款式名 → 本地文件名`（每款一张主图，图2 的「粉色JSK / 粉色OP」样式）。
+  ///
+  /// 与整条单品共用的 5 格主图宫格（`coverImage` + `galleryImageNames`）是两个维度：
+  /// 宫格是千牛「商品主图」，这里是**款式级**的对应图——补录时每款单独传、
+  /// 单独替换，图和款式一一对应，而不是把所有图堆进同一个宫格。
+  /// key 的取法：有「款式」规格组时用选项名（如「印花JSK」）；
+  /// 没有规格组但有颜色分类时用「颜色 + 类型短标」（如「粉色OP」）。
+  /// 旧记录没有此字段，解码自动为 nil（向后兼容）。
+  var variantImageNames: [String: String]? = nil
 
   /// 规格组（颜色分类 / 尺码 / …）。`nil` 或空数组表示该单品没有可选规格，
   /// 此时详情页的「一键入库」不必让使用者做选择，直接按单品信息入库。
@@ -326,6 +344,8 @@ nonisolated struct MidsummerItemDTO: Codable, Identifiable, Hashable, Sendable {
       return "定金 ¥\(deposit) · 尾款 ¥\(balance)"
     }
     if let deposit { return "定金 ¥\(deposit)" }
+    // 全款预约价：独立于现货区间与定金的一档，明示「预约」口径。
+    if let preorderPrice { return "预约价 ¥\(preorderPrice)" }
     if let range = priceRange {
       return range.min == range.max ? "¥\(range.min)" : "¥\(range.min)–\(range.max)"
     }

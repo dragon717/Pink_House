@@ -529,6 +529,9 @@
         }
       }
     },
+    "(%lld)" : {
+
+    },
     "(%lld%@)" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -11140,7 +11143,6 @@
       }
     },
     "¥%lld" : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -87955,6 +87957,9 @@
         }
       }
     },
+    "更换" : {
+
+    },
     "更换图片" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -94335,6 +94340,12 @@
     "款名，例如「樱花小羊 SK」" : {
 
     },
+    "款式图待补充" : {
+
+    },
+    "款式对应图" : {
+
+    },
     "正午的阳光最烈，但你的笑容更耀眼" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -96174,6 +96185,9 @@
           }
         }
       }
+    },
+    "每款一张专属图，与款式一一对应；不会混入下方整条商品的主图宫格。" : {
+
     },
     "毛毛" : {
       "extractionState" : "stale",
@@ -121867,6 +121881,9 @@
 
     },
     "补录尺码表或价格表" : {
+
+    },
+    "补录款式图" : {
 
     },
     "补打本周未打卡" : {
