@@ -278,6 +278,60 @@ final class MidsummerListingTests: XCTestCase {
       createdAt: Date(), updatedAt: Date(), listedAt: nil))
   }
 
+  // MARK: 系列级上新信息（2026-09-16 改版新增字段）
+
+  /// 新字段（阶段 / 系列标题 / 上新日期 / 定金区间）编解码往返不丢。
+  func testLaunchFieldsRoundtrip() throws {
+    var listing = makeListing()
+    let date = Date(timeIntervalSince1970: 1_789_000_000)
+    listing.stage = .deposit
+    listing.launchTitle = "小熊博物馆系列"
+    listing.hasKnownLaunchDate = true
+    listing.launchDate = date
+    listing.depositMin = 30
+    listing.depositMax = 80
+
+    let data = try JSONEncoder().encode(listing)
+    let decoded = try JSONDecoder().decode(MidsummerListing.self, from: data)
+
+    XCTAssertEqual(decoded.stage, .deposit)
+    XCTAssertEqual(decoded.launchTitle, "小熊博物馆系列")
+    XCTAssertEqual(decoded.hasKnownLaunchDate, true)
+    XCTAssertEqual(decoded.launchDate, date)
+    XCTAssertEqual(decoded.depositMin, 30)
+    XCTAssertEqual(decoded.depositMax, 80)
+  }
+
+  /// 旧存档 JSON（没有新字段键）解码不炸：新字段全部落 nil（向后兼容）。
+  func testLegacyJSONDecodesWithNilLaunchFields() throws {
+    let legacy = """
+      {"id":"upload-legacy01","seriesID":"midsummer-2026-sakura-lamb","name":"旧存档",
+       "kindRaw":"op","price":199,"preorderPrice":null,"deposit":null,"balance":null,
+       "priceKindRaw":"shop","note":"","sourceURL":"","sizes":["S"],
+       "variantOptionNames":["现 sk 粉色"],"imageFiles":[],"status":"listed",
+       "createdAt":600000000.0,"updatedAt":600000000.0,"listedAt":600000000.0}
+      """
+    let decoded = try JSONDecoder().decode(MidsummerListing.self, from: Data(legacy.utf8))
+
+    XCTAssertEqual(decoded.name, "旧存档")
+    XCTAssertNil(decoded.stage)
+    XCTAssertNil(decoded.launchTitle)
+    XCTAssertNil(decoded.hasKnownLaunchDate)
+    XCTAssertNil(decoded.launchDate)
+    XCTAssertNil(decoded.depositMin)
+    XCTAssertNil(decoded.depositMax)
+  }
+
+  /// 阶段 → 价格配置项联动：第 4 步按阶段显示对应价格项。
+  func testStagePriceFieldsLinkage() {
+    XCTAssertEqual(MidsummerLaunchStage.teaser.priceFields, [], "图透阶段无价格配置")
+    XCTAssertEqual(MidsummerLaunchStage.deposit.priceFields, [.deposit, .balance], "定金阶段显示定金 + 尾款")
+    XCTAssertEqual(MidsummerLaunchStage.balance.priceFields, [.balance], "尾款阶段只显示尾款")
+    XCTAssertEqual(MidsummerLaunchStage.shipping.priceFields, [.shop], "出货阶段显示现货价")
+    XCTAssertEqual(MidsummerLaunchStage.rerun.priceFields, [.shop, .preorder], "再贩阶段显示现货价 + 预约价")
+    XCTAssertEqual(MidsummerLaunchStage.inStock.priceFields, [.shop], "现货阶段显示现货价")
+  }
+
   // MARK: 工具
 
   private func makeSolidImage() -> UIImage {

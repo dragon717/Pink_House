@@ -3,7 +3,8 @@
 //  ItemManagerUITests
 //
 //  上新工作台（樱花小羊系列 · 用户 2026-09-16）全流程验收：
-//    发布新商品 → 录入（名称 / 关联款式 / 尺码 / 价格）→ 图片步 → 预览上架
+//    发布新商品 → ①系列主图与信息（标题 / 日期）→ ②选择上新阶段
+//    → ③尺码信息 → ④单品与价格（名称 / 关联款式 / 价格按阶段联动）→ 发布上架
 //    → 上架商品出现在工作台列表（已上架）→ 出现在系列详情商品列表
 //    → 详情页一键入库（规格抽屉带出继承的款式组）。
 //
@@ -13,9 +14,15 @@
 //  访问性标识契约（改产品代码时同步改本文件）：
 //    · 系列详情入口        → series-listing-workspace-button
 //    · 工作台发布按钮      → listing-open-form
-//    · 表单字段            → listing-name / listing-kind / listing-style-<optionID>
-//                            listing-size-<size> / listing-price / listing-preorder
-//                            listing-deposit / listing-balance / listing-note / listing-source
+//    · 顶栏                → listing-cancel / listing-save-draft
+//    · ①主图与信息        → listing-launch-title / listing-date-toggle
+//                            listing-launch-date / listing-image-add / listing-note
+//    · ②上新阶段          → listing-stage-<raw>
+//    · ③尺码信息          → listing-size-<size>
+//    · ④单品与价格        → listing-name / listing-kind / listing-style-<optionID>
+//                            listing-price / listing-preorder
+//                            listing-deposit / listing-balance
+//                            listing-deposit-min / listing-deposit-max / listing-source
 //    · 步骤导航            → listing-next / listing-back / listing-publish
 //    · 工作台行            → listing-edit-<id> / listing-more-<id>
 //    · 状态菜单            → listing-menu-list-<id> / listing-menu-delist-<id> / listing-menu-delete-<id>
@@ -158,35 +165,76 @@ final class MidsummerListingFlowUITests: XCTestCase {
     }
     openForm.tap()
     sleep(2)
-    capture("84-表单-基本信息")
+    capture("84-表单-主图与信息")
 
-    // ② 录入基本信息
-    let nameField = app.textFields["listing-name"]
-    guard nameField.waitForExistence(timeout: 5) else {
-      dumpHierarchy("84-找不到名称输入框", app: app)
-      XCTFail("表单第一步应有商品名称输入框")
+    // ② ①系列主图与信息：系列标题（主图可选，直接下一步）
+    let titleField = app.textFields["listing-launch-title"]
+    guard titleField.waitForExistence(timeout: 5) else {
+      dumpHierarchy("84-找不到系列标题输入框", app: app)
+      XCTFail("表单第一步应有系列标题输入框")
       return
     }
+    titleField.tap()
+    titleField.typeText("小熊博物馆系列\n")
+    usleep(500_000)
+    capture("85-表单-主图与信息录入完成")
+    app.buttons["listing-next"].tap()
+    sleep(1)
+
+    // ③ ②选择上新阶段：选「现货」→ 第 4 步应只显示现货价（联动断言在 ④ 里做）
+    let stageChip = app.buttons["listing-stage-inStock"]
+    guard stageChip.waitForExistence(timeout: 5) else {
+      dumpHierarchy("86-找不到上新阶段选项", app: app)
+      XCTFail("第二步应有「选择上新阶段」chips")
+      return
+    }
+    stageChip.tap()
+    sleep(1)
+    capture("87-表单-上新阶段已选现货")
+    app.buttons["listing-next"].tap()
+    sleep(1)
+
+    // ④ ③尺码信息：勾选 S
+    let sizeChip = app.buttons["listing-size-S"]
+    guard scrollToElement(sizeChip, app: app) else {
+      dumpHierarchy("88-找不到尺码选项", app: app)
+      XCTFail("第三步应有可用尺码 chips")
+      return
+    }
+    sizeChip.tap()
+    sleep(1)
+    app.buttons["listing-next"].tap()
+    sleep(1)
+
+    // ⑤ ④单品与价格：商品名 + 关联款式（樱花小羊款式首项「sk 粉色」）+ 现货价
+    let nameField = app.textFields["listing-name"]
+    guard nameField.waitForExistence(timeout: 5) else {
+      dumpHierarchy("89-找不到名称输入框", app: app)
+      XCTFail("「单品与价格」步应有商品名称输入框")
+      return
+    }
+    // 阶段联动：选了「现货」→ 只显示现货价，定金 / 尾款 / 预约价不应出现
+    XCTAssertFalse(
+      app.textFields["listing-deposit"].exists,
+      "现货阶段不应显示定金配置项（价格项与阶段联动）"
+    )
+    XCTAssertFalse(
+      app.textFields["listing-balance"].exists,
+      "现货阶段不应显示尾款配置项（价格项与阶段联动）"
+    )
     nameField.tap()
     // 用换行符收起键盘（return 键），不依赖「完成」按钮的存在。
     nameField.typeText(itemName + "\n")
     usleep(500_000)
 
-    // 关联款式（樱花小羊款式首项「sk 粉色」）+ 尺码 + 现货价
     let styleChip = app.buttons["listing-style-sk-pink"]
     guard scrollToElement(styleChip, app: app) else {
-      dumpHierarchy("85-找不到款式关联选项", app: app)
+      dumpHierarchy("90-找不到款式关联选项", app: app)
       XCTFail("应能勾选关联款式「sk 粉色」")
       return
     }
     styleChip.tap()
     sleep(1)
-
-    let sizeChip = app.buttons["listing-size-S"]
-    if scrollToElement(sizeChip, app: app) {
-      sizeChip.tap()
-      sleep(1)
-    }
 
     let priceField = app.textFields["listing-price"]
     if scrollToElement(priceField, app: app) {
@@ -196,34 +244,26 @@ final class MidsummerListingFlowUITests: XCTestCase {
       app.swipeDown()
       usleep(500_000)
     }
-    capture("86-表单-录入完成")
+    capture("91-表单-单品与价格录入完成")
 
-    // ③ 图片步：不传图直接下一步（图可选）
-    app.buttons["listing-next"].tap()
-    sleep(1)
-    capture("87-表单-图片步")
-
-    // ④ 预览与发布
-    app.buttons["listing-next"].tap()
-    sleep(1)
-    capture("88-表单-预览")
+    // ⑥ 最后一步直接发布上架
     let publish = app.buttons["listing-publish"]
     guard publish.waitForExistence(timeout: 4) else {
-      dumpHierarchy("89-找不到发布按钮", app: app)
-      XCTFail("预览步应有「发布上架」按钮")
+      dumpHierarchy("92-找不到发布按钮", app: app)
+      XCTFail("最后一步应有「发布上架」按钮")
       return
     }
     publish.tap()
     sleep(2)
 
-    // ⑤ 工作台列表应出现已上架行
+    // ⑦ 工作台列表应出现已上架行
     let listedRow = app.staticTexts[itemName]
     guard listedRow.waitForExistence(timeout: 6) else {
-      dumpHierarchy("90-工作台找不到上架行", app: app)
+      dumpHierarchy("93-工作台找不到上架行", app: app)
       XCTFail("发布后工作台应列出「\(itemName)」")
       return
     }
-    capture("91-工作台-已上架")
+    capture("94-工作台-已上架")
     XCTAssertTrue(
       app.staticTexts.matching(NSPredicate(format: "label == %@", "已上架")).firstMatch.exists,
       "新发布商品的状态应为「已上架」"

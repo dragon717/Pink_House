@@ -39,6 +39,11 @@ nonisolated enum MidsummerTheme {
     light: Color(red: 0.31, green: 0.76, blue: 0.12),
     dark: Color(red: 0.46, green: 0.84, blue: 0.30)
   )
+  /// 强调粉：上新工作台的「存草稿」文字与「已知上新日期」开关（用户 2026-09-16 改版图）。
+  static let accentPink = adaptive(
+    light: Color(red: 1.00, green: 0.36, blue: 0.55),
+    dark: Color(red: 1.00, green: 0.45, blue: 0.62)
+  )
 
   // MARK: 底色与文字
 

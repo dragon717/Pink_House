@@ -14,6 +14,87 @@ import Foundation
 /// 上新工作台单品在 DTO 层的 id 前缀（首页 feed 靠它区分「基础条目」与「上架新品」）。
 nonisolated let MidsummerListingItemIDPrefix = "midsummer-listing-"
 
+/// 上新阶段（类目）：决定这个系列上新出现在时间线上的哪个阶段。
+/// 对应淘宝谷子圈话术：图透 → 定金 → 尾款 → 出货 → 再贩 / 现货。
+nonisolated enum MidsummerLaunchStage: String, Codable, CaseIterable, Sendable {
+  case teaser    // 图透
+  case deposit   // 定金
+  case balance   // 尾款
+  case shipping  // 出货
+  case rerun     // 再贩
+  case inStock   // 现货
+
+  var labelZH: String {
+    switch self {
+    case .teaser: return "图透"
+    case .deposit: return "定金"
+    case .balance: return "尾款"
+    case .shipping: return "出货"
+    case .rerun: return "再贩"
+    case .inStock: return "现货"
+    }
+  }
+
+  /// 选择 chip 上的 SF Symbol 图标（与设计稿一致）。
+  var iconSystemName: String {
+    switch self {
+    case .teaser: return "sparkles"
+    case .deposit: return "checkmark.circle.fill"
+    case .balance: return "creditcard"
+    case .shipping: return "shippingbox"
+    case .rerun: return "arrow.clockwise"
+    case .inStock: return "bag"
+    }
+  }
+}
+
+/// 价格配置项（上新工作台第 4 步按阶段联动显示）。
+nonisolated enum MidsummerPriceConfigField: String, Codable, CaseIterable, Sendable {
+  case shop      // 现货价
+  case preorder  // 预约价（全款预约）
+  case deposit   // 定金
+  case balance   // 尾款
+
+  var labelZH: String {
+    switch self {
+    case .shop: return "现货价"
+    case .preorder: return "预约价（全款预约）"
+    case .deposit: return "定金"
+    case .balance: return "尾款"
+    }
+  }
+}
+
+extension MidsummerLaunchStage {
+  /// 阶段 → 价格配置项联动：第 4 步只显示当前阶段需要的价格项。
+  ///   · 图透：无价格（还没开定金，价格后面再补）；
+  ///   · 定金：定金 + 尾款（可按需只配其一）+ 定金区间；
+  ///   · 尾款：尾款；
+  ///   · 出货 / 现货：现货价；
+  ///   · 再贩：现货价 + 预约价。
+  var priceFields: [MidsummerPriceConfigField] {
+    switch self {
+    case .teaser: return []
+    case .deposit: return [.deposit, .balance]
+    case .balance: return [.balance]
+    case .shipping, .inStock: return [.shop]
+    case .rerun: return [.shop, .preorder]
+    }
+  }
+
+  /// 价格卡的说明文案（跟阶段走）。
+  var priceHint: String {
+    switch self {
+    case .teaser: return "图透阶段暂无价格配置，开定金后回来补即可。"
+    case .deposit: return "定金阶段：定金与尾款可按需选择配置；定金区间为该系列的定金范围。"
+    case .balance: return "尾款阶段：只需配置尾款金额。"
+    case .shipping: return "出货阶段：配置现货价。"
+    case .rerun: return "再贩阶段：配置现货价，支持全款预约时再填预约价。"
+    case .inStock: return "现货阶段：配置现货价。"
+    }
+  }
+}
+
 /// 上架状态机：`draft → listed ⇄ delisted`。`delisted` 可重新上架。
 nonisolated enum MidsummerListingStatus: String, Codable, CaseIterable, Sendable {
   case draft
@@ -44,6 +125,19 @@ nonisolated struct MidsummerListing: Codable, Identifiable, Equatable, Sendable 
   var balance: Int?
   /// `price` 的口径 raw。nil = 未填现货价。
   var priceKindRaw: String?
+  // MARK: 系列级上新信息（上新工作台第 1 步「类目与信息」，2026-09-16 改版新增）
+  // 全部可选 + 默认 nil：旧存档 JSON 解码不受影响（Codable 对可选字段走 decodeIfPresent）。
+  /// 上新阶段（图透 / 定金 / 尾款 / 出货 / 再贩 / 现货）。
+  var stageRaw: String? = nil
+  /// 系列标题（时间线上展示的主标题，30 字以内）。
+  var launchTitle: String? = nil
+  /// 是否已知确定上新日期；false = 待定 / 团长还没公布。
+  var hasKnownLaunchDate: Bool? = nil
+  /// 上新日期（`hasKnownLaunchDate == true` 时有效）。
+  var launchDate: Date? = nil
+  /// 定金区间下限 / 上限（元）。
+  var depositMin: Int? = nil
+  var depositMax: Int? = nil
   var note: String
   /// 原文出处（合规必填，Apple 5.2）。留空时转 DTO 回退到系列出处。
   var sourceURL: String
@@ -68,6 +162,11 @@ nonisolated struct MidsummerListing: Codable, Identifiable, Equatable, Sendable 
   var priceKind: MidsummerPriceKind? {
     get { priceKindRaw.flatMap(MidsummerPriceKind.init(rawValue:)) }
     set { priceKindRaw = newValue?.rawValue }
+  }
+
+  var stage: MidsummerLaunchStage? {
+    get { stageRaw.flatMap(MidsummerLaunchStage.init(rawValue:)) }
+    set { stageRaw = newValue?.rawValue }
   }
 
   static func newID() -> String {
