@@ -33,7 +33,8 @@ final class MidsummerBrandPageSnapshotTests: XCTestCase {
   /// 在 `ImageRenderer` 下没有活跃的更新周期，会触发
   /// `SwiftUICore/Logging.swift Fatal error: no current update to enqueue action to` 直接崩测试。
   /// 顶栏是非滚动容器，能稳定出图。
-  /// （2026-09-16 起顶栏不再有「上传上新」入口——上新上传统一走系列详情「上新管理」。）
+  /// （2026-09-17 起品牌首页顶栏右上角恢复常驻「上传上新」主操作按钮，
+  /// 上传流 = 选系列 → 四步 Stepper 表单；系列详情仍走「上新管理」。）
   @MainActor
   func testTopBarExportsSnapshot() throws {
     let view = MidsummerTopBar(
@@ -45,6 +46,36 @@ final class MidsummerBrandPageSnapshotTests: XCTestCase {
     )
     .background(Color.white)
     try render(view, name: "01-topbar", size: CGSize(width: 393, height: 64))
+  }
+
+  /// 品牌首页顶栏：右上角「上传上新」主操作入口（icon + 文字胶囊）。
+  @MainActor
+  func testTopBarWithUploadEntryExportsSnapshot() throws {
+    let view = MidsummerTopBar(
+      title: "仲夏物语",
+      subtitle: "Midsummer Tale · 2017 年创立",
+      showsBack: false,
+      onBack: {},
+      onClose: {},
+      onUpload: {}
+    )
+    .background(Color.white)
+    try render(view, name: "01a-topbar-upload", size: CGSize(width: 393, height: 64))
+  }
+
+  /// 小屏降级：320pt（iPhone SE 一代宽度）下标题先缩放再截断，按钮保持完整可点不重叠。
+  @MainActor
+  func testTopBarUploadEntryNarrowWidthExportsSnapshot() throws {
+    let view = MidsummerTopBar(
+      title: "仲夏物语三丽鸥家族合作联名系列",
+      subtitle: "Midsummer Tale · 2017 年创立",
+      showsBack: false,
+      onBack: {},
+      onClose: {},
+      onUpload: {}
+    )
+    .background(Color.white)
+    try render(view, name: "01b-topbar-upload-narrow", size: CGSize(width: 320, height: 64))
   }
 
   @MainActor

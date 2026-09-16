@@ -410,4 +410,51 @@ final class TimeHallEntryExplorationUITests: XCTestCase {
     capture("32-新版4步表单第一步")
     dumpHierarchy("32b-表单-层级", app: app)
   }
+
+  // MARK: - 用例 5：品牌首页右上角「上传上新」主操作入口（用户 2026-09-17）
+
+  @MainActor
+  func testE_BrandTopRightUploadEntry() throws {
+    let app = launchApp()
+    sleep(4)
+
+    guard enterTimeHall(app), enterBrand(app, index: 5) else { return }
+
+    // 顶栏右上角常驻入口：不上折叠菜单、不放二级弹窗。
+    let upload = app.buttons["brand-upload-entry"]
+    XCTAssertTrue(
+      upload.waitForExistence(timeout: 6) && upload.isHittable,
+      "品牌首页顶栏右上角应有可点的「上传上新」主操作入口"
+    )
+    capture("40-品牌首页右上角上传入口")
+
+    upload.tap()
+    sleep(2)
+
+    // 第一步：选系列（轻量选择器，点选后直达 4 步表单）。
+    let pickerTitle = app.navigationBars["选择要上新的系列"]
+    XCTAssertTrue(
+      pickerTitle.waitForExistence(timeout: 6),
+      "点「上传上新」应弹出「选择要上新的系列」选择器"
+    )
+    capture("41-选系列选择器")
+
+    let firstSeries = app.buttons.matching(
+      NSPredicate(format: "identifier BEGINSWITH %@", "upload-picker-series-")
+    ).firstMatch
+    XCTAssertTrue(firstSeries.exists, "选择器应列出可上新的系列")
+    firstSeries.tap()
+    sleep(2)
+
+    // 第二段：直达新版 4 步 Stepper 表单。
+    let saveDraft = app.buttons["listing-save-draft"]
+    let stepOne = app.descendants(matching: .any)
+      .matching(NSPredicate(format: "identifier == %@", "listing-step-0"))
+      .firstMatch
+    XCTAssertTrue(
+      saveDraft.waitForExistence(timeout: 6) || stepOne.exists,
+      "选完系列应直达新版 4 步上新表单"
+    )
+    capture("42-直达4步表单第一步")
+  }
 }
