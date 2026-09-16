@@ -38,9 +38,14 @@ final class TimeHallEntryExplorationUITests: XCTestCase {
 
   /// 统一入口：每次启动都重置创作者模式存档，保证用例之间互不污染。
   @MainActor
-  private func launchApp() -> XCUIApplication {
+  /// `enableCreatorMode`：开关本机创作者模式（模拟运营白名单放行）。
+  /// 双视角切换与上传入口只对它可见——普通用户两种都看不到。
+  private func launchApp(enableCreatorMode: Bool = false) -> XCUIApplication {
     let app = XCUIApplication()
     app.launchArguments += ["-ui-test-reset-creator-mode"]
+    if enableCreatorMode {
+      app.launchArguments += ["-ui-test-enable-creator-mode"]
+    }
     app.launch()
     dismissSystemPrompts(app)
     return app
@@ -433,10 +438,25 @@ final class TimeHallEntryExplorationUITests: XCTestCase {
 
   @MainActor
   func testE_BrandTopRightUploadEntry() throws {
-    let app = launchApp()
+    let app = launchApp(enableCreatorMode: true)
     sleep(4)
 
     guard enterTimeHall(app), enterBrand(app, index: 5) else { return }
+
+    // 双视角切换：默认用户视图，切到创作者视图后出现上传入口。
+    let creatorToggle = app.buttons["创作者视图"]
+    XCTAssertTrue(
+      creatorToggle.waitForExistence(timeout: 6),
+      "运营白名单应看到顶栏右上角的「用户 / 创作者」视角切换"
+    )
+    capture("40-双视角切换-默认用户视图")
+    XCTAssertFalse(
+      app.buttons["brand-upload-entry"].exists,
+      "用户视图下不应出现上传入口"
+    )
+    creatorToggle.tap()
+    sleep(1)
+    capture("41-切换到创作者视图")
 
     // 顶栏右上角常驻入口：不上折叠菜单、不放二级弹窗。
     let upload = app.buttons["brand-upload-entry"]
@@ -489,5 +509,29 @@ final class TimeHallEntryExplorationUITests: XCTestCase {
       "系列标题填完应能进入第②步（上新阶段）"
     )
     capture("43-新建系列-进入第②步")
+  }
+
+  // MARK: - 用例 6：普通用户看不到双视角切换与上传入口（用户 2026-09-17）
+
+  @MainActor
+  func testF_NormalUserSeesNoCreatorControls() throws {
+    let app = launchApp()
+    sleep(4)
+
+    guard enterTimeHall(app), enterBrand(app, index: 5) else { return }
+
+    XCTAssertFalse(
+      app.buttons["用户视图"].exists || app.buttons["创作者视图"].exists,
+      "普通用户不应看到创作者视图 / 用户视图的切换控件"
+    )
+    XCTAssertFalse(
+      app.buttons["创作者视图"].exists,
+      "普通用户不应看到「创作者」视角按钮"
+    )
+    XCTAssertFalse(
+      app.buttons["brand-upload-entry"].exists,
+      "普通用户不应看到上传入口"
+    )
+    capture("50-普通用户-无创作者控件")
   }
 }

@@ -47,6 +47,10 @@ struct ItemManagerApp: App {
         // Ensure NotificationManager is initialized to set the delegate
         _ = NotificationManager.shared
         _ = WardrobeNavigationStyle.normalizeStoredPreference()
+        // UI 测试的创作者模式启动参数必须在首帧渲染前生效：
+        // `CreatorMode.shared` 之前只在设置页被创建，导致门控读取的是上一次
+        // 运行残留的存档值，UI 用例之间互相污染（本轮踩过）。
+        _ = CreatorMode.shared
     }
     
     var body: some Scene {

@@ -55,6 +55,27 @@ final class MidsummerStore: ObservableObject {
   @Published private(set) var creatorGate: NoticeCloudKitService.CreatorGate = .unresolved(
     reason: "尚未判定"
   )
+  /// 双视角切换（创作者视图 / 用户视图）的可见性门控（用户 2026-09-17）。
+  ///
+  /// 只有运营白名单看得到这套切换与创作者能力；普通用户一律看不到。
+  /// 三态语义与 CloudKit 判定一致：
+  ///   · `allowed`    → 显示
+  ///   · `denied`     → **不显示**（明确不在白名单，本机开关也撬不开）
+  ///   · `unresolved` → 身份取不到（模拟器 / 未登录 iCloud / 断网），
+  ///                    此时允许本机「创作者模式」开关放行界面，便于内容维护者
+  ///                    在模拟器上核对创作者视图；真正的写入权限仍在 CloudKit
+  ///                    Security Roles（见 docs/MIDSUMMER_TALE_CLOUDKIT_SETUP.md §2）。
+  var canEnterCreatorView: Bool {
+    switch creatorGate {
+    case .allowed:
+      return true
+    case .denied:
+      return false
+    case .unresolved:
+      return CreatorMode.isEnabledInDefaults()
+    }
+  }
+
   /// 本次会话内成功上传、但云端还没回读到的条目（乐观更新用）
   @Published private(set) var pendingUploads: [MidsummerSeriesDTO] = []
 

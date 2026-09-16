@@ -26,6 +26,8 @@ struct MidsummerBrandView: View {
   /// 导航栈：同一页面可能从多个层级进入（首页卡片 → 系列详情 → 系列资料页），
   /// 用栈而不是单值路由，返回键才能总是回到「进入时的那一层」。
   @State private var path: [MidsummerRoute] = []
+  /// 双视角状态（用户 / 创作者）：同一套骨架按它切换交互与可编辑性。
+  @StateObject private var viewModeStore = MidsummerViewModeStore()
   /// 品牌首页右上角「上传上新」：直达新建系列的四步表单（不再选既有系列）。
   @State private var showingUploadForm = false
 
@@ -43,7 +45,9 @@ struct MidsummerBrandView: View {
           onBack: goBack,
           onClose: onClose,
           // 主操作入口常驻品牌首页右上角：不上折叠菜单、不放二级弹窗（用户 2026-09-17）。
-          onUpload: route == .home ? { showingUploadForm = true } : nil
+          onUpload: route == .home && viewModeStore.isCreator ? { showingUploadForm = true } : nil,
+          // 切换控件本身只对运营白名单渲染；普通用户既无切换也无上传入口。
+          viewMode: route == .home && store.canEnterCreatorView ? viewModeStore : nil
         )
 
         switch route {
@@ -80,6 +84,8 @@ struct MidsummerBrandView: View {
     .task {
       await store.refreshFromCloud()
     }
+    // 双视角状态向下传递：首页卡片 / 详情 / 规格面板读同一份真值。
+    .environmentObject(viewModeStore)
     .sheet(isPresented: $showingUploadForm) {
       // 直达新建系列（用户 2026-09-17）：series 传 nil 进入新建模式，
       // 提交时用第①步填写的系列档案创建自建系列并挂上新品。
@@ -150,8 +156,11 @@ struct MidsummerTopBar: View {
   let showsBack: Bool
   let onBack: () -> Void
   let onClose: (() -> Void)?
-  /// 非 nil 时在右上角显示「上传上新」主操作按钮（仅品牌首页传入）。
+  /// 非 nil 时右上角显示「上传上新」主操作按钮（仅品牌首页传入）。
   var onUpload: (() -> Void)? = nil
+  /// 双视角：非 nil 时右上角显示「用户 / 创作者」分段控件（仅品牌首页、
+  /// 且仅运营白名单可见；普通用户完全看不到，见 `MidsummerStore.canEnterCreatorView`）。
+  var viewMode: MidsummerViewModeStore? = nil
 
   var body: some View {
     HStack(spacing: 10) {
@@ -187,7 +196,33 @@ struct MidsummerTopBar: View {
 
       Spacer(minLength: 0)
 
-      if let onUpload {
+      // 双视角：切换控件在上，创作者视图下的「上传」入口在它正下方。
+      if let viewMode {
+        VStack(alignment: .trailing, spacing: 6) {
+          MidsummerViewModeSwitch(store: viewMode)
+          if viewMode.isCreator, let onUpload {
+            Button(action: onUpload) {
+              HStack(spacing: 4) {
+                Image(systemName: "plus.square.on.square")
+                  .font(.system(size: 11, weight: .bold))
+                Text("上传上新")
+                  .font(.system(size: 12, weight: .medium))
+              }
+              .foregroundStyle(MidsummerTheme.brandOrange)
+              .themeSkinLegibleText(level: .badge, slot: MidsummerThemeSlot.topBarAddButton)
+              .padding(.horizontal, 10)
+              .padding(.vertical, 6)
+              .background(MidsummerTheme.orangeSurface)
+              .clipShape(Capsule())
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("brand-upload-entry")
+            .accessibilityLabel("上传上新")
+            .transition(.move(edge: .trailing).combined(with: .opacity))
+          }
+        }
+        .animation(.easeOut(duration: 0.18), value: viewMode.mode)
+      } else if let onUpload {
         Button(action: onUpload) {
           HStack(spacing: 4) {
             Image(systemName: "plus.square.on.square")
@@ -217,6 +252,49 @@ struct MidsummerTopBar: View {
   }
 }
 
+// MARK: - 双视角切换（用户 2026-09-17）
+
+/// 顶栏右上角的两段式切换：当前视角高亮 + 图标，一眼可辨。
+/// 只对运营白名单渲染（调用方已按 `canEnterCreatorView` 门控）。
+struct MidsummerViewModeSwitch: View {
+  @ObservedObject var store: MidsummerViewModeStore
+
+  var body: some View {
+    HStack(spacing: 0) {
+      ForEach(MidsummerViewMode.allCases, id: \.self) { mode in
+        let isSelected = store.mode == mode
+        Button {
+          withAnimation(.easeOut(duration: 0.16)) { store.setMode(mode) }
+        } label: {
+          HStack(spacing: 3) {
+            Image(systemName: mode.iconSystemName)
+              .font(.system(size: 9, weight: .bold))
+            Text(mode.shortLabel)
+              .font(.system(size: 11, weight: .semibold))
+          }
+          .foregroundStyle(isSelected ? Color.white : MidsummerTheme.secondaryText)
+          .padding(.horizontal, 9)
+          .padding(.vertical, 5)
+          .background(
+            isSelected ? MidsummerTheme.brandOrange : MidsummerTheme.secondaryText.opacity(0.10),
+            in: Capsule()
+          )
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier(mode.accessibilityIdentifier)
+        .accessibilityLabel(mode.labelZH)
+        .accessibilityValue(isSelected ? "当前视角" : "")
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+      }
+    }
+    .padding(2)
+    // ⚠️ 容器上**不要**再挂 accessibilityIdentifier：SwiftUI 会把容器标识
+    // 合并给子按钮，两段按钮会同时报同一个 identifier，UI 测试无法区分
+    // （本轮踩过）。区分靠各自按钮上的 `mode.accessibilityIdentifier`。
+    .background(MidsummerTheme.secondaryText.opacity(0.08), in: Capsule())
+  }
+}
+
 // MARK: - 首页（对应图一）
 
 struct MidsummerHomeContent: View {
@@ -226,11 +304,15 @@ struct MidsummerHomeContent: View {
   let onOpenSeriesDetail: (String) -> Void
 
   @Environment(\.modelContext) private var modelContext
+  /// 双视角：同一套卡片骨架，创作者视图下点卡片进编辑态、并显示编辑角标。
+  @EnvironmentObject private var viewMode: MidsummerViewModeStore
 
   @State private var selectedYear: Int?
   @State private var selectedSeriesID: String?
   @State private var detailItem: MidsummerItemDTO?
   @State private var detailSeries: MidsummerSeriesDTO?
+  /// 创作者视图下点卡片 → 详情直接是可编辑表单，而不是只读展示。
+  @State private var detailStartsEditing = false
 
   /// 形态 A（一键入库）的进行中 / 已完成状态
   @State private var insertingItemID: String?
@@ -285,7 +367,13 @@ struct MidsummerHomeContent: View {
       // 但旧写法在 series 为 nil 时会呈现一个**完全空白的 sheet**（点进去一片白）。
       // 这里改为按 seriesID 回查，仍查不到才给明确空状态——任何情况下都不出白屏。
       if let series = detailSeries ?? store.series(withID: item.seriesID) {
-        MidsummerItemDetailSheet(series: series, item: item, brandName: brandName)
+        // 同一份详情组件：用户视图只读，创作者视图直接是可编辑表单。
+        MidsummerItemDetailSheet(
+          series: series,
+          item: item,
+          brandName: brandName,
+          startsEditing: detailStartsEditing
+        )
       } else {
         ContentUnavailableView(
           "找不到该单品所属系列",
@@ -501,11 +589,14 @@ struct MidsummerHomeContent: View {
       onTap: {
         detailSeries = series
         detailItem = item
+        // 创作者视图：点卡片 = 进入该商品的编辑态，不再只是浏览。
+        detailStartsEditing = viewMode.isCreator
       },
       // 「每个商品上提供直接加入衣橱的入口」——卡片右侧就是形态 A。
       onQuickInsert: { quickInsertToWardrobe(item: item, series: series) },
       isInserting: insertingItemID == item.id,
-      didInsert: insertedItemIDs.contains(item.id)
+      didInsert: insertedItemIDs.contains(item.id),
+      showsEditingBadge: viewMode.isCreator
     )
   }
 }
@@ -531,6 +622,11 @@ struct MidsummerItemCard: View {
   var onQuickInsert: (() -> Void)? = nil
   var isInserting: Bool = false
   var didInsert: Bool = false
+  /// 创作者视图下的可编辑提示角标（同一张卡片骨架，仅多一枚提示）。
+  var showsEditingBadge: Bool = false
+
+  /// 用户视图留白更足，创作者视图更紧凑（信息密度优先）——只改数值，不改结构。
+  private var contentSpacing: CGFloat { showsEditingBadge ? 10 : 12 }
 
   var body: some View {
     // 同 `TimeHallCommerceItemCard`：不能用「外层 Button 套内层 Button」。
@@ -567,12 +663,28 @@ struct MidsummerItemCard: View {
           }
         }
         .padding(.top, 5)
+
+        // 创作者视图：告诉你「点开直接编辑」，与用户视图的浏览预期区分开。
+        if showsEditingBadge {
+          HStack(spacing: 4) {
+            Image(systemName: "square.and.pencil")
+              .font(.system(size: 9, weight: .bold))
+            Text("点击编辑名称 / 图片 / 描述")
+              .font(.system(size: 10))
+          }
+          .foregroundStyle(MidsummerTheme.brandOrange)
+          .padding(.horizontal, 7)
+          .padding(.vertical, 3)
+          .background(MidsummerTheme.orangeSurface, in: Capsule())
+          .padding(.top, 6)
+          .accessibilityIdentifier("midsummer-card-edit-badge-\(item.id)")
+        }
       }
 
       wardrobeInsertButton
     }
     .padding(.horizontal, 12)
-    .padding(.vertical, 11)
+    .padding(.vertical, showsEditingBadge ? 11 : 14)
     .contentShape(Rectangle())
     .onTapGesture(perform: onTap)
     .themeSkinAdaptiveSectionCard(
@@ -851,9 +963,12 @@ struct MidsummerItemDetailSheet: View {
   let item: MidsummerItemDTO
   /// 入库时的品牌名。默认取品牌页固定的「仲夏物语」。
   var brandName: String = "仲夏物语"
+  /// 创作者视图下点开即编辑（用户 2026-09-17）：同一份组件，字段变可编辑 + 出现保存。
+  var startsEditing: Bool = false
 
   @Environment(\.dismiss) private var dismiss
   @Environment(\.modelContext) private var modelContext
+  @EnvironmentObject private var viewMode: MidsummerViewModeStore
 
   @State private var isInsertingToWardrobe = false
   @State private var quickInsertMessage: String?
@@ -861,6 +976,16 @@ struct MidsummerItemDetailSheet: View {
   @State private var showsSpecDrawer = false
   /// 抽屉的入库意图：详情页两个按钮共用同一个面板，只是主按钮的去向不同
   @State private var drawerIntent: MidsummerWardrobeInsertIntent = .quickInsert
+
+  // 编辑态：名称 / 描述 / 主图（创作者视图，用户 2026-09-17）。
+  @State private var isEditing = false
+  @State private var editedName: String = ""
+  @State private var editedNote: String = ""
+  @State private var isSaving = false
+  @State private var saveMessage: String?
+  /// 主图替换（PhotosPicker）：保存时与整条图片一起 publish。
+  @State private var coverPickerItem: PhotosPickerItem?
+  @State private var pickedCoverImage: UIImage?
 
   // 图片上传进度与提示（款式对应图的补录/更换/删除共用；白名单门控见 isAdminUser）：
   // 本弹层里的 `item` 是值拷贝，保存后背后列表交给 `refreshFromCloud()` 全量刷新。
@@ -992,9 +1117,56 @@ struct MidsummerItemDetailSheet: View {
           .accessibilityIdentifier("midsummer-detail-hero")
 
           VStack(alignment: .leading, spacing: 8) {
-            Text(item.name)
-              .font(.system(size: 17, weight: .semibold))
-              .foregroundStyle(MidsummerTheme.primaryText)
+            if isEditing {
+              // 创作者视图：同一块位置和层级，只是把静态文本换成输入控件。
+              VStack(alignment: .leading, spacing: 4) {
+                Text("商品名称")
+                  .font(.system(size: 11))
+                  .foregroundStyle(MidsummerTheme.secondaryText)
+                TextField("商品名称", text: $editedName)
+                  .textFieldStyle(.roundedBorder)
+                  .font(.system(size: 15, weight: .semibold))
+                  .accessibilityIdentifier("midsummer-detail-name-field")
+
+                Text("描述 / 备注")
+                  .font(.system(size: 11))
+                  .foregroundStyle(MidsummerTheme.secondaryText)
+                  .padding(.top, 6)
+                TextEditor(text: $editedNote)
+                  .font(.system(size: 13))
+                  .frame(minHeight: 76)
+                  .overlay(
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                      .stroke(MidsummerTheme.divider, lineWidth: 0.8)
+                  )
+                  .accessibilityIdentifier("midsummer-detail-note-field")
+
+                HStack(spacing: 10) {
+                  PhotosPicker(selection: $coverPickerItem, matching: .images) {
+                    Label(
+                      pickedCoverImage == nil ? "更换主图" : "已选新主图",
+                      systemImage: "photo.badge.plus"
+                    )
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(MidsummerTheme.brandOrange)
+                  }
+                  .accessibilityIdentifier("midsummer-detail-cover-picker")
+                  if pickedCoverImage != nil {
+                    Button("取消换图") { pickedCoverImage = nil; coverPickerItem = nil }
+                      .font(.system(size: 12))
+                  }
+                  Spacer(minLength: 0)
+                }
+                .padding(.top, 6)
+              }
+              .padding(10)
+              .background(MidsummerTheme.orangeSurface)
+              .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            } else {
+              Text(item.name)
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundStyle(MidsummerTheme.primaryText)
+            }
 
             Text(item.priceTextWithKind)
               .font(.system(size: 15, weight: .semibold))
@@ -1088,7 +1260,44 @@ struct MidsummerItemDetailSheet: View {
       .navigationBarTitleDisplayMode(.inline)
       .toolbar {
         ToolbarItem(placement: .topBarTrailing) {
-          Button("完成") { dismiss() }
+          if isEditing {
+            HStack(spacing: 12) {
+              if isSaving { ProgressView() }
+              Button("保存") { Task { await saveEdits() } }
+                .disabled(isSaving)
+                .accessibilityIdentifier("midsummer-detail-save")
+              Button("完成") { dismiss() }
+            }
+          } else {
+            HStack(spacing: 12) {
+              // 只有创作者视图（运营白名单）才给出编辑入口——用户视图是只读详情。
+              if viewMode.isCreator {
+                Button {
+                  withAnimation(.easeOut(duration: 0.18)) { isEditing = true }
+                } label: {
+                  Image(systemName: "square.and.pencil")
+                }
+                .accessibilityIdentifier("midsummer-detail-edit")
+                .accessibilityLabel("编辑商品")
+              }
+              Button("完成") { dismiss() }
+            }
+          }
+        }
+      }
+      .onAppear {
+        editedName = item.name
+        editedNote = item.note ?? ""
+        if startsEditing || viewMode.isCreator { isEditing = startsEditing || viewMode.isCreator }
+      }
+      .onChange(of: coverPickerItem) { _, newValue in
+        guard let newValue else { return }
+        coverPickerItem = nil
+        Task {
+          guard let data = try? await newValue.loadTransferable(type: Data.self),
+            let image = UIImage(data: data)
+          else { return }
+          pickedCoverImage = image
         }
       }
       .onChange(of: variantPhotoItem) { _, newValue in
@@ -1325,7 +1534,7 @@ struct MidsummerItemDetailSheet: View {
           .font(.system(size: 9))
           .foregroundStyle(MidsummerTheme.secondaryText)
       }
-      if MidsummerStore.shared.isAdminUser {
+      if viewMode.isCreator || MidsummerStore.shared.isAdminUser {
         HStack(spacing: 8) {
           PhotosPicker(
             selection: Binding(
@@ -1361,6 +1570,71 @@ struct MidsummerItemDetailSheet: View {
           }
         }
       }
+    }
+  }
+
+  // MARK: 创作者视图 · 保存编辑（用户 2026-09-17）
+
+  /// 名称 / 描述 / 主图改动落库：与款式图上传同一条 publish 链路，
+  /// 保存后整页由 `refreshFromCloud()` 全量回读，用户视图立即看到新内容。
+  private func saveEdits() async {
+    guard !isSaving else { return }
+    isSaving = true
+    defer { isSaving = false }
+    do {
+      let trimmedName = editedName.trimmingCharacters(in: .whitespacesAndNewlines)
+      let updated = MidsummerItemDTO(
+        id: item.id,
+        seriesID: item.seriesID,
+        name: trimmedName.isEmpty ? item.name : trimmedName,
+        kind: item.kind,
+        price: item.price,
+        preorderPrice: item.preorderPrice,
+        deposit: item.deposit,
+        balance: item.balance,
+        priceKind: item.priceKind,
+        priceCapturedOn: item.priceCapturedOn,
+        priceNote: item.priceNote,
+        sizes: item.sizes,
+        colors: item.colors,
+        coverImage: item.coverImage,
+        galleryImageNames: item.galleryImageNames,
+        itemURL: item.itemURL,
+        sourceURL: item.sourceURL,
+        note: editedNote.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+          ? nil : editedNote,
+        sizeChartImages: item.sizeChartImages,
+        variantImageNames: workingVariantImages,
+        specGroups: item.specGroups,
+        skus: item.skus
+      )
+      // 主图替换：新图排在最前，其余图原位保留（publish 是整条重写）。
+      var images: [UIImage] = []
+      if let pickedCoverImage { images.append(pickedCoverImage) }
+      images += loadImages(workingImageNames)
+
+      let orderedKeys =
+        variantKeys
+        + workingVariantImages.keys.filter { !variantKeys.contains($0) }.sorted()
+      let entries: [(name: String, image: UIImage)] = orderedKeys.compactMap { key in
+        guard let fileName = workingVariantImages[key],
+          let existing = ImageManager.shared.loadImage(fileName: fileName)
+        else { return nil }
+        return (key, existing)
+      }
+
+      _ = try await MidsummerCloudService.shared.publish(
+        item: updated,
+        images: images,
+        sizeChartImage: nil,
+        variantImages: entries
+      )
+      saveMessage = "已保存，其他用户刷新后可见。"
+      isEditing = false
+      await MidsummerStore.shared.refreshFromCloud()
+      dismiss()
+    } catch {
+      saveMessage = "保存失败：\(error.localizedDescription)"
     }
   }
 
