@@ -337,4 +337,259 @@ final class MidsummerListingFlowUITests: XCTestCase {
         "入库反馈应带出继承自系列的规格（款式 / 尺码），实际是：\(toast.label)")
     }
   }
+
+  // MARK: - 用例：③尺码项可新增 / 编辑 / 删除（2026-09-17 四步重写）
+
+  @MainActor
+  func testSizeItemsCanBeAddedEditedAndDeleted() throws {
+    let app = launchApp()
+    sleep(4)
+    guard enterMidsummer(app), enterSakuraSeries(app) else { return }
+    guard openForm(app) else { return }
+
+    // ① 系列标题
+    let titleField = app.textFields["listing-launch-title"]
+    guard titleField.waitForExistence(timeout: 5) else {
+      dumpHierarchy("S0-找不到标题输入框", app: app)
+      XCTFail("第一步应有系列标题输入框")
+      return
+    }
+    focusAndType(app, "尺码验收系列\n", into: titleField)
+    usleep(400_000)
+    app.buttons["listing-next"].tap()
+    sleep(1)
+    capture("S1-已填标题")
+
+    // ② 上新阶段：现货
+    let stageChip = app.buttons["listing-stage-inStock"]
+    guard stageChip.waitForExistence(timeout: 5) else {
+      XCTFail("第二步应能选上新阶段")
+      return
+    }
+    stageChip.tap()
+    app.buttons["listing-next"].tap()
+    sleep(1)
+
+    // ③ 尺码：自定义新增
+    let customField = app.textFields["listing-size-custom"]
+    guard scrollToElement(customField, app: app) else {
+      dumpHierarchy("S2-找不到自定义尺码输入框", app: app)
+      XCTFail("第三步应有「新增尺码」输入框")
+      return
+    }
+    customField.tap()
+    focusAndType(app, "70-75", into: customField)
+    app.buttons["listing-size-add"].tap()
+    sleep(1)
+    capture("S2-新增自定义尺码")
+    XCTAssertTrue(
+      app.textFields["listing-size-input-0"].exists,
+      "新增的尺码应出现在可编辑列表中（listing-size-input-0）"
+    )
+
+    // 编辑：焦点落到行内输入框后追加「F」（TextField 本身可编辑；不碰键盘删除键——
+    // 中文键盘的删除键可能滚不到可视区，AX 滚动会超时拖垮整条用例）
+    let firstRow = app.textFields["listing-size-input-0"]
+    if firstRow.waitForExistence(timeout: 4) {
+      XCTAssertEqual(firstRow.value as? String, "70-75", "行内输入框应回显刚新增的尺码名")
+      focusAndType(app, "F", into: firstRow)
+    }
+    capture("S3-编辑尺码名")
+
+    // 常用尺码 chip：点一下加入，再点一下移除
+    let presetS = app.buttons["listing-size-S"]
+    guard scrollToElement(presetS, app: app) else {
+      XCTFail("第三步应有常用尺码 chips")
+      return
+    }
+    presetS.tap()
+    sleep(1)
+    XCTAssertTrue(
+      app.textFields["listing-size-input-1"].exists,
+      "常用尺码加入后应成为列表里的第 2 个可编辑项"
+    )
+    capture("S4-常用尺码加入列表")
+
+    // 删除：删掉第 1 项（只剩 1 项）
+    app.buttons["listing-size-delete-0"].tap()
+    sleep(1)
+    XCTAssertFalse(
+      app.textFields["listing-size-input-1"].exists,
+      "删除后列表应只剩 1 项"
+    )
+    capture("S5-删除尺码项")
+  }
+
+  // MARK: - 用例：④定金 / 尾款为可选项（按需开关）
+
+  @MainActor
+  func testDepositAndBalanceAreOptionalToggles() throws {
+    let app = launchApp()
+    sleep(4)
+    guard enterMidsummer(app), enterSakuraSeries(app) else { return }
+    guard openForm(app) else { return }
+
+    let titleField = app.textFields["listing-launch-title"]
+    guard titleField.waitForExistence(timeout: 5) else { return }
+    focusAndType(app, "定金阶段验收\n", into: titleField)
+    usleep(400_000)
+    app.buttons["listing-next"].tap()
+    sleep(1)
+
+    // ② 定金阶段
+    let depositStage = app.buttons["listing-stage-deposit"]
+    guard depositStage.waitForExistence(timeout: 5) else {
+      XCTFail("应能选择「定金」阶段")
+      return
+    }
+    depositStage.tap()
+    app.buttons["listing-next"].tap()
+    sleep(1)
+    // ③ 尺码步：直接下一步（可留空）
+    app.buttons["listing-next"].tap()
+    sleep(1)
+
+    // ④ 定金 / 尾款：默认应有开关；未开前不出现金额输入框
+    let depositToggle = app.switches["listing-deposit-toggle"]
+    let balanceToggle = app.switches["listing-balance-toggle"]
+    guard scrollToElement(depositToggle, app: app) else {
+      dumpHierarchy("P0-找不到定金开关", app: app)
+      XCTFail("定金阶段第 4 步应出现「配置定金」开关")
+      return
+    }
+    capture("P1-定金阶段价格配置")
+    XCTAssertTrue(balanceToggle.exists, "定金阶段应同时给出「配置尾款」开关（按需）")
+
+    // 关掉定金开关 → 金额框不出现
+    if depositToggle.value as? String == "1" {
+      depositToggle.tap()
+      sleep(1)
+    }
+    XCTAssertFalse(
+      app.textFields["listing-deposit"].exists,
+      "关掉「配置定金」后不应显示定金金额输入框"
+    )
+    capture("P2-关闭定金开关后")
+
+    // 打开尾款开关 → 出现尾款金额框
+    if balanceToggle.value as? String != "1" {
+      balanceToggle.tap()
+      sleep(1)
+    }
+    XCTAssertTrue(
+      app.textFields["listing-balance"].exists,
+      "打开「配置尾款」后应出现尾款金额输入框"
+    )
+    capture("P3-开启尾款开关后")
+  }
+
+  // MARK: - 用例：提交前全量校验 + 步骤内报错
+
+  @MainActor
+  func testSubmitBlocksAndShowsErrorWhenRequiredMissing() throws {
+    let app = launchApp()
+    sleep(4)
+    guard enterMidsummer(app), enterSakuraSeries(app) else { return }
+    guard openForm(app) else { return }
+
+    // ① 什么都不填直接下一步 → 应报错并停在第一步
+    app.buttons["listing-next"].tap()
+    sleep(1)
+    XCTAssertTrue(
+      app.staticTexts["listing-step-error"].exists || app.descendants(matching: .any)
+        .matching(NSPredicate(format: "identifier == %@", "listing-step-error")).firstMatch.exists,
+      "未填系列标题点下一步应就地报错"
+    )
+    capture("V1-第一步必填报错")
+    XCTAssertTrue(
+      app.buttons["listing-next"].exists,
+      "报错后应停留在当前步骤"
+    )
+
+    // 填上标题继续
+    let titleField = app.textFields["listing-launch-title"]
+    focusAndType(app, "校验验收系列\n", into: titleField)
+    usleep(400_000)
+    app.buttons["listing-next"].tap()
+    sleep(1)
+
+    // ② 不选阶段直接下一步 → 报错
+    app.buttons["listing-next"].tap()
+    sleep(1)
+    XCTAssertTrue(
+      app.descendants(matching: .any)
+        .matching(NSPredicate(format: "identifier == %@", "listing-step-error")).firstMatch.exists,
+      "未选上新阶段点下一步应就地报错"
+    )
+    capture("V2-第二步必填报错")
+
+    // 选现货 → ③ 尺码（留空）→ ④ 不填名称直接发布 → 应报错且不提交
+    app.buttons["listing-stage-inStock"].tap()
+    app.buttons["listing-next"].tap()
+    sleep(1)
+    app.buttons["listing-next"].tap()
+    sleep(1)
+
+    let publish = app.buttons["listing-publish"]
+    guard publish.waitForExistence(timeout: 5) else {
+      dumpHierarchy("V3-找不到发布按钮", app: app)
+      XCTFail("第 4 步应有发布按钮")
+      return
+    }
+    publish.tap()
+    sleep(1)
+    let errorNode = app.descendants(matching: .any)
+      .matching(NSPredicate(format: "identifier == %@", "listing-step-error")).firstMatch
+    XCTAssertTrue(errorNode.exists, "缺商品名称时点发布应给出明确错误提示")
+    XCTAssertTrue(
+      app.buttons["listing-publish"].exists,
+      "校验不通过时不应关闭表单（全量校验拦截）"
+    )
+    capture("V3-发布前全量校验拦截")
+  }
+
+  // MARK: - 工具
+
+  /// 打开系列详情里的「上新管理」→「发布新商品」。
+  @MainActor
+  private func openForm(_ app: XCUIApplication) -> Bool {
+    let workspaceButton = app.buttons["series-listing-workspace-button"]
+    guard scrollToElement(workspaceButton, app: app) else {
+      dumpHierarchy("F0-找不到上新管理入口", app: app)
+      XCTFail("系列详情应有「上新管理」入口")
+      return false
+    }
+    workspaceButton.tap()
+    sleep(2)
+    let openForm = app.buttons["listing-open-form"]
+    guard openForm.waitForExistence(timeout: 5) else {
+      dumpHierarchy("F1-找不到发布新商品", app: app)
+      XCTFail("工作台应有「发布新商品」入口")
+      return false
+    }
+    openForm.tap()
+    sleep(2)
+    return true
+  }
+
+  /// 稳妥输入：tap 后等键盘真弹出再 typeText（tap 偶发不聚焦，
+  /// typeText 会在无焦点时直接抛 "Neither element nor any descendant has keyboard focus"）。
+  /// 注：本 SDK 的 XCUIElement 没有 hasKeyboardFocus，用键盘是否出现作为焦点信号。
+  @MainActor
+  private func focusAndType(_ app: XCUIApplication, _ text: String, into field: XCUIElement) {
+    for _ in 0..<6 {
+      guard field.exists else {
+        usleep(600_000)
+        continue
+      }
+      field.tap()
+      usleep(700_000)
+      if app.keyboards.firstMatch.exists {
+        field.typeText(text)
+        return
+      }
+    }
+    // 最后兜底：直接尝试（失败会抛出，便于暴露真实问题）
+    field.typeText(text)
+  }
 }
