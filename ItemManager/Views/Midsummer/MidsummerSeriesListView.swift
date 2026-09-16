@@ -217,9 +217,7 @@ struct MidsummerSeriesDetailView: View {
   @State private var insertingItemID: String?
   @State private var insertedItemIDs: Set<String> = []
   @State private var insertToast: String?
-  /// 运营者补录（尺码表 / 价格表）：白名单门控，见 summaryCard 里的入口按钮
-  @State private var showingSupplement = false
-  /// 上新工作台（樱花小羊 · 用户 2026-09-16）：录入 / 图片 / 预览 / 上架状态管理。
+  /// 上新工作台（用户 2026-09-16）：主图/阶段/尺码/单品价格 4 步表单 + 上架管理。
   @State private var showingListingWorkspace = false
 
   private var series: MidsummerSeriesDTO? { store.series(withID: seriesID) }
@@ -270,15 +268,8 @@ struct MidsummerSeriesDetailView: View {
         MidsummerItemDetailSheet(series: series, item: item, brandName: brandName)
       }
     }
-    // 运营者补录：沿用投稿表单的补录模式（existingSeries 非空即补录），
-    // 白名单门控在按钮与表单内各有一道（isAdminUser / CloudKit 角色双重保险）。
-    .sheet(isPresented: $showingSupplement) {
-      if let series {
-        MidsummerContributeView(store: store, existingSeries: series)
-      }
-    }
-    // 上新工作台：canContribute 三态门控（与投稿入口同一套；模拟器里由
-    // 「创作者模式」开关解闸）。目前面向樱花小羊系列开放。
+    // 上新工作台：所有系列无条件开放（旧版 canContribute 三态门控已随投稿
+    // 表单一并移除，上新上传只保留这一条最新链路）。
     .sheet(isPresented: $showingListingWorkspace) {
       if let series {
         MidsummerListingWorkspaceView(store: store, series: series)
@@ -393,51 +384,31 @@ struct MidsummerSeriesDetailView: View {
         }
       }
 
-      // 运营者补充上传入口（方案设计 docs/上新咨询双方案设计.md §五）：
-      // 尺码表 / 价格表优先来自淘宝详情页采集，缺项时由白名单运营者在此补录。
-      if store.isAdminUser {
-        Button {
-          showingSupplement = true
-        } label: {
-          Label("补录尺码表 / 价格表", systemImage: "square.and.pencil")
-            .font(.system(size: 12, weight: .medium))
-            .foregroundStyle(MidsummerTheme.brandOrange)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 9)
-            .background(MidsummerTheme.orangeSurface)
-            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-        }
-        .buttonStyle(.plain)
-        .accessibilityIdentifier("series-supplement-button")
-        .accessibilityLabel("补录尺码表或价格表")
-      }
-
       // 上新工作台入口（用户 2026-09-16）：基于本系列的商品上传上新系统，
-      // 录入 → 图片 → 预览 → 上架，上架商品自动进系列 feed 并可一键加入衣橱。
-      // canContribute 三态门控：白名单 / 创作者模式；未开放的系列不显示入口。
-      if store.canContribute && series.id == MidsummerStyleChartData.ArchiveContent.seriesID {
-        Button {
-          showingListingWorkspace = true
-        } label: {
-          HStack {
-            Label("上新管理", systemImage: "plus.square.on.square")
-              .font(.system(size: 12, weight: .medium))
-            Spacer()
-            Text("已上架 \(MidsummerListingStore.shared.listedCount(inSeries: series.id))")
-              .font(.system(size: 10))
-              .foregroundStyle(MidsummerTheme.secondaryText)
-          }
-          .foregroundStyle(MidsummerTheme.brandOrange)
-          .frame(maxWidth: .infinity)
-          .padding(.vertical, 9)
-          .padding(.horizontal, 10)
-          .background(MidsummerTheme.orangeSurface)
-          .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+      // 主图与信息 → 上新阶段 → 尺码信息 → 单品与价格，上架商品自动进系列 feed
+      // 并可一键加入衣橱。2026-09-16 深夜起去掉门控：所有系列无条件开放，
+      // 上新上传统一只走这条最新链路（旧投稿表单已删除）。
+      Button {
+        showingListingWorkspace = true
+      } label: {
+        HStack {
+          Label("上新管理", systemImage: "plus.square.on.square")
+            .font(.system(size: 12, weight: .medium))
+          Spacer()
+          Text("已上架 \(MidsummerListingStore.shared.listedCount(inSeries: series.id))")
+            .font(.system(size: 10))
+            .foregroundStyle(MidsummerTheme.secondaryText)
         }
-        .buttonStyle(.plain)
-        .accessibilityIdentifier("series-listing-workspace-button")
-        .accessibilityLabel("上新管理")
+        .foregroundStyle(MidsummerTheme.brandOrange)
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 9)
+        .padding(.horizontal, 10)
+        .background(MidsummerTheme.orangeSurface)
+        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
       }
+      .buttonStyle(.plain)
+      .accessibilityIdentifier("series-listing-workspace-button")
+      .accessibilityLabel("上新管理")
     }
     .padding(14)
     .themeSkinAdaptiveSectionCard(

@@ -2,7 +2,7 @@
 //  TimeHallEntryExplorationUITests.swift
 //  ItemManagerUITests
 //
-//  真实交互验收：把「加入衣橱」「创作者上传」这几条链路在模拟器上走一遍并留证。
+//  真实交互验收：把「加入衣橱」「上新工作台入口」这几条链路在模拟器上走一遍并留证。
 //
 //  为什么需要它：`ImageRenderer` 快照只能证明版式渲染得出来，
 //  证不了「点得动、点对了、点完有反应」。本轮三个问题（入口看不见 / 点了没反应 /
@@ -13,8 +13,8 @@
 //    · 「⋯」更多 → label「更多操作」
 //    · 一键入库（卡片/详情） → label「一键入库」
 //    · 加入并编辑（详情页） → label「加入并编辑」
-//    · 仲夏物语页脚开启创作者模式 → identifier「midsummer-enable-creator-mode」
-//    · 设置页创作者模式开关 → identifier「settings-creator-mode-toggle」
+//    · 系列详情「上新管理」 → identifier「series-listing-workspace-button」
+//      （2026-09-16 深夜起免门控：旧创作者模式引导 / 顶栏「上传上新」/ 投稿表单已删除）
 //
 //  运行方式：
 //    xcodebuild test -scheme ItemManager \
@@ -170,10 +170,10 @@ final class TimeHallEntryExplorationUITests: XCTestCase {
     guard enterTimeHall(app), enterBrand(app, index: 5) else { return }
     capture("10-仲夏物语品牌页")
 
-    // 1) 默认（创作者模式关闭）顶栏不应出现上传入口
+    // 1) 顶栏不再有「上传上新」入口（旧投稿链路已删除，上新走系列详情「上新管理」）
     XCTAssertFalse(
       app.buttons["上传上新"].exists,
-      "创作者模式默认关闭时，顶栏不应出现「上传上新」"
+      "顶栏不应再出现「上传上新」（旧投稿链路已删除）"
     )
 
     // 2) 商品行右侧的加号现在是真按钮，不再只是装饰图标
@@ -324,92 +324,90 @@ final class TimeHallEntryExplorationUITests: XCTestCase {
     }
   }
 
-  // MARK: - 用例 4：创作者上传入口（本轮补的入口）
+  // MARK: - 用例 4：上新工作台入口（免门控直达 · 用户 2026-09-16 深夜改版）
 
+  /// 旧版 testD 验的是「创作者模式 → 顶栏上传上新 → 投稿表单」，该链路已整体删除。
+  /// 现在上新上传只有一条路：系列详情「上新管理」→ 上新工作台 → 4 步表单，
+  /// 且对所有用户无条件开放（不再需要创作者模式 / 白名单）。
   @MainActor
-  func testD_CreatorContributionEntry() throws {
+  func testD_ListingWorkspaceEntryWithoutGate() throws {
     let app = launchApp()
     sleep(4)
 
     guard enterTimeHall(app), enterBrand(app, index: 5) else { return }
 
-    // 默认关闭 → 顶栏没有入口，页脚应给出「开启创作者模式」的引导。
-    // 页脚在列表末尾，同样要滚到**可点**为止（`exists` 会是 true 但 y 在屏幕外）。
-    let enableEntry = app.buttons["midsummer-enable-creator-mode"]
-    var becameHittable = false
+    // 旧版页脚「开启创作者模式」引导应已删除
+    XCTAssertFalse(
+      app.buttons["midsummer-enable-creator-mode"].exists,
+      "页脚不应再有「开启创作者模式」引导（旧投稿链路已删除）"
+    )
+
+    // 经「全部商品 → 系列列表 → 樱花小羊」进系列详情（与 ListingFlowUITests 同路）
+    let allEntry = app.buttons["midsummer-entry-all-series"]
+    guard allEntry.waitForExistence(timeout: 6) else {
+      dumpHierarchy("30-找不到全部商品入口", app: app)
+      XCTFail("品牌页应有「全部商品」入口行")
+      return
+    }
+    allEntry.tap()
+    sleep(2)
+
+    let seriesRow = app.buttons
+      .matching(NSPredicate(format: "label BEGINSWITH %@", "樱花小羊，"))
+      .firstMatch
+    guard seriesRow.waitForExistence(timeout: 6) else {
+      dumpHierarchy("31-找不到樱花小羊系列行", app: app)
+      XCTFail("系列列表应有「樱花小羊」行")
+      return
+    }
+    seriesRow.tap()
+    sleep(2)
+
+    // 「上新管理」入口无条件出现：滚动到完整可见再点（dock 压住的按钮点了没反应）
+    let entry = app.buttons["series-listing-workspace-button"]
+    var tapped = false
     for _ in 0..<25 {
-      if enableEntry.exists && enableEntry.isHittable {
-        becameHittable = true
+      if entry.exists && isComfortablyVisible(entry, app: app) {
+        entry.tap()
+        tapped = true
         break
       }
       app.swipeUp()
       usleep(600_000)
     }
-
-    capture("30-页脚的创作者模式引导")
-    XCTAssertTrue(
-      becameHittable,
-      "默认关闭时，页脚应当有可见可点的「开启创作者模式」引导入口"
-    )
-    dumpHierarchy("31-页脚-层级", app: app)
-
-    guard becameHittable else { return }
-
-    enableEntry.tap()
-    sleep(1)
-    capture("32-开启确认弹窗")
-
-    let confirm = app.buttons["开启"]
-    XCTAssertTrue(confirm.waitForExistence(timeout: 5), "应当出现确认弹窗")
-    guard confirm.exists else {
-      dumpHierarchy("32b-没等到确认弹窗-层级", app: app)
+    capture("30-系列详情的上新管理入口")
+    XCTAssertTrue(tapped, "系列详情应有可见可点的「上新管理」入口（免门控）")
+    guard tapped else {
+      dumpHierarchy("30b-找不到上新管理入口-层级", app: app)
       return
     }
-    confirm.tap()
     sleep(2)
 
-    // 顶栏出现「上传上新」——注意此时页面在底部，要先滚回顶部
-    for _ in 0..<12 {
-      app.swipeDown()
-      usleep(300_000)
-    }
-    sleep(1)
-
-    let uploadEntry = app.buttons["上传上新"]
+    // 工作台要真的打开：锚点用首屏必然可见的「发布新商品」发布卡按钮
+    let publish = app.buttons["listing-open-form"]
     XCTAssertTrue(
-      uploadEntry.waitForExistence(timeout: 6),
-      "开启创作者模式后，顶栏应当出现「上传上新」入口"
+      publish.waitForExistence(timeout: 6),
+      "点「上新管理」应当打开上新工作台（含「发布新商品」入口）"
     )
-    capture("33-顶栏出现上传入口")
+    capture("31-上新工作台")
 
-    guard uploadEntry.exists else {
-      dumpHierarchy("33b-顶栏没有上传入口-层级", app: app)
+    guard publish.exists else {
+      dumpHierarchy("31b-工作台没打开-层级", app: app)
       return
     }
-    uploadEntry.tap()
+    publish.tap()
     sleep(2)
-    // 投稿页要真的打开。
-    // 投稿表单已改版为向导式（取消/存草稿 + 步骤条），没有导航栏标题；
-    // 锚点用首屏可见的「① 选择类目与基本信息」标题与「存草稿」按钮。
-    // （旧的 `navigationBars["上传上新"]` / 「系列名」锚点对应的是改版前 UI。）
-    XCTAssertTrue(
-      app.staticTexts["① 选择类目与基本信息"].exists || app.buttons["存草稿"].exists,
-      "点「上传上新」应当打开投稿页"
-    )
-    capture("36-投稿页")
-    dumpHierarchy("36b-投稿页-层级", app: app)
 
-    // 再确认表单本身是完整的（含必填的原文出处），只是要滚动才看得到
-    var sawSourceField = false
-    for _ in 0..<10 {
-      if app.staticTexts["原文出处（必填）"].exists {
-        sawSourceField = true
-        break
-      }
-      app.swipeUp()
-      usleep(400_000)
-    }
-    XCTAssertTrue(sawSourceField, "投稿页表单应当包含必填的「原文出处」字段")
-    capture("37-投稿页-滚动到表单下半部分")
+    // 4 步表单第一步（新版）：锚点「取消 / 存草稿」顶栏 + 步骤条节点
+    let saveDraft = app.buttons["listing-save-draft"]
+    let stepOne = app.descendants(matching: .any)
+      .matching(NSPredicate(format: "identifier == %@", "listing-step-0"))
+      .firstMatch
+    XCTAssertTrue(
+      saveDraft.waitForExistence(timeout: 6) || stepOne.exists,
+      "点「发布新商品」应当打开新版 4 步上新表单（① 系列主图与信息）"
+    )
+    capture("32-新版4步表单第一步")
+    dumpHierarchy("32b-表单-层级", app: app)
   }
 }

@@ -23,12 +23,9 @@ struct MidsummerBrandView: View {
   var onClose: (() -> Void)?
 
   @ObservedObject private var store = MidsummerStore.shared
-  /// 观察创作者模式：开关一变，顶栏的「上传上新」入口立即出现/隐藏，无需重进页面。
-  @ObservedObject private var creatorMode = CreatorMode.shared
   /// 导航栈：同一页面可能从多个层级进入（首页卡片 → 系列详情 → 系列资料页），
   /// 用栈而不是单值路由，返回键才能总是回到「进入时的那一层」。
   @State private var path: [MidsummerRoute] = []
-  @State private var showingContribute = false
 
   private var route: MidsummerRoute { path.last ?? .home }
 
@@ -41,10 +38,8 @@ struct MidsummerBrandView: View {
           title: title,
           subtitle: subtitle,
           showsBack: !path.isEmpty,
-          canContribute: store.canContribute,
           onBack: goBack,
-          onClose: onClose,
-          onContribute: { showingContribute = true }
+          onClose: onClose
         )
 
         switch route {
@@ -77,9 +72,6 @@ struct MidsummerBrandView: View {
             .transition(pageTransition(forward: true))
         }
       }
-    }
-    .sheet(isPresented: $showingContribute) {
-      MidsummerContributeView(store: store)
     }
     .task {
       await store.refreshFromCloud()
@@ -147,10 +139,8 @@ struct MidsummerTopBar: View {
   let title: String
   let subtitle: String?
   let showsBack: Bool
-  let canContribute: Bool
   let onBack: () -> Void
   let onClose: (() -> Void)?
-  let onContribute: () -> Void
 
   var body: some View {
     HStack(spacing: 10) {
@@ -181,25 +171,6 @@ struct MidsummerTopBar: View {
       }
 
       Spacer(minLength: 0)
-
-      // 创作者上传入口：仅 admin 可见（合规闸门，见 docs 说明）
-      if canContribute {
-        Button(action: onContribute) {
-          HStack(spacing: 4) {
-            Image(systemName: "plus")
-              .font(.system(size: 11, weight: .bold))
-            Text("上传上新")
-              .font(.system(size: 12, weight: .medium))
-          }
-          .foregroundStyle(MidsummerTheme.brandOrange)
-          .themeSkinLegibleText(level: .badge, slot: MidsummerThemeSlot.topBarAddButton)
-          .padding(.horizontal, 9)
-          .padding(.vertical, 5)
-          .background(MidsummerTheme.orangeSurface)
-          .clipShape(Capsule())
-        }
-        .buttonStyle(.plain)
-      }
     }
     .padding(.horizontal, 12)
     .padding(.vertical, 8)
@@ -475,12 +446,6 @@ struct MidsummerHomeContent: View {
         .font(.system(size: 13))
         .foregroundStyle(MidsummerTheme.secondaryText)
         .themeSkinLegibleText(level: .inline, slot: MidsummerThemeSlot.emptyState)
-      if store.canContribute {
-        Text("可在右上角「上传上新」补充")
-          .font(.system(size: 11))
-          .foregroundStyle(MidsummerTheme.secondaryText)
-          .themeSkinLegibleText(level: .inline, slot: MidsummerThemeSlot.emptyState)
-      }
     }
     .frame(maxWidth: .infinity)
     .padding(.vertical, 44)
@@ -1457,16 +1422,9 @@ struct MidsummerItemDetailSheet: View {
 }
 
 // MARK: - 数据完整性说明（页脚）
-//
-// 这里同时承担第二个职责：**创作者模式的发现入口**。
-// 上传入口默认隐藏在顶栏之外（避免普通浏览者误入投稿页），如果不在页脚留一条可点的引导，
-// 内容维护者就得自己猜到「设置 → 创作者模式」才能开启——那和「找不到入口」没区别。
 
 struct MidsummerDataNote: View {
   @ObservedObject var store: MidsummerStore
-  @ObservedObject private var creatorMode = CreatorMode.shared
-
-  @State private var showsEnablePrompt = false
 
   var body: some View {
     VStack(alignment: .leading, spacing: 8) {
@@ -1483,59 +1441,9 @@ struct MidsummerDataNote: View {
         .font(.system(size: 10))
         .foregroundStyle(MidsummerTheme.secondaryText)
         .fixedSize(horizontal: false, vertical: true)
-
-      if store.canContribute {
-        HStack(spacing: 4) {
-          Image(systemName: "square.and.arrow.up")
-            .font(.system(size: 10, weight: .semibold))
-          Text(store.isAdminUser ? "点右上角「上传上新」补充缺项。" : "创作者模式已开启，点右上角「上传上新」补充缺项。")
-            .font(.system(size: 10))
-        }
-        .foregroundStyle(MidsummerTheme.brandOrange)
-      } else if store.creatorGate.isDefinitelyNotOperator {
-        // 明确不在白名单：不再给出「开启创作者模式」的引导——那个开关撬不开这个闸门，
-        // 给了按钮只会让人以为开关坏了。这里如实说明原因。
-        Text("本机 iCloud 账户不在运营白名单里，因此不显示上传入口。")
-          .font(.system(size: 10))
-          .foregroundStyle(MidsummerTheme.secondaryText)
-          .fixedSize(horizontal: false, vertical: true)
-          .accessibilityIdentifier("midsummer-creator-denied-note")
-      } else {
-        Button {
-          showsEnablePrompt = true
-        } label: {
-          HStack(spacing: 4) {
-            Image(systemName: "square.and.arrow.up")
-              .font(.system(size: 10, weight: .semibold))
-            Text("我是内容维护者，开启创作者模式以补充缺项")
-              .font(.system(size: 10, weight: .medium))
-          }
-          .foregroundStyle(MidsummerTheme.brandOrange)
-          .padding(.horizontal, 8)
-          .padding(.vertical, 5)
-          .background(MidsummerTheme.orangeSurface, in: Capsule())
-        }
-        .buttonStyle(.plain)
-        .accessibilityIdentifier("midsummer-enable-creator-mode")
-      }
     }
     .frame(maxWidth: .infinity, alignment: .leading)
     .padding(.horizontal, 14)
     .padding(.top, 18)
-    .confirmationDialog(
-      "开启创作者模式？",
-      isPresented: $showsEnablePrompt,
-      titleVisibility: .visible
-    ) {
-      Button("开启") { creatorMode.setEnabled(true) }
-      Button("取消", role: .cancel) {}
-    } message: {
-      Text(
-        "开启后，品牌页右上角会出现「上传上新」入口，用于补充缺失的上新系列与单品资料。\n\n"
-          + "该开关只在「取不到本机 iCloud 身份」时（模拟器、未登录 iCloud、断网）用来放行界面。"
-          + "如果本机账户已被明确判定为「不在运营白名单里」，入口一律不显示，这个开关也打不开它。\n\n"
-          + "能否真正写入线上内容库，取决于该 iCloud 账户是否已被加入 CloudKit 创作者名单。"
-      )
-    }
   }
 }

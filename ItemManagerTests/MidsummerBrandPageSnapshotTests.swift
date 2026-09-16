@@ -19,8 +19,7 @@ import XCTest
 ///       下拿不到真实内容，只能得到空框架。所以整页快照仅作冒烟，
 ///       真正能人工核对版式的是下面那些**非滚动容器**的区块快照。
 ///   (c) 被渲染的视图里若有 `.task { await … }` / `.onAppear { … }` 且会在渲染期写状态
-///       （例如 `MidsummerContributeView` 的 `.onAppear(perform: prefill)`、
-///       `MidsummerBrandView` 的 `.task { await store.refreshFromCloud() }`），会直接
+///       （例如 `MidsummerBrandView` 的 `.task { await store.refreshFromCloud() }`），会直接
 ///       触发 `SwiftUICore Fatal error: no current update to enqueue action to` 崩掉测试进程。
 ///       因此这两类页面**不要**整体丢进 `ImageRenderer`——只渲染无状态的区块组件。
 ///   (d) `renderer.isOpaque = true` 时，未被内容覆盖的区域会渲染成**黑色**。
@@ -28,41 +27,24 @@ import XCTest
 ///       否则快照会出现黑边、内容还会被垂直居中。
 final class MidsummerBrandPageSnapshotTests: XCTestCase {
 
-  // MARK: - 顶栏（含创作者上传入口的可见性闸门）
+  // MARK: - 顶栏
 
   /// 不渲染整页 `MidsummerBrandView`：它带 `.task { await store.refreshFromCloud() }`，
   /// 在 `ImageRenderer` 下没有活跃的更新周期，会触发
   /// `SwiftUICore/Logging.swift Fatal error: no current update to enqueue action to` 直接崩测试。
-  /// 顶栏是非滚动容器，既能稳定出图，又能核对「上传上新」入口的 admin 闸门。
+  /// 顶栏是非滚动容器，能稳定出图。
+  /// （2026-09-16 起顶栏不再有「上传上新」入口——上新上传统一走系列详情「上新管理」。）
   @MainActor
-  func testTopBarWithContributeEntryExportsSnapshot() throws {
+  func testTopBarExportsSnapshot() throws {
     let view = MidsummerTopBar(
       title: "仲夏物语",
       subtitle: "Midsummer Tale · 2017 年创立",
       showsBack: false,
-      canContribute: true,
       onBack: {},
-      onClose: {},
-      onContribute: {}
+      onClose: {}
     )
     .background(Color.white)
-    try render(view, name: "01-topbar-admin", size: CGSize(width: 393, height: 64))
-  }
-
-  /// 非 admin：同一个顶栏不应出现「上传上新」入口。
-  @MainActor
-  func testTopBarWithoutContributeEntryExportsSnapshot() throws {
-    let view = MidsummerTopBar(
-      title: "仲夏物语",
-      subtitle: "Midsummer Tale · 2017 年创立",
-      showsBack: false,
-      canContribute: false,
-      onBack: {},
-      onClose: {},
-      onContribute: {}
-    )
-    .background(Color.white)
-    try render(view, name: "01b-topbar-guest", size: CGSize(width: 393, height: 64))
+    try render(view, name: "01-topbar", size: CGSize(width: 393, height: 64))
   }
 
   @MainActor
@@ -85,11 +67,9 @@ final class MidsummerBrandPageSnapshotTests: XCTestCase {
 
   // MARK: - 可人工核对的区块快照（非滚动容器）
   //
-  // ⚠️ 这里**没有**贡献表单（`MidsummerContributeView`）的快照，是有意的：
-  // 它是 `NavigationStack { Form { … } }` —— `Form` 栅格化不出内容，
-  // 而且它的 `.onAppear(perform: prefill)` 会在渲染期写 `@State`，
-  // 直接触发 `SwiftUICore Fatal error: no current update to enqueue action to` 崩掉整个测试进程。
-  // 上传入口的验收改由 `MidsummerContributeViewTests` 做逻辑断言（见该文件）。
+  // ⚠️ 别把整页 Form/ScrollView 容器丢进 ImageRenderer：它们只渲染可视区框架，
+  // 且带 `.onAppear`/`.task` 写状态的页面会触发
+  // `SwiftUICore Fatal error: no current update to enqueue action to` 崩掉整个测试进程。
 
   /// 单行卡片是最容易看出「像不像参考图」的粒度，单独导一张。
   @MainActor

@@ -102,8 +102,6 @@ struct MidsummerSpecPanel: View {
 
   @State private var selection: MidsummerSpecSelection
   @State private var quantity: Int
-  /// 运营者补录（尺码表 / 价格表）入口：白名单门控，见 supplementEntry
-  @State private var showingSupplement = false
   /// 多选配一套：开启后款式组的点击改为「勾选/取消勾选」，确认时按勾选项
   /// 逐条生成单品级选择交给 `onMultiConfirm`。尺码 / 价格档位仍单选，
   /// 作为整套的共同规格（无尺码的小物会在入库时自动不带尺码）。
@@ -150,7 +148,6 @@ struct MidsummerSpecPanel: View {
             multiPicks: multiPicks
           )
           quantityRow
-          supplementEntry
         }
         .padding(.horizontal, 16)
         .padding(.top, 14)
@@ -411,43 +408,6 @@ struct MidsummerSpecPanel: View {
     .padding(.horizontal, 16)
     .padding(.top, 12)
     .padding(.bottom, 14)
-  }
-
-  // MARK: 运营者补录入口（docs/上新咨询双方案设计.md §五）
-  //
-  // 尺码表 / 价格表 / 单品图优先来自淘宝详情页采集；缺项时白名单运营者可从抽屉直接进入补录。
-  // 门控：isAdminUser（前端隐藏）+ CloudKit 创作者角色（后端写入权限），双保险。
-
-  private var needsSupplement: Bool {
-    item.sizes.isEmpty || !item.hasItemLevelPrice || item.coverImage == nil
-  }
-
-  @ViewBuilder
-  private var supplementEntry: some View {
-    if MidsummerStore.shared.isAdminUser, needsSupplement {
-      Button {
-        showingSupplement = true
-      } label: {
-        HStack(spacing: 6) {
-          Image(systemName: "square.and.pencil")
-            .font(.system(size: 11))
-          Text("该单品缺单品图、尺码表或价格——运营者点此补录")
-            .font(.system(size: 11, weight: .medium))
-          Spacer(minLength: 0)
-        }
-        .foregroundStyle(MidsummerTheme.brandOrange)
-        .padding(.horizontal, 10)
-        .padding(.vertical, 8)
-        .background(MidsummerTheme.orangeSurface)
-        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-      }
-      .buttonStyle(.plain)
-      .accessibilityIdentifier("spec-supplement-button")
-      .accessibilityLabel("运营者补录单品图、尺码表或价格表")
-      .sheet(isPresented: $showingSupplement) {
-        MidsummerContributeView(store: MidsummerStore.shared, existingSeries: series)
-      }
-    }
   }
 
   private var confirmTitle: String {

@@ -1,7 +1,7 @@
 import PhotosUI
 import SwiftUI
 
-// MARK: - 上新工作台（樱花小羊系列 · 用户 2026-09-16）
+// MARK: - 上新工作台（用户 2026-09-16，App 内唯一的上新上传链路）
 //
 // 围绕单个系列的「商品上传上新系统」，与衣橱深度结合：
 //   · 录入：名称 / 分类 / 关联款式 / 尺码 / 价格四档 / 备注 / 出处；
@@ -9,10 +9,10 @@ import SwiftUI
 //   · 状态管理：草稿 → 已上架 ⇄ 已下架，上架商品自动并入系列 feed——
 //     品牌页卡片、详情页、规格抽屉、一键入库（含多选配一套）全部走既有链路。
 //
-// 入口：系列详情页「上新管理」（`store.canContribute` 门控，与投稿入口同一套
-// 三态闸门；模拟器里用「创作者模式」开关或 UI 测试启动参数解闸）。
-// 视觉全部复用 MidsummerTheme 与投稿表单（MidsummerContributeView）的组件形态：
-// wizardCard 白卡、橙色主按钮、chip 多选、主图宫格，保证界面风格统一。
+// 入口：系列详情页「上新管理」，所有系列无条件开放（2026-09-16 深夜起去掉
+// canContribute 三态门控与樱花小羊限制；旧投稿表单 MidsummerContributeView 已删除）。
+// 视觉沿用 MidsummerTheme 的组件形态：wizardCard 白卡、橙色主按钮、chip 多选、
+// 主图宫格，保证界面风格统一。
 
 struct MidsummerListingWorkspaceView: View {
   @ObservedObject var store: MidsummerStore

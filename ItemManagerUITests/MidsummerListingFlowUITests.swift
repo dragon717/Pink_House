@@ -8,8 +8,8 @@
 //    → 上架商品出现在工作台列表（已上架）→ 出现在系列详情商品列表
 //    → 详情页一键入库（规格抽屉带出继承的款式组）。
 //
-//  门控：入口由 `store.canContribute` 把守，模拟器取不到 CloudKit 身份，
-//  用启动参数 `-ui-test-enable-creator-mode` 解闸（配套 CreatorMode 实现）。
+//  入口：系列详情「上新管理」对所有用户无条件开放（2026-09-16 深夜起去掉
+//  canContribute 门控，旧投稿表单已删除），无需任何启动参数解闸。
 //
 //  访问性标识契约（改产品代码时同步改本文件）：
 //    · 系列详情入口        → series-listing-workspace-button
@@ -40,7 +40,6 @@ final class MidsummerListingFlowUITests: XCTestCase {
   @MainActor
   private func launchApp() -> XCUIApplication {
     let app = XCUIApplication()
-    app.launchArguments += ["-ui-test-reset-creator-mode", "-ui-test-enable-creator-mode"]
     app.launch()
     dismissSystemPrompts(app)
     return app

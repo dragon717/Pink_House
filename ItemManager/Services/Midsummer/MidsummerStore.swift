@@ -49,31 +49,12 @@ final class MidsummerStore: ObservableObject {
   @Published private(set) var isRefreshingCloud = false
   /// CloudKit 管理员白名单的判定结果。模拟器 / 未登录 iCloud / 非白名单账号下为 false。
   @Published private(set) var isAdminUser = false
-  /// 三态白名单判定结果（含「取不到身份」这一态）。上传入口的显示门控看它。
+  /// 三态白名单判定结果（含「取不到身份」这一态）。
+  /// 2026-09-16 起只服务于 CloudKit 写入权限判定（`isAdminUser`），不再做任何
+  /// 界面门控——上新工作台入口对所有用户无条件开放。
   @Published private(set) var creatorGate: NoticeCloudKitService.CreatorGate = .unresolved(
     reason: "尚未判定"
   )
-  /// 上传入口的显示门控。
-  ///
-  /// 三态语义（使用者的明确要求：「不在白名单里就不该显示」）：
-  ///   · `allowed`    → 显示
-  ///   · `denied`     → **不显示**，本机「创作者模式」开关也不能撬开
-  ///   · `unresolved` → 身份取不到（模拟器 / 未登录 iCloud / 断网）。
-  ///                    此时不能等同于「不是运营」，否则内容维护者在模拟器上永远没有入口，
-  ///                    所以允许「创作者模式」开关解界面闸门。
-  ///
-  /// ⚠️ 只是**界面闸门**，不是安全边界——真正的写入权限在 CloudKit Console 的
-  /// Security Roles（见 docs/MIDSUMMER_TALE_CLOUDKIT_SETUP.md §2）。
-  var canContribute: Bool {
-    switch creatorGate {
-    case .allowed:
-      return true
-    case .denied:
-      return false
-    case .unresolved:
-      return CreatorMode.isEnabledInDefaults()
-    }
-  }
   /// 本次会话内成功上传、但云端还没回读到的条目（乐观更新用）
   @Published private(set) var pendingUploads: [MidsummerSeriesDTO] = []
 
