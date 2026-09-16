@@ -216,7 +216,8 @@ nonisolated enum MidsummerPriceKind: String, Codable, CaseIterable, Sendable {
 
   var labelZH: String {
     switch self {
-    case .shop: return "商品页价"
+    // 使用者口径：淘宝商品页直读的挂牌价就是「现货价」（用户 2026-09-16 定名）。
+    case .shop: return "现货价"
     case .reference: return "参考价"
     case .balance: return "尾款"
     }
@@ -270,6 +271,20 @@ nonisolated struct MidsummerItemDTO: Codable, Identifiable, Hashable, Sendable {
   /// 旧 Bundle 种子与旧 CloudKit 记录没有此字段，解码时自动为 nil（向后兼容）；
   /// 用 `var` + 默认值是为了让成员初始化器带默认参数，既有构造点无需改动。
   var sizeChartImageName: String? = nil
+
+  /// 款式尺码表条目：一个款式 + 它的尺码表图（数组保序，按分类顺序展示）。
+  struct SizeChartEntry: Codable, Equatable, Hashable {
+    let style: String
+    let imageName: String
+  }
+
+  /// 款式尺码表：`款式 → 尺码表图`，一链接多款时每款各有一张（淘宝详情页按款式分列）。
+  ///
+  /// 与 `sizeChartImageName`（整条单品共用一张）是两个维度：归集型单品
+  /// （如「樱花小羊」9 款）各款尺码不同，一张表讲不清楚，必须按款式给。
+  /// 图多为 Bundle 种子静态素材（`seed-` 前缀，随包分发）；旧记录没有此字段，
+  /// 解码自动为 nil（向后兼容）。
+  var sizeChartImages: [SizeChartEntry]? = nil
 
   /// 款式对应图：`款式名 → 本地文件名`（每款一张主图，图2 的「粉色JSK / 粉色OP」样式）。
   ///
@@ -372,8 +387,22 @@ nonisolated struct MidsummerItemDTO: Codable, Identifiable, Hashable, Sendable {
   /// 归集商品的 `price` 为 nil、价格全在 SKU 表里，用这个判断才不会误报「缺价格」。
   var hasPrice: Bool { !effectivePrices.isEmpty || deposit != nil }
 
+  /// 尺码从小到大展示排序（用户 2026-09-16 要求）：XS < S < M < L < XL < XXL < F，
+  /// 认识不了的码（如「均码」「定制」）按原名排在后面、保持相对顺序。
+  /// 三坑尺码基本都落在这张表里；排序是**展示层**行为，不改存储顺序。
+  static func sortedSizeLabels(_ sizes: [String]) -> [String] {
+    let rank = ["XXS": 0, "XS": 1, "S": 2, "M": 3, "L": 4, "XL": 5, "XXL": 6, "XXXL": 7, "F": 8]
+    return sizes.enumerated().sorted { a, b in
+      let ra = rank[a.element.uppercased()] ?? 99
+      let rb = rank[b.element.uppercased()] ?? 99
+      if ra != rb { return ra < rb }
+      return a.offset < b.offset
+    }
+    .map(\.element)
+  }
+
   var sizesText: String {
-    sizes.isEmpty ? "尺码待补充" : sizes.joined(separator: " / ")
+    sizes.isEmpty ? "尺码待补充" : Self.sortedSizeLabels(sizes).joined(separator: " / ")
   }
 }
 
@@ -442,7 +471,7 @@ nonisolated struct MidsummerSeriesDTO: Codable, Identifiable, Hashable, Sendable
   }
 
   var sizesText: String {
-    sizes.isEmpty ? "尺码待补充" : sizes.joined(separator: " / ")
+    sizes.isEmpty ? "尺码待补充" : MidsummerItemDTO.sortedSizeLabels(sizes).joined(separator: " / ")
   }
 
   /// `2024.02.09`

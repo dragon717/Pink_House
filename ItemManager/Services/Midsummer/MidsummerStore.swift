@@ -1,6 +1,5 @@
 import Combine
 import Foundation
-
 // MARK: - Bundle 种子
 //
 // `ItemManager/Resources/Midsummer/midsummer-series.json`
@@ -81,10 +80,20 @@ final class MidsummerStore: ObservableObject {
   private let seed: MidsummerCatalogDTO?
   private var cloudSeries: [MidsummerSeriesDTO] = []
   private var didStartCloudRefresh = false
+  /// 上新工作台（`MidsummerListingStore`）的变更订阅：上架 / 下架 / 编辑后
+  /// 立即重算 catalog，让系列 feed 跟着变，不需要手动刷新。
+  private var listingSubscription: AnyCancellable?
 
   init(bundle: Bundle = .main) {
     seed = MidsummerSeedCatalog.load(bundle: bundle)
     recomputeCatalog()
+    // 上新工作台存档变更 → 重算 feed。receive(on:) 跳出 willSet 时机，
+    // 保证重算读到的是**已落好**的新 listings，而不是变更前的旧值。
+    listingSubscription = MidsummerListingStore.shared.objectWillChange
+      .receive(on: DispatchQueue.main)
+      .sink { [weak self] _ in
+        Task { @MainActor [weak self] in self?.recomputeCatalog() }
+      }
     // 随包种子图 → 用户 Images 目录（幂等，后台执行不阻塞首屏）。
     // 导入完成后 nudge 一次：若视图在拷贝完成前已经渲染过封面/缩略图，
     // 让它们重新取图，避免首启停在占位图上。
@@ -191,6 +200,42 @@ final class MidsummerStore: ObservableObject {
     for series in seed.series { byID[series.id] = series }
     // 云端覆盖同 id（创作者校正），并补充新系列
     for series in cloudSeries { byID[series.id] = series }
+
+    // 上新工作台（用户 2026-09-16）：已上架的本地新品并入对应系列——
+    // 草稿 / 已下架不进 feed；下架重新上架自动回归。转换需要系列原单品
+    // 做规格继承（款式组 / 尺码组 / 尺码表），所以先合完系列再挂新单品。
+    let pendingListings = MidsummerListingStore.shared.listedListings
+    if !pendingListings.isEmpty {
+      var mergedByID: [String: MidsummerSeriesDTO] = [:]
+      for (id, series) in byID {
+        let listings = pendingListings.filter { $0.seriesID == id }
+        if listings.isEmpty {
+          mergedByID[id] = series
+        } else {
+          let sourceItem = series.items.first
+          let newItems = listings.map { $0.makeItemDTO(sourceItem: sourceItem, seriesSourceURL: series.sourceURL) }
+          mergedByID[id] = MidsummerSeriesDTO(
+            id: series.id,
+            name: series.name,
+            year: series.year,
+            launchedOn: series.launchedOn,
+            stage: series.stage,
+            coverImage: series.coverImage,
+            depositMin: series.depositMin,
+            depositMax: series.depositMax,
+            priceSource: series.priceSource,
+            sizes: series.sizes,
+            colors: series.colors,
+            summary: series.summary,
+            sourceURL: series.sourceURL,
+            sourceKind: series.sourceKind,
+            verified: series.verified,
+            items: series.items + newItems
+          )
+        }
+      }
+      byID = mergedByID
+    }
 
     let merged = byID.values.sorted { lhs, rhs in
       // 尚未确认上新日期的系列排在最前——它们正是最需要创作者补充的一批

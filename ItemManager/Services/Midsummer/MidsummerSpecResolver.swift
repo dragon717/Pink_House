@@ -172,36 +172,53 @@ nonisolated enum MidsummerSpecResolver {
     return normalized(next, of: item)
   }
 
+  // MARK: - 必选组与标注组
+
+  /// 参与「必选」判定的组：SKU 表为空时是全部组；否则是**至少被一条 SKU 提及**的组。
+  ///
+  /// 背景（价格档位组，用户 2026-09-16）：「现货价 / 预约价 / 定金 / 尾款」这类
+  /// **标注组**不参与 SKU 组合（没有任何 SKU 提及它），只作为入库备注的档位标记。
+  /// 它与 `isAvailable` / `matchedSKU` 的「SKU 没提及 → 不构成否决」是同一条规则
+  /// 在**完整性**维度的延伸：没被 SKU 提及的组，也不该把「没选它」当成缺失——
+  /// 否则使用者点掉价格档位的已选项，顶部就会因为「未选全」丢失命中 SKU 的价格。
+  static func requiredGroups(of item: MidsummerItemDTO) -> [MidsummerSpecGroup] {
+    let groups = groups(of: item)
+    let table = skus(of: item)
+    guard !table.isEmpty else { return groups }
+    let mentioned = Set(table.flatMap { $0.options.keys })
+    return groups.filter { mentioned.contains($0.id) }
+  }
+
   // MARK: - 完整性
 
   static func isComplete(_ selection: MidsummerSpecSelection, of item: MidsummerItemDTO) -> Bool {
     let groups = groups(of: item)
     guard !groups.isEmpty else { return true }
-    return groups.allSatisfy { selection[$0.id] != nil }
+    return requiredGroups(of: item).allSatisfy { selection[$0.id] != nil }
   }
 
-  /// 还没选的组名，用于「请选择 尺码」这类提示。
+  /// 还没选的组名，用于「请选择 尺码」这类提示。标注组（SKU 未提及）不算缺失。
   static func missingGroupNames(_ selection: MidsummerSpecSelection, of item: MidsummerItemDTO) -> [String] {
-    groups(of: item)
+    requiredGroups(of: item)
       .filter { selection[$0.id] == nil }
       .map(\.name)
   }
 
   // MARK: - 展示值
 
-  /// 命中 SKU 表里的**完整**组合（缺组或组合不存在都返回 nil）。
+  /// 命中 SKU 表里的组合：该 SKU **提及的每一组**都与当前选择一致。
   ///
-  /// ⚠️ 与 `isAvailable` 必须是**同一条**规则：SKU 没提及的组不参与匹配。
-  /// 归集商品里「小物」这类款本来就**没有尺码**（它的 SKU 只有款式 + 颜色），
-  /// 早期这里要求每组都对上，结果小物永远命中不了自己的 SKU，
-  /// 明明写了价却退回「价格待补充」——和 `isAvailable` 的口径自相矛盾。
+  /// ⚠️ 与 `isAvailable` 是**同一条**规则：SKU 没提及的组（含没选的必选组、
+  /// 标注组）不构成否决。以前这里用 `isComplete` 做闸门，多选套装入库时
+  /// 「胸针（无尺码款，不写尺码）」被判不完整，命中不了自己 ¥59 的 SKU——
+  /// 无尺码小物必须在未选尺码时也能命中价格，所以闸门拿掉、逐组判定。
   static func matchedSKU(_ selection: MidsummerSpecSelection, of item: MidsummerItemDTO) -> MidsummerSKU? {
-    let groups = groups(of: item)
-    guard !groups.isEmpty, isComplete(selection, of: item) else { return nil }
+    let allGroups = groups(of: item)
+    guard !allGroups.isEmpty else { return nil }
     return skus(of: item).first { sku in
       // 一条约束都不写的 SKU 不构成「命中」，否则它会匹配掉所有选择。
       guard !sku.options.isEmpty else { return false }
-      return groups.allSatisfy { group in
+      return allGroups.allSatisfy { group in
         guard let constraint = sku.options[group.id] else { return true }
         return constraint == selection[group.id]
       }
@@ -343,5 +360,45 @@ nonisolated enum MidsummerSpecResolver {
       let picked = selection[variantGroup.id]
     else { return nil }
     return option(picked, in: variantGroup)?.name
+  }
+
+  // MARK: - 多选套装入库
+
+  /// 多选配一套（用户 2026-09-16）：为某个**已勾选**的款式选项生成单品级选择。
+  ///
+  /// 场景：粉色 SK 的 S 码 + 开衫 + 胸针配成一套 → 多选这些款式后一次入库，
+  /// 每个勾选项各落一条衣橱记录，凭共同的套装标记归为同一套。
+  ///
+  /// 其余组的勾选是否带上这条单品级选择，按两条规则：
+  ///   · **必选组**（尺码等）：只有该款式存在提及该组的 SKU 才沿用——
+  ///     小物/胸针这类无尺码款不该把「S码」写进它的记录；
+  ///   · **标注组**（价格档位等，`requiredGroups` 之外）：SKU 从不提及，
+  ///     恒定沿用——档位备注对套装里每一件都成立。
+  static func perVariantSelection(
+    for variantOptionID: String,
+    base: MidsummerSpecSelection,
+    of item: MidsummerItemDTO
+  ) -> MidsummerSpecSelection {
+    let allGroups = groups(of: item)
+    guard let variantGroup = allGroups.first(where: { $0.resolvedRole == .variant }),
+      variantGroup.options.contains(where: { $0.id == variantOptionID })
+    else { return base }
+
+    var selection = MidsummerSpecSelection()
+    selection[variantGroup.id] = variantOptionID
+    let requiredIDs = Set(requiredGroups(of: item).map(\.id))
+    let table = skus(of: item)
+
+    for group in allGroups where group.id != variantGroup.id {
+      guard let picked = base[group.id] else { continue }
+      let mentionedByVariant = table.contains { sku in
+        sku.options[variantGroup.id] == variantOptionID && sku.options[group.id] != nil
+      }
+      let isAnnotationGroup = !requiredIDs.contains(group.id)
+      if mentionedByVariant || isAnnotationGroup {
+        selection[group.id] = picked
+      }
+    }
+    return selection
   }
 }

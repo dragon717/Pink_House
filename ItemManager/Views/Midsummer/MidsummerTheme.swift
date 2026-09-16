@@ -175,22 +175,13 @@ struct MidsummerCoverView: View {
   var showsWatermark: Bool = true
 
   var body: some View {
-    ZStack {
-      if let url = remoteURL {
-        AsyncImage(url: url) { phase in
-          switch phase {
-          case .success(let image):
-            image.resizable().scaledToFill()
-          default:
-            placeholder
-          }
-        }
-      } else if let imageName, !imageName.isEmpty,
-        let resolved = Self.resolvedImage(named: imageName)
-      {
-        Image(uiImage: resolved).resizable().scaledToFill()
-      } else {
-        placeholder
+    // 用 GeometryReader 拿到调用方给的槽位尺寸，把 fill 图**显式钉进**该尺寸
+    // 再 `clipped()`：布局与绘制都不溢出。此前「ZStack + scaledToFill」会让
+    // 容器被图撑到原始比例高度——视觉上靠 clipShape 看似裁掉，实际布局溢出
+    // 压住上下文字，辅助功能 frame 也错（详情页头图盖住名称/价格 就是这么来的）。
+    GeometryReader { proxy in
+      ZStack {
+        coverContent(size: proxy.size)
       }
     }
     .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
@@ -198,6 +189,40 @@ struct MidsummerCoverView: View {
       RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
         .stroke(MidsummerTheme.divider, lineWidth: 0.5)
     )
+    // 立一个以组件自身（=槽位）为准的 a11y 元素：头图是装饰图，
+    // VoiceOver 只需要读到「这张图在这里」，不用逐个聚焦溢出内容。
+    .accessibilityElement(children: .ignore)
+  }
+
+  @ViewBuilder
+  private func coverContent(size: CGSize) -> some View {
+    if let url = remoteURL {
+      AsyncImage(url: url) { phase in
+        switch phase {
+        case .success(let image):
+          filled(image.resizable(), size: size)
+        default:
+          placeholder
+        }
+      }
+    } else if let imageName, !imageName.isEmpty,
+      let resolved = Self.resolvedImage(named: imageName)
+    {
+      filled(Image(uiImage: resolved).resizable(), size: size)
+    } else {
+      placeholder
+    }
+  }
+
+  /// fill 填满槽位后按槽位裁剪——溢出既不参与布局也不参与绘制。
+  /// `accessibilityHidden` 去掉 Image 自身的 a11y 元素：否则它会以未裁剪的
+  /// 图片比例 frame（方图 402×402）参与父级 a11y frame 合并，把 VoiceOver
+  /// 焦点框和自动化读到的头图范围带偏到槽位之外。
+  private func filled(_ base: Image, size: CGSize) -> some View {
+    base.scaledToFill()
+      .frame(width: size.width, height: size.height)
+      .clipped()
+      .accessibilityHidden(true)
   }
 
   private var remoteURL: URL? {

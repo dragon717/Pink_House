@@ -143,6 +143,16 @@ class PetViewModel: ObservableObject {
         }
     }
 
+    /// 发布 aiService：本方法（setupAIService）常在视图更新周期内被调用
+    /// （PetHomeView 的 onAppear/onChange → updateWardrobeContext → 这里），
+    /// 直接写 @Published 会触发 "Publishing changes from within view updates" 警告。
+    /// 推迟到本次更新周期结束后写入（下一 runloop tick），视图下一帧即可取到。
+    private func publishAIService() {
+        DispatchQueue.main.async { [weak self] in
+            self?.aiService = PetAIService.shared
+        }
+    }
+
     private func setupAIService() {
         let petName = status.displayName
 
@@ -159,7 +169,7 @@ class PetViewModel: ObservableObject {
                 if let dsApiKey = AIConfigManager.shared.dsApiKey {
                     print("    -> DeepSeek Key found: \(dsApiKey.prefix(4))...")
                     PetAIService.shared.updateConfiguration(role: currentPet.aiRole, petName: petName, apiKey: dsApiKey, provider: .deepSeek, wardrobeContext: self.wardrobeContext)
-                    self.aiService = PetAIService.shared
+                    publishAIService()
                     print("✅ [PetViewModel] 已启用 DeepSeek 模型")
                     return
                 } else {
@@ -170,7 +180,7 @@ class PetViewModel: ObservableObject {
                 if let minimaxKey = AIConfigManager.shared.minimaxApiKey {
                     print("    -> Minimax Key found: \(minimaxKey.prefix(4))...")
                     PetAIService.shared.updateConfiguration(role: currentPet.aiRole, petName: petName, apiKey: minimaxKey, provider: .minimax, wardrobeContext: self.wardrobeContext)
-                    self.aiService = PetAIService.shared
+                    publishAIService()
                     print("✅ [PetViewModel] 已启用 Minimax 模型")
                     return
                 } else {

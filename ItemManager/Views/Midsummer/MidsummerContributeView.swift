@@ -1362,6 +1362,7 @@ struct MidsummerContributeView: View {
       sourceURL: item.sourceURL,
       note: item.note,
       sizeChartImageName: uploaded.sizeChartImageName ?? item.sizeChartImageName,
+      sizeChartImages: item.sizeChartImages,
       variantImageNames: uploaded.variantImageNames.isEmpty ? item.variantImageNames : uploaded.variantImageNames,
       specGroups: item.specGroups,
       skus: item.skus

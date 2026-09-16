@@ -129,29 +129,41 @@ final class MidsummerPriceIntegrityTests: XCTestCase {
     let catalog = try loadSeed()
     let sakura = try XCTUnwrap(catalog.series(withID: "midsummer-2026-sakura-lamb"))
 
-    XCTAssertEqual(sakura.items.count, 1, "同一淘宝链接下的多款必须归集为一个商品")
-    let product = try XCTUnwrap(sakura.items.first)
+    // 两个淘宝链接（服装 item 1032370386538 + 小物 item 1031690555405）
+    // 合并为一个归集商品——不再单列小物条目。
+    XCTAssertEqual(sakura.items.count, 1, "两条淘宝链接合并为一个归集商品")
+    let product = try XCTUnwrap(
+      sakura.items.first { $0.id == "midsummer-2026-sakura-lamb" },
+      "主链接归集商品缺失")
 
-    XCTAssertEqual(product.variantCount, 16, "樱花小羊同一个链接内含 16 个颜色分类选项")
+    XCTAssertEqual(product.variantCount, 24, "合并条目含 24 个颜色分类选项（服装 16 + 小物 8）")
     XCTAssertNotNil(
       product.itemURL,
-      "归集商品必须留下那个唯一的商品链接，否则「统一到一个链接」无从体现"
-    )
+      "归集商品必须留下那个唯一的商品链接，否则「统一到一个链接」无从体现")
     XCTAssertTrue(
       product.specGroups?.contains { $0.resolvedRole == .variant } ?? false,
-      "归集商品必须用「款式」组把多款区分开"
-    )
+      "归集商品必须用「款式」组把多款区分开")
 
-    // 逐款商品页价必须落在 SKU 表里，且区间由它派生（淘宝采集 2026-09-16）
+    // 逐款商品页价必须落在 SKU 表里，且区间由它派生（淘宝采集 2026-09-16）。
+    // 合并后区间取两个页面的并集：服装 ¥119–999，小物 ¥59–149。
     let prices = Set((product.skus ?? []).compactMap(\.price))
     XCTAssertTrue(
-      prices.isSuperset(of: [119, 229, 279, 359, 369, 399, 449, 599, 699, 999]),
+      prices.isSuperset(of: [59, 119, 149, 229, 279, 359, 369, 399, 449, 599, 699, 999]),
       "逐款商品页价缺失或写错：实际 \(prices.sorted())"
     )
-    XCTAssertEqual(product.priceRange?.min, 119)
+    XCTAssertEqual(product.priceRange?.min, 59)
     XCTAssertEqual(product.priceRange?.max, 999)
-    XCTAssertEqual(product.priceText, "¥119–999")
-    XCTAssertEqual(sakura.priceRangeText, "¥119–999", "系列区间应派生自商品")
+    XCTAssertEqual(product.priceText, "¥59–999")
+
+    // 小物款式（草帽等）必须真的并入款式组，而不是只搬了 SKU
+    let styleNames = Set(
+      (product.specGroups ?? [])
+        .first { $0.resolvedRole == .variant }?
+        .options.map(\.name) ?? [])
+    XCTAssertTrue(styleNames.contains("现 草帽 生成色"), "小物的颜色分类选项应并入款式组")
+
+    // 系列区间与合并条目区间一致（两条链接共同派生）
+    XCTAssertEqual(sakura.priceRangeText, "¥59–999", "系列区间应派生自全部商品")
     XCTAssertNil(sakura.depositRangeText, "淘宝链接未给定金口径，不得虚构定金区间")
   }
 

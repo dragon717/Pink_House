@@ -205,6 +205,10 @@ struct MidsummerSeriesRow: View {
 struct MidsummerSeriesDetailView: View {
   @ObservedObject var store: MidsummerStore
   let seriesID: String
+  /// 系列资料页入口（款式分类与尺码表 / 链接原始信息）。
+  /// 由品牌页宿主注入导航闭包——本页不自己持有路由，保持与首页同一套导航栈。
+  var onOpenStyleChartCatalog: (() -> Void)? = nil
+  var onOpenLinkReport: (() -> Void)? = nil
 
   @Environment(\.modelContext) private var modelContext
 
@@ -215,6 +219,8 @@ struct MidsummerSeriesDetailView: View {
   @State private var insertToast: String?
   /// 运营者补录（尺码表 / 价格表）：白名单门控，见 summaryCard 里的入口按钮
   @State private var showingSupplement = false
+  /// 上新工作台（樱花小羊 · 用户 2026-09-16）：录入 / 图片 / 预览 / 上架状态管理。
+  @State private var showingListingWorkspace = false
 
   private var series: MidsummerSeriesDTO? { store.series(withID: seriesID) }
   private var brandName: String { store.catalog?.brandName ?? "仲夏物语" }
@@ -224,6 +230,7 @@ struct MidsummerSeriesDetailView: View {
       if let series {
         VStack(alignment: .leading, spacing: 0) {
           summaryCard(series)
+          archiveSection(series)
           priceTableSection(series)
           itemsSection(series)
           MidsummerDataNote(store: store)
@@ -268,6 +275,13 @@ struct MidsummerSeriesDetailView: View {
     .sheet(isPresented: $showingSupplement) {
       if let series {
         MidsummerContributeView(store: store, existingSeries: series)
+      }
+    }
+    // 上新工作台：canContribute 三态门控（与投稿入口同一套；模拟器里由
+    // 「创作者模式」开关解闸）。目前面向樱花小羊系列开放。
+    .sheet(isPresented: $showingListingWorkspace) {
+      if let series {
+        MidsummerListingWorkspaceView(store: store, series: series)
       }
     }
   }
@@ -397,6 +411,33 @@ struct MidsummerSeriesDetailView: View {
         .accessibilityIdentifier("series-supplement-button")
         .accessibilityLabel("补录尺码表或价格表")
       }
+
+      // 上新工作台入口（用户 2026-09-16）：基于本系列的商品上传上新系统，
+      // 录入 → 图片 → 预览 → 上架，上架商品自动进系列 feed 并可一键加入衣橱。
+      // canContribute 三态门控：白名单 / 创作者模式；未开放的系列不显示入口。
+      if store.canContribute && series.id == MidsummerStyleChartData.ArchiveContent.seriesID {
+        Button {
+          showingListingWorkspace = true
+        } label: {
+          HStack {
+            Label("上新管理", systemImage: "plus.square.on.square")
+              .font(.system(size: 12, weight: .medium))
+            Spacer()
+            Text("已上架 \(MidsummerListingStore.shared.listedCount(inSeries: series.id))")
+              .font(.system(size: 10))
+              .foregroundStyle(MidsummerTheme.secondaryText)
+          }
+          .foregroundStyle(MidsummerTheme.brandOrange)
+          .frame(maxWidth: .infinity)
+          .padding(.vertical, 9)
+          .padding(.horizontal, 10)
+          .background(MidsummerTheme.orangeSurface)
+          .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("series-listing-workspace-button")
+        .accessibilityLabel("上新管理")
+      }
     }
     .padding(14)
     .themeSkinAdaptiveSectionCard(
@@ -421,6 +462,38 @@ struct MidsummerSeriesDetailView: View {
         .foregroundStyle(MidsummerTheme.primaryText)
         .fixedSize(horizontal: false, vertical: true)
       Spacer(minLength: 0)
+    }
+  }
+
+  // MARK: 系列资料（款式分类与尺码表 / 链接原始信息）
+  //
+  // 这两份资料是按系列整理的（目前只有樱花小羊），原先挂在品牌页首页顶层，
+  // 与该系列的两个商品卡片分散在三行；合并入口后统一收进对应系列的详情页。
+  // 资料尚未整理的系列不显示该区块——不出现点进去空空如也的入口。
+
+  private func archiveSection(_ series: MidsummerSeriesDTO) -> some View {
+    Group {
+      if series.id == MidsummerStyleChartData.ArchiveContent.seriesID {
+        VStack(spacing: 0) {
+          MidsummerArchiveEntryRow(
+            title: "款式分类与尺码表",
+            subtitle:
+              "\(MidsummerStyleChartCatalog.loadFromBundle()?.categories.count ?? 0) 个分类 · 尺码表原图",
+            symbol: "ruler",
+            a11yID: "midsummer-entry-stylechart"
+          ) { onOpenStyleChartCatalog?() }
+          MidsummerArchiveEntryRow(
+            title: "链接原始信息",
+            // 链接数取自链接报告 JSON（两条淘宝来源合并在一个条目里，
+            // series.items.count 已不能反映真实链接数）。
+            subtitle:
+              "\(MidsummerLinkReport.loadFromBundle()?.links.count ?? 0) 个淘宝链接 · 原文转录",
+            symbol: "link",
+            a11yID: "midsummer-entry-linkreport"
+          ) { onOpenLinkReport?() }
+        }
+        .padding(.top, 10)
+      }
     }
   }
 
@@ -527,7 +600,7 @@ struct MidsummerSeriesDetailView: View {
         } else if let range = item.priceRange {
           let kindSuffix: String
           switch item.priceKind ?? item.variantPriceKind {
-          case .shop: kindSuffix = "（商品页价）"
+          case .shop: kindSuffix = "（现货价）"
           case .reference: kindSuffix = "（参考价）"
           case .balance, nil: kindSuffix = ""
           }
@@ -604,6 +677,9 @@ struct MidsummerSeriesDetailView: View {
           .foregroundStyle(MidsummerTheme.primaryText)
           .lineLimit(2)
           .multilineTextAlignment(.leading)
+          // 系列详情页里概览卡的系列名与商品行名可能同文案（如「樱花小羊」），
+          // UI 测试用这个 ASCII identifier 精确锁定商品行（中文 identifier 会被截断）。
+          .accessibilityIdentifier("midsummer-series-item-\(item.id)")
 
         HStack(spacing: 5) {
           Text(item.kind.shortLabel)

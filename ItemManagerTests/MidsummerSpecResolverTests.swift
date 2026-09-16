@@ -483,6 +483,101 @@ final class MidsummerSpecResolverTests: XCTestCase {
     XCTAssertEqual(selection["color"], "sk-white")
   }
 
+  // MARK: - 8. 多选配一套：单品级选择构造
+
+  /// 多选套装入库（用户 2026-09-16）：为每个勾选款式生成单品级选择——
+  /// 尺码只对「存在带尺码 SKU 的款式」沿用（小物不带尺码），
+  /// 价格档位这类标注组恒定沿用（对套装每件都成立的备注）。
+  func testPerVariantSelectionDropsSizeForSizelessVariants() {
+    let styleGroup = group("style", "颜色分类", role: .variant, [
+      option("sk-pink", "sk 粉色"), option("accessory", "胸针"),
+    ])
+    let sizeGroup = group("size", "尺码", role: .size, [option("s", "S码"), option("m", "M码")])
+    let pricing = group("pricing", "价格档位", role: .other, [
+      option("spot", "现货价"), option("deposit", "定金"),
+    ])
+    let item = makeItem(
+      specGroups: [styleGroup, sizeGroup, pricing],
+      skus: [
+        sku("sk-s", ["style": "sk-pink", "size": "s"], price: 449),
+        // 胸针没有尺码：SKU 只约束款式
+        sku("pin-only", ["style": "accessory"], price: 59),
+      ],
+      price: nil
+    )
+    let base = MidsummerSpecSelection(picks: [
+      "style": "sk-pink", "size": "s", "pricing": "spot",
+    ])
+
+    // 裙装款：尺码 + 档位都带上，命中自己的 SKU 价
+    let dress = MidsummerSpecResolver.perVariantSelection(for: "sk-pink", base: base, of: item)
+    XCTAssertEqual(dress["style"], "sk-pink")
+    XCTAssertEqual(dress["size"], "s")
+    XCTAssertEqual(dress["pricing"], "spot")
+    XCTAssertEqual(MidsummerSpecResolver.price(for: dress, of: item), 449)
+    XCTAssertEqual(MidsummerSpecResolver.wardrobeMapping(dress, of: item).sizes, "S码")
+
+    // 胸针款：不带尺码（SKU 表里它根本没有尺码），档位照带，命中自己的价
+    let pin = MidsummerSpecResolver.perVariantSelection(for: "accessory", base: base, of: item)
+    XCTAssertEqual(pin["style"], "accessory")
+    XCTAssertNil(pin["size"], "无尺码款不得把基础选择里的尺码写进记录")
+    XCTAssertEqual(pin["pricing"], "spot")
+    XCTAssertEqual(MidsummerSpecResolver.price(for: pin, of: item), 59)
+    XCTAssertEqual(MidsummerSpecResolver.wardrobeMapping(pin, of: item).sizes, "S, M, L, XL",
+      "尺码缺省时回退单品自带尺码，与单件入库同规则")
+  }
+
+  // MARK: - 7. 标注组（价格档位）：SKU 未提及的组可选、不挡价格
+
+  /// 「现货价 / 预约价 / 定金 / 尾款」不参与 SKU 组合（没有任何 SKU 提及）：
+  /// 不选它不算缺失、不影响默认选择与价格命中；选中值只进规格备注。
+  /// 用户 2026-09-16 加价格档位组时确立——否则点掉档位已选项，顶部会丢价格。
+  func testAnnotationGroupIsOptionalAndDoesNotBlockPrice() {
+    let pricingGroup = group("pricing", "价格档位", role: .other, [
+      option("spot", "现货价"), option("preorder", "预约价"),
+      option("deposit", "定金"), option("balance", "尾款"),
+    ])
+    let item = makeItem(
+      specGroups: [colorGroup, pricingGroup, sizeGroup],
+      skus: [
+        sku("white-l", ["color": "sk-white", "size": "l"], price: 449),
+        sku("pink-s", ["color": "sk-pink", "size": "s"], price: 449),
+      ],
+      price: nil
+    )
+
+    // 默认选择只含 SKU 提及的组，档位组不被强选
+    let def = MidsummerSpecResolver.defaultSelection(of: item)
+    XCTAssertEqual(def["color"], "sk-white")
+    XCTAssertEqual(def["size"], "l")
+    XCTAssertNil(def["pricing"], "SKU 未提及的标注组不该被默认选中")
+
+    // 不选档位 = 完整状态，不进缺失提示
+    XCTAssertTrue(MidsummerSpecResolver.isComplete(def, of: item))
+    XCTAssertEqual(MidsummerSpecResolver.missingGroupNames(def, of: item), [])
+
+    // 不选档位照样命中 SKU 价格（这是本次改动的根因回归）
+    XCTAssertEqual(MidsummerSpecResolver.price(for: def, of: item), 449)
+
+    // 选了档位：只进备注，不影响配色 / 尺码映射，也不影响价格
+    var picks = def.picks
+    picks["pricing"] = "spot"
+    let selection = MidsummerSpecSelection(picks: picks)
+    XCTAssertTrue(MidsummerSpecResolver.isComplete(selection, of: item))
+    XCTAssertEqual(MidsummerSpecResolver.price(for: selection, of: item), 449)
+    let mapping = MidsummerSpecResolver.wardrobeMapping(selection, of: item)
+    XCTAssertEqual(mapping.colors, "Sk白色")
+    XCTAssertEqual(mapping.sizes, "L")
+    XCTAssertEqual(mapping.specText, "Sk白色 / 现货价 / L")
+
+    // 档位组也能随时取消（点已选项 = 取消），取消后仍是完整状态
+    let cancelled = MidsummerSpecResolver.toggling(
+      groupID: "pricing", optionID: "spot", in: selection, of: item)
+    XCTAssertNil(cancelled["pricing"])
+    XCTAssertTrue(MidsummerSpecResolver.isComplete(cancelled, of: item))
+    XCTAssertEqual(MidsummerSpecResolver.price(for: cancelled, of: item), 449)
+  }
+
   /// 「允许不选中任何选项」：三组全清空之后仍然是合法状态，不能被悄悄补回来。
   func testEveryGroupCanBeLeftUnselected() {
     let item = makeItem(specGroups: [colorGroup, sizeGroup])
@@ -548,5 +643,29 @@ final class MidsummerSpecResolverTests: XCTestCase {
       "style": "dress", "color": "pink", "size": "m",
     ])
     XCTAssertEqual(MidsummerSpecResolver.price(for: dress, of: item), 152)
+  }
+
+  /// 多选套装入库走 extraNoteLines 写套装标记；不传时备注与旧版逐字一致。
+  func testMakeDraftAppendsExtraNoteLinesOnlyWhenProvided() throws {
+    let series = MidsummerSeriesDTO(
+      id: "series-1", name: "樱花小羊", year: 2026, launchedOn: "", stage: .inStock,
+      coverImage: nil, depositMin: nil, depositMax: nil, priceSource: nil,
+      sizes: [], colors: [], summary: nil,
+      sourceURL: "https://example.com", sourceKind: "public", verified: true, items: []
+    )
+    let plain = MidsummerWardrobeDraftBuilder.makeDraft(
+      for: makeItem(), series: series, brandName: "仲夏物语",
+      selection: .empty, quantity: 1, modelContext: context
+    )
+    XCTAssertFalse(plain.note.contains("套装入库"), "普通入库不得出现套装标记")
+
+    let setDraft = MidsummerWardrobeDraftBuilder.makeDraft(
+      for: makeItem(), series: series, brandName: "仲夏物语",
+      selection: .empty, quantity: 1,
+      extraNoteLines: ["套装入库：2026-09-16 18:00（2 件一套）", "套装成员：A、B"],
+      modelContext: context
+    )
+    XCTAssertTrue(setDraft.note.contains("套装入库：2026-09-16 18:00（2 件一套）"))
+    XCTAssertTrue(setDraft.note.hasSuffix("套装成员：A、B"), "套装行追加在备注末尾")
   }
 }

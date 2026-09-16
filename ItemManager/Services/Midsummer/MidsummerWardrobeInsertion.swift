@@ -27,12 +27,15 @@ enum MidsummerWardrobeDraftBuilder {
   ///     此时配色与尺码沿用单品自带值——这是卡片上「快速入库」的路径。
   ///   - quantity: 入库数量。**没有上限**，也不做任何库存校验（见
   ///     `MidsummerSpecResolver` 顶部的产品差异说明）。
+  ///   - extraNoteLines: 追加到备注末尾的行（多选套装入库用它写套装标记与成员，
+  ///     普通单件入库不传，保持备注与旧版逐字一致）。
   static func makeDraft(
     for item: MidsummerItemDTO,
     series: MidsummerSeriesDTO,
     brandName: String,
     selection: MidsummerSpecSelection = .empty,
     quantity: Int = 1,
+    extraNoteLines: [String] = [],
     modelContext: ModelContext
   ) -> ClothingEditDraft {
     let now = Date()
@@ -63,6 +66,7 @@ enum MidsummerWardrobeDraftBuilder {
     if !source.isEmpty {
       noteLines.append("原文出处：\(source)")
     }
+    noteLines.append(contentsOf: extraNoteLines)
 
     // 现货价 > 定金 > 尾款：与卡片上的价格展示口径一致。
     // 若当前规格组合在 SKU 表里有独立定价，以 SKU 价为准。

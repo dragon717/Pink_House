@@ -250,6 +250,14 @@ final class MidsummerCloudService {
         record["variantImageMap"] = json as CKRecordValue
       }
     }
+    // 款式尺码表映射（款式 → 本地文件名）。尺码表图以文件名引用（多为随包种子图，
+    // 每台设备都有），不随 record 传资产；映射序列化进 `sizeChartMap` 字符串字段。
+    if let chartMap = item.sizeChartImages, !chartMap.isEmpty,
+      let data = try? JSONEncoder().encode(chartMap),
+      let json = String(data: data, encoding: .utf8)
+    {
+      record["sizeChartMap"] = json as CKRecordValue
+    }
     try await save(record)
     return MidsummerPublishedImages(
       coverImageName: uploadedCoverName,
@@ -338,10 +346,23 @@ final class MidsummerCloudService {
       // 由 Bundle 种子 `midsummer-series.json` 提供规格组与 SKU 组合。
       // 见 docs/MIDSUMMER_TALE_SPEC_SELECTION.md「规格数据的三个来源」。
       sizeChartImageName: sizeChartImageName,
+      sizeChartImages: Self.decodeSizeChartMap(from: record),
       variantImageNames: variantImageNames,
       specGroups: nil,
       skus: nil
     )
+  }
+
+  /// 从 `sizeChartMap` 字符串字段还原款式尺码表映射。字段缺失/解析失败都返回 nil。
+  private nonisolated static func decodeSizeChartMap(from record: CKRecord)
+    -> [MidsummerItemDTO.SizeChartEntry]?
+  {
+    guard let json = record["sizeChartMap"] as? String,
+      let data = json.data(using: .utf8),
+      let entries = try? JSONDecoder().decode([MidsummerItemDTO.SizeChartEntry].self, from: data),
+      !entries.isEmpty
+    else { return nil }
+    return entries
   }
 
   /// 把随查询下载的尺码表资产（CKAsset 临时文件）复制进 ImageManager 的 Images 目录，

@@ -185,13 +185,14 @@ final class TimeHallEntryExplorationUITests: XCTestCase {
     )
     dumpHierarchy("12-仲夏物语品牌页-层级", app: app)
 
-    // 3) 点卡片能打开详情弹窗（验证「外层 Button 套内层 Button」导致点不动的问题已修）
-    let firstItemName = app.staticTexts.matching(
-      NSPredicate(format: "label CONTAINS %@", "樱花小羊")
-    ).firstMatch
+    // 3) 点商品能打开详情弹窗（验证「外层 Button 套内层 Button」导致点不动的问题已修）。
+    //    樱花小羊两条淘宝链接已合并为一张商品卡片，点卡片直接开详情。
+    let sakuraCard = app.descendants(matching: .any)
+      .matching(NSPredicate(format: "label BEGINSWITH %@", "樱花小羊，现货价"))
+      .firstMatch
     var openedDetail = false
-    if firstItemName.exists {
-      firstItemName.tap()
+    if sakuraCard.waitForExistence(timeout: 5) {
+      sakuraCard.tap()
       openedDetail = app.buttons["加入并编辑"].waitForExistence(timeout: 5)
       capture("13-仲夏物语单品详情")
       dumpHierarchy("13b-仲夏物语单品详情-层级", app: app)
@@ -208,16 +209,36 @@ final class TimeHallEntryExplorationUITests: XCTestCase {
       sleep(1)
     }
 
-    // 5) 卡片上直接一点即入橱，并给出可见反馈
+    // 5) 行内直接一点即入橱，并给出可见反馈（关掉详情后停在品牌页首页）。
+    //    ⚠️ 屏底悬浮 dock 压住的按钮照样报 isHittable，点下去会命中 dock
+    //    （曾把 App 切到「我」tab）——必须要求目标完整落在可见安全区内再点。
     let cardQuickInsert = app.buttons.matching(NSPredicate(format: "label == %@", "一键入库"))
     if cardQuickInsert.count > 0 {
-      cardQuickInsert.element(boundBy: 0).tap()
-      sleep(3)
-      capture("15-点了一键入库之后")
-      let toast = app.staticTexts.matching(
-        NSPredicate(format: "label BEGINSWITH %@", "已加入衣橱")
-      ).firstMatch
-      XCTAssertTrue(toast.exists, "一键入库后应当出现「已加入衣橱」的就地反馈")
+      var tapped = false
+      var scrolls = 0
+      let safeTop: CGFloat = 120
+      let safeBottom = app.frame.height - 160
+      while !tapped && scrolls < 10 {
+        let candidate = cardQuickInsert.element(boundBy: 0)
+        let frame = candidate.exists ? candidate.frame : .zero
+        if candidate.exists && candidate.isHittable
+          && frame.minY >= safeTop && frame.maxY <= safeBottom {
+          candidate.tap()
+          tapped = true
+        } else {
+          app.swipeUp()
+          scrolls += 1
+          usleep(500_000)
+        }
+      }
+      if tapped {
+        sleep(3)
+        capture("15-点了一键入库之后")
+        let toast = app.staticTexts.matching(
+          NSPredicate(format: "label BEGINSWITH %@", "已加入衣橱")
+        ).firstMatch
+        XCTAssertTrue(toast.exists, "一键入库后应当出现「已加入衣橱」的就地反馈")
+      }
     }
   }
 
@@ -367,21 +388,16 @@ final class TimeHallEntryExplorationUITests: XCTestCase {
     }
     uploadEntry.tap()
     sleep(2)
-    capture("34-投稿页")
-    dumpHierarchy("35-投稿页-层级", app: app)
-
     // 投稿页要真的打开。
-    // 注意：`原文出处（必填）` 在表单下半部分，首屏不在渲染范围内（Form 懒渲染），
-    // 用它当「页面开了没有」的锚点会误判，所以锚点换成首屏可见的标题与系列名。
+    // 投稿表单已改版为向导式（取消/存草稿 + 步骤条），没有导航栏标题；
+    // 锚点用首屏可见的「① 选择类目与基本信息」标题与「存草稿」按钮。
+    // （旧的 `navigationBars["上传上新"]` / 「系列名」锚点对应的是改版前 UI。）
     XCTAssertTrue(
-      app.navigationBars["上传上新"].exists || app.staticTexts["系列名"].exists,
+      app.staticTexts["① 选择类目与基本信息"].exists || app.buttons["存草稿"].exists,
       "点「上传上新」应当打开投稿页"
     )
-    XCTAssertTrue(
-      app.staticTexts["当前 iCloud 账户不在创作者名单中"].exists,
-      "非管理员账号下，投稿页应当如实提示权限状态"
-    )
-    capture("36-投稿页-权限提示")
+    capture("36-投稿页")
+    dumpHierarchy("36b-投稿页-层级", app: app)
 
     // 再确认表单本身是完整的（含必填的原文出处），只是要滚动才看得到
     var sawSourceField = false

@@ -597,14 +597,25 @@ class PetAIService: ObservableObject {
     
     func updateConfiguration(role: PetRole, petName: String, apiKey: String, provider: AIProvider = .deepSeek, wardrobeContext: String) {
         self.role = role
-        self.petName = petName
-        
+
         let cleanKey = cleanedPetAIAPIKey(apiKey) ?? ""
         self.apiKey = cleanKey
-        
+
         self.provider = provider
         self.updateSystemContext(wardrobeContext: wardrobeContext)
-        
+
+        // `petName` 是本方法唯一触碰的 @Published 属性，而调用链经常落在视图更新周期内：
+        // PetHomeView 的 onAppear/onChange → updateWardrobeContext → setupAIService → 这里，
+        // 设置页发的 "AISettingsChanged" 通知也会同步送达。立即写入会触发
+        // "Publishing changes from within view updates is not allowed"（未定义行为）。
+        // 修复：非发布属性（role/apiKey/provider）同步写，保证后续请求立即用上新配置；
+        // 发布写入推迟到本次更新周期结束后执行，值未变则跳过避免无谓的 objectWillChange。
+        if self.petName != petName {
+            DispatchQueue.main.async { [weak self] in
+                self?.petName = petName
+            }
+        }
+
         print("🔧 [PetAIService] Config Updated - Provider: \(provider), Role: \(role), KeyLen: \(cleanKey.count)")
         if !cleanKey.isEmpty {
             print("🔑 [PetAIService] Key Prefix: \(cleanKey.prefix(4))...")

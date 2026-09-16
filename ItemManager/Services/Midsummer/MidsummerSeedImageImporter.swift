@@ -12,7 +12,8 @@ import Foundation
 
 nonisolated enum MidsummerSeedImageImporter {
   /// 种子图文件名前缀（樱花小羊系列）。新增系列种子图时扩展该清单。
-  static let filePrefixes = ["seed-sakura-lamb-"]
+  /// `seed-sakura-lamb-` = 封面 / 款式对应图；`seed-sakura-chart-` = 按款式裁切的尺码表图。
+  static let filePrefixes = ["seed-sakura-lamb-", "seed-sakura-chart-", "seed-sakura-goods-"]
 
   static func importIfNeeded() async {
     let bundleFiles = Bundle.main.urls(forResourcesWithExtension: "jpg", subdirectory: nil)?

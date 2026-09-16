@@ -11,6 +11,10 @@ nonisolated enum MidsummerRoute: Equatable {
   case home
   case seriesList
   case seriesDetail(seriesID: String)
+  /// 款式分类与尺码表（原生资料页）
+  case styleChartCatalog
+  /// 链接原始信息（原生资料页）
+  case linkReport
 }
 
 // MARK: - 品牌页宿主
@@ -21,8 +25,12 @@ struct MidsummerBrandView: View {
   @ObservedObject private var store = MidsummerStore.shared
   /// 观察创作者模式：开关一变，顶栏的「上传上新」入口立即出现/隐藏，无需重进页面。
   @ObservedObject private var creatorMode = CreatorMode.shared
-  @State private var route: MidsummerRoute = .home
+  /// 导航栈：同一页面可能从多个层级进入（首页卡片 → 系列详情 → 系列资料页），
+  /// 用栈而不是单值路由，返回键才能总是回到「进入时的那一层」。
+  @State private var path: [MidsummerRoute] = []
   @State private var showingContribute = false
+
+  private var route: MidsummerRoute { path.last ?? .home }
 
   var body: some View {
     ZStack {
@@ -32,7 +40,7 @@ struct MidsummerBrandView: View {
         MidsummerTopBar(
           title: title,
           subtitle: subtitle,
-          showsBack: route != .home,
+          showsBack: !path.isEmpty,
           canContribute: store.canContribute,
           onBack: goBack,
           onClose: onClose,
@@ -41,8 +49,12 @@ struct MidsummerBrandView: View {
 
         switch route {
         case .home:
-          MidsummerHomeContent(store: store, onOpenSeriesList: { navigate(to: .seriesList) })
-            .transition(pageTransition(forward: true))
+          MidsummerHomeContent(
+            store: store,
+            onOpenSeriesList: { navigate(to: .seriesList) },
+            onOpenSeriesDetail: { navigate(to: .seriesDetail(seriesID: $0)) }
+          )
+          .transition(pageTransition(forward: true))
         case .seriesList:
           MidsummerSeriesListView(
             store: store,
@@ -50,7 +62,18 @@ struct MidsummerBrandView: View {
           )
           .transition(pageTransition(forward: true))
         case .seriesDetail(let seriesID):
-          MidsummerSeriesDetailView(store: store, seriesID: seriesID)
+          MidsummerSeriesDetailView(
+            store: store,
+            seriesID: seriesID,
+            onOpenStyleChartCatalog: { navigate(to: .styleChartCatalog) },
+            onOpenLinkReport: { navigate(to: .linkReport) }
+          )
+          .transition(pageTransition(forward: true))
+        case .styleChartCatalog:
+          MidsummerStyleChartCatalogView()
+            .transition(pageTransition(forward: true))
+        case .linkReport:
+          MidsummerLinkReportView()
             .transition(pageTransition(forward: true))
         }
       }
@@ -70,6 +93,8 @@ struct MidsummerBrandView: View {
     case .home: return store.catalog?.brandName ?? "仲夏物语"
     case .seriesList: return "全部系列"
     case .seriesDetail(let seriesID): return store.series(withID: seriesID)?.name ?? "系列详情"
+    case .styleChartCatalog: return "款式分类与尺码表"
+    case .linkReport: return "链接原始信息"
     }
   }
 
@@ -87,24 +112,25 @@ struct MidsummerBrandView: View {
     case .seriesDetail(let seriesID):
       guard let series = store.series(withID: seriesID) else { return nil }
       return series.launchedOn.isEmpty ? "上新日期待补充" : "\(series.launchDateText) 上新"
+    case .styleChartCatalog:
+      return "樱花小羊 · 15 类尺码资料"
+    case .linkReport:
+      return "淘宝商品页原文转录"
     }
   }
 
   // MARK: 导航
 
   private func navigate(to destination: MidsummerRoute) {
-    withAnimation(.easeInOut(duration: 0.22)) { route = destination }
+    withAnimation(.easeInOut(duration: 0.22)) { path.append(destination) }
   }
 
   private func goBack() {
-    switch route {
-    case .home:
+    guard !path.isEmpty else {
       onClose?()
-    case .seriesList:
-      navigate(to: .home)
-    case .seriesDetail:
-      navigate(to: .seriesList)
+      return
     }
+    withAnimation(.easeInOut(duration: 0.22)) { path.removeLast() }
   }
 
   private func pageTransition(forward: Bool) -> AnyTransition {
@@ -190,6 +216,8 @@ struct MidsummerTopBar: View {
 struct MidsummerHomeContent: View {
   @ObservedObject var store: MidsummerStore
   let onOpenSeriesList: () -> Void
+  /// 合并后的系列入口卡片 → 系列详情（同一系列的多个链接从详情页进入）
+  let onOpenSeriesDetail: (String) -> Void
 
   @Environment(\.modelContext) private var modelContext
 
@@ -212,8 +240,14 @@ struct MidsummerHomeContent: View {
     return store.allSeries.filter { $0.year == activeYear }
   }
 
-  private var feed: [(series: MidsummerSeriesDTO, item: MidsummerItemDTO)] {
-    store.itemFeed(year: activeYear, seriesID: selectedSeriesID)
+  /// 首页 feed 按系列归组：同一系列的多个商品链接（如樱花小羊 主链 + 小物链）
+  /// 合并为一张系列入口卡片，不再各自占一行——「三个条目指向同一系列」的
+  /// 旧布局会让人以为它们是三件不相关的商品。
+  private var visibleSeries: [MidsummerSeriesDTO] {
+    guard let activeYear else { return [] }
+    let inYear = store.allSeries.filter { $0.year == activeYear }
+    if let selectedSeriesID { return inYear.filter { $0.id == selectedSeriesID } }
+    return inYear
   }
 
   var body: some View {
@@ -377,6 +411,10 @@ struct MidsummerHomeContent: View {
       .contentShape(Rectangle())
     }
     .buttonStyle(.plain)
+    // 「全部商品」入口行的 ASCII identifier：UI 测试经「全部商品 → 系列列表 →
+    // 系列详情」这条路径访问资料页（合并后樱花小羊是单条目系列，首页卡片
+    // 直开单品详情，不再经过系列详情）。
+    .accessibilityIdentifier("midsummer-entry-all-series")
     .themeSkinAdaptiveSectionCard(
       slot: MidsummerThemeSlot.card,
       cornerRadius: 0,
@@ -394,11 +432,28 @@ struct MidsummerHomeContent: View {
   private var itemList: some View {
     ScrollView(.vertical, showsIndicators: false) {
       LazyVStack(spacing: 0) {
-        if feed.isEmpty {
+        if visibleSeries.isEmpty {
           emptyState
         } else {
-          ForEach(Array(feed.enumerated()), id: \.offset) { _, entry in
-            itemCard(series: entry.series, item: entry.item)
+          ForEach(visibleSeries) { series in
+            // 上新工作台（用户 2026-09-16）的单品 id 带 `midsummer-listing-` 命名空间。
+            // 单链接/组卡的判定只看**基础条目**——否则一上新就会把「樱花小羊」的
+            // 单品卡变成组卡，改变既有交互；上架新品以独立商品卡追加在本系列下方，
+            // 与原款同样可点详情、可一键入库。
+            let listingItems = series.items.filter { $0.id.hasPrefix(MidsummerListingItemIDPrefix) }
+            let baseItems = series.items.filter { !$0.id.hasPrefix(MidsummerListingItemIDPrefix) }
+            if baseItems.count == 1, let item = baseItems.first {
+              // 单链接系列：与原来一样直接展示商品卡片（点击 → 单品详情）
+              itemCard(series: series, item: item)
+            } else {
+              // 多链接系列：合并为一张系列入口卡片（点击 → 系列详情）
+              MidsummerSeriesGroupCard(series: series) {
+                onOpenSeriesDetail(series.id)
+              }
+            }
+            ForEach(listingItems, id: \.id) { item in
+              itemCard(series: series, item: item)
+            }
             Rectangle().fill(MidsummerTheme.divider).frame(height: 0.5)
           }
           MidsummerDataNote(store: store)
@@ -539,6 +594,11 @@ struct MidsummerItemCard: View {
       isEnabled: onQuickInsert != nil,
       action: { onQuickInsert?() }
     )
+    // 按单品 id 的 ASCII identifier：UI 测试可定点到某张卡片的入库按钮，
+    // 而不是「屏幕上第一个可见的一键入库」。
+    // 注意必须挂在按钮本身上——外层卡片是 accessibilityElement(children:.contain)
+    // 容器，挂在外部只会落到整卡元素上，查询会命中整卡而不是这颗按钮。
+    .accessibilityIdentifier("midsummer-card-insert-\(item.id)")
     .padding(.top, 36)
   }
   /// 价格用不同字号拼接，还原图一「小 ¥ + 大数字」的观感。
@@ -586,7 +646,7 @@ struct MidsummerItemCard: View {
   /// 归集商品的价格**全在 SKU 表里**，单品层的 `deposit` / `balance` 都是 nil，
   /// 光看「¥160–400」会被当成全款区间——而它其实是两款的尾款。
   ///
-  /// 只给**尾款**加前缀：参考价 / 商品页价虽然出处不同，但都是全款量级，
+  /// 只给**尾款**加前缀：参考价 / 现货价虽然出处不同，但都是全款量级，
   /// 卡片上一眼能看懂；尾款不是全款，不标出来就会让人按全款估预算。
   /// 完整口径（含「参考价」）在详情页的 `priceTextWithKind` 里给出。
   private var rangePrefix: String {
@@ -602,6 +662,152 @@ struct MidsummerItemCard: View {
       return "\(series.name) · 含 \(item.variantCount) 个款式"
     }
     return "\(series.name) · \(series.items.count) 款"
+  }
+}
+
+// MARK: - 系列入口合并卡片（多链接系列）
+//
+// 同一系列的多个商品链接（樱花小羊 主链 + 小物链）在首页合并为一张卡片：
+//   • 卡片外观与 MidsummerItemCard 同构（方图 + 徽章 + 名称 + 价格 + 尺码行），
+//     价格/尺码/款数取全系列派生口径（¥59–999 覆盖两个链接的全部款式）；
+//   • 点击整卡进入系列详情——两个链接、款式分类与尺码表、链接原始信息都在那里；
+//   • 右侧不放「一键入库 ⊕」：一键入库需要明确到具体商品，两个链接时替使用者
+//     静默挑一个就是以前的坑。入口收敛为「查看系列」，入库在详情页逐商品进行。
+
+struct MidsummerSeriesGroupCard: View {
+  let series: MidsummerSeriesDTO
+  let onTap: () -> Void
+
+  var body: some View {
+    HStack(alignment: .top, spacing: 10) {
+      MidsummerCoverView(imageName: series.coverImage, series: series)
+        .frame(width: 106, height: 106)
+
+      VStack(alignment: .leading, spacing: 0) {
+        HStack(alignment: .top, spacing: 5) {
+          MidsummerStageBadge(stage: series.stage)
+          Text(series.name)
+            .font(.system(size: 14, weight: .medium))
+            .foregroundStyle(MidsummerTheme.primaryText)
+            .lineLimit(2)
+            .multilineTextAlignment(.leading)
+          Spacer(minLength: 0)
+        }
+
+        Spacer(minLength: 6)
+
+        priceView
+
+        Text(subtitle)
+          .font(.system(size: 11))
+          .foregroundStyle(MidsummerTheme.secondaryText)
+          .lineLimit(1)
+
+        MidsummerSizesRow(sizes: series.sizes, compact: true)
+          .padding(.top, 5)
+      }
+
+      openSeriesButton
+    }
+    .padding(.horizontal, 12)
+    .padding(.vertical, 11)
+    .contentShape(Rectangle())
+    .onTapGesture(perform: onTap)
+    .themeSkinAdaptiveSectionCard(
+      slot: MidsummerThemeSlot.card,
+      cornerRadius: 0,
+      showsDecoration: false
+    ) {
+      MidsummerTheme.surface
+    }
+    .accessibilityElement(children: .contain)
+    .accessibilityLabel("\(series.name)，系列入口，\(series.items.count) 个商品链接，\(series.priceRangeText)")
+    .accessibilityIdentifier("midsummer-series-card-\(series.id)")
+  }
+
+  private var priceView: some View {
+    Group {
+      if let range = series.priceRange {
+        HStack(alignment: .firstTextBaseline, spacing: 0) {
+          Text("¥").font(.system(size: 12, weight: .semibold))
+          Text(range.min == range.max ? "\(range.min)" : "\(range.min)–\(range.max)")
+            .font(.system(size: 19, weight: .bold))
+        }
+        .foregroundStyle(MidsummerTheme.priceRed)
+      } else {
+        MidsummerPendingTag(text: "价格待补充")
+      }
+    }
+  }
+
+  private var subtitle: String {
+    let links = series.items.count
+    let variants = series.variantCount
+    if links > 1 && variants > 0 {
+      return "\(series.name) 系列 · \(links) 个链接 · 含 \(variants) 个款式"
+    }
+    return "\(series.name) 系列 · \(series.itemCountText)"
+  }
+
+  /// 与 MidsummerWardrobeIconButton 同一视觉规格的圆形入口（箭头语义 = 查看）。
+  /// 不是 Button：整卡点击已由 onTapGesture 承接，嵌套按钮会互相打架。
+  private var openSeriesButton: some View {
+    Image(systemName: "chevron.right")
+      .font(.system(size: 15, weight: .bold))
+      .foregroundStyle(.white)
+      .padding(8)
+      .background(MidsummerTheme.brandOrange, in: Circle())
+      .overlay { Circle().stroke(Color.white.opacity(0.9), lineWidth: 1) }
+      .shadow(color: .black.opacity(0.18), radius: 3, y: 1)
+      .padding(.top, 36)
+  }
+}
+
+// MARK: - 资料页入口行（款式分类与尺码表 / 链接原始信息）
+//
+// 原先挂在品牌页首页顶层——同一系列的内容散落在三行里；现统一收进系列详情页。
+// 视觉与 `allEntryRow`（全部商品入口）同一卡片样式。
+
+struct MidsummerArchiveEntryRow: View {
+  let title: String
+  let subtitle: String
+  let symbol: String
+  let a11yID: String
+  let action: () -> Void
+
+  var body: some View {
+    Button(action: action) {
+      HStack(spacing: 10) {
+        Image(systemName: symbol)
+          .font(.system(size: 14, weight: .medium))
+          .foregroundStyle(MidsummerTheme.brandOrange)
+        Text(title)
+          .font(.system(size: 14, weight: .medium))
+          .foregroundStyle(MidsummerTheme.primaryText)
+        Spacer(minLength: 0)
+        Text(subtitle)
+          .font(.system(size: 11))
+          .foregroundStyle(MidsummerTheme.secondaryText)
+        Image(systemName: "chevron.right")
+          .font(.system(size: 12, weight: .semibold))
+          .foregroundStyle(MidsummerTheme.secondaryText)
+      }
+      .padding(.horizontal, 14)
+      .padding(.vertical, 11)
+      .contentShape(Rectangle())
+    }
+    .buttonStyle(.plain)
+    .accessibilityIdentifier(a11yID)
+    .themeSkinAdaptiveSectionCard(
+      slot: MidsummerThemeSlot.card,
+      cornerRadius: 0,
+      showsDecoration: false
+    ) {
+      MidsummerTheme.surface
+    }
+    .overlay(alignment: .bottom) {
+      Rectangle().fill(MidsummerTheme.divider).frame(height: 0.5)
+    }
   }
 }
 
@@ -656,12 +862,9 @@ struct MidsummerItemDetailSheet: View {
   /// 抽屉的入库意图：详情页两个按钮共用同一个面板，只是主按钮的去向不同
   @State private var drawerIntent: MidsummerWardrobeInsertIntent = .quickInsert
 
-  // 单品图补录（对齐千牛发布路径：主图宫格，最多 5 张，第 1 张为主图；运营者白名单门控）：
-  // 本弹层里的 `item` 是值拷贝，保存后用 `uploadedImageNames` 乐观回显，
-  // 背后列表交给 `refreshFromCloud()` 全量刷新。
-  @State private var supplementPhotoItem: [PhotosPickerItem] = []
+  // 图片上传进度与提示（款式对应图的补录/更换/删除共用；白名单门控见 isAdminUser）：
+  // 本弹层里的 `item` 是值拷贝，保存后背后列表交给 `refreshFromCloud()` 全量刷新。
   @State private var isUploadingItemImage = false
-  @State private var uploadedImageNames: [String]?
   @State private var itemImageMessage: String?
   // 款式对应图（图2「粉色JSK / 粉色OP」样式）：每款一个独立图位，图与款式一一对应。
   @State private var uploadedVariantImageNames: [String: String]?
@@ -669,13 +872,9 @@ struct MidsummerItemDetailSheet: View {
   @State private var variantPickerTarget: String?
   @State private var variantPhotoItem: PhotosPickerItem?
 
-  /// 单品图片上限（与千牛发布宝贝一致：5 张，第 1 张为主图）
-  private static let maxItemImages = 5
-
-  /// 展示/编辑中的图片名列表：本会话已保存的 > 云端已回填的（主图 + 附图，按序）。
+  /// 详情头图与款式图整条重写时携带的图片名列表（主图 + 附图，按序）。
   private var workingImageNames: [String] {
-    if let uploadedImageNames { return uploadedImageNames }
-    return ([item.coverImage] + (item.galleryImageNames ?? [])).compactMap { $0 }
+    ([item.coverImage] + (item.galleryImageNames ?? [])).compactMap { $0 }
   }
 
   /// 图片名 → 本地 UIImage（供整条重写时把已有图一并带上）。
@@ -728,6 +927,53 @@ struct MidsummerItemDetailSheet: View {
     TabNavigationManager.shared.presentWardrobeCreation(with: draft)
   }
 
+  /// 多选配一套（用户 2026-09-16）：勾选的多件款式一次入库为**同一套**。
+  ///
+  /// 每个勾选项各落一条 `Clothing`（字段互不相同，合并成一条会丢数据），
+  /// 「同一套」由**共同的套装标记**体现：每条记录的备注里写
+  /// 「套装入库：<时间标记>（N 件一套）」+「套装成员：…」，按标记即可互相认定。
+  /// 复用既有单件链路（makeDraft → QuickInserter），字段口径完全一致；
+  /// 中途失败时已写入的成员保留（真实落库成功），失败原因进吐司。
+  private func quickInsertSetToWardrobe(selections: [MidsummerSpecSelection], quantity: Int) {
+    guard !isInsertingToWardrobe, !selections.isEmpty else { return }
+    isInsertingToWardrobe = true
+    defer { isInsertingToWardrobe = false }
+
+    let memberNames = selections.map { MidsummerSpecResolver.displayName(item, selection: $0) }
+    let marker = Self.setFormatter.string(from: Date())
+    let setLines = [
+      "套装入库：\(marker)（\(selections.count) 件一套）",
+      "套装成员：\(memberNames.joined(separator: "、"))",
+    ]
+    let countSuffix = quantity > 1 ? " ×\(quantity)" : ""
+
+    do {
+      for selection in selections {
+        let draft = MidsummerWardrobeDraftBuilder.makeDraft(
+          for: item,
+          series: series,
+          brandName: brandName,
+          selection: selection,
+          quantity: quantity,
+          extraNoteLines: setLines,
+          modelContext: modelContext
+        )
+        _ = try TimeHallWardrobeQuickInserter.insert(draft: draft, modelContext: modelContext)
+      }
+      quickInsertMessage =
+        "已加入衣橱：\(selections.count) 件一套\(countSuffix)（\(memberNames.joined(separator: "、"))）"
+    } catch {
+      quickInsertMessage = "加入失败：" + error.localizedDescription
+    }
+  }
+
+  /// 套装标记的时间戳（同批成员共享同一标记，凭备注互相认定一套）。
+  private static let setFormatter: DateFormatter = {
+    let formatter = DateFormatter()
+    formatter.dateFormat = "yyyy-MM-dd HH:mm"
+    return formatter
+  }()
+
   private func presentDrawer(_ intent: MidsummerWardrobeInsertIntent) {
     drawerIntent = intent
     withAnimation(.easeOut(duration: 0.2)) { showsSpecDrawer = true }
@@ -742,19 +988,10 @@ struct MidsummerItemDetailSheet: View {
           )
           .frame(height: 200)
           .frame(maxWidth: .infinity)
+          .clipped()
+          .accessibilityIdentifier("midsummer-detail-hero")
 
           VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 6) {
-              MidsummerStageBadge(stage: series.stage, filled: true)
-              Text(item.kind.shortLabel)
-                .font(.system(size: 10, weight: .semibold))
-                .foregroundStyle(MidsummerTheme.secondaryText)
-                .padding(.horizontal, 5)
-                .padding(.vertical, 1.5)
-                .background(MidsummerTheme.subtleFill)
-                .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
-            }
-
             Text(item.name)
               .font(.system(size: 17, weight: .semibold))
               .foregroundStyle(MidsummerTheme.primaryText)
@@ -763,16 +1000,42 @@ struct MidsummerItemDetailSheet: View {
               .font(.system(size: 15, weight: .semibold))
               .foregroundStyle(MidsummerTheme.priceRed)
 
-            if item.variantCount > 1 {
-              labeledRow("包含款式", value: "\(item.variantCount) 款（同一商品链接内可选）")
-            }
+            // 预约价（全款预约）与现货价是两档钱，单独成行；
+            // 没采集到就如实写「待补充」，不虚构。
+            labeledRow(
+              "预约价",
+              value: item.preorderPrice.map { "¥\($0)（全款预约）" } ?? "待补充")
+
             if !item.colors.isEmpty {
               labeledRow("配色", value: item.colors.joined(separator: " / "))
             }
             labeledRow("尺码", value: item.sizesText)
-            sizeChartSection
+
+            // 加入衣橱：与日牌商品详情页一致，两种形态并列、视觉权重对等。
+            // 两者都**先弹规格面板**再执行——对应淘宝「加入购物车」的交互。
+            // 位置（用户 2026-09-16）：移到「款式对应图」上方，先给行动入口再看款式图。
+            VStack(spacing: 7) {
+              TimeHallWardrobeInsertButtons(
+                isBusy: isInsertingToWardrobe,
+                onQuickInsert: { presentDrawer(.quickInsert) },
+                onOpenEditor: { presentDrawer(.openEditor) },
+                // 详情页弹在列表之上，背后卡片的同名按钮仍在层级里；
+                // 加前缀让 UI 测试能精确定位到详情页这一组。
+                identifierPrefix: "midsummer-detail"
+              )
+
+              if let quickInsertMessage {
+                Text(quickInsertMessage)
+                  .font(.system(size: 11))
+                  .foregroundStyle(MidsummerTheme.brandOrange)
+                  .transition(.opacity)
+              }
+            }
+            .padding(.top, 6)
+
+            // 「单品尺码表」折叠区已移除（用户 2026-09-16：与款式对应图组内嵌的
+            // 尺码表重复）——尺码表统一由 variantImageSection 各款式组下方承载。
             variantImageSection
-            itemImageSection
             if MidsummerSpecResolver.hasSpecs(item) {
               labeledRow("可选规格", value: MidsummerSpecResolver.groups(of: item).map(\.name).joined(separator: " / "))
             }
@@ -794,26 +1057,7 @@ struct MidsummerItemDetailSheet: View {
                 .padding(.top, 2)
             }
 
-            // 加入衣橱：与日牌商品详情页一致，两种形态并列、视觉权重对等。
-            // 两者都**先弹规格面板**再执行——对应淘宝「加入购物车」的交互。
-            VStack(spacing: 7) {
-              TimeHallWardrobeInsertButtons(
-                isBusy: isInsertingToWardrobe,
-                onQuickInsert: { presentDrawer(.quickInsert) },
-                onOpenEditor: { presentDrawer(.openEditor) },
-                // 详情页弹在列表之上，背后卡片的同名按钮仍在层级里；
-                // 加前缀让 UI 测试能精确定位到详情页这一组。
-                identifierPrefix: "midsummer-detail"
-              )
-
-              if let quickInsertMessage {
-                Text(quickInsertMessage)
-                  .font(.system(size: 11))
-                  .foregroundStyle(MidsummerTheme.brandOrange)
-                  .transition(.opacity)
-              }
-            }
-            .padding(.top, 6)
+            // 加入衣橱按钮已上移至「款式对应图」上方（用户 2026-09-16）。
 
             // 归集后的商品在同一个电商链接下展示，所以这里把「商品链接」单独给出；
             // 「原文出处」仍是资料出处（可能是资讯页），两者用途不同，不要合并。
@@ -847,12 +1091,6 @@ struct MidsummerItemDetailSheet: View {
           Button("完成") { dismiss() }
         }
       }
-      .onChange(of: supplementPhotoItem) { _, newValue in
-        guard !newValue.isEmpty else { return }
-        let picked = newValue
-        supplementPhotoItem = []
-        Task { await appendItemImages(picked) }
-      }
       .onChange(of: variantPhotoItem) { _, newValue in
         guard let newValue, let target = variantPickerTarget else { return }
         variantPhotoItem = nil
@@ -880,43 +1118,15 @@ struct MidsummerItemDetailSheet: View {
           },
           onClose: {
             withAnimation(.easeOut(duration: 0.2)) { showsSpecDrawer = false }
+          },
+          onMultiConfirm: { selections, quantity in
+            withAnimation(.easeOut(duration: 0.2)) { showsSpecDrawer = false }
+            quickInsertSetToWardrobe(selections: selections, quantity: quantity)
           }
         )
         .transition(.opacity)
       }
     }
-  }
-
-  /// 单品尺码表（双方案设计 §一.2 / §四）：
-  /// 有图 → 折叠面板展开即看；无图 → 如实标注「待补充」，不虚构数据。
-  /// 图片来源两处：淘宝详情页自动采集（scrapers/ 管线，经 CloudKit 下发）或运营者补录上传，
-  /// 两者最终都落在 `MidsummerItemDTO.sizeChartImageName` 这一个字段上。
-  @ViewBuilder
-  private var sizeChartSection: some View {
-    let chartName = item.sizeChartImageName
-      .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-      .flatMap { $0.isEmpty ? nil : $0 }
-    DisclosureGroup {
-      if let chartName, let image = ImageManager.shared.loadImage(fileName: chartName) {
-        Image(uiImage: image)
-          .resizable()
-          .scaledToFit()
-          .frame(maxWidth: .infinity)
-          .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-          .accessibilityIdentifier("midsummer-item-sizechart-image")
-      } else {
-        Label("尺码表待补充——运营者可在补录入口上传", systemImage: "ruler")
-          .font(.system(size: 11))
-          .foregroundStyle(MidsummerTheme.secondaryText)
-          .padding(.vertical, 4)
-          .accessibilityIdentifier("midsummer-item-sizechart-missing")
-      }
-    } label: {
-      Text("单品尺码表")
-        .font(.system(size: 12, weight: .medium))
-        .foregroundStyle(MidsummerTheme.primaryText)
-    }
-    .accessibilityIdentifier("midsummer-item-sizechart")
   }
 
   // MARK: 款式对应图（图2「粉色JSK / 粉色OP」样式）
@@ -943,260 +1153,214 @@ struct MidsummerItemDetailSheet: View {
     return colors.map { "\($0)\(item.kind.shortLabel)" }
   }
 
-  /// 款式对应图区块：每个款式一个独立图位（图 + 补录/更换/删除入口），
+  /// 按款式归组后的款式图数据：「现 sk 粉色 / 现 sk 蓝绿色」同属一族「sk」。
+  /// 归组规则（用户口径：同款不同色一类，内搭等独立款式各自一类）：
+  /// 选项名形如「现 <款式> <颜色>」——去掉「现」前缀后，最后一个 token 是颜色，
+  /// 其余拼接为款式族；族名与 `sizeChartImages.style` 大小写不敏感匹配，
+  /// 匹配上的族在其图片下方内嵌该款尺码表（图 2 注释口径：尺码表放归类好的图片下面）。
+  private struct VariantStyleGroup: Identifiable {
+    let family: String
+    let displayName: String
+    var keys: [String]
+    let chart: MidsummerItemDTO.SizeChartEntry?
+    var id: String { family }
+  }
+
+  private var variantStyleGroups: [VariantStyleGroup] {
+    let ordered =
+      variantKeys
+      + workingVariantImages.keys.filter { !variantKeys.contains($0) }.sorted()
+    var groups: [VariantStyleGroup] = []
+    var indexByFamily: [String: Int] = [:]
+    let charts = item.sizeChartImages ?? []
+    for key in ordered {
+      let tokens = key.split(separator: " ").map(String.init)
+      let family: String
+      if tokens.count >= 3, tokens.first == "现" {
+        family = tokens.dropFirst().dropLast().joined(separator: " ")
+      } else {
+        // 历史遗留命名（如「粉色OP」）没有三段结构，整名自成一组。
+        family = key
+      }
+      if let i = indexByFamily[family] {
+        groups[i].keys.append(key)
+      } else {
+        indexByFamily[family] = groups.count
+        let chart = charts.first { $0.style.lowercased() == family.lowercased() }
+        groups.append(
+          VariantStyleGroup(
+            family: family,
+            displayName: chart?.style ?? family,
+            keys: [key],
+            chart: chart
+          ))
+      }
+    }
+    return groups
+  }
+
+  /// 款式对应图区块：按款式归组展示（同款不同色同组），每组下方内嵌该款尺码表，
   /// 与下方整条单品共用的主图宫格是两个维度——图必须**归属到具体款式**，
   /// 而不是把所有图堆进同一个宫格。
   @ViewBuilder
   private var variantImageSection: some View {
-    let keys = variantKeys
-    let extraKeys = workingVariantImages.keys.filter { !keys.contains($0) }.sorted()
-    let allKeys = keys + extraKeys
-    if !allKeys.isEmpty {
+    let groups = variantStyleGroups
+    if !groups.isEmpty {
       VStack(alignment: .leading, spacing: 8) {
         Text("款式对应图")
           .font(.system(size: 12, weight: .medium))
           .foregroundStyle(MidsummerTheme.primaryText)
-        Text("每款一张专属图，与款式一一对应；不会混入下方整条商品的主图宫格。")
+        Text("同款不同色归为一组；每组下方附该款尺码表，对照查看不用来回翻。")
           .font(.system(size: 10))
           .foregroundStyle(MidsummerTheme.secondaryText)
 
-        ForEach(allKeys, id: \.self) { key in
-          variantImageRow(key)
+        ForEach(groups) { group in
+          variantStyleGroupSection(group)
         }
       }
     }
   }
 
-  private func variantImageRow(_ variant: String) -> some View {
-    let imageFile = workingVariantImages[variant]
-    return HStack(alignment: .center, spacing: 10) {
-      Group {
-        if let imageFile, let image = ImageManager.shared.loadImage(fileName: imageFile) {
-          Image(uiImage: image)
-            .resizable()
-            .scaledToFill()
-        } else {
-          ZStack {
-            MidsummerTheme.subtleFill
-            Image(systemName: "photo")
-              .font(.system(size: 18, weight: .light))
-              .foregroundStyle(MidsummerTheme.secondaryText)
-          }
-        }
-      }
-      .frame(width: 56, height: 56)
-      .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-      .accessibilityIdentifier("midsummer-variant-image-\(variant)")
-
-      VStack(alignment: .leading, spacing: 4) {
-        Text(variant)
+  /// 单个款式组：组标题（款式名 + 配色数）→ 各配色图行 → 该款尺码表。
+  private func variantStyleGroupSection(_ group: VariantStyleGroup) -> some View {
+    VStack(alignment: .leading, spacing: 4) {
+      HStack(spacing: 6) {
+        Text(group.displayName)
           .font(.system(size: 12, weight: .semibold))
-          .foregroundStyle(MidsummerTheme.primaryText)
-        if imageFile == nil {
-          Text("款式图待补充")
-            .font(.system(size: 10))
-            .foregroundStyle(MidsummerTheme.secondaryText)
-        }
-        if MidsummerStore.shared.isAdminUser {
-          HStack(spacing: 12) {
-            PhotosPicker(
-              selection: Binding(
-                get: { variantPickerTarget == variant ? variantPhotoItem : nil },
-                set: { newValue in
-                  variantPickerTarget = variant
-                  variantPhotoItem = newValue
-                }
-              ),
-              matching: .images
-            ) {
-              Label(
-                imageFile == nil ? "补录款式图" : "更换",
-                systemImage: imageFile == nil ? "photo.badge.plus" : "arrow.2.squarepath"
-              )
-              .font(.system(size: 11, weight: .medium))
-              .foregroundStyle(MidsummerTheme.brandOrange)
-            }
-            .disabled(isUploadingItemImage)
-            .accessibilityIdentifier("midsummer-variant-image-pick-\(variant)")
+          .foregroundStyle(MidsummerTheme.brandOrange)
+        Text("\(group.keys.count) 个配色")
+          .font(.system(size: 10))
+          .foregroundStyle(MidsummerTheme.secondaryText)
+        Spacer(minLength: 0)
+      }
+      .padding(.top, 4)
 
-            if imageFile != nil {
-              Button {
-                Task { await deleteVariantImage(variant) }
-              } label: {
-                Label("删除", systemImage: "trash")
-                  .font(.system(size: 11))
-                  .foregroundStyle(MidsummerTheme.secondaryText)
-              }
-              .disabled(isUploadingItemImage)
-              .accessibilityIdentifier("midsummer-variant-image-delete-\(variant)")
-            }
-
-            if isUploadingItemImage {
-              ProgressView()
-            }
-          }
+      // 配色图并排网格（用户 2026-09-16：可以并排，数量过多时可以多排）——
+      // 固定 3 列自适应等宽，选项多时 LazyVGrid 自动换行，一行放不下 3 个才折行。
+      LazyVGrid(
+        columns: [
+          GridItem(.flexible(), spacing: 10),
+          GridItem(.flexible(), spacing: 10),
+          GridItem(.flexible(), spacing: 10),
+        ],
+        alignment: .leading,
+        spacing: 10
+      ) {
+        ForEach(group.keys, id: \.self) { key in
+          variantImageCard(key)
         }
       }
-      Spacer(minLength: 0)
+
+      if let chart = group.chart {
+        groupSizeChartRow(chart)
+      }
     }
-    .padding(.vertical, 2)
   }
 
-  /// 单品图宫格 + 运营者补录入口（对齐千牛发布路径）。
-  ///
-  /// 展示：主图（第 1 张，带角标）+ 附图按序宫格；无图时如实标注「待补充」，
-  /// 且**始终保留上传位**。运营者（`MidsummerStore.shared.isAdminUser`）可
-  /// 多选追加（最多补到 5 张）、单张删除，保存走 `publish(item:images:)`
-  /// 以单品 id 为 recordID 整条重写——DTO 字段齐全，不会覆盖丢失已有数据。
-  private var itemImageSection: some View {
-    VStack(alignment: .leading, spacing: 8) {
-      Text("单品图片")
-        .font(.system(size: 12, weight: .medium))
-        .foregroundStyle(MidsummerTheme.primaryText)
-
-      let names = workingImageNames
-      if names.isEmpty {
-        Label("单品图待补充——运营者可在下方上传", systemImage: "photo")
+  /// 组内尺码表：只放图（款式名已由组标题给出），保留与逐款尺码表一致的
+  /// a11y 标识，保证两个入口的图都能被测试与辅助功能定位。
+  private func groupSizeChartRow(_ entry: MidsummerItemDTO.SizeChartEntry) -> some View {
+    Group {
+      if let image = ImageManager.shared.loadImage(fileName: entry.imageName) {
+        Image(uiImage: image)
+          .resizable()
+          .scaledToFit()
+          .frame(maxWidth: .infinity)
+          .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+          .accessibilityElement(children: .ignore)
+          .accessibilityLabel("尺码表 \(entry.style)")
+          .accessibilityIdentifier("midsummer-sizechart-\(entry.style)")
+      } else {
+        Label("该款式尺码表图缺失", systemImage: "ruler")
           .font(.system(size: 11))
           .foregroundStyle(MidsummerTheme.secondaryText)
-          .padding(.vertical, 4)
-          .accessibilityIdentifier("midsummer-item-image-missing")
-      } else {
-        LazyVGrid(columns: [GridItem(.adaptive(minimum: 88), spacing: 8)], spacing: 8) {
-          ForEach(names.indices, id: \.self) { index in
-            ZStack(alignment: .topTrailing) {
-              Group {
-                if let image = ImageManager.shared.loadImage(fileName: names[index]) {
-                  Image(uiImage: image)
-                    .resizable()
-                    .scaledToFill()
-                } else {
-                  MidsummerCoverView(imageName: names[index], series: nil)
-                }
-              }
-              .frame(height: 88)
-              .frame(maxWidth: .infinity)
-              .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-              .accessibilityIdentifier("midsummer-item-image-\(index)")
+          .padding(.vertical, 2)
+      }
+    }
+    .padding(.top, 2)
+    .padding(.bottom, 6)
+  }
 
-              if MidsummerStore.shared.isAdminUser, !isUploadingItemImage {
-                Button {
-                  Task { await deleteItemImage(at: index) }
-                } label: {
-                  Image(systemName: "xmark.circle.fill")
-                    .font(.system(size: 16))
-                    .foregroundStyle(.white)
-                    .shadow(radius: 2)
-                }
-                .accessibilityIdentifier("midsummer-item-image-delete-\(index)")
-              }
-            }
-            .overlay(alignment: .bottomLeading) {
-              if index == 0 {
-                Text("主图")
-                  .font(.system(size: 9, weight: .semibold))
-                  .foregroundStyle(.white)
-                  .padding(.horizontal, 5)
-                  .padding(.vertical, 2)
-                  .background(MidsummerTheme.brandOrange)
-                  .clipShape(Capsule())
-                  .padding(4)
-              }
+  /// 配色图卡片（网格单元）：方图在上、款式名在下，运营者操作按钮收纳在名字下方。
+  /// 与旧横排行（56pt 小图 + 右侧长文案）相比，并排网格一屏能同框更多配色，
+  /// 方便同款不同色对照（用户 2026-09-16 改版口径）。
+  private func variantImageCard(_ variant: String) -> some View {
+    let imageFile = workingVariantImages[variant]
+    // 展示名去掉「现 」前缀（用户 2026-09-16：款式名前的「现」字不要）；
+    // 注意「现货价」信息行不受影响。key 本身不动——图映射、identifier、
+    // 上传槽位仍用全名，只改这一处可见文案。
+    let displayName =
+      variant.hasPrefix("现 ")
+      ? String(variant.dropFirst("现 ".count))
+      : variant
+    return VStack(alignment: .leading, spacing: 4) {
+      // Color.clear 撑出正方形画布，图 scaledToFill 铺满后被圆角裁切；
+      // 直接在 Image 上加 aspectRatio 会和 scaledToFill 打架，这是稳定写法。
+      Color.clear
+        .aspectRatio(1, contentMode: .fit)
+        .overlay {
+          if let imageFile, let image = ImageManager.shared.loadImage(fileName: imageFile) {
+            Image(uiImage: image)
+              .resizable()
+              .scaledToFill()
+          } else {
+            ZStack {
+              MidsummerTheme.subtleFill
+              Image(systemName: "photo")
+                .font(.system(size: 16, weight: .light))
+                .foregroundStyle(MidsummerTheme.secondaryText)
             }
           }
         }
-      }
+        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .accessibilityIdentifier("midsummer-variant-image-\(variant)")
 
+      Text(displayName)
+        .font(.system(size: 11, weight: .semibold))
+        .foregroundStyle(MidsummerTheme.primaryText)
+        .lineLimit(2)
+        .multilineTextAlignment(.leading)
+      if imageFile == nil {
+        Text("款式图待补充")
+          .font(.system(size: 9))
+          .foregroundStyle(MidsummerTheme.secondaryText)
+      }
       if MidsummerStore.shared.isAdminUser {
-        PhotosPicker(
-          selection: $supplementPhotoItem,
-          maxSelectionCount: Self.maxItemImages - names.count,
-          matching: .images
-        ) {
-          HStack {
-            Label(
-              names.isEmpty ? "补录单品图" : "追加图片（还可传 \(Self.maxItemImages - names.count) 张）",
-              systemImage: "plus.square.on.square"
-            )
-            .font(.system(size: 12, weight: .medium))
-            .foregroundStyle(MidsummerTheme.brandOrange)
-            Spacer()
-            if isUploadingItemImage {
-              ProgressView()
+        HStack(spacing: 8) {
+          PhotosPicker(
+            selection: Binding(
+              get: { variantPickerTarget == variant ? variantPhotoItem : nil },
+              set: { newValue in
+                variantPickerTarget = variant
+                variantPhotoItem = newValue
+              }
+            ),
+            matching: .images
+          ) {
+            Image(systemName: imageFile == nil ? "photo.badge.plus" : "arrow.2.squarepath")
+              .font(.system(size: 11, weight: .medium))
+              .foregroundStyle(MidsummerTheme.brandOrange)
+          }
+          .disabled(isUploadingItemImage)
+          .accessibilityIdentifier("midsummer-variant-image-pick-\(variant)")
+
+          if imageFile != nil {
+            Button {
+              Task { await deleteVariantImage(variant) }
+            } label: {
+              Image(systemName: "trash")
+                .font(.system(size: 11))
+                .foregroundStyle(MidsummerTheme.secondaryText)
             }
+            .disabled(isUploadingItemImage)
+            .accessibilityIdentifier("midsummer-variant-image-delete-\(variant)")
+          }
+
+          if isUploadingItemImage {
+            ProgressView()
           }
         }
-        .disabled(isUploadingItemImage || names.count >= Self.maxItemImages)
-        .accessibilityIdentifier("midsummer-item-image-supplement")
       }
-
-      if let itemImageMessage {
-        Text(itemImageMessage)
-          .font(.system(size: 10))
-          .foregroundStyle(
-            itemImageMessage.hasPrefix("已") ? MidsummerTheme.freshGreen : MidsummerTheme.brandOrange)
-          .fixedSize(horizontal: false, vertical: true)
-      }
-    }
-  }
-
-  /// 追加图片：新图先落盘（与 fetch 侧 copyItemCoverAsset 同一命名空间），
-  /// 再把「已有图 + 新图」按千牛宫格顺序整条重写。
-  private func appendItemImages(_ pickerItems: [PhotosPickerItem]) async {
-    guard !pickerItems.isEmpty, !isUploadingItemImage else { return }
-    isUploadingItemImage = true
-    defer {
-      isUploadingItemImage = false
-      itemImageMessage = nil
-    }
-
-    do {
-      var names = workingImageNames
-      let stamp = Int(Date().timeIntervalSince1970)
-      for (offset, pickerItem) in pickerItems.prefix(Self.maxItemImages - names.count).enumerated() {
-        guard let data = try await pickerItem.loadTransferable(type: Data.self),
-          let image = UIImage(data: data),
-          let jpeg = image.jpegData(compressionQuality: 0.85)
-        else {
-          itemImageMessage = "有图片读取失败，其余图片已保存。"
-          continue
-        }
-        let fileName = "midsummer-item-\(item.id)-new-\(stamp)-\(offset).jpg"
-        let destination = ImageManager.shared.imagesDirectory.appendingPathComponent(fileName)
-        try jpeg.write(to: destination, options: .atomic)
-        names.append(fileName)
-      }
-
-      // 整条重写：已有图（本地读回）+ 新图一并按序上传，主图始终是第 1 张。
-      try await MidsummerCloudService.shared.publish(
-        item: item, images: loadImages(names), sizeChartImage: nil)
-      uploadedImageNames = names
-      itemImageMessage = "已上传，其他用户刷新后可见。"
-      Task { await MidsummerStore.shared.refreshFromCloud() }
-    } catch {
-      itemImageMessage = "上传失败：\(error.localizedDescription)"
-    }
-  }
-
-  /// 删除单张图：从宫格移除后整条重写（主图位顺移，与千牛删除主图格一致）。
-  private func deleteItemImage(at index: Int) async {
-    guard workingImageNames.indices.contains(index), !isUploadingItemImage else { return }
-    isUploadingItemImage = true
-    defer {
-      isUploadingItemImage = false
-      itemImageMessage = nil
-    }
-
-    var names = workingImageNames
-    names.remove(at: index)
-    do {
-      try await MidsummerCloudService.shared.publish(
-        item: item, images: loadImages(names), sizeChartImage: nil)
-      uploadedImageNames = names
-      itemImageMessage = names.isEmpty ? "已清空单品图。" : "已删除，其他用户刷新后可见。"
-      Task { await MidsummerStore.shared.refreshFromCloud() }
-    } catch {
-      itemImageMessage = "删除失败：\(error.localizedDescription)"
     }
   }
 

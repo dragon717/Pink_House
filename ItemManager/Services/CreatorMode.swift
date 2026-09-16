@@ -28,6 +28,10 @@ final class CreatorMode: ObservableObject {
   /// 只在 App 启动参数里出现，正常运行不会命中。
   nonisolated static let resetLaunchArgument = "-ui-test-reset-creator-mode"
 
+  /// UI 测试用的开启开关：带上即把存档置为开启（上新工作台等 canContribute
+  /// 门控入口在模拟器里取不到 CloudKit 身份，靠它解界面闸门）。
+  nonisolated static let enableLaunchArgument = "-ui-test-enable-creator-mode"
+
   @Published private(set) var isEnabled: Bool
 
   private let defaults: UserDefaults
@@ -37,6 +41,9 @@ final class CreatorMode: ObservableObject {
     self.defaults = defaults
     if ProcessInfo.processInfo.arguments.contains(Self.resetLaunchArgument) {
       defaults.removeObject(forKey: Self.storageKey)
+    }
+    if ProcessInfo.processInfo.arguments.contains(Self.enableLaunchArgument) {
+      defaults.set(true, forKey: Self.storageKey)
     }
     self.isEnabled = defaults.bool(forKey: Self.storageKey)
   }

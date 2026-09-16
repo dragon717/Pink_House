@@ -36,6 +36,23 @@ nonisolated enum MidsummerWardrobeInsertIntent: Hashable, Sendable {
   var drawerTitle: String { "选择规格" }
 }
 
+// MARK: - 选项名展示口径
+//
+// 淘宝采集的归集选项名带「现 」档位前缀（如「现 sk 粉色」），界面展示时剥掉——
+// 使用者口径（2026-09-16）：款式名前的「现」字不要。
+// 只剥「现 + 空格」：「现货价」这类词不含空格、不受影响；
+// 选项 id / 图映射 / SKU 匹配 / 入库备注等数据层一律仍用全名。
+
+/// 单个选项名的展示形态：「现 sk 粉色」→「sk 粉色」。
+private func midsummerOptionDisplayName(_ name: String) -> String {
+  name.hasPrefix("现 ") ? String(name.dropFirst("现 ".count)) : name
+}
+
+/// 整段已选 / 确认文案里的选项名统一剥前缀。
+private func midsummerSpecDisplayText(_ text: String) -> String {
+  text.replacingOccurrences(of: "现 ", with: "")
+}
+
 // MARK: - 抽屉外壳
 
 /// 半透明背板 + 从底部升起的规格面板。点背板或右上角 ✕ 收起。
@@ -45,6 +62,9 @@ struct MidsummerSpecDrawer: View {
   var intent: MidsummerWardrobeInsertIntent = .quickInsert
   let onConfirm: (MidsummerSpecSelection, Int) -> Void
   let onClose: () -> Void
+  /// 多选配一套（用户 2026-09-16）：勾选多件款式一次入库为同一套。
+  /// 为 nil 时抽屉不出现多选入口（单选流程完全不变）。
+  var onMultiConfirm: (([MidsummerSpecSelection], Int) -> Void)? = nil
 
   var body: some View {
     ZStack(alignment: .bottom) {
@@ -61,7 +81,8 @@ struct MidsummerSpecDrawer: View {
         series: series,
         intent: intent,
         onConfirm: onConfirm,
-        onClose: onClose
+        onClose: onClose,
+        onMultiConfirm: onMultiConfirm
       )
       .transition(.move(edge: .bottom))
     }
@@ -76,24 +97,33 @@ struct MidsummerSpecPanel: View {
   var intent: MidsummerWardrobeInsertIntent = .quickInsert
   let onConfirm: (MidsummerSpecSelection, Int) -> Void
   let onClose: () -> Void
+  /// 多选配一套：一次带回「每件勾选项一条单品级选择」的数组。nil = 不提供多选。
+  var onMultiConfirm: (([MidsummerSpecSelection], Int) -> Void)? = nil
 
   @State private var selection: MidsummerSpecSelection
   @State private var quantity: Int
   /// 运营者补录（尺码表 / 价格表）入口：白名单门控，见 supplementEntry
   @State private var showingSupplement = false
+  /// 多选配一套：开启后款式组的点击改为「勾选/取消勾选」，确认时按勾选项
+  /// 逐条生成单品级选择交给 `onMultiConfirm`。尺码 / 价格档位仍单选，
+  /// 作为整套的共同规格（无尺码的小物会在入库时自动不带尺码）。
+  @State private var isMultiSelect = false
+  @State private var multiPicks: Set<String> = []
 
   init(
     item: MidsummerItemDTO,
     series: MidsummerSeriesDTO,
     intent: MidsummerWardrobeInsertIntent = .quickInsert,
     onConfirm: @escaping (MidsummerSpecSelection, Int) -> Void,
-    onClose: @escaping () -> Void
+    onClose: @escaping () -> Void,
+    onMultiConfirm: (([MidsummerSpecSelection], Int) -> Void)? = nil
   ) {
     self.item = item
     self.series = series
     self.intent = intent
     self.onConfirm = onConfirm
     self.onClose = onClose
+    self.onMultiConfirm = onMultiConfirm
     // 打开即预选主推组合：淘宝也是这么做的，避免使用者先面对一个「请选择」的空面板。
     _selection = State(initialValue: MidsummerSpecResolver.defaultSelection(of: item))
     _quantity = State(initialValue: 1)
@@ -108,11 +138,16 @@ struct MidsummerSpecPanel: View {
 
       ScrollView(.vertical, showsIndicators: false) {
         VStack(alignment: .leading, spacing: 18) {
+          if showsMultiSelectEntry {
+            multiSelectRow
+          }
           MidsummerSpecGroupsSection(
             item: item,
             series: series,
             selection: selection,
-            onPick: pick
+            onPick: pick,
+            isMultiSelect: isMultiSelect,
+            multiPicks: multiPicks
           )
           quantityRow
           supplementEntry
@@ -147,6 +182,60 @@ struct MidsummerSpecPanel: View {
     // 不要依赖容器标识。
   }
 
+  // MARK: 多选配一套（用户 2026-09-16）
+
+  /// 款式组（角色 variant）。多选勾选发生在这一组：裙 + 开衫 + 胸针都在「颜色分类」里。
+  private var multiVariantGroup: MidsummerSpecGroup? {
+    MidsummerSpecResolver.groups(of: item).first { $0.resolvedRole == .variant }
+  }
+
+  /// 多选入口的出现条件：一键入库意图 + 有款式组 + 款式 ≥ 2（单款没有「配一套」可言）。
+  private var showsMultiSelectEntry: Bool {
+    intent == .quickInsert
+      && onMultiConfirm != nil
+      && (multiVariantGroup?.options.count ?? 0) > 1
+  }
+
+  private var multiSelectRow: some View {
+    Button {
+      withAnimation(.snappy(duration: 0.16)) {
+        isMultiSelect.toggle()
+        if !isMultiSelect { multiPicks = [] }
+      }
+    } label: {
+      HStack(spacing: 6) {
+        Image(systemName: isMultiSelect ? "checkmark.square.fill" : "plus.square.on.square")
+          .font(.system(size: 12, weight: .semibold))
+          .foregroundStyle(isMultiSelect ? MidsummerTheme.brandOrange : MidsummerTheme.secondaryText)
+        Text("多选配一套")
+          .font(.system(size: 12, weight: .semibold))
+          .foregroundStyle(isMultiSelect ? MidsummerTheme.brandOrange : MidsummerTheme.primaryText)
+        Text(
+          isMultiSelect
+            ? "已开启：勾选多件，一次入库为同一套"
+            : "勾选多件（如裙 + 开衫 + 胸针），一次入库为同一套"
+        )
+        .font(.system(size: 10))
+        .foregroundStyle(MidsummerTheme.secondaryText)
+        .lineLimit(1)
+        .minimumScaleFactor(0.85)
+        Spacer(minLength: 0)
+      }
+      .padding(.horizontal, 10)
+      .padding(.vertical, 8)
+      .background(isMultiSelect ? MidsummerTheme.orangeSurface : MidsummerTheme.subtleFill)
+      .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+      .overlay(
+        RoundedRectangle(cornerRadius: 8, style: .continuous)
+          .stroke(isMultiSelect ? MidsummerTheme.brandOrange : MidsummerTheme.divider, lineWidth: isMultiSelect ? 1 : 0.5)
+      )
+    }
+    .buttonStyle(.plain)
+    .accessibilityIdentifier("spec-multi-toggle")
+    .accessibilityLabel("多选配一套")
+    .accessibilityValue(isMultiSelect ? "已开启" : "未开启")
+  }
+
   // MARK: 顶部：选中图 + 价格 + 已选文案
 
   private var header: some View {
@@ -167,7 +256,8 @@ struct MidsummerSpecPanel: View {
           )
           .themeSkinLegibleText(level: .badge, slot: MidsummerThemeSlot.specDrawer)
 
-        Text(MidsummerSpecResolver.selectionSummaryText(selection, of: item))
+        Text(midsummerSpecDisplayText(
+          MidsummerSpecResolver.selectionSummaryText(selection, of: item)))
           .font(.system(size: 12, weight: .medium))
           .foregroundStyle(isComplete ? MidsummerTheme.primaryText : MidsummerTheme.brandOrange)
           .lineLimit(2)
@@ -286,7 +376,7 @@ struct MidsummerSpecPanel: View {
   private var confirmBar: some View {
     VStack(spacing: 6) {
       Button {
-        onConfirm(selection, quantity)
+        confirmSelection()
       } label: {
         Text(confirmTitle)
           .font(.system(size: 15, weight: .semibold))
@@ -361,23 +451,52 @@ struct MidsummerSpecPanel: View {
   }
 
   private var confirmTitle: String {
+    if isMultiSelect, !multiPicks.isEmpty {
+      return "\(intent.confirmTitle)（\(multiPicks.count) 件一套）"
+    }
     guard let summary = MidsummerSpecResolver.summary(selection, of: item) else {
       return intent.confirmTitle
     }
-    return "\(intent.confirmTitle)（\(summary)）"
+    return "\(intent.confirmTitle)（\(midsummerSpecDisplayText(summary))）"
   }
 
   private func pick(groupID: String, optionID: String) {
-    // 一律走 resolver：点已选中的项 = 取消选中（`toggling`），
-    // 并且它会把「因联动而失效的其它组选择」一并清掉，
-    // 避免留下高亮着、却组合不成立的假选中状态。
     withAnimation(.snappy(duration: 0.16)) {
-      selection = MidsummerSpecResolver.toggling(
-        groupID: groupID,
-        optionID: optionID,
-        in: selection,
-        of: item
-      )
+      if isMultiSelect, groupID == multiVariantGroup?.id {
+        // 多选模式：款式组的点击 = 勾选/取消勾选一件，不影响单选状态；
+        // 尺码 / 价格档位仍走单选规则（整套共同规格）。
+        if multiPicks.contains(optionID) {
+          multiPicks.remove(optionID)
+        } else {
+          multiPicks.insert(optionID)
+        }
+      } else {
+        // 一律走 resolver：点已选中的项 = 取消选中（`toggling`），
+        // 并且它会把「因联动而失效的其它组选择」一并清掉，
+        // 避免留下高亮着、却组合不成立的假选中状态。
+        selection = MidsummerSpecResolver.toggling(
+          groupID: groupID,
+          optionID: optionID,
+          in: selection,
+          of: item
+        )
+      }
+    }
+  }
+
+  /// 确认：多选开启且至少勾了一件 → 按勾选顺序逐条生成单品级选择，
+  /// 走 `onMultiConfirm`（套装入库）；否则维持原单选路径，行为不变。
+  private func confirmSelection() {
+    if isMultiSelect, !multiPicks.isEmpty, let onMultiConfirm,
+      let variantGroup = multiVariantGroup
+    {
+      let orderedIDs = variantGroup.options.filter { multiPicks.contains($0.id) }.map(\.id)
+      let selections = orderedIDs.map {
+        MidsummerSpecResolver.perVariantSelection(for: $0, base: selection, of: item)
+      }
+      onMultiConfirm(selections, quantity)
+    } else {
+      onConfirm(selection, quantity)
     }
   }
 }
@@ -436,8 +555,16 @@ struct MidsummerSpecGroupsSection: View {
   var series: MidsummerSeriesDTO?
   let selection: MidsummerSpecSelection
   let onPick: (String, String) -> Void
+  /// 多选配一套（用户 2026-09-16）：开启后款式组按勾选态渲染，其余组仍单选。
+  /// 带默认值——快照测试等既有调用点不传这两个参数时行为与旧版逐像素一致。
+  var isMultiSelect: Bool = false
+  var multiPicks: Set<String> = []
 
   private var groups: [MidsummerSpecGroup] { MidsummerSpecResolver.groups(of: item) }
+
+  private var variantGroupID: String? {
+    groups.first { $0.resolvedRole == .variant }?.id
+  }
 
   var body: some View {
     VStack(alignment: .leading, spacing: 18) {
@@ -524,10 +651,18 @@ struct MidsummerSpecGroupsSection: View {
             .themeSkinLegibleText(level: .inline, slot: MidsummerThemeSlot.specDrawer)
         }
 
-        if let picked = selection[group.id],
+        if isMultiSelect, group.id == variantGroupID {
+          if !multiPicks.isEmpty {
+            Text("已勾选 \(multiPicks.count) 件")
+              .font(.system(size: 11))
+              .foregroundStyle(MidsummerTheme.brandOrange)
+              .themeSkinLegibleText(level: .chip, slot: MidsummerThemeSlot.specOption)
+              .lineLimit(1)
+          }
+        } else if let picked = selection[group.id],
           let name = MidsummerSpecResolver.option(picked, in: group)?.name
         {
-          Text("已选 \(name)")
+          Text("已选 \(midsummerOptionDisplayName(name))")
             .font(.system(size: 11))
             .foregroundStyle(MidsummerTheme.brandOrange)
             .themeSkinLegibleText(level: .chip, slot: MidsummerThemeSlot.specOption)
@@ -589,8 +724,16 @@ struct MidsummerSpecGroupsSection: View {
     selection[group.id] == option.id
   }
 
+  /// 选项的「高亮」判据：多选模式下款式组看勾选篮，其余组与单选模式同规则。
+  private func isMarked(group: MidsummerSpecGroup, option: MidsummerSpecOption) -> Bool {
+    if isMultiSelect, group.id == variantGroupID {
+      return multiPicks.contains(option.id)
+    }
+    return isSelected(group: group, option: option)
+  }
+
   private func thumbnailCell(group: MidsummerSpecGroup, option: MidsummerSpecOption) -> some View {
-    let selected = isSelected(group: group, option: option)
+    let selected = isMarked(group: group, option: option)
     // 淘宝商品页口径：每个颜色分类选项卡直接带自己的挂牌价（同组合各尺码同价）。
     let optionPrice = optionPrice(group: group, option: option)
     return Button {
@@ -599,7 +742,7 @@ struct MidsummerSpecGroupsSection: View {
       VStack(spacing: 4) {
         MidsummerSpecThumbnail(imageName: option.image, series: series, size: 54, cornerRadius: 7)
 
-        Text(option.name)
+        Text(midsummerOptionDisplayName(option.name))
           .font(.system(size: 10, weight: selected ? .semibold : .regular))
           .foregroundStyle(selected ? MidsummerTheme.brandOrange : MidsummerTheme.primaryText)
           .themeSkinLegibleText(level: selected ? .chip : .inline, slot: MidsummerThemeSlot.specOption)
@@ -637,17 +780,17 @@ struct MidsummerSpecGroupsSection: View {
     }
     .buttonStyle(.plain)
     .accessibilityIdentifier("spec-option-\(group.id)-\(option.id)")
-    .accessibilityLabel(option.name)
+    .accessibilityLabel(midsummerOptionDisplayName(option.name))
     .accessibilityValue(selected ? "已选中" : "未选中")
     .accessibilityAddTraits(selected ? .isSelected : [])
   }
 
   private func textChip(group: MidsummerSpecGroup, option: MidsummerSpecOption) -> some View {
-    let selected = isSelected(group: group, option: option)
+    let selected = isMarked(group: group, option: option)
     return Button {
       onPick(group.id, option.id)
     } label: {
-      Text(option.name)
+      Text(midsummerOptionDisplayName(option.name))
         .font(.system(size: 12, weight: selected ? .semibold : .regular))
         .foregroundStyle(selected ? MidsummerTheme.brandOrange : MidsummerTheme.primaryText)
         .themeSkinLegibleText(level: selected ? .chip : .inline, slot: MidsummerThemeSlot.specOption)
@@ -670,7 +813,7 @@ struct MidsummerSpecGroupsSection: View {
     }
     .buttonStyle(.plain)
     .accessibilityIdentifier("spec-option-\(group.id)-\(option.id)")
-    .accessibilityLabel(option.name)
+    .accessibilityLabel(midsummerOptionDisplayName(option.name))
     .accessibilityValue(selected ? "已选中" : "未选中")
     .accessibilityAddTraits(selected ? .isSelected : [])
   }
