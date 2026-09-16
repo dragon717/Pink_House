@@ -64,6 +64,8 @@ final class MidsummerStore: ObservableObject {
   /// 上新工作台（`MidsummerListingStore`）的变更订阅：上架 / 下架 / 编辑后
   /// 立即重算 catalog，让系列 feed 跟着变，不需要手动刷新。
   private var listingSubscription: AnyCancellable?
+  /// 自建系列（`MidsummerCustomSeriesStore`）的变更订阅：新建系列后立即进 catalog。
+  private var customSeriesSubscription: AnyCancellable?
 
   init(bundle: Bundle = .main) {
     seed = MidsummerSeedCatalog.load(bundle: bundle)
@@ -71,6 +73,12 @@ final class MidsummerStore: ObservableObject {
     // 上新工作台存档变更 → 重算 feed。receive(on:) 跳出 willSet 时机，
     // 保证重算读到的是**已落好**的新 listings，而不是变更前的旧值。
     listingSubscription = MidsummerListingStore.shared.objectWillChange
+      .receive(on: DispatchQueue.main)
+      .sink { [weak self] _ in
+        Task { @MainActor [weak self] in self?.recomputeCatalog() }
+      }
+    // 自建系列存档变更 → 同样重算（新系列创建后立刻出现在品牌页）。
+    customSeriesSubscription = MidsummerCustomSeriesStore.shared.objectWillChange
       .receive(on: DispatchQueue.main)
       .sink { [weak self] _ in
         Task { @MainActor [weak self] in self?.recomputeCatalog() }
@@ -181,6 +189,11 @@ final class MidsummerStore: ObservableObject {
     for series in seed.series { byID[series.id] = series }
     // 云端覆盖同 id（创作者校正），并补充新系列
     for series in cloudSeries { byID[series.id] = series }
+    // 自建系列（上传上新直达新建，用户 2026-09-17）：本地创建，不覆盖任何既有 id；
+    // 上架新品挂到自建系列 id 上，与种子 / 云端系列走同一条合并链路。
+    for series in MidsummerCustomSeriesStore.shared.seriesList where byID[series.id] == nil {
+      byID[series.id] = series
+    }
 
     // 上新工作台（用户 2026-09-16）：已上架的本地新品并入对应系列——
     // 草稿 / 已下架不进 feed；下架重新上架自动回归。转换需要系列原单品

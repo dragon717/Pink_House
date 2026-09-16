@@ -2673,6 +2673,9 @@
         }
       }
     },
+    "%@：" : {
+
+    },
     "%@: %@" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -6378,6 +6381,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%1$lld/%2$lld"
+          }
+        }
+      }
+    },
+    "%lld/%lld 项已填写" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld/%2$lld 项已填写"
           }
         }
       }
@@ -16999,6 +17012,9 @@
         }
       }
     },
+    "上传上新" : {
+
+    },
     "上传中: %d%%" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -17105,6 +17121,9 @@
       }
     },
     "上新日期待补充" : {
+
+    },
+    "上新时间" : {
 
     },
     "上新管理" : {
@@ -35480,6 +35499,9 @@
         }
       }
     },
+    "删除主图" : {
+
+    },
     "删除于 %@" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -35702,6 +35724,9 @@
           }
         }
       }
+    },
+    "删除尺码" : {
+
     },
     "删除当前头像" : {
       "extractionState" : "stale",
@@ -46474,6 +46499,9 @@
         }
       }
     },
+    "图片已删除" : {
+
+    },
     "图片已同步到 iCloud" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -55756,6 +55784,9 @@
         }
       }
     },
+    "尺码名" : {
+
+    },
     "尺码管理" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -59067,7 +59098,7 @@
         }
       }
     },
-    "已知上新日期" : {
+    "已知" : {
 
     },
     "已答对: %lld/%lld" : {
@@ -66019,7 +66050,6 @@
       }
     },
     "待定" : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -111135,6 +111165,26 @@
         }
       }
     },
+    "第 %lld 步 / 共 %lld 步" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "第 %1$lld 步 / 共 %2$lld 步"
+          }
+        }
+      }
+    },
+    "第 %lld 步 %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "第 %1$lld 步 %2$@"
+          }
+        }
+      }
+    },
     "第 %lld 页，共 %lld 页" : {
       "localizations" : {
         "en" : {
@@ -125202,7 +125252,7 @@
         }
       }
     },
-    "该阶段暂无价格配置项，可直接下一步；开定金后回来补即可。" : {
+    "该阶段暂无价格配置项，可直接发布；开定金后回来补即可。" : {
 
     },
     "该阶段的价格配置：%@" : {
@@ -129518,6 +129568,9 @@
         }
       }
     },
+    "输入尺码名" : {
+
+    },
     "输入新名字" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -130046,6 +130099,9 @@
       }
     },
     "还没有上新记录" : {
+
+    },
+    "还没有尺码项。点下面的常用尺码，或自己新增一个。" : {
 
     },
     "还没有拼豆/像素画" : {
@@ -134098,6 +134154,9 @@
         }
       }
     },
+    "选择要上新的系列" : {
+
+    },
     "选择要补卡的日期" : {
       "localizations" : {
         "en" : {
@@ -134517,6 +134576,9 @@
           }
         }
       }
+    },
+    "配置%@（可选）" : {
+
     },
     "配置文件" : {
       "localizations" : {
@@ -139074,6 +139136,9 @@
           }
         }
       }
+    },
+    "预览主图" : {
+
     },
     "预览弹窗效果" : {
       "extractionState" : "stale",

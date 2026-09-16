@@ -411,6 +411,24 @@ final class TimeHallEntryExplorationUITests: XCTestCase {
     dumpHierarchy("32b-表单-层级", app: app)
   }
 
+  /// 稳妥输入：tap 后等键盘弹出再 typeText（与 MidsummerListingFlowUITests 同实现）。
+  @MainActor
+  private func focusAndType(_ app: XCUIApplication, _ text: String, into field: XCUIElement) {
+    for _ in 0..<6 {
+      guard field.exists else {
+        usleep(600_000)
+        continue
+      }
+      field.tap()
+      usleep(700_000)
+      if app.keyboards.firstMatch.exists {
+        field.typeText(text)
+        return
+      }
+    }
+    field.typeText(text)
+  }
+
   // MARK: - 用例 5：品牌首页右上角「上传上新」主操作入口（用户 2026-09-17）
 
   @MainActor
@@ -431,30 +449,45 @@ final class TimeHallEntryExplorationUITests: XCTestCase {
     upload.tap()
     sleep(2)
 
-    // 第一步：选系列（轻量选择器，点选后直达 4 步表单）。
-    let pickerTitle = app.navigationBars["选择要上新的系列"]
-    XCTAssertTrue(
-      pickerTitle.waitForExistence(timeout: 6),
-      "点「上传上新」应弹出「选择要上新的系列」选择器"
+    // 直达新建系列（用户 2026-09-17）：不再弹「选择要上新的系列」，
+    // 直接进新版 4 步表单第①步，并出现「创建新系列」说明条。
+    XCTAssertFalse(
+      app.navigationBars["选择要上新的系列"].exists,
+      "不应再出现选系列弹窗——上传直达新建系列"
     )
-    capture("41-选系列选择器")
-
-    let firstSeries = app.buttons.matching(
-      NSPredicate(format: "identifier BEGINSWITH %@", "upload-picker-series-")
-    ).firstMatch
-    XCTAssertTrue(firstSeries.exists, "选择器应列出可上新的系列")
-    firstSeries.tap()
-    sleep(2)
-
-    // 第二段：直达新版 4 步 Stepper 表单。
+    let newSeriesHint = app.descendants(matching: .any)
+      .matching(NSPredicate(format: "identifier == %@", "listing-new-series-hint"))
+      .firstMatch
     let saveDraft = app.buttons["listing-save-draft"]
     let stepOne = app.descendants(matching: .any)
       .matching(NSPredicate(format: "identifier == %@", "listing-step-0"))
       .firstMatch
     XCTAssertTrue(
-      saveDraft.waitForExistence(timeout: 6) || stepOne.exists,
-      "选完系列应直达新版 4 步上新表单"
+      saveDraft.waitForExistence(timeout: 6) && (newSeriesHint.exists || stepOne.exists),
+      "点「上传上新」应直达新建系列的四步表单第①步"
     )
-    capture("42-直达4步表单第一步")
+    capture("41-直达新建系列表单第一步")
+
+    // 填系列标题 → 下一步，确认「创建系列 → 继续上新」链路可走。
+    let titleField = app.textFields["listing-launch-title"]
+    XCTAssertTrue(titleField.waitForExistence(timeout: 5), "第①步应有系列标题输入框")
+    focusAndType(app, "米团新建系列验收\n", into: titleField)
+    capture("42-填写系列标题")
+    usleep(500_000)
+    app.swipeDown()
+    usleep(400_000)
+
+    let next = app.buttons["listing-next"]
+    XCTAssertTrue(next.waitForExistence(timeout: 5), "底部应有「下一步」按钮")
+    next.tap()
+    sleep(2)
+    let stepTwo = app.descendants(matching: .any)
+      .matching(NSPredicate(format: "identifier == %@", "listing-step-1"))
+      .firstMatch
+    XCTAssertTrue(
+      stepTwo.exists || app.buttons["listing-stage-teaser"].exists,
+      "系列标题填完应能进入第②步（上新阶段）"
+    )
+    capture("43-新建系列-进入第②步")
   }
 }

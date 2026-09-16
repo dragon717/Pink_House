@@ -110,7 +110,10 @@ enum MidsummerListingFormStep: Int, CaseIterable, Identifiable, Sendable {
 
 struct MidsummerListingFormView: View {
   @ObservedObject var store: MidsummerStore
-  let series: MidsummerSeriesDTO
+  /// nil = 新建系列模式（上传上新直达，用户 2026-09-17）：提交时用第①步
+  /// 填写的系列标题 / 上新时间 / 主图创建自建系列，再把新品挂上去。
+  /// 非空 = 既有系列的上新 / 编辑模式。
+  let series: MidsummerSeriesDTO?
   /// 非空 = 编辑模式（预填并保留原状态）。
   var existing: MidsummerListing?
 
@@ -123,6 +126,8 @@ struct MidsummerListingFormView: View {
   /// 已到达过的最远步骤：顶部步骤条只允许跳到「走过或下一步」，避免跳步漏填。
   @State private var furthestStep: MidsummerListingFormStep = .mainImages
   @State private var stepError: String?
+  /// 新建系列模式下，提交时实际创建出来的自建系列 id（幂等：存草稿 / 发布只建一次）。
+  @State private var createdSeriesID: String?
 
   @State private var addPhotoItem: PhotosPickerItem?
   @State private var replacePhotoItem: PhotosPickerItem?
@@ -134,13 +139,15 @@ struct MidsummerListingFormView: View {
   /// 常用尺码：一键加入尺码项（仍可编辑 / 删除，不再是唯一来源）。
   private let presetSizes = ["XS", "S", "M", "L", "XL", "XXL", "均码", "定制"]
 
-  private var sourceItem: MidsummerItemDTO? { series.items.first }
+  private var sourceItem: MidsummerItemDTO? { series?.items.first }
   private var styleGroup: MidsummerSpecGroup? {
     (sourceItem?.specGroups ?? []).first { $0.resolvedRole == .variant }
   }
   private var isEditMode: Bool { existing != nil }
+  /// 上传上新直达新建系列：第①步填的就是系列档案本身。
+  private var isNewSeries: Bool { series == nil && existing == nil }
 
-  init(store: MidsummerStore, series: MidsummerSeriesDTO, existing: MidsummerListing? = nil) {
+  init(store: MidsummerStore, series: MidsummerSeriesDTO? = nil, existing: MidsummerListing? = nil) {
     self.store = store
     self.series = series
     self.existing = existing
@@ -157,6 +164,21 @@ struct MidsummerListingFormView: View {
           Text(step.sectionTitle)
             .font(.system(size: 16, weight: .semibold))
             .foregroundStyle(MidsummerTheme.primaryText)
+          if isNewSeries {
+            // 新建系列模式（用户 2026-09-17）：不再从既有系列里挑，
+            // 第①步填的系列标题 / 上新时间 / 主图就是新系列的档案。
+            Label(
+              "这一单会先创建一个新系列：下面的系列标题、上新时间与主图就是系列档案，提交后自动归入「\(store.catalog?.brandName ?? "仲夏物语")」。",
+              systemImage: "sparkles"
+            )
+              .font(.system(size: 11, weight: .medium))
+              .foregroundStyle(MidsummerTheme.brandOrange)
+              .padding(10)
+              .frame(maxWidth: .infinity, alignment: .leading)
+              .background(MidsummerTheme.orangeSurface)
+              .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+              .accessibilityIdentifier("listing-new-series-hint")
+          }
           if let stepError {
             Label(stepError, systemImage: "exclamationmark.circle.fill")
               .font(.system(size: 12, weight: .medium))
@@ -1161,10 +1183,11 @@ struct MidsummerListingFormView: View {
   /// 汇总统一 state 为 listing。`forceDraft = true` 时跳过校验存草稿：
   /// 新建保持 draft（listedAt 为空），编辑保留原状态。
   private func assembledListing(forceDraft: Bool) -> MidsummerListing {
+    let seriesID = ensureCustomSeries()
     let id = existing?.id ?? MidsummerListing.newID()
     var listing = existing ?? MidsummerListing(
       id: id,
-      seriesID: series.id,
+      seriesID: seriesID,
       name: "",
       kindRaw: draft.kind.rawValue,
       price: nil,
@@ -1222,6 +1245,69 @@ struct MidsummerListingFormView: View {
     return listing
   }
 
+  // MARK: 新建系列（上传上新直达，用户 2026-09-17）
+
+  /// 幂等创建自建系列并返回其 id：
+  /// 既有系列 / 编辑模式直接用原 id；新建模式只在第一次提交时创建一次。
+  private func ensureCustomSeries() -> String {
+    if let existing { return existing.seriesID }
+    if let series { return series.id }
+    if let createdSeriesID { return createdSeriesID }
+
+    let id = "midsummer-custom-" + UUID().uuidString.lowercased()
+    let title = trimmed(draft.launchTitle)
+    let calendar = Calendar.current
+    let referenceDate = draft.hasKnownLaunchDate ? draft.launchDate : Date()
+    let dto = MidsummerSeriesDTO(
+      id: id,
+      name: title.isEmpty ? "未命名系列" : title,
+      year: calendar.component(.year, from: referenceDate),
+      launchedOn: draft.hasKnownLaunchDate ? Self.dateText(draft.launchDate) : "",
+      stage: draft.stage.flatMap { Self.stageMapping[$0] } ?? .preview,
+      coverImage: saveCoverImage(seriesID: id),
+      depositMin: nil,
+      depositMax: nil,
+      priceSource: nil,
+      sizes: draft.sizes.map { trimmed($0) }.filter { !$0.isEmpty },
+      colors: [],
+      summary: draft.note.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : draft.note,
+      sourceURL: "",
+      sourceKind: "editorial",
+      verified: false,
+      items: []
+    )
+    MidsummerCustomSeriesStore.shared.add(dto)
+    createdSeriesID = id
+    return id
+  }
+
+  /// 第①步首图即系列封面：复用 Images 目录一条读取路径。
+  private func saveCoverImage(seriesID: String) -> String? {
+    guard let image = draft.images.first,
+      let jpeg = image.jpegData(compressionQuality: 0.85)
+    else { return nil }
+    let name = "midsummer-custom-series-\(seriesID).jpg"
+    do {
+      try jpeg.write(
+        to: ImageManager.shared.imagesDirectory.appendingPathComponent(name),
+        options: .atomic)
+      return name
+    } catch {
+      print("⚠️ [MidsummerListing] 系列封面落盘失败：\(error.localizedDescription)")
+      return nil
+    }
+  }
+
+  /// 上新阶段（表单）→ 系列阶段（目录档案）的同名映射。
+  private static let stageMapping: [MidsummerLaunchStage: MidsummerStage] = [
+    .teaser: .preview,
+    .deposit: .deposit,
+    .balance: .balance,
+    .shipping: .shipping,
+    .rerun: .restock,
+    .inStock: .inStock,
+  ]
+
   // MARK: 预填 / 工具
 
   private func prefill() {
@@ -1238,7 +1324,7 @@ struct MidsummerListingFormView: View {
     draft.balanceEnabled = existing.balance != nil
     draft.priceKind = existing.priceKind ?? .shop
     draft.note = existing.note
-    draft.sourceURL = existing.sourceURL == series.sourceURL ? "" : existing.sourceURL
+    draft.sourceURL = existing.sourceURL == series?.sourceURL ? "" : existing.sourceURL
     draft.images = existing.imageFiles.compactMap { ImageManager.shared.loadImage(fileName: $0) }
 
     draft.stage = existing.stage

@@ -17,20 +17,6 @@ nonisolated enum MidsummerRoute: Equatable {
   case linkReport
 }
 
-/// 品牌首页右上角「上传上新」的两段式上传流（sheet(item:) 驱动）：
-/// 先选要上新到哪个系列，再直接进四步 Stepper 表单。
-nonisolated enum MidsummerUploadFlow: Identifiable {
-  case pickSeries
-  case form(MidsummerSeriesDTO)
-
-  var id: String {
-    switch self {
-    case .pickSeries: return "pick"
-    case .form(let series): return "form-\(series.id)"
-    }
-  }
-}
-
 // MARK: - 品牌页宿主
 
 struct MidsummerBrandView: View {
@@ -40,8 +26,8 @@ struct MidsummerBrandView: View {
   /// 导航栈：同一页面可能从多个层级进入（首页卡片 → 系列详情 → 系列资料页），
   /// 用栈而不是单值路由，返回键才能总是回到「进入时的那一层」。
   @State private var path: [MidsummerRoute] = []
-  /// 品牌首页右上角「上传上新」的上传流：nil = 关闭；先选系列，再进四步表单。
-  @State private var uploadFlow: MidsummerUploadFlow?
+  /// 品牌首页右上角「上传上新」：直达新建系列的四步表单（不再选既有系列）。
+  @State private var showingUploadForm = false
 
   private var route: MidsummerRoute { path.last ?? .home }
 
@@ -57,7 +43,7 @@ struct MidsummerBrandView: View {
           onBack: goBack,
           onClose: onClose,
           // 主操作入口常驻品牌首页右上角：不上折叠菜单、不放二级弹窗（用户 2026-09-17）。
-          onUpload: route == .home ? { uploadFlow = .pickSeries } : nil
+          onUpload: route == .home ? { showingUploadForm = true } : nil
         )
 
         switch route {
@@ -94,15 +80,10 @@ struct MidsummerBrandView: View {
     .task {
       await store.refreshFromCloud()
     }
-    .sheet(item: $uploadFlow) { flow in
-      switch flow {
-      case .pickSeries:
-        MidsummerUploadSeriesPicker(store: store) { series in
-          uploadFlow = .form(series)
-        }
-      case .form(let series):
-        MidsummerListingFormView(store: store, series: series)
-      }
+    .sheet(isPresented: $showingUploadForm) {
+      // 直达新建系列（用户 2026-09-17）：series 传 nil 进入新建模式，
+      // 提交时用第①步填写的系列档案创建自建系列并挂上新品。
+      MidsummerListingFormView(store: store)
     }
   }
 
@@ -233,56 +214,6 @@ struct MidsummerTopBar: View {
     .overlay(alignment: .bottom) {
       Rectangle().fill(MidsummerTheme.divider).frame(height: 0.5)
     }
-  }
-}
-
-// MARK: - 上传流 · 选系列
-
-/// 「上传上新」第一段：选目标系列。上传必须落到某个系列，品牌首页没有
-/// 当前系列上下文，所以这里给一个轻量列表（按目录顺序 = 新年份在前），
-/// 点选后直接进四步 Stepper 表单——不绕道系列详情或工作台。
-struct MidsummerUploadSeriesPicker: View {
-  @ObservedObject var store: MidsummerStore
-  let onPick: (MidsummerSeriesDTO) -> Void
-
-  @Environment(\.dismiss) private var dismiss
-
-  var body: some View {
-    NavigationStack {
-      List(store.allSeries, id: \.id) { series in
-        Button {
-          dismiss()
-          onPick(series)
-        } label: {
-          HStack(spacing: 10) {
-            Text("\(series.year)")
-              .font(.system(size: 11, weight: .semibold, design: .monospaced))
-              .foregroundStyle(MidsummerTheme.secondaryText)
-            Text(series.name)
-              .font(.system(size: 14, weight: .medium))
-              .foregroundStyle(MidsummerTheme.primaryText)
-              .lineLimit(1)
-            Spacer(minLength: 0)
-            Image(systemName: "chevron.right")
-              .font(.system(size: 11, weight: .semibold))
-              .foregroundStyle(MidsummerTheme.secondaryText)
-          }
-          .padding(.vertical, 3)
-          .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .accessibilityIdentifier("upload-picker-series-\(series.id)")
-      }
-      .listStyle(.plain)
-      .navigationTitle("选择要上新的系列")
-      .navigationBarTitleDisplayMode(.inline)
-      .toolbar {
-        ToolbarItem(placement: .cancellationAction) {
-          Button("取消") { dismiss() }
-        }
-      }
-    }
-    .presentationDetents([.medium, .large])
   }
 }
 
