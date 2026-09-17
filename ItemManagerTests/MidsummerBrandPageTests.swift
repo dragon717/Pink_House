@@ -205,9 +205,21 @@ final class MidsummerBrandPageTests: XCTestCase {
     XCTAssertEqual(MidsummerItemKind.infer(fromName: "小熊博物馆 JSK"), .jsk)
     XCTAssertEqual(MidsummerItemKind.infer(fromName: "三丽鸥家族合作 联名 OP"), .op)
     // 「op罩裙jsk」这类混写要先命中更具体的品类，不能被首个关键词吃掉
-    XCTAssertEqual(MidsummerItemKind.infer(fromName: "樱花小羊 围裙 / 罩裙"), .skirt)
+    XCTAssertEqual(MidsummerItemKind.infer(fromName: "樱花小羊 围裙 / 罩裙"), .overdress)
     XCTAssertEqual(MidsummerItemKind.infer(fromName: "樱花小羊 内搭"), .blouse)
-    XCTAssertEqual(MidsummerItemKind.infer(fromName: "小物（边夹 / KC）"), .accessory)
+    XCTAssertEqual(MidsummerItemKind.infer(fromName: "小物（边夹 / KC）"), .hairItem)
+    // 2026-09-17 三级术语体系新增类型的关键词
+    XCTAssertEqual(MidsummerItemKind.infer(fromName: "樱花小羊 背带裙"), .suspenderSkirt)
+    XCTAssertEqual(MidsummerItemKind.infer(fromName: "蝴蝶结 泡泡袖内搭"), .puffBlouse)
+    XCTAssertEqual(MidsummerItemKind.infer(fromName: "小熊博物馆 羊腿袖内搭"), .gigotBlouse)
+    XCTAssertEqual(MidsummerItemKind.infer(fromName: "缎带 腰封"), .parts)
+    XCTAssertEqual(MidsummerItemKind.infer(fromName: "樱花小羊 lo鞋"), .shoesBag)
+    XCTAssertEqual(MidsummerItemKind.infer(fromName: "小羊浮雕 胸针"), .accessory)
+    // 大类归属抽查
+    XCTAssertEqual(MidsummerItemKind.suspenderSkirt.category, .dress)
+    XCTAssertEqual(MidsummerItemKind.puffBlouse.category, .inner)
+    XCTAssertEqual(MidsummerItemKind.hairItem.category, .trinket)
+    XCTAssertEqual(MidsummerItemKind.set.category, .dress, "套装（FS/set）归连衣裙类")
     XCTAssertNil(MidsummerItemKind.infer(fromName: "看不懂的标题"))
   }
 

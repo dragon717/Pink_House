@@ -49,25 +49,82 @@ nonisolated enum MidsummerStage: String, Codable, CaseIterable, Sendable {
   }
 }
 
-// MARK: - 单品类型
+// MARK: - 单品分类（2026-09-17 三级术语体系）
 
-/// Lolita 的品类缩写。界面按此分组与着色，不要改成自由字符串。
+/// 分类第一级 · 大类（用户 2026-09-17 指定的最简化三级标准）：
+/// 一、连衣裙类；二、内搭类；三、小物类。
+nonisolated enum MidsummerItemCategory: String, Codable, CaseIterable, Sendable {
+  case dress    // 一、连衣裙类（OP / JSK / SK / 特殊版型 / FS 套装）
+  case inner    // 二、内搭类（衬衫 / 泡泡袖 / 飞袖羊腿袖）
+  case trinket  // 三、小物类（头饰 / 配件 / 鞋包 / 其他）
+
+  var labelZH: String {
+    switch self {
+    case .dress: return "连衣裙类"
+    case .inner: return "内搭类"
+    case .trinket: return "小物类"
+    }
+  }
+}
+
+/// Lolita 的品类缩写（分类第二级 · 具体类型）。界面按大类分组展示，不要改成自由字符串。
+///
+/// 兼容性：`op / jsk / skirt / blouse / accessory / set` 是旧版六类的 raw，
+/// 种子 JSON 与云端记录都在用，**不可改动**；新增类型的 raw 一经上线同样冻结。
 nonisolated enum MidsummerItemKind: String, Codable, CaseIterable, Sendable {
-  case op           // 有袖连衣裙
-  case jsk          // 无袖连衣裙
-  case skirt        // 半裙
-  case blouse       // 衬衫 / 内搭
-  case accessory    // 小物
-  case set          // 套装
+  // 一、连衣裙类
+  case op              // OP 有袖连衣裙
+  case jsk             // JSK 无袖连衣裙
+  case skirt           // SK 半裙
+  case suspenderSkirt  // 背带裙
+  case sp              // SP 特殊版型
+  case ap              // AP 特殊版型
+  case overdress       // 罩裙
+  case set             // FS / 套装
+  // 二、内搭类
+  case blouse          // 衬衫
+  case puffBlouse      // 泡泡袖内搭
+  case gigotBlouse     // 飞袖 / 羊腿袖内搭
+  // 三、小物类
+  case hairItem        // 头饰（边夹 / 发带 / BNT / KC）
+  case parts           // 配件（腰封 / 围裙 / 假领）
+  case shoesBag        // 鞋包（lo鞋 / lo包）
+  case accessory       // 其他小物（胸针 / 袜类 / 手套）
+
+  /// 所属大类（分类第一级）。
+  var category: MidsummerItemCategory {
+    switch self {
+    case .op, .jsk, .skirt, .suspenderSkirt, .sp, .ap, .overdress, .set:
+      return .dress
+    case .blouse, .puffBlouse, .gigotBlouse:
+      return .inner
+    case .hairItem, .parts, .shoesBag, .accessory:
+      return .trinket
+    }
+  }
+
+  /// 某大类下的具体类型（顺序即界面展示顺序）。
+  static func kinds(in category: MidsummerItemCategory) -> [MidsummerItemKind] {
+    allCases.filter { $0.category == category }
+  }
 
   var labelZH: String {
     switch self {
     case .op: return "OP 有袖连衣裙"
     case .jsk: return "JSK 无袖连衣裙"
     case .skirt: return "SK 半裙"
-    case .blouse: return "衬衫内搭"
-    case .accessory: return "小物"
-    case .set: return "套装"
+    case .suspenderSkirt: return "背带裙"
+    case .sp: return "SP 特殊版型"
+    case .ap: return "AP 特殊版型"
+    case .overdress: return "罩裙"
+    case .set: return "FS / 套装"
+    case .blouse: return "衬衫"
+    case .puffBlouse: return "泡泡袖内搭"
+    case .gigotBlouse: return "飞袖 / 羊腿袖内搭"
+    case .hairItem: return "头饰（边夹 / 发带 / BNT / KC）"
+    case .parts: return "配件（腰封 / 围裙 / 假领）"
+    case .shoesBag: return "鞋包（lo鞋 / lo包）"
+    case .accessory: return "其他小物（胸针 / 袜类 / 手套）"
     }
   }
 
@@ -77,9 +134,18 @@ nonisolated enum MidsummerItemKind: String, Codable, CaseIterable, Sendable {
     case .op: return "OP"
     case .jsk: return "JSK"
     case .skirt: return "SK"
+    case .suspenderSkirt: return "背带裙"
+    case .sp: return "SP"
+    case .ap: return "AP"
+    case .overdress: return "罩裙"
+    case .set: return "FS"
     case .blouse: return "衬衫"
-    case .accessory: return "小物"
-    case .set: return "套装"
+    case .puffBlouse: return "泡泡袖"
+    case .gigotBlouse: return "羊腿袖"
+    case .hairItem: return "头饰"
+    case .parts: return "配件"
+    case .shoesBag: return "鞋包"
+    case .accessory: return "其他"
     }
   }
 
@@ -87,16 +153,30 @@ nonisolated enum MidsummerItemKind: String, Codable, CaseIterable, Sendable {
   static func infer(fromName name: String) -> MidsummerItemKind? {
     let lowered = name.lowercased()
     // 先判组合词，避免「op罩裙jsk」这类混写被首个命中规则吃掉
-    if lowered.contains("围裙") || lowered.contains("罩裙") { return .skirt }
+    if lowered.contains("罩裙") { return .overdress }
+    if lowered.contains("围裙") { return .parts }
+    if lowered.contains("背带") { return .suspenderSkirt }
     if lowered.contains("jsk") { return .jsk }
     if lowered.contains("op") { return .op }
     if lowered.contains("sk") || lowered.contains("半裙") { return .skirt }
+    if lowered.contains("泡泡袖") { return .puffBlouse }
+    if lowered.contains("羊腿袖") || lowered.contains("飞袖") { return .gigotBlouse }
     if lowered.contains("衬衫") || lowered.contains("内搭") || lowered.contains("开衫") {
       return .blouse
     }
-    if lowered.contains("边夹") || lowered.contains("发夹") || lowered.contains("kc")
-      || lowered.contains("项链") || lowered.contains("胸针") || lowered.contains("帽")
+    if lowered.contains("边夹") || lowered.contains("发夹") || lowered.contains("发带")
+      || lowered.contains("bnt") || lowered.contains("bonnet") || lowered.contains("kc")
+      || lowered.contains("项链") || lowered.contains("帽")
     {
+      return .hairItem
+    }
+    if lowered.contains("腰封") || lowered.contains("假领") { return .parts }
+    if lowered.contains("lo鞋") || lowered.contains("鞋子") || lowered.contains("lo包")
+      || lowered.contains("包包")
+    {
+      return .shoesBag
+    }
+    if lowered.contains("胸针") || lowered.contains("袜") || lowered.contains("手套") {
       return .accessory
     }
     return nil

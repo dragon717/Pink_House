@@ -719,15 +719,54 @@ struct MidsummerListingFormView: View {
   }
 
   private var kindCard: some View {
-    wizardCard("商品分类", hint: "决定商品在系列页的分组与图标。") {
-      Picker("分类", selection: $draft.kind) {
-        ForEach(MidsummerItemKind.allCases, id: \.self) { candidate in
-          Text(candidate.labelZH).tag(candidate)
+    wizardCard(
+      "商品分类",
+      hint: "按「连衣裙 / 内搭 / 小物」三个大类分组，点一下具体类型即可；决定商品在系列页的分组与图标。"
+    ) {
+      VStack(alignment: .leading, spacing: 12) {
+        ForEach(MidsummerItemCategory.allCases, id: \.self) { category in
+          VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 4) {
+              Text(category.labelZH)
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(MidsummerTheme.primaryText)
+              if draft.kind.category == category {
+                Circle()
+                  .fill(MidsummerTheme.brandOrange)
+                  .frame(width: 5, height: 5)
+              }
+            }
+            LazyVGrid(
+              columns: [GridItem(.adaptive(minimum: 92), spacing: 8)], alignment: .leading, spacing: 8
+            ) {
+              ForEach(MidsummerItemKind.kinds(in: category), id: \.self) { candidate in
+                let on = draft.kind == candidate
+                Button {
+                  draft.kind = candidate
+                } label: {
+                  Text(candidate.shortLabel)
+                    .font(.system(size: 12, weight: on ? .semibold : .regular))
+                    .foregroundStyle(on ? MidsummerTheme.brandOrange : MidsummerTheme.primaryText)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 8)
+                    .background(on ? MidsummerTheme.orangeSurface : MidsummerTheme.subtleFill)
+                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    .overlay(
+                      RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .stroke(on ? MidsummerTheme.brandOrange : Color.clear, lineWidth: 1)
+                    )
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("listing-kind-\(candidate.rawValue)")
+                .accessibilityLabel("\(category.labelZH) \(candidate.labelZH)")
+                .accessibilityAddTraits(on ? .isSelected : [])
+              }
+            }
+          }
         }
       }
-      .pickerStyle(.menu)
-      .frame(maxWidth: .infinity, alignment: .leading)
-      .accessibilityIdentifier("listing-kind")
     }
   }
 
