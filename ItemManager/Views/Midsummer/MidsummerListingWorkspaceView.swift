@@ -25,7 +25,13 @@ struct MidsummerListingWorkspaceView: View {
   @State private var showingForm = false
   @State private var toast: String?
 
-  private var seriesListings: [MidsummerListing] { listingStore.sortedListings.filter { $0.seriesID == series.id } }
+  private var seriesListings: [MidsummerListing] {
+    // 预售相位排序：定金期 → 尾款期 → 预售结束 → 其它，流转状态一眼可读。
+    let phaseRank: [MidsummerPresalePhase?: Int] = [.deposit: 0, .balance: 1, .ended: 2, nil: 3]
+    return listingStore.sortedListings
+      .filter { $0.seriesID == series.id }
+      .sorted { phaseRank[$0.presalePhase()] ?? 3 < phaseRank[$1.presalePhase()] ?? 3 }
+  }
 
   var body: some View {
     NavigationStack {
@@ -66,6 +72,8 @@ struct MidsummerListingWorkspaceView: View {
         MidsummerListingFormView(store: store, series: series, existing: listing)
       }
       .animation(.easeOut(duration: 0.18), value: toast)
+      // 进入工作台补一次预售流转（与系列页同一兜底），行内徽章显示当前相位。
+      .onAppear { listingStore.refreshPresaleTransitions() }
     }
   }
 
@@ -141,6 +149,16 @@ struct MidsummerListingWorkspaceView: View {
       VStack(alignment: .leading, spacing: 4) {
         HStack(spacing: 6) {
           statusChip(listing.status)
+          // 预售相位徽章：定金期 / 尾款期 / 预售结束（含截止时间）。
+          if let phase = listing.presalePhase() {
+            Text(phaseChipText(listing, phase: phase))
+              .font(.system(size: 9, weight: .semibold))
+              .foregroundStyle(MidsummerTheme.brandOrange)
+              .padding(.horizontal, 5)
+              .padding(.vertical, 2)
+              .background(MidsummerTheme.orangeSurface)
+              .clipShape(Capsule())
+          }
           Text(listing.name)
             .font(.system(size: 13, weight: .medium))
             .foregroundStyle(MidsummerTheme.primaryText)
@@ -216,6 +234,21 @@ struct MidsummerListingWorkspaceView: View {
       .padding(.vertical, 2)
       .background(color.opacity(0.12))
       .clipShape(Capsule())
+  }
+
+  /// 相位徽章文案：带阶段归属，临近截止再带剩余天数，流转时机一目了然。
+  private func phaseChipText(_ listing: MidsummerListing, phase: MidsummerPresalePhase) -> String {
+    let now = Date()
+    let deadline: Date? = {
+      switch phase {
+      case .deposit: return listing.depositEndsAt
+      case .balance: return listing.balanceEndsAt
+      case .ended: return nil
+      }
+    }()
+    guard let deadline else { return phase.labelZH }
+    let days = Int(ceil(deadline.timeIntervalSince(now) / 86_400))
+    return days > 0 ? "\(phase.labelZH) · 余 \(days) 天" : phase.labelZH
   }
 
   private func showToast(_ message: String) {

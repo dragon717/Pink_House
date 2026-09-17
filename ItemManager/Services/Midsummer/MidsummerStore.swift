@@ -171,6 +171,8 @@ final class MidsummerStore: ObservableObject {
 
   func refreshFromCloud() async {
     isRefreshingCloud = true
+    // 预售流转兜底：前台 / 下拉刷新时把到期的定金商品推进尾款阶段。
+    MidsummerListingStore.shared.refreshPresaleTransitions()
     defer { isRefreshingCloud = false }
 
     creatorGate = await MidsummerCloudService.shared.creatorGate()

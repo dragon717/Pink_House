@@ -500,7 +500,12 @@ nonisolated struct MidsummerItemDTO: Codable, Identifiable, Hashable, Sendable {
   ///   5. **参考价（`reference`）及一切划线价 / 会员价 / 到手价 / 促销标签**：
   ///      不在四类之内，详情页一律不渲染；口径细节如需保留走 `priceNote` 文案。
   ///   6. 四类全空才显示「价格待补充」诚实态；某一类缺失只影响该行。
-  func detailPriceRows(stage: MidsummerStage) -> [DetailPriceRow] {
+  ///
+  /// - Parameter presaleEnded: 定金-尾款预售已结束（用户 2026-09-17 规则 4）。
+  ///   此时预约期已了结、商品转入正常销售，**预约价与现货价同时展示**——
+  ///   预约价在前（历史成交口径，付过定金尾款的人按它结算），现货价在后
+  ///   （当前购买口径）。哪类缺数据就少哪行，两类全缺退回互斥逻辑兜底。
+  func detailPriceRows(stage: MidsummerStage, presaleEnded: Bool = false) -> [DetailPriceRow] {
     var rows: [DetailPriceRow] = []
 
     // 1) 定金 + 尾款：成对展示，缺哪类就少哪行
@@ -540,9 +545,13 @@ nonisolated struct MidsummerItemDTO: Codable, Identifiable, Hashable, Sendable {
       preorderPrice.map { DetailPriceRow(label: "预约价", value: "¥\($0)（全款预约）") }
     }
 
-    // 3) 预约价与现货价互斥，阶段定优先，优先类缺数据才退另一类
+    // 3) 预约价与现货价：常规按阶段互斥（优先类缺数据才退另一类）；
+    //    预售结束则两类同示（预约价在前、现货价在后），缺哪类少哪行。
     let presale = Self.isPresaleStage(stage)
-    if presale {
+    if presaleEnded {
+      if let row = preorderRow() { rows.append(row) }
+      if let row = spotRow() { rows.append(row) }
+    } else if presale {
       if let row = preorderRow() ?? spotRow() { rows.append(row) }
     } else {
       if let row = spotRow() ?? preorderRow() { rows.append(row) }

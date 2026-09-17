@@ -162,6 +162,10 @@ nonisolated struct MidsummerListing: Codable, Identifiable, Equatable, Sendable 
   /// 定金区间下限 / 上限（元）。
   var depositMin: Int? = nil
   var depositMax: Int? = nil
+  /// 定金阶段截止时间（nil = 未设置，定金期不自动流转）。
+  var depositEndsAt: Date? = nil
+  /// 尾款阶段截止时间（nil = 未设置，尾款期不自动结束）。
+  var balanceEndsAt: Date? = nil
   var note: String
   /// 原文出处（合规必填，Apple 5.2）。留空时转 DTO 回退到系列出处。
   var sourceURL: String
@@ -218,6 +222,72 @@ nonisolated struct MidsummerListing: Codable, Identifiable, Equatable, Sendable 
         .compactMap { $0 }.joined(separator: " + ")
     }
     return "价格待填"
+  }
+}
+
+// MARK: - 定金 → 尾款 预售状态机（用户 2026-09-17 业务规则）
+
+/// 定金-尾款一体预售的运行相位。时间驱动、纯函数可判，跨 App 重启稳定。
+///
+/// 业务规则（用户 2026-09-17）：
+///   1. 以定金形式上新 → 处于「上新（定金）」列表；
+///   2. 定金阶段结束 → 自动从上新列表移除；
+///   3. 进入尾款阶段 → 自动展示到尾款列表，并显示尾款价格；
+///   4. 定金与尾款均结束 → 预售结束：详情页同时展示预约价与现货价。
+nonisolated enum MidsummerPresalePhase: String, Codable, Sendable, Equatable {
+  /// 定金期：出现在「上新（定金）」列表。
+  case deposit
+  /// 尾款期：出现在「尾款」列表，价格行显示尾款。
+  case balance
+  /// 预售结束：两列表都不再出现；详情页预约价与现货价同时展示。
+  case ended
+
+  var labelZH: String {
+    switch self {
+    case .deposit: return "定金期"
+    case .balance: return "尾款期"
+    case .ended: return "预售结束"
+    }
+  }
+}
+
+extension MidsummerListing {
+
+  /// 定金 + 尾款的合计（预约价）。任一缺省则为 nil——预售定金模式下
+  /// 「定金金额与尾款金额之和等于预约价」，缺一半就算不出全款。
+  var expectedPreorderPrice: Int? {
+    guard let deposit, let balance else { return nil }
+    return deposit + balance
+  }
+
+  /// 当前所处预售相位（纯函数，`now` 可注入供单测与预览）。
+  ///
+  /// 返回 nil = 该商品不走定金-尾款状态机（阶段是预约价 / 现货，或还没选阶段），
+  /// 列表归属与详情页展示沿用各自的既有逻辑。
+  ///
+  /// 边界约定：
+  ///   · **截止时间未设置** = 阶段不会自动结束：定金期永远停在定金期，
+  ///     尾款期永远停在尾款期（创作者仍可手动改阶段）；
+  ///   · `now == depositEndsAt` 算定金结束（用 `>=` 判定，卡点时刻归下一阶段）；
+  ///   · **倒挂配置**（`balanceEndsAt <= depositEndsAt`）：定金结束时尾款期
+  ///     已被压成 0，直接判「预售结束」，不产生一个瞬时的尾款期；
+  ///   · 只流转、不落死：相位由时间函数实时推导，创作者事后延长
+  ///     `balanceEndsAt`，商品会自动「复活」回尾款期。
+  func presalePhase(at now: Date = Date()) -> MidsummerPresalePhase? {
+    switch stage {
+    case .deposit:
+      // 定金期未结束（含未配置截止时间）。
+      guard let depositEndsAt, now >= depositEndsAt else { return .deposit }
+      // 定金已结束 → 看尾款期：未配置截止 = 尾款期不自动结束。
+      guard let balanceEndsAt else { return .balance }
+      // 尾款期未到 → 尾款期；已到（含倒挂配置）→ 预售结束。
+      return now >= balanceEndsAt ? .ended : .balance
+    case .balance:
+      guard let balanceEndsAt, now >= balanceEndsAt else { return .balance }
+      return .ended
+    default:
+      return nil
+    }
   }
 }
 

@@ -78,6 +78,9 @@ struct MidsummerListingDraft {
   var balanceEnabled: Bool = false
   var depositMinText: String = ""
   var depositMaxText: String = ""
+  // 预售时间窗（定金-尾款自动流转的依据；nil = 不自动流转）。
+  var depositEndsAt: Date? = nil
+  var balanceEndsAt: Date? = nil
   var priceKind: MidsummerPriceKind = .shop
   var sourceURL: String = ""
 
@@ -563,6 +566,24 @@ struct MidsummerListingFormView: View {
       if !fields.isEmpty && typed.allSatisfy({ trimmed($0.1).isEmpty }) {
         return "请至少填写一项当前阶段的价格：\(fields.map(\.labelZH).joined(separator: " / "))。"
       }
+
+      // 预售时间窗校验：倒挂配置会让定金结束时直接判「预售结束」。
+      if let depositEndsAt = draft.depositEndsAt,
+        let balanceEndsAt = draft.balanceEndsAt,
+        balanceEndsAt <= depositEndsAt
+      {
+        return "尾款截止需晚于定金截止（第 2 步），否则预售会在定金结束时立即结束。"
+      }
+
+      // 定金 + 尾款 = 预约价（硬规则）：两边都配了数字且预约价也填了数，必须相等。
+      if draft.depositEnabled, draft.balanceEnabled,
+        let deposit = Int(trimmed(draft.depositText)),
+        let balance = Int(trimmed(draft.balanceText)),
+        let preorder = Int(trimmed(draft.preorderText)),
+        preorder != deposit + balance
+      {
+        return "预约价应为定金 + 尾款 = ¥\(deposit + balance)（当前填了 ¥\(preorder)）。"
+      }
       return nil
 
     case .confirm:
@@ -682,8 +703,68 @@ struct MidsummerListingFormView: View {
         .padding(.top, 2)
         .transition(.opacity)
       }
+
+      // 定金-尾款预售时间窗（用户 2026-09-17 自动流转规则）：
+      // 定金期结束 → 自动从「上新」列表移除并进入尾款列表；
+      // 尾款期也结束 → 预售结束，详情页同时展示预约价与现货价。
+      if draft.stage == .deposit || draft.stage == .balance {
+        VStack(alignment: .leading, spacing: 8) {
+          Text("预售时间窗（到点自动流转；不设置则停留在当前阶段）")
+            .font(.system(size: 11))
+            .foregroundStyle(MidsummerTheme.secondaryText)
+          if draft.stage == .deposit {
+            optionalDatePicker(
+              "定金截止", binding: $draft.depositEndsAt, identifier: "listing-deposit-ends")
+          }
+          optionalDatePicker(
+            "尾款截止", binding: $draft.balanceEndsAt, identifier: "listing-balance-ends")
+          if let depositEndsAt = draft.depositEndsAt,
+            let balanceEndsAt = draft.balanceEndsAt,
+            balanceEndsAt <= depositEndsAt
+          {
+            Text("尾款截止需晚于定金截止，否则定金结束时会直接判定预售结束。")
+              .font(.system(size: 11))
+              .foregroundStyle(MidsummerTheme.priceRed)
+          }
+        }
+        .padding(.top, 4)
+      }
     }
     .animation(.snappy(duration: 0.16), value: draft.stage)
+  }
+
+  /// 可选时间选择器：默认「未设置」（不自动流转）；打开开关后出现 DatePicker。
+  private func optionalDatePicker(
+    _ title: String, binding: Binding<Date?>, identifier: String
+  ) -> some View {
+    HStack(spacing: 10) {
+      Toggle(isOn: Binding(
+        get: { binding.wrappedValue != nil },
+        set: { on in binding.wrappedValue = on ? Date().addingTimeInterval(7 * 86_400) : nil }
+      )) {
+        Text(title)
+          .font(.system(size: 13))
+          .foregroundStyle(MidsummerTheme.primaryText)
+      }
+      .toggleStyle(.switch)
+      .labelsHidden()
+      .accessibilityIdentifier("\(identifier)-toggle")
+
+      if let date = binding.wrappedValue {
+        DatePicker(
+          "", selection: Binding(get: { date }, set: { binding.wrappedValue = $0 }),
+          displayedComponents: [.date, .hourAndMinute]
+        )
+        .font(.system(size: 12))
+        .labelsHidden()
+        .accessibilityIdentifier(identifier)
+      } else {
+        Text("未设置")
+          .font(.system(size: 12))
+          .foregroundStyle(MidsummerTheme.secondaryText)
+      }
+      Spacer(minLength: 0)
+    }
   }
 
   // MARK: ③ 商品与尺码（名称 / 分类 / 尺码 / 款式 / 价格 同屏）
@@ -1140,7 +1221,21 @@ struct MidsummerListingFormView: View {
                 priceField("尾款金额", text: $draft.balanceText, identifier: "listing-balance")
               }
             }
+            // 定金 + 尾款 = 预约价（硬规则）：两项都配齐后自动算出预约价，
+            // 详情页预售结束时的「预约价 + 现货价」双价展示用的就是它。
+            if draft.depositEnabled, draft.balanceEnabled,
+              let deposit = Int(trimmed(draft.depositText)),
+              let balance = Int(trimmed(draft.balanceText))
+            {
+              Text("定金 ¥\(deposit) + 尾款 ¥\(balance) = 预约价 ¥\(deposit + balance)（自动核算）")
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(MidsummerTheme.freshGreen)
+            }
           }
+          .onChange(of: draft.depositText) { _, _ in syncPreorderFromDepositBalance() }
+          .onChange(of: draft.balanceText) { _, _ in syncPreorderFromDepositBalance() }
+          .onChange(of: draft.depositEnabled) { _, _ in syncPreorderFromDepositBalance() }
+          .onChange(of: draft.balanceEnabled) { _, _ in syncPreorderFromDepositBalance() }
         }
       }
     }
@@ -1159,6 +1254,17 @@ struct MidsummerListingFormView: View {
         .tint(MidsummerTheme.accentPink)
         .accessibilityIdentifier(identifier)
     }
+  }
+
+  /// 定金 + 尾款 = 预约价的自动核算：两项都配齐时把预约价回填进 draft
+  /// （预约价输入框不在定金阶段的价格项里，落盘走这里回填的值）。
+  /// 两项没配齐则不动预约价，避免把半成品价格写进存档。
+  private func syncPreorderFromDepositBalance() {
+    guard draft.depositEnabled, draft.balanceEnabled,
+      let deposit = Int(trimmed(draft.depositText)),
+      let balance = Int(trimmed(draft.balanceText))
+    else { return }
+    draft.preorderText = String(deposit + balance)
   }
 
   private var depositRangeRow: some View {
@@ -1214,6 +1320,17 @@ struct MidsummerListingFormView: View {
         summaryRow("系列标题", draft.launchTitle)
         summaryRow("上新时间", draft.hasKnownLaunchDate ? Self.dateText(draft.launchDate) : "待定")
         summaryRow("上新阶段", draft.stage?.labelZH ?? "未选择")
+        if draft.depositEndsAt != nil || draft.balanceEndsAt != nil {
+          summaryRow(
+            "预售时间窗",
+            [
+              draft.depositEndsAt.map { "定金至 \(Self.dateText($0))" },
+              draft.balanceEndsAt.map { "尾款至 \(Self.dateText($0))" },
+            ]
+            .compactMap { $0 }
+            .joined(separator: "；")
+          )
+        }
         summaryRow("尺码", draft.sizes.isEmpty ? "无（小物 / 均码）" : draft.sizes.joined(separator: " / "))
         summaryRow("商品名称", draft.name)
         summaryRow("款式", styleSummaryText)
@@ -1516,6 +1633,13 @@ struct MidsummerListingFormView: View {
     listing.preorderPrice = Int(trimmed(draft.preorderText))
     listing.deposit = draft.depositEnabled ? Int(trimmed(draft.depositText)) : nil
     listing.balance = draft.balanceEnabled ? Int(trimmed(draft.balanceText)) : nil
+    // 定金 + 尾款 = 预约价：配齐后预约价以合计为准（onChange 已回填 draft，
+    // 这里再兜一次底，直接从存档编辑等绕过表单 onChange 的路径也正确）。
+    if listing.deposit != nil, listing.balance != nil {
+      listing.preorderPrice = listing.expectedPreorderPrice
+    } else {
+      listing.preorderPrice = Int(trimmed(draft.preorderText))
+    }
     listing.priceKind = Int(trimmed(draft.priceText)) == nil ? nil : draft.priceKind
     listing.note = draft.note
     listing.sourceURL = trimmed(draft.sourceURL)
@@ -1527,6 +1651,17 @@ struct MidsummerListingFormView: View {
     listing.launchDate = draft.hasKnownLaunchDate ? draft.launchDate : nil
     listing.depositMin = draft.depositEnabled ? Int(trimmed(draft.depositMinText)) : nil
     listing.depositMax = draft.depositEnabled ? Int(trimmed(draft.depositMaxText)) : nil
+    // 预售时间窗：只对定金-尾款线生效；其它阶段清空，避免残留脏配置。
+    if draft.stage == .deposit {
+      listing.depositEndsAt = draft.depositEndsAt
+      listing.balanceEndsAt = draft.balanceEndsAt
+    } else if draft.stage == .balance {
+      listing.depositEndsAt = nil
+      listing.balanceEndsAt = draft.balanceEndsAt
+    } else {
+      listing.depositEndsAt = nil
+      listing.balanceEndsAt = nil
+    }
 
     let savedNames = listingStore.saveImages(draft.images, listingID: id)
     if !savedNames.isEmpty || !draft.images.isEmpty {
@@ -1672,6 +1807,8 @@ struct MidsummerListingFormView: View {
     draft.launchDate = existing.launchDate ?? Date()
     draft.depositMinText = existing.depositMin.map(String.init) ?? ""
     draft.depositMaxText = existing.depositMax.map(String.init) ?? ""
+    draft.depositEndsAt = existing.depositEndsAt
+    draft.balanceEndsAt = existing.balanceEndsAt
   }
 
   private func loadPicker(

@@ -1173,7 +1173,11 @@ struct MidsummerItemDetailSheet: View {
             // `MidsummerItemDTO.detailPriceRows(stage:)` 注释；其余（参考价、
             // 划线价、会员价、到手价、促销标签）一律不渲染。缺哪类就少哪行，
             // 不出现空白或「待补充」占位。
-            let priceRows = item.detailPriceRows(stage: series.stage)
+            // 上新工作台商品（id 带 listing 前缀）：定金-尾款预售结束后，
+            // 预约价与现货价**同时展示**（业务规则第 4 条）。
+            let isListingPresaleEnded = MidsummerListingStore.shared
+              .listing(forItemID: item.id)?.presalePhase() == .ended
+            let priceRows = item.detailPriceRows(stage: series.stage, presaleEnded: isListingPresaleEnded)
             if let headline = priceRows.first {
               Text("\(headline.label) \(headline.value)")
                 .font(.system(size: 15, weight: .semibold))

@@ -211,6 +211,8 @@ struct MidsummerSeriesDetailView: View {
   var onOpenLinkReport: (() -> Void)? = nil
 
   @Environment(\.modelContext) private var modelContext
+  /// 上架记录（定金-尾款预售相位分区与流转都从这读）。
+  @ObservedObject private var listingStore = MidsummerListingStore.shared
 
   @State private var detailItem: MidsummerItemDTO?
   /// 形态 A（一键入库）的进行中 / 已完成状态
@@ -263,6 +265,9 @@ struct MidsummerSeriesDetailView: View {
       }
     }
     .animation(.easeOut(duration: 0.18), value: insertToast)
+    // 进入页面补一次预售流转：App 一直开着（没重启）时，跨过截止时刻
+    // 也能把到期的定金商品推进尾款阶段，分区立即重新归属。
+    .onAppear { listingStore.refreshPresaleTransitions() }
     .sheet(item: $detailItem) { item in
       if let series {
         MidsummerItemDetailSheet(series: series, item: item, brandName: brandName)
@@ -596,13 +601,58 @@ struct MidsummerSeriesDetailView: View {
 
   // MARK: 单品列表
 
+  // MARK: 商品列表（预售相位分区：上新 · 定金 / 尾款 / 全部商品）
+
+  /// 定金-尾款状态机驱动的列表归属（用户 2026-09-17 业务规则）：
+  ///   · 定金期商品 → 「上新（定金）」区；
+  ///   · 定金截止后自动从上新区移除 → 进入「尾款」区（行内显示尾款价）；
+  ///   · 尾款期也结束 → 预售结束，商品回到「全部商品」区，
+  ///     详情页同时展示预约价与现货价。
+  private func presalePartition(_ series: MidsummerSeriesDTO, now: Date)
+    -> (deposit: [MidsummerItemDTO], balance: [MidsummerItemDTO], rest: [MidsummerItemDTO])
+  {
+    var deposit: [MidsummerItemDTO] = []
+    var balance: [MidsummerItemDTO] = []
+    var rest: [MidsummerItemDTO] = []
+    for item in series.items {
+      switch listingStore.listing(forItemID: item.id)?.presalePhase(at: now) {
+      case .deposit: deposit.append(item)
+      case .balance: balance.append(item)
+      default: rest.append(item)  // 预售结束 / 不走状态机（种子商品、现货、预约价）
+      }
+    }
+    return (deposit, balance, rest)
+  }
+
   private func itemsSection(_ series: MidsummerSeriesDTO) -> some View {
-    VStack(alignment: .leading, spacing: 0) {
+    let partition = presalePartition(series, now: Date())
+    return VStack(alignment: .leading, spacing: 0) {
+      if !partition.deposit.isEmpty {
+        presaleSectionHeader(
+          title: "上新（定金）", count: partition.deposit.count,
+          caption: "定金期商品；截止后自动转入尾款列表",
+          identifier: "midsummer-presale-section-deposit")
+        ForEach(partition.deposit) { item in
+          itemRow(series: series, item: item, presalePhase: .deposit)
+          sectionDivider
+        }
+      }
+      if !partition.balance.isEmpty {
+        presaleSectionHeader(
+          title: "尾款", count: partition.balance.count,
+          caption: "尾款期商品；付清尾款即等出货",
+          identifier: "midsummer-presale-section-balance")
+        ForEach(partition.balance) { item in
+          itemRow(series: series, item: item, presalePhase: .balance)
+          sectionDivider
+        }
+      }
+
       HStack(spacing: 6) {
         Text("全部商品")
           .font(.system(size: 14, weight: .semibold))
           .foregroundStyle(MidsummerTheme.primaryText)
-        Text(series.itemCountText)
+        Text("\(partition.rest.count) 件")
           .font(.system(size: 11))
           .foregroundStyle(MidsummerTheme.secondaryText)
         Spacer(minLength: 0)
@@ -611,7 +661,7 @@ struct MidsummerSeriesDetailView: View {
       .padding(.top, 20)
       .padding(.bottom, 8)
 
-      if series.items.isEmpty {
+      if partition.rest.isEmpty && partition.deposit.isEmpty && partition.balance.isEmpty {
         VStack(spacing: 6) {
           Image(systemName: "tray")
             .font(.system(size: 22, weight: .light))
@@ -623,18 +673,66 @@ struct MidsummerSeriesDetailView: View {
         .frame(maxWidth: .infinity)
         .padding(.vertical, 30)
       } else {
-        ForEach(series.items) { item in
+        ForEach(partition.rest) { item in
           itemRow(series: series, item: item)
-          Rectangle()
-            .fill(MidsummerTheme.divider)
-            .frame(height: 0.5)
-            .padding(.leading, 112)
+          sectionDivider
         }
       }
     }
   }
 
-  private func itemRow(series: MidsummerSeriesDTO, item: MidsummerItemDTO) -> some View {
+  private var sectionDivider: some View {
+    Rectangle()
+      .fill(MidsummerTheme.divider)
+      .frame(height: 0.5)
+      .padding(.leading, 112)
+  }
+
+  private func presaleSectionHeader(title: String, count: Int, caption: String, identifier: String)
+    -> some View
+  {
+    VStack(alignment: .leading, spacing: 3) {
+      HStack(spacing: 6) {
+        Text(title)
+          .font(.system(size: 14, weight: .semibold))
+          .foregroundStyle(MidsummerTheme.primaryText)
+        Text("\(count) 件")
+          .font(.system(size: 11))
+          .foregroundStyle(MidsummerTheme.secondaryText)
+        Spacer(minLength: 0)
+      }
+      Text(caption)
+        .font(.system(size: 10))
+        .foregroundStyle(MidsummerTheme.secondaryText)
+    }
+    .padding(.horizontal, 14)
+    .padding(.top, 20)
+    .padding(.bottom, 8)
+    .accessibilityIdentifier(identifier)
+  }
+
+  /// 列表行价格文案：预售期按相位显示「当前阶段要付的钱」。
+  ///   · 定金期：定金 + 尾款一体展示（如「定金 ¥388 · 尾款 ¥400」）；
+  ///   · 尾款期：只显示尾款（缺尾款数据时如实退回常规价格文案，不占位）；
+  ///   · 其它相位（含预售结束）：常规带口径价格文案。
+  private func priceLine(for item: MidsummerItemDTO, phase: MidsummerPresalePhase?) -> String {
+    switch phase {
+    case .deposit:
+      // 定金与尾款成对出现是预售定金模式的口径；只有定金就只写定金。
+      switch (item.deposit, item.balance) {
+      case let (deposit?, balance?): return "定金 ¥\(deposit) · 尾款 ¥\(balance)"
+      case let (deposit?, nil): return "定金 ¥\(deposit)"
+      default: return item.priceTextWithKind
+      }
+    case .balance:
+      if let balance = item.balance { return "尾款 ¥\(balance)" }
+      return item.priceTextWithKind
+    default:
+      return item.priceTextWithKind
+    }
+  }
+
+  private func itemRow(series: MidsummerSeriesDTO, item: MidsummerItemDTO, presalePhase: MidsummerPresalePhase? = nil) -> some View {
     // 同一个坑：外层 Button 套内层 Button 会让「加入衣橱」和整行点击互相打架。
     // 整行点击交给 contentShape + onTapGesture，入库按钮保持真 Button。
     HStack(alignment: .top, spacing: 12) {
@@ -653,6 +751,17 @@ struct MidsummerSeriesDetailView: View {
           .accessibilityIdentifier("midsummer-series-item-\(item.id)")
 
         HStack(spacing: 5) {
+          // 预售相位徽章：一眼看出商品此刻在上新期还是尾款期。
+          if let presalePhase {
+            Text(presalePhase.labelZH)
+              .font(.system(size: 9, weight: .semibold))
+              .foregroundStyle(MidsummerTheme.brandOrange)
+              .padding(.horizontal, 5)
+              .padding(.vertical, 1.5)
+              .background(MidsummerTheme.orangeSurface)
+              .clipShape(Capsule())
+              .accessibilityIdentifier("midsummer-item-phase-\(item.id)")
+          }
           Text(item.kind.shortLabel)
             .font(.system(size: 10, weight: .semibold))
             .foregroundStyle(MidsummerTheme.secondaryText)
@@ -677,7 +786,9 @@ struct MidsummerSeriesDetailView: View {
 
         // 带口径：归集商品的逐款价可能是「尾款」口径（如卢瓦尔葡萄园 3.0），
         // 只显示 ¥160–400 会让人按全款估预算。
-        Text(item.priceTextWithKind)
+        // 尾款期商品按业务规则**只显示尾款价**（当前要付的钱）；
+        // 定金期商品显示「定金 · 尾款」一体价（两者同属一个阶段体系）。
+        Text(priceLine(for: item, phase: presalePhase))
           .font(.system(size: 13, weight: .semibold))
           .foregroundStyle(
             item.hasPrice ? MidsummerTheme.priceRed : MidsummerTheme.secondaryText

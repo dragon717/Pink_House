@@ -35,6 +35,9 @@ final class MidsummerListingStore: ObservableObject {
       fileURL = Self.defaultFileURL()
     }
     load()
+    // 注意：init 只做纯加载，不在这里跑预售流转——流转的时机应由「用户真的
+    // 在看列表」（系列页 / 工作台 onAppear）与「云端刷新」驱动，避免加载
+    // 时刻隐式改写存档（单测注入历史时间会被提前流转，语义也难解释）。
   }
 
   // MARK: 查询
@@ -91,6 +94,52 @@ final class MidsummerListingStore: ObservableObject {
     }
     listings.removeAll { $0.id == id }
     persist()
+  }
+
+  // MARK: 预售状态自动流转（用户 2026-09-17 业务规则）
+
+  /// 按当前时间推进「定金 → 尾款」的**写入式**流转。
+  ///
+  /// 只写一件事：定金期已结束的商品把 `stage` 从 `.deposit` 推进到 `.balance`——
+  /// 这样创作者工作台、系列 feed 合并链路读到的是当前真实阶段。
+  /// 「预售结束」**不写盘**：相位由 `presalePhase(at:)` 时间函数实时推导，
+  /// 创作者事后延长尾款截止时间，商品自动回到尾款期；写成终态就没法回头了。
+  ///
+  /// - Parameter now: 可注入时间（单测 / 预览），默认当前时刻。
+  /// - Returns: 发生阶段流转的商品数量（供调用方决定是否刷新 UI）。
+  @discardableResult
+  func refreshPresaleTransitions(now: Date = Date()) -> Int {
+    var moved = 0
+    for (index, listing) in listings.enumerated() {
+      guard listing.status == .listed, listing.stage == .deposit,
+        let phase = listing.presalePhase(at: now), phase == .balance
+      else { continue }
+      listings[index].stage = .balance
+      moved += 1
+    }
+    if moved > 0 { persist() }
+    return moved
+  }
+
+  /// 某系列里按预售相位查询已上架商品。
+  /// 返回的 key 有序：`.deposit` 在前（上新列表）、`.balance` 居中（尾款列表）、
+  /// `.ended` 收尾；不走状态机的商品不在结果里（它们进「全部商品」）。
+  func presaleGrouped(inSeries seriesID: String, now: Date = Date())
+    -> [(phase: MidsummerPresalePhase, listings: [MidsummerListing])]
+  {
+    let order: [MidsummerPresalePhase] = [.deposit, .balance, .ended]
+    let grouped = Dictionary(
+      grouping: listings(inSeries: seriesID).filter { $0.status == .listed }
+    ) { $0.presalePhase(at: now) }
+    return order.compactMap { phase in
+      grouped[phase].map { (phase, $0.sorted { $0.updatedAt > $1.updatedAt }) }
+    }
+  }
+
+  /// 详情页 item id（`midsummer-listing-<id>`）反查上架记录。
+  func listing(forItemID itemID: String) -> MidsummerListing? {
+    guard itemID.hasPrefix(MidsummerListingItemIDPrefix) else { return nil }
+    return listing(withID: String(itemID.dropFirst(MidsummerListingItemIDPrefix.count)))
   }
 
   // MARK: 商品图
