@@ -383,14 +383,26 @@ final class MidsummerListingTests: XCTestCase {
     XCTAssertNil(decoded.depositMax)
   }
 
-  /// 阶段 → 价格配置项联动：第 4 步按阶段显示对应价格项。
+  /// 阶段 → 价格配置项联动：第 3 步价格卡按阶段显示对应价格项（2026-09-17 四档）。
   func testStagePriceFieldsLinkage() {
-    XCTAssertEqual(MidsummerLaunchStage.teaser.priceFields, [], "图透阶段无价格配置")
+    XCTAssertEqual(MidsummerLaunchStage.allCases.count, 4, "阶段只保留 定金/尾款/预约价/现货 四档")
     XCTAssertEqual(MidsummerLaunchStage.deposit.priceFields, [.deposit, .balance], "定金阶段显示定金 + 尾款")
     XCTAssertEqual(MidsummerLaunchStage.balance.priceFields, [.balance], "尾款阶段只显示尾款")
-    XCTAssertEqual(MidsummerLaunchStage.shipping.priceFields, [.shop], "出货阶段显示现货价")
-    XCTAssertEqual(MidsummerLaunchStage.rerun.priceFields, [.shop, .preorder], "再贩阶段显示现货价 + 预约价")
+    XCTAssertEqual(MidsummerLaunchStage.preorder.priceFields, [.preorder], "预约价阶段只显示预约价")
     XCTAssertEqual(MidsummerLaunchStage.inStock.priceFields, [.shop], "现货阶段显示现货价")
+  }
+
+  /// 旧存档阶段 raw 降级映射：出货 → 现货、再贩 → 预约价、图透置空。
+  func testLegacyStageRawMapping() {
+    func decode(_ raw: String?) -> MidsummerLaunchStage? {
+      var listing = makeListing()
+      listing.stageRaw = raw
+      return listing.stage
+    }
+    XCTAssertEqual(decode("shipping"), .inStock, "旧「出货」应降级为现货")
+    XCTAssertEqual(decode("rerun"), .preorder, "旧「再贩」应降级为预约价")
+    XCTAssertNil(decode("teaser"), "旧「图透」语义已不存在，应置空由创作者重选")
+    XCTAssertNil(decode("未知raw"), "未知 raw 不应崩溃，返回 nil")
   }
 
   // MARK: 工具

@@ -7,7 +7,7 @@ import SwiftUI
 //   1. **四步在同一个界面**：顶部步骤导航 + 进度指示 + 内容区 + 底部上一步/下一步，
 //      全程一张页面内切换，不再分页 / 不再另开 sheet；
 //   2. ①上传系列主图（多图：预览 / 删除 / 替换）+ 系列标题 + 上新时间；
-//   3. ②选择上新阶段，它是第 4 步价格配置的联动依据；
+//   3. ②选择上新阶段（2026-09-17 收敛为 定金/尾款/预约价/现货 四档），它是第 3 步价格配置的联动依据；
 //   4. ③尺码信息：支持新增 / 编辑 / 删除尺码项（不再是固定候选勾选）；
 //   5. ④单品与价格：现货价 / 预约价 / 定金 / 尾款，定金与尾款为可选项、
 //      由开关按需配置；价格项只显示当前阶段对应的那些；
@@ -73,7 +73,7 @@ struct MidsummerListingDraft {
   var preorderText: String = ""
   var depositText: String = ""
   var balanceText: String = ""
-  /// 定金 / 尾款是**可选项**：开关打开才配置（第 4 步按需开启）。
+  /// 定金 / 尾款是**可选项**：开关打开才配置（第 3 步按需开启）。
   var depositEnabled: Bool = false
   var balanceEnabled: Bool = false
   var depositMinText: String = ""
@@ -517,7 +517,7 @@ struct MidsummerListingFormView: View {
 
     case .stage:
       if draft.stage == nil {
-        return "请选择上新阶段——它决定第 4 步出现哪些价格配置项。"
+        return "请选择上新阶段——它决定第 3 步出现哪些价格配置项。"
       }
       return nil
 
@@ -640,7 +640,7 @@ struct MidsummerListingFormView: View {
   private var stageStep: some View {
     wizardCard(
       "选择上新阶段（类目）",
-      hint: "选错阶段会让系列出现在错误的时间线上，提交前可随时回来改；第 4 步的价格配置项跟这里的阶段联动。"
+      hint: "选错阶段会让系列出现在错误的时间线上，提交前可随时回来改；第 3 步的价格配置项跟这里的阶段联动。"
     ) {
       LazyVGrid(columns: [GridItem(.adaptive(minimum: 96), spacing: 8)], spacing: 8) {
         ForEach(MidsummerLaunchStage.allCases, id: \.self) { candidate in
@@ -1582,11 +1582,9 @@ struct MidsummerListingFormView: View {
 
   /// 上新阶段（表单）→ 系列阶段（目录档案）的同名映射。
   private static let stageMapping: [MidsummerLaunchStage: MidsummerStage] = [
-    .teaser: .preview,
     .deposit: .deposit,
     .balance: .balance,
-    .shipping: .shipping,
-    .rerun: .restock,
+    .preorder: .preorder,
     .inStock: .inStock,
   ]
 

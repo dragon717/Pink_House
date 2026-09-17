@@ -19,6 +19,7 @@ nonisolated enum MidsummerStage: String, Codable, CaseIterable, Sendable {
   case preview      // 图透
   case deposit      // 定金
   case balance      // 尾款
+  case preorder     // 预约价（全款预约，2026-09-17 表单阶段收敛后新增）
   case shipping     // 出货
   case restock      // 再贩
   case inStock      // 现货
@@ -28,6 +29,7 @@ nonisolated enum MidsummerStage: String, Codable, CaseIterable, Sendable {
     case .preview: return "图透"
     case .deposit: return "定金"
     case .balance: return "尾款"
+    case .preorder: return "预约价"
     case .shipping: return "出货"
     case .restock: return "再贩"
     case .inStock: return "现货"
@@ -39,6 +41,7 @@ nonisolated enum MidsummerStage: String, Codable, CaseIterable, Sendable {
     case .preview: return "sparkles"
     case .deposit: return "hand.raised.fill"
     case .balance: return "creditcard.fill"
+    case .preorder: return "clock.arrow.circlepath"
     case .shipping: return "shippingbox.fill"
     case .restock: return "arrow.clockwise"
     case .inStock: return "bag.fill"
@@ -395,9 +398,9 @@ nonisolated struct MidsummerItemDTO: Codable, Identifiable, Hashable, Sendable {
     let value: String
   }
 
-  /// 阶段是否属于预售线（图透 / 定金 / 尾款）：这三档里「预约价」优先于「现货价」。
+  /// 阶段是否属于预售线（图透 / 定金 / 尾款 / 预约价）：这几档里「预约价」优先于「现货价」。
   static func isPresaleStage(_ stage: MidsummerStage) -> Bool {
-    stage == .preview || stage == .deposit || stage == .balance
+    stage == .preview || stage == .deposit || stage == .balance || stage == .preorder
   }
 
   /// 上新阶段（含预售）详情页价格：**只保留四类**——定金 / 尾款 / 现货价 / 预约价。

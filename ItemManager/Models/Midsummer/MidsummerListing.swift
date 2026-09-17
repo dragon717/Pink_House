@@ -15,22 +15,24 @@ import Foundation
 nonisolated let MidsummerListingItemIDPrefix = "midsummer-listing-"
 
 /// 上新阶段（类目）：决定这个系列上新出现在时间线上的哪个阶段。
-/// 对应淘宝谷子圈话术：图透 → 定金 → 尾款 → 出货 → 再贩 / 现货。
+///
+/// 2026-09-17 收敛为四档（用户：只保留定金、尾款、现货、预约价）：
+///   · 定金 → 尾款：预售定金模式，按先后顺序走；
+///   · 预约价：全款预约（不走定金模式的另一条预售线）；
+///   · 现货：开售后。
+/// 旧的图透 / 出货 / 再贩不再作为可选阶段；旧存档 raw 在 `MidsummerListing.stage`
+/// 里做降级映射，解码不会失败。
 nonisolated enum MidsummerLaunchStage: String, Codable, CaseIterable, Sendable {
-  case teaser    // 图透
   case deposit   // 定金
   case balance   // 尾款
-  case shipping  // 出货
-  case rerun     // 再贩
+  case preorder  // 预约价（全款预约）
   case inStock   // 现货
 
   var labelZH: String {
     switch self {
-    case .teaser: return "图透"
     case .deposit: return "定金"
     case .balance: return "尾款"
-    case .shipping: return "出货"
-    case .rerun: return "再贩"
+    case .preorder: return "预约价"
     case .inStock: return "现货"
     }
   }
@@ -38,11 +40,9 @@ nonisolated enum MidsummerLaunchStage: String, Codable, CaseIterable, Sendable {
   /// 选择 chip 上的 SF Symbol 图标（与设计稿一致）。
   var iconSystemName: String {
     switch self {
-    case .teaser: return "sparkles"
     case .deposit: return "checkmark.circle.fill"
     case .balance: return "creditcard"
-    case .shipping: return "shippingbox"
-    case .rerun: return "arrow.clockwise"
+    case .preorder: return "clock.arrow.circlepath"
     case .inStock: return "bag"
     }
   }
@@ -66,30 +66,26 @@ nonisolated enum MidsummerPriceConfigField: String, Codable, CaseIterable, Senda
 }
 
 extension MidsummerLaunchStage {
-  /// 阶段 → 价格配置项联动：第 4 步只显示当前阶段需要的价格项。
-  ///   · 图透：无价格（还没开定金，价格后面再补）；
+  /// 阶段 → 价格配置项联动：第 3 步价格卡只显示当前阶段需要的价格项。
   ///   · 定金：定金 + 尾款（可按需只配其一）+ 定金区间；
   ///   · 尾款：尾款；
-  ///   · 出货 / 现货：现货价；
-  ///   · 再贩：现货价 + 预约价。
+  ///   · 预约价：预约价（全款预约）；
+  ///   · 现货：现货价。
   var priceFields: [MidsummerPriceConfigField] {
     switch self {
-    case .teaser: return []
     case .deposit: return [.deposit, .balance]
     case .balance: return [.balance]
-    case .shipping, .inStock: return [.shop]
-    case .rerun: return [.shop, .preorder]
+    case .preorder: return [.preorder]
+    case .inStock: return [.shop]
     }
   }
 
   /// 价格卡的说明文案（跟阶段走）。
   var priceHint: String {
     switch self {
-    case .teaser: return "图透阶段暂无价格配置，开定金后回来补即可。"
     case .deposit: return "定金阶段：定金与尾款可按需选择配置；定金区间为该系列的定金范围。"
     case .balance: return "尾款阶段：只需配置尾款金额。"
-    case .shipping: return "出货阶段：配置现货价。"
-    case .rerun: return "再贩阶段：配置现货价，支持全款预约时再填预约价。"
+    case .preorder: return "预约价阶段：配置全款预约价。"
     case .inStock: return "现货阶段：配置现货价。"
     }
   }
@@ -196,7 +192,16 @@ nonisolated struct MidsummerListing: Codable, Identifiable, Equatable, Sendable 
   }
 
   var stage: MidsummerLaunchStage? {
-    get { stageRaw.flatMap(MidsummerLaunchStage.init(rawValue:)) }
+    get {
+      if let stage = stageRaw.flatMap(MidsummerLaunchStage.init(rawValue:)) { return stage }
+      // 旧存档降级映射（2026-09-17 阶段收敛为四档前的 raw）：
+      //   出货 → 现货；再贩 → 预约价；图透语义（未开卖）已不存在，置空让创作者重选。
+      switch stageRaw {
+      case "shipping": return .inStock
+      case "rerun": return .preorder
+      default: return nil
+      }
+    }
     set { stageRaw = newValue?.rawValue }
   }
 
