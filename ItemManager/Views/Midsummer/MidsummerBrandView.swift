@@ -1168,15 +1168,26 @@ struct MidsummerItemDetailSheet: View {
                 .foregroundStyle(MidsummerTheme.primaryText)
             }
 
-            Text(item.priceTextWithKind)
-              .font(.system(size: 15, weight: .semibold))
-              .foregroundStyle(MidsummerTheme.priceRed)
-
-            // 预约价（全款预约）与现货价是两档钱，单独成行；
-            // 没采集到就如实写「待补充」，不虚构。
-            labeledRow(
-              "预约价",
-              value: item.preorderPrice.map { "¥\($0)（全款预约）" } ?? "待补充")
+            // —— 价格区（用户 2026-09-17）：上新阶段只保留四类价格 ——
+            // 定金 / 尾款 / 现货价 / 预约价。显示条件与互斥关系见
+            // `MidsummerItemDTO.detailPriceRows(stage:)` 注释；其余（参考价、
+            // 划线价、会员价、到手价、促销标签）一律不渲染。缺哪类就少哪行，
+            // 不出现空白或「待补充」占位。
+            let priceRows = item.detailPriceRows(stage: series.stage)
+            if let headline = priceRows.first {
+              Text("\(headline.label) \(headline.value)")
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(MidsummerTheme.priceRed)
+                .accessibilityIdentifier("midsummer-detail-price-headline")
+              ForEach(priceRows.dropFirst(), id: \.label) { row in
+                labeledRow(row.label, value: row.value)
+                  .accessibilityIdentifier("midsummer-detail-price-row-\(row.label)")
+              }
+            } else {
+              // 四类全空才走诚实态；这不是定金/尾款单缺时的占位。
+              MidsummerPendingTag(text: "价格待补充")
+                .accessibilityIdentifier("midsummer-detail-price-pending")
+            }
 
             if !item.colors.isEmpty {
               labeledRow("配色", value: item.colors.joined(separator: " / "))

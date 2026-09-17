@@ -6,7 +6,8 @@
 //  枕头胸针）并入主链条目后的呈现——两个淘宝链接合并为一个「樱花小羊」条目：
 //    1. 品牌页只有一张「樱花小羊」卡片（a11y 标签 =「名称，现货价 ¥59–999」，
 //       区间取两页并集），不再出现「樱花小羊 小物」独立条目。
-//    2. 详情页：名称 → 现货价 → 预约价行纵向有序（徽章已按用户要求移除）；
+//    2. 详情页：名称 → 现货价纵向有序（徽章已按用户要求移除）；四类价格口径
+//       （用户 2026-09-17）下未采集的类别不渲染该行，无「待补充」占位；
 //       「包含款式」行已移除；尺码从小到大（XS/S/M/L/XL/XXL/F）、
 //       单品尺码表入口齐备；款式对应图按款式归组、组内嵌尺码表。
 //    3. 一键入库 → 规格面板：颜色分类 (24) 逐项可选，小物选项（现 草帽 生成色）
@@ -134,7 +135,8 @@ final class MidsummerGoodsItemUITests: XCTestCase {
     sleep(2)
 
     // 2. 详情页：徽章已按用户要求移除——名称在最上、价格其下，纵向有序；
-    //    价格写清并集口径且以「现货价」为前缀，价格行下紧跟「预约价」行。
+    //    价格写清并集口径且以「现货价」为前缀。四类价格口径（用户 2026-09-17）：
+    //    未采集的类别（如樱花小羊没有预约价）直接不渲染该行，不再有「待补充」占位。
     let done = app.buttons["完成"]
     XCTAssertTrue(done.waitForExistence(timeout: 6), "详情页应以弹窗形式打开（右上角「完成」）")
 
@@ -173,20 +175,34 @@ final class MidsummerGoodsItemUITests: XCTestCase {
       bodyPrice.label.hasPrefix("现货价"),
       "价格行应以「现货价」为口径前缀，实际：\(bodyPrice.label)")
 
-    // 2b. 预约价行：价格下方独立成行；樱花小羊未采集预约价，如实标注「待补充」。
+    // 2b. 预约价行（用户 2026-09-17 四类价格口径）：樱花小羊未采集预约价，
+    //     且其系列处于现货阶段（现货价优先）——「预约价」行**不应**出现，
+    //     也不允许出现「待补充」占位。
     let preorderRow = app.staticTexts["预约价"]
     var preorderScroll = 0
-    while !preorderRow.exists && preorderScroll < 6 {
+    while !preorderRow.exists && preorderScroll < 3 {
       app.swipeUp()
       usleep(500_000)
       preorderScroll += 1
     }
-    XCTAssertTrue(preorderRow.exists, "详情页应在现货价下方渲染「预约价」行")
-    if preorderRow.exists {
-      XCTAssertGreaterThanOrEqual(
-        preorderRow.frame.minY, bodyPrice.frame.minY,
-        "预约价行应在价格行之下（价格行之后才出现）")
+    XCTAssertFalse(preorderRow.exists, "未采集预约价且现货阶段时不应渲染「预约价」行")
+    // 四类价格里只有现货价有数据（樱花小羊系列 stage=inStock）：以价格区专属
+    // identifier 定位——定金 / 尾款 / 预约价三行都不应出现，也不能用「待补充」占位
+    //（缺哪类就少哪行）。「定金」「尾款」等字样在商品其它区域（规格档位、
+    // 上新说明等）合法存在，所以不能用全文匹配。
+    let headline = app.otherElements["midsummer-detail-price-headline"]
+    let headlineText = headline.exists ? headline : app.staticTexts["midsummer-detail-price-headline"]
+    XCTAssertTrue(
+      headlineText.waitForExistence(timeout: 4) && headlineText.label.hasPrefix("现货价"),
+      "价格区主行应以「现货价」开头，实际：\(headlineText.exists ? headlineText.label : "未找到")")
+    for absentRow in ["midsummer-detail-price-row-定金", "midsummer-detail-price-row-尾款", "midsummer-detail-price-row-预约价"] {
+      XCTAssertFalse(
+        app.descendants(matching: .any).matching(identifier: absentRow).firstMatch.exists,
+        "价格区不应渲染无数据的行：\(absentRow)")
     }
+    XCTAssertFalse(
+      app.descendants(matching: .any).matching(identifier: "midsummer-detail-price-pending").firstMatch.exists,
+      "有现货价时不应出现「价格待补充」诚实态标签")
 
     // 3. 信息行齐备：尺码（从小到大）。
     //    「包含款式」行与「单品尺码表」入口均已按用户要求移除

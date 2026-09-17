@@ -387,6 +387,87 @@ nonisolated struct MidsummerItemDTO: Codable, Identifiable, Hashable, Sendable {
   /// 归集商品的 `price` 为 nil、价格全在 SKU 表里，用这个判断才不会误报「缺价格」。
   var hasPrice: Bool { !effectivePrices.isEmpty || deposit != nil }
 
+  // MARK: 详情页四类价格口径（用户 2026-09-17）
+
+  /// 详情页价格行。`label + value` 直接可读（如「定金」+「¥388」）。
+  nonisolated struct DetailPriceRow: Equatable, Sendable {
+    let label: String
+    let value: String
+  }
+
+  /// 阶段是否属于预售线（图透 / 定金 / 尾款）：这三档里「预约价」优先于「现货价」。
+  static func isPresaleStage(_ stage: MidsummerStage) -> Bool {
+    stage == .preview || stage == .deposit || stage == .balance
+  }
+
+  /// 上新阶段（含预售）详情页价格：**只保留四类**——定金 / 尾款 / 现货价 / 预约价。
+  ///
+  /// 显示条件与互斥关系：
+  ///   1. **定金 + 尾款成对**（预售定金模式）：有定金先给「定金 ¥x」；尾款**有数据才**
+  ///      追加「尾款 ¥y」行（支付定金后还要付的钱）。缺尾款就少一行，不占位、不写
+  ///      「待补充」——空行比缺数据更误导。
+  ///   2. **归集商品的 SKU 尾款**：单品层无任何价、SKU 逐款价口径统一为 `balance`
+  ///      时，派生区间整体按「尾款」展示（如「尾款 ¥160–400」）。
+  ///   3. **预约价 vs 现货价互斥**，由系列阶段（`series.stage`，创作者上传第②步
+  ///      选定，CloudKit / Bundle 种子下发）决定优先级：
+  ///      预售线（图透/定金/尾款）优先展示预约价；出货 / 再贩 / 现货优先展示现货价。
+  ///      只有当优先的那类没有数据时，才退回展示另一类——两者绝不同时出现。
+  ///   4. **现货价**的取数：单品 `price` 且口径为 `shop`（或未标口径）；
+  ///      归集商品退到 SKU 逐款价派生区间（口径统一 `shop` 或未标）。
+  ///   5. **参考价（`reference`）及一切划线价 / 会员价 / 到手价 / 促销标签**：
+  ///      不在四类之内，详情页一律不渲染；口径细节如需保留走 `priceNote` 文案。
+  ///   6. 四类全空才显示「价格待补充」诚实态；某一类缺失只影响该行。
+  func detailPriceRows(stage: MidsummerStage) -> [DetailPriceRow] {
+    var rows: [DetailPriceRow] = []
+
+    // 1) 定金 + 尾款：成对展示，缺哪类就少哪行
+    if let deposit {
+      rows.append(DetailPriceRow(label: "定金", value: "¥\(deposit)"))
+    }
+    if let balance {
+      rows.append(DetailPriceRow(label: "尾款", value: "¥\(balance)"))
+    }
+    // 2) 归集商品：单品层无价、SKU 口径统一为尾款 → 区间整体按尾款
+    if deposit == nil, balance == nil, !hasItemLevelPrice,
+      let range = priceRange,
+      case .balance? = variantPriceKind
+    {
+      let amount =
+        range.min == range.max ? "¥\(range.min)" : "¥\(range.min)–\(range.max)"
+      rows.append(DetailPriceRow(label: "尾款", value: amount))
+    }
+
+    // 现货价候选（只有口径为 shop / 未标的价格才算现货价；reference / balance 不算）
+    let spotRange: (min: Int, max: Int)? = {
+      if let price, priceKind == nil || priceKind == .shop { return priceRange }
+      // 价格全在 SKU 表：口径统一 shop 或完全未标 → 默认现货价；balance 已走上面；reference / 混合口径不展示
+      guard price == nil, !hasItemLevelPrice, priceKind == nil,
+        let range = priceRange
+      else { return nil }
+      let skuKinds = Set((skus ?? []).compactMap { $0.priceKind })
+      guard skuKinds.isEmpty || skuKinds == [.shop] else { return nil }
+      return range
+    }()
+    func spotRow() -> DetailPriceRow? {
+      guard let range = spotRange else { return nil }
+      let amount = range.min == range.max ? "¥\(range.min)" : "¥\(range.min)–\(range.max)"
+      return DetailPriceRow(label: "现货价", value: amount)
+    }
+    func preorderRow() -> DetailPriceRow? {
+      preorderPrice.map { DetailPriceRow(label: "预约价", value: "¥\($0)（全款预约）") }
+    }
+
+    // 3) 预约价与现货价互斥，阶段定优先，优先类缺数据才退另一类
+    let presale = Self.isPresaleStage(stage)
+    if presale {
+      if let row = preorderRow() ?? spotRow() { rows.append(row) }
+    } else {
+      if let row = spotRow() ?? preorderRow() { rows.append(row) }
+    }
+
+    return rows
+  }
+
   /// 尺码从小到大展示排序（用户 2026-09-16 要求）：XS < S < M < L < XL < XXL < F，
   /// 认识不了的码（如「均码」「定制」）按原名排在后面、保持相对顺序。
   /// 三坑尺码基本都落在这张表里；排序是**展示层**行为，不改存储顺序。
