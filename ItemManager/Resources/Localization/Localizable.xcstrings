@@ -34578,6 +34578,7 @@
       }
     },
     "分类" : {
+      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
