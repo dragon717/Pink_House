@@ -4,7 +4,8 @@
 //
 //  上新工作台（樱花小羊系列 · 用户 2026-09-16）全流程验收：
 //    发布新商品 → ①系列主图与信息（标题 / 日期）→ ②选择上新阶段
-//    → ③尺码信息 → ④单品与价格（名称 / 关联款式 / 价格按阶段联动）→ 发布上架
+//    → ③商品与尺码（2026-09-17 归组：名称 / 分类 / 尺码 / 款式 / 价格 同屏）
+//    → ④确认发布（原文出处 + 提交汇总）→ 发布上架
 //    → 上架商品出现在工作台列表（已上架）→ 出现在系列详情商品列表
 //    → 详情页一键入库（规格抽屉带出继承的款式组）。
 //
@@ -18,11 +19,16 @@
 //    · ①主图与信息        → listing-launch-title / listing-date-toggle
 //                            listing-launch-date / listing-image-add / listing-note
 //    · ②上新阶段          → listing-stage-<raw>
-//    · ③尺码信息          → listing-size-<size>
-//    · ④单品与价格        → listing-name / listing-kind / listing-style-<optionID>
+//    · ③商品与尺码        → listing-name / listing-kind
+//                            listing-size-<size> / listing-size-custom / listing-size-add
+//                            listing-size-input-<i> / listing-size-delete-<i>
+//                            listing-style-<optionID> / listing-style-custom / listing-style-add
+//                            listing-style-image-<i> / listing-style-name-<i>
+//                            listing-style-price-<i> / listing-style-delete-<i>
 //                            listing-price / listing-preorder
 //                            listing-deposit / listing-balance
-//                            listing-deposit-min / listing-deposit-max / listing-source
+//                            listing-deposit-min / listing-deposit-max
+//    · ④确认发布          → listing-source
 //    · 步骤导航            → listing-next / listing-back / listing-publish
 //    · 工作台行            → listing-edit-<id> / listing-more-<id>
 //    · 状态菜单            → listing-menu-list-<id> / listing-menu-delist-<id> / listing-menu-delete-<id>
@@ -193,23 +199,11 @@ final class MidsummerListingFlowUITests: XCTestCase {
     app.buttons["listing-next"].tap()
     sleep(1)
 
-    // ④ ③尺码信息：勾选 S
-    let sizeChip = app.buttons["listing-size-S"]
-    guard scrollToElement(sizeChip, app: app) else {
-      dumpHierarchy("88-找不到尺码选项", app: app)
-      XCTFail("第三步应有可用尺码 chips")
-      return
-    }
-    sizeChip.tap()
-    sleep(1)
-    app.buttons["listing-next"].tap()
-    sleep(1)
-
-    // ⑤ ④单品与价格：商品名 + 关联款式（樱花小羊款式首项「sk 粉色」）+ 现货价
+    // ④ ③商品与尺码（2026-09-17 归组）：名称 / 分类 / 尺码 / 款式 / 价格 同一屏
     let nameField = app.textFields["listing-name"]
     guard nameField.waitForExistence(timeout: 5) else {
       dumpHierarchy("89-找不到名称输入框", app: app)
-      XCTFail("「单品与价格」步应有商品名称输入框")
+      XCTFail("「商品与尺码」步应有商品名称输入框")
       return
     }
     // 阶段联动：选了「现货」→ 只显示现货价，定金 / 尾款 / 预约价不应出现
@@ -226,6 +220,21 @@ final class MidsummerListingFlowUITests: XCTestCase {
     nameField.typeText(itemName + "\n")
     usleep(500_000)
 
+    // 尺码与价格同屏（归组的核心）：本屏内必须同时够得到常用尺码与自定义入口
+    let sizeChip = app.buttons["listing-size-S"]
+    guard scrollToElement(sizeChip, app: app) else {
+      dumpHierarchy("88-找不到尺码选项", app: app)
+      XCTFail("「商品与尺码」步应有常用尺码 chips（XS/S/M/L/XL/XXL/均码/F）")
+      return
+    }
+    sizeChip.tap()
+    sleep(1)
+    XCTAssertTrue(
+      app.textFields["listing-size-custom"].exists,
+      "尺码区应保留「新增尺码」自定义入口"
+    )
+
+    // 款式区在尺码区下方：图 + 名 + 该款价格
     let styleChip = app.buttons["listing-style-sk-pink"]
     guard scrollToElement(styleChip, app: app) else {
       dumpHierarchy("90-找不到款式关联选项", app: app)
@@ -234,6 +243,15 @@ final class MidsummerListingFlowUITests: XCTestCase {
     }
     styleChip.tap()
     sleep(1)
+    XCTAssertTrue(
+      app.textFields["listing-style-custom"].exists,
+      "款式区应保留自定义新增入口"
+    )
+    if sizeChip.exists && styleChip.exists {
+      XCTAssertGreaterThan(
+        styleChip.frame.minY, sizeChip.frame.minY,
+        "款式区应位于尺码选择区下方")
+    }
 
     let priceField = app.textFields["listing-price"]
     if scrollToElement(priceField, app: app) {
@@ -243,9 +261,11 @@ final class MidsummerListingFlowUITests: XCTestCase {
       app.swipeDown()
       usleep(500_000)
     }
-    capture("91-表单-单品与价格录入完成")
+    capture("91-表单-商品与尺码录入完成")
+    app.buttons["listing-next"].tap()
+    sleep(1)
 
-    // ⑥ 最后一步直接发布上架
+    // ⑥ ④确认发布：汇总 + 发布上架
     let publish = app.buttons["listing-publish"]
     guard publish.waitForExistence(timeout: 4) else {
       dumpHierarchy("92-找不到发布按钮", app: app)
@@ -420,7 +440,7 @@ final class MidsummerListingFlowUITests: XCTestCase {
     capture("S5-删除尺码项")
   }
 
-  // MARK: - 用例：④定金 / 尾款为可选项（按需开关）
+  // MARK: - 用例：定金 / 尾款为可选项（按需开关，③商品与尺码屏内）
 
   @MainActor
   func testDepositAndBalanceAreOptionalToggles() throws {
@@ -445,11 +465,8 @@ final class MidsummerListingFlowUITests: XCTestCase {
     depositStage.tap()
     app.buttons["listing-next"].tap()
     sleep(1)
-    // ③ 尺码步：直接下一步（可留空）
-    app.buttons["listing-next"].tap()
+    // ③ 商品与尺码（归组后价格也在这一屏）：定金 / 尾款开关
     sleep(1)
-
-    // ④ 定金 / 尾款：默认应有开关；未开前不出现金额输入框
     let depositToggle = app.switches["listing-deposit-toggle"]
     let balanceToggle = app.switches["listing-balance-toggle"]
     guard scrollToElement(depositToggle, app: app) else {
@@ -523,28 +540,20 @@ final class MidsummerListingFlowUITests: XCTestCase {
     )
     capture("V2-第二步必填报错")
 
-    // 选现货 → ③ 尺码（留空）→ ④ 不填名称直接发布 → 应报错且不提交
+    // 选现货 → ③ 商品与尺码：不填名称 / 款式直接点下一步 → 应就地报错且不前进
     app.buttons["listing-stage-inStock"].tap()
     app.buttons["listing-next"].tap()
     sleep(1)
     app.buttons["listing-next"].tap()
     sleep(1)
-
-    let publish = app.buttons["listing-publish"]
-    guard publish.waitForExistence(timeout: 5) else {
-      dumpHierarchy("V3-找不到发布按钮", app: app)
-      XCTFail("第 4 步应有发布按钮")
-      return
-    }
-    publish.tap()
-    sleep(1)
-    let errorNode = app.descendants(matching: .any)
+    let stepError3 = app.descendants(matching: .any)
       .matching(NSPredicate(format: "identifier == %@", "listing-step-error")).firstMatch
-    XCTAssertTrue(errorNode.exists, "缺商品名称时点发布应给出明确错误提示")
+    XCTAssertTrue(stepError3.exists, "③ 缺商品名称 / 款式点下一步应就地报错")
     XCTAssertTrue(
-      app.buttons["listing-publish"].exists,
-      "校验不通过时不应关闭表单（全量校验拦截）"
-    )
+      app.descendants(matching: .any)
+        .matching(NSPredicate(format: "identifier == %@", "listing-step-progress")).firstMatch
+        .label.contains("第 3 步"),
+      "校验不通过应停留在第 3 步（实际：\(progressLabel(app))）")
     capture("V3-发布前全量校验拦截")
   }
 
@@ -591,5 +600,13 @@ final class MidsummerListingFlowUITests: XCTestCase {
     }
     // 最后兜底：直接尝试（失败会抛出，便于暴露真实问题）
     field.typeText(text)
+  }
+
+  /// 当前步骤进度文案（如「第 3 步 / 共 4 步」），用于断言「校验不通过不前进」。
+  @MainActor
+  private func progressLabel(_ app: XCUIApplication) -> String {
+    app.descendants(matching: .any)
+      .matching(NSPredicate(format: "identifier == %@", "listing-step-progress"))
+      .firstMatch.label
   }
 }

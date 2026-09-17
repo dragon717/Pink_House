@@ -110,6 +110,34 @@ nonisolated enum MidsummerListingStatus: String, Codable, CaseIterable, Sendable
   }
 }
 
+/// 上架表单第 3 步的「款式」条目：款式名 + 该款式图 + 该款式价格。
+///
+/// 与衣橱**同一口径**（用户 2026-09-17）：
+///   · 名称 → 写进 variant 规格组（`resolvedRole == .variant`），不在系列资料里的
+///     新款式（如「蓝色 OP」）也会自建选项，衣橱 / 规格抽屉 / 筛选才认得到；
+///   · 图   → 写进 `variantImageNames`，详情页按款式给图；
+///   · 价格 → 写进 SKU 逐款价，选中该款式时显示该款价格（未填则回退单品价）。
+nonisolated struct MidsummerListingStyle: Codable, Identifiable, Equatable, Sendable {
+  var id: String
+  var name: String
+  /// 该款式图（`ImageManager` Images 目录内的文件名）。
+  var imageFile: String?
+  /// 该款式价格（元）；nil = 沿用单品价。
+  var price: Int?
+
+  init(
+    id: String = UUID().uuidString.lowercased(),
+    name: String,
+    imageFile: String? = nil,
+    price: Int? = nil
+  ) {
+    self.id = id
+    self.name = name
+    self.imageFile = imageFile
+    self.price = price
+  }
+}
+
 nonisolated struct MidsummerListing: Codable, Identifiable, Equatable, Sendable {
   /// `upload-` 前缀 + 8 位随机串；转 DTO 时再加 `midsummer-listing-` 命名空间。
   let id: String
@@ -147,6 +175,9 @@ nonisolated struct MidsummerListing: Codable, Identifiable, Equatable, Sendable 
   /// 这就是「自动关联该系列的风格与数据」的锚点：规格组、款式对应图、尺码表
   /// 都按它从系列单品里继承。
   var variantOptionNames: [String]
+  /// 款式条目（名 / 图 / 价）。`nil` = 旧存档（只有 `variantOptionNames`），
+  /// 此时图与逐款价都拿不到，按老口径回退。
+  var styles: [MidsummerListingStyle]? = nil
   /// 商品图（ImageManager Images 目录内的文件名）。第 1 张为主图。
   var imageFiles: [String]
   var status: MidsummerListingStatus
@@ -210,16 +241,42 @@ extension MidsummerListing {
     let sizeGroup = sourceGroups.first { $0.resolvedRole == .size }
     let pricingGroup = sourceGroups.first { $0.resolvedRole == .other && $0.id == "pricing" }
 
+    // 款式条目：新存档带图与逐款价；旧存档（styles 为 nil）退化成「只有名字」。
+    let styleEntries: [(name: String, imageFile: String?, price: Int?)] =
+      styles.map { $0.map { ($0.name, $0.imageFile, $0.price) } }
+      ?? variantOptionNames.map { ($0, nil, nil) }
+    let styleNames = styleEntries.map(\.name)
+
     var groups: [MidsummerSpecGroup] = []
 
-    // 款式组：只保留关联的款式选项；一个都没命中就不带款式组（退化为无规格单品）。
+    // 款式组：保留关联的系列选项，**再补上系列资料里没有的新款式选项**——
+    // 创作者自己新增的「蓝色 OP」不在系列款式表里，不补就进不了衣橱的款式归类。
     if let styleGroup {
-      let picked = styleGroup.options.filter { variantOptionNames.contains($0.name) }
-      if !picked.isEmpty {
-        groups.append(
-          MidsummerSpecGroup(id: styleGroup.id, name: styleGroup.name, role: styleGroup.role, options: picked)
+      let picked = styleGroup.options.filter { styleNames.contains($0.name) }
+      var options = picked
+      let knownNames = Set(picked.map(\.name))
+      for entry in styleEntries where !knownNames.contains(entry.name) {
+        options.append(
+          MidsummerSpecOption(id: "st-\(entry.name)", name: entry.name, image: entry.imageFile)
         )
       }
+      if !options.isEmpty {
+        groups.append(
+          MidsummerSpecGroup(id: styleGroup.id, name: styleGroup.name, role: styleGroup.role, options: options)
+        )
+      }
+    } else if !styleEntries.isEmpty {
+      // 系列完全没有款式资料（自建系列）：自建款式组，口径与系列款式组一致。
+      groups.append(
+        MidsummerSpecGroup(
+          id: "variant",
+          name: "款式",
+          role: .variant,
+          options: styleEntries.map {
+            MidsummerSpecOption(id: "st-\($0.name)", name: $0.name, image: $0.imageFile)
+          }
+        )
+      )
     }
 
     // 尺码组：先按系列选项匹配（「S」匹配「S码」），匹配不上的尺码自建选项。
@@ -248,11 +305,15 @@ extension MidsummerListing {
       groups.append(pricingGroup)
     }
 
-    // 款式对应图：关联款式与图片按顺序对位（图不够时循环复用，至少每款有图）。
+    // 款式对应图：优先用该款式自己上传的图，没有才按商品图顺序对位
+    //（图不够时循环复用，至少每款有图）。
     var variantImages: [String: String] = [:]
+    for entry in styleEntries {
+      if let file = entry.imageFile, !file.isEmpty { variantImages[entry.name] = file }
+    }
     if !imageFiles.isEmpty {
-      for (index, styleName) in variantOptionNames.enumerated() {
-        variantImages[styleName] = imageFiles[index % imageFiles.count]
+      for (index, entry) in styleEntries.enumerated() where variantImages[entry.name] == nil {
+        variantImages[entry.name] = imageFiles[index % imageFiles.count]
       }
     }
 
@@ -262,8 +323,27 @@ extension MidsummerListing {
     let inheritedCharts = (sourceItem?.sizeChartImages ?? [])?.filter { entry in
       let style = entry.style.lowercased()
       guard !style.isEmpty else { return false }
-      return variantOptionNames.contains { $0.lowercased().contains(style) }
+      return styleNames.contains { $0.lowercased().contains(style) }
     }
+
+    // SKU 逐款价：填了价格的款式各写一条（只约束款式组，不写尺码组——
+    // SKU 未提及的组不构成否决，尺码仍可自由搭配）。
+    let skus: [MidsummerSKU]? = {
+      guard let variantGroup = groups.first(where: { $0.resolvedRole == .variant }) else { return nil }
+      let priced = styleEntries.compactMap { entry -> MidsummerSKU? in
+        guard let price = entry.price else { return nil }
+        let optionID =
+          variantGroup.options.first(where: { $0.name == entry.name })?.id ?? "st-\(entry.name)"
+        return MidsummerSKU(
+          id: "style-\(optionID)",
+          options: [variantGroup.id: optionID],
+          image: entry.imageFile,
+          price: price,
+          priceKind: priceKind ?? .shop
+        )
+      }
+      return priced.isEmpty ? nil : priced
+    }()
 
     let trimmedURL = sourceURL.trimmingCharacters(in: .whitespacesAndNewlines)
 
@@ -289,7 +369,7 @@ extension MidsummerListing {
       sizeChartImages: (inheritedCharts?.isEmpty ?? true) ? nil : inheritedCharts,
       variantImageNames: variantImages.isEmpty ? nil : variantImages,
       specGroups: groups.isEmpty ? nil : groups,
-      skus: nil
+      skus: skus
     )
   }
 

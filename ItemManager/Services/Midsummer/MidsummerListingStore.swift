@@ -122,8 +122,27 @@ final class MidsummerListingStore: ObservableObject {
     return names
   }
 
+  /// 单个**款式图**落盘：`-style-<index>` 与商品主图共用命名空间区分命名。
+  ///
+  /// 注意调用顺序：必须在 `saveImages` **之后**——它会按前缀清掉这个 listing
+  /// 的旧图（含上次保存的款式图），之后重写才不会留下孤儿文件。
+  func saveStyleImage(_ image: UIImage, listingID: String, index: Int) -> String? {
+    let name = "midsummer-listing-\(listingID)-style-\(index).jpg"
+    guard let jpeg = image.jpegData(compressionQuality: 0.85) else { return nil }
+    do {
+      try jpeg.write(
+        to: ImageManager.shared.imagesDirectory.appendingPathComponent(name),
+        options: .atomic)
+      return name
+    } catch {
+      print("⚠️ [MidsummerListing] 款式图落盘失败：\(error.localizedDescription)")
+      return nil
+    }
+  }
+
   func deleteImageFiles(of listing: MidsummerListing) {
-    for name in listing.imageFiles {
+    let names = listing.imageFiles + (listing.styles?.compactMap(\.imageFile) ?? [])
+    for name in names {
       try? FileManager.default.removeItem(
         at: ImageManager.shared.imagesDirectory.appendingPathComponent(name))
     }

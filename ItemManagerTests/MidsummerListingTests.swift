@@ -179,6 +179,67 @@ final class MidsummerListingTests: XCTestCase {
     XCTAssertNil(dto.priceKind, "没填现货价就不该带口径")
   }
 
+  // MARK: DTO 转换 · 款式（2026-09-17 新增，衣橱联动口径）
+
+  /// 自定义款式（系列资料里没有的「蓝色 OP」）也要进款式组，
+  /// 否则衣橱 / 规格抽屉 / 筛选都认不到它。
+  func testCustomStylesEnterVariantGroup() {
+    let listing = makeListing {
+      $0.styles = [
+        MidsummerListingStyle(name: "蓝色 OP", imageFile: "style-blue.jpg", price: 219),
+        MidsummerListingStyle(name: "绿色 OP", imageFile: nil, price: nil),
+      ]
+      $0.variantOptionNames = ["蓝色 OP", "绿色 OP"]
+    }
+    let dto = listing.makeItemDTO(sourceItem: makeSourceItem(), seriesSourceURL: "https://series.example")
+
+    let styleGroup = (dto.specGroups ?? []).first { $0.resolvedRole == .variant }
+    XCTAssertEqual(
+      styleGroup?.options.map(\.name), ["蓝色 OP", "绿色 OP"],
+      "自定义款式应作为款式组选项进入渲染链（衣橱按它归类）")
+    XCTAssertEqual(dto.variantImageNames?["蓝色 OP"], "style-blue.jpg", "款式图应随款式名落到 variantImageNames")
+    XCTAssertEqual(dto.variantImageNames?["绿色 OP"], "listing-b.jpg", "没传款式图时按商品图顺序对位（每款都有图）")
+  }
+
+  /// 逐款价 → SKU 表：选中该款式时解析出该款价格，未填的款式回退单品价。
+  func testStylePriceBecomesSKUPrice() {
+    let listing = makeListing {
+      $0.styles = [
+        MidsummerListingStyle(name: "蓝色 OP", imageFile: "style-blue.jpg", price: 219),
+        MidsummerListingStyle(name: "绿色 OP", imageFile: "style-green.jpg", price: nil),
+      ]
+      $0.variantOptionNames = ["蓝色 OP", "绿色 OP"]
+      $0.price = 199
+    }
+    let dto = listing.makeItemDTO(sourceItem: makeSourceItem(), seriesSourceURL: "https://series.example")
+    let styleGroup = (dto.specGroups ?? []).first { $0.resolvedRole == .variant }!
+    let blue = styleGroup.options.first { $0.name == "蓝色 OP" }!
+    let green = styleGroup.options.first { $0.name == "绿色 OP" }!
+
+    // 只写了一条 SKU（蓝色有价）；绿色没有逐款价 → 回退单品价。
+    XCTAssertEqual(dto.skus?.count, 1, "只有填了价格的款式才落 SKU 逐款价")
+    var bluePick = MidsummerSpecSelection()
+    bluePick[styleGroup.id] = blue.id
+    var greenPick = MidsummerSpecSelection()
+    greenPick[styleGroup.id] = green.id
+    XCTAssertEqual(MidsummerSpecResolver.price(for: bluePick, of: dto), 219, "选「蓝色 OP」应命中该款逐款价")
+    XCTAssertEqual(MidsummerSpecResolver.price(for: greenPick, of: dto), 199, "未填逐款价的款式回退单品价")
+
+    // 选了不存在的组合也不该崩（SKU 只约束款式组）。
+    XCTAssertTrue(
+      MidsummerSpecResolver.isComplete(greenPick, of: dto),
+      "款式组选到未落 SKU 的选项时仍应可入库")
+  }
+
+  /// 旧存档（只有 variantOptionNames、styles 为 nil）不能回归：退化成「只有名字」。
+  func testLegacyListingWithoutStylesStillWorks() {
+    let listing = makeListing { $0.styles = nil }
+    let dto = listing.makeItemDTO(sourceItem: makeSourceItem(), seriesSourceURL: "https://series.example")
+    let styleGroup = (dto.specGroups ?? []).first { $0.resolvedRole == .variant }
+    XCTAssertEqual(styleGroup?.options.map(\.name), ["现 sk 粉色"], "旧存档按 variantOptionNames 走原口径")
+    XCTAssertNil(dto.skus, "旧存档没有逐款价，不生成 SKU")
+  }
+
   // MARK: 存储与状态机
 
   private func makeTempStore() -> MidsummerListingStore {
