@@ -166,6 +166,9 @@ nonisolated struct MidsummerListing: Codable, Identifiable, Equatable, Sendable 
   var depositEndsAt: Date? = nil
   /// 尾款阶段截止时间（nil = 未设置，尾款期不自动结束）。
   var balanceEndsAt: Date? = nil
+  /// 多选分类 raw（用户 2026-09-18，对照商品详情模板：一次上新可同时归属
+  /// 多个类型，如 sk + 内搭）。nil / 空 = 旧存档，回退单一 `kindRaw`。
+  var kindRaws: [String]? = nil
   var note: String
   /// 原文出处（合规必填，Apple 5.2）。留空时转 DTO 回退到系列出处。
   var sourceURL: String
@@ -188,6 +191,25 @@ nonisolated struct MidsummerListing: Codable, Identifiable, Equatable, Sendable 
   var kind: MidsummerItemKind {
     get { MidsummerItemKind(rawValue: kindRaw) ?? .op }
     set { kindRaw = newValue.rawValue }
+  }
+
+  /// 多选分类（用户 2026-09-18）：getter 兼容旧存档（`kindRaws` 为 nil 时
+  /// 回退单一 `kind`）；setter 同步写 `kindRaw` = 首个分类，让只认单一分类的
+  /// 旧代码 / DTO 转换（`makeItemDTO` 用主分类决定系列页分组）不失效。
+  var kinds: [MidsummerItemKind] {
+    get {
+      if let kindRaws, !kindRaws.isEmpty {
+        let parsed = kindRaws.compactMap(MidsummerItemKind.init(rawValue:))
+        if !parsed.isEmpty { return parsed }
+      }
+      return [kind]
+    }
+    set {
+      var deduped: [MidsummerItemKind] = []
+      for candidate in newValue where !deduped.contains(candidate) { deduped.append(candidate) }
+      kindRaws = deduped.map(\.rawValue)
+      kind = deduped.first ?? .op
+    }
   }
 
   var priceKind: MidsummerPriceKind? {

@@ -164,7 +164,7 @@ struct MidsummerListingWorkspaceView: View {
             .foregroundStyle(MidsummerTheme.primaryText)
             .lineLimit(2)
         }
-        Text("\(listing.kind.shortLabel) · \(listing.priceSummary) · 关联 \(listing.variantOptionNames.count) 个款式")
+        Text("\(listing.kinds.map(\.shortLabel).joined(separator: "/")) · \(listing.priceSummary) · 关联 \(listing.variantOptionNames.count) 个款式")
           .font(.system(size: 11))
           .foregroundStyle(MidsummerTheme.secondaryText)
           .lineLimit(1)

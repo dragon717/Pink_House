@@ -405,6 +405,57 @@ final class MidsummerListingTests: XCTestCase {
     XCTAssertNil(decode("未知raw"), "未知 raw 不应崩溃，返回 nil")
   }
 
+  // MARK: 多选分类（2026-09-18，对照商品详情模板）
+
+  /// kinds setter 同步主分类：kindRaws 存全量、kindRaw 存首个，旧代码读 kind 不失效。
+  func testMultiKindSetterSyncsPrimaryKind() {
+    var listing = makeListing()
+    listing.kinds = [.skirt, .blouse, .accessory]
+    XCTAssertEqual(listing.kinds, [.skirt, .blouse, .accessory], "多选分类应按写入顺序保留")
+    XCTAssertEqual(listing.kind, .skirt, "首个分类应成为主分类")
+    XCTAssertEqual(listing.kindRaw, MidsummerItemKind.skirt.rawValue, "kindRaw 同步主分类，旧代码口径不变")
+    XCTAssertEqual(
+      listing.kindRaws,
+      [MidsummerItemKind.skirt.rawValue, MidsummerItemKind.blouse.rawValue, MidsummerItemKind.accessory.rawValue]
+    )
+  }
+
+  /// 旧存档（kindRaws 为 nil）回退单一 kind，解码与展示都不炸。
+  func testMultiKindLegacyFallback() {
+    var listing = makeListing()
+    XCTAssertNil(listing.kindRaws, "旧存档没有多选分类字段")
+    XCTAssertEqual(listing.kinds, [listing.kind], "旧存档的 kinds 应回退为单一主分类")
+  }
+
+  /// kinds setter 去重：重复写入同一分类只保留一份。
+  func testMultiKindDeduplicates() {
+    var listing = makeListing()
+    listing.kinds = [.skirt, .skirt, .blouse]
+    XCTAssertEqual(listing.kinds, [.skirt, .blouse], "重复分类应去重")
+  }
+
+  /// kinds 里存在无效 raw 时跳过、全无效再回退单一 kind（不出现空数组）。
+  func testMultiKindToleratesUnknownRaws() {
+    var listing = makeListing()
+    listing.kindRaws = ["不存在的分类", MidsummerItemKind.blouse.rawValue]
+    XCTAssertEqual(listing.kinds, [.blouse], "无效 raw 应被跳过")
+
+    listing.kindRaws = ["不存在的分类"]
+    XCTAssertEqual(listing.kinds, [listing.kind], "全无效 raw 应回退单一主分类")
+  }
+
+  /// 批量款式名解析（纯函数）：换行 / 顿号 / 中英文逗号 / 分号分隔，去空、保空格。
+  func testParseBatchStyleNames() {
+    let parsed = MidsummerListingFormView.parseBatchStyleNames(
+      "sk 粉色\nsk 蓝绿色、内搭 奶白色，定位花jsk 粉色, 无腰op 蓝绿色；段段jsk 粉色"
+    )
+    XCTAssertEqual(
+      parsed,
+      ["sk 粉色", "sk 蓝绿色", "内搭 奶白色", "定位花jsk 粉色", "无腰op 蓝绿色", "段段jsk 粉色"],
+      "五种分隔符都应拆开，款式名内部空格保留，空白项丢弃")
+    XCTAssertTrue(MidsummerListingFormView.parseBatchStyleNames("  \n 、，").isEmpty, "纯空白输入应解析为空")
+  }
+
   // MARK: 工具
 
   private func makeSolidImage() -> UIImage {

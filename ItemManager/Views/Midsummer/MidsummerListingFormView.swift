@@ -63,7 +63,10 @@ struct MidsummerListingDraft {
   var stage: MidsummerLaunchStage?
   // ③ 商品与尺码（用户 2026-09-17 归组：名称 / 分类 / 尺码 / 款式 / 价格 同屏）
   var name: String = ""
-  var kind: MidsummerItemKind = .op
+  /// 商品分类（用户 2026-09-18 改多选）：一个商品可同时归属多个类型
+  ///（如「sk」+「内搭」），与商品详情模板里跨分类的款式网格同口径。
+  /// 首个分类是主分类，决定商品在系列页的主分组。
+  var kinds: [MidsummerItemKind] = [.op]
   var sizes: [String] = []
   var customSizeText: String = ""
   var styles: [MidsummerListingStyleDraft] = []
@@ -176,6 +179,12 @@ struct MidsummerListingFormView: View {
   /// 再选图」的方式让多个款式条目共用一个 picker。
   @State private var stylePhotoItem: PhotosPickerItem?
   @State private var stylePickerTarget: String?
+  /// 款式快速批量录入（用户 2026-09-18，对照商品详情模板里 24 色级别的
+  /// 款式数量）：展开多行文本框，一次粘贴多个款式名（换行 / 顿号 / 逗号
+  /// 分隔），自动去重后逐条建目，图与逐款价后补。
+  @State private var showBatchStyleInput = false
+  @State private var batchStylesText = ""
+  @State private var styleBatchMessage: String?
   @State private var imageError: String?
   @State private var previewIndex: Int?
 
@@ -527,6 +536,7 @@ struct MidsummerListingFormView: View {
     case .itemBasics:
       // ③ 合并步：名称 / 分类 / 尺码 / 款式 / 价格 都在这一屏校验。
       if trimmed(draft.name).isEmpty { return "请填写商品名称。" }
+      if draft.kinds.isEmpty { return "请至少选择一个商品分类。" }
 
       if draft.sizes.contains(where: { trimmed($0).isEmpty }) {
         return "有尺码项名称为空，请补全或删除该行。"
@@ -801,8 +811,8 @@ struct MidsummerListingFormView: View {
 
   private var kindCard: some View {
     wizardCard(
-      "商品分类",
-      hint: "按「连衣裙 / 内搭 / 小物」三个大类分组，点一下具体类型即可；决定商品在系列页的分组与图标。"
+      "商品分类（可多选）",
+      hint: "按「连衣裙 / 内搭 / 小物」三个大类分组，点一下选中、再点取消，可同时选多个类型（如 SK + 内搭）；第一个选中的是主分类，决定商品在系列页的主分组与图标。"
     ) {
       VStack(alignment: .leading, spacing: 12) {
         ForEach(MidsummerItemCategory.allCases, id: \.self) { category in
@@ -811,7 +821,7 @@ struct MidsummerListingFormView: View {
               Text(category.labelZH)
                 .font(.system(size: 11, weight: .medium))
                 .foregroundStyle(MidsummerTheme.primaryText)
-              if draft.kind.category == category {
+              if draft.kinds.contains(where: { $0.category == category }) {
                 Circle()
                   .fill(MidsummerTheme.brandOrange)
                   .frame(width: 5, height: 5)
@@ -821,9 +831,15 @@ struct MidsummerListingFormView: View {
               columns: [GridItem(.adaptive(minimum: 92), spacing: 8)], alignment: .leading, spacing: 8
             ) {
               ForEach(MidsummerItemKind.kinds(in: category), id: \.self) { candidate in
-                let on = draft.kind == candidate
+                let on = draft.kinds.contains(candidate)
                 Button {
-                  draft.kind = candidate
+                  if let index = draft.kinds.firstIndex(of: candidate) {
+                    // 至少保留一个分类：最后一个选中的不可取消。
+                    guard draft.kinds.count > 1 else { return }
+                    draft.kinds.remove(at: index)
+                  } else {
+                    draft.kinds.append(candidate)
+                  }
                 } label: {
                   Text(candidate.shortLabel)
                     .font(.system(size: 12, weight: on ? .semibold : .regular))
@@ -996,6 +1012,63 @@ struct MidsummerListingFormView: View {
         .buttonStyle(.plain)
         .accessibilityIdentifier("listing-style-add")
       }
+
+      // 快速批量录入（用户 2026-09-18）：款式多时逐条加太慢，先批量建名，
+      // 图和逐款价之后再补。
+      VStack(alignment: .leading, spacing: 8) {
+        Button {
+          withAnimation(.snappy(duration: 0.16)) { showBatchStyleInput.toggle() }
+        } label: {
+          Label(
+            showBatchStyleInput ? "收起批量添加" : "批量添加款式",
+            systemImage: showBatchStyleInput ? "chevron.up" : "text.badge.plus"
+          )
+          .font(.system(size: 12, weight: .medium))
+          .foregroundStyle(MidsummerTheme.brandOrange)
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("listing-style-batch-toggle")
+
+        if showBatchStyleInput {
+          TextEditor(text: $batchStylesText)
+            .font(.system(size: 13))
+            .frame(minHeight: 88)
+            .padding(6)
+            .background(MidsummerTheme.subtleFill)
+            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .overlay(
+              RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .stroke(MidsummerTheme.divider, lineWidth: 0.8)
+            )
+            .accessibilityIdentifier("listing-style-batch-input")
+
+          Text("每行一个款式名，也可用顿号 / 逗号分隔，如「sk 粉色、sk 蓝绿色、内搭 奶白色」。重复的会自动跳过。")
+            .font(.system(size: 11))
+            .foregroundStyle(MidsummerTheme.secondaryText)
+
+          Button {
+            addStylesInBatch()
+          } label: {
+            Text("全部添加")
+              .font(.system(size: 13, weight: .semibold))
+              .foregroundStyle(MidsummerTheme.onAccent)
+              .frame(maxWidth: .infinity)
+              .padding(.vertical, 9)
+              .background(MidsummerTheme.brandOrange)
+              .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+          }
+          .buttonStyle(.plain)
+          .accessibilityIdentifier("listing-style-batch-add")
+
+          if let styleBatchMessage {
+            Text(styleBatchMessage)
+              .font(.system(size: 11))
+              .foregroundStyle(MidsummerTheme.brandOrange)
+              .transition(.opacity)
+          }
+        }
+      }
+      .padding(.top, 2)
     }
   }
 
@@ -1120,6 +1193,43 @@ struct MidsummerListingFormView: View {
     draft.styles.append(MidsummerListingStyleDraft(name: name))
     draft.customStyleText = ""
     stepError = nil
+  }
+
+  /// 快速批量录入（用户 2026-09-18）：按换行 / 顿号 / 逗号拆分款式名，
+  /// 去空、去重（与已有条目及本批内部都去重），逐条建目；图与逐款价后补。
+  private func addStylesInBatch() {
+    let raw = batchStylesText
+    guard !raw.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+      styleBatchMessage = "请先粘贴或输入款式名。"
+      return
+    }
+    let names = Self.parseBatchStyleNames(raw)
+
+    var added = 0
+    var skipped: [String] = []
+    for name in names {
+      if draft.styles.contains(where: { $0.name.lowercased() == name.lowercased() }) {
+        skipped.append(name)
+        continue
+      }
+      draft.styles.append(MidsummerListingStyleDraft(name: name))
+      added += 1
+    }
+
+    var message = "已添加 \(added) 个款式"
+    if !skipped.isEmpty {
+      message += "，跳过重复 \(skipped.count) 个（\(skipped.prefix(3).joined(separator: "、"))\(skipped.count > 3 ? "…" : "")）"
+    }
+    styleBatchMessage = message
+    if added > 0 { batchStylesText = "" }
+  }
+
+  /// 批量款式名解析（纯函数，供单测）：换行 / 顿号 / 中英文逗号 / 分号都是
+  /// 分隔符；款式名内部的空格保留（如「sk 粉色」）。
+  static func parseBatchStyleNames(_ raw: String) -> [String] {
+    raw.components(separatedBy: CharacterSet(charactersIn: "\n\r、，,；;"))
+      .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+      .filter { !$0.isEmpty }
   }
 
   private func removeStyle(id: String) {
@@ -1333,6 +1443,12 @@ struct MidsummerListingFormView: View {
         }
         summaryRow("尺码", draft.sizes.isEmpty ? "无（小物 / 均码）" : draft.sizes.joined(separator: " / "))
         summaryRow("商品名称", draft.name)
+        summaryRow(
+          "商品分类",
+          draft.kinds.isEmpty
+            ? "未选择"
+            : draft.kinds.map(\.shortLabel).joined(separator: " / ")
+        )
         summaryRow("款式", styleSummaryText)
         summaryRow("价格", priceSummaryText)
         summaryRow("主图", "\(draft.images.count) 张")
@@ -1609,7 +1725,7 @@ struct MidsummerListingFormView: View {
       id: id,
       seriesID: seriesID,
       name: "",
-      kindRaw: draft.kind.rawValue,
+      kindRaw: draft.kinds.first?.rawValue ?? MidsummerItemKind.op.rawValue,
       price: nil,
       preorderPrice: nil,
       deposit: nil,
@@ -1628,7 +1744,9 @@ struct MidsummerListingFormView: View {
 
     let trimmedName = trimmed(draft.name)
     listing.name = trimmedName.isEmpty && forceDraft ? "未命名草稿" : trimmedName
-    listing.kind = draft.kind
+    // 多选分类（用户 2026-09-18）：`kinds` setter 会同步写 kindRaws 与
+    // 主分类 kindRaw，旧代码 / DTO 转换读 kind 仍拿到首个主分类。
+    listing.kinds = draft.kinds
     listing.price = Int(trimmed(draft.priceText))
     listing.preorderPrice = Int(trimmed(draft.preorderText))
     listing.deposit = draft.depositEnabled ? Int(trimmed(draft.depositText)) : nil
@@ -1767,7 +1885,7 @@ struct MidsummerListingFormView: View {
   private func prefill() {
     guard let existing else { return }
     draft.name = existing.name
-    draft.kind = existing.kind
+    draft.kinds = existing.kinds.isEmpty ? [existing.kind] : existing.kinds
     draft.sizes = existing.sizes
     // 款式回显：新存档带图与逐款价；旧存档（只有 variantOptionNames）降级成「只有名字」。
     if let styles = existing.styles, !styles.isEmpty {

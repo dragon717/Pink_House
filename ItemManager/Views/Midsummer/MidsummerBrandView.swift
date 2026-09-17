@@ -1183,6 +1183,12 @@ struct MidsummerItemDetailSheet: View {
                 .font(.system(size: 15, weight: .semibold))
                 .foregroundStyle(MidsummerTheme.priceRed)
                 .accessibilityIdentifier("midsummer-detail-price-headline")
+              // 固定说明小字（用户 2026-09-18，对照商品详情模板）：价格横幅
+              // 下方原样展示，说明本页数量与品牌店库互不影响。
+              Text("不跟店库数量 · 不影响品牌库存")
+                .font(.system(size: 11))
+                .foregroundStyle(MidsummerTheme.secondaryText)
+                .accessibilityIdentifier("midsummer-detail-stock-note")
               ForEach(priceRows.dropFirst(), id: \.label) { row in
                 labeledRow(row.label, value: row.value)
                   .accessibilityIdentifier("midsummer-detail-price-row-\(row.label)")
