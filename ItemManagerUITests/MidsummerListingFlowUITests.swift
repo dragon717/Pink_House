@@ -4,7 +4,8 @@
 //
 //  上新工作台（樱花小羊系列 · 用户 2026-09-16）全流程验收：
 //    发布新商品 → ①系列主图与信息（标题 / 日期）→ ②选择上新阶段
-//    → ③商品与尺码（2026-09-17 归组：名称 / 分类 / 尺码 / 款式 / 价格 同屏）
+//    → ③分类与款式（2026-09-18：分类+款式合并、商品名自动生成可改、
+//      预约价 / 定金固定显示、尾款自动核算）
 //    → ④确认发布（原文出处 + 提交汇总）→ 发布上架
 //    → 上架商品出现在工作台列表（已上架）→ 出现在系列详情商品列表
 //    → 详情页一键入库（规格抽屉带出继承的款式组）。
@@ -19,15 +20,15 @@
 //    · ①主图与信息        → listing-launch-title / listing-date-toggle
 //                            listing-launch-date / listing-image-add / listing-note
 //    · ②上新阶段          → listing-stage-<raw>
-//    · ③商品与尺码        → listing-name / listing-kind
+//    · ③分类与款式        → listing-name（自动生成可改）/ listing-kind
 //                            listing-size-<size> / listing-size-custom / listing-size-add
 //                            listing-size-input-<i> / listing-size-delete-<i>
 //                            listing-style-<optionID> / listing-style-custom / listing-style-add
 //                            listing-style-image-<i> / listing-style-name-<i>
-//                            listing-style-price-<i> / listing-style-delete-<i>
-//                            listing-price / listing-preorder
-//                            listing-deposit / listing-balance
-//                            listing-deposit-min / listing-deposit-max
+//                            listing-style-delete-<i>
+//                            listing-style-batch-toggle / -input / -add
+//                            listing-preorder / listing-deposit-toggle / listing-deposit
+//                            listing-balance-auto / listing-balance-hint / listing-balance-error
 //    · ④确认发布          → listing-source
 //    · 步骤导航            → listing-next / listing-back / listing-publish
 //    · 工作台行            → listing-edit-<id> / listing-more-<id>
@@ -130,15 +131,48 @@ final class MidsummerListingFlowUITests: XCTestCase {
     return true
   }
 
+  /// 双向滚动查找（2026-09-18）：先向上滑（找下方内容），不行再向下滑
+  ///（找上方内容）。
+  /// 安全约束：表单是可下拉关闭的 sheet——内容滚到顶后继续 swipeDown 会把
+  /// sheet 拉关。所以向下滑限制 3 次、任何时刻元素消失（sheet 被关）立即返回。
   @MainActor
   private func scrollToElement(_ element: XCUIElement, app: XCUIApplication, maxSwipes: Int = 8) -> Bool {
     var swipes = 0
-    while !(element.exists && element.isHittable) && swipes < maxSwipes {
+    while swipes < maxSwipes {
+      guard element.exists else { return false }
+      if element.isHittable { return true }
       app.swipeUp()
       usleep(400_000)
       swipes += 1
     }
-    return element.exists
+    swipes = 0
+    while swipes < 3 {
+      guard element.exists else { return false }
+      if element.isHittable { return true }
+      app.swipeDown()
+      usleep(400_000)
+      swipes += 1
+    }
+    return element.exists && element.isHittable
+  }
+
+  /// 可靠收起数字键盘：数字键盘没有 return 键，且全屏 swipeDown 的落点
+  /// 可能正好在键盘上（手势打在键盘上无效）。改为对 ScrollView 直接下拉——
+  /// 表单开了 scrollDismissesKeyboard(.interactively)，下拉内容即跟手收键盘。
+  @MainActor
+  private func dismissKeyboard(_ app: XCUIApplication) {
+    var tries = 0
+    while app.keyboards.firstMatch.exists && tries < 5 {
+      let scrollView = app.scrollViews.firstMatch
+      if scrollView.exists {
+        scrollView.swipeDown()
+      } else {
+        app.swipeDown()
+      }
+      usleep(600_000)
+      tries += 1
+    }
+    sleep(1)
   }
 
   // MARK: - 用例：录入 → 上架 → 系列可见 → 一键入库
@@ -199,42 +233,19 @@ final class MidsummerListingFlowUITests: XCTestCase {
     app.buttons["listing-next"].tap()
     sleep(1)
 
-    // ④ ③商品与尺码（2026-09-17 归组）：名称 / 分类 / 尺码 / 款式 / 价格 同一屏
-    let nameField = app.textFields["listing-name"]
-    guard nameField.waitForExistence(timeout: 5) else {
-      dumpHierarchy("89-找不到名称输入框", app: app)
-      XCTFail("「商品与尺码」步应有商品名称输入框")
-      return
-    }
-    // 阶段联动：选了「现货」→ 只显示现货价，定金 / 尾款 / 预约价不应出现
-    XCTAssertFalse(
-      app.textFields["listing-deposit"].exists,
-      "现货阶段不应显示定金配置项（价格项与阶段联动）"
-    )
-    XCTAssertFalse(
-      app.textFields["listing-balance"].exists,
-      "现货阶段不应显示尾款配置项（价格项与阶段联动）"
-    )
-    nameField.tap()
-    // 用换行符收起键盘（return 键），不依赖「完成」按钮的存在。
-    nameField.typeText(itemName + "\n")
-    usleep(500_000)
-
-    // 尺码与价格同屏（归组的核心）：本屏内必须同时够得到常用尺码与自定义入口
-    let sizeChip = app.buttons["listing-size-S"]
-    guard scrollToElement(sizeChip, app: app) else {
-      dumpHierarchy("88-找不到尺码选项", app: app)
-      XCTFail("「商品与尺码」步应有常用尺码 chips（XS/S/M/L/XL/XXL/均码/F）")
-      return
-    }
-    sizeChip.tap()
-    sleep(1)
+    // ④ ③分类与款式（2026-09-18 合并）：分类 chips + 款式 + 自动商品名 + 价格同屏。
+    // 操作顺序严格**自上而下**（款式 → 商品名 → 尺码 → 价格）：表单是可下拉
+    // 关闭的 sheet，任何「向上回滚」的滑动都可能把 sheet 拉关，全程只向下滚。
     XCTAssertTrue(
-      app.textFields["listing-size-custom"].exists,
-      "尺码区应保留「新增尺码」自定义入口"
+      app.textFields["listing-preorder"].exists,
+      "价格卡固定显示预约价（全款）输入"
+    )
+    XCTAssertTrue(
+      app.buttons["listing-deposit-toggle"].exists || app.switches["listing-deposit-toggle"].exists,
+      "价格卡固定显示定金配置开关"
     )
 
-    // 款式区在尺码区下方：图 + 名 + 该款价格
+    // 款式区在分类 chips 下方：先勾选关联款式「sk 粉色」
     let styleChip = app.buttons["listing-style-sk-pink"]
     guard scrollToElement(styleChip, app: app) else {
       dumpHierarchy("90-找不到款式关联选项", app: app)
@@ -247,19 +258,49 @@ final class MidsummerListingFlowUITests: XCTestCase {
       app.textFields["listing-style-custom"].exists,
       "款式区应保留自定义新增入口"
     )
+
+    // 商品名（自动生成可改）在款式区下方
+    let nameField = app.textFields["listing-name"]
+    guard scrollToElement(nameField, app: app) else {
+      dumpHierarchy("89-找不到名称输入框", app: app)
+      XCTFail("「分类与款式」步应有自动生成的商品名输入框")
+      return
+    }
+    nameField.tap()
+    // 商品名已自动生成（如「现 sk 粉色」）：先按现有长度逐字删除，再输入新名
+    //（typeText 是在光标处追加，不清空会拼成「自动名+新名」）。
+    if let current = nameField.value as? String, !current.isEmpty {
+      nameField.typeText(String(repeating: "\u{8}", count: current.count))
+    }
+    // 用换行符收起键盘（return 键），不依赖「完成」按钮的存在。
+    nameField.typeText(itemName + "\n")
+    usleep(500_000)
+
+    // 尺码区在商品名下方：常用尺码 + 自定义入口同屏（归组的核心）
+    let sizeChip = app.buttons["listing-size-S"]
+    guard scrollToElement(sizeChip, app: app) else {
+      dumpHierarchy("88-找不到尺码选项", app: app)
+      XCTFail("「商品与尺码」步应有常用尺码 chips（XS/S/M/L/XL/XXL/均码/F）")
+      return
+    }
+    sizeChip.tap()
+    sleep(1)
+    XCTAssertTrue(
+      app.textFields["listing-size-custom"].exists,
+      "尺码区应保留「新增尺码」自定义入口"
+    )
     if sizeChip.exists && styleChip.exists {
-      XCTAssertGreaterThan(
+      XCTAssertLessThan(
         styleChip.frame.minY, sizeChip.frame.minY,
-        "款式区应位于尺码选择区下方")
+        "款式区应位于尺码选择区上方（2026-09-18 合并卡：分类 → 款式 → 商品名 → 尺码）")
     }
 
-    let priceField = app.textFields["listing-price"]
-    if scrollToElement(priceField, app: app) {
-      priceField.tap()
-      priceField.typeText("199")
-      // 数字键盘没有 return 键：靠滑动（scrollDismissesKeyboard=.interactively）收起。
-      app.swipeDown()
-      usleep(500_000)
+    // 价格卡在最底部：填预约价（全款）；尾款自动算，不再手填（2026-09-18 口径）。
+    let preorderField = app.textFields["listing-preorder"]
+    if scrollToElement(preorderField, app: app) {
+      preorderField.tap()
+      preorderField.typeText("199")
+      dismissKeyboard(app)
     }
     capture("91-表单-商品与尺码录入完成")
     app.buttons["listing-next"].tap()
@@ -440,7 +481,7 @@ final class MidsummerListingFlowUITests: XCTestCase {
     capture("S5-删除尺码项")
   }
 
-  // MARK: - 用例：定金 / 尾款为可选项（按需开关，③商品与尺码屏内）
+  // MARK: - 用例：定金可选、尾款自动核算（2026-09-18 口径，③分类与款式屏内）
 
   @MainActor
   func testDepositAndBalanceAreOptionalToggles() throws {
@@ -465,39 +506,76 @@ final class MidsummerListingFlowUITests: XCTestCase {
     depositStage.tap()
     app.buttons["listing-next"].tap()
     sleep(1)
-    // ③ 商品与尺码（归组后价格也在这一屏）：定金 / 尾款开关
+    // ③ 分类与款式（价格同屏）：定金开关固定显示；尾款无开关、自动核算
     sleep(1)
     let depositToggle = app.switches["listing-deposit-toggle"]
-    let balanceToggle = app.switches["listing-balance-toggle"]
     guard scrollToElement(depositToggle, app: app) else {
       dumpHierarchy("P0-找不到定金开关", app: app)
-      XCTFail("定金阶段第 4 步应出现「配置定金」开关")
+      XCTFail("第 3 步价格卡应固定显示「配置定金」开关")
       return
     }
     capture("P1-定金阶段价格配置")
-    XCTAssertTrue(balanceToggle.exists, "定金阶段应同时给出「配置尾款」开关（按需）")
-
-    // 关掉定金开关 → 金额框不出现
-    if depositToggle.value as? String == "1" {
-      depositToggle.tap()
-      sleep(1)
-    }
     XCTAssertFalse(
-      app.textFields["listing-deposit"].exists,
-      "关掉「配置定金」后不应显示定金金额输入框"
+      app.switches["listing-balance-toggle"].exists,
+      "尾款已改为自动核算，不应再有手动开关"
     )
-    capture("P2-关闭定金开关后")
-
-    // 打开尾款开关 → 出现尾款金额框
-    if balanceToggle.value as? String != "1" {
-      balanceToggle.tap()
-      sleep(1)
-    }
-    XCTAssertTrue(
+    XCTAssertFalse(
       app.textFields["listing-balance"].exists,
-      "打开「配置尾款」后应出现尾款金额输入框"
+      "尾款无需手动填写，不应有尾款金额输入框"
     )
-    capture("P3-开启尾款开关后")
+
+    // 选定金阶段后开关应已自动打开（onChange 默认引导）→ 定金金额框在层级里。
+    // 先填定金（此时页面未滚到底部，后续收键盘手势不会拉到 sheet），
+    // 再填预约价——顺序反过来会在页面最底部做收键盘滑动，把表单 sheet 拉关。
+    let depositField = app.textFields["listing-deposit"]
+    XCTAssertTrue(depositField.exists, "定金开关开着时应出现定金金额输入框")
+    guard scrollToElement(depositField, app: app) else {
+      dumpHierarchy("P1-定金金额输入框不可见", app: app)
+      XCTFail("定金金额输入框应能滚动到可见")
+      return
+    }
+    depositField.tap()
+    depositField.typeText("50")
+
+    let preorderField = app.textFields["listing-preorder"]
+    guard scrollToElement(preorderField, app: app) else {
+      dumpHierarchy("P0-找不到预约价输入框", app: app)
+      XCTFail("价格卡应有预约价（全款）输入")
+      return
+    }
+    preorderField.tap()
+    preorderField.typeText("199")
+    dismissKeyboard(app)
+    sleep(1)
+
+    // 尾款自动行：预约价 199 − 定金 50 = 尾款 149，区分显示。
+    // combine 后是单一任意类型元素，用 any 查询（StaticText 可能查不到）。
+    let autoBalance = app.descendants(matching: .any)
+      .matching(NSPredicate(format: "identifier == %@", "listing-balance-auto")).firstMatch
+    XCTAssertTrue(autoBalance.waitForExistence(timeout: 4), "预约价与定金配齐后应出现尾款自动行")
+    XCTAssertTrue(
+      autoBalance.label.contains("149"),
+      "尾款应自动算出 199 − 50 = 149（实际：\(autoBalance.label)）"
+    )
+    capture("P2-尾款自动核算")
+
+    // 关掉定金开关 → 尾款自动行消失，回到「自动计算」提示
+    guard scrollToElement(depositToggle, app: app) else {
+      dumpHierarchy("P3-找不到定金开关", app: app)
+      XCTFail("关定金断言前应能滚动到定金开关")
+      return
+    }
+    depositToggle.tap()
+    sleep(1)
+    XCTAssertFalse(
+      autoBalance.exists,
+      "关掉定金后尾款自动行应消失"
+    )
+    XCTAssertTrue(
+      app.staticTexts["listing-balance-hint"].exists,
+      "关掉定金后应显示「填完预约价与定金后自动计算」提示"
+    )
+    capture("P3-关闭定金开关后")
   }
 
   // MARK: - 用例：提交前全量校验 + 步骤内报错
