@@ -205,6 +205,9 @@ struct MidsummerSeriesRow: View {
 struct MidsummerSeriesDetailView: View {
   @ObservedObject var store: MidsummerStore
   let seriesID: String
+  /// 创作者视图标记（由品牌页宿主传入；快照测试直接构造本页时保持 false，
+  /// 价格总表行不可点、不出现编辑标记）。基础条目改价走 CloudKit 白名单。
+  var isCreatorMode: Bool = false
   /// 系列资料页入口（款式分类与尺码表 / 链接原始信息）。
   /// 由品牌页宿主注入导航闭包——本页不自己持有路由，保持与首页同一套导航栈。
   var onOpenStyleChartCatalog: (() -> Void)? = nil
@@ -221,6 +224,15 @@ struct MidsummerSeriesDetailView: View {
   @State private var insertToast: String?
   /// 上新工作台（用户 2026-09-16）：主图/阶段/尺码/单品价格 4 步表单 + 上架管理。
   @State private var showingListingWorkspace = false
+  /// 价格总表行点击 → 改价目标（用户 2026-09-18）。
+  @State private var priceEditTarget: PriceEditTarget?
+
+  /// 改价目标：listing 非 nil = 工作台商品（本地编辑），nil = 基础条目（CloudKit）。
+  private struct PriceEditTarget: Identifiable {
+    let item: MidsummerItemDTO
+    let listing: MidsummerListing?
+    var id: String { item.id }
+  }
 
   private var series: MidsummerSeriesDTO? { store.series(withID: seriesID) }
   private var brandName: String { store.catalog?.brandName ?? "仲夏物语" }
@@ -271,6 +283,15 @@ struct MidsummerSeriesDetailView: View {
     .sheet(item: $detailItem) { item in
       if let series {
         MidsummerItemDetailSheet(series: series, item: item, brandName: brandName)
+      }
+    }
+    // 改价面板（用户 2026-09-18）：工作台商品走本地编辑链路；种子 / 云端
+    // 基础条目走 CloudKit 发布（需要创作者白名单，失败时面板内给出原因）。
+    .sheet(item: $priceEditTarget) { target in
+      if let listing = target.listing {
+        MidsummerListingPriceEditSheet(listing: listing)
+      } else {
+        MidsummerItemPriceEditSheet(item: target.item)
       }
     }
     // 上新工作台：所有系列无条件开放（旧版 canContribute 三态门控已随投稿
@@ -490,6 +511,12 @@ struct MidsummerSeriesDetailView: View {
         Text("按购买方式分组")
           .font(.system(size: 10))
           .foregroundStyle(MidsummerTheme.secondaryText)
+        // 创作者视图：点行直接改价（用户 2026-09-18），普通用户无此提示与手势。
+        if isCreatorMode {
+          Text("点行改价")
+            .font(.system(size: 10, weight: .medium))
+            .foregroundStyle(MidsummerTheme.brandOrange)
+        }
         Spacer(minLength: 0)
       }
 
@@ -504,17 +531,7 @@ struct MidsummerSeriesDetailView: View {
               .font(.system(size: 11, weight: .semibold))
               .foregroundStyle(MidsummerTheme.brandOrange)
             ForEach(group.rows, id: \.name) { row in
-              HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Text(row.name)
-                  .font(.system(size: 12))
-                  .foregroundStyle(MidsummerTheme.primaryText)
-                  .lineLimit(1)
-                Spacer(minLength: 8)
-                Text(row.amount)
-                  .font(.system(size: 12, weight: .semibold).monospacedDigit())
-                  .foregroundStyle(MidsummerTheme.priceRed)
-                  .lineLimit(1)
-              }
+              priceTableRow(row)
             }
           }
           .padding(.vertical, 4)
@@ -544,9 +561,57 @@ struct MidsummerSeriesDetailView: View {
     .accessibilityIdentifier("series-price-table")
   }
 
+  /// 价格总表行：创作者视图下点行进改价面板（工作台商品 → 本地编辑；
+  /// 基础条目 → CloudKit 发布），普通用户保持纯展示。
+  private func priceTableRow(_ row: PriceRow) -> some View {
+    let rowContent = HStack(alignment: .firstTextBaseline, spacing: 8) {
+      Text(row.name)
+        .font(.system(size: 12))
+        .foregroundStyle(MidsummerTheme.primaryText)
+        .lineLimit(1)
+      Spacer(minLength: 8)
+      Text(row.amount)
+        .font(.system(size: 12, weight: .semibold).monospacedDigit())
+        .foregroundStyle(MidsummerTheme.priceRed)
+        .lineLimit(1)
+      if isCreatorMode, row.itemID != nil {
+        Image(systemName: "square.and.pencil")
+          .font(.system(size: 10))
+          .foregroundStyle(MidsummerTheme.secondaryText)
+      }
+    }
+    let editable = isCreatorMode && row.itemID != nil
+    return Group {
+      if editable {
+        Button {
+          openPriceEditor(itemID: row.itemID ?? "")
+        } label: {
+          rowContent
+            .padding(.vertical, 2)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("series-price-row-\(row.itemID ?? "")")
+      } else {
+        rowContent
+      }
+    }
+  }
+
+  /// 按单品 id 打开改价面板：工作台商品（id 带 listing 前缀或能反查到上架记录）
+  /// 走本地编辑；种子 / 云端基础条目走 CloudKit 发布。
+  private func openPriceEditor(itemID: String) {
+    guard let series,
+      let item = series.items.first(where: { $0.id == itemID })
+    else { return }
+    priceEditTarget = PriceEditTarget(item: item, listing: listingStore.listing(forItemID: itemID))
+  }
+
   private struct PriceRow {
     let name: String
     let amount: String
+    /// 该行对应的单品 id；创作者视图下点行进改价面板（nil = 无法定位的派生行）。
+    let itemID: String?
   }
 
   private struct PriceGroup {
@@ -562,19 +627,23 @@ struct MidsummerSeriesDetailView: View {
     var fullPreorder: [PriceRow] = []
     var depositBalance: [PriceRow] = []
     for item in series.items {
+      let itemID = item.id
       switch (item.deposit, item.balance) {
       case (let deposit?, let balance?):
         depositBalance.append(
-          PriceRow(name: item.name, amount: "定金 ¥\(deposit) · 尾款 ¥\(balance)"))
+          PriceRow(name: item.name, amount: "定金 ¥\(deposit) · 尾款 ¥\(balance)", itemID: itemID))
       case (let deposit?, nil):
-        fullPreorder.append(PriceRow(name: item.name, amount: "全款 ¥\(deposit)"))
+        fullPreorder.append(
+          PriceRow(name: item.name, amount: "全款 ¥\(deposit)", itemID: itemID))
       case (nil, let balance?):
         // 只有尾款没有定金：仍属预约链路，但单独标口径，不伪装成现货价。
-        depositBalance.append(PriceRow(name: item.name, amount: "尾款 ¥\(balance)"))
+        depositBalance.append(
+          PriceRow(name: item.name, amount: "尾款 ¥\(balance)", itemID: itemID))
       case (nil, nil):
         // 显式预约价优先归「全款预约」组，不再靠「只有定金」猜口径。
         if let preorder = item.preorderPrice {
-          fullPreorder.append(PriceRow(name: item.name, amount: "预约价 ¥\(preorder)"))
+          fullPreorder.append(
+            PriceRow(name: item.name, amount: "预约价 ¥\(preorder)", itemID: itemID))
         } else if let range = item.priceRange {
           let kindSuffix: String
           switch item.priceKind ?? item.variantPriceKind {
@@ -586,7 +655,8 @@ struct MidsummerSeriesDetailView: View {
             PriceRow(
               name: item.name,
               amount: range.min == range.max
-                ? "¥\(range.min)\(kindSuffix)" : "¥\(range.min)–\(range.max)\(kindSuffix)"))
+                ? "¥\(range.min)\(kindSuffix)" : "¥\(range.min)–\(range.max)\(kindSuffix)",
+              itemID: itemID))
         }
       }
     }

@@ -68,6 +68,8 @@ struct MidsummerBrandView: View {
           MidsummerSeriesDetailView(
             store: store,
             seriesID: seriesID,
+            // 创作者视图标记：价格总表行在创作者视图下可点进改价面板。
+            isCreatorMode: viewModeStore.isCreator,
             onOpenStyleChartCatalog: { navigate(to: .styleChartCatalog) },
             onOpenLinkReport: { navigate(to: .linkReport) }
           )

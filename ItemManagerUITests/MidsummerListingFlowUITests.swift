@@ -33,6 +33,12 @@
 //    · ④确认发布          → listing-source
 //    · 步骤导航            → listing-next / listing-back / listing-publish
 //    · 工作台行            → listing-edit-<id> / listing-more-<id>
+//                            listing-price-<id>（改价快捷按钮，2026-09-18）
+//    · 价格总表（工作台）  → workspace-price-table / listing-price-row-<id>
+//    · 改价面板            → price-edit-shop / price-edit-preorder
+//                            price-edit-deposit / price-edit-balance / price-edit-save
+//                            price-edit-image-add / price-edit-image-preview-<i>
+//    · 系列详情价格总表    → series-price-table / series-price-row-<itemId>（创作者视图可点）
 //    · 状态菜单            → listing-menu-list-<id> / listing-menu-delist-<id> / listing-menu-delete-<id>
 
 import XCTest
@@ -911,5 +917,172 @@ final class MidsummerListingFlowUITests: XCTestCase {
       return
     }
     capture("C15-跨系列-系列详情可见")
+  }
+
+  // MARK: - 用例：创作者改价入口（用户 2026-09-18）
+  //
+  // 发布现货商品（预约价 199 走表单必填口径）→ 工作台「系列价格总表」点该商品行
+  // → 改价面板回显预约价 199 → 清空预约价、填现货价 399 → 保存
+  // → 总表行立即显示「¥399」→ 关闭工作台，系列详情价格总表同步出现「¥399（现货价）」。
+  // 商品图上传依赖系统相册权限，UI 用例不覆盖（面板内已带上传 / 替换 / 放大预览入口）。
+
+  @MainActor
+  func testEditListingPriceInWorkspace() throws {
+    let itemName = "改价验收\(Int(Date().timeIntervalSince1970) % 100_000) 小物"
+
+    let app = launchApp()
+    sleep(4)
+    guard enterMidsummer(app), enterSakuraSeries(app) else { return }
+    guard openForm(app) else { return }
+
+    // ① 系列标题
+    let titleField = app.textFields["listing-launch-title"]
+    guard titleField.waitForExistence(timeout: 5) else {
+      dumpHierarchy("P0-找不到系列标题输入框", app: app)
+      XCTFail("第一步应有系列标题输入框")
+      return
+    }
+    focusAndType(app, "改价验收系列\n", into: titleField)
+    usleep(400_000)
+    app.buttons["listing-next"].tap()
+    sleep(1)
+
+    // ② 上新阶段：现货
+    let stageChip = app.buttons["listing-stage-inStock"]
+    guard stageChip.waitForExistence(timeout: 5) else {
+      dumpHierarchy("P1-找不到上新阶段选项", app: app)
+      XCTFail("第二步应能选上新阶段")
+      return
+    }
+    stageChip.tap()
+    app.buttons["listing-next"].tap()
+    sleep(1)
+
+    // ③ 关联款式 + 自定义商品名 + 预约价 199（表单必填口径）
+    let styleChip = app.buttons["listing-style-sk-pink"]
+    guard scrollToElement(styleChip, app: app) else {
+      dumpHierarchy("P2-找不到款式选项", app: app)
+      XCTFail("应能勾选关联款式「sk 粉色」")
+      return
+    }
+    styleChip.tap()
+    sleep(1)
+
+    let nameField = app.textFields["listing-name"]
+    guard scrollToElement(nameField, app: app) else {
+      dumpHierarchy("P3-找不到商品名输入框", app: app)
+      XCTFail("应有自动生成的商品名输入框")
+      return
+    }
+    nameField.tap()
+    if let current = nameField.value as? String, !current.isEmpty {
+      nameField.typeText(String(repeating: "\u{8}", count: current.count))
+    }
+    nameField.typeText(itemName + "\n")
+    usleep(500_000)
+
+    let preorderField = app.textFields["listing-preorder"]
+    guard scrollToElement(preorderField, app: app) else {
+      dumpHierarchy("P4-找不到预约价输入框", app: app)
+      XCTFail("价格卡应有预约价输入")
+      return
+    }
+    preorderField.tap()
+    preorderField.typeText("199")
+    dismissKeyboard(app)
+    app.buttons["listing-next"].tap()
+    sleep(1)
+
+    // ④ 发布上架
+    let publish = app.buttons["listing-publish"]
+    guard publish.waitForExistence(timeout: 4) else {
+      dumpHierarchy("P5-找不到发布按钮", app: app)
+      XCTFail("最后一步应有「发布上架」按钮")
+      return
+    }
+    publish.tap()
+    sleep(2)
+
+    // ⑤ 工作台「系列价格总表」：点该商品行进改价面板
+    // （行是 Button，label 含商品名；工作台行不是按钮，不会误匹配）
+    let priceRow = app.buttons
+      .matching(NSPredicate(format: "label CONTAINS %@", itemName)).firstMatch
+    guard priceRow.waitForExistence(timeout: 6) else {
+      dumpHierarchy("P6-工作台价格总表找不到商品行", app: app)
+      XCTFail("系列价格总表应列出「\(itemName)」（预约价 ¥199 组）")
+      return
+    }
+    capture("P6-工作台价格总表")
+    priceRow.tap()
+    sleep(2)
+
+    // ⑥ 改价面板：回显预约价 199 → 清空、填现货价 399 → 保存
+    let preorderEdit = app.textFields["price-edit-preorder"]
+    guard preorderEdit.waitForExistence(timeout: 5) else {
+      dumpHierarchy("P7-改价面板没打开", app: app)
+      XCTFail("价格总表行点击应打开改价面板")
+      return
+    }
+    XCTAssertEqual(preorderEdit.value as? String, "199", "改价面板应回显原预约价")
+    capture("P7-改价面板回显")
+
+    preorderEdit.tap()
+    if let current = preorderEdit.value as? String {
+      preorderEdit.typeText(String(repeating: "\u{8}", count: current.count))
+    }
+    usleep(300_000)
+
+    let shopEdit = app.textFields["price-edit-shop"]
+    guard shopEdit.waitForExistence(timeout: 3) else {
+      XCTFail("改价面板应有现货价输入")
+      return
+    }
+    shopEdit.tap()
+    shopEdit.typeText("399")
+
+    let save = app.buttons["price-edit-save"]
+    guard save.waitForExistence(timeout: 3) else {
+      XCTFail("改价面板应有保存按钮")
+      return
+    }
+    capture("P8-改价面板填写完成")
+    save.tap()
+    sleep(2)
+
+    // ⑦ 保存后总表行立即刷新为「¥399」（现货价组）
+    let updatedAmount = app.staticTexts["¥399"]
+    guard updatedAmount.waitForExistence(timeout: 6) else {
+      dumpHierarchy("P9-保存后总表未刷新", app: app)
+      XCTFail("保存后系列价格总表应显示「¥399」")
+      return
+    }
+    capture("P9-保存后总表刷新")
+
+    // ⑧ 关闭工作台 → 系列详情价格总表同步出现「¥399（现货价）」
+    let done = app.buttons["完成"].firstMatch
+    if done.exists { done.tap() }
+    var closeWaits = 0
+    while app.buttons["price-edit-save"].exists && closeWaits < 10 {
+      usleep(500_000)
+      closeWaits += 1
+    }
+    closeWaits = 0
+    while app.buttons["listing-open-form"].exists && closeWaits < 10 {
+      usleep(500_000)
+      closeWaits += 1
+    }
+    sleep(2)
+
+    let detailAmount = app.staticTexts
+      .matching(NSPredicate(format: "label CONTAINS %@", "¥399")).firstMatch
+    guard scrollToElement(detailAmount, app: app, maxSwipes: 12) else {
+      dumpHierarchy("P10-系列详情价格总表未同步", app: app)
+      XCTFail("系列详情价格总表应同步显示改后的价格（¥399（现货价））")
+      return
+    }
+    XCTAssertTrue(
+      detailAmount.label.contains("现货价"),
+      "现货价口径应写进总表行文案（实际：\(detailAmount.label)）")
+    capture("P10-系列详情价格总表同步")
   }
 }

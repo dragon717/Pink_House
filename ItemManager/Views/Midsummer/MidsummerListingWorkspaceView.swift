@@ -24,6 +24,8 @@ struct MidsummerListingWorkspaceView: View {
   @State private var editingListing: MidsummerListing?
   @State private var showingForm = false
   @State private var toast: String?
+  /// 改价入口（用户 2026-09-18）：价格总表行 / 商品行「改价」按钮共用。
+  @State private var priceEditingListing: MidsummerListing?
 
   private var seriesListings: [MidsummerListing] {
     // 预售相位排序：定金期 → 尾款期 → 预售结束 → 其它，流转状态一眼可读。
@@ -38,6 +40,7 @@ struct MidsummerListingWorkspaceView: View {
       ScrollView(.vertical, showsIndicators: false) {
         VStack(alignment: .leading, spacing: 12) {
           publishCard
+          priceTableCard
           if let toast {
             Text(toast)
               .font(.system(size: 12, weight: .medium))
@@ -70,6 +73,13 @@ struct MidsummerListingWorkspaceView: View {
       }
       .sheet(item: $editingListing) { listing in
         MidsummerListingFormView(store: store, series: series, existing: listing)
+      }
+      // 改价（用户 2026-09-18）：价格总表行 / 商品行「改价」进入同一编辑面板，
+      // 保存后 upsert 触发 updatedAt → feed 重算，行内金额立即刷新。
+      .sheet(item: $priceEditingListing) { listing in
+        MidsummerListingPriceEditSheet(listing: listing) { message in
+          showToast(message)
+        }
       }
       .animation(.easeOut(duration: 0.18), value: toast)
       // 进入工作台补一次预售流转（与系列页同一兜底），行内徽章显示当前相位。
@@ -125,6 +135,151 @@ struct MidsummerListingWorkspaceView: View {
     .padding(.vertical, 40)
   }
 
+  // MARK: 系列价格总表（用户 2026-09-18）
+  //
+  // 本系列**全部上新商品**（含草稿 / 已上架 / 已下架）的价格汇总，分组口径与
+  // 系列详情页价格总表一致：现货价 / 全款预约 / 定金尾款预约 / 待补价格。
+  // 每行可点，直接进改价面板——改完保存，这里与系列详情页的总表一起刷新。
+
+  private struct WorkspacePriceRow: Identifiable {
+    let listing: MidsummerListing
+    let amount: String
+    var id: String { listing.id }
+  }
+
+  private struct WorkspacePriceGroup: Identifiable {
+    let header: String
+    let rows: [WorkspacePriceRow]
+    var id: String { header }
+  }
+
+  /// 上新商品 → 价格分组。判定顺序与系列详情页 priceGroups 同源：
+  /// 定金/尾款 → 定金尾款组；预约价 → 全款预约组；现货价 → 现货价组；全空 → 待补。
+  private var workspacePriceGroups: [WorkspacePriceGroup] {
+    var spot: [WorkspacePriceRow] = []
+    var fullPreorder: [WorkspacePriceRow] = []
+    var depositBalance: [WorkspacePriceRow] = []
+    var pending: [WorkspacePriceRow] = []
+    for listing in seriesListings {
+      switch (listing.deposit, listing.balance) {
+      case (let deposit?, let balance?):
+        depositBalance.append(
+          WorkspacePriceRow(listing: listing, amount: "定金 ¥\(deposit) · 尾款 ¥\(balance)"))
+      case (let deposit?, nil):
+        depositBalance.append(
+          WorkspacePriceRow(
+            listing: listing,
+            amount: listing.preorderPrice != nil
+              ? "定金 ¥\(deposit) · 尾款自动（预约价 − 定金）" : "定金 ¥\(deposit) · 尾款待填"))
+      case (nil, let balance?):
+        // 只有尾款没有定金：仍属预约链路，单独标口径，不伪装成现货价。
+        depositBalance.append(WorkspacePriceRow(listing: listing, amount: "尾款 ¥\(balance)"))
+      case (nil, nil):
+        if let preorder = listing.preorderPrice {
+          fullPreorder.append(WorkspacePriceRow(listing: listing, amount: "预约价 ¥\(preorder)"))
+        } else if let price = listing.price {
+          spot.append(WorkspacePriceRow(listing: listing, amount: "¥\(price)"))
+        } else {
+          pending.append(WorkspacePriceRow(listing: listing, amount: "待填写"))
+        }
+      }
+    }
+    var groups: [WorkspacePriceGroup] = []
+    if !spot.isEmpty { groups.append(WorkspacePriceGroup(header: "现货价", rows: spot)) }
+    if !fullPreorder.isEmpty {
+      groups.append(WorkspacePriceGroup(header: "预约价 · 全款预约", rows: fullPreorder))
+    }
+    if !depositBalance.isEmpty {
+      groups.append(WorkspacePriceGroup(header: "预约价 · 定金尾款预约", rows: depositBalance))
+    }
+    if !pending.isEmpty {
+      groups.append(WorkspacePriceGroup(header: "价格待补充", rows: pending))
+    }
+    return groups
+  }
+
+  private var priceTableCard: some View {
+    let groups = workspacePriceGroups
+    return VStack(alignment: .leading, spacing: 10) {
+      HStack(spacing: 6) {
+        Text("系列价格总表")
+          .font(.system(size: 14, weight: .semibold))
+          .foregroundStyle(MidsummerTheme.primaryText)
+        Text("点行直接改价")
+          .font(.system(size: 10))
+          .foregroundStyle(MidsummerTheme.brandOrange)
+        Spacer(minLength: 0)
+      }
+
+      if groups.isEmpty {
+        Text("还没有上新商品价格；点上方「发布新商品」开始。")
+          .font(.system(size: 12))
+          .foregroundStyle(MidsummerTheme.secondaryText)
+      } else {
+        ForEach(groups) { group in
+          VStack(alignment: .leading, spacing: 4) {
+            Text(group.header)
+              .font(.system(size: 11, weight: .semibold))
+              .foregroundStyle(MidsummerTheme.brandOrange)
+            ForEach(group.rows) { row in
+              Button {
+                priceEditingListing = row.listing
+              } label: {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                  Text(row.listing.name)
+                    .font(.system(size: 12))
+                    .foregroundStyle(MidsummerTheme.primaryText)
+                    .lineLimit(1)
+                  if row.listing.status != .listed {
+                    Text(row.listing.status.labelZH)
+                      .font(.system(size: 9, weight: .semibold))
+                      .foregroundStyle(MidsummerTheme.secondaryText)
+                      .padding(.horizontal, 4)
+                      .padding(.vertical, 1)
+                      .background(MidsummerTheme.subtleFill)
+                      .clipShape(Capsule())
+                  }
+                  Spacer(minLength: 8)
+                  Text(row.amount)
+                    .font(.system(size: 12, weight: .semibold).monospacedDigit())
+                    .foregroundStyle(MidsummerTheme.priceRed)
+                    .lineLimit(1)
+                  Image(systemName: "square.and.pencil")
+                    .font(.system(size: 10))
+                    .foregroundStyle(MidsummerTheme.secondaryText)
+                }
+                .padding(.vertical, 2)
+                .contentShape(Rectangle())
+              }
+              .buttonStyle(.plain)
+              .accessibilityIdentifier("listing-price-row-\(row.id)")
+            }
+          }
+          .padding(.vertical, 4)
+          if group.header != groups.last?.header {
+            Rectangle()
+              .fill(MidsummerTheme.divider)
+              .frame(height: 0.5)
+          }
+        }
+      }
+
+      Text("口径：现货价即买即得；全款预约一次付清；定金尾款预约需付两次。")
+        .font(.system(size: 10))
+        .foregroundStyle(MidsummerTheme.secondaryText)
+        .fixedSize(horizontal: false, vertical: true)
+    }
+    .padding(12)
+    .themeSkinAdaptiveSectionCard(
+      slot: MidsummerThemeSlot.card,
+      cornerRadius: 14,
+      showsDecoration: true
+    ) {
+      MidsummerTheme.surface
+    }
+    .accessibilityIdentifier("workspace-price-table")
+  }
+
   // MARK: listing 行
 
   private func listingRow(_ listing: MidsummerListing) -> some View {
@@ -172,20 +327,42 @@ struct MidsummerListingWorkspaceView: View {
 
       Spacer(minLength: 0)
 
-      // 行内主操作：编辑（状态与危险操作收进菜单，避免误触）。
-      Button {
-        editingListing = listing
-      } label: {
-        Text("编辑")
-          .font(.system(size: 12, weight: .medium))
+      // 行内主操作：改价（直接进价格编辑）+ 编辑（进完整表单），
+      // 状态与危险操作收进菜单，避免误触。
+      VStack(spacing: 8) {
+        Button {
+          editingListing = listing
+        } label: {
+          Text("编辑")
+            .font(.system(size: 12, weight: .medium))
+            .foregroundStyle(MidsummerTheme.brandOrange)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(MidsummerTheme.orangeSurface)
+            .clipShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("listing-edit-\(listing.id)")
+
+        Button {
+          priceEditingListing = listing
+        } label: {
+          HStack(spacing: 3) {
+            Image(systemName: "yensign.circle")
+              .font(.system(size: 10, weight: .semibold))
+            Text("改价")
+              .font(.system(size: 12, weight: .medium))
+          }
           .foregroundStyle(MidsummerTheme.brandOrange)
           .padding(.horizontal, 10)
           .padding(.vertical, 6)
           .background(MidsummerTheme.orangeSurface)
           .clipShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("listing-price-\(listing.id)")
+        .accessibilityLabel("改价")
       }
-      .buttonStyle(.plain)
-      .accessibilityIdentifier("listing-edit-\(listing.id)")
 
       Menu {
         switch listing.status {
