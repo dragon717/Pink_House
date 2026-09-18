@@ -443,13 +443,15 @@ struct MidsummerSeriesDetailView: View {
 
   // MARK: 系列资料（款式分类与尺码表 / 链接原始信息）
   //
-  // 这两份资料是按系列整理的（目前只有樱花小羊），原先挂在品牌页首页顶层，
-  // 与该系列的两个商品卡片分散在三行；合并入口后统一收进对应系列的详情页。
+  // 这两份资料按系列整理，挂在**有资料数据的系列**详情页（清单见
+  // `MidsummerStyleChartData.ArchiveContent.seriesIDs`，目前樱花小羊已整理，
+  // 仲夏物语其余系列补齐数据后自动开放）。原先挂在品牌页首页顶层，
+  // 与该系列的商品卡片分散在三行；合并入口后统一收进对应系列的详情页。
   // 资料尚未整理的系列不显示该区块——不出现点进去空空如也的入口。
 
   private func archiveSection(_ series: MidsummerSeriesDTO) -> some View {
     Group {
-      if series.id == MidsummerStyleChartData.ArchiveContent.seriesID {
+      if MidsummerStyleChartData.ArchiveContent.seriesIDs.contains(series.id) {
         VStack(spacing: 0) {
           MidsummerArchiveEntryRow(
             title: "款式分类与尺码表",

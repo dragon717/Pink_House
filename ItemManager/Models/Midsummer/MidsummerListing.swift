@@ -4,7 +4,8 @@ import Foundation
 //
 // 与「创作者投稿」（MidsummerContributeView → CloudKit）是两条通道：
 //   · 投稿：系列级、云端公共库、白名单门控；
-//   · 上新工作台（本文件）：**围绕「樱花小羊」系列**的单品上新，
+//   · 上新工作台（本文件）：**仲夏物语全部系列**的单品上新（用户
+//     2026-09-18 起从樱花小羊统一扩展到品牌下所有系列/角色），
 //     本地持久化（草稿 / 已上架 / 已下架），上架后并入系列 feed。
 //
 // 深度结合衣橱的关键：上架商品转成 `MidsummerItemDTO` 进入既有渲染链——
@@ -137,7 +138,7 @@ nonisolated struct MidsummerListingStyle: Codable, Identifiable, Equatable, Send
 nonisolated struct MidsummerListing: Codable, Identifiable, Equatable, Sendable {
   /// `upload-` 前缀 + 8 位随机串；转 DTO 时再加 `midsummer-listing-` 命名空间。
   let id: String
-  /// 目前固定为樱花小羊（`MidsummerStyleChartData.ArchiveContent.seriesID`）。
+  /// 所属系列（仲夏物语任意系列，按创建表单时所在系列详情写入）。
   var seriesID: String
   var name: String
   var kindRaw: String

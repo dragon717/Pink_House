@@ -12,9 +12,11 @@ import UIKit
 enum MidsummerStyleChartData {
 
   /// 系列资料的归属系列：「款式分类与尺码表」「链接原始信息」按系列整理，
-  /// 目前只有樱花小羊系列有完整资料；其它系列的详情页不显示资料入口。
+  /// 挂在**有资料数据的系列**详情页（仲夏物语全系列统一上新/展示指令；
+  /// 资料数据本身仍按系列逐步补齐）。目前已整理樱花小羊；新系列补齐
+  /// json 后把 id 加进清单，系列详情页的「系列资料」区块自动开放。
   nonisolated enum ArchiveContent {
-    static let seriesID = "midsummer-2026-sakura-lamb"
+    static let seriesIDs: Set<String> = ["midsummer-2026-sakura-lamb"]
   }
 
   /// 解析静态素材图：bundle 资源优先，找不到再查 ImageManager 的用户目录。

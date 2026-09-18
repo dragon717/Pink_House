@@ -8,7 +8,7 @@ import UIKit
 // ImageManager 的 Images 目录（`midsummer-listing-` 命名空间，与种子图 /
 // 草稿图 / 云端下载图同目录共存，`loadImage(fileName:)` 一条读取路径全通）。
 //
-// 为什么本地而不是 CloudKit：樱花小羊的上新是运营者自己的日常动作，
+// 为什么本地而不是 CloudKit：仲夏物语的上新是运营者自己的日常动作，
 // 先保证「录了就能上架、上架就能入库」的闭环；后续要多人协作时再接云端
 // （记录结构已按 Codable 设计，迁移成本低）。
 

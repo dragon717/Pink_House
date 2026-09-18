@@ -2,7 +2,8 @@
 //  MidsummerListingFlowUITests.swift
 //  ItemManagerUITests
 //
-//  上新工作台（樱花小羊系列 · 用户 2026-09-16）全流程验收：
+//  上新工作台（仲夏物语全系列 · 用户 2026-09-16，2026-09-18 起统一扩展到
+//  品牌下所有系列）全流程验收：
 //    发布新商品 → ①系列主图与信息（标题 / 日期）→ ②选择上新阶段
 //    → ③分类与款式（2026-09-18：分类+款式合并、商品名自动生成可改、
 //      预约价 / 定金固定显示、尾款自动核算）
@@ -106,9 +107,11 @@ final class MidsummerListingFlowUITests: XCTestCase {
     return true
   }
 
-  /// 「全部商品 → 系列列表 → 樱花小羊」进系列详情（上新管理入口在那里）。
+  /// 「全部商品 → 系列列表 → 指定系列」进系列详情（上新管理入口在那里）。
+  /// 仲夏物语全系列共用同一套上新指令链（用户 2026-09-18 扩展），
+  /// 入口按系列名参数化；默认樱花小羊（种子数据最全）。
   @MainActor
-  private func enterSakuraSeries(_ app: XCUIApplication) -> Bool {
+  private func enterSeries(_ app: XCUIApplication, _ name: String = "樱花小羊") -> Bool {
     let allEntry = app.buttons["midsummer-entry-all-series"]
     guard allEntry.waitForExistence(timeout: 6) else {
       dumpHierarchy("80-找不到全部商品入口", app: app)
@@ -119,16 +122,22 @@ final class MidsummerListingFlowUITests: XCTestCase {
     sleep(2)
 
     let seriesRow = app.buttons
-      .matching(NSPredicate(format: "label BEGINSWITH %@", "樱花小羊，"))
+      .matching(NSPredicate(format: "label BEGINSWITH %@", "\(name)，"))
       .firstMatch
     guard seriesRow.waitForExistence(timeout: 6) else {
-      dumpHierarchy("81-找不到樱花小羊系列行", app: app)
-      XCTFail("系列列表应有「樱花小羊」行")
+      dumpHierarchy("81-找不到\(name)系列行", app: app)
+      XCTFail("系列列表应有「\(name)」行")
       return false
     }
     seriesRow.tap()
     sleep(2)
     return true
+  }
+
+  /// 兼容旧调用点：樱花小羊入口。
+  @MainActor
+  private func enterSakuraSeries(_ app: XCUIApplication) -> Bool {
+    enterSeries(app, "樱花小羊")
   }
 
   /// 双向滚动查找（2026-09-18）：先向上滑（找下方内容），不行再向下滑
@@ -686,5 +695,221 @@ final class MidsummerListingFlowUITests: XCTestCase {
     app.descendants(matching: .any)
       .matching(NSPredicate(format: "identifier == %@", "listing-step-progress"))
       .firstMatch.label
+  }
+
+  // MARK: - 用例：同一套指令链在另一系列生效（仲夏物语全系列统一 · 2026-09-18）
+  //
+  // 之前所有上新用例都从樱花小羊进入——那是「种子数据最全」的现实约束，
+  // 不是产品边界。本用例换一个系列（小熊博物馆系列）完整走一遍：
+  // 分类款式合并卡 + 批量录入自动拼「分类名+颜色」+ 商品名自动生成 +
+  // 预约价/定金固定显示 + 尾款自动核算 + 发布上架 → 系列可见，
+  // 证明指令链是系列无关的，樱花小羊没有任何特权逻辑。
+
+  @MainActor
+  func testPublishListingOnAnotherSeries() throws {
+    let app = launchApp()
+    sleep(4)
+    guard enterMidsummer(app), enterSeries(app, "小熊博物馆系列") else { return }
+    guard openForm(app) else { return }
+
+    // ① 系列标题
+    let titleField = app.textFields["listing-launch-title"]
+    guard titleField.waitForExistence(timeout: 5) else {
+      dumpHierarchy("C0-找不到系列标题输入框", app: app)
+      XCTFail("第一步应有系列标题输入框（小熊博物馆系列）")
+      return
+    }
+    focusAndType(app, "跨系列验收上新\n", into: titleField)
+    usleep(400_000)
+    app.buttons["listing-next"].tap()
+    sleep(1)
+
+    // ② 上新阶段：选「现货」
+    let stageChip = app.buttons["listing-stage-inStock"]
+    guard stageChip.waitForExistence(timeout: 5) else {
+      dumpHierarchy("C1-找不到上新阶段选项", app: app)
+      XCTFail("第二步应有「选择上新阶段」chips")
+      return
+    }
+    stageChip.tap()
+    app.buttons["listing-next"].tap()
+    sleep(1)
+
+    // ③ 分类与款式：价格卡固定显示（不随阶段联动）——全系列同口径
+    XCTAssertTrue(
+      app.textFields["listing-preorder"].exists,
+      "跨系列也应固定显示预约价（全款）输入"
+    )
+    XCTAssertTrue(
+      app.buttons["listing-deposit-toggle"].exists || app.switches["listing-deposit-toggle"].exists,
+      "跨系列也应固定显示定金配置开关"
+    )
+
+    // 批量录入款式（该系列没有可勾选的款式 chip，走批量入口）：
+    // 输入纯颜色，自动拼主分类前缀 →「OP 白色」「OP 黑色」。
+    let batchToggle = app.buttons["listing-style-batch-toggle"]
+    guard scrollToElement(batchToggle, app: app) else {
+      dumpHierarchy("C2-找不到批量录入入口", app: app)
+      XCTFail("款式区应有「批量添加」折叠入口")
+      return
+    }
+    batchToggle.tap()
+    sleep(1)
+    let batchInput = app.textViews["listing-style-batch-input"]
+    guard batchInput.waitForExistence(timeout: 4) else {
+      dumpHierarchy("C3-找不到批量输入框", app: app)
+      XCTFail("批量添加展开后应有输入框")
+      return
+    }
+    batchInput.tap()
+    batchInput.typeText("白色、黑色")
+    app.buttons["listing-style-batch-add"].tap()
+    sleep(1)
+    // 批量输入的键盘一直聚焦会让下方尺码 chips 处于键盘后面（isHittable=false），
+    // 且此时滚动位置在表单顶部，不能下拉收键盘（会把 sheet 拉关）。
+    // 安全做法：点「收起批量添加」让 TextEditor 失焦、键盘随之收起。
+    app.buttons["listing-style-batch-toggle"].tap()
+    sleep(1)
+
+    // 自动拼接断言：款式行名 = 主分类 shortLabel + 颜色。
+    // 注意：行容器 identifier（listing-style-row-0）会合并覆盖行内输入框的
+    // listing-style-name-0，按类型过滤（textFields）才能唯一定位到名字输入框。
+    let styleName0 = app.textFields["listing-style-row-0"]
+    guard scrollToElement(styleName0, app: app) else {
+      dumpHierarchy("C4-找不到款式行", app: app)
+      XCTFail("批量添加后应出现款式行")
+      return
+    }
+    XCTAssertEqual(
+      styleName0.value as? String, "OP 白色",
+      "批量录入应自动拼「分类名+颜色」为款式名"
+    )
+
+    // 商品名自动生成 = 首个款式名（跨系列同样生效，不手动改）
+    let nameField = app.textFields["listing-name"]
+    guard scrollToElement(nameField, app: app) else {
+      dumpHierarchy("C5-找不到商品名输入框", app: app)
+      XCTFail("「分类与款式」步应有自动生成的商品名输入框")
+      return
+    }
+    XCTAssertEqual(
+      nameField.value as? String, "OP 白色",
+      "商品名应自动取首个款式名"
+    )
+
+    // 尺码（常用 chips 跨系列同样可用）：滚到尺码区后视口内是哪颗点哪颗
+    //（S/M 可能已被滚出视口上方，XL/均码/F 同样是有效断言）。
+    let presetSizeIDs = ["listing-size-XS", "listing-size-S", "listing-size-M",
+                         "listing-size-L", "listing-size-XL", "listing-size-XXL",
+                         "listing-size-均码", "listing-size-F"]
+    let customSizeEntry = app.textFields["listing-size-custom"]
+    var tappedSize = false
+    for _ in 0..<6 {
+      guard customSizeEntry.exists else { break }
+      let visibleChip = app.buttons.matching(
+        NSPredicate(format: "identifier IN %@", presetSizeIDs)
+      ).allElementsBoundByIndex.first { $0.isHittable }
+      if let chip = visibleChip {
+        chip.tap()
+        tappedSize = true
+        break
+      }
+      guard customSizeEntry.exists else { break }
+      app.swipeUp()
+      usleep(400_000)
+    }
+    guard tappedSize else {
+      dumpHierarchy("C6-找不到尺码选项", app: app)
+      XCTFail("尺码区应有常用尺码 chips")
+      return
+    }
+    sleep(1)
+
+    // 价格：预约价 + 开定金 → 尾款自动核算（跨系列同口径）
+    let preorderField = app.textFields["listing-preorder"]
+    guard scrollToElement(preorderField, app: app) else {
+      dumpHierarchy("C7-找不到预约价输入框", app: app)
+      XCTFail("价格卡应有预约价输入")
+      return
+    }
+    preorderField.tap()
+    preorderField.typeText("259")
+    dismissKeyboard(app)
+
+    let depositToggle = app.switches["listing-deposit-toggle"]
+    if !depositToggle.exists {
+      // 某些版本 Toggle 落在 buttons 里
+      _ = app.buttons["listing-deposit-toggle"]
+    }
+    let toggleElement = depositToggle.exists ? depositToggle : app.buttons["listing-deposit-toggle"]
+    guard scrollToElement(toggleElement, app: app) else {
+      dumpHierarchy("C8-找不到定金开关", app: app)
+      XCTFail("价格卡应有定金配置开关")
+      return
+    }
+    if toggleElement.value as? String != "1" {
+      toggleElement.tap()
+      sleep(1)
+    }
+    let depositField = app.textFields["listing-deposit"]
+    guard scrollToElement(depositField, app: app) else {
+      dumpHierarchy("C9-找不到定金金额输入框", app: app)
+      XCTFail("打开「配置定金」后应出现定金金额输入框")
+      return
+    }
+    depositField.tap()
+    depositField.typeText("60")
+    dismissKeyboard(app)
+    sleep(1)
+
+    let autoBalance = app.descendants(matching: .any)
+      .matching(NSPredicate(format: "identifier == %@", "listing-balance-auto")).firstMatch
+    XCTAssertTrue(autoBalance.waitForExistence(timeout: 4), "跨系列也应出现尾款自动行")
+    XCTAssertTrue(
+      autoBalance.label.contains("199"),
+      "尾款应自动算出 259 − 60 = 199（实际：\(autoBalance.label)）"
+    )
+    capture("C10-跨系列-尾款自动核算")
+
+    // ④ 发布
+    app.buttons["listing-next"].tap()
+    sleep(1)
+    let publish = app.buttons["listing-publish"]
+    guard publish.waitForExistence(timeout: 4) else {
+      dumpHierarchy("C11-找不到发布按钮", app: app)
+      XCTFail("最后一步应有「发布上架」按钮")
+      return
+    }
+    publish.tap()
+    sleep(2)
+
+    // ⑤ 工作台列表出现已上架行（商品名没手动改过，应显示自动生成的「OP 白色」）
+    let listedRow = app.staticTexts["OP 白色"]
+    guard listedRow.waitForExistence(timeout: 6) else {
+      dumpHierarchy("C12-工作台找不到上架行", app: app)
+      XCTFail("发布后工作台应列出自动命名的「OP 白色」")
+      return
+    }
+    capture("C13-跨系列-工作台已上架")
+
+    // ⑥ 关闭工作台 → 系列详情商品列表应出现新商品
+    let done = app.buttons["完成"].firstMatch
+    if done.exists { done.tap() }
+    var closeWaits = 0
+    while app.buttons["listing-open-form"].exists && closeWaits < 10 {
+      usleep(500_000)
+      closeWaits += 1
+    }
+    sleep(2)
+
+    let seriesItem = app.descendants(matching: .any)
+      .matching(NSPredicate(format: "identifier BEGINSWITH %@", "midsummer-series-item-midsummer-listing-"))
+      .firstMatch
+    guard scrollToElement(seriesItem, app: app, maxSwipes: 12) else {
+      dumpHierarchy("C14-系列详情找不到上架商品", app: app)
+      XCTFail("上架商品应出现在小熊博物馆系列详情的商品列表里")
+      return
+    }
+    capture("C15-跨系列-系列详情可见")
   }
 }
