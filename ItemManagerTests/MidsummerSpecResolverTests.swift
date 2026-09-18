@@ -668,4 +668,194 @@ final class MidsummerSpecResolverTests: XCTestCase {
     XCTAssertTrue(setDraft.note.contains("套装入库：2026-09-16 18:00（2 件一套）"))
     XCTAssertTrue(setDraft.note.hasSuffix("套装成员：A、B"), "套装行追加在备注末尾")
   }
+
+  // MARK: - 款式名解析（类型 / 颜色 → 衣橱字段，用户 2026-09-18）
+
+  /// 「sk 粉色」→ 类型 SK、颜色粉色（需求示例 1）。
+  func testParseVariantSkPink() {
+    let parsed = MidsummerSpecResolver.parseVariantFields("sk 粉色")
+    XCTAssertEqual(parsed.type, .skirt)
+    XCTAssertEqual(parsed.color, "粉色")
+  }
+
+  /// 「无腰op粉色」→ 类型 op、颜色粉色（需求示例 2）。
+  /// 「无腰」是款式修饰，留在入库名称里，不混进颜色。
+  func testParseVariantNoWaistOpPink() {
+    let parsed = MidsummerSpecResolver.parseVariantFields("无腰op粉色")
+    XCTAssertEqual(parsed.type, .op)
+    XCTAssertEqual(parsed.color, "粉色")
+  }
+
+  /// 「现 」现货标记前缀要剥掉（种子款式名如「现 sk 粉色」）。
+  func testParseVariantStripsInStockPrefix() {
+    let parsed = MidsummerSpecResolver.parseVariantFields("现 sk 粉色")
+    XCTAssertEqual(parsed.type, .skirt)
+    XCTAssertEqual(parsed.color, "粉色")
+  }
+
+  /// 长词优先：「jsk」不能被它内部的「sk」截胡。
+  func testParseVariantJskNotTruncatedBySk() {
+    let parsed = MidsummerSpecResolver.parseVariantFields("段段jsk蓝色")
+    XCTAssertEqual(parsed.type, .jsk)
+    XCTAssertEqual(parsed.color, "蓝色")
+  }
+
+  /// 中文短标（背带裙）同样可解析；大小写不敏感（OP / op 同义）。
+  func testParseVariantChineseKindAndCaseInsensitive() {
+    XCTAssertEqual(
+      MidsummerSpecResolver.parseVariantFields("背带裙 墨绿").type, .suspenderSkirt)
+    XCTAssertEqual(
+      MidsummerSpecResolver.parseVariantFields("背带裙 墨绿").color, "墨绿")
+    XCTAssertEqual(MidsummerSpecResolver.parseVariantFields("无腰OP粉色").type, .op)
+  }
+
+  /// 只有类型没有颜色 → 颜色 nil（调用方回退单品配色）。
+  func testParseVariantWithoutColor() {
+    let parsed = MidsummerSpecResolver.parseVariantFields("sk")
+    XCTAssertEqual(parsed.type, .skirt)
+    XCTAssertNil(parsed.color)
+  }
+
+  /// 无分类短标 → (nil, nil)，不猜（调用方回退单品自带分类）。
+  func testParseVariantUnknownTokenReturnsNil() {
+    let parsed = MidsummerSpecResolver.parseVariantFields("库洛米")
+    XCTAssertNil(parsed.type)
+    XCTAssertNil(parsed.color)
+  }
+
+  // MARK: - 单件入库：解析结果一一对应衣橱字段（用户 2026-09-18）
+
+  /// 款式组（role = .variant）+ 尺码组（role = .size），无颜色组——
+  /// 类型与颜色从款式名解析，尺码用用户实际选的。
+  private var variantStyleGroup: MidsummerSpecGroup {
+    group("style", "颜色分类", role: .variant, [
+      option("v1", "sk 粉色"),
+      option("v2", "无腰op粉色"),
+    ])
+  }
+
+  private var draftSeries: MidsummerSeriesDTO {
+    MidsummerSeriesDTO(
+      id: "series-1", name: "樱花小羊", year: 2026, launchedOn: "2026-03-01",
+      stage: .inStock, coverImage: nil, depositMin: nil, depositMax: nil,
+      priceSource: nil, sizes: ["S", "M"], colors: [], summary: nil,
+      sourceURL: "https://example.com", sourceKind: "public", verified: true, items: []
+    )
+  }
+
+  func testMakeDraftMapsParsedTypeColorAndSelectedSize() {
+    let item = makeItem(specGroups: [variantStyleGroup, sizeGroup])
+    let selection = MidsummerSpecSelection(picks: ["style": "v2", "size": "m"])
+    let draft = MidsummerWardrobeDraftBuilder.makeDraft(
+      for: item, series: draftSeries, brandName: "仲夏物语",
+      selection: selection, modelContext: context
+    )
+    XCTAssertEqual(draft.types, "OP", "「无腰op粉色」应解析出类型 OP")
+    XCTAssertEqual(draft.colors, "粉色", "颜色应取款式名解析结果")
+    XCTAssertEqual(draft.sizes, "M", "尺码应填用户实际选择的尺码")
+    XCTAssertEqual(draft.priceTotal, 119, "现货类型按 SKU 逐款价 / 单品价")
+    XCTAssertFalse(draft.isDepositPlan)
+  }
+
+  /// 定金尾款类型：价格字段对应填写定金尾款信息（需求示例 4）。
+  /// 尾款缺省时按「预约价 − 定金」推（与上新表单的生成规则互为逆运算）。
+  func testMakeDraftDepositPlanFillsDepositAndBalance() {
+    let item = MidsummerItemDTO(
+      id: "item-presale",
+      seriesID: "series-1",
+      name: "樱花小羊",
+      kind: .skirt,
+      price: nil,
+      preorderPrice: 199,
+      deposit: 50,
+      balance: nil,
+      priceKind: nil,
+      priceCapturedOn: nil,
+      priceNote: nil,
+      sizes: ["S"],
+      colors: [],
+      coverImage: nil,
+      itemURL: nil,
+      sourceURL: "https://example.com",
+      note: nil,
+      specGroups: nil,
+      skus: nil
+    )
+    let draft = MidsummerWardrobeDraftBuilder.makeDraft(
+      for: item, series: draftSeries, brandName: "仲夏物语",
+      selection: .empty, modelContext: context
+    )
+    XCTAssertTrue(draft.isDepositPlan)
+    XCTAssertEqual(draft.deposit, 50, "定金应落 deposit 字段")
+    XCTAssertEqual(draft.balance, 149, "尾款缺省应按 预约价 − 定金 = 199 − 50 推出")
+    XCTAssertEqual(draft.priceTotal, 199, "总额应等于预约价（定金+尾款）")
+    XCTAssertEqual(draft.originalPrice, 199)
+    XCTAssertTrue(
+      draft.note.contains("价格口径：定金 ¥50 + 尾款 ¥149 = 预约价 ¥199"),
+      "定金尾款构成应写进备注，实际：\(draft.note)")
+  }
+
+  // MARK: - 多件入库：合并为一条衣橱记录（用户 2026-09-18）
+
+  func testMakeSetDraftMergesMembersIntoSingleDraft() {
+    let item = makeItem(specGroups: [variantStyleGroup, sizeGroup])
+    let selections = [
+      MidsummerSpecSelection(picks: ["style": "v1", "size": "s"]),
+      MidsummerSpecSelection(picks: ["style": "v2", "size": "s"]),
+    ]
+    let draft = MidsummerWardrobeDraftBuilder.makeSetDraft(
+      for: item, series: draftSeries, brandName: "仲夏物语",
+      selections: selections, quantity: 1,
+      setMarker: "2026-09-18 11:00", modelContext: context
+    )
+    // 一条记录：成员字段合并而不是各写一条。
+    XCTAssertEqual(draft.types, "SK、OP", "类型应为成员解析结果的去重合并")
+    XCTAssertEqual(draft.colors, "粉色", "两件都是粉色 → 合并后只有一项")
+    XCTAssertEqual(draft.sizes, "S", "尺码取用户实际选择")
+    XCTAssertEqual(draft.priceTotal, 238, "总额 = 成员价格之和（119 × 2）")
+    XCTAssertEqual(draft.stock, 1, "stock 是套数，不再按件数拆记录")
+    XCTAssertEqual(draft.name, "sk 粉色＋无腰op粉色（套装）")
+    XCTAssertTrue(draft.note.contains("套装入库：2026-09-18 11:00（2 件一套，合并为一条衣橱记录）"))
+    XCTAssertTrue(draft.note.contains("套装成员：sk 粉色、无腰op粉色"))
+    XCTAssertTrue(draft.note.contains("· sk 粉色"), "成员明细应逐条写进备注")
+  }
+
+  /// 定金尾款的一套：定金 / 尾款分别求和，整条记录是定金计划。
+  func testMakeSetDraftDepositPlanSumsDepositAndBalance() {
+    let presaleItem = MidsummerItemDTO(
+      id: "item-presale-set",
+      seriesID: "series-1",
+      name: "樱花小羊",
+      kind: .skirt,
+      price: nil,
+      preorderPrice: 199,
+      deposit: 50,
+      balance: nil,
+      priceKind: nil,
+      priceCapturedOn: nil,
+      priceNote: nil,
+      sizes: ["S"],
+      colors: [],
+      coverImage: nil,
+      itemURL: nil,
+      sourceURL: "https://example.com",
+      note: nil,
+      specGroups: [variantStyleGroup, sizeGroup],
+      skus: nil
+    )
+    let selections = [
+      MidsummerSpecSelection(picks: ["style": "v1", "size": "s"]),
+      MidsummerSpecSelection(picks: ["style": "v2"]),
+    ]
+    let draft = MidsummerWardrobeDraftBuilder.makeSetDraft(
+      for: presaleItem, series: draftSeries, brandName: "仲夏物语",
+      selections: selections, quantity: 2,
+      setMarker: "2026-09-18 11:30", modelContext: context
+    )
+    XCTAssertTrue(draft.isDepositPlan)
+    XCTAssertEqual(draft.deposit, 100, "定金应为成员之和（50 × 2）")
+    XCTAssertEqual(draft.balance, 298, "尾款应为成员之和（149 × 2）")
+    XCTAssertEqual(draft.priceTotal, 398, "总额应为成员预约价之和（199 × 2）")
+    XCTAssertEqual(draft.stock, 2, "stock = 套数")
+  }
 }

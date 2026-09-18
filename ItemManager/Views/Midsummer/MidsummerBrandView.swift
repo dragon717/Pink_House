@@ -1052,13 +1052,12 @@ struct MidsummerItemDetailSheet: View {
     TabNavigationManager.shared.presentWardrobeCreation(with: draft)
   }
 
-  /// 多选配一套（用户 2026-09-16）：勾选的多件款式一次入库为**同一套**。
+  /// 多选配一套（用户 2026-09-16 引入；2026-09-18 改合并口径）：
+  /// 勾选的多件款式合并为**一条**衣橱记录一次入库。
   ///
-  /// 每个勾选项各落一条 `Clothing`（字段互不相同，合并成一条会丢数据），
-  /// 「同一套」由**共同的套装标记**体现：每条记录的备注里写
-  /// 「套装入库：<时间标记>（N 件一套）」+「套装成员：…」，按标记即可互相认定。
-  /// 复用既有单件链路（makeDraft → QuickInserter），字段口径完全一致；
-  /// 中途失败时已写入的成员保留（真实落库成功），失败原因进吐司。
+  /// 使用者明确要求「多件商品合并录入到同一个衣橱中，不得拆分为多个衣橱」，
+  /// 成员明细（规格 / 价格）整体写进备注，套装标记保留（互相认定一套的能力
+  /// 不丢）。复用既有落库实现（含失败回滚），失败原因进吐司。
   private func quickInsertSetToWardrobe(selections: [MidsummerSpecSelection], quantity: Int) {
     guard !isInsertingToWardrobe, !selections.isEmpty else { return }
     isInsertingToWardrobe = true
@@ -1066,25 +1065,18 @@ struct MidsummerItemDetailSheet: View {
 
     let memberNames = selections.map { MidsummerSpecResolver.displayName(item, selection: $0) }
     let marker = Self.setFormatter.string(from: Date())
-    let setLines = [
-      "套装入库：\(marker)（\(selections.count) 件一套）",
-      "套装成员：\(memberNames.joined(separator: "、"))",
-    ]
     let countSuffix = quantity > 1 ? " ×\(quantity)" : ""
 
     do {
-      for selection in selections {
-        let draft = MidsummerWardrobeDraftBuilder.makeDraft(
-          for: item,
-          series: series,
-          brandName: brandName,
-          selection: selection,
-          quantity: quantity,
-          extraNoteLines: setLines,
-          modelContext: modelContext
-        )
-        _ = try TimeHallWardrobeQuickInserter.insert(draft: draft, modelContext: modelContext)
-      }
+      _ = try MidsummerWardrobeInserter.quickInsertSet(
+        item: item,
+        series: series,
+        brandName: brandName,
+        selections: selections,
+        quantity: quantity,
+        setMarker: marker,
+        modelContext: modelContext
+      )
       quickInsertMessage =
         "已加入衣橱：\(selections.count) 件一套\(countSuffix)（\(memberNames.joined(separator: "、"))）"
     } catch {

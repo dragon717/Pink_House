@@ -362,6 +362,87 @@ nonisolated enum MidsummerSpecResolver {
     return option(picked, in: variantGroup)?.name
   }
 
+  // MARK: - 款式名解析（类型 / 颜色 → 衣橱字段，用户 2026-09-18）
+
+  /// 从款式名解析「类型 + 颜色」，入库时一一对应衣橱的类型 / 颜色字段。
+  ///
+  /// 解析规则（纯函数，供单测）：
+  ///   · 先剥「现 」前缀（种子款式名如「现 sk 粉色」——「现」是现货标记，不是颜色）；
+  ///   · 在剩余串里**大小写不敏感**地找分类短标，长词优先——「jsk」不能被它
+  ///     内部的「sk」截胡；
+  ///   · 类型 = 命中短标对应的分类；颜色 = 短标**之后**的剩余文本（剥掉
+  ///     分隔符与空白）。短标前面的修饰（如「无腰」）属于款式名本身，
+  ///     保留在入库名称里，不混进颜色；
+  ///   · 找不到任何短标 → (nil, nil)，调用方回退单品自带值（不猜）。
+  ///
+  /// 例：
+  ///   「sk 粉色」   → (SK, 粉色)
+  ///   「无腰op粉色」 → (OP, 粉色)
+  ///   「段段jsk蓝色」→ (JSK, 蓝色)
+  ///   「现 sk 粉色」 → (SK, 粉色)
+  ///   「库洛米」     → (nil, nil)
+  static func parseVariantFields(_ raw: String) -> (type: MidsummerItemKind?, color: String?) {
+    var value = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+    if value.hasPrefix("现 ") { value = String(value.dropFirst("现 ".count)) }
+
+    let lowered = value.lowercased()
+    // 长词优先：「无腰op粉色」里 "op" 命中；"jsk" 里的 "sk" 不许抢先。
+    let tokens = MidsummerItemKind.allCases
+      .map { $0.shortLabel.lowercased() }
+      .sorted { $0.count > $1.count }
+
+    var best: (range: Range<String.Index>, kind: MidsummerItemKind)?
+    for token in tokens where !token.isEmpty {
+      guard let range = lowered.range(of: token) else { continue }
+      let kind = MidsummerItemKind.allCases.first {
+        $0.shortLabel.lowercased() == token
+      }
+      guard let kind else { continue }
+      if let current = best {
+        // 更靠前优先；同起点时长词优先（tokens 已按长度降序，先到先得）。
+        if range.lowerBound < current.range.lowerBound {
+          best = (range, kind)
+        }
+      } else {
+        best = (range, kind)
+      }
+    }
+
+    guard let hit = best else { return (nil, nil) }
+    var color = String(value[hit.range.upperBound...])
+    // 剥颜色前的分隔符：「sk - 粉色」「op·粉色」都归一成「粉色」。
+    while let first = color.first, " -—·、_/".contains(first) {
+      color.removeFirst()
+    }
+    color = color.trimmingCharacters(in: .whitespacesAndNewlines)
+    return (hit.kind, color.isEmpty ? nil : color)
+  }
+
+  /// 显式选中的颜色分类名（role == .color 的组）；没选该组返回 nil。
+  ///
+  /// 与 `wardrobeMapping` 的 fallback 语义区分开：入库时「用户显式选的颜色」
+  /// 优先级最高，其次才是从款式名解析的颜色、单品自带配色。
+  static func selectedColorName(
+    _ selection: MidsummerSpecSelection,
+    of item: MidsummerItemDTO
+  ) -> String? {
+    guard let colorGroup = groups(of: item).first(where: { $0.resolvedRole == .color }),
+      let picked = selection[colorGroup.id]
+    else { return nil }
+    return option(picked, in: colorGroup)?.name
+  }
+
+  /// 显式选中的尺码名（role == .size 的组）；没选该组返回 nil。
+  static func selectedSizeName(
+    _ selection: MidsummerSpecSelection,
+    of item: MidsummerItemDTO
+  ) -> String? {
+    guard let sizeGroup = groups(of: item).first(where: { $0.resolvedRole == .size }),
+      let picked = selection[sizeGroup.id]
+    else { return nil }
+    return option(picked, in: sizeGroup)?.name
+  }
+
   // MARK: - 多选套装入库
 
   /// 多选配一套（用户 2026-09-16）：为某个**已勾选**的款式选项生成单品级选择。
