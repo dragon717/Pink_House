@@ -83,6 +83,37 @@ final class MidsummerPriceEditingTests: XCTestCase {
     XCTAssertEqual(values, MidsummerPriceValues(price: 399, preorderPrice: 299, deposit: 60, balance: 239))
   }
 
+  // 定金与预约价的联动：与上新表单第 3 步逐字同文案（改价面板不能写出表单不允许的价格）。
+  func testValidateRequiresPreorderWhenDepositFilled() {
+    guard case .failure(let error) = MidsummerPriceValidator.validate(
+      price: "", preorder: "", deposit: "60", balance: "")
+    else {
+      XCTFail("只填定金时应被拦截（表单口径：开定金必填预约价）")
+      return
+    }
+    XCTAssertTrue(error.message.contains("已配置定金"), error.message)
+  }
+
+  func testValidateRejectsPreorderNotGreaterThanDeposit() {
+    for (preorder, deposit) in [("60", "60"), ("50", "99")] {
+      guard case .failure(let error) = MidsummerPriceValidator.validate(
+        price: "", preorder: preorder, deposit: deposit, balance: "")
+      else {
+        XCTFail("预约价 \(preorder) ≤ 定金 \(deposit) 应被拦截")
+        continue
+      }
+      XCTAssertTrue(error.message.contains("预约价需大于定金"), error.message)
+    }
+  }
+
+  func testValidateAcceptsPreorderGreaterThanDeposit() throws {
+    let values = try MidsummerPriceValidator.validate(
+      price: "", preorder: "299", deposit: "60", balance: ""
+    ).get()
+    XCTAssertEqual(values.deposit, 60)
+    XCTAssertEqual(values.preorderPrice, 299)
+  }
+
   func testValidateReportsFirstBadField() {
     guard case .failure(let error) = MidsummerPriceValidator.validate(
       price: "12.5", preorder: "", deposit: "", balance: "")
@@ -112,6 +143,38 @@ final class MidsummerPriceEditingTests: XCTestCase {
     let manual = MidsummerPriceValidator.resolvingAutoBalance(
       MidsummerPriceValues(price: nil, preorderPrice: 299, deposit: 60, balance: 100))
     XCTAssertEqual(manual.balance, 100)
+  }
+
+  // MARK: 旧档口径预填
+
+  func testPrefillKeepsExistingPreorder() {
+    let kept = MidsummerPriceValidator.prefill(preorderPrice: 199, deposit: nil, balance: nil)
+    XCTAssertEqual(kept.preorder, 199)
+    XCTAssertFalse(kept.didMigrateLegacyDeposit)
+  }
+
+  func testPrefillFillsPreorderFromDepositAndBalance() {
+    // 旧档「定金 + 尾款」缺预约价：预填定金 + 尾款，编辑不丢口径。
+    let filled = MidsummerPriceValidator.prefill(preorderPrice: nil, deposit: 60, balance: 239)
+    XCTAssertEqual(filled.preorder, 299)
+    XCTAssertEqual(filled.deposit, 60)
+    XCTAssertFalse(filled.didMigrateLegacyDeposit)
+  }
+
+  func testPrefillMigratesLegacyDepositOnly() {
+    // 旧档把全款预约价记在「定金」上（与系列详情 priceGroups 同口径）：
+    // 迁移成「预约价 = 定金、定金留空」，否则一进面板就撞上必填校验。
+    let migrated = MidsummerPriceValidator.prefill(preorderPrice: nil, deposit: 299, balance: nil)
+    XCTAssertEqual(migrated.preorder, 299)
+    XCTAssertNil(migrated.deposit)
+    XCTAssertTrue(migrated.didMigrateLegacyDeposit)
+  }
+
+  func testPrefillLeavesEmptyPricesEmpty() {
+    let empty = MidsummerPriceValidator.prefill(preorderPrice: nil, deposit: nil, balance: nil)
+    XCTAssertNil(empty.preorder)
+    XCTAssertNil(empty.deposit)
+    XCTAssertFalse(empty.didMigrateLegacyDeposit)
   }
 
   func testConsistencyHintConsistentAndInconsistent() {

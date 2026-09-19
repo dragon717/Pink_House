@@ -11,6 +11,18 @@ final class MidsummerPresalePhaseTests: XCTestCase {
 
   private let seriesID = "midsummer-2026-sakura-lamb"
 
+  override func setUp() {
+    super.setUp()
+    // 同上：`MidsummerListingStore` 的写接口需要创作者角色，
+    // 本文件验的是预售相位规则，注入角色后照旧跑自己的逻辑。
+    CreatorAccess.setTestOverride(.creator)
+  }
+
+  override func tearDown() {
+    CreatorAccess.setTestOverride(nil)
+    super.tearDown()
+  }
+
   /// 统一的时间基准：以真实「现在」为锚做偏移。store 的写入式流转与
   /// 相位判定共用同一个 now，避免 init 时钟与测试时钟错位。
   private var anchor: Date { Date() }
@@ -130,11 +142,14 @@ final class MidsummerPresalePhaseTests: XCTestCase {
       makeBalanceListing(balanceEndsAt: now.addingTimeInterval(1)).presalePhase(at: now), .balance)
   }
 
-  /// 预约价 / 现货阶段不走定金-尾款状态机（返回 nil，展示逻辑各走各的）。
+  /// 现货阶段不走定金-尾款状态机；预约价阶段**纯全款**（没配定金）也不走。
+  /// 预约价 + 配定金的新口径流转由 `MidsummerListingTests.testPreorderStageWithDepositFlowsPresale` 覆盖。
   func testNonPresaleStagesReturnNil() {
     var listing = makeDepositListing()
+    listing.deposit = nil
+    listing.balance = nil
     listing.stage = .preorder
-    XCTAssertNil(listing.presalePhase(at: .distantFuture))
+    XCTAssertNil(listing.presalePhase(at: .distantFuture), "纯全款预约不走状态机")
     listing.stage = .inStock
     XCTAssertNil(listing.presalePhase(at: .distantFuture))
     listing.stage = nil
@@ -165,9 +180,9 @@ final class MidsummerPresalePhaseTests: XCTestCase {
       depositEndsAt: now.addingTimeInterval(3_600), deposit: nil, balance: nil)
 
     let store = MidsummerListingStore(directory: temporaryDirectory())
-    store.upsert(ended)
-    store.upsert(depositDue)
-    store.upsert(depositRunning)
+    try! store.upsert(ended)
+    try! store.upsert(depositDue)
+    try! store.upsert(depositRunning)
 
     let moved = store.refreshPresaleTransitions(now: now)
     XCTAssertEqual(moved, 1, "只有到期的定金商品发生流转")
@@ -183,7 +198,7 @@ final class MidsummerPresalePhaseTests: XCTestCase {
     let draft = makeDepositListing(
       depositEndsAt: now.addingTimeInterval(-1), status: .draft)
     let store = MidsummerListingStore(directory: temporaryDirectory())
-    store.upsert(draft)
+    try! store.upsert(draft)
     XCTAssertEqual(store.refreshPresaleTransitions(now: now), 0)
     XCTAssertEqual(store.listing(withID: draft.id)?.stage, .deposit)
   }
@@ -211,7 +226,7 @@ final class MidsummerPresalePhaseTests: XCTestCase {
     spot.stage = .inStock
 
     let store = MidsummerListingStore(directory: temporaryDirectory())
-    for listing in [deposit, balance, ended, spot] { store.upsert(listing) }
+    for listing in [deposit, balance, ended, spot] { try! store.upsert(listing) }
 
     let groups = store.presaleGrouped(inSeries: seriesID, now: now)
     XCTAssertEqual(groups.map(\.phase), [.deposit, .balance, .ended])
@@ -224,7 +239,7 @@ final class MidsummerPresalePhaseTests: XCTestCase {
   func testListingForItemIDRequiresPrefix() {
     let listing = makeDepositListing()
     let store = MidsummerListingStore(directory: temporaryDirectory())
-    store.upsert(listing)
+    try! store.upsert(listing)
     XCTAssertNotNil(store.listing(forItemID: MidsummerListingItemIDPrefix + listing.id))
     XCTAssertNil(store.listing(forItemID: listing.id), "裸 listing id 不该命中")
     XCTAssertNil(store.listing(forItemID: "seed-item"), "种子商品不在上架记录里")

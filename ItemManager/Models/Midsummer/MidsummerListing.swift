@@ -15,19 +15,23 @@ import Foundation
 /// 上新工作台单品在 DTO 层的 id 前缀（首页 feed 靠它区分「基础条目」与「上架新品」）。
 nonisolated let MidsummerListingItemIDPrefix = "midsummer-listing-"
 
-/// 上新阶段（类目）：决定这个系列上新出现在时间线上的哪个阶段。
+/// 上新阶段（类目）：
 ///
-/// 2026-09-17 收敛为四档（用户：只保留定金、尾款、现货、预约价）：
-///   · 定金 → 尾款：预售定金模式，按先后顺序走；
-///   · 预约价：全款预约（不走定金模式的另一条预售线）；
-///   · 现货：开售后。
-/// 旧的图透 / 出货 / 再贩不再作为可选阶段；旧存档 raw 在 `MidsummerListing.stage`
-/// 里做降级映射，解码不会失败。
+/// 2026-09-19 再收敛（用户：定金 + 尾款就是预约价，是一个东西）：
+/// **可选阶段只有「预约价 / 现货」两档**（见 `selectableCases`）。
+/// 「定金 + 尾款」不再是独立阶段，而是预约价的**拆分填法**——
+/// 预约价阶段下可以直接填预约全款，也可以配定金、尾款按「预约价 − 定金」自动核算。
+/// `deposit` / `balance` 两个 case 仅为旧存档 raw 与预售相位机保留，
+/// 表单不再提供选择入口；价格卡自 2026-09-18 起固定显示、不随阶段联动。
 nonisolated enum MidsummerLaunchStage: String, Codable, CaseIterable, Sendable {
-  case deposit   // 定金
-  case balance   // 尾款
-  case preorder  // 预约价（全款预约）
+  case deposit   // 定金（旧口径，仅旧存档；新表单不可选）
+  case balance   // 尾款（旧口径，仅旧存档；新表单不可选）
+  case preorder  // 预约价（全款预约，或定金+尾款拆分填法）
   case inStock   // 现货
+
+  /// 表单里**可选择的阶段**（用户 2026-09-19）：只有预约价与现货。
+  /// 旧存档的定金 / 尾款阶段在编辑时按既有值显示，但新选择不再提供这两档。
+  static let selectableCases: [MidsummerLaunchStage] = [.preorder, .inStock]
 
   var labelZH: String {
     switch self {
@@ -67,16 +71,15 @@ nonisolated enum MidsummerPriceConfigField: String, Codable, CaseIterable, Senda
 }
 
 extension MidsummerLaunchStage {
-  /// 阶段 → 价格配置项联动：第 3 步价格卡只显示当前阶段需要的价格项。
-  ///   · 定金：定金 + 尾款（可按需只配其一）+ 定金区间；
-  ///   · 尾款：尾款；
-  ///   · 预约价：预约价（全款预约）；
-  ///   · 现货：现货价。
+  /// 阶段 → 价格配置项联动（2026-09-19 新口径）：
+  ///   · 预约价：预约全款直填，**或**配定金、尾款自动核算——两种填法都是预约价；
+  ///   · 现货：现货价；
+  ///   · 定金 / 尾款：旧口径，仅旧存档编辑时保留原有配置项。
   var priceFields: [MidsummerPriceConfigField] {
     switch self {
     case .deposit: return [.deposit, .balance]
     case .balance: return [.balance]
-    case .preorder: return [.preorder]
+    case .preorder: return [.preorder, .deposit, .balance]
     case .inStock: return [.shop]
     }
   }
@@ -86,7 +89,7 @@ extension MidsummerLaunchStage {
     switch self {
     case .deposit: return "定金阶段：定金与尾款可按需选择配置；定金区间为该系列的定金范围。"
     case .balance: return "尾款阶段：只需配置尾款金额。"
-    case .preorder: return "预约价阶段：配置全款预约价。"
+    case .preorder: return "预约价阶段：可直接填预约全款；也可打开定金填定金金额，尾款按「预约价 − 定金」自动核算。"
     case .inStock: return "现货阶段：配置现货价。"
     }
   }
@@ -121,17 +124,23 @@ nonisolated struct MidsummerListingStyle: Codable, Identifiable, Equatable, Send
   var imageFile: String?
   /// 该款式价格（元）；nil = 沿用单品价。
   var price: Int?
+  /// 该款式自己的尺码集合（用户 2026-09-18：每填写一个颜色分类/款式，
+  /// 需同时选择该款式对应的尺码；上架后规格面板选中该款式时只有这些尺码可点）。
+  /// `nil` = 旧存档，回退单品级 `sizes`。
+  var sizes: [String]? = nil
 
   init(
     id: String = UUID().uuidString.lowercased(),
     name: String,
     imageFile: String? = nil,
-    price: Int? = nil
+    price: Int? = nil,
+    sizes: [String]? = nil
   ) {
     self.id = id
     self.name = name
     self.imageFile = imageFile
     self.price = price
+    self.sizes = sizes
   }
 }
 
@@ -305,6 +314,14 @@ extension MidsummerListing {
       guard let balanceEndsAt else { return .balance }
       // 尾款期未到 → 尾款期；已到（含倒挂配置）→ 预售结束。
       return now >= balanceEndsAt ? .ended : .balance
+    case .preorder:
+      // 2026-09-19 新口径：定金+尾款并入预约价阶段后，**配了定金**的预约价
+      // 商品沿用同一条定金 → 尾款自动流转（时间窗字段与旧口径共用）；
+      // 纯全款预约（没配定金）不参与状态机，列表归属走既有逻辑。
+      guard deposit != nil else { return nil }
+      guard let depositEndsAt, now >= depositEndsAt else { return .deposit }
+      guard let balanceEndsAt else { return .balance }
+      return now >= balanceEndsAt ? .ended : .balance
     case .balance:
       guard let balanceEndsAt, now >= balanceEndsAt else { return .balance }
       return .ended
@@ -339,10 +356,10 @@ extension MidsummerListing {
     let sizeGroup = sourceGroups.first { $0.resolvedRole == .size }
     let pricingGroup = sourceGroups.first { $0.resolvedRole == .other && $0.id == "pricing" }
 
-    // 款式条目：新存档带图与逐款价；旧存档（styles 为 nil）退化成「只有名字」。
-    let styleEntries: [(name: String, imageFile: String?, price: Int?)] =
-      styles.map { $0.map { ($0.name, $0.imageFile, $0.price) } }
-      ?? variantOptionNames.map { ($0, nil, nil) }
+    // 款式条目：新存档带图 / 逐款价 / 逐款尺码；旧存档（styles 为 nil）退化成「只有名字」。
+    let styleEntries: [(name: String, imageFile: String?, price: Int?, sizes: [String]?)] =
+      styles.map { $0.map { ($0.name, $0.imageFile, $0.price, $0.sizes) } }
+      ?? variantOptionNames.map { ($0, nil, nil, nil) }
     let styleNames = styleEntries.map(\.name)
 
     var groups: [MidsummerSpecGroup] = []
@@ -378,29 +395,59 @@ extension MidsummerListing {
     }
 
     // 尺码组：先按系列选项匹配（「S」匹配「S码」），匹配不上的尺码自建选项。
-    if let sizeGroup, !sizes.isEmpty {
-      var options: [MidsummerSpecOption] = []
-      var unmatched: [String] = []
-      for size in sizes {
-        if let hit = sizeGroup.options.first(where: { Self.optionName($0.name, matchesSize: size) }) {
-          if !options.contains(where: { $0.id == hit.id }) { options.append(hit) }
-        } else {
-          unmatched.append(size)
+    // 系列没有尺码组（自建系列上新 / 系列单品没整理过尺码）时，按填写的尺码
+    // **整组自建**——之前 `if let sizeGroup` 直接整段跳过，上新时明明填了尺码，
+    // 用户侧规格面板却没有尺码栏位、入库也只能回退成全部尺码并集（2026-09-19 根因修复）。
+    if !sizes.isEmpty {
+      if let sizeGroup {
+        var options: [MidsummerSpecOption] = []
+        var unmatched: [String] = []
+        for size in sizes {
+          if let hit = sizeGroup.options.first(where: { Self.optionName($0.name, matchesSize: size) }) {
+            if !options.contains(where: { $0.id == hit.id }) { options.append(hit) }
+          } else {
+            unmatched.append(size)
+          }
         }
-      }
-      options += unmatched.map {
-        MidsummerSpecOption(id: "sz-\($0)", name: "\($0)码", image: nil)
-      }
-      if !options.isEmpty {
+        options += unmatched.map {
+          MidsummerSpecOption(id: "sz-\($0)", name: "\($0)码", image: nil)
+        }
+        if !options.isEmpty {
+          groups.append(
+            MidsummerSpecGroup(id: sizeGroup.id, name: sizeGroup.name, role: sizeGroup.role, options: options)
+          )
+        }
+      } else {
         groups.append(
-          MidsummerSpecGroup(id: sizeGroup.id, name: sizeGroup.name, role: sizeGroup.role, options: options)
+          MidsummerSpecGroup(
+            id: "size",
+            name: "尺码",
+            role: .size,
+            options: sizes.map { MidsummerSpecOption(id: "sz-\($0)", name: $0, image: nil) }
+          )
         )
       }
     }
 
-    // 价格档位标注组：原样继承。
+    // 价格档位标注组：原样继承（种子 / 采集商品自带）。
+    // 系列没有该组（自建系列 / 系列单品没整理过档位）时，按本商品实际配置的
+    // 价格档位**自建**——与上面尺码组同一条根因（2026-09-19）：不能依赖继承
+    // 才有档位标注，否则用户侧规格面板与入库备注都缺「价格档位」栏位。
+    // 选项只保留实际填了的档位（顺序与种子一致），默认选中即落在正确档位；
+    // 一个价格都没填就不造空组。
     if let pricingGroup {
       groups.append(pricingGroup)
+    } else {
+      var tierOptions: [MidsummerSpecOption] = []
+      if price != nil { tierOptions.append(MidsummerSpecOption(id: "spot", name: "现货价", image: nil)) }
+      if preorderPrice != nil { tierOptions.append(MidsummerSpecOption(id: "preorder", name: "预约价", image: nil)) }
+      if deposit != nil { tierOptions.append(MidsummerSpecOption(id: "deposit", name: "定金", image: nil)) }
+      if balance != nil { tierOptions.append(MidsummerSpecOption(id: "balance", name: "尾款", image: nil)) }
+      if !tierOptions.isEmpty {
+        groups.append(
+          MidsummerSpecGroup(id: "pricing", name: "价格档位", role: .other, options: tierOptions)
+        )
+      }
     }
 
     // 款式对应图：优先用该款式自己上传的图，没有才按商品图顺序对位
@@ -424,24 +471,62 @@ extension MidsummerListing {
       return styleNames.contains { $0.lowercased().contains(style) }
     }
 
-    // SKU 逐款价：填了价格的款式各写一条（只约束款式组，不写尺码组——
-    // SKU 未提及的组不构成否决，尺码仍可自由搭配）。
+    // SKU 表（用户 2026-09-18 逐款尺码口径）：填了价格的款式各写 SKU。
+    //   · 款式带自己的尺码集合 → 按「款式 × 尺码」逐组合写一条（约束款式组 +
+    //     尺码组），规格面板选中该款式后只有这些尺码可点，与樱花小羊一致；
+    //   · 款式没配尺码（旧档）→ 只约束款式组（任意尺码可搭，兼容旧口径）。
+    // 没填价格的款式不写 SKU（价格回退单品价，规格不因此收窄）。
     let skus: [MidsummerSKU]? = {
       guard let variantGroup = groups.first(where: { $0.resolvedRole == .variant }) else { return nil }
-      let priced = styleEntries.compactMap { entry -> MidsummerSKU? in
-        guard let price = entry.price else { return nil }
+      let sizeGroup = groups.first { $0.resolvedRole == .size }
+      var result: [MidsummerSKU] = []
+      for entry in styleEntries {
+        guard let price = entry.price else { continue }
         let optionID =
           variantGroup.options.first(where: { $0.name == entry.name })?.id ?? "st-\(entry.name)"
-        return MidsummerSKU(
-          id: "style-\(optionID)",
-          options: [variantGroup.id: optionID],
-          image: entry.imageFile,
-          price: price,
-          priceKind: priceKind ?? .shop
-        )
+        let variantOptions = [variantGroup.id: optionID]
+        let styleSizes = entry.sizes?.filter { !$0.isEmpty } ?? []
+        if let sizeGroup, !styleSizes.isEmpty {
+          for size in styleSizes {
+            let sizeOptionID =
+              sizeGroup.options.first(where: { Self.optionName($0.name, matchesSize: size) })?.id
+              ?? "sz-\(size)"
+            result.append(
+              MidsummerSKU(
+                id: "style-\(optionID)-sz-\(sizeOptionID)",
+                options: variantOptions.merging([sizeGroup.id: sizeOptionID]) { _, new in new },
+                image: entry.imageFile,
+                price: price,
+                priceKind: priceKind ?? .shop
+              )
+            )
+          }
+        } else {
+          result.append(
+            MidsummerSKU(
+              id: "style-\(optionID)",
+              options: variantOptions,
+              image: entry.imageFile,
+              price: price,
+              priceKind: priceKind ?? .shop
+            )
+          )
+        }
       }
-      return priced.isEmpty ? nil : priced
+      return result.isEmpty ? nil : result
     }()
+
+    // 颜色：上新表单不单独收颜色——颜色揉在款式名里（「sk 粉色」）。
+    // 从款式名解析去重，详情页「配色」行与入库兜底才有值可显；
+    // 解析不出颜色的款式（如「胸针」）不硬造，全部解析不出就保持空。
+    var derivedColors: [String] = []
+    for entry in styleEntries {
+      if let color = MidsummerSpecResolver.parseVariantFields(entry.name).color,
+        !derivedColors.contains(color)
+      {
+        derivedColors.append(color)
+      }
+    }
 
     let trimmedURL = sourceURL.trimmingCharacters(in: .whitespacesAndNewlines)
 
@@ -454,11 +539,13 @@ extension MidsummerListing {
       preorderPrice: preorderPrice,
       deposit: deposit,
       balance: balance,
+      depositEndsAt: depositEndsAt,
+      balanceEndsAt: balanceEndsAt,
       priceKind: price == nil ? nil : priceKind,
       priceCapturedOn: price == nil ? nil : Self.todayStamp(),
       priceNote: nil,
       sizes: sizes,
-      colors: [],
+      colors: derivedColors,
       coverImage: imageFiles.first,
       galleryImageNames: imageFiles.count > 1 ? Array(imageFiles.dropFirst()) : nil,
       itemURL: trimmedURL.isEmpty ? nil : trimmedURL,

@@ -5,14 +5,16 @@
 //  上新工作台（仲夏物语全系列 · 用户 2026-09-16，2026-09-18 起统一扩展到
 //  品牌下所有系列）全流程验收：
 //    发布新商品 → ①系列主图与信息（标题 / 日期）→ ②选择上新阶段
-//    → ③分类与款式（2026-09-18：分类+款式合并、商品名自动生成可改、
+//    → ③分类与款式（款式逐款录入、商品名自动取首个款式名、
 //      预约价 / 定金固定显示、尾款自动核算）
 //    → ④确认发布（原文出处 + 提交汇总）→ 发布上架
 //    → 上架商品出现在工作台列表（已上架）→ 出现在系列详情商品列表
 //    → 详情页一键入库（规格抽屉带出继承的款式组）。
 //
-//  入口：系列详情「上新管理」对所有用户无条件开放（2026-09-16 深夜起去掉
-//  canContribute 门控，旧投稿表单已删除），无需任何启动参数解闸。
+//  入口：系列详情「上新管理」——2026-09-16 深夜起去掉 canContribute 门控
+//  （旧投稿表单已删除），2026-09-18 起改为**按创作者角色门控**：
+//  普通用户看不到入口，创作者可见可进。本文件用启动参数
+//  `-ui-test-enable-creator-mode` 解闸，跑的是创作者视角全流程。
 //
 //  访问性标识契约（改产品代码时同步改本文件）：
 //    · 系列详情入口        → series-listing-workspace-button
@@ -21,8 +23,7 @@
 //    · ①主图与信息        → listing-launch-title / listing-date-toggle
 //                            listing-launch-date / listing-image-add / listing-note
 //    · ②上新阶段          → listing-stage-<raw>
-//    · ③分类与款式        → listing-name（自动生成可改）/ listing-kind
-//                            listing-size-<size> / listing-size-custom / listing-size-add
+//    · ③分类与款式        → listing-size-<size> / listing-size-custom / listing-size-add
 //                            listing-size-input-<i> / listing-size-delete-<i>
 //                            listing-style-<optionID> / listing-style-custom / listing-style-add
 //                            listing-style-image-<i> / listing-style-name-<i>
@@ -54,6 +55,11 @@ final class MidsummerListingFlowUITests: XCTestCase {
   @MainActor
   private func launchApp() -> XCUIApplication {
     let app = XCUIApplication()
+    // 2026-09-18 起创作者能力（上新管理 / 改价 / 换图）按角色门控：
+    // 本文件跑的全是创作者流程，必须先用启动参数解闸，否则入口不渲染。
+    // 普通用户「看不到入口」的验收在 TimeHallEntryExplorationUITests
+    // `testD2_ListingWorkspaceEntryHiddenForViewer`。
+    app.launchArguments += ["-ui-test-reset-creator-mode", "-ui-test-enable-creator-mode"]
     app.launch()
     dismissSystemPrompts(app)
     return app
@@ -119,7 +125,7 @@ final class MidsummerListingFlowUITests: XCTestCase {
   @MainActor
   private func enterSeries(_ app: XCUIApplication, _ name: String = "樱花小羊") -> Bool {
     let allEntry = app.buttons["midsummer-entry-all-series"]
-    guard allEntry.waitForExistence(timeout: 6) else {
+    guard allEntry.waitForExistence(timeout: 10) else {
       dumpHierarchy("80-找不到全部商品入口", app: app)
       XCTFail("品牌页应有「全部商品」入口行")
       return false
@@ -130,7 +136,7 @@ final class MidsummerListingFlowUITests: XCTestCase {
     let seriesRow = app.buttons
       .matching(NSPredicate(format: "label BEGINSWITH %@", "\(name)，"))
       .firstMatch
-    guard seriesRow.waitForExistence(timeout: 6) else {
+    guard seriesRow.waitForExistence(timeout: 10) else {
       dumpHierarchy("81-找不到\(name)系列行", app: app)
       XCTFail("系列列表应有「\(name)」行")
       return false
@@ -149,21 +155,22 @@ final class MidsummerListingFlowUITests: XCTestCase {
   /// 双向滚动查找（2026-09-18）：先向上滑（找下方内容），不行再向下滑
   ///（找上方内容）。
   /// 安全约束：表单是可下拉关闭的 sheet——内容滚到顶后继续 swipeDown 会把
-  /// sheet 拉关。所以向下滑限制 3 次、任何时刻元素消失（sheet 被关）立即返回。
+  /// sheet 拉关。所以向下滑限制 3 次、任何时刻元素消失（sheet 被关）边滚边查（懒容器兼容）。
   @MainActor
   private func scrollToElement(_ element: XCUIElement, app: XCUIApplication, maxSwipes: Int = 8) -> Bool {
+    // 懒容器（LazyVGrid / LazyVStack）里的元素在滚进视口前 exists == false，
+    // 所以不能先查 exists 再滚动——必须「边滚边查」，否则首屏外的懒元素
+    // 会被直接判「不存在」（2026-09-18 表单卡序调整后踩坑）。
     var swipes = 0
     while swipes < maxSwipes {
-      guard element.exists else { return false }
-      if element.isHittable { return true }
+      if element.exists && element.isHittable { return true }
       app.swipeUp()
       usleep(400_000)
       swipes += 1
     }
     swipes = 0
     while swipes < 3 {
-      guard element.exists else { return false }
-      if element.isHittable { return true }
+      if element.exists && element.isHittable { return true }
       app.swipeDown()
       usleep(400_000)
       swipes += 1
@@ -194,8 +201,6 @@ final class MidsummerListingFlowUITests: XCTestCase {
 
   @MainActor
   func testPublishListingAndInsertToWardrobe() throws {
-    // 唯一商品名：重复跑测试不会与上一轮的存档撞名。
-    let itemName = "上新验收\(Int(Date().timeIntervalSince1970) % 100_000) 开衫"
 
     let app = launchApp()
     sleep(4)
@@ -248,50 +253,20 @@ final class MidsummerListingFlowUITests: XCTestCase {
     app.buttons["listing-next"].tap()
     sleep(1)
 
-    // ④ ③分类与款式（2026-09-18 合并）：分类 chips + 款式 + 自动商品名 + 价格同屏。
-    // 操作顺序严格**自上而下**（款式 → 商品名 → 尺码 → 价格）：表单是可下拉
+    // ④ ③分类与款式（2026-09-18 晚改版）：尺码池在前、款式逐款录入在后。
+    // 操作顺序严格**自上而下**（尺码 → 款式 → 价格）：表单是可下拉
     // 关闭的 sheet，任何「向上回滚」的滑动都可能把 sheet 拉关，全程只向下滚。
+    // 价格项与阶段联动（2026-09-19）：现货阶段只显示现货价，不显示预约价组。
     XCTAssertTrue(
+      app.textFields["listing-spot-price"].exists,
+      "现货阶段价格卡应联动显示现货价输入"
+    )
+    XCTAssertFalse(
       app.textFields["listing-preorder"].exists,
-      "价格卡固定显示预约价（全款）输入"
-    )
-    XCTAssertTrue(
-      app.buttons["listing-deposit-toggle"].exists || app.switches["listing-deposit-toggle"].exists,
-      "价格卡固定显示定金配置开关"
+      "现货阶段不应出现预约价（全款）输入（价格项只跟阶段走）"
     )
 
-    // 款式区在分类 chips 下方：先勾选关联款式「sk 粉色」
-    let styleChip = app.buttons["listing-style-sk-pink"]
-    guard scrollToElement(styleChip, app: app) else {
-      dumpHierarchy("90-找不到款式关联选项", app: app)
-      XCTFail("应能勾选关联款式「sk 粉色」")
-      return
-    }
-    styleChip.tap()
-    sleep(1)
-    XCTAssertTrue(
-      app.textFields["listing-style-custom"].exists,
-      "款式区应保留自定义新增入口"
-    )
-
-    // 商品名（自动生成可改）在款式区下方
-    let nameField = app.textFields["listing-name"]
-    guard scrollToElement(nameField, app: app) else {
-      dumpHierarchy("89-找不到名称输入框", app: app)
-      XCTFail("「分类与款式」步应有自动生成的商品名输入框")
-      return
-    }
-    nameField.tap()
-    // 商品名已自动生成（如「现 sk 粉色」）：先按现有长度逐字删除，再输入新名
-    //（typeText 是在光标处追加，不清空会拼成「自动名+新名」）。
-    if let current = nameField.value as? String, !current.isEmpty {
-      nameField.typeText(String(repeating: "\u{8}", count: current.count))
-    }
-    // 用换行符收起键盘（return 键），不依赖「完成」按钮的存在。
-    nameField.typeText(itemName + "\n")
-    usleep(500_000)
-
-    // 尺码区在商品名下方：常用尺码 + 自定义入口同屏（归组的核心）
+    // 尺码池在最上面：先选好 S，后面添加的款式会自动带上该尺码（逐款可再调整）
     let sizeChip = app.buttons["listing-size-S"]
     guard scrollToElement(sizeChip, app: app) else {
       dumpHierarchy("88-找不到尺码选项", app: app)
@@ -304,17 +279,31 @@ final class MidsummerListingFlowUITests: XCTestCase {
       app.textFields["listing-size-custom"].exists,
       "尺码区应保留「新增尺码」自定义入口"
     )
+
+    // 款式区在尺码池下方：勾选关联款式「sk 粉色」（每款需配尺码，自动带入池里的 S）
+    let styleChip = app.buttons["listing-style-sk-pink"]
+    guard scrollToElement(styleChip, app: app) else {
+      dumpHierarchy("90-找不到款式关联选项", app: app)
+      XCTFail("应能勾选关联款式「sk 粉色」")
+      return
+    }
+    styleChip.tap()
+    sleep(1)
+    XCTAssertTrue(
+      app.textFields["listing-style-custom"].exists,
+      "款式区应保留自定义新增入口"
+    )
     if sizeChip.exists && styleChip.exists {
       XCTAssertLessThan(
-        styleChip.frame.minY, sizeChip.frame.minY,
-        "款式区应位于尺码选择区上方（2026-09-18 合并卡：分类 → 款式 → 商品名 → 尺码）")
+        sizeChip.frame.minY, styleChip.frame.minY,
+        "尺码池应位于款式区上方（2026-09-18 晚改版：先选尺码池，再逐款录入）")
     }
 
-    // 价格卡在最底部：填预约价（全款）；尾款自动算，不再手填（2026-09-18 口径）。
-    let preorderField = app.textFields["listing-preorder"]
-    if scrollToElement(preorderField, app: app) {
-      preorderField.tap()
-      preorderField.typeText("199")
+    // 价格卡在最底部：填现货价（现货阶段的必填口径，2026-09-19 阶段联动）。
+    let spotField = app.textFields["listing-spot-price"]
+    if scrollToElement(spotField, app: app) {
+      spotField.tap()
+      spotField.typeText("199")
       dismissKeyboard(app)
     }
     capture("91-表单-商品与尺码录入完成")
@@ -331,11 +320,11 @@ final class MidsummerListingFlowUITests: XCTestCase {
     publish.tap()
     sleep(2)
 
-    // ⑦ 工作台列表应出现已上架行
-    let listedRow = app.staticTexts[itemName]
+    // ⑦ 工作台列表应出现已上架行（商品名自动取首个款式名「现 sk 粉色」）
+    let listedRow = app.staticTexts["现 sk 粉色"]
     guard listedRow.waitForExistence(timeout: 6) else {
       dumpHierarchy("93-工作台找不到上架行", app: app)
-      XCTFail("发布后工作台应列出「\(itemName)」")
+      XCTFail("发布后工作台应列出自动命名的「现 sk 粉色」")
       return
     }
     capture("94-工作台-已上架")
@@ -403,10 +392,9 @@ final class MidsummerListingFlowUITests: XCTestCase {
     ).firstMatch
     XCTAssertTrue(toast.exists, "确认后应出现「已加入衣橱」反馈（上架商品走既有入库链路）")
     if toast.exists {
-      // 多轮测试会在存档里累计多条「上新验收… 开衫」，firstMatch 点中的
-      // 可能是上一轮的商品；断言只锁定「商品名 + 继承的规格」这两个本质点。
+      // 断言锁定「商品名 + 继承的规格」这两个本质点。
       XCTAssertTrue(
-        toast.label.contains("开衫"),
+        toast.label.contains("现 sk 粉色"),
         "入库反馈应写明商品名，实际是：\(toast.label)")
       XCTAssertTrue(
         toast.label.contains("现 sk 粉色") && toast.label.contains("S码"),
@@ -512,13 +500,13 @@ final class MidsummerListingFlowUITests: XCTestCase {
     app.buttons["listing-next"].tap()
     sleep(1)
 
-    // ② 定金阶段
-    let depositStage = app.buttons["listing-stage-deposit"]
-    guard depositStage.waitForExistence(timeout: 5) else {
-      XCTFail("应能选择「定金」阶段")
+    // ② 预约价阶段（2026-09-19 阶段收敛：定金+尾款并入预约价，可选阶段只剩预约价/现货）
+    let preorderStage = app.buttons["listing-stage-preorder"]
+    guard preorderStage.waitForExistence(timeout: 5) else {
+      XCTFail("应能选择「预约价」阶段")
       return
     }
-    depositStage.tap()
+    preorderStage.tap()
     app.buttons["listing-next"].tap()
     sleep(1)
     // ③ 分类与款式（价格同屏）：定金开关固定显示；尾款无开关、自动核算
@@ -529,7 +517,7 @@ final class MidsummerListingFlowUITests: XCTestCase {
       XCTFail("第 3 步价格卡应固定显示「配置定金」开关")
       return
     }
-    capture("P1-定金阶段价格配置")
+    capture("P1-预约价阶段价格配置")
     XCTAssertFalse(
       app.switches["listing-balance-toggle"].exists,
       "尾款已改为自动核算，不应再有手动开关"
@@ -539,9 +527,11 @@ final class MidsummerListingFlowUITests: XCTestCase {
       "尾款无需手动填写，不应有尾款金额输入框"
     )
 
-    // 选定金阶段后开关应已自动打开（onChange 默认引导）→ 定金金额框在层级里。
+    // 定金开关默认关闭（2026-09-19 起不再自动打开）：手动打开走「定金+尾款」拆分填法。
     // 先填定金（此时页面未滚到底部，后续收键盘手势不会拉到 sheet），
     // 再填预约价——顺序反过来会在页面最底部做收键盘滑动，把表单 sheet 拉关。
+    depositToggle.tap()
+    sleep(1)
     let depositField = app.textFields["listing-deposit"]
     XCTAssertTrue(depositField.exists, "定金开关开着时应出现定金金额输入框")
     guard scrollToElement(depositField, app: app) else {
@@ -633,7 +623,7 @@ final class MidsummerListingFlowUITests: XCTestCase {
     )
     capture("V2-第二步必填报错")
 
-    // 选现货 → ③ 商品与尺码：不填名称 / 款式直接点下一步 → 应就地报错且不前进
+    // 选现货 → ③ 商品与尺码：不填款式直接点下一步 → 应就地报错且不前进
     app.buttons["listing-stage-inStock"].tap()
     app.buttons["listing-next"].tap()
     sleep(1)
@@ -641,7 +631,7 @@ final class MidsummerListingFlowUITests: XCTestCase {
     sleep(1)
     let stepError3 = app.descendants(matching: .any)
       .matching(NSPredicate(format: "identifier == %@", "listing-step-error")).firstMatch
-    XCTAssertTrue(stepError3.exists, "③ 缺商品名称 / 款式点下一步应就地报错")
+    XCTAssertTrue(stepError3.exists, "③ 缺款式点下一步应就地报错")
     XCTAssertTrue(
       app.descendants(matching: .any)
         .matching(NSPredicate(format: "identifier == %@", "listing-step-progress")).firstMatch
@@ -685,8 +675,9 @@ final class MidsummerListingFlowUITests: XCTestCase {
         continue
       }
       field.tap()
-      usleep(700_000)
-      if app.keyboards.firstMatch.exists {
+      // 机器负载高时键盘弹出会明显变慢：用 waitForExistence 显式等，
+      // 固定 sleep 太短会误判「没聚焦」，随后 typeText 直接抛错（历史踩坑）。
+      if app.keyboards.firstMatch.waitForExistence(timeout: 4) {
         field.typeText(text)
         return
       }
@@ -707,8 +698,8 @@ final class MidsummerListingFlowUITests: XCTestCase {
   //
   // 之前所有上新用例都从樱花小羊进入——那是「种子数据最全」的现实约束，
   // 不是产品边界。本用例换一个系列（小熊博物馆系列）完整走一遍：
-  // 分类款式合并卡 + 批量录入自动拼「分类名+颜色」+ 商品名自动生成 +
-  // 预约价/定金固定显示 + 尾款自动核算 + 发布上架 → 系列可见，
+  // 批量录入（原样命名，不拼前缀）+ 尾款自动核算 +
+  // 预约价/定金（预约价阶段联动显示）+ 尾款自动核算 + 发布上架 → 系列可见，
   // 证明指令链是系列无关的，樱花小羊没有任何特权逻辑。
 
   @MainActor
@@ -730,8 +721,8 @@ final class MidsummerListingFlowUITests: XCTestCase {
     app.buttons["listing-next"].tap()
     sleep(1)
 
-    // ② 上新阶段：选「现货」
-    let stageChip = app.buttons["listing-stage-inStock"]
+    // ② 上新阶段：选「预约价」（尾款自动核算属于预约价阶段的填法）
+    let stageChip = app.buttons["listing-stage-preorder"]
     guard stageChip.waitForExistence(timeout: 5) else {
       dumpHierarchy("C1-找不到上新阶段选项", app: app)
       XCTFail("第二步应有「选择上新阶段」chips")
@@ -741,70 +732,17 @@ final class MidsummerListingFlowUITests: XCTestCase {
     app.buttons["listing-next"].tap()
     sleep(1)
 
-    // ③ 分类与款式：价格卡固定显示（不随阶段联动）——全系列同口径
+    // ③ 分类与款式：预约价阶段显示预约价 / 定金 / 尾款（阶段联动，跨系列同口径）
     XCTAssertTrue(
       app.textFields["listing-preorder"].exists,
-      "跨系列也应固定显示预约价（全款）输入"
+      "跨系列预约价阶段也应显示预约价（全款）输入"
     )
     XCTAssertTrue(
       app.buttons["listing-deposit-toggle"].exists || app.switches["listing-deposit-toggle"].exists,
-      "跨系列也应固定显示定金配置开关"
+      "跨系列预约价阶段也应显示定金配置开关"
     )
 
-    // 批量录入款式（该系列没有可勾选的款式 chip，走批量入口）：
-    // 输入纯颜色，自动拼主分类前缀 →「OP 白色」「OP 黑色」。
-    let batchToggle = app.buttons["listing-style-batch-toggle"]
-    guard scrollToElement(batchToggle, app: app) else {
-      dumpHierarchy("C2-找不到批量录入入口", app: app)
-      XCTFail("款式区应有「批量添加」折叠入口")
-      return
-    }
-    batchToggle.tap()
-    sleep(1)
-    let batchInput = app.textViews["listing-style-batch-input"]
-    guard batchInput.waitForExistence(timeout: 4) else {
-      dumpHierarchy("C3-找不到批量输入框", app: app)
-      XCTFail("批量添加展开后应有输入框")
-      return
-    }
-    batchInput.tap()
-    batchInput.typeText("白色、黑色")
-    app.buttons["listing-style-batch-add"].tap()
-    sleep(1)
-    // 批量输入的键盘一直聚焦会让下方尺码 chips 处于键盘后面（isHittable=false），
-    // 且此时滚动位置在表单顶部，不能下拉收键盘（会把 sheet 拉关）。
-    // 安全做法：点「收起批量添加」让 TextEditor 失焦、键盘随之收起。
-    app.buttons["listing-style-batch-toggle"].tap()
-    sleep(1)
-
-    // 自动拼接断言：款式行名 = 主分类 shortLabel + 颜色。
-    // 注意：行容器 identifier（listing-style-row-0）会合并覆盖行内输入框的
-    // listing-style-name-0，按类型过滤（textFields）才能唯一定位到名字输入框。
-    let styleName0 = app.textFields["listing-style-row-0"]
-    guard scrollToElement(styleName0, app: app) else {
-      dumpHierarchy("C4-找不到款式行", app: app)
-      XCTFail("批量添加后应出现款式行")
-      return
-    }
-    XCTAssertEqual(
-      styleName0.value as? String, "OP 白色",
-      "批量录入应自动拼「分类名+颜色」为款式名"
-    )
-
-    // 商品名自动生成 = 首个款式名（跨系列同样生效，不手动改）
-    let nameField = app.textFields["listing-name"]
-    guard scrollToElement(nameField, app: app) else {
-      dumpHierarchy("C5-找不到商品名输入框", app: app)
-      XCTFail("「分类与款式」步应有自动生成的商品名输入框")
-      return
-    }
-    XCTAssertEqual(
-      nameField.value as? String, "OP 白色",
-      "商品名应自动取首个款式名"
-    )
-
-    // 尺码（常用 chips 跨系列同样可用）：滚到尺码区后视口内是哪颗点哪颗
-    //（S/M 可能已被滚出视口上方，XL/均码/F 同样是有效断言）。
+    // 尺码池在款式区上方：先选一个常用尺码，批量加款式时会自动带上
     let presetSizeIDs = ["listing-size-XS", "listing-size-S", "listing-size-M",
                          "listing-size-L", "listing-size-XL", "listing-size-XXL",
                          "listing-size-均码", "listing-size-F"]
@@ -830,6 +768,46 @@ final class MidsummerListingFlowUITests: XCTestCase {
       return
     }
     sleep(1)
+
+    // 批量录入款式（该系列没有可勾选的款式 chip，走批量入口）：
+    // 输入纯颜色名，原样成为款式行（2026-09-19 起不再自动拼「分类+颜色」前缀）。
+    let batchToggle = app.buttons["listing-style-batch-toggle"]
+    guard scrollToElement(batchToggle, app: app) else {
+      dumpHierarchy("C2-找不到批量录入入口", app: app)
+      XCTFail("款式区应有「批量添加」折叠入口")
+      return
+    }
+    batchToggle.tap()
+    sleep(1)
+    let batchInput = app.textViews["listing-style-batch-input"]
+    guard batchInput.waitForExistence(timeout: 4) else {
+      dumpHierarchy("C3-找不到批量输入框", app: app)
+      XCTFail("批量添加展开后应有输入框")
+      return
+    }
+    batchInput.tap()
+    batchInput.typeText("白色、黑色")
+    app.buttons["listing-style-batch-add"].tap()
+    sleep(1)
+    // 批量输入的键盘一直聚焦会让下方内容处于键盘后面（isHittable=false），
+    // 且此时滚动位置在表单顶部，不能下拉收键盘（会把 sheet 拉关）。
+    // 安全做法：点「收起批量添加」让 TextEditor 失焦、键盘随之收起。
+    app.buttons["listing-style-batch-toggle"].tap()
+    sleep(1)
+
+    // 自动拼接断言（2026-09-19 更新）：输入什么就是什么，不再自动拼「OP 」前缀。
+    // 款式卡容器 identifier（listing-style-card-0）不合并子元素，
+    // 名字输入框自身带 listing-style-name-0。
+    let styleName0 = app.textFields["listing-style-name-0"]
+    guard scrollToElement(styleName0, app: app) else {
+      dumpHierarchy("C4-找不到款式行", app: app)
+      XCTFail("批量添加后应出现款式行")
+      return
+    }
+    XCTAssertEqual(
+      styleName0.value as? String, "白色",
+      "批量录入应原样保留输入的颜色名（不再自动拼分类前缀）"
+    )
 
     // 价格：预约价 + 开定金 → 尾款自动核算（跨系列同口径）
     let preorderField = app.textFields["listing-preorder"]
@@ -889,11 +867,11 @@ final class MidsummerListingFlowUITests: XCTestCase {
     publish.tap()
     sleep(2)
 
-    // ⑤ 工作台列表出现已上架行（商品名没手动改过，应显示自动生成的「OP 白色」）
-    let listedRow = app.staticTexts["OP 白色"]
+    // ⑤ 工作台列表出现已上架行（商品名没手动改过，应显示自动生成的「白色」）
+    let listedRow = app.staticTexts["白色"]
     guard listedRow.waitForExistence(timeout: 6) else {
       dumpHierarchy("C12-工作台找不到上架行", app: app)
-      XCTFail("发布后工作台应列出自动命名的「OP 白色」")
+      XCTFail("发布后工作台应列出自动命名的「白色」")
       return
     }
     capture("C13-跨系列-工作台已上架")
@@ -928,7 +906,6 @@ final class MidsummerListingFlowUITests: XCTestCase {
 
   @MainActor
   func testEditListingPriceInWorkspace() throws {
-    let itemName = "改价验收\(Int(Date().timeIntervalSince1970) % 100_000) 小物"
 
     let app = launchApp()
     sleep(4)
@@ -947,8 +924,8 @@ final class MidsummerListingFlowUITests: XCTestCase {
     app.buttons["listing-next"].tap()
     sleep(1)
 
-    // ② 上新阶段：现货
-    let stageChip = app.buttons["listing-stage-inStock"]
+    // ② 上新阶段：预约价（改价面板的「预约价 → 现货价」流转依赖原值为预约价）
+    let stageChip = app.buttons["listing-stage-preorder"]
     guard stageChip.waitForExistence(timeout: 5) else {
       dumpHierarchy("P1-找不到上新阶段选项", app: app)
       XCTFail("第二步应能选上新阶段")
@@ -958,7 +935,16 @@ final class MidsummerListingFlowUITests: XCTestCase {
     app.buttons["listing-next"].tap()
     sleep(1)
 
-    // ③ 关联款式 + 自定义商品名 + 预约价 199（表单必填口径）
+    // ③ 尺码池（款式之前）→ 关联款式 + 预约价 199（表单必填口径；商品名自动取款式名）
+    let presetSizeChip = app.buttons["listing-size-S"]
+    guard scrollToElement(presetSizeChip, app: app) else {
+      dumpHierarchy("P2-找不到尺码选项", app: app)
+      XCTFail("尺码池应有常用尺码 chips")
+      return
+    }
+    presetSizeChip.tap()
+    sleep(1)
+
     let styleChip = app.buttons["listing-style-sk-pink"]
     guard scrollToElement(styleChip, app: app) else {
       dumpHierarchy("P2-找不到款式选项", app: app)
@@ -967,19 +953,6 @@ final class MidsummerListingFlowUITests: XCTestCase {
     }
     styleChip.tap()
     sleep(1)
-
-    let nameField = app.textFields["listing-name"]
-    guard scrollToElement(nameField, app: app) else {
-      dumpHierarchy("P3-找不到商品名输入框", app: app)
-      XCTFail("应有自动生成的商品名输入框")
-      return
-    }
-    nameField.tap()
-    if let current = nameField.value as? String, !current.isEmpty {
-      nameField.typeText(String(repeating: "\u{8}", count: current.count))
-    }
-    nameField.typeText(itemName + "\n")
-    usleep(500_000)
 
     let preorderField = app.textFields["listing-preorder"]
     guard scrollToElement(preorderField, app: app) else {
@@ -1005,15 +978,37 @@ final class MidsummerListingFlowUITests: XCTestCase {
 
     // ⑤ 工作台「系列价格总表」：点该商品行进改价面板
     // （行是 Button，label 含商品名；工作台行不是按钮，不会误匹配）
-    let priceRow = app.buttons
-      .matching(NSPredicate(format: "label CONTAINS %@", itemName)).firstMatch
-    guard priceRow.waitForExistence(timeout: 6) else {
+    // 整行 label 精确匹配 + 挑可点的实例：工作台是卡片 sheet，背后系列详情页
+    // 也有一张同口径价格总表，同款商品在底层页面同样有「现 sk 粉色、预约价 ¥199」
+    // 一行——firstMatch 会命中被 sheet 盖住的底层行（not hittable，坐标点击
+    // 也落在蒙层上），必须在同名行里挑 isHittable 的那一行。
+    let priceRowMatches = app.buttons
+      .matching(NSPredicate(format: "label == %@", "现 sk 粉色、预约价 ¥199"))
+    guard priceRowMatches.firstMatch.waitForExistence(timeout: 6) else {
       dumpHierarchy("P6-工作台价格总表找不到商品行", app: app)
-      XCTFail("系列价格总表应列出「\(itemName)」（预约价 ¥199 组）")
+      XCTFail("系列价格总表应列出自动命名的「现 sk 粉色」（预约价 ¥199 组）")
+      return
+    }
+    // isHittable 在卡片 sheet 里对可见元素也会误报 false，改按「frame 落在
+    // 屏幕内」挑出 sheet 自己的行（底层页面的同名行都在 y>852 屏外），并
+    // 用坐标点击行中心，绕开 hittable 判定。
+    let screenBounds = app.frame
+    var priceRow: XCUIElement?
+    for i in 0..<priceRowMatches.count {
+      let candidate = priceRowMatches.element(boundBy: i)
+      let f = candidate.frame
+      if f.minY >= screenBounds.minY, f.maxY <= screenBounds.maxY, f.width > 0 {
+        priceRow = candidate
+        break
+      }
+    }
+    guard let onScreenRow = priceRow else {
+      dumpHierarchy("P6b-价格总表行均不在屏内", app: app)
+      XCTFail("价格总表行均不在屏内（可能只匹配到底层页面的同名行）")
       return
     }
     capture("P6-工作台价格总表")
-    priceRow.tap()
+    onScreenRow.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
     sleep(2)
 
     // ⑥ 改价面板：回显预约价 199 → 清空、填现货价 399 → 保存

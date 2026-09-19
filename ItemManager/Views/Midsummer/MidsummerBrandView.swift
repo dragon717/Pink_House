@@ -28,6 +28,9 @@ struct MidsummerBrandView: View {
   @State private var path: [MidsummerRoute] = []
   /// 双视角状态（用户 / 创作者）：同一套骨架按它切换交互与可编辑性。
   @StateObject private var viewModeStore = MidsummerViewModeStore()
+  /// 角色闸门（用户 2026-09-18）：上传上新 / 视角切换 / 换图等创作者入口只认它，
+  /// 与 `MidsummerStore.canEnterCreatorView` 同源（后者是判定结果的镜像）。
+  @ObservedObject private var creatorAccess = CreatorAccess.shared
   /// 品牌首页右上角「上传上新」：直达新建系列的四步表单（不再选既有系列）。
   @State private var showingUploadForm = false
 
@@ -45,9 +48,10 @@ struct MidsummerBrandView: View {
           onBack: goBack,
           onClose: onClose,
           // 主操作入口常驻品牌首页右上角：不上折叠菜单、不放二级弹窗（用户 2026-09-17）。
-          onUpload: route == .home && viewModeStore.isCreator ? { showingUploadForm = true } : nil,
-          // 切换控件本身只对运营白名单渲染；普通用户既无切换也无上传入口。
-          viewMode: route == .home && store.canEnterCreatorView ? viewModeStore : nil
+          onUpload: route == .home && creatorAccess.isCreator && viewModeStore.isCreator
+            ? { showingUploadForm = true } : nil,
+          // 切换控件本身只对创作者渲染；普通用户既无切换也无上传入口。
+          viewMode: route == .home && creatorAccess.isCreator ? viewModeStore : nil
         )
 
         switch route {
@@ -71,7 +75,9 @@ struct MidsummerBrandView: View {
             // 创作者视图标记：价格总表行在创作者视图下可点进改价面板。
             isCreatorMode: viewModeStore.isCreator,
             onOpenStyleChartCatalog: { navigate(to: .styleChartCatalog) },
-            onOpenLinkReport: { navigate(to: .linkReport) }
+            onOpenLinkReport: { navigate(to: .linkReport) },
+            // 删除系列成功后退出本页（系列已不存在）——回到进入前的那一层。
+            onSeriesDeleted: { goBack() }
           )
           .transition(pageTransition(forward: true))
         case .styleChartCatalog:
@@ -161,7 +167,7 @@ struct MidsummerTopBar: View {
   /// 非 nil 时右上角显示「上传上新」主操作按钮（仅品牌首页传入）。
   var onUpload: (() -> Void)? = nil
   /// 双视角：非 nil 时右上角显示「用户 / 创作者」分段控件（仅品牌首页、
-  /// 且仅运营白名单可见；普通用户完全看不到，见 `MidsummerStore.canEnterCreatorView`）。
+  /// 且仅创作者可见；普通用户完全看不到，见 `CreatorAccess.shared.isCreator`）。
   var viewMode: MidsummerViewModeStore? = nil
 
   var body: some View {
@@ -257,7 +263,7 @@ struct MidsummerTopBar: View {
 // MARK: - 双视角切换（用户 2026-09-17）
 
 /// 顶栏右上角的两段式切换：当前视角高亮 + 图标，一眼可辨。
-/// 只对运营白名单渲染（调用方已按 `canEnterCreatorView` 门控）。
+/// 只对创作者角色渲染（调用方已按 `CreatorAccess.shared.isCreator` 门控）。
 struct MidsummerViewModeSwitch: View {
   @ObservedObject var store: MidsummerViewModeStore
 
@@ -308,6 +314,9 @@ struct MidsummerHomeContent: View {
   @Environment(\.modelContext) private var modelContext
   /// 双视角：同一套卡片骨架，创作者视图下点卡片进编辑态、并显示编辑角标。
   @EnvironmentObject private var viewMode: MidsummerViewModeStore
+  /// 角色闸门：编辑角标与「点卡片即编辑」只在创作者角色下生效。
+  /// 命名避开 POSIX 的 `access()` 全局函数，免得读起来歧义。
+  @ObservedObject private var creatorAccess = CreatorAccess.shared
 
   @State private var selectedYear: Int?
   @State private var selectedSeriesID: String?
@@ -315,11 +324,9 @@ struct MidsummerHomeContent: View {
   @State private var detailSeries: MidsummerSeriesDTO?
   /// 创作者视图下点卡片 → 详情直接是可编辑表单，而不是只读展示。
   @State private var detailStartsEditing = false
-
-  /// 形态 A（一键入库）的进行中 / 已完成状态
-  @State private var insertingItemID: String?
-  @State private var insertedItemIDs: Set<String> = []
-  @State private var insertToast: String?
+  /// 系列删除（用户 2026-09-19）：系列行向右滑动露出左侧删除键，确认后执行。
+  @State private var seriesDeleteTarget: MidsummerSeriesDTO?
+  @State private var seriesDeleteError: String?
 
   private var brandName: String { store.catalog?.brandName ?? "仲夏物语" }
 
@@ -350,20 +357,40 @@ struct MidsummerHomeContent: View {
       }
     }
     .background(MidsummerTheme.pageBackground)
-    .overlay(alignment: .top) {
-      if let insertToast {
-        Text(insertToast)
-          .font(.system(size: 12, weight: .medium))
-          .foregroundStyle(.white)
-          .padding(.horizontal, 12)
-          .padding(.vertical, 7)
-          .background(MidsummerTheme.brandOrange.opacity(0.94), in: Capsule())
-          .padding(.top, 8)
-          .transition(.move(edge: .top).combined(with: .opacity))
-          .allowsHitTesting(false)
+    // 系列删除二次确认（用户 2026-09-19）：滑动露出删除键 → 点击 → 确认后才执行。
+    .confirmationDialog(
+      "删除「\(seriesDeleteTarget?.name ?? "该系列")」？",
+      isPresented: Binding(
+        get: { seriesDeleteTarget != nil },
+        set: { if !$0 { seriesDeleteTarget = nil } }
+      ),
+      titleVisibility: .visible,
+      presenting: seriesDeleteTarget
+    ) { target in
+      Button("删除系列（含全部上架商品）", role: .destructive) {
+        deleteSeries(target)
       }
+      Button("取消", role: .cancel) {}
+    } message: { target in
+      // 文案按系列类型分支：自建 = 真删除；种子 / 云端 = 本机隐藏（可恢复）。
+      Text(
+        target.id.hasPrefix("midsummer-custom-")
+          ? "会一并删除该系列下的所有上架商品与图片，删除后不可恢复。"
+          : "该系列是平台基础资料：仅从本机移除（云端不受影响，可恢复），其下的上架商品会一并删除。"
+      )
     }
-    .animation(.easeOut(duration: 0.18), value: insertToast)
+    // 删除失败的兜底提示（滑动删除在首页执行，没有详情页那种内联错误位）。
+    .alert(
+      "删除系列失败",
+      isPresented: Binding(
+        get: { seriesDeleteError != nil },
+        set: { if !$0 { seriesDeleteError = nil } }
+      )
+    ) {
+      Button("好", role: .cancel) {}
+    } message: {
+      Text(seriesDeleteError ?? "")
+    }
     .sheet(item: $detailItem) { item in
       // 兜底：`detailSeries` 与 `detailItem` 是同时赋值的，正常不会错位；
       // 但旧写法在 series 为 nil 时会呈现一个**完全空白的 sheet**（点进去一片白）。
@@ -386,55 +413,17 @@ struct MidsummerHomeContent: View {
     }
   }
 
-  // MARK: 形态 A：一键入库（卡片上的快捷入口）
-  //
-  // 卡片上的 ⊕ 刻意**不弹规格面板**——那个入口的价值就是「快」。
-  // 代价是使用者没有明确选规格，所以：
-  //   1. 走 `defaultSelection`（有 SKU 表取主推组合，否则每组第一项）
-  //   2. 吐司里把实际入库的规格写出来，不静默替使用者决定
-  // 需要自己挑规格时走详情页的入口。
-
-  private func quickInsertToWardrobe(item: MidsummerItemDTO, series: MidsummerSeriesDTO) {
-    guard insertingItemID == nil else { return }
-    insertingItemID = item.id
-    defer { insertingItemID = nil }
-
-    let selection = MidsummerWardrobeInserter.defaultSelection(for: item)
-
-    do {
-      let clothing = try MidsummerWardrobeInserter.quickInsert(
-        item: item,
-        series: series,
-        brandName: brandName,
-        selection: selection,
-        modelContext: modelContext
-      )
-      insertedItemIDs.insert(item.id)
-      insertToast = Self.insertToastText(clothingName: clothing.name, item: item, selection: selection)
-    } catch {
-      insertToast = "加入失败：" + error.localizedDescription
-    }
-  }
-
-  /// 吐司文案：`已加入衣橱：樱花小羊 SK（Sk粉色 / M）`；无规格时退回旧文案。
-  private static func insertToastText(
-    clothingName: String,
-    item: MidsummerItemDTO,
-    selection: MidsummerSpecSelection
-  ) -> String {
-    guard let summary = MidsummerSpecResolver.summary(selection, of: item) else {
-      return "已加入衣橱：\(clothingName)"
-    }
-    return "已加入衣橱：\(clothingName)（\(summary)）"
-  }
-
   // MARK: 形态 B：加入并编辑
 
   private func openEditorToWardrobe(item: MidsummerItemDTO, series: MidsummerSeriesDTO) {
+    // 预售相位同样要带进草稿：定金期预填的编辑页要能直接看到定金口径与
+    // 尾款窗口（用户 2026-09-19 分阶段口径）。
+    let phase = MidsummerListingStore.shared.listing(forItemID: item.id)?.presalePhase()
     MidsummerWardrobeInserter.openEditor(
       item: item,
       series: series,
       brandName: brandName,
+      presalePhase: phase,
       modelContext: modelContext
     )
   }
@@ -532,23 +521,47 @@ struct MidsummerHomeContent: View {
           emptyState
         } else {
           ForEach(visibleSeries) { series in
-            // 上新工作台（用户 2026-09-16）的单品 id 带 `midsummer-listing-` 命名空间。
-            // 单链接/组卡的判定只看**基础条目**——否则一上新就会把「樱花小羊」的
-            // 单品卡变成组卡，改变既有交互；上架新品以独立商品卡追加在本系列下方，
-            // 与原款同样可点详情、可一键入库。
-            let listingItems = series.items.filter { $0.id.hasPrefix(MidsummerListingItemIDPrefix) }
-            let baseItems = series.items.filter { !$0.id.hasPrefix(MidsummerListingItemIDPrefix) }
-            if baseItems.count == 1, let item = baseItems.first {
-              // 单链接系列：与原来一样直接展示商品卡片（点击 → 单品详情）
-              itemCard(series: series, item: item)
-            } else {
-              // 多链接系列：合并为一张系列入口卡片（点击 → 系列详情）
-              MidsummerSeriesGroupCard(series: series) {
-                onOpenSeriesDetail(series.id)
+            // 系列行删除交互（用户 2026-09-19）：删除键位于系列项**左侧**，
+            // 向右滑动卡片时露出，点击后二次确认才执行——任何系列创作者都可删
+            //（自建 = 真删除；种子 / 云端 = 本机隐藏可恢复），普通用户无手势。
+            MidsummerSwipeRightDeleteRow(
+              seriesID: series.id,
+              deletable: creatorAccess.isCreator,
+              onDelete: { seriesDeleteTarget = series }
+            ) {
+              // 上新工作台（用户 2026-09-16）的单品 id 带 `midsummer-listing-` 命名空间，
+              // 判定时先按这个前缀把「基础条目」和「上架商品」分开。
+              let listingItems = series.items.filter { $0.id.hasPrefix(MidsummerListingItemIDPrefix) }
+              let baseItems = series.items.filter { !$0.id.hasPrefix(MidsummerListingItemIDPrefix) }
+
+              // 首页每一行的层级归属（2026-09-18 修复「卡片层级 ≠ 跳转目标层级」）：
+              //
+              //   ① 唯一基础条目（种子 / 云端 / 外部导入）→ 它是本系列的主商品，直接出
+              //      **商品卡**（点击 → 单品详情）；上架新品继续以商品卡追加在下方。
+              //      这一支必须保持原样，否则一上新就会把「樱花小羊」的商品卡变成组卡。
+              //   ② 没有基础条目、恰好 1 条上架商品 → 本系列总共就这一件商品，同样按
+              //      **商品层级**出卡（点击 → 单品详情）。此前这一支会掉进 `else`，
+              //      退化成「系列入口卡 + 同一件商品的商品卡」两张：同一件东西在系列层
+              //      和单品层各出现一次，而且两张卡落点不同——系列卡得再进一次系列详情
+              //      才看得到商品，与卡片自称的层级对不上。自建系列（上传上新直达新建）
+              //      必然命中这一支。
+              //   ③ 其余（多个基础条目 / 多条上架商品）→ 一张**系列入口卡**收敛到
+              //      系列详情，点开即系列层，与卡片层级一致。
+              let singleBase = baseItems.count == 1 ? baseItems.first : nil
+              let singleListing = baseItems.isEmpty && listingItems.count == 1 ? listingItems.first : nil
+              if let singleBase {
+                itemCard(series: series, item: singleBase)
+              } else if let singleListing {
+                itemCard(series: series, item: singleListing)
+              } else {
+                MidsummerSeriesGroupCard(series: series) {
+                  onOpenSeriesDetail(series.id)
+                }
               }
-            }
-            ForEach(listingItems, id: \.id) { item in
-              itemCard(series: series, item: item)
+              // ② 已经把唯一那条上架商品画成商品卡了，这里只补画剩下的，避免重复出卡。
+              ForEach(listingItems.filter { $0.id != singleListing?.id }, id: \.id) { item in
+                itemCard(series: series, item: item)
+              }
             }
             Rectangle().fill(MidsummerTheme.divider).frame(height: 0.5)
           }
@@ -591,15 +604,32 @@ struct MidsummerHomeContent: View {
       onTap: {
         detailSeries = series
         detailItem = item
-        // 创作者视图：点卡片 = 进入该商品的编辑态，不再只是浏览。
-        detailStartsEditing = viewMode.isCreator
+        // 创作者视图 + 创作者角色：点卡片 = 进入该商品的编辑态，不再只是浏览。
+        detailStartsEditing = viewMode.isCreator && creatorAccess.isCreator
       },
-      // 「每个商品上提供直接加入衣橱的入口」——卡片右侧就是形态 A。
-      onQuickInsert: { quickInsertToWardrobe(item: item, series: series) },
-      isInserting: insertingItemID == item.id,
-      didInsert: insertedItemIDs.contains(item.id),
-      showsEditingBadge: viewMode.isCreator
+      showsEditingBadge: viewMode.isCreator && creatorAccess.isCreator
     )
+  }
+
+  /// 执行系列删除（用户 2026-09-19，与系列详情页同一套口径）：
+  /// 先清该系列下的上架商品（各自带图与权限校验），再删系列档案与封面图；
+  /// `MidsummerStore` 订阅了两边的变更，列表会自动收缩。
+  private func deleteSeries(_ series: MidsummerSeriesDTO) {
+    do {
+      let listingStore = MidsummerListingStore.shared
+      for listing in listingStore.listings(inSeries: series.id) {
+        try listingStore.delete(listing.id)
+      }
+      // 自建系列真删除；种子 / 云端系列走隐藏账本（本机移除，云端不动，可恢复）。
+      if series.id.hasPrefix("midsummer-custom-") {
+        try MidsummerCustomSeriesStore.shared.remove(series.id)
+      } else {
+        try MidsummerHiddenSeriesStore.shared.hide(series.id)
+      }
+      seriesDeleteError = nil
+    } catch {
+      seriesDeleteError = error.userMessage
+    }
   }
 }
 
@@ -609,21 +639,14 @@ struct MidsummerHomeContent: View {
 //   • 左：106pt 方图
 //   • 右：阶段徽标 + 款名，价格用「小 ¥ + 大数字」两段字号拼接
 //   • 底部：尺码行（缺项显示「款码待补」）
-//   • 最右：橙色加购图标
 //
-// ⚠️ 历史问题（本轮修复）：最右那个橙色 `bag.badge.plus` 以前只是一个 **装饰性
-// `Image`**，没有任何点击行为。使用者以为它是「加入衣橱」入口，点下去只会命中整行，
-// 于是被理解成「点了加号却什么都没发生／只弹出一个没有加购功能的详情页」。
-// 现在它是一颗真正的按钮，与日牌商品卡的行为对齐（形态 A 一键入库）。
+// 卡片右侧**不放**「一键入库 ⊕」快捷入口（用户 2026-09-18 要求移除，用户/创作者
+// 两种视图都不再渲染）：入库一律进详情页操作，那里会先弹规格面板、明确到具体商品。
 
 struct MidsummerItemCard: View {
   let series: MidsummerSeriesDTO
   let item: MidsummerItemDTO
   let onTap: () -> Void
-  /// 形态 A：一键入库。为 nil 时按钮退化为只读图标（快照用）。
-  var onQuickInsert: (() -> Void)? = nil
-  var isInserting: Bool = false
-  var didInsert: Bool = false
   /// 创作者视图下的可编辑提示角标（同一张卡片骨架，仅多一枚提示）。
   var showsEditingBadge: Bool = false
 
@@ -682,8 +705,6 @@ struct MidsummerItemCard: View {
           .accessibilityIdentifier("midsummer-card-edit-badge-\(item.id)")
         }
       }
-
-      wardrobeInsertButton
     }
     .padding(.horizontal, 12)
     .padding(.vertical, showsEditingBadge ? 11 : 14)
@@ -700,21 +721,6 @@ struct MidsummerItemCard: View {
     .accessibilityLabel("\(item.name)，\(item.priceTextWithKind)")
   }
 
-  /// 卡片右侧的加入衣橱入口（形态 A）。
-  private var wardrobeInsertButton: some View {
-    MidsummerWardrobeIconButton(
-      isInserting: isInserting,
-      didInsert: didInsert,
-      isEnabled: onQuickInsert != nil,
-      action: { onQuickInsert?() }
-    )
-    // 按单品 id 的 ASCII identifier：UI 测试可定点到某张卡片的入库按钮，
-    // 而不是「屏幕上第一个可见的一键入库」。
-    // 注意必须挂在按钮本身上——外层卡片是 accessibilityElement(children:.contain)
-    // 容器，挂在外部只会落到整卡元素上，查询会命中整卡而不是这颗按钮。
-    .accessibilityIdentifier("midsummer-card-insert-\(item.id)")
-    .padding(.top, 36)
-  }
   /// 价格用不同字号拼接，还原图一「小 ¥ + 大数字」的观感。
   ///
   /// 口径（顺序不要改，也不要把定金并进区间）：
@@ -776,6 +782,89 @@ struct MidsummerItemCard: View {
       return "\(series.name) · 含 \(item.variantCount) 个款式"
     }
     return "\(series.name) · \(series.items.count) 款"
+  }
+}
+
+// MARK: - 系列行「向右滑动露出删除键」容器（用户 2026-09-19）
+//
+// 交互规格：删除键位于系列项**左侧**，手指向右拖动系列卡片时从左缘露出；
+// 松手时拖过一半就停住（可点），否则弹回。点击删除只负责把目标抛给宿主的
+// 二次确认对话框，确认后才真正执行删除。
+//
+// 不可删除的行（普通用户 / 种子与云端系列）不包手势、不渲染删除键——
+// 与「系列详情页只有自建系列可删」同一套权限口径。
+
+struct MidsummerSwipeRightDeleteRow<Content: View>: View {
+  let seriesID: String
+  var deletable: Bool
+  let onDelete: () -> Void
+  @ViewBuilder let content: () -> Content
+
+  @State private var offset: CGFloat = 0
+  @State private var isConfirmingDelete = false
+
+  /// 删除键宽度（露出时的停驻位）。
+  private let revealWidth: CGFloat = 76
+
+  var body: some View {
+    if deletable {
+      ZStack(alignment: .leading) {
+        deleteButton
+        content()
+          .offset(x: offset)
+          .simultaneousGesture(dragGesture)
+      }
+      .confirmationDialog(
+        "删除该系列？",
+        isPresented: $isConfirmingDelete,
+        titleVisibility: .visible
+      ) {
+        Button("删除系列（含全部上架商品）", role: .destructive) {
+          onDelete()
+        }
+        Button("取消", role: .cancel) {}
+      } message: {
+        Text("会一并删除该系列下的所有上架商品与图片，删除后不可恢复。")
+      }
+    } else {
+      content()
+    }
+  }
+
+  /// 左缘删除键：未露出时隐藏（但仍占位在底层，被卡片盖住）。
+  private var deleteButton: some View {
+    Button {
+      isConfirmingDelete = true
+    } label: {
+      VStack(spacing: 3) {
+        Image(systemName: "trash.fill")
+          .font(.system(size: 15, weight: .semibold))
+        Text("删除")
+          .font(.system(size: 11, weight: .semibold))
+      }
+      .foregroundStyle(.white)
+      .frame(width: revealWidth - 12, height: 60)
+      .background(MidsummerTheme.priceRed, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+    }
+    .buttonStyle(.plain)
+    .opacity(offset > 6 ? 1 : 0)
+    .accessibilityIdentifier("series-swipe-delete-\(seriesID)")
+    .accessibilityLabel("删除系列")
+  }
+
+  /// 只认横向主导的拖动（竖直方向让路给页面滚动）；向右最多拖出删除键
+  /// 宽度 + 少量余量，向左不位移。
+  private var dragGesture: some Gesture {
+    DragGesture(minimumDistance: 24, coordinateSpace: .local)
+      .onChanged { value in
+        guard abs(value.translation.width) > abs(value.translation.height) else { return }
+        offset = min(max(0, value.translation.width), revealWidth + 12)
+      }
+      .onEnded { value in
+        withAnimation(.snappy(duration: 0.18)) {
+          offset = value.translation.width > revealWidth / 2 ? revealWidth - 8 : 0
+        }
+      }
   }
 }
 
@@ -863,7 +952,7 @@ struct MidsummerSeriesGroupCard: View {
     return "\(series.name) 系列 · \(series.itemCountText)"
   }
 
-  /// 与 MidsummerWardrobeIconButton 同一视觉规格的圆形入口（箭头语义 = 查看）。
+  /// 圆形入口（箭头语义 = 查看），视觉沿袭已下线的「一键入库 ⊕」圆钮。
   /// 不是 Button：整卡点击已由 onTapGesture 承接，嵌套按钮会互相打架。
   private var openSeriesButton: some View {
     Image(systemName: "chevron.right")
@@ -925,39 +1014,6 @@ struct MidsummerArchiveEntryRow: View {
   }
 }
 
-// MARK: - 加入衣橱的图标入口（商品卡与系列页共用）
-//
-// 统一一处的意义：以前仲夏物语那个橙色 `bag.badge.plus` 在**每个**列表页各画了一遍，
-// 都是「无底色的描边图标」——压在浅色商品图上对比度低，且一个都不是按钮。
-// 现在收敛成组件：橙底白图标 + 细白描边 + 投影，并且**一定是真按钮**。
-
-struct MidsummerWardrobeIconButton: View {
-  var isInserting = false
-  var didInsert = false
-  var isEnabled = true
-  let action: () -> Void
-
-  var body: some View {
-    Button(action: action) {
-      Image(
-        systemName: didInsert
-          ? "checkmark.circle.fill"
-          : (isInserting ? "hourglass" : TimeHallWardrobeInsertMode.quickInsert.symbolName)
-      )
-      .font(.system(size: 15, weight: .bold))
-      .foregroundStyle(.white)
-      .padding(8)
-      .background(MidsummerTheme.brandOrange, in: Circle())
-      .overlay { Circle().stroke(Color.white.opacity(0.9), lineWidth: 1) }
-      .shadow(color: .black.opacity(0.18), radius: 3, y: 1)
-    }
-    .buttonStyle(.plain)
-    .disabled(isInserting || !isEnabled)
-    .accessibilityLabel(TimeHallWardrobeInsertMode.quickInsert.title)
-    .accessibilityHint(TimeHallWardrobeInsertMode.quickInsert.hint)
-  }
-}
-
 // MARK: - 单品详情弹窗
 
 struct MidsummerItemDetailSheet: View {
@@ -971,6 +1027,8 @@ struct MidsummerItemDetailSheet: View {
   @Environment(\.dismiss) private var dismiss
   @Environment(\.modelContext) private var modelContext
   @EnvironmentObject private var viewMode: MidsummerViewModeStore
+  /// 角色闸门：编辑资料 / 换主图 / 换款式图都是创作者能力（普通用户只读）。
+  @ObservedObject private var creatorAccess = CreatorAccess.shared
 
   @State private var isInsertingToWardrobe = false
   @State private var quickInsertMessage: String?
@@ -978,6 +1036,16 @@ struct MidsummerItemDetailSheet: View {
   @State private var showsSpecDrawer = false
   /// 抽屉的入库意图：详情页两个按钮共用同一个面板，只是主按钮的去向不同
   @State private var drawerIntent: MidsummerWardrobeInsertIntent = .quickInsert
+
+  /// 当前预售相位（用户 2026-09-19 一键入库分阶段口径）：
+  ///   · `.deposit` 定金期 → 主按钮「一键加入定金」，入库同步心愿尾款；
+  ///   · `.balance` 尾款期 → 定金尾款口径入库，尾款窗口随档同步；
+  ///   · `.ended` 预售结束 → 预约价与现货价同时可选（规格面板价格档位组）；
+  ///   · nil → 不走状态机，沿用常规口径。
+  /// 上新工作台的 listing 实时查询；种子 / 采集商品无 listing，得 nil。
+  private var presalePhase: MidsummerPresalePhase? {
+    MidsummerListingStore.shared.listing(forItemID: item.id)?.presalePhase()
+  }
 
   // 编辑态：名称 / 描述 / 主图（创作者视图，用户 2026-09-17）。
   @State private var isEditing = false
@@ -1026,12 +1094,19 @@ struct MidsummerItemDetailSheet: View {
         brandName: brandName,
         selection: selection,
         quantity: quantity,
+        presalePhase: presalePhase,
         modelContext: modelContext
       )
       let spec = MidsummerSpecResolver.summary(selection, of: item)
       let count = quantity > 1 ? " ×\(quantity)" : ""
-      quickInsertMessage = spec.map { "已加入衣橱：\(clothing.name)\(count)（\($0)）" }
+      let base = spec.map { "已加入衣橱：\(clothing.name)\(count)（\($0)）" }
         ?? "已加入衣橱：\(clothing.name)\(count)"
+      // 定金期 / 尾款期入库即同步心愿尾款（用户 2026-09-19），吐司里把这件事讲清。
+      if (presalePhase == .deposit || presalePhase == .balance), let deposit = item.deposit {
+        quickInsertMessage = "\(base) · 定金 ¥\(deposit) 已同步心愿尾款"
+      } else {
+        quickInsertMessage = base
+      }
     } catch {
       quickInsertMessage = "加入失败：" + error.localizedDescription
     }
@@ -1048,6 +1123,7 @@ struct MidsummerItemDetailSheet: View {
       brandName: brandName,
       selection: selection,
       quantity: quantity,
+      presalePhase: presalePhase,
       modelContext: modelContext
     )
     dismiss()
@@ -1077,6 +1153,7 @@ struct MidsummerItemDetailSheet: View {
         selections: selections,
         quantity: quantity,
         setMarker: marker,
+        presalePhase: presalePhase,
         modelContext: modelContext
       )
       quickInsertMessage =
@@ -1206,6 +1283,9 @@ struct MidsummerItemDetailSheet: View {
                 isBusy: isInsertingToWardrobe,
                 onQuickInsert: { presentDrawer(.quickInsert) },
                 onOpenEditor: { presentDrawer(.openEditor) },
+                // 定金期：主按钮如实写「一键加入定金」（用户 2026-09-19
+                // 分阶段口径）；其余相位保持「一键入库」。
+                quickInsertTitle: presalePhase == .deposit ? "一键加入定金" : nil,
                 // 详情页弹在列表之上，背后卡片的同名按钮仍在层级里；
                 // 加前缀让 UI 测试能精确定位到详情页这一组。
                 identifierPrefix: "midsummer-detail"
@@ -1285,8 +1365,8 @@ struct MidsummerItemDetailSheet: View {
             }
           } else {
             HStack(spacing: 12) {
-              // 只有创作者视图（运营白名单）才给出编辑入口——用户视图是只读详情。
-              if viewMode.isCreator {
+              // 只有创作者（角色 + 创作者视图）才给出编辑入口——用户视图是只读详情。
+              if viewMode.isCreator, creatorAccess.isCreator {
                 Button {
                   withAnimation(.easeOut(duration: 0.18)) { isEditing = true }
                 } label: {
@@ -1303,7 +1383,8 @@ struct MidsummerItemDetailSheet: View {
       .onAppear {
         editedName = item.name
         editedNote = item.note ?? ""
-        if startsEditing || viewMode.isCreator { isEditing = startsEditing || viewMode.isCreator }
+        let creatorEditing = viewMode.isCreator && creatorAccess.isCreator
+        if startsEditing || creatorEditing { isEditing = startsEditing || creatorEditing }
       }
       .onChange(of: coverPickerItem) { _, newValue in
         guard let newValue else { return }
@@ -1331,6 +1412,7 @@ struct MidsummerItemDetailSheet: View {
           item: item,
           series: series,
           intent: drawerIntent,
+          presalePhase: presalePhase,
           onConfirm: { selection, quantity in
             let intent = drawerIntent
             withAnimation(.easeOut(duration: 0.2)) { showsSpecDrawer = false }
@@ -1549,7 +1631,8 @@ struct MidsummerItemDetailSheet: View {
           .font(.system(size: 9))
           .foregroundStyle(MidsummerTheme.secondaryText)
       }
-      if viewMode.isCreator || MidsummerStore.shared.isAdminUser {
+      // 换款式图 = 创作者能力：创作者视图 + 创作者角色同时满足才出现。
+      if viewMode.isCreator, creatorAccess.isCreator {
         HStack(spacing: 8) {
           PhotosPicker(
             selection: Binding(

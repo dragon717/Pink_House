@@ -19,7 +19,12 @@ struct MidsummerListingWorkspaceView: View {
   let series: MidsummerSeriesDTO
 
   @ObservedObject private var listingStore = MidsummerListingStore.shared
+  /// 角色闸门（用户 2026-09-18）：工作台整体是创作者专属页面。
+  /// 入口已被系列详情页门控，这里再守一次——状态恢复 / 深链绕过入口也进不来编辑态。
+  @ObservedObject private var creatorAccess = CreatorAccess.shared
   @Environment(\.dismiss) private var dismiss
+
+  private var canEdit: Bool { creatorAccess.isCreator }
 
   @State private var editingListing: MidsummerListing?
   @State private var showingForm = false
@@ -39,21 +44,26 @@ struct MidsummerListingWorkspaceView: View {
     NavigationStack {
       ScrollView(.vertical, showsIndicators: false) {
         VStack(alignment: .leading, spacing: 12) {
-          publishCard
-          priceTableCard
-          if let toast {
-            Text(toast)
-              .font(.system(size: 12, weight: .medium))
-              .foregroundStyle(MidsummerTheme.freshGreen)
-              .frame(maxWidth: .infinity, alignment: .leading)
-              .transition(.opacity)
-          }
-          if seriesListings.isEmpty {
-            emptyState
-          } else {
-            ForEach(seriesListings) { listing in
-              listingRow(listing)
+          if canEdit {
+            publishCard
+            priceTableCard
+            if let toast {
+              Text(toast)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(MidsummerTheme.freshGreen)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .transition(.opacity)
             }
+            if seriesListings.isEmpty {
+              emptyState
+            } else {
+              ForEach(seriesListings) { listing in
+                listingRow(listing)
+              }
+            }
+          } else {
+            // 非创作者：整页拒绝，不渲染任何上架数据与写操作。
+            viewerNotice
           }
         }
         .padding(.horizontal, 12)
@@ -88,6 +98,31 @@ struct MidsummerListingWorkspaceView: View {
   }
 
   // MARK: 发布入口卡
+
+  /// 非创作者进入本页时的整页拒绝（正常路径进不来，这里兜状态恢复 / 深链 / 未来新入口）。
+  ///
+  /// 刻意**不渲染**价格总表与上架记录：上架管理（含草稿 / 已下架商品的价格与图片）
+  /// 是运营数据，不该出现在普通用户界面上。系列层面的商品与价格，普通用户可以从
+  /// 系列详情页正常浏览，功能不缺失。
+  private var viewerNotice: some View {
+    VStack(alignment: .leading, spacing: 10) {
+      Image(systemName: "lock.fill")
+        .font(.system(size: 22, weight: .medium))
+        .foregroundStyle(MidsummerTheme.brandOrange)
+      Text("「上新管理」仅创作者可用")
+        .font(.system(size: 15, weight: .semibold))
+        .foregroundStyle(MidsummerTheme.primaryText)
+      Text(CreatorAccess.shared.deniedGuidance)
+        .font(.system(size: 12))
+      .foregroundStyle(MidsummerTheme.secondaryText)
+      .fixedSize(horizontal: false, vertical: true)
+    }
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .padding(16)
+    .background(MidsummerTheme.subtleFill)
+    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+    .accessibilityIdentifier("listing-workspace-viewer-notice")
+  }
 
   private var publishCard: some View {
     Button {
@@ -205,14 +240,17 @@ struct MidsummerListingWorkspaceView: View {
         Text("系列价格总表")
           .font(.system(size: 14, weight: .semibold))
           .foregroundStyle(MidsummerTheme.primaryText)
-        Text("点行直接改价")
-          .font(.system(size: 10))
-          .foregroundStyle(MidsummerTheme.brandOrange)
+        // 只有创作者能点行改价，普通用户这里保持纯展示（与系列详情页同口径）。
+        if canEdit {
+          Text("点行直接改价")
+            .font(.system(size: 10))
+            .foregroundStyle(MidsummerTheme.brandOrange)
+        }
         Spacer(minLength: 0)
       }
 
       if groups.isEmpty {
-        Text("还没有上新商品价格；点上方「发布新商品」开始。")
+        Text(canEdit ? "还没有上新商品价格；点上方「发布新商品」开始。" : "还没有上新商品价格。")
           .font(.system(size: 12))
           .foregroundStyle(MidsummerTheme.secondaryText)
       } else {
@@ -222,37 +260,7 @@ struct MidsummerListingWorkspaceView: View {
               .font(.system(size: 11, weight: .semibold))
               .foregroundStyle(MidsummerTheme.brandOrange)
             ForEach(group.rows) { row in
-              Button {
-                priceEditingListing = row.listing
-              } label: {
-                HStack(alignment: .firstTextBaseline, spacing: 8) {
-                  Text(row.listing.name)
-                    .font(.system(size: 12))
-                    .foregroundStyle(MidsummerTheme.primaryText)
-                    .lineLimit(1)
-                  if row.listing.status != .listed {
-                    Text(row.listing.status.labelZH)
-                      .font(.system(size: 9, weight: .semibold))
-                      .foregroundStyle(MidsummerTheme.secondaryText)
-                      .padding(.horizontal, 4)
-                      .padding(.vertical, 1)
-                      .background(MidsummerTheme.subtleFill)
-                      .clipShape(Capsule())
-                  }
-                  Spacer(minLength: 8)
-                  Text(row.amount)
-                    .font(.system(size: 12, weight: .semibold).monospacedDigit())
-                    .foregroundStyle(MidsummerTheme.priceRed)
-                    .lineLimit(1)
-                  Image(systemName: "square.and.pencil")
-                    .font(.system(size: 10))
-                    .foregroundStyle(MidsummerTheme.secondaryText)
-                }
-                .padding(.vertical, 2)
-                .contentShape(Rectangle())
-              }
-              .buttonStyle(.plain)
-              .accessibilityIdentifier("listing-price-row-\(row.id)")
+              priceTableRowContent(row)
             }
           }
           .padding(.vertical, 4)
@@ -279,6 +287,52 @@ struct MidsummerListingWorkspaceView: View {
     }
     .accessibilityIdentifier("workspace-price-table")
   }
+
+  /// 价格总表行：创作者可点（进改价面板），普通用户是纯展示文本。
+  @ViewBuilder
+  private func priceTableRowContent(_ row: WorkspacePriceRow) -> some View {
+    let content = HStack(alignment: .firstTextBaseline, spacing: 8) {
+      Text(row.listing.name)
+        .font(.system(size: 12))
+        .foregroundStyle(MidsummerTheme.primaryText)
+        .lineLimit(1)
+      if row.listing.status != .listed {
+        Text(row.listing.status.labelZH)
+          .font(.system(size: 9, weight: .semibold))
+          .foregroundStyle(MidsummerTheme.secondaryText)
+          .padding(.horizontal, 4)
+          .padding(.vertical, 1)
+          .background(MidsummerTheme.subtleFill)
+          .clipShape(Capsule())
+      }
+      Spacer(minLength: 8)
+      Text(row.amount)
+        .font(.system(size: 12, weight: .semibold).monospacedDigit())
+        .foregroundStyle(MidsummerTheme.priceRed)
+        .lineLimit(1)
+      if canEdit {
+        Image(systemName: "square.and.pencil")
+          .font(.system(size: 10))
+          .foregroundStyle(MidsummerTheme.secondaryText)
+      }
+    }
+    .padding(.vertical, 2)
+    .contentShape(Rectangle())
+
+    if canEdit {
+      Button {
+        priceEditingListing = row.listing
+      } label: {
+        content
+      }
+      .buttonStyle(.plain)
+      .accessibilityIdentifier("listing-price-row-\(row.id)")
+    } else {
+      content
+        .accessibilityIdentifier("listing-price-row-\(row.id)")
+    }
+  }
+
 
   // MARK: listing 行
 
@@ -327,63 +381,71 @@ struct MidsummerListingWorkspaceView: View {
 
       Spacer(minLength: 0)
 
-      // 行内主操作：改价（直接进价格编辑）+ 编辑（进完整表单），
-      // 状态与危险操作收进菜单，避免误触。
-      VStack(spacing: 8) {
-        Button {
-          editingListing = listing
-        } label: {
-          Text("编辑")
-            .font(.system(size: 12, weight: .medium))
+      // 创作者能力闸门：编辑 / 改价 / 上下架 / 删除只给创作者。
+      // 普通用户在本页只能看到商品与价格，没有任何可点的写操作。
+      if canEdit {
+        // 行内主操作：改价（直接进价格编辑）+ 编辑（进完整表单），
+        // 状态与危险操作收进菜单，避免误触。
+        VStack(spacing: 8) {
+          Button {
+            editingListing = listing
+          } label: {
+            Text("编辑")
+              .font(.system(size: 12, weight: .medium))
+              .foregroundStyle(MidsummerTheme.brandOrange)
+              .padding(.horizontal, 10)
+              .padding(.vertical, 6)
+              .background(MidsummerTheme.orangeSurface)
+              .clipShape(Capsule())
+          }
+          .buttonStyle(.plain)
+          .accessibilityIdentifier("listing-edit-\(listing.id)")
+
+          Button {
+            priceEditingListing = listing
+          } label: {
+            HStack(spacing: 3) {
+              Image(systemName: "yensign.circle")
+                .font(.system(size: 10, weight: .semibold))
+              Text("改价")
+                .font(.system(size: 12, weight: .medium))
+            }
             .foregroundStyle(MidsummerTheme.brandOrange)
             .padding(.horizontal, 10)
             .padding(.vertical, 6)
             .background(MidsummerTheme.orangeSurface)
             .clipShape(Capsule())
-        }
-        .buttonStyle(.plain)
-        .accessibilityIdentifier("listing-edit-\(listing.id)")
-
-        Button {
-          priceEditingListing = listing
-        } label: {
-          HStack(spacing: 3) {
-            Image(systemName: "yensign.circle")
-              .font(.system(size: 10, weight: .semibold))
-            Text("改价")
-              .font(.system(size: 12, weight: .medium))
           }
-          .foregroundStyle(MidsummerTheme.brandOrange)
-          .padding(.horizontal, 10)
-          .padding(.vertical, 6)
-          .background(MidsummerTheme.orangeSurface)
-          .clipShape(Capsule())
+          .buttonStyle(.plain)
+          .accessibilityIdentifier("listing-price-\(listing.id)")
+          .accessibilityLabel("改价")
         }
-        .buttonStyle(.plain)
-        .accessibilityIdentifier("listing-price-\(listing.id)")
-        .accessibilityLabel("改价")
-      }
 
-      Menu {
-        switch listing.status {
-        case .draft, .delisted:
-          Button("上架") { listingStore.updateStatus(of: listing.id, to: .listed) }
-            .accessibilityIdentifier("listing-menu-list-\(listing.id)")
-        case .listed:
-          Button("下架") { listingStore.updateStatus(of: listing.id, to: .delisted) }
-            .accessibilityIdentifier("listing-menu-delist-\(listing.id)")
+        Menu {
+          switch listing.status {
+          case .draft, .delisted:
+            Button("上架") { changeStatus(of: listing, to: .listed) }
+              .accessibilityIdentifier("listing-menu-list-\(listing.id)")
+          case .listed:
+            Button("下架") { changeStatus(of: listing, to: .delisted) }
+              .accessibilityIdentifier("listing-menu-delist-\(listing.id)")
+          }
+          Button("删除", role: .destructive) {
+            do {
+              try listingStore.delete(listing.id)
+              showToast("已删除「\(listing.name)」")
+            } catch {
+              showToast(error.userMessage)
+            }
+          }
+          .accessibilityIdentifier("listing-menu-delete-\(listing.id)")
+        } label: {
+          Image(systemName: "ellipsis.circle")
+            .font(.system(size: 16))
+            .foregroundStyle(MidsummerTheme.secondaryText)
         }
-        Button("删除", role: .destructive) {
-          listingStore.delete(listing.id)
-          showToast("已删除「\(listing.name)」")
-        }
-        .accessibilityIdentifier("listing-menu-delete-\(listing.id)")
-      } label: {
-        Image(systemName: "ellipsis.circle")
-          .font(.system(size: 16))
-          .foregroundStyle(MidsummerTheme.secondaryText)
+        .accessibilityIdentifier("listing-more-\(listing.id)")
       }
-      .accessibilityIdentifier("listing-more-\(listing.id)")
     }
     .padding(12)
     .frame(maxWidth: .infinity, alignment: .leading)
@@ -426,6 +488,16 @@ struct MidsummerListingWorkspaceView: View {
     guard let deadline else { return phase.labelZH }
     let days = Int(ceil(deadline.timeIntervalSince(now) / 86_400))
     return days > 0 ? "\(phase.labelZH) · 余 \(days) 天" : phase.labelZH
+  }
+
+  /// 上架 / 下架：服务层会再校验一次角色，被拒时把原因显示出来（不静默失败）。
+  private func changeStatus(of listing: MidsummerListing, to status: MidsummerListingStatus) {
+    do {
+      try listingStore.updateStatus(of: listing.id, to: status)
+      showToast(status == .listed ? "已上架「\(listing.name)」" : "已下架「\(listing.name)」")
+    } catch {
+      showToast(error.userMessage)
+    }
   }
 
   private func showToast(_ message: String) {

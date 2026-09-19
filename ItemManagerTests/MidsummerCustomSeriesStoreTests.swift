@@ -10,6 +10,8 @@ final class MidsummerCustomSeriesStoreTests: XCTestCase {
   private var store: MidsummerCustomSeriesStore!
 
   override func setUp() async throws {
+    // 新建系列属于创作者能力（2026-09-18 起服务层校验角色），注入创作者角色。
+    CreatorAccess.setTestOverride(.creator)
     directory = FileManager.default.temporaryDirectory
       .appendingPathComponent("midsummer-custom-series-tests-\(UUID().uuidString)", isDirectory: true)
     try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
@@ -17,6 +19,7 @@ final class MidsummerCustomSeriesStoreTests: XCTestCase {
   }
 
   override func tearDown() async throws {
+    CreatorAccess.setTestOverride(nil)
     try? FileManager.default.removeItem(at: directory)
   }
 
@@ -44,7 +47,7 @@ final class MidsummerCustomSeriesStoreTests: XCTestCase {
   /// add 后可按 id 取回；同 id 再 add 覆盖（幂等）。
   func testAddAndLookupRoundTrip() {
     let series = makeSeries()
-    store.add(series)
+    try! store.add(series)
     XCTAssertEqual(store.series(withID: series.id)?.name, "小熊博物馆系列")
     XCTAssertEqual(store.series(withID: series.id)?.sizes, ["S", "M", "L"])
 
@@ -55,14 +58,14 @@ final class MidsummerCustomSeriesStoreTests: XCTestCase {
       depositMin: nil, depositMax: nil, priceSource: nil, sizes: renamed.sizes,
       colors: [], summary: renamed.summary, sourceURL: "", sourceKind: "editorial",
       verified: false, items: [])
-    store.add(renamed)
+    try! store.add(renamed)
     XCTAssertEqual(store.seriesList.count, 1, "同 id 重复 add 应覆盖而不是追加")
     XCTAssertEqual(store.series(withID: series.id)?.name, "改名后的系列")
   }
 
   /// 重新 init（同一目录）应从 JSON 恢复——存档落盘可跨启动。
   func testPersistsAcrossInstances() {
-    store.add(makeSeries())
+    try! store.add(makeSeries())
     let reloaded = MidsummerCustomSeriesStore(directory: directory)
     XCTAssertEqual(reloaded.seriesList.count, 1)
     XCTAssertEqual(reloaded.series(withID: "midsummer-custom-test")?.summary, "含大货，定金后 30 天内发货")

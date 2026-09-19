@@ -52,6 +52,9 @@ final class CreatorMode: ObservableObject {
     guard enabled != isEnabled else { return }
     isEnabled = enabled
     defaults.set(enabled, forKey: Self.storageKey)
+    // 角色判定（`CreatorAccess`）实时读这里的存档值，写接口会立刻跟着变；
+    // 同步一次判定依据，让设置页的「当前角色」文案与真实角色一致。
+    CreatorAccess.shared.refreshBasis()
   }
 
   /// 供 `MidsummerStore` 这类不持有本对象引用的类型做**只读**判断。

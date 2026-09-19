@@ -328,6 +328,15 @@ nonisolated struct MidsummerItemDTO: Codable, Identifiable, Hashable, Sendable {
   let deposit: Int?
   /// 尾款（元）
   let balance: Int?
+  /// 定金截止时间（定金阶段结束 → 尾款阶段开始）。
+  ///
+  /// 一键入库的同步依据（用户 2026-09-19 分阶段口径）：定金期入库时把它
+  /// 同步成衣橱心愿尾款的 `finalPaymentDate`（尾款开始）。旧记录解码
+  /// 自动为 nil（向后兼容）。
+  var depositEndsAt: Date? = nil
+  /// 尾款截止时间（尾款阶段结束 → 现货阶段）。一键入库把它同步成
+  /// 衣橱心愿尾款的 `finalPaymentEndDate`（尾款结束）。旧记录解码自动为 nil。
+  var balanceEndsAt: Date? = nil
   /// `price` 的口径。填了 `price` 就必须填它——否则界面只能猜这个数字是什么。
   let priceKind: MidsummerPriceKind?
   /// 价格采集日期 `yyyy-MM-dd`。价格会变，没有采集日的价格无法判断是否过期。

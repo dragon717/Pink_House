@@ -17,11 +17,14 @@ import SwiftUI
 
 // MARK: - 统一表单 state
 
-/// 第 3 步的「款式」条目：图片 + 名称。
+/// 第 3 步的「颜色分类/款式」条目：图片 + 名称 + 逐款价格 + 该款尺码。
 ///
-/// 2026-09-18 改版（对照商品详情模板）：逐款价从表单移除——价格体系收敛为
-/// 预约价（全款）/ 定金 / 尾款（自动），款式行只剩图 + 名。
-/// 数据层 `MidsummerListingStyle.price` 字段保留（旧存档兼容），表单不再写入。
+/// 2026-09-18 晚改版（用户要求，对照樱花小羊规格面板）：
+///   · 每填写一个颜色分类/款式，需**同时选择该款式对应的尺码**（必选）；
+///   · 每个款式下方有独立的价格输入框，右侧有该款式独立的图片上传入口；
+///   · 选好尺码（上传完成）后，款式下方自动生成并展示该款式的尺码表。
+/// 数据层：价格写 `MidsummerListingStyle.price`、尺码写 `sizes`，
+/// 上架后转 DTO 时按「款式 × 尺码」写 SKU，规格面板选中款式只出该款尺码。
 struct MidsummerListingStyleDraft: Identifiable {
   let id: String
   var name: String
@@ -29,17 +32,25 @@ struct MidsummerListingStyleDraft: Identifiable {
   /// 已落盘的款式图文件名：编辑回显时带入，用户没换图就继续用它，
   /// 换图后以新落盘的文件为准（避免重复存一份孤儿图）。
   var imageFile: String?
+  /// 该款价格（元）的输入文本；空 = 发布时回退单品预约价（全款）。
+  var priceText: String
+  /// 该款尺码（必选，至少一个）。
+  var sizes: [String]
 
   init(
     id: String = UUID().uuidString.lowercased(),
     name: String = "",
     image: UIImage? = nil,
-    imageFile: String? = nil
+    imageFile: String? = nil,
+    priceText: String = "",
+    sizes: [String] = []
   ) {
     self.id = id
     self.name = name
     self.image = image
     self.imageFile = imageFile
+    self.priceText = priceText
+    self.sizes = sizes
   }
 
   /// 展示名：剥「现 」前缀（与规格抽屉同口径），数据层仍用全名。
@@ -60,21 +71,27 @@ struct MidsummerListingDraft {
   // ② 上新阶段
   var stage: MidsummerLaunchStage?
   // ③ 分类与款式 + 尺码（2026-09-18 改版：名称/价格字段移除，分类与款式合并）
-  /// 商品名：由「分类名 + 颜色」拼出的首个款式名自动生成，仍可手动修改
-  ///（改过之后以手动值为准，不再被自动同步覆盖）。
+  /// 商品名：跟随首个款式名自动生成（2026-09-18 晚移除手动输入框；
+  /// 编辑已有上架商品时带入原名称，以手动值为准）。
   var name: String = ""
   var nameManuallyEdited: Bool = false
-  /// 商品分类（多选）：首个是主分类，决定款式名自动拼接用的「分类名」。
+  /// 商品分类（多选）：选择入口已移除，默认 / 沿用存档值；
+  /// 首个是主分类，只决定落库的 `kindRaw`（款式名不再自动拼分类前缀，
+  /// 用户 2026-09-19：自动「OP 」前缀属异常展示，已移除）。
   var kinds: [MidsummerItemKind] = [.op]
   var sizes: [String] = []
   var customSizeText: String = ""
   var styles: [MidsummerListingStyleDraft] = []
   var customStyleText: String = ""
-  // 价格（2026-09-18 口径：预约价（全款）为输入，定金可选，尾款自动算）
+  // 价格（2026-09-19 口径：价格项与第 2 步上新阶段联动——
+  // 预约价阶段填 预约价（全款）/ 定金（可选）/ 尾款（自动算）；
+  // 现货阶段填现货价。逐款价回退也按阶段取对应单品价。）
   var preorderText: String = ""
   var depositText: String = ""
   /// 定金是**可选项**：开关打开才配置。
   var depositEnabled: Bool = false
+  /// 现货价（元）的输入文本；现货阶段（`stage == .inStock`）使用。
+  var spotPriceText: String = ""
   // 预售时间窗（定金-尾款自动流转的依据；nil = 不自动流转）。
   var depositEndsAt: Date? = nil
   var balanceEndsAt: Date? = nil
@@ -156,6 +173,12 @@ struct MidsummerListingFormView: View {
 
   @Environment(\.dismiss) private var dismiss
   @ObservedObject private var listingStore = MidsummerListingStore.shared
+  /// 角色闸门（用户 2026-09-18）：四步上新表单是创作者专属**页面**。
+  /// 入口（顶栏「上传上新」/ 工作台「发布新商品」/「编辑」）已按角色门控，
+  /// 这里再守一次页面本身——状态恢复、深链或以后新增的入口都进不来编辑态。
+  @ObservedObject private var creatorAccess = CreatorAccess.shared
+
+  private var canEdit: Bool { creatorAccess.isCreator }
 
   /// 四步共用的唯一 state。
   @State private var draft = MidsummerListingDraft()
@@ -202,16 +225,87 @@ struct MidsummerListingFormView: View {
   }
 
   var body: some View {
+    Group {
+      if canEdit {
+        formContent
+      } else {
+        viewerPage
+      }
+    }
+  }
+
+  /// 非创作者落到本页时的整页拒绝（2026-09-18 权限收口）。
+  ///
+  /// 三个入口（顶栏「上传上新」/ 工作台「发布新商品」/ 行「编辑」）已经按角色渲染，
+  /// 这里挡的是绕过入口的路径：场景恢复、sheet 被状态重建、或将来新增的呈现方式。
+  /// 刻意不预填草稿、不渲染四步表单——商品草稿的价格与主图属于运营数据。
+  /// 写操作本身另有服务层 `CreatorAccess.requireCreator` 兜底，见 `persist`。
+  private var viewerPage: some View {
+    VStack(spacing: 0) {
+      HStack {
+        Spacer(minLength: 0)
+        Button {
+          dismiss()
+        } label: {
+          Text("完成")
+            .font(.system(size: 14, weight: .medium))
+            .foregroundStyle(MidsummerTheme.brandOrange)
+            .padding(.horizontal, 18)
+            .padding(.vertical, 9)
+            .overlay(Capsule().stroke(MidsummerTheme.divider, lineWidth: 1))
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("listing-viewer-close")
+      }
+      .padding(.horizontal, 12)
+      .padding(.top, 8)
+      .padding(.bottom, 4)
+
+      VStack(alignment: .leading, spacing: 10) {
+        Image(systemName: "lock.fill")
+          .font(.system(size: 22, weight: .medium))
+          .foregroundStyle(MidsummerTheme.brandOrange)
+        Text("「上传上新」仅创作者可用")
+          .font(.system(size: 15, weight: .semibold))
+          .foregroundStyle(MidsummerTheme.primaryText)
+        Text(CreatorAccess.shared.deniedGuidance)
+          .font(.system(size: 12))
+          .foregroundStyle(MidsummerTheme.secondaryText)
+          .fixedSize(horizontal: false, vertical: true)
+      }
+      .frame(maxWidth: .infinity, alignment: .leading)
+      .padding(16)
+      .background(MidsummerTheme.subtleFill)
+      .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+      .padding(.horizontal, 12)
+      .padding(.top, 12)
+      .accessibilityIdentifier("listing-form-viewer-notice")
+
+      Spacer(minLength: 0)
+    }
+    .background(MidsummerTheme.pageBackground)
+  }
+
+  private var formContent: some View {
     VStack(spacing: 0) {
       topBar
       stepHeader
       Rectangle().fill(MidsummerTheme.divider).frame(height: 0.5)
 
+      // 步骤标题固定在页面最顶部（用户 2026-09-19）：原来它随内容一起滚动，
+      // 滚到卡片中间就看不到当前在填哪一块；挪到滚动区外后「分类与款式」
+      // 等步骤名在任何滚动位置都钉在最顶上。
+      Text(step.sectionTitle)
+        .font(.system(size: 16, weight: .semibold))
+        .foregroundStyle(MidsummerTheme.primaryText)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 12)
+        .padding(.top, 10)
+        .padding(.bottom, 4)
+        .accessibilityIdentifier("listing-step-title")
+
       ScrollView {
         VStack(alignment: .leading, spacing: 12) {
-          Text(step.sectionTitle)
-            .font(.system(size: 16, weight: .semibold))
-            .foregroundStyle(MidsummerTheme.primaryText)
           if isNewSeries {
             // 新建系列模式（用户 2026-09-17）：不再从既有系列里挑，
             // 第①步填的系列标题 / 上新时间 / 主图就是新系列的档案。
@@ -269,9 +363,13 @@ struct MidsummerListingFormView: View {
       replacePhotoItem = nil
     }
     .onChange(of: stylePhotoItem) { _, newValue in
+      // 先把目标款式 id 捕获成局部量再异步加载（用户 2026-09-19 修复）：
+      // 下面两行会同步把 stylePickerTarget 置空，若在 apply 闭包里现读，
+      // 异步回来时恒为 nil → guard 失败 → 款式图永远落不进款式（上传"失灵"根因）。
+      let target = stylePickerTarget
       loadPicker(newValue) { image in
         guard let image,
-          let target = stylePickerTarget,
+          let target,
           let index = draft.styles.firstIndex(where: { $0.id == target })
         else { return }
         draft.styles[index].image = image
@@ -279,11 +377,6 @@ struct MidsummerListingFormView: View {
       }
       stylePickerTarget = nil
       stylePhotoItem = nil
-    }
-    .onChange(of: draft.stage) { _, newStage in
-      // 阶段切换（2026-09-18）：价格配置固定显示（预约价 / 定金 / 尾款自动），
-      // 这里只做默认值引导——选定金阶段时顺手打开定金开关（可再手动关掉）。
-      if newStage == .deposit, !draft.depositEnabled { draft.depositEnabled = true }
     }
     .onAppear { prefill() }
   }
@@ -515,8 +608,6 @@ struct MidsummerListingFormView: View {
 
     case .itemBasics:
       // ③ 合并步（2026-09-18）：分类与款式 / 尺码 / 价格（预约价+定金，尾款自动）。
-      if trimmed(draft.name).isEmpty { return "请填写商品名称。" }
-      if draft.kinds.isEmpty { return "请至少选择一个商品分类。" }
 
       if draft.sizes.contains(where: { trimmed($0).isEmpty }) {
         return "有尺码项名称为空，请补全或删除该行。"
@@ -527,33 +618,57 @@ struct MidsummerListingFormView: View {
       }
 
       if draft.styles.isEmpty {
-        return "请至少添加一个款式——上架后按款式归类与展示。"
+        return "请至少添加一个颜色分类/款式——上架后按款式归类与展示。"
       }
       if draft.styles.contains(where: { trimmed($0.name).isEmpty }) {
-        return "有款式条目的名称为空，请补全或删除该行。"
+        return "有颜色分类/款式的名称为空，请补全或删除该行。"
       }
       let styleNames = draft.styles.map { trimmed($0.name).lowercased() }
       if Set(styleNames).count != styleNames.count {
         return "存在重复款式，请合并后再继续。"
       }
-
-      // 价格（2026-09-18 口径）：预约价 / 定金需为整数；定金开启时两者都要有
-      // 且预约价 > 定金（尾款 = 预约价 − 定金 自动算出）。
-      for (label, text) in [("预约价", draft.preorderText), ("定金", draft.depositEnabled ? draft.depositText : "")] {
-        if !trimmed(text).isEmpty && Int(trimmed(text)) == nil {
-          return "\(label) 需填整数金额（元）。"
+      // 逐款尺码（用户 2026-09-18 晚改版）：每填写一个颜色分类/款式，
+      // 需同时选择该款式对应的尺码。
+      for style in draft.styles where !trimmed(style.name).isEmpty {
+        if style.sizes.isEmpty {
+          return "款式「\(Self.displayStyleName(trimmed(style.name)))」请至少选择一个尺码。"
         }
       }
-      let depositValue = draft.depositEnabled ? Int(trimmed(draft.depositText)) : nil
-      let preorderValue = Int(trimmed(draft.preorderText))
-      if depositValue == nil && preorderValue == nil {
-        return "请至少填写预约价（全款），或开启定金并填写金额。"
+      // 逐款价格：填了就必须是整数金额。
+      for style in draft.styles where !trimmed(style.priceText).isEmpty {
+        if Int(trimmed(style.priceText)) == nil {
+          return "款式「\(Self.displayStyleName(trimmed(style.name)))」的价格需填整数金额（元）。"
+        }
       }
-      if depositValue != nil && preorderValue == nil {
-        return "已配置定金：请再填预约价（全款），尾款会自动算出。"
-      }
-      if let depositValue, let preorderValue, preorderValue <= depositValue {
-        return "预约价需大于定金（当前差值 ¥\(preorderValue - depositValue)），否则算不出尾款。"
+
+      // 价格（2026-09-19 口径：与第 2 步上新阶段联动）：
+      //   · 现货阶段 → 只认现货价（整数，必填）；
+      //   · 预约价阶段（含旧存档定金 / 尾款）→ 预约价 / 定金需为整数；
+      //     定金开启时两者都要有且预约价 > 定金（尾款 = 预约价 − 定金 自动算出）。
+      if draft.stage == .inStock {
+        if !trimmed(draft.spotPriceText).isEmpty && Int(trimmed(draft.spotPriceText)) == nil {
+          return "现货价 需填整数金额（元）。"
+        }
+        if Int(trimmed(draft.spotPriceText)) == nil {
+          return "现货阶段：请填写现货价（元）。"
+        }
+      } else {
+        for (label, text) in [("预约价", draft.preorderText), ("定金", draft.depositEnabled ? draft.depositText : "")] {
+          if !trimmed(text).isEmpty && Int(trimmed(text)) == nil {
+            return "\(label) 需填整数金额（元）。"
+          }
+        }
+        let depositValue = draft.depositEnabled ? Int(trimmed(draft.depositText)) : nil
+        let preorderValue = Int(trimmed(draft.preorderText))
+        if depositValue == nil && preorderValue == nil {
+          return "请至少填写预约价（全款），或开启定金并填写金额。"
+        }
+        if depositValue != nil && preorderValue == nil {
+          return "已配置定金：请再填预约价（全款），尾款会自动算出。"
+        }
+        if let depositValue, let preorderValue, preorderValue <= depositValue {
+          return "预约价需大于定金（当前差值 ¥\(preorderValue - depositValue)），否则算不出尾款。"
+        }
       }
 
       // 预售时间窗校验：倒挂配置会让定金结束时直接判「预售结束」。
@@ -642,10 +757,10 @@ struct MidsummerListingFormView: View {
   private var stageStep: some View {
     wizardCard(
       "选择上新阶段（类目）",
-      hint: "选错阶段会让系列出现在错误的时间线上，提交前可随时回来改；第 3 步的价格配置项跟这里的阶段联动。"
+      hint: "阶段只有「预约价 / 现货」两档：定金 + 尾款就是预约价，是预约价的拆分填法（在第 3 步价格卡选择填全款还是定金+尾款）。选错阶段会让系列出现在错误的时间线上。"
     ) {
       LazyVGrid(columns: [GridItem(.adaptive(minimum: 96), spacing: 8)], spacing: 8) {
-        ForEach(MidsummerLaunchStage.allCases, id: \.self) { candidate in
+        ForEach(MidsummerLaunchStage.selectableCases, id: \.self) { candidate in
           let on = draft.stage == candidate
           Button {
             draft.stage = on ? nil : candidate
@@ -674,7 +789,7 @@ struct MidsummerListingFormView: View {
 
       if let stage = draft.stage {
         VStack(alignment: .leading, spacing: 3) {
-          Text("阶段决定商品在时间线上的列表归属；价格配置（预约价 / 定金 / 尾款自动）固定在第 3 步，不随阶段切换隐藏。")
+          Text("阶段决定商品在时间线上的列表归属；预约价阶段支持「预约全款」或「定金 + 尾款（自动核算）」两种填法，都在第 3 步价格卡配置。")
             .font(.system(size: 11))
             .foregroundStyle(MidsummerTheme.secondaryText)
         }
@@ -682,15 +797,16 @@ struct MidsummerListingFormView: View {
         .transition(.opacity)
       }
 
-      // 定金-尾款预售时间窗（用户 2026-09-17 自动流转规则）：
+      // 预售时间窗（用户 2026-09-17 自动流转规则；2026-09-19 起挂在预约价阶段下）：
       // 定金期结束 → 自动从「上新」列表移除并进入尾款列表；
       // 尾款期也结束 → 预售结束，详情页同时展示预约价与现货价。
-      if draft.stage == .deposit || draft.stage == .balance {
+      // 旧存档的定金 / 尾款阶段编辑时仍显示各自的时间窗配置。
+      if draft.stage == .preorder || draft.stage == .deposit || draft.stage == .balance {
         VStack(alignment: .leading, spacing: 8) {
-          Text("预售时间窗（到点自动流转；不设置则停留在当前阶段）")
+          Text("预售时间窗（到点自动流转；不设置则停留在当前阶段；纯全款预约可不配置）")
             .font(.system(size: 11))
             .foregroundStyle(MidsummerTheme.secondaryText)
-          if draft.stage == .deposit {
+          if draft.stage == .deposit || draft.stage == .preorder {
             optionalDatePicker(
               "定金截止", binding: $draft.depositEndsAt, identifier: "listing-deposit-ends")
           }
@@ -747,12 +863,77 @@ struct MidsummerListingFormView: View {
 
   // MARK: ③ 分类与款式（2026-09-18 合并：分类 chips + 款式条目 + 自动商品名）
 
+  /// 步骤③布局按权限分级（用户 2026-09-19）：
+  ///   · **白名单创作者** → 新版布局：预约价格表占位 → 分类与款式 → 价格 → 尺码，
+  ///     且款式卡填完分类名即自动出尺码表；
+  ///   · 其余创作者（含本机开关创作者）与普通用户 → 旧布局，逐像素不动。
+  /// 普通用户根本进不了本页（`canEdit` 页面级门控），这里再按白名单收敛一次。
+  @ViewBuilder
   private var itemBasicsStep: some View {
+    if creatorAccess.isWhitelistedCreator {
+      whitelistedItemBasicsStep
+    } else {
+      legacyItemBasicsStep
+    }
+  }
+
+  /// 旧布局（2026-09-18 版）：尺码池在前——先备好尺码项，逐款录入时才能
+  /// 立即给每款点选尺码。非白名单创作者继续用这一版。
+  private var legacyItemBasicsStep: some View {
     VStack(alignment: .leading, spacing: 12) {
-      categoryStyleCard
       sizesCard
+      categoryStyleCard
       priceCard
     }
+  }
+
+  /// 新版布局（白名单创作者，用户 2026-09-19）：按填写动线重排——
+  /// **分类与款式 → 价格 → 尺码**；分类与款式区上方预留「预约价格表」空位。
+  /// 尺码池挪到最后不挡动线：款式卡里选不到尺码时仍有引导文案
+  /// （「尺码项在下面」），先定款再备码也顺畅。
+  private var whitelistedItemBasicsStep: some View {
+    VStack(alignment: .leading, spacing: 12) {
+      preorderPriceTableSlot
+      categoryStyleCard
+      priceCard
+      sizesCard
+    }
+  }
+
+  /// 「预约价格表」预留空位（用户 2026-09-19）：后续在该系列下展示预约价格表，
+  /// 空位先占住版面。占位**不可交互**、不参与任何校验——只是布局锚点。
+  private var preorderPriceTableSlot: some View {
+    VStack(alignment: .leading, spacing: 6) {
+      HStack(spacing: 6) {
+        Image(systemName: "tablecells")
+          .font(.system(size: 13, weight: .medium))
+          .foregroundStyle(MidsummerTheme.brandOrange)
+        Text("预约价格表")
+          .font(.system(size: 14, weight: .semibold))
+          .foregroundStyle(MidsummerTheme.primaryText)
+        Spacer(minLength: 0)
+        Text("预留位")
+          .font(.system(size: 10, weight: .medium))
+          .foregroundStyle(MidsummerTheme.secondaryText)
+          .padding(.horizontal, 7)
+          .padding(.vertical, 2)
+          .background(MidsummerTheme.subtleFill)
+          .clipShape(Capsule())
+      }
+      Text("该系列的预约价格表将在这里展示（预留区域，即将上线）。")
+        .font(.system(size: 11))
+        .foregroundStyle(MidsummerTheme.secondaryText)
+    }
+    .padding(14)
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .background(MidsummerTheme.subtleFill.opacity(0.4))
+    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+    .overlay(
+      RoundedRectangle(cornerRadius: 14, style: .continuous)
+        .stroke(MidsummerTheme.divider, style: StrokeStyle(lineWidth: 1, dash: [4]))
+    )
+    .accessibilityElement(children: .combine)
+    .accessibilityIdentifier("listing-preorder-price-slot")
   }
 
   // MARK: ④ 确认与发布
@@ -764,49 +945,17 @@ struct MidsummerListingFormView: View {
     }
   }
 
-  /// 分类与款式合并卡（用户 2026-09-18）：上半选分类、下半录款式，
-  /// 款式名自动按「分类名 + 颜色」拼接；卡末尾是自动生成、可修改的商品名。
+  /// 分类与款式卡：逐款录入——每款必选尺码 + 独立价格 + 独立图片，
+  /// 选好尺码后下方自动生成该款尺码表（对照樱花小羊规格面板）。
+  /// （2026-09-18 晚：商品分类 chips 与「商品名」输入框按需求移除，
+  ///   商品名自动取首个款式名。）
   private var categoryStyleCard: some View {
     wizardCard(
       "分类与款式",
-      hint: "先选分类（可多选，第一个是主分类），再录款式——只输颜色即可，款式名自动拼成「分类名 + 颜色」（如「粉色」→「sk 粉色」）；自带前缀的输入（如「内搭 奶白色」）原样保留。商品名按首个款式自动生成，可修改。"
+      hint: "逐个填写颜色分类/款式——每款需同时选择尺码，填好价格、传好图，会自动生成该款尺码表。"
     ) {
-      kindSelectionSection
-      Divider().overlay(MidsummerTheme.divider)
       stylesSection
-      Divider().overlay(MidsummerTheme.divider)
-      autoNameRow
     }
-  }
-
-  /// 商品名（自动生成 + 可修改）：未手动改过时跟随首个款式名自动同步；
-  /// 一旦手动编辑，以手动值为准。
-  private var autoNameRow: some View {
-    VStack(alignment: .leading, spacing: 6) {
-      Text("商品名（自动生成，可修改）")
-        .font(.system(size: 11, weight: .medium))
-        .foregroundStyle(MidsummerTheme.primaryText)
-      TextField("选完款式后自动生成", text: nameBinding)
-        .font(.system(size: 14))
-        .padding(10)
-        .background(MidsummerTheme.subtleFill)
-        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-        .accessibilityIdentifier("listing-name")
-      Text("默认取第一个款式名，改过之后不再自动覆盖。")
-        .font(.system(size: 11))
-        .foregroundStyle(MidsummerTheme.secondaryText)
-    }
-  }
-
-  /// 商品名 binding：用户输入即标记手动编辑，停止自动同步。
-  private var nameBinding: Binding<String> {
-    Binding(
-      get: { draft.name },
-      set: { newValue in
-        draft.name = newValue
-        draft.nameManuallyEdited = true
-      }
-    )
   }
 
   /// 未手动改过商品名时，让商品名跟随首个款式名（增删款式、改款名都同步）。
@@ -815,62 +964,6 @@ struct MidsummerListingFormView: View {
     draft.name =
       draft.styles.map { trimmed($0.name) }.first { !$0.isEmpty }
       ?? ""
-  }
-
-  private var kindSelectionSection: some View {
-    VStack(alignment: .leading, spacing: 12) {
-      Text("商品分类（可多选）")
-        .font(.system(size: 12, weight: .semibold))
-        .foregroundStyle(MidsummerTheme.primaryText)
-      ForEach(MidsummerItemCategory.allCases, id: \.self) { category in
-          VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 4) {
-              Text(category.labelZH)
-                .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(MidsummerTheme.primaryText)
-              if draft.kinds.contains(where: { $0.category == category }) {
-                Circle()
-                  .fill(MidsummerTheme.brandOrange)
-                  .frame(width: 5, height: 5)
-              }
-            }
-            LazyVGrid(
-              columns: [GridItem(.adaptive(minimum: 92), spacing: 8)], alignment: .leading, spacing: 8
-            ) {
-              ForEach(MidsummerItemKind.kinds(in: category), id: \.self) { candidate in
-                let on = draft.kinds.contains(candidate)
-                Button {
-                  if let index = draft.kinds.firstIndex(of: candidate) {
-                    // 至少保留一个分类：最后一个选中的不可取消。
-                    guard draft.kinds.count > 1 else { return }
-                    draft.kinds.remove(at: index)
-                  } else {
-                    draft.kinds.append(candidate)
-                  }
-                } label: {
-                  Text(candidate.shortLabel)
-                    .font(.system(size: 12, weight: on ? .semibold : .regular))
-                    .foregroundStyle(on ? MidsummerTheme.brandOrange : MidsummerTheme.primaryText)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.75)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 8)
-                    .background(on ? MidsummerTheme.orangeSurface : MidsummerTheme.subtleFill)
-                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                    .overlay(
-                      RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .stroke(on ? MidsummerTheme.brandOrange : Color.clear, lineWidth: 1)
-                    )
-                }
-                .buttonStyle(.plain)
-                .accessibilityIdentifier("listing-kind-\(candidate.rawValue)")
-                .accessibilityLabel("\(category.labelZH) \(candidate.labelZH)")
-                .accessibilityAddTraits(on ? .isSelected : [])
-              }
-            }
-          }
-        }
-      }
   }
 
   private var sizesCard: some View {
@@ -943,21 +1036,21 @@ struct MidsummerListingFormView: View {
     }
   }
 
-  // MARK: 款式（2026-09-18 并入分类卡：图片 + 名称；逐款价已从表单移除）
+  // MARK: 颜色分类/款式（2026-09-18 晚改版：每款必选尺码 + 独立价格 + 独立图片）
 
   private var stylesSection: some View {
     VStack(alignment: .leading, spacing: 10) {
-      Text("款式（\(draft.styles.count)）")
+      Text("颜色分类/款式（\(draft.styles.count)）")
         .font(.system(size: 12, weight: .semibold))
         .foregroundStyle(MidsummerTheme.primaryText)
       if draft.styles.isEmpty {
-        Text("还没有款式条目。点下面的系列款式加入，或自己新增一个。")
+        Text("还没有颜色分类/款式。点下面的系列款式加入，或在下方输入添加——每个款式需同时选择尺码、填价格、传图片。")
           .font(.system(size: 12))
           .foregroundStyle(MidsummerTheme.secondaryText)
       } else {
-        VStack(spacing: 8) {
+        VStack(spacing: 10) {
           ForEach(draft.styles) { style in
-            styleRow(style.id)
+            styleCard(style.id)
           }
         }
       }
@@ -998,7 +1091,7 @@ struct MidsummerListingFormView: View {
       }
 
       HStack(spacing: 8) {
-        TextField("输入颜色，如「粉色」", text: $draft.customStyleText)
+        TextField("输入颜色分类/款式，如「粉色OP」", text: $draft.customStyleText)
           .font(.system(size: 14))
           .padding(10)
           .background(MidsummerTheme.subtleFill)
@@ -1048,7 +1141,7 @@ struct MidsummerListingFormView: View {
             )
             .accessibilityIdentifier("listing-style-batch-input")
 
-          Text("每行一个款式名，也可用顿号 / 逗号分隔，如「sk 粉色、sk 蓝绿色、内搭 奶白色」。重复的会自动跳过。")
+          Text("每行一个颜色分类/款式名，也可用顿号 / 逗号分隔，如「粉色OP、红色OP、sk 粉色」。重复的会自动跳过；加入后请逐款选尺码、填价格、传图。")
             .font(.system(size: 11))
             .foregroundStyle(MidsummerTheme.secondaryText)
 
@@ -1078,56 +1171,237 @@ struct MidsummerListingFormView: View {
     }
   }
 
-  private func styleRow(_ id: String) -> some View {
+  /// 单个「颜色分类/款式」录入卡（用户 2026-09-18 晚改版，对照樱花小羊）：
+  ///   · 左侧：款式名 + 该款价格输入框（下方）；
+  ///   · 右侧：该款式独立的图片上传入口；
+  ///   · 中部：该款尺码点选（必选，从第 3 步尺码池里挑）；
+  ///   · 底部：选好尺码 / 传好图后**自动生成**该款尺码表。
+  private func styleCard(_ id: String) -> some View {
     let index = draft.styles.firstIndex(where: { $0.id == id }) ?? 0
-    return HStack(spacing: 8) {
-      PhotosPicker(selection: $stylePhotoItem, matching: .images) {
-        Group {
-          if let image = draft.styles.indices.contains(index) ? draft.styles[index].image : nil {
-            Image(uiImage: image)
-              .resizable()
-              .scaledToFill()
-          } else {
-            VStack(spacing: 2) {
-              Image(systemName: "photo.badge.plus")
-                .font(.system(size: 15))
-              Text("款式图")
-                .font(.system(size: 8))
+    return VStack(alignment: .leading, spacing: 10) {
+      HStack(alignment: .top, spacing: 10) {
+        VStack(alignment: .leading, spacing: 8) {
+          TextField("颜色分类/款式名，如「粉色OP」", text: styleNameBinding(id: id))
+            .font(.system(size: 14))
+            .padding(10)
+            .background(MidsummerTheme.subtleFill)
+            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .accessibilityIdentifier("listing-style-name-\(index)")
+
+          HStack(spacing: 6) {
+            Text("¥")
+              .font(.system(size: 12, weight: .semibold))
+              .foregroundStyle(MidsummerTheme.priceRed)
+            TextField(stylePricePlaceholder, text: stylePriceBinding(id: id))
+              .font(.system(size: 14))
+              .keyboardType(.numberPad)
+              .accessibilityIdentifier("listing-style-price-\(index)")
+          }
+          .padding(10)
+          .background(MidsummerTheme.subtleFill)
+          .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        }
+
+        // 右侧：该款式独立的图片上传入口
+        VStack(spacing: 4) {
+          PhotosPicker(selection: $stylePhotoItem, matching: .images) {
+            Group {
+              if let image = draft.styles.indices.contains(index) ? draft.styles[index].image : nil {
+                Image(uiImage: image)
+                  .resizable()
+                  .scaledToFill()
+              } else {
+                VStack(spacing: 2) {
+                  Image(systemName: "photo.badge.plus")
+                    .font(.system(size: 15))
+                  Text("款式图")
+                    .font(.system(size: 8))
+                }
+                .foregroundStyle(MidsummerTheme.secondaryText)
+              }
             }
+            .frame(width: 60, height: 60)
+            .background(MidsummerTheme.subtleFill)
+            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .overlay(
+              RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .strokeBorder(MidsummerTheme.divider, style: StrokeStyle(lineWidth: 1, dash: [3]))
+            )
+          }
+          .simultaneousGesture(TapGesture().onEnded { stylePickerTarget = id })
+          .accessibilityIdentifier("listing-style-image-\(index)")
+          .accessibilityLabel("上传款式图")
+
+          Button {
+            removeStyle(id: id)
+          } label: {
+            Image(systemName: "minus.circle.fill")
+              .font(.system(size: 18))
+              .foregroundStyle(MidsummerTheme.priceRed)
+          }
+          .buttonStyle(.plain)
+          .accessibilityIdentifier("listing-style-delete-\(index)")
+          .accessibilityLabel("删除款式")
+        }
+      }
+
+      // 该款尺码（必选）：从尺码池里逐项点选。
+      VStack(alignment: .leading, spacing: 6) {
+        HStack(spacing: 4) {
+          Text("该款尺码")
+            .font(.system(size: 11, weight: .medium))
+            .foregroundStyle(MidsummerTheme.primaryText)
+          Text("（必选，至少一个）")
+            .font(.system(size: 10))
             .foregroundStyle(MidsummerTheme.secondaryText)
+        }
+        if draft.sizes.isEmpty {
+          Text("尺码项还没配置——先在「尺码」区加入尺码，再回来给这个款式选。")
+            .font(.system(size: 11))
+            .foregroundStyle(MidsummerTheme.secondaryText)
+        } else {
+          LazyVGrid(
+            columns: [GridItem(.adaptive(minimum: 56), spacing: 6)], alignment: .leading, spacing: 6
+          ) {
+            ForEach(draft.sizes, id: \.self) { size in
+              let on = draft.styles.indices.contains(index)
+                && draft.styles[index].sizes.contains(size)
+              Button {
+                toggleStyleSize(id: id, size: size)
+              } label: {
+                Text(size)
+                  .font(.system(size: 12, weight: on ? .semibold : .regular))
+                  .foregroundStyle(on ? MidsummerTheme.brandOrange : MidsummerTheme.primaryText)
+                  .frame(maxWidth: .infinity)
+                  .padding(.vertical, 6)
+                  .background(on ? MidsummerTheme.orangeSurface : MidsummerTheme.subtleFill)
+                  .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+                  .overlay(
+                    RoundedRectangle(cornerRadius: 7, style: .continuous)
+                      .stroke(on ? MidsummerTheme.brandOrange : Color.clear, lineWidth: 1)
+                  )
+              }
+              .buttonStyle(.plain)
+              .accessibilityIdentifier("listing-style-\(index)-size-\(size)")
+              .accessibilityAddTraits(on ? .isSelected : [])
+            }
           }
         }
-        .frame(width: 52, height: 52)
-        .background(MidsummerTheme.subtleFill)
-        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-        .overlay(
-          RoundedRectangle(cornerRadius: 8, style: .continuous)
-            .strokeBorder(MidsummerTheme.divider, style: StrokeStyle(lineWidth: 1, dash: [3]))
-        )
       }
-      .simultaneousGesture(TapGesture().onEnded { stylePickerTarget = id })
-      .accessibilityIdentifier("listing-style-image-\(index)")
-      .accessibilityLabel("上传款式图")
 
-      TextField("款式名", text: styleNameBinding(id: id))
-        .font(.system(size: 14))
-        .padding(10)
-        .background(MidsummerTheme.subtleFill)
-        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-        .accessibilityIdentifier("listing-style-name-\(index)")
-
-      Button {
-        removeStyle(id: id)
-      } label: {
-        Image(systemName: "minus.circle.fill")
-          .font(.system(size: 18))
-          .foregroundStyle(MidsummerTheme.priceRed)
+      // 该款尺码表（尺码 × 价格，一目了然）：白名单新布局下**填完分类名
+      // 并选了尺码**即自动显示（用户 2026-09-19），不再等图片上传；
+      // 旧布局保持原判定（有视觉素材 + 有尺码）。
+      if showsStyleSizeTable(index) {
+        styleSizeTable(index: index)
+          .transition(.opacity)
       }
-      .buttonStyle(.plain)
-      .accessibilityIdentifier("listing-style-delete-\(index)")
-      .accessibilityLabel("删除款式")
     }
-    .accessibilityIdentifier("listing-style-row-\(index)")
+    .padding(10)
+    .background(MidsummerTheme.subtleFill.opacity(0.5))
+    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+    .overlay(
+      RoundedRectangle(cornerRadius: 10, style: .continuous)
+        .stroke(MidsummerTheme.divider, lineWidth: 0.8)
+    )
+    // ⚠️ 不要给这个卡片容器挂 accessibilityIdentifier：SwiftUI 会把它覆盖到
+    // 全部子元素上（名称 / 价格输入框、删除按钮全变成同一个标识），
+    // UI 测试的 listing-style-name-<i> 就查不到了（listing-style-row-0 同款踩坑）。
+    .animation(.snappy(duration: 0.16), value: styleSizes(index))
+  }
+
+  /// 款式卡价格输入框的占位文案（与第 2 步阶段联动，用户 2026-09-19）：
+  /// 现货阶段 →「该款现货价」；其余 / 未选阶段 →「该款预约价」。
+  private var stylePricePlaceholder: String {
+    draft.stage == .inStock ? "该款现货价（元）" : "该款预约价（元）"
+  }
+
+  /// 该款是否已有视觉素材（新选的图 / 编辑回显的已落盘图）——「上传完成」的判定。
+  private func hasStyleVisual(_ index: Int) -> Bool {
+    guard draft.styles.indices.contains(index) else { return false }
+    return draft.styles[index].image != nil
+      || !(draft.styles[index].imageFile ?? "").isEmpty
+  }
+
+  /// 该款尺码表的出现条件（用户 2026-09-19 按权限分级）：
+  ///   · 白名单创作者：填完具体分类（款式名，如「粉色OP」）并选了尺码
+  ///     就自动显示——动线上「填完分类 → 立刻看到该分类的尺码表」；
+  ///   · 其余创作者：沿用旧判定（已有视觉素材 + 已选尺码）。
+  private func showsStyleSizeTable(_ index: Int) -> Bool {
+    guard draft.styles.indices.contains(index), !styleSizes(index).isEmpty else { return false }
+    if creatorAccess.isWhitelistedCreator {
+      return !trimmed(draft.styles[index].name).isEmpty
+    }
+    return hasStyleVisual(index)
+  }
+
+  private func styleSizes(_ index: Int) -> [String] {
+    guard draft.styles.indices.contains(index) else { return [] }
+    return draft.styles[index].sizes
+  }
+
+  /// 该款尺码表（自动生成）：表头「尺码 | 价格」，一行一个尺码。
+  /// 价格显示该款价格（未单独填时按阶段回退单品价：现货阶段回退现货价，
+  /// 其余阶段回退预约价，与发布口径一致）。
+  private func styleSizeTable(index: Int) -> some View {
+    let fallbackPrice = draft.stage == .inStock
+      ? Int(trimmed(draft.spotPriceText))
+      : Int(trimmed(draft.preorderText))
+    let price = Int(trimmed(draft.styles.indices.contains(index) ? draft.styles[index].priceText : ""))
+      ?? fallbackPrice
+    return VStack(alignment: .leading, spacing: 6) {
+      Text("款式尺码表（自动生成）")
+        .font(.system(size: 10, weight: .semibold))
+        .foregroundStyle(MidsummerTheme.secondaryText)
+      VStack(spacing: 0) {
+        HStack(spacing: 0) {
+          sizeTableCell("尺码", header: true)
+          sizeTableCell("价格", header: true)
+        }
+        ForEach(styleSizes(index), id: \.self) { size in
+          HStack(spacing: 0) {
+            sizeTableCell(size)
+            sizeTableCell(price.map { "¥\($0)" } ?? "价格待填")
+          }
+        }
+      }
+      .overlay(
+        RoundedRectangle(cornerRadius: 8, style: .continuous)
+          .stroke(MidsummerTheme.divider, lineWidth: 0.8)
+      )
+      .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+    }
+    .accessibilityElement(children: .contain)
+    .accessibilityIdentifier("listing-style-size-table-\(index)")
+  }
+
+  private func sizeTableCell(_ text: String, header: Bool = false) -> some View {
+    Text(text)
+      .font(.system(size: 11, weight: header ? .semibold : .regular))
+      .foregroundStyle(header ? MidsummerTheme.secondaryText : MidsummerTheme.primaryText)
+      .frame(maxWidth: .infinity, minHeight: 26, alignment: .leading)
+      .padding(.horizontal, 8)
+      .background(header ? MidsummerTheme.subtleFill : Color.clear)
+  }
+
+  private func stylePriceBinding(id: String) -> Binding<String> {
+    Binding(
+      get: { draft.styles.first(where: { $0.id == id })?.priceText ?? "" },
+      set: { newValue in
+        guard let index = draft.styles.firstIndex(where: { $0.id == id }) else { return }
+        draft.styles[index].priceText = newValue
+      }
+    )
+  }
+
+  /// 点选 / 取消该款的一个尺码。
+  private func toggleStyleSize(id: String, size: String) {
+    guard let index = draft.styles.firstIndex(where: { $0.id == id }) else { return }
+    if let position = draft.styles[index].sizes.firstIndex(of: size) {
+      draft.styles[index].sizes.remove(at: position)
+    } else {
+      draft.styles[index].sizes.append(size)
+    }
   }
 
   private func styleNameBinding(id: String) -> Binding<String> {
@@ -1151,7 +1425,8 @@ struct MidsummerListingFormView: View {
       MidsummerListingStyleDraft(
         name: option.name,
         image: seriesStyleImage(for: option.name),
-        imageFile: sourceItem?.variantImageNames?[option.name]
+        imageFile: sourceItem?.variantImageNames?[option.name],
+        sizes: draft.sizes
       )
     )
     syncAutoName()
@@ -1163,17 +1438,11 @@ struct MidsummerListingFormView: View {
     return ImageManager.shared.loadImage(fileName: fileName)
   }
 
-  /// 「分类名 + 颜色」自动拼款式名（用户 2026-09-18）：输入不含任何已选
-  /// 分类短标 / 大类名时，用主分类短标拼前缀（「粉色」→「sk 粉色」）；
-  /// 自带前缀的输入（「sk 粉色」「内搭 奶白色」）原样保留。
+  /// 用户输入什么就是什么（用户 2026-09-19）：旧的「分类短标 + 颜色」自动拼前缀
+  /// 已移除——分类选择入口下线后 `kinds` 恒有默认值 `.op`，任何不带前缀的输入
+  /// 都会被强加「OP 」前缀（「小狗托胸」→「OP 小狗托胸」），属异常展示。
   func autoStyleName(for input: String) -> String {
-    let value = trimmed(input)
-    guard !value.isEmpty, let primary = draft.kinds.first else { return value }
-    let knownPrefixes = draft.kinds.map(\.shortLabel) + MidsummerItemCategory.allCases.map(\.labelZH)
-    if knownPrefixes.contains(where: { value.lowercased().contains($0.lowercased()) }) {
-      return value
-    }
-    return "\(primary.shortLabel) \(value)"
+    trimmed(input)
   }
 
   private func addCustomStyle() {
@@ -1187,7 +1456,7 @@ struct MidsummerListingFormView: View {
       stepError = "款式「\(name)」已经在列表里了。"
       return
     }
-    draft.styles.append(MidsummerListingStyleDraft(name: name))
+    draft.styles.append(MidsummerListingStyleDraft(name: name, sizes: draft.sizes))
     draft.customStyleText = ""
     stepError = nil
     syncAutoName()
@@ -1210,7 +1479,7 @@ struct MidsummerListingFormView: View {
         skipped.append(name)
         continue
       }
-      draft.styles.append(MidsummerListingStyleDraft(name: name))
+      draft.styles.append(MidsummerListingStyleDraft(name: name, sizes: draft.sizes))
       added += 1
     }
 
@@ -1282,12 +1551,37 @@ struct MidsummerListingFormView: View {
     }
   }
 
-  // MARK: 价格卡（2026-09-18 口径：预约价（全款）+ 定金可选，尾款自动算；
-  // 固定显示，不再随第 2 步阶段联动）
+  // MARK: 价格卡（2026-09-19 口径：与第 2 步上新阶段联动——用户 2026-09-19
+  // 要求价格项（定金、尾款、预约价、现货价）按当前所处阶段动态展示与更新）
+  @ViewBuilder
   private var priceCard: some View {
+    switch draft.stage {
+    case .inStock:
+      inStockPriceCard
+    case .preorder, .deposit, .balance:
+      preorderPriceCard
+    case nil:
+      wizardCard("价格（元）", hint: "请先回到第 2 步选择上新阶段——价格项会按所选阶段联动显示（预约价阶段：预约价 / 定金 / 尾款；现货阶段：现货价）。") {
+        Text("未选择上新阶段，暂无价格项。")
+          .font(.system(size: 12))
+          .foregroundStyle(MidsummerTheme.secondaryText)
+      }
+    }
+  }
+
+  /// 现货阶段的价格卡：只出现现货价一项。
+  private var inStockPriceCard: some View {
+    wizardCard("价格（元）", hint: MidsummerLaunchStage.inStock.priceHint + " 款式卡未单独填价时，回退用这个现货价。") {
+      priceField("现货价", text: $draft.spotPriceText, identifier: "listing-spot-price")
+    }
+  }
+
+  /// 预约价阶段的价格卡（含旧存档定金 / 尾款阶段）：「全款直填」或
+  /// 「定金 + 尾款自动」两种填法任选。
+  private var preorderPriceCard: some View {
     wizardCard(
       "价格（元）",
-      hint: "填预约价（全款）与定金，尾款自动按「预约价 − 定金」算出并分开显示；不走定金模式时只填预约价即可。"
+      hint: MidsummerLaunchStage.preorder.priceHint + " 款式卡未单独填价时，回退用这个预约价。"
     ) {
       priceField("预约价（全款）", text: $draft.preorderText, identifier: "listing-preorder")
 
@@ -1420,13 +1714,19 @@ struct MidsummerListingFormView: View {
     return parts.joined(separator: " + ")
   }
 
-  /// 款式汇总：款式名列表（逐款价口径已移除）。
+  /// 款式汇总：款式名 + 逐款价 + 该款尺码（2026-09-18 晚改版口径）。
   private var styleSummaryText: String {
     guard !draft.styles.isEmpty else { return "" }
     return draft.styles
-      .map { trimmed($0.name) }
+      .map { style -> String in
+        let name = trimmed(style.name)
+        guard !name.isEmpty else { return "" }
+        var parts = [Self.displayStyleName(name)]
+        if let price = Int(trimmed(style.priceText)) { parts.append("¥\(price)") }
+        if !style.sizes.isEmpty { parts.append(style.sizes.joined(separator: "/")) }
+        return parts.joined(separator: " ")
+      }
       .filter { !$0.isEmpty }
-      .map(Self.displayStyleName)
       .joined(separator: " / ")
   }
 
@@ -1647,19 +1947,45 @@ struct MidsummerListingFormView: View {
       }
     }
     stepError = nil
-    listingStore.upsert(assembledListing(forceDraft: false))
-    dismiss()
+    // 上新是创作者能力：先过角色校验，再落图落盘，避免被拒时留下半成品文件。
+    do {
+      try CreatorAccess.requireCreator(.listingPublish)
+      try listingStore.upsert(assembledListing(forceDraft: false), operation: .listingPublish)
+      dismiss()
+    } catch {
+      stepError = error.userMessage
+    }
   }
 
   private func saveDraft() {
-    listingStore.upsert(assembledListing(forceDraft: true))
-    dismiss()
+    do {
+      try CreatorAccess.requireCreator(.listingPublish)
+      try listingStore.upsert(assembledListing(forceDraft: true), operation: .listingPublish)
+      dismiss()
+    } catch {
+      stepError = error.userMessage
+    }
   }
 
   /// 汇总统一 state 为 listing。`forceDraft = true` 时跳过校验存草稿：
   /// 新建保持 draft（listedAt 为空），编辑保留原状态。
-  private func assembledListing(forceDraft: Bool) -> MidsummerListing {
-    let seriesID = ensureCustomSeries()
+  private func assembledListing(forceDraft: Bool) throws -> MidsummerListing {
+    // 逐款尺码的并集（用户 2026-09-18 晚改版）：每个款式各自选的尺码汇总成
+    // 单品级尺码表（保持首个出现顺序）；款式都没选尺码时回退全局尺码池。
+    var resolvedSizes: [String] {
+      var seen = Set<String>()
+      var union: [String] = []
+      for style in draft.styles {
+        for size in style.sizes where !seen.contains(size) {
+          seen.insert(size)
+          union.append(size)
+        }
+      }
+      return union.isEmpty
+        ? draft.sizes.map { trimmed($0) }.filter { !$0.isEmpty }
+        : union
+    }
+    let seriesID = try ensureCustomSeries(sizes: resolvedSizes)
     let id = existing?.id ?? MidsummerListing.newID()
     var listing = existing ?? MidsummerListing(
       id: id,
@@ -1690,20 +2016,30 @@ struct MidsummerListingFormView: View {
     // 多选分类（用户 2026-09-18）：`kinds` setter 会同步写 kindRaws 与
     // 主分类 kindRaw，旧代码 / DTO 转换读 kind 仍拿到首个主分类。
     listing.kinds = draft.kinds
-    // 价格（2026-09-18 口径）：现货价与逐款价不再从表单收集；
-    // 预约价（全款）为输入，尾款 = 预约价 − 定金 自动算出（校验已保证差值为正）。
-    listing.price = nil
-    listing.priceKind = nil
-    listing.deposit = draft.depositEnabled ? Int(trimmed(draft.depositText)) : nil
-    listing.preorderPrice = Int(trimmed(draft.preorderText))
-    if listing.deposit != nil, let preorder = listing.preorderPrice, preorder > listing.deposit! {
-      listing.balance = preorder - listing.deposit!
-    } else {
+    // 价格（2026-09-19 口径：与第 2 步上新阶段联动）：
+    //   · 现货阶段 → 写现货价（`price` + `priceKind == .shop`），清空预约价组；
+    //   · 预约价阶段（含旧存档定金 / 尾款）→ 预约价（全款）为输入，
+    //     尾款 = 预约价 − 定金 自动算出（校验已保证差值为正），清空现货价。
+    if draft.stage == .inStock {
+      listing.price = Int(trimmed(draft.spotPriceText))
+      listing.priceKind = listing.price != nil ? .shop : nil
+      listing.preorderPrice = nil
+      listing.deposit = nil
       listing.balance = nil
+    } else {
+      listing.price = nil
+      listing.priceKind = nil
+      listing.deposit = draft.depositEnabled ? Int(trimmed(draft.depositText)) : nil
+      listing.preorderPrice = Int(trimmed(draft.preorderText))
+      if listing.deposit != nil, let preorder = listing.preorderPrice, preorder > listing.deposit! {
+        listing.balance = preorder - listing.deposit!
+      } else {
+        listing.balance = nil
+      }
     }
     listing.note = draft.note
     listing.sourceURL = trimmed(draft.sourceURL)
-    listing.sizes = draft.sizes.map { trimmed($0) }.filter { !$0.isEmpty }
+    listing.sizes = resolvedSizes
 
     listing.stage = draft.stage
     listing.launchTitle = trimmed(draft.launchTitle)
@@ -1712,8 +2048,9 @@ struct MidsummerListingFormView: View {
     // 定金区间输入已随价格口径改版移除（系列级字段留空）。
     listing.depositMin = nil
     listing.depositMax = nil
-    // 预售时间窗：只对定金-尾款线生效；其它阶段清空，避免残留脏配置。
-    if draft.stage == .deposit {
+    // 预售时间窗：预约价阶段（含旧口径定金阶段）写入，供定金 → 尾款自动流转；
+    // 其它阶段清空，避免残留脏配置。
+    if draft.stage == .preorder || draft.stage == .deposit {
       listing.depositEndsAt = draft.depositEndsAt
       listing.balanceEndsAt = draft.balanceEndsAt
     } else if draft.stage == .balance {
@@ -1724,25 +2061,34 @@ struct MidsummerListingFormView: View {
       listing.balanceEndsAt = nil
     }
 
-    let savedNames = listingStore.saveImages(draft.images, listingID: id)
+    let savedNames = try listingStore.saveImages(draft.images, listingID: id)
     if !savedNames.isEmpty || !draft.images.isEmpty {
       listing.imageFiles = savedNames
     }
 
-    // 款式：名 / 图。逐款价已从表单口径移除（旧档的逐款价在编辑保存后不再保留）。
+    // 款式：名 / 图 / 逐款价 / 逐款尺码（用户 2026-09-18 晚改版）。
     // 图必须在 saveImages 之后落盘——
     // saveImages 会按前缀清掉这个 listing 的旧图（含上次保存的款式图）。
+    // 逐款价回退（与阶段联动）：该款没单独填价时，现货阶段用单品现货价，
+    // 其余阶段用单品预约价（全款）/ 定金+尾款，保证上架后规格面板每个
+    // 款式卡都有价格（与樱花小羊展示一致）。
+    let fallbackStylePrice: Int? =
+      draft.stage == .inStock
+      ? (listing.price ?? listing.preorderPrice ?? listing.expectedPreorderPrice ?? listing.deposit)
+      : (listing.preorderPrice ?? listing.expectedPreorderPrice ?? listing.deposit)
     let styleEntries: [MidsummerListingStyle] = draft.styles.enumerated().compactMap { index, style in
       let styleName = trimmed(style.name)
       guard !styleName.isEmpty else { return nil }
       let file =
-        style.image.flatMap { listingStore.saveStyleImage($0, listingID: id, index: index) }
+        style.image.flatMap { try? listingStore.saveStyleImage($0, listingID: id, index: index) }
         ?? style.imageFile
+      let styleSizes = style.sizes.map { trimmed($0) }.filter { !$0.isEmpty }
       return MidsummerListingStyle(
         id: style.id,
         name: styleName,
         imageFile: file,
-        price: nil
+        price: Int(trimmed(style.priceText)) ?? fallbackStylePrice,
+        sizes: styleSizes.isEmpty ? nil : styleSizes
       )
     }
     listing.styles = styleEntries
@@ -1767,7 +2113,8 @@ struct MidsummerListingFormView: View {
 
   /// 幂等创建自建系列并返回其 id：
   /// 既有系列 / 编辑模式直接用原 id；新建模式只在第一次提交时创建一次。
-  private func ensureCustomSeries() -> String {
+  /// `sizes` 用逐款尺码的并集（与上架单品保持同一口径）。
+  private func ensureCustomSeries(sizes: [String]) throws -> String {
     if let existing { return existing.seriesID }
     if let series { return series.id }
     if let createdSeriesID { return createdSeriesID }
@@ -1786,7 +2133,7 @@ struct MidsummerListingFormView: View {
       depositMin: nil,
       depositMax: nil,
       priceSource: nil,
-      sizes: draft.sizes.map { trimmed($0) }.filter { !$0.isEmpty },
+      sizes: sizes,
       colors: [],
       summary: draft.note.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : draft.note,
       sourceURL: "",
@@ -1794,7 +2141,7 @@ struct MidsummerListingFormView: View {
       verified: false,
       items: []
     )
-    MidsummerCustomSeriesStore.shared.add(dto)
+    try MidsummerCustomSeriesStore.shared.add(dto)
     createdSeriesID = id
     return id
   }
@@ -1833,15 +2180,17 @@ struct MidsummerListingFormView: View {
     draft.nameManuallyEdited = !existing.name.isEmpty
     draft.kinds = existing.kinds.isEmpty ? [existing.kind] : existing.kinds
     draft.sizes = existing.sizes
-    // 款式回显：新存档带图；旧存档（只有 variantOptionNames）降级成「只有名字」。
-    // 逐款价已从表单口径移除，不再回显。
+    // 款式回显：新存档带图 / 逐款价 / 逐款尺码；旧存档（只有 variantOptionNames）
+    // 降级成「只有名字」，逐款尺码回退单品级尺码。
     if let styles = existing.styles, !styles.isEmpty {
       draft.styles = styles.map {
         MidsummerListingStyleDraft(
           id: $0.id,
           name: $0.name,
           image: $0.imageFile.flatMap { ImageManager.shared.loadImage(fileName: $0) },
-          imageFile: $0.imageFile
+          imageFile: $0.imageFile,
+          priceText: $0.price.map(String.init) ?? "",
+          sizes: $0.sizes ?? existing.sizes
         )
       }
     } else {
@@ -1849,13 +2198,16 @@ struct MidsummerListingFormView: View {
         MidsummerListingStyleDraft(
           name: name,
           image: seriesStyleImage(for: name),
-          imageFile: sourceItem?.variantImageNames?[name]
+          imageFile: sourceItem?.variantImageNames?[name],
+          sizes: existing.sizes
         )
       }
     }
     draft.preorderText = existing.preorderPrice.map(String.init) ?? ""
     draft.depositText = existing.deposit.map(String.init) ?? ""
     draft.depositEnabled = existing.deposit != nil
+    // 现货价回显：现货阶段编辑时能带出原值。
+    draft.spotPriceText = existing.price.map(String.init) ?? ""
     draft.note = existing.note
     draft.sourceURL = existing.sourceURL == series?.sourceURL ? "" : existing.sourceURL
     draft.images = existing.imageFiles.compactMap { ImageManager.shared.loadImage(fileName: $0) }
@@ -1879,11 +2231,11 @@ struct MidsummerListingFormView: View {
           apply(UIImage(data: data))
         } else {
           apply(nil)
-          imageError = "商品图读取失败，请换一张试试。"
+          imageError = "图片读取失败，请换一张试试。"
         }
       } catch {
         apply(nil)
-        imageError = "商品图读取失败，请换一张试试。"
+        imageError = "图片读取失败，请换一张试试。"
       }
     }
   }

@@ -410,50 +410,6 @@ final class MidsummerSpecSelectionUITests: XCTestCase {
     )
   }
 
-  // MARK: - 用例 3：卡片上的 ⊕ 仍是「快速入库」，但吐司要写明规格
-
-  @MainActor
-  func testCardQuickInsertReportsChosenSpecs() throws {
-    let app = launchApp()
-    sleep(4)
-
-    guard enterTimeHall(app), enterMidsummer(app) else { return }
-
-    // 卡片右侧的 ⊕ 是 label 为「一键入库」的按钮。定点到「小熊博物馆」卡片：
-    // 它是单链接系列且带规格组（style+size），吐司必须带出规格；
-    // 首屏的樱花小羊已合并为系列入口卡片（不带 ⊕），三丽鸥没有规格组，
-    // 「找屏幕上第一个可见的 ⊕」会点错卡片。
-    let insertButton = app.buttons["midsummer-card-insert-midsummer-2026-bear-museum"]
-    var step = 0
-    while !(insertButton.exists && insertButton.isHittable) && step < 25 {
-      app.swipeUp()
-      step += 1
-      usleep(500_000)
-    }
-    capture("30-找到卡片上的快捷入库入口")
-    XCTAssertTrue(
-      insertButton.exists,
-      "小熊博物馆卡片上应当有「一键入库」（下滚 \(step) 次仍未找到）"
-    )
-    guard insertButton.isHittable else {
-      dumpHierarchy("31-卡片入口不可点", app: app)
-      return
-    }
-
-    insertButton.tap()
-    sleep(3)
-    capture("32-卡片快捷入库后的吐司")
-
-    let toast = app.staticTexts.matching(
-      NSPredicate(format: "label CONTAINS %@", "已加入衣橱")
-    ).firstMatch
-    XCTAssertTrue(toast.exists, "卡片快捷入库后应当出现「已加入衣橱」吐司")
-    if toast.exists {
-      // 卡片入口走默认规格，必须把规格写出来，不能静默替使用者决定
-      XCTAssertTrue(
-        toast.label.contains("（") && toast.label.contains("）"),
-        "卡片快捷入库的吐司应当带出实际使用的规格，实际是：\(toast.label)"
-      )
-    }
-  }
+  // MARK: - 用例 3（已下线）：卡片上的 ⊕ 快捷入库入口已按用户要求移除
+  // （2026-09-18）。入库一律走详情页：先弹规格面板、明确选规格，再落库。
 }

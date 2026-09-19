@@ -44,9 +44,27 @@ final class MidsummerCustomSeriesStore: ObservableObject {
 
   // MARK: 变更
 
-  func add(_ series: MidsummerSeriesDTO) {
+  /// 新建 / 覆盖系列：属于创作者的上架管理能力，非创作者一律拒绝。
+  func add(_ series: MidsummerSeriesDTO) throws {
+    try CreatorAccess.requireCreator(.seriesCreate)
     seriesList.removeAll { $0.id == series.id }
     seriesList.append(series)
+    persist()
+  }
+
+  /// 删除自建系列（用户 2026-09-18：误传商品时可以删除对应系列）。
+  ///
+  /// 只负责系列档案本身与封面图；该系列下的上架商品（listings）与它们的
+  /// 商品图由调用方走 `MidsummerListingStore.delete(_:)` 逐条清理——
+  /// 那边有自己的权限校验与图清理逻辑，这里不重复。
+  func remove(_ seriesID: String) throws {
+    try CreatorAccess.requireCreator(.seriesDelete)
+    guard let target = series(withID: seriesID) else { return }
+    if let cover = target.coverImage, !cover.isEmpty {
+      try? FileManager.default.removeItem(
+        at: ImageManager.shared.imagesDirectory.appendingPathComponent(cover))
+    }
+    seriesList.removeAll { $0.id == seriesID }
     persist()
   }
 

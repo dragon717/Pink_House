@@ -131,6 +131,9 @@ final class MidsummerCloudService {
   /// 发布系列。返回系列封面的本地文件名（乐观更新用；没传图返回 nil）。
   @discardableResult
   func publish(series: MidsummerSeriesDTO, coverImage: UIImage?) async throws -> String? {
+    // 权限预校验：公共库写入是创作者能力，非创作者在**建 CKRecord 之前**就被拦下。
+    // 真正的写权限仍在 CloudKit Security Roles，这里挡的是 App 内越权调用。
+    try CreatorAccess.requireCreator(.cloudPublish)
     // recordName 为空串会抛 ObjC 异常 CKException（Swift catch 拦不住，直接闪退），
     // 这里提前拦成可捕获的错误。
     guard !series.id.isEmpty else {
@@ -182,6 +185,8 @@ final class MidsummerCloudService {
     variantImages: [(name: String, image: UIImage)] = []
   ) async throws -> MidsummerPublishedImages
   {
+    // 同上：发布到公共库先过创作者校验（改价 / 换图落到基础条目时走的就是这条路）。
+    try CreatorAccess.requireCreator(.cloudPublish)
     // 同 publish(series:)：空 recordName 会抛 ObjC 异常直接闪退，提前拦住。
     guard !item.id.isEmpty, !item.seriesID.isEmpty else {
       throw MidsummerUploadError.other("单品 id 未生成，无法上传，请重新进入发布页再试。")
@@ -198,12 +203,25 @@ final class MidsummerCloudService {
     record["note"] = (item.note ?? "") as CKRecordValue
     record["publishedAt"] = Date() as CKRecordValue
     if let value = item.price { record["price"] = value as CKRecordValue }
+    // 预约价（全款预约）：与 price / deposit / balance 同为四类价格之一，
+    // 读取侧 `makeItem` 会读它——漏写会出现「改价面板保存成功、回读后价格复原」的假象。
+    if let value = item.preorderPrice { record["preorderPrice"] = value as CKRecordValue }
     if let value = item.deposit { record["deposit"] = value as CKRecordValue }
     if let value = item.balance { record["balance"] = value as CKRecordValue }
     if let value = item.priceKind { record["priceKind"] = value.rawValue as CKRecordValue }
     if let value = item.priceCapturedOn { record["priceCapturedOn"] = value as CKRecordValue }
     if let value = item.priceNote { record["priceNote"] = value as CKRecordValue }
     if let url = item.itemURL { record["itemURL"] = url as CKRecordValue }
+    // 规格组 / SKU 表（2026-09-19 根因修复）：之前云端往返恒为 nil——创作者投稿、
+    // 改价面板整条重写、跨设备同步之后，商品会退化成「无规格单品」，用户侧
+    // 看不到颜色分类 / 尺码栏位，入库也直接按单品落。序列化成 JSON 字符串字段，
+    // 避开 CloudKit 列表字段的限制（不能写空列表、字典类型受限）。
+    if let json = Self.specGroupsJSON(item.specGroups) {
+      record["specGroupsJSON"] = json as CKRecordValue
+    }
+    if let json = Self.skusJSON(item.skus) {
+      record["skusJSON"] = json as CKRecordValue
+    }
     if let createdBy = await currentUserID() { record["createdBy"] = createdBy as CKRecordValue }
 
     // 主图 + 附图：与千牛主图宫格一一对应（第 1 格 = coverImage，第 2–5 格 = galleryImage2..5）。
@@ -342,15 +360,51 @@ final class MidsummerCloudService {
       itemURL: record["itemURL"] as? String,
       sourceURL: record["sourceURL"] as? String ?? "",
       note: (record["note"] as? String).flatMap { $0.isEmpty ? nil : $0 },
-      // 规格尚未接入上传表单：CloudKit 侧仍按「无规格」处理，
-      // 由 Bundle 种子 `midsummer-series.json` 提供规格组与 SKU 组合。
-      // 见 docs/MIDSUMMER_TALE_SPEC_SELECTION.md「规格数据的三个来源」。
+      // 规格组 / SKU 表从 JSON 字符串字段还原（2026-09-19 起云端往返保留规格，
+      // 上传时填的颜色分类 / 尺码在用户侧与入库时都能看到）；旧记录没有这些键，
+      // 解码为 nil，与「无规格单品」同口径。
       sizeChartImageName: sizeChartImageName,
       sizeChartImages: Self.decodeSizeChartMap(from: record),
       variantImageNames: variantImageNames,
-      specGroups: nil,
-      skus: nil
+      specGroups: Self.decodeSpecGroups(from: record["specGroupsJSON"] as? String),
+      skus: Self.decodeSkus(from: record["skusJSON"] as? String)
     )
+  }
+
+  // MARK: - 规格序列化（specGroups / skus 的云端往返）
+
+  /// 规格组序列化成 JSON 字符串。nil / 空 / 编码失败都返回 nil（不写 record）。
+  nonisolated static func specGroupsJSON(_ groups: [MidsummerSpecGroup]?) -> String? {
+    guard let groups, !groups.isEmpty,
+      let data = try? JSONEncoder().encode(groups)
+    else { return nil }
+    return String(data: data, encoding: .utf8)
+  }
+
+  /// SKU 表序列化成 JSON 字符串。nil / 空 / 编码失败都返回 nil（不写 record）。
+  nonisolated static func skusJSON(_ skus: [MidsummerSKU]?) -> String? {
+    guard let skus, !skus.isEmpty,
+      let data = try? JSONEncoder().encode(skus)
+    else { return nil }
+    return String(data: data, encoding: .utf8)
+  }
+
+  /// 从字符串字段还原规格组。字段缺失 / 解析失败都返回 nil，与「无规格」同口径。
+  nonisolated static func decodeSpecGroups(from json: String?) -> [MidsummerSpecGroup]? {
+    guard let json, let data = json.data(using: .utf8),
+      let groups = try? JSONDecoder().decode([MidsummerSpecGroup].self, from: data),
+      !groups.isEmpty
+    else { return nil }
+    return groups
+  }
+
+  /// 从字符串字段还原 SKU 表。字段缺失 / 解析失败都返回 nil，与「无约束」同口径。
+  nonisolated static func decodeSkus(from json: String?) -> [MidsummerSKU]? {
+    guard let json, let data = json.data(using: .utf8),
+      let skus = try? JSONDecoder().decode([MidsummerSKU].self, from: data),
+      !skus.isEmpty
+    else { return nil }
+    return skus
   }
 
   /// 从 `sizeChartMap` 字符串字段还原款式尺码表映射。字段缺失/解析失败都返回 nil。

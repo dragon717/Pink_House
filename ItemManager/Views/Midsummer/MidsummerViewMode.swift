@@ -8,8 +8,8 @@ import SwiftUI
 //   · 用户视图（viewer）：浏览优先，卡片化 + 留白 + 只读详情；
 //   · 创作者视图（creator）：编辑优先，顶栏上传入口、卡片点开直接进入编辑态。
 //
-// 切换入口只对运营白名单可见（`MidsummerStore.canEnterCreatorView`）——
-// 普通用户看不到切换控件，也看不到上传入口。
+// 切换入口只对创作者角色可见（`CreatorAccess.shared.isCreator`）——
+// 普通用户看不到切换控件，也看不到上传入口（2026-09-18 起角色是唯一真值）。
 
 nonisolated enum MidsummerViewMode: String, CaseIterable, Sendable {
   /// 用户视图：浏览与交互，只读。

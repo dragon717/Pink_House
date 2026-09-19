@@ -50,31 +50,26 @@ final class MidsummerStore: ObservableObject {
   /// CloudKit 管理员白名单的判定结果。模拟器 / 未登录 iCloud / 非白名单账号下为 false。
   @Published private(set) var isAdminUser = false
   /// 三态白名单判定结果（含「取不到身份」这一态）。
-  /// 2026-09-16 起只服务于 CloudKit 写入权限判定（`isAdminUser`），不再做任何
-  /// 界面门控——上新工作台入口对所有用户无条件开放。
+  ///
+  /// 2026-09-18 起它是 `CreatorAccess` 判定结果的**镜像**：真值在 `CreatorAccess`
+  /// （界面门控与服务层校验同读一份），本类只把结果转发成 `@Published`，
+  /// 让已经观察 `MidsummerStore` 的视图照旧刷新。
   @Published private(set) var creatorGate: NoticeCloudKitService.CreatorGate = .unresolved(
     reason: "尚未判定"
   )
-  /// 双视角切换（创作者视图 / 用户视图）的可见性门控（用户 2026-09-17）。
+  /// 创作者能力门控（用户 2026-09-18）：上架管理 / 改价 / 换图等入口只认它。
   ///
-  /// 只有运营白名单看得到这套切换与创作者能力；普通用户一律看不到。
   /// 三态语义与 CloudKit 判定一致：
-  ///   · `allowed`    → 显示
-  ///   · `denied`     → **不显示**（明确不在白名单，本机开关也撬不开）
+  ///   · `allowed`    → 创作者
+  ///   · `denied`     → **普通用户**（明确不在白名单，本机开关也撬不开）
   ///   · `unresolved` → 身份取不到（模拟器 / 未登录 iCloud / 断网），
-  ///                    此时允许本机「创作者模式」开关放行界面，便于内容维护者
-  ///                    在模拟器上核对创作者视图；真正的写入权限仍在 CloudKit
+  ///                    此时允许本机「创作者模式」开关放行，便于内容维护者
+  ///                    在模拟器上维护内容；真正的写入权限仍在 CloudKit
   ///                    Security Roles（见 docs/MIDSUMMER_TALE_CLOUDKIT_SETUP.md §2）。
-  var canEnterCreatorView: Bool {
-    switch creatorGate {
-    case .allowed:
-      return true
-    case .denied:
-      return false
-    case .unresolved:
-      return CreatorMode.isEnabledInDefaults()
-    }
-  }
+  ///
+  /// 与 `CreatorAccess.shared.isCreator` 同源（判定逻辑只在 `CreatorAccess` 一处）：
+  /// 这里保留转发是为了让只观察 `MidsummerStore` 的旧调用点也能拿到同一份答案。
+  var canEnterCreatorView: Bool { CreatorAccess.shared.isCreator }
 
   /// 本次会话内成功上传、但云端还没回读到的条目（乐观更新用）
   @Published private(set) var pendingUploads: [MidsummerSeriesDTO] = []
@@ -87,6 +82,9 @@ final class MidsummerStore: ObservableObject {
   private var listingSubscription: AnyCancellable?
   /// 自建系列（`MidsummerCustomSeriesStore`）的变更订阅：新建系列后立即进 catalog。
   private var customSeriesSubscription: AnyCancellable?
+  /// 隐藏系列账本（`MidsummerHiddenSeriesStore`）的变更订阅：删除种子系列后
+  /// 立即从 catalog 消失，恢复后自动回归。
+  private var hiddenSeriesSubscription: AnyCancellable?
 
   init(bundle: Bundle = .main) {
     seed = MidsummerSeedCatalog.load(bundle: bundle)
@@ -100,6 +98,12 @@ final class MidsummerStore: ObservableObject {
       }
     // 自建系列存档变更 → 同样重算（新系列创建后立刻出现在品牌页）。
     customSeriesSubscription = MidsummerCustomSeriesStore.shared.objectWillChange
+      .receive(on: DispatchQueue.main)
+      .sink { [weak self] _ in
+        Task { @MainActor [weak self] in self?.recomputeCatalog() }
+      }
+    // 隐藏系列账本变更 → 重算（删除种子系列后立即从 feed / 列表消失）。
+    hiddenSeriesSubscription = MidsummerHiddenSeriesStore.shared.objectWillChange
       .receive(on: DispatchQueue.main)
       .sink { [weak self] _ in
         Task { @MainActor [weak self] in self?.recomputeCatalog() }
@@ -175,7 +179,10 @@ final class MidsummerStore: ObservableObject {
     MidsummerListingStore.shared.refreshPresaleTransitions()
     defer { isRefreshingCloud = false }
 
-    creatorGate = await MidsummerCloudService.shared.creatorGate()
+    // 角色判定：刷新 `CreatorAccess`（界面门控 + 服务层校验的真值），
+    // 再把结果镜像到本类，让观察 store 的视图跟着变。只问一次 CloudKit。
+    await CreatorAccess.shared.refresh()
+    creatorGate = CreatorAccess.shared.gate
     isAdminUser = (creatorGate == .allowed)
 
     guard let remote = await MidsummerCloudService.shared.fetchSeries() else {
@@ -212,11 +219,16 @@ final class MidsummerStore: ObservableObject {
     for series in seed.series { byID[series.id] = series }
     // 云端覆盖同 id（创作者校正），并补充新系列
     for series in cloudSeries { byID[series.id] = series }
+    // 隐藏系列账本（用户 2026-09-19）：创作者「删除」种子 / 云端系列 = 本机隐藏，
+    // 合并完成后按账本过滤——云端资料不动，恢复账本即回归。
+    let hiddenIDs = MidsummerHiddenSeriesStore.shared.hiddenIDs
     // 自建系列（上传上新直达新建，用户 2026-09-17）：本地创建，不覆盖任何既有 id；
     // 上架新品挂到自建系列 id 上，与种子 / 云端系列走同一条合并链路。
-    for series in MidsummerCustomSeriesStore.shared.seriesList where byID[series.id] == nil {
+    for series in MidsummerCustomSeriesStore.shared.seriesList
+    where byID[series.id] == nil && !hiddenIDs.contains(series.id) {
       byID[series.id] = series
     }
+    byID = byID.filter { !hiddenIDs.contains($0.key) }
 
     // 上新工作台（用户 2026-09-16）：已上架的本地新品并入对应系列——
     // 草稿 / 已下架不进 feed；下架重新上架自动回归。转换需要系列原单品

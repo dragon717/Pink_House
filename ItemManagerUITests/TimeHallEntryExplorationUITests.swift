@@ -11,7 +11,7 @@
 //  访问性标识约定（改产品代码时若改了这些文案，同步改本文件）：
 //    · 品牌列表「进店」按钮 → label「进入品牌档案」
 //    · 「⋯」更多 → label「更多操作」
-//    · 一键入库（卡片/详情） → label「一键入库」
+//    · 一键入库（详情页；卡片行内快捷入口已于 2026-09-18 移除） → label「一键入库」
 //    · 加入并编辑（详情页） → label「加入并编辑」
 //    · 系列详情「上新管理」 → identifier「series-listing-workspace-button」
 //      （2026-09-16 深夜起免门控：旧创作者模式引导 / 顶栏「上传上新」/ 投稿表单已删除）
@@ -181,12 +181,13 @@ final class TimeHallEntryExplorationUITests: XCTestCase {
       "顶栏不应再出现「上传上新」（旧投稿链路已删除）"
     )
 
-    // 2) 商品行右侧的加号现在是真按钮，不再只是装饰图标
+    // 2) 商品行上**不再有**「一键入库」快捷入口（2026-09-18 按用户要求移除，
+    //    用户/创作者两种视图一致）；入库一律走详情页。
     let quickInsert = app.buttons.matching(NSPredicate(format: "label == %@", "一键入库"))
     capture("11-仲夏物语商品行")
-    XCTAssertTrue(
+    XCTAssertFalse(
       quickInsert.count > 0,
-      "仲夏物语商品行上应当存在「一键入库」入口（当前 \(quickInsert.count) 个）"
+      "仲夏物语商品行上不应再有「一键入库」快捷入口（当前 \(quickInsert.count) 个）"
     )
     dumpHierarchy("12-仲夏物语品牌页-层级", app: app)
 
@@ -214,37 +215,9 @@ final class TimeHallEntryExplorationUITests: XCTestCase {
       sleep(1)
     }
 
-    // 5) 行内直接一点即入橱，并给出可见反馈（关掉详情后停在品牌页首页）。
-    //    ⚠️ 屏底悬浮 dock 压住的按钮照样报 isHittable，点下去会命中 dock
-    //    （曾把 App 切到「我」tab）——必须要求目标完整落在可见安全区内再点。
-    let cardQuickInsert = app.buttons.matching(NSPredicate(format: "label == %@", "一键入库"))
-    if cardQuickInsert.count > 0 {
-      var tapped = false
-      var scrolls = 0
-      let safeTop: CGFloat = 120
-      let safeBottom = app.frame.height - 160
-      while !tapped && scrolls < 10 {
-        let candidate = cardQuickInsert.element(boundBy: 0)
-        let frame = candidate.exists ? candidate.frame : .zero
-        if candidate.exists && candidate.isHittable
-          && frame.minY >= safeTop && frame.maxY <= safeBottom {
-          candidate.tap()
-          tapped = true
-        } else {
-          app.swipeUp()
-          scrolls += 1
-          usleep(500_000)
-        }
-      }
-      if tapped {
-        sleep(3)
-        capture("15-点了一键入库之后")
-        let toast = app.staticTexts.matching(
-          NSPredicate(format: "label BEGINSWITH %@", "已加入衣橱")
-        ).firstMatch
-        XCTAssertTrue(toast.exists, "一键入库后应当出现「已加入衣橱」的就地反馈")
-      }
-    }
+    // 5) 行内「一键入库」快捷入口已移除（2026-09-18）——原来的「行内一点即入橱 +
+    //    吐司反馈」整段断言随之下线；入库反馈由详情页规格面板路径覆盖
+    //    （见 MidsummerSpecSelectionUITests）。
   }
 
   // MARK: - 用例 3：日牌档案页 · 商品卡片上的「一键入库」确实存在且可点
@@ -332,11 +305,13 @@ final class TimeHallEntryExplorationUITests: XCTestCase {
   // MARK: - 用例 4：上新工作台入口（免门控直达 · 用户 2026-09-16 深夜改版）
 
   /// 旧版 testD 验的是「创作者模式 → 顶栏上传上新 → 投稿表单」，该链路已整体删除。
-  /// 现在上新上传只有一条路：系列详情「上新管理」→ 上新工作台 → 4 步表单，
-  /// 且对所有用户无条件开放（不再需要创作者模式 / 白名单）。
+  /// 现在上新上传只有一条路：系列详情「上新管理」→ 上新工作台 → 4 步表单。
+  /// 2026-09-18 起按角色门控：普通用户看不到这个入口，创作者可见可进。
+  /// 本用例跑**创作者**路径（启动参数解闸）；普通用户路径见
+  /// `testD2_ListingWorkspaceEntryHiddenForViewer`。
   @MainActor
-  func testD_ListingWorkspaceEntryWithoutGate() throws {
-    let app = launchApp()
+  func testD_ListingWorkspaceEntryForCreator() throws {
+    let app = launchApp(enableCreatorMode: true)
     sleep(4)
 
     guard enterTimeHall(app), enterBrand(app, index: 5) else { return }
@@ -414,6 +389,61 @@ final class TimeHallEntryExplorationUITests: XCTestCase {
     )
     capture("32-新版4步表单第一步")
     dumpHierarchy("32b-表单-层级", app: app)
+  }
+
+  /// 普通用户（未开启创作者模式）：系列详情**不出现**「上新管理」入口，
+  /// 价格总表行也不可点（没有 `series-price-row-*` 按钮）。
+  /// 浏览 / 入库 / 购买不受影响——这里只验「创作者入口对普通用户不可见」。
+  @MainActor
+  func testD2_ListingWorkspaceEntryHiddenForViewer() throws {
+    let app = launchApp()
+    sleep(4)
+
+    guard enterTimeHall(app), enterBrand(app, index: 5) else { return }
+
+    let allEntry = app.buttons["midsummer-entry-all-series"]
+    guard allEntry.waitForExistence(timeout: 6) else {
+      dumpHierarchy("40-找不到全部商品入口", app: app)
+      XCTFail("品牌页应有「全部商品」入口行（普通用户也要能浏览）")
+      return
+    }
+    allEntry.tap()
+    sleep(2)
+
+    let seriesRow = app.buttons
+      .matching(NSPredicate(format: "label BEGINSWITH %@", "樱花小羊，"))
+      .firstMatch
+    guard seriesRow.waitForExistence(timeout: 6) else {
+      dumpHierarchy("41-找不到樱花小羊系列行", app: app)
+      XCTFail("系列列表应有「樱花小羊」行")
+      return
+    }
+    seriesRow.tap()
+    sleep(2)
+
+    // 上下滚一圈再下结论：避免「其实有但没渲染出来」的假阴性。
+    var foundWorkspace = false
+    for _ in 0..<12 {
+      if app.buttons["series-listing-workspace-button"].exists {
+        foundWorkspace = true
+        break
+      }
+      app.swipeUp()
+      usleep(500_000)
+    }
+    capture("40-普通用户系列详情无上新管理入口")
+    XCTAssertFalse(foundWorkspace, "普通用户不应看到「上新管理」入口（创作者专属能力）")
+
+    let priceRows = app.buttons.matching(
+      NSPredicate(format: "identifier BEGINSWITH %@", "series-price-row-"))
+    XCTAssertEqual(priceRows.count, 0, "普通用户的价格总表行不可点（无改价入口）")
+
+    // 浏览能力不受影响：价格总表卡片本身仍在（只是只读）。
+    XCTAssertTrue(
+      app.descendants(matching: .any)
+        .matching(NSPredicate(format: "identifier == %@", "series-price-table"))
+        .firstMatch.exists,
+      "普通用户仍应看到价格总表（只读展示）")
   }
 
   /// 稳妥输入：tap 后等键盘弹出再 typeText（与 MidsummerListingFlowUITests 同实现）。

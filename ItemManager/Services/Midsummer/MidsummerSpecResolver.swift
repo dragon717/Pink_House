@@ -443,6 +443,41 @@ nonisolated enum MidsummerSpecResolver {
     return option(picked, in: sizeGroup)?.name
   }
 
+  // MARK: - 价格档位选择（一键入库分阶段口径，用户 2026-09-19）
+
+  /// 规格面板「价格档位」组的显式选择结果。
+  /// 按选项**名称**识别——种子档位组与 `makeItemDTO` 自建档位组的选项 id
+  /// 各不相同，但「现货价 / 预约价 / 定金 / 尾款」四个名称是统一口径。
+  nonisolated enum MidsummerPriceTierPick: String, Sendable {
+    case spot  // 现货价
+    case preorder  // 预约价
+    case deposit  // 定金
+    case balance  // 尾款
+  }
+
+  /// 当前规格选择里显式选中的价格档位；没选（或组不存在）返回 nil。
+  ///
+  /// 注意「标注组不构成缺失」的既有规则：价格档位组不被 SKU 提及，
+  /// 使用者可以一组都不选，所以 nil 是合法常态，调用方必须自带默认档。
+  static func selectedPriceTier(
+    _ selection: MidsummerSpecSelection,
+    of item: MidsummerItemDTO
+  ) -> MidsummerPriceTierPick? {
+    for group in groups(of: item) where group.resolvedRole == .other {
+      guard let picked = selection[group.id],
+        let name = option(picked, in: group)?.name
+      else { continue }
+      switch name {
+      case "现货价": return .spot
+      case "预约价": return .preorder
+      case "定金": return .deposit
+      case "尾款": return .balance
+      default: continue
+      }
+    }
+    return nil
+  }
+
   // MARK: - 多选套装入库
 
   /// 多选配一套（用户 2026-09-16）：为某个**已勾选**的款式选项生成单品级选择。

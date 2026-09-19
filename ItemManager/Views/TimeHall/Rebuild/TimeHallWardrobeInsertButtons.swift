@@ -10,6 +10,10 @@ struct TimeHallWardrobeInsertButtons: View {
   var isBusy = false
   let onQuickInsert: () -> Void
   let onOpenEditor: () -> Void
+  /// 形态 A 的标题覆盖。缺省用 `TimeHallWardrobeInsertMode.quickInsert.title`
+  /// （「一键入库」）；仲夏物语定金期传「一键加入定金」（用户 2026-09-19
+  /// 分阶段口径），其余品牌 / 相位不传即保持旧文案。
+  var quickInsertTitle: String? = nil
   /// 可选的访问性标识前缀。
   ///
   /// 为什么需要：详情页弹在列表**之上**时，背后列表卡片上的同名按钮仍在层级里，
@@ -28,7 +32,9 @@ struct TimeHallWardrobeInsertButtons: View {
       HStack(spacing: 10) {
         Button(action: onQuickInsert) {
           Label(
-            isBusy ? "正在准备图片…".appLocalized : TimeHallWardrobeInsertMode.quickInsert.title,
+            isBusy
+              ? "正在准备图片…".appLocalized
+              : (quickInsertTitle ?? TimeHallWardrobeInsertMode.quickInsert.title),
             systemImage: isBusy
               ? "hourglass" : TimeHallWardrobeInsertMode.quickInsert.symbolName
           )

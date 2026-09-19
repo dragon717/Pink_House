@@ -66,9 +66,45 @@ final class MidsummerListingStore: ObservableObject {
   }
 
   // MARK: 变更
+  //
+  // ⚠️ 以下全部是**写接口**，第一行都过 `CreatorAccess.requireCreator`：
+  // 界面隐藏入口只是第一层，绕过界面直接调这些接口同样会被拦下（不落盘）。
+  // 调用方传入 `operation` 只是为了让拒绝提示能说清是哪一步被拦（发布 / 改价 / 换图）。
 
   /// 新建或更新（按 id 判定）；同时刷新 `updatedAt`。
-  func upsert(_ listing: MidsummerListing) {
+  ///
+  /// - Parameter operation: 触发本次写入的动作（发布 / 改价 / 编辑），用于权限提示。
+  /// - Throws: `CreatorAccessDenied` 非创作者调用时抛出，数据保持不变。
+  func upsert(_ listing: MidsummerListing, operation: CreatorOperation = .listingEdit) throws {
+    try CreatorAccess.requireCreator(operation)
+    write(listing)
+  }
+
+  /// 状态迁移：上架 / 下架 / 转草稿。`listed` 会记录上架时间。
+  func updateStatus(of id: String, to status: MidsummerListingStatus) throws {
+    try CreatorAccess.requireCreator(.listingStatus)
+    guard var listing = listing(withID: id) else { return }
+    listing.status = status
+    listing.listedAt = status == .listed ? Date() : nil
+    write(listing)
+  }
+
+  /// 删除 listing 并清掉它的商品图文件。
+  func delete(_ id: String) throws {
+    try CreatorAccess.requireCreator(.listingDelete)
+    if let listing = listing(withID: id) {
+      deleteImageFiles(of: listing)
+    }
+    listings.removeAll { $0.id == id }
+    persist()
+  }
+
+  /// 无校验的落盘通道：**只给系统自动流转**（预售相位推进）用。
+  ///
+  /// 业务规则里「定金期 → 尾款期」的推进是时间驱动的，不是任何人的编辑动作，
+  /// 对普通用户的已上架商品同样生效——它不能走带权限校验的 `upsert`，
+  /// 否则普通用户 App 里的预售状态会永远推不动。
+  private func write(_ listing: MidsummerListing) {
     var next = listing
     next.updatedAt = Date()
     if let index = listings.firstIndex(where: { $0.id == next.id }) {
@@ -79,29 +115,14 @@ final class MidsummerListingStore: ObservableObject {
     persist()
   }
 
-  /// 状态迁移：上架 / 下架 / 转草稿。`listed` 会记录上架时间。
-  func updateStatus(of id: String, to status: MidsummerListingStatus) {
-    guard var listing = listing(withID: id) else { return }
-    listing.status = status
-    listing.listedAt = status == .listed ? Date() : nil
-    upsert(listing)
-  }
-
-  /// 删除 listing 并清掉它的商品图文件。
-  func delete(_ id: String) {
-    if let listing = listing(withID: id) {
-      deleteImageFiles(of: listing)
-    }
-    listings.removeAll { $0.id == id }
-    persist()
-  }
-
   // MARK: 预售状态自动流转（用户 2026-09-17 业务规则）
 
   /// 按当前时间推进「定金 → 尾款」的**写入式**流转。
   ///
   /// 只写一件事：定金期已结束的商品把 `stage` 从 `.deposit` 推进到 `.balance`——
   /// 这样创作者工作台、系列 feed 合并链路读到的是当前真实阶段。
+  /// 2026-09-19 阶段收敛后，**预约价阶段配了定金**的商品（定金+尾款拆分填法）
+  /// 沿用同一条流转；纯全款预约（没配定金）不参与。
   /// 「预售结束」**不写盘**：相位由 `presalePhase(at:)` 时间函数实时推导，
   /// 创作者事后延长尾款截止时间，商品自动回到尾款期；写成终态就没法回头了。
   ///
@@ -111,7 +132,10 @@ final class MidsummerListingStore: ObservableObject {
   func refreshPresaleTransitions(now: Date = Date()) -> Int {
     var moved = 0
     for (index, listing) in listings.enumerated() {
-      guard listing.status == .listed, listing.stage == .deposit,
+      let onPresaleLine =
+        listing.stage == .deposit
+        || (listing.stage == .preorder && listing.deposit != nil)
+      guard listing.status == .listed, onPresaleLine,
         let phase = listing.presalePhase(at: now), phase == .balance
       else { continue }
       listings[index].stage = .balance
@@ -146,7 +170,10 @@ final class MidsummerListingStore: ObservableObject {
 
   /// 把表单里选的图片落盘（JPEG，主图在前），返回文件名数组。
   /// 同一个 listing 重复保存时旧图先清（替换语义），避免孤儿文件堆积。
-  func saveImages(_ images: [UIImage], listingID: String) -> [String] {
+  ///
+  /// 换图属于创作者能力：权限校验必须在**删旧图之前**，否则被拒时旧图已经没了。
+  func saveImages(_ images: [UIImage], listingID: String) throws -> [String] {
+    try CreatorAccess.requireCreator(.imageReplace)
     // 清掉这个 listing 之前的图（按命名空间前缀匹配）。
     let prefix = "midsummer-listing-\(listingID)"
     let stale = imageFileNames(withPrefix: prefix)
@@ -175,7 +202,8 @@ final class MidsummerListingStore: ObservableObject {
   ///
   /// 注意调用顺序：必须在 `saveImages` **之后**——它会按前缀清掉这个 listing
   /// 的旧图（含上次保存的款式图），之后重写才不会留下孤儿文件。
-  func saveStyleImage(_ image: UIImage, listingID: String, index: Int) -> String? {
+  func saveStyleImage(_ image: UIImage, listingID: String, index: Int) throws -> String? {
+    try CreatorAccess.requireCreator(.imageReplace)
     let name = "midsummer-listing-\(listingID)-style-\(index).jpg"
     guard let jpeg = image.jpegData(compressionQuality: 0.85) else { return nil }
     do {

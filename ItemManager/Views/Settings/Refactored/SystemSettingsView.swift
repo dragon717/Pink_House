@@ -34,6 +34,8 @@ struct SystemSettingsView: View {
     @Environment(\.modelContext) private var modelContext
     @State private var languageManager = LanguageManager.shared
     @State private var creatorMode = CreatorMode.shared
+    /// 角色判定结果（`CreatorAccess`）：设置页据此决定开关能否自己提权。
+    @ObservedObject private var creatorAccess = CreatorAccess.shared
     @AppStorage("useAggressiveMemoryOptimization") private var useAggressiveMemoryOptimization = true
     
     // Backup & Restore State
@@ -162,22 +164,34 @@ struct SystemSettingsView: View {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("创作者模式")
                             .font(.body)
-                        Text("开启后，仲夏物语品牌页右上角出现「上传上新」入口，可补充缺失的系列与单品资料（日期、价格、尺码、配色、封面图）。\n\n注意：若本机 iCloud 账户已明确判定为「不在运营白名单里」，入口一律不显示，这个开关也不会把它打开——白名单才是入口的硬闸门。开关只在「取不到 iCloud 身份」时（模拟器、未登录 iCloud）用来放行界面。\n\n调试：在 Xcode 控制台搜索 CreatorGate 可看到本机的 iCloud 用户标识与判定结果。")
+                        Text("开启后可使用仲夏物语的创作者能力：上架管理（上新工作台）、修改价格、更换商品图、上传上新。\n\n2026-09-18 起这些能力统一按角色门控：普通用户看不到入口，也调不动对应接口。\n\n注意：若本机 iCloud 账户已明确判定为「不在运营白名单里」，开关会被锁定——白名单才是硬闸门，自己开不了。开关只在「取不到 iCloud 身份」时（模拟器、未登录 iCloud）用来放行。\n\n调试：在 Xcode 控制台搜索 CreatorGate 可看到本机的 iCloud 用户标识与判定结果。")
                             .font(.caption2)
                             .foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
                     }
                 }
                 .adaptiveRow()
+                // 明确不在白名单的账号不能自己提权：开关锁在关闭态。
+                .disabled(creatorAccess.gate == .denied)
                 .accessibilityIdentifier("settings-creator-mode-toggle")
 
-                Text("该开关只决定入口是否显示。能否真正写入线上内容库，取决于当前 iCloud 账户是否已在 CloudKit 创作者名单中；未获授权的提交会失败并给出提示。")
+                Text("当前角色：\(creatorAccess.statusText)")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .adaptiveRow()
+                    .accessibilityIdentifier("settings-creator-role-status")
+
+                Text("该开关只决定本机是否放行创作者界面。能否真正写入线上内容库，取决于当前 iCloud 账户是否已在 CloudKit 创作者名单中；未获授权的提交会失败并给出提示。")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
                     .adaptiveRow(showDivider: false)
             }
         }
+        // 进设置页补一次角色判定：白名单结果可能还没回来（首启异步），
+        // 这里刷新后开关的可用状态与角色文案才准。
+        .task { await creatorAccess.refresh() }
         .sheet(isPresented: $showingShareSheet) {
             ShareSheet(items: shareItems)
         }

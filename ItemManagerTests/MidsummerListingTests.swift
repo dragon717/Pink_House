@@ -12,6 +12,19 @@ import XCTest
 @MainActor
 final class MidsummerListingTests: XCTestCase {
 
+  override func setUp() {
+    super.setUp()
+    // 写接口（upsert / 改状态 / 落图）2026-09-18 起统一按创作者角色校验。
+    // 本文件验的是持久化与状态机，注入创作者角色让用例继续跑自己的逻辑；
+    // 权限矩阵本身由 `CreatorAccessTests` 覆盖。
+    CreatorAccess.setTestOverride(.creator)
+  }
+
+  override func tearDown() {
+    CreatorAccess.setTestOverride(nil)
+    super.tearDown()
+  }
+
   // MARK: 测试夹具：模拟樱花小羊主条目的规格结构
 
   /// 与种子数据同构：款式组（含「现 」前缀全名）、尺码组（选项名带「码」）、
@@ -240,6 +253,150 @@ final class MidsummerListingTests: XCTestCase {
     XCTAssertNil(dto.skus, "旧存档没有逐款价，不生成 SKU")
   }
 
+  // MARK: DTO 转换 · 自建系列（2026-09-19 根因修复）
+
+  /// 自建系列（无基础条目，sourceItem == nil）上新：填了尺码就必须有尺码组，
+  /// 填了款式名（颜色揉在款式名里）就必须解析出配色——
+  /// 之前尺码组整段丢失，用户侧规格面板没有尺码栏位、入库按单品落。
+  func testSelfBuiltSeriesGetsSizeGroupAndColors() {
+    let listing = makeListing {
+      $0.styles = [
+        MidsummerListingStyle(name: "sk 粉色", price: 259, sizes: ["S", "M"]),
+        MidsummerListingStyle(name: "sk 蓝色", price: 259, sizes: ["M"]),
+      ]
+      $0.variantOptionNames = ["sk 粉色", "sk 蓝色"]
+      $0.sizes = ["S", "M"]
+      $0.price = nil
+      $0.preorderPrice = 259
+    }
+    // 自建系列没有基础条目可继承。
+    let dto = listing.makeItemDTO(sourceItem: nil, seriesSourceURL: "")
+
+    let sizeGroup = (dto.specGroups ?? []).first { $0.resolvedRole == .size }
+    XCTAssertNotNil(sizeGroup, "系列没有尺码组时应按填写的尺码自建，而不是整组丢弃")
+    XCTAssertEqual(sizeGroup?.options.map(\.name), ["S", "M"], "自建尺码组应包含填写的全部尺码")
+
+    let styleGroup = (dto.specGroups ?? []).first { $0.resolvedRole == .variant }
+    XCTAssertEqual(styleGroup?.options.map(\.name), ["sk 粉色", "sk 蓝色"])
+
+    XCTAssertEqual(dto.colors, ["粉色", "蓝色"], "颜色应从款式名解析出去重（用户侧「配色」栏位的来源）")
+
+    // 规格面板默认选择应能选全（有款式 + 尺码两组可选）。
+    let selection = MidsummerSpecResolver.defaultSelection(of: dto)
+    XCTAssertTrue(MidsummerSpecResolver.isComplete(selection, of: dto))
+
+    // 逐款尺码约束：SKU 按「款式 × 尺码」逐组合落。
+    XCTAssertEqual(dto.skus?.count, 3, "sk 粉色(S,M) + sk 蓝色(M) 共 3 条 SKU")
+  }
+
+  /// 自建系列没填尺码（小物 / 均码）：不出现空尺码组。
+  func testSelfBuiltSeriesWithoutSizesHasNoSizeGroup() {
+    let listing = makeListing {
+      $0.styles = [MidsummerListingStyle(name: "胸针", price: 59, sizes: [])]
+      $0.variantOptionNames = ["胸针"]
+      $0.sizes = []
+    }
+    let dto = listing.makeItemDTO(sourceItem: nil, seriesSourceURL: "")
+    XCTAssertFalse(
+      (dto.specGroups ?? []).contains { $0.resolvedRole == .size },
+      "没填尺码时不应出现空尺码组")
+  }
+
+  // MARK: 价格档位标注组自建（2026-09-19 根因修复）
+
+  /// 没有可继承的档位组时（自建系列 / 系列单品没整理过档位），按本商品实际
+  /// 配置的价格档位自建「价格档位」标注组——否则用户侧规格面板与入库备注
+  /// 都缺「价格档位」栏位，与尺码组丢失是同一条根因。
+  func testSelfBuiltPricingGroupForDepositStageListing() {
+    let listing = makeListing {
+      $0.price = nil
+      $0.preorderPrice = nil
+      $0.deposit = 50
+      $0.balance = 209
+    }
+    // 自建系列：无基础条目可继承 pricing 组。
+    let dto = listing.makeItemDTO(sourceItem: nil, seriesSourceURL: "")
+
+    let pricingGroup = (dto.specGroups ?? []).first { $0.id == "pricing" }
+    XCTAssertNotNil(pricingGroup, "填了定金/尾款就必须有价格档位标注组，不能依赖继承")
+    XCTAssertEqual(pricingGroup?.name, "价格档位")
+    XCTAssertEqual(pricingGroup?.options.map(\.name), ["定金", "尾款"], "只保留实际填了的档位")
+
+    // 默认选择落在第一个已填档位（定金），且入库备注的「已选规格」带上档位。
+    let selection = MidsummerSpecResolver.defaultSelection(of: dto)
+    let mapping = MidsummerSpecResolver.wardrobeMapping(selection, of: dto)
+    XCTAssertTrue(
+      mapping.specText?.contains("定金") ?? false,
+      "入库备注的已选规格应包含价格档位标注")
+  }
+
+  /// 现货商品：自建档位组只含「现货价」；一个价格都没填就不造空组。
+  func testSelfBuiltPricingGroupInStockAndEmpty() {
+    let inStock = makeListing {
+      $0.price = 199
+      $0.preorderPrice = nil
+      $0.deposit = nil
+      $0.balance = nil
+    }
+    let inStockDTO = inStock.makeItemDTO(sourceItem: nil, seriesSourceURL: "")
+    XCTAssertEqual(
+      (inStockDTO.specGroups ?? []).first { $0.id == "pricing" }?.options.map(\.name),
+      ["现货价"],
+      "现货商品自建档位组只含现货价")
+
+    let noPrice = makeListing {
+      $0.price = nil
+      $0.preorderPrice = nil
+      $0.deposit = nil
+      $0.balance = nil
+    }
+    let noPriceDTO = noPrice.makeItemDTO(sourceItem: nil, seriesSourceURL: "")
+    XCTAssertNil(
+      (noPriceDTO.specGroups ?? []).first { $0.id == "pricing" },
+      "一个价格都没填时不造空档位组")
+  }
+
+  /// 有基础条目可继承时走原口径：档位组原样继承（含全部四个选项），不受自建逻辑影响。
+  func testInheritedPricingGroupStillWinsOverSelfBuilt() {
+    let listing = makeListing {
+      $0.price = nil
+      $0.deposit = 50
+      $0.balance = 209
+    }
+    let dto = listing.makeItemDTO(sourceItem: makeSourceItem(), seriesSourceURL: "https://series.example")
+    let pricingGroup = (dto.specGroups ?? []).first { $0.id == "pricing" }
+    XCTAssertEqual(
+      pricingGroup?.options.map(\.name),
+      ["现货价", "预约价", "定金", "尾款"],
+      "系列自带档位组时原样继承，保持既有口径")
+  }
+
+  /// 云端往返（2026-09-19 根因修复）：specGroups / skus 序列化成 JSON 字符串后
+  /// 必须能无损还原——否则创作者投稿、改价整条重写、跨设备同步后商品退化成
+  /// 「无规格单品」，用户看不到颜色分类 / 尺码栏位。
+  func testSpecGroupsCloudJSONRoundTrip() throws {
+    let source = makeSourceItem()
+    let skus = [
+      MidsummerSKU(id: "sku-1", options: ["style": "sk-pink", "size": "s"], image: nil, price: 219, priceKind: .shop)
+    ]
+
+    let groupsJSON = MidsummerCloudService.specGroupsJSON(source.specGroups)
+    XCTAssertNotNil(groupsJSON, "非空规格组应序列化成功")
+    let decodedGroups = MidsummerCloudService.decodeSpecGroups(from: groupsJSON)
+    XCTAssertEqual(decodedGroups, source.specGroups, "规格组 JSON 往返应无损")
+
+    let skusJSON = MidsummerCloudService.skusJSON(skus)
+    XCTAssertEqual(MidsummerCloudService.decodeSkus(from: skusJSON), skus, "SKU 表 JSON 往返应无损")
+
+    // 边界：nil / 空 / 脏数据都安全落 nil，与「无规格」同口径。
+    XCTAssertNil(MidsummerCloudService.specGroupsJSON(nil))
+    XCTAssertNil(MidsummerCloudService.specGroupsJSON([]))
+    XCTAssertNil(MidsummerCloudService.skusJSON(nil))
+    XCTAssertNil(MidsummerCloudService.decodeSpecGroups(from: nil))
+    XCTAssertNil(MidsummerCloudService.decodeSpecGroups(from: "not-json"))
+    XCTAssertNil(MidsummerCloudService.decodeSkus(from: "not-json"))
+  }
+
   // MARK: 存储与状态机
 
   private func makeTempStore() -> MidsummerListingStore {
@@ -255,7 +412,7 @@ final class MidsummerListingTests: XCTestCase {
     try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
 
     let store = MidsummerListingStore(directory: directory)
-    store.upsert(makeListing())
+    try! store.upsert(makeListing())
     XCTAssertEqual(store.listings.count, 1)
 
     // 新实例从磁盘恢复（进程重启等价）。
@@ -268,14 +425,14 @@ final class MidsummerListingTests: XCTestCase {
   func testStatusTransitions() {
     let store = makeTempStore()
     let listing = makeListing { $0.status = .draft }
-    store.upsert(listing)
+    try! store.upsert(listing)
     let id = listing.id
 
-    store.updateStatus(of: id, to: .listed)
+    try! store.updateStatus(of: id, to: .listed)
     XCTAssertEqual(store.listing(withID: id)?.status, .listed)
     XCTAssertNotNil(store.listing(withID: id)?.listedAt)
 
-    store.updateStatus(of: id, to: .delisted)
+    try! store.updateStatus(of: id, to: .delisted)
     XCTAssertEqual(store.listing(withID: id)?.status, .delisted)
     XCTAssertNil(store.listing(withID: id)?.listedAt)
     XCTAssertTrue(store.listedListings.isEmpty, "已下架商品不进 feed")
@@ -284,9 +441,9 @@ final class MidsummerListingTests: XCTestCase {
   func testUpsertUpdatesInPlace() {
     let store = makeTempStore()
     var listing = makeListing()
-    store.upsert(listing)
+    try! store.upsert(listing)
     listing.name = "改名后的开衫"
-    store.upsert(listing)
+    try! store.upsert(listing)
 
     XCTAssertEqual(store.listings.count, 1, "同 id upsert 应原地更新而不是追加")
     XCTAssertEqual(store.listing(withID: listing.id)?.name, "改名后的开衫")
@@ -295,12 +452,12 @@ final class MidsummerListingTests: XCTestCase {
   func testDeleteRemovesRecordAndImages() {
     let store = makeTempStore()
     var listing = makeListing()
-    let savedNames = store.saveImages([makeSolidImage()], listingID: listing.id)
+    let savedNames = try! store.saveImages([makeSolidImage()], listingID: listing.id)
     XCTAssertFalse(savedNames.isEmpty, "图片应落盘成功")
     listing.imageFiles = savedNames
-    store.upsert(listing)
+    try! store.upsert(listing)
 
-    store.delete(listing.id)
+    try! store.delete(listing.id)
     XCTAssertTrue(store.listings.isEmpty)
 
     for name in savedNames {
@@ -317,8 +474,8 @@ final class MidsummerListingTests: XCTestCase {
   func testSaveImagesReplacesPreviousFiles() {
     let store = makeTempStore()
     let listingID = "upload-replace-test"
-    let first = store.saveImages([makeSolidImage(), makeSolidImage()], listingID: listingID)
-    let second = store.saveImages([makeSolidImage()], listingID: listingID)
+    let first = try! store.saveImages([makeSolidImage(), makeSolidImage()], listingID: listingID)
+    let second = try! store.saveImages([makeSolidImage()], listingID: listingID)
 
     XCTAssertEqual(first.count, 2)
     XCTAssertEqual(second.count, 1)
@@ -383,13 +540,62 @@ final class MidsummerListingTests: XCTestCase {
     XCTAssertNil(decoded.depositMax)
   }
 
-  /// 阶段 → 价格配置项联动：第 3 步价格卡按阶段显示对应价格项（2026-09-17 四档）。
+  /// 阶段收敛（2026-09-19）：可选阶段只有 预约价/现货 两档；
+  /// 预约价阶段下预约全款与定金+尾款拆分两种填法都开放（价格配置项联动）。
   func testStagePriceFieldsLinkage() {
-    XCTAssertEqual(MidsummerLaunchStage.allCases.count, 4, "阶段只保留 定金/尾款/预约价/现货 四档")
-    XCTAssertEqual(MidsummerLaunchStage.deposit.priceFields, [.deposit, .balance], "定金阶段显示定金 + 尾款")
-    XCTAssertEqual(MidsummerLaunchStage.balance.priceFields, [.balance], "尾款阶段只显示尾款")
-    XCTAssertEqual(MidsummerLaunchStage.preorder.priceFields, [.preorder], "预约价阶段只显示预约价")
+    XCTAssertEqual(
+      MidsummerLaunchStage.selectableCases, [.preorder, .inStock],
+      "表单可选阶段应只有 预约价 / 现货 两档（定金+尾款并入预约价）")
+    XCTAssertEqual(
+      MidsummerLaunchStage.preorder.priceFields, [.preorder, .deposit, .balance],
+      "预约价阶段：全款直填，或配定金、尾款自动核算")
     XCTAssertEqual(MidsummerLaunchStage.inStock.priceFields, [.shop], "现货阶段显示现货价")
+  }
+
+  /// 预约价阶段 + 配了定金：沿用定金 → 尾款自动流转（2026-09-19 新口径）。
+  func testPreorderStageWithDepositFlowsPresale() {
+    let now = Date()
+    var listing = MidsummerListing(
+      id: "upload-preorder-flow",
+      seriesID: "midsummer-2026-sakura-lamb",
+      name: "预约价拆分填法验收",
+      kindRaw: MidsummerItemKind.jsk.rawValue,
+      price: nil,
+      preorderPrice: 259,
+      deposit: 50,
+      balance: 209,
+      priceKindRaw: nil,
+      note: "",
+      sourceURL: "",
+      sizes: [],
+      variantOptionNames: [],
+      imageFiles: [],
+      status: .listed,
+      createdAt: Date(),
+      updatedAt: Date(),
+      listedAt: Date()
+    )
+    listing.stage = .preorder
+    listing.depositEndsAt = now.addingTimeInterval(3_600)
+    listing.balanceEndsAt = now.addingTimeInterval(86_400)
+    XCTAssertEqual(listing.presalePhase(at: now), .deposit, "定金期未结束 → 定金期")
+
+    listing.depositEndsAt = now.addingTimeInterval(-1)
+    XCTAssertEqual(listing.presalePhase(at: now), .balance, "定金结束 → 尾款期")
+
+    // 写入式流转同样覆盖新口径：到期后 stage 推进为 .balance。
+    let directory = FileManager.default.temporaryDirectory
+      .appendingPathComponent("listing-tests-\(UUID().uuidString)", isDirectory: true)
+    try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    let store = MidsummerListingStore(directory: directory)
+    try! store.upsert(listing)
+    XCTAssertEqual(store.refreshPresaleTransitions(now: now), 1)
+    XCTAssertEqual(store.listing(withID: listing.id)?.stage, .balance)
+
+    // 纯全款预约（没配定金）不参与状态机。
+    listing.deposit = nil
+    listing.balance = nil
+    XCTAssertNil(listing.presalePhase(at: now), "纯全款预约不走定金尾款状态机")
   }
 
   /// 旧存档阶段 raw 降级映射：出货 → 现货、再贩 → 预约价、图透置空。

@@ -60,6 +60,8 @@ struct MidsummerSpecDrawer: View {
   let item: MidsummerItemDTO
   let series: MidsummerSeriesDTO
   var intent: MidsummerWardrobeInsertIntent = .quickInsert
+  /// 当前预售相位（nil = 不走状态机）。定金期把确认按钮改成「加入定金」。
+  var presalePhase: MidsummerPresalePhase? = nil
   let onConfirm: (MidsummerSpecSelection, Int) -> Void
   let onClose: () -> Void
   /// 多选配一套（用户 2026-09-16）：勾选多件款式一次入库为同一套。
@@ -80,6 +82,7 @@ struct MidsummerSpecDrawer: View {
         item: item,
         series: series,
         intent: intent,
+        presalePhase: presalePhase,
         onConfirm: onConfirm,
         onClose: onClose,
         onMultiConfirm: onMultiConfirm
@@ -95,6 +98,8 @@ struct MidsummerSpecPanel: View {
   let item: MidsummerItemDTO
   let series: MidsummerSeriesDTO
   var intent: MidsummerWardrobeInsertIntent = .quickInsert
+  /// 当前预售相位（nil = 不走状态机）。定金期确认按钮文案变「加入定金」。
+  var presalePhase: MidsummerPresalePhase? = nil
   let onConfirm: (MidsummerSpecSelection, Int) -> Void
   let onClose: () -> Void
   /// 多选配一套：一次带回「每件勾选项一条单品级选择」的数组。nil = 不提供多选。
@@ -112,6 +117,7 @@ struct MidsummerSpecPanel: View {
     item: MidsummerItemDTO,
     series: MidsummerSeriesDTO,
     intent: MidsummerWardrobeInsertIntent = .quickInsert,
+    presalePhase: MidsummerPresalePhase? = nil,
     onConfirm: @escaping (MidsummerSpecSelection, Int) -> Void,
     onClose: @escaping () -> Void,
     onMultiConfirm: (([MidsummerSpecSelection], Int) -> Void)? = nil
@@ -119,6 +125,7 @@ struct MidsummerSpecPanel: View {
     self.item = item
     self.series = series
     self.intent = intent
+    self.presalePhase = presalePhase
     self.onConfirm = onConfirm
     self.onClose = onClose
     self.onMultiConfirm = onMultiConfirm
@@ -394,6 +401,16 @@ struct MidsummerSpecPanel: View {
       .accessibilityIdentifier("spec-confirm")
       .accessibilityLabel(confirmTitle)
 
+      // 定金期语义（用户 2026-09-19）：入库 = 加定金 + 进衣橱 + 同步心愿尾款，
+      // 写在面板上让使用者确认前就能看到，不靠入库后的吐司补说。
+      if intent == .quickInsert, presalePhase == .deposit {
+        Text("定金期入库：商品加入衣橱，并同步到心愿尾款，尾款期再付尾款")
+          .font(.system(size: 11))
+          .foregroundStyle(MidsummerTheme.brandOrange)
+          .themeSkinLegibleText(level: .inline, slot: MidsummerThemeSlot.specDrawer)
+          .accessibilityIdentifier("spec-deposit-hint")
+      }
+
       if !isComplete {
         // 提示从「请先选择…」改成陈述句：现在是**可继续**的状态，不是被拦下。
         Text(
@@ -410,14 +427,21 @@ struct MidsummerSpecPanel: View {
     .padding(.bottom, 14)
   }
 
+  /// 主按钮的基础动作词。定金期（用户 2026-09-19 一键入库分阶段口径）：
+  /// 这一阶段付的是定金，文案如实写「加入定金」——入库后同步心愿尾款。
+  private var insertActionTitle: String {
+    if intent == .quickInsert, presalePhase == .deposit { return "加入定金" }
+    return intent.confirmTitle
+  }
+
   private var confirmTitle: String {
     if isMultiSelect, !multiPicks.isEmpty {
-      return "\(intent.confirmTitle)（\(multiPicks.count) 件一套）"
+      return "\(insertActionTitle)（\(multiPicks.count) 件一套）"
     }
     guard let summary = MidsummerSpecResolver.summary(selection, of: item) else {
-      return intent.confirmTitle
+      return insertActionTitle
     }
-    return "\(intent.confirmTitle)（\(midsummerSpecDisplayText(summary))）"
+    return "\(insertActionTitle)（\(midsummerSpecDisplayText(summary))）"
   }
 
   private func pick(groupID: String, optionID: String) {

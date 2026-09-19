@@ -51,6 +51,9 @@ struct ItemManagerApp: App {
         // `CreatorMode.shared` 之前只在设置页被创建，导致门控读取的是上一次
         // 运行残留的存档值，UI 用例之间互相污染（本轮踩过）。
         _ = CreatorMode.shared
+        // 角色判定同理要在首帧前初始化：服务层的写接口是同步校验，
+        // 读的是 `CreatorAccess` 的快照，晚一步就可能出现「首屏期间一律当普通用户」。
+        _ = CreatorAccess.shared
     }
     
     var body: some Scene {
@@ -142,6 +145,9 @@ struct MainContentView: View {
             // 排查「为什么这台设备看不到运营上传入口」时，在 Xcode 控制台搜索
             // `CreatorGate` 就能看到：本机 key、白名单、是否命中、判定结果。
             Task { _ = await NoticeCloudKitService.shared.creatorGate() }
+            // 同上，把判定结果同步进 `CreatorAccess`：
+            // 之后所有创作者入口与写接口都以它为准（默认普通用户，判定成功才升级）。
+            Task { await CreatorAccess.shared.refresh() }
 
             if let url = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: WidgetDataManager.appGroupIdentifier) {
                 print("App Group Container URL: \(url.path)")

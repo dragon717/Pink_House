@@ -858,4 +858,157 @@ final class MidsummerSpecResolverTests: XCTestCase {
     XCTAssertEqual(draft.priceTotal, 398, "总额应为成员预约价之和（199 × 2）")
     XCTAssertEqual(draft.stock, 2, "stock = 套数")
   }
+
+  // MARK: - 一键入库分阶段口径（用户 2026-09-19）
+
+  /// 价格档位组（makeItemDTO 自建档位组的形态：选项名统一为四档口径）。
+  private var tierGroup: MidsummerSpecGroup {
+    group("pricing", "价格档位", role: .other, [
+      option("spot", "现货价"),
+      option("preorder", "预约价"),
+      option("deposit", "定金"),
+      option("balance", "尾款"),
+    ])
+  }
+
+  private func testDate(_ year: Int, _ month: Int, _ day: Int) -> Date {
+    Calendar.current.date(from: DateComponents(year: year, month: month, day: day, hour: 12))!
+  }
+
+  private func makePhaseItem(
+    price: Int? = nil,
+    preorderPrice: Int? = 199,
+    deposit: Int? = 50,
+    balance: Int? = 149,
+    depositEndsAt: Date? = nil,
+    balanceEndsAt: Date? = nil,
+    specGroups: [MidsummerSpecGroup]? = nil
+  ) -> MidsummerItemDTO {
+    MidsummerItemDTO(
+      id: "item-presale-phase",
+      seriesID: "series-1",
+      name: "樱花小羊",
+      kind: .skirt,
+      price: price,
+      preorderPrice: preorderPrice,
+      deposit: deposit,
+      balance: balance,
+      depositEndsAt: depositEndsAt,
+      balanceEndsAt: balanceEndsAt,
+      priceKind: nil,
+      priceCapturedOn: nil,
+      priceNote: nil,
+      sizes: ["S"],
+      colors: [],
+      coverImage: nil,
+      itemURL: nil,
+      sourceURL: "https://example.com",
+      note: nil,
+      specGroups: specGroups,
+      skus: nil
+    )
+  }
+
+  /// 定金期一键入库 = 一键加入定金：定金尾款口径入库（同步心愿尾款），
+  /// 尾款窗口随档写进 finalPaymentDate / finalPaymentEndDate，备注写明。
+  func testMakeDraftDepositPhaseSyncsFinalPaymentWindow() {
+    let depositEnd = testDate(2026, 9, 25)
+    let balanceEnd = testDate(2026, 10, 10)
+    let item = makePhaseItem(depositEndsAt: depositEnd, balanceEndsAt: balanceEnd)
+    let draft = MidsummerWardrobeDraftBuilder.makeDraft(
+      for: item, series: draftSeries, brandName: "仲夏物语",
+      selection: .empty, presalePhase: .deposit, modelContext: context
+    )
+    XCTAssertTrue(draft.isDepositPlan, "定金期入库应同步心愿尾款（isDepositPlan）")
+    XCTAssertEqual(draft.deposit, 50)
+    XCTAssertEqual(draft.balance, 149)
+    XCTAssertEqual(draft.priceTotal, 199, "定金 + 尾款 = 预约价")
+    XCTAssertEqual(draft.finalPaymentDate, depositEnd, "定金截止 = 尾款开始")
+    XCTAssertEqual(draft.finalPaymentEndDate, balanceEnd, "尾款截止 = 尾款结束")
+    XCTAssertTrue(
+      draft.note.contains("尾款时间：2026年9月25日 – 2026年10月10日（已同步心愿尾款）"),
+      "尾款窗口应写进备注，实际：\(draft.note)")
+  }
+
+  /// 尾款期同样定金口径；只配了定金截止时窗口压平为同一天（end >= start）。
+  func testMakeDraftBalancePhaseFlattensWindowWhenBalanceEndMissing() {
+    let depositEnd = testDate(2026, 9, 25)
+    let item = makePhaseItem(depositEndsAt: depositEnd, balanceEndsAt: nil)
+    let draft = MidsummerWardrobeDraftBuilder.makeDraft(
+      for: item, series: draftSeries, brandName: "仲夏物语",
+      selection: .empty, presalePhase: .balance, modelContext: context
+    )
+    XCTAssertTrue(draft.isDepositPlan)
+    XCTAssertEqual(draft.finalPaymentDate, depositEnd)
+    XCTAssertEqual(draft.finalPaymentEndDate, depositEnd, "尾款截止缺省时压平到尾款开始")
+  }
+
+  /// 预售结束：显式选「现货价」→ 现货口径（不是定金计划，定金不落价）。
+  func testMakeDraftEndedPhaseSpotTierRecordsSpotPrice() {
+    let item = makePhaseItem(price: 219, specGroups: [tierGroup])
+    let selection = MidsummerSpecSelection(picks: ["pricing": "spot"])
+    let draft = MidsummerWardrobeDraftBuilder.makeDraft(
+      for: item, series: draftSeries, brandName: "仲夏物语",
+      selection: selection, presalePhase: .ended, modelContext: context
+    )
+    XCTAssertFalse(draft.isDepositPlan, "预售结束 + 现货档位应走现货口径")
+    XCTAssertEqual(draft.priceTotal, 219, "现货口径落现货价")
+    XCTAssertEqual(draft.deposit, 0, "现货口径不把定金当价格写")
+  }
+
+  /// 预售结束：显式选「定金」→ 仍走定金尾款口径（预约价入库）。
+  func testMakeDraftEndedPhaseDepositTierKeepsDepositPlan() {
+    let item = makePhaseItem(price: 219, specGroups: [tierGroup])
+    let selection = MidsummerSpecSelection(picks: ["pricing": "deposit"])
+    let draft = MidsummerWardrobeDraftBuilder.makeDraft(
+      for: item, series: draftSeries, brandName: "仲夏物语",
+      selection: selection, presalePhase: .ended, modelContext: context
+    )
+    XCTAssertTrue(draft.isDepositPlan)
+    XCTAssertEqual(draft.priceTotal, 199, "定金尾款口径总额 = 预约价")
+  }
+
+  /// 预售结束未选档位：现货价优先（面板默认选中项即现货价）；
+  /// 无现货价时回退定金尾款口径。
+  func testMakeDraftEndedPhaseDefaultsToSpotWhenAvailable() {
+    let withSpot = makePhaseItem(price: 219, specGroups: [tierGroup])
+    let spotDraft = MidsummerWardrobeDraftBuilder.makeDraft(
+      for: withSpot, series: draftSeries, brandName: "仲夏物语",
+      selection: .empty, presalePhase: .ended, modelContext: context
+    )
+    XCTAssertFalse(spotDraft.isDepositPlan)
+    XCTAssertEqual(spotDraft.priceTotal, 219)
+
+    let withoutSpot = makePhaseItem(price: nil, specGroups: [tierGroup])
+    let depositDraft = MidsummerWardrobeDraftBuilder.makeDraft(
+      for: withoutSpot, series: draftSeries, brandName: "仲夏物语",
+      selection: .empty, presalePhase: .ended, modelContext: context
+    )
+    XCTAssertTrue(depositDraft.isDepositPlan, "无现货价时回退定金尾款口径")
+    XCTAssertEqual(depositDraft.priceTotal, 199)
+  }
+
+  /// 价格档位按**选项名称**识别（种子档位组与自建档位组 id 不同，名称统一）。
+  func testSelectedPriceTierByName() {
+    let item = makePhaseItem(specGroups: [tierGroup])
+    XCTAssertEqual(
+      MidsummerSpecResolver.selectedPriceTier(
+        MidsummerSpecSelection(picks: ["pricing": "spot"]), of: item),
+      .spot)
+    XCTAssertEqual(
+      MidsummerSpecResolver.selectedPriceTier(
+        MidsummerSpecSelection(picks: ["pricing": "preorder"]), of: item),
+      .preorder)
+    XCTAssertEqual(
+      MidsummerSpecResolver.selectedPriceTier(
+        MidsummerSpecSelection(picks: ["pricing": "deposit"]), of: item),
+      .deposit)
+    XCTAssertEqual(
+      MidsummerSpecResolver.selectedPriceTier(
+        MidsummerSpecSelection(picks: ["pricing": "balance"]), of: item),
+      .balance)
+    XCTAssertNil(
+      MidsummerSpecResolver.selectedPriceTier(.empty, of: item),
+      "未选档位返回 nil（标注组不构成缺失）")
+  }
 }
