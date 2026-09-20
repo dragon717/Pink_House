@@ -268,11 +268,17 @@ final class ShopCatalogPhase456Tests: XCTestCase {
 
     // MARK: helpers
 
+    /// 容器必须随用例保活：`ModelContext` 不强持有容器，
+    /// 容器若先释放，`save()` 会抛 `No eligible connection available`（NSException，
+    /// `try?`/`catch` 均拦不住）。与 `ClothingTests` 的容器保活约定一致。
+    private var retainedContainers: [ModelContainer] = []
+
     /// 每次新建内存容器（与 App 数据隔离）；schema 与 ClothingTests 相同
     private func modelContext() -> ModelContext {
         let config = ModelConfiguration(isStoredInMemoryOnly: true)
         let schema = Schema([Clothing.self, Brand.self, Tag.self])
         let container = try! ModelContainer(for: schema, configurations: config)
+        retainedContainers.append(container)
         return ModelContext(container)
     }
 }
