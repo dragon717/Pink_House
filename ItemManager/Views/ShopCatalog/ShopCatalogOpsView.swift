@@ -562,7 +562,7 @@ private struct ShopCatalogDraftDetailEditor: View {
             TextEditor(text: $variantsText)
                 .frame(minHeight: 60)
                 .font(.system(size: 13))
-            Text("配色尺码：每行「颜色,尺码」，一侧可留空（如「夜空蓝,M」「,L」）")
+            Text("配色尺码：每行「颜色,尺码[,图片]」，一侧可留空（如「夜空蓝,M,night.png」）；第三段填图片行同一文件名/URL 即完成图文绑定（选中该配色时展示其照片）")
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)
             TextField("尺码表列名（逗号分隔，如：尺码,胸围,衣长）", text: $chartColumnsText)
@@ -583,8 +583,11 @@ private struct ShopCatalogDraftDetailEditor: View {
     private func loadProductInfo() {
         let draft = draftBox
         imagesText = draft.images.map { $0.originalURL }.joined(separator: "\n")
+        let idToRef = Dictionary(uniqueKeysWithValues: draft.images.map { ($0.id, $0.originalURL) })
         variantsText = draft.variants.map {
-            "\($0.color ?? ""),\($0.size ?? "")"
+            let base = "\($0.color ?? ""),\($0.size ?? "")"
+            guard let ref = $0.imageAssetID.flatMap({ idToRef[$0] }) else { return base }
+            return "\(base),\(ref)"
         }.joined(separator: "\n")
         if let chart = draft.sizeChart {
             chartColumnsText = chart.columns.joined(separator: ",")
@@ -610,7 +613,12 @@ private struct ShopCatalogDraftDetailEditor: View {
                              thumbnailURL: nil, previewURL: nil,
                              originalURL: ref, width: nil, height: nil)
             }
-        // 配色尺码：每行「颜色,尺码」
+        // 配色尺码：每行「颜色,尺码[,图片]」——第三段为图片引用（与图片行相同的
+        // 文件名/URL），图文联动（V1.2 点菜式选购）；匹配不到图片行则忽略绑定
+        let imageRefs = imagesText
+            .components(separatedBy: .newlines)
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
         draft.variants = variantsText
             .components(separatedBy: .newlines)
             .map { $0.trimmingCharacters(in: .whitespaces) }
@@ -621,9 +629,15 @@ private struct ShopCatalogDraftDetailEditor: View {
                     .map { $0.trimmingCharacters(in: .whitespaces) }
                 let color = parts.first.flatMap { $0.isEmpty ? nil : $0 }
                 let size = parts.count > 1 ? (parts[1].isEmpty ? nil : parts[1]) : nil
+                var imageAssetID: String? = nil
+                if parts.count > 2, !parts[2].isEmpty,
+                   let asset = draft.images.first(where: { $0.originalURL == parts[2] }) {
+                    imageAssetID = asset.id
+                }
                 return CatalogProductVariant(id: "var-draft-\(draft.id.prefix(6))-\(index)",
                                              productID: "",
-                                             color: color, size: size)
+                                             color: color, size: size,
+                                             imageAssetID: imageAssetID)
             }
         // 尺码表：列 + 行（label:值,…）+ 原图
         let columns = chartColumnsText

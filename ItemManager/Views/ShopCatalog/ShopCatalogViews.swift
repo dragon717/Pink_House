@@ -370,230 +370,154 @@ struct ShopCatalogShopView: View {
     }
 }
 
-// MARK: - 系列详情（计划 §11-12，参考图4 卡片风格）
+// MARK: - 系列详情（V1.2：合并主卡 = 系列对外唯一主链路）
+//
+//  旧版把系列下单品铺成 N 张独立卡片（单品与链接一一对应的分散结构）；
+//  现在整个系列对外只保留一张合并大卡，点进即「点菜式选购页」
+//  （ShopCatalogSeriesMenuView）：按品类列出全部单品、明码标价、各带商品照，
+//  勾选合并到同一次加入操作；规格选择图文绑定（选中配色切换对应照片）。
+//  单品完整资料（尺码表/销售历史等）经点菜页行内「>」进入商品详情保留可达。
 
 struct ShopCatalogSeriesView: View {
     let seriesID: String
 
     @Environment(ThemeManager.self) private var themeManager
     @ObservedObject private var store = ShopCatalogStore.shared
-    @State private var selectedCategory: String?
-    /// 系列页多选加入衣橱（计划 §12，P0）：选择后进入确认页（参考图6）
-    @State private var isSelecting = false
-    @State private var selectedProductIDs: Set<String> = []
-    @State private var showsMerge = false
-    @State private var mergeToast: String?
+    @State private var showsMenu = false
 
     private var series: CatalogSeries? { store.series(id: seriesID) }
-
-    private var visibleProducts: [CatalogProduct] {
-        store.products(inSeries: seriesID, category: selectedCategory)
-    }
+    private var products: [CatalogProduct] { store.products(inSeries: seriesID) }
 
     var body: some View {
         ZStack {
             LiquidBackground(themeSkinWallpaperContext: .timeHall)
                 .ignoresSafeArea()
             ScrollView(.vertical, showsIndicators: false) {
-                VStack(spacing: 14) {
-                    categoryStrip
-                    productGrid
-                }
-                .padding(16)
-                .padding(.bottom, 80)
+                seriesMainCard
+                    .padding(16)
+                    .padding(.bottom, 80)
             }
         }
         .navigationTitle(series?.name ?? "")
         .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Button(isSelecting ? "取消" : "多选") {
-                    isSelecting.toggle()
-                    if !isSelecting { selectedProductIDs = [] }
-                }
-                .font(.system(size: 14, weight: .medium))
-            }
-        }
-        .safeAreaInset(edge: .bottom) {
-            if isSelecting { multiSelectBar }
-        }
-        .sheet(isPresented: $showsMerge) {
-            NavigationStack {
-                ShopCatalogWardrobeMergeView(selectedProductIDs: selectedProductIDs.sorted()) { count in
-                    mergeToast = "已加入少女衣橱（\(count) 条记录）"
-                }
-            }
-            .presentationDetents([.large])
-        }
-        .overlay(alignment: .bottom) {
-            if let mergeToast {
-                Text(mergeToast)
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 8)
-                    .background(Capsule().fill(Color.black.opacity(0.75)))
-                    .padding(.bottom, 60)
-                    .task {
-                        try? await Task.sleep(nanoseconds: 1_600_000_000)
-                        await MainActor.run { self.mergeToast = nil }
-                    }
-            }
+        .sheet(isPresented: $showsMenu) {
+            ShopCatalogSeriesMenuView(store: store, seriesID: seriesID)
+                .presentationDetents([.large])
         }
     }
 
-    private var categoryStrip: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                chip(title: "全部", isSelected: selectedCategory == nil) { selectedCategory = nil }
-                ForEach(store.categories(inSeries: seriesID), id: \.self) { c in
-                    chip(title: c, isSelected: selectedCategory == c) { selectedCategory = c }
-                }
-            }
-        }
-    }
+    // MARK: 合并大卡（系列主卡）
 
-    private func chip(title: String, isSelected: Bool, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Text(title.appLocalized)
-                .font(.system(size: 13, weight: isSelected ? .semibold : .regular))
-                .foregroundStyle(isSelected ? .white : themeManager.secondaryTextColor)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 7)
-                .background(Capsule().fill(isSelected ? Color.pink : Color.secondary.opacity(0.12)))
-        }
-        .buttonStyle(.plain)
-    }
-
-    private var productGrid: some View {
-        LazyVGrid(columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)], spacing: 14) {
-            ForEach(visibleProducts) { p in
-                if isSelecting {
-                    selectableProductCard(p)
-                } else {
-                    NavigationLink {
-                        ShopCatalogProductView(productID: p.id)
-                    } label: {
-                        productCard(p)
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-        }
-    }
-
-    /// 多选模式卡片：点按切换勾选
-    private func selectableProductCard(_ p: CatalogProduct) -> some View {
+    private var seriesMainCard: some View {
         Button {
-            if selectedProductIDs.contains(p.id) {
-                selectedProductIDs.remove(p.id)
-            } else {
-                selectedProductIDs.insert(p.id)
-            }
+            showsMenu = true
         } label: {
-            productCard(p)
-                .overlay(alignment: .topTrailing) {
-                    ZStack {
-                        Circle()
-                            .fill(selectedProductIDs.contains(p.id) ? Color.pink : Color.white.opacity(0.85))
-                            .frame(width: 26, height: 26)
-                            .shadow(color: .black.opacity(0.12), radius: 2, y: 1)
-                        if selectedProductIDs.contains(p.id) {
-                            Image(systemName: "checkmark")
-                                .font(.system(size: 13, weight: .bold))
-                                .foregroundStyle(.white)
+            VStack(alignment: .leading, spacing: 12) {
+                ShopCatalogAssetImage(reference: coverReference)
+                    .aspectRatio(16 / 10, contentMode: .fill)
+                    .frame(maxWidth: .infinity)
+                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    .overlay(alignment: .bottomTrailing) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "menucard")
+                            Text("点菜选购".appLocalized)
+                        }
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 7)
+                        .background(Capsule().fill(Color.black.opacity(0.45)))
+                        .padding(10)
+                    }
+                    .overlay(alignment: .topLeading) {
+                        ForEach(Array(statusTags.enumerated()), id: \.offset) { index, text in
+                            if index == 0 {
+                                statusTag(text)
+                                    .padding(10)
+                            }
                         }
                     }
-                    .padding(8)
+
+                Text(series?.name ?? "")
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(themeManager.primaryTextColor)
+
+                HStack(spacing: 6) {
+                    if let year = series?.year { Text(String(year)) }
+                    if let season = series?.season, !season.isEmpty { Text("· \(season)") }
+                    Text("· \(products.count) 个单品")
+                    if !categoriesSummary.isEmpty { Text("· \(categoriesSummary)") }
                 }
+                .font(.caption)
+                .foregroundStyle(themeManager.secondaryTextColor)
+
+                HStack(spacing: 8) {
+                    Text(priceRangeText)
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(themeManager.primaryTextColor)
+                    ForEach(statusTags, id: \.self) { statusTag($0) }
+                    Spacer(minLength: 0)
+                }
+            }
+            .padding(10)
+            .themeSkinSectionCard(cornerRadius: 16)
         }
         .buttonStyle(.plain)
     }
 
-    /// 底部操作条（计划 §12：已选择 N 件 → [加入少女衣橱] → 确认页）
-    private var multiSelectBar: some View {
-        HStack(spacing: 12) {
-            Text("已选择 \(selectedProductIDs.count) 件")
-                .font(.system(size: 14, weight: .medium))
-                .foregroundStyle(themeManager.primaryTextColor)
-            Spacer()
-            Button {
-                guard !selectedProductIDs.isEmpty else { return }
-                showsMerge = true
-            } label: {
-                Text("加入少女衣橱")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 18)
-                    .padding(.vertical, 10)
-                    .background(Capsule().fill(selectedProductIDs.isEmpty ? Color.gray.opacity(0.5) : Color.pink))
+    // MARK: 汇总口径
+
+    /// 封面：系列主视觉优先，缺省回退首个单品首图
+    private var coverReference: String? {
+        if let cover = series?.cover, !cover.isEmpty {
+            return store.asset(id: cover)?.originalURL ?? cover
+        }
+        guard let first = products.first?.images.first else { return nil }
+        return store.asset(id: first)?.originalURL ?? first
+    }
+
+    private var categoriesSummary: String {
+        let cats = Array(Set(products.map(\.category)))
+        return cats.isEmpty ? "" : cats.joined(separator: "/")
+    }
+
+    /// 价格区间：现货价优先、缺省回退预约价；单值时只显示一个
+    private var priceRangeText: String {
+        let prices = products.compactMap { p -> Decimal? in
+            let archive = store.priceArchive(forProduct: p.id)
+            return archive.currentStockPrice ?? archive.historicalReservationPrice
+        }
+        guard let minP = prices.min() else { return "价格待补充" }
+        if prices.count == 1 || minP == (prices.max() ?? minP) {
+            return ShopCatalogFormat.price(minP)
+        }
+        return "\(ShopCatalogFormat.price(minP)) – \(ShopCatalogFormat.price(prices.max()!))"
+    }
+
+    /// 系列整体状态：预约中 > 现货中 > 即将开始（去重，最多三枚）
+    private var statusTags: [String] {
+        var tags: [String] = []
+        for p in products {
+            let events = store.saleEvents(forProduct: p.id)
+            if events.contains(where: { store.windowStatus(of: $0) == .open && $0.type == .reservation }) {
+                if !tags.contains("预约中") { tags.append("预约中") }
             }
-            .disabled(selectedProductIDs.isEmpty)
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
-        .background(.ultraThinMaterial)
-    }
-
-    private func productCard(_ p: CatalogProduct) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            ShopCatalogAssetImage(reference: firstImageReference(of: p))
-                .aspectRatio(3 / 4, contentMode: .fill)
-                .frame(maxWidth: .infinity)
-                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-            Text(p.name)
-                .font(.system(size: 14, weight: .medium))
-                .foregroundStyle(themeManager.primaryTextColor)
-                .lineLimit(2)
-                .multilineTextAlignment(.leading)
-            priceLine(p)
-        }
-        .padding(8)
-        .themeSkinSectionCard(cornerRadius: 14)
-    }
-
-    private func priceLine(_ p: CatalogProduct) -> some View {
-        let archive = store.priceArchive(forProduct: p.id)
-        return HStack(spacing: 6) {
-            if let stock = archive.currentStockPrice {
-                Text(ShopCatalogFormat.price(stock))
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(themeManager.primaryTextColor)
-            } else if let r = archive.historicalReservationPrice {
-                Text(ShopCatalogFormat.price(r))
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(themeManager.accentTextColor)
-            } else {
-                Text("价格待补充")
-                    .font(.system(size: 13))
-                    .foregroundStyle(themeManager.secondaryTextColor)
+            if events.contains(where: { store.windowStatus(of: $0) == .open && $0.type == .stock }) {
+                if !tags.contains("现货中") { tags.append("现货中") }
             }
-            statusTag(p)
-            Spacer(minLength: 0)
+            if events.contains(where: { store.windowStatus(of: $0) == .upcoming }) {
+                if !tags.contains("即将开始") { tags.append("即将开始") }
+            }
         }
+        return tags
     }
 
-    @ViewBuilder
-    private func statusTag(_ p: CatalogProduct) -> some View {
-        let events = store.saleEvents(forProduct: p.id)
-        if let active = events.first(where: { store.windowStatus(of: $0) == .open }) {
-            tag(text: active.type == .reservation ? "预约中" : "现货中")
-        } else if let upcoming = events.first(where: { store.windowStatus(of: $0) == .upcoming }) {
-            tag(text: "即将开始")
-        }
-    }
-
-    private func tag(text: String) -> some View {
+    private func statusTag(_ text: String) -> some View {
         Text(text.appLocalized)
             .font(.system(size: 10, weight: .medium))
             .foregroundStyle(themeManager.accentTextColor)
             .padding(.horizontal, 6)
             .padding(.vertical, 2)
             .background(Capsule().fill(themeManager.accentTextColor.opacity(0.1)))
-    }
-
-    private func firstImageReference(of p: CatalogProduct) -> String? {
-        guard let first = p.images.first else { return nil }
-        return store.asset(id: first)?.originalURL ?? first
     }
 }

@@ -190,6 +190,9 @@ struct CatalogProductVariant: Codable, Identifiable, Hashable, Sendable {
     var productID: String
     var color: String? = nil
     var size: String? = nil
+    /// 规格图绑定（图文联动，V1.2 点菜式选购）：CatalogAsset id；
+    /// 选中该规格时展示区同步切换为其对应照片。nil = 未绑定（沿用商品首图）。
+    var imageAssetID: String? = nil
 }
 
 // MARK: - SizeChart 尺码表

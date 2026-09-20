@@ -155,4 +155,28 @@ final class ShopCatalogModelsTests: XCTestCase {
         XCTAssertEqual(catalog.saleEvents.first?.type, .reservation)
         XCTAssertEqual(catalog.shops.first?.aliases, []) // 缺失键兜底为空数组
     }
+
+    // MARK: 规格图文绑定（V1.2 点菜式选购）
+
+    func testVariantImageBindingDecodeBackwardCompat() throws {
+        // 旧 JSON 无 imageAssetID → nil（图文绑定字段向后兼容）
+        let old = try JSONDecoder().decode(
+            CatalogProductVariant.self,
+            from: Data(#"{"id":"v1","productID":"p1","color":"夜空蓝","size":"M"}"#.utf8))
+        XCTAssertNil(old.imageAssetID)
+
+        // 带绑定 → 正常解析
+        let bound = try JSONDecoder().decode(
+            CatalogProductVariant.self,
+            from: Data(#"{"id":"v2","productID":"p1","color":"樱粉","size":"L","imageAssetID":"asset-1"}"#.utf8))
+        XCTAssertEqual(bound.imageAssetID, "asset-1")
+    }
+
+    func testVariantImageBindingRoundTrip() throws {
+        let v = CatalogProductVariant(id: "v1", productID: "p1",
+                                      color: "夜空蓝", size: "M", imageAssetID: "asset-9")
+        let data = try JSONEncoder().encode(v)
+        let back = try JSONDecoder().decode(CatalogProductVariant.self, from: data)
+        XCTAssertEqual(back.imageAssetID, "asset-9", "绑定关系编解码回环不丢")
+    }
 }
