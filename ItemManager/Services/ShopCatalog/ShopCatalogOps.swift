@@ -436,6 +436,44 @@ final class ShopCatalogDraftStore: ObservableObject {
         return count
     }
 
+    /// 整批归属整合（V1.1 §4.1）：一次指定「店家 + 系列」，写入批次会话并同步到
+    /// 该批全部未发布草稿——同一系列的多单品归入同一条系列链路，用户端从系列页
+    /// 查看并选择全部单品，避免单品与链接一一对应的分散结构。
+    /// 已发布（.published）条目不回写（发布产物已写入覆盖层，改动请走实体编辑）。
+    /// 返回更新的草稿数。
+    @discardableResult
+    func applyBatchAttribution(
+        batchID: String,
+        shopID: String?, newShopName: String, newShopAliases: String,
+        seriesID: String?, newSeriesName: String, newSeriesYear: Int?, newSeriesSeason: String
+    ) -> Int {
+        var batches = Self.loadBatches()
+        guard let idx = batches.firstIndex(where: { $0.id == batchID }) else { return 0 }
+        batches[idx].shopID = shopID
+        batches[idx].newShopName = newShopName
+        batches[idx].newShopAliases = newShopAliases
+        batches[idx].seriesID = seriesID
+        batches[idx].newSeriesName = newSeriesName
+        batches[idx].newSeriesYear = newSeriesYear
+        batches[idx].newSeriesSeason = newSeriesSeason
+        saveBatches(batches)
+
+        var count = 0
+        for var draft in drafts
+        where draft.batchID == batchID && draft.status != .published && draft.status != .archived {
+            draft.shopID = shopID
+            draft.newShopName = newShopName
+            draft.newShopAliases = newShopAliases
+            draft.seriesID = seriesID
+            draft.newSeriesName = newSeriesName
+            draft.newSeriesYear = newSeriesYear
+            draft.newSeriesSeason = newSeriesSeason
+            upsert(draft)
+            count += 1
+        }
+        return count
+    }
+
     /// 单品粒度审核（§4.1）：通过 → reviewed；驳回 → 退回草稿并保留原因
     func review(_ draft: CatalogProductDraft, approve: Bool, reason: String? = nil) throws {
         try CreatorAccess.requireCreator(.listingStatus)

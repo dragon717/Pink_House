@@ -154,6 +154,7 @@ struct ShopCatalogOpsView: View {
 
     @State private var importText = ""
     @State private var batchImportText = ""
+    @State private var selectedBatch: CatalogBatchEntrySession?
 
     private var importProxy: Binding<String> {
         Binding(get: { importText }, set: { importText = $0 })
@@ -202,11 +203,12 @@ struct ShopCatalogOpsView: View {
     private func batchRow(_ batch: CatalogBatchEntrySession) -> some View {
         let batchDrafts = draftStore.drafts.filter { $0.batchID == batch.id }
         let draftable = batchDrafts.filter { $0.status == .draft }.count
+        let assigned = batch.shopID != nil || !batch.newShopName.isEmpty
         return HStack(spacing: 10) {
             VStack(alignment: .leading, spacing: 3) {
                 Text(batchTitle(batch))
                     .font(.system(size: 13, weight: .medium))
-                Text("共 \(batchDrafts.count) 条 · 待提交 \(draftable) 条")
+                Text("共 \(batchDrafts.count) 条 · 待提交 \(draftable) 条\(assigned ? "" : " · 未指定归属")")
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
             }
@@ -222,6 +224,11 @@ struct ShopCatalogOpsView: View {
                 .buttonStyle(.bordered)
                 .tint(.orange)
             }
+        }
+        .contentShape(Rectangle())
+        .onTapGesture { selectedBatch = batch }
+        .sheet(item: $selectedBatch) { batch in
+            ShopCatalogBatchDetailView(draftStore: draftStore, store: store, batch: batch)
         }
     }
 
