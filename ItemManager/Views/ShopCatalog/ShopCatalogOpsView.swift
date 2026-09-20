@@ -297,6 +297,8 @@ private struct ShopCatalogDraftEditorRow: View {
     @Binding var actionError: String?
 
     @State private var showsEditor = false
+    @State private var showsRejectPrompt = false
+    @State private var rejectReasonText = ""
 
     var body: some View {
         HStack(spacing: 10) {
@@ -309,15 +311,20 @@ private struct ShopCatalogDraftEditorRow: View {
                         .font(.system(size: 11))
                         .foregroundStyle(.secondary)
                 }
+                // 驳回原因（V1.1 §4.1）：退回草稿后保留展示，重新提交时清空
+                if let reason = draft.rejectReason, !reason.isEmpty {
+                    Text("驳回：\(reason)")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.red)
+                        .lineLimit(2)
+                }
             }
             Spacer()
             if draft.status == .submitted {
-                // 单品粒度审核（§4.1）：通过发布 / 驳回退回草稿
+                // 单品粒度审核（§4.1）：通过发布 / 驳回退回草稿（保留原因）
                 Button("驳回", role: .destructive) {
-                    do {
-                        try draftStore.review(draft, approve: false)
-                        toast = "已驳回，退回草稿"
-                    } catch { actionError = error.localizedDescription }
+                    rejectReasonText = ""
+                    showsRejectPrompt = true
                 }
                 .font(.system(size: 13))
                 .buttonStyle(.bordered)
@@ -329,6 +336,19 @@ private struct ShopCatalogDraftEditorRow: View {
         .onTapGesture { showsEditor = true }
         .sheet(isPresented: $showsEditor) {
             ShopCatalogDraftDetailEditor(draft: draft, draftStore: draftStore, store: store)
+        }
+        .alert("驳回原因", isPresented: $showsRejectPrompt) {
+            TextField("选填，将展示给补录人", text: $rejectReasonText)
+            Button("确认驳回", role: .destructive) {
+                do {
+                    try draftStore.review(draft, approve: false, reason: rejectReasonText)
+                    toast = "已驳回，退回草稿"
+                } catch { actionError = error.localizedDescription }
+                rejectReasonText = ""
+            }
+            Button("取消", role: .cancel) { rejectReasonText = "" }
+        } message: {
+            Text("草稿将退回草稿箱并保留原因（V1.1 §4.1）")
         }
     }
 

@@ -329,4 +329,11 @@ struct CatalogPriceArchive: Hashable, Sendable {
         guard let r = reservation?.price, let s = stock?.price else { return nil }
         return s - r
     }
+
+    /// 差价百分比（相对预约价，含符号的浮点百分数，如 20 / -12.5 表示 +20% / −12.5%）；
+    /// 预约价为 0 或缺失时为 nil（V1.1 §1 P0：展示预约‑现货差价及百分比）
+    var stockOverReservationDeltaPercent: Double? {
+        guard let r = reservation?.price, let delta = stockOverReservationDelta, r != 0 else { return nil }
+        return NSDecimalNumber(decimal: delta / r * 100).doubleValue
+    }
 }

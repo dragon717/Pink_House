@@ -68,6 +68,9 @@ nonisolated struct CatalogProductDraft: Codable, Identifiable, Hashable, Sendabl
     var sizeChart: CatalogSizeChart? = nil
 
     var status: CatalogPublicationStatus = .draft
+    /// 审核驳回原因（V1.1 §4.1：驳回退回草稿并保留原因）；重新提交时清空。
+    /// Optional + 默认 nil，合成解码对旧 JSON 自动兜底。
+    var rejectReason: String? = nil
     var createdAt: Date = Date()
 
     /// 预约草稿的定金尾款对账（允许缺省，缺省时发布前自动补齐）
@@ -433,13 +436,22 @@ final class ShopCatalogDraftStore: ObservableObject {
         return count
     }
 
-    /// 单品粒度审核（§4.1）：通过 → reviewed；驳回 → 退回草稿
-    func review(_ draft: CatalogProductDraft, approve: Bool) throws {
+    /// 单品粒度审核（§4.1）：通过 → reviewed；驳回 → 退回草稿并保留原因
+    func review(_ draft: CatalogProductDraft, approve: Bool, reason: String? = nil) throws {
         try CreatorAccess.requireCreator(.listingStatus)
         guard draft.status == .submitted else {
             throw ShopCatalogDraftStoreError.illegalTransition(from: draft.status, to: approve ? .reviewed : .draft)
         }
-        try advance(draft, to: approve ? .reviewed : .draft)
+        if approve {
+            try advance(draft, to: .reviewed)
+            return
+        }
+        // 驳回：原因写入草稿（空白原因归一为 nil），状态退回 draft
+        let trimmed = reason?.trimmingCharacters(in: .whitespacesAndNewlines)
+        var updated = draft
+        updated.status = .draft
+        updated.rejectReason = (trimmed?.isEmpty == false) ? trimmed : nil
+        upsert(updated)
     }
 
     // MARK: 发布状态机（计划 §31：draft → submitted → reviewed → published，任一态可 archived）
@@ -459,6 +471,8 @@ final class ShopCatalogDraftStore: ObservableObject {
         }
         var updated = draft
         updated.status = newStatus
+        // 重新提交即视为已回应驳回意见：清空驳回原因
+        if newStatus == .submitted { updated.rejectReason = nil }
         upsert(updated)
     }
 

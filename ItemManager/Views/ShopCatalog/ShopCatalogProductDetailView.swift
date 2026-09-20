@@ -272,6 +272,12 @@ struct ShopCatalogProductView: View {
                         Text(delta >= 0 ? "+¥\(NSDecimalNumber(decimal: delta).stringValue)" : "-¥\(NSDecimalNumber(decimal: abs(delta)).stringValue)")
                             .font(.caption.weight(.semibold))
                             .foregroundStyle(themeManager.accentTextColor)
+                        // V1.1 §1 P0：差价需同时展示百分比（相对预约价）
+                        if let percent = archive.stockOverReservationDeltaPercent {
+                            Text(String(format: "%@%.1f%%", percent >= 0 ? "+" : "−", abs(percent)))
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(themeManager.accentTextColor)
+                        }
                     }
                 }
             }
