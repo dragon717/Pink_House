@@ -22,6 +22,7 @@ struct MeView: View {
     @StateObject private var authManager = AuthenticationManager.shared
     @StateObject private var cloudManager = CloudSyncManager.shared
     @ObservedObject private var vipManager = VIPManager.shared
+    @ObservedObject private var creatorAccess = CreatorAccess.shared
 
     @State private var isImporting = false
     @State private var showingImportAlert = false
@@ -266,6 +267,20 @@ struct MeView: View {
                                     subtitle: "特效 · 调试 · 管理员",
                                     icon: "flask.fill",
                                     iconColor: .green
+                                )
+                            }
+                            .buttonStyle(PlainButtonStyle())
+                        }
+
+                        // 运营工具（计划 §26：设置 → 运营工具 → 店家商品库，
+                        // 仅 Catalog Editor（创作者白名单）可见，普通用户完全看不到）
+                        if creatorAccess.isCreator {
+                            NavigationLink(destination: ShopCatalogOpsView()) {
+                                SettingsGridItem(
+                                    title: "运营工具",
+                                    subtitle: "店家商品库 · 补录上新",
+                                    icon: "shippingbox.fill",
+                                    iconColor: .pink
                                 )
                             }
                             .buttonStyle(PlainButtonStyle())

@@ -144,7 +144,13 @@ final class Clothing {
     var model3DPath: String? = nil // 3D模型文件路径
     var model3DType: String? = nil // 3D模型类型: "multi"(多图3D), "single"(单图3D)
     var model3DThumbnailPath: String? = nil // 3D模型缩略图路径
-    
+
+    // Catalog 引用（店家上新联动；现有用户模型不重写，只加可选引用字段，
+    // 见 docs/少女心愿_店家上新_第一版落地计划.md §4。nil = 与公共 Catalog 无关的旧数据）
+    var catalogProductID: String? = nil // 公共 Catalog 的商品 ID
+    var catalogVariantID: String? = nil // 公共 Catalog 的配色/尺码规格 ID
+    var catalogSaleEventID: String? = nil // 生成该条记录所依据的销售记录（预约/现货）ID
+
     @Relationship(deleteRule: .nullify)
     var tags: [Tag]? = []
     

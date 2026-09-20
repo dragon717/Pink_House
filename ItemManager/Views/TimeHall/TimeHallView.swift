@@ -345,6 +345,8 @@ struct TimeHallView: View {
   @State private var searchText = ""
   @State private var isTimelineAscending = false
   @State private var isHeaderCollapsed = false
+  /// 「店家上新 / 历年系列」浏览（Phase 2：只读）
+  @State private var showsShopCatalog = false
 
   private var palette: MagicThemePalette {
     MagicThemeDesignSystem.palette(themeManager: themeManager, colorScheme: colorScheme)
@@ -456,6 +458,9 @@ struct TimeHallView: View {
     }
     .sheet(item: $detailCommerceItem) { item in
       TimeHallCommerceItemDetailView(item: item)
+    }
+    .fullScreenCover(isPresented: $showsShopCatalog) {
+      ShopCatalogBrowseView()
     }
     .onChange(of: isRoutePageActive) { _, isActive in
       guard isActive else { return }
@@ -1127,7 +1132,8 @@ struct TimeHallView: View {
       TimeHallBrandListHome(
         listings: brandListings,
         onEnter: { enterBrand(id: $0) },
-        onOpenWebsite: { openBrandWebsite(id: $0) }
+        onOpenWebsite: { openBrandWebsite(id: $0) },
+        onOpenShopCatalog: { showsShopCatalog = true }
       )
     }
   }

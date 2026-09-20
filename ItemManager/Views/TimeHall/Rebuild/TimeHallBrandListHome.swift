@@ -78,6 +78,8 @@ struct TimeHallBrandListHome: View {
   let onEnter: (String) -> Void
   /// 「⋯」菜单里的「访问官网」。为 nil 时该行不显示「⋯」。
   var onOpenWebsite: ((String) -> Void)? = nil
+  /// 「店家上新」入口（计划 §8：时光馆内部新增，不重做时光馆）。为 nil 时不显示入口卡片。
+  var onOpenShopCatalog: (() -> Void)? = nil
 
   @State private var keyword = ""
   @State private var filter: TimeHallBrandListFilter = .all
@@ -184,6 +186,11 @@ struct TimeHallBrandListHome: View {
     } else {
       ScrollView(.vertical, showsIndicators: false) {
         LazyVStack(spacing: 0) {
+          if let onOpenShopCatalog {
+            ShopCatalogEntryCard(onTap: onOpenShopCatalog)
+              .padding(.horizontal, 16)
+              .padding(.bottom, 10)
+          }
           ForEach(visibleListings) { listing in
             TimeHallBrandListRow(
               listing: listing,
