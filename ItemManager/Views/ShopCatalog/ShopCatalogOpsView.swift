@@ -41,7 +41,9 @@ struct ShopCatalogOpsView: View {
         Form {
             dashboardSection
             importSection
+            batchSection
             draftSection
+            manageSection
             exportSection
         }
         .overlay(alignment: .bottom) {
@@ -151,8 +153,83 @@ struct ShopCatalogOpsView: View {
     }
 
     @State private var importText = ""
+    @State private var batchImportText = ""
+
     private var importProxy: Binding<String> {
         Binding(get: { importText }, set: { importText = $0 })
+    }
+
+    // MARK: 批量录入会话（V1.1 §4.1）
+
+    private var batchSection: some View {
+        Section("批次录入（多链接多单品）") {
+            TextEditor(text: $batchImportText)
+                .frame(minHeight: 88)
+                .font(.system(size: 13))
+            Button {
+                importBatch()
+            } label: {
+                Label("批量解析并生成草稿（每条链接一个单品）", systemImage: "square.stack.3d.up")
+            }
+            .disabled(batchImportText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            ForEach(ShopCatalogDraftStore.loadBatches().reversed()) { batch in
+                batchRow(batch)
+            }
+        }
+    }
+
+    /// 批次解析：先选归属（沿用首个草稿缺省 = 新建店家/系列由人工补），再批量生成
+    private func importBatch() {
+        let outcome = ShopCatalogTaobaoParser.parseBatch(batchImportText)
+        guard !outcome.drafts.isEmpty || !outcome.failures.isEmpty else { return }
+        var session = CatalogBatchEntrySession()
+        // 若解析内容可识别出统一店家/系列名，预填第一条（人工可改）
+        if let first = outcome.drafts.first {
+            session.newShopName = first.newShopName
+            session.newSeriesName = first.newSeriesName
+        }
+        // 回填原文（仅运营侧留存）
+        for draft in outcome.drafts {
+            if let url = draft.sourceURL {
+                session.sourceTexts[draft.id] = url
+            }
+        }
+        let summary = draftStore.createBatch(session, drafts: outcome.drafts, failures: outcome.failures)
+        batchImportText = ""
+        toast = summary
+    }
+
+    private func batchRow(_ batch: CatalogBatchEntrySession) -> some View {
+        let batchDrafts = draftStore.drafts.filter { $0.batchID == batch.id }
+        let draftable = batchDrafts.filter { $0.status == .draft }.count
+        return HStack(spacing: 10) {
+            VStack(alignment: .leading, spacing: 3) {
+                Text(batchTitle(batch))
+                    .font(.system(size: 13, weight: .medium))
+                Text("共 \(batchDrafts.count) 条 · 待提交 \(draftable) 条")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+            if draftable > 0 {
+                Button("批量提交") {
+                    do {
+                        let count = try draftStore.submitBatch(batch.id)
+                        toast = "已批量提交 \(count) 条单品草稿"
+                    } catch { actionError = error.localizedDescription }
+                }
+                .font(.system(size: 13, weight: .semibold))
+                .buttonStyle(.bordered)
+                .tint(.orange)
+            }
+        }
+    }
+
+    private func batchTitle(_ batch: CatalogBatchEntrySession) -> String {
+        let shop = batch.shopID.flatMap { store.shop(id: $0)?.name } ?? batch.newShopName
+        let series = batch.seriesID.flatMap { store.series(id: $0)?.name } ?? batch.newSeriesName
+        let head = [shop, series].filter { !$0.isEmpty }.joined(separator: " · ")
+        return head.isEmpty ? "批次 \(batch.id)" : head
     }
 
     // MARK: 草稿箱（§30 人工补录 / §31 状态流转）
@@ -177,6 +254,20 @@ struct ShopCatalogOpsView: View {
             Text("草稿箱")
         } footer: {
             Text("发布 = 草稿 → 提交 → 审核通过后写入覆盖层并对用户可见（§31）；同名商品的现货记录会追加到既有商品（§29 去重 / 现货价格补录）。")
+        }
+    }
+
+    // MARK: 实体管理（V1.1 §4.2：编辑 / 归档 / 引用保护删除）
+
+    private var manageSection: some View {
+        Section {
+            NavigationLink {
+                ShopCatalogOpsManageView()
+            } label: {
+                Label("店家 / 系列 / 商品管理（编辑、归档、删除）", systemImage: "square.and.pencil.circle")
+            }
+        } footer: {
+            Text("被用户心愿/尾款/衣橱引用过的条目只能归档，不能删除（引用保护）。")
         }
     }
 
@@ -220,6 +311,18 @@ private struct ShopCatalogDraftEditorRow: View {
                 }
             }
             Spacer()
+            if draft.status == .submitted {
+                // 单品粒度审核（§4.1）：通过发布 / 驳回退回草稿
+                Button("驳回", role: .destructive) {
+                    do {
+                        try draftStore.review(draft, approve: false)
+                        toast = "已驳回，退回草稿"
+                    } catch { actionError = error.localizedDescription }
+                }
+                .font(.system(size: 13))
+                .buttonStyle(.bordered)
+                .tint(.red)
+            }
             nextActionButton
         }
         .contentShape(Rectangle())
@@ -311,6 +414,14 @@ private struct ShopCatalogDraftDetailEditor: View {
 
     private let categories = ShopCatalogStore.canonicalCategoryOrder
 
+    // MARK: 完整商品资料（G5：手动录入可完成全部业务；文本行式录入）
+    @State private var imagesText = ""       // 每行一个 Bundle 文件名或 URL
+    @State private var variantsText = ""     // 每行「颜色,尺码」（可留空一侧）
+    @State private var chartColumnsText = "" // 列名，逗号分隔
+    @State private var chartRowsText = ""    // 每行「label:值,值,…」
+    @State private var chartUnit = ""
+    @State private var chartImageText = ""   // 尺码表原图（Bundle 文件名/URL）
+
     var body: some View {
         NavigationStack {
             Form {
@@ -321,6 +432,7 @@ private struct ShopCatalogDraftDetailEditor: View {
                         Text("其他").tag("其他")
                     }
                 }
+                productInfoSection
                 Section("销售记录") {
                     Picker("类型", selection: $draftBox.saleKind) {
                         Text("预约价").tag(CatalogSaleEventType.reservation)
@@ -397,10 +509,125 @@ private struct ShopCatalogDraftDetailEditor: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("完成") { dismiss() }
+                    Button("完成") {
+                        applyProductInfo()
+                        dismiss()
+                    }
                 }
             }
-            .onAppear { store.loadFromBundleIfNeeded() }
+            .onAppear {
+                store.loadFromBundleIfNeeded()
+                loadProductInfo()
+            }
         }
+    }
+
+    // MARK: 完整商品资料（图片/规格/尺码表）
+
+    private var productInfoSection: some View {
+        Section {
+            TextEditor(text: $imagesText)
+                .frame(minHeight: 60)
+                .font(.system(size: 13))
+            Text("图片：每行一个 Bundle 文件名或 http(s) 链接（originalURL 必留原图）")
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+            TextEditor(text: $variantsText)
+                .frame(minHeight: 60)
+                .font(.system(size: 13))
+            Text("配色尺码：每行「颜色,尺码」，一侧可留空（如「夜空蓝,M」「,L」）")
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+            TextField("尺码表列名（逗号分隔，如：尺码,胸围,衣长）", text: $chartColumnsText)
+                .font(.system(size: 13))
+            TextEditor(text: $chartRowsText)
+                .frame(minHeight: 60)
+                .font(.system(size: 13))
+            Text("尺码表行：每行「标签:值,值,…」与列一一对应（如「M:84,52」）")
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+            TextField("单位（cm）", text: $chartUnit)
+            TextField("尺码表原图（文件名/URL）", text: $chartImageText)
+        } header: {
+            Text("图片 / 配色尺码 / 尺码表")
+        }
+    }
+
+    private func loadProductInfo() {
+        let draft = draftBox
+        imagesText = draft.images.map { $0.originalURL }.joined(separator: "\n")
+        variantsText = draft.variants.map {
+            "\($0.color ?? ""),\($0.size ?? "")"
+        }.joined(separator: "\n")
+        if let chart = draft.sizeChart {
+            chartColumnsText = chart.columns.joined(separator: ",")
+            chartRowsText = chart.rows.map { row in
+                "\(row.label):" + row.values.map { $0 ?? "" }.joined(separator: ",")
+            }.joined(separator: "\n")
+            chartUnit = chart.unit ?? ""
+            chartImageText = chart.sourceImage ?? ""
+        }
+    }
+
+    private func applyProductInfo() {
+        var draft = draftBox
+        // 图片：非空行 → CatalogAsset（originalURL 必留）
+        draft.images = imagesText
+            .components(separatedBy: .newlines)
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
+            .enumerated()
+            .map { index, ref in
+                CatalogAsset(id: "asset-draft-\(draft.id.prefix(6))-\(index)",
+                             type: .productImage,
+                             thumbnailURL: nil, previewURL: nil,
+                             originalURL: ref, width: nil, height: nil)
+            }
+        // 配色尺码：每行「颜色,尺码」
+        draft.variants = variantsText
+            .components(separatedBy: .newlines)
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
+            .enumerated()
+            .map { index, line in
+                let parts = line.components(separatedBy: ",")
+                    .map { $0.trimmingCharacters(in: .whitespaces) }
+                let color = parts.first.flatMap { $0.isEmpty ? nil : $0 }
+                let size = parts.count > 1 ? (parts[1].isEmpty ? nil : parts[1]) : nil
+                return CatalogProductVariant(id: "var-draft-\(draft.id.prefix(6))-\(index)",
+                                             productID: "",
+                                             color: color, size: size)
+            }
+        // 尺码表：列 + 行（label:值,…）+ 原图
+        let columns = chartColumnsText
+            .components(separatedBy: ",")
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
+        let rows = chartRowsText
+            .components(separatedBy: .newlines)
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
+            .compactMap { line -> CatalogSizeRow? in
+                let pair = line.split(separator: ":", maxSplits: 1, omittingEmptySubsequences: true)
+                guard let label = pair.first else { return nil }
+                let values = (pair.count > 1 ? String(pair[1]) : "")
+                    .components(separatedBy: ",")
+                    .map { $0.trimmingCharacters(in: .whitespaces) }
+                    .map { $0.isEmpty ? nil : $0 }
+                return CatalogSizeRow(label: String(label), values: values)
+            }
+        let sourceImage = chartImageText.trimmingCharacters(in: .whitespaces)
+        if !columns.isEmpty || !rows.isEmpty || !sourceImage.isEmpty {
+            var chart = CatalogSizeChart(id: "sizechart-draft-\(draft.id.prefix(6))",
+                                         productID: "")
+            chart.unit = chartUnit.isEmpty ? nil : chartUnit
+            chart.columns = columns
+            chart.rows = rows
+            chart.sourceImage = sourceImage.isEmpty ? nil : sourceImage
+            draft.sizeChart = chart
+        } else {
+            draft.sizeChart = nil
+        }
+        draftBox = draft
     }
 }

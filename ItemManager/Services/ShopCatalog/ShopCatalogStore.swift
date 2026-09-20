@@ -81,8 +81,11 @@ final class ShopCatalogStore: ObservableObject {
         rebuildMergedCatalog()
     }
 
-    /// 合并规则：以 Bundle 种子为基底；覆盖层中同 id 实体跳过、新 id 实体追加；
-    /// SaleEvent 一律追加（追加式销售历史，计划 §7 约束：预约价不被覆盖）。
+    /// 合并规则（重构方案 §5.3）：
+    ///   · shops/series/products/variants/sizeCharts/assets：覆盖层**同 id 实体整体替换**
+    ///     基底（后写胜出）——支撑运营「编辑已发布实体」与「归档」（写 archivedAt 后
+    ///     同 id 替换即可生效）；新 id 实体追加。
+    ///   · saleEvents：**永远追加**，不做替换（硬约束：销售历史不可覆盖）。
     private func rebuildMergedCatalog() {
         guard let base = baseCatalog else {
             catalog = overlayCatalog
@@ -93,16 +96,21 @@ final class ShopCatalogStore: ObservableObject {
             return
         }
         var merged = base
-        func appendNew<T: Identifiable>(_ source: [T], into target: inout [T]) {
-            let existing = Set(target.map(\.id))
-            target.append(contentsOf: source.filter { !existing.contains($0.id) })
+        func replaceOrAppend<T: Identifiable>(_ source: [T], into target: inout [T]) {
+            for entity in source {
+                if let index = target.firstIndex(where: { $0.id == entity.id }) {
+                    target[index] = entity
+                } else {
+                    target.append(entity)
+                }
+            }
         }
-        appendNew(overlay.shops, into: &merged.shops)
-        appendNew(overlay.series, into: &merged.series)
-        appendNew(overlay.products, into: &merged.products)
-        appendNew(overlay.variants, into: &merged.variants)
-        appendNew(overlay.sizeCharts, into: &merged.sizeCharts)
-        appendNew(overlay.assets, into: &merged.assets)
+        replaceOrAppend(overlay.shops, into: &merged.shops)
+        replaceOrAppend(overlay.series, into: &merged.series)
+        replaceOrAppend(overlay.products, into: &merged.products)
+        replaceOrAppend(overlay.variants, into: &merged.variants)
+        replaceOrAppend(overlay.sizeCharts, into: &merged.sizeCharts)
+        replaceOrAppend(overlay.assets, into: &merged.assets)
         merged.saleEvents.append(contentsOf: overlay.saleEvents)
         catalog = merged
     }
@@ -116,8 +124,18 @@ final class ShopCatalogStore: ObservableObject {
 
     // MARK: 店家（计划 §9）
 
+    /// 用户侧查询统一排除已归档实体（V1.1 §4.2：归档后用户端不再展示；
+    /// 运营端绕过本层直接查 `catalog` 原始数组）。
+    nonisolated static func isLive(_ archivedAt: Date?) -> Bool { archivedAt == nil }
+
+    /// 实体是否来自 Bundle 种子（只读）：运营「物理删除」只对覆盖层产物有效，
+    /// 种子实体只能归档（同 id 替换写 archivedAt）。
+    func isSeedShop(id: String) -> Bool { baseCatalog?.shops.contains { $0.id == id } ?? false }
+    func isSeedSeries(id: String) -> Bool { baseCatalog?.series.contains { $0.id == id } ?? false }
+    func isSeedProduct(id: String) -> Bool { baseCatalog?.products.contains { $0.id == id } ?? false }
+
     func shop(id: String) -> CatalogShop? {
-        catalog?.shops.first { $0.id == id }
+        catalog?.shops.first { $0.id == id && Self.isLive($0.archivedAt) }
     }
 
     /// 店家最近一次「上新」时间：取该店已开始（startAt ≤ now）的 SaleEvent 里最新的
@@ -137,13 +155,15 @@ final class ShopCatalogStore: ObservableObject {
         }
     }
 
-    /// 店家列表：按最近上新时间倒序
+    /// 店家列表：按最近上新时间倒序（排除已归档店家）
     func shopsSortedByActivity() -> [CatalogShop] {
         guard let catalog else { return [] }
-        return catalog.shops.sorted {
-            (latestActivityDate(shopID: $0.id) ?? .distantPast)
-                > (latestActivityDate(shopID: $1.id) ?? .distantPast)
-        }
+        return catalog.shops
+            .filter { Self.isLive($0.archivedAt) }
+            .sorted {
+                (latestActivityDate(shopID: $0.id) ?? .distantPast)
+                    > (latestActivityDate(shopID: $1.id) ?? .distantPast)
+            }
     }
 
     /// 店家搜索：正式名包含命中或任一别名包含命中（计划 §8：第一版搜索范围 = 店家名称与别名）
@@ -159,14 +179,14 @@ final class ShopCatalogStore: ObservableObject {
     // MARK: 系列（计划 §10 / §11）
 
     func series(id: String) -> CatalogSeries? {
-        catalog?.series.first { $0.id == id }
+        catalog?.series.first { $0.id == id && Self.isLive($0.archivedAt) }
     }
 
-    /// 店家的全部系列，按年份倒序（无年份的排最后）
+    /// 店家的全部系列，按年份倒序（无年份的排最后；排除已归档系列）
     func series(inShop shopID: String) -> [CatalogSeries] {
         guard let catalog else { return [] }
         return catalog.series
-            .filter { $0.shopID == shopID }
+            .filter { $0.shopID == shopID && Self.isLive($0.archivedAt) }
             .sorted {
                 switch (($0.year ?? .min, $1.year ?? .min)) {
                 case let (a, b) where a != b: return a > b
@@ -180,7 +200,7 @@ final class ShopCatalogStore: ObservableObject {
     }
 
     func productCount(inSeries seriesID: String) -> Int {
-        catalog?.products.filter { $0.seriesID == seriesID }.count ?? 0
+        catalog?.products.filter { $0.seriesID == seriesID && Self.isLive($0.archivedAt) }.count ?? 0
     }
 
     /// 系列卡上的「yyyy.MM 上新」：该系列下已开始的最新 SaleEvent 时间（参考图4）
@@ -194,10 +214,10 @@ final class ShopCatalogStore: ObservableObject {
             .max()
     }
 
-    /// 系列下某分类的商品；`nil` = 全部分类
+    /// 系列下某分类的商品；`nil` = 全部分类（排除已归档商品）
     func products(inSeries seriesID: String, category: String? = nil) -> [CatalogProduct] {
         guard let catalog else { return [] }
-        let all = catalog.products.filter { $0.seriesID == seriesID }
+        let all = catalog.products.filter { $0.seriesID == seriesID && Self.isLive($0.archivedAt) }
         guard let category else { return all }
         return all.filter { $0.category == category }
     }
@@ -224,7 +244,7 @@ final class ShopCatalogStore: ObservableObject {
     // MARK: 商品与规格（计划 §13）
 
     func product(id: String) -> CatalogProduct? {
-        catalog?.products.first { $0.id == id }
+        catalog?.products.first { $0.id == id && Self.isLive($0.archivedAt) }
     }
 
     func variants(forProduct productID: String) -> [CatalogProductVariant] {

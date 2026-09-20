@@ -72,6 +72,7 @@ enum CatalogPublicationStatus: String, Codable, CaseIterable, Identifiable {
 // MARK: - Shop 店家
 
 /// 店家（计划 §4 模型表：id, name, aliases, logo, cover, description）
+/// V1.1 §4.2 归档保护：被引用实体禁止物理删除，只能写 archivedAt（nil = 未归档）。
 struct CatalogShop: Codable, Identifiable, Hashable, Sendable {
     var id: String
     var name: String
@@ -80,17 +81,21 @@ struct CatalogShop: Codable, Identifiable, Hashable, Sendable {
     var logo: String? = nil
     var cover: String? = nil
     var description: String? = nil
+    /// 归档标记（V1.1 §4.2）：nil = 未归档；非 nil = 归档时间。decodeIfPresent 兼容旧 JSON
+    var archivedAt: Date? = nil
 
     /// 兼容旧格式：aliases 缺失时兜底为空数组（带默认值的非可选字段
     /// 不被合成 Decodable 自动兜底，需显式 decodeIfPresent）
     init(id: String, name: String, aliases: [String] = [],
-         logo: String? = nil, cover: String? = nil, description: String? = nil) {
+         logo: String? = nil, cover: String? = nil, description: String? = nil,
+         archivedAt: Date? = nil) {
         self.id = id
         self.name = name
         self.aliases = aliases
         self.logo = logo
         self.cover = cover
         self.description = description
+        self.archivedAt = archivedAt
     }
 
     init(from decoder: Decoder) throws {
@@ -101,7 +106,8 @@ struct CatalogShop: Codable, Identifiable, Hashable, Sendable {
             aliases: try c.decodeIfPresent([String].self, forKey: .aliases) ?? [],
             logo: try c.decodeIfPresent(String.self, forKey: .logo),
             cover: try c.decodeIfPresent(String.self, forKey: .cover),
-            description: try c.decodeIfPresent(String.self, forKey: .description))
+            description: try c.decodeIfPresent(String.self, forKey: .description),
+            archivedAt: try c.decodeIfPresent(Date.self, forKey: .archivedAt))
     }
 
     /// 名称或任一别名命中（大小写不敏感），供店家搜索与导入匹配复用
@@ -125,6 +131,9 @@ struct CatalogSeries: Codable, Identifiable, Hashable, Sendable {
     var season: String? = nil
     var cover: String? = nil
     var description: String? = nil
+    /// 归档标记（V1.1 §4.2）：nil = 未归档，非 nil = 归档时间。
+    /// Optional 字段由合成 Decodable 以 decodeIfPresent 处理，旧 JSON 缺键自动置 nil。
+    var archivedAt: Date? = nil
 }
 
 // MARK: - Product 商品
@@ -140,10 +149,14 @@ struct CatalogProduct: Codable, Identifiable, Hashable, Sendable {
     /// 商品图（CatalogAsset 的 id 列表；原图一律经 CatalogAsset.originalURL 取）
     var images: [String] = []
     var description: String? = nil
+    /// 归档标记（V1.1 §4.2）：nil = 未归档，非 nil = 归档时间。
+    /// Optional 字段由合成 Decodable 以 decodeIfPresent 处理，旧 JSON 缺键自动置 nil。
+    var archivedAt: Date? = nil
 
     /// 兼容旧格式：images 缺失时兜底为空数组（理由同 CatalogShop.init(from:)）
     init(id: String, shopID: String, seriesID: String, name: String,
-         category: String, images: [String] = [], description: String? = nil) {
+         category: String, images: [String] = [], description: String? = nil,
+         archivedAt: Date? = nil) {
         self.id = id
         self.shopID = shopID
         self.seriesID = seriesID
@@ -151,6 +164,7 @@ struct CatalogProduct: Codable, Identifiable, Hashable, Sendable {
         self.category = category
         self.images = images
         self.description = description
+        self.archivedAt = archivedAt
     }
 
     init(from decoder: Decoder) throws {
@@ -162,7 +176,8 @@ struct CatalogProduct: Codable, Identifiable, Hashable, Sendable {
             name: try c.decode(String.self, forKey: .name),
             category: try c.decode(String.self, forKey: .category),
             images: try c.decodeIfPresent([String].self, forKey: .images) ?? [],
-            description: try c.decodeIfPresent(String.self, forKey: .description))
+            description: try c.decodeIfPresent(String.self, forKey: .description),
+            archivedAt: try c.decodeIfPresent(Date.self, forKey: .archivedAt))
     }
 }
 
