@@ -35,10 +35,13 @@ enum ShopCatalogFormat {
 
 // MARK: - 浏览根
 
-/// 时光馆「店家上新」入口页（fullScreenCover 呈现，自带导航栈与关闭按钮）
+/// 时光馆首屏「店家上新」（Phase 1：直接作为底部 Tab 根视图，也兼容 fullScreenCover）。
+/// `onLegacyArchive` 非 nil 时，左上角按钮变为「馆藏档案」次级入口（过渡期只读旧馆）；
+/// 否则保持原「返回时光馆」关闭按钮（fullScreenCover 场景）。
 struct ShopCatalogBrowseView: View {
     @Environment(\.dismiss) private var dismiss
     @ObservedObject private var store = ShopCatalogStore.shared
+    var onLegacyArchive: (() -> Void)? = nil
 
     var body: some View {
         NavigationStack {
@@ -51,14 +54,23 @@ struct ShopCatalogBrowseView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    Button {
-                        dismiss()
-                    } label: {
-                        Image(systemName: "chevron.down")
-                            .font(.system(size: 15, weight: .semibold))
-                            .foregroundStyle(.secondary)
+                    if let onLegacyArchive {
+                        Button(action: onLegacyArchive) {
+                            Image(systemName: "books.vertical")
+                                .font(.system(size: 15, weight: .semibold))
+                                .foregroundStyle(.secondary)
+                        }
+                        .accessibilityLabel("馆藏档案")
+                    } else {
+                        Button {
+                            dismiss()
+                        } label: {
+                            Image(systemName: "chevron.down")
+                                .font(.system(size: 15, weight: .semibold))
+                                .foregroundStyle(.secondary)
+                        }
+                        .accessibilityLabel("返回时光馆")
                     }
-                    .accessibilityLabel("返回时光馆")
                 }
             }
         }

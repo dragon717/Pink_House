@@ -347,6 +347,8 @@ struct TimeHallView: View {
   @State private var isHeaderCollapsed = false
   /// 「店家上新 / 历年系列」浏览（Phase 2：只读）
   @State private var showsShopCatalog = false
+  /// Phase 1 重构：时光馆首屏 = 店家上新；旧四模式内容降级为「馆藏档案」只读次级入口。
+  @State private var showsLegacyArchive = false
 
   private var palette: MagicThemePalette {
     MagicThemeDesignSystem.palette(themeManager: themeManager, colorScheme: colorScheme)
@@ -439,21 +441,14 @@ struct TimeHallView: View {
 
   var body: some View {
     Group {
-      if activeMerchant == .pinkHouse {
-        pinkHouseHall
-      } else if activeMerchant == .midsummerTale {
-        // 仲夏物语走独立品牌页：布局参考淘宝品牌页（左年份栏 + 系列筛选 + 商品卡片）
-        MidsummerBrandView(onClose: {
-          isHeaderCollapsed = false
-          activeMerchant = nil
-          curatedCatalog = nil
-        })
-      } else if let activeMerchant {
-        curatedBrandHall(activeMerchant)
+      if showsLegacyArchive {
+        // 过渡期（重构方案 Phase 1–3）：旧编年史/图鉴/珍选/搭配降级为只读归档入口
+        legacyRoot
+          // 旧馆自带自绘头部，隐藏系统导航栏；限定作用域，避免连带隐藏首屏店家上新的导航栏
+          .toolbar(.hidden, for: .navigationBar)
       } else {
-        // 主页参考图一：品牌列表（方形缩略图 + 名称 + 「N件新品｜N天前加入」 + 进店）。
-        // 旧的左右滑动轮播选品牌页（`merchantSelection`）不再作为主页使用。
-        brandListHome
+        // 首屏 = 店家上新（V1.1 文档：时光馆 → 店家上新 → …）
+        ShopCatalogBrowseView(onLegacyArchive: { showsLegacyArchive = true })
       }
     }
     .sheet(item: $detailCommerceItem) { item in
@@ -468,16 +463,51 @@ struct TimeHallView: View {
       activeMerchant = nil
       curatedCatalog = nil
       isHeaderCollapsed = false
+      showsLegacyArchive = false
     }
     .onChange(of: carouselMerchant) { _, merchant in
       storeTheme = TimeHallStoreTheme.themes(for: merchant).first ?? .omotesando
     }
-    .toolbar(.hidden, for: .navigationBar)
     // 首屏不等它（§15.3）：先把 Bundle 快照铺满，再在后台确认线上版本。
     // 内部受 `TimeHallRuntimeConfiguration.isCloudSyncEnabled` 与
     // `didStartCloudRefresh` 双重保护，开关关闭时不会发出任何请求。
     .task {
       store.startCloudRefreshIfNeeded()
+    }
+  }
+
+  /// 旧时光馆内容（编年史 / 图鉴 / 珍选 / 搭配），Phase 1 起仅作只读归档入口可达。
+  /// 仅移动挂载位置，逻辑零改动；迁移完成后随 Phase 4 下线。
+  private var legacyRoot: some View {
+    Group {
+      if activeMerchant == .pinkHouse {
+        pinkHouseHall
+      } else if activeMerchant == .midsummerTale {
+        // 仲夏物语走独立品牌页：布局参考淘宝品牌页（左年份栏 + 系列筛选 + 商品卡片）
+        MidsummerBrandView(onClose: {
+          isHeaderCollapsed = false
+          activeMerchant = nil
+          curatedCatalog = nil
+        })
+      } else if let activeMerchant {
+        curatedBrandHall(activeMerchant)
+      } else {
+        brandListHome
+      }
+    }
+    .overlay(alignment: .topTrailing) {
+      Button {
+        showsLegacyArchive = false
+      } label: {
+        Label("店家上新", systemImage: "chevron.right")
+          .font(.system(size: 12, weight: .semibold))
+          .padding(.horizontal, 10)
+          .padding(.vertical, 6)
+          .background(Capsule().fill(.thinMaterial))
+      }
+      .padding(.trailing, 16)
+      .padding(.top, 6)
+      .accessibilityLabel("返回店家上新")
     }
   }
 

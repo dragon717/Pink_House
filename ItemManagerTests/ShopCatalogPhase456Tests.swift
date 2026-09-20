@@ -80,16 +80,22 @@ final class ShopCatalogPhase456Tests: XCTestCase {
     // MARK: Phase 4 套装合并（§12/§19-24）
 
     func testSetDraftMergesAccessories() throws {
-        // 主衣物 JSK + 小物 KC / 袖套 / 包 → 一条记录（§12 示例）
-        let draft = try ShopCatalogWardrobeDraftBuilder.makeSetDraft(
+        // 主衣物 JSK + 小物 KC / 袖套 / 包 → 一条记录（§12 示例；§23 拆条：小物挂第一条主衣物）
+        let results = try ShopCatalogWardrobeDraftBuilder.makeSplitDrafts(
             selections: [
                 .init(productID: "prod-ag-xueguo-jsk", priceMode: .stock),
                 .init(productID: "prod-ag-xueguo-kc", priceMode: .stock),
                 .init(productID: "prod-ag-xueguo-armwarmer", priceMode: .stock),
                 .init(productID: "prod-ag-xueguo-bag", priceMode: .stock),
             ],
+            accessoryProductIDs: [
+                "prod-ag-xueguo-kc", "prod-ag-xueguo-armwarmer", "prod-ag-xueguo-bag",
+            ],
             store: store, modelContext: modelContext()
         )
+        // 只有一件主衣物 → 仅一条记录
+        XCTAssertEqual(results.count, 1)
+        let draft = results[0].draft
         // 主类型由主衣物决定（§20）
         XCTAssertEqual(draft.types, "JSK")
         // 小物写入现有「小物」栏（§21）
@@ -101,17 +107,33 @@ final class ShopCatalogPhase456Tests: XCTestCase {
         XCTAssertTrue(draft.name.contains("＋"), "套装名称应包含小物成员")
     }
 
-    func testSetDraftRejectsMultiplePrimaries() throws {
-        // 计划 §23：JSK + OP 两件主衣物 → 冲突检测
-        XCTAssertThrowsError(try ShopCatalogWardrobeDraftBuilder.makeSetDraft(
+    func testSplitDraftsCreateRecordPerPrimary() throws {
+        // §23：多件主衣物各自成一条记录（JSK + OP → 2 条），不再视为冲突
+        let results = try ShopCatalogWardrobeDraftBuilder.makeSplitDrafts(
             selections: [
                 .init(productID: "prod-ag-xueguo-jsk", priceMode: .stock),
                 .init(productID: "prod-unniq-yunduo-op", priceMode: .stock),
             ],
+            accessoryProductIDs: [],
+            store: store, modelContext: modelContext()
+        )
+        XCTAssertEqual(results.count, 2)
+        XCTAssertEqual(results[0].draft.types, "JSK")
+        XCTAssertEqual(results[1].draft.types, "OP")
+    }
+
+    func testSetDraftRejectsPrimaryMarkedAsAccessory() throws {
+        // 计划 §23：主衣物不能被勾为小物（服务层防呆，防静默丢弃）
+        XCTAssertThrowsError(try ShopCatalogWardrobeDraftBuilder.makeSplitDrafts(
+            selections: [
+                .init(productID: "prod-ag-xueguo-jsk", priceMode: .stock),
+                .init(productID: "prod-unniq-yunduo-op", priceMode: .stock),
+            ],
+            accessoryProductIDs: ["prod-unniq-yunduo-op"],
             store: store, modelContext: modelContext()
         )) { error in
-            guard case ShopCatalogWardrobeError.multiplePrimaries = error else {
-                return XCTFail("应抛 multiplePrimaries，实际：\(error)")
+            guard case ShopCatalogWardrobeError.primaryMarkedAsAccessory = error else {
+                return XCTFail("应抛 primaryMarkedAsAccessory，实际：\(error)")
             }
         }
     }
@@ -214,6 +236,13 @@ final class ShopCatalogPhase456Tests: XCTestCase {
         draft.newShopName = "测试新店家"
         draft.newSeriesName = "测试系列"
         draft.newSeriesYear = 2026
+
+        // §31 状态机：仅 reviewed 可发布（draft → submitted → reviewed）。
+        // advance 只更新 Store 内副本，调用方需回读最新状态再推进。
+        try draftStore.advance(draft, to: .submitted)
+        draft = try XCTUnwrap(draftStore.drafts.first { $0.id == draft.id })
+        try draftStore.advance(draft, to: .reviewed)
+        draft = try XCTUnwrap(draftStore.drafts.first { $0.id == draft.id })
 
         let summary = try draftStore.publish(draft, store: store)
         XCTAssertTrue(summary.contains("测试发布款"))

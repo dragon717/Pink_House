@@ -167,6 +167,15 @@ enum ShopCatalogWardrobeDraftBuilder {
         let primaryEntries = built.filter {
             ShopCatalogWardrobeCategory.isPrimary($0.product.category) && !accessorySet.contains($0.product.id)
         }
+        // §23「不能把 OP 当小物」：主衣物分类被勾为小物属于非法勾选，
+        // 必须显式报错而不是静默丢弃（否则该商品会凭空消失）。
+        let illegalAccessories = built.filter {
+            ShopCatalogWardrobeCategory.isPrimary($0.product.category) && accessorySet.contains($0.product.id)
+        }
+        if !illegalAccessories.isEmpty {
+            throw ShopCatalogWardrobeError.primaryMarkedAsAccessory(
+                illegalAccessories.map(\.product.name))
+        }
         let accessoryEntries = built.filter {
             !ShopCatalogWardrobeCategory.isPrimary($0.product.category) && accessorySet.contains($0.product.id)
         }
@@ -369,6 +378,8 @@ nonisolated enum ShopCatalogWardrobeError: LocalizedError {
     case emptySelection
     case productNotFound(String)
     case multiplePrimaries([String])
+    /// §23：主衣物（JSK/OP/SK/Blouse）不能被勾为小物
+    case primaryMarkedAsAccessory([String])
 
     var errorDescription: String? {
         switch self {
@@ -379,6 +390,8 @@ nonisolated enum ShopCatalogWardrobeError: LocalizedError {
         case .multiplePrimaries(let names):
             // 计划 §23：多主衣物需用户先取消多余主衣物
             return "一次只能加入一件主衣物，当前选中了多件：\(names.joined(separator: "、"))。请取消多余的 JSK/OP/SK/Blouse 后重试。"
+        case .primaryMarkedAsAccessory(let names):
+            return "主衣物不能勾选为小物：\(names.joined(separator: "、"))。主衣物会各自生成一条衣橱记录。"
         }
     }
 }
