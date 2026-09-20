@@ -129,7 +129,7 @@ struct ShopCatalogOpsView: View {
 
     private var importSection: some View {
         Section("淘宝导入（分享文本 / 链接）") {
-            TextEditor(text: $importProxy)
+            TextEditor(text: $importText)
                 .frame(minHeight: 72)
                 .font(.system(size: 13))
             Button {

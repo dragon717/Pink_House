@@ -792,8 +792,7 @@ struct ShopCatalogReservationSheet: View {
         }
         // §17：尾款时间可设置；未设置 = 待公布（沿用草稿里的占位）
         if hasTailDate {
-            draft.finalPaymentDate = tailDate
-            draft.finalPaymentEndDate = tailDate
+            draft = draft.with(finalPaymentDate: tailDate, finalPaymentEndDate: tailDate)
         }
         do {
             _ = try ShopCatalogWardrobeInserter.insert(

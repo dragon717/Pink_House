@@ -116,7 +116,7 @@ struct ShopCatalogWardrobeMergeView: View {
                 HStack(spacing: 10) {
                     ForEach(items, id: \.product.id) { item in
                         VStack(alignment: .leading, spacing: 5) {
-                            ShopCatalogAssetImage(reference: store.asset(id: item.product.images.first)?.originalURL ?? item.product.images.first)
+                            ShopCatalogAssetImage(reference: item.product.images.first.flatMap { store.asset(id: $0)?.originalURL ?? $0 })
                                 .aspectRatio(3 / 4, contentMode: .fill)
                                 .frame(width: 74)
                                 .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
@@ -251,12 +251,14 @@ struct ShopCatalogWardrobeMergeView: View {
         Button {
             confirmInsert()
         } label: {
-            if isInserting {
-                ProgressView().tint(.white).padding(.vertical, 14)
-            } else {
-                Text("确认加入衣橱".appLocalized)
-                    .font(.system(size: 16, weight: .semibold))
-                    .padding(.vertical, 14)
+            Group {
+                if isInserting {
+                    ProgressView().tint(.white).padding(.vertical, 14)
+                } else {
+                    Text("确认加入衣橱".appLocalized)
+                        .font(.system(size: 16, weight: .semibold))
+                        .padding(.vertical, 14)
+                }
             }
             .frame(maxWidth: .infinity)
         }

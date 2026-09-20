@@ -182,36 +182,96 @@ enum ShopCatalogWardrobeDraftBuilder {
         }
 
         return entryHeads.enumerated().map { index, head in
-            var draft = head.draft
+            guard index == 0 else { return (draft: head.draft, selection: head.selection) }
+
             // 小物只挂第一条主衣物记录（§23 示例：JSK + KC / OP 各一条）
-            if index == 0 {
-                let names = accessoryEntries.map { $0.product.name }
-                let accessoryPriceTotal = accessoryEntries.reduce(Decimal(0)) { sum, item in
-                    let archive = store.priceArchive(forProduct: item.product.id)
-                    return sum + (archive.currentStockPrice ?? archive.historicalReservationPrice ?? 0)
-                }
-                if !names.isEmpty {
-                    draft.accessories = names.joined(separator: "、") // §21 写入现有「小物」栏
-                    draft.accessoriesPrice = NSDecimalNumber(decimal: accessoryPriceTotal).doubleValue
-                }
-                var noteLines = draft.note.components(separatedBy: "\n")
-                for item in accessoryEntries {
-                    noteLines.append("小物：\(item.product.name)（\(accessoryPriceLine(item.product))）")
-                }
-                draft.note = noteLines.joined(separator: "\n")
-                if head.draft.isDepositPlan {
-                    // 预约套装：小物价计入尾款（§24 尾款多件写入）
-                    draft.balance += NSDecimalNumber(decimal: accessoryPriceTotal).doubleValue
-                    draft.priceTotal += NSDecimalNumber(decimal: accessoryPriceTotal).doubleValue
-                } else {
-                    draft.priceTotal += NSDecimalNumber(decimal: accessoryPriceTotal).doubleValue
-                }
-                draft.name = names.isEmpty
-                    ? draft.name
-                    : "\(head.product.name)＋\(names.joined(separator: "＋"))（套装）"
+            let names = accessoryEntries.map { $0.product.name }
+            let accessoryPriceTotal = accessoryEntries.reduce(Decimal(0)) { sum, item in
+                let archive = store.priceArchive(forProduct: item.product.id)
+                return sum + (archive.currentStockPrice ?? archive.historicalReservationPrice ?? 0)
             }
-            return (draft: draft, selection: head.selection)
+            var noteLines = head.draft.note.components(separatedBy: "\n")
+            for item in accessoryEntries {
+                noteLines.append("小物：\(item.product.name)（\(accessoryPriceLine(item.product))）")
+            }
+
+            let accessoryTotalDouble = NSDecimalNumber(decimal: accessoryPriceTotal).doubleValue
+            // 预约套装：小物价计入尾款（§24 尾款多件写入）
+            let mergedBalance = head.draft.isDepositPlan
+                ? head.draft.balance + accessoryTotalDouble
+                : head.draft.balance
+            let mergedName = names.isEmpty
+                ? head.draft.name
+                : "\(head.product.name)＋\(names.joined(separator: "＋"))（套装）"
+
+            // ClothingEditDraft 全 let + 显式 init：用复制重建生成合并后的草稿
+            let merged = head.draft.with(
+                name: mergedName,
+                accessories: names.joined(separator: "、"), // §21 写入现有「小物」栏
+                accessoriesPrice: accessoryTotalDouble,
+                priceTotal: head.draft.priceTotal + accessoryTotalDouble,
+                balance: mergedBalance,
+                note: noteLines.joined(separator: "\n")
+            )
+            return (draft: merged, selection: head.selection)
         }
+    }
+}
+
+// MARK: - 草稿复制重建
+
+/// `ClothingEditDraft` 的属性全部为 `let`（显式 init，属现有衣橱底层，不改）。
+/// 店家上新套装合并 / 预约改尾款时间需要「改若干字段」的语义，这里以复制重建实现。
+extension ClothingEditDraft {
+    func with(
+        name: String? = nil,
+        accessories: String? = nil,
+        accessoriesPrice: Double? = nil,
+        priceTotal: Double? = nil,
+        balance: Double? = nil,
+        note: String? = nil,
+        finalPaymentDate: Date? = nil,
+        finalPaymentEndDate: Date? = nil
+    ) -> ClothingEditDraft {
+        ClothingEditDraft(
+            id: id,
+            name: name ?? self.name,
+            brandName: brandName,
+            types: types,
+            colors: colors,
+            sizes: sizes,
+            length: length,
+            condition: condition,
+            accessories: accessories ?? self.accessories,
+            imagePaths: imagePaths,
+            isShared: isShared,
+            originalPrice: originalPrice,
+            originalPriceJPY: originalPriceJPY,
+            originalPriceCurrencyCode: originalPriceCurrencyCode,
+            originalPriceExchangeRateJPY: originalPriceExchangeRateJPY,
+            originalPriceRateUpdatedAt: originalPriceRateUpdatedAt,
+            priceTotal: priceTotal ?? self.priceTotal,
+            deposit: deposit,
+            balance: balance ?? self.balance,
+            accessoriesPrice: accessoriesPrice ?? self.accessoriesPrice,
+            shippingFee: shippingFee,
+            shippingFeeJPY: shippingFeeJPY,
+            shippingFeeCurrencyCode: shippingFeeCurrencyCode,
+            shippingExchangeRateJPY: shippingExchangeRateJPY,
+            shippingRateUpdatedAt: shippingRateUpdatedAt,
+            stock: stock,
+            purchaseDate: purchaseDate,
+            depositDate: depositDate,
+            isDepositPlan: isDepositPlan,
+            reservationKindRawValue: reservationKindRawValue,
+            finalPaymentDate: finalPaymentDate ?? self.finalPaymentDate,
+            finalPaymentEndDate: finalPaymentEndDate ?? self.finalPaymentEndDate,
+            note: note ?? self.note,
+            accessoryList: accessoryList,
+            sizeChartImagePath: sizeChartImagePath,
+            priceChartImagePath: priceChartImagePath,
+            selectedTags: selectedTags
+        )
     }
 }
 
