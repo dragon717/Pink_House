@@ -328,6 +328,7 @@ struct TimeHallView: View {
   @Environment(ThemeManager.self) private var themeManager
   @Environment(\.colorScheme) private var colorScheme
   @Environment(\.isRoutePageActive) private var isRoutePageActive
+  @Environment(\.modelContext) private var modelContext
   @ObservedObject private var store = TimeHallCatalogStore.shared
 
   @State private var carouselMerchant: TimeHallMerchant = .pinkHouse
@@ -473,6 +474,9 @@ struct TimeHallView: View {
     // `didStartCloudRefresh` 双重保护，开关关闭时不会发出任何请求。
     .task {
       store.startCloudRefreshIfNeeded()
+      // 旧馆收藏 → 心愿尾款 一次性迁移（方案 §5.6；标记存在即静默跳过，
+      // 未匹配收藏保留旧馆归档，treasured.v1 原键永不删除）
+      TimeHallTreasuredWishMigrator.runIfNotYetMigrated(modelContext: modelContext)
     }
   }
 
