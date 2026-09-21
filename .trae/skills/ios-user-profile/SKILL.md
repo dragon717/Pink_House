@@ -1,198 +1,45 @@
 ---
-name: "ios-user-profile"
-description: "iOS用户资料管理（头像+昵称）实现指南。包含持久化、备份恢复、多用户支持。Invoke when implementing user avatar/nickname features with Apple ID integration."
+name: ios-user-profile
+description: "Pink_House iOS 端的用户资料（自定义头像 + 昵称）模块。当要改头像或昵称的持久化、增删 Documents/UserAvatars 下的头像文件、调整 UserDefaults 的 userProfiles / customNickname / customAvatarPath 存取、把用户资料接入备份与恢复、改 UserProfileEditView / UserAvatarView 的展示或尺寸、处理多 Apple ID 切换后的资料归属、或在 MainActor 默认隔离下从非主线程读取用户资料时使用。也用于这些具体症状：头像换了却不刷新、重装或换机后头像路径失效、退出再登录资料串号、备份恢复后头像丢失。"
 ---
 
-# iOS 用户资料管理最佳实践
+本技能描述的是 Pink_House 仓库里**已经存在的实现**，不是一份可照抄的教程。
 
-## 功能概述
-实现用户自定义头像和昵称功能，支持与 Apple ID 绑定，实现多用户独立存储。
+**铁律：动这块代码前先读真实文件，不要照本技能或任何文档里的片段直接覆盖。**
+仓库里的实现会演进，脱离仓库的示例代码必然漂移（历史上就发生过：`customAvatarPath` 从
+"存完整路径"改成"只存文件名"，而文档里还留着旧口径）。
 
-## 核心架构
+## TRIGGER / DO NOT TRIGGER
 
-### 1. 数据模型设计
+TRIGGER 当：改头像 / 昵称的存储或展示、把用户资料接进备份、处理多 Apple ID 资料归属、排查头像不刷新或恢复后丢失。
+DO NOT TRIGGER 当：只改与用户资料无关的 UI、只做 SwiftUI 通用版式调整、或只跑不涉及落盘的纯逻辑单测。
 
-```swift
-// 用户资料结构体
-struct UserProfile: Codable {
-    var nickname: String = ""
-    var avatarPath: String = ""
-    var updatedAt: Date = Date()
-}
-```
+## 真实文件地图
 
-### 2. 持久化策略
+| 关注点 | 文件 |
+|---|---|
+| 资料模型 + 持久化 + 多用户存取 | `ItemManager/Services/AuthenticationManager.swift` |
+| 头像编辑页（相册 / 拍照 / 删除） | `ItemManager/Views/Settings/UserProfileEditView.swift` |
+| 头像展示组件 | `ItemManager/Components/UserAvatarView.swift` |
+| 备份 / 恢复 | `ItemManager/Services/BackupService.swift`、`ItemManager/Services/BackupModels.swift` |
+| 账户卡片（40pt 头像） | `ItemManager/Views/Settings/Components/AccountCard.swift` |
+| 「我」页（80 / 50pt 头像） | `ItemManager/Views/MeView.swift` |
 
-**存储位置：**
-- 头像文件：`Documents/UserAvatars/{filename}.jpg`
-- 用户资料：`@AppStorage("userProfiles")` (JSON 格式)
+## 四条最容易出错的口径
 
-**多用户支持：**
-```swift
-// 存储格式: [userID: UserProfile]
-@AppStorage("userProfiles") private var userProfilesData: String = "{}"
-```
+1. **`customAvatarPath` 只存文件名，不存绝对路径。** 完整 URL 由 `avatarFileURL` 动态拼
+   （`Documents/UserAvatars/<filename>`）。存绝对路径会在重装 / 换机后失效。
+2. **`userProfiles` 是一个 JSON 字符串**（`@AppStorage` 存不了字典），
+   key 为 `userIdentifier`，格式 `[String: UserProfile]`。解析失败时静默回落空字典，不抛错。
+3. **`AuthenticationManager` 是 `@MainActor` 隔离的。** 非主线程读取必须 `await MainActor.run { }`。
+   （工程开了 `SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor`。）
+4. **落盘测试不准指向真实沙盒。** 单测宿主就是主 App，`FileManager.default` = 用户数据目录。
+   见 `concurrency-and-testing.md`。
 
-### 3. 核心类设计
+## References
 
-```swift
-@MainActor
-class AuthenticationManager: ObservableObject {
-    // 当前用户资料（实时同步）
-    @AppStorage("customNickname") var customNickname: String = ""
-    @AppStorage("customAvatarPath") var customAvatarPath: String = ""
-    
-    // 显示名称（优先自定义，其次 Apple ID）
-    var displayName: String {
-        if !customNickname.isEmpty { return customNickname }
-        if !givenName.isEmpty { return givenName }
-        return "已登录用户"
-    }
-    
-    // 按用户ID存取资料
-    func loadUserProfile(for userID: String) -> UserProfile
-    func saveUserProfile(_ profile: UserProfile, for userID: String)
-}
-```
-
-## 实现步骤
-
-### 步骤 1: 头像存储
-
-```swift
-func updateCustomAvatar(image: UIImage) {
-    // 1. 创建专用目录
-    let avatarDir = documentsDir.appendingPathComponent("UserAvatars", isDirectory: true)
-    try? FileManager.default.createDirectory(at: avatarDir, withIntermediateDirectories: true)
-    
-    // 2. 生成唯一文件名
-    let filename = "avatar_\(userIdentifier.suffix(8))_\(Int(Date().timeIntervalSince1970)).jpg"
-    let fileURL = avatarDir.appendingPathComponent(filename)
-    
-    // 3. 压缩保存
-    if let data = image.jpegData(compressionQuality: 0.8) {
-        try? data.write(to: fileURL)
-        
-        // 4. 删除旧头像
-        if !customAvatarPath.isEmpty {
-            try? FileManager.default.removeItem(atPath: customAvatarPath)
-        }
-        
-        // 5. 更新路径
-        customAvatarPath = fileURL.path
-    }
-}
-```
-
-### 步骤 2: 编辑界面
-
-```swift
-struct UserProfileEditView: View {
-    @ObservedObject var authManager: AuthenticationManager
-    @State private var nickname: String = ""
-    @State private var avatarImage: UIImage?
-    
-    // 功能：相册选择、拍照、删除头像
-}
-```
-
-**关键组件：**
-- `PhotosPicker`：相册选择
-- `UIImagePickerController`：拍照
-- `UserAvatarView`：头像显示（优先自定义，其次首字母）
-
-### 步骤 3: 备份/恢复集成
-
-**备份流程：**
-1. 收集当前用户资料（userID、nickname）
-2. 如有头像，添加文件到备份列表
-3. 更新 manifest 版本号
-
-**恢复流程：**
-1. 恢复 `userProfiles` 到 UserDefaults
-2. 复制头像文件到 `UserAvatars/` 目录
-3. 更新头像路径
-4. 如当前登录用户匹配，刷新显示
-
-```swift
-// BackupManifest 添加字段
-struct BackupManifest: Codable {
-    let userProfile: UserProfileDTO?
-    let userAvatarFile: String?
-}
-```
-
-## 最佳实践
-
-### 1. Actor 隔离处理
-
-```swift
-// 从非主线程访问 @MainActor 属性
-let userInfo = await MainActor.run { () -> (userId: String, nickname: String)? in
-    let auth = AuthenticationManager.shared
-    guard auth.isAuthenticated else { return nil }
-    return (auth.userIdentifier, auth.customNickname)
-}
-```
-
-### 2. 文件管理
-
-- **压缩质量**：0.8 平衡清晰度和大小
-- **唯一命名**：包含用户ID后缀 + 时间戳
-- **旧文件清理**：更新时删除旧头像
-
-### 3. 显示优先级
-
-```swift
-// 头像显示优先级：
-// 1. 自定义头像
-// 2. Apple ID 首字母缩写
-// 3. 默认图标
-
-// 昵称显示优先级：
-// 1. 自定义昵称
-// 2. Apple ID 名称
-// 3. "已登录用户"
-```
-
-### 4. 版本管理
-
-备份版本升级策略：
-- 新增字段使用 Optional
-- 恢复时检查字段存在性
-- 保持向后兼容
-
-## 界面规范
-
-### Sheet 尺寸
-```swift
-// 账户与同步页面占 90% 屏幕
-.sheet(isPresented: $showingSheet) {
-    CloudSyncSheetView(...)
-        .presentationDetents([.fraction(0.9)])
-}
-```
-
-### 头像尺寸
-- 编辑页面：120pt
-- 账户卡片：40-50pt
-- 账户详情：80pt
-
-## 常见问题
-
-### Q: 如何处理多个 Apple ID？
-A: 使用 `userProfiles` 字典，key 为 `userIdentifier`，每个用户独立存储。
-
-### Q: 退出登录后资料会丢失吗？
-A: 不会。资料按 userID 存储，重新登录相同 Apple ID 会自动恢复。
-
-### Q: 备份时未登录怎么办？
-A: 备份流程检查 `isAuthenticated`，未登录时跳过用户资料备份。
-
-## 相关文件
-
-- `AuthenticationManager.swift` - 核心管理类
-- `UserProfileEditView.swift` - 编辑界面
-- `UserAvatarView.swift` - 头像显示组件
-- `BackupService.swift` - 备份/恢复逻辑
-- `BackupModels.swift` - 备份数据结构
+- `references/architecture-and-storage.md`: 动手改这块之前读。存储布局、UserDefaults key 清单、多用户字典的读写路径。
+- `references/avatar-files.md`: 改头像写入 / 清理 / 命名时读。目录、命名规则、旧文件清理、以及"只存文件名"的正确口径。
+- `references/backup-and-restore.md`: 把用户资料接进备份 / 排查恢复后头像丢失时读。manifest 字段与恢复顺序。
+- `references/ui-and-sizing.md`: 改头像展示或编辑页版式时读。各调用点的真实尺寸与显示优先级。
+- `references/concurrency-and-testing.md`: 在非主线程访问资料、或为这块写单测时读。MainActor 访问方式 + 测试数据隔离硬规则。

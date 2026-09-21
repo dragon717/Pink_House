@@ -51556,6 +51556,9 @@
         }
       }
     },
+    "字母索引" : {
+
+    },
     "存储与性能" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -100193,6 +100196,9 @@
         }
       }
     },
+    "清除搜索" : {
+
+    },
     "清除标签筛选" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -101376,6 +101382,9 @@
           }
         }
       }
+    },
+    "点按或上下滑动，快速跳转到对应字母分组" : {
+
     },
     "点按跳到对应组件开关" : {
       "extractionState" : "stale",

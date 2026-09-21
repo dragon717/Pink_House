@@ -16,12 +16,90 @@ struct ShopCatalogOpsManageView: View {
     @Environment(\.modelContext) private var modelContext
     @State private var toast: String?
     @State private var actionError: String?
+    @State private var searchText = ""
+    @FocusState private var searchFieldFocused: Bool
+    @State private var hudLetter: String?
+
+    /// 修掉首尾空白后的搜索词
+    private var trimmedQuery: String {
+        searchText.trimmingCharacters(in: .whitespaces)
+    }
+
+    /// 搜索过滤后的店家（名称或别名命中）
+    private var filteredShops: [CatalogShop] {
+        let shops = store.catalog?.shops ?? []
+        return shops.filter {
+            AZIndexGrouping.matches(name: $0.name, aliases: $0.aliases, query: trimmedQuery)
+        }
+    }
+
+    /// A-Z 分组（含中文转拼音首字母）
+    private var shopGroups: [(letter: String, items: [CatalogShop])] {
+        AZIndexGrouping.groups(filteredShops) { $0.name }
+    }
 
     var body: some View {
-        Form {
-            shopSection
-            seriesSection
-            productSection
+        // 搜索栏在 VStack 上层、List 之外 → 常驻固定，不随内容滚动
+        VStack(spacing: 0) {
+            AZPinnedSearchBar(text: $searchText,
+                              focused: $searchFieldFocused,
+                              placeholder: "搜索店家名称或别名")
+            ScrollViewReader { proxy in
+                List {
+                    if trimmedQuery.isEmpty {
+                        // 店家：A-Z 分组 + 右侧索引滑块
+                        ForEach(shopGroups, id: \.letter) { group in
+                            Section {
+                                ForEach(group.items) { shop in
+                                    ShopManageRow(
+                                        shop: shop,
+                                        store: store,
+                                        modelContext: modelContext,
+                                        toast: $toast,
+                                        actionError: $actionError
+                                    )
+                                }
+                            } header: {
+                                Text(group.letter).id(group.letter)
+                            }
+                        }
+                        seriesSection
+                        productSection
+                    } else {
+                        if filteredShops.isEmpty {
+                            ContentUnavailableView.search(text: searchText)
+                        } else {
+                            Section("店家（\(filteredShops.count)）") {
+                                ForEach(filteredShops) { shop in
+                                    ShopManageRow(
+                                        shop: shop,
+                                        store: store,
+                                        modelContext: modelContext,
+                                        toast: $toast,
+                                        actionError: $actionError
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+                .listStyle(.insetGrouped)
+                .scrollDismissesKeyboard(.immediately)
+                .overlay(alignment: .trailing) {
+                    // 有搜索词时隐藏索引（符合系统搜索交互）
+                    if trimmedQuery.isEmpty, !shopGroups.isEmpty {
+                        AZIndexRail(letters: shopGroups.map(\.letter),
+                                    hudLetter: $hudLetter) { letter in
+                            withAnimation(nil) {
+                                proxy.scrollTo(letter, anchor: .top)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        .overlay {
+            AZIndexHUD(letter: hudLetter)
         }
         .navigationTitle("实体管理")
         .navigationBarTitleDisplayMode(.inline)
@@ -49,22 +127,6 @@ struct ShopCatalogOpsManageView: View {
             Text(actionError ?? "")
         }
         .onAppear { store.loadFromBundleIfNeeded() }
-    }
-
-    // MARK: 店家
-
-    private var shopSection: some View {
-        Section("店家（\(store.catalog?.shops.count ?? 0)）") {
-            ForEach(store.catalog?.shops ?? []) { shop in
-                ShopManageRow(
-                    shop: shop,
-                    store: store,
-                    modelContext: modelContext,
-                    toast: $toast,
-                    actionError: $actionError
-                )
-            }
-        }
     }
 
     // MARK: 系列
