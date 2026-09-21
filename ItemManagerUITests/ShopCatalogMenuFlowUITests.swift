@@ -82,6 +82,46 @@ final class ShopCatalogMenuFlowUITests: XCTestCase {
     capture(app, "05-完成回店家主页")
   }
 
+  // MARK: - 四态按钮（真实种子状态实证）
+
+  /// 种子窗口（2026-09-21 视角）：
+  ///   · 雪国来信 JSK  预约中（09-10 → 09-28）   → 【加入心愿】+【我已经预约】
+  ///   · 雪国来信 单肩包 现货在售（无截止）        → 【加入少女衣橱】（无加入心愿）
+  @MainActor
+  func testProductDetailActionButtonMatchesSalePhase() throws {
+    let app = launchAndNavigateToShop()
+
+    // 进点菜页
+    let seriesCard = app.staticTexts["雪国来信"]
+    scrollUntilVisible(app, seriesCard)
+    seriesCard.tap()
+    XCTAssertTrue(app.navigationBars["雪国来信"].waitForExistence(timeout: 8), "应直达点菜页")
+
+    // 1) JSK：预约中 → 加入心愿 + 我已经预约
+    let jskRow = app.staticTexts["雪国来信 JSK"]
+    scrollUntilVisible(app, jskRow)
+    jskRow.tap()
+    XCTAssertTrue(app.navigationBars["商品详情"].waitForExistence(timeout: 6), "应进入 JSK 详情")
+    let wish = app.buttons["加入心愿"]
+    XCTAssertTrue(wish.waitForExistence(timeout: 6), "预约中商品主按钮应为「加入心愿」")
+    XCTAssertTrue(app.buttons["我已经预约"].exists, "预约中应显示「我已经预约」次按钮")
+    capture(app, "10-四态按钮-预约中")
+
+    // 返回点菜页
+    app.navigationBars.buttons.firstMatch.tap()
+    XCTAssertTrue(app.navigationBars["雪国来信"].waitForExistence(timeout: 6), "应回到点菜页")
+
+    // 2) 单肩包：现货在售 → 加入少女衣橱，且不出现加入心愿
+    let bagRow = app.staticTexts["雪国来信 单肩包"]
+    scrollUntilVisible(app, bagRow)
+    bagRow.tap()
+    XCTAssertTrue(app.navigationBars["商品详情"].waitForExistence(timeout: 6), "应进入单肩包详情")
+    let wardrobe = app.buttons["加入少女衣橱"]
+    XCTAssertTrue(wardrobe.waitForExistence(timeout: 6), "现货在售商品主按钮应为「加入少女衣橱」")
+    XCTAssertFalse(app.buttons["加入心愿"].exists, "现货在售不应出现「加入心愿」")
+    capture(app, "11-四态按钮-现货在售")
+  }
+
   // MARK: - 导航前置
 
   /// 启动 → 关弹窗 → 时光馆 tab → 店家列表点 Alice Girl → 店家主页
