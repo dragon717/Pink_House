@@ -3,10 +3,10 @@
 //  ItemManager
 //
 //  店家商品库运营端（Phase 6，计划 §26-31）：
-//    · CatalogProductDraft  运营草稿（§27 自动生成草稿 → 人工补录）
-//    · ShopCatalogTaobaoParser  淘宝分享文本 / URL 导入的轻量解析（§28）
+//    · CatalogProductDraft  运营草稿（§27 手动录入草稿 → 人工补录）
 //    · ShopCatalogDraftStore    草稿持久化 + 发布 → 覆盖层 JSON（§31 草稿/发布）
 //    · 发布校验：必填项、价格、定金尾款对账、Shop/Series/Product 去重（§29）
+//    · 淘宝导入（§28 ShopCatalogTaobaoParser）与批量导入已下线，代码已删除
 //
 //  简化说明（第一版）：审核态由白名单创作者一步完成——发布 = 校验通过后
 //  写入覆盖层并对用户可见；CatalogPublicationStatus 枚举保留完整状态机。
@@ -57,7 +57,6 @@ nonisolated struct CatalogProductDraft: Codable, Identifiable, Hashable, Sendabl
     var balance: Double?
     var startAt: Date? = nil
     var endAt: Date? = nil
-    var sourceURL: String? = nil
 
     /// 完整商品资料（V1.1 G5：手动录入必须能完成全部业务）
     /// 图片以 CatalogAsset 表达（originalURL 必填）；发布时一并写入覆盖层
@@ -81,154 +80,6 @@ nonisolated struct CatalogProductDraft: Codable, Identifiable, Hashable, Sendabl
     }
 }
 
-// MARK: - 淘宝解析（§28：部分自动解析，人工补录兜底）
-
-nonisolated enum ShopCatalogTaobaoParser {
-
-    nonisolated struct ParsedListing: Sendable, Equatable {
-        var url: String?
-        var title: String?
-        var price: Double?
-        var deposit: Double?
-        var balance: Double?
-        /// 解析出的字段说明（人工补录提示用）
-        var notes: [String]
-    }
-
-    /// 从淘宝 App 分享文本 / 链接中抽取可自动化的最小字段集。
-    /// 抽不到的字段留空，由人工补录（计划 §28「部分自动解析」定位）。
-    static func parse(_ text: String) -> ParsedListing {
-        var result = ParsedListing(notes: [])
-        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-
-        // 1. URL（短链 / 商品页）
-        if let range = trimmed.range(of: #"https?://[^\s，,。）)]+"#, options: .regularExpression) {
-            result.url = String(trimmed[range])
-            result.notes.append("已识别链接")
-        }
-
-        // 2. 标题：第一个非链接、非「复制这条信息」口令行的行
-        for line in trimmed.components(separatedBy: .newlines) {
-            let l = line.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !l.isEmpty,
-                  !l.lowercased().contains("http"),
-                  !l.contains("复制"),
-                  !l.contains("打开淘宝"),
-                  !l.contains("----------------") else { continue }
-            result.title = String(l.prefix(60))
-            break
-        }
-
-        // 3. 价格：¥428 / 428元 / 价格:428
-        let pricePatterns = [#"(?:¥|￥)\s*(\d+(?:\.\d+)?)"#, #"(\d+(?:\.\d+)?)\s*元"#, #"价格[:：]?\s*(\d+(?:\.\d+)?)"#]
-        for p in pricePatterns {
-            if let range = trimmed.range(of: p, options: .regularExpression),
-               let num = trimmed[range].range(of: #"\d+(?:\.\d+)?"#, options: .regularExpression),
-               let value = Double(trimmed[num]) {
-                result.price = value
-                break
-            }
-        }
-
-        // 4. 定金 / 尾款
-        if let range = trimmed.range(of: #"定金[:：\s]*?(\d+(?:\.\d+)?)"#, options: .regularExpression) {
-            result.deposit = Double(trimmed[range].range(of: #"\d+(?:\.\d+)?"#, options: .regularExpression).map { String(trimmed[$0]) } ?? "")
-        }
-        if let range = trimmed.range(of: #"尾款[:：\s]*?(\d+(?:\.\d+)?)"#, options: .regularExpression) {
-            result.balance = Double(trimmed[range].range(of: #"\d+(?:\.\d+)?"#, options: .regularExpression).map { String(trimmed[$0]) } ?? "")
-        }
-
-        // 5. 有定金即预约记录，否则现货
-        if result.deposit != nil || result.balance != nil {
-            result.notes.append("识别为预约（含定金/尾款）")
-        } else {
-            result.notes.append("默认按现货记录")
-        }
-        return result
-    }
-
-    /// 解析结果 → 草稿（§28 自动生成草稿）
-    static func makeDraft(from parsed: ParsedListing, category: String = "其他") -> CatalogProductDraft {
-        var draft = CatalogProductDraft()
-        draft.name = parsed.title ?? ""
-        draft.category = category
-        if let d = parsed.deposit {
-            draft.saleKind = .reservation
-            draft.deposit = d
-            draft.balance = parsed.balance ?? ((parsed.price ?? 0) - d >= 0 ? (parsed.price ?? 0) - d : nil)
-            draft.price = parsed.price ?? ((d + (parsed.balance ?? 0)))
-        } else {
-            draft.saleKind = .stock
-            draft.price = parsed.price ?? 0
-        }
-        draft.sourceURL = parsed.url
-        return draft
-    }
-
-    // MARK: 批量导入（V1.1 §4.1：多条链接/分享文本 → 多条独立草稿，逐条容错）
-
-    /// 批量导入结果：每条输入独立产出草稿或错误，失败不阻塞其余条目
-    nonisolated struct BatchParseOutcome: Sendable, Equatable {
-        var drafts: [CatalogProductDraft]
-        /// 解析失败条目（原文片段 + 原因），运营在批次页逐条补录
-        var failures: [BatchParseFailure]
-
-        nonisolated struct BatchParseFailure: Sendable, Equatable {
-            var excerpt: String
-            var reason: String
-        }
-    }
-
-    /// 多条淘宝内容批量解析：按 URL 切分输入文本，每段一个候选单品。
-    /// 规则：每条 URL 及其前导文本 = 一个条目；无 URL 的整段文本 = 单条目兜底。
-    /// 解析结果**永远是草稿**，绝不直接发布（硬约束 §6）。
-    static func parseBatch(_ text: String) -> BatchParseOutcome {
-        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else {
-            return BatchParseOutcome(drafts: [], failures: [])
-        }
-
-        // 切分：以 http(s) URL 为界，URL 带上其前导文案作为一段
-        var segments: [String] = []
-        if let regex = try? NSRegularExpression(pattern: #"https?://[^\s，,。）)]+"#) {
-            let ns = trimmed as NSString
-            let matches = regex.matches(in: trimmed, range: NSRange(location: 0, length: ns.length))
-            var cursor = 0
-            for m in matches {
-                if m.range.location > cursor {
-                    let head = ns.substring(with: NSRange(location: cursor, length: m.range.location - cursor))
-                    segments.append(head + ns.substring(with: m.range))
-                } else {
-                    segments.append(ns.substring(with: m.range))
-                }
-                cursor = m.range.location + m.range.length
-            }
-            if cursor < ns.length {
-                segments.append(ns.substring(from: cursor))
-            }
-        }
-        if segments.isEmpty { segments = [trimmed] }
-
-        var drafts: [CatalogProductDraft] = []
-        var failures: [BatchParseOutcome.BatchParseFailure] = []
-        for segment in segments {
-            let content = segment.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !content.isEmpty else { continue }
-            let parsed = parse(content)
-            // 完全解析不出任何有效字段（无链接、无标题、无价格）→ 记失败不阻塞
-            if parsed.url == nil, (parsed.title ?? "").isEmpty, parsed.price == nil {
-                failures.append(.init(excerpt: String(content.prefix(40)),
-                                      reason: "未识别到链接、标题或价格，请手动补录"))
-                continue
-            }
-            let draft = makeDraft(from: parsed)
-            // 同批次草稿默认归入同一批次会话（batchID 由调用方回填）
-            drafts.append(draft)
-        }
-        return BatchParseOutcome(drafts: drafts, failures: failures)
-    }
-}
-
 // MARK: - 批次录入会话（V1.1 §4.1：一次补录任务录入多个单品、多品类混合）
 
 /// 批次会话：归属店家/系列（可新建）+ 若干独立单品草稿。
@@ -245,9 +96,6 @@ nonisolated struct CatalogBatchEntrySession: Codable, Identifiable, Hashable, Se
     var newSeriesYear: Int?
     var newSeriesSeason: String = ""
     var createdAt: Date = Date()
-
-    /// 原始淘宝文本仅运营侧留存（draftID → 原文），绝不透出用户端（V1.1 §5）
-    var sourceTexts: [String: String] = [:]
 }
 
 // MARK: - 发布校验（§29 去重 + 基础校验）
@@ -434,12 +282,11 @@ final class ShopCatalogDraftStore: ObservableObject {
         ShopCatalogStorage.directory.appendingPathComponent("shop-catalog-batches.json")
     }
 
-    /// 创建批次并把批量解析出的草稿写入草稿箱（含失败清单回传提示文案）
+    /// 创建批次并把草稿写入草稿箱
     @discardableResult
     func createBatch(
         _ session: CatalogBatchEntrySession,
-        drafts: [CatalogProductDraft],
-        failures: [ShopCatalogTaobaoParser.BatchParseOutcome.BatchParseFailure] = []
+        drafts: [CatalogProductDraft]
     ) -> String {
         var batches = Self.loadBatches()
         batches.append(session)
@@ -457,10 +304,7 @@ final class ShopCatalogDraftStore: ObservableObject {
             draft.newSeriesSeason = session.newSeriesSeason
             upsert(draft)
         }
-        if failures.isEmpty {
-            return "已生成 \(drafts.count) 条单品草稿"
-        }
-        return "已整理部分资料：\(drafts.count) 条草稿，\(failures.count) 条异常请手动补全"
+        return "已生成 \(drafts.count) 条单品草稿"
     }
 
     /// 批量提交（§4.1）：本批次全部草稿态条目 → 提交；单品状态互不耦合

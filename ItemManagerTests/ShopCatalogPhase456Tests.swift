@@ -161,28 +161,6 @@ final class ShopCatalogPhase456Tests: XCTestCase {
         try? context.save()
     }
 
-    // MARK: Phase 6 淘宝解析（§28）
-
-    func testTaobaoShareTextParsing() {
-        let text = """
-        8.8 雪国来信JSK 夜空蓝
-        【淘宝】https://item.taobao.com/item.htm?id=123456
-        价格：428 定金：128 尾款：300
-        复制这条信息，打开淘宝即可查看
-        """
-        let parsed = ShopCatalogTaobaoParser.parse(text)
-        XCTAssertEqual(parsed.url, "https://item.taobao.com/item.htm?id=123456")
-        XCTAssertEqual(parsed.title, "8.8 雪国来信JSK 夜空蓝")
-        XCTAssertEqual(parsed.price, 428)
-        XCTAssertEqual(parsed.deposit, 128)
-        XCTAssertEqual(parsed.balance, 300)
-
-        let draft = ShopCatalogTaobaoParser.makeDraft(from: parsed)
-        XCTAssertEqual(draft.saleKind, .reservation)
-        XCTAssertEqual(draft.name, "8.8 雪国来信JSK 夜空蓝")
-        XCTAssertEqual(draft.price, 428)
-    }
-
     // MARK: Phase 6 校验与去重（§29）
 
     func testValidationFailures() {

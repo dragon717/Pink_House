@@ -6,7 +6,6 @@
 //    · archivedAt 归档标记：向后兼容解码（§5.1）
 //    · 覆盖层合并规则升级：同 id 替换 + SaleEvent 只追加（§5.3）
 //    · 用户侧归档过滤（§5.1 查询层收口）
-//    · 淘宝批量解析逐条容错（G6）
 //    · 批次会话 + 批量提交 + 单品粒度审核（G1/G2）
 //    · 发布携带图片/规格/尺码表（G5）
 //    · 引用保护：被引用商品删除拦截、归档后用户端隐藏（G3/G4）
@@ -146,29 +145,6 @@ final class ShopCatalogOpsV11Tests: XCTestCase {
         try ShopCatalogDraftStore.archiveShop(XCTUnwrap(shop))
         store.reloadWithOverlay()
         XCTAssertEqual(store.searchShops(keyword: "归档测试店家").count, 0)
-    }
-
-    // MARK: G6 批量解析
-
-    func testTaobaoBatchParseSplitsByLinkAndToleratesFailures() {
-        let text = """
-        【新品】樱花 JSK 定金:100 尾款:328 https://item.taobao.com/item.htm?id=111
-        现货小物 KC ¥59 https://item.taobao.com/item.htm?id=222
-        复制这条信息打开淘宝
-        """
-        let outcome = ShopCatalogTaobaoParser.parseBatch(text)
-        XCTAssertEqual(outcome.drafts.count, 2, "两条链接各生成一条草稿")
-        // 第一条含定金 → 预约；第二条 ¥59 → 现货
-        XCTAssertEqual(outcome.drafts[0].saleKind, .reservation)
-        XCTAssertEqual(outcome.drafts[1].saleKind, .stock)
-        // 「复制这条信息打开淘宝」无可解析字段 → 失败清单，不阻塞
-        XCTAssertEqual(outcome.failures.count, 1)
-    }
-
-    func testTaobaoBatchParseEmptyInput() {
-        let outcome = ShopCatalogTaobaoParser.parseBatch("   ")
-        XCTAssertTrue(outcome.drafts.isEmpty)
-        XCTAssertTrue(outcome.failures.isEmpty)
     }
 
     // MARK: G1/G2 批次 + 单品粒度审核

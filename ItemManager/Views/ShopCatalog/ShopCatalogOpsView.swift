@@ -4,8 +4,8 @@
 //
 //  运营中心（计划 §26-31，入口：设置 → 运营工具 → 店家商品库，Catalog Editor 白名单）：
 //    · 看板：今日更新 / 草稿 / 待审核 / 待补充 + ＋补录上新（§26）
-//    · 补录：从淘宝内容导入（推荐）/ 手动录入（§27）
-//    · 淘宝分享文本 / URL → 自动解析生成草稿（§28，禁止直接发布）
+//    · 补录：手动录入（§27）
+//    · 淘宝分享文本 / URL 导入与批量导入已下线（§28 Parser 及关联代码已删除）
 //    · 草稿流转：draft → submitted → reviewed → published（+archived，§31）
 //    · 发布校验与 Shop / Series / Product 去重（§29）；整包 JSON 导出
 //
@@ -39,8 +39,10 @@ struct ShopCatalogOpsView: View {
     private var content: some View {
         Form {
             dashboardSection
-            importSection
-            batchSection
+            // 淘宝导入（§28）与批量导入（§4.1 多链接解析）已下线，仅保留既有批次列表
+            if !ShopCatalogDraftStore.loadBatches().isEmpty {
+                batchListSection
+            }
             draftSection
             manageSection
             exportSection
@@ -74,12 +76,12 @@ struct ShopCatalogOpsView: View {
     }
 
     /// 手动录入（V1.1 §4.1.2）：建一个批次会话 + 首条空草稿，
-    /// 会话内可「＋添加单品」连续录入多件，整批归属 / 批量提交与淘宝导入同流程
+    /// 会话内可「＋添加单品」连续录入多件，整批归属 / 批量提交见批次列表
     private func startManualBatch() {
         let session = CatalogBatchEntrySession()
         var draft = CatalogProductDraft()
         draft.batchID = session.id
-        _ = draftStore.createBatch(session, drafts: [draft], failures: [])
+        _ = draftStore.createBatch(session, drafts: [draft])
         manualBatch = session
     }
 
@@ -93,7 +95,7 @@ struct ShopCatalogOpsView: View {
                 dashboardStat(title: "待审核", value: draftStore.pendingReviewCount)
                 dashboardStat(title: "待补充", value: draftStore.needsSupplementCount)
             }
-            // ＋ 补录上新（§27：手动录入会话；淘宝批量导入见下方内联区）
+            // ＋ 补录上新（§27：手动录入会话；批次展示见下方批次列表）
             Menu {
                 Button {
                     startManualBatch()
@@ -133,76 +135,16 @@ struct ShopCatalogOpsView: View {
         .frame(maxWidth: .infinity)
     }
 
-    // MARK: 淘宝导入（§28：部分解析 → 草稿，禁止直接发布）
-
-    private var importSection: some View {
-        Section("淘宝导入（分享文本 / 链接）") {
-            TextEditor(text: $importText)
-                .frame(minHeight: 72)
-                .font(.system(size: 13))
-            Button {
-                let parsed = ShopCatalogTaobaoParser.parse(importText)
-                let draft = ShopCatalogTaobaoParser.makeDraft(from: parsed)
-                draftStore.upsert(draft)
-                importText = ""
-                // §28 三态：已识别 / 请确认 / 待补充
-                toast = "已生成草稿（\(parsed.notes.joined(separator: "，"))），请补录店家与系列后提交"
-            } label: {
-                Label("解析并生成草稿", systemImage: "wand.and.stars")
-            }
-            .disabled(importText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-            Text("能拆多少拆多少，剩下人工补：自动识别链接 / 标题 / 价格 / 定金尾款；店家、系列、分类由人工补录。")
-                .font(.system(size: 11))
-                .foregroundStyle(.secondary)
-        }
-    }
-
-    @State private var importText = ""
-    @State private var batchImportText = ""
     @State private var selectedBatch: CatalogBatchEntrySession?
 
-    private var importProxy: Binding<String> {
-        Binding(get: { importText }, set: { importText = $0 })
-    }
+    // MARK: 批次列表（V1.1 §4.1；淘宝/批量导入入口已下线，仅保留既有批次的管理）
 
-    // MARK: 批量录入会话（V1.1 §4.1）
-
-    private var batchSection: some View {
-        Section("批次录入（多链接多单品）") {
-            TextEditor(text: $batchImportText)
-                .frame(minHeight: 88)
-                .font(.system(size: 13))
-            Button {
-                importBatch()
-            } label: {
-                Label("批量解析并生成草稿（每条链接一个单品）", systemImage: "square.stack.3d.up")
-            }
-            .disabled(batchImportText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+    private var batchListSection: some View {
+        Section("批次") {
             ForEach(ShopCatalogDraftStore.loadBatches().reversed()) { batch in
                 batchRow(batch)
             }
         }
-    }
-
-    /// 批次解析：先选归属（沿用首个草稿缺省 = 新建店家/系列由人工补），再批量生成
-    private func importBatch() {
-        let outcome = ShopCatalogTaobaoParser.parseBatch(batchImportText)
-        guard !outcome.drafts.isEmpty || !outcome.failures.isEmpty else { return }
-        var session = CatalogBatchEntrySession()
-        // 若解析内容可识别出统一店家/系列名，预填第一条（人工可改）
-        if let first = outcome.drafts.first {
-            session.newShopName = first.newShopName
-            session.newSeriesName = first.newSeriesName
-        }
-        // 回填原文（仅运营侧留存）
-        for draft in outcome.drafts {
-            if let url = draft.sourceURL {
-                session.sourceTexts[draft.id] = url
-            }
-        }
-        let summary = draftStore.createBatch(session, drafts: outcome.drafts, failures: outcome.failures)
-        batchImportText = ""
-        toast = summary
     }
 
     private func batchRow(_ batch: CatalogBatchEntrySession) -> some View {
@@ -529,12 +471,6 @@ struct ShopCatalogDraftDetailEditor: View {
                             TextField("季节（如 冬）", text: $draftBox.newSeriesSeason)
                         }
                     }
-                }
-                Section("来源") {
-                    TextField("淘宝链接（可空）", text: Binding(
-                        get: { draftBox.sourceURL ?? "" },
-                        set: { draftBox.sourceURL = $0.isEmpty ? nil : $0 }
-                    ))
                 }
             }
             .navigationTitle("补录草稿")
