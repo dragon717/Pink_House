@@ -6,8 +6,8 @@
 //    · ShopCatalogBrowseView   —— 浏览根（独立 NavigationStack，时光馆 fullScreenCover 呈现）
 //    · ShopCatalogEntryCard    —— 时光馆内「店家上新 · 最近上新 · 历年系列」入口卡（§8，参考图2 NEW 角标）
 //    · ShopCatalogListView     —— 店家列表（§9：Logo / 名称 / 最近上新 / 系列数 / 别名搜索，参考图3 列表风格）
-//    · ShopCatalogShopView     —— 店家主页（§10：当前上新 + [当前上新][2026][2025]…年份翻阅，参考图4）
-//    · ShopCatalogSeriesView   —— 系列详情（§11：主视觉 + 分类筛选 + §12 多选加入衣橱）
+//    · ShopCatalogShopView     —— 店家主页（§10：当前上新 + [当前上新][2026][2025]…年份翻阅；
+//      系列卡点击直达「点菜式选购页」ShopCatalogSeriesMenuView，原合并大卡中转页已删除）
 //
 //  视觉：约束 1「不改变现有 UI」——全部沿用 themeManager 令牌 + themeSkinSectionCard
 //  + LiquidBackground(.timeHall)，不自创配色。
@@ -41,7 +41,16 @@ enum ShopCatalogFormat {
 struct ShopCatalogBrowseView: View {
     @Environment(\.dismiss) private var dismiss
     @ObservedObject private var store = ShopCatalogStore.shared
+    /// 开售提醒深链：通知点击 → TabNavigationManager → 本栈压入商品详情
+    @ObservedObject private var tabNav = TabNavigationManager.shared
     var onLegacyArchive: (() -> Void)? = nil
+
+    private var showsDeepLinkProduct: Binding<Bool> {
+        Binding(
+            get: { tabNav.pendingShopCatalogProductID != nil },
+            set: { if !$0 { tabNav.pendingShopCatalogProductID = nil } }
+        )
+    }
 
     var body: some View {
         NavigationStack {
@@ -52,6 +61,11 @@ struct ShopCatalogBrowseView: View {
             }
             .navigationTitle("店家上新")
             .navigationBarTitleDisplayMode(.inline)
+            .navigationDestination(isPresented: showsDeepLinkProduct) {
+                if let productID = tabNav.pendingShopCatalogProductID {
+                    ShopCatalogProductView(productID: productID)
+                }
+            }
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     if let onLegacyArchive {
@@ -259,6 +273,8 @@ struct ShopCatalogShopView: View {
     @ObservedObject private var store = ShopCatalogStore.shared
     /// nil = 「当前上新」；有值 = 按年份翻阅历年
     @State private var selectedYear: Int?
+    /// 系列卡直达「点菜式选购页」（原合并大卡中转页已删除）
+    @State private var menuSeries: CatalogSeries?
 
     private var shop: CatalogShop? { store.shop(id: shopID) }
 
@@ -284,6 +300,10 @@ struct ShopCatalogShopView: View {
         }
         .navigationTitle(shop?.name ?? "")
         .navigationBarTitleDisplayMode(.inline)
+        .sheet(item: $menuSeries) { series in
+            ShopCatalogSeriesMenuView(store: store, seriesID: series.id)
+                .presentationDetents([.large])
+        }
     }
 
     private var yearStrip: some View {
@@ -327,8 +347,8 @@ struct ShopCatalogShopView: View {
         } else {
             VStack(spacing: 12) {
                 ForEach(visibleSeries) { s in
-                    NavigationLink {
-                        ShopCatalogSeriesView(seriesID: s.id)
+                    Button {
+                        menuSeries = s
                     } label: {
                         seriesCard(s)
                     }
@@ -370,154 +390,9 @@ struct ShopCatalogShopView: View {
     }
 }
 
-// MARK: - 系列详情（V1.2：合并主卡 = 系列对外唯一主链路）
+// MARK: - 系列直达点菜式选购（V1.2 路由收口）
 //
-//  旧版把系列下单品铺成 N 张独立卡片（单品与链接一一对应的分散结构）；
-//  现在整个系列对外只保留一张合并大卡，点进即「点菜式选购页」
-//  （ShopCatalogSeriesMenuView）：按品类列出全部单品、明码标价、各带商品照，
-//  勾选合并到同一次加入操作；规格选择图文绑定（选中配色切换对应照片）。
-//  单品完整资料（尺码表/销售历史等）经点菜页行内「>」进入商品详情保留可达。
-
-struct ShopCatalogSeriesView: View {
-    let seriesID: String
-
-    @Environment(ThemeManager.self) private var themeManager
-    @ObservedObject private var store = ShopCatalogStore.shared
-    @State private var showsMenu = false
-
-    private var series: CatalogSeries? { store.series(id: seriesID) }
-    private var products: [CatalogProduct] { store.products(inSeries: seriesID) }
-
-    var body: some View {
-        ZStack {
-            LiquidBackground(themeSkinWallpaperContext: .timeHall)
-                .ignoresSafeArea()
-            ScrollView(.vertical, showsIndicators: false) {
-                seriesMainCard
-                    .padding(16)
-                    .padding(.bottom, 80)
-            }
-        }
-        .navigationTitle(series?.name ?? "")
-        .navigationBarTitleDisplayMode(.inline)
-        .sheet(isPresented: $showsMenu) {
-            ShopCatalogSeriesMenuView(store: store, seriesID: seriesID)
-                .presentationDetents([.large])
-        }
-    }
-
-    // MARK: 合并大卡（系列主卡）
-
-    private var seriesMainCard: some View {
-        Button {
-            showsMenu = true
-        } label: {
-            VStack(alignment: .leading, spacing: 12) {
-                ShopCatalogAssetImage(reference: coverReference)
-                    .aspectRatio(16 / 10, contentMode: .fill)
-                    .frame(maxWidth: .infinity)
-                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-                    .overlay(alignment: .bottomTrailing) {
-                        HStack(spacing: 4) {
-                            Image(systemName: "menucard")
-                            Text("点菜选购".appLocalized)
-                        }
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 7)
-                        .background(Capsule().fill(Color.black.opacity(0.45)))
-                        .padding(10)
-                    }
-                    .overlay(alignment: .topLeading) {
-                        ForEach(Array(statusTags.enumerated()), id: \.offset) { index, text in
-                            if index == 0 {
-                                statusTag(text)
-                                    .padding(10)
-                            }
-                        }
-                    }
-
-                Text(series?.name ?? "")
-                    .font(.system(size: 17, weight: .semibold))
-                    .foregroundStyle(themeManager.primaryTextColor)
-
-                HStack(spacing: 6) {
-                    if let year = series?.year { Text(String(year)) }
-                    if let season = series?.season, !season.isEmpty { Text("· \(season)") }
-                    Text("· \(products.count) 个单品")
-                    if !categoriesSummary.isEmpty { Text("· \(categoriesSummary)") }
-                }
-                .font(.caption)
-                .foregroundStyle(themeManager.secondaryTextColor)
-
-                HStack(spacing: 8) {
-                    Text(priceRangeText)
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(themeManager.primaryTextColor)
-                    ForEach(statusTags, id: \.self) { statusTag($0) }
-                    Spacer(minLength: 0)
-                }
-            }
-            .padding(10)
-            .themeSkinSectionCard(cornerRadius: 16)
-        }
-        .buttonStyle(.plain)
-    }
-
-    // MARK: 汇总口径
-
-    /// 封面：系列主视觉优先，缺省回退首个单品首图
-    private var coverReference: String? {
-        if let cover = series?.cover, !cover.isEmpty {
-            return store.asset(id: cover)?.originalURL ?? cover
-        }
-        guard let first = products.first?.images.first else { return nil }
-        return store.asset(id: first)?.originalURL ?? first
-    }
-
-    private var categoriesSummary: String {
-        let cats = Array(Set(products.map(\.category)))
-        return cats.isEmpty ? "" : cats.joined(separator: "/")
-    }
-
-    /// 价格区间：现货价优先、缺省回退预约价；单值时只显示一个
-    private var priceRangeText: String {
-        let prices = products.compactMap { p -> Decimal? in
-            let archive = store.priceArchive(forProduct: p.id)
-            return archive.currentStockPrice ?? archive.historicalReservationPrice
-        }
-        guard let minP = prices.min() else { return "价格待补充" }
-        if prices.count == 1 || minP == (prices.max() ?? minP) {
-            return ShopCatalogFormat.price(minP)
-        }
-        return "\(ShopCatalogFormat.price(minP)) – \(ShopCatalogFormat.price(prices.max()!))"
-    }
-
-    /// 系列整体状态：预约中 > 现货中 > 即将开始（去重，最多三枚）
-    private var statusTags: [String] {
-        var tags: [String] = []
-        for p in products {
-            let events = store.saleEvents(forProduct: p.id)
-            if events.contains(where: { store.windowStatus(of: $0) == .open && $0.type == .reservation }) {
-                if !tags.contains("预约中") { tags.append("预约中") }
-            }
-            if events.contains(where: { store.windowStatus(of: $0) == .open && $0.type == .stock }) {
-                if !tags.contains("现货中") { tags.append("现货中") }
-            }
-            if events.contains(where: { store.windowStatus(of: $0) == .upcoming }) {
-                if !tags.contains("即将开始") { tags.append("即将开始") }
-            }
-        }
-        return tags
-    }
-
-    private func statusTag(_ text: String) -> some View {
-        Text(text.appLocalized)
-            .font(.system(size: 10, weight: .medium))
-            .foregroundStyle(themeManager.accentTextColor)
-            .padding(.horizontal, 6)
-            .padding(.vertical, 2)
-            .background(Capsule().fill(themeManager.accentTextColor.opacity(0.1)))
-    }
-}
+//  路由链路（2026-09-21 优化）：店家主页系列卡 → 直接弹出 ShopCatalogSeriesMenuView。
+//  原「系列合并大卡」中转页（ShopCatalogSeriesView）已删除：它只承担「点一下进点菜页」
+//  的转发职责，属于冗余层级；单品完整资料（尺码表/销售历史等）仍经点菜页行内「>」
+//  进入商品详情保留可达。

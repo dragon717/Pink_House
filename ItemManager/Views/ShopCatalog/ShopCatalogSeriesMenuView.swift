@@ -21,6 +21,8 @@ struct ShopCatalogSeriesMenuView: View {
     @State private var selectedColor: [String: String] = [:]
     @State private var showsMerge = false
     @State private var mergeToast: String?
+    /// 大图预览：正在查看的单品（点击行内缩略图弹出，关闭即返回原页面）
+    @State private var viewerProduct: CatalogProduct?
 
     private var series: CatalogSeries? { store.series(id: seriesID) }
     private var products: [CatalogProduct] { store.products(inSeries: seriesID) }
@@ -61,6 +63,10 @@ struct ShopCatalogSeriesMenuView: View {
                     }
                 }
                 .presentationDetents([.large])
+            }
+            .fullScreenCover(item: $viewerProduct) { product in
+                ShopCatalogImageViewer(references: viewerReferences(for: product),
+                                       startIndex: viewerStartIndex(for: product))
             }
             .overlay(alignment: .bottom) {
                 if let mergeToast {
@@ -119,10 +125,16 @@ struct ShopCatalogSeriesMenuView: View {
 
     private func menuItemRow(_ p: CatalogProduct) -> some View {
         HStack(alignment: .top, spacing: 12) {
-            ShopCatalogAssetImage(reference: imageReference(for: p))
-                .aspectRatio(3 / 4, contentMode: .fill)
-                .frame(width: 96)
-                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            Button {
+                viewerProduct = p
+            } label: {
+                ShopCatalogAssetImage(reference: imageReference(for: p))
+                    .aspectRatio(3 / 4, contentMode: .fill)
+                    .frame(width: 96)
+                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("查看大图")
 
             VStack(alignment: .leading, spacing: 6) {
                 NavigationLink {
@@ -212,6 +224,18 @@ struct ShopCatalogSeriesMenuView: View {
         }
         guard let first = p.images.first else { return nil }
         return store.asset(id: first)?.originalURL ?? first
+    }
+
+    /// 大图预览：该单品全部商品照（与缩略图同一解析口径）
+    private func viewerReferences(for p: CatalogProduct) -> [String] {
+        p.images.map { store.asset(id: $0)?.originalURL ?? $0 }
+    }
+
+    /// 大图预览起始页 = 缩略图当前展示的那张（选中配色绑定的照片），缺省首页
+    private func viewerStartIndex(for p: CatalogProduct) -> Int {
+        guard let current = imageReference(for: p) else { return 0 }
+        let refs = viewerReferences(for: p)
+        return refs.firstIndex(of: current) ?? 0
     }
 
     // MARK: 勾选与底部操作条
