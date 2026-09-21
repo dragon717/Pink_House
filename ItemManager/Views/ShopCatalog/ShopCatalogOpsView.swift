@@ -17,9 +17,8 @@ struct ShopCatalogOpsView: View {
     @ObservedObject private var draftStore = ShopCatalogDraftStore.shared
     @ObservedObject private var store = ShopCatalogStore.shared
 
-    /// 补录入口：nil=关闭；.taobao=淘宝导入；.manual=手动录入
-    @State private var showsTaobaoImport = false
-    @State private var showsManualDraft = false
+    /// 手动录入批次会话（V1.1 §4.1.2：同一会话内连续添加多件单品）
+    @State private var manualBatch: CatalogBatchEntrySession?
     @State private var toast: String?
     @State private var actionError: String?
 
@@ -69,6 +68,19 @@ struct ShopCatalogOpsView: View {
         } message: {
             Text(actionError ?? "")
         }
+        .sheet(item: $manualBatch) { batch in
+            ShopCatalogBatchDetailView(draftStore: draftStore, store: store, batch: batch)
+        }
+    }
+
+    /// 手动录入（V1.1 §4.1.2）：建一个批次会话 + 首条空草稿，
+    /// 会话内可「＋添加单品」连续录入多件，整批归属 / 批量提交与淘宝导入同流程
+    private func startManualBatch() {
+        let session = CatalogBatchEntrySession()
+        var draft = CatalogProductDraft()
+        draft.batchID = session.id
+        _ = draftStore.createBatch(session, drafts: [draft], failures: [])
+        manualBatch = session
     }
 
     // MARK: 运营中心看板（§26）
@@ -81,18 +93,12 @@ struct ShopCatalogOpsView: View {
                 dashboardStat(title: "待审核", value: draftStore.pendingReviewCount)
                 dashboardStat(title: "待补充", value: draftStore.needsSupplementCount)
             }
-            // ＋ 补录上新（§27：淘宝导入推荐 / 手动录入兜底）
+            // ＋ 补录上新（§27：手动录入会话；淘宝批量导入见下方内联区）
             Menu {
                 Button {
-                    showsTaobaoImport = true
+                    startManualBatch()
                 } label: {
-                    Label("从淘宝内容导入（推荐）", systemImage: "wand.and.stars")
-                }
-                Button {
-                    draftStore.upsert(CatalogProductDraft())
-                    showsManualDraft = true
-                } label: {
-                    Label("手动录入", systemImage: "square.and.pencil")
+                    Label("手动录入（可连续添加多件）", systemImage: "square.and.pencil")
                 }
             } label: {
                 Text("＋ 补录上新".appLocalized)
@@ -139,7 +145,6 @@ struct ShopCatalogOpsView: View {
                 let draft = ShopCatalogTaobaoParser.makeDraft(from: parsed)
                 draftStore.upsert(draft)
                 importText = ""
-                showsTaobaoImport = false
                 // §28 三态：已识别 / 请确认 / 待补充
                 toast = "已生成草稿（\(parsed.notes.joined(separator: "，"))），请补录店家与系列后提交"
             } label: {
@@ -422,9 +427,9 @@ private struct ShopCatalogDraftEditorRow: View {
     }
 }
 
-// MARK: - 草稿详情编辑（人工补录，§30 兜底：手动可完整全流程）
+// MARK: - 草稿详情编辑（人工补录，§30 兜底：手动可完整全流程；批次详情页亦复用）
 
-private struct ShopCatalogDraftDetailEditor: View {
+struct ShopCatalogDraftDetailEditor: View {
     @Binding private var draftBox: CatalogProductDraft
     @ObservedObject private var draftStore: ShopCatalogDraftStore
     @ObservedObject private var store: ShopCatalogStore

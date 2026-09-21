@@ -174,7 +174,11 @@ struct ShopCatalogBatchDetailView: View {
                     if index == 0 {
                         groupHeader(key: key, count: items.count)
                     }
-                    draftSummaryRow(draft)
+                    NavigationLink {
+                        ShopCatalogDraftDetailEditor(draft: draft, draftStore: draftStore, store: store)
+                    } label: {
+                        draftSummaryRow(draft)
+                    }
                 }
             }
             if batchDrafts.isEmpty {
@@ -182,9 +186,22 @@ struct ShopCatalogBatchDetailView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
+            Button {
+                addManualItem()
+            } label: {
+                Label("＋ 添加单品（多品类混合，同一会话连续录入）", systemImage: "plus.circle.fill")
+            }
         } header: {
             Text("本批单品（\(batchDrafts.count) 条，按系列分组）")
         }
+    }
+
+    /// 手动会话加单品：新建空草稿挂入本批次，整批归属/批量提交与其余单品同流程（V1.1 §4.1.2）
+    private func addManualItem() {
+        var draft = CatalogProductDraft()
+        draft.batchID = batch.id
+        draftStore.upsert(draft)
+        toast = "已添加单品（本批第 \(batchDrafts.count) 件），点入补全资料"
     }
 
     /// 分组键：系列 id → 系列名；新建系列 → 名称；未指定 → 归入「未指定系列」

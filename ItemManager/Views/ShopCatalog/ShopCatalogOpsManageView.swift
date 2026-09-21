@@ -112,8 +112,6 @@ private struct ShopManageRow: View {
     @State private var showsEdit = false
     @State private var showsArchiveConfirm = false
     @State private var showsDeleteConfirm = false
-    @State private var draftName = ""
-    @State private var draftAliases = ""
 
     var body: some View {
         HStack(spacing: 10) {
@@ -135,9 +133,7 @@ private struct ShopManageRow: View {
             }
             Spacer()
             Menu {
-                Button("编辑名称/别名") {
-                    draftName = shop.name
-                    draftAliases = shop.aliases.joined(separator: "，")
+                Button("编辑（名称/别名/Logo/封面/简介）") {
                     showsEdit = true
                 }
                 if shop.archivedAt == nil {
@@ -149,22 +145,8 @@ private struct ShopManageRow: View {
                     .foregroundStyle(.secondary)
             }
         }
-        .alert("编辑店家", isPresented: $showsEdit) {
-            TextField("名称", text: $draftName)
-            TextField("别名（逗号分隔）", text: $draftAliases)
-            Button("保存") {
-                var updated = shop
-                updated.name = draftName.trimmingCharacters(in: .whitespaces)
-                updated.aliases = draftAliases
-                    .components(separatedBy: CharacterSet(charactersIn: "，,、"))
-                    .map { $0.trimmingCharacters(in: .whitespaces) }
-                    .filter { !$0.isEmpty }
-                do {
-                    try ShopCatalogDraftStore.upsertEntity(updated, keyPath: \.shops)
-                    toast = "已更新店家「\(updated.name)」，下属系列/商品同步生效"
-                } catch { actionError = error.localizedDescription }
-            }
-            Button("取消", role: .cancel) {}
+        .sheet(isPresented: $showsEdit) {
+            ShopCatalogShopEditSheet(shop: shop, toast: $toast, actionError: $actionError)
         }
         .confirmationDialog("归档「\(shop.name)」？", isPresented: $showsArchiveConfirm, titleVisibility: .visible) {
             Button("归档（用户端隐藏，数据保留）", role: .destructive) {
@@ -199,9 +181,6 @@ private struct SeriesManageRow: View {
     @State private var showsEdit = false
     @State private var showsArchiveConfirm = false
     @State private var showsDeleteConfirm = false
-    @State private var draftName = ""
-    @State private var draftYear = ""
-    @State private var draftSeason = ""
 
     var body: some View {
         HStack(spacing: 10) {
@@ -223,10 +202,7 @@ private struct SeriesManageRow: View {
             }
             Spacer()
             Menu {
-                Button("编辑名称/年份/季节") {
-                    draftName = series.name
-                    draftYear = series.year.map(String.init) ?? ""
-                    draftSeason = series.season ?? ""
+                Button("编辑（名称/年份/季节/封面/简介）") {
                     showsEdit = true
                 }
                 if series.archivedAt == nil {
@@ -238,23 +214,8 @@ private struct SeriesManageRow: View {
                     .foregroundStyle(.secondary)
             }
         }
-        .alert("编辑系列", isPresented: $showsEdit) {
-            TextField("名称", text: $draftName)
-            TextField("年份", text: $draftYear)
-                .keyboardType(.numberPad)
-            TextField("季节（如 冬）", text: $draftSeason)
-            Button("保存") {
-                var updated = series
-                updated.name = draftName.trimmingCharacters(in: .whitespaces)
-                updated.year = Int(draftYear.trimmingCharacters(in: .whitespaces))
-                let season = draftSeason.trimmingCharacters(in: .whitespaces)
-                updated.season = season.isEmpty ? nil : season
-                do {
-                    try ShopCatalogDraftStore.upsertEntity(updated, keyPath: \.series)
-                    toast = "已更新系列「\(updated.name)」"
-                } catch { actionError = error.localizedDescription }
-            }
-            Button("取消", role: .cancel) {}
+        .sheet(isPresented: $showsEdit) {
+            ShopCatalogSeriesEditSheet(series: series, toast: $toast, actionError: $actionError)
         }
         .confirmationDialog("归档「\(series.name)」？", isPresented: $showsArchiveConfirm, titleVisibility: .visible) {
             Button("归档（用户端隐藏，收藏保留）", role: .destructive) {
@@ -287,6 +248,7 @@ private struct ProductManageRow: View {
     @Binding var actionError: String?
 
     @State private var showsEdit = false
+    @State private var showsDeepEdit = false
     @State private var showsArchiveConfirm = false
     @State private var showsDeleteConfirm = false
     @State private var draftName = ""
@@ -321,10 +283,13 @@ private struct ProductManageRow: View {
             }
             Spacer()
             Menu {
-                Button("编辑名称/分类") {
+                Button("编辑基础（名称/分类）") {
                     draftName = product.name
                     draftCategory = product.category
                     showsEdit = true
+                }
+                Button("深度编辑（图片/配色尺码/尺码表/销售记录）") {
+                    showsDeepEdit = true
                 }
                 if product.archivedAt == nil {
                     Button("归档", role: .destructive) { showsArchiveConfirm = true }
@@ -334,6 +299,10 @@ private struct ProductManageRow: View {
                 Image(systemName: "ellipsis.circle")
                     .foregroundStyle(.secondary)
             }
+        }
+        .sheet(isPresented: $showsDeepEdit) {
+            ShopCatalogProductDeepEditView(product: product, store: store,
+                                           toast: $toast, actionError: $actionError)
         }
         .alert("编辑商品", isPresented: $showsEdit) {
             TextField("名称", text: $draftName)
@@ -367,5 +336,148 @@ private struct ProductManageRow: View {
             }
             Button("取消", role: .cancel) {}
         }
+    }
+}
+
+// MARK: - 店家编辑（V1.1 §4.2 Shop：名称/别名/Logo/封面/简介，id 不变）
+
+private struct ShopCatalogShopEditSheet: View {
+    let shop: CatalogShop
+    @Binding var toast: String?
+    @Binding var actionError: String?
+    @Environment(\.dismiss) private var dismiss
+
+    @State private var name = ""
+    @State private var aliases = ""
+    @State private var logo = ""
+    @State private var cover = ""
+    @State private var descriptionText = ""
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("基础信息") {
+                    TextField("名称", text: $name)
+                    TextField("别名（逗号分隔）", text: $aliases)
+                }
+                Section("视觉与简介") {
+                    TextField("Logo（Bundle 文件名/URL，可空）", text: $logo)
+                    TextField("封面（Bundle 文件名/URL，可空）", text: $cover)
+                    TextField("简介", text: $descriptionText)
+                }
+            }
+            .navigationTitle("编辑店家")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("取消") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("保存") { save() }
+                }
+            }
+            .onAppear {
+                name = shop.name
+                aliases = shop.aliases.joined(separator: "，")
+                logo = shop.logo ?? ""
+                cover = shop.cover ?? ""
+                descriptionText = shop.description ?? ""
+            }
+        }
+    }
+
+    private func save() {
+        var updated = shop
+        updated.name = name.trimmingCharacters(in: .whitespaces)
+        updated.aliases = aliases
+            .components(separatedBy: CharacterSet(charactersIn: "，,、"))
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
+        updated.logo = trimmedOrNil(logo)
+        updated.cover = trimmedOrNil(cover)
+        updated.description = trimmedOrNil(descriptionText)
+        do {
+            try ShopCatalogDraftStore.upsertEntity(updated, keyPath: \.shops)
+            toast = "已更新店家「\(updated.name)」，下属系列/商品同步生效"
+            dismiss()
+        } catch {
+            actionError = error.localizedDescription
+        }
+    }
+
+    private func trimmedOrNil(_ s: String) -> String? {
+        let t = s.trimmingCharacters(in: .whitespaces)
+        return t.isEmpty ? nil : t
+    }
+}
+
+// MARK: - 系列编辑（V1.1 §4.2 Series：名称/年份/季节/封面/简介，id 不变）
+
+private struct ShopCatalogSeriesEditSheet: View {
+    let series: CatalogSeries
+    @Binding var toast: String?
+    @Binding var actionError: String?
+    @Environment(\.dismiss) private var dismiss
+
+    @State private var name = ""
+    @State private var yearText = ""
+    @State private var season = ""
+    @State private var cover = ""
+    @State private var descriptionText = ""
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("基础信息") {
+                    TextField("名称", text: $name)
+                    TextField("年份（如 2026）", text: $yearText)
+                        .keyboardType(.numberPad)
+                    TextField("季节（如 冬）", text: $season)
+                }
+                Section("视觉与简介") {
+                    TextField("封面（Bundle 文件名/URL，可空）", text: $cover)
+                    TextField("简介", text: $descriptionText)
+                }
+            }
+            .navigationTitle("编辑系列")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("取消") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("保存") { save() }
+                }
+            }
+            .onAppear {
+                name = series.name
+                yearText = series.year.map(String.init) ?? ""
+                season = series.season ?? ""
+                cover = series.cover ?? ""
+                descriptionText = series.description ?? ""
+            }
+        }
+    }
+
+    private func save() {
+        var updated = series
+        updated.name = name.trimmingCharacters(in: .whitespaces)
+        updated.year = Int(yearText.trimmingCharacters(in: .whitespaces))
+        let seasonTrimmed = season.trimmingCharacters(in: .whitespaces)
+        updated.season = seasonTrimmed.isEmpty ? nil : seasonTrimmed
+        updated.cover = trimmedOrNil(cover)
+        updated.description = trimmedOrNil(descriptionText)
+        do {
+            try ShopCatalogDraftStore.upsertEntity(updated, keyPath: \.series)
+            toast = "已更新系列「\(updated.name)」，下属商品自动跟随"
+            dismiss()
+        } catch {
+            actionError = error.localizedDescription
+        }
+    }
+
+    private func trimmedOrNil(_ s: String) -> String? {
+        let t = s.trimmingCharacters(in: .whitespaces)
+        return t.isEmpty ? nil : t
     }
 }

@@ -704,6 +704,91 @@ final class ShopCatalogDraftStore: ObservableObject {
         ShopCatalogStore.shared.reloadWithOverlay()
     }
 
+    /// 已发布商品深度编辑（V1.1 §4.2 Product 修改：名称/分类/图片/配色尺码/尺码表）。
+    /// id 永不改变，用户侧引用不受影响；一次落盘 product + assets + variants + sizeChart。
+    /// 图片行 originalURL 未变的复用原 asset id（避免规格图文绑定与用户缓存断链）。
+    static func updatePublishedProduct(
+        _ product: CatalogProduct,
+        assets: [CatalogAsset],
+        variants: [CatalogProductVariant],
+        sizeChart: CatalogSizeChart?
+    ) throws {
+        try CreatorAccess.requireCreator(.listingEdit)
+        var overlay = loadOverlay() ?? ShopCatalog()
+
+        // 旧商品图（来自覆盖层或 Bundle 种子）：清理覆盖层内旧图 asset，
+        // Bundle 种子 asset 只读不可删，但新图用全新 id 写入覆盖层后同 id 合并规则以新图为准
+        let oldImages = overlay.products.first { $0.id == product.id }?.images
+            ?? ShopCatalogStore.shared.catalog?.products.first { $0.id == product.id }?.images
+            ?? []
+        if !oldImages.isEmpty {
+            overlay.assets.removeAll { oldImages.contains($0.id) }
+        }
+
+        // 新 assets 写入（id 冲突时换新 id）
+        var assetIDs: [String] = []
+        for var asset in assets {
+            if overlay.assets.contains(where: { $0.id == asset.id }) {
+                asset.id = "asset-edit-\(UUID().uuidString.prefix(8))"
+            }
+            overlay.assets.append(asset)
+            assetIDs.append(asset.id)
+        }
+
+        var updated = product
+        updated.images = assetIDs
+
+        // 规格 / 尺码表整组重建（productID 归位）
+        overlay.variants.removeAll { $0.productID == product.id }
+        overlay.variants.append(contentsOf: variants.map { v in
+            var v = v
+            v.productID = product.id
+            return v
+        })
+        overlay.sizeCharts.removeAll { $0.productID == product.id }
+        if var chart = sizeChart {
+            chart.productID = product.id
+            overlay.sizeCharts.append(chart)
+        }
+
+        if let index = overlay.products.firstIndex(where: { $0.id == product.id }) {
+            overlay.products[index] = updated
+        } else {
+            // 既有商品在 Bundle 种子里：同 id 替换规则会以覆盖层版本胜出（§5.3）
+            overlay.products.append(updated)
+        }
+        try saveOverlay(overlay)
+        ShopCatalogStore.shared.reloadWithOverlay()
+    }
+
+    /// 追加销售记录（V1.1 §4.2 修改销售事件：追加式，预约价永不覆盖——计划 §7 约束）
+    static func appendSaleEvent(
+        productID: String,
+        type: CatalogSaleEventType,
+        price: Double,
+        deposit: Double?,
+        balance: Double?
+    ) throws {
+        try CreatorAccess.requireCreator(.listingEdit)
+        var overlay = loadOverlay() ?? ShopCatalog()
+        var event = CatalogSaleEvent(
+            id: "ev-edit-\(UUID().uuidString.prefix(8))",
+            productID: productID,
+            type: type,
+            price: Decimal(price),
+            deposit: deposit.map { Decimal($0) },
+            balance: balance.map { Decimal($0) },
+            startAt: nil,
+            endAt: nil
+        )
+        if type == .reservation, event.balance == nil {
+            event.balance = event.price - (event.deposit ?? 0)
+        }
+        overlay.saleEvents.append(event)
+        try saveOverlay(overlay)
+        ShopCatalogStore.shared.reloadWithOverlay()
+    }
+
     /// 归档：写 archivedAt（同 id 替换）。用户端隐藏，用户已收藏记录保留（§4.2）。
     static func archiveShop(_ shop: CatalogShop) throws {
         try CreatorAccess.requireCreator(.listingStatus)
