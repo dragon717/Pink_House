@@ -309,6 +309,56 @@ nonisolated enum ShopCatalogDraftValidator {
     }
 }
 
+// MARK: - 统一存储目录（测试隔离，2026-09-21 事故根源修复）
+
+/// ShopCatalog 全部运营数据的统一根目录（草稿 / 批次 / 覆盖层 / 运营上传图片）。
+///
+/// 事故回顾：单元测试以主 App 为宿主运行，`FileManager.default` 指向用户真实沙盒。
+/// 多个测试套件在 tearDown 里删除真实覆盖层/草稿文件，导致用户发布的系列在
+/// 每轮回归测试后被清掉（表现为「发布的系列刷新后消失」）。
+/// 根源修复：所有测试必须先 `useTemporaryForTesting()` 把读写重定向到独立临时
+/// 目录，结束时 `restoreDefaultForTesting()` 还原并清理——测试从此无法触碰生产数据。
+nonisolated enum ShopCatalogStorage {
+
+    /// 测试注入的临时目录；nil = 生产路径（宿主 App 沙盒 Application Support/ShopCatalog）
+    private nonisolated(unsafe) static var testOverride: URL?
+
+    /// 当前生效的存储根目录（测试注入优先）
+    static var directory: URL {
+        if let testOverride { return testOverride }
+        let dir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("ShopCatalog", isDirectory: true)
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        return dir
+    }
+
+    /// 生产路径（永不受测试注入影响）：供回归测试断言「测试未污染生产数据」
+    static var productionDirectory: URL {
+        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("ShopCatalog", isDirectory: true)
+    }
+
+    static var isTestOverridden: Bool { testOverride != nil }
+
+    /// 测试专用：重定向到全新临时目录（每套测试独立，互不串扰）
+    @discardableResult
+    static func useTemporaryForTesting() -> URL {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("ShopCatalogTests-\(UUID().uuidString)", isDirectory: true)
+        try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+        testOverride = url
+        return url
+    }
+
+    /// 测试专用：恢复生产路径并清掉临时目录
+    static func restoreDefaultForTesting() {
+        if let url = testOverride {
+            try? FileManager.default.removeItem(at: url)
+        }
+        testOverride = nil
+    }
+}
+
 // MARK: - 草稿存储 + 发布（§31）
 
 @MainActor
@@ -319,25 +369,16 @@ final class ShopCatalogDraftStore: ObservableObject {
 
     private let fileManager = FileManager.default
     private var draftsURL: URL {
-        let dir = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("ShopCatalog", isDirectory: true)
-        try? fileManager.createDirectory(at: dir, withIntermediateDirectories: true)
-        return dir.appendingPathComponent("shop-catalog-drafts.json")
+        ShopCatalogStorage.directory.appendingPathComponent("shop-catalog-drafts.json")
     }
 
     private var batchesURL: URL {
-        let dir = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("ShopCatalog", isDirectory: true)
-        try? fileManager.createDirectory(at: dir, withIntermediateDirectories: true)
-        return dir.appendingPathComponent("shop-catalog-batches.json")
+        ShopCatalogStorage.directory.appendingPathComponent("shop-catalog-batches.json")
     }
 
     /// 发布后的覆盖层：与 Bundle 种子合并后对用户可见
     nonisolated static var overlayURL: URL {
-        let dir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("ShopCatalog", isDirectory: true)
-        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        return dir.appendingPathComponent("shop-catalog-override.json")
+        ShopCatalogStorage.directory.appendingPathComponent("shop-catalog-override.json")
     }
 
     private init() {
@@ -390,10 +431,7 @@ final class ShopCatalogDraftStore: ObservableObject {
     }
 
     nonisolated private static var batchesURLStatic: URL {
-        let dir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("ShopCatalog", isDirectory: true)
-        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        return dir.appendingPathComponent("shop-catalog-batches.json")
+        ShopCatalogStorage.directory.appendingPathComponent("shop-catalog-batches.json")
     }
 
     /// 创建批次并把批量解析出的草稿写入草稿箱（含失败清单回传提示文案）

@@ -20,6 +20,8 @@ final class ShopCatalogOpsDeepEditTests: XCTestCase {
 
     override func setUp() {
         super.setUp()
+        // 存储重定向到临时目录：测试不得触碰用户真实沙盒（2026-09-21 事故防线）
+        ShopCatalogStorage.useTemporaryForTesting()
         store = ShopCatalogStore()
         XCTAssertNotNil(store.loadFromBundleIfNeeded())
         CreatorAccess.setTestOverride(.creator)
@@ -27,12 +29,7 @@ final class ShopCatalogOpsDeepEditTests: XCTestCase {
 
     override func tearDown() {
         CreatorAccess.setTestOverride(nil)
-        let dir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("ShopCatalog", isDirectory: true)
-        for name in ["shop-catalog-override.json", "shop-catalog-drafts.json", "shop-catalog-batches.json"] {
-            try? FileManager.default.removeItem(at: dir.appendingPathComponent(name))
-        }
-        store.reloadWithOverlay()
+        ShopCatalogStorage.restoreDefaultForTesting()
         super.tearDown()
     }
 

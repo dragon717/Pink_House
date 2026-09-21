@@ -339,8 +339,7 @@ final class ShopCatalogStore: ObservableObject {
 nonisolated enum ShopCatalogImageStore {
 
     static var directory: URL {
-        let dir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("ShopCatalog/images", isDirectory: true)
+        let dir = ShopCatalogStorage.directory.appendingPathComponent("images", isDirectory: true)
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         return dir
     }
