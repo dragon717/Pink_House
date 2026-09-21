@@ -182,3 +182,85 @@ final class ShopCatalogOpsDeepEditTests: XCTestCase {
             productID: "prod-x", type: .stock, price: 1, deposit: nil, balance: nil))
     }
 }
+
+// MARK: 系列可见性修复（无档期记录 = ongoing 必须算「当前上新」）
+
+extension ShopCatalogOpsDeepEditTests {
+
+    /// 回归：发布系列（销售记录不填日期、系列不填年份）后，用户端店主页「当前上新」必须可见。
+    /// 此前 currentSeries 只认 open/upcoming，无档期记录为 ongoing → 系列掉进历年又无年份 chip → 整体不可见。
+    func testPublishedSeriesWithoutDatesShowsInCurrent() throws {
+        var draft = CatalogProductDraft()
+        draft.name = "无档期可见款"
+        draft.saleKind = .stock
+        draft.price = 100
+        draft.newShopName = "无档期店家"
+        draft.newSeriesName = "无档期系列"   // 年份选填 → nil
+        // startAt / endAt 均不填（发布流程的真实默认）
+        let published = try publishNew(draft)
+        XCTAssertNotNil(published)
+
+        let shop = try XCTUnwrap(store.shopsSortedByActivity().first { $0.name == "无档期店家" })
+        let current = store.currentSeries(inShop: shop.id)
+        XCTAssertTrue(current.contains { $0.name == "无档期系列" },
+                      "无档期记录应视为长期在售，系列必须出现在「当前上新」")
+        XCTAssertFalse(store.archiveSeries(inShop: shop.id).contains { $0.name == "无档期系列" })
+    }
+
+    /// 回归：已结束记录的系列落入「历年」后，无年份系列仍须可达（店主页「未标年份」chip 的数据面）。
+    func testNoYearEndedSeriesFallsIntoArchive() throws {
+        let series = CatalogSeries(id: "series-noyear-test", shopID: "shop-noyear-test", name: "往期无年份系列")
+        let product = CatalogProduct(id: "prod-noyear-test", shopID: "shop-noyear-test",
+                                     seriesID: series.id, name: "往期款", category: "JSK")
+        try ShopCatalogDraftStore.upsertEntity(series, keyPath: \.series)
+        try ShopCatalogDraftStore.upsertEntity(product, keyPath: \.products)
+        // 已结束的销售记录（一年前开、300 天前结束）
+        let ended = CatalogSaleEvent(id: "ev-noyear-test", productID: product.id, type: .stock,
+                                     price: 100, deposit: nil, balance: nil,
+                                     startAt: Date(timeIntervalSinceNow: -86400 * 400),
+                                     endAt: Date(timeIntervalSinceNow: -86400 * 300))
+        try ShopCatalogDraftStore.upsertEntity(ended, keyPath: \.saleEvents)
+        store.reloadWithOverlay()
+
+        XCTAssertFalse(store.currentSeries(inShop: "shop-noyear-test").contains { $0.id == series.id },
+                       "已结束记录不属于当前上新")
+        let archive = store.archiveSeries(inShop: "shop-noyear-test")
+        XCTAssertTrue(archive.contains { $0.id == series.id }, "已结束系列应落入历年")
+        XCTAssertTrue(archive.contains { $0.year == nil },
+                      "无年份系列在历年中存在 → 店主页应显示「未标年份」chip")
+        XCTAssertFalse(store.years(inShop: "shop-noyear-test").contains(1900),
+                       "无年份系列不应产生虚构年份 chip")
+    }
+}
+
+// MARK: 图片上传存储（PhotosPicker → local: 引用 → 解析回环）
+
+extension ShopCatalogOpsDeepEditTests {
+
+    func testImageStoreSaveAndResolveRoundTrip() throws {
+        // 生成测试图（20x20 红色方块）
+        let renderer = UIGraphicsImageRenderer(size: CGSize(width: 20, height: 20))
+        let image = renderer.image { ctx in
+            UIColor.red.setFill()
+            ctx.fill(CGRect(x: 0, y: 0, width: 20, height: 20))
+        }
+        let data = try XCTUnwrap(image.jpegData(compressionQuality: 0.9))
+
+        let reference = try XCTUnwrap(ShopCatalogImageStore.save(data))
+        XCTAssertTrue(reference.hasPrefix("local:"), "引用必须是 local: 前缀")
+
+        // Resolver 能解析回真实文件，且文件存在
+        let url = try XCTUnwrap(ShopCatalogImageResolver.url(for: reference))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: url.path))
+
+        // 清理落盘文件（避免测试积累）
+        try? FileManager.default.removeItem(at: url)
+    }
+
+    func testImageStoreRejectsUnsafeReference() {
+        XCTAssertNil(ShopCatalogImageStore.url(for: "local:../../etc/passwd"))
+        XCTAssertNil(ShopCatalogImageStore.url(for: "local:"))
+        XCTAssertNil(ShopCatalogImageStore.url(for: "asset-ag-jsk-1"),
+                     "非 local: 引用不归 ImageStore 管（走 Bundle 解析）")
+    }
+}

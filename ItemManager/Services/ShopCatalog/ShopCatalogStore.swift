@@ -307,7 +307,9 @@ final class ShopCatalogStore: ObservableObject {
         }
     }
 
-    /// 店家主页「当前上新」：系列内任一商品存在「进行中或未开始」的预约 / 现货记录（计划 §10）
+    /// 店家主页「当前上新」：系列内任一商品存在「进行中或未开始」的预约 / 现货记录（计划 §10）。
+    /// 无档期（startAt/endAt 均空）的记录视为长期在售（.ongoing）——运营发布时可以不填日期，
+    /// 这类系列必须出现在「当前上新」，否则会同时掉出历年年份 chip（无年份）导致整体不可见。
     func currentSeries(inShop shopID: String, now: Date = Date()) -> [CatalogSeries] {
         guard let catalog else { return [] }
         return series(inShop: shopID).filter { s in
@@ -315,7 +317,7 @@ final class ShopCatalogStore: ObservableObject {
             let events = catalog.saleEvents.filter { productIDs.contains($0.productID) }
             return events.contains {
                 switch windowStatus(of: $0, now: now) {
-                case .open, .upcoming: return true
+                case .open, .upcoming, .ongoing: return true
                 default: return false
                 }
             }
@@ -331,8 +333,57 @@ final class ShopCatalogStore: ObservableObject {
 
 // MARK: - 图片解析（计划 §5：CatalogAsset 保留 originalURL）
 
+/// 运营上传图片的落盘存储（V1.1 §4.2 图片入口配套）：
+/// PhotosPicker 选图 → 压缩写入 Application Support/ShopCatalog/images/ →
+/// 生成「local:<文件名>」引用随 CatalogAsset.originalURL / sizeChart.sourceImage 持久化。
+nonisolated enum ShopCatalogImageStore {
+
+    static var directory: URL {
+        let dir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("ShopCatalog/images", isDirectory: true)
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        return dir
+    }
+
+    /// 保存图片数据 → 引用「local:<文件名>」；长边压到 1600px 控制 occupies。
+    static func save(_ data: Data) -> String? {
+        guard let image = UIImage(data: data) else { return nil }
+        let scaled = scaledDown(image, maxDimension: 1600)
+        guard let jpeg = scaled.jpegData(compressionQuality: 0.85) else { return nil }
+        let name = "img-\(UUID().uuidString.prefix(8)).jpg"
+        do {
+            try jpeg.write(to: directory.appendingPathComponent(name))
+            return "local:\(name)"
+        } catch {
+            return nil
+        }
+    }
+
+    /// 「local:」引用 → 文件 URL；非 local 引用返回 nil（交给 Bundle/远程解析）
+    static func url(for reference: String) -> URL? {
+        guard reference.lowercased().hasPrefix("local:") else { return nil }
+        let name = String(reference.dropFirst(6))
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty, !name.contains("/") else { return nil }
+        return directory.appendingPathComponent(name)
+    }
+
+    private static func scaledDown(_ image: UIImage, maxDimension: CGFloat) -> UIImage {
+        let maxSide = max(image.size.width, image.size.height)
+        guard maxSide > maxDimension, maxSide > 0 else { return image }
+        let scale = maxDimension / maxSide
+        let newSize = CGSize(width: image.size.width * scale,
+                             height: image.size.height * scale)
+        let renderer = UIGraphicsImageRenderer(size: newSize)
+        return renderer.image { _ in
+            image.draw(in: CGRect(origin: .zero, size: newSize))
+        }
+    }
+}
+
 /// CatalogAsset 引用解析：
 ///   · http(s) 开头 → 远程图（AsyncImage）
+///   · local: 开头 → 运营上传图（Application Support/ShopCatalog/images/）
 ///   · 其余视为 Bundle 内文件名（兼容 "bundle:" 前缀），
 ///     依次在根目录 / images / TimeHall/images / ShopCatalog/images 中查找。
 /// 第一版直接复用 Bundle 内已有的时光馆画册图作为演示素材，不复制资源。
@@ -342,6 +393,9 @@ nonisolated enum ShopCatalogImageResolver {
               !name.isEmpty else { return nil }
         if name.lowercased().hasPrefix("http://") || name.lowercased().hasPrefix("https://") {
             return URL(string: name)
+        }
+        if name.lowercased().hasPrefix("local:") {
+            return ShopCatalogImageStore.url(for: name)
         }
         if name.lowercased().hasPrefix("bundle:") {
             name = String(name.dropFirst(7))

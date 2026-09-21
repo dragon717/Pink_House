@@ -74,7 +74,8 @@ struct ShopCatalogProductDeepEditView: View {
             TextEditor(text: $imagesText)
                 .frame(minHeight: 60)
                 .font(.system(size: 13))
-            Text("图片：每行一个 Bundle 文件名或 http(s) 链接；originalURL 未变的行自动复用原图片资源（规格绑定与用户端缓存不断链）")
+            ShopCatalogImagePickerButton(mode: .append, text: $imagesText, label: "添加商品图片")
+            Text("图片：每行一个 Bundle 文件名或 http(s) 链接；originalURL 未变的行自动复用原图片资源（规格绑定与用户端缓存不断链）；也可点上方按钮从相册选图自动入库")
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)
             TextEditor(text: $variantsText)
@@ -92,7 +93,8 @@ struct ShopCatalogProductDeepEditView: View {
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)
             TextField("单位（cm）", text: $chartUnit)
-            TextField("尺码表原图（文件名/URL）", text: $chartImageText)
+            TextField("尺码表/价格表原图（文件名/URL）", text: $chartImageText)
+            ShopCatalogImagePickerButton(mode: .replace, text: $chartImageText, label: "添加尺码表/价格表原图")
         } header: {
             Text("图片 / 配色尺码 / 尺码表")
         }

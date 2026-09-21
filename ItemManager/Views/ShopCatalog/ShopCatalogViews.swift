@@ -271,18 +271,32 @@ struct ShopCatalogShopView: View {
 
     @Environment(ThemeManager.self) private var themeManager
     @ObservedObject private var store = ShopCatalogStore.shared
-    /// nil = 「当前上新」；有值 = 按年份翻阅历年
-    @State private var selectedYear: Int?
+    /// 店主页系列筛选：当前上新 / 未标年份 / 具体年份
+    enum YearFilter: Equatable {
+        case current
+        case noYear
+        case year(Int)
+    }
+    @State private var yearFilter: YearFilter = .current
     /// 系列卡直达「点菜式选购页」（原合并大卡中转页已删除）
     @State private var menuSeries: CatalogSeries?
 
     private var shop: CatalogShop? { store.shop(id: shopID) }
 
     private var visibleSeries: [CatalogSeries] {
-        if let selectedYear {
-            return store.archiveSeries(inShop: shopID).filter { $0.year == selectedYear }
+        switch yearFilter {
+        case .current:
+            return store.currentSeries(inShop: shopID)
+        case .noYear:
+            return store.archiveSeries(inShop: shopID).filter { $0.year == nil }
+        case .year(let year):
+            return store.archiveSeries(inShop: shopID).filter { $0.year == year }
         }
-        return store.currentSeries(inShop: shopID)
+    }
+
+    /// 无年份的历年系列（运营发布时年份选填），存在则显示「未标年份」chip 兜底
+    private var hasNoYearArchiveSeries: Bool {
+        store.archiveSeries(inShop: shopID).contains { $0.year == nil }
     }
 
     var body: some View {
@@ -309,9 +323,12 @@ struct ShopCatalogShopView: View {
     private var yearStrip: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
-                chip(title: "当前上新", isSelected: selectedYear == nil) { selectedYear = nil }
+                chip(title: "当前上新", isSelected: yearFilter == .current) { yearFilter = .current }
                 ForEach(store.years(inShop: shopID), id: \.self) { year in
-                    chip(title: String(year), isSelected: selectedYear == year) { selectedYear = year }
+                    chip(title: String(year), isSelected: yearFilter == .year(year)) { yearFilter = .year(year) }
+                }
+                if hasNoYearArchiveSeries {
+                    chip(title: "未标年份", isSelected: yearFilter == .noYear) { yearFilter = .noYear }
                 }
             }
         }
@@ -338,7 +355,7 @@ struct ShopCatalogShopView: View {
                 Image(systemName: "clock.arrow.circlepath")
                     .font(.system(size: 24))
                     .foregroundStyle(themeManager.tertiaryTextColor)
-                Text(selectedYear == nil ? "暂无进行中的上新" : "该年份暂无收录系列")
+                Text(yearFilter == .current ? "暂无进行中的上新" : "该年份暂无收录系列")
                     .font(.system(size: 14))
                     .foregroundStyle(themeManager.secondaryTextColor)
             }

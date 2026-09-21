@@ -362,7 +362,9 @@ private struct ShopCatalogShopEditSheet: View {
                 }
                 Section("视觉与简介") {
                     TextField("Logo（Bundle 文件名/URL，可空）", text: $logo)
+                    ShopCatalogImagePickerButton(mode: .replace, text: $logo, label: "添加 Logo 图片")
                     TextField("封面（Bundle 文件名/URL，可空）", text: $cover)
+                    ShopCatalogImagePickerButton(mode: .replace, text: $cover, label: "添加封面图片")
                     TextField("简介", text: $descriptionText)
                 }
             }
@@ -436,6 +438,7 @@ private struct ShopCatalogSeriesEditSheet: View {
                 }
                 Section("视觉与简介") {
                     TextField("封面（Bundle 文件名/URL，可空）", text: $cover)
+                    ShopCatalogImagePickerButton(mode: .replace, text: $cover, label: "添加封面图片")
                     TextField("简介", text: $descriptionText)
                 }
             }
