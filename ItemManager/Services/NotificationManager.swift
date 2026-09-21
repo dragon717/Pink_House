@@ -124,6 +124,13 @@ class NotificationManager: NSObject, UNUserNotificationCenterDelegate {
                 TabNavigationManager.shared.navigateToDepositNotificationClothing(clothingID)
             }
 
+            // 店家上新开售提醒：深链到时光馆对应商品详情页
+            if let info = request.content.userInfo as? [String: Any],
+               info["kind"] as? String == "shop-catalog-sale-reminder",
+               let productID = info["catalogProductID"] as? String {
+                TabNavigationManager.shared.navigateToShopCatalogProduct(productID)
+            }
+
             completionHandler()
         }
     }

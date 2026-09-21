@@ -327,6 +327,11 @@ final class DeleteTracker {
                 }
                 item.deletionSource = deletionSource
                 item.lastModified = Date()
+                // 心愿记录（含开售提醒）删除时，同步取消对应商品的开售提醒本地通知；
+                // 未注册过提醒时为无害操作。覆盖本机删除与 iCloud 同步删除两条路径。
+                if let productID = item.catalogProductID, item.isDepositPlan {
+                    ShopCatalogSaleReminder.cancel(productID: productID)
+                }
                 print("DeleteTracker: ✓ Force deleted clothing '\(itemName)' source=\(deletionSource ?? "nil")")
                 return true
             } else {

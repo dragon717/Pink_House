@@ -11,7 +11,11 @@
 //    · 主信息卡：商品名 / 店家 · 系列 · 年份 / 配色 / 尺码
 //    · 尺码表卡：结构化表格 + 「查看原尺码表 >」（§15）
 //    · 价格档案卡：预约价（含定金）/ 现货价 / 差价（§13）
-//    · 操作：加入心愿 / 我已经预约（§16-17）/ 加入少女衣橱（底部主按钮）
+//    · 操作区按预约状态条件渲染：
+//      预约中 → 【加入心愿】主按钮 + 我已经预约（§16-17）
+//      预约未开始 → 【加入心愿】（实际作用 = 开售提醒）
+//      现货在售 → 【加入少女衣橱】（不提供加入心愿）
+//      预约已结束 → 置灰【预约已结束】标签；有现货则引导加入衣橱购现货
 //
 
 import SwiftUI
@@ -333,35 +337,44 @@ struct ShopCatalogProductView: View {
         } else {
             VStack(spacing: 10) {
                 if let product {
-                    let events = store.saleEvents(forProduct: product.id)
-                    let hasActiveReservation = events.contains {
-                        $0.type == .reservation && store.windowStatus(of: $0) != .ended
-                    }
-                    // 底部主按钮（参考图5：加入少女衣橱）
-                    Button {
-                        showsMergeSheet = true
-                    } label: {
-                        Text("加入少女衣橱".appLocalized)
-                            .themeSkinLegibleText(level: .chip, slot: .primaryButton)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 14)
-                    }
-                    .buttonStyle(ThemeSkinPrimaryButtonStyle(fallbackTint: .pink, cornerRadius: 16, verticalPadding: 14))
-
-                    HStack(spacing: 10) {
-                        secondaryAction(title: "加入心愿", symbol: "heart") {
-                            addToWishlist()
+                    switch purchasePhase(for: product.id) {
+                    case .reservationActive:
+                        // 预约中：主按钮 = 加入心愿（到「心愿尾款」跟进定金/尾款）
+                        primaryButton(title: "加入心愿", symbol: "heart.fill") {
+                            addToWishlist(reminder: false)
                         }
-                        if hasActiveReservation {
-                            secondaryAction(title: "我已经预约", symbol: "calendar.badge.clock") {
-                                showsReservationSheet = true
+                        secondaryAction(title: "我已经预约", symbol: "calendar.badge.clock") {
+                            showsReservationSheet = true
+                        }
+                        statusCaption("预约中：加入心愿后，到「心愿尾款」随时准备付定金或尾款")
+                    case .reservationUpcoming:
+                        // 预约未开始：仍显示加入心愿，实际作用是开售提醒
+                        primaryButton(title: "加入心愿", symbol: "heart") {
+                            addToWishlist(reminder: true)
+                        }
+                        statusCaption("预约未开始：加入后将作为开售提醒，到点通知你来买")
+                    case .inStock:
+                        // 现货在售：不提供加入心愿，直接入库
+                        primaryButton(title: "加入少女衣橱", symbol: nil) {
+                            showsMergeSheet = true
+                        }
+                        statusCaption("现货在售：可直接加入衣橱留存搭配")
+                    case .reservationEnded:
+                        // 预约已结束：置灰标签；有现货则引导购买现货
+                        endedTag
+                        if hasStock {
+                            primaryButton(title: "加入少女衣橱", symbol: nil) {
+                                showsMergeSheet = true
                             }
+                            statusCaption("预约已结束：现货在售，可加入衣橱留存")
+                        } else {
+                            statusCaption("预约已结束：本款已无法预约，也暂无现货")
                         }
-                    }
-                    if !hasActiveReservation {
-                        Text("当前不在预约期，可加入心愿或直接入库".appLocalized)
-                            .font(.caption2)
-                            .foregroundStyle(themeManager.tertiaryTextColor)
+                    case .neutral:
+                        // 无任何上新窗口 / 价格档案：仅保留入库入口
+                        primaryButton(title: "加入少女衣橱", symbol: nil) {
+                            showsMergeSheet = true
+                        }
                     }
                 }
             }
@@ -386,6 +399,72 @@ struct ShopCatalogProductView: View {
         }
     }
 
+    // MARK: 购买阶段（按预约状态条件渲染的依据）
+
+    private func purchasePhase(for productID: String) -> ShopCatalogPurchasePhase {
+        let events = store.saleEvents(forProduct: productID)
+        let reservationStatuses = events
+            .filter { $0.type == .reservation }
+            .map { store.windowStatus(of: $0) }
+        let stockWindowOpen = events.contains {
+            $0.type != .reservation && store.windowStatus(of: $0).isOpenLike
+        }
+        let archive = store.priceArchive(forProduct: productID)
+        return ShopCatalogPurchasePhase.resolve(
+            reservationStatuses: reservationStatuses,
+            stockWindowOpen: stockWindowOpen,
+            hasStockPrice: archive.currentStockPrice != nil,
+            hasReservationPrice: archive.reservation != nil
+        )
+    }
+
+    /// 是否有可买的现货（现货窗口进行中，或价格档案含现货价）
+    private var hasStock: Bool {
+        guard let product else { return false }
+        let events = store.saleEvents(forProduct: product.id)
+        if events.contains(where: { $0.type != .reservation && store.windowStatus(of: $0).isOpenLike }) {
+            return true
+        }
+        return store.priceArchive(forProduct: product.id).currentStockPrice != nil
+    }
+
+    /// 主按钮（与原「加入少女衣橱」同款主题样式，保持视觉一致）
+    private func primaryButton(title: String, symbol: String?, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Group {
+                if let symbol {
+                    Label(title.appLocalized, systemImage: symbol)
+                } else {
+                    Text(title.appLocalized)
+                }
+            }
+            .themeSkinLegibleText(level: .chip, slot: .primaryButton)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 14)
+        }
+        .buttonStyle(ThemeSkinPrimaryButtonStyle(fallbackTint: .pink, cornerRadius: 16, verticalPadding: 14))
+    }
+
+    private func statusCaption(_ text: String) -> some View {
+        Text(text.appLocalized)
+            .font(.caption2)
+            .foregroundStyle(themeManager.tertiaryTextColor)
+            .multilineTextAlignment(.center)
+            .frame(maxWidth: .infinity)
+    }
+
+    /// 置灰的「预约已结束」标签（非按钮，避免误导可点）
+    private var endedTag: some View {
+        Label("预约已结束".appLocalized, systemImage: "clock.badge.xmark")
+            .font(.system(size: 14, weight: .medium))
+            .foregroundStyle(.secondary)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 12)
+            .background(Color.secondary.opacity(0.12))
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .accessibilityLabel("预约已结束")
+    }
+
     private func secondaryAction(title: String, symbol: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Label(title.appLocalized, systemImage: symbol)
@@ -403,7 +482,7 @@ struct ShopCatalogProductView: View {
         actionToast = text
     }
 
-    private func addToWishlist() {
+    private func addToWishlist(reminder: Bool) {
         guard let draft = ShopCatalogWardrobeDraftBuilder.makeDraft(
             selection: .init(productID: productID, priceMode: .wishlist),
             store: store, modelContext: modelContext
@@ -417,10 +496,85 @@ struct ShopCatalogProductView: View {
                 selection: .init(productID: productID, priceMode: .wishlist),
                 store: store, modelContext: modelContext
             )
-            showActionToast("已加入心愿，可到心愿尾款查看")
+            if reminder {
+                scheduleSaleReminderIfNeeded()
+            } else {
+                showActionToast("已加入心愿，可到心愿尾款查看")
+            }
         } catch {
             showActionToast("加入心愿失败：\(error.localizedDescription)")
         }
+    }
+
+    /// 预约未开始的商品：加入心愿 = 开售提醒，到预约窗口 startAt 弹本地通知
+    private func scheduleSaleReminderIfNeeded() {
+        let events = store.saleEvents(forProduct: productID)
+        guard let fireDate = ShopCatalogSaleReminder.upcomingSaleStart(events: events) else {
+            // 开售时间未定档：先入心愿，不定时提醒
+            showActionToast("已加入心愿（开售时间待公布，暂无法定时提醒）")
+            return
+        }
+        let productName = product?.name ?? ""
+        let seriesName = series?.name
+        Task {
+            let ok = await ShopCatalogSaleReminder.schedule(
+                productID: productID,
+                productName: productName,
+                seriesName: seriesName,
+                fireDate: fireDate
+            )
+            showActionToast(ok
+                ? "已加入心愿，\(ShopCatalogFormat.month(fireDate)) 开售时提醒你来买"
+                : "已加入心愿；通知权限未开启，请到系统设置开启后才能收到开售提醒")
+        }
+    }
+}
+
+/// 上新窗口状态的小辅助：open / ongoing 都视为「可操作」
+private extension ShopCatalogStore.SaleWindowStatus {
+    var isOpenLike: Bool { self == .open || self == .ongoing }
+}
+
+// MARK: - 购买阶段（按预约状态条件渲染，纯逻辑便于单测）
+
+/// 商品详情操作区的按钮策略依据（优先级：预约中 > 预约未开始 > 预约已结束 > 现货 > 无信息）
+///
+/// 规则（对应运营口径）：
+/// · 预约中 → 【加入心愿】（心愿尾款跟进定金/尾款）
+/// · 预约未开始 → 【加入心愿】（实际作用 = 开售提醒）
+/// · 现货在售 → 【加入少女衣橱】，不提供加入心愿
+/// · 预约已结束 → 置灰【预约已结束】标签；有现货则引导加入衣橱购现货
+enum ShopCatalogPurchasePhase: Equatable {
+    case reservationActive   // 预约中
+    case reservationUpcoming // 预约未开始（加入心愿 = 开售提醒）
+    case inStock             // 现货在售
+    case reservationEnded    // 预约已结束
+    case neutral             // 无窗口 / 无价格档案
+
+    static func resolve(
+        reservationStatuses: [ShopCatalogStore.SaleWindowStatus],
+        stockWindowOpen: Bool,
+        hasStockPrice: Bool,
+        hasReservationPrice: Bool
+    ) -> ShopCatalogPurchasePhase {
+        if reservationStatuses.contains(.open) || reservationStatuses.contains(.ongoing) {
+            return .reservationActive
+        }
+        if reservationStatuses.contains(.upcoming) {
+            return .reservationUpcoming
+        }
+        if reservationStatuses.contains(.ended) {
+            return .reservationEnded
+        }
+        // 没有预约窗口：看现货窗口 / 现货价档案
+        if stockWindowOpen || hasStockPrice {
+            return .inStock
+        }
+        if hasReservationPrice {
+            // 只剩历史预约价：预约期已过
+            return .reservationEnded
+        }
+        return .neutral
     }
 }
 

@@ -30,6 +30,8 @@ class TabNavigationManager: ObservableObject {
     @Published var navigateToSmallWorld: SmallWorldDestination?
     @Published var navigateToClothingID: UUID?
     @Published var pendingWardrobeCreationDraft: ClothingEditDraft?
+    /// 开售提醒深链：待打开的店家上新商品 ID（时光馆 Tab 4 栈内压入商品详情）
+    @Published var pendingShopCatalogProductID: String?
     
     // 记录进入House前的来源，用于智能返回
     // 当用户从Tab 0（衣橱/心愿尾款）跳转到House时，记录当时的HomeTab
@@ -75,6 +77,12 @@ class TabNavigationManager: ObservableObject {
         navigateToTab = 0
     }
 
+    /// 开售提醒深链：切到时光馆（Tab 4），店家上新栈随后把目标商品详情压入
+    func navigateToShopCatalogProduct(_ productID: String) {
+        pendingShopCatalogProductID = productID
+        navigateToTab = 4
+    }
+
     /// 切回衣橱并用外部资料打开现有的手动创建页。
     func presentWardrobeCreation(with draft: ClothingEditDraft) {
         navigate(to: .wardrobe(.wardrobe))
@@ -109,5 +117,6 @@ class TabNavigationManager: ObservableObject {
         navigateToSmallWorld = nil
         navigateToClothingID = nil
         pendingWardrobeCreationDraft = nil
+        pendingShopCatalogProductID = nil
     }
 }
