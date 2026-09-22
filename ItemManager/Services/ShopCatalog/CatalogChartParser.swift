@@ -1,0 +1,243 @@
+//
+//  CatalogChartParser.swift
+//  ItemManager
+//
+//  尺码表 / 预约价格表 图片自动解析（2026-09-22）：
+//    上传图片 → Vision OCR 逐词元识别 → 按包围盒重建行 → 表格文本解析 → 结构化 columns / rows，
+//    详情页按表格样式直接渲染，无需人工二次录入。
+//    · parse(image:)   —— OCR 通道（异步）
+//    · parseText(_:)   —— 纯文本解析（nonisolated 纯函数，单测覆盖）
+//    · reconstructLineTexts —— 包围盒 → 行文本（纯函数，单测覆盖）
+//    · CatalogManualChartText —— 手动录入文本（逗号分隔列 + 「标签:值,值」行）共享解析
+//    · 解析失败 / 字段缺失一律抛 CatalogChartParserError，给出明确可操作的提示；
+//      原图引用始终保留，详情页可查看原图并引导人工修正。
+//
+//  2026-09-22 修复（用户反馈「表头下没有数据行」）：
+//    Vision 对列间距大的表格会把**每个单元格识别成独立 observation**，
+//    旧实现按「一行文本一个 observation」解析 → 表头后全是单词元行被当孤立标签丢弃。
+//    现改为按包围盒垂直聚类重建行、水平排序拼列（\t 分隔），单元格被打散也能还原表格。
+//
+
+import UIKit
+import Vision
+
+nonisolated enum CatalogChartParserError: LocalizedError {
+    case imageUnavailable
+    case noTextRecognized
+    case tableUnparsable(reason: String)
+
+    var errorDescription: String? {
+        switch self {
+        case .imageUnavailable:
+            return "无法读取图片内容，请重新上传（支持截图或清晰拍照）"
+        case .noTextRecognized:
+            return "图片中未识别到文字，请确认上传的是价格表 / 尺码表截图"
+        case .tableUnparsable(let reason):
+            return "表格解析失败：\(reason)。原图已保留，可在下方手动修正识别结果"
+        }
+    }
+}
+
+nonisolated enum CatalogChartParser {
+
+    struct Table: Sendable, Hashable {
+        var columns: [String]
+        var rows: [CatalogSizeRow]
+    }
+
+    /// OCR 单元格：文本 + 归一化包围盒（Vision 坐标系，原点左下）
+    struct Cell: Sendable, Equatable {
+        let text: String
+        let box: CGRect
+    }
+
+    // MARK: OCR 通道
+
+    /// 图片 → OCR 词元 → 包围盒重建行 → 结构化表格
+    static func parse(image: UIImage) async throws -> Table {
+        guard let cgImage = image.cgImage else { throw CatalogChartParserError.imageUnavailable }
+        let cells = try await recognizeCells(cgImage: cgImage)
+        guard !cells.isEmpty else { throw CatalogChartParserError.noTextRecognized }
+        return try parseText(reconstructLineTexts(from: cells))
+    }
+
+    private static func recognizeCells(cgImage: CGImage) async throws -> [Cell] {
+        try await withCheckedThrowingContinuation { continuation in
+            let request = VNRecognizeTextRequest { request, error in
+                if let error {
+                    continuation.resume(throwing: error)
+                    return
+                }
+                let observations = (request.results as? [VNRecognizedTextObservation]) ?? []
+                let cells: [Cell] = observations.compactMap { observation in
+                    guard let text = observation.topCandidates(1).first?.string else { return nil }
+                    return Cell(text: text, box: observation.boundingBox)
+                }
+                continuation.resume(returning: cells)
+            }
+            request.recognitionLevel = .accurate
+            request.recognitionLanguages = ["zh-Hans", "en-US"]
+            request.usesLanguageCorrection = false
+            let handler = VNImageRequestHandler(cgImage: cgImage, options: [:])
+            DispatchQueue.global(qos: .userInitiated).async {
+                do {
+                    try handler.perform([request])
+                } catch {
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
+    }
+
+    // MARK: 包围盒 → 行文本（纯函数，可单测）
+
+    /// 单元格按行聚类（垂直中心接近 = 同一行）、行内按 x 排序，列间用 \t 分隔。
+    /// Vision 坐标系原点在**左下**：midY 越大越靠图片上方，应排在越前。
+    nonisolated static func reconstructLineTexts(from cells: [Cell]) -> [String] {
+        guard !cells.isEmpty else { return [] }
+        let sorted = cells.sorted { $0.box.midY > $1.box.midY }
+        var rows: [[Cell]] = []
+        var current: [Cell] = []
+        var currentMidY: CGFloat = 0
+        for cell in sorted {
+            if let last = current.last,
+               abs(cell.box.midY - currentMidY) > max(cell.box.height, last.box.height) * 0.6 {
+                rows.append(current)
+                current = [cell]
+            } else {
+                current.append(cell)
+            }
+            currentMidY = current.map(\.box.midY).reduce(0, +) / CGFloat(current.count)
+        }
+        if !current.isEmpty { rows.append(current) }
+        return rows.map { row in
+            row.sorted { $0.box.minX < $1.box.minX }
+                .map(\.text)
+                .joined(separator: "\t")
+        }
+    }
+
+    // MARK: 文本解析（纯函数，可单测）
+
+    /// 行文本 → 表格。口径：
+    ///   · 第一个含 ≥2 个词元的行 = 列头行（首个词元是左上角标签，如「尺码」「项目」）
+    ///   · 其后每行 = 「行标签 值 值 …」，值不足的列补 nil（详情页显示「—」）
+    ///   · 词元支持空格 / 制表符（包围盒重建输出 \t 分隔）分隔
+    ///   · 值为「-」「/」「—」「暂无」等占位时视为空；词元尾部冒号 / 逗号（OCR 噪声）剔除
+    nonisolated static func parseText(_ lines: [String]) throws -> Table {
+        let cleaned = lines
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
+        guard let headerIndex = cleaned.firstIndex(where: { tokens($0).count >= 2 }) else {
+            throw CatalogChartParserError.tableUnparsable(reason: "未找到至少两列的表头行")
+        }
+        let columns = Array(tokens(cleaned[headerIndex]).dropFirst())
+        guard !columns.isEmpty else {
+            throw CatalogChartParserError.tableUnparsable(reason: "表头除行标签外没有数据列")
+        }
+        var rows: [CatalogSizeRow] = []
+        for line in cleaned[(cleaned.index(after: headerIndex))...] {
+            let lineTokens = tokens(line)
+            guard let label = lineTokens.first else { continue }
+            let values: [String?] = (1...columns.count).map { offset in
+                guard lineTokens.indices.contains(offset) else { return nil }
+                let value = lineTokens[offset]
+                return placeholderTokens.contains(value) ? nil : value
+            }
+            // 孤立标签行（OCR 把行标签和数值拆开时可能出现）：暂存为标签行跳过
+            if values.allSatisfy({ $0 == nil }) && lineTokens.count <= 1 { continue }
+            rows.append(CatalogSizeRow(label: label, values: values))
+        }
+        guard !rows.isEmpty else {
+            throw CatalogChartParserError.tableUnparsable(reason: "表头下没有数据行")
+        }
+        return Table(columns: columns, rows: rows)
+    }
+
+    nonisolated private static let placeholderTokens: Set<String> = ["-", "/", "—", "–", "―", "暂无"]
+
+    /// 词元切分：制表符（包围盒重建输出）优先，空格（含连续空白）兜底；
+    /// 词元尾部冒号 / 逗号（OCR 噪声，如「86-92:」）剔除
+    nonisolated private static func tokens(_ line: String) -> [String] {
+        let raw: [Substring] = line.contains("\t")
+            ? line.split(separator: "\t", omittingEmptySubsequences: true)
+            : line.split(whereSeparator: { $0 == " " || $0 == "\t" })
+        return raw
+            .map { CatalogManualChartText.cleanToken(String($0)) }
+            .filter { !$0.isEmpty }
+    }
+}
+
+// MARK: - 手动录入文本共享解析（深度编辑 / 补录草稿编辑器 / 系列价格表）
+
+/// 手动表格文本（列名逗号分隔 + 每行「标签:值,值,…」）的共享解析与规范化。
+/// 三处编辑器共用同一口径，避免各自实现漂移（2026-09-22 修复重复「尺码」列）。
+nonisolated enum CatalogManualChartText {
+
+    /// 行标签列的列名（用户在列头里把标签列也写进去时，剔除以免与角落标签列重复）
+    static let labelColumnNames: Set<String> = [
+        "尺码", "尺寸", "规格", "型号", "项目", "款式", "商品", "名称", "颜色", "size", "item",
+    ]
+
+    /// 词元清洗：去掉尾部冒号（全半角）与逗号（全半角），如「86-92:」→「86-92」
+    static func cleanToken(_ token: String) -> String {
+        var result = token.trimmingCharacters(in: .whitespaces)
+        while let last = result.last, last == ":" || last == "：" || last == "," || last == "，" {
+            result.removeLast()
+            result = result.trimmingCharacters(in: .whitespaces)
+        }
+        return result
+    }
+
+    /// 列名文本 → 数据列。首列若为行标签列名（如「尺码」）则剔除——
+    /// 渲染时角落已有独立标签列，保留会出现重复「尺码」列且整体错位一列。
+    static func parseColumns(_ text: String) -> [String] {
+        let columns = text
+            .components(separatedBy: ",")
+            .map { cleanToken($0.replacingOccurrences(of: "，", with: ",")) }
+            .filter { !$0.isEmpty }
+        guard let first = columns.first, isLabelColumn(first) else { return columns }
+        return Array(columns.dropFirst())
+    }
+
+    /// 行文本（每行「标签:值,值,…」）→ 行。值尾冒号 / 逗号清洗，空段补 nil。
+    static func parseRows(_ text: String) -> [CatalogSizeRow] {
+        text
+            .components(separatedBy: .newlines)
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
+            .compactMap { line -> CatalogSizeRow? in
+                let pair = line.split(separator: ":", maxSplits: 1, omittingEmptySubsequences: true)
+                guard let label = pair.first else { return nil }
+                let values = (pair.count > 1 ? String(pair[1]) : "")
+                    .components(separatedBy: ",")
+                    .map { cleanToken($0) }
+                    .map { $0.isEmpty ? nil : $0 }
+                return CatalogSizeRow(label: cleanToken(String(label)), values: values)
+            }
+    }
+
+    /// 渲染 / 保存前的统一规范化（旧数据里已存入的重复标签列在此兜底修复）：
+    ///   · 值 / 标签去尾冒号
+    ///   · 首列是行标签列名（如「尺码」）时剔除，行的值保持原序——
+    ///     旧数据里值本就整体左移一列，剔除后恰好对齐（多余尾值无害）
+    static func normalized(columns: [String], rows: [CatalogSizeRow])
+        -> (columns: [String], rows: [CatalogSizeRow]) {
+        let cleanedRows = rows.map { row in
+            CatalogSizeRow(label: cleanToken(row.label),
+                           values: row.values.map { value in
+                               guard let value else { return nil }
+                               let cleaned = cleanToken(value)
+                               return cleaned.isEmpty ? nil : cleaned
+                           })
+        }
+        guard let first = columns.first, isLabelColumn(first) else {
+            return (columns, cleanedRows)
+        }
+        return (Array(columns.dropFirst()), cleanedRows)
+    }
+
+    static func isLabelColumn(_ name: String) -> Bool {
+        labelColumnNames.contains(name.lowercased())
+    }
+}

@@ -22,6 +22,13 @@ struct ShopCatalogOpsView: View {
     @State private var toast: String?
     @State private var actionError: String?
 
+    // 批次删除 / 多选（2026-09-22 批次列表治理）
+    @State private var isSelectingBatches = false          // 多选模式开关
+    @State private var selectedBatchIDs: Set<String> = []   // 多选已勾选
+    @State private var pendingDeleteBatchIDs: Set<String> = [] // 待二次确认的删除目标
+    @State private var showsBatchDeleteConfirm = false      // 删除二次确认弹窗
+    @State private var blockedBatchDeletions: [CatalogBatchDeleteBlock] = [] // 被拦截条目（附原因）
+
     var body: some View {
         Group {
             if creatorAccess.isCreator {
@@ -40,7 +47,7 @@ struct ShopCatalogOpsView: View {
         Form {
             dashboardSection
             // 淘宝导入（§28）与批量导入（§4.1 多链接解析）已下线，仅保留既有批次列表
-            if !ShopCatalogDraftStore.loadBatches().isEmpty {
+            if !draftStore.batches.isEmpty {
                 batchListSection
             }
             draftSection
@@ -72,6 +79,25 @@ struct ShopCatalogOpsView: View {
         }
         .sheet(item: $manualBatch) { batch in
             ShopCatalogBatchDetailView(draftStore: draftStore, store: store, batch: batch)
+        }
+        .confirmationDialog(batchDeleteConfirmTitle,
+                            isPresented: $showsBatchDeleteConfirm,
+                            titleVisibility: .visible) {
+            Button("删除批次（草稿与已发布数据保留）", role: .destructive) {
+                performBatchDelete()
+            }
+            Button("取消", role: .cancel) {}
+        } message: {
+            Text(batchDeleteImpactText)
+        }
+        // 拦截反馈：被拦截的批次整体保留并逐条说明原因；处理后可对相同选择直接重试
+        .alert("部分批次无法删除", isPresented: Binding(
+            get: { !blockedBatchDeletions.isEmpty },
+            set: { if !$0 { blockedBatchDeletions = [] } }
+        )) {
+            Button("知道了", role: .cancel) {}
+        } message: {
+            Text(blockedBatchDeletionsText)
         }
     }
 
@@ -138,20 +164,65 @@ struct ShopCatalogOpsView: View {
     @State private var selectedBatch: CatalogBatchEntrySession?
 
     // MARK: 批次列表（V1.1 §4.1；淘宝/批量导入入口已下线，仅保留既有批次的管理）
+    //
+    // 行内操作（2026-09-22 列表治理）：
+    //   · 右侧「更多」菜单（ellipsis.circle，视觉克制）：删除批次…
+    //   · Section 标题右侧「选择」进入多选，批量删除
+    //   · 删除前 confirmationDialog 二次确认并说明影响范围
+    //   · 批次下仍有未处理草稿（draft/submitted/reviewed）→ 拦截并说明原因，条目保留
+    //   · 持久化失败 → actionError 反馈，条目保留，可用相同选择直接重试
 
     private var batchListSection: some View {
-        Section("批次") {
-            ForEach(ShopCatalogDraftStore.loadBatches().reversed()) { batch in
+        Section {
+            ForEach(draftStore.batches.reversed()) { batch in
                 batchRow(batch)
             }
+        } header: {
+            batchSectionHeader
+        } footer: {
+            if isSelectingBatches {
+                Text("已选 \(selectedBatchIDs.count) 个批次。删除只移除批次分组记录，单品草稿与已发布数据不受影响；仍有未处理草稿的批次会被拦截并说明原因。")
+                    .font(.system(size: 11))
+            }
         }
+    }
+
+    /// Section 标题右侧：多选入口 / 删除 / 取消（替代整页 toolbar，视觉集中在列表内）
+    private var batchSectionHeader: some View {
+        HStack(spacing: 12) {
+            Text("批次")
+            Spacer()
+            if isSelectingBatches {
+                Button {
+                    beginBatchDelete(selectedBatchIDs)
+                } label: {
+                    Text("删除(\(selectedBatchIDs.count))")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(selectedBatchIDs.isEmpty ? Color.secondary : Color.red)
+                }
+                .disabled(selectedBatchIDs.isEmpty)
+                Button("取消") { exitBatchSelection() }
+                    .font(.system(size: 12))
+            } else {
+                Button("选择") { isSelectingBatches = true }
+                    .font(.system(size: 12))
+            }
+        }
+        .textCase(nil)
     }
 
     private func batchRow(_ batch: CatalogBatchEntrySession) -> some View {
         let batchDrafts = draftStore.drafts.filter { $0.batchID == batch.id }
         let draftable = batchDrafts.filter { $0.status == .draft }.count
         let assigned = batch.shopID != nil || !batch.newShopName.isEmpty
+        let isSelected = selectedBatchIDs.contains(batch.id)
         return HStack(spacing: 10) {
+            // 多选模式：行首勾选框（非多选时不占位，保持视觉克制）
+            if isSelectingBatches {
+                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                    .font(.system(size: 18))
+                    .foregroundStyle(isSelected ? Color.pink : Color.secondary)
+            }
             VStack(alignment: .leading, spacing: 3) {
                 Text(batchTitle(batch))
                     .font(.system(size: 13, weight: .medium))
@@ -160,22 +231,131 @@ struct ShopCatalogOpsView: View {
                     .foregroundStyle(.secondary)
             }
             Spacer()
-            if draftable > 0 {
-                Button("批量提交") {
-                    do {
-                        let count = try draftStore.submitBatch(batch.id)
-                        toast = "已批量提交 \(count) 条单品草稿"
-                    } catch { actionError = error.localizedDescription }
+            if !isSelectingBatches {
+                if draftable > 0 {
+                    Button("批量提交") {
+                        do {
+                            let count = try draftStore.submitBatch(batch.id)
+                            toast = "已批量提交 \(count) 条单品草稿"
+                        } catch { actionError = error.localizedDescription }
+                    }
+                    .font(.system(size: 13, weight: .semibold))
+                    .buttonStyle(.bordered)
+                    .tint(.orange)
                 }
-                .font(.system(size: 13, weight: .semibold))
-                .buttonStyle(.bordered)
-                .tint(.orange)
+                // 「更多」下拉菜单：与实体管理商品行同一交互模式（ellipsis.circle）
+                Menu {
+                    Button(role: .destructive) {
+                        beginBatchDelete([batch.id])
+                    } label: {
+                        Label("删除批次…", systemImage: "trash")
+                    }
+                } label: {
+                    Image(systemName: "ellipsis.circle")
+                        .font(.system(size: 16))
+                        .foregroundStyle(.secondary)
+                }
             }
         }
         .contentShape(Rectangle())
-        .onTapGesture { selectedBatch = batch }
+        .onTapGesture {
+            if isSelectingBatches {
+                toggleBatchSelection(batch.id)
+            } else {
+                selectedBatch = batch
+            }
+        }
         .sheet(item: $selectedBatch) { batch in
             ShopCatalogBatchDetailView(draftStore: draftStore, store: store, batch: batch)
+        }
+    }
+
+    // MARK: 批次删除（状态与回调）
+
+    private func toggleBatchSelection(_ id: String) {
+        if selectedBatchIDs.contains(id) {
+            selectedBatchIDs.remove(id)
+        } else {
+            selectedBatchIDs.insert(id)
+        }
+    }
+
+    private func exitBatchSelection() {
+        isSelectingBatches = false
+        selectedBatchIDs = []
+    }
+
+    /// 删除入口（单条菜单 / 多选按钮共用）：先确认，再执行
+    private func beginBatchDelete(_ ids: Set<String>) {
+        guard !ids.isEmpty else { return }
+        pendingDeleteBatchIDs = ids
+        showsBatchDeleteConfirm = true
+    }
+
+    private var pendingDeleteTitles: [String] {
+        pendingDeleteBatchIDs.compactMap { id in
+            draftStore.batches.first(where: { $0.id == id }).map(batchTitle)
+        }
+    }
+
+    private var batchDeleteConfirmTitle: String {
+        let titles = pendingDeleteTitles
+        if titles.count == 1, let only = titles.first { return "删除「\(only)」？" }
+        return "删除 \(pendingDeleteBatchIDs.count) 个批次？"
+    }
+
+    /// 影响范围说明：删除只作用于批次归组记录；预告知将被拦截的批次
+    private var batchDeleteImpactText: String {
+        var lines: [String] = []
+        let titles = pendingDeleteTitles
+        if titles.count == 1, let only = titles.first {
+            lines.append("将删除批次「\(only)」。")
+        } else {
+            lines.append("将删除 \(titles.count) 个批次。")
+        }
+        lines.append("影响范围：仅删除批次分组记录；草稿箱中的单品草稿与已发布到覆盖层的数据都不受影响。")
+        let blockedCount = pendingDeleteBatchIDs.filter {
+            ShopCatalogDraftStore.batchDeleteBlockReason(batchID: $0, drafts: draftStore.drafts) != nil
+        }.count
+        if blockedCount == 0 {
+            lines.append("所选批次下均无未处理草稿，可以直接删除。")
+        } else {
+            lines.append("其中 \(blockedCount) 个批次仍有未处理草稿，将被拦截并说明原因。")
+        }
+        return lines.joined(separator: "\n")
+    }
+
+    private var blockedBatchDeletionsText: String {
+        blockedBatchDeletions.map { block in
+            let title = draftStore.batches.first(where: { $0.id == block.batchID })
+                .map(batchTitle) ?? block.batchID
+            return "「\(title)」\(block.reason)"
+        }
+        .joined(separator: "\n\n")
+    }
+
+    /// 确认后执行：删除成功的从选择中移除；被拦截的保留条目与选择，弹窗说明原因；
+    /// 抛错（持久化失败）时什么都不变，走通用「操作失败」弹窗，可用相同选择重试
+    private func performBatchDelete() {
+        do {
+            let result = try draftStore.deleteBatches(ids: pendingDeleteBatchIDs)
+            pendingDeleteBatchIDs = []
+            guard !result.deletedIDs.isEmpty else {
+                blockedBatchDeletions = result.blocked
+                return
+            }
+            toast = result.blocked.isEmpty
+                ? "已删除 \(result.deletedIDs.count) 个批次"
+                : "已删除 \(result.deletedIDs.count) 个批次，其余被拦截"
+            selectedBatchIDs.subtract(result.deletedIDs)
+            if !result.blocked.isEmpty {
+                blockedBatchDeletions = result.blocked
+            } else if selectedBatchIDs.isEmpty || draftStore.batches.isEmpty {
+                exitBatchSelection()
+            }
+        } catch {
+            pendingDeleteBatchIDs = []
+            actionError = error.localizedDescription
         }
     }
 
@@ -261,7 +441,7 @@ private struct ShopCatalogDraftEditorRow: View {
                     .font(.system(size: 14, weight: .medium))
                 HStack(spacing: 6) {
                     statusBadge
-                    Text("\(draft.saleKind.displayName) · \(ShopCatalogFormat.price(Decimal(draft.price)))")
+                    Text(draft.priceSummary)
                         .font(.system(size: 11))
                         .foregroundStyle(.secondary)
                 }
@@ -388,6 +568,34 @@ struct ShopCatalogDraftDetailEditor: View {
 
     private let categories = ShopCatalogStore.canonicalCategoryOrder
 
+    /// 预约价输入绑定：0 显示为空（可空），输入即写回 price
+    private var reservationPriceBinding: Binding<Double?> {
+        Binding(
+            get: { draftBox.effectiveReservationPrice },
+            set: { draftBox.price = $0 ?? 0 }
+        )
+    }
+
+    /// 款式名输入绑定（V1.4）：空串 = 清除显式款式，发布时按名称自动派生
+    private var designNameBinding: Binding<String> {
+        Binding(
+            get: { draftBox.designName ?? "" },
+            set: { draftBox.designName = $0.trimmingCharacters(in: .whitespaces).isEmpty ? nil : $0 }
+        )
+    }
+
+    /// 旧口径迁移：存量「现货草稿」（saleKind == .stock 且 price 承载现货价）
+    /// 在新编辑器里打开时一次性搬到 stockPrice，price 让位给预约价 ——
+    /// 之后预约 / 现货即可并存编辑，旧数据不丢。
+    private func migrateLegacySaleKindIfNeeded() {
+        guard draftBox.saleKind == .stock,
+              draftBox.stockPrice == nil,
+              draftBox.price > 0 else { return }
+        draftBox.stockPrice = draftBox.price
+        draftBox.price = 0
+        draftBox.saleKind = .reservation
+    }
+
     // MARK: 完整商品资料（G5：手动录入可完成全部业务；文本行式录入）
     @State private var imagesText = ""       // 每行一个 Bundle 文件名或 URL
     @State private var variantsText = ""     // 每行「颜色,尺码」（可留空一侧）
@@ -401,26 +609,28 @@ struct ShopCatalogDraftDetailEditor: View {
             Form {
                 Section("商品") {
                     TextField("商品名称", text: $draftBox.name)
+                    // V1.4「同款不同色」：款式名可空 = 按商品名剥离颜色词自动派生；
+                    // 同款不同色的补录填同一款式名，发布后列表自动归入同一款式
+                    TextField("款式（可空，默认按名称自动识别）", text: designNameBinding)
                     Picker("分类", selection: $draftBox.category) {
                         ForEach(categories.filter { $0 != "其他" }, id: \.self) { Text($0).tag($0) }
                         Text("其他").tag("其他")
                     }
                 }
                 productInfoSection
-                Section("销售记录") {
-                    Picker("类型", selection: $draftBox.saleKind) {
-                        Text("预约价").tag(CatalogSaleEventType.reservation)
-                        Text("现货价").tag(CatalogSaleEventType.stock)
-                    }
+                Section {
+                    // 预约价与现货价并存且不互斥（2026-09-22）：
+                    // 可同时填写、各自生成销售记录；现货价可空置，后续补录修改。
+                    // 任一项填写都不会禁用 / 清空 / 覆盖另一项。
                     HStack {
-                        Text("价格")
+                        Text("预约价")
                         Spacer()
-                        TextField("0", value: $draftBox.price, format: .number)
+                        TextField("可空", value: reservationPriceBinding, format: .number)
                             .keyboardType(.decimalPad)
                             .multilineTextAlignment(.trailing)
                             .frame(width: 110)
                     }
-                    if draftBox.saleKind == .reservation {
+                    if draftBox.effectiveReservationPrice != nil {
                         HStack {
                             Text("定金")
                             Spacer()
@@ -443,11 +653,23 @@ struct ShopCatalogDraftDetailEditor: View {
                                 .foregroundStyle(.red)
                         }
                     }
+                    HStack {
+                        Text("现货价")
+                        Spacer()
+                        TextField("可空", value: $draftBox.stockPrice, format: .number)
+                            .keyboardType(.decimalPad)
+                            .multilineTextAlignment(.trailing)
+                            .frame(width: 110)
+                    }
+                } header: {
+                    Text("价格（预约与现货可并存）")
+                } footer: {
+                    Text("至少填写预约价或现货价之一；现货价可先空置，后续通过补录追加。")
                 }
                 Section("店家") {
                     Picker("关联店家", selection: $draftBox.shopID) {
                         Text("新建店家").tag(String?.none)
-                        ForEach(store.catalog?.shops ?? []) { shop in
+                        ForEach(store.shopsSortedByName()) { shop in
                             Text(shop.name).tag(String?.some(shop.id))
                         }
                     }
@@ -459,7 +681,7 @@ struct ShopCatalogDraftDetailEditor: View {
                 Section("系列") {
                     Picker("关联系列", selection: $draftBox.seriesID) {
                         Text("新建系列").tag(String?.none)
-                        ForEach(store.catalog?.series ?? []) { series in
+                        ForEach(store.seriesSortedByName()) { series in
                             Text(series.name).tag(String?.some(series.id))
                         }
                     }
@@ -485,6 +707,7 @@ struct ShopCatalogDraftDetailEditor: View {
             }
             .onAppear {
                 store.loadFromBundleIfNeeded()
+                migrateLegacySaleKindIfNeeded()
                 loadProductInfo()
             }
         }
@@ -516,8 +739,8 @@ struct ShopCatalogDraftDetailEditor: View {
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)
             TextField("单位（cm）", text: $chartUnit)
-            TextField("尺码表/价格表原图（文件名/URL）", text: $chartImageText)
-            ShopCatalogImagePickerButton(mode: .replace, text: $chartImageText, label: "添加尺码表/价格表原图")
+            TextField("尺码表原图（文件名/URL）", text: $chartImageText)
+            ShopCatalogImagePickerButton(mode: .replace, text: $chartImageText, label: "添加尺码表原图")
         } header: {
             Text("图片 / 配色尺码 / 尺码表")
         }
@@ -582,24 +805,12 @@ struct ShopCatalogDraftDetailEditor: View {
                                              color: color, size: size,
                                              imageAssetID: imageAssetID)
             }
-        // 尺码表：列 + 行（label:值,…）+ 原图
-        let columns = chartColumnsText
-            .components(separatedBy: ",")
-            .map { $0.trimmingCharacters(in: .whitespaces) }
-            .filter { !$0.isEmpty }
-        let rows = chartRowsText
-            .components(separatedBy: .newlines)
-            .map { $0.trimmingCharacters(in: .whitespaces) }
-            .filter { !$0.isEmpty }
-            .compactMap { line -> CatalogSizeRow? in
-                let pair = line.split(separator: ":", maxSplits: 1, omittingEmptySubsequences: true)
-                guard let label = pair.first else { return nil }
-                let values = (pair.count > 1 ? String(pair[1]) : "")
-                    .components(separatedBy: ",")
-                    .map { $0.trimmingCharacters(in: .whitespaces) }
-                    .map { $0.isEmpty ? nil : $0 }
-                return CatalogSizeRow(label: String(label), values: values)
-            }
+        // 尺码表：列 + 行（label:值,…）+ 原图；共享解析口径（首列「尺码」= 标签列剔除、尾冒号清洗）
+        let parsedChart = CatalogManualChartText.normalized(
+            columns: CatalogManualChartText.parseColumns(chartColumnsText),
+            rows: CatalogManualChartText.parseRows(chartRowsText))
+        let columns = parsedChart.columns
+        let rows = parsedChart.rows
         let sourceImage = chartImageText.trimmingCharacters(in: .whitespaces)
         if !columns.isEmpty || !rows.isEmpty || !sourceImage.isEmpty {
             var chart = CatalogSizeChart(id: "sizechart-draft-\(draft.id.prefix(6))",

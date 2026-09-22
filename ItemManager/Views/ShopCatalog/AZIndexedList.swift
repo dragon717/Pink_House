@@ -12,51 +12,10 @@
 
 import SwiftUI
 import UIKit
-import CoreFoundation
 
-// MARK: - 分组纯逻辑（可单测）
-
-enum AZIndexGrouping {
-
-    /// 取名称索引字母：A-Z（小写转大写）/ 中文转拼音首字母 / 其它归 "#"
-    nonisolated static func indexLetter(for name: String) -> String {
-        let trimmed = name.trimmingCharacters(in: .whitespaces)
-        guard let first = trimmed.first else { return "#" }
-        let s = String(first)
-        if s.range(of: "^[A-Za-z]", options: .regularExpression) != nil {
-            return s.uppercased()
-        }
-        // 中文（或其它非拉丁文字）转拼音后取首字母
-        let mutable = NSMutableString(string: s)
-        CFStringTransform(mutable, nil, kCFStringTransformMandarinLatin, false)
-        CFStringTransform(mutable, nil, kCFStringTransformStripDiacritics, false)
-        if let c = (mutable as String).first, c.isASCII, c.isLetter {
-            return String(c).uppercased()
-        }
-        return "#"
-    }
-
-    /// 按索引字母分组，组按 # → A → … → Z 排序，组内按本地化规则排序
-    nonisolated static func groups<T>(_ items: [T], name: (T) -> String) -> [(letter: String, items: [T])] {
-        let buckets = Dictionary(grouping: items, by: { indexLetter(for: name($0)) })
-        let order = "#ABCDEFGHIJKLMNOPQRSTUVWXYZ".map(String.init)
-        return order.compactMap { letter -> (letter: String, items: [T])? in
-            guard let bucket = buckets[letter] else { return nil }
-            let sorted = bucket.sorted {
-                name($0).localizedStandardCompare(name($1)) == .orderedAscending
-            }
-            return (letter, sorted)
-        }
-    }
-
-    /// 搜索匹配：名称或任一别名命中即算
-    nonisolated static func matches(name: String, aliases: [String], query: String) -> Bool {
-        let q = query.trimmingCharacters(in: .whitespaces)
-        guard !q.isEmpty else { return true }
-        return name.localizedCaseInsensitiveContains(q)
-            || aliases.contains { $0.localizedCaseInsensitiveContains(q) }
-    }
-}
+// 分组 / 字典序 / 搜索匹配的唯一实现在 Service 层：
+// ItemManager/Services/ShopCatalog/AZIndexGrouping.swift
+// （根因：Catalog 数组是录入顺序，任何直接遍历的列表都没有字典序保证）
 
 // MARK: - Liquid Glass 兼容修饰符
 

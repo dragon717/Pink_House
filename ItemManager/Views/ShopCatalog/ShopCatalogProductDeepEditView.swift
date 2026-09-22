@@ -4,9 +4,14 @@
 //
 //  已发布商品深度编辑（V1.1 §4.2 Product 修改，重構方案缺口①收口）：
 //    · 名称 / 分类 / 图片 / 配色尺码（图文绑定）/ 尺码表 全字段可编辑
-//    · 追加销售记录（预约/现货；追加式，预约价永不覆盖——计划 §7 约束）
 //    · id 永不改变，用户侧引用（心愿/尾款/衣橱）不受影响
 //    · 录入格式与补录草稿编辑器一致（每行一张图 / 「颜色,尺码[,图片]」）
+//
+//  ⚠️ 2026-09-22 双流程拆分：本页**只负责商品资料**，「价格」相关的两种操作
+//  已拆成两条互不共用的独立流程，仅在页面底部提供只读总览与两个独立入口：
+//    · 价格修正（覆盖当前价，不产生历史）→ ShopCatalogPriceCorrectionSheet
+//    · 追加销售记录（再贩，append-only 带批次时间）→ ShopCatalogSaleRecordAppendSheet
+//  本页的「保存」按钮只提交商品资料，不再顺带写任何价格。
 //
 
 import SwiftUI
@@ -27,12 +32,6 @@ struct ShopCatalogProductDeepEditView: View {
     @State private var chartUnit = ""
     @State private var chartImageText = ""   // 尺码表原图
 
-    // 追加销售记录（可选，留空价格 = 本次不追加）
-    @State private var saleKind: CatalogSaleEventType = .stock
-    @State private var salePriceText = ""
-    @State private var saleDepositText = ""
-    @State private var saleBalanceText = ""
-
     @State private var loaded = false
 
     private let categories = ShopCatalogStore.canonicalCategoryOrder
@@ -47,7 +46,8 @@ struct ShopCatalogProductDeepEditView: View {
                     }
                 }
                 productInfoSection
-                appendSaleSection
+                ShopCatalogPriceFlowEntrySection(product: product, store: store,
+                                                 toast: $toast, actionError: $actionError)
             }
             .navigationTitle("深度编辑商品")
             .navigationBarTitleDisplayMode(.inline)
@@ -56,7 +56,8 @@ struct ShopCatalogProductDeepEditView: View {
                     Button("取消") { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("保存") { save() }
+                    // 文案明确：本按钮只保存商品资料，不含任何价格改动
+                    Button("保存资料") { save() }
                 }
             }
             .onAppear {
@@ -97,29 +98,6 @@ struct ShopCatalogProductDeepEditView: View {
             ShopCatalogImagePickerButton(mode: .replace, text: $chartImageText, label: "添加尺码表/价格表原图")
         } header: {
             Text("图片 / 配色尺码 / 尺码表")
-        }
-    }
-
-    // MARK: 追加销售记录
-
-    private var appendSaleSection: some View {
-        Section {
-            Picker("类型", selection: $saleKind) {
-                Text("现货价").tag(CatalogSaleEventType.stock)
-                Text("预约价").tag(CatalogSaleEventType.reservation)
-            }
-            TextField("价格（留空 = 本次不追加销售记录）", text: $salePriceText)
-                .keyboardType(.decimalPad)
-            if saleKind == .reservation {
-                TextField("定金（可空）", text: $saleDepositText)
-                    .keyboardType(.decimalPad)
-                TextField("尾款（可空，缺省 = 价格 − 定金）", text: $saleBalanceText)
-                    .keyboardType(.decimalPad)
-            }
-        } header: {
-            Text("追加销售记录（不覆盖既有记录）")
-        } footer: {
-            Text("同款新现货 / 新一档预约请在追加一条记录；既有记录永不覆盖。")
         }
     }
 
@@ -211,50 +189,28 @@ struct ShopCatalogProductDeepEditView: View {
                                              imageAssetID: imageAssetID)
             }
 
-        // 尺码表：列 + 行 + 原图（全空则清除）
-        let columns = chartColumnsText
-            .components(separatedBy: ",")
-            .map { $0.trimmingCharacters(in: .whitespaces) }
-            .filter { !$0.isEmpty }
-        let chartRows = chartRowsText
-            .components(separatedBy: .newlines)
-            .map { $0.trimmingCharacters(in: .whitespaces) }
-            .filter { !$0.isEmpty }
-            .compactMap { line -> CatalogSizeRow? in
-                let pair = line.split(separator: ":", maxSplits: 1, omittingEmptySubsequences: true)
-                guard let label = pair.first else { return nil }
-                let values = (pair.count > 1 ? String(pair[1]) : "")
-                    .components(separatedBy: ",")
-                    .map { $0.trimmingCharacters(in: .whitespaces) }
-                    .map { $0.isEmpty ? nil : $0 }
-                return CatalogSizeRow(label: String(label), values: values)
-            }
+        // 尺码表：列 + 行 + 原图（全空则清除）；共享解析口径（首列「尺码」= 标签列剔除，
+        // 值尾冒号清洗），避免与补录编辑器 / 详情页渲染出现重复「尺码」列错位
+        let parsedColumns = CatalogManualChartText.parseColumns(chartColumnsText)
+        let parsedRows = CatalogManualChartText.parseRows(chartRowsText)
+        let normalizedChart = CatalogManualChartText.normalized(columns: parsedColumns, rows: parsedRows)
         let sourceImage = chartImageText.trimmingCharacters(in: .whitespaces)
         var sizeChart: CatalogSizeChart? = nil
-        if !columns.isEmpty || !chartRows.isEmpty || !sourceImage.isEmpty {
+        if !normalizedChart.columns.isEmpty || !normalizedChart.rows.isEmpty || !sourceImage.isEmpty {
             var chart = CatalogSizeChart(id: "sizechart-edit-\(product.id.suffix(8))",
                                          productID: product.id)
             chart.unit = chartUnit.isEmpty ? nil : chartUnit
-            chart.columns = columns
-            chart.rows = chartRows
+            chart.columns = normalizedChart.columns
+            chart.rows = normalizedChart.rows
             chart.sourceImage = sourceImage.isEmpty ? nil : sourceImage
             sizeChart = chart
         }
 
         do {
+            // 只写商品资料：价格一律不走这里（修正 / 追加各走各的独立接口）
             try ShopCatalogDraftStore.updatePublishedProduct(
                 updated, assets: assets, variants: variants, sizeChart: sizeChart)
-            // 追加销售记录（可选）
-            let priceText = salePriceText.trimmingCharacters(in: .whitespaces)
-            if let price = Double(priceText), price > 0 {
-                try ShopCatalogDraftStore.appendSaleEvent(
-                    productID: product.id,
-                    type: saleKind,
-                    price: price,
-                    deposit: saleKind == .reservation ? Double(saleDepositText.trimmingCharacters(in: .whitespaces)) : nil,
-                    balance: saleKind == .reservation ? Double(saleBalanceText.trimmingCharacters(in: .whitespaces)) : nil)
-            }
-            toast = "已更新商品「\(updated.name)」，id 不变，用户引用不受影响"
+            toast = "已更新商品资料「\(updated.name)」，id 不变，用户引用不受影响"
             dismiss()
         } catch {
             actionError = error.localizedDescription

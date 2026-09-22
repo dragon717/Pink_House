@@ -5,7 +5,7 @@
 //  运营端完整能力收口（V1.1 §4.2 深度编辑）：
 //    · updatePublishedProduct：已发布商品全字段替换（图片/规格/尺码表/名称/分类）
 //      —— id 不变、未变图片行复用原 asset id（断链保护）、规格/尺码表整组重建
-//    · appendSaleEvent：追加式销售记录（预约价永不覆盖——计划 §7 约束）
+//    · appendSaleRecord：追加式销售记录（预约价永不覆盖——计划 §7 约束）
 //
 
 import XCTest
@@ -147,8 +147,10 @@ final class ShopCatalogOpsDeepEditTests: XCTestCase {
         XCTAssertNil(archive.currentStockPrice)
 
         // 追加现货：价格档案出现现货价，预约记录保留
-        try ShopCatalogDraftStore.appendSaleEvent(
-            productID: published.id, type: .stock, price: 260, deposit: nil, balance: nil)
+        // 追加接口强制携带批次时间（再贩日期），这正是与「价格修正」的分界
+        try ShopCatalogDraftStore.appendSaleRecord(
+            productID: published.id, type: .stock, price: 260,
+            deposit: nil, balance: nil, startAt: Date(), endAt: nil, batchLabel: "首批现货")
         store.reloadWithOverlay()
         archive = store.priceArchive(forProduct: published.id)
         XCTAssertEqual(archive.currentStockPrice, 260)
@@ -158,8 +160,9 @@ final class ShopCatalogOpsDeepEditTests: XCTestCase {
 
         // 再追加一条预约（新一档）：追加不替换，记录数递增
         let before = store.saleEvents(forProduct: published.id).count
-        try ShopCatalogDraftStore.appendSaleEvent(
-            productID: published.id, type: .reservation, price: 180, deposit: 40, balance: nil)
+        try ShopCatalogDraftStore.appendSaleRecord(
+            productID: published.id, type: .reservation, price: 180, deposit: 40, balance: nil,
+            startAt: Date(timeIntervalSinceNow: -86400 * 30), endAt: nil, batchLabel: "往期预约")
         store.reloadWithOverlay()
         XCTAssertEqual(store.saleEvents(forProduct: published.id).count, before + 1)
         // 缺省尾款 = 价格 − 定金
@@ -175,8 +178,12 @@ final class ShopCatalogOpsDeepEditTests: XCTestCase {
                                        name: "白名单校验", category: "JSK")
         XCTAssertThrowsError(try ShopCatalogDraftStore.updatePublishedProduct(
             published, assets: [], variants: [], sizeChart: nil))
-        XCTAssertThrowsError(try ShopCatalogDraftStore.appendSaleEvent(
-            productID: "prod-x", type: .stock, price: 1, deposit: nil, balance: nil))
+        XCTAssertThrowsError(try ShopCatalogDraftStore.appendSaleRecord(
+            productID: "prod-x", type: .stock, price: 1,
+            deposit: nil, balance: nil, startAt: Date(), endAt: nil, batchLabel: nil))
+        XCTAssertThrowsError(try ShopCatalogDraftStore.correctCurrentPrice(
+            productID: "prod-x", reservationPrice: nil, stockPrice: 1,
+            deposit: nil, balance: nil))
     }
 }
 

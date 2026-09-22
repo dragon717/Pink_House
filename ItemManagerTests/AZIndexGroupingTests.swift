@@ -48,6 +48,26 @@ final class AZIndexGroupingTests: XCTestCase {
         XCTAssertEqual(groups[2].items.map(\.name), ["仲夏物语"])
     }
 
+    func test全量字典序排序与录入顺序无关() {
+        struct Item { let name: String }
+        // 故意打乱录入顺序：输出必须与输入顺序无关
+        let items = [
+            Item(name: "仲夏物语"),
+            Item(name: "baby, the Stars Shine Bright"),
+            Item(name: "Angelic Pretty"),
+            Item(name: "☆特殊符号"),
+            Item(name: "Alice Girl"),
+        ]
+        let sorted = AZIndexGrouping.sortedByName(items) { $0.name }.map(\.name)
+        XCTAssertEqual(sorted, [
+            "☆特殊符号",
+            "Alice Girl",
+            "Angelic Pretty",
+            "baby, the Stars Shine Bright",
+            "仲夏物语",
+        ])
+    }
+
     func test搜索匹配名称与别名() {
         XCTAssertTrue(AZIndexGrouping.matches(name: "UNNIQ 许愿池原创",
                                              aliases: ["UNNIQ", "许愿池"],

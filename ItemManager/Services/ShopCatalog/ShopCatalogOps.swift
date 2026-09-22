@@ -32,6 +32,35 @@ nonisolated enum ShopCatalogDraftStoreError: LocalizedError {
     }
 }
 
+// MARK: - 价格双流程错误（2026-09-22）
+
+/// 价格修正 / 追加销售记录两条流程各自的校验错误。
+/// 分开定义而非复用 `ShopCatalogDraftValidator.ValidationError`：草稿发布校验
+/// 与这两条运营流程语义不同（是否要求时间维度、是否需要去重都不一样）。
+nonisolated enum ShopCatalogPriceEditError: LocalizedError {
+    /// 价格非正数
+    case invalidPrice
+    /// 定金 + 尾款 ≠ 价格（或清了预约价却留着定金 / 尾款）
+    case depositBalanceMismatch(String)
+    /// 追加记录重复提交（业务指纹命中既有记录）
+    case duplicateRecord
+    /// 商品不存在（可能已被删除）
+    case productNotFound(String)
+
+    var errorDescription: String? {
+        switch self {
+        case .invalidPrice:
+            return "价格必须大于 0"
+        case .depositBalanceMismatch(let detail):
+            return "定金尾款对账失败：\(detail)"
+        case .duplicateRecord:
+            return "该销售记录已存在（同商品 / 同类型 / 同价格 / 同批次日），请勿重复提交"
+        case .productNotFound(let id):
+            return "未找到商品 \(id)，可能已被删除"
+        }
+    }
+}
+
 // MARK: - 运营草稿
 
 nonisolated struct CatalogProductDraft: Codable, Identifiable, Hashable, Sendable {
@@ -50,9 +79,18 @@ nonisolated struct CatalogProductDraft: Codable, Identifiable, Hashable, Sendabl
 
     var name: String = ""
     var category: String = "其他"
+    /// 款式名（2026-09-22 V1.4「同款不同色」归类）：可空 = 按商品名剥离颜色词自动派生；
+    /// 同款式不同颜色的补录填同一款式名，发布后列表自动归入同一款式展示。
+    /// Optional + 默认 nil，合成解码对旧 JSON 自动兜底。
+    var designName: String? = nil
     /// 本次销售记录类型：reservation / stock
+    /// ⚠️ 2026-09-22 起仅作旧数据兼容：预约价与现货价**并存且不互斥**，
+    /// 新录入一律用 price（预约价）+ stockPrice（现货价），不再用本字段切换互斥表单。
     var saleKind: CatalogSaleEventType = .reservation
+    /// 预约价（可空 = 0；现货价可与之并存，也可两者都空置后补录）
     var price: Double = 0
+    /// 现货价（可空，后续补录修改；与预约价并存，互不清空/覆盖）
+    var stockPrice: Double? = nil
     var deposit: Double?
     var balance: Double?
     var startAt: Date? = nil
@@ -72,9 +110,34 @@ nonisolated struct CatalogProductDraft: Codable, Identifiable, Hashable, Sendabl
     var rejectReason: String? = nil
     var createdAt: Date = Date()
 
+    // MARK: 预约 / 现货并存口径（2026-09-22）
+
+    /// 预约价口径：新口径下 price 即预约价；
+    /// 唯一例外是**未经新编辑器迁移的旧现货草稿**（saleKind == .stock 且未单独填
+    /// stockPrice）——它的 price 历史上就是现货价，不得重复解释为预约价。
+    nonisolated var effectiveReservationPrice: Double? {
+        if saleKind == .stock && stockPrice == nil { return nil }
+        return price > 0 ? price : nil
+    }
+
+    /// 现货价口径：新口径取 stockPrice；
+    /// 旧现货草稿（同上）回退解释 price，保证存量草稿发布行为不变。
+    nonisolated var effectiveStockPrice: Double? {
+        if saleKind == .stock && stockPrice == nil { return price > 0 ? price : nil }
+        return stockPrice.flatMap { $0 > 0 ? $0 : nil }
+    }
+
+    /// 价格摘要：预约 / 现货并存展示（谁填了显示谁，都不填给引导文案）
+    nonisolated var priceSummary: String {
+        var parts: [String] = []
+        if let r = effectiveReservationPrice { parts.append("预约 ¥\(Int(r))") }
+        if let s = effectiveStockPrice { parts.append("现货 ¥\(Int(s))") }
+        return parts.isEmpty ? "待填价格" : parts.joined(separator: " · ")
+    }
+
     /// 预约草稿的定金尾款对账（允许缺省，缺省时发布前自动补齐）
     nonisolated var depositBalanceIssue: String? {
-        guard saleKind == .reservation, let d = deposit, let b = balance else { return nil }
+        guard effectiveReservationPrice != nil, let d = deposit, let b = balance else { return nil }
         return (Decimal(d) + Decimal(b)) == Decimal(price)
             ? nil : "定金 \(Int(d)) + 尾款 \(Int(b)) ≠ 总价 \(Int(price))"
     }
@@ -122,7 +185,10 @@ nonisolated enum ShopCatalogDraftValidator {
 
     static func validate(_ draft: CatalogProductDraft, catalog: ShopCatalog?) throws {
         guard !draft.name.trimmingCharacters(in: .whitespaces).isEmpty else { throw ValidationError.missingName }
-        guard draft.price > 0 else { throw ValidationError.invalidPrice }
+        // 预约价与现货价并存且不互斥：至少填一项即可；现货价可空置后补录（2026-09-22）
+        guard draft.effectiveReservationPrice != nil || draft.effectiveStockPrice != nil else {
+            throw ValidationError.invalidPrice
+        }
         if let issue = draft.depositBalanceIssue { throw ValidationError.depositBalanceMismatch(issue) }
         guard draft.shopID != nil || !draft.newShopName.trimmingCharacters(in: .whitespaces).isEmpty else {
             throw ValidationError.missingShop
@@ -207,6 +273,56 @@ nonisolated enum ShopCatalogStorage {
     }
 }
 
+// MARK: - 批次单品分组（2026-09-22：未指定系列默认继承整批归属）
+
+/// 批次详情「本批单品（按系列分组）」的分组键纯逻辑（nonisolated 可单测）：
+///   · 草稿**自报**了系列（关联系列 Picker 选中，或填了新系列名）→ 永远用自己的，
+///     整批归属怎么变都不覆盖（用户手动修改不被覆盖）；
+///   · 草稿未自报 → **继承**整批归属当前选定的系列（上方店家/系列选择联动，
+///     上方一变，分组即时跟着变）；
+///   · 整批也没选定系列 → 维持原有默认行为「未指定系列」。
+/// 注意：这里只是**展示分组**口径；把继承值真正写进草稿数据仍走「应用到整批」按钮
+/// （applyBatchAttribution），避免上方随便点一下就静默改数据。
+nonisolated enum CatalogBatchGrouping {
+    static let unspecified = "未指定系列"
+
+    /// - Parameters:
+    ///   - draftOwnSeriesName: 草稿自报系列的展示名（seriesID 解析成功 = 系列名，
+    ///     解析失败 = 原始 id 兜底；填了新系列名 = 该名称）；nil = 草稿未自报系列
+    ///   - batchSeriesName: 整批归属当前选定系列的展示名；nil = 上方未选定系列
+    static func groupKey(draftOwnSeriesName: String?, batchSeriesName: String?) -> String {
+        if let own = draftOwnSeriesName { return own }
+        if let batch = batchSeriesName { return batch }
+        return unspecified
+    }
+}
+
+// MARK: - 批次删除（2026-09-22 批次列表治理）
+
+/// 批量删除结果：成功删除的批次 + 被拦截的批次（条目保留，附原因，可处理后重试）
+nonisolated struct CatalogBatchDeleteBlock: Identifiable, Hashable, Sendable {
+    let batchID: String
+    let reason: String
+    var id: String { batchID }
+}
+
+nonisolated struct CatalogBatchDeleteResult: Sendable {
+    let deletedIDs: Set<String>
+    let blocked: [CatalogBatchDeleteBlock]
+}
+
+nonisolated enum ShopCatalogBatchStoreError: LocalizedError {
+    /// 批次记录持久化失败：内存与磁盘都未变化，条目完整保留，可直接重试
+    case persistenceFailed(String)
+
+    var errorDescription: String? {
+        switch self {
+        case .persistenceFailed(let detail):
+            return "批次记录写入失败：\(detail)。列表未发生任何变化，请重试。"
+        }
+    }
+}
+
 // MARK: - 草稿存储 + 发布（§31）
 
 @MainActor
@@ -214,6 +330,9 @@ final class ShopCatalogDraftStore: ObservableObject {
     static let shared = ShopCatalogDraftStore()
 
     @Published private(set) var drafts: [CatalogProductDraft] = []
+    /// 批次会话（发布式：createBatch / saveBatches / deleteBatches 统一维护，
+    /// 视图请读 `batches` 而不是直接调 `loadBatches()`，否则删除后不会刷新）
+    @Published private(set) var batches: [CatalogBatchEntrySession] = []
 
     private let fileManager = FileManager.default
     private var draftsURL: URL {
@@ -231,6 +350,7 @@ final class ShopCatalogDraftStore: ObservableObject {
 
     private init() {
         loadDrafts()
+        batches = Self.loadBatches()
     }
 
     func loadDrafts() {
@@ -276,10 +396,74 @@ final class ShopCatalogDraftStore: ObservableObject {
         if let data = try? encoder.encode(batches) {
             try? data.write(to: batchesURL, options: .atomic)
         }
+        self.batches = batches
     }
 
     nonisolated private static var batchesURLStatic: URL {
         ShopCatalogStorage.directory.appendingPathComponent("shop-catalog-batches.json")
+    }
+
+    // MARK: 批次删除（2026-09-22 批次列表治理）
+
+    /// 批次删除拦截判定：批次下仍有**未处理**单品草稿（draft / submitted / reviewed）
+    /// 时禁止删除，返回面向运营的可读原因；nil = 可删。
+    /// 「已处理」口径：已发布（published）或已归档（archived）的草稿不算未处理——
+    /// 批次只是归组记录，发布产物在覆盖层，删除批次不影响它们。
+    nonisolated static func batchDeleteBlockReason(
+        batchID: String, drafts: [CatalogProductDraft]
+    ) -> String? {
+        let unprocessed = drafts.filter {
+            $0.batchID == batchID
+                && ($0.status == .draft || $0.status == .submitted || $0.status == .reviewed)
+        }
+        guard !unprocessed.isEmpty else { return nil }
+        var parts: [String] = []
+        let draftCount = unprocessed.filter { $0.status == .draft }.count
+        let submittedCount = unprocessed.filter { $0.status == .submitted }.count
+        let reviewedCount = unprocessed.filter { $0.status == .reviewed }.count
+        if draftCount > 0 { parts.append("草稿 \(draftCount) 条") }
+        if submittedCount > 0 { parts.append("待审核 \(submittedCount) 条") }
+        if reviewedCount > 0 { parts.append("待发布 \(reviewedCount) 条") }
+        return "批次下仍有未处理数据（\(parts.joined(separator: "、"))），请先提交 / 发布，或在草稿箱中删除这些草稿后再删除批次。"
+    }
+
+    /// 批量删除批次会话。**只删归组记录，不动任何单品草稿**：
+    ///   · 草稿箱中的草稿原样保留（batchID 引用随之失效，仅失去批次归组）；
+    ///   · 已发布到覆盖层的数据完全不受影响；
+    ///   · 未处理草稿命中拦截的批次**整体保留**（连同原因返回），可处理后重试；
+    ///   · 持久化失败时抛错，磁盘与内存均不变化，调用方提示重试即可。
+    @discardableResult
+    func deleteBatches(ids: Set<String>) throws -> CatalogBatchDeleteResult {
+        try CreatorAccess.requireCreator(.listingEdit)
+        guard !ids.isEmpty else {
+            return CatalogBatchDeleteResult(deletedIDs: [], blocked: [])
+        }
+
+        var blocked: [CatalogBatchDeleteBlock] = []
+        var deletable = Set<String>()
+        for id in ids {
+            if let reason = Self.batchDeleteBlockReason(batchID: id, drafts: drafts) {
+                blocked.append(CatalogBatchDeleteBlock(batchID: id, reason: reason))
+            } else {
+                deletable.insert(id)
+            }
+        }
+        guard !deletable.isEmpty else {
+            return CatalogBatchDeleteResult(deletedIDs: [], blocked: blocked)
+        }
+
+        var remaining = Self.loadBatches()
+        remaining.removeAll { deletable.contains($0.id) }
+        do {
+            let encoder = JSONEncoder()
+            encoder.dateEncodingStrategy = .iso8601
+            let data = try encoder.encode(remaining)
+            try data.write(to: batchesURL, options: .atomic)
+        } catch {
+            throw ShopCatalogBatchStoreError.persistenceFailed(error.localizedDescription)
+        }
+        batches = remaining
+        return CatalogBatchDeleteResult(deletedIDs: deletable, blocked: blocked)
     }
 
     /// 创建批次并把草稿写入草稿箱
@@ -413,7 +597,7 @@ final class ShopCatalogDraftStore: ObservableObject {
     var needsSupplementCount: Int {
         drafts.filter { draft in
             draft.name.trimmingCharacters(in: .whitespaces).isEmpty
-                || draft.price <= 0
+                || (draft.effectiveReservationPrice == nil && draft.effectiveStockPrice == nil)
                 || (draft.shopID == nil && draft.newShopName.trimmingCharacters(in: .whitespaces).isEmpty)
                 || (draft.seriesID == nil && draft.newSeriesName.trimmingCharacters(in: .whitespaces).isEmpty)
         }.count
@@ -464,14 +648,18 @@ final class ShopCatalogDraftStore: ObservableObject {
             overlay.series.append(series)
         }
 
-        // 商品：同名 → 现货记录追加；否则新建
+        // 商品：已存在 → 只追加本次销售记录；否则新建
+        //
+        // ⚠️ 重复不再是阻断条件（2026-09-22）：补录上新场景里，商品常常已经存在于
+        // Catalog，甚至已被用户收进心愿 / 尾款 / 衣橱。此时补录的目的正是给既有
+        // 商品补充价格，预约价与现货价都必须能继续录入并提交；一旦拦截，价格就
+        // 永远补不上去。
+        // 处理口径：商品本体（名称/分类/图片/规格/尺码表）保持不变仅在草稿
+        // 携带新资料时补全；本次价格作为一条新的 SaleEvent 追加，永不以"重复"
+        // 为由抛错。
         var productID: String
         var summary: String
         if let existing = ShopCatalogDraftValidator.findExistingProduct(for: draft, seriesID: series.id, catalog: catalog ?? overlay) {
-            guard draft.saleKind == .stock else {
-                throw ShopCatalogDraftValidator.ValidationError.depositBalanceMismatch(
-                    "「\(existing.name)」已收录，预约记录请直接编辑既有商品，或改用现货追加")
-            }
             productID = existing.id
             // 追加现货时若草稿带了规格/尺码表/图片，一并补全到既有商品（V1.1 §4.2 编辑）
             if !draft.variants.isEmpty || draft.sizeChart != nil || !draft.images.isEmpty {
@@ -512,7 +700,28 @@ final class ShopCatalogDraftStore: ObservableObject {
                     overlay.products.append(updated)
                 }
             }
-            summary = "已向既有商品「\(existing.name)」追加现货记录"
+            // V1.4「同款不同色」：既有商品缺款式名时按草稿回填（显式优先、名称派生兜底）。
+            // 放在资料补全块之外：纯补价草稿也能让既有商品归入款式组。
+            // 判定以**覆盖层**为准（写入目标）：调用方传入的 store 视图可能尚未刷新。
+            let overlayProduct = overlay.products.first { $0.id == existing.id } ?? existing
+            if overlayProduct.designName == nil {
+                let backfilled = ShopCatalogSameDesignGrouper.resolveDesignName(
+                    explicit: draft.designName, name: overlayProduct.name)
+                if let backfilled {
+                    var updated = overlayProduct
+                    updated.designName = backfilled
+                    if let index = overlay.products.firstIndex(where: { $0.id == existing.id }) {
+                        overlay.products[index] = updated
+                    } else {
+                        overlay.products.append(updated)
+                    }
+                }
+            }
+            // 本次提交的价格由下方统一的 SaleEvent 追加逻辑落库
+            var appendedKinds: [String] = []
+            if draft.effectiveReservationPrice != nil { appendedKinds.append("预约价") }
+            if draft.effectiveStockPrice != nil { appendedKinds.append("现货价") }
+            summary = "已向既有商品「\(existing.name)」追加\(appendedKinds.joined(separator: " + "))记录"
         } else {
             productID = "prod-ops-\(UUID().uuidString.prefix(8))"
             let assetIDs = draft.images.map { asset -> String in
@@ -523,10 +732,15 @@ final class ShopCatalogDraftStore: ObservableObject {
                 overlay.assets.append(a)
                 return a.id
             }
+            // V1.4「同款不同色」：显式款式名优先，未填按名称剥离颜色词派生，
+            // 发布后列表按款式归组展示（同款不同色合并为一条）
             overlay.products.append(CatalogProduct(id: productID, shopID: shop.id, seriesID: series.id,
                                                    name: draft.name.trimmingCharacters(in: .whitespaces),
                                                    category: draft.category,
-                                                   images: assetIDs))
+                                                   images: assetIDs,
+                                                   designName: ShopCatalogSameDesignGrouper.resolveDesignName(
+                                                       explicit: draft.designName,
+                                                       name: draft.name.trimmingCharacters(in: .whitespaces))))
             // 规格 / 尺码表随商品一并落库（G5：手动录入可完成全部业务）
             overlay.variants.append(contentsOf: draft.variants.map { v in
                 var v = v
@@ -540,24 +754,38 @@ final class ShopCatalogDraftStore: ObservableObject {
             summary = "已发布商品「\(draft.name)」"
         }
 
-        // 销售记录（追加式，预约价不被覆盖——计划 §7 约束）
-        let eventPrice = Decimal(draft.price)
-        let eventDeposit = draft.deposit.map { Decimal($0) }
-        let eventBalance = draft.balance.map { Decimal($0) }
-        var event = CatalogSaleEvent(
-            id: "ev-ops-\(UUID().uuidString.prefix(8))",
-            productID: productID,
-            type: draft.saleKind,
-            price: eventPrice,
-            deposit: eventDeposit,
-            balance: eventBalance,
-            startAt: draft.startAt,
-            endAt: draft.endAt
-        )
-        if draft.saleKind == .reservation, event.balance == nil {
-            event.balance = eventPrice - (eventDeposit ?? 0)
+        // 销售记录（追加式，历史记录永不覆盖）：预约价与现货价**并存且不互斥**
+        //（2026-09-22）—— 都填时各生成一条 SaleEvent；只填其一也放行（现货价可空置后补录）。
+        if let reservationPrice = draft.effectiveReservationPrice {
+            let eventDeposit = draft.deposit.map { Decimal($0) }
+            var event = CatalogSaleEvent(
+                id: "ev-ops-\(UUID().uuidString.prefix(8))",
+                productID: productID,
+                type: .reservation,
+                price: Decimal(reservationPrice),
+                deposit: eventDeposit,
+                balance: draft.balance.map { Decimal($0) },
+                startAt: draft.startAt,
+                endAt: draft.endAt
+            )
+            // 只填定金时尾款自动补齐（沿用既有口径：预约价不被覆盖）
+            if event.balance == nil {
+                event.balance = event.price - (eventDeposit ?? 0)
+            }
+            overlay.saleEvents.append(event)
         }
-        overlay.saleEvents.append(event)
+        if let stockPrice = draft.effectiveStockPrice {
+            overlay.saleEvents.append(CatalogSaleEvent(
+                id: "ev-ops-\(UUID().uuidString.prefix(8))",
+                productID: productID,
+                type: .stock,
+                price: Decimal(stockPrice),
+                deposit: nil,
+                balance: nil,
+                startAt: draft.startAt,
+                endAt: draft.endAt
+            ))
+        }
 
         try Self.saveOverlay(overlay)
         store.reloadWithOverlay()
@@ -619,6 +847,12 @@ final class ShopCatalogDraftStore: ObservableObject {
 
         var updated = product
         updated.images = assetIDs
+        // 防线：价格修正属于独立流程，资料保存若拿到修正前的旧快照，
+        // 不得把修正值清掉（修正只能由 correctCurrentPrice / clearPriceCorrection 改动）
+        if updated.priceCorrection == nil,
+           let stored = overlay.products.first(where: { $0.id == product.id })?.priceCorrection {
+            updated.priceCorrection = stored
+        }
 
         // 规格 / 尺码表整组重建（productID 归位）
         overlay.variants.removeAll { $0.productID == product.id }
@@ -643,32 +877,164 @@ final class ShopCatalogDraftStore: ObservableObject {
         ShopCatalogStore.shared.reloadWithOverlay()
     }
 
-    /// 追加销售记录（V1.1 §4.2 修改销售事件：追加式，预约价永不覆盖——计划 §7 约束）
-    static func appendSaleEvent(
+    // MARK: 价格双流程（2026-09-22：价格修正 / 追加销售记录彻底分离）
+    //
+    // 两条流程的边界（硬约束，任何改动都不得打破）：
+    //
+    //   ┌──────────────┬──────────────────────────┬──────────────────────────┐
+    //   │              │ 价格修正                  │ 追加销售记录              │
+    //   │              │ correctCurrentPrice       │ appendSaleRecord          │
+    //   ├──────────────┼──────────────────────────┼──────────────────────────┤
+    //   │ 语义         │ 更正当前商品属性           │ 新增业务事件（再贩/补货） │
+    //   │ 存储         │ product.priceCorrection   │ saleEvents（数组追加）    │
+    //   │ 写入方式     │ 覆盖，只留最新状态         │ append-only，永不改写     │
+    //   │ 历史记录     │ 不产生                    │ 每条一条，按时间排序      │
+    //   │ 时间维度     │ correctedAt（审计）        │ startAt 必填（批次时间）  │
+    //   │ 重复提交     │ 幂等（同值覆盖无副作用）   │ 指纹相同 → 抛错拦截      │
+    //   └──────────────┴──────────────────────────┴──────────────────────────┘
+    //
+    // 两者**不共用任何校验或写入代码**：修正只碰 product，追加只碰 saleEvents。
+
+    /// 价格修正：**覆盖**商品的当前价格状态（现货价 / 预约价 / 定金 / 尾款）。
+    /// 只保留最新状态，不产生任何历史记录 —— `saleEvents` 全程只读不写。
+    ///
+    /// 口径（2026-09-22 调整）：传 nil = **清除该价格**（当前生效值变为「暂无」），
+    /// 不是「跳过不修改」——修正弹窗预填当前生效值、按完整快照提交，
+    /// 所以想保留的字段必须带着原值一起提交。全部留空 = 清除全部价格，合法。
+    @discardableResult
+    static func correctCurrentPrice(
         productID: String,
-        type: CatalogSaleEventType,
-        price: Double,
-        deposit: Double?,
-        balance: Double?
-    ) throws {
+        reservationPrice: Decimal?,
+        stockPrice: Decimal?,
+        deposit: Decimal?,
+        balance: Decimal?
+    ) throws -> CatalogPriceCorrection {
+        try CreatorAccess.requireCreator(.listingEdit)
+
+        // 校验规则（只服务于「修正」语义：合法性 + 对账，不涉及批次时间）
+        if let r = reservationPrice { guard r > 0 else { throw ShopCatalogPriceEditError.invalidPrice } }
+        if let s = stockPrice { guard s > 0 else { throw ShopCatalogPriceEditError.invalidPrice } }
+        if let d = deposit { guard d >= 0 else { throw ShopCatalogPriceEditError.invalidPrice } }
+        if let b = balance { guard b >= 0 else { throw ShopCatalogPriceEditError.invalidPrice } }
+        if let d = deposit, let b = balance, let base = reservationPrice, d + b != base {
+            throw ShopCatalogPriceEditError.depositBalanceMismatch(
+                "定金 \(NSDecimalNumber(decimal: d).stringValue) + 尾款 \(NSDecimalNumber(decimal: b).stringValue) ≠ 预约价 \(NSDecimalNumber(decimal: base).stringValue)")
+        }
+        // 预约价被清除时，定金 / 尾款失去对账基准，必须一并清空
+        if reservationPrice == nil, deposit != nil || balance != nil {
+            throw ShopCatalogPriceEditError.depositBalanceMismatch(
+                "预约价已留空（清除），定金与尾款也需一并留空；或填回预约价后再修正定金尾款")
+        }
+
+        let correction = CatalogPriceCorrection(reservationPrice: reservationPrice,
+                                                stockPrice: stockPrice,
+                                                deposit: deposit,
+                                                balance: balance,
+                                                correctedAt: Date())
+
+        var overlay = loadOverlay() ?? ShopCatalog()
+        var product = overlay.products.first { $0.id == productID }
+            ?? ShopCatalogStore.shared.catalog?.products.first { $0.id == productID }
+        guard let product else { throw ShopCatalogPriceEditError.productNotFound(productID) }
+
+        var updated = product
+        updated.priceCorrection = correction
+        if let index = overlay.products.firstIndex(where: { $0.id == productID }) {
+            overlay.products[index] = updated
+        } else {
+            // 既有商品在 Bundle 种子里：同 id 替换规则以覆盖层版本胜出（§5.3）
+            overlay.products.append(updated)
+        }
+        // ⚠️ 这里**绝不触碰 overlay.saleEvents**：修正不产生历史记录
+        try saveOverlay(overlay)
+        ShopCatalogStore.shared.reloadWithOverlay()
+        return correction
+    }
+
+    /// 撤销价格修正：回到「由 append-only 历史推导」的口径。
+    /// 只清 `priceCorrection`，销售历史一条不动。
+    static func clearPriceCorrection(productID: String) throws {
         try CreatorAccess.requireCreator(.listingEdit)
         var overlay = loadOverlay() ?? ShopCatalog()
+        guard var product = overlay.products.first(where: { $0.id == productID })
+            ?? ShopCatalogStore.shared.catalog?.products.first(where: { $0.id == productID })
+        else { throw ShopCatalogPriceEditError.productNotFound(productID) }
+        product.priceCorrection = nil
+        if let index = overlay.products.firstIndex(where: { $0.id == productID }) {
+            overlay.products[index] = product
+        } else {
+            overlay.products.append(product)
+        }
+        try saveOverlay(overlay)
+        ShopCatalogStore.shared.reloadWithOverlay()
+    }
+
+    /// 追加销售记录（往年款再贩 / 复刻 / 补货）：**append-only** 写入。
+    ///
+    /// 不可变性保证：本函数对 `overlay.saleEvents` 只做 `append`，
+    /// 不做任何 remove / replace —— 已有记录永不被修改或覆盖。
+    ///
+    /// - startAt 必填：再贩日期 / 批次时间，是每条记录的时间维度；
+    /// - 重复提交防护：业务指纹（商品 / 类型 / 价格 / 定金尾款 / 批次日）
+    ///   命中既有记录时抛 `duplicateRecord`，不会写出第二条。
+    @discardableResult
+    static func appendSaleRecord(
+        productID: String,
+        type: CatalogSaleEventType,
+        price: Decimal,
+        deposit: Decimal? = nil,
+        balance: Decimal? = nil,
+        startAt: Date,
+        endAt: Date? = nil,
+        batchLabel: String? = nil
+    ) throws -> CatalogSaleEvent {
+        try CreatorAccess.requireCreator(.listingEdit)
+
+        // 校验规则（只服务于「追加」语义：价格合法 + 时间维度必填 + 对账 + 去重）
+        guard price > 0 else { throw ShopCatalogPriceEditError.invalidPrice }
+        if let d = deposit, let b = balance, d + b != price {
+            throw ShopCatalogPriceEditError.depositBalanceMismatch(
+                "定金 \(NSDecimalNumber(decimal: d).stringValue) + 尾款 \(NSDecimalNumber(decimal: b).stringValue) ≠ 价格 \(NSDecimalNumber(decimal: price).stringValue)")
+        }
+
         var event = CatalogSaleEvent(
-            id: "ev-edit-\(UUID().uuidString.prefix(8))",
+            id: "ev-append-\(UUID().uuidString.prefix(8))",
             productID: productID,
             type: type,
-            price: Decimal(price),
-            deposit: deposit.map { Decimal($0) },
-            balance: balance.map { Decimal($0) },
-            startAt: nil,
-            endAt: nil
+            price: price,
+            deposit: deposit,
+            balance: balance,
+            startAt: startAt,
+            endAt: endAt,
+            batchLabel: trimmedBatchLabel(batchLabel),
+            recordedAt: Date()
         )
+        // 预约类记录只填定金时自动补齐尾款（先补齐再算指纹，保证去重口径一致）
         if type == .reservation, event.balance == nil {
             event.balance = event.price - (event.deposit ?? 0)
         }
-        overlay.saleEvents.append(event)
+
+        var overlay = loadOverlay() ?? ShopCatalog()
+        // 重复提交防护：覆盖层 + 已合并进内存的种子记录都要比对
+        var known = overlay.saleEvents
+        for existing in ShopCatalogStore.shared.catalog?.saleEvents ?? []
+        where !known.contains(where: { $0.id == existing.id }) {
+            known.append(existing)
+        }
+        let fingerprint = event.appendFingerprint
+        guard !known.contains(where: { $0.appendFingerprint == fingerprint }) else {
+            throw ShopCatalogPriceEditError.duplicateRecord
+        }
+
+        overlay.saleEvents.append(event)   // 只追加：既有记录不可变
         try saveOverlay(overlay)
         ShopCatalogStore.shared.reloadWithOverlay()
+        return event
+    }
+
+    private static func trimmedBatchLabel(_ raw: String?) -> String? {
+        let trimmed = raw?.trimmingCharacters(in: .whitespacesAndNewlines)
+        return (trimmed?.isEmpty == false) ? trimmed : nil
     }
 
     /// 归档：写 archivedAt（同 id 替换）。用户端隐藏，用户已收藏记录保留（§4.2）。

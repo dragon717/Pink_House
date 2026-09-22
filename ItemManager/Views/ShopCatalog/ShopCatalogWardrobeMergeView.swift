@@ -18,6 +18,12 @@ import SwiftData
 
 struct ShopCatalogWardrobeMergeView: View {
     let selectedProductIDs: [String]
+    /// 各单品自选的加购价格口径（系列点菜页传入；缺省全部按现货价）
+    var priceChoices: [String: ShopCatalogCardPriceChoice] = [:]
+    /// 各单品选定的颜色（系列点菜页传入；缺省不写颜色）
+    var colorByProduct: [String: String] = [:]
+    /// 各单品选定的尺码（系列点菜页传入；缺省不写尺码）
+    var sizeByProduct: [String: String] = [:]
     /// 完成后的提示文案回传（由系列页展示 toast）
     var onFinished: (Int) -> Void
 
@@ -33,11 +39,26 @@ struct ShopCatalogWardrobeMergeView: View {
     @State private var errorText: String?
     @State private var isInserting = false
 
+    /// 展示价 = 用户选定口径对应的当前价（与落库口径一致）
+    private func price(for productID: String) -> Decimal? {
+        let archive = store.priceArchive(forProduct: productID)
+        if priceChoices[productID] == .reservation {
+            return archive.currentReservationPrice ?? archive.reservation?.price
+        }
+        return archive.currentStockPrice ?? archive.historicalReservationPrice
+    }
+
+    /// 价格标签：预约口径带「预约」前缀，便于和现货区分
+    private func priceLabel(for productID: String) -> String {
+        guard let price = price(for: productID) else { return "价格未填" }
+        let amount = "¥\(NSDecimalNumber(decimal: price).stringValue)"
+        return priceChoices[productID] == .reservation ? "预约 \(amount)" : amount
+    }
+
     private var items: [(product: CatalogProduct, price: Decimal?)] {
         selectedProductIDs.compactMap { id in
             guard let p = store.product(id: id) else { return nil }
-            let archive = store.priceArchive(forProduct: id)
-            return (p, archive.currentStockPrice ?? archive.historicalReservationPrice)
+            return (p, price(for: id))
         }
     }
 
@@ -124,7 +145,7 @@ struct ShopCatalogWardrobeMergeView: View {
                                 .font(.system(size: 11))
                                 .foregroundStyle(themeManager.primaryTextColor)
                                 .lineLimit(1)
-                            Text(item.price.map { "¥\(NSDecimalNumber(decimal: $0).stringValue)" } ?? "价格未填")
+                            Text(priceLabel(for: item.product.id))
                                 .font(.system(size: 11, weight: .medium))
                                 .foregroundStyle(themeManager.accentTextColor)
                         }
@@ -203,7 +224,7 @@ struct ShopCatalogWardrobeMergeView: View {
                             .font(.system(size: 14, weight: .medium))
                             .foregroundStyle(themeManager.primaryTextColor)
                         Spacer()
-                        Text(item.price.map { "¥\(NSDecimalNumber(decimal: $0).stringValue)" } ?? "价格未填")
+                        Text(priceLabel(for: item.product.id))
                             .font(.system(size: 12))
                             .foregroundStyle(themeManager.secondaryTextColor)
                     }
@@ -276,8 +297,24 @@ struct ShopCatalogWardrobeMergeView: View {
             return
         }
         let keptAccessoryIDs = accessoryIDs
-        let selections = items.map { item in
-            ShopCatalogWardrobeDraftBuilder.Selection(productID: item.product.id, priceMode: .stock)
+        // 价格口径（V1.3）：点菜页自选的口径优先；预约口径须有可用预约记录，否则回退现货
+        let selections = items.map { item -> ShopCatalogWardrobeDraftBuilder.Selection in
+            let id = item.product.id
+            let archive = store.priceArchive(forProduct: id)
+            if priceChoices[id] == .reservation, let event = archive.reservation {
+                return ShopCatalogWardrobeDraftBuilder.Selection(
+                    productID: id,
+                    color: colorByProduct[id],
+                    size: sizeByProduct[id],
+                    priceMode: .reservation(depositPaid: event.deposit ?? 0)
+                )
+            }
+            return ShopCatalogWardrobeDraftBuilder.Selection(
+                productID: id,
+                color: colorByProduct[id],
+                size: sizeByProduct[id],
+                priceMode: .stock
+            )
         }
         do {
             let pairs = try ShopCatalogWardrobeDraftBuilder.makeSplitDrafts(

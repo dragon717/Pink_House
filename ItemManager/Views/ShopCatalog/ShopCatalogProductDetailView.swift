@@ -32,6 +32,8 @@ struct ShopCatalogProductView: View {
     @State private var viewerIndex = 0
     @State private var showsViewer = false
     @State private var showsMergeSheet = false
+    /// 价格表卡片展开状态（Request 14：默认收起，点击展开查看表格 + 原图）
+    @State private var isPriceChartExpanded = false
 
     private var product: CatalogProduct? { store.product(id: productID) }
     private var series: CatalogSeries? { product.map { store.series(id: $0.seriesID) } ?? nil }
@@ -55,6 +57,9 @@ struct ShopCatalogProductView: View {
                         .padding(.horizontal)
                         .offset(y: -36)
                     sizeChartCard
+                        .padding(.horizontal)
+                        .offset(y: -36)
+                    seriesPriceChartCard
                         .padding(.horizontal)
                         .offset(y: -36)
                     priceArchiveCard
@@ -83,9 +88,48 @@ struct ShopCatalogProductView: View {
 
     @State private var carouselIndex = 0
 
+    /// 轮播 slide（V1.4 同款不同色）：本商品图片在前（进入详情默认展示当前所选
+    /// 颜色的主图），之后追加同款其他颜色商品的主图——左右滑动即可在多个
+    /// 颜色图片之间切换预览；slide 带颜色标注。
+    private struct CarouselSlide: Equatable {
+        let ref: String
+        let colorLabel: String?
+    }
+
+    private var carouselSlides: [CarouselSlide] {
+        guard let product else { return [] }
+        var slides = product.images.map {
+            CarouselSlide(ref: store.asset(id: $0)?.originalURL ?? $0, colorLabel: ownColorLabel)
+        }
+        let design = ShopCatalogSameDesignGrouper.designName(of: product)
+        let siblings = (store.catalog?.products ?? []).filter {
+            $0.id != product.id
+                && $0.seriesID == product.seriesID
+                && $0.category == product.category
+                && $0.archivedAt == nil
+                && ShopCatalogSameDesignGrouper.designName(of: $0) == design
+        }
+        for sibling in siblings {
+            guard let first = sibling.images.first else { continue }
+            let ref = store.asset(id: first)?.originalURL ?? first
+            guard !slides.contains(where: { $0.ref == ref }) else { continue }
+            slides.append(CarouselSlide(
+                ref: ref,
+                colorLabel: store.colors(forProduct: sibling.id).first
+                    ?? ShopCatalogSameDesignGrouper.colorLabel(for: sibling.name)))
+        }
+        return slides
+    }
+
+    private var ownColorLabel: String? {
+        guard let product else { return nil }
+        if let color = store.colors(forProduct: product.id).first { return color }
+        return ShopCatalogSameDesignGrouper.colorLabel(for: product.name)
+    }
+
     private var carousel: some View {
         ZStack(alignment: .bottom) {
-            if imageReferences.isEmpty {
+            if carouselSlides.isEmpty {
                 Rectangle()
                     .fill(Color.gray.opacity(0.2))
                     .overlay {
@@ -96,13 +140,13 @@ struct ShopCatalogProductView: View {
                     .frame(height: 400)
             } else {
                 TabView(selection: $carouselIndex) {
-                    ForEach(Array(imageReferences.enumerated()), id: \.offset) { index, ref in
-                        ShopCatalogAssetImage(reference: ref)
+                    ForEach(Array(carouselSlides.enumerated()), id: \.offset) { index, slide in
+                        ShopCatalogAssetImage(reference: slide.ref)
                             .frame(height: 400)
                             .clipped()
                             .tag(index)
                             .onTapGesture {
-                                viewerReferences = imageReferences
+                                viewerReferences = carouselSlides.map(\.ref)
                                 viewerIndex = carouselIndex
                                 showsViewer = true
                             }
@@ -111,10 +155,25 @@ struct ShopCatalogProductView: View {
                 .tabViewStyle(PageTabViewStyle(indexDisplayMode: .never))
                 .frame(height: 400)
 
+                // 颜色标注：当前 slide 对应的颜色（同款不同色滑动切换时的定位提示）
+                if let colorLabel = carouselSlides.indices.contains(carouselIndex)
+                    ? carouselSlides[carouselIndex].colorLabel : nil {
+                    HStack {
+                        Text(colorLabel.appLocalized)
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 4)
+                            .background(Capsule().fill(Color.black.opacity(0.45)))
+                            .padding(.leading, 12)
+                        Spacer()
+                    }
+                }
+
                 HStack(spacing: 4) {
-                    Text("\(min(carouselIndex + 1, imageReferences.count))")
+                    Text("\(min(carouselIndex + 1, carouselSlides.count))")
                     Text("/")
-                    Text("\(imageReferences.count)")
+                    Text("\(carouselSlides.count)")
                 }
                 .font(.caption2)
                 .foregroundStyle(.white)
@@ -205,7 +264,7 @@ struct ShopCatalogProductView: View {
                     }
                 }
                 if chart.hasStructuredContent {
-                    structuredTable(chart)
+                    structuredTable(columns: chart.columns, rows: chart.rows, cornerLabel: "尺码")
                 }
                 if chart.sourceImage == nil && !chart.hasStructuredContent {
                     Text("暂无尺码表数据".appLocalized)
@@ -219,12 +278,15 @@ struct ShopCatalogProductView: View {
         }
     }
 
-    private func structuredTable(_ chart: CatalogSizeChart) -> some View {
-        VStack(spacing: 0) {
+    private func structuredTable(columns: [String], rows: [CatalogSizeRow], cornerLabel: String) -> some View {
+        // 渲染前统一规范化（CatalogManualChartText.normalized）：旧数据里已存入的
+        // 重复行标签列（如首列「尺码」）在此剔除，值尾冒号清洗——保证列与数据对齐
+        let normalized = CatalogManualChartText.normalized(columns: columns, rows: rows)
+        return VStack(spacing: 0) {
             HStack(spacing: 0) {
-                Text("尺码".appLocalized)
+                Text(cornerLabel.appLocalized)
                     .frame(width: 64, alignment: .leading)
-                ForEach(chart.columns, id: \.self) { col in
+                ForEach(normalized.columns, id: \.self) { col in
                     Text(col)
                         .frame(maxWidth: .infinity)
                 }
@@ -233,12 +295,12 @@ struct ShopCatalogProductView: View {
             .foregroundStyle(themeManager.primaryTextColor)
             .padding(.vertical, 8)
 
-            ForEach(Array(chart.rows.enumerated()), id: \.offset) { _, rowEntry in
+            ForEach(Array(normalized.rows.enumerated()), id: \.offset) { _, rowEntry in
                 Divider().background(themeManager.tertiaryTextColor.opacity(0.3))
                 HStack(spacing: 0) {
                     Text(rowEntry.label)
                         .frame(width: 64, alignment: .leading)
-                    ForEach(Array(chart.columns.enumerated()), id: \.offset) { index, _ in
+                    ForEach(Array(normalized.columns.enumerated()), id: \.offset) { index, _ in
                         Text(rowEntry.values.indices.contains(index) ? (rowEntry.values[index] ?? "—") : "—")
                             .frame(maxWidth: .infinity)
                     }
@@ -250,24 +312,138 @@ struct ShopCatalogProductView: View {
         }
     }
 
-    // MARK: 价格档案（§13：预约价 / 现货价 / 差价）
+    // MARK: 预约价格表（系列共用；单品详情自动读取所属系列配置）
 
+    /// 价格表归属系列维度：此处只读展示，不上传（上传入口在 系列 → 编辑）。
+    /// 结构化内容由上传图片 OCR 自动解析生成；解析失败时保留原图并给出明确提示。
+    /// 系列预约价区间（按本系列在售商品当前预约价汇总）：
+    /// 价格表 OCR 解析失败时的兜底展示，保证详情页始终能看到价格区间
+    private var seriesReservationPriceRange: (min: Decimal, max: Decimal)? {
+        guard let series else { return nil }
+        let prices = store.products(inSeries: series.id)
+            .compactMap { store.priceArchive(forProduct: $0.id).currentReservationPrice }
+        guard let lowest = prices.min(), let highest = prices.max() else { return nil }
+        return (lowest, highest)
+    }
+
+    @ViewBuilder
+    private var seriesPriceChartCard: some View {
+        if let chart = series?.priceChart {
+            VStack(alignment: .leading, spacing: 12) {
+                // 头部：默认收起，仅展示标题 + 预约价区间摘要；点击展开查看表格与原图
+                Button {
+                    withAnimation(.easeInOut(duration: 0.25)) {
+                        isPriceChartExpanded.toggle()
+                    }
+                } label: {
+                    HStack(spacing: 8) {
+                        Text("预约价格表".appLocalized)
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(themeManager.primaryTextColor)
+                        Spacer()
+                        if let range = seriesReservationPriceRange {
+                            Text("\(ShopCatalogFormat.price(range.min)) – \(ShopCatalogFormat.price(range.max))")
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundStyle(themeManager.accentTextColor)
+                        }
+                        Image(systemName: isPriceChartExpanded ? "chevron.up" : "chevron.down")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(themeManager.secondaryTextColor)
+                    }
+                }
+                .buttonStyle(.plain)
+
+                if isPriceChartExpanded {
+                    VStack(alignment: .leading, spacing: 12) {
+                        if chart.hasStructuredContent {
+                            structuredTable(columns: chart.columns, rows: chart.rows, cornerLabel: "项目")
+                            if let unit = chart.unit {
+                                Text("单位：\(unit)".appLocalized)
+                                    .font(.caption2)
+                                    .foregroundStyle(themeManager.tertiaryTextColor)
+                            }
+                        } else {
+                            Text(chart.sourceImage != nil
+                                 ? "价格表图片已上传，但未能自动解析出表格内容，请在系列配置中重新上传或手动补录；上方区间按本系列在售商品汇总".appLocalized
+                                 : "暂无价格表数据".appLocalized)
+                                .font(.caption)
+                                .foregroundStyle(themeManager.tertiaryTextColor)
+                        }
+                        // 原图：详情页内嵌直接展示（不再只依赖全屏查看器）
+                        if let sourceRef = chart.sourceImage {
+                            priceChartImageSection(sourceRef)
+                        }
+                    }
+                    .transition(.opacity)
+                }
+            }
+            .padding(16)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .themeSkinSectionCard(cornerRadius: 16)
+        }
+    }
+
+    /// 价格表原图内嵌展示：
+    ///   · 文件可解析 → 圆角图片（等比、限高），点击进全屏查看器放大（沿用商品图查看器）
+    ///   · 文件丢失 / 引用不可解析 → 明确提示重新上传，而不是渲染空白
+    @ViewBuilder
+    private func priceChartImageSection(_ ref: String) -> some View {
+        if priceChartImageMissing(ref) {
+            HStack(spacing: 6) {
+                Image(systemName: "exclamationmark.triangle")
+                Text("原图文件丢失，请在系列配置中重新上传价格表图片".appLocalized)
+            }
+            .font(.caption)
+            .foregroundStyle(themeManager.tertiaryTextColor)
+        } else {
+            VStack(alignment: .leading, spacing: 6) {
+                ShopCatalogAssetImage(reference: ref, contentMode: .fit)
+                    .frame(maxWidth: .infinity)
+                    .frame(maxHeight: 360)
+                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .stroke(themeManager.tertiaryTextColor.opacity(0.25), lineWidth: 1)
+                    )
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        viewerReferences = [ref]
+                        viewerIndex = 0
+                        showsViewer = true
+                    }
+                Text("点击图片可放大查看".appLocalized)
+                    .font(.caption2)
+                    .foregroundStyle(themeManager.tertiaryTextColor)
+            }
+        }
+    }
+
+    /// 原图可解析性诊断：local: 文件丢失 / 引用无法解析时返回 true，
+    /// 把「图片显示不出来」变成明确原因（数据随沙盒重置丢失时给用户可操作的提示）
+    private func priceChartImageMissing(_ ref: String) -> Bool {
+        ShopCatalogImageResolver.isUnavailable(ref)
+    }
+
+    // MARK: 价格档案（§13：预约价 / 现货价 / 差价；定金尾款并列 + 缺失兜底）
+
+    /// 完整、并列展示该商品已维护的全部价格信息：
+    ///   · 预约场景：预约总价 + 定金 / 尾款（同排并列，缺任一显示「暂无」）
+    ///   · 现货场景：现货价；定金 / 尾款同样占位展示，缺失显示「暂无」
+    /// 原则：任何字段缺失都走兜底文案，既不空白也不强解包——补录只填了现货价、
+    /// 或只填了定金没填尾款时，页面都完整可读。
     @ViewBuilder
     private var priceArchiveCard: some View {
         let archive = store.priceArchive(forProduct: productID)
-        if archive.reservation != nil || archive.stock != nil {
+        if archive.reservation != nil || archive.stock != nil || archive.isCorrected {
             VStack(alignment: .leading, spacing: 12) {
                 Text("价格档案".appLocalized)
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundStyle(themeManager.primaryTextColor)
-                if let r = archive.reservation {
-                    priceRow(label: "预约价（定金 ¥%@）".appLocalized(
-                        NSDecimalNumber(decimal: r.deposit ?? 0).stringValue
-                    ), value: r.price)
-                }
-                if let s = archive.stock {
-                    priceRow(label: "现货价".appLocalized, value: s.price)
-                }
+                // 展示「当前生效值」：价格修正覆盖优先，未修正则回退到历史记录推导
+                priceRow(label: "预约价".appLocalized, value: archive.currentReservationPrice)
+                depositBalanceRow(deposit: archive.currentDeposit,
+                                  balance: archive.currentBalance)
+                priceRow(label: "现货价".appLocalized, value: archive.currentStockPrice)
                 if let delta = archive.stockOverReservationDelta {
                     HStack(spacing: 6) {
                         Text("差价（现货 − 预约）".appLocalized)
@@ -284,6 +460,11 @@ struct ShopCatalogProductView: View {
                         }
                     }
                 }
+                if let correctedAt = archive.correction?.correctedAt {
+                    Text("价格已于 \(correctedAt.formatted(.dateTime.year().month().day())) 修正（仅更新当前价，历史销售记录不变）")
+                        .font(.caption2)
+                        .foregroundStyle(themeManager.tertiaryTextColor)
+                }
             }
             .padding(16)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -291,15 +472,50 @@ struct ShopCatalogProductView: View {
         }
     }
 
-    private func priceRow(label: String, value: Decimal) -> some View {
+    private func priceRow(label: String, value: Decimal?) -> some View {
         HStack {
             Text(label)
                 .font(.caption)
                 .foregroundStyle(themeManager.secondaryTextColor)
             Spacer()
-            Text("¥\(NSDecimalNumber(decimal: value).stringValue)")
-                .font(.system(size: 16, weight: .semibold))
-                .foregroundStyle(themeManager.primaryTextColor)
+            priceText(value)
+        }
+    }
+
+    /// 定金 / 尾款并列展示（预约场景核心字段；缺失显示「暂无」）
+    private func depositBalanceRow(deposit: Decimal?, balance: Decimal?) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+            priceCell(label: "定金".appLocalized, value: deposit)
+            Rectangle()
+                .fill(themeManager.tertiaryTextColor.opacity(0.25))
+                .frame(width: 1, height: 30)
+            priceCell(label: "尾款".appLocalized, value: balance)
+        }
+    }
+
+    private func priceCell(label: String, value: Decimal?) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(label)
+                .font(.caption2)
+                .foregroundStyle(themeManager.tertiaryTextColor)
+            priceText(value, font: .system(size: 14, weight: .semibold))
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// 价格值文案：无值统一兜底「暂无」，保证关键信息不空白、也不强解包崩溃
+    private func priceText(_ value: Decimal?,
+                           font: Font = .system(size: 16, weight: .semibold)) -> some View {
+        Group {
+            if let value {
+                Text("¥\(NSDecimalNumber(decimal: value).stringValue)")
+                    .font(font)
+                    .foregroundStyle(themeManager.primaryTextColor)
+            } else {
+                Text("暂无".appLocalized)
+                    .font(font)
+                    .foregroundStyle(themeManager.tertiaryTextColor)
+            }
         }
     }
 

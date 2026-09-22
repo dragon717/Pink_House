@@ -134,6 +134,27 @@ struct CatalogSeries: Codable, Identifiable, Hashable, Sendable {
     /// 归档标记（V1.1 §4.2）：nil = 未归档，非 nil = 归档时间。
     /// Optional 字段由合成 Decodable 以 decodeIfPresent 处理，旧 JSON 缺键自动置 nil。
     var archivedAt: Date? = nil
+    /// 系列级预约价格表（2026-09-22）：整个系列共用，旧 JSON 缺键自动置 nil
+    var priceChart: CatalogPriceChart? = nil
+}
+
+// MARK: - PriceCorrection 价格修正（2026-09-22：与 append-only 销售历史分离）
+
+/// 价格修正结果：**对当前商品属性的更正**，不是业务事件。
+///
+/// 与 `CatalogSaleEvent` 的边界（双流程硬约束）：
+///   · 本结构**只有一份最新状态**——再次修正直接整体覆盖，不产生历史记录；
+///   · `CatalogSaleEvent` 是**追加式**业务事件（往年款再贩 / 补货），永不覆盖；
+///   · 两者存储位置、写入接口、校验规则全部独立，不得互相写入。
+///
+/// 字段全部可选：nil = 该项未修正，展示时回退到 SaleEvent 推导值。
+struct CatalogPriceCorrection: Codable, Hashable, Sendable {
+    var reservationPrice: Decimal? = nil
+    var stockPrice: Decimal? = nil
+    var deposit: Decimal? = nil
+    var balance: Decimal? = nil
+    /// 最后一次修正时间（审计用；不是业务批次时间）
+    var correctedAt: Date? = nil
 }
 
 // MARK: - Product 商品
@@ -152,11 +173,20 @@ struct CatalogProduct: Codable, Identifiable, Hashable, Sendable {
     /// 归档标记（V1.1 §4.2）：nil = 未归档，非 nil = 归档时间。
     /// Optional 字段由合成 Decodable 以 decodeIfPresent 处理，旧 JSON 缺键自动置 nil。
     var archivedAt: Date? = nil
+    /// 价格修正后的**当前价格状态**（2026-09-22）：由「价格修正」流程覆盖写入，
+    /// 与 append-only 的 SaleEvent 历史互不相干。nil = 从未修正过。
+    /// Optional 字段由合成 Decodable 以 decodeIfPresent 处理，旧 JSON 缺键自动置 nil。
+    var priceCorrection: CatalogPriceCorrection? = nil
+    /// 款式名（2026-09-22「同款不同色」归类）：同款式不同颜色的商品共享同一款式名，
+    /// 列表按款式合并展示、卡片内颜色子项切换。nil = 未显式指定（按商品名剥离颜色词派生）。
+    /// Optional 字段由合成 Decodable 以 decodeIfPresent 处理，旧 JSON 缺键自动置 nil。
+    var designName: String? = nil
 
     /// 兼容旧格式：images 缺失时兜底为空数组（理由同 CatalogShop.init(from:)）
     init(id: String, shopID: String, seriesID: String, name: String,
          category: String, images: [String] = [], description: String? = nil,
-         archivedAt: Date? = nil) {
+         archivedAt: Date? = nil, priceCorrection: CatalogPriceCorrection? = nil,
+         designName: String? = nil) {
         self.id = id
         self.shopID = shopID
         self.seriesID = seriesID
@@ -165,6 +195,8 @@ struct CatalogProduct: Codable, Identifiable, Hashable, Sendable {
         self.images = images
         self.description = description
         self.archivedAt = archivedAt
+        self.priceCorrection = priceCorrection
+        self.designName = designName
     }
 
     init(from decoder: Decoder) throws {
@@ -177,7 +209,9 @@ struct CatalogProduct: Codable, Identifiable, Hashable, Sendable {
             category: try c.decode(String.self, forKey: .category),
             images: try c.decodeIfPresent([String].self, forKey: .images) ?? [],
             description: try c.decodeIfPresent(String.self, forKey: .description),
-            archivedAt: try c.decodeIfPresent(Date.self, forKey: .archivedAt))
+            archivedAt: try c.decodeIfPresent(Date.self, forKey: .archivedAt),
+            priceCorrection: try c.decodeIfPresent(CatalogPriceCorrection.self, forKey: .priceCorrection),
+            designName: try c.decodeIfPresent(String.self, forKey: .designName))
     }
 }
 
@@ -221,6 +255,25 @@ struct CatalogSizeChart: Codable, Identifiable, Hashable, Sendable {
     }
 }
 
+// MARK: - PriceChart 系列级预约价格表
+
+/// 预约价格表（2026-09-22：与尺码表拆分为两个独立素材）：
+///   · 归属**系列**而非单品：一张价格表整个系列共用，在系列维度配置处上传维护，
+///     单品编辑页不再上传；单品详情页自动读取所属系列的价格表
+///   · columns / rows 由上传图片 OCR 自动解析生成，允许人工修正
+///   · sourceImage 保留原图引用（「local:」运营上传图或 Bundle 文件名）
+struct CatalogPriceChart: Codable, Hashable, Sendable {
+    var id: String
+    var seriesID: String
+    var unit: String? = nil
+    var columns: [String] = []
+    var rows: [CatalogSizeRow] = []
+    var sourceImage: String? = nil
+
+    /// 是否存在结构化内容（只有原图时为 false，此时详情页给出明确提示）
+    var hasStructuredContent: Bool { !columns.isEmpty && !rows.isEmpty }
+}
+
 // MARK: - SaleEvent 销售记录
 
 /// 单次销售记录（计划 §4：id, productID, type, price, deposit, balance, startAt, endAt）
@@ -233,13 +286,47 @@ struct CatalogSaleEvent: Codable, Identifiable, Hashable, Sendable {
     /// 定金 / 尾款（预约类记录常用；现货记录可为 nil）
     var deposit: Decimal? = nil
     var balance: Decimal? = nil
+    /// 业务时间（预约/现货档期；再贩场景下即**再贩日期 / 批次时间**，必填）
     var startAt: Date? = nil
     var endAt: Date? = nil
+    /// 批次标识（2026-09-22 再贩场景）：如「2025 再贩第二批」，可空
+    var batchLabel: String? = nil
+    /// 记录写入时间（append-only 审计用，与 startAt 业务时间区分）
+    var recordedAt: Date? = nil
 
     /// 校验定金 + 尾款与总价的一致性（允许缺省字段，不做强约束）
     var isDepositBalanceConsistent: Bool {
         guard let deposit, let balance else { return true }
         return (deposit + balance) == price
+    }
+
+    /// 追加记录指纹：**重复提交防护**用。
+    /// 业务维度完全一致（同商品 / 同类型 / 同价格 / 同定金尾款 / 同批次日）
+    /// 即视为同一条记录的重复提交，不区分写入时间 `recordedAt`——重复提交
+    /// 只是「再次点了保存」，不是一条新的再贩记录。
+    var appendFingerprint: String {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0) ?? .current
+        let day: String
+        if let startAt {
+            let c = calendar.dateComponents([.year, .month, .day], from: startAt)
+            day = "\(c.year ?? 0)-\(c.month ?? 0)-\(c.day ?? 0)"
+        } else {
+            day = "nodate"
+        }
+        let d = deposit.map { NSDecimalNumber(decimal: $0).stringValue } ?? "-"
+        let b = balance.map { NSDecimalNumber(decimal: $0).stringValue } ?? "-"
+        return [productID, type.rawValue, NSDecimalNumber(decimal: price).stringValue, d, b, day]
+            .joined(separator: "|")
+    }
+
+    /// 展示用批次描述：有批次名显示批次名，否则显示日期
+    var batchDisplay: String {
+        if let batchLabel, !batchLabel.trimmingCharacters(in: .whitespaces).isEmpty {
+            return batchLabel
+        }
+        guard let startAt else { return "未标注批次" }
+        return startAt.formatted(.dateTime.year().month().day())
     }
 }
 
@@ -303,40 +390,86 @@ struct ShopCatalog: Codable, Hashable, Sendable {
 // MARK: - 价格档案（计划 §6 用户端展示口径）
 
 /// 价格档案汇总：从商品的 SaleEvent 列表推导「历史预约价 / 当前现货价 / 差价」。
-/// 口径：同类取时间最近的一条；预约记录只追加、永不覆盖（由模型层保证——
-/// 本结构为只读推导，任何写入都生成新 SaleEvent）。
+/// 口径：同类取「时间最近」的一条；startAt 相同（都为空或同一时刻）时，
+/// 取**数组中更靠后**的那条，即后追加的补录记录胜出。
+/// 原因：补录上新追加的记录通常不带 startAt（全部落到 distantPast），而
+/// `Sequence.max(by:)` 在并列时保留先出现的元素，会导致新补的价格被旧记录
+/// 盖住——商品页无论怎么补录都不变。这里显式用下标做 tie-break 保证确定性。
+/// 预约 / 现货记录本身仍只追加、不覆盖（本结构是只读推导，写入一律生成新 SaleEvent）。
 struct CatalogPriceArchive: Hashable, Sendable {
-    /// 最近一次预约记录
+    /// 最近一次预约记录（**未修正**，来自 append-only 历史）
     let reservation: CatalogSaleEvent?
-    /// 最近一次现货记录
+    /// 最近一次现货记录（**未修正**，来自 append-only 历史）
     let stock: CatalogSaleEvent?
+    /// 价格修正结果（nil = 从未修正 → 下面所有「当前值」回退到历史推导）
+    let correction: CatalogPriceCorrection?
 
-    init(events: [CatalogSaleEvent]) {
+    init(events: [CatalogSaleEvent], correction: CatalogPriceCorrection? = nil) {
         func latest(_ type: CatalogSaleEventType) -> CatalogSaleEvent? {
-            events
-                .filter { $0.type == type }
-                .max { ($0.startAt ?? .distantPast) < ($1.startAt ?? .distantPast) }
+            events.enumerated()
+                .filter { $0.element.type == type }
+                .max { lhs, rhs in
+                    let l = lhs.element.startAt ?? .distantPast
+                    let r = rhs.element.startAt ?? .distantPast
+                    if l != r { return l < r }
+                    return lhs.offset < rhs.offset
+                }?
+                .element
         }
         self.reservation = latest(.reservation)
         self.stock = latest(.stock)
+        // 全 nil 的修正 = 「全部价格已清除」的有效状态，必须原样保留，
+        // 不能按空值吞掉（否则清除操作永远不生效）
+        self.correction = correction
     }
 
-    /// 当前现货价（计划 §6 用户页「当前现货价」）
-    var currentStockPrice: Decimal? { stock?.price }
+    /// 是否存在价格修正
+    var isCorrected: Bool { correction != nil }
 
-    /// 历史预约价（计划 §6 用户页「历史预约价」）
-    var historicalReservationPrice: Decimal? { reservation?.price }
+    // 「当前生效值」口径（2026-09-22 调整）：
+    // 一旦存在价格修正，四个当前值**以修正值为准、逐字段对号入座**——
+    // 修正值 nil = 该价格已被清除（展示「暂无」），**不回退**到历史推导；
+    // 只有从未修正过（correction == nil）时才回退到最近一次销售记录推导。
+    // 原因：修正弹窗按「留空 = 清除」提交完整快照，若 nil 还回退历史，
+    // 用户清掉的价格会「清不掉」。
+
+    /// 当前现货价
+    var currentStockPrice: Decimal? {
+        if let correction { return correction.stockPrice }
+        return stock?.price
+    }
+
+    /// 当前预约价
+    var currentReservationPrice: Decimal? {
+        if let correction { return correction.reservationPrice }
+        return reservation?.price
+    }
+
+    /// 历史预约价（计划 §6 用户页「历史预约价」）：保留旧命名，语义 = 当前生效预约价
+    var historicalReservationPrice: Decimal? { currentReservationPrice }
+
+    /// 当前定金
+    var currentDeposit: Decimal? {
+        if let correction { return correction.deposit }
+        return reservation?.deposit
+    }
+
+    /// 当前尾款
+    var currentBalance: Decimal? {
+        if let correction { return correction.balance }
+        return reservation?.balance
+    }
 
     /// 差价（现货 − 预约）；任一侧缺失则为 nil
     var stockOverReservationDelta: Decimal? {
-        guard let r = reservation?.price, let s = stock?.price else { return nil }
+        guard let r = currentReservationPrice, let s = currentStockPrice else { return nil }
         return s - r
     }
 
     /// 差价百分比（相对预约价，含符号的浮点百分数，如 20 / -12.5 表示 +20% / −12.5%）；
     /// 预约价为 0 或缺失时为 nil（V1.1 §1 P0：展示预约‑现货差价及百分比）
     var stockOverReservationDeltaPercent: Double? {
-        guard let r = reservation?.price, let delta = stockOverReservationDelta, r != 0 else { return nil }
+        guard let r = currentReservationPrice, let delta = stockOverReservationDelta, r != 0 else { return nil }
         return NSDecimalNumber(decimal: delta / r * 100).doubleValue
     }
 }

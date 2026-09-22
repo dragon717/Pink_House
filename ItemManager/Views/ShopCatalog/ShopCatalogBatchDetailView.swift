@@ -218,11 +218,33 @@ struct ShopCatalogBatchDetailView: View {
         Dictionary(grouping: batchDrafts, by: groupKey(for:))
     }
 
+    /// 分组键（2026-09-22 默认继承整批系列）：
+    ///   · 草稿自报系列（seriesID / newSeriesName）→ 用自己的，永不被整批覆盖；
+    ///   · 未自报 → 继承整批归属当前选定的系列（上方选择一变，分组即时联动）；
+    ///   · 整批也未选定 → 维持「未指定系列」（原有默认行为）。
+    /// 纯逻辑在 `CatalogBatchGrouping.groupKey`，此处只负责名称解析。
     private func groupKey(for draft: CatalogProductDraft) -> String {
-        if let sid = draft.seriesID, let name = store.series(id: sid)?.name { return name }
-        if let sid = draft.seriesID { return sid }
-        let name = draft.newSeriesName.trimmingCharacters(in: .whitespacesAndNewlines)
-        return name.isEmpty ? "未指定系列" : name
+        let own: String?
+        if let sid = draft.seriesID {
+            own = store.series(id: sid)?.name ?? sid   // 系列查不到时用原始 id 兜底
+        } else {
+            let name = draft.newSeriesName.trimmingCharacters(in: .whitespacesAndNewlines)
+            own = name.isEmpty ? nil : name
+        }
+        return CatalogBatchGrouping.groupKey(draftOwnSeriesName: own,
+                                             batchSeriesName: inheritedSeriesKey)
+    }
+
+    /// 整批归属当前选定系列的展示名（上方「系列」Picker 选中项，或正在填写的新系列名）；
+    /// 上方未选定系列时为 nil → 分组回落「未指定系列」。
+    /// 直接读 @State（seriesID / newSeriesName），所以上方一变，下方分组同步联动。
+    private var inheritedSeriesKey: String? {
+        // 本视图的 seriesID 是非可选 String（"" = 新建系列）
+        if !seriesID.isEmpty {
+            return store.series(id: seriesID)?.name ?? seriesID
+        }
+        let name = newSeriesName.trimmingCharacters(in: .whitespacesAndNewlines)
+        return name.isEmpty ? nil : name
     }
 
     private func groupHeader(key: String, count: Int) -> some View {
@@ -241,7 +263,7 @@ struct ShopCatalogBatchDetailView: View {
         VStack(alignment: .leading, spacing: 2) {
             Text(draft.name.isEmpty ? "（未命名单品）" : draft.name)
                 .font(.system(size: 13))
-            Text("\(draft.category) · \(draft.saleKind.displayName) · \(draft.status.displayName)")
+            Text("\(draft.category) · \(draft.priceSummary) · \(draft.status.displayName)")
                 .font(.caption2)
                 .foregroundStyle(.secondary)
         }

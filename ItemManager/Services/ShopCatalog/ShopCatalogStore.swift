@@ -166,6 +166,24 @@ final class ShopCatalogStore: ObservableObject {
             }
     }
 
+    // MARK: 字典序访问器（展示列表的唯一出口）
+
+    /// 根因说明：catalog 里的数组是**录入顺序 / JSON 顺序**，不是字典序。
+    /// 任何要按名称展示的列表（运营端实体管理、补录草稿的店家/系列选择器等）
+    /// 都必须走这三个访问器或 `AZIndexGrouping.groups`，禁止直接遍历原始数组。
+    /// 这里包含已归档实体（运营端需要看到并管理它们）。
+    func shopsSortedByName() -> [CatalogShop] {
+        AZIndexGrouping.sortedByName(catalog?.shops ?? []) { $0.name }
+    }
+
+    func seriesSortedByName() -> [CatalogSeries] {
+        AZIndexGrouping.sortedByName(catalog?.series ?? []) { $0.name }
+    }
+
+    func productsSortedByName() -> [CatalogProduct] {
+        AZIndexGrouping.sortedByName(catalog?.products ?? []) { $0.name }
+    }
+
     /// 店家搜索：正式名包含命中或任一别名包含命中（计划 §8：第一版搜索范围 = 店家名称与别名）
     func searchShops(keyword: String) -> [CatalogShop] {
         let q = keyword.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
@@ -267,12 +285,31 @@ final class ShopCatalogStore: ObservableObject {
         catalog?.sizeCharts.first { $0.productID == productID }
     }
 
+    /// 价格档案 = append-only 历史推导值 + 价格修正覆盖值（修正优先）。
+    /// 本方法只读：任何写入都必须走 `ShopCatalogDraftStore.correctCurrentPrice`
+    ///（修正，覆盖当前状态）或 `appendSaleRecord`（追加，新增业务事件）。
     func priceArchive(forProduct productID: String) -> CatalogPriceArchive {
-        CatalogPriceArchive(events: saleEvents(forProduct: productID))
+        let correction = catalog?.products.first { $0.id == productID }?.priceCorrection
+        return CatalogPriceArchive(events: saleEvents(forProduct: productID), correction: correction)
     }
 
     func saleEvents(forProduct productID: String) -> [CatalogSaleEvent] {
         catalog?.saleEvents.filter { $0.productID == productID } ?? []
+    }
+
+    /// 追加式销售历史（按批次时间倒序：最近批次在前；并列时后追加的在前，
+    /// 与 `CatalogPriceArchive` 的「最新」判定完全一致）。
+    /// 只读视图：不支持任何改写接口，历史一经写入不可变。
+    func saleHistory(forProduct productID: String) -> [CatalogSaleEvent] {
+        saleEvents(forProduct: productID)
+            .enumerated()
+            .sorted { lhs, rhs in
+                let l = lhs.element.startAt ?? .distantPast
+                let r = rhs.element.startAt ?? .distantPast
+                if l != r { return l > r }
+                return lhs.offset > rhs.offset
+            }
+            .map(\.element)
     }
 
     func saleEvent(id: String) -> CatalogSaleEvent? {
@@ -387,8 +424,7 @@ nonisolated enum ShopCatalogImageStore {
 ///     依次在根目录 / images / TimeHall/images / ShopCatalog/images 中查找。
 /// 第一版直接复用 Bundle 内已有的时光馆画册图作为演示素材，不复制资源。
 nonisolated enum ShopCatalogImageResolver {
-    static func url(for reference: String?, bundle: Bundle = .main) -> URL? {
-        guard var name = reference?.trimmingCharacters(in: .whitespacesAndNewlines),
+    static func url(for reference: String?, bundle: Bundle = .main) -> URL? {        guard var name = reference?.trimmingCharacters(in: .whitespacesAndNewlines),
               !name.isEmpty else { return nil }
         if name.lowercased().hasPrefix("http://") || name.lowercased().hasPrefix("https://") {
             return URL(string: name)
@@ -406,6 +442,21 @@ nonisolated enum ShopCatalogImageResolver {
             ?? bundle.url(forResource: stem, withExtension: ext, subdirectory: "images")
             ?? bundle.url(forResource: stem, withExtension: ext, subdirectory: "TimeHall/images")
             ?? bundle.url(forResource: stem, withExtension: ext, subdirectory: "ShopCatalog/images")
+    }
+
+    /// 引用能否解析出「本地确实存在」的图片：
+    ///   · 空引用 / 解析不出 URL → true（不可用）
+    ///   · http(s) 引用 → false（可用性交给网络层，本地无法判断）
+    ///   · local: / Bundle 引用 → 按解析出的文件是否存在判定
+    /// 用于把「图片显示不出来」变成明确提示（如沙盒重置后 local: 文件丢失），
+    /// 而不是渲染一张空白图。nonisolated 纯逻辑，可单测。
+    static func isUnavailable(_ reference: String?) -> Bool {
+        guard let trimmed = reference?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !trimmed.isEmpty else { return true }
+        if trimmed.lowercased().hasPrefix("http") { return false }
+        guard let url = url(for: trimmed) else { return true }
+        if url.isFileURL { return !FileManager.default.fileExists(atPath: url.path) }
+        return false
     }
 }
 
@@ -426,8 +477,10 @@ struct ShopCatalogAssetImage: View {
                     placeholder
                 }
             })
-        } else if let path = localPath {
-            Image(uiImage: UIImage(contentsOfFile: path) ?? UIImage())
+        } else if let path = localPath, let loaded = UIImage(contentsOfFile: path) {
+            // 文件存在且可解码才渲染；读失败（如沙盒重置后文件丢失）走占位图，
+            // 不再渲染空白的 UIImage()（表现为整块空白/黑屏，用户无从判断原因）
+            Image(uiImage: loaded)
                 .resizable()
                 .aspectRatio(contentMode: contentMode)
         } else {
