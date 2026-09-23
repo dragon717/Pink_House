@@ -57,7 +57,7 @@ final class CreatorMode: ObservableObject {
     CreatorAccess.shared.refreshBasis()
   }
 
-  /// 供 `MidsummerStore` 这类不持有本对象引用的类型做**只读**判断。
+  /// 供不持有本对象引用的类型（如服务层门控）做**只读**判断。
   nonisolated static func isEnabledInDefaults(_ defaults: UserDefaults = .standard) -> Bool {
     defaults.bool(forKey: storageKey)
   }

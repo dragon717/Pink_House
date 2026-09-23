@@ -2,12 +2,13 @@
 //  TimeHallShopCatalogFirstScreenUITests.swift
 //  ItemManagerUITests
 //
-//  重构方案 Phase 1 交互验收：时光馆首屏 = 店家上新，「馆藏档案」为只读次级入口。
+//  时光馆首屏验收：时光馆只保留「店家上新」。
+//  2026-09-24 旧馆（馆藏档案 / 我的品牌品牌列表）已整体移除，
+//  本用例同时守住「旧入口不再出现」这一删除口径。
 //
 //  访问性标识约定（改产品代码时若改了这些文案，同步改本文件）：
-//    · 店家上新首屏左上角 → label「馆藏档案」（次级只读入口）
-//    · 馆藏档案右上角返回 → label「返回店家上新」
-//    · fullScreenCover 兼容态左上角 → label「返回时光馆」
+//    · 时光馆首屏导航栏标题 → 「店家上新」
+//    · 「馆藏档案」入口 → 已删除，不得再出现
 //
 
 import XCTest
@@ -19,7 +20,7 @@ final class TimeHallShopCatalogFirstScreenUITests: XCTestCase {
   }
 
   @MainActor
-  func testTimeHallFirstScreenIsShopCatalogWithLegacyArchiveEntry() throws {
+  func testTimeHallFirstScreenIsShopCatalogWithoutLegacyArchive() throws {
     let app = XCUIApplication()
     app.launch()
     dismissSystemPrompts(app)
@@ -35,22 +36,12 @@ final class TimeHallShopCatalogFirstScreenUITests: XCTestCase {
     XCTAssertTrue(navTitle.waitForExistence(timeout: 8), "时光馆首屏应为店家上新")
     capture(app, "01-时光馆首屏-店家上新")
 
-    // 3. 左上角「馆藏档案」进入旧馆
+    // 3. 旧馆入口已随旧馆代码移除，不得再出现
     let legacyEntry = app.buttons["馆藏档案"]
-    XCTAssertTrue(legacyEntry.exists, "店家上新左上角应有馆藏档案入口")
-    legacyEntry.tap()
-
+    XCTAssertFalse(legacyEntry.exists, "馆藏档案入口已移除，不应出现")
     let legacyHeader = app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "个品牌")).firstMatch
-    XCTAssertTrue(legacyHeader.waitForExistence(timeout: 8), "馆藏档案应展示旧品牌列表（我的品牌/N个品牌）")
-    capture(app, "02-馆藏档案-旧品牌列表")
-
-    // 4. 右上角返回店家上新
-    let backButton = app.buttons["返回店家上新"]
-    XCTAssertTrue(backButton.exists, "馆藏档案应有返回店家上新入口")
-    backButton.tap()
-
-    XCTAssertTrue(app.navigationBars["店家上新"].waitForExistence(timeout: 8), "应回到店家上新首屏")
-    capture(app, "03-返回店家上新")
+    XCTAssertFalse(legacyHeader.exists, "「我的品牌 / N个品牌」品牌列表已移除，不应出现")
+    capture(app, "02-旧馆入口已移除")
   }
 
   // MARK: - 工具

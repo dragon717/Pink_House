@@ -3,8 +3,7 @@
 //  ItemManager
 //
 //  「店家上新」浏览页（计划 §7-12 + 附录A 参考图2/3/4）：
-//    · ShopCatalogBrowseView   —— 浏览根（独立 NavigationStack，时光馆 fullScreenCover 呈现）
-//    · ShopCatalogEntryCard    —— 时光馆内「店家上新 · 最近上新 · 历年系列」入口卡（§8，参考图2 NEW 角标）
+//    · ShopCatalogBrowseView   —— 浏览根（独立 NavigationStack，时光馆 Tab 首屏）
 //    · ShopCatalogListView     —— 店家列表（§9：Logo / 名称 / 最近上新 / 系列数 / 别名搜索，参考图3 列表风格）
 //    · ShopCatalogShopView     —— 店家主页（§10：当前上新 + [当前上新][2026][2025]…年份翻阅；
 //      系列卡点击直达「点菜式选购页」ShopCatalogSeriesMenuView，原合并大卡中转页已删除）
@@ -35,15 +34,11 @@ enum ShopCatalogFormat {
 
 // MARK: - 浏览根
 
-/// 时光馆首屏「店家上新」（Phase 1：直接作为底部 Tab 根视图，也兼容 fullScreenCover）。
-/// `onLegacyArchive` 非 nil 时，左上角按钮变为「馆藏档案」次级入口（过渡期只读旧馆）；
-/// 否则保持原「返回时光馆」关闭按钮（fullScreenCover 场景）。
+/// 时光馆首屏「店家上新」（直接作为底部 Tab 根视图）。
 struct ShopCatalogBrowseView: View {
-    @Environment(\.dismiss) private var dismiss
     @ObservedObject private var store = ShopCatalogStore.shared
     /// 开售提醒深链：通知点击 → TabNavigationManager → 本栈压入商品详情
     @ObservedObject private var tabNav = TabNavigationManager.shared
-    var onLegacyArchive: (() -> Void)? = nil
 
     private var showsDeepLinkProduct: Binding<Bool> {
         Binding(
@@ -66,79 +61,10 @@ struct ShopCatalogBrowseView: View {
                     ShopCatalogProductView(productID: productID)
                 }
             }
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    if let onLegacyArchive {
-                        Button(action: onLegacyArchive) {
-                            Image(systemName: "books.vertical")
-                                .font(.system(size: 15, weight: .semibold))
-                                .foregroundStyle(.secondary)
-                        }
-                        .accessibilityLabel("馆藏档案")
-                    } else {
-                        Button {
-                            dismiss()
-                        } label: {
-                            Image(systemName: "chevron.down")
-                                .font(.system(size: 15, weight: .semibold))
-                                .foregroundStyle(.secondary)
-                        }
-                        .accessibilityLabel("返回时光馆")
-                    }
-                }
-            }
         }
         .onAppear {
             store.loadFromBundleIfNeeded()
         }
-    }
-}
-
-// MARK: - 时光馆「店家上新」入口卡片（计划 §8，参考图2：NEW 角标）
-
-/// 展示在时光馆品牌列表顶部：店家上新 · 最近上新 · 历年系列
-struct ShopCatalogEntryCard: View {
-    @Environment(ThemeManager.self) private var themeManager
-    let onTap: () -> Void
-
-    var body: some View {
-        Button(action: onTap) {
-            HStack(spacing: 12) {
-                ZStack {
-                    Circle()
-                        .fill(themeManager.accentTextColor.opacity(0.12))
-                    Image(systemName: "bag.fill")
-                        .font(.system(size: 17))
-                        .foregroundStyle(themeManager.accentTextColor)
-                }
-                .frame(width: 44, height: 44)
-                .overlay(alignment: .topTrailing) {
-                    Text("NEW")
-                        .font(.system(size: 8, weight: .bold))
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 4)
-                        .padding(.vertical, 2)
-                        .background(Capsule().fill(Color.pink))
-                        .offset(x: 6, y: -4)
-                }
-
-                VStack(alignment: .leading, spacing: 3) {
-                    Text("店家上新")
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(themeManager.primaryTextColor)
-                    Text("最近上新 · 历年系列")
-                        .font(.system(size: 12))
-                        .foregroundStyle(themeManager.secondaryTextColor)
-                }
-                Spacer(minLength: 0)
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(themeManager.tertiaryTextColor)
-            }
-            .padding(12)
-        }
-        .buttonStyle(.plain)
-        .themeSkinSectionCard(cornerRadius: 16)
     }
 }
 

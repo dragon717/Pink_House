@@ -118,7 +118,7 @@ final class ShopCatalogStore: ObservableObject {
     }
 
     nonisolated static func bundleURL(in bundle: Bundle) -> URL? {
-        // 与 TimeHall / Midsummer 相同的三级查找：子目录 → Resources/子目录 → 根
+        // 三级查找：子目录 → Resources/子目录 → 根（含 TimeHall/images 既有图片回退）
         bundle.url(forResource: bundleResourceName, withExtension: "json", subdirectory: "ShopCatalog")
             ?? bundle.url(forResource: bundleResourceName, withExtension: "json", subdirectory: "Resources/ShopCatalog")
             ?? bundle.url(forResource: bundleResourceName, withExtension: "json")

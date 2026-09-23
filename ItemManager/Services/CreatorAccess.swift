@@ -224,7 +224,7 @@ final class CreatorAccess: ObservableObject {
   /// App 启动与云端刷新各调一次；判定不到（断网 / 未登录 iCloud）时保守回落为
   /// 「取不到身份」，由本机开关决定是否放行。
   func refresh() async {
-    apply(gate: await MidsummerCloudService.shared.creatorGate())
+    apply(gate: await NoticeCloudKitService.shared.creatorGate())
   }
 
   /// 本机「创作者模式」开关变更后调用：角色是实时读 UserDefaults 的，

@@ -54,6 +54,7 @@ struct ItemManagerApp: App {
         // 角色判定同理要在首帧前初始化：服务层的写接口是同步校验，
         // 读的是 `CreatorAccess` 的快照，晚一步就可能出现「首屏期间一律当普通用户」。
         _ = CreatorAccess.shared
+        LegacyTimeHallDataCleaner.purgeIfNeeded()
     }
     
     var body: some Scene {

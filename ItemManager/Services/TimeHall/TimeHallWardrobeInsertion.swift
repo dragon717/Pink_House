@@ -1,46 +1,16 @@
 import Foundation
 import SwiftData
 
-// MARK: - 加入衣橱的两种形态（并行保留，供对比）
+// MARK: - 加入衣橱的两种形态
 //
 // 形态 A「一键入库」：不打开编辑页，直接把商品落成 `Clothing` 写入 SwiftData。
-//                    追求「快捷」——在商品卡片上一点即入橱。
 // 形态 B「加入并编辑」：复用既有的 `TabNavigationManager.presentWardrobeCreation(with:)`，
 //                    跳到衣橱的手动创建页并预填，使用者可逐项确认后再保存。
 //
-// 两者**同时保留**，不替使用者预设默认值；界面上都出现，便于对比后再取舍。
-
-nonisolated enum TimeHallWardrobeInsertMode: String, CaseIterable, Identifiable, Sendable {
-  case quickInsert
-  case openEditor
-
-  var id: String { rawValue }
-
-  /// 一键入库的图标（卡片上的紧凑入口也用它）
-  var symbolName: String {
-    switch self {
-    case .quickInsert: return "plus.circle.fill"
-    case .openEditor: return "square.and.pencil"
-    }
-  }
-}
-
-@MainActor
-extension TimeHallWardrobeInsertMode {
-  var title: String {
-    switch self {
-    case .quickInsert: return "一键入库".appLocalized
-    case .openEditor: return "加入并编辑".appLocalized
-    }
-  }
-
-  var hint: String {
-    switch self {
-    case .quickInsert: return "立即加入衣橱，不打开编辑页".appLocalized
-    case .openEditor: return "打开衣橱编辑页，确认后再保存".appLocalized
-    }
-  }
-}
+// 2026-09-24：旧馆（馆藏档案/我的品牌）与仲夏物语模块整体移除，
+// 原先由 `TimeHallItemDTO` / `TimeHallCommerceItemDTO` / 仲夏 DTO 走
+// DraftBuilder 的重载与 `TimeHallWardrobeInsertMode`/`InsertButtons` 随之删除；
+// 本文件只剩「草稿 → 落库」的共用管线，供店家上新复用。
 
 // MARK: - 形态 A：一键入库
 
@@ -93,7 +63,7 @@ enum TimeHallWardrobeQuickInserter {
       isResaleTransfer: draft.isResaleTransfer ?? false
     )
 
-    // 尺码表 / 价格表沿用草稿里的图片路径（TimeHall 侧的淘宝式商品会填这两项）。
+    // 尺码表 / 价格表沿用草稿里的图片路径（商品档案会填这两项）。
     let sizeChart = draft.sizeChartImagePath?.trimmingCharacters(in: .whitespacesAndNewlines)
     let priceChart = draft.priceChartImagePath?.trimmingCharacters(in: .whitespacesAndNewlines)
     clothing.sizeChartImagePath = (sizeChart?.isEmpty == true) ? nil : sizeChart
@@ -105,40 +75,10 @@ enum TimeHallWardrobeQuickInserter {
     } catch {
       // 保存失败要回滚插入，避免留下一个只有内存态的幽灵条目。
       modelContext.delete(clothing)
-      AppLogger.error("TimeHall 一键入库失败：\(error.localizedDescription)")
+      AppLogger.error("一键入库失败：\(error.localizedDescription)")
       throw TimeHallWardrobeInsertError.saveFailed(error.localizedDescription)
     }
     return clothing
-  }
-
-  /// 由馆藏条目（`TimeHallItemDTO`）一键入库。
-  @discardableResult
-  static func insert(
-    item: TimeHallItemDTO,
-    store: TimeHallCatalogStore,
-    modelContext: ModelContext
-  ) throws -> Clothing {
-    let draft = TimeHallWardrobeDraftBuilder.makeDraft(
-      for: item,
-      store: store,
-      modelContext: modelContext
-    )
-    return try insert(draft: draft, modelContext: modelContext)
-  }
-
-  /// 由商品条目（`TimeHallCommerceItemDTO`）一键入库。
-  @discardableResult
-  static func insert(
-    item: TimeHallCommerceItemDTO,
-    store: TimeHallCatalogStore,
-    modelContext: ModelContext
-  ) throws -> Clothing {
-    let draft = TimeHallWardrobeDraftBuilder.makeDraft(
-      for: item,
-      store: store,
-      modelContext: modelContext
-    )
-    return try insert(draft: draft, modelContext: modelContext)
   }
 
   /// 与 `ClothingEditView.getOrCreateBrand(name:)` 同规则：先查后建，查失败也退化为新建。

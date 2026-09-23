@@ -134,11 +134,6 @@ struct SystemSettingsView: View {
             
             // MARK: - 存储与性能
             AdaptiveSection(header: "存储与性能") {
-                NavigationLink(destination: TimeHallCacheSettingsView()) {
-                    Label("时光馆下载缓存", systemImage: "square.stack.3d.up")
-                }
-                .adaptiveRow()
-                
                 Toggle(isOn: $useAggressiveMemoryOptimization) {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("积极内存优化")
@@ -153,9 +148,10 @@ struct SystemSettingsView: View {
 
             // MARK: - 创作者
             //
-            // 仲夏物语的「上传上新」入口原本只对 CloudKit 白名单里的 iCloud 账户可见，
-            // 判定依赖 `userRecordID()`——模拟器/未登录 iCloud 时取不到，入口永远不出现。
-            // 这个开关把「界面显示入口」独立出来，让内容维护者能在任意设备上补齐缺项。
+            // 运营/创作者写入口（店家商品库运营中心等）原本只对 CloudKit 白名单里的
+            // iCloud 账户可见，判定依赖 `userRecordID()`——模拟器/未登录 iCloud 时取不到，
+            // 入口永远不出现。这个开关把「界面显示入口」独立出来，
+            // 让内容维护者能在任意设备上补齐缺项。
             AdaptiveSection(header: "创作者") {
                 Toggle(isOn: Binding(
                     get: { creatorMode.isEnabled },
@@ -164,7 +160,7 @@ struct SystemSettingsView: View {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("创作者模式")
                             .font(.body)
-                        Text("开启后可使用仲夏物语的创作者能力：上架管理（上新工作台）、修改价格、更换商品图、上传上新。\n\n2026-09-18 起这些能力统一按角色门控：普通用户看不到入口，也调不动对应接口。\n\n注意：若本机 iCloud 账户已明确判定为「不在运营白名单里」，开关会被锁定——白名单才是硬闸门，自己开不了。开关只在「取不到 iCloud 身份」时（模拟器、未登录 iCloud）用来放行。\n\n调试：在 Xcode 控制台搜索 CreatorGate 可看到本机的 iCloud 用户标识与判定结果。")
+                        Text("开启后可使用创作者能力：店家商品库运营中心（补录上新、草稿流转、上下架、改价）。\n\n这些能力统一按角色门控：普通用户看不到入口，也调不动对应接口。\n\n注意：若本机 iCloud 账户已明确判定为「不在运营白名单里」，开关会被锁定——白名单才是硬闸门，自己开不了。开关只在「取不到 iCloud 身份」时（模拟器、未登录 iCloud）用来放行。\n\n调试：在 Xcode 控制台搜索 CreatorGate 可看到本机的 iCloud 用户标识与判定结果。")
                             .font(.caption2)
                             .foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
