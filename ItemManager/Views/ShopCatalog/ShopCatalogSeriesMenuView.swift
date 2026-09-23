@@ -260,7 +260,12 @@ struct ShopCatalogSeriesMenuView: View {
             let colorCount = group.products.count
             HStack(alignment: .top, spacing: 12) {
                 Button {
-                    viewerProduct = p
+                    // 黑屏根因修复（2026-09-24）：无图商品的 references 为空数组，
+                    // 查看器会渲染成纯黑 +「1 / 0」——无图时不再打开大图预览
+                    //（缩略图本身已是占位图，无图可放大）
+                    if !viewerReferences(for: p).isEmpty {
+                        viewerProduct = p
+                    }
                 } label: {
                     ShopCatalogAssetImage(reference: imageReference(for: p))
                         .aspectRatio(3 / 4, contentMode: .fill)

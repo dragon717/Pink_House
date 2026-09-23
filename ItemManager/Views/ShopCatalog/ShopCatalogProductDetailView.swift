@@ -433,14 +433,14 @@ struct ShopCatalogProductView: View {
         }
     }
 
-    private func structuredTable(columns: [String], rows: [CatalogSizeRow], cornerLabel: String) -> some View {
+    private func structuredTable(columns: [String], rows: [CatalogSizeRow], cornerLabel: String, labelWidth: CGFloat = 64) -> some View {
         // 渲染前统一规范化（CatalogManualChartText.normalized）：旧数据里已存入的
         // 重复行标签列（如首列「尺码」）在此剔除，值尾冒号清洗——保证列与数据对齐
         let normalized = CatalogManualChartText.normalized(columns: columns, rows: rows)
         return VStack(spacing: 0) {
             HStack(spacing: 0) {
                 Text(cornerLabel.appLocalized)
-                    .frame(width: 64, alignment: .leading)
+                    .frame(width: labelWidth, alignment: .leading)
                 ForEach(normalized.columns, id: \.self) { col in
                     Text(col)
                         .frame(maxWidth: .infinity)
@@ -454,7 +454,7 @@ struct ShopCatalogProductView: View {
                 Divider().background(themeManager.tertiaryTextColor.opacity(0.3))
                 HStack(spacing: 0) {
                     Text(rowEntry.label)
-                        .frame(width: 64, alignment: .leading)
+                        .frame(width: labelWidth, alignment: .leading)
                     ForEach(Array(normalized.columns.enumerated()), id: \.offset) { index, _ in
                         Text(rowEntry.values.indices.contains(index) ? (rowEntry.values[index] ?? "—") : "—")
                             .frame(maxWidth: .infinity)
@@ -527,7 +527,11 @@ struct ShopCatalogProductView: View {
                     // 展示内容（`plan`）仍与尺码表卡同源，这里不重复判定。
                     VStack(alignment: .leading, spacing: 12) {
                         if plan.showsTable {
-                            structuredTable(columns: chart.columns, rows: chart.rows, cornerLabel: "项目")
+                            // 首列 96pt（2026-09-24 需求）：表头「裙装名称」4 字 + 常见
+                            // 款式名（如「托胸贴布绣 JSK」）单行放下，不折行不挤压相邻列；
+                            // 尺码表卡保持默认 64pt 不受影响
+                            structuredTable(columns: chart.columns, rows: chart.rows,
+                                            cornerLabel: "裙装名称", labelWidth: 96)
                             if let unit = chart.unit {
                                 Text("单位：\(unit)".appLocalized)
                                     .font(.caption2)
@@ -1181,24 +1185,38 @@ struct ShopCatalogImageViewer: View {
     var body: some View {
         ZStack {
             Color.black.ignoresSafeArea()
-            TabView(selection: $page) {
-                ForEach(Array(references.enumerated()), id: \.offset) { index, ref in
-                    ZoomableImage(reference: ref)
-                        .tag(index)
-                        .onTapGesture {
-                            if isSelecting {
-                                toggle(index)
-                            }
-                        }
-                        .overlay(alignment: .topTrailing) {
-                            if isSelecting {
-                                selectBadge(index)
-                                    .padding(20)
-                            }
-                        }
+            if references.isEmpty {
+                // 空引用兜底（2026-09-24 黑屏根因修复）：调用方传空数组时
+                // TabView 零页面 → 纯黑屏 +「1 / 0」计数（用户看到的正是这个）。
+                // 这里给明确提示，保证任何调用方都不会再渲染出无内容的黑屏。
+                VStack(spacing: 10) {
+                    Image(systemName: "photo.on.rectangle")
+                        .font(.system(size: 44))
+                        .foregroundStyle(.white.opacity(0.55))
+                    Text("暂无可查看的图片".appLocalized)
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.75))
                 }
+            } else {
+                TabView(selection: $page) {
+                    ForEach(Array(references.enumerated()), id: \.offset) { index, ref in
+                        ZoomableImage(reference: ref)
+                            .tag(index)
+                            .onTapGesture {
+                                if isSelecting {
+                                    toggle(index)
+                                }
+                            }
+                            .overlay(alignment: .topTrailing) {
+                                if isSelecting {
+                                    selectBadge(index)
+                                        .padding(20)
+                                }
+                            }
+                    }
+                }
+                .tabViewStyle(.page(indexDisplayMode: .never))
             }
-            .tabViewStyle(.page(indexDisplayMode: .never))
 
             VStack {
                 HStack {
@@ -1212,9 +1230,11 @@ struct ShopCatalogImageViewer: View {
                     }
                     .accessibilityLabel("关闭大图")
                     Spacer()
-                    Text("\(page + 1) / \(references.count)")
-                        .font(.system(size: 13, weight: .medium).monospacedDigit())
-                        .foregroundStyle(.white.opacity(0.85))
+                    if !references.isEmpty {
+                        Text("\(page + 1) / \(references.count)")
+                            .font(.system(size: 13, weight: .medium).monospacedDigit())
+                            .foregroundStyle(.white.opacity(0.85))
+                    }
                     Spacer()
                     Button {
                         // 进入多选时默认勾选当前页
