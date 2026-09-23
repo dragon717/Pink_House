@@ -69,6 +69,7 @@ struct ClothingEditDraft: Codable {
     let sizeChartImagePath: String?  // 尺码表图片路径
     let priceChartImagePath: String? // 价格表图片路径
     let selectedTags: [TagData]      // 选中的标签
+    let isResaleTransfer: Bool?      // v1.16+ 转单（闲鱼收单等），衣橱卡片「转单」状态标签；旧草稿按 false
     let timestamp: Date
 
     init(id: UUID = UUID(),
@@ -107,7 +108,8 @@ struct ClothingEditDraft: Codable {
          accessoryList: [AccessoryItemData],
          sizeChartImagePath: String? = nil,
          priceChartImagePath: String? = nil,
-         selectedTags: [TagData] = []) {
+         selectedTags: [TagData] = [],
+         isResaleTransfer: Bool? = nil) {
         self.id = id
         self.name = name
         self.brandName = brandName
@@ -145,6 +147,7 @@ struct ClothingEditDraft: Codable {
         self.sizeChartImagePath = sizeChartImagePath
         self.priceChartImagePath = priceChartImagePath
         self.selectedTags = selectedTags
+        self.isResaleTransfer = isResaleTransfer
         self.timestamp = Date()
     }
 
@@ -595,6 +598,7 @@ final class ClothingEditModel {
     var depositDate: Date = Date()
     var isDepositPlan: Bool = false
     var reservationKind: ClothingReservationKind = .owned
+    var isResaleTransfer: Bool = false
     var finalPaymentDate: Date = Date()
     var finalPaymentEndDate: Date = Date()
     var note: String = ""
@@ -1392,6 +1396,11 @@ struct ClothingEditView: View {
         }
     }
 
+    private var isResaleTransfer: Bool {
+        get { editModel.isResaleTransfer }
+        nonmutating set { editModel.isResaleTransfer = newValue }
+    }
+
     private var finalPaymentDate: Date {
         get { editModel.finalPaymentDate }
         nonmutating set { editModel.finalPaymentDate = newValue }
@@ -1551,6 +1560,7 @@ struct ClothingEditView: View {
             purchaseDate: modelBinding(\.purchaseDate),
             depositDate: modelBinding(\.depositDate),
             reservationKind: modelBinding(\.reservationKind),
+            isResaleTransfer: modelBinding(\.isResaleTransfer),
             finalPaymentDate: modelBinding(\.finalPaymentDate),
             finalPaymentEndDate: modelBinding(\.finalPaymentEndDate)
         )
@@ -2066,6 +2076,7 @@ struct ClothingEditView: View {
         purchaseDate = c.purchaseDate
         depositDate = c.depositDate ?? Date()
         reservationKind = c.reservationKind
+        isResaleTransfer = c.isResaleTransfer
         finalPaymentDate = c.finalPaymentDate ?? Date()
         finalPaymentEndDate = c.finalPaymentEndDate ?? ClothingEditModel.defaultFinalPaymentEndDate(from: finalPaymentDate)
         note = c.note
@@ -2136,7 +2147,8 @@ struct ClothingEditView: View {
             accessoryList: accessoryList,
             sizeChartImagePath: sizeChartImagePath,
             priceChartImagePath: priceChartImagePath,
-            selectedTags: tagDataList
+            selectedTags: tagDataList,
+            isResaleTransfer: isResaleTransfer
         )
     }
 
@@ -2225,6 +2237,7 @@ struct ClothingEditView: View {
         accessoryList = draft.accessoryList
         sizeChartImagePath = draft.sizeChartImagePath
         priceChartImagePath = draft.priceChartImagePath
+        isResaleTransfer = draft.isResaleTransfer ?? false
         draftID = draft.id
 
         // 恢复标签：从TagData数组中恢复Tag对象
@@ -2864,6 +2877,7 @@ struct ClothingEditView: View {
             }
             c.updatedAt = now
             c.lastModified = now
+            c.isResaleTransfer = isResaleTransfer
 
             // 保存表图字段
             let newSizeChartPath = sizeChartImagePath?.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -2913,7 +2927,8 @@ struct ClothingEditView: View {
                 finalPaymentEndDate: finalPaymentEndDateValue,
                 note: note,
                 stock: sanitizedStock(stock),
-                status: finalReservationKind == .sold ? .offShelf : .onShelf
+                status: finalReservationKind == .sold ? .offShelf : .onShelf,
+                isResaleTransfer: isResaleTransfer
             )
 
             // 保存表图字段

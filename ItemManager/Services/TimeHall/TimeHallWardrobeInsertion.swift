@@ -89,7 +89,8 @@ enum TimeHallWardrobeQuickInserter {
       finalPaymentEndDate: draft.finalPaymentEndDate,
       note: draft.note,
       stock: draft.stock,
-      status: .onShelf
+      status: .onShelf,
+      isResaleTransfer: draft.isResaleTransfer ?? false
     )
 
     // 尺码表 / 价格表沿用草稿里的图片路径（TimeHall 侧的淘宝式商品会填这两项）。

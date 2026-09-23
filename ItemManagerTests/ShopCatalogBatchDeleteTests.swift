@@ -41,7 +41,7 @@ final class ShopCatalogBatchDeleteTests: XCTestCase {
             draft.status = status
             drafts.append(draft)
         }
-        _ = draftStore.createBatch(session, drafts: drafts)
+        _ = try draftStore.createBatch(session, drafts: drafts)
         return session
     }
 

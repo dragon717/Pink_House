@@ -82,9 +82,9 @@ final class ShopCatalogStore: ObservableObject {
     }
 
     /// 合并规则（重构方案 §5.3）：
-    ///   · shops/series/products/variants/sizeCharts/assets：覆盖层**同 id 实体整体替换**
-    ///     基底（后写胜出）——支撑运营「编辑已发布实体」与「归档」（写 archivedAt 后
-    ///     同 id 替换即可生效）；新 id 实体追加。
+    ///   · shops/series/products/variants/sizeCharts/assets/styleProfiles：覆盖层**同 id
+    ///     实体整体替换**基底（后写胜出）——支撑运营「编辑已发布实体」与「归档」
+    ///     （写 archivedAt 后同 id 替换即可生效）；新 id 实体追加。
     ///   · saleEvents：**永远追加**，不做替换（硬约束：销售历史不可覆盖）。
     private func rebuildMergedCatalog() {
         guard let base = baseCatalog else {
@@ -111,6 +111,8 @@ final class ShopCatalogStore: ObservableObject {
         replaceOrAppend(overlay.variants, into: &merged.variants)
         replaceOrAppend(overlay.sizeCharts, into: &merged.sizeCharts)
         replaceOrAppend(overlay.assets, into: &merged.assets)
+        // 款式公共档案（SPU 面料 / 款式描述）：同款式键整体替换，后写胜出
+        replaceOrAppend(overlay.styleProfiles, into: &merged.styleProfiles)
         merged.saleEvents.append(contentsOf: overlay.saleEvents)
         catalog = merged
     }
@@ -275,14 +277,90 @@ final class ShopCatalogStore: ObservableObject {
         return variants(forProduct: productID).compactMap(\.color).filter { seen.insert($0).inserted }
     }
 
+    /// **同款颜色集合**（详情页「配色」行的唯一数据源，2026-09-23 系统性修复）。
+    ///
+    /// 与标题的「· N 色」**同源**：两者都由 `ShopCatalogDesignPalette` 的同款商品集合推导。
+    /// 旧口径读的是「本商品自己的规格色」，在 SPU/SKU 结构下每个颜色是独立商品 →
+    /// 本商品只有自己那一色，纯名称命名（没建规格）时一条都没有 →
+    /// 「配色」行整行消失，而标题仍写着「· 3 色」。
+    ///
+    /// ⚠️ 加购弹窗里的「规格色选择」（挑本商品要买哪个色号）仍然用
+    /// `colors(forProduct:)` —— 那个是**本商品规格**的选择器，不是「这款有哪几色」，
+    /// 两者语义不同，不要合并。
+    func designColors(forProduct productID: String) -> [String] {
+        guard let catalog,
+              let product = catalog.products.first(where: { $0.id == productID }) else {
+            // 商品不在目录（脏引用）：退回本商品规格色，至少不空手
+            return colors(forProduct: productID)
+        }
+        return ShopCatalogDesignPalette.colors(
+            of: product,
+            among: catalog.products,
+            explicitColors: { self.colors(forProduct: $0.id) })
+    }
+
     /// 尺码去重（保持出现顺序）
     func sizes(forProduct productID: String) -> [String] {
         var seen = Set<String>()
         return variants(forProduct: productID).compactMap(\.size).filter { seen.insert($0).inserted }
     }
 
+    /// 尺码表（2026-09-23 **款式共享**）：表属于款式，不属于颜色 ——
+    /// 只要同款任意一个颜色填过，全款都能拿到同一张表，无需逐个颜色重复填写。
+    /// 解析口径唯一收口在 `ShopCatalogSizeChartSharing.canonicalChart`，
+    /// 调用方不要再自己 `.first { productID == ... }`（那就又变成「只看自己」了）。
     func sizeChart(forProduct productID: String) -> CatalogSizeChart? {
-        catalog?.sizeCharts.first { $0.productID == productID }
+        guard let catalog else { return nil }
+        guard let product = catalog.products.first(where: { $0.id == productID }) else {
+            // 商品已删 / 脏引用：退回该行自身的直查，至少不误共享到别的款
+            return catalog.sizeCharts.last { $0.productID == productID }
+        }
+        return ShopCatalogSizeChartSharing.canonicalChart(for: product,
+                                                          among: catalog.products,
+                                                          charts: catalog.sizeCharts)
+    }
+
+    /// 前台尺码列（详情页「尺码」行、点菜页尺码 chips、预约尺码选择共用同一口径）：
+    /// 款式共享尺码表的尺码维度 → 本商品规格尺码 → 同款其它颜色的规格尺码。
+    /// 尺码维度的朝向消歧收在 `ShopCatalogSizeChartSharing.sizeLabels`。
+    func sizeRun(forProduct productID: String) -> [String] {
+        guard let catalog, let product = catalog.products.first(where: { $0.id == productID }) else {
+            return sizes(forProduct: productID)
+        }
+        return ShopCatalogSizeChartSharing.sizeRun(
+            for: product, among: catalog.products, charts: catalog.sizeCharts,
+            sizesByProduct: { ShopCatalogSizeChartSharing.variantSizesByProduct(catalog) })
+    }
+
+    /// 款式公共档案（SPU 面料 / 款式描述，2026-09-23 录入端重构）。
+    /// 尺码表不在这里 —— 它是独立的款式级实体，见 `sizeChart(forProduct:)`。
+    func styleProfile(forProduct productID: String) -> CatalogStyleProfile? {
+        guard let catalog, let product = catalog.products.first(where: { $0.id == productID }) else {
+            return nil
+        }
+        return ShopCatalogStyleProfileSharing.profile(for: product,
+                                                      among: catalog.products,
+                                                      profiles: catalog.styleProfiles)
+    }
+
+    /// 款式面料（**款式级公共属性**：同款各颜色读到同一份，仅需录入一次）
+    func fabric(forProduct productID: String) -> String? {
+        guard let catalog, let product = catalog.products.first(where: { $0.id == productID }) else {
+            return nil
+        }
+        return ShopCatalogStyleProfileSharing.fabric(for: product,
+                                                     among: catalog.products,
+                                                     profiles: catalog.styleProfiles)
+    }
+
+    /// 款式描述（**款式级公共属性**）：档案优先，回退商品自身 description（历史写法）
+    func styleDescription(forProduct productID: String) -> String? {
+        guard let catalog, let product = catalog.products.first(where: { $0.id == productID }) else {
+            return nil
+        }
+        return ShopCatalogStyleProfileSharing.styleDescription(for: product,
+                                                              among: catalog.products,
+                                                              profiles: catalog.styleProfiles)
     }
 
     /// 价格档案 = append-only 历史推导值 + 价格修正覆盖值（修正优先）。

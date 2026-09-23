@@ -200,23 +200,28 @@ struct ShopCatalogSeriesMenuView: View {
         store.priceArchive(forProduct: product.id).reservation?.deposit ?? 0
     }
 
-    /// 加购记录的颜色：合并卡片走颜色词标签；未合并单品沿用规格选择
+    /// 加购记录的颜色：合并卡片走颜色词标签；未合并单品沿用规格选择。
+    /// 颜色取值统一口径 —— 这个值会写进心愿/衣橱记录，必须是真颜色，
+    /// 不能拿「整名兜底」充数。
     private func selectionColor(for product: CatalogProduct) -> String? {
         let group = cardGroups(in: products).first { $0.products.contains { $0.id == product.id } }
         if let group, group.products.count > 1 {
-            return ShopCatalogSameDesignGrouper.colorLabel(for: product.name)
+            return ShopCatalogColorPresentation.label(
+                explicitColors: store.colors(forProduct: product.id),
+                name: product.name)
         }
         return selectedColor[product.id] ?? store.colors(forProduct: product.id).first
     }
 
     // MARK: 尺码选择（V1.4：选择区补充尺码维度）
 
-    /// 可选尺码：尺码表行标签优先（S / M …），无尺码表时回退规格里的尺码
+    /// 可选尺码：**款式级尺码列**（2026-09-23 款式共享）——
+    /// 同款共享尺码表的尺码维度 → 本商品规格尺码 → 同款其它颜色的规格尺码。
+    /// 唯一口径在 `ShopCatalogStore.sizeRun(forProduct:)`；
+    /// 尺码维度的朝向消歧（种子 columns = S/M/L vs 手填 rows.label = S/M/L）
+    /// 收在 `ShopCatalogSizeChartSharing.sizeLabels`，前台不再自己取行标签。
     private func sizeOptions(for product: CatalogProduct) -> [String] {
-        let fromChart = store.sizeChart(forProduct: product.id)?
-            .rows.map(\.label).filter { !$0.isEmpty } ?? []
-        if !fromChart.isEmpty { return fromChart }
-        return store.sizes(forProduct: product.id)
+        store.sizeRun(forProduct: product.id)
     }
 
     /// 实际生效的尺码：用户已选优先，否则取第一个可选尺码
@@ -270,14 +275,18 @@ struct ShopCatalogSeriesMenuView: View {
                         ShopCatalogProductView(productID: p.id)
                     } label: {
                         HStack(spacing: 4) {
-                            Text(colorCount > 1 ? group.baseName : p.name)
-                                .font(.system(size: 14, weight: .medium))
-                                .foregroundStyle(themeManager.primaryTextColor)
-                                .multilineTextAlignment(.leading)
-                            if colorCount > 1 {
-                                Text("· \(colorCount) 色")
-                                    .font(.system(size: 11))
-                                    .foregroundStyle(themeManager.tertiaryTextColor)
+                            // 标题 = 款式名（与商品详情页同一句话；内外一致口径 2026-09-23）。
+                            // 之前「多色走款名 / 单色走整名」正是内外不一致的根源。
+                            if let title = ShopCatalogTitleResolver.title(products: group.products) {
+                                ShopCatalogProductTitleLabel(
+                                    title: title,
+                                    textColor: themeManager.primaryTextColor,
+                                    annotationColor: themeManager.tertiaryTextColor,
+                                    lineLimit: 2)
+                            } else {
+                                Text(p.name)
+                                    .font(.system(size: 14, weight: .medium))
+                                    .foregroundStyle(themeManager.primaryTextColor)
                             }
                             Image(systemName: "chevron.right")
                                 .font(.system(size: 10, weight: .semibold))
@@ -290,7 +299,7 @@ struct ShopCatalogSeriesMenuView: View {
                     if colorCount > 1 {
                         colorChips(group, active: p)
                     } else {
-                        specChips(p)
+                        colorSpec(p)
                     }
                     sizeChips(p)
                 }
@@ -410,13 +419,39 @@ struct ShopCatalogSeriesMenuView: View {
         .buttonStyle(.plain)
     }
 
+    /// 颜色呈现（颜色「单独呈现」的唯一入口，2026-09-23）：
+    ///   · 多个显式规格色 → 可切换 chips（图文绑定，选中换本行照片）；
+    ///   · 单一颜色（含只写在商品名里的颜色词）→ **只呈现**该颜色。
+    ///     标题已经不带颜色了，这里必须补上，否则用户在这个商品上再也看不到颜色。
+    @ViewBuilder
+    private func colorSpec(_ p: CatalogProduct) -> some View {
+        let colors = store.colors(forProduct: p.id)
+        if colors.count > 1 {
+            specChips(p)
+        } else if let label = ShopCatalogColorPresentation.label(explicitColors: colors,
+                                                                name: p.name) {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 6) {
+                    Text("配色".appLocalized)
+                        .font(.system(size: 10))
+                        .foregroundStyle(themeManager.tertiaryTextColor)
+                    ShopCatalogColorChip(label: label,
+                                         unselectedColor: themeManager.secondaryTextColor)
+                }
+            }
+        }
+    }
+
     /// 合并卡片的颜色 chips：切换激活单品（同款不同色）
     private func colorChips(_ group: CardGroup, active p: CatalogProduct) -> some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 6) {
                 ForEach(group.products) { product in
                     let isActive = product.id == p.id
-                    let label = ShopCatalogSameDesignGrouper.colorLabel(for: product.name)
+                    // 颜色取值统一口径；真的没有颜色线索时才退回整名（chips 不能空着）
+                    let label = ShopCatalogColorPresentation.label(
+                        explicitColors: store.colors(forProduct: product.id),
+                        name: product.name) ?? product.name
                     Button {
                         activeProductByCard[group.id] = product.id
                         // 命中同名规格色时同步规格图文绑定（切换行内照片）
@@ -424,12 +459,8 @@ struct ShopCatalogSeriesMenuView: View {
                             selectedColor[product.id] = label
                         }
                     } label: {
-                        Text(label.appLocalized)
-                            .font(.system(size: 11, weight: isActive ? .semibold : .regular))
-                            .foregroundStyle(isActive ? .white : themeManager.secondaryTextColor)
-                            .padding(.horizontal, 9)
-                            .padding(.vertical, 4)
-                            .background(Capsule().fill(isActive ? Color.pink : Color.secondary.opacity(0.12)))
+                        ShopCatalogColorChip(label: label, isSelected: isActive,
+                                             unselectedColor: themeManager.secondaryTextColor)
                     }
                     .buttonStyle(.plain)
                 }
@@ -437,7 +468,7 @@ struct ShopCatalogSeriesMenuView: View {
         }
     }
 
-    /// 规格选择（图文绑定，未合并单品）：配色 chips，选中即切换本行照片为该规格绑定图
+    /// 规格选择（图文绑定，未合并单品）：多个配色时选中即切换本行照片为该规格绑定图
     @ViewBuilder
     private func specChips(_ p: CatalogProduct) -> some View {
         let colors = store.colors(forProduct: p.id)
@@ -449,12 +480,8 @@ struct ShopCatalogSeriesMenuView: View {
                         Button {
                             selectedColor[p.id] = color
                         } label: {
-                            Text(color.appLocalized)
-                                .font(.system(size: 11, weight: isSelected ? .semibold : .regular))
-                                .foregroundStyle(isSelected ? .white : themeManager.secondaryTextColor)
-                                .padding(.horizontal, 9)
-                                .padding(.vertical, 4)
-                                .background(Capsule().fill(isSelected ? Color.pink : Color.secondary.opacity(0.12)))
+                            ShopCatalogColorChip(label: color, isSelected: isSelected,
+                                                 unselectedColor: themeManager.secondaryTextColor)
                         }
                         .buttonStyle(.plain)
                     }

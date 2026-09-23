@@ -31,6 +31,8 @@ struct ShopCatalogProductDeepEditView: View {
     @State private var chartRowsText = ""    // 每行「label:值,值,…」
     @State private var chartUnit = ""
     @State private var chartImageText = ""   // 尺码表原图
+    /// 当前回显的尺码表是否来自同款其它颜色（款式共享：同款一套表，无需重复填写）
+    @State private var chartInheritedFromAnotherColor = false
 
     @State private var loaded = false
 
@@ -85,6 +87,10 @@ struct ShopCatalogProductDeepEditView: View {
             Text("配色尺码：每行「颜色,尺码[,图片]」，一侧可留空；第三段填图片行同一文件名/URL 即完成图文绑定")
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)
+            // 2026-09-23 需求 M：整段文本粘贴录入，别让用户在这两个框里一点点手敲
+            ShopCatalogChartPasteButton(kind: .sizeChart,
+                                        columnsText: $chartColumnsText,
+                                        rowsText: $chartRowsText)
             TextField("尺码表列名（逗号分隔，如：尺码,胸围,衣长）", text: $chartColumnsText)
                 .font(.system(size: 13))
             TextEditor(text: $chartRowsText)
@@ -94,8 +100,19 @@ struct ShopCatalogProductDeepEditView: View {
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)
             TextField("单位（cm）", text: $chartUnit)
-            TextField("尺码表/价格表原图（文件名/URL）", text: $chartImageText)
-            ShopCatalogImagePickerButton(mode: .replace, text: $chartImageText, label: "添加尺码表/价格表原图")
+            TextField("尺码表原图（文件名/URL）", text: $chartImageText)
+            ShopCatalogImagePickerButton(mode: .replace, text: $chartImageText, label: "添加尺码表原图")
+            Text("此处只登记**本商品**的尺码表原图；预约价格表归属系列（一张表全系列共用），上传入口在「实体管理 → 系列 → 编辑」，不要填在这里，否则尺码表卡会显示成价格表。")
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+            Text("尺码表按**款式共享**：同款（同系列 + 同品类 + 同款式名）任意一个颜色填写，其余颜色自动共用同一套，无需重复填写；这里留空保存 = **清空整款**的尺码表。")
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+            if chartInheritedFromAnotherColor {
+                Text("上方尺码表来自同款其它颜色（同款共享一套）。直接保存不会重复写入，改动则会同步到整款。")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.pink)
+            }
         } header: {
             Text("图片 / 配色尺码 / 尺码表")
         }
@@ -125,6 +142,10 @@ struct ShopCatalogProductDeepEditView: View {
             }.joined(separator: "\n")
             chartUnit = chart.unit ?? ""
             chartImageText = chart.sourceImage ?? ""
+            // 款式共享：表可能是同款其它颜色填的（此时这里照样回显，直接保存即可）
+            chartInheritedFromAnotherColor = chart.productID != product.id
+        } else {
+            chartInheritedFromAnotherColor = false
         }
     }
 

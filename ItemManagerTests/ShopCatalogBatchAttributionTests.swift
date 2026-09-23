@@ -36,8 +36,8 @@ final class ShopCatalogBatchAttributionTests: XCTestCase {
     /// 构造整批归属（既有店家 id + 新建系列名），应用到 batchID
     private func apply(_ batchID: String,
                        shopID: String? = nil, newShop: String = "整合测试店家",
-                       seriesID: String? = nil, newSeries: String = "整合测试系列") -> Int {
-        draftStore.applyBatchAttribution(
+                       seriesID: String? = nil, newSeries: String = "整合测试系列") throws -> Int {
+        try draftStore.applyBatchAttribution(
             batchID: batchID,
             shopID: shopID, newShopName: newShop, newShopAliases: "alias-a,alias-b",
             seriesID: seriesID, newSeriesName: newSeries, newSeriesYear: 2026, newSeriesSeason: "冬")
@@ -57,9 +57,9 @@ final class ShopCatalogBatchAttributionTests: XCTestCase {
     func testApplyBatchAttributionSyncsAllDraftsAndSession() throws {
         let session = CatalogBatchEntrySession()
         let drafts = (1...3).map { makeDraft(name: "整批单品-\($0)") }
-        draftStore.createBatch(session, drafts: drafts)
+        try draftStore.createBatch(session, drafts: drafts)
 
-        let count = apply(session.id)
+        let count = try apply(session.id)
         XCTAssertEqual(count, 3, "整批 3 条全部同步")
 
         for draft in draftStore.drafts where draft.batchID == session.id {
@@ -85,9 +85,9 @@ final class ShopCatalogBatchAttributionTests: XCTestCase {
         var published = makeDraft(name: "已发布单品")
         published.status = .published
         let pending = makeDraft(name: "待处理单品")
-        draftStore.createBatch(session, drafts: [published, pending])
+        try draftStore.createBatch(session, drafts: [published, pending])
 
-        let count = apply(session.id)
+        let count = try apply(session.id)
         XCTAssertEqual(count, 1, "已发布条目不回写")
 
         let back = try XCTUnwrap(draftStore.drafts.first { $0.id == published.id })
@@ -109,10 +109,10 @@ final class ShopCatalogBatchAttributionTests: XCTestCase {
         let session = CatalogBatchEntrySession()
         let names = ["聚合款-JSK", "聚合款-KC", "聚合款-包"]
         let drafts = names.map { makeDraft(name: $0) }
-        draftStore.createBatch(session, drafts: drafts)
+        try draftStore.createBatch(session, drafts: drafts)
 
         // 整批归属：同一店家 + 同一新建系列（复刻运营整合操作）
-        let count = apply(session.id, newShop: "聚合发布店家", newSeries: "聚合发布系列")
+        let count = try apply(session.id, newShop: "聚合发布店家", newSeries: "聚合发布系列")
         XCTAssertEqual(count, 3)
 
         // 逐条走完发布（互不耦合）

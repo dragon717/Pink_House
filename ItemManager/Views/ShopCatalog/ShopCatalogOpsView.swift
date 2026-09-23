@@ -11,6 +11,7 @@
 //
 
 import SwiftUI
+import PhotosUI
 
 struct ShopCatalogOpsView: View {
     @ObservedObject private var creatorAccess = CreatorAccess.shared
@@ -28,6 +29,12 @@ struct ShopCatalogOpsView: View {
     @State private var pendingDeleteBatchIDs: Set<String> = [] // 待二次确认的删除目标
     @State private var showsBatchDeleteConfirm = false      // 删除二次确认弹窗
     @State private var blockedBatchDeletions: [CatalogBatchDeleteBlock] = [] // 被拦截条目（附原因）
+
+    // 草稿箱删除 / 多选（2026-09-23）
+    @State private var isSelectingDrafts = false             // 草稿箱多选模式开关
+    @State private var selectedDraftIDs: Set<String> = []     // 多选已勾选
+    @State private var pendingDeleteDraftIDs: Set<String> = [] // 待二次确认的删除目标
+    @State private var showsDraftDeleteConfirm = false        // 删除二次确认弹窗
 
     var body: some View {
         Group {
@@ -90,6 +97,17 @@ struct ShopCatalogOpsView: View {
         } message: {
             Text(batchDeleteImpactText)
         }
+        // 草稿箱删除二次确认（单条 / 多选共用同一入口，同批次删除的口径）
+        .confirmationDialog(draftDeleteConfirmTitle,
+                            isPresented: $showsDraftDeleteConfirm,
+                            titleVisibility: .visible) {
+            Button("删除草稿", role: .destructive) {
+                performDraftDelete()
+            }
+            Button("取消", role: .cancel) {}
+        } message: {
+            Text(draftDeleteImpactText)
+        }
         // 拦截反馈：被拦截的批次整体保留并逐条说明原因；处理后可对相同选择直接重试
         .alert("部分批次无法删除", isPresented: Binding(
             get: { !blockedBatchDeletions.isEmpty },
@@ -107,8 +125,13 @@ struct ShopCatalogOpsView: View {
         let session = CatalogBatchEntrySession()
         var draft = CatalogProductDraft()
         draft.batchID = session.id
-        _ = draftStore.createBatch(session, drafts: [draft])
-        manualBatch = session
+        do {
+            _ = try draftStore.createBatch(session, drafts: [draft])
+            manualBatch = session
+        } catch {
+            // 保存失败可见、可重试（R01）：不静默成功，也不把用户带进一个没落盘的批次
+            actionError = error.localizedDescription
+        }
     }
 
     // MARK: 运营中心看板（§26）
@@ -367,6 +390,14 @@ struct ShopCatalogOpsView: View {
     }
 
     // MARK: 草稿箱（§30 人工补录 / §31 状态流转）
+    //
+    // 删除（2026-09-23；与批次列表同一套交互，保持一致）：
+    //   · 每条草稿行尾一个独立删除按钮（trash）
+    //   · Section 标题右侧「选择」进入多选，批量删除
+    //   · 删除前 confirmationDialog 二次确认，并说明影响范围（条数 + 状态构成）
+    //   · 删除后 drafts 为 @Published → 列表实时刷新；结果走 toast 胶囊
+    //   · 无硬拦截：草稿箱是运营自己的待处理记录，且批次删除的拦截文案本身就指引
+    //     「在草稿箱中删除这些草稿」——这里再拦一道会让那条指引变成死路
 
     private var draftSection: some View {
         Section {
@@ -376,7 +407,11 @@ struct ShopCatalogOpsView: View {
                     draftStore: draftStore,
                     store: store,
                     toast: $toast,
-                    actionError: $actionError
+                    actionError: $actionError,
+                    isSelecting: isSelectingDrafts,
+                    isSelected: selectedDraftIDs.contains(draft.id),
+                    onToggleSelection: { toggleDraftSelection(draft.id) },
+                    onRequestDelete: { beginDraftDelete([draft.id]) }
                 )
             }
             if draftStore.drafts.isEmpty {
@@ -385,9 +420,126 @@ struct ShopCatalogOpsView: View {
                     .foregroundStyle(.secondary)
             }
         } header: {
-            Text("草稿箱")
+            draftSectionHeader
         } footer: {
-            Text("发布 = 草稿 → 提交 → 审核通过后写入覆盖层并对用户可见（§31）；同名商品的现货记录会追加到既有商品（§29 去重 / 现货价格补录）。")
+            if isSelectingDrafts {
+                Text("已选 \(selectedDraftIDs.count) 条草稿。删除只移除草稿箱中的记录；已发布到覆盖层的商品数据与销售记录不受影响。")
+                    .font(.system(size: 11))
+            } else {
+                Text("发布 = 草稿 → 提交 → 审核通过后写入覆盖层并对用户可见（§31）；同名商品的现货记录会追加到既有商品（§29 去重 / 现货价格补录）。")
+            }
+        }
+    }
+
+    /// Section 标题右侧：多选入口 / 删除 / 取消（与批次列表同款，视觉集中在列表内）
+    private var draftSectionHeader: some View {
+        HStack(spacing: 12) {
+            Text("草稿箱")
+            Spacer()
+            if isSelectingDrafts {
+                Button {
+                    beginDraftDelete(selectedDraftIDs)
+                } label: {
+                    Text("删除(\(selectedDraftIDs.count))")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(selectedDraftIDs.isEmpty ? Color.secondary : Color.red)
+                }
+                .disabled(selectedDraftIDs.isEmpty)
+                Button("取消") { exitDraftSelection() }
+                    .font(.system(size: 12))
+            } else if !draftStore.drafts.isEmpty {
+                Button("选择") { isSelectingDrafts = true }
+                    .font(.system(size: 12))
+            }
+        }
+        .textCase(nil)
+    }
+
+    // MARK: 草稿删除（状态与回调）
+
+    private func toggleDraftSelection(_ id: String) {
+        if selectedDraftIDs.contains(id) {
+            selectedDraftIDs.remove(id)
+        } else {
+            selectedDraftIDs.insert(id)
+        }
+    }
+
+    private func exitDraftSelection() {
+        isSelectingDrafts = false
+        selectedDraftIDs = []
+    }
+
+    /// 删除入口（单条行内按钮 / 多选按钮共用）：先确认，再执行
+    private func beginDraftDelete(_ ids: Set<String>) {
+        guard !ids.isEmpty else { return }
+        pendingDeleteDraftIDs = ids
+        showsDraftDeleteConfirm = true
+    }
+
+    private var pendingDeleteDraftNames: [String] {
+        let ids = pendingDeleteDraftIDs
+        return draftStore.drafts.filter { ids.contains($0.id) }.map {
+            $0.name.isEmpty ? "（未命名草稿）" : $0.name
+        }
+    }
+
+    private var draftDeleteConfirmTitle: String {
+        let names = pendingDeleteDraftNames
+        if names.count == 1, let only = names.first { return "删除「\(only)」？" }
+        return "删除 \(names.count) 条草稿？"
+    }
+
+    /// 影响范围说明：与执行共用同一份判定（`previewDraftDeletion`），
+    /// 所以这里说的条数、状态构成就是实际会删掉的
+    private var draftDeleteImpactText: String {
+        let plan = draftStore.previewDraftDeletion(ids: pendingDeleteDraftIDs)
+        var lines: [String] = []
+        let names = pendingDeleteDraftNames
+        if names.count == 1, let only = names.first {
+            lines.append("将删除草稿「\(only)」。")
+        } else {
+            lines.append("将删除 \(plan.targetCount) 条草稿。")
+        }
+        // 按状态逐项列出（固定 allCases 顺序，避免字典乱序）
+        let breakdown = CatalogPublicationStatus.allCases.compactMap { status -> String? in
+            guard let count = plan.countsByStatus[status], count > 0 else { return nil }
+            return "\(status.displayName) \(count) 条"
+        }
+        if !breakdown.isEmpty {
+            lines.append("构成：" + breakdown.joined(separator: "、") + "。")
+        }
+        lines.append("影响范围：仅移除草稿箱中的记录；已发布到覆盖层的商品资料与销售记录不受影响，批次分组记录也不受影响。")
+        if plan.settledCount > 0 {
+            lines.append("其中 \(plan.settledCount) 条已发布 / 已归档 —— 删除只去掉这份发布回执，线上数据不变。")
+        }
+        if plan.inFlightCount > 0 {
+            lines.append("其中 \(plan.inFlightCount) 条仍在流转中，删除后将退出审核 / 发布流程。")
+        }
+        return lines.joined(separator: "\n")
+    }
+
+    /// 确认后执行：删除成功 → toast 结果提示 + 列表实时刷新（`drafts` 为 @Published）；
+    /// 持久化失败 → 什么都没变，走通用「操作失败」弹窗，可原样重试
+    private func performDraftDelete() {
+        let ids = pendingDeleteDraftIDs
+        pendingDeleteDraftIDs = []
+        do {
+            let plan = try draftStore.deleteDrafts(ids: ids)
+            guard plan.targetCount > 0 else {
+                // 选中项已经不在草稿箱（例如刚被别处删掉）：不谎报成功
+                toast = "所选草稿已不在草稿箱，无需删除"
+                selectedDraftIDs.subtract(ids)
+                if selectedDraftIDs.isEmpty { exitDraftSelection() }
+                return
+            }
+            toast = "已删除 \(plan.targetCount) 条草稿"
+            selectedDraftIDs.subtract(Set(plan.targetIDs))
+            if selectedDraftIDs.isEmpty || draftStore.drafts.isEmpty {
+                exitDraftSelection()
+            }
+        } catch {
+            actionError = error.localizedDescription
         }
     }
 
@@ -430,12 +582,26 @@ private struct ShopCatalogDraftEditorRow: View {
     @Binding var toast: String?
     @Binding var actionError: String?
 
+    /// 多选模式（草稿箱批量删除）：行首显示勾选框，整行点击 = 切换勾选，
+    /// 同时隐藏行内流转 / 删除按钮，避免勾选时误触「提交 / 发布」
+    var isSelecting: Bool = false
+    var isSelected: Bool = false
+    var onToggleSelection: (() -> Void)? = nil
+    /// 单条删除回调（仅非多选模式）。nil = 不显示删除按钮
+    var onRequestDelete: (() -> Void)? = nil
+
     @State private var showsEditor = false
     @State private var showsRejectPrompt = false
     @State private var rejectReasonText = ""
 
     var body: some View {
         HStack(spacing: 10) {
+            // 多选模式：行首勾选框（非多选时不占位，保持视觉克制）
+            if isSelecting {
+                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                    .font(.system(size: 18))
+                    .foregroundStyle(isSelected ? Color.pink : Color.secondary)
+            }
             VStack(alignment: .leading, spacing: 4) {
                 Text(draft.name.isEmpty ? "（未命名草稿）" : draft.name)
                     .font(.system(size: 14, weight: .medium))
@@ -454,20 +620,41 @@ private struct ShopCatalogDraftEditorRow: View {
                 }
             }
             Spacer()
-            if draft.status == .submitted {
-                // 单品粒度审核（§4.1）：通过发布 / 驳回退回草稿（保留原因）
-                Button("驳回", role: .destructive) {
-                    rejectReasonText = ""
-                    showsRejectPrompt = true
+            if !isSelecting {
+                if draft.status == .submitted {
+                    // 单品粒度审核（§4.1）：通过发布 / 驳回退回草稿（保留原因）
+                    Button("驳回", role: .destructive) {
+                        rejectReasonText = ""
+                        showsRejectPrompt = true
+                    }
+                    .font(.system(size: 13))
+                    .buttonStyle(.bordered)
+                    .tint(.red)
                 }
-                .font(.system(size: 13))
-                .buttonStyle(.bordered)
-                .tint(.red)
+                nextActionButton
+                // 单条删除按钮（需求：每条草稿一个独立删除按钮）。
+                // 多选模式下不显示，统一走 Section 头部的「删除(N)」
+                if let onRequestDelete {
+                    Button(role: .destructive) {
+                        onRequestDelete()
+                    } label: {
+                        Image(systemName: "trash")
+                            .font(.system(size: 15))
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.red)
+                    .accessibilityLabel(Text("删除草稿"))
+                }
             }
-            nextActionButton
         }
         .contentShape(Rectangle())
-        .onTapGesture { showsEditor = true }
+        .onTapGesture {
+            if isSelecting {
+                onToggleSelection?()
+            } else {
+                showsEditor = true
+            }
+        }
         .sheet(isPresented: $showsEditor) {
             ShopCatalogDraftDetailEditor(draft: draft, draftStore: draftStore, store: store)
         }
@@ -560,29 +747,15 @@ struct ShopCatalogDraftDetailEditor: View {
     init(draft: CatalogProductDraft, draftStore: ShopCatalogDraftStore, store: ShopCatalogStore) {
         _draftBox = Binding(
             get: { draftStore.drafts.first { $0.id == draft.id } ?? draft },
-            set: { draftStore.upsert($0) }
+            // Binding 的 set 无法抛错：失败落到 draftStore.lastPersistenceError，
+            // 由下方横幅显式提示（R01：保存失败可见、可重试，不静默成功）
+            set: { draftStore.upsertReportingError($0) }
         )
         self.draftStore = draftStore
         self.store = store
     }
 
     private let categories = ShopCatalogStore.canonicalCategoryOrder
-
-    /// 预约价输入绑定：0 显示为空（可空），输入即写回 price
-    private var reservationPriceBinding: Binding<Double?> {
-        Binding(
-            get: { draftBox.effectiveReservationPrice },
-            set: { draftBox.price = $0 ?? 0 }
-        )
-    }
-
-    /// 款式名输入绑定（V1.4）：空串 = 清除显式款式，发布时按名称自动派生
-    private var designNameBinding: Binding<String> {
-        Binding(
-            get: { draftBox.designName ?? "" },
-            set: { draftBox.designName = $0.trimmingCharacters(in: .whitespaces).isEmpty ? nil : $0 }
-        )
-    }
 
     /// 旧口径迁移：存量「现货草稿」（saleKind == .stock 且 price 承载现货价）
     /// 在新编辑器里打开时一次性搬到 stockPrice，price 让位给预约价 ——
@@ -596,76 +769,103 @@ struct ShopCatalogDraftDetailEditor: View {
         draftBox.saleKind = .reservation
     }
 
-    // MARK: 完整商品资料（G5：手动录入可完成全部业务；文本行式录入）
-    @State private var imagesText = ""       // 每行一个 Bundle 文件名或 URL
-    @State private var variantsText = ""     // 每行「颜色,尺码」（可留空一侧）
-    @State private var chartColumnsText = "" // 列名，逗号分隔
-    @State private var chartRowsText = ""    // 每行「label:值,值,…」
+    // MARK: 款式（SPU）层状态 —— 全色共用，只填一次
+
+    @State private var designNameText = ""
+    @State private var categoryText = "其他"
+    @State private var fabricText = ""
+    @State private var styleDescriptionText = ""
+    @State private var chartColumnsText = ""
+    @State private var chartRowsText = ""
     @State private var chartUnit = ""
-    @State private var chartImageText = ""   // 尺码表原图（Bundle 文件名/URL）
+    @State private var chartImageText = ""
+
+    // 价格组（同款同价：按款式录一次，整组落到每条颜色草稿）
+    @State private var reservationPrice: Double?
+    @State private var stockPrice: Double?
+    @State private var deposit: Double?
+    @State private var balance: Double?
+    @State private var currency: CatalogCurrency?
+
+    // MARK: 颜色（SKU）层状态 —— 每色一行，图片与颜色行强绑定
+
+    @State private var colors: [ShopCatalogDraftStyleForm.ColorRow] = []
+
+    @State private var loaded = false
+    @State private var toast: String?
+    @State private var errorText: String?
+
+    /// 款式名（唯一决议点）：显式填写优先，否则按源草稿商品名派生。
+    /// 名字预览与保存落库都读它，避免「看到的」与「存下的」分叉。
+    private var resolvedStyleName: String {
+        ShopCatalogDraftStyleForm.resolveStyleName(explicit: designNameText, source: draftBox)
+    }
+
+    /// 款式尺码表（列 + 行 + 单位 + 原图；共享解析口径：首列「尺码」剔除、尾冒号清洗）
+    private var composedChart: CatalogSizeChart? {
+        let parsed = CatalogManualChartText.normalized(
+            columns: CatalogManualChartText.parseColumns(chartColumnsText),
+            rows: CatalogManualChartText.parseRows(chartRowsText))
+        let image = chartImageText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !parsed.columns.isEmpty || !parsed.rows.isEmpty || !image.isEmpty else { return nil }
+        var chart = CatalogSizeChart(id: "sizechart-draft-\(draftBox.id.prefix(6))", productID: "")
+        chart.unit = chartUnit.trimmingCharacters(in: .whitespaces).isEmpty ? nil : chartUnit
+        chart.columns = parsed.columns
+        chart.rows = parsed.rows
+        chart.sourceImage = image.isEmpty ? nil : image
+        return chart
+    }
+
+    /// 尺码勾选候选 = 款式尺码表的尺码轴（每个颜色不再重复填表）
+    private var availableSizes: [String] {
+        ShopCatalogSizeChartSharing.sizeLabels(of: composedChart)
+    }
 
     var body: some View {
         NavigationStack {
             Form {
-                Section("商品") {
-                    TextField("商品名称", text: $draftBox.name)
-                    // V1.4「同款不同色」：款式名可空 = 按商品名剥离颜色词自动派生；
-                    // 同款不同色的补录填同一款式名，发布后列表自动归入同一款式
-                    TextField("款式（可空，默认按名称自动识别）", text: designNameBinding)
-                    Picker("分类", selection: $draftBox.category) {
+                // R01：保存失败必须可见。写入失败时内存与磁盘都没变，
+                // 用户原地再改一次即可重试，不能让用户以为已经存好了。
+                if let failure = draftStore.lastPersistenceError {
+                    Section {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("草稿未保存").font(.system(size: 13, weight: .semibold))
+                                .foregroundStyle(.red)
+                            Text(failure).font(.system(size: 12))
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+                // R01：草稿文件损坏时明确告知原文件已保留 + 备份位置，并给出恢复入口
+                if draftStore.isBlockedByCorruptFile {
+                    Section {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("草稿文件无法解析，已暂停写入").font(.system(size: 13, weight: .semibold))
+                                .foregroundStyle(.orange)
+                            Text(draftStore.lastLoadIssue ?? "")
+                                .font(.system(size: 12))
+                                .foregroundStyle(.secondary)
+                            Button("我已处理，重新加载") {
+                                draftStore.clearCorruptFileBlockAndReload()
+                            }
+                            .font(.system(size: 13))
+                        }
+                    }
+                }
+                Section {
+                    TextField("款式名（同款共用，如：一字领 OP）", text: $designNameText)
+                    Picker("分类", selection: $categoryText) {
                         ForEach(categories.filter { $0 != "其他" }, id: \.self) { Text($0).tag($0) }
                         Text("其他").tag("其他")
                     }
-                }
-                productInfoSection
-                Section {
-                    // 预约价与现货价并存且不互斥（2026-09-22）：
-                    // 可同时填写、各自生成销售记录；现货价可空置，后续补录修改。
-                    // 任一项填写都不会禁用 / 清空 / 覆盖另一项。
-                    HStack {
-                        Text("预约价")
-                        Spacer()
-                        TextField("可空", value: reservationPriceBinding, format: .number)
-                            .keyboardType(.decimalPad)
-                            .multilineTextAlignment(.trailing)
-                            .frame(width: 110)
-                    }
-                    if draftBox.effectiveReservationPrice != nil {
-                        HStack {
-                            Text("定金")
-                            Spacer()
-                            TextField("可空", value: $draftBox.deposit, format: .number)
-                                .keyboardType(.decimalPad)
-                                .multilineTextAlignment(.trailing)
-                                .frame(width: 110)
-                        }
-                        HStack {
-                            Text("尾款")
-                            Spacer()
-                            TextField("可空", value: $draftBox.balance, format: .number)
-                                .keyboardType(.decimalPad)
-                                .multilineTextAlignment(.trailing)
-                                .frame(width: 110)
-                        }
-                        if let issue = draftBox.depositBalanceIssue {
-                            Text(issue)
-                                .font(.system(size: 12))
-                                .foregroundStyle(.red)
-                        }
-                    }
-                    HStack {
-                        Text("现货价")
-                        Spacer()
-                        TextField("可空", value: $draftBox.stockPrice, format: .number)
-                            .keyboardType(.decimalPad)
-                            .multilineTextAlignment(.trailing)
-                            .frame(width: 110)
-                    }
                 } header: {
-                    Text("价格（预约与现货可并存）")
+                    Text("商品（款式）")
                 } footer: {
-                    Text("至少填写预约价或现货价之一；现货价可先空置，后续通过补录追加。")
+                    Text("商品名 = **颜色名 + 款式名**，由下方每个颜色行自动组合。款式名留空时按颜色行的商品名自动识别；多颜色录入必须填写。")
                 }
+                stylePublicInfoSection
+                priceSection
+                colorSection
                 Section("店家") {
                     Picker("关联店家", selection: $draftBox.shopID) {
                         Text("新建店家").tag(String?.none)
@@ -699,130 +899,458 @@ struct ShopCatalogDraftDetailEditor: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("完成") {
-                        applyProductInfo()
-                        dismiss()
-                    }
+                    Button("完成") { saveStyleForm() }
                 }
             }
             .onAppear {
+                guard !loaded else { return }
+                loaded = true
                 store.loadFromBundleIfNeeded()
                 migrateLegacySaleKindIfNeeded()
-                loadProductInfo()
+                loadStyleForm()
+            }
+            .overlay(alignment: .bottom) {
+                if let toast {
+                    Text(toast)
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 8)
+                        .background(Capsule().fill(Color.black.opacity(0.75)))
+                        .padding(.bottom, 16)
+                        .task {
+                            try? await Task.sleep(nanoseconds: 2_400_000_000)
+                            await MainActor.run { self.toast = nil }
+                        }
+                }
+            }
+            .alert("保存失败", isPresented: Binding(
+                get: { errorText != nil },
+                set: { if !$0 { errorText = nil } }
+            )) {
+                Button("好", role: .cancel) {}
+            } message: {
+                Text(errorText ?? "")
             }
         }
     }
 
-    // MARK: 完整商品资料（图片/规格/尺码表）
+    // MARK: 款式层（SPU）：面料 / 款式描述 / 尺码表
+    //
+    //  2026-09-23 录入端分层：尺码表、面料、款式描述是**款式公共属性**（同款只填一次，
+    //  发布时落到款式档案）；商品图片、配色尺码是**颜色差异属性**，在每个颜色行里独立填。
+    //  分区展示不只是好看 —— 它把「哪些是整款一份、哪些是每色各自」摆在明面上，
+    //  从结构上就不会再出现「把配色图当款式图复制到其他颜色」。
 
-    private var productInfoSection: some View {
+    /// 款式公共资料：面料 / 款式描述 / 尺码表 —— 同款共用一份，只填一次
+    private var stylePublicInfoSection: some View {
         Section {
-            TextEditor(text: $imagesText)
+            TextField("面料成分（如：100% 聚酯纤维）", text: $fabricText)
+                .font(.system(size: 13))
+            TextEditor(text: $styleDescriptionText)
                 .frame(minHeight: 60)
                 .font(.system(size: 13))
-            ShopCatalogImagePickerButton(mode: .append, text: $imagesText, label: "添加商品图片")
-            Text("图片：每行一个 Bundle 文件名或 http(s) 链接（originalURL 必留原图）；也可点上方按钮从相册选图自动入库")
-                .font(.system(size: 11))
-                .foregroundStyle(.secondary)
-            TextEditor(text: $variantsText)
-                .frame(minHeight: 60)
-                .font(.system(size: 13))
-            Text("配色尺码：每行「颜色,尺码[,图片]」，一侧可留空（如「夜空蓝,M,night.png」）；第三段填图片行同一文件名/URL 即完成图文绑定（选中该配色时展示其照片）")
-                .font(.system(size: 11))
-                .foregroundStyle(.secondary)
-            TextField("尺码表列名（逗号分隔，如：尺码,胸围,衣长）", text: $chartColumnsText)
+                .overlay(alignment: .topLeading) {
+                    if styleDescriptionText.isEmpty {
+                        Text("款式描述（同款所有颜色共用）")
+                            .font(.system(size: 13))
+                            .foregroundStyle(.secondary)
+                            .padding(.top, 8)
+                            .allowsHitTesting(false)
+                    }
+                }
+            // 2026-09-23 需求 M：整段文本粘贴录入
+            ShopCatalogChartPasteButton(kind: .sizeChart,
+                                        columnsText: $chartColumnsText,
+                                        rowsText: $chartRowsText)
+            TextField("尺码表列名（逗号分隔，如：尺码,前裙长,胸围）", text: $chartColumnsText)
                 .font(.system(size: 13))
             TextEditor(text: $chartRowsText)
                 .frame(minHeight: 60)
                 .font(.system(size: 13))
-            Text("尺码表行：每行「标签:值,值,…」与列一一对应（如「M:84,52」）")
-                .font(.system(size: 11))
-                .foregroundStyle(.secondary)
+                .overlay(alignment: .topLeading) {
+                    if chartRowsText.isEmpty {
+                        Text("每行「标签:值,值,…」，如 S:80,78-83,60-66")
+                            .font(.system(size: 12))
+                            .foregroundStyle(.secondary)
+                            .padding(.top, 8)
+                            .allowsHitTesting(false)
+                    }
+                }
             TextField("单位（cm）", text: $chartUnit)
             TextField("尺码表原图（文件名/URL）", text: $chartImageText)
             ShopCatalogImagePickerButton(mode: .replace, text: $chartImageText, label: "添加尺码表原图")
         } header: {
-            Text("图片 / 配色尺码 / 尺码表")
+            Text("款式公共资料（同款共用，只需填一次）")
+        } footer: {
+            if availableSizes.isEmpty {
+                Text("面料、款式描述、尺码表属于款式（SPU），本款全部颜色共用同一份。填了尺码表，下面每个颜色就能直接勾选尺码。")
+                    .font(.system(size: 11))
+            } else {
+                Text("识别出的尺码：\(availableSizes.joined(separator: " / "))（下面每个颜色直接勾选，不再重复填表）")
+                    .font(.system(size: 11))
+            }
         }
     }
 
-    private func loadProductInfo() {
-        let draft = draftBox
-        imagesText = draft.images.map { $0.originalURL }.joined(separator: "\n")
-        let idToRef = Dictionary(uniqueKeysWithValues: draft.images.map { ($0.id, $0.originalURL) })
-        variantsText = draft.variants.map {
-            let base = "\($0.color ?? ""),\($0.size ?? "")"
-            guard let ref = $0.imageAssetID.flatMap({ idToRef[$0] }) else { return base }
-            return "\(base),\(ref)"
-        }.joined(separator: "\n")
-        if let chart = draft.sizeChart {
+    // MARK: 价格组（同款同价，按款式录一次）
+
+    private var priceSection: some View {
+        Section {
+            // 预约价与现货价并存且不互斥（2026-09-22）：可同时填写、各自生成销售记录；
+            // 现货价可空置后补录。任一项填写都不会禁用 / 清空 / 覆盖另一项。
+            HStack {
+                Text("预约价")
+                Spacer()
+                TextField("可空", value: $reservationPrice, format: .number)
+                    .keyboardType(.decimalPad)
+                    .multilineTextAlignment(.trailing)
+                    .frame(width: 110)
+            }
+            if reservationPrice != nil {
+                HStack {
+                    Text("定金")
+                    Spacer()
+                    TextField("可空", value: $deposit, format: .number)
+                        .keyboardType(.decimalPad)
+                        .multilineTextAlignment(.trailing)
+                        .frame(width: 110)
+                }
+                HStack {
+                    Text("尾款")
+                    Spacer()
+                    TextField("可空", value: $balance, format: .number)
+                        .keyboardType(.decimalPad)
+                        .multilineTextAlignment(.trailing)
+                        .frame(width: 110)
+                }
+                if let issue = depositBalanceIssue {
+                    Text(issue)
+                        .font(.system(size: 12))
+                        .foregroundStyle(.red)
+                }
+            }
+            HStack {
+                Text("现货价")
+                Spacer()
+                TextField("可空", value: $stockPrice, format: .number)
+                    .keyboardType(.decimalPad)
+                    .multilineTextAlignment(.trailing)
+                    .frame(width: 110)
+            }
+            Picker("币种", selection: $currency) {
+                Text("未标注").tag(CatalogCurrency?.none)
+                ForEach(CatalogCurrency.allCases) { item in
+                    Text(item.displayName).tag(CatalogCurrency?.some(item))
+                }
+            }
+        } header: {
+            Text("价格（同款同价，按款式录一次）")
+        } footer: {
+            Text("至少填写预约价或现货价之一；现货价可先空置，后续通过补录追加。价格整组写入本款每条颜色草稿。")
+        }
+    }
+
+    private var depositBalanceIssue: String? {
+        guard let r = reservationPrice, let d = deposit, let b = balance else { return nil }
+        return Decimal(d) + Decimal(b) == Decimal(r)
+            ? nil : "定金 \(Int(d)) + 尾款 \(Int(b)) ≠ 预约价 \(Int(r))"
+    }
+
+    // MARK: 颜色（SKU）—— 图片与颜色行强绑定
+
+    /// 颜色 SKU 添加区。
+    ///
+    /// 需求原文的落点：「将图片上传组件与颜色字段直接绑定，让用户点颜色的同时就能直接传图」——
+    /// 缩略图、选图按钮、删除按钮**都在同一个颜色行内**，
+    /// 不再有「先在页面另一处传图、再回来自己对应文件名」这一步。
+    private var colorSection: some View {
+        Section {
+            ForEach($colors) { row in
+                colorRow(row)
+            }
+            Button {
+                colors.append(ShopCatalogDraftStyleForm.ColorRow())
+            } label: {
+                Label("添加颜色", systemImage: "plus.circle")
+                    .font(.system(size: 13))
+            }
+        } header: {
+            Text("颜色（\(colors.count) 色，每色传图 + 勾尺码）")
+        } footer: {
+            Text("商品名 = 颜色名 + 款式名（每行都有预览）。配色图只属于该颜色：前端详情页切到这一色时读的就是它。"
+                + "移除一个未上线的颜色会同时删掉它的草稿；已发布 / 已归档的颜色在这里只读。")
+        }
+    }
+
+    @ViewBuilder
+    private func colorRow(_ row: Binding<ShopCatalogDraftStyleForm.ColorRow>) -> some View {
+        let settled = row.wrappedValue.isSettled
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                if settled {
+                    Image(systemName: "checkmark.seal.fill")
+                        .font(.system(size: 13))
+                        .foregroundStyle(.green)
+                }
+                TextField("颜色名（如：生成色）", text: row.colorName)
+                    .font(.system(size: 14))
+                    .disabled(settled)
+                if !settled && colors.count > 1 {
+                    Button(role: .destructive) {
+                        let id = row.wrappedValue.id
+                        colors.removeAll { $0.id == id }
+                    } label: {
+                        Image(systemName: "minus.circle")
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.red)
+                    .accessibilityLabel(Text("移除该颜色"))
+                }
+            }
+
+            // 图片区：与颜色字段同处一个行视图内 —— 这就是「图片与 SKU 强关联」
+            ShopCatalogColorImageRow(refs: row.imageRefs, isDisabled: settled)
+
+            sizeChips(for: row)
+
+            Text("将发布为：\(ShopCatalogDraftStyleForm.namePreview(colorName: row.wrappedValue.colorName, styleName: resolvedStyleName))")
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+        }
+        .padding(.vertical, 4)
+    }
+
+    /// 尺码勾选（候选 = 款式尺码表，每色不再重复填表）
+    @ViewBuilder
+    private func sizeChips(for row: Binding<ShopCatalogDraftStyleForm.ColorRow>) -> some View {
+        if row.wrappedValue.isSettled {
+            EmptyView()
+        } else if availableSizes.isEmpty {
+            Text("款式尺码表还没有尺码 —— 先填上方「款式公共资料」的尺码表，这里就能勾选")
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+        } else {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("尺码")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                FlowLayout(spacing: 8) {
+                    ForEach(availableSizes, id: \.self) { size in
+                        let isOn = row.wrappedValue.sizes.contains(size)
+                        Button {
+                            if isOn {
+                                row.wrappedValue.sizes.removeAll { $0 == size }
+                            } else {
+                                row.wrappedValue.sizes.append(size)
+                            }
+                        } label: {
+                            Text(size)
+                                .font(.system(size: 12, weight: isOn ? .semibold : .regular))
+                                .foregroundStyle(isOn ? Color.white : Color.pink)
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 5)
+                                .background(Capsule().fill(isOn ? Color.pink : Color.pink.opacity(0.12)))
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+        }
+    }
+
+    // MARK: 加载 / 保存
+
+    /// 读入表单：款式层取源草稿，颜色行取**本款全部草稿**（源草稿排第一位）。
+    /// 家族口径与仓库落盘同源（`sameStyleFamily`）—— 两处不一致会导致误删。
+    private func loadStyleForm() {
+        let source = draftBox
+        designNameText = source.designName ?? ""
+        categoryText = source.category
+        fabricText = source.fabric ?? ""
+        styleDescriptionText = source.styleDescription ?? ""
+        if let chart = source.sizeChart {
             chartColumnsText = chart.columns.joined(separator: ",")
-            chartRowsText = chart.rows.map { row in
-                "\(row.label):" + row.values.map { $0 ?? "" }.joined(separator: ",")
-            }.joined(separator: "\n")
+            chartRowsText = chart.rows
+                .map { "\($0.label):" + $0.values.map { $0 ?? "" }.joined(separator: ",") }
+                .joined(separator: "\n")
             chartUnit = chart.unit ?? ""
             chartImageText = chart.sourceImage ?? ""
         }
+        reservationPrice = source.effectiveReservationPrice
+        stockPrice = source.effectiveStockPrice
+        deposit = source.deposit
+        balance = source.balance
+        currency = source.currency
+        let family = ShopCatalogDraftStyleForm.sameStyleFamily(of: source, in: draftStore.drafts)
+        colors = ShopCatalogDraftStyleForm.rows(of: family, sourceID: source.id)
+        if colors.isEmpty {
+            // 兜底：源草稿已不在草稿箱（例如刚被别处删掉）时，至少保留它自己这一行
+            colors = ShopCatalogDraftStyleForm.rows(of: [source], sourceID: source.id)
+        }
     }
 
-    private func applyProductInfo() {
-        var draft = draftBox
-        // 图片：非空行 → CatalogAsset（originalURL 必留）
-        draft.images = imagesText
-            .components(separatedBy: .newlines)
-            .map { $0.trimmingCharacters(in: .whitespaces) }
-            .filter { !$0.isEmpty }
-            .enumerated()
-            .map { index, ref in
-                CatalogAsset(id: "asset-draft-\(draft.id.prefix(6))-\(index)",
-                             type: .productImage,
-                             thumbnailURL: nil, previewURL: nil,
-                             originalURL: ref, width: nil, height: nil)
-            }
-        // 配色尺码：每行「颜色,尺码[,图片]」——第三段为图片引用（与图片行相同的
-        // 文件名/URL），图文联动（V1.2 点菜式选购）；匹配不到图片行则忽略绑定
-        let imageRefs = imagesText
-            .components(separatedBy: .newlines)
-            .map { $0.trimmingCharacters(in: .whitespaces) }
-            .filter { !$0.isEmpty }
-        draft.variants = variantsText
-            .components(separatedBy: .newlines)
-            .map { $0.trimmingCharacters(in: .whitespaces) }
-            .filter { !$0.isEmpty }
-            .enumerated()
-            .map { index, line in
-                let parts = line.components(separatedBy: ",")
-                    .map { $0.trimmingCharacters(in: .whitespaces) }
-                let color = parts.first.flatMap { $0.isEmpty ? nil : $0 }
-                let size = parts.count > 1 ? (parts[1].isEmpty ? nil : parts[1]) : nil
-                var imageAssetID: String? = nil
-                if parts.count > 2, !parts[2].isEmpty,
-                   let asset = draft.images.first(where: { $0.originalURL == parts[2] }) {
-                    imageAssetID = asset.id
-                }
-                return CatalogProductVariant(id: "var-draft-\(draft.id.prefix(6))-\(index)",
-                                             productID: "",
-                                             color: color, size: size,
-                                             imageAssetID: imageAssetID)
-            }
-        // 尺码表：列 + 行（label:值,…）+ 原图；共享解析口径（首列「尺码」= 标签列剔除、尾冒号清洗）
-        let parsedChart = CatalogManualChartText.normalized(
-            columns: CatalogManualChartText.parseColumns(chartColumnsText),
-            rows: CatalogManualChartText.parseRows(chartRowsText))
-        let columns = parsedChart.columns
-        let rows = parsedChart.rows
-        let sourceImage = chartImageText.trimmingCharacters(in: .whitespaces)
-        if !columns.isEmpty || !rows.isEmpty || !sourceImage.isEmpty {
-            var chart = CatalogSizeChart(id: "sizechart-draft-\(draft.id.prefix(6))",
-                                         productID: "")
-            chart.unit = chartUnit.isEmpty ? nil : chartUnit
-            chart.columns = columns
-            chart.rows = rows
-            chart.sourceImage = sourceImage.isEmpty ? nil : sourceImage
-            draft.sizeChart = chart
-        } else {
-            draft.sizeChart = nil
+    /// 「完成」= 整款一次落盘（款式公共资料 + 全部颜色 SKU）
+    private func saveStyleForm() {
+        do {
+            let result = try draftStore.applyStyleForm(sourceDraftID: draftBox.id,
+                                                       style: styleInput(),
+                                                       colors: colors)
+            toast = summary(for: result)
+            dismiss()
+        } catch {
+            errorText = error.localizedDescription
         }
-        draftBox = draft
+    }
+
+    private func styleInput() -> ShopCatalogDraftStyleForm.StyleInput {
+        var style = ShopCatalogDraftStyleForm.StyleInput()
+        style.designName = designNameText
+        style.category = categoryText
+        style.fabric = fabricText
+        style.styleDescription = styleDescriptionText
+        style.sizeChart = composedChart
+        style.reservationPrice = reservationPrice
+        style.stockPrice = stockPrice
+        style.deposit = deposit
+        style.balance = balance
+        // 档期本表单不编辑，原样透传 —— 避免保存一次就把已有档期抹掉
+        style.startAt = draftBox.startAt
+        style.endAt = draftBox.endAt
+        style.currency = currency
+        style.shopID = draftBox.shopID
+        style.newShopName = draftBox.newShopName
+        style.newShopAliases = draftBox.newShopAliases
+        style.seriesID = draftBox.seriesID
+        style.newSeriesName = draftBox.newSeriesName
+        style.newSeriesYear = draftBox.newSeriesYear
+        style.newSeriesSeason = draftBox.newSeriesSeason
+        style.batchID = draftBox.batchID
+        return style
+    }
+
+    private func summary(for result: ShopCatalogStyleFormResult) -> String {
+        var parts: [String] = []
+        if result.createdCount > 0 { parts.append("新增 \(result.createdCount) 色") }
+        if result.updatedCount > 0 { parts.append("更新 \(result.updatedCount) 色") }
+        if result.removedCount > 0 { parts.append("移除 \(result.removedCount) 色") }
+        if result.skippedSettledCount > 0 { parts.append("跳过已上线 \(result.skippedSettledCount) 色") }
+        return parts.isEmpty ? "款式资料已保存" : "已保存：" + parts.joined(separator: "、")
+    }
+}
+
+// MARK: - 行内配色图选择器（图片与颜色 SKU 强绑定）
+
+/// 颜色行内的图片组件：缩略图 + 相册选图 + 单张删除。
+///
+/// 需求原文：「请在颜色 SKU 添加区，将图片上传组件与颜色字段直接绑定。让用户点颜色的
+/// 同时就能直接传图，实现图片与 SKU 的强关联。不要单独弄一个图片上传区让用户去对应。」
+///
+/// 所以它绑定的是**该颜色行自己的引用数组**（不是一整块多行文本），
+/// 传完的图直接就是这一色的配色图 —— 不需要用户再去别处把文件名抄一遍。
+/// 引用格式走 `ShopCatalogImageStore` 的 `local:<文件名>`，展示统一走
+/// `ShopCatalogAssetImage`（读不到文件走占位图，不渲染空白）。
+private struct ShopCatalogColorImageRow: View {
+    @Binding var refs: [String]
+    /// 已发布 / 已归档的颜色：只读展示，不给改图入口
+    var isDisabled: Bool = false
+
+    @State private var selection: PhotosPickerItem?
+    @State private var errorText: String?
+
+    private let thumbnailSide: CGFloat = 64
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 10) {
+                    ForEach(Array(refs.enumerated()), id: \.offset) { index, ref in
+                        thumbnail(ref: ref, index: index)
+                    }
+                    if !isDisabled {
+                        addButton
+                    }
+                }
+                .padding(.vertical, 4)
+                .padding(.trailing, 6)
+            }
+            if refs.isEmpty && isDisabled {
+                Text("该颜色已上线，配色图请到商品编辑里修改")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+            }
+            if let errorText {
+                Text(errorText)
+                    .font(.system(size: 11))
+                    .foregroundStyle(.red)
+            }
+        }
+        .onChange(of: selection) { _, item in
+            guard let item else { return }
+            selection = nil
+            Task { await handle(item) }
+        }
+    }
+
+    private func thumbnail(ref: String, index: Int) -> some View {
+        ZStack(alignment: .topTrailing) {
+            ShopCatalogAssetImage(reference: ref)
+                .frame(width: thumbnailSide, height: thumbnailSide)
+                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+            if index == 0 {
+                Text("主图")
+                    .font(.system(size: 9, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 4)
+                    .padding(.vertical, 1)
+                    .background(Capsule().fill(Color.black.opacity(0.5)))
+                    .padding(3)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
+            }
+            if !isDisabled {
+                Button {
+                    guard refs.indices.contains(index) else { return }
+                    refs.remove(at: index)
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 16))
+                        .foregroundStyle(.white, Color.black.opacity(0.55))
+                }
+                .buttonStyle(.plain)
+                .offset(x: 5, y: -5)
+                .accessibilityLabel(Text("移除这张图片"))
+            }
+        }
+    }
+
+    private var addButton: some View {
+        PhotosPicker(selection: $selection, matching: .images) {
+            VStack(spacing: 3) {
+                Image(systemName: "photo.badge.plus")
+                    .font(.system(size: 18))
+                Text(refs.isEmpty ? "传配色图" : "加图")
+                    .font(.system(size: 10))
+            }
+            .frame(width: thumbnailSide, height: thumbnailSide)
+            .foregroundStyle(.pink)
+            .background(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .strokeBorder(Color.pink.opacity(0.45),
+                                  style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func handle(_ item: PhotosPickerItem) async {
+        guard let data = try? await item.loadTransferable(type: Data.self),
+              let reference = ShopCatalogImageStore.save(data) else {
+            await MainActor.run { errorText = "图片保存失败，请重试" }
+            return
+        }
+        await MainActor.run {
+            errorText = nil
+            refs.append(reference)
+        }
     }
 }

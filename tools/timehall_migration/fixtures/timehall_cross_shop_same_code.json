@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "source": "https://cross-shop-b.example.jp/",
+  "scope": "brand",
+  "catalogues": [
+    {"id": "cat-cross-1", "year": 2024, "titleZH": "跨店同码画册", "coverImage": null}
+  ],
+  "items": [
+    {
+      "id": "item-cross-1",
+      "productCode": "SHARED-CODE",
+      "categoryZH": "OP",
+      "name": "Cross Shop OP",
+      "nameZH": "B 店同码商品",
+      "brand": "Brand B",
+      "catalogueID": "cat-cross-1",
+      "priceJPY": 30000,
+      "observedAt": "2024-05-01T00:00:00Z",
+      "coverImage": null,
+      "gallery": []
+    }
+  ],
+  "commerceItems": []
+}

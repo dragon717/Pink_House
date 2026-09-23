@@ -1,0 +1,46 @@
+{
+  "version": 1,
+  "source": "https://same-code.example.jp/",
+  "scope": "brand",
+  "catalogues": [
+    {
+      "id": "cat-same-1",
+      "year": 2024,
+      "seasonLabel": "春",
+      "title": "Spring",
+      "titleZH": "同码测试画册",
+      "coverImage": "cat-same-1.jpg"
+    }
+  ],
+  "items": [
+    {
+      "id": "item-same-1",
+      "productCode": "SC-001",
+      "categoryZH": "JSK",
+      "name": "Same Code JSK",
+      "nameZH": "同码展品",
+      "brand": "Same Code Brand",
+      "catalogueID": "cat-same-1",
+      "priceJPY": 24800,
+      "observedAt": "2024-03-01T00:00:00Z",
+      "coverImage": "item-same-1.jpg",
+      "gallery": ["item-same-1-2.jpg"]
+    }
+  ],
+  "commerceItems": [
+    {
+      "id": "commerce-same-1",
+      "productCode": "SC-001",
+      "categoryZH": "JSK",
+      "name": "Same Code JSK",
+      "nameZH": "同码在售",
+      "brand": "Same Code Brand",
+      "regularPriceJPY": 26000,
+      "salePriceJPY": 24800,
+      "observedAt": "2026-09-01T00:00:00Z",
+      "coverImage": "commerce-same-1.jpg",
+      "colors": ["粉"],
+      "sizes": ["M"]
+    }
+  ]
+}

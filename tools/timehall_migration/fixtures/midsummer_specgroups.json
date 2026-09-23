@@ -1,0 +1,80 @@
+{
+  "brandID": "fixture-brand",
+  "brandName": "规格测试品牌",
+  "brandNameEN": "Fixture Brand",
+  "series": [
+    {
+      "id": "fx-2026-spec",
+      "name": "规格测试系列",
+      "year": 2026,
+      "launchedOn": "2026-02-09",
+      "stage": "deposit",
+      "depositMin": 100,
+      "depositMax": 120,
+      "priceCapturedOn": "2026-09-14",
+      "coverImage": null,
+      "sizes": ["S", "M", "L"],
+      "colors": ["粉色", "蓝色"],
+      "items": [
+        {
+          "id": "fx-2026-spec",
+          "seriesID": "fx-2026-spec",
+          "name": "规格测试系列",
+          "kind": "set",
+          "price": null,
+          "deposit": null,
+          "balance": null,
+          "priceKind": null,
+          "priceCapturedOn": "2026-09-14",
+          "sizes": ["S", "M", "L"],
+          "colors": ["粉色", "蓝色"],
+          "coverImage": "fx-main.jpg",
+          "itemURL": "https://item.taobao.com/item.htm?id=FX123",
+          "sourceURL": "https://example.com/library/FX",
+          "specGroups": [
+            {
+              "id": "style",
+              "name": "款式",
+              "role": "variant",
+              "options": [
+                {"id": "op", "name": "切替 OP", "image": "fx-op.jpg"},
+                {"id": "jsk", "name": "JSK", "image": "fx-jsk.jpg"}
+              ]
+            },
+            {
+              "id": "color",
+              "name": "颜色",
+              "role": "color",
+              "options": [
+                {"id": "pink", "name": "粉色", "image": null},
+                {"id": "blue", "name": "蓝色", "image": null}
+              ]
+            },
+            {
+              "id": "size",
+              "name": "尺码",
+              "role": "size",
+              "options": [
+                {"id": "s", "name": "S", "image": null},
+                {"id": "m", "name": "M", "image": null},
+                {"id": "l", "name": "L", "image": null}
+              ]
+            }
+          ],
+          "skus": [
+            {"id": "op-pink-s", "options": {"style": "op", "color": "pink", "size": "s"},
+             "image": "fx-op-pink.jpg", "price": 468, "priceKind": "shop"},
+            {"id": "op-pink-m", "options": {"style": "op", "color": "pink", "size": "m"},
+             "image": "fx-op-pink.jpg", "price": 468, "priceKind": "shop"},
+            {"id": "jsk-blue-l", "options": {"style": "jsk", "color": "blue", "size": "l"},
+             "image": "fx-jsk-blue.jpg", "price": 528, "priceKind": "shop"}
+          ],
+          "sizeChartImages": [
+            {"style": "OP", "imageName": "fx-chart-op.jpg"},
+            {"style": "JSK", "imageName": "fx-chart-jsk.jpg"}
+          ]
+        }
+      ]
+    }
+  ]
+}

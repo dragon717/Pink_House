@@ -58,6 +58,8 @@ struct WardrobeCellSnapshot: Identifiable, Equatable, Sendable {
     let isDepositPlan: Bool
     let isFullPaymentReservation: Bool
     let isSold: Bool
+    /// 转单（闲鱼收单等）：衣橱卡片「转单」状态标签（2026-09-23 需求 N）
+    let isResaleTransfer: Bool
     let totalDeposit: Decimal
     let totalBalance: Decimal
     let fullPaymentReservationTotalAmount: Decimal
@@ -73,6 +75,17 @@ struct WardrobeCellSnapshot: Identifiable, Equatable, Sendable {
         imagePaths.first
     }
 
+    /// 衣橱卡片状态小标签（需求 N §III.3）：`全款` / `已付定` / `转单`（另有 `已售出`）。
+    /// 口径唯一来源 `ShopCatalogWardrobeStatusTag.chips`，各处卡片不要再自己写 if 分支。
+    var statusTags: [ShopCatalogWardrobeStatusTag] {
+        ShopCatalogWardrobeStatusTag.chips(
+            isSold: isSold,
+            isFullPaymentReservation: isFullPaymentReservation,
+            isDepositPlan: isDepositPlan,
+            isResaleTransfer: isResaleTransfer
+        )
+    }
+
     @MainActor
     init(clothing: Clothing) {
         self.id = clothing.id
@@ -85,6 +98,7 @@ struct WardrobeCellSnapshot: Identifiable, Equatable, Sendable {
         self.isDepositPlan = clothing.isDepositPlan
         self.isFullPaymentReservation = clothing.isFullPaymentReservation
         self.isSold = clothing.reservationKind == .sold
+        self.isResaleTransfer = clothing.isResaleTransfer
         self.totalDeposit = clothing.wardrobeListTotalDeposit
         self.totalBalance = clothing.wardrobeListTotalBalance
         self.fullPaymentReservationTotalAmount = clothing.wardrobeListFullPaymentReservationTotalAmount
@@ -95,6 +109,54 @@ struct WardrobeCellSnapshot: Identifiable, Equatable, Sendable {
         self.colors = clothing.colors
         self.sizes = clothing.sizes
         self.tagNames = clothing.tags?.map(\.name) ?? []
+    }
+}
+
+// MARK: - 状态标签样式（需求 N §III.3：图标 / 配色口径唯一）
+
+private extension ShopCatalogWardrobeStatusTag {
+    var symbolName: String {
+        switch self {
+        case .sold: return "tag.slash.fill"
+        case .fullPaid: return "checkmark.seal.fill"
+        case .depositPaid: return "heart.fill"
+        case .resaleTransfer: return "arrow.left.arrow.right"
+        }
+    }
+
+    var badgeTint: Color {
+        switch self {
+        case .sold: return Color.red.opacity(0.6)
+        case .fullPaid: return Color(hex: "7A5A54")
+        case .depositPaid: return Color(hex: "7A5A54")
+        case .resaleTransfer: return Color(hex: "6B7A8F")
+        }
+    }
+}
+
+/// 衣橱卡片状态小标签（需求 N §III.3：`全款` / `已付定` / `转单`，沿用 `已售出`）
+private struct ClothingCardStatusChip: View {
+    let tag: ShopCatalogWardrobeStatusTag
+    /// 主题皮肤下的强调色（付款类标签跟随主题，售出 / 转单保持固定语义色）
+    var themeSkinTint: Color = .pink
+
+    private var background: Color {
+        switch tag {
+        case .sold: return Color.red.opacity(0.6)
+        case .resaleTransfer: return Color(hex: "6B7A8F")
+        case .fullPaid, .depositPaid: return themeSkinTint
+        }
+    }
+
+    var body: some View {
+        Text(tag.rawValue.appLocalized)
+            .font(.system(size: 10, weight: .bold))
+            .foregroundStyle(.white)
+            .padding(.horizontal, 4)
+            .padding(.vertical, 2)
+            .background(background)
+            .clipShape(RoundedRectangle(cornerRadius: 4))
+            .accessibilityLabel(Text(tag.rawValue.appLocalized))
     }
 }
 
@@ -424,18 +486,12 @@ struct ClothingCard: View, Equatable {
                         .padding(8)
                     }
                     
-                    if snapshot.isSold {
+                    // 状态标签（需求 N §III.3）：网格卡只展示主标签，避免与 3D / 库存角标重叠
+                    if let primaryTag = snapshot.statusTags.first {
                         wardrobeCellBadge(
-                            text: "已售出".appLocalized,
-                            tint: Color.red.opacity(0.6),
-                            icon: "tag.slash.fill"
-                        )
-                        .padding(8)
-                    } else if snapshot.isDepositPlan {
-                        wardrobeCellBadge(
-                            text: snapshot.isFullPaymentReservation ? "全款预约".appLocalized : "心愿尾款".appLocalized,
-                            tint: Color(hex: "7A5A54"),
-                            icon: "heart.fill"
+                            text: primaryTag.rawValue.appLocalized,
+                            tint: primaryTag.badgeTint,
+                            icon: primaryTag.symbolName
                         )
                         .padding(8)
                     }
@@ -829,16 +885,16 @@ struct ClothingRow: View, Equatable {
                     }
                 }
                 .overlay(alignment: .topTrailing) {
-                    if snapshot.isSold || snapshot.isDepositPlan {
-                        Text(snapshot.isSold ? "已售出".appLocalized : (snapshot.isFullPaymentReservation ? "全款".appLocalized : "尾款".appLocalized))
-                            .font(.system(size: 10, weight: .bold))
-                            .foregroundStyle(.white)
-                            .themeSkinLegibleText(level: .chip, slot: .discountBadge, descriptor: wardrobeThemeDescriptor)
-                            .padding(.horizontal, 4)
-                            .padding(.vertical, 2)
-                            .background(snapshot.isSold ? Color.red.opacity(0.6) : (isThemeSkinThemed ? rowAccentColor : Color.pink))
-                            .clipShape(RoundedRectangle(cornerRadius: 4))
-                            .offset(x: 4, y: -4)
+                    if !snapshot.statusTags.isEmpty {
+                        HStack(spacing: 3) {
+                            ForEach(snapshot.statusTags, id: \.self) { tag in
+                                ClothingCardStatusChip(
+                                    tag: tag,
+                                    themeSkinTint: isThemeSkinThemed ? rowAccentColor : Color.pink
+                                )
+                            }
+                        }
+                        .offset(x: 4, y: -4)
                     }
                 }
                 

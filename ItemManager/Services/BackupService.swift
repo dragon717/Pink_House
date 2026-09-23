@@ -293,6 +293,7 @@ class BackupService {
                     purchaseDate: c.purchaseDate,
                     depositDate: c.depositDate,
                     isDepositPlan: c.isDepositPlan,
+                    isResaleTransfer: c.isResaleTransfer,
                     finalPaymentDate: c.finalPaymentDate,
                     finalPaymentEndDate: c.finalPaymentEndDate,
                     finalPaymentInstallmentCount: 0,
@@ -1710,6 +1711,8 @@ class BackupService {
             clothingBack.purchaseDate = dto.purchaseDate
             clothingBack.depositDate = dto.depositDate
             clothingBack.isDepositPlan = dto.isDepositPlan
+            // 转单标记（需求 N）：旧备份没有该字段 → 默认 false
+            clothingBack.isResaleTransfer = dto.isResaleTransfer ?? false
             clothingBack.finalPaymentDate = dto.finalPaymentDate
             clothingBack.finalPaymentEndDate = dto.finalPaymentEndDate
             clothingBack.finalPaymentInstallmentCount = 0

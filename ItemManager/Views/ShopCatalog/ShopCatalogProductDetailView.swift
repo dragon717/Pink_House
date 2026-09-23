@@ -8,8 +8,11 @@
 //  只在时光馆语境下展示 Catalog 商品资料。
 //
 //    · 图集轮播（页码胶囊，同现有详情页）+ 大图查看（滑动/缩放/单张/批量保存 §14）
-//    · 主信息卡：商品名 / 店家 · 系列 · 年份 / 配色 / 尺码
-//    · 尺码表卡：结构化表格 + 「查看原尺码表 >」（§15）
+//    · 主信息卡：款式名（**内外一致口径**，2026-09-23）/ 店家 · 系列 · 年份 / 配色 / 尺码
+//      「内外标题一致」= 标题永远是款式名，颜色不参与标题（同款多色时只加「· N 色」标注），
+//      颜色由「配色」行与轮播颜色胶囊单独呈现；与点菜页卡片共用
+//      `ShopCatalogTitleResolver` + `ShopCatalogProductTitleLabel`。
+//    · 尺码表卡：结构化表格常显 + **原图折叠区**（默认收起，仅一个入口；Request D / §15）
 //    · 价格档案卡：预约价（含定金）/ 现货价 / 差价（§13）
 //    · 操作区按预约状态条件渲染：
 //      预约中 → 【加入心愿】主按钮 + 我已经预约（§16-17）
@@ -27,6 +30,9 @@ struct ShopCatalogProductView: View {
     let productID: String
 
     @Environment(ThemeManager.self) private var themeManager
+    /// 桌面端（iPad / 常规宽度）与移动端（compact）共用同一份视图，
+    /// 靠 size class 决定原图展开后的最大高度，而不是写死一个手机尺寸。
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @ObservedObject private var store = ShopCatalogStore.shared
     @State private var viewerReferences: [String] = []
     @State private var viewerIndex = 0
@@ -34,6 +40,10 @@ struct ShopCatalogProductView: View {
     @State private var showsMergeSheet = false
     /// 价格表卡片展开状态（Request 14：默认收起，点击展开查看表格 + 原图）
     @State private var isPriceChartExpanded = false
+    /// 尺码表**原图**展开状态（Request D：默认收起，仅留一个入口；点开看完整原图，
+    /// 再次点击或「收起」按钮折叠）。这里只存用户意图，展示形态由
+    /// `ShopCatalogChartDisclosure.plan` 推导——视图不再自己拼折叠分支。
+    @State private var isSizeChartImageExpanded = false
 
     private var product: CatalogProduct? { store.product(id: productID) }
     private var series: CatalogSeries? { product.map { store.series(id: $0.seriesID) } ?? nil }
@@ -96,35 +106,49 @@ struct ShopCatalogProductView: View {
         let colorLabel: String?
     }
 
+    /// 同款其他颜色商品（同系列 + 同品类 + 同款式名 + 未归档）。
+    /// 标题的「· N 色」、配色行、轮播的「其它颜色主图」都取这一份 —— 三个数字不可能对不上。
+    /// 判定口径收口在 `ShopCatalogDesignPalette`（唯一处），不要在视图里再写一遍过滤。
+    private var sameDesignSiblings: [CatalogProduct] {
+        guard let product else { return [] }
+        return ShopCatalogDesignPalette.sameDesignProducts(of: product,
+                                                          among: store.catalog?.products ?? [])
+    }
+
+    /// 标题（内外一致口径，2026-09-23）：**标题 = 款式名**，颜色不参与标题文字；
+    /// 同款多色时由「· N 色」标注 + 配色行 + 轮播颜色胶囊分别呈现。
+    /// 与点菜页卡片、商品管理款式组共用 `ShopCatalogTitleResolver`，
+    /// 同一个商品在哪儿看都是同一句话。
+    private var productTitle: ShopCatalogProductTitle? {
+        guard let product else { return nil }
+        return ShopCatalogTitleResolver.title(product: product, siblings: sameDesignSiblings)
+    }
+
     private var carouselSlides: [CarouselSlide] {
         guard let product else { return [] }
         var slides = product.images.map {
             CarouselSlide(ref: store.asset(id: $0)?.originalURL ?? $0, colorLabel: ownColorLabel)
         }
-        let design = ShopCatalogSameDesignGrouper.designName(of: product)
-        let siblings = (store.catalog?.products ?? []).filter {
-            $0.id != product.id
-                && $0.seriesID == product.seriesID
-                && $0.category == product.category
-                && $0.archivedAt == nil
-                && ShopCatalogSameDesignGrouper.designName(of: $0) == design
-        }
-        for sibling in siblings {
+        for sibling in sameDesignSiblings {
             guard let first = sibling.images.first else { continue }
             let ref = store.asset(id: first)?.originalURL ?? first
             guard !slides.contains(where: { $0.ref == ref }) else { continue }
             slides.append(CarouselSlide(
                 ref: ref,
-                colorLabel: store.colors(forProduct: sibling.id).first
-                    ?? ShopCatalogSameDesignGrouper.colorLabel(for: sibling.name)))
+                colorLabel: ShopCatalogColorPresentation.label(
+                    explicitColors: store.colors(forProduct: sibling.id),
+                    name: sibling.name)))
         }
         return slides
     }
 
+    /// 本商品的颜色标注：与所有颜色入口同一份取值口径
+    /// （显式规格色优先 → 名称里的颜色词 → 无则不给标注）
     private var ownColorLabel: String? {
         guard let product else { return nil }
-        if let color = store.colors(forProduct: product.id).first { return color }
-        return ShopCatalogSameDesignGrouper.colorLabel(for: product.name)
+        return ShopCatalogColorPresentation.label(
+            explicitColors: store.colors(forProduct: product.id),
+            name: product.name)
     }
 
     private var carousel: some View {
@@ -190,14 +214,26 @@ struct ShopCatalogProductView: View {
 
     private var mainInfoCard: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text(product?.name ?? "")
-                .font(.title2.bold())
-                .foregroundStyle(themeManager.primaryTextColor)
-                .frame(maxWidth: .infinity, alignment: .leading)
+            // 标题 = 款式名（与点菜页卡片、商品管理款式组同一口径）；
+            // 颜色只在下方「配色」行与轮播颜色胶囊里单独呈现。
+            if let productTitle {
+                ShopCatalogProductTitleLabel(
+                    title: productTitle,
+                    font: .title2.bold(),
+                    textColor: themeManager.primaryTextColor,
+                    annotationColor: themeManager.tertiaryTextColor,
+                    lineLimit: nil)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            } else {
+                Text(product?.name ?? "")
+                    .font(.title2.bold())
+                    .foregroundStyle(themeManager.primaryTextColor)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
 
             HStack(spacing: 6) {
                 if let shop { Text(shop.name) }
-                if let year = series?.year { Text("· \(String(year))") }
+                if let yearMonth = series?.yearMonthText { Text("· \(yearMonth)") }
                 if let season = series?.season, !season.isEmpty { Text("· \(season)") }
                 if let category = product?.category { Text("· \(category)") }
             }
@@ -212,7 +248,13 @@ struct ShopCatalogProductView: View {
             if !sizes.isEmpty {
                 specRow(label: "尺码", values: sizes)
             }
-            if let desc = product?.description, !desc.isEmpty {
+            // 面料 / 款式描述：**款式级公共属性**（2026-09-23 录入端重构）——
+            // 读的是款式档案，同款各颜色显示同一份；不再是「每个颜色各存一份描述」。
+            // 款式描述对旧数据回退 `product.description`（重构前描述写在商品上）。
+            if let fabric = styleFabric {
+                specRow(label: "面料", values: [fabric])
+            }
+            if let desc = styleDescription, !desc.isEmpty {
                 Text(desc)
                     .font(.system(size: 13))
                     .foregroundStyle(themeManager.secondaryTextColor)
@@ -233,40 +275,63 @@ struct ShopCatalogProductView: View {
         }
     }
 
-    private var colors: [String] { store.colors(forProduct: productID) }
-    private var sizes: [String] { store.sizes(forProduct: productID) }
+    /// 「配色」行 = **同款全部颜色**（本商品在前，同款其他颜色商品依次追加）。
+    ///
+    /// 2026-09-23 系统性修复：旧口径只读本商品自己的规格色（`store.colors(forProduct:)`），
+    /// 而 SPU/SKU 结构下每个颜色是独立商品 → 本商品只有自己那一色，纯名称命名时一条都没有
+    /// → 整行消失，但标题仍写着「· N 色」。现在与标题同源（`designColors`）。
+    private var colors: [String] { store.designColors(forProduct: productID) }
+    /// 尺码行（卡外的尺码信息）：与点菜页 chips / 预约尺码共用同一份「款式级尺码列」——
+    /// 同款任一颜色填了尺码表，这里就跟着变（2026-09-23 款式共享）。
+    private var sizes: [String] { store.sizeRun(forProduct: productID) }
+
+    /// 款式面料（**款式级公共属性**：同款各颜色显示同一份）
+    private var styleFabric: String? { store.fabric(forProduct: productID) }
+
+    /// 款式描述（**款式级公共属性**：档案优先，回退商品自身 description 兼容旧数据）
+    private var styleDescription: String? { store.styleDescription(forProduct: productID) }
 
     // MARK: 尺码表（§15：结构化 + 原始图）
 
+    /// 尺码表原图引用：`sourceImage` 既可能是 CatalogAsset id（模型约定 / 迁移产物），
+    /// 也可能是运营手填的文件名 / `local:` / URL —— 两种口径统一走同一个解析入口。
+    private func sizeChartReference(_ chart: CatalogSizeChart) -> String? {
+        ShopCatalogChartReference.resolve(chart.sourceImage) { store.asset(id: $0)?.originalURL }
+    }
+
+    /// 尺码表展示计划：与价格表共用同一套判定（`ShopCatalogChartPresentation`），
+    /// 两张卡只允许消费同一份 `Plan`，不可能再各偏一边。
+    private var sizeChartPlan: ShopCatalogChartPresentation.Plan? {
+        guard let chart = store.sizeChart(forProduct: productID) else { return nil }
+        return ShopCatalogChartPresentation.plan(
+            hasStructuredContent: chart.hasStructuredContent,
+            reference: sizeChartReference(chart),
+            isImageUnavailable: ShopCatalogImageResolver.isUnavailable)
+    }
+
+    /// 尺码表卡：结构化表格常显 + **原图默认收起**（Request D）。
+    ///
+    /// 折叠范围只有「原图」一块：表格是尺码表的主要信息，常显不折叠。
+    /// 收起态**只有一个可点击入口**（需求原文），所以原先头部那个「查看原尺码表 >」
+    /// 不再与入口并列——否则收起态会出现两个可点目标。全屏查看改由
+    /// 「展开 → 点图片」到达，路径仍然是 2 步。
+    /// 模型契约（`CatalogSizeChart.hasStructuredContent` 注释「只有原图时商品详情
+    /// 仅展示原图」）依然成立：只有原图时，入口本身就是「这张卡有原图」的可见证据，
+    /// 点开即见完整原图；`plan.isEmpty` 也照旧把「只有原图」算作有内容。
     @ViewBuilder
     private var sizeChartCard: some View {
-        if let chart = store.sizeChart(forProduct: productID) {
+        if let chart = store.sizeChart(forProduct: productID), let plan = sizeChartPlan {
             VStack(alignment: .leading, spacing: 12) {
-                HStack {
-                    Text("尺码表".appLocalized)
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(themeManager.primaryTextColor)
-                    Spacer()
-                    if let sourceRef = chart.sourceImage.flatMap({ store.asset(id: $0)?.originalURL ?? $0 }) {
-                        Button {
-                            viewerReferences = [sourceRef]
-                            viewerIndex = 0
-                            showsViewer = true
-                        } label: {
-                            HStack(spacing: 3) {
-                                Text("查看原尺码表".appLocalized)
-                                Image(systemName: "chevron.right")
-                            }
-                            .font(.caption)
-                            .foregroundStyle(themeManager.accentTextColor)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-                if chart.hasStructuredContent {
+                Text("尺码表".appLocalized)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(themeManager.primaryTextColor)
+                if plan.showsTable {
                     structuredTable(columns: chart.columns, rows: chart.rows, cornerLabel: "尺码")
                 }
-                if chart.sourceImage == nil && !chart.hasStructuredContent {
+                // 原图折叠区：渲染决策一律来自 ShopCatalogChartDisclosure，
+                // 视图只持有用户意图（isSizeChartImageExpanded），不自己拼折叠分支。
+                sizeChartImageSection(plan)
+                if plan.isEmpty {
                     Text("暂无尺码表数据".appLocalized)
                         .font(.caption)
                         .foregroundStyle(themeManager.tertiaryTextColor)
@@ -275,6 +340,96 @@ struct ShopCatalogProductView: View {
             .padding(16)
             .frame(maxWidth: .infinity, alignment: .leading)
             .themeSkinSectionCard(cornerRadius: 16)
+        }
+    }
+
+    // MARK: 尺码表原图折叠区（Request D）
+
+    /// 尺码表原图的收起 / 展开：
+    ///   · **收起（默认）**——只显示一个可点击入口，文案与 chevron 方向明示当前状态；
+    ///   · **展开**——完整原图（点图进全屏放大）+ 一个显式「收起」按钮；
+    ///     点入口本身同样能收起（需求：「再次点击**或通过关闭操作**收起」）；
+    ///   · **文件丢失**——警示直出、不折叠（`ShopCatalogChartDisclosure` 既定口径：
+    ///     折叠一个待办提示，等于让用户永远不知道要重新上传）。
+    @ViewBuilder
+    private func sizeChartImageSection(_ plan: ShopCatalogChartPresentation.Plan) -> some View {
+        let disclosure = ShopCatalogChartDisclosure.plan(image: plan.image,
+                                                        isExpanded: isSizeChartImageExpanded)
+        VStack(alignment: .leading, spacing: 10) {
+            if disclosure.showsTrigger {
+                Button {
+                    toggleSizeChartImage()
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "photo.on.rectangle.angled")
+                        Text(sizeChartTriggerTitle(disclosure.trigger))
+                        Spacer(minLength: 8)
+                        Image(systemName: disclosure.trigger == .expand ? "chevron.down" : "chevron.up")
+                            .font(.caption2.weight(.bold))
+                    }
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(themeManager.accentTextColor)
+                    .padding(.vertical, 9)
+                    .padding(.horizontal, 12)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .fill(themeManager.accentTextColor.opacity(0.10))
+                    )
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(Text(sizeChartTriggerTitle(disclosure.trigger)))
+                .accessibilityHint(Text(disclosure.trigger == .expand
+                                        ? "展开查看完整尺码表原图".appLocalized
+                                        : "收起尺码表原图".appLocalized))
+            }
+            if disclosure.showsImage {
+                VStack(alignment: .leading, spacing: 8) {
+                    chartImageBlock(plan.image,
+                                    missingHint: "原尺码表图片文件已丢失，请在商品资料中重新上传".appLocalized)
+                    Button {
+                        toggleSizeChartImage()
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "chevron.up")
+                            Text("收起".appLocalized)
+                        }
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(themeManager.secondaryTextColor)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 7)
+                        .background(
+                            RoundedRectangle(cornerRadius: 9, style: .continuous)
+                                .fill(themeManager.tertiaryTextColor.opacity(0.12))
+                        )
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(Text("收起尺码表原图".appLocalized))
+                }
+                // 入口与图片同属一个容器，收起时整块淡出并向上收回 → 视觉上「折叠」
+                .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+            if disclosure.showsMissingHint {
+                chartImageBlock(plan.image,
+                                missingHint: "原尺码表图片文件已丢失，请在商品资料中重新上传".appLocalized)
+            }
+        }
+    }
+
+    /// 展开与收起共用同一段动画，两条触发路径（点入口 / 点「收起」）手感一致。
+    private func toggleSizeChartImage() {
+        withAnimation(.easeInOut(duration: 0.25)) {
+            isSizeChartImageExpanded.toggle()
+        }
+    }
+
+    private func sizeChartTriggerTitle(_ trigger: ShopCatalogChartDisclosure.Trigger) -> String {
+        switch trigger {
+        case .expand:   return "查看尺码表原图".appLocalized
+        case .collapse: return "收起尺码表原图".appLocalized
+        case .none:     return ""
         }
     }
 
@@ -326,9 +481,21 @@ struct ShopCatalogProductView: View {
         return (lowest, highest)
     }
 
+    /// 价格表展示计划：与尺码表共用同一套判定（`ShopCatalogChartPresentation`）。
+    private var priceChartPlan: ShopCatalogChartPresentation.Plan? {
+        guard let chart = series?.priceChart else { return nil }
+        let reference = ShopCatalogChartReference.resolve(chart.sourceImage) {
+            store.asset(id: $0)?.originalURL
+        }
+        return ShopCatalogChartPresentation.plan(
+            hasStructuredContent: chart.hasStructuredContent,
+            reference: reference,
+            isImageUnavailable: ShopCatalogImageResolver.isUnavailable)
+    }
+
     @ViewBuilder
     private var seriesPriceChartCard: some View {
-        if let chart = series?.priceChart {
+        if let chart = series?.priceChart, let plan = priceChartPlan {
             VStack(alignment: .leading, spacing: 12) {
                 // 头部：默认收起，仅展示标题 + 预约价区间摘要；点击展开查看表格与原图
                 Button {
@@ -354,8 +521,12 @@ struct ShopCatalogProductView: View {
                 .buttonStyle(.plain)
 
                 if isPriceChartExpanded {
+                    // 说明：本卡不需要 `ShopCatalogChartDisclosure`——它折叠的是「表格 + 原图」
+                    // 整块（表格原本也不常显），而尺码表卡折叠的只是原图、表格常显，
+                    // 两者的折叠语义不同，共用同一套折叠判定反而会互相牵制。
+                    // 展示内容（`plan`）仍与尺码表卡同源，这里不重复判定。
                     VStack(alignment: .leading, spacing: 12) {
-                        if chart.hasStructuredContent {
+                        if plan.showsTable {
                             structuredTable(columns: chart.columns, rows: chart.rows, cornerLabel: "项目")
                             if let unit = chart.unit {
                                 Text("单位：\(unit)".appLocalized)
@@ -363,16 +534,15 @@ struct ShopCatalogProductView: View {
                                     .foregroundStyle(themeManager.tertiaryTextColor)
                             }
                         } else {
-                            Text(chart.sourceImage != nil
-                                 ? "价格表图片已上传，但未能自动解析出表格内容，请在系列配置中重新上传或手动补录；上方区间按本系列在售商品汇总".appLocalized
-                                 : "暂无价格表数据".appLocalized)
+                            Text(priceChartFallbackText(plan))
                                 .font(.caption)
                                 .foregroundStyle(themeManager.tertiaryTextColor)
                         }
-                        // 原图：详情页内嵌直接展示（不再只依赖全屏查看器）
-                        if let sourceRef = chart.sourceImage {
-                            priceChartImageSection(sourceRef)
-                        }
+                        // 原图：内嵌直接展示（与尺码表同一渲染入口，不再只依赖全屏查看器）
+                        chartImageBlock(plan.image,
+                                        missingHint: "价格表原图文件已丢失，请在系列配置中重新上传".appLocalized)
+                        // 多图（2026-09-24 需求）：首图由 plan 渲染，这里补第 2 张起
+                        extraPriceChartImages
                     }
                     .transition(.opacity)
                 }
@@ -383,23 +553,89 @@ struct ShopCatalogProductView: View {
         }
     }
 
-    /// 价格表原图内嵌展示：
-    ///   · 文件可解析 → 圆角图片（等比、限高），点击进全屏查看器放大（沿用商品图查看器）
-    ///   · 文件丢失 / 引用不可解析 → 明确提示重新上传，而不是渲染空白
+    /// 价格表多图（2026-09-24 需求）的补充展示：首图由 `chartImageBlock(plan.image:)`
+    /// 渲染（单一展示口径不动），这里只补第 2 张起的原图。
+    /// 引用解析与 `priceChartPlan` 同源：asset id → originalURL，其余原样交给解析器。
+    private var extraPriceChartImageReferences: [String] {
+        guard let chart = series?.priceChart,
+              let images = chart.sourceImages, images.count > 1 else { return [] }
+        return images.dropFirst().compactMap {
+            ShopCatalogChartReference.resolve($0) { store.asset(id: $0)?.originalURL }
+        }
+    }
+
     @ViewBuilder
-    private func priceChartImageSection(_ ref: String) -> some View {
-        if priceChartImageMissing(ref) {
+    private var extraPriceChartImages: some View {
+        let references = extraPriceChartImageReferences
+        if !references.isEmpty {
+            VStack(alignment: .leading, spacing: 6) {
+                ForEach(Array(references.enumerated()), id: \.offset) { index, reference in
+                    ShopCatalogAssetImage(reference: reference, contentMode: .fit)
+                        .frame(maxWidth: .infinity)
+                        .frame(maxHeight: chartImageMaxHeight)
+                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                .stroke(themeManager.tertiaryTextColor.opacity(0.25), lineWidth: 1)
+                        )
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            // 第 2 张起点开查看器时带上全部原图（含首图），可左右翻阅
+                            var all: [String] = []
+                            if case .ready(let firstRef) = priceChartPlan?.image {
+                                all.append(firstRef)
+                            }
+                            all.append(contentsOf: references)
+                            viewerReferences = all
+                            viewerIndex = all.firstIndex(of: reference) ?? index + 1
+                            showsViewer = true
+                        }
+                }
+            }
+        }
+    }
+
+    /// 无结构化内容时的兜底文案：区分「本来没有登记」「有图但没解析出表格」「有图但文件丢了」，
+    /// 三种情况的用户动作完全不同，不能合成一句话。
+    private func priceChartFallbackText(_ plan: ShopCatalogChartPresentation.Plan) -> String {        switch plan.image {
+        case .none:
+            return "暂无价格表数据".appLocalized
+        case .ready:
+            return "价格表图片已上传，但未能自动解析出表格内容，可在系列配置中手动补录；上方区间按本系列在售商品汇总".appLocalized
+        case .unavailable:
+            return "价格表图片已登记，但原图文件已丢失，请在系列配置中重新上传".appLocalized
+        }
+    }
+
+    /// 原图展开后的最大高度：把「移动端 / 桌面端」的差异收敛在这一个数字上。
+    ///   · compact（手机）：360pt，保证一张长尺码表不会单独吃掉整屏，价格与操作区仍在手边；
+    ///   · regular（iPad / 桌面宽度）：520pt，宽幅尺码表能一次看全，不必依赖全屏查看器。
+    private var chartImageMaxHeight: CGFloat {
+        horizontalSizeClass == .regular ? 520 : 360
+    }
+
+    /// 图表原图内嵌展示（尺码表 / 价格表**共用**同一渲染）：
+    ///   · `.ready` → 圆角图片（等比、限高），点击进全屏查看器放大（沿用商品图查看器）
+    ///   · `.unavailable` → 明确提示重新上传，而不是渲染一张空白图
+    ///   · `.none` → 不渲染
+    @ViewBuilder
+    private func chartImageBlock(_ state: ShopCatalogChartPresentation.ImageState,
+                                 missingHint: String) -> some View {
+        switch state {
+        case .none:
+            EmptyView()
+        case .unavailable:
             HStack(spacing: 6) {
                 Image(systemName: "exclamationmark.triangle")
-                Text("原图文件丢失，请在系列配置中重新上传价格表图片".appLocalized)
+                Text(missingHint)
             }
             .font(.caption)
             .foregroundStyle(themeManager.tertiaryTextColor)
-        } else {
+        case .ready(let ref):
             VStack(alignment: .leading, spacing: 6) {
                 ShopCatalogAssetImage(reference: ref, contentMode: .fit)
                     .frame(maxWidth: .infinity)
-                    .frame(maxHeight: 360)
+                    .frame(maxHeight: chartImageMaxHeight)
                     .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                     .overlay(
                         RoundedRectangle(cornerRadius: 12, style: .continuous)
@@ -416,12 +652,6 @@ struct ShopCatalogProductView: View {
                     .foregroundStyle(themeManager.tertiaryTextColor)
             }
         }
-    }
-
-    /// 原图可解析性诊断：local: 文件丢失 / 引用无法解析时返回 true，
-    /// 把「图片显示不出来」变成明确原因（数据随沙盒重置丢失时给用户可操作的提示）
-    private func priceChartImageMissing(_ ref: String) -> Bool {
-        ShopCatalogImageResolver.isUnavailable(ref)
     }
 
     // MARK: 价格档案（§13：预约价 / 现货价 / 差价；定金尾款并列 + 缺失兜底）
@@ -523,7 +753,27 @@ struct ShopCatalogProductView: View {
 
     @Environment(\.modelContext) private var modelContext
     @State private var showsReservationSheet = false
+    /// 加购弹窗口径（付定金 / 全款）
+    @State private var entryOption: ShopCatalogWardrobeEntryOption = .depositPaid
+    /// 「其他记账方式」折叠区展开状态（需求二：预约已结束时定金 + 尾款收在这里）
+    @State private var showsOtherEntryOptions = false
     @State private var actionToast: String?
+
+    /// 打开加购确认页（金额一律由系统从后台档案读取，用户不填写）
+    private func openEntrySheet(_ option: ShopCatalogWardrobeEntryOption) {
+        // 没有预约价档案时无法按预约口径记账 → 退回现货加购（多选确认页）
+        if option != .wishlist, !hasReservationPrice {
+            showsMergeSheet = true
+            return
+        }
+        entryOption = option
+        showsReservationSheet = true
+    }
+
+    /// 后台是否有预约价（定金 / 尾款的来源）
+    private var hasReservationPrice: Bool {
+        (store.priceArchive(forProduct: productID).currentReservationPrice ?? 0) > 0
+    }
 
     /// 该商品是否已进入心愿 / 尾款 / 衣橱（按 catalogProductID 关联现有数据）
     private var existingRecord: Clothing? {
@@ -537,10 +787,12 @@ struct ShopCatalogProductView: View {
     @ViewBuilder
     private var actionSection: some View {
         if let existing = existingRecord {
+            // `isFinalPaymentPlan` = 已付定且仍有尾款待补（全款入橱不算「在心愿尾款中」）
+            let awaitingFinalPayment = existing.isFinalPaymentPlan
             VStack(spacing: 6) {
                 Label(
-                    existing.isDepositPlan ? "已在心愿尾款中" : "已在少女衣橱中",
-                    systemImage: existing.isDepositPlan ? "heart.fill" : "checkmark.seal.fill"
+                    awaitingFinalPayment ? "已在心愿尾款中" : "已在少女衣橱中",
+                    systemImage: awaitingFinalPayment ? "heart.fill" : "checkmark.seal.fill"
                 )
                 .font(.system(size: 14, weight: .medium))
                 .foregroundStyle(themeManager.accentTextColor)
@@ -555,14 +807,25 @@ struct ShopCatalogProductView: View {
                 if let product {
                     switch purchasePhase(for: product.id) {
                     case .reservationActive:
-                        // 预约中：主按钮 = 加入心愿（到「心愿尾款」跟进定金/尾款）
+                        // 预约期内（需求 N §II 场景一）：加入心愿 / 付定金加购 / 全款加购
+                        // 付定金 → 衣橱「已付定」+ 心愿尾款自动生成待补任务（尾款读后台）
+                        // 全款   → 衣橱「已全款」，绝不生成心愿尾款任务
                         primaryButton(title: "加入心愿", symbol: "heart.fill") {
                             addToWishlist(reminder: false)
                         }
-                        secondaryAction(title: "我已经预约", symbol: "calendar.badge.clock") {
-                            showsReservationSheet = true
+                        if hasReservationPrice {
+                            secondaryAction(
+                                title: ShopCatalogWardrobeEntryPolicy.buttonTitle(for: .depositPaid, phase: .reservationActive),
+                                symbol: "calendar.badge.clock"
+                            ) { openEntrySheet(.depositPaid) }
+                            secondaryAction(
+                                title: ShopCatalogWardrobeEntryPolicy.buttonTitle(for: .fullPaid, phase: .reservationActive),
+                                symbol: "checkmark.seal.fill"
+                            ) { openEntrySheet(.fullPaid) }
+                            statusCaption("预约中：付定金 → 心愿尾款等补款；付全款 → 直接记为已全款，不会生成尾款任务")
+                        } else {
+                            statusCaption("预约中：加入心愿后，到「心愿尾款」随时准备付定金或尾款")
                         }
-                        statusCaption("预约中：加入心愿后，到「心愿尾款」随时准备付定金或尾款")
                     case .reservationUpcoming:
                         // 预约未开始：仍显示加入心愿，实际作用是开售提醒
                         primaryButton(title: "加入心愿", symbol: "heart") {
@@ -576,9 +839,22 @@ struct ShopCatalogProductView: View {
                         }
                         statusCaption("现货在售：可直接加入衣橱留存搭配")
                     case .reservationEnded:
-                        // 预约已结束：置灰标签；有现货则引导购买现货
+                        // 预约已结束（需求 N §II 场景二 × 需求二 §二 业务背景）：
+                        //   · 主按钮 =【加入衣橱】→ 全款（后台预约价）→ 衣橱「已全款」，无尾款任务（**默认引导**）
+                        //   · 【加入心愿尾款】→ 定金 + 尾款，收进「其他记账方式」折叠区
+                        //
+                        // ⚠️ 2026-09-23 用户拍板：结束后**只改变默认 UI 引导，不剥夺记账能力**。
+                        //    「官方补款期 / 只交过定金 / 闲鱼全款收转单」这些情形仍必须能记定金 + 尾款。
+                        //    因此这里只是把入口降级为折叠项——**禁止改成彻底隐藏或置灰**。
                         endedTag
-                        if hasStock {
+                        if hasReservationPrice {
+                            primaryButton(
+                                title: ShopCatalogWardrobeEntryPolicy.buttonTitle(for: .fullPaid, phase: .reservationEnded),
+                                symbol: "checkmark.seal.fill"
+                            ) { openEntrySheet(.fullPaid) }
+                            statusCaption("预约已结束：按后台预约价一次记清，衣橱记为「已全款」，不会生成尾款任务")
+                            otherEntryOptionsDisclosure
+                        } else if hasStock {
                             primaryButton(title: "加入少女衣橱", symbol: nil) {
                                 showsMergeSheet = true
                             }
@@ -595,7 +871,7 @@ struct ShopCatalogProductView: View {
                 }
             }
             .sheet(isPresented: $showsReservationSheet) {
-                ShopCatalogReservationSheet(productID: productID)
+                ShopCatalogReservationSheet(productID: productID, option: entryOption)
             }
             .overlay(alignment: .bottom) {
                 if let actionToast {
@@ -615,9 +891,64 @@ struct ShopCatalogProductView: View {
         }
     }
 
+    /// 「其他记账方式」折叠区（2026-09-23 需求二）：把**非默认**的记账入口收起来，但绝不删掉。
+    ///
+    /// 用户裁定原文：「保留双分支，预约结束只改变默认 UI 引导（主推全款），
+    /// 但不剥夺用户记录『定金 + 尾款』的功能。请按『全款为主，定金尾款为隐藏备用』的方式实现交互。」
+    ///
+    /// 所以它是**折叠**（一次点击可达）而不是隐藏或置灰——
+    /// 「官方补款期」「只交过定金」「闲鱼全款收转单」这些真实情形都需要它。
+    @ViewBuilder
+    private var otherEntryOptionsDisclosure: some View {
+        VStack(spacing: 6) {
+            Button {
+                withAnimation(.easeInOut(duration: 0.2)) { showsOtherEntryOptions.toggle() }
+            } label: {
+                HStack(spacing: 4) {
+                    Text("其他记账方式：已付过定金 / 补款期")
+                        .font(.system(size: 13))
+                    Image(systemName: showsOtherEntryOptions ? "chevron.up" : "chevron.down")
+                        .font(.system(size: 11))
+                }
+                .foregroundStyle(themeManager.secondaryTextColor)
+            }
+            .buttonStyle(.plain)
+
+            if showsOtherEntryOptions {
+                secondaryAction(
+                    title: ShopCatalogWardrobeEntryPolicy.buttonTitle(for: .depositPaid, phase: .reservationEnded),
+                    symbol: "heart.fill"
+                ) { openEntrySheet(.depositPaid) }
+                Text("按后台已付定金记账，尾款自动进入心愿尾款等你补款")
+                    .font(.system(size: 11))
+                    .foregroundStyle(themeManager.tertiaryTextColor)
+                    .multilineTextAlignment(.center)
+            }
+        }
+        .frame(maxWidth: .infinity)
+    }
+
     // MARK: 购买阶段（按预约状态条件渲染的依据）
 
     private func purchasePhase(for productID: String) -> ShopCatalogPurchasePhase {
+        // 1. 系列层「发售阶段」优先（2026-09-23 需求二）：运营在系列上显式声明，
+        //    并且「过了预约结束时间」会自动流转为「预约已结束」（读取时判定，见
+        //    `CatalogSeriesSalePhaseResolver` 的类型注释）。
+        //
+        //    未声明（旧数据 salePhase == nil）→ 落到下面第 2 步的档期推导，
+        //    行为与改动前完全一致（不需要给存量系列做任何数据迁移）。
+        if let declared = CatalogSeriesSalePhaseResolver.effectivePhase(
+            declared: series?.salePhase,
+            reservationEndAt: series?.reservationEndAt,
+            now: Date()
+        ) {
+            switch declared {
+            case .reservationActive: return .reservationActive
+            case .reservationEnded: return .reservationEnded
+            case .inStock: return .inStock
+            }
+        }
+        // 2. 既有口径：按销售事件档期推导
         let events = store.saleEvents(forProduct: productID)
         let reservationStatuses = events
             .filter { $0.type == .reservation }
@@ -1015,12 +1346,19 @@ private struct ZoomableImage: View {
     }
 }
 
-// MARK: - 我已经预约（计划 §17：进入现有心愿尾款）
+// MARK: - 加购记账确认（需求 N §II：金额自动读取，用户不输入）
 
-/// 记录预约页：商品/店家/系列自动带入；颜色尺码可选；定金可改；尾款自动算；
-/// 尾款时间可为「待公布」，也可手动设定（设定后提醒走现有心愿尾款通知逻辑，§18 严格沿用）。
+/// 加购记账确认页：商品 / 店家 / 系列自动带入；颜色、尺码可选；
+/// **金额一律只读展示**——预约价、已付定金、待付尾款、本次入橱金额全部取后台价格档案。
+/// 需求 §I 核心原则：所有金额必须由系统自动读取后台数据，绝对不能让用户手动输入。
+///
+/// 两种口径（需求 §II）：
+///   · `.depositPaid` 支付定金 → 衣橱「已付定」，心愿尾款里自动生成待补任务
+///   · `.fullPaid`    支付全款 → 衣橱「已全款」（金额 = 后台预约价），**绝不生成**任何心愿尾款任务
 struct ShopCatalogReservationSheet: View {
     let productID: String
+    /// 加购口径（默认付定金）
+    var option: ShopCatalogWardrobeEntryOption = .depositPaid
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
@@ -1029,8 +1367,7 @@ struct ShopCatalogReservationSheet: View {
 
     @State private var selectedColor: String?
     @State private var selectedSize: String?
-    @State private var depositText: String = ""
-    /// 尾款时间：nil = 待公布
+    /// 尾款时间：nil = 待公布（仅付定金口径可设）
     @State private var hasTailDate = false
     @State private var tailDate = Date()
     @State private var errorText: String?
@@ -1042,9 +1379,29 @@ struct ShopCatalogReservationSheet: View {
         store.priceArchive(forProduct: productID)
     }
 
-    private var reservationPrice: Decimal { archive.historicalReservationPrice ?? 0 }
-    private var deposit: Decimal { Decimal(Double(depositText) ?? 0) }
-    private var balance: Decimal { max(0, reservationPrice - deposit) }
+    /// 后台预约价（= 定金 + 尾款总和）；全款口径的入橱金额
+    private var reservationPrice: Decimal { archive.currentReservationPrice ?? 0 }
+    /// 后台已付定金（只读：用户已经付给店家的钱，系统自己算）
+    private var backendDeposit: Decimal { min(max(0, archive.currentDeposit ?? 0), reservationPrice) }
+    /// 待付尾款（全款口径为 0，因为不存在待补任务）
+    ///
+    /// 走 `ShopCatalogWardrobeAmount`（需求 §II「尾款金额自动读取后台录入的『尾款』数据」），
+    /// 与落库用的 `ShopCatalogWardrobeDraftBuilder` **同一份算法**——
+    /// 弹窗上显示的待补金额必须等于最终写到心愿尾款里的金额。
+    private var pendingBalance: Decimal {
+        guard option != .fullPaid else { return 0 }
+        return ShopCatalogWardrobeAmount.pendingBalance(
+            backendBalance: archive.currentBalance,
+            reservationPrice: reservationPrice,
+            depositPaid: backendDeposit
+        )
+    }
+    /// 本次入橱记账金额
+    private var entryAmount: Decimal { option == .fullPaid ? reservationPrice : backendDeposit }
+    private var isFullPaid: Bool { option == .fullPaid }
+
+    /// 尺码候选：款式共享口径（同款任一颜色填过尺码表 → 这里就有；2026-09-23）
+    private var sizeRun: [String] { store.sizeRun(forProduct: productID) }
 
     var body: some View {
         NavigationStack {
@@ -1052,42 +1409,39 @@ struct ShopCatalogReservationSheet: View {
                 Section("商品") {
                     LabeledContent("商品", value: product?.name ?? "")
                     LabeledContent("店家", value: shop?.name ?? "—")
-                    LabeledContent("系列", value: series.map { "\($0.name)\($0.year.map { " · \($0)" } ?? "")" } ?? "—")
+                    LabeledContent("系列", value: series.map { "\($0.name)\($0.yearMonthText.map { " · \($0)" } ?? "")" } ?? "—")
                 }
                 if !store.colors(forProduct: productID).isEmpty {
                     Section("配色") {
                         chipGrid(store.colors(forProduct: productID), selection: $selectedColor)
                     }
                 }
-                if !store.sizes(forProduct: productID).isEmpty {
+                if !sizeRun.isEmpty {
                     Section("尺码") {
-                        chipGrid(store.sizes(forProduct: productID), selection: $selectedSize)
+                        chipGrid(sizeRun, selection: $selectedSize)
                     }
                 }
-                Section("价格") {
-                    LabeledContent("预约总价", value: ShopCatalogFormat.price(reservationPrice))
-                    HStack {
-                        Text("已付定金")
-                        Spacer()
-                        TextField("0", text: $depositText)
-                            .keyboardType(.decimalPad)
-                            .multilineTextAlignment(.trailing)
-                            .frame(width: 110)
-                        Text("元")
-                    }
-                    LabeledContent("待付尾款", value: ShopCatalogFormat.price(balance))
+                Section("金额（自动读取，无需填写）") {
+                    LabeledContent("预约价", value: ShopCatalogFormat.price(reservationPrice))
+                    LabeledContent("已付定金", value: ShopCatalogFormat.price(backendDeposit))
+                    LabeledContent("待付尾款", value: ShopCatalogFormat.price(pendingBalance))
+                        .foregroundStyle(isFullPaid ? themeManager.secondaryTextColor : themeManager.accentTextColor)
+                    LabeledContent(isFullPaid ? "本次入橱（全款）" : "本次入橱（已付定）",
+                                   value: ShopCatalogFormat.price(entryAmount))
                         .foregroundStyle(themeManager.accentTextColor)
-                    // §17：尾款时间可为「待公布」，也可手动设置（用于提醒）
-                    Toggle("已公布尾款时间", isOn: $hasTailDate.animation())
-                    if hasTailDate {
-                        DatePicker("尾款时间", selection: $tailDate, displayedComponents: .date)
+                    // 全款口径不生成任何尾款任务，因此也不提供尾款时间设置
+                    if !isFullPaid {
+                        Toggle("已公布尾款时间", isOn: $hasTailDate.animation())
+                        if hasTailDate {
+                            DatePicker("尾款时间", selection: $tailDate, displayedComponents: .date)
+                        }
                     }
                 }
                 Section {
                     Button {
-                        confirmReservation()
+                        confirmEntry()
                     } label: {
-                        Text("确认预约，进入心愿尾款")
+                        Text(isFullPaid ? "确认全款入橱（已全款）" : "确认定金入橱（已付定）")
                             .frame(maxWidth: .infinity)
                             .font(.system(size: 15, weight: .semibold))
                             .foregroundStyle(.white)
@@ -1099,10 +1453,12 @@ struct ShopCatalogReservationSheet: View {
                             .foregroundStyle(.red)
                     }
                 } footer: {
-                    Text("预约记录进入现有心愿尾款：已付定金 → 待付尾款 → 尾款完成 → 加入少女衣橱。不做发货 / 收货状态。")
+                    Text(isFullPaid
+                         ? "全款入橱：按后台预约价一次记清，衣橱记为「已全款」，**不会**生成任何心愿尾款任务。"
+                         : "定金入橱：按后台已付定金记账，尾款自动进入心愿尾款等你补款。")
                 }
             }
-            .navigationTitle("我已经预约")
+            .navigationTitle(isFullPaid ? "全款加购" : "付定金加购")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
@@ -1111,10 +1467,6 @@ struct ShopCatalogReservationSheet: View {
             }
             .onAppear {
                 store.loadFromBundleIfNeeded()
-                if depositText.isEmpty {
-                    let d = archive.reservation?.deposit ?? 0
-                    depositText = d > 0 ? NSDecimalNumber(decimal: d).stringValue : ""
-                }
                 if let end = archive.reservation?.endAt {
                     hasTailDate = true
                     tailDate = end
@@ -1144,30 +1496,31 @@ struct ShopCatalogReservationSheet: View {
         }
     }
 
-    private func confirmReservation() {
+    private func confirmEntry() {
+        guard option != .wishlist else { return }
         guard reservationPrice > 0 else {
-            errorText = "该商品没有预约价档案，无法预约"
+            errorText = "该商品没有预约价档案，无法加购"
             return
         }
-        guard deposit <= reservationPrice else {
-            errorText = "定金不能超过预约总价"
-            return
-        }
+        let priceMode: ShopCatalogWardrobeDraftBuilder.PriceMode = isFullPaid
+            ? .fullReservation
+            : .reservation(depositPaid: backendDeposit)
         let selection = ShopCatalogWardrobeDraftBuilder.Selection(
             productID: productID,
             color: selectedColor,
             size: selectedSize,
-            priceMode: .reservation(depositPaid: deposit)
+            priceMode: priceMode
         )
         guard var draft = ShopCatalogWardrobeDraftBuilder.makeDraft(
             selection: selection,
             store: store, modelContext: modelContext
         ) else {
-            errorText = "生成预约记录失败"
+            errorText = "生成衣橱记录失败"
             return
         }
-        // §17：尾款时间可设置；未设置 = 待公布（沿用草稿里的占位）
-        if hasTailDate {
+        // §17：尾款时间可设置；未设置 = 待公布（沿用草稿里的占位）。
+        // 全款口径没有尾款任务，不写尾款时间。
+        if !isFullPaid, hasTailDate {
             draft = draft.with(finalPaymentDate: tailDate, finalPaymentEndDate: tailDate)
         }
         do {

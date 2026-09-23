@@ -151,6 +151,10 @@ final class Clothing {
     var catalogVariantID: String? = nil // 公共 Catalog 的配色/尺码规格 ID
     var catalogSaleEventID: String? = nil // 生成该条记录所依据的销售记录（预约/现货）ID
 
+    /// 转单（闲鱼收单等他人转手）：衣橱卡片状态标签「转单」（2026-09-23 需求 N）。
+    /// 与付款口径（全款 / 已付定）互相独立，可同时出现；默认 false 供旧数据轻量迁移。
+    var isResaleTransfer: Bool = false
+
     @Relationship(deleteRule: .nullify)
     var tags: [Tag]? = []
     
@@ -211,7 +215,8 @@ final class Clothing {
          finalPaymentEndDate: Date? = nil,
          note: String = "",
          stock: Int = 1,
-         status: ClothingStatus = .onShelf) {
+         status: ClothingStatus = .onShelf,
+         isResaleTransfer: Bool = false) {
         self.id = UUID()
         self.name = name
         self.brand = brand
@@ -245,6 +250,7 @@ final class Clothing {
         self.note = note
         self.stock = FinancialDataSanitizer.stock(stock)
         self.status = status
+        self.isResaleTransfer = isResaleTransfer
         self.createdAt = Date()
         self.updatedAt = Date()
     }

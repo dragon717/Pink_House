@@ -1,0 +1,41 @@
+{
+  "generatedAt": "2026-09-16",
+  "sources": [
+    {
+      "label": "规格测试链接",
+      "shopName": "规格测试品牌",
+      "url": "https://item.taobao.com/item.htm?id=FX123",
+      "capturedOn": "2026-09-15"
+    }
+  ],
+  "categories": [
+    {
+      "id": "op",
+      "name": "① OP",
+      "price": "¥468",
+      "sizes": "S / M / L",
+      "charts": [
+        {
+          "title": "OP 尺码表",
+          "imageName": "fx-chart-op.jpg",
+          "headers": ["尺寸", "胸围", "腰围"],
+          "rows": [["S", "84", "64"], ["M", "88", "68"], ["L", "92", "72"]]
+        }
+      ]
+    },
+    {
+      "id": "jsk",
+      "name": "② JSK",
+      "price": "¥528",
+      "sizes": "S / M / L",
+      "charts": [
+        {
+          "title": "JSK 尺码表",
+          "imageName": "fx-chart-jsk.jpg",
+          "headers": ["尺寸", "胸围", "裙长"],
+          "rows": [["S", "82", "95"], ["M", "86", "97"], ["L", "90", "99"]]
+        }
+      ]
+    }
+  ]
+}

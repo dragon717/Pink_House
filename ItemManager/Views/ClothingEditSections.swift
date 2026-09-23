@@ -1064,6 +1064,8 @@ struct ClothingPurchaseInfoView: View {
     @Binding var purchaseDate: Date
     @Binding var depositDate: Date
     @Binding var reservationKind: ClothingReservationKind
+    /// 转单（闲鱼收单等）：衣橱卡片「转单」状态标签（2026-09-23 需求 N）
+    @Binding var isResaleTransfer: Bool
     @Binding var finalPaymentDate: Date
     @Binding var finalPaymentEndDate: Date
     
@@ -1124,7 +1126,21 @@ struct ClothingPurchaseInfoView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .themeSkinLegibleText(level: .inline, slot: .sectionCard)
-                
+
+                Toggle(isOn: $isResaleTransfer.animation()) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("转单".appLocalized)
+                            .font(.subheadline)
+                            .themeSkinLegibleText(level: .inline, slot: .sectionCard)
+                        Text("闲鱼收单等他人转手：衣橱卡片会带上「转单」标签".appLocalized)
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                            .themeSkinLegibleText(level: .inline, slot: .sectionCard)
+                    }
+                }
+                .tint(Color.accentColor)
+                .accessibilityLabel("转单")
+
                 switch reservationKind {
                 case .owned, .sold:
                     EmptyView()

@@ -18,6 +18,7 @@
 
 import Foundation
 import SwiftData
+import UIKit
 
 // MARK: - 主衣物 / 小物分类判定（计划 §19-20）
 
@@ -41,6 +42,9 @@ enum ShopCatalogWardrobeDraftBuilder {
         case stock
         /// 预约价（定金 + 尾款）→ 心愿尾款
         case reservation(depositPaid: Decimal)
+        /// 全款（预约价）→ 已全款：金额 = 后台预约价（定金 + 尾款总和），
+        /// **绝不生成**任何心愿尾款任务（2026-09-23 需求 N §II 场景一 / 场景二分支 B）
+        case fullReservation
         /// 仅心愿：未付任何款项，全部记为待付尾款
         case wishlist
     }
@@ -64,7 +68,7 @@ enum ShopCatalogWardrobeDraftBuilder {
 
         var noteLines: [String] = []
         if let series { noteLines.append("系列：\(series.name)") }
-        if let year = series?.year { noteLines.append("年份：\(String(year))") }
+        if let yearMonth = series?.yearMonthText { noteLines.append("年月：\(yearMonth)") }
 
         // 价格口径（计划 §13/§16/§17）：预约 → 定金尾款；心愿 → 全记待付尾款；现货 → 总价。
         var depositAmount: Decimal = 0
@@ -75,39 +79,106 @@ enum ShopCatalogWardrobeDraftBuilder {
         var finalPaymentEnd: Date = Date()
         var saleEventID: String? = nil
 
+        // 币种（R02）：整条记录统一用商品的生效币种，日元不按人民币入库。
+        let archive = store.priceArchive(forProduct: product.id)
+        let currency: CatalogCurrency = archive.currentCurrency ?? .unknown
+
         switch selection.priceMode {
         case .stock:
-            let archive = store.priceArchive(forProduct: product.id)
             totalAmount = archive.currentStockPrice
                 ?? archive.historicalReservationPrice ?? 0
         case .reservation(let depositPaid):
-            let archive = store.priceArchive(forProduct: product.id)
             guard let event = archive.reservation else { return nil }
             depositAmount = max(0, min(depositPaid, event.price))
-            balanceAmount = event.price - depositAmount
+            // 待补尾款（2026-09-23 需求 N §II 修正）：**读后台录入的「尾款」**，
+            // 后台没录才退回「预约价 − 已付定金」。口径唯一来源 `ShopCatalogWardrobeAmount`，
+            // 与加购弹窗的只读预览共用（弹窗显示多少，心愿尾款就写多少）。
+            balanceAmount = ShopCatalogWardrobeAmount.pendingBalance(
+                backendBalance: archive.currentBalance,
+                reservationPrice: event.price,
+                depositPaid: depositAmount
+            )
             totalAmount = event.price
             isDepositPlan = true
             saleEventID = event.id
+            // 后台三价不自洽时不静默：如实留痕，说明尾款取了哪个数
+            if ShopCatalogWardrobeAmount.isBackendPriceInconsistent(
+                deposit: event.deposit,
+                balance: archive.currentBalance,
+                reservationPrice: event.price
+            ) {
+                let symbol = currency.symbol
+                noteLines.append(
+                    "后台三价不自洽：定金 \(symbol)\(NSDecimalNumber(decimal: event.deposit ?? 0).stringValue)"
+                    + " + 尾款 \(symbol)\(NSDecimalNumber(decimal: archive.currentBalance ?? 0).stringValue)"
+                    + " ≠ 预约价 \(symbol)\(NSDecimalNumber(decimal: event.price).stringValue)"
+                    + "；待补尾款按「录入的尾款」记账"
+                )
+            }
             // 尾款窗口（§17）：预约结束 = 尾款开始；结束未公布 → 待公布（用开始时间占位）
             finalPaymentStart = event.endAt ?? Date()
             finalPaymentEnd = finalPaymentStart
+        case .fullReservation:
+            // 全款（预约价）：金额一律取后台预约价（= 定金 + 尾款总和），用户不输入。
+            // 记为「已付定 + 尾款 0」→ `isFullPaymentReservation` → 卡片标签「全款」，
+            // 且 `pendingFinalPaymentAmount == 0` → 心愿尾款里不会留下待补任务。
+            guard let event = archive.reservation else { return nil }
+            depositAmount = event.price
+            balanceAmount = 0
+            totalAmount = event.price
+            isDepositPlan = true
+            saleEventID = event.id
+            finalPaymentStart = event.endAt ?? Date()
+            finalPaymentEnd = finalPaymentStart
         case .wishlist:
-            let archive = store.priceArchive(forProduct: product.id)
             totalAmount = archive.currentStockPrice
                 ?? archive.historicalReservationPrice ?? 0
             balanceAmount = totalAmount
             isDepositPlan = true
         }
 
-        if isDepositPlan {
-            noteLines.append("价格口径：定金 ¥\(depositAmount) + 尾款 ¥\(balanceAmount) = ¥\(totalAmount)")
+        // 金额与币种一起留痕：个人记录事后要能回答「这笔钱是什么币」
+        if currency.isUnknown {
+            noteLines.append("币种待确认（来源未标注币种；金额按原值记录，未做换算）")
+        } else if currency != .cny {
+            noteLines.append("原始币种：\(currency.displayName)（\(currency.symbol)\(NSDecimalNumber(decimal: totalAmount).stringValue)，未做换算）")
         }
 
-        let colors = [selection.color].compactMap { $0 }.joined(separator: "、")
+        if isDepositPlan {
+            let symbol = currency.symbol
+            func money(_ value: Decimal) -> String {
+                "\(symbol)\(NSDecimalNumber(decimal: value).stringValue)"
+            }
+            if balanceAmount == 0 {
+                // 全款（预约价）：已付清，心愿尾款里不会留下待补任务（需求 N §II）
+                noteLines.append("价格口径：全款 \(money(totalAmount))（已付清，不生成尾款任务）")
+            } else if depositAmount + balanceAmount == totalAmount {
+                noteLines.append("价格口径：定金 \(money(depositAmount)) + 尾款 \(money(balanceAmount)) = \(money(totalAmount))")
+            } else {
+                // 后台三价不自洽：不能写「A + B = C」这种算不平的等式，
+                // 但也不许偷偷改数——照实写，并点明以哪个为准。
+                noteLines.append("价格口径：定金 \(money(depositAmount)) + 尾款 \(money(balanceAmount))（预约价 \(money(totalAmount))，以后台录入为准）")
+            }
+        }
+
+        // 记录名（需求 N §III.1）：`[系列名] + [款式名] + [颜色]`，缺失项按 §III.2 降级。
+        // 颜色优先用户选定色、其次后台规格色 —— 保证「同名不同色」在衣橱里能一眼区分；
+        // 纯配饰（无规格色也无颜色词）→ 自动降级为 `[系列名] + [款式名]`。
+        let resolvedColor = ShopCatalogWardrobeTitle.resolvedColor(
+            explicit: selection.color,
+            specColors: store.colors(forProduct: product.id),
+            productName: product.name
+        )
+        let recordName = ShopCatalogWardrobeTitle.recordName(
+            product: product,
+            seriesName: series?.name,
+            color: resolvedColor
+        )
+        let colors = resolvedColor ?? ""
         let sizes = [selection.size].compactMap { $0 }.joined(separator: "、")
 
         let draft = ClothingEditDraft(
-            name: product.name,
+            name: recordName,
             brandName: shop?.name ?? "",
             types: product.category,
             colors: colors,
@@ -115,11 +186,14 @@ enum ShopCatalogWardrobeDraftBuilder {
             length: "",
             condition: "全新",
             accessories: "",
-            imagePaths: [],
+            // 2026-09-24 根因修复：把商品图物化成 ImageManager 文件，衣橱卡片才有图可显示
+            imagePaths: materializeImagePaths(for: product, store: store, modelContext: modelContext),
             isShared: false,
-            originalPrice: NSDecimalNumber(decimal: totalAmount).doubleValue,
-            originalPriceJPY: 0,
-            originalPriceCurrencyCode: ClothingPriceCurrency.cny.rawValue,
+            // R02：金额写进**币种对应**的字段。日元进 originalPriceJPY 并标 JPY，
+            // 不写进「人民币原价」——否则 24800 日元会变成 24800 元人民币。
+            originalPrice: currency == .jpy ? 0 : NSDecimalNumber(decimal: totalAmount).doubleValue,
+            originalPriceJPY: currency == .jpy ? NSDecimalNumber(decimal: totalAmount).doubleValue : 0,
+            originalPriceCurrencyCode: currency.clothingCurrencyCode,
             priceTotal: NSDecimalNumber(decimal: totalAmount).doubleValue,
             deposit: NSDecimalNumber(decimal: depositAmount).doubleValue,
             balance: NSDecimalNumber(decimal: balanceAmount).doubleValue,
@@ -136,6 +210,40 @@ enum ShopCatalogWardrobeDraftBuilder {
             sizeChartImagePath: nil
         )
         return draft
+    }
+
+    /// 商品图引用 → 衣橱图片文件名（2026-09-24 根因修复）。
+    ///
+    /// 根因：`makeDraft` 曾硬编码 `imagePaths: []`，加购落库的 `Clothing` 没有任何图片，
+    /// 而衣橱卡片走 `ImageManager` 文件名体系 —— 引用再完整也无处取图，表现为「衣橱不显示图片」。
+    ///
+    /// 引用推导与详情页同一口径：`store.asset(id:)?.originalURL ?? 原值`，随后分类解析：
+    ///   · `local:` 运营上传图 → Application Support/ShopCatalog/images/
+    ///   · 其余视为 Bundle 画册图（含 "bundle:" 前缀）
+    ///   · http(s) 远程图 → 不在主线程同步拉网络，跳过（详情页轮播仍可看原图）
+    /// 单张失败不阻塞其余图片；全部失败返回空数组（卡片展示占位，与旧行为一致）。
+    /// 物化是「复制」不是「搬移」：Catalog 侧引用原样保留。
+    @MainActor
+    static func materializeImagePaths(
+        for product: CatalogProduct,
+        store: ShopCatalogStore,
+        modelContext: ModelContext,
+        maxCount: Int = 6
+    ) -> [String] {
+        var fileNames: [String] = []
+        for assetID in product.images {
+            guard fileNames.count < maxCount else { break }
+            let reference = store.asset(id: assetID)?.originalURL ?? assetID
+            let trimmed = reference.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmed.isEmpty else { continue }
+            if trimmed.lowercased().hasPrefix("http") { continue }
+            guard let url = ShopCatalogImageResolver.url(for: trimmed),
+                  let image = UIImage(contentsOfFile: url.path),
+                  let fileName = ImageManager.shared.saveImage(image, context: modelContext)
+            else { continue }
+            fileNames.append(fileName)
+        }
+        return fileNames
     }
 
     /// 系列页多选 → 按计划 §19-24 生成草稿组：
@@ -187,7 +295,20 @@ enum ShopCatalogWardrobeDraftBuilder {
         func accessoryPriceLine(_ product: CatalogProduct) -> String {
             let archive = store.priceArchive(forProduct: product.id)
             let price = archive.currentStockPrice ?? archive.historicalReservationPrice
-            return price.map { "¥\(NSDecimalNumber(decimal: $0).stringValue)" } ?? "价格未填"
+            let symbol = (archive.currentCurrency ?? .unknown).symbol
+            return price.map { "\(symbol)\(NSDecimalNumber(decimal: $0).stringValue)" } ?? "价格未填"
+        }
+
+        /// 主衣物的币种：小物只与同币种的主衣物合并计价（§7.5：跨币种不直接合计）
+        let headCurrency = entryHeads.first.map {
+            store.priceArchive(forProduct: $0.product.id).currentCurrency
+        } ?? nil
+
+        /// 与主衣物同币种的小物才可计入合计；跨币种小物单独列出，不参与加总
+        func isSameCurrencyAsHead(_ product: CatalogProduct) -> Bool {
+            guard let headCurrency, !headCurrency.isUnknown else { return true }
+            let c = store.priceArchive(forProduct: product.id).currentCurrency
+            return c == nil || c == headCurrency
         }
 
         return entryHeads.enumerated().map { index, head in
@@ -196,12 +317,15 @@ enum ShopCatalogWardrobeDraftBuilder {
             // 小物只挂第一条主衣物记录（§23 示例：JSK + KC / OP 各一条）
             let names = accessoryEntries.map { $0.product.name }
             let accessoryPriceTotal = accessoryEntries.reduce(Decimal(0)) { sum, item in
+                guard isSameCurrencyAsHead(item.product) else { return sum }
                 let archive = store.priceArchive(forProduct: item.product.id)
                 return sum + (archive.currentStockPrice ?? archive.historicalReservationPrice ?? 0)
             }
             var noteLines = head.draft.note.components(separatedBy: "\n")
             for item in accessoryEntries {
-                noteLines.append("小物：\(item.product.name)（\(accessoryPriceLine(item.product))）")
+                let line = "小物：\(item.product.name)（\(accessoryPriceLine(item.product))）"
+                noteLines.append(isSameCurrencyAsHead(item.product)
+                                 ? line : line + "（币种不同，未计入合计）")
             }
 
             let accessoryTotalDouble = NSDecimalNumber(decimal: accessoryPriceTotal).doubleValue
@@ -211,7 +335,7 @@ enum ShopCatalogWardrobeDraftBuilder {
                 : head.draft.balance
             let mergedName = names.isEmpty
                 ? head.draft.name
-                : "\(head.product.name)＋\(names.joined(separator: "＋"))（套装）"
+                : "\(head.draft.name)＋\(names.joined(separator: "＋"))（套装）"
 
             // ClothingEditDraft 全 let + 显式 init：用复制重建生成合并后的草稿
             let merged = head.draft.with(
@@ -240,7 +364,8 @@ extension ClothingEditDraft {
         balance: Double? = nil,
         note: String? = nil,
         finalPaymentDate: Date? = nil,
-        finalPaymentEndDate: Date? = nil
+        finalPaymentEndDate: Date? = nil,
+        isResaleTransfer: Bool? = nil
     ) -> ClothingEditDraft {
         ClothingEditDraft(
             id: id,
@@ -279,7 +404,8 @@ extension ClothingEditDraft {
             accessoryList: accessoryList,
             sizeChartImagePath: sizeChartImagePath,
             priceChartImagePath: priceChartImagePath,
-            selectedTags: selectedTags
+            selectedTags: selectedTags,
+            isResaleTransfer: isResaleTransfer ?? self.isResaleTransfer
         )
     }
 }
@@ -347,15 +473,24 @@ enum ShopCatalogWardrobeInserter {
         onto clothing: Clothing,
         store: ShopCatalogStore
     ) {
+        let headCurrency = clothing.originalPriceCurrencyCode
         var sortIndex = 0
         for productID in accessoryProductIDs.sorted() {
             guard let product = store.product(id: productID) else { continue }
             let archive = store.priceArchive(forProduct: productID)
             let price = archive.currentStockPrice ?? archive.historicalReservationPrice ?? 0
+            let currency = archive.currentCurrency ?? .unknown
             let isReservation = clothing.isDepositPlan
+            // `AccessoryItem` 只有金额没有币种字段。小物与主衣物币种不同时，
+            // 把金额写进名称并置 price = 0 —— 宁可少一个可合计的数字，
+            // 也不能把 24800 日元当成 24800 元记进个人账（§7.5 不隐式换汇）。
+            let sameCurrency = currency.clothingCurrencyCode == headCurrency
+            let name = sameCurrency
+                ? product.name
+                : "\(product.name)（\(currency.symbol)\(NSDecimalNumber(decimal: price).stringValue)，\(currency.displayName)）"
             let item = AccessoryItem(
-                name: product.name,
-                price: price,
+                name: name,
+                price: sameCurrency ? price : 0,
                 deposit: isReservation ? (archive.reservation?.deposit ?? 0) : 0,
                 balance: isReservation ? max(0, price - (archive.reservation?.deposit ?? 0)) : 0,
                 sortIndex: sortIndex

@@ -38,6 +38,74 @@ enum CatalogSaleEventType: String, Codable, CaseIterable, Identifiable {
     }
 }
 
+/// 金额币种（2026-09-22 第三版收口 R02 最小兼容设计）
+///
+/// 背景：旧迁移脚本把 `priceJPY / salePriceJPY / regularPriceJPY` 直接写进没有
+/// 币种语义的 `price`，衣橱草稿又写死 CNY —— 于是「¥24800」在两处分别是
+/// 24800 元人民币和 24800 日元，金额与币种脱钩，跨币种差价、合计、个人实付
+/// 全是错的。
+///
+/// 口径（方案 §7.5）：
+///   · 源金额 + 源币种 → Catalog 展示 → 用户选择 → 个人记录金额 + 同币种；
+///   · 日元不得按人民币入库，来源不明标「币种待确认」；
+///   · **不隐式换汇**：跨币种不直接比较、不直接合计；
+///   · 旧 JSON 的无币种记录按可验证来源补齐，不做全局默认 CNY。
+enum CatalogCurrency: String, Codable, CaseIterable, Identifiable, Sendable {
+    case cny = "CNY"
+    case jpy = "JPY"
+    /// 来源未标注币种：展示「币种待确认」，不参与跨币种计算
+    case unknown = "UNKNOWN"
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .cny: return "人民币"
+        case .jpy: return "日元"
+        case .unknown: return "币种待确认"
+        }
+    }
+
+    /// 金额符号。unknown 仍显示「¥」但配套文案必须提示币种待确认，
+    /// 避免把「不知道是什么钱」呈现成「确定是人民币」。
+    var symbol: String {
+        switch self {
+        case .cny: return "¥"
+        case .jpy: return "JP¥"
+        case .unknown: return "¥"
+        }
+    }
+
+    var isUnknown: Bool { self == .unknown }
+
+    /// 与衣橱既有口径（`ClothingPriceCurrency`）对齐的代码。
+    /// unknown 回退到 CNY 只用于「必须给衣橱一个显示币种」的场合，
+    /// 并会同时写入「币种待确认」备注，不作为换汇依据。
+    var clothingCurrencyCode: String {
+        switch self {
+        case .cny: return "CNY"
+        case .jpy: return "JPY"
+        case .unknown: return "CNY"
+        }
+    }
+}
+
+/// 金额 + 币种的最小载体：跨币种比较 / 合计一律先过 `isSameCurrency(as:)`。
+nonisolated struct CatalogMoney: Hashable, Sendable {
+    var amount: Decimal
+    var currency: CatalogCurrency
+
+    func isSameCurrency(as other: CatalogMoney) -> Bool {
+        currency == other.currency && !currency.isUnknown
+    }
+
+    /// 展示文本（币种待确认时不加符号前缀，改由配套文案说明）
+    var displayText: String {
+        guard !currency.isUnknown else { return "\(NSDecimalNumber(decimal: amount).stringValue)（币种待确认）" }
+        return "\(currency.symbol)\(NSDecimalNumber(decimal: amount).stringValue)"
+    }
+}
+
 /// CatalogAsset 图片资源类型（计划 §5）
 enum CatalogAssetType: String, Codable, CaseIterable, Identifiable {
     case productImage    // 商品图
@@ -122,11 +190,40 @@ struct CatalogShop: Codable, Identifiable, Hashable, Sendable {
 // MARK: - Series 系列
 
 /// 系列（计划 §4：id, shopID, name, year, season, cover, description；与 Product 必须分开）
+// MARK: - Series 系列发售阶段（2026-09-23 需求二）
+
+/// 系列层面的「发售阶段」：明确区分该系列当前在**预约中**还是**预约已结束**，
+/// 直接决定前端加购时能给什么模式（预约期可入定金 / 尾款，结束后引导全款）。
+///
+/// 与 `ShopCatalogPurchasePhase`（单品级、由销售事件档期推导）的分工：
+///   · 本类型 = **运营在系列上显式声明**的口径，带「预约结束时间」与过期自动流转；
+///   · 单品详情页**优先**消费它，未声明（nil）时才回退到档期推导 —— 旧数据行为不变。
+nonisolated enum CatalogSeriesSalePhase: String, Codable, CaseIterable, Identifiable, Sendable {
+    case reservationActive = "reservation_active"
+    case reservationEnded = "reservation_ended"
+    case inStock = "in_stock"
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .reservationActive: return "预约中"
+        case .reservationEnded: return "预约已结束"
+        case .inStock: return "现货"
+        }
+    }
+}
+
+/// 系列（V1.1 §4.2：id / shopID / name / year / season / cover / description）
 struct CatalogSeries: Codable, Identifiable, Hashable, Sendable {
     var id: String
     var shopID: String
     var name: String
     var year: Int? = nil
+    /// 年月（2026-09-24 需求）：与 `year` 配合表达「2026-10」这类年月粒度；
+    /// nil = 只填了年份（旧数据形态）。录入/解析/展示统一走 `CatalogYearMonthText`。
+    /// **必须 Optional**：合成 `Decodable` 对旧 JSON / 已发布覆盖层缺键自动置 nil，零迁移。
+    var month: Int? = nil
     /// 季节（如「冬」），自由文本
     var season: String? = nil
     var cover: String? = nil
@@ -136,6 +233,16 @@ struct CatalogSeries: Codable, Identifiable, Hashable, Sendable {
     var archivedAt: Date? = nil
     /// 系列级预约价格表（2026-09-22）：整个系列共用，旧 JSON 缺键自动置 nil
     var priceChart: CatalogPriceChart? = nil
+    /// 发售阶段（2026-09-23 需求二）：nil = **未声明**（旧数据 / 运营还没填）
+    /// → 前端沿用销售记录档期推导，行为与改动前完全一致。
+    ///
+    /// **必须 Optional**：合成 `Decodable` 对非 Optional 字段走 `decode`，
+    /// 旧 JSON / 已发布的覆盖层缺这个键会直接抛错，整个系列列表都打不开。
+    var salePhase: CatalogSeriesSalePhase? = nil
+    /// 预约结束时间（仅在选择「预约中」时要求填写）。
+    /// 当前时间越过它 → 生效阶段自动流转为「预约已结束」（`CatalogSeriesSalePhaseResolver`）。
+    /// 切到其它阶段时**不清除**该值：它是「预约是什么时候结束的」这条事实本身。
+    var reservationEndAt: Date? = nil
 }
 
 // MARK: - PriceCorrection 价格修正（2026-09-22：与 append-only 销售历史分离）
@@ -155,6 +262,9 @@ struct CatalogPriceCorrection: Codable, Hashable, Sendable {
     var balance: Decimal? = nil
     /// 最后一次修正时间（审计用；不是业务批次时间）
     var correctedAt: Date? = nil
+    /// 修正快照的币种（R02）。nil = 沿用销售记录的币种；
+    /// 修正价格时必须与商品既有币种一致——修价不是换币种，跨币种修正会被拒绝。
+    var currency: CatalogCurrency? = nil
 }
 
 // MARK: - Product 商品
@@ -255,6 +365,40 @@ struct CatalogSizeChart: Codable, Identifiable, Hashable, Sendable {
     }
 }
 
+// MARK: - StyleProfile 款式（SPU）公共档案
+
+/// 款式公共档案（2026-09-23 录入端重构：SPU / SKU 分层）。
+///
+/// 分层口径（需求原文）：
+///   · **款式（SPU）公共属性** —— 尺码表、面料、款式描述：录商品的第一步填，**只填一次**；
+///   · **颜色（SKU）差异属性** —— 颜色图片、颜色尺码选择：添加每个颜色时独立填。
+///
+/// 本结构承载其中的「面料 / 款式描述」。**尺码表不放在这里**，它已经是款式级实体
+/// （`CatalogSizeChart` 的读写都按款式归一化，见 `ShopCatalogSizeChartSharing`），
+/// 再搬一次家只会多出第二个真相来源；新旧两处口径统一由 `ShopCatalogStyleProfileSharing`
+/// 对外暴露，调用方不必知道数据住在哪。
+///
+/// `id` 就是款式键（`ShopCatalogStyleProfileSharing.styleKey`），因此
+/// **一个款式天然只有一份档案**——写入口径是整体替换，不存在「红色一份、粉色一份」。
+struct CatalogStyleProfile: Codable, Identifiable, Hashable, Sendable {
+    /// 款式键：`seriesID|category|designName`（与 `ShopCatalogSameDesignGrouper.designKey` 同源）
+    var id: String
+    var seriesID: String
+    var category: String
+    var designName: String
+    /// 面料（如「雪花提花布 + 蕾丝拼接」）
+    var fabric: String? = nil
+    /// 款式描述（款式级共用文案）
+    var styleDescription: String? = nil
+    var updatedAt: Date? = nil
+
+    /// 是否有任何公共内容（全空 = 不该落库）
+    var isEmpty: Bool {
+        (fabric ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && (styleDescription ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+}
+
 // MARK: - PriceChart 系列级预约价格表
 
 /// 预约价格表（2026-09-22：与尺码表拆分为两个独立素材）：
@@ -262,6 +406,9 @@ struct CatalogSizeChart: Codable, Identifiable, Hashable, Sendable {
 ///     单品编辑页不再上传；单品详情页自动读取所属系列的价格表
 ///   · columns / rows 由上传图片 OCR 自动解析生成，允许人工修正
 ///   · sourceImage 保留原图引用（「local:」运营上传图或 Bundle 文件名）
+///   · sourceImages（2026-09-24 需求）：价格表**多图**引用列表；
+///     sourceImage 恒等于首图（单一展示口径继续成立），其余图供详情页补充展示。
+///     Optional 字段由合成 Decodable 以 decodeIfPresent 处理，旧 JSON 缺键自动置 nil。
 struct CatalogPriceChart: Codable, Hashable, Sendable {
     var id: String
     var seriesID: String
@@ -269,6 +416,7 @@ struct CatalogPriceChart: Codable, Hashable, Sendable {
     var columns: [String] = []
     var rows: [CatalogSizeRow] = []
     var sourceImage: String? = nil
+    var sourceImages: [String]? = nil
 
     /// 是否存在结构化内容（只有原图时为 false，此时详情页给出明确提示）
     var hasStructuredContent: Bool { !columns.isEmpty && !rows.isEmpty }
@@ -293,6 +441,22 @@ struct CatalogSaleEvent: Codable, Identifiable, Hashable, Sendable {
     var batchLabel: String? = nil
     /// 记录写入时间（append-only 审计用，与 startAt 业务时间区分）
     var recordedAt: Date? = nil
+    /// 金额币种（R02）。nil = 旧数据未标注 → 按 `effectiveCurrency` 视为「待确认」。
+    /// Optional 字段由合成 Decodable 以 decodeIfPresent 处理，旧 JSON 缺键自动置 nil。
+    var currency: CatalogCurrency? = nil
+    /// 价格分档区间（R05）：同一档期内按尺码 / SKU 分档的真实区间。
+    /// 只有来源明确给出分档时才写；单一价格时两者均为 nil。
+    var priceTierMin: Decimal? = nil
+    var priceTierMax: Decimal? = nil
+
+    /// 生效币种：nil（旧数据）按「待确认」处理，**不做全局默认 CNY**。
+    var effectiveCurrency: CatalogCurrency { currency ?? .unknown }
+
+    /// 是否为分档价格（有多个真实档位）
+    var hasPriceTier: Bool {
+        guard let min = priceTierMin, let max = priceTierMax else { return false }
+        return max > min
+    }
 
     /// 校验定金 + 尾款与总价的一致性（允许缺省字段，不做强约束）
     var isDepositBalanceConsistent: Bool {
@@ -316,7 +480,10 @@ struct CatalogSaleEvent: Codable, Identifiable, Hashable, Sendable {
         }
         let d = deposit.map { NSDecimalNumber(decimal: $0).stringValue } ?? "-"
         let b = balance.map { NSDecimalNumber(decimal: $0).stringValue } ?? "-"
-        return [productID, type.rawValue, NSDecimalNumber(decimal: price).stringValue, d, b, day]
+        // 币种参与去重（R02）：同一天、同价格但币种不同是两条不同的销售记录，
+        // 不能因为数值相同就判定为重复提交。
+        return [productID, type.rawValue, NSDecimalNumber(decimal: price).stringValue,
+                d, b, day, effectiveCurrency.rawValue]
             .joined(separator: "|")
     }
 
@@ -357,12 +524,15 @@ struct ShopCatalog: Codable, Hashable, Sendable {
     var sizeCharts: [CatalogSizeChart] = []
     var saleEvents: [CatalogSaleEvent] = []
     var assets: [CatalogAsset] = []
+    /// 款式（SPU）公共档案（2026-09-23）：面料 / 款式描述，一个款式一份。
+    /// Optional 缺键容错：合成解码对带默认值字段走 decodeIfPresent（见下方 init(from:)）
+    var styleProfiles: [CatalogStyleProfile] = []
 
     /// 兼容旧格式：任何集合字段缺失时兜底为空数组（理由同 CatalogShop.init(from:)）
     init(version: Int = 1, shops: [CatalogShop] = [], series: [CatalogSeries] = [],
          products: [CatalogProduct] = [], variants: [CatalogProductVariant] = [],
          sizeCharts: [CatalogSizeChart] = [], saleEvents: [CatalogSaleEvent] = [],
-         assets: [CatalogAsset] = []) {
+         assets: [CatalogAsset] = [], styleProfiles: [CatalogStyleProfile] = []) {
         self.version = version
         self.shops = shops
         self.series = series
@@ -371,6 +541,7 @@ struct ShopCatalog: Codable, Hashable, Sendable {
         self.sizeCharts = sizeCharts
         self.saleEvents = saleEvents
         self.assets = assets
+        self.styleProfiles = styleProfiles
     }
 
     init(from decoder: Decoder) throws {
@@ -383,7 +554,8 @@ struct ShopCatalog: Codable, Hashable, Sendable {
             variants: try c.decodeIfPresent([CatalogProductVariant].self, forKey: .variants) ?? [],
             sizeCharts: try c.decodeIfPresent([CatalogSizeChart].self, forKey: .sizeCharts) ?? [],
             saleEvents: try c.decodeIfPresent([CatalogSaleEvent].self, forKey: .saleEvents) ?? [],
-            assets: try c.decodeIfPresent([CatalogAsset].self, forKey: .assets) ?? [])
+            assets: try c.decodeIfPresent([CatalogAsset].self, forKey: .assets) ?? [],
+            styleProfiles: try c.decodeIfPresent([CatalogStyleProfile].self, forKey: .styleProfiles) ?? [])
     }
 }
 
@@ -460,16 +632,64 @@ struct CatalogPriceArchive: Hashable, Sendable {
         return reservation?.balance
     }
 
-    /// 差价（现货 − 预约）；任一侧缺失则为 nil
+    // MARK: 币种（R02）
+
+    /// 预约记录的生效币种（无预约记录时为 nil）
+    var reservationCurrency: CatalogCurrency? { reservation?.effectiveCurrency }
+
+    /// 现货记录的生效币种（无现货记录时为 nil）
+    var stockCurrency: CatalogCurrency? { stock?.effectiveCurrency }
+
+    /// 修正快照声明的币种
+    var correctionCurrency: CatalogCurrency? { correction?.currency }
+
+    /// 当前生效币种：修正声明 > 最近一次销售记录；都没有则 nil（未知）。
+    /// 预约与现货币种不一致时取**预约**（定金尾款口径以预约为准）。
+    var currentCurrency: CatalogCurrency? {
+        correctionCurrency ?? reservationCurrency ?? stockCurrency
+    }
+
+    /// 预约与现货**币种不同**（§7.5：跨币种不直接比较、不直接合计）。
+    /// 币种待确认（unknown）时不算「不同」，但也不参与差价计算
+    /// （见 `stockOverReservationDelta`）。
+    var isCrossCurrency: Bool {
+        guard let r = reservationCurrency, let s = stockCurrency else { return false }
+        return r != s
+    }
+
+    /// 只有一侧标了币种、另一侧是「待确认」：不能假定它们同币种，也不做隐式换汇。
+    ///
+    /// 两侧**都没标**（存量旧数据的常态）不算混币种——那是同一份历史来源，
+    /// 若一并拒绝，V1.1 的「预约‑现货差价」对所有存量商品会整体失效。
+    /// 差别在于：两侧都未标注时我们只是**不声明币种**，仍然回答差价；
+    /// 一侧明确、一侧不明时才是真的不知道该按哪种钱算。
+    var isMixedKnownUnknownCurrency: Bool {
+        guard let r = reservationCurrency, let s = stockCurrency else { return false }
+        return r.isUnknown != s.isUnknown
+    }
+
+    /// 差价（现货 − 预约）；任一侧缺失、**币种不一致或一侧币种不明**时为 nil。
+    ///
+    /// 旧实现直接做减法，遇到「预约 24800 JPY / 现货 1580 CNY」会算出一个
+    /// 既不是日元也不是人民币的数。这里显式拦掉：跨币种没有差价可言。
     var stockOverReservationDelta: Decimal? {
         guard let r = currentReservationPrice, let s = currentStockPrice else { return nil }
+        guard isCrossCurrency == false, isMixedKnownUnknownCurrency == false else { return nil }
         return s - r
     }
 
     /// 差价百分比（相对预约价，含符号的浮点百分数，如 20 / -12.5 表示 +20% / −12.5%）；
-    /// 预约价为 0 或缺失时为 nil（V1.1 §1 P0：展示预约‑现货差价及百分比）
+    /// 预约价为 0 / 缺失 / 跨币种时为 nil（V1.1 §1 P0：展示预约‑现货差价及百分比）
     var stockOverReservationDeltaPercent: Double? {
         guard let r = currentReservationPrice, let delta = stockOverReservationDelta, r != 0 else { return nil }
         return NSDecimalNumber(decimal: delta / r * 100).doubleValue
+    }
+
+    /// 差价不可算的原因（供详情页给明确提示，而不是留一个空白或错误数字）
+    var deltaUnavailableReason: String? {
+        if currentReservationPrice == nil || currentStockPrice == nil { return nil }
+        if isCrossCurrency { return "预约与现货币种不同，不计算差价" }
+        if isMixedKnownUnknownCurrency { return "只有一侧标注了币种，另一侧为「币种待确认」，不计算差价" }
+        return nil
     }
 }

@@ -399,6 +399,7 @@ struct ClothingDTO: Codable {
     let purchaseDate: Date
     let depositDate: Date?
     let isDepositPlan: Bool
+    let isResaleTransfer: Bool? // v1.16+ 转单（闲鱼收单等），老版本备份可能不存在
     let finalPaymentDate: Date?
     let finalPaymentEndDate: Date?
     let finalPaymentInstallmentCount: Int? // v1.13+ 旧版尾款账单兼容字段，恢复时会清理

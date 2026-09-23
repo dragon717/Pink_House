@@ -21,6 +21,13 @@ import SwiftData
 nonisolated enum ShopCatalogDraftStoreError: LocalizedError {
     case illegalTransition(from: CatalogPublicationStatus, to: CatalogPublicationStatus)
     case notReadyForPublish(CatalogPublicationStatus)
+    /// 发布产物已写入覆盖层，但草稿状态/结果回执写盘失败（R09 半成功）。
+    /// 产物是既成事实，不回滚；重试只会补回执，不会重复发布。
+    case publishResultUnrecorded(summary: String, detail: String)
+    /// 目标商品不存在（可能已被删除 / 脏引用）
+    case productNotFound(String)
+    /// 同款同步的模板草稿不存在（列表已刷新 / 脏引用）
+    case sourceDraftNotFound(String)
 
     var errorDescription: String? {
         switch self {
@@ -28,6 +35,13 @@ nonisolated enum ShopCatalogDraftStoreError: LocalizedError {
             return "状态不能从「\(from.displayName)」变更为「\(to.displayName)」"
         case .notReadyForPublish(let status):
             return "草稿当前为「\(status.displayName)」，需先提交并审核通过后才能发布"
+        case .publishResultUnrecorded(let summary, let detail):
+            return "已发布：\(summary)。但草稿状态未能保存（\(detail)）——请勿重复点击发布，"
+                + "重新进入本条草稿再发布一次即可补齐回执，不会重复生成销售记录。"
+        case .productNotFound(let id):
+            return "未找到商品 \(id)，可能已被删除——请刷新后重试"
+        case .sourceDraftNotFound(let id):
+            return "未找到作为模板的草稿 \(id)，可能已被删除——请返回列表刷新后重试"
         }
     }
 }
@@ -46,6 +60,8 @@ nonisolated enum ShopCatalogPriceEditError: LocalizedError {
     case duplicateRecord
     /// 商品不存在（可能已被删除）
     case productNotFound(String)
+    /// 修正 / 追加的币种与商品既有币种不一致（R02：修价不是换币种，也不隐式换汇）
+    case crossCurrency(String)
 
     var errorDescription: String? {
         switch self {
@@ -57,6 +73,9 @@ nonisolated enum ShopCatalogPriceEditError: LocalizedError {
             return "该销售记录已存在（同商品 / 同类型 / 同价格 / 同批次日），请勿重复提交"
         case .productNotFound(let id):
             return "未找到商品 \(id)，可能已被删除"
+        case .crossCurrency(let detail):
+            return "币种不一致：\(detail)。修正价格不是更换币种，也不可隐式换汇；"
+                + "请先用正确币种重新录入，或交由人工核对来源币种。"
         }
     }
 }
@@ -95,6 +114,10 @@ nonisolated struct CatalogProductDraft: Codable, Identifiable, Hashable, Sendabl
     var balance: Double?
     var startAt: Date? = nil
     var endAt: Date? = nil
+    /// 金额币种（R02）。nil = 未标注 → 发布时按「币种待确认」入库，
+    /// **不做全局默认 CNY**（§5.2 步骤 6：币种必须明确）。
+    /// Optional + 默认 nil，合成解码对旧 JSON 自动兜底。
+    var currency: CatalogCurrency? = nil
 
     /// 完整商品资料（V1.1 G5：手动录入必须能完成全部业务）
     /// 图片以 CatalogAsset 表达（originalURL 必填）；发布时一并写入覆盖层
@@ -103,12 +126,22 @@ nonisolated struct CatalogProductDraft: Codable, Identifiable, Hashable, Sendabl
     var variants: [CatalogProductVariant] = []
     /// 结构化尺码表（含 sourceImage）；发布时一并写入覆盖层
     var sizeChart: CatalogSizeChart? = nil
+    /// 款式（SPU）公共资料：面料成分 —— 同款所有颜色共用一份，发布时落到
+    /// `CatalogStyleProfile`（款式档案）。Optional + 默认 nil，合成解码对旧 JSON 自动兜底。
+    var fabric: String? = nil
+    /// 款式（SPU）公共资料：款式描述 —— 同上，整款一份。
+    /// 注意与 `CatalogProduct.description` 的关系：发布后以款式档案为准，
+    /// 档案为空时读取侧回退商品自身的 description（历史写法兼容）。
+    var styleDescription: String? = nil
 
     var status: CatalogPublicationStatus = .draft
     /// 审核驳回原因（V1.1 §4.1：驳回退回草稿并保留原因）；重新提交时清空。
     /// Optional + 默认 nil，合成解码对旧 JSON 自动兜底。
     var rejectReason: String? = nil
     var createdAt: Date = Date()
+    /// 已发布结果（R09）：重复提交与半成功恢复的依据。
+    /// Optional + 默认 nil，合成解码对旧 JSON 自动兜底（旧草稿 = 未记录，走首次发布）。
+    var publishedResult: CatalogDraftPublishResult? = nil
 
     // MARK: 预约 / 现货并存口径（2026-09-22）
 
@@ -140,6 +173,112 @@ nonisolated struct CatalogProductDraft: Codable, Identifiable, Hashable, Sendabl
         guard effectiveReservationPrice != nil, let d = deposit, let b = balance else { return nil }
         return (Decimal(d) + Decimal(b)) == Decimal(price)
             ? nil : "定金 \(Int(d)) + 尾款 \(Int(b)) ≠ 总价 \(Int(price))"
+    }
+}
+
+// MARK: - 发布结果记录（2026-09-22 第三版收口 R09：发布幂等与半成功恢复）
+
+/// 一次成功发布的落库结果，随草稿持久化。
+///
+/// 用途有两个，都是 R09 点名要解决的失效形态：
+///   1. **重复提交**：同一份草稿内容再次点发布（重复点击、或 UI 持有旧 reviewed 快照），
+///      凭 `operationKey` 判定「这次内容和上次完全一样」→ 直接返回上次结果，
+///      不再追加一组销售事件。
+///   2. **半成功恢复**：覆盖层已写成功、但草稿状态/结果写回失败（写盘失败、进程被杀）。
+///      下次发布时覆盖层里已有产物，凭确定性事件 id 反查命中 → 只补齐草稿状态，
+///      **绝不重新生成一组事件**。
+nonisolated struct CatalogDraftPublishResult: Codable, Hashable, Sendable {
+    /// 发布产生的商品 ID（新建或复用的既有商品）
+    var productID: String
+    /// 本次发布写入的销售事件 ID（确定性生成，可反查）
+    var saleEventIDs: [String]
+    /// 发布完成时间
+    var publishedAt: Date
+    /// 发布时的内容指纹；内容没变就复用本次结果
+    var operationKey: String
+}
+
+extension CatalogProductDraft {
+
+    /// 发布操作键：**决定发布产物**的字段指纹（不含状态、不含写入时间）。
+    ///
+    /// 刻意排除 `status / rejectReason / createdAt / id`，因为同一份内容被驳回后
+    /// 重新提交、或换个草稿 id 重录，都应复用已发布的产物而不是再发一遍。
+    /// 反过来，任何会改变产物的字段（店家 / 系列 / 商品名 / 分类 / 价格 / 档期 /
+    /// 款式名）变化都会让指纹改变，从而允许一次**真实的新发布**。
+    nonisolated var publishOperationKey: String {
+        func d(_ value: Double?) -> String {
+            guard let value else { return "-" }
+            return NSDecimalNumber(value: value).stringValue
+        }
+        func t(_ date: Date?) -> String {
+            guard let date else { return "-" }
+            return String(Int(date.timeIntervalSince1970))
+        }
+        let parts = [
+            shopID ?? "new:\(newShopName)",
+            newShopAliases,
+            seriesID ?? "new:\(newSeriesName)",
+            String(newSeriesYear.map(String.init) ?? "-"),
+            newSeriesSeason,
+            name,
+            category,
+            designName ?? "-",
+            String(effectiveReservationPrice ?? -1),
+            String(effectiveStockPrice ?? -1),
+            d(deposit), d(balance),
+            t(startAt), t(endAt),
+            images.map(\.originalURL).joined(separator: ","),
+            variants.map { "\($0.color ?? "-")/\($0.size ?? "-")" }.joined(separator: ","),
+            sizeChart.map { "\($0.columns.joined(separator: ","))#\($0.rows.count)#\($0.sourceImage ?? "-")" } ?? "-",
+            // 款式（SPU）公共资料参与指纹：改了面料/描述就是一份新内容，
+            // 否则重新发布会被「已恢复发布结果」吞掉，面料改动永远落不了库。
+            fabric ?? "-",
+            styleDescription ?? "-",
+            // 币种参与指纹（R02）：同价格不同币种是两条不同的销售记录。
+            // 未标注（nil）与旧草稿口径一致地退化为 "-"，不会让存量已发布草稿换指纹。
+            currency?.rawValue ?? "-",
+        ]
+        return parts.joined(separator: "|")
+    }
+
+    /// 决定「落到哪个商品」的归属指纹：店家 / 系列 / 商品名 / 品类 / 款式。
+    /// 改归属 = 落到另一个商品，因此销售事件 ID 也必须跟着变。
+    nonisolated var productIdentityKey: String {
+        [shopID ?? "new:\(newShopName)",
+         seriesID ?? "new:\(newSeriesName)",
+         name, category, designName ?? "-"].joined(separator: "|")
+    }
+
+    /// 单条销售事件的确定性指纹（R09）：**只包含与该事件有关的字段**。
+    ///
+    /// 用整份草稿指纹会导致「只改了预约价，现货价被原样重发一次」——
+    /// 现货事件 ID 变了，覆盖层里就多出一条内容完全相同的记录。
+    /// 这里按类型收窄：预约事件只看预约三件套，现货事件只看现货价。
+    nonisolated func saleEventKey(_ type: CatalogSaleEventType) -> String {
+        let priceFields: [String]
+        switch type {
+        case .reservation:
+            priceFields = [d(effectiveReservationPrice), d(deposit), d(balance)]
+        case .stock:
+            priceFields = [d(effectiveStockPrice)]
+        case .rerelease:
+            // 再贩记录不走发布流程（由「追加销售记录」入口写入），这里给空指纹占位
+            priceFields = []
+        }
+        return ([productIdentityKey, type.rawValue] + priceFields
+                + [t(startAt), t(endAt), currency?.rawValue ?? "-"])
+            .joined(separator: "|")
+    }
+
+    private nonisolated func d(_ value: Double?) -> String {
+        guard let value else { return "-" }
+        return NSDecimalNumber(value: value).stringValue
+    }
+
+    private nonisolated func t(_ date: Date?) -> String {
+        guard let date else { return "-" }
+        return String(Int(date.timeIntervalSince1970))
     }
 }
 
@@ -311,6 +450,51 @@ nonisolated struct CatalogBatchDeleteResult: Sendable {
     let blocked: [CatalogBatchDeleteBlock]
 }
 
+// MARK: - 商品批量删除（2026-09-23：多选 + 二次确认）
+
+/// 商品被拦下的原因。文案与单项 `ShopCatalogEntityError` 保持同一口径，
+/// 但这里用**枚举**而不是拼好的错误对象，方便弹窗逐条列出、也方便单测断言。
+nonisolated enum CatalogProductDeleteReason: Hashable, Sendable {
+    /// 已被用户心愿 / 尾款 / 衣橱引用（含软删除记录）→ 只能归档
+    case referencedByUserData
+    /// 来自随版本内置的种子档案（Bundle 只读）→ 无法物理删除，只能归档
+    case seedImmutable
+
+    var message: String {
+        switch self {
+        case .referencedByUserData:
+            return "已被用户心愿/尾款/衣橱引用，禁止删除，仅可归档。"
+        case .seedImmutable:
+            return "来自随版本内置的种子档案，无法物理删除，仅可归档。"
+        }
+    }
+}
+
+/// 批量删除中被拦下的单个商品（条目保留并附原因，处理后可用同样的选择重试）
+nonisolated struct CatalogProductDeleteBlock: Identifiable, Hashable, Sendable {
+    let productID: String
+    let name: String
+    let reason: CatalogProductDeleteReason
+    var id: String { productID }
+}
+
+/// 商品批量删除结果：成功物理删除的 id + 被拦截的条目。
+/// 部分成功是允许的，但**绝不静默**——`blocked` 必须原样展示给操作者。
+nonisolated struct CatalogProductDeleteResult: Sendable {
+    let deletedIDs: Set<String>
+    let blocked: [CatalogProductDeleteBlock]
+}
+
+/// 删除预检结果（只读）：供「二次确认」弹窗展示**真实**影响范围。
+/// 与真正执行走同一个决策函数，所以弹窗说会删几件、实际就删几件。
+nonisolated struct CatalogProductDeletePreview: Equatable, Sendable {
+    let deletableNames: [String]
+    let blocked: [CatalogProductDeleteBlock]
+
+    var deletableCount: Int { deletableNames.count }
+    var blockedCount: Int { blocked.count }
+}
+
 nonisolated enum ShopCatalogBatchStoreError: LocalizedError {
     /// 批次记录持久化失败：内存与磁盘都未变化，条目完整保留，可直接重试
     case persistenceFailed(String)
@@ -320,6 +504,89 @@ nonisolated enum ShopCatalogBatchStoreError: LocalizedError {
         case .persistenceFailed(let detail):
             return "批次记录写入失败：\(detail)。列表未发生任何变化，请重试。"
         }
+    }
+}
+
+// MARK: - 草稿删除判定（2026-09-23：单条 + 多选批量）
+
+/// 草稿删除的判定结果：**预检与执行同源**。
+///
+/// `ShopCatalogDraftStore.previewDraftDeletion`（只读，供确认弹窗）与
+/// `deleteDrafts`（执行）都走 `ShopCatalogDraftDeletion.plan`，
+/// 所以「弹窗说删 N 条」与「实际删 N 条」不可能对不上。
+///
+/// 与「批次删除」刻意不同，这里**没有任何硬拦截**。理由是批次删除的拦截文案本身
+/// 就让运营「在草稿箱中删除这些草稿后再删除批次」——若草稿删除也再拦一道，
+/// 那条指引就成了死路。可删范围覆盖全部状态（含已发布 / 已归档这份发布回执），
+/// 因为删除只作用于草稿箱记录、不碰覆盖层产物，所以是安全的；
+/// 状态构成只用来把影响范围讲清楚，不承担拦截职责。
+///
+/// 纯数据、无文案：影响范围文案由视图层拼（与 `batchDeleteImpactText` 同一分工），
+/// 这样这个类型不必依赖 MainActor 隔离的本地化能力，可以留在 nonisolated 里单测。
+nonisolated struct ShopCatalogDraftDeletionPlan: Equatable, Sendable {
+    /// 选择中**真实存在**、会被删除的草稿 id（保持草稿箱原有顺序）
+    var targetIDs: [String] = []
+    /// 选择中已找不到的 id（例如已在别处删掉）→ 执行时静默跳过，不算删除数
+    var staleIDs: [String] = []
+    /// 目标按发布状态分组的条数（视图按 `CatalogPublicationStatus.allCases` 顺序展示）
+    var countsByStatus: [CatalogPublicationStatus: Int] = [:]
+    /// 仍在流转中的条数（草稿 / 待审核 / 待发布）
+    var inFlightCount: Int = 0
+    /// 已出终态的条数（已发布 / 已归档 —— 发布回执）
+    var settledCount: Int = 0
+
+    var isEmpty: Bool { targetIDs.isEmpty }
+    var targetCount: Int { targetIDs.count }
+}
+
+// MARK: - 整款表单落盘结果（2026-09-23「款式 + 多颜色」录入）
+
+/// 一次「整款表单」保存的落库结果（每条颜色草稿的去向都要能讲清楚）。
+///
+/// 之所以要区分「跳过」与「更新」：已发布 / 已归档的颜色行在表单里是只读的，
+/// 保存时**静默跳过它们的草稿**，但绝不能假装「整款都存好了」——
+/// 运营得知道哪几个颜色因为已经上线而没有被这次编辑改动。
+nonisolated struct ShopCatalogStyleFormResult: Equatable, Sendable {
+    /// 更新了资料的既有颜色草稿数
+    var updatedCount: Int = 0
+    /// 本次表单新加、刚建出来的颜色草稿数
+    var createdCount: Int = 0
+    /// 从表单里移除、并连带删掉的未发布颜色草稿数
+    var removedCount: Int = 0
+    /// 因为已发布 / 已归档而被跳过的颜色行数（产物在覆盖层，改草稿不生效）
+    var skippedSettledCount: Int = 0
+
+    var isEmpty: Bool { updatedCount == 0 && createdCount == 0 && removedCount == 0 }
+    /// 实际写入的颜色草稿数（不含被移除的）
+    var writtenCount: Int { updatedCount + createdCount }
+}
+
+nonisolated enum ShopCatalogDraftDeletion {
+
+    /// 由「勾选的 id 集合 + 当前草稿箱」推导删除判定。
+    ///
+    /// - Parameters:
+    ///   - ids: 勾选的草稿 id（单条删除时只放一条）
+    ///   - drafts: 草稿箱当前内容（生产注入 `ShopCatalogDraftStore.drafts`）
+    static func plan(ids: Set<String>,
+                     drafts: [CatalogProductDraft]) -> ShopCatalogDraftDeletionPlan {
+        guard !ids.isEmpty else { return ShopCatalogDraftDeletionPlan() }
+
+        var plan = ShopCatalogDraftDeletionPlan()
+        // 遍历 drafts 而不是 ids：保证 targetIDs 与草稿箱展示顺序一致，
+        // 弹窗里「将删除「A」、「B」」才和用户看到的行序对得上
+        for draft in drafts where ids.contains(draft.id) {
+            plan.targetIDs.append(draft.id)
+            plan.countsByStatus[draft.status, default: 0] += 1
+            switch draft.status {
+            case .draft, .submitted, .reviewed:
+                plan.inFlightCount += 1
+            case .published, .archived:
+                plan.settledCount += 1
+            }
+        }
+        plan.staleIDs = ids.subtracting(Set(plan.targetIDs)).sorted()
+        return plan
     }
 }
 
@@ -353,48 +620,201 @@ final class ShopCatalogDraftStore: ObservableObject {
         batches = Self.loadBatches()
     }
 
+    // MARK: 草稿持久化（R01：编解码同源 + 坏文件保护 + 写盘失败可见）
+
+    /// 最近一次加载的异常（文件损坏 / 解析失败），供运营 UI 显式提示。
+    /// nil = 加载正常（含「文件不存在」这种合法的空草稿箱）。
+    @Published private(set) var lastLoadIssue: String? = nil
+
+    /// 最近一次写入失败原因（R01：写盘失败必须可见，不能静默成功）。
+    /// SwiftUI Binding 的 set 闭包无法抛错，写入入口用 `upsertReportingError`
+    /// 把错误落到这里，由 UI 显式提示；内存与磁盘都不变，可原样重试。
+    @Published private(set) var lastPersistenceError: String? = nil
+
+    /// 坏文件待处理状态：为 true 时**禁止任何写回**（R01 后半段风险：
+    /// 「解码失败 → 当成空库 → 下一次保存覆盖掉还能抢救的旧文件」）。
+    /// 只有人工处理完坏文件（移除或修复）并重新加载后才解除。
+    private(set) var isBlockedByCorruptFile = false
+
+    /// 坏文件备份路径（供 UI 指引运营去哪里找回原文件）
+    private(set) var corruptFileBackupURL: URL? = nil
+
     func loadDrafts() {
-        guard let data = try? Data(contentsOf: draftsURL) else { drafts = []; return }
-        drafts = (try? JSONDecoder().decode([CatalogProductDraft].self, from: data)) ?? []
-    }
-
-    private func persist() {
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
-        if let data = try? encoder.encode(drafts) {
-            try? data.write(to: draftsURL, options: .atomic)
+        let fm = FileManager.default
+        guard fm.fileExists(atPath: draftsURL.path),
+              let data = try? Data(contentsOf: draftsURL) else {
+            // 文件不存在 = 合法的空草稿箱（首次启动），不是错误
+            drafts = []
+            lastLoadIssue = nil
+            isBlockedByCorruptFile = false
+            corruptFileBackupURL = nil
+            return
+        }
+        do {
+            drafts = try ShopCatalogJSONCoding.decoder()
+                .decode([CatalogProductDraft].self, from: data)
+            lastLoadIssue = nil
+            isBlockedByCorruptFile = false
+            corruptFileBackupURL = nil
+        } catch {
+            // 解码失败：**绝不**当作空库。原文件原地保留，另存一份带时间戳的副本，
+            // 并进入「待处理」状态阻止后续写回。
+            let backup = Self.backupURL(for: draftsURL)
+            try? fm.copyItem(at: draftsURL, to: backup)
+            corruptFileBackupURL = backup
+            isBlockedByCorruptFile = true
+            lastLoadIssue = Self.describeDecodingFailure(error)
+            // drafts 保持进入本方法前的内存值（首次启动即为空数组），
+            // 但 isBlockedByCorruptFile 会阻止把它写回磁盘。
         }
     }
 
-    func upsert(_ draft: CatalogProductDraft) {
-        if let index = drafts.firstIndex(where: { $0.id == draft.id }) {
-            drafts[index] = draft
+    /// 人工处理完坏文件后调用：解除写入封锁并重新加载。
+    /// （运营 UI 的「我已处理，重新加载」入口；不删除任何文件。）
+    func clearCorruptFileBlockAndReload() {
+        isBlockedByCorruptFile = false
+        corruptFileBackupURL = nil
+        lastLoadIssue = nil
+        loadDrafts()
+    }
+
+    private static func backupURL(for url: URL) -> URL {
+        let stamp = ISO8601DateFormatter().string(from: Date())
+            .replacingOccurrences(of: ":", with: "-")
+        return url.deletingPathExtension()
+            .appendingPathExtension("corrupt-\(stamp).json")
+    }
+
+    private static func describeDecodingFailure(_ error: Error) -> String {
+        if let decoding = error as? DecodingError {
+            switch decoding {
+            case .keyNotFound(let key, let context):
+                return "缺少字段 \(key.stringValue)（路径 \(context.codingPath.map(\.stringValue).joined(separator: "."))）"
+            case .typeMismatch(let type, let context):
+                return "字段类型不符，期望 \(type)（路径 \(context.codingPath.map(\.stringValue).joined(separator: "."))）"
+            case .valueNotFound(let type, let context):
+                return "字段值为空，期望 \(type)（路径 \(context.codingPath.map(\.stringValue).joined(separator: "."))）"
+            case .dataCorrupted(let context):
+                return context.debugDescription
+            @unknown default:
+                return error.localizedDescription
+            }
+        }
+        return error.localizedDescription
+    }
+
+    /// 写盘：**先写磁盘再提交内存**，失败时内存与磁盘都不变，可直接重试。
+    private func persist(_ snapshot: [CatalogProductDraft]) throws {
+        if isBlockedByCorruptFile {
+            throw ShopCatalogDraftFileError.writeBlockedByCorruptFile(draftsURL)
+        }
+        let data: Data
+        do {
+            data = try ShopCatalogJSONCoding.encoder().encode(snapshot)
+        } catch {
+            throw ShopCatalogDraftFileError.writeFailed(error.localizedDescription)
+        }
+        do {
+            try data.write(to: draftsURL, options: .atomic)
+        } catch {
+            throw ShopCatalogDraftFileError.writeFailed(error.localizedDescription)
+        }
+    }
+
+    /// 绑定式写入（SwiftUI `Binding` 的 set 不能抛错）：失败时记到 `lastPersistenceError`。
+    /// 语义与 `upsert(_:)` 完全一致（内存与磁盘都不变，可原样重试），只是错误出口不同。
+    func upsertReportingError(_ draft: CatalogProductDraft) {
+        do {
+            try upsert(draft)
+            lastPersistenceError = nil
+        } catch {
+            lastPersistenceError = error.localizedDescription
+        }
+    }
+
+    /// 写入单条草稿。写盘失败抛错（内存不变、磁盘不变），调用方提示后可原样重试。
+    func upsert(_ draft: CatalogProductDraft) throws {
+        var snapshot = drafts
+        if let index = snapshot.firstIndex(where: { $0.id == draft.id }) {
+            snapshot[index] = draft
         } else {
-            drafts.append(draft)
+            snapshot.append(draft)
         }
-        persist()
+        try persist(snapshot)
+        drafts = snapshot
     }
 
-    func delete(_ draft: CatalogProductDraft) {
-        drafts.removeAll { $0.id == draft.id }
-        persist()
+    /// 批量写入草稿（整批成功或整批失败，避免「写了一半」的半成品文件）。
+    func upsert(_ drafts: [CatalogProductDraft]) throws {
+        var snapshot = self.drafts
+        for draft in drafts {
+            if let index = snapshot.firstIndex(where: { $0.id == draft.id }) {
+                snapshot[index] = draft
+            } else {
+                snapshot.append(draft)
+            }
+        }
+        try persist(snapshot)
+        self.drafts = snapshot
+    }
+
+    // MARK: 草稿删除（2026-09-23：单条 + 多选批量）
+
+    /// 只读预检：确认弹窗据此说明「删几条、哪些状态、会不会影响线上数据」。
+    /// 与 `deleteDrafts` 共用 `ShopCatalogDraftDeletion.plan`，因此与实际删除数恒等。
+    func previewDraftDeletion(ids: Set<String>) -> ShopCatalogDraftDeletionPlan {
+        ShopCatalogDraftDeletion.plan(ids: ids, drafts: drafts)
+    }
+
+    /// 删除草稿（单条删除同样走这里，`ids` 只放一条 —— **不存在第二条写入路径**）。
+    ///
+    /// 三条硬约束：
+    ///   · **整批只写一次盘**：先在快照上删完再 `persist`，绝不循环调单条删除。
+    ///     `persist` 是「先写磁盘、再提交内存」，失败时磁盘与内存都不变，可原样重试；
+    ///   · **不连带改批次**：批次只是归组视图，草稿 `batchID` 引用随之失效即可，
+    ///     `shop-catalog-batches.json` 一条不动（与「删批次不动草稿」互为镜像）；
+    ///   · **不碰覆盖层**：已发布商品的资料与销售记录完全不受影响 ——
+    ///     被删掉的只是草稿箱里的记录（含已发布草稿那份发布回执）。
+    ///
+    /// `drafts` 是 `@Published`，赋值即触发草稿箱列表实时刷新。
+    /// - Returns: 实际命中的判定结果（视图直接拿它拼结果提示）。
+    @discardableResult
+    func deleteDrafts(ids: Set<String>) throws -> ShopCatalogDraftDeletionPlan {
+        try CreatorAccess.requireCreator(.listingEdit)
+        let plan = ShopCatalogDraftDeletion.plan(ids: ids, drafts: drafts)
+        guard !plan.isEmpty else { return plan }
+
+        let doomed = Set(plan.targetIDs)
+        var snapshot = drafts
+        snapshot.removeAll { doomed.contains($0.id) }
+        try persist(snapshot)
+        drafts = snapshot
+        return plan
     }
 
     // MARK: 批次会话（V1.1 §4.1）
 
     /// 全部批次（草稿状态互不耦合，批次只是归组视图）
+    /// 批次读取：与草稿同源的宽容解码器（R01）。文件损坏时**返回空并保留原文件**，
+    /// 由 `lastLoadIssue` 报告——批次只是归组视图，不因解析失败阻断草稿箱。
     nonisolated static func loadBatches() -> [CatalogBatchEntrySession] {
         guard let data = try? Data(contentsOf: batchesURLStatic) else { return [] }
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
-        return (try? decoder.decode([CatalogBatchEntrySession].self, from: data)) ?? []
+        return (try? ShopCatalogJSONCoding.decoder()
+            .decode([CatalogBatchEntrySession].self, from: data)) ?? []
     }
 
-    func saveBatches(_ batches: [CatalogBatchEntrySession]) {
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
-        if let data = try? encoder.encode(batches) {
-            try? data.write(to: batchesURL, options: .atomic)
+    /// 批次落盘：**先写磁盘再提交内存**，失败抛错（内存与磁盘均不变，可原样重试）。
+    func saveBatches(_ batches: [CatalogBatchEntrySession]) throws {
+        let data: Data
+        do {
+            data = try ShopCatalogJSONCoding.encoder().encode(batches)
+        } catch {
+            throw ShopCatalogBatchStoreError.persistenceFailed(error.localizedDescription)
+        }
+        do {
+            try data.write(to: batchesURL, options: .atomic)
+        } catch {
+            throw ShopCatalogBatchStoreError.persistenceFailed(error.localizedDescription)
         }
         self.batches = batches
     }
@@ -455,9 +875,7 @@ final class ShopCatalogDraftStore: ObservableObject {
         var remaining = Self.loadBatches()
         remaining.removeAll { deletable.contains($0.id) }
         do {
-            let encoder = JSONEncoder()
-            encoder.dateEncodingStrategy = .iso8601
-            let data = try encoder.encode(remaining)
+            let data = try ShopCatalogJSONCoding.encoder().encode(remaining)
             try data.write(to: batchesURL, options: .atomic)
         } catch {
             throw ShopCatalogBatchStoreError.persistenceFailed(error.localizedDescription)
@@ -466,16 +884,19 @@ final class ShopCatalogDraftStore: ObservableObject {
         return CatalogBatchDeleteResult(deletedIDs: deletable, blocked: blocked)
     }
 
-    /// 创建批次并把草稿写入草稿箱
+    /// 创建批次并把草稿写入草稿箱。
+    /// 草稿写盘失败时抛错：批次记录已落盘但草稿未落盘的「半成功」由调用方提示重试
+    /// （重试会把同一批草稿重新写入，批次记录按 id 去重不会重复）。
     @discardableResult
     func createBatch(
         _ session: CatalogBatchEntrySession,
         drafts: [CatalogProductDraft]
-    ) -> String {
+    ) throws -> String {
         var batches = Self.loadBatches()
         batches.append(session)
-        saveBatches(batches)
+        try saveBatches(batches)
 
+        var prepared: [CatalogProductDraft] = []
         for var draft in drafts {
             draft.batchID = session.id
             // 批次级归属：整批同店同系列（草稿可再单独改）
@@ -486,9 +907,10 @@ final class ShopCatalogDraftStore: ObservableObject {
             draft.newSeriesName = session.newSeriesName
             draft.newSeriesYear = session.newSeriesYear
             draft.newSeriesSeason = session.newSeriesSeason
-            upsert(draft)
+            prepared.append(draft)
         }
-        return "已生成 \(drafts.count) 条单品草稿"
+        try upsert(prepared)     // 整批成功或整批失败，不留半成品
+        return "已生成 \(prepared.count) 条单品草稿"
     }
 
     /// 批量提交（§4.1）：本批次全部草稿态条目 → 提交；单品状态互不耦合
@@ -512,7 +934,7 @@ final class ShopCatalogDraftStore: ObservableObject {
         batchID: String,
         shopID: String?, newShopName: String, newShopAliases: String,
         seriesID: String?, newSeriesName: String, newSeriesYear: Int?, newSeriesSeason: String
-    ) -> Int {
+    ) throws -> Int {
         var batches = Self.loadBatches()
         guard let idx = batches.firstIndex(where: { $0.id == batchID }) else { return 0 }
         batches[idx].shopID = shopID
@@ -522,9 +944,9 @@ final class ShopCatalogDraftStore: ObservableObject {
         batches[idx].newSeriesName = newSeriesName
         batches[idx].newSeriesYear = newSeriesYear
         batches[idx].newSeriesSeason = newSeriesSeason
-        saveBatches(batches)
+        try saveBatches(batches)
 
-        var count = 0
+        var updated: [CatalogProductDraft] = []
         for var draft in drafts
         where draft.batchID == batchID && draft.status != .published && draft.status != .archived {
             draft.shopID = shopID
@@ -534,10 +956,148 @@ final class ShopCatalogDraftStore: ObservableObject {
             draft.newSeriesName = newSeriesName
             draft.newSeriesYear = newSeriesYear
             draft.newSeriesSeason = newSeriesSeason
-            upsert(draft)
-            count += 1
+            updated.append(draft)
         }
-        return count
+        try upsert(updated)      // 整批成功或整批失败
+        return updated.count
+    }
+
+    // MARK: 同款不同色：款式公共资料一键同步（2026-09-23）
+
+    /// 把一条草稿的**款式公共资料**同步到同款其他颜色草稿
+    /// （即「复制信息到同款其他颜色」／批次页的「同步款式资料」）。
+    ///
+    /// 与 `applyBatchAttribution` 的分工，两者互不替代：
+    ///   · 那个管**归属**（店家 / 系列），整批一刀切；
+    ///   · 本方法管**款式公共资料**（价格组 / 尺码表 / 面料 / 款式描述），以某一条为模板。
+    /// 两者都不碰颜色私有字段（商品名 / 配色图 / 配色尺码）——
+    /// 复制名称会把粉色改叫生成色，复制图片会把三个颜色压成一张图。
+    ///
+    /// 约定：
+    ///   · **模板草稿原样不动**，只写目标；
+    ///   · 已发布 / 已归档的目标不回写（产物已在覆盖层，改草稿不影响线上）；
+    ///   · 字段按「整快照覆盖」语义 —— 模板为空即清除目标该项，不是「跳过不修改」，
+    ///     这样「再同步一次」能把改错的值纠正回来；
+    ///   · **整批一次落盘**：要么全成功，要么磁盘上一条都没变。
+    ///
+    /// - Parameters:
+    ///   - sourceDraftID: 模板草稿（用户当前录入并保存好的那一条，通常是有完整资料的颜色）
+    ///   - targetDraftIDs: 目标草稿 id；非同款、或不可写的会被剔除而不是报错
+    ///   - fields: 要同步的字段集合（空集合 = 无事发生）
+    /// - Returns: 实际更新的草稿数（0 = 没有可写目标，UI 应提示而非假装成功）
+    @discardableResult
+    func syncStyleInfo(sourceDraftID: String,
+                       targetDraftIDs: [String],
+                       fields: Set<ShopCatalogDraftStyleSync.Field>) throws -> Int {
+        try CreatorAccess.requireCreator(.listingStatus)
+        guard let source = drafts.first(where: { $0.id == sourceDraftID }) else {
+            throw ShopCatalogDraftStoreError.sourceDraftNotFound(sourceDraftID)
+        }
+        let wanted = Set(targetDraftIDs)
+        // 防线：只认同款、且未发布/未归档的目标。调用方（视图）可能传进过期选择，
+        // 这里按数据自己判一遍 —— 预检与执行同源，不靠 UI 自觉。
+        let targets = drafts.filter { draft in
+            guard wanted.contains(draft.id),
+                  draft.status != .published, draft.status != .archived else { return false }
+            return ShopCatalogDraftStyleForm.isSameStyle(source, draft)
+        }
+        guard !targets.isEmpty else { return 0 }
+
+        let plan = ShopCatalogDraftStyleSync.syncPlan(from: source, to: targets, fields: fields)
+        let updated = targets.compactMap { plan[$0.id] }
+        guard !updated.isEmpty else { return 0 }
+        try upsert(updated)
+        return updated.count
+    }
+
+    /// 同款判定已上移到 `ShopCatalogDraftStyleForm.identity / isSameStyle / sameStyleFamily`：
+    /// 表单展示的家族、跨草稿同步的目标、整款表单的落盘范围必须是**同一份判定**，
+    /// 否则会出现「界面看不到、落盘却认为该改甚至该删」的颜色。
+    /// （原先私有的 `syncStyleIdentity` / `isSameStyleForSync` 已随之删除，不留第二套口径。）
+
+    // MARK: 整款录入：款式 + 多颜色一次性落盘（2026-09-23）
+
+    /// 一次表单提交 = 整款（款式公共资料 + N 个颜色 SKU）一次落盘。
+    ///
+    /// 取代「先建单品、再逐色重录公共资料」的旧流程：颜色行在本表单内直接新增，
+    /// 公共资料只写一遍。落盘是**一次 `persist`** —— 要么全成功，要么磁盘上一条都没变。
+    ///
+    /// 四条口径（与项目既有规则一致，不另开一套语义）：
+    ///   · **预检与执行同源**：同款判定由服务层自己按数据判一遍，不靠 UI 传对 id；
+    ///   · **款式名一处决议**：显式填写优先，否则按源草稿派生，再交给所有颜色共用。
+    ///     绝不逐条派生 —— 新加的颜色没有历史商品名可派生，会派生出空款名而掉出同款组；
+    ///   · **已发布 / 已归档只读跳过**：产物已在覆盖层，改草稿不影响线上，
+    ///     但如实返回跳过条数，不假装整款都存好了；
+    ///   · **移除颜色 = 删除其未发布草稿**：与「删批次不连带删草稿」不矛盾 ——
+    ///     批次只是归组记录，而颜色行**就是**这份草稿本身，删掉它是用户的明确意图，
+    ///     留着会变成草稿箱里的孤儿。已发布的草稿保留（那是发布回执）。
+    @discardableResult
+    func applyStyleForm(
+        sourceDraftID: String,
+        style: ShopCatalogDraftStyleForm.StyleInput,
+        colors: [ShopCatalogDraftStyleForm.ColorRow]
+    ) throws -> ShopCatalogStyleFormResult {
+        try CreatorAccess.requireCreator(.listingEdit)
+
+        guard let source = drafts.first(where: { $0.id == sourceDraftID }) else {
+            throw ShopCatalogDraftStoreError.sourceDraftNotFound(sourceDraftID)
+        }
+
+        // 款名决议 + 校验（与表单展示同一份口径：`resolveStyleName` 是唯一决议点）
+        var resolved = style
+        resolved.styleNameFallback = ShopCatalogDraftStyleForm.resolveStyleName(
+            explicit: style.designName, source: source)
+        try ShopCatalogDraftStyleForm.validate(colors: colors, styleName: resolved.styleNameFallback)
+
+        let orderedSizes = ShopCatalogSizeChartSharing.sizeLabels(of: style.sizeChart)
+        // 家族口径与视图展示同源（`sameStyleFamily`）—— 两处不一致会把「表单没显示」
+        // 的草稿当成「用户删掉了这个颜色」而误删
+        let family = ShopCatalogDraftStyleForm.sameStyleFamily(of: source, in: drafts)
+
+        var snapshot = drafts
+        var result = ShopCatalogStyleFormResult()
+        let represented = Set(colors.compactMap(\.draftID))
+
+        // 1) 表单里已移除的同款颜色：未发布的连带删除，已发布的保留并计入跳过
+        let removable = Set(family.filter {
+            !represented.contains($0.id) && !ShopCatalogDraftStyleForm.isSettled($0)
+        }.map(\.id))
+        result.skippedSettledCount = family.filter {
+            !represented.contains($0.id) && ShopCatalogDraftStyleForm.isSettled($0)
+        }.count
+        if !removable.isEmpty {
+            snapshot.removeAll { removable.contains($0.id) }
+            result.removedCount = removable.count
+        }
+
+        // 2) 逐行应用：命中的既有草稿更新，没有的按新增建出来
+        for row in colors {
+            if let draftID = row.draftID,
+               let index = snapshot.firstIndex(where: { $0.id == draftID }) {
+                let existing = snapshot[index]
+                guard !ShopCatalogDraftStyleForm.isSettled(existing) else {
+                    result.skippedSettledCount += 1
+                    continue
+                }
+                let styled = ShopCatalogDraftStyleForm.applyStyle(resolved,
+                                                                  to: existing,
+                                                                  colorName: row.colorName)
+                snapshot[index] = ShopCatalogDraftStyleForm.applyColor(row,
+                                                                       to: styled,
+                                                                       orderedSizes: orderedSizes)
+                result.updatedCount += 1
+            } else {
+                snapshot.append(ShopCatalogDraftStyleForm.makeNewDraft(colorRow: row,
+                                                                       style: resolved,
+                                                                       basedOn: source,
+                                                                       orderedSizes: orderedSizes))
+                result.createdCount += 1
+            }
+        }
+
+        try persist(snapshot)   // 单次落盘：失败时磁盘与内存都不变，可原样重试
+        drafts = snapshot
+        return result
     }
 
     /// 单品粒度审核（§4.1）：通过 → reviewed；驳回 → 退回草稿并保留原因
@@ -555,7 +1115,7 @@ final class ShopCatalogDraftStore: ObservableObject {
         var updated = draft
         updated.status = .draft
         updated.rejectReason = (trimmed?.isEmpty == false) ? trimmed : nil
-        upsert(updated)
+        try upsert(updated)
     }
 
     // MARK: 发布状态机（计划 §31：draft → submitted → reviewed → published，任一态可 archived）
@@ -577,7 +1137,7 @@ final class ShopCatalogDraftStore: ObservableObject {
         updated.status = newStatus
         // 重新提交即视为已回应驳回意见：清空驳回原因
         if newStatus == .submitted { updated.rejectReason = nil }
-        upsert(updated)
+        try upsert(updated)
     }
 
     // MARK: 运营中心看板（计划 §26：今日更新 / 草稿 / 待审核 / 待补充）
@@ -603,8 +1163,105 @@ final class ShopCatalogDraftStore: ObservableObject {
         }.count
     }
 
+    // MARK: 发布幂等基元（R09）
+
+    /// 确定性销售事件 ID：**同一份草稿内容 + 同一价格类型**永远得到同一个 ID。
+    ///
+    /// 这是重复发布的最后一道防线——即便调用方拿着一份状态仍是 `.reviewed` 的旧快照
+    /// （内存里没有 publishedResult）再点一次，算出来的事件 ID 也和上次完全相同，
+    /// 覆盖层里已有该 ID 时直接跳过追加，不会写出第二组事件。
+    nonisolated static func publishEventID(
+        draftID: String, type: CatalogSaleEventType, eventKey: String
+    ) -> String {
+        let seed = "\(draftID)|\(type.rawValue)|\(eventKey)"
+        return "ev-ops-\(draftID.prefix(8))-\(type.rawValue)-\(stableHash(seed))"
+    }
+
+    /// 草稿本次发布要写的全部事件 ID（按类型逐个确定性生成）。
+    /// 覆盖层里已存在同 ID 的事件会被跳过，因此「只改了其中一价」不会重发另一条。
+    nonisolated static func publishEventIDs(
+        for draft: CatalogProductDraft
+    ) -> [CatalogSaleEventType: String] {
+        var result: [CatalogSaleEventType: String] = [:]
+        if draft.effectiveReservationPrice != nil {
+            result[.reservation] = publishEventID(draftID: draft.id, type: .reservation,
+                                                  eventKey: draft.saleEventKey(.reservation))
+        }
+        if draft.effectiveStockPrice != nil {
+            result[.stock] = publishEventID(draftID: draft.id, type: .stock,
+                                            eventKey: draft.saleEventKey(.stock))
+        }
+        return result
+    }
+
+    /// 64 位 FNV-1a（无依赖、跨进程稳定），输出 16 位十六进制。
+    /// 只用于生成可反查的稳定 ID 后缀，不承担任何安全用途。
+    nonisolated static func stableHash(_ text: String) -> String {
+        var hash: UInt64 = 14_695_981_039_346_656_037
+        for byte in text.utf8 {
+            hash ^= UInt64(byte)
+            hash = hash &* 1_099_511_628_211
+        }
+        return String(format: "%016llx", hash)
+    }
+
+    /// 半成功恢复：覆盖层已写入、草稿状态/结果未写回时，凭确定性事件 ID 反查。
+    ///
+    /// - Returns: 命中返回恢复说明；未命中返回 nil（说明覆盖层里确实没有本次产物，
+    ///   调用方按首次发布处理）。
+    @discardableResult
+    func recoverPendingPublish(
+        _ draft: CatalogProductDraft, store: ShopCatalogStore
+    ) throws -> String? {
+        guard var overlay = Self.loadOverlay() else { return nil }
+        let key = draft.publishOperationKey
+        let candidateIDs = Set(Self.publishEventIDs(for: draft).values)
+        guard !candidateIDs.isEmpty else { return nil }
+        let hit = overlay.saleEvents.filter { candidateIDs.contains($0.id) }
+        // ⚠️ 必须**全部命中**才算「这次发布已经发生过」。
+        // 只命中一部分说明内容变了（例如只改了预约价）：现货事件 ID 不变所以还在，
+        // 但新的预约事件还没写。此时若按恢复处理，本次真实变更就会被吞掉。
+        guard hit.count == candidateIDs.count else { return nil }
+
+        // 款式档案补齐：本方法等价于「产物已落、收尾没做完」，因此除了草稿回执，
+        // 还要把草稿携带的款式面料/描述写进款式档案 —— 否则「只改了面料再发布」
+        // 会停在入口①/② 而永远落不了库（事件 ID 不含面料，必然全部命中）。
+        var styleProfileWritten = false
+        if ShopCatalogDraftStyleSync.hasStyleContent(draft),
+           let target = Self.mergedProduct(id: hit[0].productID, overlay: overlay) {
+            var working = overlay
+            Self.applyStyleProfile(fabric: draft.fabric,
+                                   styleDescription: draft.styleDescription,
+                                   for: target, overlay: &working)
+            if working.styleProfiles != overlay.styleProfiles {
+                overlay = working
+                styleProfileWritten = true
+            }
+        }
+
+        // 覆盖层里已有产物 → 只补齐草稿状态与结果记录，**不再写任何事件**
+        var updated = draft
+        updated.status = .published
+        updated.publishedResult = CatalogDraftPublishResult(
+            productID: hit[0].productID,
+            saleEventIDs: hit.map(\.id),
+            publishedAt: Date(),
+            operationKey: key)
+        if styleProfileWritten {
+            try Self.saveOverlay(overlay)
+        }
+        try upsert(updated)
+        store.reloadWithOverlay()
+        return "已恢复发布结果（覆盖层已写入、草稿状态未落盘）：商品 \(hit[0].productID)，未重复生成销售记录"
+    }
+
     /// 发布：白名单校验（§26 服务层入口）→ 状态校验（§31：仅 reviewed 可发布）→
-    /// 校验 → 去重合并（复用既有店家/系列；同名商品现货记录追加）→ 写覆盖层。
+    /// 校验 → 幂等 / 恢复判定 → 去重合并（复用既有店家/系列；同名商品追加记录）
+    /// → 写覆盖层 → 写草稿状态。
+    ///
+    /// ⚠️ 顺序刻意是「先覆盖层、后草稿状态」：覆盖层是发布产物，草稿状态只是回执。
+    /// 万一状态写失败，产物仍在，`recoverPendingPublish` 或再次调用本方法可以补齐，
+    /// 且不会重新生成一组事件。
     func publish(_ draft: CatalogProductDraft, store: ShopCatalogStore) throws -> String {
         try CreatorAccess.requireCreator(.listingPublish)
         guard draft.status == .reviewed else {
@@ -612,6 +1269,22 @@ final class ShopCatalogDraftStore: ObservableObject {
         }
         let catalog = store.catalog
         try ShopCatalogDraftValidator.validate(draft, catalog: catalog)
+
+        // ── 幂等入口 ①：草稿已记录过同一份内容的发布结果 ────────────────────
+        let operationKey = draft.publishOperationKey
+        if let recorded = draft.publishedResult, recorded.operationKey == operationKey {
+            store.reloadWithOverlay()
+            if draft.status != .published {
+                var settled = draft
+                settled.status = .published
+                try upsert(settled)
+            }
+            return "「\(draft.name)」此前已发布（同一内容重复提交，未重复生成销售记录）"
+        }
+        // ── 幂等入口 ②：覆盖层已有本次产物但草稿没记录（半成功 / 旧快照重放） ──
+        if let recovered = try recoverPendingPublish(draft, store: store) {
+            return recovered
+        }
 
         var overlay = Self.loadOverlay() ?? ShopCatalog()
 
@@ -674,12 +1347,8 @@ final class ShopCatalogDraftStore: ObservableObject {
                         return copy
                     })
                 }
-                if let chart = draft.sizeChart {
-                    var chart = chart
-                    chart.productID = existing.id
-                    overlay.sizeCharts.removeAll { $0.productID == existing.id }
-                    overlay.sizeCharts.append(chart)
-                }
+                // 尺码表统一挪到下方「款式名回填之后」写入（**款式共享**口径，2026-09-23）：
+                // 范围判定要用最终的款式键，早写会按回填前的款式名分组。
                 if !draft.images.isEmpty {
                     var assetIDs: [String] = []
                     for var asset in draft.images {
@@ -717,6 +1386,12 @@ final class ShopCatalogDraftStore: ObservableObject {
                     }
                 }
             }
+            // 尺码表（**款式共享**，2026-09-23）：从任一颜色补录尺码表，都归一化到整款。
+            // 放在款式名回填之后 —— 范围判定必须用最终的款式键。
+            if let chart = draft.sizeChart {
+                let target = overlay.products.first { $0.id == existing.id } ?? overlayProduct
+                Self.applySizeChart(chart, for: target, overlay: &overlay)
+            }
             // 本次提交的价格由下方统一的 SaleEvent 追加逻辑落库
             var appendedKinds: [String] = []
             if draft.effectiveReservationPrice != nil { appendedKinds.append("预约价") }
@@ -747,51 +1422,101 @@ final class ShopCatalogDraftStore: ObservableObject {
                 v.productID = productID
                 return v
             })
-            if var chart = draft.sizeChart {
-                chart.productID = productID
-                overlay.sizeCharts.append(chart)
+            // 尺码表（**款式共享**，2026-09-23）：新颜色填了尺码表 → 整款统一（含已有颜色）；
+            // 没填则不动既有表 —— 读取侧会自动把同款的表给新颜色，无需重复填写。
+            if let chart = draft.sizeChart,
+               let created = overlay.products.first(where: { $0.id == productID }) {
+                Self.applySizeChart(chart, for: created, overlay: &overlay)
             }
             summary = "已发布商品「\(draft.name)」"
         }
 
         // 销售记录（追加式，历史记录永不覆盖）：预约价与现货价**并存且不互斥**
         //（2026-09-22）—— 都填时各生成一条 SaleEvent；只填其一也放行（现货价可空置后补录）。
+        //
+        // ⚠️ 事件 ID 由草稿 ID + 内容指纹**确定性**生成（R09）：同一份内容再次发布
+        // 得到相同 ID，下面的「已存在则跳过」保证不会写出第二组事件。
+        var appendedEventIDs: [String] = []
+
+        func appendEvent(_ event: CatalogSaleEvent) {
+            guard !overlay.saleEvents.contains(where: { $0.id == event.id }) else { return }
+            overlay.saleEvents.append(event)
+            appendedEventIDs.append(event.id)
+        }
+
+        // 币种随金额一起落库：草稿未标注 → 明确写「待确认」，不冒充 CNY（R02）
+        let eventCurrency: CatalogCurrency = draft.currency ?? .unknown
+
         if let reservationPrice = draft.effectiveReservationPrice {
             let eventDeposit = draft.deposit.map { Decimal($0) }
             var event = CatalogSaleEvent(
-                id: "ev-ops-\(UUID().uuidString.prefix(8))",
+                id: Self.publishEventID(draftID: draft.id, type: .reservation,
+                                        eventKey: draft.saleEventKey(.reservation)),
                 productID: productID,
                 type: .reservation,
                 price: Decimal(reservationPrice),
                 deposit: eventDeposit,
                 balance: draft.balance.map { Decimal($0) },
                 startAt: draft.startAt,
-                endAt: draft.endAt
+                endAt: draft.endAt,
+                currency: eventCurrency
             )
             // 只填定金时尾款自动补齐（沿用既有口径：预约价不被覆盖）
             if event.balance == nil {
                 event.balance = event.price - (eventDeposit ?? 0)
             }
-            overlay.saleEvents.append(event)
+            appendEvent(event)
         }
         if let stockPrice = draft.effectiveStockPrice {
-            overlay.saleEvents.append(CatalogSaleEvent(
-                id: "ev-ops-\(UUID().uuidString.prefix(8))",
+            appendEvent(CatalogSaleEvent(
+                id: Self.publishEventID(draftID: draft.id, type: .stock,
+                                        eventKey: draft.saleEventKey(.stock)),
                 productID: productID,
                 type: .stock,
                 price: Decimal(stockPrice),
                 deposit: nil,
                 balance: nil,
                 startAt: draft.startAt,
-                endAt: draft.endAt
+                endAt: draft.endAt,
+                currency: eventCurrency
             ))
         }
 
+        // 款式（SPU）公共资料：面料 / 款式描述 → 款式档案（整款一份，2026-09-23）。
+        //
+        // ⚠️ 只在草稿**携带**款式资料时才写。`writePlan` 的语义是「空 = 清除」，
+        // 若纯补价草稿（两项都空）也走一遍，会把同款既有的面料 / 描述整块抹掉 ——
+        // 补价格把面料弄丢，是这个接口最容易出的静默事故。
+        // 发布之后要改款式资料，走「款式公共资料」入口（`updateStylePublicInfo`）。
+        if ShopCatalogDraftStyleSync.hasStyleContent(draft),
+           let target = overlay.products.first(where: { $0.id == productID }) {
+            Self.applyStyleProfile(fabric: draft.fabric,
+                                   styleDescription: draft.styleDescription,
+                                   for: target, overlay: &overlay)
+        }
+
+        // ── ① 先落盘发布产物（覆盖层） ──────────────────────────────────────
         try Self.saveOverlay(overlay)
         store.reloadWithOverlay()
-        var draft = draft
-        draft.status = .published
-        upsert(draft)
+
+        // ── ② 再写回草稿状态与发布结果 ──────────────────────────────────────
+        // 这一步失败时产物已经在覆盖层里：不做回滚（产物是事实），
+        // 抛错让 UI 提示「已发布，状态回执未保存」，随后可用 publish 或
+        // recoverPendingPublish 补齐，且不会重复生成事件。
+        var published = draft
+        published.status = .published
+        published.publishedResult = CatalogDraftPublishResult(
+            productID: productID,
+            saleEventIDs: appendedEventIDs,
+            publishedAt: Date(),
+            operationKey: operationKey)
+        do {
+            try upsert(published)
+        } catch {
+            throw ShopCatalogDraftStoreError.publishResultUnrecorded(
+                summary: summary + "（\(shop.name) · \(series.name)）",
+                detail: error.localizedDescription)
+        }
         return summary + "（\(shop.name) · \(series.name)）"
     }
 
@@ -812,6 +1537,152 @@ final class ShopCatalogDraftStore: ObservableObject {
         }
         try saveOverlay(overlay)
         ShopCatalogStore.shared.reloadWithOverlay()
+    }
+
+    // MARK: 尺码表写入（唯一入口，2026-09-23 款式共享）
+    //
+    //  尺码表属于**款式**（同系列 + 同品类 + 同款式名），不属于颜色：
+    //    · 任一颜色填了尺码表 → 整款所有颜色都拿到同一张（内容逐字相同）；
+    //    · 传 nil → 整款清空（不是只清当前颜色）。
+    //  三个写入点（新发布 / 补录补全 / 深度编辑）**全部**走 `applySizeChart`，
+    //  禁止再自己写 `overlay.sizeCharts.removeAll { productID == … } + append`
+    //  —— 那正是「只有红色有尺码表、粉色没有」的来源。
+
+    /// 应用尺码表写入计划（删旧 + 扇出新行）。
+    /// 判定范围用「Bundle 基底 + 本次待写覆盖层」的合并视图：既有颜色可能住在只读的
+    /// 种子里，只查覆盖层会漏掉同款的颜色。
+    private static func applySizeChart(_ chart: CatalogSizeChart?,
+                                       for product: CatalogProduct,
+                                       overlay: inout ShopCatalog) {
+        let (products, charts) = writeTargetCatalog(overlay: overlay)
+        let plan = ShopCatalogSizeChartSharing.writePlan(chart: chart, for: product,
+                                                        among: products, charts: charts)
+        let removals = Set(plan.removals)
+        overlay.sizeCharts.removeAll { removals.contains($0.productID) }
+        overlay.sizeCharts.append(contentsOf: plan.upserts)
+    }
+
+    // MARK: 款式（SPU）档案写入（内部唯一入口，2026-09-23）
+
+    /// 写入款式档案（面料 / 款式描述）：**整款一份**，按款式键整体替换。
+    ///
+    /// 与尺码表同源：判定范围用「Bundle 基底 + 本次待写覆盖层」的合并视图 ——
+    /// 同款的其他颜色可能还住在只读的种子里，只查覆盖层会漏掉它们，
+    /// 于是「整款一份」退化成「只写了当前颜色那一份」，读取侧又按款式键取最后一条，
+    /// 结果就是改 A 色面料、B 色看不到。
+    private static func applyStyleProfile(fabric: String?,
+                                         styleDescription: String?,
+                                         for product: CatalogProduct,
+                                         overlay: inout ShopCatalog) {
+        let (products, _) = writeTargetCatalog(overlay: overlay)
+        let plan = ShopCatalogStyleProfileSharing.writePlan(
+            fabric: fabric,
+            styleDescription: styleDescription,
+            for: product,
+            among: products,
+            profiles: writeTargetStyleProfiles(overlay: overlay))
+        let removals = Set(plan.removals)
+        overlay.styleProfiles.removeAll { removals.contains($0.id) }
+        overlay.styleProfiles.append(contentsOf: plan.upserts)
+    }
+
+    /// 款式档案的合并视图（Bundle 基底 + 本次覆盖层，同 id 后写胜出）
+    private static func writeTargetStyleProfiles(overlay: ShopCatalog) -> [CatalogStyleProfile] {
+        var profiles = ShopCatalogStore.shared.catalog?.styleProfiles ?? []
+        for profile in overlay.styleProfiles {
+            if let index = profiles.firstIndex(where: { $0.id == profile.id }) {
+                profiles[index] = profile
+            } else {
+                profiles.append(profile)
+            }
+        }
+        return profiles
+    }
+
+    /// 从「覆盖层 + store 已刷新视图」里取商品：
+    /// 发布路径里刚写进 overlay 的商品，此时可能还没出现在 store 的视图里。
+    private static func mergedProduct(id: String, overlay: ShopCatalog) -> CatalogProduct? {
+        if let hit = overlay.products.first(where: { $0.id == id }) { return hit }
+        return ShopCatalogStore.shared.catalog?.products.first(where: { $0.id == id })
+    }
+
+    /// 写入目标的合并视图：Bundle 基底 + 本次覆盖层（同 id 后写胜出）。
+    /// 与 `ShopCatalogStore.rebuildMergedCatalog` 同一口径，只是覆盖层用的是
+    /// **本次待写的那一份**（还没落盘，读 store 拿不到）。
+    private static func writeTargetCatalog(overlay: ShopCatalog)
+        -> (products: [CatalogProduct], charts: [CatalogSizeChart]) {
+        let base = ShopCatalogStore.shared.catalog ?? ShopCatalog()
+        var products = base.products
+        for product in overlay.products {
+            if let index = products.firstIndex(where: { $0.id == product.id }) {
+                products[index] = product
+            } else {
+                products.append(product)
+            }
+        }
+        var charts = base.sizeCharts
+        for chart in overlay.sizeCharts {
+            if let index = charts.firstIndex(where: { $0.id == chart.id }) {
+                charts[index] = chart
+            } else {
+                charts.append(chart)
+            }
+        }
+        return (products, charts)
+    }
+
+    // MARK: - 款式（SPU）公共属性写入（唯一入口，2026-09-23 录入端重构）
+
+    /// 写入一个款式的公共属性：**尺码表 + 面料 + 款式描述**，一次落盘。
+    ///
+    /// 为什么必须合成一个入口：这三项是同一份「款式公共资料」，任何一个界面提交时
+    /// 拿到的是整块快照。拆成三个接口就意味着三次落盘，中途失败会留下
+    /// 「尺码表换了、面料没换」的半套状态，而且三次之间各自读到的 overlay 版本不同，
+    /// 后一次会把前一次的写入整个覆盖掉（覆盖层是整包写的）。
+    ///
+    /// 语义（与价格修正的「整快照提交」一致）：
+    ///   · `sizeChart == nil` → **清除该款式尺码表**（整款，不是只清当前颜色）；
+    ///   · `fabric` / `styleDescription` 为空 → 清除该项，不是「跳过不修改」。
+    ///
+    /// 传入任意一个颜色都能命中整款 —— 款式键由 `styleKey` 归一化。
+    @discardableResult
+    static func updateStylePublicInfo(fabric: String?,
+                                      styleDescription: String?,
+                                      sizeChart: CatalogSizeChart?,
+                                      forProductID productID: String) throws -> String {
+        try CreatorAccess.requireCreator(.listingEdit)
+        var overlay = loadOverlay() ?? ShopCatalog()
+        let (products, charts) = writeTargetCatalog(overlay: overlay)
+        guard let product = products.first(where: { $0.id == productID }) else {
+            throw ShopCatalogDraftStoreError.productNotFound(productID)
+        }
+
+        // ① 尺码表（款式共享：先删整款旧行，再为每个在售颜色各写一行）
+        let chartPlan = ShopCatalogSizeChartSharing.writePlan(chart: sizeChart, for: product,
+                                                              among: products, charts: charts)
+        let chartRemovals = Set(chartPlan.removals)
+        overlay.sizeCharts.removeAll { chartRemovals.contains($0.productID) }
+        overlay.sizeCharts.append(contentsOf: chartPlan.upserts)
+
+        // ② 款式档案（面料 / 款式描述：整款一份，按键整体替换）
+        let profilePlan = ShopCatalogStyleProfileSharing.writePlan(
+            fabric: fabric, styleDescription: styleDescription, for: product,
+            among: products, profiles: overlay.styleProfiles)
+        let profileRemovals = Set(profilePlan.removals)
+        overlay.styleProfiles.removeAll { profileRemovals.contains($0.id) }
+        overlay.styleProfiles.append(contentsOf: profilePlan.upserts)
+
+        try Self.saveOverlay(overlay)
+        ShopCatalogStore.shared.reloadWithOverlay()
+
+        let designName = ShopCatalogSameDesignGrouper.designName(of: product)
+        var parts: [String] = []
+        if sizeChart != nil { parts.append("尺码表") }
+        if profilePlan.upserts.contains(where: { $0.fabric != nil }) { parts.append("面料") }
+        if profilePlan.upserts.contains(where: { $0.styleDescription != nil }) { parts.append("款式描述") }
+        return parts.isEmpty
+            ? "已清空款式「\(designName)」的公共资料"
+            : "已保存款式「\(designName)」的\(parts.joined(separator: " / "))，全部颜色已同步"
     }
 
     /// 已发布商品深度编辑（V1.1 §4.2 Product 修改：名称/分类/图片/配色尺码/尺码表）。
@@ -861,12 +1732,10 @@ final class ShopCatalogDraftStore: ObservableObject {
             v.productID = product.id
             return v
         })
-        overlay.sizeCharts.removeAll { $0.productID == product.id }
-        if var chart = sizeChart {
-            chart.productID = product.id
-            overlay.sizeCharts.append(chart)
-        }
-
+        // 尺码表（**款式共享**，2026-09-23）：在任一颜色编辑 = 整款生效；
+        // 表单留空 = 整款清空（深度编辑页提示文案同款口径）。
+        // 用 `updated` 而不是入参 `product`：名称/分类刚被改过，款式分组可能因此变化。
+        applySizeChart(sizeChart, for: updated, overlay: &overlay)
         if let index = overlay.products.firstIndex(where: { $0.id == product.id }) {
             overlay.products[index] = updated
         } else {
@@ -907,9 +1776,20 @@ final class ShopCatalogDraftStore: ObservableObject {
         reservationPrice: Decimal?,
         stockPrice: Decimal?,
         deposit: Decimal?,
-        balance: Decimal?
+        balance: Decimal?,
+        currency: CatalogCurrency? = nil
     ) throws -> CatalogPriceCorrection {
         try CreatorAccess.requireCreator(.listingEdit)
+
+        let archive = ShopCatalogStore.shared.priceArchive(forProduct: productID)
+        let existingCurrency = archive.currentCurrency
+        // 币种校验（R02）：修正的是**金额**，不是币种。
+        // 商品已有明确币种时，不允许用另一个币种去「修正」它。
+        if let currency, let existingCurrency,
+           !existingCurrency.isUnknown, !currency.isUnknown, currency != existingCurrency {
+            throw ShopCatalogPriceEditError.crossCurrency(
+                "商品既有币种为\(existingCurrency.displayName)，本次修正传的是\(currency.displayName)")
+        }
 
         // 校验规则（只服务于「修正」语义：合法性 + 对账，不涉及批次时间）
         if let r = reservationPrice { guard r > 0 else { throw ShopCatalogPriceEditError.invalidPrice } }
@@ -930,7 +1810,8 @@ final class ShopCatalogDraftStore: ObservableObject {
                                                 stockPrice: stockPrice,
                                                 deposit: deposit,
                                                 balance: balance,
-                                                correctedAt: Date())
+                                                correctedAt: Date(),
+                                                currency: currency ?? existingCurrency)
 
         var overlay = loadOverlay() ?? ShopCatalog()
         var product = overlay.products.first { $0.id == productID }
@@ -986,9 +1867,20 @@ final class ShopCatalogDraftStore: ObservableObject {
         balance: Decimal? = nil,
         startAt: Date,
         endAt: Date? = nil,
-        batchLabel: String? = nil
+        batchLabel: String? = nil,
+        currency: CatalogCurrency? = nil
     ) throws -> CatalogSaleEvent {
         try CreatorAccess.requireCreator(.listingEdit)
+
+        // 币种解析：未显式传入 → 沿用商品既有币种；都没有才落「待确认」（R02）
+        let archive = ShopCatalogStore.shared.priceArchive(forProduct: productID)
+        let existingCurrency = archive.currentCurrency
+        if let currency, let existingCurrency,
+           !existingCurrency.isUnknown, !currency.isUnknown, currency != existingCurrency {
+            throw ShopCatalogPriceEditError.crossCurrency(
+                "商品既有币种为\(existingCurrency.displayName)，本次记录传的是\(currency.displayName)")
+        }
+        let eventCurrency = currency ?? existingCurrency ?? .unknown
 
         // 校验规则（只服务于「追加」语义：价格合法 + 时间维度必填 + 对账 + 去重）
         guard price > 0 else { throw ShopCatalogPriceEditError.invalidPrice }
@@ -1007,7 +1899,8 @@ final class ShopCatalogDraftStore: ObservableObject {
             startAt: startAt,
             endAt: endAt,
             batchLabel: trimmedBatchLabel(batchLabel),
-            recordedAt: Date()
+            recordedAt: Date(),
+            currency: eventCurrency
         )
         // 预约类记录只填定金时自动补齐尾款（先补齐再算指纹，保证去重口径一致）
         if type == .reservation, event.balance == nil {
@@ -1090,6 +1983,90 @@ final class ShopCatalogDraftStore: ObservableObject {
         ShopCatalogStore.shared.reloadWithOverlay()
     }
 
+    // MARK: 商品批量删除（2026-09-23 需求：批量删除商品 + 二次确认）
+
+    /// 预检与执行**同源的**决策结果：两个入口都调它，所以「弹窗说会删 5 件」
+    /// 与「实际删了 5 件」不可能不一致。
+    private struct ProductDeletionPlan {
+        var deletable: [CatalogProduct] = []
+        var blocked: [CatalogProductDeleteBlock] = []
+    }
+
+    /// 逐个判定：被用户引用 → 拦截；种子（Bundle 只读）或不在覆盖层 → 拦截；其余可删。
+    /// 引用判定对整批只查一次数据库（不是每件一次）。
+    private static func planProductDeletion(
+        _ products: [CatalogProduct],
+        store: ShopCatalogStore,
+        modelContext: ModelContext
+    ) throws -> ProductDeletionPlan {
+        // 调用方可能传重复项（如全选 + 手点同一件），同 id 只处理一次
+        var seen = Set<String>()
+        let unique = products.filter { seen.insert($0.id).inserted }
+        guard !unique.isEmpty else { return ProductDeletionPlan() }
+
+        // 引用保护：被用户心愿/尾款/衣橱引用（含软删除记录）→ 禁止物理删除
+        let referenced = try ShopCatalogReferenceGuard.referencedProductIDs(
+            Set(unique.map(\.id)), modelContext: modelContext)
+        // 只有覆盖层里的商品才可能被物理删除——种子在 Bundle 里，改不动
+        let overlayIDs = Set((loadOverlay()?.products ?? []).map(\.id))
+
+        var plan = ProductDeletionPlan()
+        for product in unique {
+            if referenced.contains(product.id) {
+                plan.blocked.append(CatalogProductDeleteBlock(
+                    productID: product.id, name: product.name,
+                    reason: .referencedByUserData))
+            } else if !overlayIDs.contains(product.id) || store.isSeedProduct(id: product.id) {
+                plan.blocked.append(CatalogProductDeleteBlock(
+                    productID: product.id, name: product.name,
+                    reason: .seedImmutable))
+            } else {
+                plan.deletable.append(product)
+            }
+        }
+        return plan
+    }
+
+    /// 只读预检：算出这批商品里哪些会被删、哪些被拦及原因，**不写盘**。
+    /// 供「二次确认」弹窗把真实影响范围说清楚（含「另有 N 件将被跳过」）。
+    static func previewProductDeletion(
+        _ products: [CatalogProduct],
+        store: ShopCatalogStore,
+        modelContext: ModelContext
+    ) throws -> CatalogProductDeletePreview {
+        try CreatorAccess.requireCreator(.listingDelete)
+        let plan = try planProductDeletion(products, store: store, modelContext: modelContext)
+        return CatalogProductDeletePreview(deletableNames: plan.deletable.map(\.name),
+                                          blocked: plan.blocked)
+    }
+
+    /// 批量物理删除商品：守卫与单品删除完全相同（种子不可删 / 被引用只能归档），
+    /// 差别只在**整批只写一次覆盖层**——逐条调用 `deleteProduct` 会产生 N 次中途落盘
+    /// 与 N 次 reload，中途失败就留下「删了一半」的中间态。
+    ///
+    /// 部分成功是允许的，但绝不静默：`blocked` 原样返回，调用方必须展示。
+    @discardableResult
+    static func deleteProducts(
+        _ products: [CatalogProduct],
+        store: ShopCatalogStore,
+        modelContext: ModelContext
+    ) throws -> CatalogProductDeleteResult {
+        try CreatorAccess.requireCreator(.listingDelete)
+        let plan = try planProductDeletion(products, store: store, modelContext: modelContext)
+        guard !plan.deletable.isEmpty, var overlay = loadOverlay() else {
+            return CatalogProductDeleteResult(deletedIDs: [], blocked: plan.blocked)
+        }
+
+        let ids = Set(plan.deletable.map(\.id))
+        overlay.products.removeAll { ids.contains($0.id) }
+        // 与单品删除同口径：无引用时连带清理其规格 / 尺码表（销售事件按硬约束保留历史）
+        overlay.variants.removeAll { ids.contains($0.productID) }
+        overlay.sizeCharts.removeAll { ids.contains($0.productID) }
+        try saveOverlay(overlay)
+        ShopCatalogStore.shared.reloadWithOverlay()
+        return CatalogProductDeleteResult(deletedIDs: ids, blocked: plan.blocked)
+    }
+
     static func deleteSeries(
         _ series: CatalogSeries, store: ShopCatalogStore, modelContext: ModelContext
     ) throws {
@@ -1141,26 +2118,18 @@ final class ShopCatalogDraftStore: ObservableObject {
 
     nonisolated static func loadOverlay() -> ShopCatalog? {
         guard let data = try? Data(contentsOf: overlayURL) else { return nil }
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
-        return try? decoder.decode(ShopCatalog.self, from: data)
+        return try? ShopCatalogJSONCoding.decoder().decode(ShopCatalog.self, from: data)
     }
 
     private nonisolated static func saveOverlay(_ overlay: ShopCatalog) throws {
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        let data = try encoder.encode(overlay)
+        let data = try ShopCatalogJSONCoding.encoder(prettyPrinted: true).encode(overlay)
         try data.write(to: overlayURL, options: .atomic)
     }
 
     /// 导出整包（含 Bundle 种子 + 覆盖层），用于交接 / 备份
     func exportJSON(store: ShopCatalogStore) -> String? {
         guard let catalog = store.catalog else { return nil }
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        guard let data = try? encoder.encode(catalog) else { return nil }
+        guard let data = try? ShopCatalogJSONCoding.encoder(prettyPrinted: true).encode(catalog) else { return nil }
         return String(data: data, encoding: .utf8)
     }
 }

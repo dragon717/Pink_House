@@ -164,7 +164,7 @@ final class ShopCatalogOpsV11Tests: XCTestCase {
             d.price = Double(index + 1) * 100
             drafts.append(d)
         }
-        let summary = draftStore.createBatch(session, drafts: drafts)
+        let summary = try draftStore.createBatch(session, drafts: drafts)
         XCTAssertTrue(summary.contains("3 条"))
 
         // 批量提交：3 条全部 draft → submitted

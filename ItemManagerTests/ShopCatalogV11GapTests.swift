@@ -70,7 +70,7 @@ final class ShopCatalogV11GapTests: XCTestCase {
         draft.name = name
         draft.saleKind = .stock
         draft.price = 199
-        draftStore.upsert(draft)
+        try draftStore.upsert(draft)
         try draftStore.advance(draft, to: .submitted)
         return try XCTUnwrap(draftStore.drafts.first { $0.id == draft.id })
     }

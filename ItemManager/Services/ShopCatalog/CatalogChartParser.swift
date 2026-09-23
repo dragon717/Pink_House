@@ -201,10 +201,11 @@ nonisolated enum CatalogManualChartText {
     }
 
     /// 行文本（每行「标签:值,值,…」）→ 行。值尾冒号 / 逗号清洗，空段补 nil。
+    /// 2026-09-23：先做全角 → 半角归一（中文输入法打出的「：」「，」也算分隔符）。
     static func parseRows(_ text: String) -> [CatalogSizeRow] {
         text
             .components(separatedBy: .newlines)
-            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .map { normalizeSeparators($0).trimmingCharacters(in: .whitespaces) }
             .filter { !$0.isEmpty }
             .compactMap { line -> CatalogSizeRow? in
                 let pair = line.split(separator: ":", maxSplits: 1, omittingEmptySubsequences: true)
@@ -215,6 +216,19 @@ nonisolated enum CatalogManualChartText {
                     .map { $0.isEmpty ? nil : $0 }
                 return CatalogSizeRow(label: cleanToken(String(label)), values: values)
             }
+    }
+
+    /// 全角 → 半角（：，｜、全角空格）+ 去 Markdown 强调符与反引号。
+    /// 粘贴来源五花八门（微信 / 备忘录 / Excel / 模型回复），先归一再解析。
+    static func normalizeSeparators(_ text: String) -> String {
+        var result = text
+        result = result.replacingOccurrences(of: "：", with: ":")
+        result = result.replacingOccurrences(of: "，", with: ",")
+        result = result.replacingOccurrences(of: "｜", with: "|")
+        result = result.replacingOccurrences(of: "　", with: " ")
+        result = result.replacingOccurrences(of: "**", with: "")
+        result = result.replacingOccurrences(of: "`", with: "")
+        return result
     }
 
     /// 渲染 / 保存前的统一规范化（旧数据里已存入的重复标签列在此兜底修复）：
@@ -239,5 +253,123 @@ nonisolated enum CatalogManualChartText {
 
     static func isLabelColumn(_ name: String) -> Bool {
         labelColumnNames.contains(name.lowercased())
+    }
+
+    // MARK: 整段文本 → 表格（「粘贴录入」与「多模态回复」共用口径，2026-09-23 需求 M）
+
+    /// 整段文本的解析结果。
+    struct PastedChart: Sendable {
+        /// 列名行原文（回填「列名」输入框；找不到列名行时为空串）
+        var columnsText: String
+        /// 数据行文本（逐行「标签:值,值,…」，回填「行」输入框）
+        var rowsText: String
+        /// 解析后的列名（已剔行标签列，可直接展示 / 保存）
+        var columns: [String]
+        var rows: [CatalogSizeRow]
+
+        var isEmpty: Bool { columns.isEmpty && rows.isEmpty }
+    }
+
+    /// 用户直接粘贴的整段文本 → 表格。兼容三种来源：
+    ///   · 手工 / 模型输出的「列名行 + 标签:值」纯文本
+    ///   · Markdown 表格（`| 款式 | 预约价 |`）
+    ///   · Excel / Numbers 复制出来的制表符分隔表
+    ///
+    /// 用户诉求原文：「我需要的是能直接复制粘贴的规整文本」——模板不重要，
+    /// 整段丢进来就能识别并按行拆分，才算真的可用。
+    static func parsePastedText(_ text: String) -> PastedChart {
+        let lines = normalizeSeparators(text)
+            .components(separatedBy: .newlines)
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
+        guard !lines.isEmpty else {
+            return PastedChart(columnsText: "", rowsText: "", columns: [], rows: [])
+        }
+        if lines.contains(where: { $0.hasPrefix("|") }) {
+            return markdownTable(lines)
+        }
+        var headerIndex: Int?
+        for (index, line) in lines.enumerated() where isHeaderCandidate(line) {
+            // 列名行之后必须至少有一行数据行，否则更像是被误当表头的说明文字
+            let hasDataAfter = lines[(index + 1)...].contains { dataLine($0) != nil }
+            if hasDataAfter {
+                headerIndex = index
+                break
+            }
+        }
+        var rowLines: [String] = []
+        for (index, line) in lines.enumerated() where index != headerIndex {
+            if let converted = dataLine(line) { rowLines.append(converted) }
+        }
+        // 列名行原文回填前把制表符 / 竖线归一成逗号：
+        // 否则「尺码\t胸围」会被 parseColumns 当成**一个**列名（只认逗号分隔）
+        let columnsText = headerIndex.map { headerText(lines[$0]) } ?? ""
+        return make(columnsText: columnsText, rowLines: rowLines)
+    }
+
+    /// 列名行 → 逗号分隔文本（兼容 Excel 复制的制表符、Markdown / 网页的竖线）
+    private static func headerText(_ line: String) -> String {
+        line.replacingOccurrences(of: "\t", with: ",")
+            .replacingOccurrences(of: "|", with: ",")
+    }
+
+    /// 列名行判定：不含冒号 + 至少 2 段 + **没有任何一段含数字**。
+    /// 最后一条是关键：数据行（款名,318,91,227）必然带数字，靠它避免把数据行误判成列名行。
+    private static func isHeaderCandidate(_ line: String) -> Bool {
+        guard !line.contains(":") else { return false }
+        let fields = splitFields(line)
+        guard fields.count >= 2 else { return false }
+        return !fields.contains(where: { $0.contains(where: \.isNumber) })
+    }
+
+    /// 数据行归一化：已是「标签:值」的原样保留；
+    /// 否则首段当标签、其余当值（兼容用户按「款名,318,91,227」贴过来的写法）
+    private static func dataLine(_ line: String) -> String? {
+        if line.contains(":") { return line }
+        let fields = splitFields(line).map(cleanToken)
+        guard fields.count >= 2, !fields[0].isEmpty else { return nil }
+        return fields[0] + ":" + fields.dropFirst().joined(separator: ",")
+    }
+
+    /// 字段切分：英文 / 中文逗号、制表符、竖线都算分隔符
+    private static func splitFields(_ line: String) -> [String] {
+        line.split(whereSeparator: { character in
+            character == "," || character == "\t" || character == "|"
+        })
+        .map { $0.trimmingCharacters(in: .whitespaces) }
+        .filter { !$0.isEmpty }
+    }
+
+    private static func markdownTable(_ lines: [String]) -> PastedChart {
+        var header: [String] = []
+        var rowLines: [String] = []
+        for line in lines where line.hasPrefix("|") {
+            let cells = splitFields(line)
+            guard !cells.isEmpty else { continue }
+            if cells.allSatisfy(isSeparatorCell) { continue }   // |---|---| 分隔行
+            if header.isEmpty {
+                header = cells
+                continue
+            }
+            let label = cleanToken(cells[0])
+            guard !label.isEmpty else { continue }
+            rowLines.append(label + ":" + cells.dropFirst().map(cleanToken).joined(separator: ","))
+        }
+        return make(columnsText: header.joined(separator: ","), rowLines: rowLines)
+    }
+
+    private static func isSeparatorCell(_ cell: String) -> Bool {
+        !cell.isEmpty && cell.allSatisfy { $0 == "-" || $0 == ":" || $0 == "=" || $0 == " " }
+    }
+
+    /// 组装：列名走 parseColumns（剔行标签列）→ 行文本走 parseRows → 统一 normalized。
+    /// 与「保存价格表 / 尺码表」链路完全同一套口径，**预览即落库结果**。
+    private static func make(columnsText: String, rowLines: [String]) -> PastedChart {
+        let rowsText = rowLines.joined(separator: "\n")
+        let parsed = normalized(columns: parseColumns(columnsText), rows: parseRows(rowsText))
+        return PastedChart(columnsText: columnsText,
+                           rowsText: rowsText,
+                           columns: parsed.columns,
+                           rows: parsed.rows)
     }
 }

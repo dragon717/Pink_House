@@ -407,6 +407,59 @@ struct ShopCatalogShopView: View {
     }
 }
 
+// MARK: - 商品标题（内外一致口径，2026-09-23）
+//
+//  同一个商品在详情页、点菜页、商品管理的标题必须是**同一句话**：款式名。
+//  颜色不参与标题，只在「· N 色」标注与独立的颜色元素（配色行 / 颜色 chips /
+//  轮播胶囊 / 颜色标签）里出现。取值一律来自 `ShopCatalogProductTitle`
+//  （`ShopCatalogTitlePresentation.swift`），三处共用这一份渲染，不许各自拼
+//  `Text(product.name)` / `Text("· N 色")`。
+
+/// 商品标题标签：款式名 +（同款多色时）「· N 色」标注
+struct ShopCatalogProductTitleLabel: View {
+    let title: ShopCatalogProductTitle
+    var font: Font = .system(size: 14, weight: .medium)
+    var textColor: Color = .primary
+    var annotationColor: Color = .secondary
+    var lineLimit: Int? = 1
+
+    var body: some View {
+        HStack(spacing: 4) {
+            Text(title.text)
+                .font(font)
+                .foregroundStyle(textColor)
+                .lineLimit(lineLimit)
+            if let colorCountText = title.colorCountText {
+                Text(colorCountText)
+                    .font(.system(size: 11))
+                    .foregroundStyle(annotationColor)
+                    .lineLimit(1)
+            }
+        }
+    }
+}
+
+// MARK: - 颜色标签
+
+/// 单个颜色的小胶囊（颜色「单独呈现」时的统一形态）
+struct ShopCatalogColorChip: View {
+    let label: String
+    var isSelected: Bool = false
+    var accent: Color = .pink
+    /// 未选中时的文字色：主题皮肤页面传 `themeManager.secondaryTextColor`，
+    /// 普通列表用默认 `.secondary`（不依赖环境注入）。
+    var unselectedColor: Color = .secondary
+
+    var body: some View {
+        Text(label.appLocalized)
+            .font(.system(size: 11, weight: isSelected ? .semibold : .regular))
+            .foregroundStyle(isSelected ? .white : unselectedColor)
+            .padding(.horizontal, 9)
+            .padding(.vertical, 4)
+            .background(Capsule().fill(isSelected ? accent : Color.secondary.opacity(0.12)))
+    }
+}
+
 // MARK: - 系列直达点菜式选购（V1.2 路由收口）
 //
 //  路由链路（2026-09-21 优化）：店家主页系列卡 → 直接弹出 ShopCatalogSeriesMenuView。
