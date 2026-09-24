@@ -192,6 +192,8 @@ struct BookGridView: View {
             }
             .padding(24)
         }
+        // 底部悬浮 Dock 避让：书架首屏最后一排书会被 Dock 盖住。
+        .avoidingBottomDock()
     }
 
     /// 根据手帐返回对应的高亮目标键

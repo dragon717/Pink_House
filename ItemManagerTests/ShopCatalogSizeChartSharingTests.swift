@@ -300,6 +300,53 @@ final class ShopCatalogSizeChartSharingTests: XCTestCase {
         XCTAssertEqual(ShopCatalogSizeChartSharing.variantSizesByProduct(catalog)["p-red"], ["M", "S"],
                        "按出现顺序去重，空白尺码不算")
     }
+
+    // MARK: 尺码值零过滤（2026-09-24 需求：任何格式都不得被隐藏 / 省略 / 过滤）
+
+    /// 单尺码（均码 / F / 单一数字码）也必须完整读出 ——
+    /// 点菜页曾用 `count > 1` 判断是否渲染尺码行，单尺码商品整行消失；
+    /// 视图层已改为「非空即展示」，这里锁数据口径：单元素尺码轴原样返回。
+    func testSingleSizeValueIsReturnedAsIs() {
+        let red = product("p-red", name: "红色毛绒围巾")
+        let run = ShopCatalogSizeChartSharing.sizeRun(
+            for: red, among: [red], charts: [],
+            sizesByProduct: { ["p-red": ["均码"]] })
+        XCTAssertEqual(run, ["均码"], "单尺码不得被吞")
+
+        let free = ShopCatalogSizeChartSharing.sizeRun(
+            for: red, among: [red], charts: [],
+            sizesByProduct: { ["p-red": ["F"]] })
+        XCTAssertEqual(free, ["F"], "F（均码）不得被吞")
+    }
+
+    /// 混合格式尺码轴原样返回：`looksLikeSizeRun` 判定失败时也要走兜底
+    /// 把全部词元交出去，不做任何内容层面的挑选。
+    func testMixedFormatSizeAxisIsNotFiltered() {
+        let red = product("p-red", name: "红色毛绒围巾")
+        // "4XL" 不在 isSizeToken 的字母集合里 → 整轴「不像尺码」→ 兜底分支仍要全量返回
+        let run = ShopCatalogSizeChartSharing.sizeRun(
+            for: red, among: [red], charts: [chart("p-red", columns: ["S", "M", "4XL"])],
+            sizesByProduct: { [:] })
+        XCTAssertEqual(run, ["S", "M", "4XL"], "任何格式的尺码值都不得被过滤")
+
+        let numeric = ShopCatalogSizeChartSharing.sizeRun(
+            for: red, among: [red], charts: [chart("p-red", columns: ["F", "47", "24"])],
+            sizesByProduct: { [:] })
+        XCTAssertEqual(numeric, ["F", "47", "24"], "数字码 / F 混排原样展示")
+    }
+
+    /// 两轴都不像尺码时兜底择轴：返回**汉字词元更少**的轴（部位轴全汉字、
+    /// 尺码轴通常无汉字）——旧行为无条件取行标签，会把真尺码吞成 ["胸围"]。
+    func testFallbackPicksTheAxisWithFewerHanTokens() {
+        let red = product("p-red", name: "红色毛绒围巾")
+        // "O/S" 含斜杠、不在 isSizeToken 集合 → columns 整轴判负 → 兜底仍须交出尺码列
+        let run = ShopCatalogSizeChartSharing.sizeRun(
+            for: red, among: [red],
+            charts: [chart("p-red", columns: ["S", "M", "L", "O/S"])],
+            sizesByProduct: { [:] })
+        XCTAssertEqual(run, ["S", "M", "L", "O/S"],
+                       "兜底不得把尺码列吞成部位行标签（旧行为返回 [\"胸围\"]）")
+    }
 }
 
 // MARK: - 端到端：真实 Store + 真实发布 / 深度编辑链路

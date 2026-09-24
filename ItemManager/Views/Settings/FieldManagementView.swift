@@ -51,6 +51,8 @@ struct FieldManagementView: View {
             }
         }
         .scrollContentBackground(.hidden)
+        // 底部悬浮 Dock 避让：字段值列表最后一条会被 Dock 盖住。
+        .avoidingBottomDock()
         .background {
             LiquidBackground()
         }

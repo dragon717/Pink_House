@@ -201,6 +201,15 @@ struct CatalogShop: Codable, Identifiable, Hashable, Sendable {
 nonisolated enum CatalogSeriesSalePhase: String, Codable, CaseIterable, Identifiable, Sendable {
     case reservationActive = "reservation_active"
     case reservationEnded = "reservation_ended"
+    /// 尾款中（2026-09-24 需求三）：预约窗口结束后、**开始收尾款**的结算期。
+    ///
+    /// 与「预约已结束」的分工（这两个阶段必须能区分，否则运营无法表达
+    /// 「预约收了定金，现在正在等大家补尾款」这条事实）：
+    ///   · 预约已结束 = 预约（付定金）窗口关闭，尾款**还没开始收**；
+    ///   · 尾款中     = 尾款支付进行中（已到「尾款时间」或运营显式声明）。
+    ///
+    /// rawValue 只追加、不改既有三个：已发布覆盖层里的阶段字符串必须继续可解码。
+    case balancePending = "balance_pending"
     case inStock = "in_stock"
 
     var id: String { rawValue }
@@ -209,7 +218,29 @@ nonisolated enum CatalogSeriesSalePhase: String, Codable, CaseIterable, Identifi
         switch self {
         case .reservationActive: return "预约中"
         case .reservationEnded: return "预约已结束"
+        case .balancePending: return "尾款中"
         case .inStock: return "现货"
+        }
+    }
+}
+
+/// 「尾款时间」的粒度（2026-09-24 需求四）：运营可能只能给出**大致时间**
+/// （「大货到后」「2027 年春节前」），也可能给出**具体时间**（到分）。
+///
+/// 为什么要显式区分，而不是「能解析成日期就当具体时间」：
+///   1. 自动流转只允许建立在**确定时刻**上 —— 大致时间是人的描述，不是时间点，
+///      拿它做 `now > x` 判定就是把猜测当事实（与既有「缺依据就不猜」口径冲突）；
+///   2. 展示口径不同：大致时间原样展示文本，具体时间按 locale 格式化。
+nonisolated enum CatalogBalanceDueKind: String, Codable, CaseIterable, Identifiable, Sendable {
+    case approximate = "approximate"
+    case exact = "exact"
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .approximate: return "大致时间"
+        case .exact: return "具体时间"
         }
     }
 }
@@ -239,10 +270,46 @@ struct CatalogSeries: Codable, Identifiable, Hashable, Sendable {
     /// **必须 Optional**：合成 `Decodable` 对非 Optional 字段走 `decode`，
     /// 旧 JSON / 已发布的覆盖层缺这个键会直接抛错，整个系列列表都打不开。
     var salePhase: CatalogSeriesSalePhase? = nil
+
+    // MARK: 预约期（2026-09-24 需求五：预约中必须同时有「开始 + 结束」）
+
+    /// 预约开始时间。**选填**：预约期开口那天运营常常记不清，但结束时间必须有
+    /// （它是自动流转的依据）。填了就必须不晚于 `reservationEndAt`（见
+    /// `CatalogSeriesReservationWindow`）。
+    ///
+    /// **必须 Optional**（同 `salePhase` 的理由）：旧 JSON / 已发布覆盖层缺这个键，
+    /// 非 Optional 会让合成 `Decodable` 直接抛错，整个系列列表都打不开。
+    var reservationStartAt: Date? = nil
     /// 预约结束时间（仅在选择「预约中」时要求填写）。
     /// 当前时间越过它 → 生效阶段自动流转为「预约已结束」（`CatalogSeriesSalePhaseResolver`）。
     /// 切到其它阶段时**不清除**该值：它是「预约是什么时候结束的」这条事实本身。
     var reservationEndAt: Date? = nil
+
+    // MARK: 尾款时间（2026-09-24 需求四）
+
+    /// 尾款时间粒度：`approximate`（大致时间，自由文本）/ `exact`（具体时间，`balanceDueAt`）。
+    ///
+    /// **必须 Optional**（同 `salePhase` 的理由）：旧 JSON / 已发布覆盖层缺这三个键，
+    /// 非 Optional 会让合成 `Decodable` 直接抛错，整个系列列表打不开。
+    /// nil = 未填写 → 不参与任何自动流转、界面上不展示尾款时间。
+    var balanceDueKind: CatalogBalanceDueKind? = nil
+    /// 大致时间的**原文**（如「大货到后 1 个月」「2027 年春节前」）。
+    /// 只在大致粒度下有意义；**故意不做日期解析** —— 它不是时间点，解析出来的
+    /// 任何时刻都是猜的，会让自动流转说假话。上限与校验见 `CatalogSeriesBalanceDue`。
+    var balanceDueText: String? = nil
+    /// 具体时间（到分）。只在具体粒度下有意义，且是**唯一**允许驱动自动流转的字段。
+    /// 切到其它阶段时**不清除**（与 `reservationEndAt` 同口径：事实保留，表单只是隐藏）。
+    ///
+    /// 语义 = **尾款期的开始**（「开始收尾款」的时刻），2026-09-24 需求五起与
+    /// `balanceDueEndAt` 组成尾款区间。**key 不改**（改 key = 存量数据全丢）。
+    var balanceDueAt: Date? = nil
+    /// 大致时间下的**尾款结束描述**（如「大货到后 2 个月」）。
+    /// 与 `balanceDueText` 成对：2026-09-24 需求五要求尾款期同时给出开始与结束。
+    var balanceDueEndText: String? = nil
+    /// 尾款结束时间（到分）。**选填**：不填 = 未声明结束，参与展示但不参与任何流转判定
+    /// （「尾款是否收齐」在数据模型里没有依据，出口只能是运营声明 —— 见
+    /// `CatalogSeriesSalePhaseResolver.balancePhaseExitsByDeclarationOnly`）。
+    var balanceDueEndAt: Date? = nil
 }
 
 // MARK: - PriceCorrection 价格修正（2026-09-22：与 append-only 销售历史分离）
@@ -527,12 +594,20 @@ struct ShopCatalog: Codable, Hashable, Sendable {
     /// 款式（SPU）公共档案（2026-09-23）：面料 / 款式描述，一个款式一份。
     /// Optional 缺键容错：合成解码对带默认值字段走 decodeIfPresent（见下方 init(from:)）
     var styleProfiles: [CatalogStyleProfile] = []
+    /// 删除墓碑（2026-09-24 强制删除）：种子实体物理删不掉（Bundle 只读），
+    /// 运营「强制删除」把 id 记进这里，合并层据此排除（含种子与覆盖层副本）。
+    /// Optional 缺键容错：旧覆盖层 JSON 没有这些键也能解码。
+    var removedShopIDs: [String] = []
+    var removedSeriesIDs: [String] = []
+    var removedProductIDs: [String] = []
 
     /// 兼容旧格式：任何集合字段缺失时兜底为空数组（理由同 CatalogShop.init(from:)）
     init(version: Int = 1, shops: [CatalogShop] = [], series: [CatalogSeries] = [],
          products: [CatalogProduct] = [], variants: [CatalogProductVariant] = [],
          sizeCharts: [CatalogSizeChart] = [], saleEvents: [CatalogSaleEvent] = [],
-         assets: [CatalogAsset] = [], styleProfiles: [CatalogStyleProfile] = []) {
+         assets: [CatalogAsset] = [], styleProfiles: [CatalogStyleProfile] = [],
+         removedShopIDs: [String] = [], removedSeriesIDs: [String] = [],
+         removedProductIDs: [String] = []) {
         self.version = version
         self.shops = shops
         self.series = series
@@ -542,6 +617,9 @@ struct ShopCatalog: Codable, Hashable, Sendable {
         self.saleEvents = saleEvents
         self.assets = assets
         self.styleProfiles = styleProfiles
+        self.removedShopIDs = removedShopIDs
+        self.removedSeriesIDs = removedSeriesIDs
+        self.removedProductIDs = removedProductIDs
     }
 
     init(from decoder: Decoder) throws {
@@ -555,7 +633,10 @@ struct ShopCatalog: Codable, Hashable, Sendable {
             sizeCharts: try c.decodeIfPresent([CatalogSizeChart].self, forKey: .sizeCharts) ?? [],
             saleEvents: try c.decodeIfPresent([CatalogSaleEvent].self, forKey: .saleEvents) ?? [],
             assets: try c.decodeIfPresent([CatalogAsset].self, forKey: .assets) ?? [],
-            styleProfiles: try c.decodeIfPresent([CatalogStyleProfile].self, forKey: .styleProfiles) ?? [])
+            styleProfiles: try c.decodeIfPresent([CatalogStyleProfile].self, forKey: .styleProfiles) ?? [],
+            removedShopIDs: try c.decodeIfPresent([String].self, forKey: .removedShopIDs) ?? [],
+            removedSeriesIDs: try c.decodeIfPresent([String].self, forKey: .removedSeriesIDs) ?? [],
+            removedProductIDs: try c.decodeIfPresent([String].self, forKey: .removedProductIDs) ?? [])
     }
 }
 

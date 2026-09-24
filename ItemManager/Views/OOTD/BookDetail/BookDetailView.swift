@@ -117,6 +117,8 @@ struct BookDetailView: View {
                     }
                     .padding()
                 }
+                // 底部悬浮 Dock 避让：手帐书页最后一排会被 Dock 盖住。
+                .avoidingBottomDock()
             }
         }
         .id(refreshTrigger)

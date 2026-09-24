@@ -110,6 +110,8 @@ struct ShopCatalogListView: View {
             .padding(16)
             .padding(.bottom, 40)
         }
+        // 底部悬浮 Dock 避让：店家列表最后一条会被 Dock 盖住。
+        .avoidingBottomDock()
     }
 
     private var searchBar: some View {
@@ -213,16 +215,21 @@ struct ShopCatalogShopView: View {
         switch yearFilter {
         case .current:
             return store.currentSeries(inShop: shopID)
+        // 年份/未标年份筛选覆盖**全量系列**（含正在上新的）：
+        // 曾只用 archiveSeries（= 全量 − 当前上新），导致「正在上新的系列」
+        // 在它自己标注的年份下永远查不到（2026-09-24 用户实测：系列填 2026-4、
+        // 现货在售，点「2026」chip 却显示「该年份暂无收录系列」）。
+        // 「当前上新」是活动维度，年份是档案维度，两者正交。
         case .noYear:
-            return store.archiveSeries(inShop: shopID).filter { $0.year == nil }
+            return store.series(inShop: shopID).filter { $0.year == nil }
         case .year(let year):
-            return store.archiveSeries(inShop: shopID).filter { $0.year == year }
+            return store.series(inShop: shopID).filter { $0.year == year }
         }
     }
 
-    /// 无年份的历年系列（运营发布时年份选填），存在则显示「未标年份」chip 兜底
+    /// 无年份的系列（运营发布时年份选填），存在则显示「未标年份」chip 兜底
     private var hasNoYearArchiveSeries: Bool {
-        store.archiveSeries(inShop: shopID).contains { $0.year == nil }
+        store.series(inShop: shopID).contains { $0.year == nil }
     }
 
     var body: some View {
@@ -237,6 +244,8 @@ struct ShopCatalogShopView: View {
                 .padding(16)
                 .padding(.bottom, 40)
             }
+            // 底部悬浮 Dock 避让：系列列表最后一张卡会被 Dock 盖住。
+            .avoidingBottomDock()
         }
         .navigationTitle(shop?.name ?? "")
         .navigationBarTitleDisplayMode(.inline)

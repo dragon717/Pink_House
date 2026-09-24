@@ -94,6 +94,13 @@ nonisolated struct CatalogProductDraft: Codable, Identifiable, Hashable, Sendabl
     var seriesID: String?
     var newSeriesName: String = ""
     var newSeriesYear: Int?
+    /// 新建系列的**月份**（2026-09-24 需求五「只有它不带月份」的根源修复）。
+    ///
+    /// 原先这条链路只承载年份，而建系列的两处（`publish` / `ensureAttributionEntities`）
+    /// 都只写 `year:`，所以凡经「批量录入 → 批次归属 → 发布」诞生的系列 `month` 恒为 nil，
+    /// 列表里就只有这一批显示「2026」、其它显示「2026-10」。补上月通道即根治。
+    /// Optional + 无默认值 → 合成 `Decodable` 走 `decodeIfPresent`，旧草稿零迁移。
+    var newSeriesMonth: Int?
     var newSeriesSeason: String = ""
 
     var name: String = ""
@@ -219,7 +226,10 @@ extension CatalogProductDraft {
             shopID ?? "new:\(newShopName)",
             newShopAliases,
             seriesID ?? "new:\(newSeriesName)",
-            String(newSeriesYear.map(String.init) ?? "-"),
+            // 年月段（2026-09-24 需求五）：只带年份时输出与旧指纹**逐字相同**
+            // （"-" / "2026"），所以存量已发布草稿的指纹不变，不会被误判成「内容变了」
+            // 而重新发布；带上月份时才产生新指纹，改动才会真实落库。
+            Self.yearMonthKey(year: newSeriesYear, month: newSeriesMonth),
             newSeriesSeason,
             name,
             category,
@@ -280,6 +290,24 @@ extension CatalogProductDraft {
         guard let date else { return "-" }
         return String(Int(date.timeIntervalSince1970))
     }
+
+    // MARK: 年月的指纹段（2026-09-24 需求五）
+
+    /// 「yyyy-MM」的指纹形态：只有年份 → "2026"；年月齐全 → "2026-10"；都没有 → "-"。
+    ///
+    /// **两条不变式**（顺序很重要）：
+    ///   1. 只有年份时输出与旧实现逐字相同 —— 存量已发布草稿的 `publishOperationKey`
+    ///      不变，不会被幂等入口当成「新内容」重新走一遍发布；
+    ///   2. 月份参与了指纹，所以「补上月再发布」是一次真实的新内容，
+    ///      改动不会被幂等入口吞掉（这是本项目 `CatalogProductDraft` 加字段的固定规则）。
+    nonisolated static func yearMonthKey(year: Int?, month: Int?) -> String {
+        switch (year, month) {
+        case let (year?, month?): return "\(year)-\(month)"
+        case let (year?, nil): return String(year)
+        case let (nil, month?): return "?-\(month)"   // 理论不可达（月必伴随年），留给坏数据
+        case (nil, nil): return "-"
+        }
+    }
 }
 
 // MARK: - 批次录入会话（V1.1 §4.1：一次补录任务录入多个单品、多品类混合）
@@ -296,6 +324,9 @@ nonisolated struct CatalogBatchEntrySession: Codable, Identifiable, Hashable, Se
     var seriesID: String?
     var newSeriesName: String = ""
     var newSeriesYear: Int?
+    /// 新建系列的月份（同 `CatalogProductDraft.newSeriesMonth`）：整批归属要把
+    /// 「2026-10」这种年月粒度一路带到建系列那一步。Optional → 旧 JSON 零迁移。
+    var newSeriesMonth: Int?
     var newSeriesSeason: String = ""
     var createdAt: Date = Date()
 }
@@ -906,6 +937,7 @@ final class ShopCatalogDraftStore: ObservableObject {
             draft.seriesID = session.seriesID
             draft.newSeriesName = session.newSeriesName
             draft.newSeriesYear = session.newSeriesYear
+            draft.newSeriesMonth = session.newSeriesMonth
             draft.newSeriesSeason = session.newSeriesSeason
             prepared.append(draft)
         }
@@ -933,7 +965,8 @@ final class ShopCatalogDraftStore: ObservableObject {
     func applyBatchAttribution(
         batchID: String,
         shopID: String?, newShopName: String, newShopAliases: String,
-        seriesID: String?, newSeriesName: String, newSeriesYear: Int?, newSeriesSeason: String
+        seriesID: String?, newSeriesName: String,
+        newSeriesYear: Int?, newSeriesMonth: Int?, newSeriesSeason: String
     ) throws -> Int {
         var batches = Self.loadBatches()
         guard let idx = batches.firstIndex(where: { $0.id == batchID }) else { return 0 }
@@ -943,6 +976,7 @@ final class ShopCatalogDraftStore: ObservableObject {
         batches[idx].seriesID = seriesID
         batches[idx].newSeriesName = newSeriesName
         batches[idx].newSeriesYear = newSeriesYear
+        batches[idx].newSeriesMonth = newSeriesMonth
         batches[idx].newSeriesSeason = newSeriesSeason
         try saveBatches(batches)
 
@@ -955,11 +989,225 @@ final class ShopCatalogDraftStore: ObservableObject {
             draft.seriesID = seriesID
             draft.newSeriesName = newSeriesName
             draft.newSeriesYear = newSeriesYear
+            draft.newSeriesMonth = newSeriesMonth
             draft.newSeriesSeason = newSeriesSeason
             updated.append(draft)
         }
         try upsert(updated)      // 整批成功或整批失败
         return updated.count
+    }
+
+    // MARK: 批次详情页「一站式配置」：系列配置的同步写入（2026-09-24 需求）
+
+    /// 把批次的归属**落成真实实体**（店家 + 系列），供批次详情页配置系列级三项
+    /// （发售阶段 / 图文 / 预约价格表）。返回解析后的 (店家, 系列)；无法解析时返回 nil。
+    ///
+    /// ── 为什么要这一步 ──
+    ///
+    /// 批次在此之前只持有「店名 / 系列名」这类**文本意向**，系列实体要等**发布**时才创建
+    /// （`publish` 里的三档解析：既有 id → 同名去重 → 新建）。而这三项配置住在
+    /// `CatalogSeries` 上，所以「还没发布就配置系列」必须先有系列实体。
+    ///
+    /// ── 与发布同源（关键） ──
+    ///
+    /// 店家和系列的解析**逐档复用发布同款判定**（`findExistingShop` / `findExistingSeries`），
+    /// 所以这里创建的实体与发布时会创建的是**同一条**（同名系列不会被建出两条）。
+    /// 若各写一套，运营会看到「批次里配好价格的系列」与「发布后出现的系列」是两个。
+    ///
+    /// ── 写盘顺序 ──
+    ///
+    /// 先写覆盖层（实体），再回写批次会话与整批草稿（id 归一）。中途失败时实体可能已建、
+    /// 链接未更新 —— 重跑本方法即可收敛（同名去重命中，不会重复建实体）。
+    @discardableResult
+    func ensureAttributionEntities(
+        batchID: String,
+        store: ShopCatalogStore
+    ) throws -> (shop: CatalogShop, series: CatalogSeries)? {
+        try CreatorAccess.requireCreator(.listingEdit)
+        let batches = Self.loadBatches()
+        guard let session = batches.first(where: { $0.id == batchID }) else { return nil }
+        var overlay = Self.loadOverlay() ?? ShopCatalog()
+        let catalog = store.catalog
+
+        // 店家：既有 id → 名称/别名去重 → 新建（三档与 `publish` 一字不差）
+        var probe = CatalogProductDraft()
+        probe.shopID = session.shopID
+        probe.newShopName = session.newShopName
+        probe.newShopAliases = session.newShopAliases
+
+        let shop: CatalogShop
+        if let shopID = session.shopID,
+           let existing = catalog?.shops.first(where: { $0.id == shopID })
+            ?? overlay.shops.first(where: { $0.id == shopID }) {
+            shop = existing
+        } else if let hit = ShopCatalogDraftValidator.findExistingShop(for: probe, catalog: catalog ?? overlay) {
+            shop = hit
+        } else {
+            let name = session.newShopName.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !name.isEmpty else { return nil }
+            let aliases = session.newShopAliases
+                .components(separatedBy: CharacterSet(charactersIn: "，,、"))
+                .map { $0.trimmingCharacters(in: .whitespaces) }
+                .filter { !$0.isEmpty }
+            shop = CatalogShop(id: "shop-ops-\(UUID().uuidString.prefix(8))",
+                               name: name,
+                               aliases: aliases)
+            overlay.shops.append(shop)
+        }
+
+        // 系列：既有 id → 同店同名去重 → 新建（同样与 `publish` 同源）
+        probe.shopID = shop.id
+        probe.seriesID = session.seriesID
+        probe.newSeriesName = session.newSeriesName
+
+        let series: CatalogSeries
+        if let seriesID = session.seriesID,
+           let existing = catalog?.series.first(where: { $0.id == seriesID })
+            ?? overlay.series.first(where: { $0.id == seriesID }) {
+            // 复用既有系列时「只填空不覆盖」地补全年月（2026-09-24 需求五）：
+            // 存量系列如果是旧链路建的，month 恒为 nil —— 运营在这里补一次年月即收敛。
+            series = Self.completingYearMonth(existing,
+                                              year: session.newSeriesYear,
+                                              month: session.newSeriesMonth,
+                                              in: &overlay)
+        } else if let hit = ShopCatalogDraftValidator.findExistingSeries(for: probe,
+                                                                        shopID: shop.id,
+                                                                        catalog: catalog ?? overlay) {
+            series = Self.completingYearMonth(hit,
+                                              year: session.newSeriesYear,
+                                              month: session.newSeriesMonth,
+                                              in: &overlay)
+        } else {
+            let name = session.newSeriesName.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !name.isEmpty else { return nil }
+            series = CatalogSeries(id: "series-ops-\(UUID().uuidString.prefix(8))",
+                                   shopID: shop.id,
+                                   name: name,
+                                   year: session.newSeriesYear,
+                                   month: session.newSeriesMonth,
+                                   season: session.newSeriesSeason.isEmpty ? nil : session.newSeriesSeason)
+            overlay.series.append(series)
+        }
+
+        try Self.saveOverlay(overlay)
+        ShopCatalogStore.shared.reloadWithOverlay()
+
+        // 归属链接归一：批次会话 + 整批未发布草稿都指向解析出的实体 id。
+        // 名称 / 年月 / 季节副本原样保留（它们是运营填的输入，不是派生值）。
+        try applyBatchAttribution(
+            batchID: batchID,
+            shopID: shop.id, newShopName: session.newShopName, newShopAliases: session.newShopAliases,
+            seriesID: series.id, newSeriesName: session.newSeriesName,
+            newSeriesYear: session.newSeriesYear, newSeriesMonth: session.newSeriesMonth,
+            newSeriesSeason: session.newSeriesSeason)
+        return (shop, series)
+    }
+
+    // MARK: 系列年月的「只填空不覆盖」补全（2026-09-24 需求五）
+
+    /// 判定是否需要把草稿/批次带来的年月补进系列。需要则返回**补全后的副本**，否则 `nil`。
+    ///
+    /// 补全规则（三条，写在这里不留第二套):
+    ///   1. 系列**没有年**：把输入的年写进去，月跟着一起写（年月必须同源）；
+    ///   2. 系列**有年且与输入同年、但没有月**：只补月；
+    ///   3. 其余一律**不动** —— 已有月份不覆盖（那是运营声明），年份不一致也不补月
+    ///      （同名不同年 = 另一条系列，硬补就是脏数据）。
+    ///
+    /// 为什么要有这一步：`month` 是 2026-09-24 才加上的字段，之前所有经批次 /
+    /// 草稿链路建立的系列都缺它。光补写入通道只能保证**新**系列带上月份，
+    /// 存量那些还得有一条明确的修复路径 —— 这就是那一条。
+    nonisolated static func seriesCompletingYearMonth(_ series: CatalogSeries,
+                                                      year: Int?,
+                                                      month: Int?) -> CatalogSeries? {
+        var updated = series
+        if let year, updated.year == nil {
+            updated.year = year
+            if let month, updated.month == nil { updated.month = month }
+            return updated
+        }
+        if let month, updated.year == year, updated.month == nil {
+            updated.month = month
+            return updated
+        }
+        return nil
+    }
+
+    /// 同上，外加**写进内存覆盖层**（调用方随后统一 `saveOverlay`）。
+    /// 无需补全时原样返回，绝不会因为「补全」而多写一次盘。
+    nonisolated static func completingYearMonth(_ series: CatalogSeries,
+                                               year: Int?,
+                                               month: Int?,
+                                               in overlay: inout ShopCatalog) -> CatalogSeries {
+        guard let completed = seriesCompletingYearMonth(series, year: year, month: month) else {
+            return series
+        }
+        if let index = overlay.series.firstIndex(where: { $0.id == completed.id }) {
+            overlay.series[index] = completed
+        } else {
+            overlay.series.append(completed)
+        }
+        return completed
+    }
+
+    /// 按 id 取系列实体：覆盖层优先（更新），再回落到合并后的目录。
+    nonisolated static func seriesEntity(id: String, overlay: ShopCatalog, catalog: ShopCatalog?) -> CatalogSeries? {
+        overlay.series.first { $0.id == id } ?? catalog?.series.first { $0.id == id }
+    }
+
+    /// 给**既有系列**补全缺失的年月（2026-09-24 需求五的存量修复入口）。
+    ///
+    /// 场景：批次详情页选了「既有系列」，那个系列是旧链路建的、没有月份。
+    /// `applyBatchAttribution` 只写批次与草稿（不碰实体），所以需要这一条明确的补全入口
+    /// —— 否则运营在批次页补的年月只能等下一次发布才可能生效。
+    ///
+    /// 判定与 `ensureAttributionEntities` / `publish` 里的补全**同一份实现**
+    /// （`seriesCompletingYearMonth`）：只填空、不覆盖；年份对不上就不补月。
+    /// - Returns: 是否真的写了盘（false = 无需补全 / 系列不在覆盖层 / 没填年月）
+    @discardableResult
+    func completeSeriesYearMonth(seriesID: String, year: Int?, month: Int?) throws -> Bool {
+        try CreatorAccess.requireCreator(.listingEdit)
+        guard year != nil || month != nil else { return false }
+        var overlay = Self.loadOverlay() ?? ShopCatalog()
+        guard let existing = Self.seriesEntity(id: seriesID, overlay: overlay, catalog: nil) else {
+            return false
+        }
+        let completed = Self.completingYearMonth(existing, year: year, month: month, in: &overlay)
+        guard completed != existing else { return false }   // 无需补全 → 一个字节都不写
+        try Self.saveOverlay(overlay)
+        ShopCatalogStore.shared.reloadWithOverlay()
+        return true
+    }
+
+    /// 保存系列级三项配置（发售阶段 / 图文 / 预约价格表）——**批次详情页与系列编辑页共用**。
+    ///
+    /// 需求一「保存时前后端需保证批次数据与所属系列数据同步更新」的落地方式：
+    ///
+    ///   1. **单一写入点**：三项配置只有一处存储（`CatalogSeries`），批次里没有副本，
+    ///      所以「写一次 = 全批次、全单品同步生效」，不存在需要扇出的第二份数据；
+    ///   2. **链接归一**：把该批里**仍然未自报系列**（`seriesID == nil`，即继承整批归属）
+    ///      的未发布草稿显式指向本次配置的系列 id —— 从此它们的归属不再依赖
+    ///      「批次的当前选择」这一层间接引用，改批次归属也不会把它们的配置带走；
+    ///   3. **不碰自报系列的草稿**：单品页自己改过归属的条目保持原样（既有裁定：
+    ///      自报系列优先，永不被整批覆盖）；
+    ///   4. 返回**实际同步的草稿数**，UI 如实汇报（0 也要说，不假装成功）。
+    ///
+    /// 失败语义：先写覆盖层再改草稿；覆盖层失败则草稿一条都不动（抛错可见）。
+    @discardableResult
+    func saveSeriesConfig(_ series: CatalogSeries, batchID: String? = nil) throws -> Int {
+        try CreatorAccess.requireCreator(.listingEdit)
+        try Self.upsertEntity(series, keyPath: \.series)
+        guard let batchID else { return 0 }
+        let inherited = drafts.filter {
+            $0.batchID == batchID && $0.status != .published && $0.status != .archived && $0.seriesID == nil
+        }
+        guard !inherited.isEmpty else { return 0 }
+        let linked = inherited.map { draft -> CatalogProductDraft in
+            var updated = draft
+            updated.seriesID = series.id
+            return updated
+        }
+        try upsert(linked)
+        return linked.count
     }
 
     // MARK: 同款不同色：款式公共资料一键同步（2026-09-23）
@@ -1120,17 +1368,20 @@ final class ShopCatalogDraftStore: ObservableObject {
 
     // MARK: 发布状态机（计划 §31：draft → submitted → reviewed → published，任一态可 archived）
 
+    /// 合法流转表（唯一口径）：单条 `advance` 与批量 `batchAdvance` 共用，
+    /// 改流转规则只改这一处。
+    nonisolated static let allowedTransitions: [CatalogPublicationStatus: Set<CatalogPublicationStatus>] = [
+        .draft: [.submitted, .archived],
+        .submitted: [.reviewed, .archived, .draft],
+        .reviewed: [.published, .archived],
+        .published: [.archived],
+        .archived: [.draft],
+    ]
+
     /// 推进草稿状态。非法流转抛错。
     /// `submitted → draft` 为审核驳回（V1.1 §4.1：部分通过发布、部分驳回退回草稿）。
     func advance(_ draft: CatalogProductDraft, to newStatus: CatalogPublicationStatus) throws {
-        let allowed: [CatalogPublicationStatus: Set<CatalogPublicationStatus>] = [
-            .draft: [.submitted, .archived],
-            .submitted: [.reviewed, .archived, .draft],
-            .reviewed: [.published, .archived],
-            .published: [.archived],
-            .archived: [.draft],
-        ]
-        guard allowed[draft.status]?.contains(newStatus) == true else {
+        guard Self.allowedTransitions[draft.status]?.contains(newStatus) == true else {
             throw ShopCatalogDraftStoreError.illegalTransition(from: draft.status, to: newStatus)
         }
         var updated = draft
@@ -1138,6 +1389,90 @@ final class ShopCatalogDraftStore: ObservableObject {
         // 重新提交即视为已回应驳回意见：清空驳回原因
         if newStatus == .submitted { updated.rejectReason = nil }
         try upsert(updated)
+    }
+
+    // MARK: 草稿批量流转（2026-09-24：批量提交审核 / 批量审核通过）
+
+    /// 批量流转结果：成功与跳过 / 失败**分开计数，绝不静默**（部分成功如实回报）。
+    struct CatalogBatchFlowResult {
+        struct Entry {
+            let name: String
+            let reason: String
+        }
+        var succeededCount = 0
+        /// 状态不符等前置校验跳过（未执行任何写操作）
+        var skipped: [Entry] = []
+        /// 执行了但失败（如发布校验不过、落盘失败），失败原因逐条带出
+        var failures: [Entry] = []
+    }
+
+    /// 批量推进状态（批量提交审核 → `.submitted` / 批量审核通过 → `.reviewed`）。
+    ///
+    /// 口径：
+    ///   · 状态校验与单条 `advance` **共用同一张流转表**——只有
+    ///     `draft → submitted` / `submitted → reviewed` 会执行，其余状态逐条记跳过原因；
+    ///   · **整批只写一次盘**（与 deleteDrafts 同款）：快照上改完再 `persist`，
+    ///     写盘失败时磁盘与内存都不变，可原样重试——绝不出现「写了一半」的半成品；
+    ///   · `drafts` 是 `@Published`，成功后赋值即刷新列表；
+    ///   · 需要运营白名单（同单条流转）。
+    @discardableResult
+    func batchAdvance(ids: Set<String>, to newStatus: CatalogPublicationStatus) throws -> CatalogBatchFlowResult {
+        try CreatorAccess.requireCreator(.listingStatus)
+        var result = CatalogBatchFlowResult()
+        var snapshot = drafts
+        for id in ids.sorted() {
+            guard let index = snapshot.firstIndex(where: { $0.id == id }) else {
+                result.skipped.append(.init(name: "（id \(id.prefix(8))…）", reason: "草稿已不在草稿箱"))
+                continue
+            }
+            let draft = snapshot[index]
+            guard Self.allowedTransitions[draft.status]?.contains(newStatus) == true else {
+                let actionName = newStatus == .submitted ? "提交审核" : "审核通过"
+                result.skipped.append(.init(
+                    name: draftDisplayName(draft),
+                    reason: "当前状态「\(draft.status.displayName)」，仅\(newStatus == .submitted ? "草稿" : "待审核")状态的草稿可\(actionName)"))
+                continue
+            }
+            snapshot[index].status = newStatus
+            // 重新提交即视为已回应驳回意见：清空驳回原因（与单条 advance 同口径）
+            if newStatus == .submitted { snapshot[index].rejectReason = nil }
+            result.succeededCount += 1
+        }
+        guard result.succeededCount > 0 else { return result }
+        try persist(snapshot)
+        drafts = snapshot
+        return result
+    }
+
+    /// 批量发布：仅 `.reviewed` 可发布。逐条复用单条 `publish(_, store:)` ——
+    /// 幂等入口、完整校验器、半成功恢复（recoverPendingPublish）全部继承。
+    /// 发布是重操作且每条独立写覆盖层，**部分失败不回滚已成功的**（产物是事实），
+    /// 失败逐条带原因返回，由 UI 汇总提示。
+    @discardableResult
+    func batchPublish(ids: Set<String>, store: ShopCatalogStore) -> CatalogBatchFlowResult {
+        var result = CatalogBatchFlowResult()
+        // 按草稿箱顺序执行（ids 是集合，顺序不稳定）
+        for draft in drafts where ids.contains(draft.id) {
+            guard draft.status == .reviewed else {
+                result.skipped.append(.init(
+                    name: draftDisplayName(draft),
+                    reason: "当前状态「\(draft.status.displayName)」，仅审核通过的草稿可发布"))
+                continue
+            }
+            do {
+                _ = try publish(draft, store: store)
+                result.succeededCount += 1
+            } catch {
+                result.failures.append(.init(name: draftDisplayName(draft),
+                                             reason: error.localizedDescription))
+            }
+        }
+        return result
+    }
+
+    /// 展示名兜底：空名给「（未命名草稿）」（与列表行同口径）
+    private func draftDisplayName(_ draft: CatalogProductDraft) -> String {
+        draft.name.isEmpty ? "（未命名草稿）" : draft.name
     }
 
     // MARK: 运营中心看板（计划 §26：今日更新 / 草稿 / 待审核 / 待补充）
@@ -1239,6 +1574,25 @@ final class ShopCatalogDraftStore: ObservableObject {
             }
         }
 
+        // 系列年月补齐（2026-09-24 需求五）：与上面的款式档案补齐同理 —— 本方法等价于
+        // 「产物已落、收尾没做完」。月份进了 `publishOperationKey`，所以「补上年月再发布」
+        // 会走到这里（事件 ID 不含年月，必然全部命中）；若这里不补，运营在批次页 /
+        // 草稿箱补的年月就永远落不到系列上，而界面又会显示「已发布」。
+        // 目标系列取**事件所属商品**的 seriesID —— 那是这次发布真正写进去的那条系列。
+        var yearMonthWritten = false
+        if let product = Self.mergedProduct(id: hit[0].productID, overlay: overlay),
+           let target = Self.seriesEntity(id: product.seriesID, overlay: overlay, catalog: store.catalog) {
+            var working = overlay
+            let completed = Self.completingYearMonth(target,
+                                                     year: draft.newSeriesYear,
+                                                     month: draft.newSeriesMonth,
+                                                     in: &working)
+            if completed != target {
+                overlay = working
+                yearMonthWritten = true
+            }
+        }
+
         // 覆盖层里已有产物 → 只补齐草稿状态与结果记录，**不再写任何事件**
         var updated = draft
         updated.status = .published
@@ -1247,7 +1601,7 @@ final class ShopCatalogDraftStore: ObservableObject {
             saleEventIDs: hit.map(\.id),
             publishedAt: Date(),
             operationKey: key)
-        if styleProfileWritten {
+        if styleProfileWritten || yearMonthWritten {
             try Self.saveOverlay(overlay)
         }
         try upsert(updated)
@@ -1309,14 +1663,23 @@ final class ShopCatalogDraftStore: ObservableObject {
         let series: CatalogSeries
         if let seriesID = draft.seriesID,
            let existing = catalog?.series.first(where: { $0.id == seriesID }) ?? overlay.series.first(where: { $0.id == seriesID }) {
-            series = existing
+            // 复用既有系列时「只填空不覆盖」地补全年月（2026-09-24 需求五）：
+            // 存量系列若由旧链路建立，month 恒为 nil —— 补一次年月即收敛，绝不改写已有值。
+            series = Self.completingYearMonth(existing,
+                                              year: draft.newSeriesYear,
+                                              month: draft.newSeriesMonth,
+                                              in: &overlay)
         } else if let hit = ShopCatalogDraftValidator.findExistingSeries(for: draft, shopID: shop.id, catalog: catalog ?? overlay) {
-            series = hit
+            series = Self.completingYearMonth(hit,
+                                              year: draft.newSeriesYear,
+                                              month: draft.newSeriesMonth,
+                                              in: &overlay)
         } else {
             series = CatalogSeries(id: "series-ops-\(UUID().uuidString.prefix(8))",
                                    shopID: shop.id,
                                    name: draft.newSeriesName.trimmingCharacters(in: .whitespaces),
                                    year: draft.newSeriesYear,
+                                   month: draft.newSeriesMonth,
                                    season: draft.newSeriesSeason.isEmpty ? nil : draft.newSeriesSeason)
             overlay.series.append(series)
         }
@@ -1524,6 +1887,7 @@ final class ShopCatalogDraftStore: ObservableObject {
 
     /// 把修改后的实体写入覆盖层（同 id 整体替换，合并规则见 ShopCatalogStore §5.3）。
     /// id 永不改变；所有关联的系列、商品自动跟随展示信息。
+    /// 同 id 重新录入 = 复活：清掉强制删除留下的墓碑，否则合并层会把新实体滤掉。
     static func upsertEntity<T: Identifiable>(
         _ entity: T, keyPath: WritableKeyPath<ShopCatalog, [T]>
     ) throws {
@@ -1535,8 +1899,82 @@ final class ShopCatalogDraftStore: ObservableObject {
         } else {
             overlay[keyPath: keyPath].append(entity)
         }
+        switch entity {
+        case let shop as CatalogShop:
+            overlay.removedShopIDs.removeAll { $0 == shop.id }
+        case let series as CatalogSeries:
+            overlay.removedSeriesIDs.removeAll { $0 == series.id }
+        case let product as CatalogProduct:
+            overlay.removedProductIDs.removeAll { $0 == product.id }
+        default:
+            break
+        }
         try saveOverlay(overlay)
         ShopCatalogStore.shared.reloadWithOverlay()
+    }
+
+    // MARK: 商品改名（唯一入口，2026-09-24）
+
+    /// 商品改名 / 改品类：**款式（SPU）级**，一次落盘整款生效。
+    ///
+    /// 为什么必须是款式级、为什么不能只改被点中的那一个颜色，见
+    /// `ShopCatalogProductRename` 的文件头（根因 + 7 条收口口径）。一句话：
+    /// `designName` / `category` 是款式身份（`designKey` = 品类|款式名），而标题只认
+    /// `designName`（发布时就被写成非空显式值 → `name` 被永久遮蔽）。
+    /// 只改一个颜色既**看不到变化**（只写 `name`），又会**把同款拆组**（只改 `designName`）。
+    ///
+    /// 计划由 `ShopCatalogProductRename.plan` 统一给出：界面弹窗的预览文案与这里的
+    /// 落盘**共用同一份**，不允许各算一套。
+    ///
+    /// - Returns: 本次改名计划（供调用方拼提示文案：整款色数 / 款式名前后值）
+    @discardableResult
+    static func renameProduct(productID: String,
+                              newName: String,
+                              newCategory: String) throws -> ShopCatalogProductRename.Plan {
+        try CreatorAccess.requireCreator(.listingEdit)
+        var overlay = loadOverlay() ?? ShopCatalog()
+        // 判定范围必须用「Bundle 基底 + 本次覆盖层」的合并视图：同款的颜色可能还住在
+        // 只读种子里，只查覆盖层会漏掉它们，扇出就退化成「只改自己」。
+        let (products, _) = writeTargetCatalog(overlay: overlay)
+        guard let product = products.first(where: { $0.id == productID }) else {
+            throw ShopCatalogDraftStoreError.productNotFound(productID)
+        }
+        let plan = ShopCatalogProductRename.plan(
+            product: product,
+            newName: newName,
+            newCategory: newCategory,
+            among: products,
+            profiles: writeTargetStyleProfiles(overlay: overlay))
+        applyRenamePlan(plan, overlay: &overlay)
+        try saveOverlay(overlay)
+        ShopCatalogStore.shared.reloadWithOverlay()
+        return plan
+    }
+
+    /// 改名计划的落盘（唯一写点）：商品扇出 + 款式档案改键。
+    ///
+    /// 两条入口（`renameProduct` 基础编辑 / `updatePublishedProduct` 深度编辑）
+    /// 都只走这里，避免出现「一边改了款式名、一边没改」的分叉。
+    private static func applyRenamePlan(_ plan: ShopCatalogProductRename.Plan,
+                                        overlay: inout ShopCatalog) {
+        for product in plan.products {
+            if let index = overlay.products.firstIndex(where: { $0.id == product.id }) {
+                overlay.products[index] = product
+            } else {
+                // 既有商品在 Bundle 种子里：同 id 替换规则以覆盖层版本胜出（§5.3）
+                overlay.products.append(product)
+            }
+        }
+        applyStyleProfilePlan(plan.styleProfile, overlay: &overlay)
+    }
+
+    /// 款式档案改键落盘（删旧 id + 写新 id，整体替换）
+    private static func applyStyleProfilePlan(_ plan: ShopCatalogProductRename.StyleProfilePlan,
+                                              overlay: inout ShopCatalog) {
+        guard !plan.removals.isEmpty || !plan.upserts.isEmpty else { return }
+        let removals = Set(plan.removals)
+        overlay.styleProfiles.removeAll { removals.contains($0.id) }
+        overlay.styleProfiles.append(contentsOf: plan.upserts)
     }
 
     // MARK: 尺码表写入（唯一入口，2026-09-23 款式共享）
@@ -1688,12 +2126,19 @@ final class ShopCatalogDraftStore: ObservableObject {
     /// 已发布商品深度编辑（V1.1 §4.2 Product 修改：名称/分类/图片/配色尺码/尺码表）。
     /// id 永不改变，用户侧引用不受影响；一次落盘 product + assets + variants + sizeChart。
     /// 图片行 originalURL 未变的复用原 asset id（避免规格图文绑定与用户缓存断链）。
+    ///
+    /// 名称 / 分类走**款式级**改名（2026-09-24 修复）：整款扇出 + 款式档案改键，
+    /// 与「编辑基础（名称/分类）」弹窗共用 `ShopCatalogProductRename.plan`。
+    /// 名称未改动时沿用现有款式名（不重新派生，避免改掉人工指定的存量款式名）。
+    ///
+    /// - Returns: 本次改名计划（供调用方拼提示文案；名称未变时字段值等于原值）
+    @discardableResult
     static func updatePublishedProduct(
         _ product: CatalogProduct,
         assets: [CatalogAsset],
         variants: [CatalogProductVariant],
         sizeChart: CatalogSizeChart?
-    ) throws {
+    ) throws -> ShopCatalogProductRename.Plan {
         try CreatorAccess.requireCreator(.listingEdit)
         var overlay = loadOverlay() ?? ShopCatalog()
 
@@ -1732,18 +2177,32 @@ final class ShopCatalogDraftStore: ObservableObject {
             v.productID = product.id
             return v
         })
+
+        // 改名扇出（2026-09-24 修复）：名称 / 分类是**款式级**字段 ——
+        // 只写被编辑的那一个颜色会让同款拆组、款式档案断链、尺码表共享范围塌成自己一个人。
+        // 基准必须取「改名**前**」的那一份（`stored`）：`updated` 里的 `name` 已经是新值，
+        // 拿它自己跟自己比会把「改了名」误判成「没改名」。整款先落进覆盖层，再算尺码表范围。
+        let productsBeforeRename = writeTargetCatalog(overlay: overlay).products
+        let storedProduct = productsBeforeRename.first { $0.id == product.id }
+        let renamePlan = ShopCatalogProductRename.plan(
+            edited: updated,
+            basedOn: storedProduct ?? updated,
+            among: productsBeforeRename,
+            profiles: writeTargetStyleProfiles(overlay: overlay))
+        applyRenamePlan(renamePlan, overlay: &overlay)
+
         // 尺码表（**款式共享**，2026-09-23）：在任一颜色编辑 = 整款生效；
         // 表单留空 = 整款清空（深度编辑页提示文案同款口径）。
-        // 用 `updated` 而不是入参 `product`：名称/分类刚被改过，款式分组可能因此变化。
-        applySizeChart(sizeChart, for: updated, overlay: &overlay)
-        if let index = overlay.products.firstIndex(where: { $0.id == product.id }) {
-            overlay.products[index] = updated
-        } else {
-            // 既有商品在 Bundle 种子里：同 id 替换规则会以覆盖层版本胜出（§5.3）
-            overlay.products.append(updated)
-        }
+        // ⚠️ 两个顺序约束，缺一个就退化：
+        //   ① 必须放在 `applyRenamePlan` 之后 —— `writeTargetCatalog` 按覆盖层现算，
+        //      改名还没落进覆盖层时，款式范围里只有自己一个颜色，表只会扇出到一行；
+        //   ② 必须传**改名后**的那一份（`renamePlan.products.first`）—— 局部变量
+        //      `updated` 的 `designName` 还是旧值，拿它去比款式键会和刚写进去的新键对不上。
+        let renamedProduct = renamePlan.products.first ?? updated
+        applySizeChart(sizeChart, for: renamedProduct, overlay: &overlay)
         try saveOverlay(overlay)
         ShopCatalogStore.shared.reloadWithOverlay()
+        return renamePlan
     }
 
     // MARK: 价格双流程（2026-09-22：价格修正 / 追加销售记录彻底分离）
@@ -1980,6 +2439,8 @@ final class ShopCatalogDraftStore: ObservableObject {
             throw ShopCatalogEntityError.seedImmutableOnlyArchive(kind: "商品", name: product.name)
         }
         try saveOverlay(updated)
+        // 生产路径传 `.shared`；测试传独立实例时也要看到删除结果（与 forceDeleteShop 同口径）
+        if store !== ShopCatalogStore.shared { store.reloadWithOverlay() }
         ShopCatalogStore.shared.reloadWithOverlay()
     }
 
@@ -2063,6 +2524,7 @@ final class ShopCatalogDraftStore: ObservableObject {
         overlay.variants.removeAll { ids.contains($0.productID) }
         overlay.sizeCharts.removeAll { ids.contains($0.productID) }
         try saveOverlay(overlay)
+        if store !== ShopCatalogStore.shared { store.reloadWithOverlay() }
         ShopCatalogStore.shared.reloadWithOverlay()
         return CatalogProductDeleteResult(deletedIDs: ids, blocked: plan.blocked)
     }
@@ -2114,6 +2576,139 @@ final class ShopCatalogDraftStore: ObservableObject {
         ShopCatalogStore.shared.reloadWithOverlay()
     }
 
+    // MARK: 店家强制删除（级联，2026-09-24）
+    //
+    //  普通删除的守卫（有下级 → 拦截）对「整店下架」这种运营动作太紧：
+    //  逐个先删系列再删商品要几十次确认。强制删除一次级联到底：
+    //    · 店家 → 全部系列 → 全部商品 → 规格 / 尺码表；
+    //    · 种子实体物理删不掉（Bundle 只读）→ 写**墓碑**（removed*IDs），
+    //      合并层（ShopCatalogStore.applyTombstones）据此从生效目录排除；
+    //    · 被用户心愿/尾款/衣橱引用的商品**保留**（引用保护红线不因「强制」放松），
+    //      如实计入汇报；
+    //    · 销售事件按 append-only 硬约束**永不删除**；
+    //    · 预检与执行共用同一 plan（「弹窗说删几个、实际就删几个」）；
+    //    · 覆盖层整批只写一次。
+
+    /// 强制删除结果汇报（数量口径：合并视图里实际消失的记录数）。
+    nonisolated struct ShopForceDeletionReport: Equatable, Sendable {
+        var shopName: String = ""
+        var deletedSeriesCount = 0
+        var deletedProductCount = 0
+        /// 因被用户引用而保留的商品名（引用保护红线，非错误）
+        var keptReferencedProductNames: [String] = []
+        var deletedVariantCount = 0
+        var deletedSizeChartCount = 0
+        /// 销售事件保留条数（不删，只为汇报透明）
+        var retainedSaleEventCount = 0
+
+        /// 涉及的子级项目总数（系列 + 商品 + 规格 + 尺码表）
+        var childRecordCount: Int {
+            deletedSeriesCount + deletedProductCount + deletedVariantCount + deletedSizeChartCount
+        }
+    }
+
+    /// 强制删除计划（预检与执行同源）。
+    private struct ShopForceDeletionPlan {
+        var series: [CatalogSeries] = []
+        var deletableProducts: [CatalogProduct] = []
+        var keptReferencedProducts: [CatalogProduct] = []
+        var variantCount = 0
+        var sizeChartCount = 0
+        var saleEventCount = 0
+    }
+
+    /// 只读预检：算清这家店会被级联删掉什么、什么会被保留。不写盘。
+    private static func planShopForceDeletion(
+        _ shop: CatalogShop,
+        store: ShopCatalogStore,
+        modelContext: ModelContext
+    ) throws -> ShopForceDeletionPlan {
+        let catalog = store.catalog
+        // 下级系列：按 shopID 归属
+        let series = (catalog?.series ?? []).filter { $0.shopID == shop.id }
+        let seriesIDs = Set(series.map(\.id))
+        // 下级商品：直接挂店 + 挂在这些系列下（两条路径并集，防止单边缺字段漏删）
+        let products = (catalog?.products ?? []).filter {
+            $0.shopID == shop.id || seriesIDs.contains($0.seriesID)
+        }
+        // 引用保护红线：被用户心愿/尾款/衣橱引用（含软删除）的商品保留
+        let referenced = try ShopCatalogReferenceGuard.referencedProductIDs(
+            Set(products.map(\.id)), modelContext: modelContext)
+        let deletable = products.filter { !referenced.contains($0.id) }
+        let deletedProductIDs = Set(deletable.map(\.id))
+
+        return ShopForceDeletionPlan(
+            series: series,
+            deletableProducts: deletable,
+            keptReferencedProducts: products.filter { referenced.contains($0.id) },
+            variantCount: (catalog?.variants ?? []).filter { deletedProductIDs.contains($0.productID) }.count,
+            sizeChartCount: (catalog?.sizeCharts ?? []).filter { deletedProductIDs.contains($0.productID) }.count,
+            saleEventCount: (catalog?.saleEvents ?? []).filter { deletedProductIDs.contains($0.productID) }.count
+        )
+    }
+
+    /// 只读预检（供确认弹窗展示真实影响范围）。
+    static func previewShopForceDeletion(
+        _ shop: CatalogShop,
+        store: ShopCatalogStore,
+        modelContext: ModelContext
+    ) throws -> ShopForceDeletionReport {
+        try CreatorAccess.requireCreator(.listingDelete)
+        return Self.report(shop: shop, plan: try planShopForceDeletion(shop, store: store, modelContext: modelContext))
+    }
+
+    /// 强制删除店家（级联全部下级）。守卫与普通删除同源，仅放宽「有下级」一条；
+    /// 引用保护与种子墓碑口径见本节头注释。
+    @discardableResult
+    static func forceDeleteShop(
+        _ shop: CatalogShop,
+        store: ShopCatalogStore,
+        modelContext: ModelContext
+    ) throws -> ShopForceDeletionReport {
+        try CreatorAccess.requireCreator(.listingDelete)
+        let plan = try planShopForceDeletion(shop, store: store, modelContext: modelContext)
+
+        let deletedSeriesIDs = Set(plan.series.map(\.id))
+        let deletedProductIDs = Set(plan.deletableProducts.map(\.id))
+
+        var overlay = loadOverlay() ?? ShopCatalog()
+
+        // ① 移除覆盖层内副本（覆盖层有的才物理删得掉）
+        overlay.shops.removeAll { $0.id == shop.id }
+        overlay.series.removeAll { deletedSeriesIDs.contains($0.id) }
+        overlay.products.removeAll { deletedProductIDs.contains($0.id) }
+        overlay.variants.removeAll { deletedProductIDs.contains($0.productID) }
+        overlay.sizeCharts.removeAll { deletedProductIDs.contains($0.productID) }
+
+        // ② 写墓碑：种子实体（以及残余副本）在合并层排除。已删实体若日后
+        //    同 id 重新录入，upsertEntity 会清掉对应墓碑（复活语义）。
+        func appendTombstone(_ id: String, to list: inout [String]) {
+            if !list.contains(id) { list.append(id) }
+        }
+        appendTombstone(shop.id, to: &overlay.removedShopIDs)
+        for id in deletedSeriesIDs { appendTombstone(id, to: &overlay.removedSeriesIDs) }
+        for id in deletedProductIDs { appendTombstone(id, to: &overlay.removedProductIDs) }
+
+        // ③ 整批只写一次
+        try saveOverlay(overlay)
+        // 生产路径传 `.shared`；测试传独立实例时也要让它看到删除结果
+        if store !== ShopCatalogStore.shared { store.reloadWithOverlay() }
+        ShopCatalogStore.shared.reloadWithOverlay()
+        return Self.report(shop: shop, plan: plan)
+    }
+
+    private static func report(shop: CatalogShop, plan: ShopForceDeletionPlan) -> ShopForceDeletionReport {
+        ShopForceDeletionReport(
+            shopName: shop.name,
+            deletedSeriesCount: plan.series.count,
+            deletedProductCount: plan.deletableProducts.count,
+            keptReferencedProductNames: plan.keptReferencedProducts.map(\.name),
+            deletedVariantCount: plan.variantCount,
+            deletedSizeChartCount: plan.sizeChartCount,
+            retainedSaleEventCount: plan.saleEventCount
+        )
+    }
+
     // MARK: 覆盖层读写
 
     nonisolated static func loadOverlay() -> ShopCatalog? {
@@ -2159,6 +2754,26 @@ enum ShopCatalogReferenceGuard {
             }
         }
         return hit
+    }
+
+    /// 被引用的**记录条数**（同一商品可能有多条：定金+尾款一条、正装一条…）。
+    /// 专供改名提示用：改名**不**去改用户私有记录的名字（那是加入时的快照，
+    /// 且 `Clothing` 是按 `catalogProductID` 引用商品的，改名不断链），
+    /// 但必须如实告知有多少条这种记录，不许静默。
+    /// 只数未软删的记录 —— 用户看不见的记录不该出现在提示里。
+    static func referencedRecordCount(
+        _ productIDs: Set<String>, modelContext: ModelContext
+    ) throws -> Int {
+        guard !productIDs.isEmpty else { return 0 }
+        let descriptor = FetchDescriptor<Clothing>(
+            predicate: #Predicate { clothing in
+                clothing.catalogProductID != nil && clothing.isDeleted == false
+            }
+        )
+        return try modelContext.fetch(descriptor).filter { clothing in
+            guard let pid = clothing.catalogProductID else { return false }
+            return productIDs.contains(pid)
+        }.count
     }
 
     /// 系列被引用判定：系列下存在任意商品（含已归档）或商品被用户引用

@@ -31,6 +31,19 @@ final class CatalogSeriesSalePhaseResolverTests: XCTestCase {
             declared: declared, reservationEndAt: end, now: now)
     }
 
+    /// 带尾款时间的生效阶段（2026-09-24 需求三/四）
+    private func phase(_ declared: CatalogSeriesSalePhase?,
+                       end: Date?,
+                       balanceKind: CatalogBalanceDueKind?,
+                       balanceAt: Date?) -> CatalogSeriesSalePhase? {
+        CatalogSeriesSalePhaseResolver.effectivePhase(
+            declared: declared,
+            reservationEndAt: end,
+            balanceDueKind: balanceKind,
+            balanceDueAt: balanceAt,
+            now: now)
+    }
+
     /// 未声明（旧数据）→ nil：**不替运营猜**，调用方回退档期推导
     func testUndeclaredPhaseStaysNil() {
         XCTAssertNil(phase(nil, end: nil))
@@ -95,11 +108,110 @@ final class CatalogSeriesSalePhaseResolverTests: XCTestCase {
     }
 
     /// §二.1 选项与显示名（需求原文：预约中 / 预约已结束 / 现货）
+    /// + 2026-09-24 需求三新增「尾款中」
     func testPhaseOptionsAndDisplayNames() {
-        XCTAssertEqual(CatalogSeriesSalePhase.allCases.count, 3)
+        XCTAssertEqual(CatalogSeriesSalePhase.allCases.count, 4)
         XCTAssertEqual(CatalogSeriesSalePhase.reservationActive.displayName, "预约中")
         XCTAssertEqual(CatalogSeriesSalePhase.reservationEnded.displayName, "预约已结束")
+        XCTAssertEqual(CatalogSeriesSalePhase.balancePending.displayName, "尾款中")
         XCTAssertEqual(CatalogSeriesSalePhase.inStock.displayName, "现货")
+    }
+
+    // MARK: 需求三「尾款中」的触发条件与流转（2026-09-24）
+
+    /// 触发条件一：预约中 + 已过预约结束时间 + **具体**尾款时间已到 → 尾款中
+    func testActivePastEndWithDueBalanceFlowsToBalancePending() {
+        XCTAssertEqual(phase(.reservationActive, end: oneHourAgo,
+                             balanceKind: .exact, balanceAt: oneHourAgo),
+                       .balancePending)
+    }
+
+    /// 已过预约结束时间、但具体尾款时间还没到 → 停在「预约已结束」（等尾款）
+    func testActivePastEndWithFutureBalanceStaysEnded() {
+        XCTAssertEqual(phase(.reservationActive, end: oneHourAgo,
+                             balanceKind: .exact, balanceAt: oneHourLater),
+                       .reservationEnded)
+    }
+
+    /// 大致时间**不参与**自动流转（不是确定时刻，不拿它猜）
+    func testApproximateBalanceNeverDrivesAutoFlow() {
+        XCTAssertEqual(phase(.reservationActive, end: oneHourAgo,
+                             balanceKind: .approximate, balanceAt: oneHourAgo),
+                       .reservationEnded)
+        XCTAssertEqual(phase(.reservationEnded, end: oneHourAgo,
+                             balanceKind: .approximate, balanceAt: oneHourAgo),
+                       .reservationEnded)
+    }
+
+    /// 触发条件二：声明「预约已结束」+ 具体尾款时间已到 → 尾款中
+    /// （「预约中填过尾款时间、后来手动改成预约已结束」的系列也能按时进尾款中）
+    func testEndedWithDueBalanceFlowsToBalancePending() {
+        XCTAssertEqual(phase(.reservationEnded, end: nil,
+                             balanceKind: .exact, balanceAt: oneHourAgo),
+                       .balancePending)
+        XCTAssertEqual(phase(.reservationEnded, end: nil,
+                             balanceKind: .exact, balanceAt: oneHourLater),
+                       .reservationEnded)
+    }
+
+    /// 边界：`now == balanceAt` 已算到尾款时间（收尾款从该时刻开始）
+    func testBalanceBoundaryIsInclusive() {
+        XCTAssertEqual(phase(.reservationEnded, end: nil,
+                             balanceKind: .exact, balanceAt: now),
+                       .balancePending)
+    }
+
+    /// 运营**显式声明**「尾款中 / 现货」时，时间不改写它（声明最优先）
+    func testDeclaredPhasesAreNeverRewrittenByTime() {
+        XCTAssertEqual(phase(.balancePending, end: oneHourAgo,
+                             balanceKind: .exact, balanceAt: oneHourLater),
+                       .balancePending)
+        XCTAssertEqual(phase(.balancePending, end: oneHourLater,
+                             balanceKind: .exact, balanceAt: oneHourLater),
+                       .balancePending)
+        XCTAssertEqual(phase(.inStock, end: oneHourAgo,
+                             balanceKind: .exact, balanceAt: oneHourAgo),
+                       .inStock)
+    }
+
+    /// 未声明 + 有尾款时间 → 仍然 nil（不替运营决定）
+    func testUndeclaredStaysNilEvenWithBalanceTime() {
+        XCTAssertNil(phase(nil, end: oneHourAgo,
+                           balanceKind: .exact, balanceAt: oneHourAgo))
+    }
+
+    /// 尾款中的加购引导与「预约中」同族（补尾款 = 定金 + 尾款），不是主推全款
+    func testBalancePendingPrefersDepositPlusBalanceGuidance() {
+        XCTAssertFalse(CatalogSeriesSalePhaseResolver.prefersFullPayment(.balancePending))
+    }
+
+    /// 尾款时间输入项的显示条件（需求四）：预约中必显；尾款中可修正；其余不显示
+    func testBalanceInputVisibility() {
+        XCTAssertTrue(CatalogSeriesSalePhaseResolver.showsBalanceDueInput(.reservationActive))
+        XCTAssertTrue(CatalogSeriesSalePhaseResolver.showsBalanceDueInput(.balancePending))
+        XCTAssertFalse(CatalogSeriesSalePhaseResolver.showsBalanceDueInput(.reservationEnded))
+        XCTAssertFalse(CatalogSeriesSalePhaseResolver.showsBalanceDueInput(.inStock))
+        XCTAssertFalse(CatalogSeriesSalePhaseResolver.showsBalanceDueInput(nil))
+    }
+
+    /// 「尾款中」的出口只能由运营声明（数据里没有「尾款是否收齐」的可判定依据）
+    func testBalancePhaseExitsByDeclarationOnly() {
+        XCTAssertTrue(CatalogSeriesSalePhaseResolver.balancePhaseExitsByDeclarationOnly(.balancePending))
+        XCTAssertFalse(CatalogSeriesSalePhaseResolver.balancePhaseExitsByDeclarationOnly(.inStock))
+    }
+
+    /// 自动流转提示：声明「预约中」但生效阶段已不是预约中（含流转到「尾款中」）
+    func testHasAutoFlowedCoversBalancePending() {
+        XCTAssertTrue(CatalogSeriesSalePhaseResolver.hasAutoFlowed(
+            declared: .reservationActive, reservationEndAt: oneHourAgo,
+            balanceDueKind: .exact, balanceDueAt: oneHourAgo, now: now))
+        XCTAssertTrue(CatalogSeriesSalePhaseResolver.hasAutoFlowed(
+            declared: .reservationEnded, reservationEndAt: oneHourAgo,
+            balanceDueKind: .exact, balanceDueAt: oneHourAgo, now: now))
+        XCTAssertFalse(CatalogSeriesSalePhaseResolver.hasAutoFlowed(
+            declared: .balancePending, reservationEndAt: oneHourAgo,
+            balanceDueKind: .exact, balanceDueAt: oneHourAgo, now: now),
+            "已经是尾款中，就不算「自动流转」提示的对象")
     }
 
     // MARK: 旧数据兼容（两个新字段必须 Optional）

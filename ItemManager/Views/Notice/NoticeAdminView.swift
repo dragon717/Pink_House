@@ -180,6 +180,8 @@ struct NoticeAdminView: View {
             }
             existingNoticesSection
         }
+        // 底部悬浮 Dock 避让：本页由「我」push 进入，表单最后一段会被 Dock 盖住。
+        .avoidingBottomDock()
     }
 
     private var quickModalSection: some View {

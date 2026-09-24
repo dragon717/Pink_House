@@ -127,7 +127,22 @@ nonisolated enum ShopCatalogSizeChartSharing {
 
         if looksLikeSizeRun(columns) { return columns }
         if looksLikeSizeRun(rowLabels) { return rowLabels }
+        // 两轴都不像尺码（2026-09-24 零过滤需求兜底）：返回**汉字词元更少**的轴 ——
+        // 部位轴（胸围 / 腰围）全汉字，尺码轴（S / M / 4XL…）通常无汉字；
+        // 旧行为（无条件取行标签）会把 "4XL" 这类未识别格式的尺码列整个吞成 ["胸围"]。
+        // 汉字数打平则维持旧行为（行标签优先）。
+        if !columns.isEmpty,
+           hanTokenCount(columns) < hanTokenCount(rowLabels.isEmpty ? columns : rowLabels) {
+            return columns
+        }
         return rowLabels.isEmpty ? columns : rowLabels
+    }
+
+    /// 词元里含汉字的个数（兜底择轴用）
+    private static func hanTokenCount(_ tokens: [String]) -> Int {
+        tokens.filter { token in
+            token.unicodeScalars.contains { (0x4E00...0x9FFF).contains($0.value) }
+        }.count
     }
 
     /// 一整条轴是否「像尺码序列」：要求**全部**词元都是尺码词，避免把
@@ -145,11 +160,15 @@ nonisolated enum ShopCatalogSizeChartSharing {
         if ["均码", "均", "一码", "FREE", "F", "ONE SIZE", "OS"].contains(upper) { return true }
         if trimmed.contains("码"), trimmed.count <= 4 { return true }
 
-        // 字母码：只由 X / S / M / L 组成（XS / S / M / L / XL / XXL / XXXL…）
+        // 字母码 / 字母数字混合码（2026-09-24 零过滤需求放宽）：
+        //   · 纯字母：XS / S / M / L / XL / XXL / XXXL（只由 X/S/M/L 组成，≤5 位）
+        //   · 混合：4XL / 2XL / 3XL（尺码字母 + 数字，≤5 位，至少含一个尺码字母）
+        // 纯数字（90 / 100）走下方数字码规则；不含尺码字母的（"47"）不进本分支。
         let letterBody = upper.replacingOccurrences(of: "号", with: "")
-        let sizeLetters = CharacterSet(charactersIn: "XSML")
+        let sizeLetters = "XSML"
         if !letterBody.isEmpty, letterBody.count <= 5,
-           letterBody.unicodeScalars.allSatisfy({ sizeLetters.contains($0) }) {
+           letterBody.allSatisfy({ sizeLetters.contains($0) || $0.isNumber }),
+           letterBody.contains(where: { sizeLetters.contains($0) }) {
             return true
         }
         // 数字码：90 / 100（「80-84」这种区间含连字符，不算）

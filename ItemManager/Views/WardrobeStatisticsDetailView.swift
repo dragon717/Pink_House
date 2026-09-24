@@ -30,7 +30,9 @@ private func wardrobeStatsMonthLabel(for date: Date) -> String {
     let formatter = DateFormatter()
     formatter.locale = LanguageManager.shared.locale
     formatter.calendar = Calendar.current
-    formatter.setLocalizedDateFormatFromTemplate("MMM")
+    // 2026-09-24 需求：时间标注精确到月份，格式如「2024年3月」——
+    // 原 "MMM" 只有「3月」，跨年窗口里看不出是哪一年
+    formatter.setLocalizedDateFormatFromTemplate("yMMM")
     return formatter.string(from: date)
 }
 
@@ -63,6 +65,8 @@ struct WardrobeStatisticsDetailView: View {
                 .padding()
                 .padding(.bottom, 40)
             }
+            // 底部悬浮 Dock 避让：本页由衣橱 push 进入，最后一张卡片会被 Dock 盖住。
+            .avoidingBottomDock()
         }
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -623,8 +627,14 @@ struct PurchaseTimeStatsCard: View {
                         }
                     }
                 }
-                .frame(height: 150)
-                
+                // X 轴：12 个月份标签**全部显示、完整、互不重叠**（2026-09-24 需求）——
+                // 显式传入全部 values（不做省略），标签含年月后变长，
+                // 用竖排 + 小字号收窄横向占位；图表同步加高给竖排标签留空间
+                .chartXAxis {
+                    statsMonthAxisLabels(last12MonthsStats.map(\.monthLabel))
+                }
+                .frame(height: 200)
+
                 Divider()
                 
                 HStack {
@@ -662,10 +672,45 @@ struct PurchaseTimeStatsCard: View {
                     }
                 }
                 .chartXSelection(value: $selectedMonth)
-                .frame(height: 150)
+                .chartXAxis {
+                    statsMonthAxisLabels(last12MonthsStats.map(\.monthLabel))
+                }
+                .frame(height: 200)
             }
         }
         .padding()
         .themeSkinSectionCard(slot: .statsCard, cornerRadius: 16)
+    }
+
+    /// 统计图 X 轴标签（两个图共用）：显式给全 12 个月份值 ——
+    /// **每个标签都必须出现**（不许 Charts 自动省略）、必须**完整**、
+    /// 且必须**互不重叠**（2026-09-24 需求）。
+    ///
+    /// 为什么改用竖排而不是 45°：标签从「3月」升级成「2024年3月」后
+    /// 单条宽度约 43pt（9pt 字号），而 iPhone 上 12 档每档只有约 25pt ——
+    /// 横排必重叠；**45° 也压不进**（投影宽度 ≈ (43+11)/√2 ≈ 38pt > 25pt，
+    /// 这正是上一版仍然叠字的原因）。竖排
+    /// （`orientation: .verticalReversed`，自下而上读）把每条标签的横向占位
+    /// 收敛成一行字高（≈11pt < 25pt），全文完整且几何上不可能重叠。
+    ///
+    /// `collisionResolution: .disabled` 是必需的：否则 Charts 会按
+    /// 「自动避让」把判定为拥挤的标签**直接省略**，与「每个标签都必须出现」冲突。
+    /// 轴区高度由 `AxisValueLabel(orientation:)` 自行计算，配合图高 150→200。
+    /// 数据、图形样式与交互（`chartXSelection`）均未改动。
+    private func statsMonthAxisLabels(_ labels: [String]) -> some AxisContent {
+        AxisMarks(values: labels) { value in
+            // ⚠️ 带 content 的这个 init 参数顺序是 collisionResolution 在 orientation 之前，
+            // 写成 (orientation:collisionResolution:) 会命中 format 版本直接编译失败
+            AxisValueLabel(collisionResolution: .disabled, orientation: .verticalReversed) {
+                if let label = value.as(String.self) {
+                    Text(label)
+                        .font(.system(size: 9))
+                        .lineLimit(1)
+                        .fixedSize()
+                }
+            }
+            AxisGridLine()
+            AxisTick()
+        }
     }
 }

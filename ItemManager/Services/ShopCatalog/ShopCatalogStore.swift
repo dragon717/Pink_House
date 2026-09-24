@@ -50,6 +50,14 @@ final class ShopCatalogStore: ObservableObject {
         self.status = .loaded
     }
 
+    /// 测试注入「合成种子」基底（Bundle 只读语义）：
+    /// `isSeedShop/Series/Product` 等守卫据此判定；App 内一律走 `loadFromBundleIfNeeded`。
+    /// 2026-09-24 种子连根清理后，原种子夹具由 `ShopCatalogSeedFixture` 提供。
+    init(baseCatalog: ShopCatalog) {
+        self.baseCatalog = baseCatalog
+        rebuildMergedCatalog()
+    }
+
     // MARK: 加载
 
     /// 从 Bundle 加载整包（同步、开销极小：JSON 反序列化 + 内存索引），
@@ -86,9 +94,18 @@ final class ShopCatalogStore: ObservableObject {
     ///     实体整体替换**基底（后写胜出）——支撑运营「编辑已发布实体」与「归档」
     ///     （写 archivedAt 后同 id 替换即可生效）；新 id 实体追加。
     ///   · saleEvents：**永远追加**，不做替换（硬约束：销售历史不可覆盖）。
+    ///   · 墓碑（2026-09-24 强制删除）：覆盖层记录的 removed*IDs 在合并结果里排除，
+    ///     使「种子实体 + 其覆盖层副本」一并从生效目录消失（规格/尺码表按商品连坐）。
     private func rebuildMergedCatalog() {
         guard let base = baseCatalog else {
-            catalog = overlayCatalog
+            // 基底未加载且覆盖层也没有 → catalog 保持 nil：
+            // `.shared` 的懒加载靠 `catalog == nil` 判定，这里置空对象会让
+            // `loadFromBundleIfNeeded` 永久短路、种子再也进不来（2026-09-24 踩到）。
+            guard let overlay = overlayCatalog else {
+                catalog = nil
+                return
+            }
+            catalog = Self.applyTombstones(overlay)
             return
         }
         guard let overlay = overlayCatalog else {
@@ -114,7 +131,37 @@ final class ShopCatalogStore: ObservableObject {
         // 款式公共档案（SPU 面料 / 款式描述）：同款式键整体替换，后写胜出
         replaceOrAppend(overlay.styleProfiles, into: &merged.styleProfiles)
         merged.saleEvents.append(contentsOf: overlay.saleEvents)
-        catalog = merged
+        // 墓碑并入 merged（并集去重）：墓碑是 struct 字段、不走 replaceOrAppend，
+        // 不并入的话 applyTombstones 读到的永远是种子里的空数组（09-24 踩到）
+        for id in overlay.removedShopIDs where !merged.removedShopIDs.contains(id) {
+            merged.removedShopIDs.append(id)
+        }
+        for id in overlay.removedSeriesIDs where !merged.removedSeriesIDs.contains(id) {
+            merged.removedSeriesIDs.append(id)
+        }
+        for id in overlay.removedProductIDs where !merged.removedProductIDs.contains(id) {
+            merged.removedProductIDs.append(id)
+        }
+        catalog = Self.applyTombstones(merged)
+    }
+
+    /// 墓碑过滤（纯函数便于单测）：被强制删除的店家/系列/商品从生效目录排除，
+    /// 已删商品的规格与尺码表连坐排除；**销售事件永不排除**（append-only 硬约束）。
+    nonisolated static func applyTombstones(_ catalog: ShopCatalog) -> ShopCatalog {
+        var result = catalog
+        let removedShops = Set(catalog.removedShopIDs)
+        let removedSeries = Set(catalog.removedSeriesIDs)
+        let removedProducts = Set(catalog.removedProductIDs)
+        guard !removedShops.isEmpty || !removedSeries.isEmpty || !removedProducts.isEmpty
+        else { return result }
+        if !removedShops.isEmpty { result.shops.removeAll { removedShops.contains($0.id) } }
+        if !removedSeries.isEmpty { result.series.removeAll { removedSeries.contains($0.id) } }
+        if !removedProducts.isEmpty {
+            result.products.removeAll { removedProducts.contains($0.id) }
+            result.variants.removeAll { removedProducts.contains($0.productID) }
+            result.sizeCharts.removeAll { removedProducts.contains($0.productID) }
+        }
+        return result
     }
 
     nonisolated static func bundleURL(in bundle: Bundle) -> URL? {
@@ -247,6 +294,35 @@ final class ShopCatalogStore: ObservableObject {
     static let canonicalCategoryOrder = [
         "JSK", "OP", "SK", "Blouse", "KC", "小物", "鞋", "包", "其他",
     ]
+
+    // MARK: 自定义分类（2026-09-24 需求：运营可增删改分类）
+
+    private static let customCategoriesKey = "shopcatalog.customCategories.v1"
+
+    /// 运营自定义分类词表（UserDefaults 轻量存储；添加顺序即展示顺序）。
+    /// 固定品类（canonicalCategoryOrder）是系统口径——品类参与加购主物判定
+    /// （ShopCatalogWardrobeCategory）与类型分组，**禁止改名/删除**；
+    /// 自定义分类由运营在「管理分类」页维护。
+    static var customCategories: [String] {
+        get { UserDefaults.standard.stringArray(forKey: customCategoriesKey) ?? [] }
+        set {
+            let cleaned = newValue
+                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                .filter { !$0.isEmpty }
+            UserDefaults.standard.set(cleaned, forKey: customCategoriesKey)
+        }
+    }
+
+    /// 分类候选**唯一口径**（所有分类 Picker / 类型分组共用）：
+    /// 固定品类（除「其他」）→ 自定义分类（添加序）→ 「其他」兜底；去重。
+    static var categoryCandidates: [String] {
+        var result = canonicalCategoryOrder.filter { $0 != "其他" }
+        for c in customCategories where !result.contains(c) {
+            result.append(c)
+        }
+        result.append("其他")
+        return result
+    }
 
     func categories(inSeries seriesID: String) -> [String] {
         let present = Array(Set(products(inSeries: seriesID).map(\.category)))

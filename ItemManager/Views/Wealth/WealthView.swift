@@ -312,7 +312,7 @@ struct WealthStorageContainerView: View {
     @State private var selectedStorageTab: StorageTab = .gold
     
     var body: some View {
-        GeometryReader { proxy in
+        GeometryReader { _ in
             VStack(spacing: 0) {
                 // 子页签选择器
                 Picker("贵金属".appLocalized, selection: $selectedStorageTab) {
@@ -340,7 +340,8 @@ struct WealthStorageContainerView: View {
                 }
                 .tabViewStyle(.page(indexDisplayMode: .never))
             }
-            .padding(.bottom, legacyCustomTabBarAvoidanceInset(safeAreaBottom: proxy.safeAreaInsets.bottom))
+            // 底部悬浮 Dock 避让：口径收口到 `avoidingBottomDock()`（唯一实现）。
+            .avoidingBottomDock()
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         }
         .onChange(of: selectedStorageTab) { _, newValue in
@@ -354,18 +355,6 @@ struct WealthStorageContainerView: View {
                 break
             }
         }
-    }
-    
-    private func legacyCustomTabBarAvoidanceInset(safeAreaBottom: CGFloat) -> CGFloat {
-        if #available(iOS 26.0, *) {
-            return 0
-        }
-        
-        let customTabBarHeight: CGFloat = 56
-        let customTabBarBottomOffset: CGFloat = safeAreaBottom > 0 ? 2 : 4
-        let overlapWithSafeArea = max(0, customTabBarHeight + customTabBarBottomOffset - safeAreaBottom)
-        
-        return overlapWithSafeArea + 8
     }
 }
 

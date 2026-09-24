@@ -36,7 +36,23 @@ struct ShopCatalogProductDeepEditView: View {
 
     @State private var loaded = false
 
-    private let categories = ShopCatalogStore.canonicalCategoryOrder
+    /// 分类候选（计算属性：管理分类后立即生效，含自定义分类与「其他」兜底）
+    private var categories: [String] { ShopCatalogStore.categoryCandidates }
+
+    /// 分类管理入口（2026-09-24 需求）
+    @State private var showsCategoryManage = false
+    @ViewBuilder
+    private var manageCategoriesButton: some View {
+        Button {
+            showsCategoryManage = true
+        } label: {
+            Label("管理分类（新增 / 改名 / 删除）", systemImage: "square.and.pencil")
+                .font(.system(size: 13))
+        }
+        .sheet(isPresented: $showsCategoryManage) {
+            ShopCatalogCategoryManageSheet()
+        }
+    }
 
     var body: some View {
         NavigationStack {
@@ -46,6 +62,13 @@ struct ShopCatalogProductDeepEditView: View {
                     Picker("分类", selection: $category) {
                         ForEach(categories, id: \.self) { Text($0).tag($0) }
                     }
+                    manageCategoriesButton
+                    // 改名口径（2026-09-24）：名称 / 分类是款式级信息，与「编辑基础（名称/分类）」
+                    // 弹窗同一套规则 —— 各界面标题显示的是款式名（名称剥离颜色词），
+                    // 颜色另立标签；改一次整款所有颜色一起生效。
+                    Text("名称与分类属于**款式级**信息：保存后同款（同分类 + 同款式名）的所有颜色一起更新。各处标题显示的是「款式名」= 名称剥离颜色词后的部分（如名称「黄色蜜糖邦尼背心裙」→ 标题「蜜糖邦尼背心裙」），颜色单独显示为标签。")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
                 }
                 productInfoSection
                 ShopCatalogPriceFlowEntrySection(product: product, store: store,
@@ -229,9 +252,17 @@ struct ShopCatalogProductDeepEditView: View {
 
         do {
             // 只写商品资料：价格一律不走这里（修正 / 追加各走各的独立接口）
-            try ShopCatalogDraftStore.updatePublishedProduct(
+            let plan = try ShopCatalogDraftStore.updatePublishedProduct(
                 updated, assets: assets, variants: variants, sizeChart: sizeChart)
-            toast = "已更新商品资料「\(updated.name)」，id 不变，用户引用不受影响"
+            // 如实回报影响范围：改名是款式级操作，整款一起动
+            var message = plan.changesDesignName
+                ? "已更新商品资料，款式名改为「\(plan.designNameAfter)」（原「\(plan.designNameBefore)」）"
+                : "已更新商品资料「\(updated.name)」，id 不变，用户引用不受影响"
+            if plan.changesCategory { message += "；品类改为「\(plan.categoryAfter)」" }
+            if plan.siblingCount > 0 {
+                message += "；同款 \(plan.totalColorCount) 个颜色一并更新"
+            }
+            toast = message
             dismiss()
         } catch {
             actionError = error.localizedDescription

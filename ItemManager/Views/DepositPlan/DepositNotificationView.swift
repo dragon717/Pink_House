@@ -110,6 +110,8 @@ struct DepositNotificationView: View {
         }
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
+        // 底部悬浮 Dock 避让：本条由衣橱设置 push 进入，最后一条提醒会被 Dock 盖住。
+        .avoidingBottomDock()
         .background(LiquidBackground(themeSkinWallpaperContext: .depositPlan))
         .navigationTitle("尾款提醒".appLocalized)
         .navigationBarTitleDisplayMode(.inline)

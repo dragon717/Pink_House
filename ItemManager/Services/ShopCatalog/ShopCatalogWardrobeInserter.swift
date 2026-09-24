@@ -45,6 +45,11 @@ enum ShopCatalogWardrobeDraftBuilder {
         /// 全款（预约价）→ 已全款：金额 = 后台预约价（定金 + 尾款总和），
         /// **绝不生成**任何心愿尾款任务（2026-09-23 需求 N §II 场景一 / 场景二分支 B）
         case fullReservation
+        /// 全款（现货价）→ 同样「已全款」（2026-09-24 需求：现货阶段两个价格口径）：
+        /// 金额 = 后台现货价，`balance = 0`、`isDepositPlan = true`
+        /// （复用同一套「已付清」存储口径 → 卡片标签「全款」、`pendingFinalPaymentAmount == 0`），
+        /// 与 `.fullReservation` **只差入橱金额取自哪份价格档案**，都**不生成**尾款任务。
+        case fullStock
         /// 仅心愿：未付任何款项，全部记为待付尾款
         case wishlist
     }
@@ -78,6 +83,8 @@ enum ShopCatalogWardrobeDraftBuilder {
         var finalPaymentStart: Date = Date()
         var finalPaymentEnd: Date = Date()
         var saleEventID: String? = nil
+        /// 全款口径的价格来源（预约价 / 现货价）：只用来在备注里写清「这个全款是按哪个价记的」
+        var fullPriceBasisText: String? = nil
 
         // 币种（R02）：整条记录统一用商品的生效币种，日元不按人民币入库。
         let archive = store.priceArchive(forProduct: product.id)
@@ -128,7 +135,23 @@ enum ShopCatalogWardrobeDraftBuilder {
             totalAmount = event.price
             isDepositPlan = true
             saleEventID = event.id
+            fullPriceBasisText = "按预约价"
             finalPaymentStart = event.endAt ?? Date()
+            finalPaymentEnd = finalPaymentStart
+        case .fullStock:
+            // 全款（现货价，2026-09-24 需求：现货阶段两个价格口径）：
+            // 金额一律取后台**现货价**，用户不输入；存储口径与 `.fullReservation` 一致
+            // （deposit = 总额、balance = 0、isDepositPlan = true）→ 同样记为「已全款」、
+            // 同样**绝不生成**心愿尾款任务 —— 两者只差金额来源。
+            guard let price = archive.currentStockPrice else { return nil }
+            depositAmount = price
+            balanceAmount = 0
+            totalAmount = price
+            isDepositPlan = true
+            saleEventID = archive.stock?.id
+            fullPriceBasisText = "按现货价"
+            // 现货全款不挂预约窗口：没有「尾款时间」可言，保持默认（不生成任务）
+            finalPaymentStart = Date()
             finalPaymentEnd = finalPaymentStart
         case .wishlist:
             totalAmount = archive.currentStockPrice
@@ -150,8 +173,11 @@ enum ShopCatalogWardrobeDraftBuilder {
                 "\(symbol)\(NSDecimalNumber(decimal: value).stringValue)"
             }
             if balanceAmount == 0 {
-                // 全款（预约价）：已付清，心愿尾款里不会留下待补任务（需求 N §II）
-                noteLines.append("价格口径：全款 \(money(totalAmount))（已付清，不生成尾款任务）")
+                // 全款：已付清，心愿尾款里不会留下待补任务（需求 N §II）。
+                // 现货阶段的「全款」有两个价格口径，必须写清按哪个价记的，
+                // 否则事后无法从备注分辨这一笔到底按预约价还是现货价入的橱。
+                let basisText = fullPriceBasisText.map { "\($0)，" } ?? ""
+                noteLines.append("价格口径：全款 \(money(totalAmount))（\(basisText)已付清，不生成尾款任务）")
             } else if depositAmount + balanceAmount == totalAmount {
                 noteLines.append("价格口径：定金 \(money(depositAmount)) + 尾款 \(money(balanceAmount)) = \(money(totalAmount))")
             } else {
@@ -432,8 +458,16 @@ enum ShopCatalogWardrobeInserter {
                     $0.color == color && $0.size == size
                 }?.id
             }
-            if case .reservation = selection.priceMode {
-                clothing.catalogSaleEventID = store.priceArchive(forProduct: product.id).reservation?.id
+            // 回写「这条记录依据哪份销售记录生成」（计划 §4）：预约口径两个分支都指向预约记录，
+            // 现货价全款指向现货记录 —— 不写回就只能靠金额反推，事后对不上账。
+            let archive = store.priceArchive(forProduct: product.id)
+            switch selection.priceMode {
+            case .reservation, .fullReservation:
+                clothing.catalogSaleEventID = archive.reservation?.id
+            case .fullStock:
+                clothing.catalogSaleEventID = archive.stock?.id
+            case .stock, .wishlist:
+                break
             }
         }
         try? modelContext.save()

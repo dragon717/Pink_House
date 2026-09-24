@@ -22,8 +22,8 @@ final class ShopCatalogWardrobeEntryTests: XCTestCase {
         super.setUp()
         // 存储重定向到临时目录：测试不得触碰用户真实沙盒（2026-09-21 事故防线）
         ShopCatalogStorage.useTemporaryForTesting()
-        store = ShopCatalogStore()
-        XCTAssertNotNil(store.loadFromBundleIfNeeded())
+        // 种子已连根清理（2026-09-24）：原种子夹具改由测试注入
+        store = ShopCatalogSeedFixture.makeStore()
     }
 
     override func tearDown() {
@@ -345,10 +345,22 @@ final class ShopCatalogWardrobeEntryTests: XCTestCase {
                 phase: .reservationEnded, hasReservationPrice: true, hasStockPrice: false),
             [.depositPaid, .fullPaid]
         )
-        // 现货在售：只有全款口径
+        // 现货阶段（2026-09-24 需求）：**只有全款**，但两个价格口径都要给
+        XCTAssertEqual(
+            ShopCatalogWardrobeEntryPolicy.options(
+                phase: .inStock, hasReservationPrice: true, hasStockPrice: true),
+            [.fullPaid, .fullStockPaid],
+            "现货阶段 = ① 按预约价全款加入 ② 按现货价全款加入，且不再出现定金+尾款"
+        )
         XCTAssertEqual(
             ShopCatalogWardrobeEntryPolicy.options(
                 phase: .inStock, hasReservationPrice: false, hasStockPrice: true),
+            [.fullStockPaid],
+            "只有现货价档案时只给「按现货价全款」，不给点下去取不到数的选项"
+        )
+        XCTAssertEqual(
+            ShopCatalogWardrobeEntryPolicy.options(
+                phase: .inStock, hasReservationPrice: true, hasStockPrice: false),
             [.fullPaid]
         )
         // 预约未开始：还没有可记的成交价，只能先入心愿（开售提醒）
@@ -362,6 +374,36 @@ final class ShopCatalogWardrobeEntryTests: XCTestCase {
             ShopCatalogWardrobeEntryPolicy.options(
                 phase: .neutral, hasReservationPrice: false, hasStockPrice: false).isEmpty
         )
+        XCTAssertTrue(
+            ShopCatalogWardrobeEntryPolicy.options(
+                phase: .inStock, hasReservationPrice: false, hasStockPrice: false).isEmpty
+        )
+    }
+
+    /// 阶段 → 分支的完整矩阵（用户需求的四句话逐一钉住，防回归时被"顺手改回"）
+    func testPhaseBranchMatrixMatchesRequirement() {
+        // 1. 预约期间：定金+尾款加入 / 全款加入
+        XCTAssertEqual(
+            ShopCatalogWardrobeEntryPolicy.defaultChoiceOption(
+                phase: .reservationActive, hasReservationPrice: true, hasStockPrice: true),
+            .depositPaid)
+        // 2. 预约结束后仍想加入衣橱：同样两个选项（默认换成全款引导）
+        XCTAssertEqual(
+            ShopCatalogWardrobeEntryPolicy.defaultChoiceOption(
+                phase: .reservationEnded, hasReservationPrice: true, hasStockPrice: true),
+            .fullPaid)
+        // 3. 现货阶段：仅全款，两个价格口径（默认现货价）
+        XCTAssertEqual(
+            ShopCatalogWardrobeEntryPolicy.defaultChoiceOption(
+                phase: .inStock, hasReservationPrice: true, hasStockPrice: true),
+            .fullStockPaid)
+        // 三个「要弹选择弹窗」的阶段都不得塌缩成「静默默认直接加入」
+        for phase in [ShopCatalogPurchasePhase.reservationActive, .reservationEnded, .inStock] {
+            XCTAssertNotNil(
+                ShopCatalogWardrobeEntryPolicy.defaultChoiceOption(
+                    phase: phase, hasReservationPrice: true, hasStockPrice: true),
+                "\(phase) 必须弹选择弹窗，不能静默默认一种加入方式")
+        }
     }
 
     /// 只有全款口径不生成尾款任务（需求原文「绝对不生成任何心愿尾款任务」）
@@ -369,6 +411,12 @@ final class ShopCatalogWardrobeEntryTests: XCTestCase {
         XCTAssertTrue(ShopCatalogWardrobeEntryOption.wishlist.createsFinalPaymentTask)
         XCTAssertTrue(ShopCatalogWardrobeEntryOption.depositPaid.createsFinalPaymentTask)
         XCTAssertFalse(ShopCatalogWardrobeEntryOption.fullPaid.createsFinalPaymentTask)
+        XCTAssertFalse(ShopCatalogWardrobeEntryOption.fullStockPaid.createsFinalPaymentTask)
+        // 两个全款价格口径同属「全款一次记清」
+        XCTAssertTrue(ShopCatalogWardrobeEntryOption.fullPaid.isFullPayment)
+        XCTAssertTrue(ShopCatalogWardrobeEntryOption.fullStockPaid.isFullPayment)
+        XCTAssertFalse(ShopCatalogWardrobeEntryOption.depositPaid.isFullPayment)
+        XCTAssertFalse(ShopCatalogWardrobeEntryOption.wishlist.isFullPayment)
     }
 
     func testPhaseSpecificButtonTitles() {
@@ -388,6 +436,102 @@ final class ShopCatalogWardrobeEntryTests: XCTestCase {
             ShopCatalogWardrobeEntryPolicy.buttonTitle(for: .fullPaid, phase: .reservationActive),
             "全款加购"
         )
+    }
+
+    // MARK: - 阶段化「加入衣橱」选择弹窗（2026-09-24 需求）
+
+    /// 弹窗选项与默认选中规则：
+    ///   · 预约中     → 两选项同屏，默认「加入心愿尾款（定金+尾款）」
+    ///   · 预约已结束 → 两选项同屏，默认「预约价全款预约」
+    ///   · 现货       → 两选项同屏（两个全款价格口径），默认「按现货价全款加入」
+    ///   · 预约未开始 → 不弹选择（nil），走加入心愿（开售提醒）
+    func testChoiceDefaultOptionPerPhase() {
+        // 预约中：默认「加入心愿尾款（定金+尾款）」
+        XCTAssertEqual(
+            ShopCatalogWardrobeEntryPolicy.defaultChoiceOption(
+                phase: .reservationActive, hasReservationPrice: true, hasStockPrice: false),
+            .depositPaid
+        )
+        // 预约已结束：默认「预约价全款预约」
+        XCTAssertEqual(
+            ShopCatalogWardrobeEntryPolicy.defaultChoiceOption(
+                phase: .reservationEnded, hasReservationPrice: true, hasStockPrice: false),
+            .fullPaid
+        )
+        // 无预约价档案：两选项无从取数，回退原路径（不弹选择）
+        XCTAssertNil(
+            ShopCatalogWardrobeEntryPolicy.defaultChoiceOption(
+                phase: .reservationActive, hasReservationPrice: false, hasStockPrice: false))
+        XCTAssertNil(
+            ShopCatalogWardrobeEntryPolicy.defaultChoiceOption(
+                phase: .reservationEnded, hasReservationPrice: false, hasStockPrice: false))
+        // 现货：弹选择，默认按现货价全款；没有现货价才退回按预约价全款
+        XCTAssertEqual(
+            ShopCatalogWardrobeEntryPolicy.defaultChoiceOption(
+                phase: .inStock, hasReservationPrice: true, hasStockPrice: true),
+            .fullStockPaid
+        )
+        XCTAssertEqual(
+            ShopCatalogWardrobeEntryPolicy.defaultChoiceOption(
+                phase: .inStock, hasReservationPrice: true, hasStockPrice: false),
+            .fullPaid
+        )
+        XCTAssertNil(
+            ShopCatalogWardrobeEntryPolicy.defaultChoiceOption(
+                phase: .inStock, hasReservationPrice: false, hasStockPrice: false))
+        // 预约未开始：不弹选择（加入心愿 = 开售提醒）
+        XCTAssertNil(
+            ShopCatalogWardrobeEntryPolicy.defaultChoiceOption(
+                phase: .reservationUpcoming, hasReservationPrice: true, hasStockPrice: true))
+    }
+
+    // MARK: - 自定义分类词表（2026-09-24 需求：分类增删改）
+
+    /// 候选口径：固定品类（除「其他」）→ 自定义（添加序）→ 「其他」兜底；去重
+    func testCategoryCandidatesMergeAndDedupe() {
+        let saved = ShopCatalogStore.customCategories
+        defer { ShopCatalogStore.customCategories = saved }
+
+        ShopCatalogStore.customCategories = ["斗篷", "JSK", "  ", "斗篷", "兔耳"]
+        XCTAssertEqual(
+            ShopCatalogStore.categoryCandidates,
+            ["JSK", "OP", "SK", "Blouse", "KC", "小物", "鞋", "包", "斗篷", "兔耳", "其他"],
+            "自定义追加在固定品类之后、其他之前；空串剔除；与固定品类重复的跳过"
+        )
+    }
+
+    /// 写入时自动 trim + 丢空串（脏输入不进词表）
+    func testCustomCategoriesSetterCleansInput() {
+        let saved = ShopCatalogStore.customCategories
+        defer { ShopCatalogStore.customCategories = saved }
+
+        ShopCatalogStore.customCategories = ["  斗篷 ", "", "兔耳"]
+        XCTAssertEqual(ShopCatalogStore.customCategories, ["斗篷", "兔耳"])
+    }
+
+    /// 选择弹窗选项标题按阶段取：预约语境用旧文案，现货阶段改用「按…全款加入」
+    func testChoiceTitles() {
+        for phase in [ShopCatalogPurchasePhase.reservationActive, .reservationEnded, .balancePending] {
+            XCTAssertEqual(
+                ShopCatalogWardrobeEntryPolicy.choiceTitle(for: .depositPaid, phase: phase),
+                "加入心愿尾款（定金+尾款）")
+            XCTAssertEqual(
+                ShopCatalogWardrobeEntryPolicy.choiceTitle(for: .fullPaid, phase: phase),
+                "预约价全款预约")
+        }
+        // 现货阶段：两个选项是**价格口径**，不能再写「预约」这个词
+        XCTAssertEqual(
+            ShopCatalogWardrobeEntryPolicy.choiceTitle(for: .fullPaid, phase: .inStock),
+            "按预约价全款加入")
+        XCTAssertEqual(
+            ShopCatalogWardrobeEntryPolicy.choiceTitle(for: .fullStockPaid, phase: .inStock),
+            "按现货价全款加入")
+        // 说明文字必须点明「衣橱记为已全款 + 不生成尾款任务」
+        for option in [ShopCatalogWardrobeEntryOption.fullPaid, .fullStockPaid] {
+            let caption = ShopCatalogWardrobeEntryPolicy.choiceCaption(for: option)
+            XCTAssertTrue(caption.contains("已全款"), "\(option) 说明缺「已全款」：\(caption)")
+            XCTAssertTrue(caption.contains("不生成尾款任务"), "\(option) 说明缺「不生成尾款任务」：\(caption)")
+        }
     }
 
     // MARK: - §II 待补尾款取数：读**后台录入的「尾款」**，不是「预约价 − 定金」现算
@@ -460,6 +604,139 @@ final class ShopCatalogWardrobeEntryTests: XCTestCase {
         try? context.save()
     }
 
+    // MARK: - 现货阶段：仅全款，两个价格口径（2026-09-24 需求 §3）
+
+    /// 现货阶段两个全款口径的**唯一差别 = 入橱金额取自哪份档案**（预约价 vs 现货价），
+    /// 两条都必须「已全款 + 不生成尾款任务」——所以不能只给一个全款按钮。
+    func testStockPhaseTwoFullPaymentBasesDifferOnlyInAmount() throws {
+        let spotStore = makeSpotPhaseStore()
+        let context = modelContext()
+
+        func draft(_ mode: ShopCatalogWardrobeDraftBuilder.PriceMode) throws -> ClothingEditDraft {
+            try XCTUnwrap(ShopCatalogWardrobeDraftBuilder.makeDraft(
+                selection: .init(productID: "prod-spot", priceMode: mode),
+                store: spotStore, modelContext: context))
+        }
+
+        let byReservation = try draft(.fullReservation)
+        let byStock = try draft(.fullStock)
+        XCTAssertEqual(Decimal(byReservation.priceTotal), 318, "① 按预约价全款加入")
+        XCTAssertEqual(Decimal(byStock.priceTotal), 428, "② 按现货价全款加入")
+        XCTAssertNotEqual(Decimal(byReservation.priceTotal), Decimal(byStock.priceTotal))
+        for entry in [byReservation, byStock] {
+            XCTAssertTrue(entry.isDepositPlan, "全款口径复用同一套「已付清」存储口径")
+            XCTAssertEqual(Decimal(entry.balance), 0, "全款口径都不留尾款")
+        }
+        XCTAssertTrue(byReservation.note.contains("按预约价"), byReservation.note)
+        XCTAssertTrue(byStock.note.contains("按现货价"), byStock.note)
+
+        // 该商品此刻的购买阶段：预约窗口全关、有现货价 → 现货阶段（详情页据此弹选择弹窗）
+        XCTAssertEqual(
+            ShopCatalogPurchasePhase.resolve(
+                reservationStatuses: [], stockWindowOpen: false,
+                hasStockPrice: true, hasReservationPrice: true),
+            .inStock
+        )
+        // 现货阶段的候选 = 两个全款价格口径，且默认选中现货价那个
+        XCTAssertEqual(
+            ShopCatalogWardrobeEntryPolicy.options(
+                phase: .inStock, hasReservationPrice: true, hasStockPrice: true),
+            [.fullPaid, .fullStockPaid]
+        )
+        XCTAssertEqual(
+            ShopCatalogWardrobeEntryPolicy.defaultChoiceOption(
+                phase: .inStock, hasReservationPrice: true, hasStockPrice: true),
+            .fullStockPaid
+        )
+    }
+
+    /// 按现货价全款落库：衣橱「已全款」、无尾款任务、依据的销售记录是**现货**那条
+    func testStockPriceFullPaymentLandsAsFullPaidWithoutTask() throws {
+        let context = modelContext()
+        let selection = ShopCatalogWardrobeDraftBuilder.Selection(
+            productID: "prod-ag-xueguo-jsk", priceMode: .fullStock)
+        let draft = try XCTUnwrap(ShopCatalogWardrobeDraftBuilder.makeDraft(
+            selection: selection, store: store, modelContext: context))
+        // 金额 = 后台现货价 568（种子 ev-ag-jsk-stock-2026），用户零输入
+        XCTAssertEqual(Decimal(draft.priceTotal), 568)
+        XCTAssertEqual(Decimal(draft.deposit), 568)
+        XCTAssertEqual(Decimal(draft.balance), 0)
+        XCTAssertTrue(draft.note.contains("按现货价"), "备注必须写明价格口径：\(draft.note)")
+
+        let clothing = try ShopCatalogWardrobeInserter.insert(
+            draft: draft, selection: selection, store: store, modelContext: context)
+        XCTAssertTrue(clothing.isFullPaymentReservation)
+        XCTAssertFalse(clothing.isFinalPaymentPlan)
+        XCTAssertEqual(clothing.reservationKind, .fullPaymentReservation)
+        XCTAssertEqual(clothing.wardrobeStatusTagsForTesting, [.fullPaid])
+        XCTAssertEqual(clothing.pendingFinalPaymentAmount, 0)
+        XCTAssertEqual(clothing.totalBalance, 0)
+        XCTAssertEqual(clothing.catalogSaleEventID, "ev-ag-jsk-stock-2026",
+                       "现货价全款要挂到现货销售记录上，而不是预约记录")
+
+        context.delete(clothing)
+        try? context.save()
+    }
+
+    /// 现货价档案缺失时不得硬编一个数：拿不到价就返回 nil，由视图回退（不静默记 0 元）
+    func testFullStockModeWithoutStockPriceReturnsNil() {
+        let noStockStore = ShopCatalogStore(catalog: ShopCatalog(
+            products: [
+                CatalogProduct(id: "prod-no-stock", shopID: "s1", seriesID: "ser1",
+                               name: "只有预约价 JSK", category: "JSK"),
+            ],
+            saleEvents: [
+                CatalogSaleEvent(id: "ev-no-stock-resv", productID: "prod-no-stock",
+                                 type: .reservation, price: 318, deposit: 91, balance: 227),
+            ]
+        ))
+        XCTAssertNil(ShopCatalogWardrobeDraftBuilder.makeDraft(
+            selection: .init(productID: "prod-no-stock", priceMode: .fullStock),
+            store: noStockStore, modelContext: modelContext()))
+    }
+
+    // MARK: - 需求：定金+尾款入心愿尾款列表 → 付完尾款自动进衣橱
+
+    /// 定金 + 尾款加入 → 进心愿尾款列表；付完尾款 → 系统自动收尾并成为衣橱里的已拥有。
+    /// 两步走的是同一套既有口径：列表筛选 = `isFinalPaymentPlan`，
+    /// 收尾 = `WealthSavingLedger` 把它切成「非定金计划」→ `reservationKind == .owned`。
+    func testDepositPlanEntersWishlistAndPayoffMovesToWardrobe() throws {
+        let context = wealthModelContext()
+        let selection = ShopCatalogWardrobeDraftBuilder.Selection(
+            productID: "prod-ag-xueguo-jsk", priceMode: .reservation(depositPaid: 128))
+        let draft = try XCTUnwrap(ShopCatalogWardrobeDraftBuilder.makeDraft(
+            selection: selection, store: store, modelContext: context))
+        let clothing = try ShopCatalogWardrobeInserter.insert(
+            draft: draft, selection: selection, store: store, modelContext: context)
+
+        // 第一步：定金 + 尾款加入 → 心愿尾款列表（isFinalPaymentPlan = 该列表的筛选口径）
+        XCTAssertTrue(clothing.isFinalPaymentPlan)
+        XCTAssertEqual(clothing.reservationKind, .depositPlan)
+        XCTAssertEqual(clothing.pendingFinalPaymentAmount, 300)
+        XCTAssertTrue(WealthSavingLedger.shouldShowFinalPaymentPayoffAction(for: clothing),
+                      "心愿尾款列表里必须能对它发起「付尾款」")
+
+        // 第二步：付完尾款 → 自动离开心愿尾款、进入衣橱（已拥有）
+        let result = try XCTUnwrap(WealthSavingLedger.recordFinalPayment(
+            amount: clothing.pendingFinalPaymentAmount,
+            for: clothing,
+            context: context))
+        XCTAssertTrue(result.paidOff)
+        XCTAssertFalse(clothing.isFinalPaymentPlan, "付清后必须离开心愿尾款列表")
+        XCTAssertFalse(clothing.isDepositPlan)
+        XCTAssertEqual(clothing.reservationKind, .owned, "付清后自动成为衣橱里的已拥有")
+        XCTAssertFalse(WealthSavingLedger.shouldShowFinalPaymentPayoffAction(for: clothing),
+                       "付清后不再显示「付尾款」入口")
+        // 口径说明：收尾只关掉「定金计划」这个事实，记录里的 `balance` 是**历史值**
+        // （当初要补多少）不会被清零 → 判「付没付清」一律用 `isFinalPaymentPlan` /
+        // `shouldShowFinalPaymentPayoffAction`，**不要**用 `pendingFinalPaymentAmount`
+        // （它对已收尾的记录仍返回历史尾款，各页面也确实是先按 `isFinalPaymentPlan` 收窄再取数）。
+        XCTAssertEqual(clothing.wardrobeValueAmount, 428, "成为衣橱资产后按完整裙装价计价")
+        // 关联仍在：这条衣橱记录知道自己来自哪个商品、依据哪份销售记录
+        XCTAssertEqual(clothing.catalogProductID, "prod-ag-xueguo-jsk")
+        XCTAssertEqual(clothing.catalogSaleEventID, "ev-ag-jsk-resv-2026")
+    }
+
     // MARK: - 图片物化（2026-09-24 根因修复回归）
 
     /// 加购草稿必须携带商品图：曾硬编码 `imagePaths: []`，
@@ -508,6 +785,33 @@ final class ShopCatalogWardrobeEntryTests: XCTestCase {
         let container = try! ModelContainer(for: schema, configurations: config)
         retainedContainers.append(container)
         return ModelContext(container)
+    }
+
+    /// 付尾款链路要用到 `WealthSavingEntry`（付清记录）与小物关系 → 用更完整的 schema 单独起容器，
+    /// 不动上面那个（既有用例的 schema 保持不变，免得引入无关差异）。
+    private func wealthModelContext() -> ModelContext {
+        let config = ModelConfiguration(isStoredInMemoryOnly: true)
+        let schema = Schema([Clothing.self, WealthSavingEntry.self, Brand.self, Tag.self, AccessoryItem.self])
+        let container = try! ModelContainer(for: schema, configurations: config)
+        retainedContainers.append(container)
+        return ModelContext(container)
+    }
+
+    /// 现货阶段夹具：预约价 318（定金 91 + 尾款 227）与现货价 428 并存 ——
+    /// 正好用来验证「两个全款口径金额不同、其余全同」。
+    private func makeSpotPhaseStore() -> ShopCatalogStore {
+        ShopCatalogStore(catalog: ShopCatalog(
+            products: [
+                CatalogProduct(id: "prod-spot", shopID: "shop-spot",
+                               seriesID: "series-spot", name: "现货测试 JSK", category: "JSK"),
+            ],
+            saleEvents: [
+                CatalogSaleEvent(id: "ev-spot-resv", productID: "prod-spot", type: .reservation,
+                                 price: 318, deposit: 91, balance: 227),
+                CatalogSaleEvent(id: "ev-spot-stock", productID: "prod-spot", type: .stock,
+                                 price: 428),
+            ]
+        ))
     }
 }
 

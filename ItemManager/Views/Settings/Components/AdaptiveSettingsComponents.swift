@@ -24,24 +24,13 @@ struct AdaptiveSettingsView<Content: View>: View {
                     .padding()
                 }
             }
-            .safeAreaInset(edge: .bottom) {
-                Color.clear
-                    .frame(height: legacyCustomTabBarAvoidanceInset(safeAreaBottom: proxy.safeAreaInsets.bottom))
-            }
+            // 底部悬浮 Dock 避让：口径收口到 `avoidingBottomDock()`（唯一实现）。
+            // 旧实现在 iOS 26+ 直接 return 0，导致这批设置页在新系统上最后一个元素被 Dock 盖住。
+            .avoidingBottomDock()
             .background(LiquidBackground())
             .navigationTitle(title.appLocalized)
             .navigationBarTitleDisplayMode(.inline)
         }
-    }
-
-    private func legacyCustomTabBarAvoidanceInset(safeAreaBottom: CGFloat) -> CGFloat {
-        if #available(iOS 26.0, *) {
-            return 0
-        }
-
-        let customTabBarHeight: CGFloat = 56
-        let customTabBarBottomOffset: CGFloat = safeAreaBottom > 0 ? 2 : 4
-        return customTabBarHeight + customTabBarBottomOffset + 12
     }
 }
 

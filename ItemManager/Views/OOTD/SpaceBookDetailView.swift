@@ -348,6 +348,8 @@ struct SpaceBookDetailView: View {
                 pagesGridView
             }
         }
+        // 底部悬浮 Dock 避让：空间书页最后一排会被 Dock 盖住。
+        .avoidingBottomDock()
     }
 
     private var emptyStateView: some View {

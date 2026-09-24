@@ -82,11 +82,17 @@ final class ShopCatalogMenuFlowUITests: XCTestCase {
     capture(app, "05-完成回店家主页")
   }
 
-  // MARK: - 四态按钮（真实种子状态实证）
+  // MARK: - 加入衣橱分支（按购买阶段给不同候选）
 
-  /// 种子窗口（2026-09-21 视角）：
-  ///   · 雪国来信 JSK  预约中（09-10 → 09-28）   → 【加入心愿】+【我已经预约】
-  ///   · 雪国来信 单肩包 现货在售（无截止）        → 【加入少女衣橱】（无加入心愿）
+  /// 种子窗口：
+  ///   · 雪国来信 JSK    预约中（09-10 → 09-28），预约价 428 + 现货价 568
+  ///     → 【加入衣橱】→ 弹窗两个候选：定金+尾款 / 预约价全款预约
+  ///   · 雪国来信 单肩包  现货在售（09-10 起，无截止），**只有现货价 238**
+  ///     → 【加入衣橱】→ 弹窗**仅全款**、只有「按现货价全款加入」一个价格口径，且无加入心愿
+  ///
+  /// 注：主按钮文案在四个阶段都是「加入衣橱」，四态要靠**弹窗里的候选**区分 ——
+  /// 所以这里锁的是弹窗内容，而不是按钮文案（旧版按「加入心愿 / 加入少女衣橱」区分，
+  /// 预约结束后会随日期漂移，已不再成立）。
   @MainActor
   func testProductDetailActionButtonMatchesSalePhase() throws {
     let app = launchAndNavigateToShop()
@@ -97,29 +103,40 @@ final class ShopCatalogMenuFlowUITests: XCTestCase {
     seriesCard.tap()
     XCTAssertTrue(app.navigationBars["雪国来信"].waitForExistence(timeout: 8), "应直达点菜页")
 
-    // 1) JSK：预约中 → 加入心愿 + 我已经预约
+    // 1) JSK：有预约价 → 两个候选（定金+尾款 / 预约价全款）
     let jskRow = app.staticTexts["雪国来信 JSK"]
     scrollUntilVisible(app, jskRow)
     jskRow.tap()
     XCTAssertTrue(app.navigationBars["商品详情"].waitForExistence(timeout: 6), "应进入 JSK 详情")
-    let wish = app.buttons["加入心愿"]
-    XCTAssertTrue(wish.waitForExistence(timeout: 6), "预约中商品主按钮应为「加入心愿」")
-    XCTAssertTrue(app.buttons["我已经预约"].exists, "预约中应显示「我已经预约」次按钮")
-    capture(app, "10-四态按钮-预约中")
+    let jskEntry = app.buttons["加入衣橱"]
+    XCTAssertTrue(jskEntry.waitForExistence(timeout: 6), "有预约价商品的入橱入口应为「加入衣橱」")
+    jskEntry.tap()
+    XCTAssertTrue(app.staticTexts["加入心愿尾款（定金+尾款）"].waitForExistence(timeout: 6),
+                  "弹窗必须给出「定金+尾款」候选")
+    XCTAssertTrue(app.staticTexts["预约价全款预约"].exists, "弹窗必须同时给出「预约价全款」候选")
+    capture(app, "10-加购分支-预约阶段两候选")
 
-    // 返回点菜页
+    // 关闭弹窗（取消），返回点菜页
+    let cancel = app.buttons["取消"]
+    if cancel.waitForExistence(timeout: 4) { cancel.tap() }
+    XCTAssertTrue(app.navigationBars["商品详情"].waitForExistence(timeout: 6), "应关掉弹窗回到详情")
     app.navigationBars.buttons.firstMatch.tap()
     XCTAssertTrue(app.navigationBars["雪国来信"].waitForExistence(timeout: 6), "应回到点菜页")
 
-    // 2) 单肩包：现货在售 → 加入少女衣橱，且不出现加入心愿
+    // 2) 单肩包：现货在售 → 仅全款，且**只有现货价**一个口径
     let bagRow = app.staticTexts["雪国来信 单肩包"]
     scrollUntilVisible(app, bagRow)
     bagRow.tap()
     XCTAssertTrue(app.navigationBars["商品详情"].waitForExistence(timeout: 6), "应进入单肩包详情")
-    let wardrobe = app.buttons["加入少女衣橱"]
-    XCTAssertTrue(wardrobe.waitForExistence(timeout: 6), "现货在售商品主按钮应为「加入少女衣橱」")
     XCTAssertFalse(app.buttons["加入心愿"].exists, "现货在售不应出现「加入心愿」")
-    capture(app, "11-四态按钮-现货在售")
+    let bagEntry = app.buttons["加入衣橱"]
+    XCTAssertTrue(bagEntry.waitForExistence(timeout: 6), "现货在售商品主按钮应为「加入衣橱」")
+    bagEntry.tap()
+    XCTAssertTrue(app.staticTexts["按现货价全款加入"].waitForExistence(timeout: 6),
+                  "现货阶段必须给出「按现货价全款加入」")
+    XCTAssertFalse(app.staticTexts["加入心愿尾款（定金+尾款）"].exists,
+                   "现货阶段不再提供定金+尾款记账")
+    capture(app, "11-加购分支-现货阶段仅全款")
   }
 
   // MARK: - 导航前置

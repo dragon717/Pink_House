@@ -68,6 +68,8 @@ struct SpaceBookGridView: View {
                 .padding(24)
             }
         }
+        // 底部悬浮 Dock 避让：空间书架最后一排书会被 Dock 盖住。
+        .avoidingBottomDock()
     }
     
     private var emptyStateForegroundColor: some ShapeStyle {

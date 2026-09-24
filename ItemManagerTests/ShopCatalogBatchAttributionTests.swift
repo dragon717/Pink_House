@@ -40,7 +40,8 @@ final class ShopCatalogBatchAttributionTests: XCTestCase {
         try draftStore.applyBatchAttribution(
             batchID: batchID,
             shopID: shopID, newShopName: newShop, newShopAliases: "alias-a,alias-b",
-            seriesID: seriesID, newSeriesName: newSeries, newSeriesYear: 2026, newSeriesSeason: "冬")
+            seriesID: seriesID, newSeriesName: newSeries,
+            newSeriesYear: 2026, newSeriesMonth: nil, newSeriesSeason: "冬")
     }
 
     private func makeDraft(name: String) -> CatalogProductDraft {

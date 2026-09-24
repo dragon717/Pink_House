@@ -76,6 +76,8 @@ struct ThemeSkinDetailView: View {
                 }
                 .padding()
             }
+            // 底部悬浮 Dock 避让：槽位开关最后一个会被 Dock 盖住。
+            .avoidingBottomDock()
             .background(LiquidBackground(themeSkinWallpaperContext: .themeDetail))
         }
         .navigationTitle(product?.localizedName ?? "主题详情".appLocalized)

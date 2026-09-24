@@ -82,7 +82,9 @@ nonisolated enum ShopCatalogDraftStyleForm {
     /// 行与草稿的对应关系用 `draftID` 表达：已有草稿 = 草稿 id；表单里新加的颜色 = nil，
     /// 保存时才创建草稿实体。`id` 只用于 SwiftUI 的列表身份，保证「新加的空行」在保存前
     /// 也有稳定身份（否则每敲一个字列表就重建，输入框会失焦）。
-    struct ColorRow: Identifiable, Equatable {
+    /// `Codable` 是为了整份颜色行（含每色的配色图引用）能被「编辑中快照」原样落盘：
+    /// 补录编辑器在切后台 / 相册选图 / 切应用后视图被重建时，靠它把图与尺码一起恢复。
+    struct ColorRow: Identifiable, Equatable, Codable {
         /// 列表身份：已有草稿 = 草稿 id；新增 = 表单生成的临时 id
         var id: String
         /// 对应草稿 id；nil = 本次表单新增的颜色
@@ -151,6 +153,9 @@ nonisolated enum ShopCatalogDraftStyleForm {
         var seriesID: String? = nil
         var newSeriesName: String = ""
         var newSeriesYear: Int? = nil
+        /// 新建系列的月份（2026-09-24 需求五）：年月一体，带上它之后经本条链路
+        /// （整款录入 → 发布）建出来的系列才会显示「2026-10」而不是只有「2026」。
+        var newSeriesMonth: Int? = nil
         var newSeriesSeason: String = ""
         var batchID: String? = nil
     }
@@ -313,6 +318,7 @@ nonisolated enum ShopCatalogDraftStyleForm {
         updated.seriesID = style.seriesID
         updated.newSeriesName = style.newSeriesName
         updated.newSeriesYear = style.newSeriesYear
+        updated.newSeriesMonth = style.newSeriesMonth
         updated.newSeriesSeason = style.newSeriesSeason
         if let batchID = style.batchID { updated.batchID = batchID }
 

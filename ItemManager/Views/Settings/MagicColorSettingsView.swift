@@ -107,6 +107,8 @@ struct MagicColorSettingsView: View {
                         }
                         .padding()
                     }
+                    // 底部悬浮 Dock 避让：配色选项最后一项会被 Dock 盖住。
+                    .avoidingBottomDock()
                 }
             }
             .navigationTitle("主题配色".appLocalized)

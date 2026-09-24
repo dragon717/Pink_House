@@ -231,6 +231,8 @@ struct RecycleBinView: View {
                 }
             }
         }
+        // 底部悬浮 Dock 避让：四个 List 共用此处（回收站可从大世界与「我」两处进入，均在 Dock 之下）。
+        .avoidingBottomDock()
     }
 
     @ToolbarContentBuilder

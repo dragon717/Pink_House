@@ -23,6 +23,7 @@
 单测宿主=主 App，`FileManager.default` = 真实沙盒。
 - 存储走 `ShopCatalogStorage`：setUp `useTemporaryForTesting()`、tearDown `restoreDefaultForTesting()`，禁对生产路径 removeItem。
 - `.shared` 跨套件累积、坏文件标志跨用例残留：只比前后快照/按 `batchID` 收窄，禁断全局总数；setUp 要 `loadDrafts()`。
+- **Bundle 种子已清空（09-24）**：`shop-catalog.json` 是空壳，全新安装零店家。测试要种子语义 → `ShopCatalogSeedFixture.makeStore()`（@MainActor；AG/UNNIQ 完整子图注入 `ShopCatalogStore(baseCatalog:)`），禁再假设 `.shared` 里有种子数据。
 
 ## SPU/SKU 分层与录入期同步（09-23）
 - 款式级录一次：尺码表、面料、款式描述；颜色级：配色图、尺码选择。
@@ -55,6 +56,45 @@
 - 标题=款式名+(多色)「· N 色」，共用 `ShopCatalogTitleResolver`；颜色走 `ShopCatalogColorPresentation.label`（规格色→名称颜色词→nil）。例外：心愿/尾款/衣橱**记录名必须带颜色**。
 - 点菜页同款合并一张卡（颜色 chips）；价格双阶段 `ShopCatalogCardPricePhase`（预约窗口内默认预约价不可选；结束后双价并存才自选，默认现货）；口径经 `priceChoices/colorByProduct` 透传 `ShopCatalogWardrobeMergeView`。
 
+## 商品改名 = 款式级（09-24 需求：改名后什么都没变）
+
+**根因（两处叠加）**：① 标题只读 `designName`；② 发布路径无条件把 `designName` 写成
+**非空显式值**（`resolveDesignName` 永不返回 nil，`baseName` 兜底回退整名）
+→ **`name` 被永久遮蔽**，`baseName(for: name)` 那条派生分支永远不执行。
+「只改 `name`」= 界面上一个像素都不动（用户三张截图：商品管理改名「黄色蜜糖邦尼背心裙」
+→ 点菜页标题仍是「背心裙」）。
+
+- **唯一口径**：`ShopCatalogProductRename.plan(edited:basedOn:among:profiles:)`（`nonisolated` 可单测）。
+  弹窗预览与落盘**共用同一份 plan**；写入口 `renameProduct(productID:newName:newCategory:)`。
+- 名称 → 款式名 = `baseName(for:)` 剥颜色词（与录入端 `draft.name = 颜色 + 款式名` 同口径）；
+  「名称」字段继续是**完整 SKU 名**（可含颜色词）。
+- **必须扇出整款**（同系列+同品类+同款式名，**含已归档**）。只改一色 = 拆组 + 款式档案孤儿 + 尺码表范围塌成 1 行。
+- 兄弟名字走**定向替换**（旧款名→新款名），颜色词与其位置保留。
+  ⚠️ `colorWord(in:)` **≠** `ShopCatalogColorPresentation.derivedLabel`：后者守卫「剥离后须≠原名」，
+  名字**恰好就是**一个颜色词（「粉色」）时返回 nil —— 「能不能当颜色标签」用它对，
+  「改名别把颜色弄丢」必须用 `colorWord(in:)`。
+- **品类也是款式级**（`designKey` = 品类|款式名）→ 随款式一起改。
+- **名称没被改动时禁止重新派生款式名**（存量存在「款式名≠名称剥颜色词」的人工命名）。
+  ⚠️ 所以 `plan` 必须有独立的 `basedOn:` 基准入参：深度编辑传进来的 `edited` 里 `name` 已是新值，
+  拿它自己跟自己比，「改了名」会被判成「没改名」（**本轮实测踩到，两个端到端用例红**）。
+- **款式档案 `CatalogStyleProfile.id` 就是款式键** → 改名必须**改键**（删旧 id + 写新 id），
+  否则面料/款式描述变孤儿（界面表现＝「改个名字面料就空白了」）。目标键已有档案时**无损合并**
+  （目标值优先、补空缺字段），不留两条同键行（读取侧是「取最后一条」＝随机胜负）。
+- **尺码表无需数据迁移**（行按 `productID` 存），但 `updatePublishedProduct` 有**两条顺序死约束**：
+  ① `applyRenamePlan` 必须在 `applySizeChart` **之前**（范围由 `writeTargetCatalog` 按覆盖层现算）；
+  ② `applySizeChart` 必须传 `renamePlan.products.first`（**改名后**那一份）—— 局部 `updated`
+  的 `designName` 还是旧值，拿去比款式键会一个新键都匹配不上。
+- 衣橱/心愿记录名是**加入时的快照，不跟着改**（`Clothing` 按 `catalogProductID` 引用，改名不断链），
+  但 toast 必须**如实报条数**（`ShopCatalogReferenceGuard.referencedRecordCount`）。
+- 改名弹窗已上移到 `ShopCatalogSeriesProductsView` **页面级**（行视图会被列表重建，
+  挂行上的弹窗 `@State` 会归零 → 名称输入到一半就丢）。
+  **`ProductManageRow` 上原本的 6 个模态已整组上移**（改名 alert + 深度编辑/价格修正/追加销售记录 3 sheet
+  + 归档/删除 2 dialog）：行现在**只渲染 + 发意图**（`onEditBasics` / `onSheet` / `onConfirm`），
+  模态目标用两个 `Identifiable` 枚举 `ProductRowSheet` / `ProductRowConfirm` 带上**商品本身** ——
+  禁再退回「一个 Bool + 另存一个商品」的双状态写法（两者不同步就会弹出**别的商品**的表单）。
+- 回归锁：`ItemManagerTests/ShopCatalogProductRenameTests.swift`（纯逻辑 18 例 + 端到端 6 例）。
+  端到端断言必须**按 id 收窄**、不按名字（`publish` 的返回值是给人看的摘要，不是 id）。
+
 ## 价格：留空=清除，修正≠追加
 - 草稿走 `effectiveReservationPrice/effectiveStockPrice`；预约价与现货价并存不互斥。
 - 修正→`priceCorrection`（`correctCurrentPrice/clearPriceCorrection`，**不动 saleEvents**）；追加→只 append `CatalogSaleEvent`（`appendSaleRecord`，`startAt` 必填，**永不 remove/replace**，去重 `appendFingerprint`）；两者不共用逻辑。
@@ -82,6 +122,8 @@
 - `previewProductDeletion` 与 `deleteProducts` 共用 `planProductDeletion`；**整批只写一次覆盖层**，禁循环调单品删除。守卫：种子、被引用商品（含软删 Clothing）给原因；级联清 variants/sizeCharts，销售事件保留；部分成功绝不静默。
 - 批次删除只动 `shop-catalog-batches.json`，**绝不连带删草稿**；视图读 `draftStore.batches`（@Published）。
 - 草稿箱删除单条/多选共用 `deleteDrafts(ids:)`。
+- **店家强制删除（09-24）**：`previewShopForceDeletion`/`forceDeleteShop` 共用 `planShopForceDeletion`；级联 店家→系列→商品→规格/尺码表；**种子实体靠墓碑**（`ShopCatalog.removedShopIDs/SeriesIDs/ProductIDs`，合并层 `applyTombstones` 排除，规格尺码表按商品连坐）；**被引用商品保留并汇报**（红线不因「强制」放松）；销售事件保留；同 id 重录走 `upsertEntity` 清墓碑（复活语义）。
+- `ShopCatalogStore.rebuildMergedCatalog`：基底 nil 且覆盖层 nil 时 **catalog 必须保持 nil**——置非 nil 空对象会把 `.shared` 的 `loadFromBundleIfNeeded`（`guard catalog == nil`）永久短路，种子消失（09-24 踩到）。
 - 禁顺手删旧能力：`MainTabView` tab4 仍 `TimeHallView()`；`TimeHallWardrobeQuickInserter` 被复用。
 
 ## 币种与发布幂等
@@ -122,4 +164,193 @@
   `owned` 普通记录**不挂付款标签**（否则全部存量衣橱被刷上「全款」）。
 - **草稿新增字段一律 Optional**：`ClothingEditDraft` 是 `Codable`，合成 `Decodable` 对非 Optional 走 `decode`，
   旧落盘草稿 JSON 缺键会**解码抛错、草稿丢失**（`isResaleTransfer: Bool?` 就是这么定的）。
-- 测试：`ItemManagerTests/ShopCatalogWardrobeEntryTests.swift`（21 项）。
+- 测试：`ItemManagerTests/ShopCatalogWardrobeEntryTests.swift`（34 项）。
+
+## 加购分支按阶段区分 + 现货阶段两个全款口径（09-24）
+
+- **分支候选唯一口径 `ShopCatalogWardrobeEntryPolicy.options(phase:hasReservationPrice:hasStockPrice:)`**：
+  预约中 / 预约已结束 / 尾款中 = `[depositPaid, fullPaid]`（**两者都以预约价档案取数**，
+  没有预约价就一条都不给）；**现货 / 中性 = `fullPaymentOptions`，只给全款、两个价格口径**
+  （`fullPaid` 按预约价 / `fullStockPaid` 按现货价），**缺哪个价格档案就不出哪个口径**。
+  ⚠️ 视图曾自己写死 `[.depositPaid, .fullPaid]`、策略改了界面不动；现在选择段候选**必须**取自这里。
+- **`defaultChoiceOption(phase:hasReservationPrice:hasStockPrice:)` 的返回值同时是「要不要弹选择弹窗」的判据**
+  （nil = 不弹，走原路径）：预约中 / 尾款中 → `depositPaid`；预约已结束 → `fullPaid`；
+  **现货 → `fullStockPaid`**（没有现货价才退回 `fullPaid`）；预约未开始 → nil（加入心愿 = 开售提醒）。
+  **这四个阶段都不得静默默认一种付款方式直接落库**，也不能隐藏 / 置灰任何候选。
+- **全款两个口径的落库完全同构**：`PriceMode.fullReservation`（预约价）与 `PriceMode.fullStock`（现货价）
+  都是 `deposit = 金额 / balance = 0 / isDepositPlan = true` → 衣橱标签都是「全款」、
+  `pendingFinalPaymentAmount == 0`、**都不生成心愿尾款任务**；**唯一差别是金额取自哪份价格档案**。
+  备注必须写「按预约价 / 按现货价」（否则事后无法分辨这笔全款按哪个价记的）。
+  `.fullStock` 缺现货价档案时**返回 nil**（不静默记 0 元）。
+- **`insert` 回写 `catalogSaleEventID`**：预约口径（`.reservation` / `.fullReservation`）→ 预约记录；
+  `.fullStock` → **现货**记录；`.stock` / `.wishlist` 不写。
+- **文案按阶段取**：`choiceTitle(for:phase:)` —— 现货阶段没有「预约」这个动作了，
+  两个选项是**价格口径**，标题必须是「按预约价全款加入 / 按现货价全款加入」，
+  **不得**沿用「预约价全款预约」；段落标题同理由「加入方式」改为「全款计价方式」。
+- **弹窗 `effectiveOption` 必须做候选自洽防御**：选中的项不在当前候选里（阶段 / 价格档案变了）
+  就退回候选第一项，否则确认按钮会按一个界面上看不到的口径落库。
+- **需求「定金+尾款 → 心愿尾款 → 付完尾款自动进衣橱」= 同一条 `Clothing` 的状态变化**：
+  `isDepositPlan + balance > 0` → `isFinalPaymentPlan`（**= 心愿尾款列表的筛选口径**）
+  → `WealthSavingLedger.recordFinalPayment` → `markFinalPaymentCompleted`（`isDepositPlan = false`）
+  → `reservationKind == .owned`（= 衣橱已拥有）。**收尾不清 `balance`（那是历史值）**，
+  所以判「付没付清」只能用 `isFinalPaymentPlan` / `shouldShowFinalPaymentPayoffAction`，
+  **禁止**用 `pendingFinalPaymentAmount`（对已收尾记录仍返回历史尾款）。
+- 文档：`docs/加购分支与现货阶段全款口径_需求实现说明.md`。
+
+## 系列配置一站式 + 尾款中/尾款时间（09-24 需求）
+
+- **三项系列配置只有一处存储**：`CatalogSeries` 的 `salePhase/reservationEndAt`、`cover/description`、
+  `priceChart`。批次/单品只持 `seriesID` **引用、没有副本** —— 所以「写一次 = 全批次 + 全单品同步生效」。
+  保存唯一入口 `ShopCatalogDraftStore.saveSeriesConfig(_:batchID:)`（单点写系列 + 未自报系列草稿的链接归一，
+  返回实际同步条数；自报系列的草稿**永不被覆盖**）。
+- **两个入口必须共用一份实现**：`Views/ShopCatalog/ShopCatalogSeriesConfigSections.swift`
+  （`ShopCatalogSeriesConfigSections` + `ShopCatalogSeriesConfigForm`），批次详情页与系列编辑页都用它。
+  **禁止**各写一套 Section：各写一套必然出现「一边填、另一边一保存就丢」。
+  边界：`form.apply(to:)` **只写自己负责的字段**（名称/年月/季节归系列编辑页），否则批次页保存会覆盖基础信息。
+- **发售阶段四态**：未设置 / 预约中 / 预约已结束 / **尾款中（`balance_pending`）** / 现货。
+  rawValue 只追加不改（旧覆盖层要继续可解码）；`allCases` 顺序 = Picker 顺序。
+- **尾款中流转（读取时判定，不做定时回写）**：预约中 →（过 `reservationEndAt`）预约已结束 →
+  （**具体**尾款时间到）尾款中。**尾款中的出口只能由运营声明**（改「现货」）——
+  别造「尾款是否收齐」的判据（会把「有笔尾款还没记」误判成收齐）。
+  显式声明的「尾款中/现货」不被时间改写（运营声明最优先）。
+- **尾款时间三字段全 Optional**：`balanceDueKind`(approximate/exact) + `balanceDueText`（大致原文，
+  **故意不解析成日期**）+ `balanceDueAt`（具体时刻，**唯一**能驱动自动流转的字段）。
+  规范化时**切换粒度清空另一种**；「未填写」是显式清空路径。校验：大致非空且 ≤30 字；
+  具体**严格晚于**预约结束时间（无基准不比对）、已过不拦。**非必填**。
+  唯一口径 `CatalogSeriesBalanceDue`（纯逻辑 nonisolated + 文案 @MainActor 扩展）。
+- **加购引导**：尾款中 **默认「加入心愿尾款（定金+尾款）」**（补尾款的动作），
+  `ShopCatalogPurchasePhase.balancePending` 必须是独立枚举值，**不得塌缩成 `reservationEnded`**
+  （否则默认选中会变成「预约价全款预约」）。两个选项仍同屏可选，**能力不剥夺**（09-23 裁定继续成立）。
+- **`ensureAttributionEntities` 与 `publish` 同源**：既有 id → 同名去重 → 新建，且**幂等**
+  （重复点击不建重复系列）。批次详情页要配置系列必须先有系列实体 —— 走这里，别自己造 id / 自己建系列。
+- 测试：`CatalogSeriesBalanceDueTests` / `ShopCatalogSeriesConfigFormTests` /
+  `CatalogSeriesBalanceDuePersistenceTests` / `ShopCatalogBatchSeriesConfigSyncTests`；
+  阶段流转在 `CatalogSeriesSalePhaseResolverTests`（已含 `allCases.count == 4` 与尾款中流转用例）。
+
+## 系列年月通道 + 预约期/尾款期区间（09-24 需求五）
+
+- **「只有它不带月份」的根因**：`CatalogSeries.month` 的写入通道原先只在系列编辑页，批次/草稿链路
+  只承载 `newSeriesYear`，而 `publish` / `ensureAttributionEntities` 建系列时也只写 `year:`。
+  修法三层，**缺一层都不算修好**：
+  ① 通道 `CatalogProductDraft.newSeriesMonth` → `CatalogBatchEntrySession.newSeriesMonth` →
+  `applyBatchAttribution(newSeriesMonth:)` → `ShopCatalogDraftStyleForm.StyleInput`；
+  ② 写入：建系列时必须写 `month`；③ 存量补全（下条）。
+- **存量补全只填空、绝不覆盖**：唯一判定 `ShopCatalogDraftStore.seriesCompletingYearMonth(_:year:month:)`
+  —— 系列无年 → 年+月一起补（**年月同源**）；同年缺月 → 只补月；**已有月份不动**、
+  **年份不一致不补月**（同名不同年 = 另一条系列）。三个触发点同一份实现：
+  `ensureAttributionEntities` / `publish`（含 `recoverPendingPublish`）/ 批次详情页显式入口
+  `completeSeriesYearMonth`（返回「是否真的写了盘」，false = 无需补全，不假装成功）。
+- **`publishOperationKey` 用 `CatalogProductDraft.yearMonthKey(year:month:)`**：只有年份时输出
+  `"2026"`、都没有 `"-"` —— 与旧实现**逐字相同**，所以存量已发布草稿不会被判成「内容变了」重发；
+  带上月份才是新指纹。`saleEventKey` **不含年月** ⇒ 事件 ID 不变 ⇒ 「补月再发布」走
+  `recoverPendingPublish` 的收尾路径、**不重复生成销售记录**（该路径也必须补年月，否则月份永远落不了库）。
+- **年月录入唯一口径 `CatalogYearMonthText`**（`2026` / `2026-10` / `2026年10月`）：批次详情页与
+  草稿编辑器共用；**解析失败不改动已存值**（打字途中「2026-」是半成品，擦掉已填月份会让输入框与
+  存储来回打架），只给红字；清空文本 = 显式清除；换系列时输入框要跟着回填该系列的年月。
+- **预约期 = 开始 + 结束，尾款期 = 开始 + 结束**（需求五）：新增 `reservationStartAt` /
+  `balanceDueEndAt` / `balanceDueEndText`（**全 Optional**，旧 JSON 零迁移）。
+  **「开始」必填、「结束」选填**：开始是自动流转唯一依据；结束必填会让存量系列一打开表单就报错
+  （「什么都没改也保存不了」），给默认值则是替运营编事实。表单用显式 `Toggle`
+  （「已设置预约开始时间」/「已设置尾款结束时间」）声明，与加购弹窗「已公布尾款时间」同一写法。
+- **`balanceDueAt` 的 Codable key 不得改名**（改 = 存量覆盖层字段全丢），它的语义本来就精确等于
+  「开始收尾款」，直接当区间起点。校验：预约 `start > end` 拦（相等放行，只在预约中校验）；
+  尾款大致起止各 ≤30 字、具体起点严格晚于预约结束、结束不得早于起点（同日允许）。
+- **结束时间不驱动任何流转**：流转仍只由「预约结束时间」＋「尾款**开始**时间」决定；
+  过了尾款结束时间只给橙色提示（「若已收齐可改为现货，系统不会自动改」）——出口只能是运营声明。
+  **不新增「预约未开始」阶段**（开始时间在未来时仍是预约中），避免动 `allCases` 与所有 `switch`。
+- 展示：`CatalogSeriesBalanceDue.displayText(of:)` 前缀随内容变（只有开始 → 「尾款时间：…」，
+  声明了结束 → 「尾款期：起 — 止」）；预约期走 `CatalogSeriesReservationWindow.displayText(of:)`。
+- 测试：`ShopCatalogSeriesWindowTests.swift`（3 类：预约期 10 / 尾款期 14 / 配置表单区间 6）、
+  `ShopCatalogSeriesYearMonthChannelTests.swift`（2 类：补全判定+指纹 9 / 存储链路 7）。
+  **⚠️ 断言「是否已开始 / 是否已过期」必须用相对当前时间的日期**，写死的时间戳会随真实日期漂移成过去。
+
+## 表单「编辑中快照」与 sheet 呈现位置（09-24 需求十四）
+
+事故：切后台 / 跳系统相册 / 切到其他应用再回来，表单**全部内容消失、页面重置为初始状态**。
+
+- **`.sheet` 一律不许挂在 `ForEach` / `List` 的行视图上**。`Form`/`List` 的行是惰性 + 可复用的，
+  切后台、跳系统相册、切到其他应用返回**都会让列表重新布局** → 行视图重建 →
+  挂在行上的 sheet 内容视图连同它全部 `@State` 一起归零。
+  正确写法：**提到页面级稳定容器上只挂一次**；多个 sheet 用 `enum XxxSheet: Identifiable` 合并
+  （同页多个 `.sheet` 绑同一状态是未定义行为，5 行就有 5 个 presenter）。
+  页面现有实现：`ShopCatalogOpsView.OpsSheet`、`ShopCatalogOpsManageView.editingSeries`。
+- **靠 `@State` 守卫防「状态被重置」是无效的**：`guard !loaded` 里的 `loaded` 自己就是 `@State`，
+  视图一重建就归零 → 守卫直接失效。**守卫和被守卫的东西在同一个生命周期里，挡不住「生命周期结束」。**
+- **要恢复的东西必须落盘**：`ShopCatalogFormSnapshotStore`（目录 `form-snapshots/`）+ 页面侧
+  `ShopCatalogFormSnapshotKeeper<Snapshot>`（`@MainActor` 值类型，放 `@State`）。四条口径：
+  ① 变更 **0.5s 防抖落盘**（**相册场景的唯一兜底** —— 相册返回不走 `onDisappear`）；
+  ② `scenePhase != .active` / `didEnterBackgroundNotification` / `onDisappear` → 立即 `flush`；
+  ③ `onAppear` → `restoreOrDiscard`（与「按存储值填出的默认态」**逐字段相同就丢弃**，不弹无意义提示）；
+  ④ 保存成功 → `commit`（清快照；此后关页的 `flush` **只清不写**，否则下次会恢复出刚保存的旧值）。
+- **恢复必须可见 + 可放弃**（`已恢复上次未保存的编辑` + `知道了` / `放弃修改`），不许静默塞回旧值。
+- **快照 `scope` 必须带实体 id**（批次 id / 草稿 id / 系列 id），换实体一律丢弃，否则串页；
+  `scope` 为空串时所有读写跳过。
+- 快照的读 / 写 / 坏文件**一律不抛错**（它是兜底，坏了不能挡住正常录入）；
+  文件名 = 白名单化 + FNV-1a 哈希后缀（避免不同 id 被擦成同名字符而串页）。
+- 快照 `Codable` 载荷里的日期**用整秒**：`ShopCatalogJSONCoding` 走 ISO8601 会截掉小数秒，
+  用 `Date()` 造测试数据会让相等断言在往返后必然失败（不是缺陷，是口径）。
+- **`.onChange(of: 某个 state)` 回填不要用来做「派生」**：它对**程序化赋值**同样触发 ——
+  快照恢复出来的年月会被「按系列重新推导」立刻抹掉（表现为「恢复了但字段没了」）。
+  要么挂在控件自己的 `Binding` setter（`ShopCatalogBatchDetailView.seriesSelection`），
+  要么在程序化赋值处显式回填一次。
+- 页面载荷：`ShopCatalogBatchConfigSnapshot` / `ShopCatalogDraftFormSnapshot` / `ShopCatalogSeriesEditSnapshot`；
+  为了能整份落盘，`ShopCatalogSeriesConfigForm` 与 `ShopCatalogDraftStyleForm.ColorRow` 加了 `Codable`
+  **遵循**（只加遵循，未增删字段、未改 key）。
+- **尚未收口**：`ShopCatalogShopEditSheet`（店家）与商品编辑页的 sheet 仍挂在行上，同类反模式待处理。
+- **验收断言口径**：这类「状态有没有丢」的交互验收一律写**「场景前快照 → 场景后逐字段比对」**，
+  **不要写死字段清单** —— 页面上的字段会合法出现 / 消失（系列配置段出现后 `seriesID` 不再为空，
+  `年月（选填…）` 输入框就**合法隐藏**），写死会把它误判成「状态丢失」。
+  验收命令与三个驱动侧坑见 `docs/表单状态丢失_根源修复说明.md` §6.4 / §6.6。
+
+## 界面遮挡与底部 Dock 避让（09-24 全量排查）
+
+**根因**：`MainTabView` 的底部导航 Dock（`customTabBar`）放在 body 的 `ZStack` 里叠在
+`contentView` **之上**，**不是系统 TabBar、不参与安全区计算**。所以「给 Dock 留底部空间」
+是每个可滚动页面自己的责任 —— 漏一个就有一个页面最后一行被吞。
+`BookHouseSmallWorldView` / `SmallWorldView` 是固定舞台，无滚动容器，天然不触底。
+
+**唯一口径**：`Views/Components/BottomDockAvoidance.swift` 的 `avoidingBottomDock()`。
+- 高度只有一处：`LegacyCustomTabBarLayout.floatingSurfaceBottomInset`
+  = 56(Dock 高) + **max(2, 4)**(贴底；**取的是 max，不是 WithSafeArea 的 2**) + 12(间隙) = **72**，
+  由 `MainTabView` 经 `\.customBottomNavigationAvoidanceInset` 下发。页面**不写数字**。
+  （曾把 72 误记成 70 —— 那种「差 2pt」的笔误会让净空算错，改这块务必回读 `MainTabView` 常量。）
+- **绝不再判断系统版本**。旧实现 `legacyCustomTabBarAvoidanceInset`（`AdaptiveSettingsView` 与
+  `WealthView` **各有一份**）在 iOS 26+ 直接 `return 0` → 全部设置页 + 安财页在新系统上
+  底部预留恒为 0。两份都已删除，回归锁 `ItemManagerTests/BottomDockAvoidanceTests` 扫源码树禁止复活。
+- 在 tab 之外（sheet / fullScreenCover）环境值退化为 0，误加无副作用。
+- **不要和自带贴底操作条叠加**（`ShopCatalogSeriesMenuView` 的 `safeAreaInset` 选择条）；
+  尾部已有 `padding(.bottom,N≥72)` 的页面（`WardrobeView` 100 / `DepositPlanView` 100 /
+  `ClothingDetailView` 80 / `ThemeSkinStoreView` 126）不要重复加。
+- **只用 `List`/`Form`/`ScrollView` 根容器**；`Group` 上挂会作用到每个 child（回收站 4 个 List 共用一处，
+  但书架 `bookGridContent` 的 Group **不能**挂 —— 正常态子视图 `BookGridView` 自带避让，会双倍）。
+
+**模态页一律不改**（浮在 Dock 之上）：`ShopCatalogSeriesMenuView`(sheet)、`MoneyCountingView`(fullScreenCover)、
+各种 `*Sheet` / `*Picker` / `Alert`。判断模板：**上溯它到底是被 push 还是被 modal 呈现**。
+
+**Dock 几何（实测）**：iPhone 18 Pro 屏高 874、底部安全区 34 → Dock 胶囊占 `[782, 838]`；
+避让 72 后内容底边落在 `768`，比 Dock 顶边高 **14pt**。截图判「有没有被吞」就量这两个数。
+落点基数：源码里 `.avoidingBottomDock()` 共 **35 处 / 28 个文件**（剥离注释后统计）。
+
+**同类但成因不同的第二类遮挡 —— 浮层与卡片顶边重叠**（商品详情轮播）：
+卡片靠 `.offset(y:)` 上提覆盖图片下沿是**有意设计**，但轮播里**底对齐**的浮层（颜色胶囊、分页胶囊）
+会落进同一条覆盖带。算法：`卡片顶边 = 轮播底边 − (上提量 − VStack 间距)`，
+浮层底部留白必须 > 这个值 + 视觉间隙。几何常量收口在 `ShopCatalogProductView`
+（`cardLiftOverCarousel` / `cardStackSpacing` / `carouselOverlayBottomInset`），
+两个浮层**必须共用同一个底部留白**（原来一个 0、一个 12，本身就没对齐）。
+
+**验收要点**：这类问题的主观感是「元素被吞」，单测覆盖不到 —— 必须模拟器真交互 + 截图量几何。
+Bundle 种子已空壳，验收前把 `ShopCatalogSeedFixture.jsonString`（+ 补足数量让列表溢出屏幕）
+**注入构建产物**的 `shop-catalog.json`（改产物、不改仓库资源），再 `build-for-testing` →
+注入 → `test-without-building`（顺序不能反，重新构建会把种子覆盖回去）。
+
+**⚠️ 本机内存是硬约束（09-24 实测卡了一整天）**：`sysctl vm.swapusage` 总 7G，常年已用 6G+。
+- `xcodebuild test`（**不是** `test-without-building`）会跑 `PruneExplicitPrecompiledModules`，
+  把显式模块缓存清掉 → 触发**整模块全量重编**（441 个 Swift 文件一次 `SwiftEmitModule`），
+  单进程要几 G → swap 打满 → **静默卡死**（日志停在 `SwiftEmitModule`、产物目录也不再变动，
+  但进程还在，看起来像「慢」）。判据：`wc -c <log>` 与 `find build/DerivedData -newermt`
+  **双双静止 5 分钟以上**才算挂；只看时间长短会误杀。
+- 省内存顺序：**先只跑 `build-for-testing`（且先 `xcrun simctl shutdown all`，模拟器自身吃 2–4G）
+  → 编完再启模拟器 → 再 `test-without-building`**。模拟器与编译器同时在场是最容易崩的组合。
+- 别在编译期间改源码（构建产物与源码就不一致了）；只改**注释**不影响行为，但仍要留意。
+- 长任务必须交由工具的后台机制托管；`nohup … &` 在本环境会随命令结束被回收（日志 0 字节、
+  进程消失，看起来像「构建秒退」）。

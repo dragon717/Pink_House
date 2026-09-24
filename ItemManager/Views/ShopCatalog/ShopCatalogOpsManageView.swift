@@ -11,6 +11,7 @@
 import SwiftUI
 import SwiftData
 import UIKit
+import Combine
 
 /// 实体类型分栏（2026-09-22 调整）：只保留 店家 / 系列 两栏。
 /// 商品不再有顶层 Tab——商品的查看 / 新增 / 编辑 / 归档全部下移到
@@ -38,6 +39,11 @@ struct ShopCatalogOpsManageView: View {
     @FocusState private var searchFieldFocused: Bool
     @State private var hudLetter: String?
     @State private var scope: ManageScope = .shops
+
+    /// 正在编辑的系列（**统一挂在页面级**，而不是挂在 `List` 的行上）。
+    /// 行是惰性 + 可复用的，把 `.sheet` 绑在行上会在切后台 / 相册选图 / 切应用返回时
+    /// 把编辑页连同用户已填内容一起重建（2026-09-24 状态丢失根源修复）。
+    @State private var editingSeries: CatalogSeries?
 
     /// 修掉首尾空白后的搜索词
     private var trimmedQuery: String {
@@ -110,6 +116,8 @@ struct ShopCatalogOpsManageView: View {
                 }
                 .listStyle(.insetGrouped)
                 .scrollDismissesKeyboard(.immediately)
+                // 底部悬浮 Dock 避让：本页在 tab 内容层内 push，最后一行会被 Dock 盖住（2026-09-24）。
+                .avoidingBottomDock()
                 .overlay(alignment: .trailing) {
                     // 有搜索词时隐藏索引（符合系统搜索交互）
                     if trimmedQuery.isEmpty, !indexLetters.isEmpty {
@@ -128,6 +136,9 @@ struct ShopCatalogOpsManageView: View {
         }
         .navigationTitle("实体管理")
         .navigationBarTitleDisplayMode(.inline)
+        .sheet(item: $editingSeries) { series in
+            ShopCatalogSeriesEditSheet(series: series, toast: $toast, actionError: $actionError)
+        }
         .overlay(alignment: .bottom) {
             if let toast {
                 Text(toast)
@@ -201,7 +212,8 @@ struct ShopCatalogOpsManageView: View {
                                     store: store,
                                     modelContext: modelContext,
                                     toast: $toast,
-                                    actionError: $actionError
+                                    actionError: $actionError,
+                                    onEdit: { editingSeries = series }
                                 )
                             }
                         }
@@ -217,7 +229,8 @@ struct ShopCatalogOpsManageView: View {
 // MARK: - 系列详情（商品管理入口，2026-09-22 自顶层「商品」Tab 下移）
 
 /// 单个系列的商品管理页：查看 / 新增 / 编辑 / 归档全部在此完成。
-/// 交互与视觉沿用实体管理层同一套组件：固定搜索栏 + A-Z 分组 + 索引滑块 + 既有商品行。
+/// 交互与视觉沿用实体管理层同一套组件：固定搜索栏 + 按类型（分类）分组展示（2026-09-24
+/// 需求：替代原「款名首字母 A-Z 分组」，分区顺序 = 分类候选固定序，组内款式归组不变）。
 private struct ShopCatalogSeriesProductsView: View {
     let series: CatalogSeries
     @ObservedObject var store: ShopCatalogStore
@@ -227,12 +240,22 @@ private struct ShopCatalogSeriesProductsView: View {
 
     @State private var searchText = ""
     @FocusState private var searchFieldFocused: Bool
-    @State private var hudLetter: String?
     @State private var showsAddProduct = false
     /// 展开查看各颜色子项的款式（V1.4 同款不同色归组）
     @State private var expandedStyleKeys: Set<String> = []
     /// 款式公共资料编辑目标（SPU 级：尺码表 / 面料 / 款式描述）
     @State private var styleProfileTarget: CatalogProduct?
+
+    // MARK: 改名（2026-09-24：款式级，一次改整款）
+
+    /// 改名目标。**挂在页面级、不挂在列表行上**：行视图是惰性 + 可复用的，
+    /// 列表一重排（滚动 / 切后台 / 跳系统相册返回）就会重建，挂在行上的弹窗
+    /// 连同它的 `@State` 一起归零 —— 名称输入到一半就会丢。
+    /// `styleProfileTarget` 早就是页面级，这里保持一致。
+    @State private var renameTarget: CatalogProduct?
+    @State private var showsRenameProduct = false
+    @State private var renameNameDraft = ""
+    @State private var renameCategoryDraft = "其他"
 
     // MARK: 批量删除（2026-09-23：多选 + 二次确认）
 
@@ -250,6 +273,13 @@ private struct ShopCatalogSeriesProductsView: View {
     @State private var showsFinalDeleteConfirm = false
     /// 被拦截的商品（展示原因，条目与选择都保留以便处理后重试）
     @State private var blockedProductDeletions: [CatalogProductDeleteBlock] = []
+
+    // MARK: 商品行模态（2026-09-24 需求十四：整组从 List 行视图上移到页面级）
+
+    /// 行的「弹出表单」目标（深度编辑 / 价格修正 / 追加销售记录）
+    @State private var productSheet: ProductRowSheet?
+    /// 行的「危险操作确认」目标（归档 / 删除）
+    @State private var productConfirm: ProductRowConfirm?
 
     private var trimmedQuery: String {
         searchText.trimmingCharacters(in: .whitespaces)
@@ -272,6 +302,7 @@ private struct ShopCatalogSeriesProductsView: View {
     private struct StyleGroup: Identifiable {
         let key: String
         let designName: String
+        let category: String
         let products: [CatalogProduct]
         var id: String { key }
     }
@@ -288,13 +319,121 @@ private struct ShopCatalogSeriesProductsView: View {
             guard let list = buckets[key], let first = list.first else { return nil }
             return StyleGroup(key: key,
                               designName: ShopCatalogSameDesignGrouper.designName(of: first),
+                              category: first.category,
                               products: list)
         }
     }
 
-    /// 款式组按款名首字母 A-Z 分组（沿用现有索引分组组件）
-    private var styleLetterGroups: [(letter: String, items: [StyleGroup])] {
-        AZIndexGrouping.groups(styleGroups) { $0.designName }
+    /// 按类型（分类）分组 + 统一排序（2026-09-24 需求：替代原「款名首字母 A-Z」分组）：
+    ///   · 分区顺序 = `categoryCandidates` 固定品类序（JSK / OP / SK / … / 自定义 / 其他）；
+    ///   · 词表之外的未知分类（历史数据遗留）排在固定序之后，按名称排序；
+    ///   · 组内保持款式归组与出现顺序，搜索过滤后分组随之收缩。
+    private var styleCategoryGroups: [(category: String, items: [StyleGroup])] {
+        var buckets: [String: [StyleGroup]] = [:]
+        for group in styleGroups {
+            buckets[group.category, default: []].append(group)
+        }
+        let known = ShopCatalogStore.categoryCandidates
+        var ordered: [(category: String, items: [StyleGroup])] = []
+        for category in known where buckets[category] != nil {
+            ordered.append((category, buckets[category]!))
+        }
+        let knownSet = Set(known)
+        let unknown = buckets.keys.filter { !knownSet.contains($0) }.sorted()
+        for category in unknown {
+            ordered.append((category, buckets[category] ?? []))
+        }
+        return ordered
+    }
+
+    // MARK: 改名 · 预览与执行（2026-09-24）
+
+    /// 改名计划：弹窗的预览文案与「保存」**共用同一份**计算结果
+    /// （`ShopCatalogProductRename.plan` 是唯一口径，界面不许另算一套）。
+    private var renamePlan: ShopCatalogProductRename.Plan? {
+        guard let target = renameTarget else { return nil }
+        return ShopCatalogProductRename.plan(product: target,
+                                             newName: renameNameDraft,
+                                             newCategory: renameCategoryDraft,
+                                             among: allProducts,
+                                             profiles: store.catalog?.styleProfiles ?? [])
+    }
+
+    /// 弹窗 message：改名前先让用户**看见**款式名会变成什么、影响几个颜色。
+    /// 用户截图里的困惑正是「改完什么都没变」，而真实规则是
+    /// 「各处标题只显示款式名（不含颜色词）」—— 这件事必须提前可见，不许静默。
+    private var renamePreviewText: String {
+        guard let plan = renamePlan else { return "" }
+        return ShopCatalogProductRename.previewText(plan, typedName: renameNameDraft) ?? ""
+    }
+
+    private func beginRename(_ product: CatalogProduct) {
+        renameTarget = product
+        renameNameDraft = product.name
+        renameCategoryDraft = product.category
+        showsRenameProduct = true
+    }
+
+    /// 保存改名：走款式级唯一入口，然后**如实回报**影响范围（整款色数 / 衣橱心愿快照条数）。
+    private func performRename() {
+        guard let target = renameTarget else { return }
+        let typedName = renameNameDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !typedName.isEmpty else {
+            actionError = "商品名称不能为空"
+            return
+        }
+        do {
+            let plan = try ShopCatalogDraftStore.renameProduct(productID: target.id,
+                                                              newName: typedName,
+                                                              newCategory: renameCategoryDraft)
+            var message = plan.changesDesignName
+                ? "已把款式名改为「\(plan.designNameAfter)」（原「\(plan.designNameBefore)」）"
+                : "款式名未变（仍是「\(plan.designNameAfter)」）"
+            if plan.changesCategory { message += "，品类改为「\(plan.categoryAfter)」" }
+            if plan.siblingCount > 0 {
+                message += "；同款 \(plan.totalColorCount) 个颜色（含其余 \(plan.siblingCount) 色）一并更新"
+            }
+            // 衣橱 / 心愿记录的名字是加入时的快照，改名不跟着改 —— 但不许静默
+            let referenced = (try? ShopCatalogReferenceGuard.referencedRecordCount(
+                Set(plan.products.map(\.id)), modelContext: modelContext)) ?? 0
+            if let note = ShopCatalogProductRename.referenceNote(referencedRecordCount: referenced) {
+                message += note
+            }
+            toast = message
+            renameTarget = nil
+        } catch { actionError = error.localizedDescription }
+    }
+
+    // MARK: 商品行模态 · 呈现与执行（2026-09-24 需求十四）
+
+    /// 归档 / 删除确认框的标题 —— 内容随目标变，所以不能写死在 `.confirmationDialog` 上
+    private var productConfirmTitle: String {
+        guard let target = productConfirm else { return "" }
+        switch target {
+        case .archive(let product): return "归档「\(product.name)」？"
+        case .delete(let product): return "删除「\(product.name)」？"
+        }
+    }
+
+    /// 「有目标 = 展示」的推导绑定：与 `showsBlockedDeletionsBinding` 同一写法，
+    /// 避免为两个确认框再各加一个 Bool `@State`（两个状态彼此不同步是这类 bug 的常见来源）
+    private var productConfirmBinding: Binding<Bool> {
+        Binding(get: { productConfirm != nil },
+                set: { if !$0 { productConfirm = nil } })
+    }
+
+    private func performArchive(_ product: CatalogProduct) {
+        do {
+            try ShopCatalogDraftStore.archiveProduct(product)
+            toast = "已归档「\(product.name)」"
+        } catch { actionError = error.localizedDescription }
+    }
+
+    private func performProductDelete(_ product: CatalogProduct) {
+        do {
+            try ShopCatalogDraftStore.deleteProduct(product, store: store, modelContext: modelContext)
+            toast = "已删除「\(product.name)」"
+        } catch { actionError = error.localizedDescription }
     }
 
     var body: some View {
@@ -302,44 +441,33 @@ private struct ShopCatalogSeriesProductsView: View {
             AZPinnedSearchBar(text: $searchText,
                               focused: $searchFieldFocused,
                               placeholder: "搜索商品名称或分类")
-            ScrollViewReader { proxy in
-                List {
-                    if filteredProducts.isEmpty {
-                        ContentUnavailableView(
-                            trimmedQuery.isEmpty ? "暂无商品" : "未找到商品",
-                            systemImage: "shippingbox",
-                            description: Text(trimmedQuery.isEmpty
-                                              ? "点右上角「＋」新增本系列商品"
-                                              : "换个关键词试试")
-                        )
-                    } else {
-                        ForEach(styleLetterGroups, id: \.letter) { letterGroup in
-                            Section {
-                                ForEach(letterGroup.items) { style in
-                                    styleGroupRows(style)
-                                }
-                            } header: {
-                                Text(letterGroup.letter).id(letterGroup.letter)
+            List {
+                if filteredProducts.isEmpty {
+                    ContentUnavailableView(
+                        trimmedQuery.isEmpty ? "暂无商品" : "未找到商品",
+                        systemImage: "shippingbox",
+                        description: Text(trimmedQuery.isEmpty
+                                          ? "点右上角「＋」新增本系列商品"
+                                          : "换个关键词试试")
+                    )
+                } else {
+                    ForEach(styleCategoryGroups, id: \.category) { group in
+                        Section {
+                            ForEach(group.items) { style in
+                                styleGroupRows(style)
                             }
-                        }
-                    }
-                }
-                .listStyle(.insetGrouped)
-                .scrollDismissesKeyboard(.immediately)
-                .overlay(alignment: .trailing) {
-                    if trimmedQuery.isEmpty, !styleLetterGroups.isEmpty {
-                        AZIndexRail(letters: styleLetterGroups.map(\.letter),
-                                    hudLetter: $hudLetter) { letter in
-                            withAnimation(nil) {
-                                proxy.scrollTo(letter, anchor: .top)
-                            }
+                        } header: {
+                            // 分区标题 = 分类名 + 组数（2026-09-24：按类型归类展示）
+                            Text("\(group.category) · \(group.items.count) 款")
+                                .id(group.category)
                         }
                     }
                 }
             }
-        }
-        .overlay {
-            AZIndexHUD(letter: hudLetter)
+            .listStyle(.insetGrouped)
+            .scrollDismissesKeyboard(.immediately)
+            // 底部悬浮 Dock 避让：截图标注的「毛绒拉夫领针织内搭」被 Dock 盖住即此页（2026-09-24）。
+            .avoidingBottomDock()
         }
         .navigationTitle(series.name)
         .navigationBarTitleDisplayMode(.inline)
@@ -382,6 +510,51 @@ private struct ShopCatalogSeriesProductsView: View {
             Button("好", role: .cancel) { blockedProductDeletions = [] }
         } message: {
             Text(blockedProductDeletionsText)
+        }
+        // 改名（2026-09-24）：**页面级**弹窗，不挂在 `ProductManageRow` 上。
+        // 「名称」继续是完整 SKU 名（可含颜色词），款式名由它派生 —— 与录入端
+        // 「draft.name = 颜色 + 款式名」同一套口径；message 让用户先看见结果。
+        .alert("编辑商品", isPresented: $showsRenameProduct) {
+            TextField("名称", text: $renameNameDraft)
+            TextField("分类（JSK/OP/SK/Blouse/KC/小物/鞋/包/其他）", text: $renameCategoryDraft)
+            Button("保存") { performRename() }
+            Button("取消", role: .cancel) { renameTarget = nil }
+        } message: {
+            Text(renamePreviewText)
+        }
+        // 商品行的三个表单 + 两个危险操作确认：**整组挂在页面级**。
+        // 按 09-24 需求十四的红线，`.sheet` / `.confirmationDialog` 一律不许挂在
+        // `ForEach`/`List` 的行视图上 —— 行是惰性 + 可复用的，列表一重排
+        // （滚动 / 切后台 / 跳系统相册返回）就会重建，挂在行上的模态连同它的
+        // `@State` 一起归零（深度编辑页正好带相册选图入口，是这条红线最初的踩坑场景）。
+        .sheet(item: $productSheet) { target in
+            switch target {
+            case .deepEdit(let product):
+                ShopCatalogProductDeepEditView(product: product, store: store,
+                                               toast: $toast, actionError: $actionError)
+            case .priceCorrection(let product):
+                ShopCatalogPriceCorrectionSheet(product: product, store: store,
+                                                toast: $toast, actionError: $actionError)
+            case .saleRecordAppend(let product):
+                ShopCatalogSaleRecordAppendSheet(product: product, store: store,
+                                                 toast: $toast, actionError: $actionError)
+            }
+        }
+        .confirmationDialog(productConfirmTitle,
+                            isPresented: productConfirmBinding,
+                            titleVisibility: .visible,
+                            presenting: productConfirm) { target in
+            switch target {
+            case .archive(let product):
+                Button("归档（用户端隐藏，收藏保留）", role: .destructive) {
+                    performArchive(product)
+                }
+            case .delete(let product):
+                Button("删除", role: .destructive) {
+                    performProductDelete(product)
+                }
+            }
+            Button("取消", role: .cancel) {}
         }
     }
 
@@ -617,9 +790,9 @@ private struct ShopCatalogSeriesProductsView: View {
                     ProductManageRow(
                         product: product,
                         store: store,
-                        modelContext: modelContext,
-                        toast: $toast,
-                        actionError: $actionError
+                        onEditBasics: { beginRename($0) },
+                        onSheet: { productSheet = $0 },
+                        onConfirm: { productConfirm = $0 }
                     )
                 }
             }
@@ -743,6 +916,9 @@ private struct ShopManageRow: View {
     @State private var showsEdit = false
     @State private var showsArchiveConfirm = false
     @State private var showsDeleteConfirm = false
+    /// 强制删除（级联）：确认弹窗文案在点菜单时预检生成（预检与执行同源）
+    @State private var showsForceDeleteConfirm = false
+    @State private var forceDeleteImpactText = ""
 
     var body: some View {
         HStack(spacing: 10) {
@@ -771,6 +947,16 @@ private struct ShopManageRow: View {
                     Button("归档", role: .destructive) { showsArchiveConfirm = true }
                 }
                 Button("删除", role: .destructive) { showsDeleteConfirm = true }
+                Button("强制删除（含全部下级）", role: .destructive) {
+                    do {
+                        let report = try ShopCatalogDraftStore.previewShopForceDeletion(
+                            shop, store: store, modelContext: modelContext)
+                        forceDeleteImpactText = Self.impactText(report)
+                        showsForceDeleteConfirm = true
+                    } catch {
+                        actionError = error.localizedDescription
+                    }
+                }
             } label: {
                 Image(systemName: "ellipsis.circle")
                     .foregroundStyle(.secondary)
@@ -797,6 +983,37 @@ private struct ShopManageRow: View {
             }
             Button("取消", role: .cancel) {}
         }
+        // 强制删除第一步：预检出的真实影响范围（系列/商品/规格/尺码表 + 引用保留说明）
+        .confirmationDialog("强制删除「\(shop.name)」及其全部下级？", isPresented: $showsForceDeleteConfirm, titleVisibility: .visible) {
+            Button("强制删除", role: .destructive) {
+                do {
+                    let report = try ShopCatalogDraftStore.forceDeleteShop(
+                        shop, store: store, modelContext: modelContext)
+                    toast = Self.resultText(report)
+                } catch { actionError = error.localizedDescription }
+            }
+            Button("取消", role: .cancel) {}
+        } message: {
+            Text(forceDeleteImpactText)
+        }
+    }
+
+    /// 影响范围文案（预检生成；销售历史按硬约束保留，明确告知）
+    private static func impactText(_ report: ShopCatalogDraftStore.ShopForceDeletionReport) -> String {
+        var text = "将级联删除：系列 \(report.deletedSeriesCount)、商品 \(report.deletedProductCount)、规格 \(report.deletedVariantCount)、尺码表 \(report.deletedSizeChartCount)。销售历史 \(report.retainedSaleEventCount) 条按规则保留。"
+        if !report.keptReferencedProductNames.isEmpty {
+            text += "\n另有 \(report.keptReferencedProductNames.count) 件商品因被心愿/衣橱引用而保留。"
+        }
+        return text
+    }
+
+    /// 执行结果文案（数量口径与预检一致：预检与执行同源）
+    private static func resultText(_ report: ShopCatalogDraftStore.ShopForceDeletionReport) -> String {
+        var text = "已删除「\(report.shopName)」：系列 \(report.deletedSeriesCount) · 商品 \(report.deletedProductCount) · 规格 \(report.deletedVariantCount) · 尺码表 \(report.deletedSizeChartCount)（子级合计 \(report.childRecordCount) 条）"
+        if !report.keptReferencedProductNames.isEmpty {
+            text += "；保留被引用商品 \(report.keptReferencedProductNames.count) 件"
+        }
+        return text
     }
 }
 
@@ -808,8 +1025,11 @@ private struct SeriesManageRow: View {
     let modelContext: ModelContext
     @Binding var toast: String?
     @Binding var actionError: String?
+    /// 打开系列编辑页。**由外层统一持有 sheet**（2026-09-24 状态丢失根源修复）：
+    /// 行内自持 `@State` + `.sheet` 会在 `List` 复用行时把编辑页连同用户已填内容
+    /// （含封面图）一起重建。
+    var onEdit: (() -> Void)? = nil
 
-    @State private var showsEdit = false
     @State private var showsArchiveConfirm = false
     @State private var showsDeleteConfirm = false
 
@@ -823,6 +1043,9 @@ private struct SeriesManageRow: View {
         switch phase {
         case .reservationActive: return Color(hex: "C2185B")
         case .reservationEnded: return Color(hex: "7A5A54")
+        // 尾款中（2026-09-24 需求三）：琥珀色 —— 与「预约已结束」的灰棕、
+        // 「现货」的墨绿都区分得开，一眼能看出这条系列正在收尾款
+        case .balancePending: return Color(hex: "B26A00")
         case .inStock: return Color(hex: "2E7D6F")
         }
     }
@@ -855,11 +1078,26 @@ private struct SeriesManageRow: View {
                 Text("\(store.shop(id: series.shopID)?.name ?? "—") · \(series.yearMonthText ?? "—") \(series.season ?? "") · \(store.productCount(inSeries: series.id)) 件")
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
+                // 预约期（2026-09-24 需求五：开始 + 结束）：填过就展示，运营一眼看到
+                // 这条系列什么时候开约、什么时候截止
+                if let window = CatalogSeriesReservationWindow.displayText(of: series) {
+                    Text(window)
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                }
+                // 尾款时间 / 尾款期（2026-09-24 需求四、需求五）：填过就展示 —— 运营扫一眼列表
+                // 就知道这条系列什么时候开始收尾款、什么时候收完
+                if let due = CatalogSeriesBalanceDue.displayText(of: series) {
+                    Text(due)
+                        .font(.system(size: 11))
+                        .foregroundStyle(effectiveSalePhase == .balancePending
+                                         ? Color(hex: "B26A00") : Color.secondary)
+                }
             }
             Spacer()
             Menu {
                 Button("编辑（名称/年月/季节/封面/简介/发售阶段）") {
-                    showsEdit = true
+                    onEdit?()
                 }
                 if series.archivedAt == nil {
                     Button("归档", role: .destructive) { showsArchiveConfirm = true }
@@ -869,9 +1107,6 @@ private struct SeriesManageRow: View {
                 Image(systemName: "ellipsis.circle")
                     .foregroundStyle(.secondary)
             }
-        }
-        .sheet(isPresented: $showsEdit) {
-            ShopCatalogSeriesEditSheet(series: series, toast: $toast, actionError: $actionError)
         }
         .confirmationDialog("归档「\(series.name)」？", isPresented: $showsArchiveConfirm, titleVisibility: .visible) {
             Button("归档（用户端隐藏，收藏保留）", role: .destructive) {
@@ -894,23 +1129,57 @@ private struct SeriesManageRow: View {
     }
 }
 
+// MARK: - 商品行模态目标（行只发意图，模态一律页面级呈现）
+
+/// 行的「弹出表单」目标（深度编辑 / 价格修正 / 追加销售记录）。
+///
+/// 为什么用 `Identifiable` 枚举，而不是给每个表单一个 `Bool` `@State`：
+///   ① 行视图会被 `List` 重建，挂在行上的 `.sheet` 连同内容视图的 `@State` 一起归零
+///      （09-24 需求十四红线；深度编辑页带相册选图入口，正是该红线最初的踩坑场景）；
+///   ② 一个 `Bool` 只表达「要不要弹」，还得另存一份「是哪个商品」——
+///      两个状态一旦不同步就会弹出**别的商品**的表单，这类 bug 极难复现。
+/// `id` 带上 case 名 + 商品 id：同一行在三种表单间切换时 SwiftUI 才会重建内容视图。
+private enum ProductRowSheet: Identifiable {
+    case deepEdit(CatalogProduct)
+    case priceCorrection(CatalogProduct)
+    case saleRecordAppend(CatalogProduct)
+
+    var id: String {
+        switch self {
+        case .deepEdit(let product): return "deepEdit-\(product.id)"
+        case .priceCorrection(let product): return "priceCorrection-\(product.id)"
+        case .saleRecordAppend(let product): return "saleRecordAppend-\(product.id)"
+        }
+    }
+}
+
+/// 行的「危险操作确认」目标（归档 / 删除）。标题随目标变，所以不写死在
+/// `.confirmationDialog` 上，改用 `presenting:` 拿到目标再算。
+private enum ProductRowConfirm: Identifiable {
+    case archive(CatalogProduct)
+    case delete(CatalogProduct)
+
+    var id: String {
+        switch self {
+        case .archive(let product): return "archive-\(product.id)"
+        case .delete(let product): return "delete-\(product.id)"
+        }
+    }
+}
+
 // MARK: - 商品行
 
+/// 商品行**只负责渲染 + 发出意图**：3 个表单与 2 个危险操作确认全部由
+/// `ShopCatalogSeriesProductsView` 页面级呈现（理由见 `ProductRowSheet` 注释）。
 private struct ProductManageRow: View {
     let product: CatalogProduct
     @ObservedObject var store: ShopCatalogStore
-    let modelContext: ModelContext
-    @Binding var toast: String?
-    @Binding var actionError: String?
-
-    @State private var showsEdit = false
-    @State private var showsDeepEdit = false
-    @State private var showsPriceCorrection = false
-    @State private var showsSaleRecordAppend = false
-    @State private var showsArchiveConfirm = false
-    @State private var showsDeleteConfirm = false
-    @State private var draftName = ""
-    @State private var draftCategory = "其他"
+    /// 「编辑基础（名称/分类）」→ 页面级弹窗（改名是款式级操作，需要整款视角做预览）
+    let onEditBasics: (CatalogProduct) -> Void
+    /// 三个表单类模态
+    let onSheet: (ProductRowSheet) -> Void
+    /// 两个危险操作确认
+    let onConfirm: (ProductRowConfirm) -> Void
 
     /// 颜色标注（统一口径）：显式规格色优先 → 名称里的颜色词 → 无则不给标签
     private var productColorLabel: String? {
@@ -953,72 +1222,26 @@ private struct ProductManageRow: View {
             Spacer()
             Menu {
                 Button("编辑基础（名称/分类）") {
-                    draftName = product.name
-                    draftCategory = product.category
-                    showsEdit = true
+                    onEditBasics(product)
                 }
                 Button("深度编辑（图片/配色尺码/尺码表）") {
-                    showsDeepEdit = true
+                    onSheet(.deepEdit(product))
                 }
                 // 价格两条流程：入口分开、语义写清楚，避免与「深度编辑」里混淆
                 Button("价格修正（覆盖当前价 · 不产生历史）") {
-                    showsPriceCorrection = true
+                    onSheet(.priceCorrection(product))
                 }
                 Button("追加销售记录（再贩 · 带批次时间）") {
-                    showsSaleRecordAppend = true
+                    onSheet(.saleRecordAppend(product))
                 }
                 if product.archivedAt == nil {
-                    Button("归档", role: .destructive) { showsArchiveConfirm = true }
+                    Button("归档", role: .destructive) { onConfirm(.archive(product)) }
                 }
-                Button("删除", role: .destructive) { showsDeleteConfirm = true }
+                Button("删除", role: .destructive) { onConfirm(.delete(product)) }
             } label: {
                 Image(systemName: "ellipsis.circle")
                     .foregroundStyle(.secondary)
             }
-        }
-        .sheet(isPresented: $showsDeepEdit) {
-            ShopCatalogProductDeepEditView(product: product, store: store,
-                                           toast: $toast, actionError: $actionError)
-        }
-        .sheet(isPresented: $showsPriceCorrection) {
-            ShopCatalogPriceCorrectionSheet(product: product, store: store,
-                                            toast: $toast, actionError: $actionError)
-        }
-        .sheet(isPresented: $showsSaleRecordAppend) {
-            ShopCatalogSaleRecordAppendSheet(product: product, store: store,
-                                             toast: $toast, actionError: $actionError)
-        }
-        .alert("编辑商品", isPresented: $showsEdit) {
-            TextField("名称", text: $draftName)
-            TextField("分类（JSK/OP/SK/Blouse/KC/小物/鞋/包/其他）", text: $draftCategory)
-            Button("保存") {
-                var updated = product
-                updated.name = draftName.trimmingCharacters(in: .whitespaces)
-                updated.category = draftCategory.trimmingCharacters(in: .whitespaces)
-                do {
-                    try ShopCatalogDraftStore.upsertEntity(updated, keyPath: \.products)
-                    toast = "已更新商品「\(updated.name)」，id 不变，用户引用不受影响"
-                } catch { actionError = error.localizedDescription }
-            }
-            Button("取消", role: .cancel) {}
-        }
-        .confirmationDialog("归档「\(product.name)」？", isPresented: $showsArchiveConfirm, titleVisibility: .visible) {
-            Button("归档（用户端隐藏，收藏保留）", role: .destructive) {
-                do {
-                    try ShopCatalogDraftStore.archiveProduct(product)
-                    toast = "已归档「\(product.name)」"
-                } catch { actionError = error.localizedDescription }
-            }
-            Button("取消", role: .cancel) {}
-        }
-        .confirmationDialog("删除「\(product.name)」？", isPresented: $showsDeleteConfirm, titleVisibility: .visible) {
-            Button("删除", role: .destructive) {
-                do {
-                    try ShopCatalogDraftStore.deleteProduct(product, store: store, modelContext: modelContext)
-                    toast = "已删除「\(product.name)」"
-                } catch { actionError = error.localizedDescription }
-            }
-            Button("取消", role: .cancel) {}
         }
     }
 }
@@ -1036,6 +1259,8 @@ private struct ShopCatalogShopEditSheet: View {
     @State private var logo = ""
     @State private var cover = ""
     @State private var descriptionText = ""
+    /// onAppear 一次性回填守卫（2026-09-24 状态丢失修复，与系列编辑同款）
+    @State private var loaded = false
 
     var body: some View {
         NavigationStack {
@@ -1063,6 +1288,10 @@ private struct ShopCatalogShopEditSheet: View {
                 }
             }
             .onAppear {
+                // 一次性回填守卫（2026-09-24 状态丢失修复，与系列编辑同款）：
+                // 切后台 / 相册选图 / 切应用返回重触发 onAppear 时不再覆盖已填内容
+                guard !loaded else { return }
+                loaded = true
                 name = shop.name
                 aliases = shop.aliases.joined(separator: "，")
                 logo = shop.logo ?? ""
@@ -1111,29 +1340,32 @@ private struct ShopCatalogSeriesEditSheet: View {
     @State private var yearMonthText = ""
     @State private var yearMonthError: String?
     @State private var season = ""
-    @State private var cover = ""
-    @State private var descriptionText = ""
+    // 系列级三项配置（发售阶段 / 视觉与简介 / 预约价格表）改由**共用表单**承载
+    // （2026-09-24 需求：批次详情页「一站式配置」）。
+    // 这里不再各自持有十余个 @State：两个入口各持一套状态的话，迟早出现
+    // 「在批次页填了尾款时间，回系列页保存一次就没了」这类互相吃掉字段的问题。
+    // 共用实现：`ShopCatalogSeriesConfigSections` + `ShopCatalogSeriesConfigForm`。
+    @State private var configForm = ShopCatalogSeriesConfigForm(series: CatalogSeries(id: "", shopID: "", name: ""))
+    /// 已加载配置的系列 id：用于「系列变了才重建表单」的判定
+    @State private var configFormSeriesID: String?
+    /// onAppear 一次性回填守卫（2026-09-24 状态丢失修复）：防止切后台 / 相册选图 /
+    /// 切应用返回时重复回填把已填内容覆盖成 series 原始值
+    @State private var loaded = false
 
-    // 预约价格表（系列共用，2026-09-22）：独立于单品尺码表的上传入口。
-    // 2026-09-23 需求一：**移除「上传价格表图片（自动识别）」与失败红字常驻提示**，
-    //   价格表统一走「粘贴文本录入（推荐，最准）」+ 列名/行文本/单位手动输入区。
-    //
-    //   `priceChartImageText` 必须保留：它承载**既有**系列的 `sourceImage`，
-    //   由 `onAppear` 回填、`makePriceChart()` 原样写回。删掉这个 state 会让
-    //   「打开编辑系列 → 保存」把用户已上传的价格表原图静默抹掉。
-    @State private var priceChartImageText = ""
-    @State private var priceChartColumnsText = ""
-    @State private var priceChartRowsText = ""
-    @State private var priceChartUnitText = ""
+    @Environment(\.scenePhase) private var scenePhase
 
-    // 发售阶段（2026-09-23 需求二）：系列层面的「预约中 / 预约已结束 / 现货」声明 + 预约结束时间。
-    // nil = 未声明（旧数据）→ 商品详情页沿用销售记录推导，与改动前完全一致。
-    @State private var salePhase: CatalogSeriesSalePhase?
-    @State private var reservationEndAt = Date()
+    /// 编辑中快照管家（2026-09-24 状态丢失**根源**修复）。
+    ///
+    /// 上面的 `loaded` 守卫只能挡「`onAppear` 被多触发一次」，挡不住真正的病灶 ——
+    /// **承载它的视图被重建**。`loaded` 自己是 `@State`，视图一重建就归零，
+    /// 守卫失效、表单被 `series` 原值重新回填（用户看到的就是「内容全没了」）。
+    /// 根治靠不依赖视图生命周期：把未提交的输入落盘，重建后自动恢复。
+    @State private var snapshotKeeper = ShopCatalogFormSnapshotKeeper<ShopCatalogSeriesEditSnapshot>(scope: "")
 
     var body: some View {
         NavigationStack {
             Form {
+                snapshotNoticeSection
                 Section("基础信息") {
                     TextField("名称", text: $name)
                     // 不用数字键盘：要允许输入「-」与「年/月」
@@ -1145,13 +1377,10 @@ private struct ShopCatalogSeriesEditSheet: View {
                     }
                     TextField("季节（如 冬）", text: $season)
                 }
-                salePhaseSection
-                Section("视觉与简介") {
-                    TextField("封面（Bundle 文件名/URL，可空）", text: $cover)
-                    ShopCatalogImagePickerButton(mode: .replace, text: $cover, label: "添加封面图片")
-                    TextField("简介", text: $descriptionText)
-                }
-                priceChartSection
+                // 系列级三项配置（发售阶段 / 视觉与简介 / 预约价格表）：
+                // 与**批次详情页**同一份实现（`ShopCatalogSeriesConfigSections`）。
+                // scope 传 nil：系列编辑页没有「本批次 N 条单品」这个上下文。
+                ShopCatalogSeriesConfigSections(form: $configForm, sharedScope: nil)
             }
             .navigationTitle("编辑系列")
             .navigationBarTitleDisplayMode(.inline)
@@ -1164,134 +1393,105 @@ private struct ShopCatalogSeriesEditSheet: View {
                 }
             }
             .onAppear {
+                // 一次性回填（2026-09-24 状态丢失修复）：切后台回前台、进相册选图、
+                // 切其他应用再返回都会重新触发 onAppear —— 无守卫时这里会用 series
+                // 原始值覆盖用户已填的全部内容（表现为表单被重置）。
+                //
+                // ⚠️ 但守卫本身救不了「视图被重建」（`loaded` 也是 `@State`）——
+                // 真正的兜底是下面那层快照：重建后把未提交的编辑自动恢复回来。
+                guard !loaded else { return }
+                loaded = true
+                snapshotKeeper.scope = Self.snapshotScope(seriesID: series.id)
                 name = series.name
                 yearMonthText = series.yearMonthText ?? ""
                 yearMonthError = nil
                 season = series.season ?? ""
-                cover = series.cover ?? ""
-                descriptionText = series.description ?? ""
-                salePhase = series.salePhase
-                reservationEndAt = series.reservationEndAt ?? Date()
-                if let chart = series.priceChart {
-                    // 多图优先：sourceImages 是 2026-09-24 起的完整口径；
-                    // 旧数据只有 sourceImage，按原值回填，保存时归一化为单元素列表
-                    if let images = chart.sourceImages, !images.isEmpty {
-                        priceChartImageText = images.joined(separator: "\n")
-                    } else {
-                        priceChartImageText = chart.sourceImage ?? ""
-                    }
-                    priceChartColumnsText = chart.columns.joined(separator: ",")
-                    priceChartRowsText = chart.rows.map { row in
-                        "\(row.label):" + row.values.map { $0 ?? "" }.joined(separator: ",")
-                    }.joined(separator: "\n")
-                    priceChartUnitText = chart.unit ?? ""
-                }
+                configForm = ShopCatalogSeriesConfigForm(series: series)
+                configFormSeriesID = series.id
+                // 在「按存储值填好的默认态」之上，用快照恢复用户离开前的未保存编辑
+                snapshotKeeper.restoreOrDiscard(defaults: makeSnapshot()) { applySnapshot($0) }
+            }
+            // ── 编辑中快照（2026-09-24 状态丢失根源修复）─────────────────────────
+            // 三处「页面即将离开」的时机各立即落盘一次；再叠一层「改一下就存一下」
+            // 的防抖落盘 —— 跳系统相册返回不会走 onDisappear，只有这层兜得住。
+            .onChange(of: scenePhase) { _, phase in
+                guard phase != .active else { return }
+                snapshotKeeper.flush(makeSnapshot())
+            }
+            .onReceive(NotificationCenter.default.publisher(for: UIApplication.didEnterBackgroundNotification)) { _ in
+                snapshotKeeper.flush(makeSnapshot())
+            }
+            .onChange(of: makeSnapshot()) { _, snapshot in
+                snapshotKeeper.schedule(snapshot)
+            }
+            .onDisappear {
+                snapshotKeeper.flush(makeSnapshot())
             }
         }
     }
 
-    // MARK: 发售阶段（2026-09-23 需求二）
+    // MARK: 编辑中快照（切后台 / 相册选图 / 切应用返回后不丢内容）
 
-    /// 需求 §二 的四条口径：
-    ///   1. 基础信息处新增「发售阶段」状态字段（预约中 / 预约已结束 / 现货）；
-    ///   2. 选「预约中」必须给出「预约结束时间」（DatePicker 常驻，必然有值）；
-    ///      选「预约已结束 / 现货」时**不显示**该输入框；
-    ///   3. 过了结束时间自动流转为「预约已结束」——由
-    ///      `CatalogSeriesSalePhaseResolver.effectivePhase` 读取时判定（见该类型的注释：
-    ///      不把运营声明改写掉，避免定时任务与声明互相覆盖）；
-    ///   4. **数据保留**：这里只动阶段与时间两个字段，价格数据（预约价 / 定金 / 尾款 / 现货价）
-    ///      一个都不碰、不清空、不隐藏；结束时间已过时下方只给提示，不拦保存。
+    private static func snapshotScope(seriesID: String) -> String {
+        "series-edit-\(seriesID)"
+    }
+
+    /// 把当前整页表单组装成快照（唯一组装口径）。含 `configForm` 里的封面图引用。
+    private func makeSnapshot() -> ShopCatalogSeriesEditSnapshot {
+        ShopCatalogSeriesEditSnapshot(seriesID: series.id,
+                                      name: name,
+                                      yearMonthText: yearMonthText,
+                                      season: season,
+                                      config: configForm)
+    }
+
+    private func applySnapshot(_ snapshot: ShopCatalogSeriesEditSnapshot) {
+        name = snapshot.name
+        yearMonthText = snapshot.yearMonthText
+        season = snapshot.season
+        configForm = snapshot.config
+        // 快照里没有校验态：恢复后让保存时的校验重新判定，不沿用旧红字
+        yearMonthError = nil
+        configFormSeriesID = series.id
+    }
+
+    /// 用户主动放弃恢复出来的未提交编辑
+    private func discardRestoredSnapshot() {
+        snapshotKeeper.discard()
+        name = series.name
+        yearMonthText = series.yearMonthText ?? ""
+        yearMonthError = nil
+        season = series.season ?? ""
+        configForm = ShopCatalogSeriesConfigForm(series: series)
+        configFormSeriesID = series.id
+        toast = "已放弃上次未保存的编辑"
+    }
+
+    /// 「已恢复未保存编辑」提示条：不静默恢复，且给一条一键放弃的路
     @ViewBuilder
-    private var salePhaseSection: some View {
-        Section {
-            Picker("发售阶段", selection: $salePhase) {
-                Text("未设置（沿用销售记录）").tag(Optional<CatalogSeriesSalePhase>.none)
-                ForEach(CatalogSeriesSalePhase.allCases) { phase in
-                    Text(phase.displayName).tag(Optional(phase))
-                }
-            }
-            if salePhase == .reservationActive {
-                DatePicker("预约结束时间",
-                           selection: $reservationEndAt,
-                           displayedComponents: [.date, .hourAndMinute])
-                if CatalogSeriesSalePhaseResolver.hasAutoFlowed(
-                    declared: salePhase, reservationEndAt: reservationEndAt, now: Date()
-                ) {
-                    Text("该时间已过，保存后本系列的生效状态会显示为「预约已结束」（价格数据保持不变）；若确实已结束，建议直接把发售阶段改为「预约已结束」。")
+    private var snapshotNoticeSection: some View {
+        if snapshotKeeper.didRestore {
+            Section {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("已恢复上次未保存的编辑")
+                        .font(.system(size: 13, weight: .semibold))
+                    Text("离开页面时（切后台 / 去相册选图 / 切到其他应用）自动保留了这里的内容，包括已选的封面图。")
                         .font(.system(size: 11))
-                        .foregroundStyle(.red)
+                        .foregroundStyle(.secondary)
+                    HStack(spacing: 12) {
+                        Button("知道了") { snapshotKeeper.markRestoreAcknowledged() }
+                            .font(.system(size: 13))
+                        Button("放弃修改", role: .destructive) { discardRestoredSnapshot() }
+                            .font(.system(size: 13))
+                    }
                 }
+            } footer: {
+                Text("「放弃修改」只清掉这份未保存的内容，不会动已保存的系列数据。")
             }
-        } header: {
-            Text("发售阶段")
-        } footer: {
-            Text(salePhaseFooter)
         }
     }
 
-    private var salePhaseFooter: String {
-        switch salePhase {
-        case .none:
-            return "未设置时，商品详情页按销售记录（预约 / 现货档期）自动判断，与以往行为一致。"
-        case .reservationActive:
-            return "预约中：到「预约结束时间」后自动流转为「预约已结束」。无论哪个阶段，预约价 / 定金 / 尾款 / 现货价都会完整保留，不会清空或隐藏。"
-        case .reservationEnded:
-            return "预约已结束：前端价格档案照常展示原预约价；加购默认引导全款入橱，「定金 + 尾款」仍可在「其他记账方式」里记录。"
-        case .inStock:
-            return "现货：加购直接按现货价计入衣橱，不走定金 / 尾款。"
-        }
-    }
-
-    // MARK: 预约价格表（整个系列共用）
-    //
-    //  2026-09-23 需求一之后只剩两条口径：
-    //    1. 「粘贴文本录入（推荐，最准）」是唯一快捷入口；
-    //    2. 列名 / 行文本 / 单位手动输入区保留，粘贴与手填共用同一套解析口径。
-    //
-    //  已移除（用户反馈：图片识别频繁报错且红字常驻霸屏）：
-    //    `ShopCatalogImagePickerButton`（上传价格表图片）、识别进度行、
-    //    「上次识别失败，未写入任何内容…」红字常驻块、失败 `alert`，
-    //    以及只为它们服务的 `parsePriceChart` / `failPriceChartParse` / 三个 @State。
-    //  **既有原图没有被丢弃**：`series.priceChart.sourceImage` 仍由 onAppear 回填、
-    //    `makePriceChart()` 原样写回，只是不再提供新的上传入口。
-
-    private var priceChartSection: some View {
-        Section {
-            // 2026-09-24 需求：恢复价格表图片上传入口，且支持一次多选。
-            // 引用以「local:文件名」按行追加进 priceChartImageText，落库时拆行写
-            // sourceImages（首图同步写 sourceImage，单一展示口径继续成立）。
-            ShopCatalogImagePickerButton(mode: .append,
-                                         text: $priceChartImageText,
-                                         label: "上传价格表图片（可多选）")
-            ShopCatalogChartPasteButton(kind: .priceChart,
-                                        columnsText: $priceChartColumnsText,
-                                        rowsText: $priceChartRowsText)
-            // 手动录入区（与尺码表同交互）：列名 + 行文本 + 单位
-            TextField("列名（逗号分隔，如：款式,预约价,定金,尾款）", text: $priceChartColumnsText)
-                .font(.system(size: 13))
-            TextEditor(text: $priceChartRowsText)
-                .frame(minHeight: 60)
-                .font(.system(size: 13))
-            Text("价格表行：每行「标签:值,值,…」与列一一对应（如「大蝴蝶结背心裙:318,91,227」）；可在「粘贴文本录入」里整段贴入，或在此手动修正后保存")
-                .font(.system(size: 11))
-                .foregroundStyle(.secondary)
-            TextField("单位（可空，如 元）", text: $priceChartUnitText)
-                .font(.system(size: 13))
-            if !priceChartImageText.isEmpty || !priceChartColumnsText.isEmpty || !priceChartRowsText.isEmpty {
-                Button("清除价格表", role: .destructive) {
-                    priceChartImageText = ""
-                    priceChartColumnsText = ""
-                    priceChartRowsText = ""
-                    priceChartUnitText = ""
-                }
-                .font(.system(size: 13))
-            }
-        } header: {
-            Text("预约价格表（整个系列共用）")
-        } footer: {
-            Text("价格表归属系列而非单品：在此录入一次，该系列全部商品详情页自动展示；无需在单品编辑页上传。用「粘贴文本录入」把整段表格文本贴进来最省事，也可在下方手动修正后保存。")
-        }
-    }
+    // MARK: 保存（本页只补「基础信息」；三项系列配置由共用组件写回）
 
     private func save() {
         // 年月校验（2026-09-24 需求）：空 = 清除；"2026-10" / "2026年10月" / 纯年份均有效；
@@ -1301,58 +1501,34 @@ private struct ShopCatalogSeriesEditSheet: View {
             return
         }
         yearMonthError = nil
+        // 尾款时间校验（2026-09-24 需求四）：与批次详情页共用同一份判定，不另写一套
+        if let error = configForm.balanceDueValidationErrorText() {
+            actionError = error
+            return
+        }
         let parsedYearMonth = CatalogYearMonthText.parse(yearMonthText)
-        var updated = series
+        // 三项系列配置（发售阶段 / 视觉与简介 / 预约价格表）统一由共用表单写回 ——
+        // 它只覆盖自己负责的字段，所以「在批次页填过尾款时间」这类并行编辑不会被本页吃掉。
+        var updated = configForm.apply(to: series)
         updated.name = name.trimmingCharacters(in: .whitespaces)
         updated.year = parsedYearMonth?.year
         updated.month = parsedYearMonth?.month
         let seasonTrimmed = season.trimmingCharacters(in: .whitespaces)
         updated.season = seasonTrimmed.isEmpty ? nil : seasonTrimmed
-        updated.cover = trimmedOrNil(cover)
-        updated.description = trimmedOrNil(descriptionText)
-        // 发售阶段（需求二）：只写「阶段」与「预约结束时间」两个字段。
-        //   · 切到非「预约中」阶段**不清除**已录入的结束时间——那是「预约什么时候结束的」
-        //     这条事实本身，清掉就再也查不回来了（表单只是把它隐藏，不是删除）。
-        //   · **绝不触碰价格数据**：预约价 / 定金 / 尾款 / 现货价由价格表与销售记录负责，
-        //     本页一个字段都不写（需求 §二.4 数据保留原则）。
-        updated.salePhase = salePhase
-        if salePhase == .reservationActive {
-            updated.reservationEndAt = reservationEndAt
-        }
-        updated.priceChart = makePriceChart()
         do {
             try ShopCatalogDraftStore.upsertEntity(updated, keyPath: \.series)
-            toast = "已更新系列「\(updated.name)」，价格表对全系列商品生效"
+            // 落库成功 = 这一份内容已提交：把表单归一成「实际保存的值」并清掉编辑中快照，
+            // 免得关页时（onDisappear）又把刚保存的内容当成「未保存的编辑」写回去。
+            name = updated.name
+            yearMonthText = CatalogYearMonthText.displayText(year: updated.year, month: updated.month) ?? ""
+            season = updated.season ?? ""
+            yearMonthError = nil
+            snapshotKeeper.commit(makeSnapshot())
+            toast = "已更新系列「\(updated.name)」，发售阶段与价格表对全系列商品生效"
             dismiss()
         } catch {
             actionError = error.localizedDescription
         }
-    }
-
-    /// 由表单内容组装系列价格表：图片与结构化内容二者留其一即可；
-    /// 解析失败时保留原图（详情页给出「未解析成功」提示）。
-    /// 共享解析口径：首列若为行标签列名（尺码/项目/款式…）剔除，值尾冒号清洗。
-    ///
-    /// 多图（2026-09-24 需求）：priceChartImageText 按行拆为引用列表写 sourceImages；
-    /// sourceImage 同步写首图——既有的单图展示/门禁口径（ShopCatalogChartPresentation）
-    /// 继续以 sourceImage 为唯一入口，不被多图改动牵连。
-    private func makePriceChart() -> CatalogPriceChart? {
-        let imageReferences = CatalogPriceChartImageText.references(fromText: priceChartImageText)
-        let sourceImage = imageReferences.first
-        let parsedChart = CatalogManualChartText.normalized(
-            columns: CatalogManualChartText.parseColumns(priceChartColumnsText),
-            rows: CatalogManualChartText.parseRows(priceChartRowsText))
-        let columns = parsedChart.columns
-        let rows = parsedChart.rows
-        guard sourceImage != nil || !columns.isEmpty || !rows.isEmpty else { return nil }
-        var chart = series.priceChart ?? CatalogPriceChart(
-            id: "pricechart-\(series.id.prefix(8))", seriesID: series.id)
-        chart.sourceImages = imageReferences.isEmpty ? nil : imageReferences
-        chart.sourceImage = sourceImage
-        chart.columns = columns
-        chart.rows = rows
-        chart.unit = trimmedOrNil(priceChartUnitText)
-        return chart
     }
 
     private func trimmedOrNil(_ s: String) -> String? {

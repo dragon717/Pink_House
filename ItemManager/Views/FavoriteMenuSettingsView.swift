@@ -33,6 +33,8 @@ struct FavoriteMenuSettingsView: View {
                     }
                 }
                 .scrollContentBackground(.hidden)
+                // 底部悬浮 Dock 避让：本页由「我」push 进入，最后一个可选项会被 Dock 盖住。
+                .avoidingBottomDock()
                 .navigationTitle("底部导航设置".appLocalized)
                 .navigationBarTitleDisplayMode(.inline)
             }

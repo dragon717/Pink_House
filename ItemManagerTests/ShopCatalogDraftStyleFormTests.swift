@@ -391,7 +391,8 @@ final class ShopCatalogStyleFormStoreTests: XCTestCase {
         try draftStore.applyBatchAttribution(
             batchID: session.id,
             shopID: nil, newShopName: "表单测试店家", newShopAliases: "",
-            seriesID: nil, newSeriesName: "天鹅之歌", newSeriesYear: 2026, newSeriesSeason: "冬")
+            seriesID: nil, newSeriesName: "天鹅之歌",
+            newSeriesYear: 2026, newSeriesMonth: nil, newSeriesSeason: "冬")
         return session
     }
 
@@ -718,7 +719,8 @@ final class ShopCatalogStyleFormEndToEndTests: XCTestCase {
         try draftStore.applyBatchAttribution(
             batchID: session.id,
             shopID: nil, newShopName: "表单测试店家", newShopAliases: "",
-            seriesID: nil, newSeriesName: "天鹅之歌", newSeriesYear: 2026, newSeriesSeason: "冬")
+            seriesID: nil, newSeriesName: "天鹅之歌",
+            newSeriesYear: 2026, newSeriesMonth: nil, newSeriesSeason: "冬")
         return session
     }
 

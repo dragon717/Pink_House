@@ -12,14 +12,39 @@
 
 import SwiftUI
 import PhotosUI
+import Combine
 
 struct ShopCatalogOpsView: View {
     @ObservedObject private var creatorAccess = CreatorAccess.shared
     @ObservedObject private var draftStore = ShopCatalogDraftStore.shared
     @ObservedObject private var store = ShopCatalogStore.shared
 
-    /// 手动录入批次会话（V1.1 §4.1.2：同一会话内连续添加多件单品）
-    @State private var manualBatch: CatalogBatchEntrySession?
+    /// 本页会弹出的表单页 —— **统一挂在一处**（见 `content` 末尾那一个 sheet）。
+    ///
+    /// 为什么必须集中（2026-09-24 状态丢失根源修复）：`.sheet` 原先挂在 `ForEach`
+    /// 的**行视图**上（批次行 / 草稿行）。`Form` 的行是惰性、可复用的容器，行身份一旦
+    /// 变化或列表重新布局（切后台、跳系统相册、切到其他应用再回来都会触发），
+    /// 行视图连同它承载的 sheet 内容视图一起被重建 —— 用户填了一半的表单
+    /// 连 `@State` 一起归零，表现为「内容全部消失、页面被重置」。
+    /// 提到稳定容器上只挂一次，sheet 的生命周期就不再和某一行绑死。
+    private enum OpsSheet: Identifiable {
+        /// 手动录入新建批次后直接进入批次详情
+        case manualBatch(CatalogBatchEntrySession)
+        /// 点批次行进入批次详情（整批归属 + 一站式系列配置）
+        case batchDetail(CatalogBatchEntrySession)
+        /// 点草稿行进入补录编辑器
+        case draftEditor(CatalogProductDraft)
+
+        var id: String {
+            switch self {
+            case .manualBatch(let batch): return "manual-\(batch.id)"
+            case .batchDetail(let batch): return "batch-\(batch.id)"
+            case .draftEditor(let draft): return "draft-\(draft.id)"
+            }
+        }
+    }
+
+    @State private var activeSheet: OpsSheet?
     @State private var toast: String?
     @State private var actionError: String?
 
@@ -35,6 +60,34 @@ struct ShopCatalogOpsView: View {
     @State private var selectedDraftIDs: Set<String> = []     // 多选已勾选
     @State private var pendingDeleteDraftIDs: Set<String> = [] // 待二次确认的删除目标
     @State private var showsDraftDeleteConfirm = false        // 删除二次确认弹窗
+
+    // 草稿箱批量流转（2026-09-24：批量提交审核 / 审核通过 / 发布）
+    @State private var pendingDraftBatchFlow: PendingDraftBatchFlow?
+    @State private var showsDraftBatchFlowConfirm = false
+    @State private var batchFlowFailureText: String?          // 部分 / 全部失败的明细反馈
+
+    /// 批量流转动作（多选模式下对勾选草稿整批执行）
+    enum PendingDraftBatchFlow: Equatable {
+        case submit   // draft → submitted
+        case approve  // submitted → reviewed
+        case publish  // reviewed → published
+
+        var title: String {
+            switch self {
+            case .submit: return "提交审核"
+            case .approve: return "审核通过"
+            case .publish: return "发布"
+            }
+        }
+        /// 允许执行该动作的来源状态
+        var eligibleStatus: CatalogPublicationStatus {
+            switch self {
+            case .submit: return .draft
+            case .approve: return .submitted
+            case .publish: return .reviewed
+            }
+        }
+    }
 
     var body: some View {
         Group {
@@ -61,6 +114,8 @@ struct ShopCatalogOpsView: View {
             manageSection
             exportSection
         }
+        // 底部悬浮 Dock 避让：表单最后一段（导出）会被 Dock 盖住。
+        .avoidingBottomDock()
         .overlay(alignment: .bottom) {
             if let toast {
                 Text(toast)
@@ -84,8 +139,14 @@ struct ShopCatalogOpsView: View {
         } message: {
             Text(actionError ?? "")
         }
-        .sheet(item: $manualBatch) { batch in
-            ShopCatalogBatchDetailView(draftStore: draftStore, store: store, batch: batch)
+        // 唯一的表单页呈现入口（见 `OpsSheet` 注释：不能再挂到 ForEach 的行上）
+        .sheet(item: $activeSheet) { sheet in
+            switch sheet {
+            case .manualBatch(let batch), .batchDetail(let batch):
+                ShopCatalogBatchDetailView(draftStore: draftStore, store: store, batch: batch)
+            case .draftEditor(let draft):
+                ShopCatalogDraftDetailEditor(draft: draft, draftStore: draftStore, store: store)
+            }
         }
         .confirmationDialog(batchDeleteConfirmTitle,
                             isPresented: $showsBatchDeleteConfirm,
@@ -108,6 +169,26 @@ struct ShopCatalogOpsView: View {
         } message: {
             Text(draftDeleteImpactText)
         }
+        // 草稿箱批量流转二次确认（提交审核 / 审核通过 / 发布共用一个弹窗）
+        .confirmationDialog(draftBatchFlowConfirmTitle,
+                            isPresented: $showsDraftBatchFlowConfirm,
+                            titleVisibility: .visible) {
+            Button("确认\(pendingDraftBatchFlow?.title ?? "执行")", role: .destructive) {
+                performDraftBatchFlow()
+            }
+            Button("取消", role: .cancel) {}
+        } message: {
+            Text(draftBatchFlowImpactText)
+        }
+        // 批量流转失败明细（发布校验不过 / 落盘失败等，逐条带原因）
+        .alert("部分操作未完成", isPresented: Binding(
+            get: { batchFlowFailureText != nil },
+            set: { if !$0 { batchFlowFailureText = nil } }
+        )) {
+            Button("知道了", role: .cancel) {}
+        } message: {
+            Text(batchFlowFailureText ?? "")
+        }
         // 拦截反馈：被拦截的批次整体保留并逐条说明原因；处理后可对相同选择直接重试
         .alert("部分批次无法删除", isPresented: Binding(
             get: { !blockedBatchDeletions.isEmpty },
@@ -127,7 +208,7 @@ struct ShopCatalogOpsView: View {
         draft.batchID = session.id
         do {
             _ = try draftStore.createBatch(session, drafts: [draft])
-            manualBatch = session
+            activeSheet = .manualBatch(session)
         } catch {
             // 保存失败可见、可重试（R01）：不静默成功，也不把用户带进一个没落盘的批次
             actionError = error.localizedDescription
@@ -183,8 +264,6 @@ struct ShopCatalogOpsView: View {
         }
         .frame(maxWidth: .infinity)
     }
-
-    @State private var selectedBatch: CatalogBatchEntrySession?
 
     // MARK: 批次列表（V1.1 §4.1；淘宝/批量导入入口已下线，仅保留既有批次的管理）
     //
@@ -285,11 +364,8 @@ struct ShopCatalogOpsView: View {
             if isSelectingBatches {
                 toggleBatchSelection(batch.id)
             } else {
-                selectedBatch = batch
+                activeSheet = .batchDetail(batch)
             }
-        }
-        .sheet(item: $selectedBatch) { batch in
-            ShopCatalogBatchDetailView(draftStore: draftStore, store: store, batch: batch)
         }
     }
 
@@ -411,7 +487,8 @@ struct ShopCatalogOpsView: View {
                     isSelecting: isSelectingDrafts,
                     isSelected: selectedDraftIDs.contains(draft.id),
                     onToggleSelection: { toggleDraftSelection(draft.id) },
-                    onRequestDelete: { beginDraftDelete([draft.id]) }
+                    onRequestDelete: { beginDraftDelete([draft.id]) },
+                    onOpenEditor: { activeSheet = .draftEditor(draft) }
                 )
             }
             if draftStore.drafts.isEmpty {
@@ -431,12 +508,41 @@ struct ShopCatalogOpsView: View {
         }
     }
 
-    /// Section 标题右侧：多选入口 / 删除 / 取消（与批次列表同款，视觉集中在列表内）
+    /// Section 标题右侧：多选入口 / 全选 / 批量流转 / 删除 / 取消
     private var draftSectionHeader: some View {
         HStack(spacing: 12) {
             Text("草稿箱")
+            // 全选 / 取消全选（2026-09-24 需求）：多选模式下一键勾满 / 清空
+            if isSelectingDrafts, !draftStore.drafts.isEmpty {
+                Button {
+                    if selectedDraftIDs.count == draftStore.drafts.count {
+                        selectedDraftIDs = []
+                    } else {
+                        selectedDraftIDs = Set(draftStore.drafts.map(\.id))
+                    }
+                } label: {
+                    Text(allDraftsSelected ? "取消全选" : "全选")
+                        .font(.system(size: 12))
+                }
+            }
             Spacer()
             if isSelectingDrafts {
+                // 批量流转（2026-09-24）：提交审核 / 审核通过 / 发布，整批执行前二次确认
+                Menu {
+                    ForEach([PendingDraftBatchFlow.submit, .approve, .publish],
+                            id: \.self) { flow in
+                        Button {
+                            beginDraftBatchFlow(flow)
+                        } label: {
+                            Text(flow.title)
+                        }
+                        .disabled(selectedDraftIDs.isEmpty)
+                    }
+                } label: {
+                    Text("批量操作")
+                        .font(.system(size: 12))
+                }
+                .disabled(selectedDraftIDs.isEmpty)
                 Button {
                     beginDraftDelete(selectedDraftIDs)
                 } label: {
@@ -453,6 +559,11 @@ struct ShopCatalogOpsView: View {
             }
         }
         .textCase(nil)
+    }
+
+    /// 是否已勾选全部草稿（空草稿箱不算全选）
+    private var allDraftsSelected: Bool {
+        !draftStore.drafts.isEmpty && selectedDraftIDs.count == draftStore.drafts.count
     }
 
     // MARK: 草稿删除（状态与回调）
@@ -543,6 +654,91 @@ struct ShopCatalogOpsView: View {
         }
     }
 
+    // MARK: 草稿批量流转（2026-09-24：提交审核 / 审核通过 / 发布）
+
+    /// 入口：记录动作 + 弹二次确认（弹窗文案里说明会命中几条、跳过几条）
+    private func beginDraftBatchFlow(_ flow: PendingDraftBatchFlow) {
+        guard !selectedDraftIDs.isEmpty else { return }
+        pendingDraftBatchFlow = flow
+        showsDraftBatchFlowConfirm = true
+    }
+
+    /// 选中草稿里**当前状态符合**该动作的条数（弹窗预检口径）
+    private var draftBatchFlowEligibleCount: Int {
+        guard let flow = pendingDraftBatchFlow else { return 0 }
+        return draftStore.drafts.filter {
+            selectedDraftIDs.contains($0.id) && $0.status == flow.eligibleStatus
+        }.count
+    }
+
+    private var draftBatchFlowConfirmTitle: String {
+        let flow = pendingDraftBatchFlow
+        return "\(flow?.title ?? "批量操作") \(draftBatchFlowEligibleCount) 条草稿？"
+    }
+
+    private var draftBatchFlowImpactText: String {
+        let flow = pendingDraftBatchFlow
+        let selectedCount = selectedDraftIDs.count
+        let eligible = draftBatchFlowEligibleCount
+        let skipped = selectedCount - eligible
+        var lines: [String] = []
+        switch flow {
+        case .submit:
+            lines.append("将把 \(eligible) 条草稿推进到「待审核」。")
+        case .approve:
+            lines.append("将把 \(eligible) 条待审核草稿审核通过（进入待发布）。")
+        case .publish:
+            lines.append("将发布 \(eligible) 条审核通过的草稿，写入用户可见目录。")
+        case nil:
+            break
+        }
+        if skipped > 0 {
+            lines.append("另有 \(skipped) 条状态不符，将跳过并在结果中说明。")
+        }
+        lines.append("操作只作用于选中的草稿；发布后销售记录照常追加，不会重复生成。")
+        return lines.joined(separator: "\n")
+    }
+
+    private func performDraftBatchFlow() {
+        guard let flow = pendingDraftBatchFlow else { return }
+        pendingDraftBatchFlow = nil
+        let ids = selectedDraftIDs
+        let actionName = flow.title
+        let result: ShopCatalogDraftStore.CatalogBatchFlowResult
+        do {
+            switch flow {
+            case .submit:
+                result = try draftStore.batchAdvance(ids: ids, to: .submitted)
+            case .approve:
+                result = try draftStore.batchAdvance(ids: ids, to: .reviewed)
+            case .publish:
+                result = draftStore.batchPublish(ids: ids, store: store)
+            }
+        } catch {
+            // 权限 / 落盘级失败：整批未生效，走错误弹窗可重试
+            actionError = error.localizedDescription
+            return
+        }
+        // 结果反馈（部分成功绝不静默）：成功 + 跳过进 toast，失败明细进 alert
+        var parts: [String] = ["\(actionName)：成功 \(result.succeededCount) 条"]
+        if !result.skipped.isEmpty {
+            parts.append("跳过 \(result.skipped.count) 条（状态不符 / 已不存在）")
+        }
+        if !result.failures.isEmpty {
+            parts.append("失败 \(result.failures.count) 条")
+        }
+        toast = parts.joined(separator: "，")
+        if !result.failures.isEmpty {
+            let detail = result.failures.map { "「\($0.name)」：\($0.reason)" }
+                .joined(separator: "\n")
+            batchFlowFailureText = detail
+        }
+        selectedDraftIDs.subtract(ids)
+        if selectedDraftIDs.isEmpty || draftStore.drafts.isEmpty {
+            exitDraftSelection()
+        }
+    }
+
     // MARK: 实体管理（V1.1 §4.2：编辑 / 归档 / 引用保护删除）
 
     private var manageSection: some View {
@@ -589,8 +785,10 @@ private struct ShopCatalogDraftEditorRow: View {
     var onToggleSelection: (() -> Void)? = nil
     /// 单条删除回调（仅非多选模式）。nil = 不显示删除按钮
     var onRequestDelete: (() -> Void)? = nil
+    /// 打开补录编辑器。**由外层统一持有 sheet**（见 `OpsSheet` 注释）——
+    /// 行内自持 `@State` + `.sheet` 会在行被复用时把编辑器连同用户已填内容一起重建。
+    var onOpenEditor: (() -> Void)? = nil
 
-    @State private var showsEditor = false
     @State private var showsRejectPrompt = false
     @State private var rejectReasonText = ""
 
@@ -652,11 +850,8 @@ private struct ShopCatalogDraftEditorRow: View {
             if isSelecting {
                 onToggleSelection?()
             } else {
-                showsEditor = true
+                onOpenEditor?()
             }
-        }
-        .sheet(isPresented: $showsEditor) {
-            ShopCatalogDraftDetailEditor(draft: draft, draftStore: draftStore, store: store)
         }
         .alert("驳回原因", isPresented: $showsRejectPrompt) {
             TextField("选填，将展示给补录人", text: $rejectReasonText)
@@ -755,7 +950,8 @@ struct ShopCatalogDraftDetailEditor: View {
         self.store = store
     }
 
-    private let categories = ShopCatalogStore.canonicalCategoryOrder
+    /// 分类候选（计算属性：管理分类后立即生效，含自定义分类与「其他」兜底）
+    private var categories: [String] { ShopCatalogStore.categoryCandidates }
 
     /// 旧口径迁移：存量「现货草稿」（saleKind == .stock 且 price 承载现货价）
     /// 在新编辑器里打开时一次性搬到 stockPrice，price 让位给预约价 ——
@@ -769,6 +965,24 @@ struct ShopCatalogDraftDetailEditor: View {
         draftBox.saleKind = .reservation
     }
 
+    /// 年月文本 → 草稿的 `newSeriesYear` / `newSeriesMonth`（唯一解析口径 `CatalogYearMonthText`）。
+    ///
+    /// 两条口径：
+    ///   · 文本清空 = **显式清除**两个字段（用户把框擦掉就是不要年月了）；
+    ///   · 解析失败**不动已存值** —— 打字途中「2026-」是半成品，那时把已填的月份擦掉
+    ///     会让输入框与存储来回打架；失败只给红字，由用户改到合法为止。
+    private func applyNewSeriesYearMonth(_ text: String) {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            draftBox.newSeriesYear = nil
+            draftBox.newSeriesMonth = nil
+            return
+        }
+        guard let parsed = CatalogYearMonthText.parse(trimmed) else { return }
+        draftBox.newSeriesYear = parsed.year
+        draftBox.newSeriesMonth = parsed.month
+    }
+
     // MARK: 款式（SPU）层状态 —— 全色共用，只填一次
 
     @State private var designNameText = ""
@@ -780,12 +994,20 @@ struct ShopCatalogDraftDetailEditor: View {
     @State private var chartUnit = ""
     @State private var chartImageText = ""
 
+    /// 新建系列的「年月」录入文本（2026-09-24 需求五）：原先是纯「年份」数字框，
+    /// 结果是经这条链路建出来的系列在列表里只有「2026」而没有月份。
+    /// 现在统一走 `CatalogYearMonthText` 的年月口径，与系列编辑页一字不差。
+    @State private var newSeriesYearMonthText = ""
+
     // 价格组（同款同价：按款式录一次，整组落到每条颜色草稿）
-    @State private var reservationPrice: Double?
-    @State private var stockPrice: Double?
-    @State private var deposit: Double?
-    @State private var balance: Double?
-    @State private var currency: CatalogCurrency?
+    // 2026-09-24 需求：金额改为文本状态 + `CatalogAmountText` 统一解析 ——
+    //   · 尾款 = 预约价 − 定金，**自动计算**，实时联动，不再手动输入；
+    //   · 非数字 / 定金大于预约价给出明确红字提示，保存时拦截；
+    //   · 币种默认人民币（旧草稿未标注的回填后也默认人民币，可手动切换）。
+    @State private var reservationPriceText = ""
+    @State private var stockPriceText = ""
+    @State private var depositText = ""
+    @State private var currency: CatalogCurrency? = .cny
 
     // MARK: 颜色（SKU）层状态 —— 每色一行，图片与颜色行强绑定
 
@@ -795,10 +1017,36 @@ struct ShopCatalogDraftDetailEditor: View {
     @State private var toast: String?
     @State private var errorText: String?
 
+    @Environment(\.scenePhase) private var scenePhase
+
+    /// 编辑中快照管家（2026-09-24 状态丢失**根源**修复）。
+    ///
+    /// 原先只有 `loaded` 一次性回填守卫 —— 但 `loaded` 自己是 `@State`，
+    /// 承载编辑器的 sheet 内容视图一旦被重建它就归零，守卫等于失效，用户填的
+    /// 款式名 / 面料 / 价格 / 每个颜色的配色图全部被存储值重新覆盖。
+    /// 真正管用的是不依赖视图生命周期：把未提交的输入落盘，重建后自动恢复。
+    /// scope 在 `onAppear` 里按源草稿 id 定下来。
+    @State private var snapshotKeeper = ShopCatalogFormSnapshotKeeper<ShopCatalogDraftFormSnapshot>(scope: "")
+
     /// 款式名（唯一决议点）：显式填写优先，否则按源草稿商品名派生。
     /// 名字预览与保存落库都读它，避免「看到的」与「存下的」分叉。
     private var resolvedStyleName: String {
         ShopCatalogDraftStyleForm.resolveStyleName(explicit: designNameText, source: draftBox)
+    }
+
+    /// 分类管理入口（2026-09-24 需求）
+    @State private var showsCategoryManage = false
+    @ViewBuilder
+    private var manageCategoriesButton: some View {
+        Button {
+            showsCategoryManage = true
+        } label: {
+            Label("管理分类（新增 / 改名 / 删除）", systemImage: "square.and.pencil")
+                .font(.system(size: 13))
+        }
+        .sheet(isPresented: $showsCategoryManage) {
+            ShopCatalogCategoryManageSheet()
+        }
     }
 
     /// 款式尺码表（列 + 行 + 单位 + 原图；共享解析口径：首列「尺码」剔除、尾冒号清洗）
@@ -824,6 +1072,7 @@ struct ShopCatalogDraftDetailEditor: View {
     var body: some View {
         NavigationStack {
             Form {
+                snapshotNoticeSection
                 // R01：保存失败必须可见。写入失败时内存与磁盘都没变，
                 // 用户原地再改一次即可重试，不能让用户以为已经存好了。
                 if let failure = draftStore.lastPersistenceError {
@@ -858,6 +1107,9 @@ struct ShopCatalogDraftDetailEditor: View {
                         ForEach(categories.filter { $0 != "其他" }, id: \.self) { Text($0).tag($0) }
                         Text("其他").tag("其他")
                     }
+                    // 分类管理入口（2026-09-24 需求）：新增 / 改名 / 删除分类，
+                    // 删除带二次确认；改后候选立即生效
+                    manageCategoriesButton
                 } header: {
                     Text("商品（款式）")
                 } footer: {
@@ -882,15 +1134,25 @@ struct ShopCatalogDraftDetailEditor: View {
                     Picker("关联系列", selection: $draftBox.seriesID) {
                         Text("新建系列").tag(String?.none)
                         ForEach(store.seriesSortedByName()) { series in
-                            Text(series.name).tag(String?.some(series.id))
+                            // 与系列列表同口径展示年月（2026-09-24 需求五）：
+                            // 少一个月就能在这条选择器里一眼看出来
+                            Text(series.yearMonthText.map { "\($0) · \(series.name)" } ?? series.name)
+                                .tag(String?.some(series.id))
                         }
                     }
                     if draftBox.seriesID == nil {
                         TextField("新系列名称", text: $draftBox.newSeriesName)
                         HStack {
-                            TextField("年份", value: $draftBox.newSeriesYear, format: .number.grouping(.never))
-                                .keyboardType(.numberPad)
+                            TextField("年月（如 2026-10）", text: $newSeriesYearMonthText)
+                                .onChange(of: newSeriesYearMonthText) { _, text in
+                                    applyNewSeriesYearMonth(text)
+                                }
                             TextField("季节（如 冬）", text: $draftBox.newSeriesSeason)
+                        }
+                        if let error = CatalogYearMonthText.validationErrorText(for: newSeriesYearMonthText) {
+                            Text(error)
+                                .font(.system(size: 11))
+                                .foregroundStyle(.red)
                         }
                     }
                 }
@@ -905,9 +1167,29 @@ struct ShopCatalogDraftDetailEditor: View {
             .onAppear {
                 guard !loaded else { return }
                 loaded = true
+                snapshotKeeper.scope = Self.snapshotScope(sourceDraftID: draftBox.id)
                 store.loadFromBundleIfNeeded()
                 migrateLegacySaleKindIfNeeded()
                 loadStyleForm()
+                // 在「按存储值填好的默认态」之上，再用快照恢复用户离开前的未保存编辑。
+                // 两者逐字段相同 → 说明上次没改什么，快照会被直接丢弃（不弹无意义提示）。
+                snapshotKeeper.restoreOrDiscard(defaults: makeSnapshot()) { applySnapshot($0) }
+            }
+            // ── 编辑中快照（2026-09-24 状态丢失根源修复）─────────────────────────
+            // 三处「页面即将离开」的时机各立即落盘一次；再叠一层「改一下就存一下」
+            // 的防抖落盘 —— 跳系统相册返回不会走 onDisappear，只有这层兜得住。
+            .onChange(of: scenePhase) { _, phase in
+                guard phase != .active else { return }
+                snapshotKeeper.flush(makeSnapshot())
+            }
+            .onReceive(NotificationCenter.default.publisher(for: UIApplication.didEnterBackgroundNotification)) { _ in
+                snapshotKeeper.flush(makeSnapshot())
+            }
+            .onChange(of: makeSnapshot()) { _, snapshot in
+                snapshotKeeper.schedule(snapshot)
+            }
+            .onDisappear {
+                snapshotKeeper.flush(makeSnapshot())
             }
             .overlay(alignment: .bottom) {
                 if let toast {
@@ -1002,38 +1284,37 @@ struct ShopCatalogDraftDetailEditor: View {
             HStack {
                 Text("预约价")
                 Spacer()
-                TextField("可空", value: $reservationPrice, format: .number)
+                TextField("可空", text: $reservationPriceText)
                     .keyboardType(.decimalPad)
                     .multilineTextAlignment(.trailing)
                     .frame(width: 110)
             }
-            if reservationPrice != nil {
+            if hasReservationPrice {
                 HStack {
                     Text("定金")
                     Spacer()
-                    TextField("可空", value: $deposit, format: .number)
+                    TextField("可空", text: $depositText)
                         .keyboardType(.decimalPad)
                         .multilineTextAlignment(.trailing)
                         .frame(width: 110)
                 }
+                // 尾款（2026-09-24 需求）：自动计算 = 预约价 − 定金，实时联动，
+                // 不再提供输入框（历史上手输尾款常与预约价对不上账）
                 HStack {
                     Text("尾款")
                     Spacer()
-                    TextField("可空", value: $balance, format: .number)
-                        .keyboardType(.decimalPad)
-                        .multilineTextAlignment(.trailing)
-                        .frame(width: 110)
-                }
-                if let issue = depositBalanceIssue {
-                    Text(issue)
-                        .font(.system(size: 12))
-                        .foregroundStyle(.red)
+                    if let b = computedBalance {
+                        Text(displayAmount(b))
+                            .foregroundStyle(b < 0 ? Color.red : Color.primary)
+                    } else {
+                        Text("—").foregroundStyle(.secondary)
+                    }
                 }
             }
             HStack {
                 Text("现货价")
                 Spacer()
-                TextField("可空", value: $stockPrice, format: .number)
+                TextField("可空", text: $stockPriceText)
                     .keyboardType(.decimalPad)
                     .multilineTextAlignment(.trailing)
                     .frame(width: 110)
@@ -1044,17 +1325,55 @@ struct ShopCatalogDraftDetailEditor: View {
                     Text(item.displayName).tag(CatalogCurrency?.some(item))
                 }
             }
+            // 异常输入提示（非数字 / 定金大于预约价），实时红字，保存时同样拦截
+            ForEach(Array(priceInputIssues.enumerated()), id: \.offset) { _, issue in
+                Text(issue)
+                    .font(.system(size: 12))
+                    .foregroundStyle(.red)
+            }
         } header: {
             Text("价格（同款同价，按款式录一次）")
         } footer: {
-            Text("至少填写预约价或现货价之一；现货价可先空置，后续通过补录追加。价格整组写入本款每条颜色草稿。")
+            Text("至少填写预约价或现货价之一；尾款 = 预约价 − 定金，自动计算。价格整组写入本款每条颜色草稿。")
         }
     }
 
-    private var depositBalanceIssue: String? {
-        guard let r = reservationPrice, let d = deposit, let b = balance else { return nil }
-        return Decimal(d) + Decimal(b) == Decimal(r)
-            ? nil : "定金 \(Int(d)) + 尾款 \(Int(b)) ≠ 预约价 \(Int(r))"
+    // MARK: 价格组派生（2026-09-24 需求，口径在 CatalogAmountText 可单测）
+
+    /// 预约价是否「在填」：文本非空即算（含非法输入 —— 此时红字提示 + 保存拦截）
+    private var hasReservationPrice: Bool {
+        !reservationPriceText.trimmingCharacters(in: .whitespaces).isEmpty
+    }
+
+    private var parsedReservation: Double? { CatalogAmountText.parse(reservationPriceText) }
+    private var parsedDeposit: Double? { CatalogAmountText.parse(depositText) }
+    private var parsedStock: Double? { CatalogAmountText.parse(stockPriceText) }
+
+    /// 尾款 = 预约价 − 定金（定金缺省按 0）；未填预约价 → nil
+    private var computedBalance: Double? {
+        CatalogAmountText.balance(reservation: parsedReservation, deposit: parsedDeposit)
+    }
+
+    /// 异常输入清单：非数字（各字段）+ 定金大于预约价
+    private var priceInputIssues: [String] {
+        var issues: [String] = []
+        if let issue = CatalogAmountText.validationErrorText(for: reservationPriceText, label: "预约价") {
+            issues.append(issue)
+        }
+        if let issue = CatalogAmountText.validationErrorText(for: depositText, label: "定金") {
+            issues.append(issue)
+        }
+        if let issue = CatalogAmountText.validationErrorText(for: stockPriceText, label: "现货价") {
+            issues.append(issue)
+        }
+        if let r = parsedReservation, let d = parsedDeposit, d > r {
+            issues.append("定金（\(displayAmount(d))）不能大于预约价（\(displayAmount(r))）")
+        }
+        return issues
+    }
+
+    private func displayAmount(_ value: Double) -> String {
+        CatalogAmountText.displayText(value)
     }
 
     // MARK: 颜色（SKU）—— 图片与颜色行强绑定
@@ -1159,6 +1478,83 @@ struct ShopCatalogDraftDetailEditor: View {
         }
     }
 
+    // MARK: 编辑中快照（切后台 / 相册选图 / 切应用返回后不丢内容）
+
+    /// 快照作用域：**一条源草稿一份**（同一款式家族的其它颜色各自有自己的编辑器会话）。
+    private static func snapshotScope(sourceDraftID: String) -> String {
+        "draft-form-\(sourceDraftID)"
+    }
+
+    /// 把当前整页表单组装成快照（唯一组装口径）。
+    private func makeSnapshot() -> ShopCatalogDraftFormSnapshot {
+        ShopCatalogDraftFormSnapshot(
+            sourceDraftID: draftBox.id,
+            designNameText: designNameText,
+            categoryText: categoryText,
+            fabricText: fabricText,
+            styleDescriptionText: styleDescriptionText,
+            chartColumnsText: chartColumnsText,
+            chartRowsText: chartRowsText,
+            chartUnit: chartUnit,
+            chartImageText: chartImageText,
+            newSeriesYearMonthText: newSeriesYearMonthText,
+            reservationPriceText: reservationPriceText,
+            stockPriceText: stockPriceText,
+            depositText: depositText,
+            currency: currency,
+            colors: colors)
+    }
+
+    /// 把快照写回表单（唯一恢复口径）。颜色行连同每色的配色图引用一起恢复 ——
+    /// 「已选封面图 / 配色图」就是靠这一项保住的。
+    private func applySnapshot(_ snapshot: ShopCatalogDraftFormSnapshot) {
+        designNameText = snapshot.designNameText
+        categoryText = snapshot.categoryText
+        fabricText = snapshot.fabricText
+        styleDescriptionText = snapshot.styleDescriptionText
+        chartColumnsText = snapshot.chartColumnsText
+        chartRowsText = snapshot.chartRowsText
+        chartUnit = snapshot.chartUnit
+        chartImageText = snapshot.chartImageText
+        newSeriesYearMonthText = snapshot.newSeriesYearMonthText
+        reservationPriceText = snapshot.reservationPriceText
+        stockPriceText = snapshot.stockPriceText
+        depositText = snapshot.depositText
+        currency = snapshot.currency
+        colors = snapshot.colors
+    }
+
+    /// 用户主动放弃恢复出来的未提交编辑：清快照 + 回到存储值
+    private func discardRestoredSnapshot() {
+        snapshotKeeper.discard()
+        loadStyleForm()
+        toast = "已放弃上次未保存的编辑"
+    }
+
+    /// 「已恢复未保存编辑」提示条：不静默恢复，且给一条一键放弃的路
+    @ViewBuilder
+    private var snapshotNoticeSection: some View {
+        if snapshotKeeper.didRestore {
+            Section {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("已恢复上次未保存的编辑")
+                        .font(.system(size: 13, weight: .semibold))
+                    Text("离开页面时（切后台 / 去相册选图 / 切到其他应用）自动保留了这里的内容，包括每个颜色已选的配色图。")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                    HStack(spacing: 12) {
+                        Button("知道了") { snapshotKeeper.markRestoreAcknowledged() }
+                            .font(.system(size: 13))
+                        Button("放弃修改", role: .destructive) { discardRestoredSnapshot() }
+                            .font(.system(size: 13))
+                    }
+                }
+            } footer: {
+                Text("「放弃修改」只清掉这份未保存的内容，不会动草稿箱里的数据。")
+            }
+        }
+    }
+
     // MARK: 加载 / 保存
 
     /// 读入表单：款式层取源草稿，颜色行取**本款全部草稿**（源草稿排第一位）。
@@ -1169,6 +1565,8 @@ struct ShopCatalogDraftDetailEditor: View {
         categoryText = source.category
         fabricText = source.fabric ?? ""
         styleDescriptionText = source.styleDescription ?? ""
+        newSeriesYearMonthText = CatalogYearMonthText.displayText(year: source.newSeriesYear,
+                                                                 month: source.newSeriesMonth) ?? ""
         if let chart = source.sizeChart {
             chartColumnsText = chart.columns.joined(separator: ",")
             chartRowsText = chart.rows
@@ -1177,11 +1575,12 @@ struct ShopCatalogDraftDetailEditor: View {
             chartUnit = chart.unit ?? ""
             chartImageText = chart.sourceImage ?? ""
         }
-        reservationPrice = source.effectiveReservationPrice
-        stockPrice = source.effectiveStockPrice
-        deposit = source.deposit
-        balance = source.balance
-        currency = source.currency
+        reservationPriceText = source.effectiveReservationPrice.map { CatalogAmountText.displayText($0) } ?? ""
+        stockPriceText = source.effectiveStockPrice.map { CatalogAmountText.displayText($0) } ?? ""
+        depositText = source.deposit.map { CatalogAmountText.displayText($0) } ?? ""
+        // 币种默认人民币（2026-09-24 需求）：新草稿与未标注币种的旧草稿都默认 CNY，
+        // 用户可手动切换；显式标注过其他币种的草稿原样保留
+        currency = source.currency ?? .cny
         let family = ShopCatalogDraftStyleForm.sameStyleFamily(of: source, in: draftStore.drafts)
         colors = ShopCatalogDraftStyleForm.rows(of: family, sourceID: source.id)
         if colors.isEmpty {
@@ -1192,10 +1591,19 @@ struct ShopCatalogDraftDetailEditor: View {
 
     /// 「完成」= 整款一次落盘（款式公共资料 + 全部颜色 SKU）
     private func saveStyleForm() {
+        // 异常价格输入（非数字 / 定金大于预约价）先拦下，不落盘（2026-09-24 需求）
+        let issues = priceInputIssues
+        guard issues.isEmpty else {
+            errorText = issues.joined(separator: "\n")
+            return
+        }
         do {
             let result = try draftStore.applyStyleForm(sourceDraftID: draftBox.id,
                                                        style: styleInput(),
                                                        colors: colors)
+            // 整款已落盘 = 这一份内容已提交：清掉编辑中快照，避免下次进来把刚保存的
+            // 内容又当成「未保存的编辑」恢复出来。
+            snapshotKeeper.commit(makeSnapshot())
             toast = summary(for: result)
             dismiss()
         } catch {
@@ -1210,10 +1618,11 @@ struct ShopCatalogDraftDetailEditor: View {
         style.fabric = fabricText
         style.styleDescription = styleDescriptionText
         style.sizeChart = composedChart
-        style.reservationPrice = reservationPrice
-        style.stockPrice = stockPrice
-        style.deposit = deposit
-        style.balance = balance
+        // 尾款 = 预约价 − 定金（自动计算，2026-09-24 需求）；预约价未填 → balance 一并 nil
+        style.reservationPrice = parsedReservation
+        style.stockPrice = parsedStock
+        style.deposit = parsedDeposit
+        style.balance = computedBalance
         // 档期本表单不编辑，原样透传 —— 避免保存一次就把已有档期抹掉
         style.startAt = draftBox.startAt
         style.endAt = draftBox.endAt
@@ -1224,6 +1633,7 @@ struct ShopCatalogDraftDetailEditor: View {
         style.seriesID = draftBox.seriesID
         style.newSeriesName = draftBox.newSeriesName
         style.newSeriesYear = draftBox.newSeriesYear
+        style.newSeriesMonth = draftBox.newSeriesMonth
         style.newSeriesSeason = draftBox.newSeriesSeason
         style.batchID = draftBox.batchID
         return style

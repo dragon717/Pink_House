@@ -151,6 +151,8 @@ struct BookShelfContentView: View {
                     .padding(24)
                     .animation(.default, value: editableBooks)
                 }
+                // 底部悬浮 Dock 避让（编辑态）。正常态走 BookGridView 自己的避让，不要在此 Group 上加，会重复。
+                .avoidingBottomDock()
             } else if isBatchEditingBooks {
                 batchBookGridContent
             } else {
@@ -198,6 +200,8 @@ struct BookShelfContentView: View {
             .padding(24)
             .animation(.default, value: selectedBookIDs)
         }
+        // 底部悬浮 Dock 避让（批量态）。
+        .avoidingBottomDock()
     }
 
     private func batchEditingBookCell(for book: BookGroup) -> some View {

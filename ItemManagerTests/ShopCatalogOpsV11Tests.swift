@@ -276,10 +276,11 @@ final class ShopCatalogOpsV11Tests: XCTestCase {
         store.reloadWithOverlay()
         XCTAssertNil(store.catalog?.products.first { $0.id == product.id }, "物理删除后应移除")
 
-        // 种子商品（Bundle 只读）→ 删除被拦截，仅归档
-        let seedProduct = try XCTUnwrap(store.catalog?.products.first { $0.id == "prod-ag-xueguo-jsk" })
+        // 种子商品（合成种子基底，Bundle 只读语义）→ 删除被拦截，仅归档
+        let seedStore = ShopCatalogSeedFixture.makeStore()
+        let seedProduct = try XCTUnwrap(seedStore.catalog?.products.first { $0.id == "prod-ag-xueguo-jsk" })
         XCTAssertThrowsError(try ShopCatalogDraftStore.deleteProduct(
-            seedProduct, store: store, modelContext: context)) { error in
+            seedProduct, store: seedStore, modelContext: context)) { error in
             guard case ShopCatalogEntityError.seedImmutableOnlyArchive = error else {
                 return XCTFail("应抛 seedImmutableOnlyArchive，实际：\(error)")
             }

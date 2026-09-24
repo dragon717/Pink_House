@@ -19,7 +19,6 @@ import XCTest
 @MainActor
 final class ShopCatalogStoreTests: XCTestCase {
 
-    private let store = ShopCatalogStore()
     /// 演示数据锚点：预约期 2026-09-10 ~ 09-28，现货 2026-11-01 起
     private var now: Date {
         var c = DateComponents()
@@ -37,19 +36,23 @@ final class ShopCatalogStoreTests: XCTestCase {
 
     @discardableResult
     private func loadedStore() -> ShopCatalogStore {
-        let s = ShopCatalogStore()
-        XCTAssertNotNil(s.loadFromBundleIfNeeded(), "Bundle 内应存在 shop-catalog.json")
+        // 种子已连根清理（2026-09-24）：演示数据锚点改由合成种子夹具提供（同 id 同字段）
+        let s = ShopCatalogSeedFixture.makeStore()
+        XCTAssertNotNil(s.catalog, "合成种子应能直接构建")
         return s
     }
 
     // MARK: 加载
 
-    func testBundleCatalogLoads() throws {
-        let s = loadedStore()
+    func testBundleCatalogLoadsEmptyAfterSeedCleanup() throws {
+        // 空种子契约：Bundle 仍要能正常加载（不白屏），且不再内置任何店家数据
+        let s = ShopCatalogStore()
+        XCTAssertNotNil(s.loadFromBundleIfNeeded(), "Bundle 内应存在 shop-catalog.json")
         let catalog = try XCTUnwrap(s.catalog)
-        XCTAssertGreaterThanOrEqual(catalog.shops.count, 2)
-        XCTAssertGreaterThanOrEqual(catalog.series.count, 3)
-        XCTAssertGreaterThanOrEqual(catalog.products.count, 6)
+        XCTAssertTrue(catalog.shops.isEmpty, "种子店家应已连根清理")
+        XCTAssertTrue(catalog.series.isEmpty)
+        XCTAssertTrue(catalog.products.isEmpty)
+        XCTAssertTrue(catalog.saleEvents.isEmpty)
         XCTAssertEqual(s.status, .loaded)
     }
 
@@ -165,5 +168,31 @@ final class ShopCatalogStoreTests: XCTestCase {
 
         // 演示数据引用的 Bundle 图（复用时光馆画册图）应能解析到
         XCTAssertNotNil(ShopCatalogImageResolver.url(for: asset.originalURL))
+    }
+
+    // MARK: 年份筛选口径（2026-09-24 店主页「年份死区」回归）
+
+    /// 店主页年份 chip 的筛选数据源必须是**全量系列**（`series(inShop:)`），
+    /// 不能用 `archiveSeries`（= 全量 − 当前上新）：正在上新的系列会被排除，
+    /// 在它自己标注的年份下永远查不到（用户实测：系列填年月 2026-4、现货在售，
+    /// 点「2026」chip 却显示「该年份暂无收录系列」）。
+    /// 「当前上新」是活动维度，年份是档案维度，两者正交。
+    func testYearFilterCoversOngoingSeries() {
+        let s = loadedStore()
+        let now = self.now
+        // fixture 锚点：雪国来信 year=2026，预约 2026-09-10 ~ 09-28 在 now 时 ongoing
+        let seriesID = "series-ag-xueguo-2026"
+        XCTAssertTrue(
+            s.currentSeries(inShop: "shop-alice-girl", now: now).contains { $0.id == seriesID },
+            "前置：该系列正在上新（锚点失效请检查 fixture 销售事件）")
+        XCTAssertFalse(
+            s.archiveSeries(inShop: "shop-alice-girl", now: now).contains { $0.id == seriesID },
+            "前置：archiveSeries 会把在售系列排除——这正是当年份死区的来源")
+        // 修复后的年份筛选口径（店主页 visibleSeries 的 .year 分支同语义）
+        let yearFiltered = s.series(inShop: "shop-alice-girl").filter { $0.year == 2026 }
+        XCTAssertTrue(
+            yearFiltered.contains { $0.id == seriesID },
+            "年份筛选必须能看到正在上新的系列（不能用 archiveSeries 过滤）")
+        XCTAssertTrue(s.years(inShop: "shop-alice-girl").contains(2026))
     }
 }

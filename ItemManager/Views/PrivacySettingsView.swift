@@ -96,6 +96,8 @@ struct PrivacySettingsView: View {
             }
         }
         .scrollContentBackground(.hidden)
+        // 底部悬浮 Dock 避让：权限说明最后一段会被 Dock 盖住。
+        .avoidingBottomDock()
         .background {
             LiquidBackground()
         }

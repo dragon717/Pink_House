@@ -21,8 +21,8 @@ final class ShopCatalogPhase456Tests: XCTestCase {
         super.setUp()
         // 存储重定向到临时目录：测试不得触碰用户真实沙盒（2026-09-21 事故防线）
         ShopCatalogStorage.useTemporaryForTesting()
-        store = ShopCatalogStore()
-        XCTAssertNotNil(store.loadFromBundleIfNeeded())
+        // 种子已连根清理（2026-09-24）：原种子夹具改由测试注入
+        store = ShopCatalogSeedFixture.makeStore()
         // 测试环境无 iCloud 白名单：注入创作者角色（§26 服务层校验的测试路径）
         CreatorAccess.setTestOverride(.creator)
     }

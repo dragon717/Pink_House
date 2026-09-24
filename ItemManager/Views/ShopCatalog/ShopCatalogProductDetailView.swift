@@ -14,11 +14,16 @@
 //      `ShopCatalogTitleResolver` + `ShopCatalogProductTitleLabel`。
 //    · 尺码表卡：结构化表格常显 + **原图折叠区**（默认收起，仅一个入口；Request D / §15）
 //    · 价格档案卡：预约价（含定金）/ 现货价 / 差价（§13）
-//    · 操作区按预约状态条件渲染：
-//      预约中 → 【加入心愿】主按钮 + 我已经预约（§16-17）
+//    · 操作区按购买阶段条件渲染（分支口径唯一来源 = `ShopCatalogWardrobeEntryPolicy`）：
+//      预约中 → 【加入衣橱】→ 选择弹窗（定金+尾款 / 预约价全款预约）+【加入心愿】次按钮
 //      预约未开始 → 【加入心愿】（实际作用 = 开售提醒）
-//      现货在售 → 【加入少女衣橱】（不提供加入心愿）
-//      预约已结束 → 置灰【预约已结束】标签；有现货则引导加入衣橱购现货
+//      预约已结束 → 置灰【预约已结束】标签 +【加入衣橱】→ 选择弹窗（默认全款）
+//      尾款中 → 置灰【尾款中】标签 +【加入衣橱】→ 选择弹窗（默认定金+尾款 = 补尾款）
+//      现货在售 → 【加入衣橱】→ 选择弹窗，**仅全款**、两个价格口径（按预约价 / 按现货价）
+//      ⚠️ 四个阶段都**不得静默默认**一种付款方式直接落库，也不隐藏 / 置灰任何候选
+//
+//  2026-09-24 需求（加购分支按阶段区分）：现货阶段补齐「仅全款 + 两个价格口径」，
+//  详见 docs/加购分支与现货阶段全款口径_需求实现说明.md
 //
 
 import SwiftUI
@@ -49,6 +54,25 @@ struct ShopCatalogProductView: View {
     private var series: CatalogSeries? { product.map { store.series(id: $0.seriesID) } ?? nil }
     private var shop: CatalogShop? { series.map { store.shop(id: $0.shopID) } ?? nil }
 
+    // MARK: 轮播 / 卡片的重叠几何（唯一口径）
+    //
+    //  详情页的视觉设计是「卡片压住图片下沿」：轮播之后的每张卡片都靠 `.offset(y:)`
+    //  整体上提，于是卡片顶边落在轮播底边**之上**。轮播底部那两个悬浮标注
+    //  （颜色胶囊、分页胶囊）也是底对齐的 —— 如果不把它们抬到卡片顶边之上，
+    //  就会被半埋进卡片顶边、并压住标题首行（2026-09-24 截图标注的遮挡问题）。
+    //
+    //  卡片顶边相对轮播底边的位置 = 上提量 − 卡片间距，所以标注的留白必须大于它。
+
+    /// 卡片相对轮播的上提量（`.offset(y:)`），5 张卡片统一使用。
+    private static let cardLiftOverCarousel: CGFloat = 36
+    /// 轮播与卡片之间的 VStack 间距。
+    private static let cardStackSpacing: CGFloat = 16
+    /// 轮播底部悬浮标注（颜色胶囊 / 分页胶囊）距轮播底边的留白：
+    /// 上提量 − 间距 + 12 视觉间隙，保证标注整体落在图片区内、不碰卡片顶边与标题。
+    private static var carouselOverlayBottomInset: CGFloat {
+        cardLiftOverCarousel - cardStackSpacing + 12
+    }
+
     /// 图集引用：product.images 存的是 CatalogAsset id，经 originalURL 解析
     private var imageReferences: [String] {
         guard let product else { return [] }
@@ -61,26 +85,29 @@ struct ShopCatalogProductView: View {
                 .ignoresSafeArea()
 
             ScrollView(.vertical, showsIndicators: false) {
-                VStack(spacing: 16) {
+                VStack(spacing: Self.cardStackSpacing) {
                     carousel
                     mainInfoCard
                         .padding(.horizontal)
-                        .offset(y: -36)
+                        .offset(y: -Self.cardLiftOverCarousel)
                     sizeChartCard
                         .padding(.horizontal)
-                        .offset(y: -36)
+                        .offset(y: -Self.cardLiftOverCarousel)
                     seriesPriceChartCard
                         .padding(.horizontal)
-                        .offset(y: -36)
+                        .offset(y: -Self.cardLiftOverCarousel)
                     priceArchiveCard
                         .padding(.horizontal)
-                        .offset(y: -36)
+                        .offset(y: -Self.cardLiftOverCarousel)
                     actionSection
                         .padding(.horizontal)
-                        .offset(y: -36)
+                        .offset(y: -Self.cardLiftOverCarousel)
                     Color.clear.frame(height: 24)
                 }
             }
+            // 底部悬浮 Dock 避让：本页从「时光馆 → 店家上新」是 push（会看到 Dock），
+            // 底部操作区「加入衣橱」会被 Dock 盖住；从系列菜单 sheet 进入时环境值为 0，自动无副作用。
+            .avoidingBottomDock()
             .ignoresSafeArea(edges: .top)
         }
         .navigationTitle("商品详情")
@@ -180,6 +207,7 @@ struct ShopCatalogProductView: View {
                 .frame(height: 400)
 
                 // 颜色标注：当前 slide 对应的颜色（同款不同色滑动切换时的定位提示）
+                // 与分页胶囊共用同一条底边留白，否则两者会各自半埋进卡片顶边。
                 if let colorLabel = carouselSlides.indices.contains(carouselIndex)
                     ? carouselSlides[carouselIndex].colorLabel : nil {
                     HStack {
@@ -192,6 +220,7 @@ struct ShopCatalogProductView: View {
                             .padding(.leading, 12)
                         Spacer()
                     }
+                    .padding(.bottom, Self.carouselOverlayBottomInset)
                 }
 
                 HStack(spacing: 4) {
@@ -205,7 +234,7 @@ struct ShopCatalogProductView: View {
                 .padding(.horizontal, 12)
                 .padding(.vertical, 6)
                 .background(Capsule().fill(Color.black.opacity(0.5)))
-                .padding(.bottom, 12)
+                .padding(.bottom, Self.carouselOverlayBottomInset)
             }
         }
     }
@@ -757,26 +786,53 @@ struct ShopCatalogProductView: View {
 
     @Environment(\.modelContext) private var modelContext
     @State private var showsReservationSheet = false
-    /// 加购弹窗口径（付定金 / 全款）
+    /// 加购弹窗口径（付定金 / 全款）；`showsEntryChoice = true` 时它是弹窗内的**默认选中项**
     @State private var entryOption: ShopCatalogWardrobeEntryOption = .depositPaid
-    /// 「其他记账方式」折叠区展开状态（需求二：预约已结束时定金 + 尾款收在这里）
-    @State private var showsOtherEntryOptions = false
+    /// 弹窗是否显示「加入方式」选择段（2026-09-24：预约中 / 预约已结束统一入口）
+    @State private var showsEntryChoice = false
     @State private var actionToast: String?
 
     /// 打开加购确认页（金额一律由系统从后台档案读取，用户不填写）
-    private func openEntrySheet(_ option: ShopCatalogWardrobeEntryOption) {
-        // 没有预约价档案时无法按预约口径记账 → 退回现货加购（多选确认页）
-        if option != .wishlist, !hasReservationPrice {
+    ///
+    /// `showsChoice = true`：阶段化统一入口 —— 弹窗内先展示「加入方式」选择段
+    /// （候选按阶段规则给出 + 默认选中），用户选定并确认后才落库；
+    /// `showsChoice = false`：单口径直达（金额预览 + 确认）。
+    private func openEntrySheet(_ option: ShopCatalogWardrobeEntryOption, showsChoice: Bool = false) {
+        // 该口径取数所需的价格档案不存在 → 退回现货加购（多选确认页），
+        // 不让用户点进一个必然「没有价格可记」的弹窗。
+        let needsReservationPrice = option == .depositPaid || option == .fullPaid
+        let needsStockPrice = option == .fullStockPaid
+        if (needsReservationPrice && !hasReservationPrice) || (needsStockPrice && !hasStockPrice) {
             showsMergeSheet = true
             return
         }
         entryOption = option
+        showsEntryChoice = showsChoice
         showsReservationSheet = true
     }
 
     /// 后台是否有预约价（定金 / 尾款的来源）
     private var hasReservationPrice: Bool {
         (store.priceArchive(forProduct: productID).currentReservationPrice ?? 0) > 0
+    }
+
+    /// 后台是否有现货价（现货阶段「按现货价全款加入」的取数来源）
+    private var hasStockPrice: Bool {
+        (store.priceArchive(forProduct: productID).currentStockPrice ?? 0) > 0
+    }
+
+    /// 该阶段是否要弹「加入方式」选择弹窗，以及默认选中哪一项。
+    ///
+    /// 唯一口径在 `ShopCatalogWardrobeEntryPolicy.defaultChoiceOption`，视图只做透传 ——
+    /// 返回 nil = 该阶段没有可选项（无价格档案等），走各自的原路径。
+    private func choiceDefault(
+        for phase: ShopCatalogPurchasePhase
+    ) -> ShopCatalogWardrobeEntryOption? {
+        ShopCatalogWardrobeEntryPolicy.defaultChoiceOption(
+            phase: phase,
+            hasReservationPrice: hasReservationPrice,
+            hasStockPrice: hasStockPrice
+        )
     }
 
     /// 该商品是否已进入心愿 / 尾款 / 衣橱（按 catalogProductID 关联现有数据）
@@ -811,23 +867,25 @@ struct ShopCatalogProductView: View {
                 if let product {
                     switch purchasePhase(for: product.id) {
                     case .reservationActive:
-                        // 预约期内（需求 N §II 场景一）：加入心愿 / 付定金加购 / 全款加购
-                        // 付定金 → 衣橱「已付定」+ 心愿尾款自动生成待补任务（尾款读后台）
-                        // 全款   → 衣橱「已全款」，绝不生成心愿尾款任务
-                        primaryButton(title: "加入心愿", symbol: "heart.fill") {
-                            addToWishlist(reminder: false)
-                        }
-                        if hasReservationPrice {
-                            secondaryAction(
-                                title: ShopCatalogWardrobeEntryPolicy.buttonTitle(for: .depositPaid, phase: .reservationActive),
-                                symbol: "calendar.badge.clock"
-                            ) { openEntrySheet(.depositPaid) }
-                            secondaryAction(
-                                title: ShopCatalogWardrobeEntryPolicy.buttonTitle(for: .fullPaid, phase: .reservationActive),
-                                symbol: "checkmark.seal.fill"
-                            ) { openEntrySheet(.fullPaid) }
-                            statusCaption("预约中：付定金 → 心愿尾款等补款；付全款 → 直接记为已全款，不会生成尾款任务")
+                        // 预约中（2026-09-24 需求）：主按钮 =【加入衣橱】→ 选择弹窗
+                        //   · 两个选项：「加入心愿尾款（定金+尾款）」（**默认选中**）/
+                        //     「预约价全款预约」；不得静默默认付款方式，必须选定并确认
+                        //   · 弹窗内金额预览随所选口径联动（定金+尾款 vs 预约价全款）
+                        // 【加入心愿】保留为次按钮（只收藏不开计划的能力不剥夺）
+                        if let defaultOption = choiceDefault(for: .reservationActive) {
+                            primaryButton(title: "加入衣橱", symbol: "tshirt.fill") {
+                                openEntrySheet(defaultOption, showsChoice: true)
+                            }
+                            statusCaption("预约中：默认按「定金+尾款」记账，也可切换为预约价全款，在下一步弹窗中选择"
+                                + reservationWindowCaptionSuffix
+                                + balanceDueCaptionSuffix)
+                            secondaryAction(title: "加入心愿", symbol: "heart.fill") {
+                                addToWishlist(reminder: false)
+                            }
                         } else {
+                            primaryButton(title: "加入心愿", symbol: "heart.fill") {
+                                addToWishlist(reminder: false)
+                            }
                             statusCaption("预约中：加入心愿后，到「心愿尾款」随时准备付定金或尾款")
                         }
                     case .reservationUpcoming:
@@ -837,27 +895,40 @@ struct ShopCatalogProductView: View {
                         }
                         statusCaption("预约未开始：加入后将作为开售提醒，到点通知你来买")
                     case .inStock:
-                        // 现货在售：不提供加入心愿，直接入库
-                        primaryButton(title: "加入少女衣橱", symbol: nil) {
-                            showsMergeSheet = true
+                        // 现货阶段（2026-09-24 需求）：定金 + 尾款阶段已经结束，**只提供全款**，
+                        // 但两个价格口径由用户选：
+                        //   ① 按预约价全款加入（`fullPaid`）② 按现货价全款加入（`fullStockPaid`）
+                        // 两个选项都记为衣橱「已全款」、都不生成心愿尾款任务，
+                        // 差别只在入橱金额取自哪份价格档案 —— 因此也不能静默默认，必须弹窗选定。
+                        if let defaultOption = choiceDefault(for: .inStock) {
+                            primaryButton(title: "加入衣橱", symbol: "tshirt.fill") {
+                                openEntrySheet(defaultOption, showsChoice: true)
+                            }
+                            statusCaption("现货在售：仅按全款加入，可按预约价或现货价记清，在下一步弹窗中选择")
+                        } else {
+                            primaryButton(title: "加入少女衣橱", symbol: nil) {
+                                showsMergeSheet = true
+                            }
+                            statusCaption("现货在售：可直接加入衣橱留存搭配")
                         }
-                        statusCaption("现货在售：可直接加入衣橱留存搭配")
                     case .reservationEnded:
-                        // 预约已结束（需求 N §II 场景二 × 需求二 §二 业务背景）：
-                        //   · 主按钮 =【加入衣橱】→ 全款（后台预约价）→ 衣橱「已全款」，无尾款任务（**默认引导**）
-                        //   · 【加入心愿尾款】→ 定金 + 尾款，收进「其他记账方式」折叠区
-                        //
-                        // ⚠️ 2026-09-23 用户拍板：结束后**只改变默认 UI 引导，不剥夺记账能力**。
-                        //    「官方补款期 / 只交过定金 / 闲鱼全款收转单」这些情形仍必须能记定金 + 尾款。
-                        //    因此这里只是把入口降级为折叠项——**禁止改成彻底隐藏或置灰**。
+                        // 预约已结束（2026-09-24 需求）：主按钮 =【加入衣橱】→ 选择弹窗
+                        //   · 两个选项：「加入心愿尾款（定金+尾款）」/「预约价全款预约」
+                        //     （**默认选中**全款——结束后多数是整笔补齐）；
+                        //     两个选项在弹窗内同屏可选，不隐藏、不置灰 ——
+                        //     「官方补款期 / 只交过定金 / 闲鱼全款收转单」仍能记定金 + 尾款
+                        //     （2026-09-23「只改引导不剥夺能力」的裁定继续成立，形态从折叠区升级为选择弹窗）
                         endedTag
-                        if hasReservationPrice {
+                        if let defaultOption = choiceDefault(for: .reservationEnded) {
                             primaryButton(
-                                title: ShopCatalogWardrobeEntryPolicy.buttonTitle(for: .fullPaid, phase: .reservationEnded),
-                                symbol: "checkmark.seal.fill"
-                            ) { openEntrySheet(.fullPaid) }
-                            statusCaption("预约已结束：按后台预约价一次记清，衣橱记为「已全款」，不会生成尾款任务")
-                            otherEntryOptionsDisclosure
+                                title: "加入衣橱",
+                                symbol: "tshirt.fill"
+                            ) {
+                                openEntrySheet(defaultOption, showsChoice: true)
+                            }
+                            statusCaption("预约已结束：默认按后台预约价一次记清，也可切换为定金+尾款，在下一步弹窗中选择"
+                                + reservationWindowCaptionSuffix
+                                + balanceDueCaptionSuffix)
                         } else if hasStock {
                             primaryButton(title: "加入少女衣橱", symbol: nil) {
                                 showsMergeSheet = true
@@ -866,16 +937,49 @@ struct ShopCatalogProductView: View {
                         } else {
                             statusCaption("预约已结束：本款已无法预约，也暂无现货")
                         }
+                    case .balancePending:
+                        // 尾款中（2026-09-24 需求三）：主按钮 =【加入衣橱】→ 选择弹窗
+                        //   · 默认选中「加入心愿尾款（定金 + 尾款）」——这一阶段的动作就是补尾款；
+                        //   · 两个选项在弹窗内同屏可选，不隐藏、不置灰
+                        //     （2026-09-23「只改引导不剥夺能力」继续成立）。
+                        //   与「预约已结束」的唯一差别就是这里的默认选中项。
+                        balanceDueTag
+                        if let defaultOption = choiceDefault(for: .balancePending) {
+                            primaryButton(title: "加入衣橱", symbol: "tshirt.fill") {
+                                openEntrySheet(defaultOption, showsChoice: true)
+                            }
+                            statusCaption("尾款中：默认按「定金 + 尾款」记账（补尾款），也可切换为预约价全款，在下一步弹窗中选择"
+                                + balanceDueCaptionSuffix)
+                        } else if hasStock {
+                            primaryButton(title: "加入少女衣橱", symbol: nil) {
+                                showsMergeSheet = true
+                            }
+                            statusCaption("尾款中：现货在售，可加入衣橱留存")
+                        } else {
+                            statusCaption("尾款中：正在收尾款，暂无现货价")
+                        }
                     case .neutral:
-                        // 无任何上新窗口 / 价格档案：仅保留入库入口
-                        primaryButton(title: "加入少女衣橱", symbol: nil) {
-                            showsMergeSheet = true
+                        // 无任何上新窗口：只看价格档案给全款口径；
+                        // 什么都没有时仅保留入库入口
+                        if let defaultOption = choiceDefault(for: .neutral) {
+                            primaryButton(title: "加入衣橱", symbol: "tshirt.fill") {
+                                openEntrySheet(defaultOption, showsChoice: true)
+                            }
+                            statusCaption("可按预约价或现货价全款记清，在下一步弹窗中选择")
+                        } else {
+                            primaryButton(title: "加入少女衣橱", symbol: nil) {
+                                showsMergeSheet = true
+                            }
                         }
                     }
                 }
             }
             .sheet(isPresented: $showsReservationSheet) {
-                ShopCatalogReservationSheet(productID: productID, option: entryOption)
+                // 阶段一并带进弹窗：候选列表与文案都按它取（现货阶段 = 两个全款价格口径）
+                ShopCatalogReservationSheet(productID: productID,
+                                            option: entryOption,
+                                            showsEntryChoice: showsEntryChoice,
+                                            phase: product.map { purchasePhase(for: $0.id) } ?? .neutral)
             }
             .overlay(alignment: .bottom) {
                 if let actionToast {
@@ -895,42 +999,10 @@ struct ShopCatalogProductView: View {
         }
     }
 
-    /// 「其他记账方式」折叠区（2026-09-23 需求二）：把**非默认**的记账入口收起来，但绝不删掉。
-    ///
-    /// 用户裁定原文：「保留双分支，预约结束只改变默认 UI 引导（主推全款），
-    /// 但不剥夺用户记录『定金 + 尾款』的功能。请按『全款为主，定金尾款为隐藏备用』的方式实现交互。」
-    ///
-    /// 所以它是**折叠**（一次点击可达）而不是隐藏或置灰——
-    /// 「官方补款期」「只交过定金」「闲鱼全款收转单」这些真实情形都需要它。
-    @ViewBuilder
-    private var otherEntryOptionsDisclosure: some View {
-        VStack(spacing: 6) {
-            Button {
-                withAnimation(.easeInOut(duration: 0.2)) { showsOtherEntryOptions.toggle() }
-            } label: {
-                HStack(spacing: 4) {
-                    Text("其他记账方式：已付过定金 / 补款期")
-                        .font(.system(size: 13))
-                    Image(systemName: showsOtherEntryOptions ? "chevron.up" : "chevron.down")
-                        .font(.system(size: 11))
-                }
-                .foregroundStyle(themeManager.secondaryTextColor)
-            }
-            .buttonStyle(.plain)
-
-            if showsOtherEntryOptions {
-                secondaryAction(
-                    title: ShopCatalogWardrobeEntryPolicy.buttonTitle(for: .depositPaid, phase: .reservationEnded),
-                    symbol: "heart.fill"
-                ) { openEntrySheet(.depositPaid) }
-                Text("按后台已付定金记账，尾款自动进入心愿尾款等你补款")
-                    .font(.system(size: 11))
-                    .foregroundStyle(themeManager.tertiaryTextColor)
-                    .multilineTextAlignment(.center)
-            }
-        }
-        .frame(maxWidth: .infinity)
-    }
+    /// 「其他记账方式」折叠区已升级为**选择弹窗**（2026-09-24 需求）：
+    /// 原折叠区（2026-09-23 需求二「全款为主，定金尾款为隐藏备用」）的两个口径现在都住在
+    /// 加购弹窗的「加入方式」选择段里——仍是**一次点击可达、同屏可选、不隐藏不置灰**，
+    /// 「官方补款期 / 只交过定金 / 闲鱼全款收转单」的记账能力完整保留。
 
     // MARK: 购买阶段（按预约状态条件渲染的依据）
 
@@ -941,18 +1013,18 @@ struct ShopCatalogProductView: View {
         //
         //    未声明（旧数据 salePhase == nil）→ 落到下面第 2 步的档期推导，
         //    行为与改动前完全一致（不需要给存量系列做任何数据迁移）。
-        if let declared = CatalogSeriesSalePhaseResolver.effectivePhase(
-            declared: series?.salePhase,
-            reservationEndAt: series?.reservationEndAt,
-            now: Date()
-        ) {
+        // 2. 既有口径：按销售事件档期推导
+        if let series,
+           let declared = CatalogSeriesSalePhaseResolver.effectivePhase(of: series, now: Date()) {
+            // 生效阶段由「声明 + 预约结束时间 + 尾款时间 + 当前时间」共同决定（读取时判定）：
+            // 具体尾款时间到点 → 尾款中；无尾款时间则维持既有流转（预约中 → 预约已结束）。
             switch declared {
             case .reservationActive: return .reservationActive
             case .reservationEnded: return .reservationEnded
+            case .balancePending: return .balancePending
             case .inStock: return .inStock
             }
         }
-        // 2. 既有口径：按销售事件档期推导
         let events = store.saleEvents(forProduct: productID)
         let reservationStatuses = events
             .filter { $0.type == .reservation }
@@ -1014,6 +1086,42 @@ struct ShopCatalogProductView: View {
             .background(Color.secondary.opacity(0.12))
             .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
             .accessibilityLabel("预约已结束")
+    }
+
+    /// 置灰的「尾款中」标签（同 `endedTag`，非按钮），并带上系列声明的尾款时间
+    private var balanceDueTag: some View {
+        Label(balanceDueTagText, systemImage: "creditcard.fill")
+            .font(.system(size: 14, weight: .medium))
+            .foregroundStyle(.secondary)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 12)
+            .background(Color.secondary.opacity(0.12))
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .accessibilityLabel(balanceDueTagText)
+    }
+
+    /// 「尾款中」标签文案（含尾款期，若运营填过）——只在系列级数据里取，不落任何本地状态
+    private var balanceDueTagText: String {
+        guard let series, let value = CatalogSeriesBalanceDue.valueText(of: series) else {
+            return "尾款中"
+        }
+        let label = CatalogSeriesBalanceDue.hasDeclaredEnd(of: series) ? "尾款期" : "尾款时间"
+        return "尾款中 · \(label)：\(value)"
+    }
+
+    /// 状态说明里追加的尾款时间后缀（未声明尾款时间 → 空串，不产生多余标点）
+    private var balanceDueCaptionSuffix: String {
+        guard let series, let value = CatalogSeriesBalanceDue.valueText(of: series) else { return "" }
+        // 「尾款期」还是「尾款时间」看有没有声明结束（2026-09-24 需求五）
+        return CatalogSeriesBalanceDue.hasDeclaredEnd(of: series)
+            ? "；尾款期：\(value)" : "；尾款时间：\(value)"
+    }
+
+    /// 状态说明里追加的预约期后缀（未声明 → 空串）。2026-09-24 需求五：预约中
+    /// 同时有开始与结束，商品页就把整段预约期如实说明出来。
+    private var reservationWindowCaptionSuffix: String {
+        guard let series, let window = CatalogSeriesReservationWindow.windowText(of: series) else { return "" }
+        return "；预约期：\(window)"
     }
 
     private func secondaryAction(title: String, symbol: String, action: @escaping () -> Void) -> some View {
@@ -1090,16 +1198,21 @@ private extension ShopCatalogStore.SaleWindowStatus {
 
 /// 商品详情操作区的按钮策略依据（优先级：预约中 > 预约未开始 > 预约已结束 > 现货 > 无信息）
 ///
-/// 规则（对应运营口径）：
-/// · 预约中 → 【加入心愿】（心愿尾款跟进定金/尾款）
+/// 规则（对应运营口径，分支候选一律走 `ShopCatalogWardrobeEntryPolicy`）：
+/// · 预约中 → 【加入衣橱】→ 选择弹窗（定金+尾款 / 预约价全款）+【加入心愿】次按钮
 /// · 预约未开始 → 【加入心愿】（实际作用 = 开售提醒）
-/// · 现货在售 → 【加入少女衣橱】，不提供加入心愿
-/// · 预约已结束 → 置灰【预约已结束】标签；有现货则引导加入衣橱购现货
+/// · 预约已结束 / 尾款中 → 置灰阶段标签 +【加入衣橱】→ 选择弹窗（默认分别是全款 / 定金+尾款）
+/// · **现货在售 → 【加入衣橱】→ 选择弹窗，仅全款、两个价格口径（按预约价 / 按现货价）**；
+///   没有任何价格档案时才退回「加入少女衣橱」（多选确认页）
 enum ShopCatalogPurchasePhase: Equatable {
     case reservationActive   // 预约中
     case reservationUpcoming // 预约未开始（加入心愿 = 开售提醒）
     case inStock             // 现货在售
     case reservationEnded    // 预约已结束
+    /// 尾款中（2026-09-24 需求三）：系列声明的结算期 —— 预约窗口已关、正在收尾款。
+    /// 与 `reservationEnded` 的区别是**加购引导**：这里主推定金 + 尾款（补尾款的动作），
+    /// 所以不能塌缩成 `reservationEnded`，否则默认选中会变成「预约价全款预约」。
+    case balancePending
     case neutral             // 无窗口 / 无价格档案
 
     static func resolve(
@@ -1372,18 +1485,35 @@ private struct ZoomableImage: View {
 /// **金额一律只读展示**——预约价、已付定金、待付尾款、本次入橱金额全部取后台价格档案。
 /// 需求 §I 核心原则：所有金额必须由系统自动读取后台数据，绝对不能让用户手动输入。
 ///
-/// 两种口径（需求 §II）：
-///   · `.depositPaid` 支付定金 → 衣橱「已付定」，心愿尾款里自动生成待补任务
-///   · `.fullPaid`    支付全款 → 衣橱「已全款」（金额 = 后台预约价），**绝不生成**任何心愿尾款任务
+/// 三个阶段 / 四种口径（需求 §II + 2026-09-24 现货阶段）：
+///   · `.depositPaid`    支付定金 → 衣橱「已付定」，心愿尾款里自动生成待补任务
+///   · `.fullPaid`       全款（金额 = 后台**预约价**）→ 衣橱「已全款」，**绝不生成**任何心愿尾款任务
+///   · `.fullStockPaid`  全款（金额 = 后台**现货价**）→ 同样「已全款」、同样不生成尾款任务
+///                       （现货阶段的两个价格口径，差别只在入橱金额取自哪份档案）
 struct ShopCatalogReservationSheet: View {
     let productID: String
-    /// 加购口径（默认付定金）
+    /// 加购口径（默认付定金）；`showsEntryChoice = true` 时作为**默认选中项**
     var option: ShopCatalogWardrobeEntryOption = .depositPaid
+    /// 显示「加入方式」选择段（2026-09-24 需求：预约中 / 预约已结束 / 尾款中 / 现货的统一入口弹窗——
+    /// **不得静默默认**任何付款方式直接加入，必须先选定并确认后才落库）
+    var showsEntryChoice: Bool = false
+    /// 当前购买阶段：选择段候选与选项文案的唯一依据（由详情页按同一份阶段口径传入）
+    var phase: ShopCatalogPurchasePhase = .reservationEnded
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
     @Environment(ThemeManager.self) private var themeManager
     @ObservedObject private var store = ShopCatalogStore.shared
+
+    /// 当前生效的加购口径：选择段里用户可切换（默认选中 = 外部按阶段规则传入）
+    @State private var selectedOption: ShopCatalogWardrobeEntryOption = .depositPaid
+    /// 防御：候选与选中项必须自洽（候选随阶段 / 价格档案变化），
+    /// 选中的那一项万一不在候选里就退回候选第一项 ——
+    /// 否则确认按钮会按一个界面上根本看不到的口径落库。
+    private var effectiveOption: ShopCatalogWardrobeEntryOption {
+        if !showsEntryChoice || choiceOptions.contains(selectedOption) { return selectedOption }
+        return choiceOptions.first ?? selectedOption
+    }
 
     @State private var selectedColor: String?
     @State private var selectedSize: String?
@@ -1399,8 +1529,12 @@ struct ShopCatalogReservationSheet: View {
         store.priceArchive(forProduct: productID)
     }
 
-    /// 后台预约价（= 定金 + 尾款总和）；全款口径的入橱金额
+    /// 后台预约价（= 定金 + 尾款总和）；「预约价全款」口径的入橱金额
     private var reservationPrice: Decimal { archive.currentReservationPrice ?? 0 }
+    /// 后台现货价；「现货价全款」口径的入橱金额
+    private var stockPrice: Decimal { archive.currentStockPrice ?? 0 }
+    private var hasReservationPrice: Bool { reservationPrice > 0 }
+    private var hasStockPrice: Bool { stockPrice > 0 }
     /// 后台已付定金（只读：用户已经付给店家的钱，系统自己算）
     private var backendDeposit: Decimal { min(max(0, archive.currentDeposit ?? 0), reservationPrice) }
     /// 待付尾款（全款口径为 0，因为不存在待补任务）
@@ -1409,16 +1543,37 @@ struct ShopCatalogReservationSheet: View {
     /// 与落库用的 `ShopCatalogWardrobeDraftBuilder` **同一份算法**——
     /// 弹窗上显示的待补金额必须等于最终写到心愿尾款里的金额。
     private var pendingBalance: Decimal {
-        guard option != .fullPaid else { return 0 }
+        guard !isFullPaid else { return 0 }
         return ShopCatalogWardrobeAmount.pendingBalance(
             backendBalance: archive.currentBalance,
             reservationPrice: reservationPrice,
             depositPaid: backendDeposit
         )
     }
-    /// 本次入橱记账金额
-    private var entryAmount: Decimal { option == .fullPaid ? reservationPrice : backendDeposit }
-    private var isFullPaid: Bool { option == .fullPaid }
+    /// 本次入橱记账金额（按所选口径取自对应价格档案，用户零输入）
+    private var entryAmount: Decimal {
+        switch effectiveOption {
+        case .fullPaid: return reservationPrice
+        case .fullStockPaid: return stockPrice
+        case .depositPaid, .wishlist: return backendDeposit
+        }
+    }
+    /// 是否「全款一次记清」口径（两个价格口径都算）
+    private var isFullPaid: Bool { effectiveOption.isFullPayment }
+    /// 全款口径的金额来源文案（预览与底注共用，保证两处口径一致）
+    private var fullPaymentBasisText: String {
+        effectiveOption == .fullStockPaid ? "现货价" : "预约价"
+    }
+
+    /// 选择段候选：唯一来源是阶段化策略（现货阶段 = 两个全款价格口径）——
+    /// 视图不再自己写死 `[.depositPaid, .fullPaid]`，否则策略改了界面不动。
+    private var choiceOptions: [ShopCatalogWardrobeEntryOption] {
+        ShopCatalogWardrobeEntryPolicy.options(
+            phase: phase,
+            hasReservationPrice: hasReservationPrice,
+            hasStockPrice: hasStockPrice
+        )
+    }
 
     /// 尺码候选：款式共享口径（同款任一颜色填过尺码表 → 这里就有；2026-09-23）
     private var sizeRun: [String] { store.sizeRun(forProduct: productID) }
@@ -1431,6 +1586,21 @@ struct ShopCatalogReservationSheet: View {
                     LabeledContent("店家", value: shop?.name ?? "—")
                     LabeledContent("系列", value: series.map { "\($0.name)\($0.yearMonthText.map { " · \($0)" } ?? "")" } ?? "—")
                 }
+                if showsEntryChoice && !choiceOptions.isEmpty {
+                    // 加入方式选择段（2026-09-24 需求）：候选与默认选中都按阶段策略取 ——
+                    //   · 预约中 / 预约已结束 / 尾款中：定金+尾款 / 预约价全款
+                    //   · 现货阶段：仅全款，两个价格口径（预约价 / 现货价）
+                    // 用户**必须在此选定**，下方金额预览与确认按钮随所选口径实时联动 ——
+                    // 不存在静默默认路径
+                    Section(phase == .inStock ? "全款计价方式" : "加入方式") {
+                        ForEach(choiceOptions, id: \.self) { candidate in
+                            entryChoiceRow(
+                                option: candidate,
+                                isSelected: selectedOption == candidate
+                            ) { selectedOption = candidate }
+                        }
+                    }
+                }
                 if !store.colors(forProduct: productID).isEmpty {
                     Section("配色") {
                         chipGrid(store.colors(forProduct: productID), selection: $selectedColor)
@@ -1442,11 +1612,17 @@ struct ShopCatalogReservationSheet: View {
                     }
                 }
                 Section("金额（自动读取，无需填写）") {
-                    LabeledContent("预约价", value: ShopCatalogFormat.price(reservationPrice))
-                    LabeledContent("已付定金", value: ShopCatalogFormat.price(backendDeposit))
+                    if hasReservationPrice {
+                        LabeledContent("预约价", value: ShopCatalogFormat.price(reservationPrice))
+                        LabeledContent("已付定金", value: ShopCatalogFormat.price(backendDeposit))
+                    }
+                    // 现货价行：现货阶段的第二个价格口径要靠它对比（没有就不显示，避免空行）
+                    if hasStockPrice {
+                        LabeledContent("现货价", value: ShopCatalogFormat.price(stockPrice))
+                    }
                     LabeledContent("待付尾款", value: ShopCatalogFormat.price(pendingBalance))
                         .foregroundStyle(isFullPaid ? themeManager.secondaryTextColor : themeManager.accentTextColor)
-                    LabeledContent(isFullPaid ? "本次入橱（全款）" : "本次入橱（已付定）",
+                    LabeledContent(isFullPaid ? "本次入橱（全款·\(fullPaymentBasisText)）" : "本次入橱（已付定）",
                                    value: ShopCatalogFormat.price(entryAmount))
                         .foregroundStyle(themeManager.accentTextColor)
                     // 全款口径不生成任何尾款任务，因此也不提供尾款时间设置
@@ -1474,11 +1650,13 @@ struct ShopCatalogReservationSheet: View {
                     }
                 } footer: {
                     Text(isFullPaid
-                         ? "全款入橱：按后台预约价一次记清，衣橱记为「已全款」，**不会**生成任何心愿尾款任务。"
+                         ? "全款入橱：按后台\(fullPaymentBasisText)一次记清，衣橱记为「已全款」，**不会**生成任何心愿尾款任务。"
                          : "定金入橱：按后台已付定金记账，尾款自动进入心愿尾款等你补款。")
                 }
             }
-            .navigationTitle(isFullPaid ? "全款加购" : "付定金加购")
+            .navigationTitle(showsEntryChoice
+                             ? "加入衣橱"
+                             : (isFullPaid ? "全款加购" : "付定金加购"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
@@ -1487,6 +1665,9 @@ struct ShopCatalogReservationSheet: View {
             }
             .onAppear {
                 store.loadFromBundleIfNeeded()
+                // 默认选中 = 外部按「阶段化默认口径」传入的选项（预约中 → 心愿尾款；
+                // 预约已结束 → 全款预约）；选择段内用户可随时切换
+                selectedOption = option
                 if let end = archive.reservation?.endAt {
                     hasTailDate = true
                     tailDate = end
@@ -1516,15 +1697,46 @@ struct ShopCatalogReservationSheet: View {
         }
     }
 
+    /// 选择段的单个选项行（radio 风格：圆圈 + 标题 + 一句话说明）
+    private func entryChoiceRow(option: ShopCatalogWardrobeEntryOption,
+                                isSelected: Bool,
+                                action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(alignment: .top, spacing: 10) {
+                Image(systemName: isSelected ? "largecircle.fill.circle" : "circle")
+                    .font(.system(size: 17))
+                    .foregroundStyle(isSelected ? Color.pink : Color.secondary)
+                    .padding(.top, 1)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(ShopCatalogWardrobeEntryPolicy.choiceTitle(for: option, phase: phase))
+                        .font(.system(size: 14, weight: isSelected ? .semibold : .regular))
+                        .foregroundStyle(themeManager.primaryTextColor)
+                    Text(ShopCatalogWardrobeEntryPolicy.choiceCaption(for: option))
+                        .font(.system(size: 11))
+                        .foregroundStyle(themeManager.secondaryTextColor)
+                }
+                Spacer(minLength: 0)
+            }
+        }
+        .buttonStyle(.plain)
+    }
+
     private func confirmEntry() {
-        guard option != .wishlist else { return }
-        guard reservationPrice > 0 else {
-            errorText = "该商品没有预约价档案，无法加购"
+        guard effectiveOption != .wishlist else { return }
+        // 取数校验按**所选口径**判：现货价全款只要求有现货价，其余口径要求有预约价
+        let requiredPrice = effectiveOption == .fullStockPaid ? stockPrice : reservationPrice
+        guard requiredPrice > 0 else {
+            errorText = effectiveOption == .fullStockPaid
+                ? "该商品没有现货价档案，无法加购"
+                : "该商品没有预约价档案，无法加购"
             return
         }
-        let priceMode: ShopCatalogWardrobeDraftBuilder.PriceMode = isFullPaid
-            ? .fullReservation
-            : .reservation(depositPaid: backendDeposit)
+        let priceMode: ShopCatalogWardrobeDraftBuilder.PriceMode
+        switch effectiveOption {
+        case .fullPaid: priceMode = .fullReservation
+        case .fullStockPaid: priceMode = .fullStock
+        case .depositPaid, .wishlist: priceMode = .reservation(depositPaid: backendDeposit)
+        }
         let selection = ShopCatalogWardrobeDraftBuilder.Selection(
             productID: productID,
             color: selectedColor,

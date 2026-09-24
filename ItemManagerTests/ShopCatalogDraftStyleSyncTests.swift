@@ -330,7 +330,8 @@ final class ShopCatalogDraftStyleSyncStoreTests: XCTestCase {
         try draftStore.applyBatchAttribution(
             batchID: session.id,
             shopID: nil, newShopName: "同步测试店家", newShopAliases: "",
-            seriesID: nil, newSeriesName: "天鹅之歌", newSeriesYear: 2026, newSeriesSeason: "冬")
+            seriesID: nil, newSeriesName: "天鹅之歌",
+            newSeriesYear: 2026, newSeriesMonth: nil, newSeriesSeason: "冬")
         return session
     }
 
@@ -512,7 +513,8 @@ final class ShopCatalogDraftStyleSyncEndToEndTests: XCTestCase {
         try draftStore.applyBatchAttribution(
             batchID: session.id,
             shopID: nil, newShopName: "同步测试店家", newShopAliases: "",
-            seriesID: nil, newSeriesName: "天鹅之歌", newSeriesYear: 2026, newSeriesSeason: "冬")
+            seriesID: nil, newSeriesName: "天鹅之歌",
+            newSeriesYear: 2026, newSeriesMonth: nil, newSeriesSeason: "冬")
         return session
     }
 

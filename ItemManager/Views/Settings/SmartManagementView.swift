@@ -94,6 +94,8 @@ struct SmartManagementView: View {
             loadPriorities()
         }
         .scrollContentBackground(.hidden)
+        // 底部悬浮 Dock 避让：本页由「萌宠 AI」设置 push 进入，最后一段会被 Dock 盖住。
+        .avoidingBottomDock()
         .background {
             LiquidBackground()
         }

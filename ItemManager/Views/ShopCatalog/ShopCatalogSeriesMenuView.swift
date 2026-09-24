@@ -318,11 +318,14 @@ struct ShopCatalogSeriesMenuView: View {
         }
     }
 
-    /// 尺码选择 chips（V1.4）：来自尺码表行标签（S / M…），仅一个可选尺码时不显示
+    /// 尺码选择 chips（V1.4）：来自尺码表行标签（S / M…）。
+    /// 2026-09-24 需求：**只要有尺码就显示**（原条件 `count > 1` 会把单尺码商品
+    /// —— 均码 / F / 单一数字码 —— 的尺码信息整行藏掉）；尺码值本身不做任何
+    /// 内容判断或过滤，S / M / L / XL / XXL / 均码 / 数字码一律原样展示。
     @ViewBuilder
     private func sizeChips(_ p: CatalogProduct) -> some View {
         let options = sizeOptions(for: p)
-        if options.count > 1 {
+        if !options.isEmpty {
             let selected = effectiveSize(for: p)
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 6) {

@@ -318,6 +318,8 @@ struct FieldSortSettingsView: View {
             EditButton()
         }
         .scrollContentBackground(.hidden)
+        // 底部悬浮 Dock 避让：字段排序最后一个会被 Dock 盖住。
+        .avoidingBottomDock()
         .background(LiquidBackground())
     }
     

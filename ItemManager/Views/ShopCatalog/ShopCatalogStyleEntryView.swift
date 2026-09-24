@@ -88,7 +88,8 @@ struct ShopCatalogStyleEntrySheet: View {
     @State private var colors: [ColorEntry] = [ColorEntry()]
     @State private var isSubmitting = false
 
-    private let categories = ShopCatalogStore.canonicalCategoryOrder
+    /// 分类候选（计算属性：管理分类后立即生效，含自定义分类与「其他」兜底）
+    private var categories: [String] { ShopCatalogStore.categoryCandidates }
 
     var body: some View {
         NavigationStack {
@@ -121,6 +122,21 @@ struct ShopCatalogStyleEntrySheet: View {
 
     // MARK: - 进入方式
 
+    /// 分类管理入口（2026-09-24 需求）：新增 / 改名 / 删除分类
+    @State private var showsCategoryManage = false
+    @ViewBuilder
+    private var manageCategoriesButton: some View {
+        Button {
+            showsCategoryManage = true
+        } label: {
+            Label("管理分类（新增 / 改名 / 删除）", systemImage: "square.and.pencil")
+                .font(.system(size: 13))
+        }
+        .sheet(isPresented: $showsCategoryManage) {
+            ShopCatalogCategoryManageSheet()
+        }
+    }
+
     private var modeSection: some View {
         Section {
             Picker("录入到", selection: modeBinding) {
@@ -151,6 +167,7 @@ struct ShopCatalogStyleEntrySheet: View {
                 ForEach(categories.filter { $0 != "其他" }, id: \.self) { Text($0).tag($0) }
                 Text("其他").tag("其他")
             }
+            manageCategoriesButton
             TextField("面料（如：雪花提花布 + 蕾丝拼接）", text: $fabricText)
             TextEditor(text: $styleDescriptionText)
                 .frame(minHeight: 56)

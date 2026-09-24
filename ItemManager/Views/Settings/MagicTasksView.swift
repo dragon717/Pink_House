@@ -86,6 +86,8 @@ struct MagicTasksView: View {
 
                 }
                 .scrollContentBackground(.hidden) // 隐藏List默认背景
+                // 底部悬浮 Dock 避让：任务列表最后一个入口会被 Dock 盖住。
+                .avoidingBottomDock()
             }
             .navigationTitle("魔法任务")
             .navigationBarTitleDisplayMode(.inline)

@@ -122,6 +122,8 @@ struct TestEffectsView: View {
                         Spacer(minLength: 50)
                     }
                 }
+                // 底部悬浮 Dock 避让：实验室最后一块豆腐块会被 Dock 盖住。
+                .avoidingBottomDock()
             }
             .navigationTitle("实验室")
             .sheet(item: $selectedModule) { module in

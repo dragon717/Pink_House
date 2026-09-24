@@ -22,14 +22,14 @@ import SwiftData
 @MainActor
 final class ShopCatalogProductBatchDeleteTests: XCTestCase {
 
-    private var store: ShopCatalogStore { ShopCatalogStore.shared }
+    /// 独立实例 + 合成种子基底（种子已连根清理，种子语义由夹具提供）
+    private let store = ShopCatalogSeedFixture.makeStore()
     private var retainedContainers: [ModelContainer] = []
 
     override func setUp() {
         super.setUp()
         ShopCatalogStorage.useTemporaryForTesting()
         CreatorAccess.setTestOverride(.creator)
-        _ = store.loadFromBundleIfNeeded()
         store.reloadWithOverlay()
     }
 
