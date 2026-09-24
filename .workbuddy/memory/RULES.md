@@ -55,6 +55,7 @@
 - **加购弹窗的「配色」区块**是「挑本商品买哪个色号」的**规格选择器**，仍读 `colors(forProduct:)` —— 与上一条语义不同，**禁合并**（会把别的商品色号塞进购买记录）。
 - 标题=款式名+(多色)「· N 色」，共用 `ShopCatalogTitleResolver`；颜色走 `ShopCatalogColorPresentation.label`（规格色→名称颜色词→nil）。例外：心愿/尾款/衣橱**记录名必须带颜色**。
 - 点菜页同款合并一张卡（颜色 chips）；价格双阶段 `ShopCatalogCardPricePhase`（预约窗口内默认预约价不可选；结束后双价并存才自选，默认现货）；口径经 `priceChoices/colorByProduct` 透传 `ShopCatalogWardrobeMergeView`。
+- **分区/分组顺序禁止用 `Set`/`Dictionary` 遍历序派生**（09-25 事故：点菜页分区乱跳）：`Array(Set(...))` 的顺序取决于**进程级随机哈希种子**，每次冷启动都换排法，表现为「商品列表不断重新排序」。唯一确定性来源是 catalog 数组的**录入顺序**（持久化、跨启动稳定）。`ShopCatalogStore.categories(inSeries:)` 已收口为：固定品类（`canonicalCategoryOrder` 除「其他」）在前 → 自定义分类按商品**首次出现序** → 「其他」垫底；新增任何分组列表都必须走这类「显式顺序源」，回归测试在 `ShopCatalogStoreTests.testSeriesCategoriesCustomOrderIsEntryOrderNotSetOrder`。
 
 ## 商品改名 = 款式级（09-24 需求：改名后什么都没变）
 

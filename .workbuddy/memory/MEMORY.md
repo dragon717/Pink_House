@@ -6,7 +6,7 @@
 - 启动：`INFOPLIST_KEY_UILaunchScreen_Generation` 必须 `NO`（YES = 空字典 = 深色纯黑，被误判「打不开」）；方向只由 Info.plist / pbxproj 的 `UISupportedInterfaceOrientations[_iPhone]` 决定。
 - 构建测试走 skill `pink-house-xcodebuild-acceptance`；destination 用 UDID `FA7332BE-B29E-4879-A139-C68A24314DB1`（写 `name=` 会 exit 70）。
 - 搜索用 `grep -E`/`-F`（BSD 禁空交替，`(a|b|)` **静默不过滤**）；搜中文兼搜 `\uXXXX`。
-- 列表一律走 `AZIndexGrouping` / `*SortedByName()`：数组是**录入顺序**不是字典序。
+- 列表一律走 `AZIndexGrouping` / `*SortedByName()`：数组是**录入顺序**不是字典序；**分区/分组顺序禁止用 `Set`/`Dictionary` 遍历序派生**——`Array(Set(...))` 随进程哈希种子每次冷启动换排法（09-25 事故：点菜页分区乱跳被当成「切换颜色导致」），顺序必须来自**显式顺序源**（数组录入序 / canonical 表）。
 - 价格：**修正 ≠ 追加**且不共用逻辑；修正**留空 = 清除**；`CatalogSaleEvent` 只 append、**永不 remove/replace**；缺失一律「暂无」，禁 `deposit ?? 0`。
 - 图表：两卡只消费同一个 `ShopCatalogChartPresentation.plan(...)`；`sourceImage` 非空绝不静默 `.none`；**识别结果必须过 `CatalogChartQuality` 门禁**，未过门禁一个字都不写进输入框（弹窗「解析失败，请手动录入」+ 恢复识别前快照）；粘贴与多模态回复共用 `parsePastedText`，**预览即落库**。（**09-23 需求一后图片识别入口已移除**，`CatalogChartExtraction` 无调用方、文件暂留；系列编辑页的 `priceChartImageText` state 必须留着，它承载既有原图。）
 - **「同款商品集合」只能有一处定义**（`ShopCatalogDesignPalette.sameDesignProducts`）：详情页「配色」行 = **同款颜色集合**（`store.designColors`），**不能**读本商品规格色 —— 否则 SPU/SKU 下会「标题写 3 色、配色行整行消失」（09-23 事故）。加购弹窗的色号选择器是另一回事，仍读 `colors(forProduct:)`，禁合并。
@@ -26,7 +26,7 @@
 - 商品改名（09-24 需求）：**标题只读 `designName`，而发布路径无条件把它写成非空显式值**（`resolveDesignName` 永不返回 nil）→ `name` 被永久遮蔽，「只改 name」界面上一个像素都不动。改名 = **款式级**操作，唯一口径 `ShopCatalogProductRename.plan(edited:basedOn:among:profiles:)`（弹窗预览与落盘共用同一份 plan），写入口 `renameProduct(productID:newName:newCategory:)`；款式名 = 名称剥颜色词（名称字段仍是完整 SKU 名）；**必须扇出整款**（同系列+同品类+同款式名，含已归档），否则拆组 + 款式档案孤儿 + 尺码表范围塌成 1 行；兄弟名字定向替换（颜色词与位置保留）；**品类也是款式级**；**名称没被改动时禁止重新派生款式名**；款式档案 `id` 就是款式键 → 必须**改键**（目标键已有档案时无损合并）；尺码表无需迁移，但 `updatePublishedProduct` 里 `applyRenamePlan` **必须先于** `applySizeChart` 且后者要传**改名后**那一份；衣橱/心愿记录名是**快照不跟着改**，但 toast 要如实报条数。
 
 ## 主题索引 → RULES.md
-环境/工具 · 启动与「强制横屏/打不开」 · 测试数据隔离 · SPU/SKU 分层与录入期同步 · 尺码表=款式级共享 · 列表/归组/标题与同款颜色 · **商品改名=款式级（整款扇出 + 款式档案改键）** · 价格（修正 vs 追加） · 图表展示同源 · 图表识别与录入（门禁/多模态/粘贴） · 系列发售阶段与自动流转 · 加购记账与衣橱标题 · **加购分支按阶段区分与现货两个全款口径** · 删除守卫 · 币种与发布幂等 · **系列配置一站式与尾款中/尾款时间** · **系列年月通道与预约/尾款区间** · **表单编辑中快照与 sheet 呈现位置** · **界面遮挡与底部 Dock 避让**
+环境/工具 · 启动与「强制横屏/打不开」 · 测试数据隔离 · SPU/SKU 分层与录入期同步 · 尺码表=款式级共享 · 列表/归组/标题与同款颜色 · **分区顺序禁用 Set 遍历序（09-25）** · **商品改名=款式级（整款扇出 + 款式档案改键）** · 价格（修正 vs 追加） · 图表展示同源 · 图表识别与录入（门禁/多模态/粘贴） · 系列发售阶段与自动流转 · 加购记账与衣橱标题 · **加购分支按阶段区分与现货两个全款口径** · 删除守卫 · 币种与发布幂等 · **系列配置一站式与尾款中/尾款时间** · **系列年月通道与预约/尾款区间** · **表单编辑中快照与 sheet 呈现位置** · **界面遮挡与底部 Dock 避让**
 
 ## 两个易踩
 - `CatalogProductDraft` 新增款式字段必须进 `publishOperationKey` 指纹，否则「改了再发布」被幂等入口吞掉。

@@ -105,6 +105,54 @@ final class ShopCatalogStoreTests: XCTestCase {
         XCTAssertEqual(s.productCount(inSeries: "series-ag-xueguo-2026"), 4)
     }
 
+    // MARK: 分区顺序确定性（2026-09-25 根因修复：点菜页分区乱跳）
+
+    /// 之前非固定品类用 `Array(Set(...))` 派生顺序 —— Set 遍历序随进程哈希种子随机，
+    /// 每次冷启动分区都换一个排法。契约：自定义分类按**商品录入顺序**（首次出现序），
+    /// 固定品类在前、「其他」垫底，与 Set 无关。
+    func testSeriesCategoriesCustomOrderIsEntryOrderNotSetOrder() throws {
+        let json = #"""
+        {"version":1,"shops":[],"series":[
+            {"id":"series-custom-1","shopID":"shop-x","name":"自定义分类系列","year":2026}],
+         "products":[
+            {"id":"p1","shopID":"shop-x","seriesID":"series-custom-1","name":"大衣","category":"外套","images":[]},
+            {"id":"p2","shopID":"shop-x","seriesID":"series-custom-1","name":"衬衫","category":"衬衫","images":[]},
+            {"id":"p3","shopID":"shop-x","seriesID":"series-custom-1","name":"内搭","category":"内搭","images":[]},
+            {"id":"p4","shopID":"shop-x","seriesID":"series-custom-1","name":"开衫","category":"开衫","images":[]},
+            {"id":"p5","shopID":"shop-x","seriesID":"series-custom-1","name":"杂项","category":"其他","images":[]},
+            {"id":"p6","shopID":"shop-x","seriesID":"series-custom-1","name":"连裙","category":"JSK","images":[]}],
+         "variants":[],"sizeCharts":[],"saleEvents":[],"assets":[]}
+        """#
+        let catalog = try ShopCatalogJSONCoding.decoder()
+            .decode(ShopCatalog.self, from: Data(json.utf8))
+        let s1 = ShopCatalogStore(baseCatalog: catalog)
+        let s2 = ShopCatalogStore(baseCatalog: catalog)
+
+        let expected = ["JSK", "外套", "衬衫", "内搭", "开衫", "其他"]
+        // 录入顺序 = p1 外套 → p2 衬衫 → p3 内搭 → p4 开衫 → p5 其他 → p6 JSK；
+        // 自定义段必须严格等于首次出现序（外套 → 衬衫 → 内搭 → 开衫），「其他」垫底
+        XCTAssertEqual(s1.categories(inSeries: "series-custom-1"), expected)
+        // 重复调用 & 另一个同数据实例：结果必须完全一致（无隐藏随机源）
+        XCTAssertEqual(s1.categories(inSeries: "series-custom-1"), expected)
+        XCTAssertEqual(s2.categories(inSeries: "series-custom-1"), expected)
+    }
+
+    func testSeriesCategoriesIgnoresArchivedProducts() throws {
+        let json = #"""
+        {"version":1,"shops":[],"series":[
+            {"id":"series-custom-2","shopID":"shop-x","name":"归档系列","year":2026}],
+         "products":[
+            {"id":"q1","shopID":"shop-x","seriesID":"series-custom-2","name":"衬衫","category":"衬衫","images":[]},
+            {"id":"q2","shopID":"shop-x","seriesID":"series-custom-2","name":"旧外套","category":"外套","archivedAt":"2026-09-01T00:00:00Z","images":[]}],
+         "variants":[],"sizeCharts":[],"saleEvents":[],"assets":[]}
+        """#
+        let catalog = try ShopCatalogJSONCoding.decoder()
+            .decode(ShopCatalog.self, from: Data(json.utf8))
+        let s = ShopCatalogStore(baseCatalog: catalog)
+        XCTAssertEqual(s.categories(inSeries: "series-custom-2"), ["衬衫"],
+                       "已归档商品所在的分区不应出现")
+    }
+
     // MARK: 价格档案（§13/§6）
 
     func testPriceArchive() throws {

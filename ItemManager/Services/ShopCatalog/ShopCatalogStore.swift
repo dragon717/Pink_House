@@ -324,16 +324,27 @@ final class ShopCatalogStore: ObservableObject {
         return result
     }
 
+    /// 系列分区顺序（点菜页 / 系列详情共用口径）：
+    /// 固定品类（canonicalCategoryOrder，除「其他」）在前；
+    /// 其余分类按**商品录入顺序**（catalog 数组首次出现序）追加，去重。
+    ///
+    /// 2026-09-25 根因修复（点菜页分区乱跳）：之前非固定品类用
+    /// `Array(Set(products.map(\.category)))` 派生顺序 —— Set 的遍历序取决于
+    /// **进程级随机哈希种子**，每次冷启动都换一个排法，用户看到的就是
+    /// 「商品列表不断重新排序、位置频繁变动」。与是否切换颜色无关，
+    /// 只是乱序恰好在反复进出页面 / 重启调试时被观察到。
+    /// 唯一确定性来源是 catalog 数组本身的录入顺序（持久化，跨启动稳定）。
     func categories(inSeries seriesID: String) -> [String] {
-        let present = Array(Set(products(inSeries: seriesID).map(\.category)))
-        var ordered: [String] = []
-        for c in Self.canonicalCategoryOrder where present.contains(c) && c != "其他" {
-            ordered.append(c)
+        var present: [String] = []
+        var seen = Set<String>()
+        for p in products(inSeries: seriesID) where seen.insert(p.category).inserted {
+            present.append(p.category)
         }
+        var ordered = Self.canonicalCategoryOrder.filter { $0 != "其他" && present.contains($0) }
         let known = Set(ordered)
-        for c in present where !known.contains(c) {
-            ordered.append(c)
-        }
+        let tail = present.filter { !known.contains($0) }
+        ordered.append(contentsOf: tail.filter { $0 != "其他" })
+        if tail.contains("其他") { ordered.append("其他") }
         return ordered
     }
 
