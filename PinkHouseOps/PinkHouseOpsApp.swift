@@ -19,11 +19,19 @@
 //  配置 public database 自动同步的选项，而且运营草稿本来就不该进任何云端库。
 //
 
+import AppKit
 import SwiftData
 import SwiftUI
 
 @main
 struct PinkHouseOpsApp: App {
+
+    /// 视觉验收用的快照钩子（见 `OpsSnapshotHarness`）。
+    ///
+    /// 挂在 `applicationDidFinishLaunching` 而不是 SwiftUI `.task`：
+    /// 快照必须在**窗口真的出现之后**抓，否则抓到的是未布局的宿主视图；
+    /// delegate 回调的时序比 `.task` 更可控。
+    @NSApplicationDelegateAdaptor(OpsAppDelegate.self) private var delegate
 
     /// 本机模型容器：草稿 + 上传任务。`cloudKitDatabase: .none` 是有意的，
     /// 不是忘了配（见文件头说明）。
@@ -49,6 +57,22 @@ struct PinkHouseOpsApp: App {
         .commands {
             // 运营工具的草稿由侧栏管理，系统「新建文稿」在这里没有意义
             CommandGroup(replacing: .newItem) { }
+        }
+    }
+}
+
+// MARK: - 启动钩子
+
+@MainActor
+final class OpsAppDelegate: NSObject, NSApplicationDelegate {
+
+    /// 有快照触发文件就以快照模式跑一遍然后退出；没有则什么都不做。
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        guard let directory = OpsSnapshotHarness.pendingRequest() else { return }
+        // 等首帧窗口布局完成再抓（0.9s 是 `render` 内部等待之外的额外余量）
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+            OpsSnapshotHarness.run(into: directory)
+            NSApp.terminate(nil)
         }
     }
 }

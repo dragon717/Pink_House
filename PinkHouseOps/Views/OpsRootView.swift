@@ -75,7 +75,16 @@ enum OpsSection: String, CaseIterable, Identifiable {
 
 struct OpsMainView: View {
     @ObservedObject var workspace: OpsWorkspace
-    @State private var section: OpsSection = .overview
+
+    /// 当前分区。默认「概览」；快照 harness 需要从别的分区起手
+    /// （见 `OpsSnapshotHarness`），所以留了一个显式入口，
+    /// 但它**只是初值**，之后完全由侧栏选择驱动。
+    @State private var section: OpsSection
+
+    init(workspace: OpsWorkspace, initialSection: OpsSection = .overview) {
+        self.workspace = workspace
+        _section = State(initialValue: initialSection)
+    }
 
     var body: some View {
         NavigationSplitView {
