@@ -229,6 +229,46 @@ with tempfile.TemporaryDirectory() as root_name:
         check("缺图报错信息点名缺失文件", "img-MISSING.jpg" in str(error), str(error)[:80])
     check("引用到的图片缺失 → 构建硬失败（不静默跳过）", raised)
 
+# ---- 公共数据库字段配置方案 §2.2 / §2.3 ----
+from protocol import validate_shop_catalog_media  # noqa: E402
+
+# canonical mediaKey（方案 §2.2）：写进商品 JSON，取值 = 图片字节 SHA-256
+check("assets 写入 canonical mediaKey",
+      rewritten["assets"][0].get("mediaKey") == one_hash,
+      str(rewritten["assets"][0].get("mediaKey")))
+check("mediaKey 与改写后的 thmedia: 引用一致",
+      rewritten["assets"][0]["originalURL"] == "thmedia:{}".format(
+          rewritten["assets"][0]["mediaKey"]))
+check("bundle:/http(s) 的 asset 不写 mediaKey",
+      all("mediaKey" not in a for a in rewritten["assets"] if a["id"] in ("asset-3", "asset-4")))
+
+known = {str(r["contentHash"]) for r in records}
+check("引用齐全时不报资产引用问题",
+      validate_shop_catalog_media(rewritten, known) == [],
+      str(validate_shop_catalog_media(rewritten, known))[:120])
+
+# 方案 §2.3 要求补上的发布前错误：包里有 mediaKey 但没有对应媒体条目
+orphan = copy.deepcopy(rewritten)
+orphan["assets"][0]["mediaKey"] = "a" * 64
+issues = validate_shop_catalog_media(orphan, known)
+check("悬空 mediaKey → 报资产引用缺失",
+      any(i["code"] == "media.reference.missing" for i in issues), str(issues[:1]))
+
+# 发布包不得依赖运营设备的 local:（换台设备就是破图）
+leftover = copy.deepcopy(rewritten)
+leftover["assets"].append(
+    {"id": "asset-y", "type": "productImage", "originalURL": "local:img-ONE.jpg"})
+issues = validate_shop_catalog_media(leftover, known)
+check("残留 local: 引用 → 报发布包依赖本地路径",
+      any(i["code"] == "media.reference.local" for i in issues), str(issues[:1]))
+
+# 非 64 位 hex 的媒体键（手填错 / 截断）必须报出来，不能放过
+bad_key = copy.deepcopy(rewritten)
+bad_key["assets"][0]["mediaKey"] = "not-a-hash"
+check("媒体键不是 64 位 hex → 报格式错误",
+      any(i["code"] == "media.reference.invalid"
+          for i in validate_shop_catalog_media(bad_key, known)))
+
 print()
 if failures:
     print("❌ {} 项未通过：{}".format(len(failures), "、".join(failures)))

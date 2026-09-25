@@ -41,7 +41,10 @@ from protocol import (  # noqa: E402
     COVERAGE_UNKNOWN,
     ENCODING_JSON_GZIP,
     ENTITY_TYPES,
+    MAX_MEDIA_BYTES,
     MAX_PACK_COMPRESSED_BYTES,
+    MEDIA_MIME_ALLOWLIST,
+    MEDIA_REFERENCE_PREFIX,
     PROTOCOL_SCHEMA_VERSION,
     READER_VERSION,
     RELEASE_RECORD_NAME,
@@ -63,6 +66,7 @@ from protocol import (  # noqa: E402
     validate_pack_payload,
     validate_partition_descriptor,
     validate_root_index,
+    validate_shop_catalog_media,
 )
 from sources_loader import (  # noqa: E402
     SourcesConfigError,
@@ -385,6 +389,15 @@ def collect_shop_catalog_media(
             missing.append(value)
             return value
         payload = source.read_bytes()
+        if len(payload) > MAX_MEDIA_BYTES:
+            raise ProtocolError(
+                "图片 {} 超出单张媒体上限（{} > {} 字节）：{}".format(
+                    file_name, len(payload), MAX_MEDIA_BYTES, source))
+        mime_type = mimetypes.guess_type(file_name)[0] or "application/octet-stream"
+        if mime_type not in MEDIA_MIME_ALLOWLIST:
+            raise ProtocolError(
+                "图片 {} 的 MIME {} 不在白名单 {} 内（客户端解不了的类型不许进公共库）".format(
+                    file_name, mime_type, list(MEDIA_MIME_ALLOWLIST)))
         content_hash = sha256_hex(payload)
         record = by_hash.get(content_hash)
         if record is None:
@@ -392,7 +405,7 @@ def collect_shop_catalog_media(
             record = {
                 "mediaKey": value,
                 "contentHash": content_hash,
-                "mimeType": mimetypes.guess_type(file_name)[0] or "application/octet-stream",
+                "mimeType": mime_type,
                 "byteCount": len(payload),
                 "recordName": "th.media.{}".format(content_hash),
                 "fileName": "{}.{}".format(content_hash, suffix),
@@ -408,6 +421,14 @@ def collect_shop_catalog_media(
             for key in ("originalURL", "thumbnailURL", "previewURL"):
                 if item.get(key):
                     item[key] = rewrite(item[key])
+            # canonical 媒体键（公共数据库字段配置方案 §2.2）：取**原图**的摘要。
+            # 缩略图 / 预览图仍只在 URL 字段里 —— 方案明确「第一版只增加一个
+            # canonical mediaKey」，需要多分辨率时再补 thumbnailMediaKey / previewMediaKey。
+            for key in ("originalURL", "thumbnailURL", "previewURL"):
+                value = item.get(key)
+                if isinstance(value, str) and value.startswith(MEDIA_REFERENCE_PREFIX):
+                    item["mediaKey"] = value[len(MEDIA_REFERENCE_PREFIX):]
+                    break
     for item in rewritten.get("shops") or []:
         if isinstance(item, dict):
             for key in ("logo", "cover"):
@@ -593,17 +614,40 @@ def load_media(input_dir: Path) -> Tuple[List[Dict[str, Any]], List[Tuple[str, P
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     records: List[Dict[str, Any]] = []
     files: List[Tuple[str, Path]] = []
-    for entry in manifest.get("media", []):
+    for index, entry in enumerate(manifest.get("media", [])):
+        if not isinstance(entry, dict):
+            raise ProtocolError("media-manifest.json 第 {} 条不是对象".format(index))
+        for key in ("mediaKey", "fileName", "mimeType"):
+            if not str(entry.get(key, "")).strip():
+                raise ProtocolError(
+                    "media-manifest.json 第 {} 条缺少 {}（方案 §2.3：三项均为必填）".format(
+                        index, key))
+        media_key = str(entry["mediaKey"]).strip()
+        mime_type = str(entry["mimeType"]).strip()
         source = input_dir / str(entry["fileName"])
         if not source.exists():
             raise ProtocolError("媒体文件缺失：{}".format(source))
         payload = source.read_bytes()
         content_hash = sha256_hex(payload)
+        # 方案 §2.3：mediaKey 必须就是字节 SHA-256 —— 记录名 th.media.<sha256> 由它推导，
+        # 允许「业务键 ≠ 内容摘要」等于允许两个名字指向同一张图、或同一个名字指向两张图。
+        if media_key != content_hash:
+            raise ProtocolError(
+                "media-manifest.json 第 {} 条的 mediaKey 与文件 SHA-256 不一致"
+                "（声明 {}，实际 {}）".format(index, media_key, content_hash))
+        if mime_type not in MEDIA_MIME_ALLOWLIST:
+            raise ProtocolError(
+                "media-manifest.json 第 {} 条的 mimeType {} 不在白名单 {} 内".format(
+                    index, mime_type, list(MEDIA_MIME_ALLOWLIST)))
+        if len(payload) > MAX_MEDIA_BYTES:
+            raise ProtocolError(
+                "media-manifest.json 第 {} 条超出单张媒体上限（{} > {} 字节）".format(
+                    index, len(payload), MAX_MEDIA_BYTES))
         records.append(
             {
-                "mediaKey": str(entry["mediaKey"]),
+                "mediaKey": media_key,
                 "contentHash": content_hash,
-                "mimeType": str(entry["mimeType"]),
+                "mimeType": mime_type,
                 "byteCount": len(payload),
                 "recordName": "th.media.{}".format(content_hash),
                 "fileName": "{}.{}".format(content_hash, source.suffix.lstrip(".") or "bin"),
@@ -751,6 +795,8 @@ def main(argv: Optional[List[str]] = None) -> int:
     # ---- 商店目录（店家上新）整包分片 ----
     shop_media_records: List[Dict[str, Any]] = []
     shop_media_files: List[Tuple[str, Path]] = []
+    # 改写后的目录（资产引用校验要用；没走商店分支时保持 None）
+    shop_doc: Optional[Dict[str, Any]] = None
     if shop_source:
         shop_input = Path(args.shop_catalog) if args.shop_catalog else args.input / "shop-catalog.json"
         shop_unpack_root: Optional[Path] = None
@@ -847,6 +893,16 @@ def main(argv: Optional[List[str]] = None) -> int:
     # 商店目录的图片与画册媒体共用同一条 THMedia 通道（发布端负责上传，客户端按需取）
     media_records += shop_media_records
     media_files += shop_media_files
+    # 资产引用校验（公共数据库字段配置方案 §2.3「必须补上的发布前错误」）：
+    # 包里每个 mediaKey / thmedia 引用都必须命中本次**真的会上传**的媒体，
+    # 否则发布头一切换，客户端就是「数据到了、图全空」。
+    if shop_doc is not None:
+        all_issues += [
+            dict(issue, layer="structural")
+            for issue in validate_shop_catalog_media(
+                shop_doc, {str(item["contentHash"]) for item in media_records}
+            )
+        ]
     withdrawals = load_withdrawals(args.withdrawals)
 
     root_index = {

@@ -52,7 +52,7 @@
 
 | Field Name | Type | 说明 |
 |---|---|---|
-| `mediaKey` | String | 稳定业务键，例如 `<canonicalEntityID>#thumb` |
+| `mediaKey` | String | **图片字节的 SHA-256**（64 位小写 hex），与记录名后缀 `sha256` 同值（公共数据库字段配置方案 §2.2：早期设计的「`<canonicalEntityID>#thumb` 业务键」口径已废弃，不要照搬） |
 | `mimeType` | String | `image/jpeg` / `image/png` / `image/webp` / `image/heic` / `image/gif` |
 | `sha256` | String | 内容 SHA-256，等于 `contentHash` |
 | `byteCount` | Int64 | 字节数 |
@@ -128,6 +128,23 @@ security add-generic-password -s PinkHouseTimeHallPublisher -a containerID -w 'i
 
 > 权限粒度提醒：server-to-server key **继承创建者在容器上的权限，无法按 Record Type 细分**。
 > 所以「普通用户不能写」只能靠第 2 节的 Security Role 落实，不能靠这把 key 的配置。
+
+### 3.1 第二种写入方式：iOS 运营端直写公共库（方案 §2.2 方式一）
+
+除了 Mac CLI + s2s key，App 内的「运营中心 → 上传发布」也可以直接写公共库，用的是
+`CKContainer(identifier: "iCloud.bugod2.ItemManager").publicCloudDatabase`，**没有第二套协议**：
+仍然只写 `THMedia` / `THDataPack` / `THRelease` 三种记录，仍按 `th.media.<sha256>` /
+`th.pack.<payloadHash>` 精确 ID 写入，最后仍用读取到的 `recordChangeTag` 条件更新发布头。
+
+这一条路额外要求：
+
+| 要求 | 说明 |
+|---|---|
+| 运营设备有**活动 iCloud 账号** | 公共库**读**不需要账号，**写**需要（Apple 官方口径）。无账号 → 任务直接落 `blocked`，不自动重试 |
+| 服务端 Security Role 授权该运营 Apple 账号 | 见上文 `TimeHallPublisher` 自定义角色；客户端 `CreatorAccess` 白名单**只隐藏入口**，不是安全边界 |
+| Development / Production 分开 | Xcode 调试包读 Development、TestFlight / App Store 读 Production，两边记录与 schema 不互通；上线前两套都要各验一遍 |
+
+⚠️ **不要把 s2s 私钥嵌进 iOS App**。iOS 直写一律走运营 Apple 账号 + 角色授权。
 
 ## 4. Query 索引（仅当运营侧要用 query 拉取时才需要）
 

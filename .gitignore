@@ -55,4 +55,6 @@ asserts/psd/*
 output/*
 
 scrapers/assets/*
-ItemManager.xcodeproj/-Xcc/*
+
+# xcodebuild 误解析参数生成的 clang 模块缓存（形如 -Xcc 目录）
+ItemManager.xcodeproj/-Xcc/

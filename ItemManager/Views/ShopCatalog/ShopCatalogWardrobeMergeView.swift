@@ -137,7 +137,9 @@ struct ShopCatalogWardrobeMergeView: View {
                 HStack(spacing: 10) {
                     ForEach(items, id: \.product.id) { item in
                         VStack(alignment: .leading, spacing: 5) {
-                            ShopCatalogAssetImage(reference: item.product.images.first.flatMap { store.asset(id: $0)?.originalURL ?? $0 })
+                            ShopCatalogAssetImage(
+                                reference: item.product.images.first.flatMap { store.asset(id: $0)?.originalURL ?? $0 },
+                                mediaKey: item.product.images.first.flatMap { store.asset(id: $0)?.mediaKey })
                                 .aspectRatio(3 / 4, contentMode: .fill)
                                 .frame(width: 74)
                                 .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))

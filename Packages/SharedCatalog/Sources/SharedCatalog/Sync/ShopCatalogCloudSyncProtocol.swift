@@ -96,6 +96,27 @@ public nonisolated enum ShopCatalogSyncProtocol {
         return isPayloadHash(hash) ? hash : nil
     }
 
+    /// 媒体键的**唯一解析口径**（公共数据库字段配置方案 §2.2）。
+    ///
+    /// canonical `mediaKey` 优先；它没有时回退 URL 字段里的 `thmedia:<hash>`
+    /// （2026-09-25 那版发布端把摘要写在 URL 里，旧包必须继续能读）。
+    /// 两个都没有 → nil，调用方按「不是远端媒体」走旧逻辑，绝不猜。
+    ///
+    /// ⚠️ 任何消费端读图的地方都必须走这里，禁止各处自己拆字符串 ——
+    ///    拆法一旦分叉，就会出现「数据拉到了、图全空」且无从定位。
+    public static func resolvedMediaKey(
+        _ mediaKey: String?, fallbackReferences: [String?] = []
+    ) -> String? {
+        if let key = mediaKey?.trimmingCharacters(in: .whitespacesAndNewlines),
+           isPayloadHash(key) {
+            return key
+        }
+        for reference in fallbackReferences {
+            if let hash = mediaContentHash(in: reference) { return hash }
+        }
+        return nil
+    }
+
     /// 校验 64 位小写十六进制 SHA-256
     public static func isPayloadHash(_ value: String) -> Bool {
         guard value.count == 64 else { return false }
@@ -514,6 +535,102 @@ public nonisolated enum ShopCatalogCloudSyncValidator {
         guard issues.isEmpty else {
             throw ShopCatalogSyncValidationError.structural(issues)
         }
+    }
+
+    /// gzip 压缩（RFC 1952）—— 与 `decompress` 成对，**两侧必须同一口径**。
+    ///
+    /// iOS 运营端自己发布 `THDataPack` 时必须产出**与 Mac 端 `gzip.compress` 同格式**
+    /// 的字节流，否则消费端 `decompress` 解不开（它对魔数 / 方法位是硬校验）。
+    ///
+    /// ⚠️ 不要被 `COMPRESSION_ZLIB` 这个名字骗了：它给的是**裸 deflate**
+    ///    （RFC 1951，无 zlib 头），本文件 `decompress` 的注释早已写明这一点。
+    ///    2026-09-26 实测复核（macOS 26）：
+    ///
+    ///        输入 0B   → 2B  `03 00`
+    ///        输入 1B   → 3B  `73 04 00`
+    ///        输入 512B → 20B 首字节 `0x7B`
+    ///
+    ///    首字节从不是 `0x78`（zlib 头）也不是 `0x1F`（gzip 头）；20 字节恰好等于
+    ///    Python `zlib.compress(src, 9)` 去掉 2+4 封装后的 deflate 段长度。
+    ///    **所以这里绝不能去剥「2 字节 zlib 头 + 4 字节 Adler32 尾」** ——
+    ///    那会把 deflate 数据本身截断，产物必然解不开（已踩过一次）。
+    ///
+    /// mtime 固定写 0：构建时间不该进产物，否则「内容没变、字节变了」——
+    /// 内容寻址的数据包会每次发布都多出一个新包。
+    public static func compress(_ data: Data) throws -> Data {
+        let encoded: Data
+        do {
+            encoded = try (data as NSData).compressed(using: .zlib) as Data
+        } catch {
+            throw ShopCatalogSyncValidationError.packMismatch("压缩失败：\(error.localizedDescription)")
+        }
+        let deflated = normalizeToRawDeflate(encoded)
+
+        var output = Data()
+        output.append(contentsOf: [0x1F, 0x8B, 0x08, 0x00])   // 魔数 + deflate + 无可选段
+        output.append(contentsOf: [0x00, 0x00, 0x00, 0x00])   // mtime = 0（见上方说明）
+        // XFL 是**提示位**不是校验位，解压端一律忽略：
+        //   0x00 = 未声明 / 0x02 = 最大压缩 / 0x04 = 最快
+        // 这里写 0x00 而不抄 Python 的 0x02 —— libcompression 用的是它自己的默认级别，
+        // 我们并不知道是否等价于「最大压缩」，写 0x02 等于替它谎报。
+        // OS=0xFF 是「未知」，与 Python gzip.compress 一致。
+        output.append(contentsOf: [0x00, 0xFF])               // XFL + OS
+        output.append(deflated)
+        let crc = Self.crc32(data)
+        for shift in stride(from: 0, to: 32, by: 8) {         // CRC32 小端
+            output.append(UInt8(truncatingIfNeeded: crc >> UInt32(shift)))
+        }
+        let size = UInt32(truncatingIfNeeded: data.count)     // ISIZE 小端
+        for shift in stride(from: 0, to: 32, by: 8) {
+            output.append(UInt8(truncatingIfNeeded: size >> UInt32(shift)))
+        }
+        return output
+    }
+
+    /// 把 `compressed(using: .zlib)` 的产物归一成裸 deflate（RFC 1951）。
+    ///
+    /// 现状下这就是恒等变换（Apple 给的就是裸 deflate），保留是因为 Apple 从未把
+    /// 这条行为写进文档，将来若改回真 zlib 封装，这里能兜住、不至于静默发出坏包。
+    ///
+    /// 判别为什么不会误伤裸 deflate：zlib 头的 CMF 低 4 位必须是 8 且 CINFO ≤ 7，
+    /// 候选只有 `0x08`…`0x78`；而实测裸 deflate 首字节是 `0x73`/`0x03`，
+    /// 若是 stored 块（BTYPE=00）则只能是 `0x00`/`0x01`（第 3–7 位必须全 0 作填充）。
+    /// 两条集合不相交，所以不会把裸 deflate 当成 zlib 去剥。
+    ///
+    /// 阈值 8 的依据：zlib 封装最短 = 2 字节头 + 2 字节空 deflate 块
+    /// （fixed-Huffman 的 end-of-block 共 10 bit）+ 4 字节 Adler32 = 8 字节。
+    /// 短于 8 就不可能带封装 —— 这里**必须**用 8，早期版本拍脑袋写 6，
+    /// 结果空数据（2 字节）和 1 字节输入（3 字节）被判成「长度异常」直接抛错。
+    private static func normalizeToRawDeflate(_ encoded: Data) -> Data {
+        /// zlib 封装的理论最短长度（见上）。低于它必然是裸 deflate。
+        let shortestPossibleZlibStream = 8
+        guard encoded.count >= shortestPossibleZlibStream else { return encoded }
+        let prefix = [UInt8](encoded.prefix(2))
+        let isZlibWrapped = prefix[0] & 0x0F == 0x08      // CM = deflate
+            && prefix[0] >> 4 <= 0x07                      // CINFO ≤ 7（窗口 ≤ 32K）
+            && (UInt16(prefix[0]) << 8 | UInt16(prefix[1])) % 31 == 0
+        if isZlibWrapped {
+            return encoded.subdata(in: 2..<(encoded.count - 4))
+        }
+        return encoded
+    }
+
+    /// CRC32（IEEE 802.3，gzip 尾校验用）。系统没把 zlib 的 crc32 暴露给 Swift，
+    /// 这里自带一张表，行为与 Python `zlib.crc32` 一致。
+    private static func crc32(_ data: Data) -> UInt32 {
+        var table = [UInt32](repeating: 0, count: 256)
+        for index in 0..<256 {
+            var value = UInt32(index)
+            for _ in 0..<8 {
+                value = (value & 1 != 0) ? (0xEDB88320 ^ (value >> 1)) : (value >> 1)
+            }
+            table[index] = value
+        }
+        var crc: UInt32 = 0xFFFFFFFF
+        for byte in data {
+            crc = table[Int((crc ^ UInt32(byte)) & 0xFF)] ^ (crc >> 8)
+        }
+        return crc ^ 0xFFFFFFFF
     }
 
     /// gzip 解压（RFC 1952）。

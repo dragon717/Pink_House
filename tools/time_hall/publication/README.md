@@ -223,7 +223,11 @@ python3 build_release.py --input <目录> --shop-catalog <商店目录.json> \
 结构校验由 `protocol.validate_shop_catalog` 专门负责：实体 id 非空唯一、
 店家/系列/商品/规格/销售记录/尺码表/款式档案的引用**必须包内可解析**、
 墓碑不得与现存实体同 id、销售记录类型/币种与发售阶段/尾款粒度枚举合法。
-图片引用允许指向 Bundle 内置资源（`bundle:` 前缀），**不**做资产引用校验。
+
+**资产引用校验**由 `protocol.validate_shop_catalog_media` 负责（公共数据库字段配置方案 §2.3
+明确要求补上的发布前错误）：包内每个 `mediaKey` / `thmedia:` 引用都必须命中
+**本次真的会上传**的 THMedia；残留的 `local:` 引用一律判失败（它只在运营那台设备成立）。
+`bundle:`（App 内置）与 http(s) 不属于 THMedia 通道，不在本校验范围内。
 
 ⚠️ **运营导出输入时必须导出「合并视图」**（Bundle 种子 + 覆盖层）。
 只导覆盖层会因引用悬空被校验拒绝——这正是设计要拦住的错误，不是误报。
@@ -253,9 +257,33 @@ python3 build_release.py --input <目录> \
 
 - 只处理 `local:`；`bundle:`（App 内置）与 http(s) 原样保留；
 - 同一张图（同内容摘要）只上传一次，多处引用共享；
-- **引用到的图缺失 → 构建硬失败（退出码 5）**，绝不静默发一个没图的包；
+- **引用到的图缺失 → 构建硬失败（退出码 5）**，绝不静默发一个没用的包；
 - 归档条目（含其专属图）先被 `strip_archived_shop_catalog` 剔除，不会白传一份；
 - 客户端按需下载（屏内才拉），落 `Caches/ShopCatalogSync/media/`，命中缓存不再打网络。
+
+#### 商品 JSON 的 canonical 媒体键（方案 §2.2）
+
+改写引用时，`CatalogAsset` 会额外写入 **`mediaKey`** —— 取值就是该图字节的 SHA-256
+（64 位小写 hex），与 `thmedia:<hash>` 里的 hash **必然一致**。它是消费端解析远端图的
+首选口径（`ShopCatalogSyncProtocol.resolvedMediaKey`：`mediaKey` 优先、`thmedia:` 兜底），
+旧包（只有 `thmedia:` 引用、没有 `mediaKey`）行为完全不变。
+
+第一版只加**一个** canonical `mediaKey`（取原图）。需要多分辨率时再补
+`thumbnailMediaKey` / `previewMediaKey`，或为同一张图发布多条 `CatalogAsset`。
+
+#### 媒体清单（`media-manifest.json`）的输入约束
+
+画册媒体走 `--input` 目录下的 `media-manifest.json`。每条至少三个键，
+缺一即构建失败：
+
+| 键 | 约束 |
+|---|---|
+| `mediaKey` | **必填**，且必须等于该文件字节的 SHA-256（否则报「声明 ≠ 实际」） |
+| `fileName` | **必填**，相对 `--input` 的路径，文件必须存在 |
+| `mimeType` | **必填**，必须在白名单内：`image/jpeg` `image/png` `image/gif` `image/webp` `image/heic` |
+
+另有单张媒体字节上限 `MAX_MEDIA_BYTES`（20 MiB）。商店目录的图片不写 manifest，
+走归档里的 `images/`，但适用**同一套** MIME 白名单与字节上限。
 
 ## 发布顺序为什么是这个顺序（§9.1）
 

@@ -116,8 +116,11 @@ struct ShopCatalogOpsView: View {
             draftSection
             manageSection
             exportSection
+            // 上传发布（iOS 运营上传实施方案 §3）：把本地目录真正发到公共库。
+            // 排在「导出」之后：导出仍然是离线交接路径，上传是直连路径，两条并存。
+            ShopCatalogOpsUploadSection(catalog: store.catalog)
         }
-        // 底部悬浮 Dock 避让：表单最后一段（导出）会被 Dock 盖住。
+        // 底部悬浮 Dock 避让：表单最后一段（上传发布）会被 Dock 盖住。
         .avoidingBottomDock()
         .overlay(alignment: .bottom) {
             if let toast {

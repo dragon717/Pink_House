@@ -33,3 +33,9 @@
 - `colorWords` 必须含**复合色**（`生成色`/`粉紫色`，长词优先），否则同款三色被拆成三款。
 - **改名计划的基准必须是「改名前后两个不同的商品快照」**：写一点像是「传入已改好 name 的那一份」更省事，但那样「名称是否被改动」自己跟自己比永远相等 → **真改名被判成没改名**（09-24 实测两条端到端用例红）。`plan(edited:basedOn:)` 两个入参缺一不可。
 - 识别名字里的颜色词有**两个**口径，别混用：`ShopCatalogColorPresentation.derivedLabel`（守卫「剥离后须≠原名」，名字恰好就是一个颜色词时返回 nil，用于「能不能当颜色标签」）vs `ShopCatalogProductRename.colorWord(in:)`（用于「改名别把颜色弄丢」）。
+- ⭐ **`NSData.compressed(using: .zlib)` 是裸 deflate（RFC 1951），不是 zlib 封装**（名字骗人）。实测：0B→2B `03 00`、1B→3B `73 04 00`、512B→20B 首字节 `0x7B`，首字节**从不是** `0x78`。所以 `compress` 绝不能剥「2 字节 zlib 头 + 4 字节 Adler32 尾」——那会截断 deflate 数据本身，产物必然解不开（Cocoa 5377）。写 `compress` 前先读同文件 `decompress` 的注释（它早就写明了），两侧必须同口径。若要写「是否 zlib 封装」的判别，阈值**必须 ≥ 8**（2 头 + 2 字节空 deflate 块 + 4 Adler32）。
+- `ShopCatalogImageStore.url(for:)` **只拼路径、不查盘**，对不存在的文件也返回非 nil。判断「文件不存在」必须自己补 `FileManager.fileExists`，否则会掉进 `unreadable` 而 `fileMissing` 永远不可达（两者对运营的含义不同：缺图→重新选图 / 读失败→重试）。
+- 持有 SwiftData 容器的 `@MainActor` store 进单测，**测试类本身要标 `@MainActor`**，光标在另一个类上不够。
+- **不要在脚本运行中途编辑脚本**：bash 按字节偏移增量读取，改文件头会让它从错位处继续读（`line N: syntax error`），收尾结论行静默丢失。
+- `xcodebuild` 参数误写相对路径会生成 `ItemManager.xcodeproj/-Xcc/`（26M clang 缓存），已 `gitignore`。
+- **自检 gzip/字节流格式，别等 xcodebuild**：`xcrun swift` 跑十行探针，产物喂 Python `gzip.decompress` 交叉验证，比全量测试快两个数量级。
