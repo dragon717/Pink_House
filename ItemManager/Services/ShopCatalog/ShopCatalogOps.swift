@@ -485,16 +485,14 @@ nonisolated struct CatalogBatchDeleteResult: Sendable {
 
 /// 商品被拦下的原因。文案与单项 `ShopCatalogEntityError` 保持同一口径，
 /// 但这里用**枚举**而不是拼好的错误对象，方便弹窗逐条列出、也方便单测断言。
+/// （2026-09-25 需求一：`referencedByUserData` 已随「引用不再拦截删除」移除——
+///   被引用商品可删，用户记录按快照保留，涉及条数走 `preservedRecordCount` 汇报。）
 nonisolated enum CatalogProductDeleteReason: Hashable, Sendable {
-    /// 已被用户心愿 / 尾款 / 衣橱引用（含软删除记录）→ 只能归档
-    case referencedByUserData
     /// 来自随版本内置的种子档案（Bundle 只读）→ 无法物理删除，只能归档
     case seedImmutable
 
     var message: String {
         switch self {
-        case .referencedByUserData:
-            return "已被用户心愿/尾款/衣橱引用，禁止删除，仅可归档。"
         case .seedImmutable:
             return "来自随版本内置的种子档案，无法物理删除，仅可归档。"
         }
@@ -514,6 +512,8 @@ nonisolated struct CatalogProductDeleteBlock: Identifiable, Hashable, Sendable {
 nonisolated struct CatalogProductDeleteResult: Sendable {
     let deletedIDs: Set<String>
     let blocked: [CatalogProductDeleteBlock]
+    /// 被删除商品曾被用户心愿/衣橱引用的记录条数：这些记录按加入时快照保留，不受影响
+    var preservedRecordCount: Int = 0
 }
 
 /// 删除预检结果（只读）：供「二次确认」弹窗展示**真实**影响范围。
@@ -521,6 +521,8 @@ nonisolated struct CatalogProductDeleteResult: Sendable {
 nonisolated struct CatalogProductDeletePreview: Equatable, Sendable {
     let deletableNames: [String]
     let blocked: [CatalogProductDeleteBlock]
+    /// 将被删除商品曾被用户心愿/衣橱引用的记录条数（这些记录按快照保留）
+    var preservedRecordCount: Int = 0
 
     var deletableCount: Int { deletableNames.count }
     var blockedCount: Int { blocked.count }
@@ -2411,27 +2413,29 @@ final class ShopCatalogDraftStore: ObservableObject {
         try upsertEntity(updated, keyPath: \.products)
     }
 
-    /// 物理删除：仅当实体来自运营覆盖层（Bundle 种子不可变）、无下级、且无用户引用时允许；
-    /// 否则抛错，提示仅可归档（§4.2 引用保护）。
+    /// 物理删除：仅当实体来自运营覆盖层（Bundle 种子不可变）时允许。
+    ///
+    /// 2026-09-25 需求一（数据独立性）：**用户引用不再拦截删除** ——
+    /// 用户衣橱/心愿记录是加入时的快照（金额、名称、物化图片副本、引用 id），
+    /// 删除发布内容不影响它们；运营侧保留对后台数据的删除权限。
+    /// 被引用商品的用户记录条数照旧统计并返回，UI 如实告知「N 条记录按快照保留」。
+    ///
+    /// - Returns: 保留的用户记录条数（未软删、引用本商品的 Clothing 条数；0 = 无引用）
+    @discardableResult
     static func deleteProduct(
         _ product: CatalogProduct, store: ShopCatalogStore, modelContext: ModelContext
-    ) throws {
+    ) throws -> Int {
         try CreatorAccess.requireCreator(.listingDelete)
-        let catalog = store.catalog
-        // 引用保护：被用户心愿/尾款/衣橱引用（含软删除记录）→ 禁止物理删除
-        let referenced = try ShopCatalogReferenceGuard.referencedProductIDs(
-            [product.id], modelContext: modelContext)
-        guard referenced.isEmpty else {
-            throw ShopCatalogEntityError.referencedOnlyArchive(
-                kind: "商品", name: product.name)
-        }
+        // 如实计数：这次删除涉及多少条用户私有记录（它们按快照保留，不受影响）
+        let preservedRecords = (try? ShopCatalogReferenceGuard.referencedRecordCount(
+            [product.id], modelContext: modelContext)) ?? 0
         guard let overlay = loadOverlay(),
               overlay.products.contains(where: { $0.id == product.id }) else {
             throw ShopCatalogEntityError.seedImmutableOnlyArchive(kind: "商品", name: product.name)
         }
         var updated = overlay
         updated.products.removeAll { $0.id == product.id }
-        // 无引用时连带清理其规格/尺码表（销售事件按硬约束保留历史）
+        // 连带清理其规格/尺码表（销售事件按硬约束保留历史）
         updated.variants.removeAll { $0.productID == product.id }
         updated.sizeCharts.removeAll { $0.productID == product.id }
         // 种子里也有同 id → 物理删除做不到（Bundle 只读），退化为归档
@@ -2442,6 +2446,7 @@ final class ShopCatalogDraftStore: ObservableObject {
         // 生产路径传 `.shared`；测试传独立实例时也要看到删除结果（与 forceDeleteShop 同口径）
         if store !== ShopCatalogStore.shared { store.reloadWithOverlay() }
         ShopCatalogStore.shared.reloadWithOverlay()
+        return preservedRecords
     }
 
     // MARK: 商品批量删除（2026-09-23 需求：批量删除商品 + 二次确认）
@@ -2451,9 +2456,12 @@ final class ShopCatalogDraftStore: ObservableObject {
     private struct ProductDeletionPlan {
         var deletable: [CatalogProduct] = []
         var blocked: [CatalogProductDeleteBlock] = []
+        /// 将被删除商品涉及的用户记录条数（未软删、引用其中商品；删除后按快照保留）
+        var preservedRecordCount = 0
     }
 
-    /// 逐个判定：被用户引用 → 拦截；种子（Bundle 只读）或不在覆盖层 → 拦截；其余可删。
+    /// 逐个判定：种子（Bundle 只读）或不在覆盖层 → 拦截；其余**一律可删**
+    ///（2026-09-25 需求一：用户引用不再拦截，用户记录按快照保留）。
     /// 引用判定对整批只查一次数据库（不是每件一次）。
     private static func planProductDeletion(
         _ products: [CatalogProduct],
@@ -2465,25 +2473,23 @@ final class ShopCatalogDraftStore: ObservableObject {
         let unique = products.filter { seen.insert($0.id).inserted }
         guard !unique.isEmpty else { return ProductDeletionPlan() }
 
-        // 引用保护：被用户心愿/尾款/衣橱引用（含软删除记录）→ 禁止物理删除
-        let referenced = try ShopCatalogReferenceGuard.referencedProductIDs(
-            Set(unique.map(\.id)), modelContext: modelContext)
         // 只有覆盖层里的商品才可能被物理删除——种子在 Bundle 里，改不动
         let overlayIDs = Set((loadOverlay()?.products ?? []).map(\.id))
 
         var plan = ProductDeletionPlan()
         for product in unique {
-            if referenced.contains(product.id) {
-                plan.blocked.append(CatalogProductDeleteBlock(
-                    productID: product.id, name: product.name,
-                    reason: .referencedByUserData))
-            } else if !overlayIDs.contains(product.id) || store.isSeedProduct(id: product.id) {
+            if !overlayIDs.contains(product.id) || store.isSeedProduct(id: product.id) {
                 plan.blocked.append(CatalogProductDeleteBlock(
                     productID: product.id, name: product.name,
                     reason: .seedImmutable))
             } else {
                 plan.deletable.append(product)
             }
+        }
+        // 用户记录计数只统计**真正会被删除**的商品（被拦的不动，自然不涉及）
+        if !plan.deletable.isEmpty {
+            plan.preservedRecordCount = (try? ShopCatalogReferenceGuard.referencedRecordCount(
+                Set(plan.deletable.map(\.id)), modelContext: modelContext)) ?? 0
         }
         return plan
     }
@@ -2498,12 +2504,13 @@ final class ShopCatalogDraftStore: ObservableObject {
         try CreatorAccess.requireCreator(.listingDelete)
         let plan = try planProductDeletion(products, store: store, modelContext: modelContext)
         return CatalogProductDeletePreview(deletableNames: plan.deletable.map(\.name),
-                                          blocked: plan.blocked)
+                                          blocked: plan.blocked,
+                                          preservedRecordCount: plan.preservedRecordCount)
     }
 
-    /// 批量物理删除商品：守卫与单品删除完全相同（种子不可删 / 被引用只能归档），
-    /// 差别只在**整批只写一次覆盖层**——逐条调用 `deleteProduct` 会产生 N 次中途落盘
-    /// 与 N 次 reload，中途失败就留下「删了一半」的中间态。
+    /// 批量物理删除商品：守卫与单品删除完全相同（种子不可删；用户引用不拦截，
+    /// 2026-09-25 需求一），差别只在**整批只写一次覆盖层**——逐条调用 `deleteProduct`
+    /// 会产生 N 次中途落盘与 N 次 reload，中途失败就留下「删了一半」的中间态。
     ///
     /// 部分成功是允许的，但绝不静默：`blocked` 原样返回，调用方必须展示。
     @discardableResult
@@ -2520,13 +2527,14 @@ final class ShopCatalogDraftStore: ObservableObject {
 
         let ids = Set(plan.deletable.map(\.id))
         overlay.products.removeAll { ids.contains($0.id) }
-        // 与单品删除同口径：无引用时连带清理其规格 / 尺码表（销售事件按硬约束保留历史）
+        // 与单品删除同口径：连带清理其规格 / 尺码表（销售事件按硬约束保留历史）
         overlay.variants.removeAll { ids.contains($0.productID) }
         overlay.sizeCharts.removeAll { ids.contains($0.productID) }
         try saveOverlay(overlay)
         if store !== ShopCatalogStore.shared { store.reloadWithOverlay() }
         ShopCatalogStore.shared.reloadWithOverlay()
-        return CatalogProductDeleteResult(deletedIDs: ids, blocked: plan.blocked)
+        return CatalogProductDeleteResult(deletedIDs: ids, blocked: plan.blocked,
+                                          preservedRecordCount: plan.preservedRecordCount)
     }
 
     static func deleteSeries(
@@ -2583,8 +2591,8 @@ final class ShopCatalogDraftStore: ObservableObject {
     //    · 店家 → 全部系列 → 全部商品 → 规格 / 尺码表；
     //    · 种子实体物理删不掉（Bundle 只读）→ 写**墓碑**（removed*IDs），
     //      合并层（ShopCatalogStore.applyTombstones）据此从生效目录排除；
-    //    · 被用户心愿/尾款/衣橱引用的商品**保留**（引用保护红线不因「强制」放松），
-    //      如实计入汇报；
+    //    · 被用户心愿/尾款/衣橱引用的商品**照删**（2026-09-25 需求一：用户记录
+    //      是加入时快照，删除不影响它们），涉及条数如实计入汇报；
     //    · 销售事件按 append-only 硬约束**永不删除**；
     //    · 预检与执行共用同一 plan（「弹窗说删几个、实际就删几个」）；
     //    · 覆盖层整批只写一次。
@@ -2594,8 +2602,11 @@ final class ShopCatalogDraftStore: ObservableObject {
         var shopName: String = ""
         var deletedSeriesCount = 0
         var deletedProductCount = 0
-        /// 因被用户引用而保留的商品名（引用保护红线，非错误）
-        var keptReferencedProductNames: [String] = []
+        /// 其中曾被用户心愿/尾款/衣橱引用的商品名：商品已照删（2026-09-25 需求一），
+        /// 用户记录按加入时快照保留、不受影响 —— 汇报必须如实说清这两件事
+        var referencedProductNames: [String] = []
+        /// 上述商品涉及的用户记录条数（未软删、引用其中商品）
+        var preservedRecordCount = 0
         var deletedVariantCount = 0
         var deletedSizeChartCount = 0
         /// 销售事件保留条数（不删，只为汇报透明）
@@ -2611,7 +2622,10 @@ final class ShopCatalogDraftStore: ObservableObject {
     private struct ShopForceDeletionPlan {
         var series: [CatalogSeries] = []
         var deletableProducts: [CatalogProduct] = []
-        var keptReferencedProducts: [CatalogProduct] = []
+        /// 其中曾被用户引用的商品（照删，汇报里如实点名）
+        var referencedProducts: [CatalogProduct] = []
+        /// 涉及的用户记录条数
+        var preservedRecordCount = 0
         var variantCount = 0
         var sizeChartCount = 0
         var saleEventCount = 0
@@ -2631,20 +2645,25 @@ final class ShopCatalogDraftStore: ObservableObject {
         let products = (catalog?.products ?? []).filter {
             $0.shopID == shop.id || seriesIDs.contains($0.seriesID)
         }
-        // 引用保护红线：被用户心愿/尾款/衣橱引用（含软删除）的商品保留
+        // 2026-09-25 需求一：被用户引用的商品**照删**（用户记录按快照保留），
+        // 但必须统计出来如实汇报，不许静默
         let referenced = try ShopCatalogReferenceGuard.referencedProductIDs(
             Set(products.map(\.id)), modelContext: modelContext)
-        let deletable = products.filter { !referenced.contains($0.id) }
-        let deletedProductIDs = Set(deletable.map(\.id))
+        let deletedProductIDs = Set(products.map(\.id))
 
-        return ShopForceDeletionPlan(
+        var plan = ShopForceDeletionPlan(
             series: series,
-            deletableProducts: deletable,
-            keptReferencedProducts: products.filter { referenced.contains($0.id) },
+            deletableProducts: products,
+            referencedProducts: products.filter { referenced.contains($0.id) },
             variantCount: (catalog?.variants ?? []).filter { deletedProductIDs.contains($0.productID) }.count,
             sizeChartCount: (catalog?.sizeCharts ?? []).filter { deletedProductIDs.contains($0.productID) }.count,
             saleEventCount: (catalog?.saleEvents ?? []).filter { deletedProductIDs.contains($0.productID) }.count
         )
+        if !products.isEmpty {
+            plan.preservedRecordCount = (try? ShopCatalogReferenceGuard.referencedRecordCount(
+                deletedProductIDs, modelContext: modelContext)) ?? 0
+        }
+        return plan
     }
 
     /// 只读预检（供确认弹窗展示真实影响范围）。
@@ -2702,7 +2721,8 @@ final class ShopCatalogDraftStore: ObservableObject {
             shopName: shop.name,
             deletedSeriesCount: plan.series.count,
             deletedProductCount: plan.deletableProducts.count,
-            keptReferencedProductNames: plan.keptReferencedProducts.map(\.name),
+            referencedProductNames: plan.referencedProducts.map(\.name),
+            preservedRecordCount: plan.preservedRecordCount,
             deletedVariantCount: plan.variantCount,
             deletedSizeChartCount: plan.sizeChartCount,
             retainedSaleEventCount: plan.saleEventCount
@@ -2757,17 +2777,20 @@ enum ShopCatalogReferenceGuard {
     }
 
     /// 被引用的**记录条数**（同一商品可能有多条：定金+尾款一条、正装一条…）。
-    /// 专供改名提示用：改名**不**去改用户私有记录的名字（那是加入时的快照，
-    /// 且 `Clothing` 是按 `catalogProductID` 引用商品的，改名不断链），
-    /// 但必须如实告知有多少条这种记录，不许静默。
+    /// 专供删除/改名提示用：删除**不去改**用户私有记录（那是加入时的快照，
+    /// 且 `Clothing` 是按 `catalogProductID` 引用商品的），但必须如实告知
+    /// 有多少条这种记录，不许静默。
     /// 只数未软删的记录 —— 用户看不见的记录不该出现在提示里。
+    /// ⚠️ 谓词用**存储属性** `deletedAt`（软删标记），不要用 `isDeleted`：
+    ///    后者不是存储属性，谓词下推到容器时会触发
+    ///    「No eligible connection available」（2026-09-25 实测崩溃）。
     static func referencedRecordCount(
         _ productIDs: Set<String>, modelContext: ModelContext
     ) throws -> Int {
         guard !productIDs.isEmpty else { return 0 }
         let descriptor = FetchDescriptor<Clothing>(
             predicate: #Predicate { clothing in
-                clothing.catalogProductID != nil && clothing.isDeleted == false
+                clothing.catalogProductID != nil && clothing.deletedAt == nil
             }
         )
         return try modelContext.fetch(descriptor).filter { clothing in
@@ -2790,8 +2813,8 @@ enum ShopCatalogReferenceGuard {
 // MARK: - 实体操作错误（V1.1 §4.2）
 
 nonisolated enum ShopCatalogEntityError: LocalizedError {
-    /// 被用户心愿/尾款/衣橱引用 → 禁止物理删除，仅可归档
-    case referencedOnlyArchive(kind: String, name: String)
+    // 2026-09-25 需求一：`referencedOnlyArchive` 已移除 —— 用户引用不再拦截删除，
+    // 用户记录按加入时快照保留；涉及条数由删除入口返回、UI 如实汇报。
     /// 存在下级实体（系列/商品）→ 禁止物理删除
     case hasChildrenOnlyArchive(kind: String, name: String, childCount: Int)
     /// 实体来自 Bundle 种子（只读）→ 无法物理删除，仅可归档
@@ -2799,8 +2822,6 @@ nonisolated enum ShopCatalogEntityError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .referencedOnlyArchive(let kind, let name):
-            return "「\(name)」已被用户心愿/尾款/衣橱引用，禁止删除，仅可归档。"
         case .hasChildrenOnlyArchive(let kind, let name, let count):
             return "「\(name)」名下仍有 \(count) 个下级条目，请先处理下级，或仅归档。"
         case .seedImmutableOnlyArchive(let kind, let name):

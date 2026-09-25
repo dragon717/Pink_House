@@ -174,6 +174,11 @@ Query 索引（如果运营侧要用 query 拉取而非 lookup）：`THDataPack.
 
 ### 3. 发布
 
+> ⚠️ **TestFlight / App Store 只读 Production 环境**，Xcode 本地构建读 Development。
+> 两者记录、Schema、s2s key 完全隔离。发给 TestFlight 用户前必须按
+> `docs/TIME_HALL_PRODUCTION_PUBLISH_RUNBOOK.md` 单独发布到 Production
+> （含 Console 部署 Schema、建 Production s2s key、写 `.production` 后缀 Keychain 凭证）。
+
 ```bash
 python3 build_release.py --input <已审核目录> --output <产物目录> --release-seq <N>
 

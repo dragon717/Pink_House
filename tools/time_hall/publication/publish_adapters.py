@@ -84,20 +84,42 @@ class Credentials:
             return cls._from_payload(payload, environment)
 
         # macOS Keychain：keyID 与私钥分开存放，避免出现在同一个输出里
+        #
+        # ⚠️ 环境隔离（2026-09-25 实测）：CloudKit 的 s2s key 是**按环境注册**的，
+        # Development 环境创建的 key 打 Production URL 会直接 HTTP 401
+        # （Apple 文档："Tokens are specific to a deployment environment"）。
+        # 所以 Production 必须使用独立的 key：Keychain 账户名加 `.production`
+        # 后缀（keyID.production / privateKey.production / containerID.production），
+        # Development 继续用无后缀账户名。
+        suffix = ".production" if environment == "production" else ""
         try:
             key_id = subprocess.check_output(
-                ["security", "find-generic-password", "-s", KEYCHAIN_SERVICE, "-a", "keyID", "-w"],
+                ["security", "find-generic-password", "-s", KEYCHAIN_SERVICE, "-a", "keyID" + suffix, "-w"],
                 stderr=subprocess.DEVNULL,
             ).decode().strip()
             private_key = subprocess.check_output(
-                ["security", "find-generic-password", "-s", KEYCHAIN_SERVICE, "-a", "privateKey", "-w"],
+                ["security", "find-generic-password", "-s", KEYCHAIN_SERVICE, "-a", "privateKey" + suffix, "-w"],
                 stderr=subprocess.DEVNULL,
             ).decode().strip()
             container_id = subprocess.check_output(
-                ["security", "find-generic-password", "-s", KEYCHAIN_SERVICE, "-a", "containerID", "-w"],
+                ["security", "find-generic-password", "-s", KEYCHAIN_SERVICE, "-a", "containerID" + suffix, "-w"],
                 stderr=subprocess.DEVNULL,
             ).decode().strip()
         except subprocess.CalledProcessError:
+            if suffix:
+                raise CredentialError(
+                    "未找到 Production 发布凭证。CloudKit s2s key 按环境隔离，"
+                    "Development 的 key 打 Production URL 会 401，必须单独创建：\n"
+                    "  1. CloudKit Console 顶部环境切到 Production；\n"
+                    "  2. API Access → Server-to-Server Keys → 新建 key（或复用同一家公私钥，注册出 Production 的 Key ID）；\n"
+                    "  3. 写入 Keychain：\n"
+                    "     security add-generic-password -s {service} -a keyID.production      -w <PROD_KEY_ID>\n"
+                    "     security add-generic-password -s {service} -a privateKey.production -w <PROD_PEM 文件内容>\n"
+                    "     security add-generic-password -s {service} -a containerID.production -w iCloud.bugod2.ItemManager\n"
+                    "开发环境可改用环境变量 {env} 指向一个 JSON 凭证文件。".format(
+                        service=KEYCHAIN_SERVICE, env=CREDENTIAL_ENV_VAR
+                    )
+                )
             raise CredentialError(
                 "未找到发布凭证。请先写入 Keychain：\n"
                 "  security add-generic-password -s {service} -a keyID      -w <KEY_ID>\n"
@@ -447,6 +469,18 @@ class CloudKitWebServicesAdapter(PublishAdapter):
                     detail = error.read().decode("utf-8", errors="replace")[:400]
                 except Exception:  # noqa: BLE001
                     pass
+                if error.code == 401:
+                    # s2s key 按环境隔离：Development 的 key 打 Production URL 必 401
+                    raise ProtocolError(
+                        "HTTP 401 Unauthorized：s2s key 没有 {} 环境的访问权。"
+                        "CloudKit 的 key 按环境注册，Production 需要在 CloudKit Console "
+                        "的 Production 环境下单独创建 key 并写入 Keychain"
+                        "（keyID.production / privateKey.production）。"
+                        "详见 tools/time_hall/publication/README.md 与 "
+                        "docs/TIME_HALL_PRODUCTION_PUBLISH_RUNBOOK.md。{}".format(
+                            self.credentials.environment, detail
+                        )
+                    ) from error
                 raise ProtocolError(
                     "HTTP {} {}: {}".format(error.code, error.reason, detail)
                 ) from error

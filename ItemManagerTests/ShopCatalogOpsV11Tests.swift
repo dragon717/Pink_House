@@ -217,9 +217,9 @@ final class ShopCatalogOpsV11Tests: XCTestCase {
         XCTAssertEqual(savedChart?.sourceImage, "full-chart.jpg", "尺码表原图必须保留")
     }
 
-    // MARK: G3/G4 引用保护
+    // MARK: G3/G4 数据独立性（2026-09-25 需求一：引用不再拦截删除）
 
-    func testReferencedProductCannotBeDeletedOnlyArchived() throws {
+    func testReferencedProductCanBeDeletedAndUserRecordIsKept() throws {
         var draft = CatalogProductDraft()
         draft.name = "引用保护款"
         draft.saleKind = .stock
@@ -235,27 +235,25 @@ final class ShopCatalogOpsV11Tests: XCTestCase {
         // 用户把该商品加入衣橱（Clothing.catalogProductID 引用）。
         // 注意：不调用 context.save() —— 内存容器的 save 会偶发抛
         // 「No eligible connection available」（ObjC 异常，try/catch 拦不住）；
-        // 同 context 的 fetch 含 pending changes，无需落盘即可被引用保护查询到。
+        // 同 context 的 fetch 含 pending changes，无需落盘即可被引用查询命中。
         let context = modelContext()
         let clothing = Clothing(name: "引用保护款", types: "OP", price: 66, stock: 1)
         clothing.catalogProductID = product.id
         context.insert(clothing)
 
-        // 删除被引用商品 → 拦截（引用保护）
-        XCTAssertThrowsError(try ShopCatalogDraftStore.deleteProduct(
-            product, store: store, modelContext: context)) { error in
-            guard case ShopCatalogEntityError.referencedOnlyArchive = error else {
-                return XCTFail("应抛 referencedOnlyArchive，实际：\(error)")
-            }
-        }
-        XCTAssertNotNil(store.catalog?.products.first { $0.id == product.id }, "被引用商品数据保留")
-
-        // 归档 → 用户端隐藏，Clothing 记录仍指向它（收藏保留）
-        try ShopCatalogDraftStore.archiveProduct(product)
+        // 2026-09-25 需求一：删除不再被引用拦截，涉及的用户记录条数如实返回
+        let preserved = try ShopCatalogDraftStore.deleteProduct(
+            product, store: store, modelContext: context)
+        XCTAssertEqual(preserved, 1)
         store.reloadWithOverlay()
-        XCTAssertNil(store.product(id: product.id))
-        XCTAssertEqual(try ShopCatalogReferenceGuard.referencedProductIDs(
-            [product.id], modelContext: context), [product.id])
+        XCTAssertNil(store.catalog?.products.first { $0.id == product.id }, "商品已物理删除")
+
+        // 用户衣橱数据按加入时快照保留：名称 / 金额 / 引用一个不动
+        let fetched = try context.fetch(FetchDescriptor<Clothing>())
+        XCTAssertEqual(fetched.count, 1, "删除发布内容不影响用户衣橱数据")
+        XCTAssertEqual(fetched.first?.catalogProductID, product.id)
+        XCTAssertEqual(fetched.first?.name, "引用保护款")
+        XCTAssertEqual(fetched.first?.price ?? 0, 66)
     }
 
     func testUnreferencedOverlayProductCanBeDeleted() throws {

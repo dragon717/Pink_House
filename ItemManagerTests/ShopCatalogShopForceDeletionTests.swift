@@ -101,7 +101,7 @@ final class ShopCatalogShopForceDeletionTests: XCTestCase {
         XCTAssertEqual(report.deletedVariantCount, 2)
         XCTAssertEqual(report.deletedSizeChartCount, 2)
         XCTAssertEqual(report.childRecordCount, 8)
-        XCTAssertTrue(report.keptReferencedProductNames.isEmpty)
+        XCTAssertTrue(report.referencedProductNames.isEmpty)
         XCTAssertEqual(report.retainedSaleEventCount, 2, "销售事件只汇报，不删除")
 
         // 合并视图：全链路消失
@@ -145,28 +145,34 @@ final class ShopCatalogShopForceDeletionTests: XCTestCase {
         XCTAssertTrue((store.catalog?.variants ?? []).allSatisfy { !seedProductIDs.contains($0.productID) })
     }
 
-    // MARK: 3. 引用保护：被引用商品保留并汇报
+    // MARK: 3. 数据独立性：被引用商品照删，用户记录按快照保留
 
-    func testForceDeleteKeepsReferencedProducts() throws {
+    func testForceDeleteDeletesReferencedProductsAndKeepsUserData() throws {
         let shop = try makeOverlayShop(id: "shop-force-ref", name: "引用保留店家", seriesCount: 1)
-        let keptProductID = "shop-force-ref-prod-0"
+        let referencedProductID = "shop-force-ref-prod-0"
 
         // 用户把该商品加入衣橱（不 save：内存容器 save 偶发抛错，fetch 含 pending changes）
         let context = modelContext()
         let clothing = Clothing(name: "引用保留款", types: "JSK", price: 66, stock: 1)
-        clothing.catalogProductID = keptProductID
+        clothing.catalogProductID = referencedProductID
         context.insert(clothing)
 
         let report = try ShopCatalogDraftStore.forceDeleteShop(
             shop, store: store, modelContext: context)
 
-        XCTAssertEqual(report.deletedProductCount, 0, "唯一商品被引用 → 不删")
-        XCTAssertEqual(report.keptReferencedProductNames, ["商品0"], "保留要如实汇报")
-        XCTAssertNotNil(store.product(id: keptProductID), "被引用商品数据保留")
+        XCTAssertEqual(report.deletedProductCount, 1, "被引用商品照删（2026-09-25 需求一）")
+        XCTAssertEqual(report.referencedProductNames, ["商品0"], "曾被引用这件事要如实汇报")
+        XCTAssertEqual(report.preservedRecordCount, 1, "涉及的用户记录条数如实汇报")
+        XCTAssertNil(store.product(id: referencedProductID), "商品已照删")
         XCTAssertNil(store.catalog?.shops.first { $0.id == shop.id }, "店家本身仍删除")
-        // 保留商品不写墓碑
+        // 墓碑照写
         let overlay = try XCTUnwrap(ShopCatalogDraftStore.loadOverlay())
-        XCTAssertFalse(overlay.removedProductIDs.contains(keptProductID))
+        XCTAssertTrue(overlay.removedProductIDs.contains(referencedProductID))
+        // 用户衣橱数据按加入时快照保留
+        let fetched = try context.fetch(FetchDescriptor<Clothing>())
+        XCTAssertEqual(fetched.count, 1, "删除发布内容不影响用户衣橱数据")
+        XCTAssertEqual(fetched.first?.catalogProductID, referencedProductID)
+        XCTAssertEqual(fetched.first?.name, "引用保留款")
     }
 
     // MARK: 4. 预检只读 + 与执行同源

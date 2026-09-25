@@ -120,12 +120,18 @@
   删掉会让「打开→保存」把用户已上传的原图静默抹掉。
 
 ## 删除守卫
-- `previewProductDeletion` 与 `deleteProducts` 共用 `planProductDeletion`；**整批只写一次覆盖层**，禁循环调单品删除。守卫：种子、被引用商品（含软删 Clothing）给原因；级联清 variants/sizeCharts，销售事件保留；部分成功绝不静默。
+- `previewProductDeletion` 与 `deleteProducts` 共用 `planProductDeletion`；**整批只写一次覆盖层**，禁循环调单品删除。守卫（09-25 需求一后）：**只剩种子不可删**；**用户引用不再拦截删除**——用户衣橱/心愿记录是加入时快照，删除发布内容不影响它们（数据独立），涉及条数走 `preservedRecordCount`（单品 `deleteProduct` 返回 Int）如实汇报；级联清 variants/sizeCharts，销售事件保留；部分成功绝不静默。`referencedOnlyArchive` 错误与 `.referencedByUserData` 拦截原因已删。
+- **`ShopCatalogReferenceGuard.referencedRecordCount` 谓词必须用存储属性 `deletedAt == nil`，禁用 `isDeleted`**——后者谓词下推会抛「No eligible connection available」（09-25 实测崩溃）。
 - 批次删除只动 `shop-catalog-batches.json`，**绝不连带删草稿**；视图读 `draftStore.batches`（@Published）。
 - 草稿箱删除单条/多选共用 `deleteDrafts(ids:)`。
-- **店家强制删除（09-24）**：`previewShopForceDeletion`/`forceDeleteShop` 共用 `planShopForceDeletion`；级联 店家→系列→商品→规格/尺码表；**种子实体靠墓碑**（`ShopCatalog.removedShopIDs/SeriesIDs/ProductIDs`，合并层 `applyTombstones` 排除，规格尺码表按商品连坐）；**被引用商品保留并汇报**（红线不因「强制」放松）；销售事件保留；同 id 重录走 `upsertEntity` 清墓碑（复活语义）。
+- **店家强制删除（09-24，09-25 放宽引用拦截）**：`previewShopForceDeletion`/`forceDeleteShop` 共用 `planShopForceDeletion`；级联 店家→系列→商品→规格/尺码表；**种子实体靠墓碑**（`ShopCatalog.removedShopIDs/SeriesIDs/ProductIDs`，合并层 `applyTombstones` 排除，规格尺码表按商品连坐）；被引用商品**照删**，汇报字段 `referencedProductNames` + `preservedRecordCount`（商品已删、用户记录按快照保留，两件事都说清）；销售事件保留；同 id 重录走 `upsertEntity` 清墓碑（复活语义）。
 - `ShopCatalogStore.rebuildMergedCatalog`：基底 nil 且覆盖层 nil 时 **catalog 必须保持 nil**——置非 nil 空对象会把 `.shared` 的 `loadFromBundleIfNeeded`（`guard catalog == nil`）永久短路，种子消失（09-24 踩到）。
 - 禁顺手删旧能力：`MainTabView` tab4 仍 `TimeHallView()`；`TimeHallWardrobeQuickInserter` 被复用。
+
+## 尾款阶段同步与大致时间估算（09-25 需求二/三）
+- 窗口解法**唯一口径** `CatalogBalanceDueApproximation.declaredWindow(of:anchor:)`：exact 直接用 `balanceDueAt/EndAt`；approximate（上旬/中旬/中下旬/下旬，同义 月初/月末/月底）→ 估算成**固定具体日期**（上旬→10日、中旬→20日、中下旬→25日、下旬→月末最后一天；显式月份是硬约束、已过顺延一年；无显式月份 = 锚点+1个月）。估算**不掺 `Date()`** → 幂等固定；无旬关键词/缺锚点 → nil 不猜。两消费方：`ShopCatalogWardrobeDraftBuilder.makeDraft`（加购，锚点 `series.reservationEndAt ?? event.endAt`，禁加购当天占位）与 `ShopCatalogWardrobeBalanceSync`（同步，锚点仅 `series.reservationEndAt`）。
+- 同步只动「尾款中」（`effectivePhase == .balancePending`）系列下 `isFinalPaymentPlan` 的 Clothing 的 `finalPaymentDate/EndDate` + 备注留痕；**金额一个不碰**；商品已删 → 跳过（数据独立）；全款/已付清不进扫描。触发点：`ShopCatalogBrowseView.task`（云同步后）+ 批次详情页 `saveSeriesConfig` 保存成功后。
+- `ShopCatalogWardrobeBalanceSync` **不持有默认 ModelContext**，context 必须调用方显式传（防单测碰生产容器）。
 
 ## 币种与发布幂等
 - `CatalogCurrency` cny/jpy/unknown 挂 SaleEvent/PriceCorrection.currency；旧 JSON 缺键=**unknown（不默认 CNY）**；两侧都 unknown 仍算差价；指纹含币种；跨币种抛 `crossCurrency`。

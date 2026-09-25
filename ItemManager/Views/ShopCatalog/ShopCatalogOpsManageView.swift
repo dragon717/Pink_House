@@ -431,8 +431,11 @@ private struct ShopCatalogSeriesProductsView: View {
 
     private func performProductDelete(_ product: CatalogProduct) {
         do {
-            try ShopCatalogDraftStore.deleteProduct(product, store: store, modelContext: modelContext)
-            toast = "已删除「\(product.name)」"
+            let preserved = try ShopCatalogDraftStore.deleteProduct(product, store: store, modelContext: modelContext)
+            // 2026-09-25 需求一：删除不影响用户数据，但必须如实说清保留了多少条
+            toast = preserved > 0
+                ? "已删除「\(product.name)」；\(preserved) 条衣橱/心愿记录按加入时快照保留"
+                : "已删除「\(product.name)」"
         } catch { actionError = error.localizedDescription }
     }
 
@@ -658,6 +661,10 @@ private struct ShopCatalogSeriesProductsView: View {
             lines.append("将物理删除 \(preview.deletableCount) 件：\(namePreview(preview.deletableNames))。")
         }
         lines.append("影响范围：连带删除其配色尺码与尺码表；销售历史按硬约束保留，不受影响。")
+        // 2026-09-25 需求一：被引用商品可删，用户记录按加入时快照保留（如实说清）
+        if preview.preservedRecordCount > 0 {
+            lines.append("已加入衣橱/心愿的 \(preview.preservedRecordCount) 条记录按加入时快照保留，不受删除影响。")
+        }
         if preview.blockedCount > 0 {
             let details = preview.blocked
                 .map { "「\($0.name)」\($0.reason.message)" }
@@ -699,6 +706,10 @@ private struct ShopCatalogSeriesProductsView: View {
             toast = result.blocked.isEmpty
                 ? "已删除 \(result.deletedIDs.count) 件商品"
                 : "已删除 \(result.deletedIDs.count) 件商品，\(result.blocked.count) 件被跳过"
+            // 2026-09-25 需求一：被引用商品已照删，用户记录按快照保留（如实告知）
+            if result.preservedRecordCount > 0 {
+                toast = (toast ?? "") + "；\(result.preservedRecordCount) 条衣橱/心愿记录按快照保留"
+            }
             selectedProductIDs.subtract(result.deletedIDs)
             if !result.blocked.isEmpty {
                 blockedProductDeletions = result.blocked
@@ -1001,8 +1012,9 @@ private struct ShopManageRow: View {
     /// 影响范围文案（预检生成；销售历史按硬约束保留，明确告知）
     private static func impactText(_ report: ShopCatalogDraftStore.ShopForceDeletionReport) -> String {
         var text = "将级联删除：系列 \(report.deletedSeriesCount)、商品 \(report.deletedProductCount)、规格 \(report.deletedVariantCount)、尺码表 \(report.deletedSizeChartCount)。销售历史 \(report.retainedSaleEventCount) 条按规则保留。"
-        if !report.keptReferencedProductNames.isEmpty {
-            text += "\n另有 \(report.keptReferencedProductNames.count) 件商品因被心愿/衣橱引用而保留。"
+        // 2026-09-25 需求一：被引用商品照删，用户记录按快照保留（如实说清两件事）
+        if !report.referencedProductNames.isEmpty {
+            text += "\n其中 \(report.referencedProductNames.count) 件曾被心愿/衣橱引用：用户的 \(report.preservedRecordCount) 条记录按加入时快照保留，不受删除影响。"
         }
         return text
     }
@@ -1010,8 +1022,8 @@ private struct ShopManageRow: View {
     /// 执行结果文案（数量口径与预检一致：预检与执行同源）
     private static func resultText(_ report: ShopCatalogDraftStore.ShopForceDeletionReport) -> String {
         var text = "已删除「\(report.shopName)」：系列 \(report.deletedSeriesCount) · 商品 \(report.deletedProductCount) · 规格 \(report.deletedVariantCount) · 尺码表 \(report.deletedSizeChartCount)（子级合计 \(report.childRecordCount) 条）"
-        if !report.keptReferencedProductNames.isEmpty {
-            text += "；保留被引用商品 \(report.keptReferencedProductNames.count) 件"
+        if !report.referencedProductNames.isEmpty {
+            text += "；\(report.preservedRecordCount) 条衣橱/心愿记录按快照保留"
         }
         return text
     }

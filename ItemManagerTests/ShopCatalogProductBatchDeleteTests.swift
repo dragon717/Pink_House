@@ -2,12 +2,14 @@
 //  ShopCatalogProductBatchDeleteTests.swift
 //  ItemManagerTests
 //
-//  商品批量删除契约（2026-09-23 需求：批量删除商品 + 二次确认）。
+//  商品批量删除契约（2026-09-23 需求：批量删除商品 + 二次确认；
+//  2026-09-25 需求一：用户引用不再拦截删除，用户记录按加入时快照保留）。
 //
 //  口径与「批次会话批量删除」一致，守卫与单品删除完全同一套：
 //    1. 预检只读：不写盘，且与执行同源（弹窗说删几件，实际就删几件）
 //    2. 种子档案（Bundle 只读）→ 拦截，附原因
-//    3. 被用户心愿/尾款/衣橱引用（含软删除）→ 拦截，附原因
+//    3. 被用户心愿/尾款/衣橱引用 → **照删**；涉及的用户记录条数如实返回
+//       （`preservedRecordCount`），用户数据按加入时快照保留
 //    4. 部分成功：可删的删掉，被拦截的**保留在库里**并返回原因，供处理后重试
 //    5. 级联口径：连带清理该商品的规格与尺码表；销售历史按硬约束保留
 //    6. 鉴权：仍需运营白名单
@@ -129,9 +131,9 @@ final class ShopCatalogProductBatchDeleteTests: XCTestCase {
                        "销售历史按硬约束保留，删除商品不得抹掉历史记录")
     }
 
-    // MARK: 3. 引用保护
+    // MARK: 3. 数据独立性：被引用商品照删，用户记录按快照保留
 
-    func testReferencedProductIsBlockedAndKeptInCatalog() throws {
+    func testReferencedProductIsDeletedAndUserRecordKept() throws {
         let product = try makeOverlayProduct(id: "prod-bd-ref", name: "被引用款")
 
         // 用户把它加进了衣橱（含未落盘的 pending changes 也能被引用查询命中）
@@ -143,10 +145,16 @@ final class ShopCatalogProductBatchDeleteTests: XCTestCase {
         let result = try ShopCatalogDraftStore.deleteProducts(
             [product], store: store, modelContext: context)
 
-        XCTAssertTrue(result.deletedIDs.isEmpty, "被引用时不得删除任何东西")
-        XCTAssertEqual(result.blocked.map(\.productID), [product.id])
-        XCTAssertEqual(result.blocked.first?.reason, .referencedByUserData)
-        XCTAssertNotNil(store.product(id: product.id), "被引用商品必须保留在库里（仅可归档）")
+        XCTAssertEqual(result.deletedIDs, [product.id], "用户引用不再拦截删除（2026-09-25 需求一）")
+        XCTAssertTrue(result.blocked.isEmpty)
+        XCTAssertEqual(result.preservedRecordCount, 1, "涉及的用户记录条数如实返回")
+        XCTAssertNil(store.product(id: product.id), "商品已物理删除")
+
+        // 用户衣橱数据按加入时快照保留
+        let fetched = try context.fetch(FetchDescriptor<Clothing>())
+        XCTAssertEqual(fetched.count, 1, "删除发布内容不影响用户衣橱数据")
+        XCTAssertEqual(fetched.first?.catalogProductID, product.id)
+        XCTAssertEqual(fetched.first?.name, "被引用款")
     }
 
     // MARK: 4. 种子保护
@@ -165,15 +173,11 @@ final class ShopCatalogProductBatchDeleteTests: XCTestCase {
 
     func testPartialSuccessDeletesDeletableAndKeepsBlocked() throws {
         let deletable = try makeOverlayProduct(id: "prod-bd-part-ok", name: "可删款")
-        let blocked = try makeOverlayProduct(id: "prod-bd-part-blocked", name: "拦下款")
-
-        let context = modelContext()
-        let clothing = Clothing(name: "拦下款", types: "JSK", price: 500, stock: 1)
-        clothing.catalogProductID = blocked.id
-        context.insert(clothing)
+        // 唯一剩余的拦截原因 = 种子档案（Bundle 只读）
+        let blocked = try XCTUnwrap(store.product(id: seedProductID))
 
         let result = try ShopCatalogDraftStore.deleteProducts(
-            [deletable, blocked], store: store, modelContext: context)
+            [deletable, blocked], store: store, modelContext: modelContext())
 
         XCTAssertEqual(result.deletedIDs, [deletable.id], "可删的正常删除")
         XCTAssertEqual(result.blocked.map(\.productID), [blocked.id], "被拦截的附原因返回")
@@ -220,7 +224,7 @@ final class ShopCatalogProductBatchDeleteTests: XCTestCase {
     // MARK: 7. 拦截原因文案可操作
 
     func testBlockedReasonMessagesExplainWhatToDoInstead() {
-        XCTAssertTrue(CatalogProductDeleteReason.referencedByUserData.message.contains("归档"),
+        XCTAssertTrue(CatalogProductDeleteReason.seedImmutable.message.contains("归档"),
                       "必须告诉操作者「仅可归档」这一替代动作")
         XCTAssertTrue(CatalogProductDeleteReason.seedImmutable.message.contains("种子"),
                       "必须说明是种子档案导致删不掉")

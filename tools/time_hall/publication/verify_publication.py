@@ -37,6 +37,7 @@ from protocol import (  # noqa: E402
     PROTOCOL_SCHEMA_VERSION,
     READER_VERSION,
     RELEASE_RECORD_NAME,
+    ProtocolError,
     canonical_json_bytes,
     sha256_hex,
     validate_pack_payload,
@@ -165,8 +166,22 @@ class CloudKitPublicReader(PublicReader):
         request = urllib.request.Request(
             self._endpoint(path), data=body, headers=headers, method="POST"
         )
-        with urllib.request.urlopen(request, timeout=60) as response:
-            return json.loads(response.read().decode("utf-8"))
+        try:
+            with urllib.request.urlopen(request, timeout=60) as response:
+                return json.loads(response.read().decode("utf-8"))
+        except urllib.error.HTTPError as error:
+            if error.code == 401:
+                # s2s key 按环境隔离：Development 的 key 打 Production URL 必 401
+                raise ProtocolError(
+                    "HTTP 401 Unauthorized：s2s key 没有 {} 环境的访问权。"
+                    "CloudKit 的 key 按环境注册，Production 需要在 CloudKit Console "
+                    "的 Production 环境下单独创建 key 并写入 Keychain"
+                    "（keyID.production / privateKey.production）。"
+                    "详见 docs/TIME_HALL_PRODUCTION_PUBLISH_RUNBOOK.md。".format(
+                        self.credentials.environment
+                    )
+                ) from error
+            raise
 
     def _lookup(self, record_type: str, record_name: str) -> Optional[Dict[str, Any]]:
         from publish_adapters import first_existing_record

@@ -187,6 +187,22 @@ enum ShopCatalogWardrobeDraftBuilder {
             }
         }
 
+        // 尾款窗口来源（2026-09-25 需求二/三）：运营已声明尾款期 → 用户记录以声明为准；
+        // 大致描述（上旬/中旬/中下旬/下旬）→ 以「约一个月」为基准估算成**固定具体日期**
+        //（锚点是运营侧事实：系列预约结束时间 → 预约销售记录结束时间，绝不用加购当天）。
+        // 窗口解法唯一口径 `CatalogBalanceDueApproximation.declaredWindow`（与同步共用）。
+        // 全款（balance == 0）不生成尾款任务，窗口无意义，不在此改。
+        // 完全无声明 → 维持旧行为（预约结束 = 尾款开始；结束未公布用开始时间占位）。
+        if isDepositPlan, balanceAmount > 0, let series {
+            let anchor = series.reservationEndAt ?? archive.reservation?.endAt
+            if let window = CatalogBalanceDueApproximation.declaredWindow(of: series, anchor: anchor),
+               window.start != finalPaymentStart || window.end != finalPaymentEnd {
+                finalPaymentStart = window.start
+                finalPaymentEnd = window.end
+                noteLines.append("尾款时间：\(window.basis)，按 \(CatalogSeriesBalanceDue.shortDateText(window.start)) 记录")
+            }
+        }
+
         // 记录名（需求 N §III.1）：`[系列名] + [款式名] + [颜色]`，缺失项按 §III.2 降级。
         // 颜色优先用户选定色、其次后台规格色 —— 保证「同名不同色」在衣橱里能一眼区分；
         // 纯配饰（无规格色也无颜色词）→ 自动降级为 `[系列名] + [款式名]`。

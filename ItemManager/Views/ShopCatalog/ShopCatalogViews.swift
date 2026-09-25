@@ -37,6 +37,8 @@ enum ShopCatalogFormat {
 /// 时光馆首屏「店家上新」（直接作为底部 Tab 根视图）。
 struct ShopCatalogBrowseView: View {
     @ObservedObject private var store = ShopCatalogStore.shared
+    /// 尾款阶段同步需要显式传入 context（内部不默认拿生产容器）
+    @Environment(\.modelContext) private var modelContext
     /// 开售提醒深链：通知点击 → TabNavigationManager → 本栈压入商品详情
     @ObservedObject private var tabNav = TabNavigationManager.shared
 
@@ -69,6 +71,9 @@ struct ShopCatalogBrowseView: View {
             // 云端商店目录同步（消费通道只读）：每次回到首屏都触发，
             // 30 分钟节流在 ShopCatalogCloudSyncService 内部，重复调用是廉价的。
             await ShopCatalogCloudSyncService.shared.syncIfNeeded()
+            // 2026-09-25 需求二/三：目录更新（或本地已是最新）后，把「尾款中」
+            // 系列的尾款窗口同步进用户衣橱条目（幂等；大致时间估算成固定具体日期）。
+            ShopCatalogWardrobeBalanceSync.syncIfNeeded(store: .shared, modelContext: modelContext)
         }
     }
 }

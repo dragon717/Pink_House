@@ -1,5 +1,6 @@
 import SwiftUI
 import Combine
+import SwiftData
 
 // MARK: - 批次详情（V1.1 §4.1 整批归属整合）
 //
@@ -17,6 +18,8 @@ struct ShopCatalogBatchDetailView: View {
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var scenePhase
+    /// 尾款阶段同步需要显式传入 context（内部不默认拿生产容器）
+    @Environment(\.modelContext) private var modelContext
 
     @State private var shopID = ""          // "" = 新建店家
     @State private var newShopName = ""
@@ -638,6 +641,13 @@ struct ShopCatalogBatchDetailView: View {
             toast = linked > 0
                 ? "已保存「\(updated.name)」的系列配置，并同步本批 \(linked) 条单品"
                 : "已保存「\(updated.name)」的系列配置（同系列全部单品同步生效）"
+            // 2026-09-25 需求二/三：发售阶段/尾款时间可能刚变化 —— 幂等同步用户
+            // 衣橱条目的尾款窗口（大致时间按约一个月基准估算成固定具体日期）。
+            let syncReport = ShopCatalogWardrobeBalanceSync.syncIfNeeded(
+                store: store, modelContext: modelContext)
+            if syncReport.updatedCount > 0 {
+                toast = (toast ?? "") + "；已同步 \(syncReport.updatedCount) 条衣橱尾款时间"
+            }
         } catch {
             errorText = error.localizedDescription
         }
