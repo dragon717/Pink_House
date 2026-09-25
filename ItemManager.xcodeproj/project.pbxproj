@@ -16,9 +16,9 @@
 		A2F14AF52F44A86C00BA78C6 /* WidgetConfigurationIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2F14AEB2F44A86C00BA78C6 /* WidgetConfigurationIntent.swift */; };
 		A2F14AF62F44A86C00BA78C6 /* WidgetEntryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2F14AEC2F44A86C00BA78C6 /* WidgetEntryView.swift */; };
 		A2F14AF82F44A86C00BA78C6 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A2F14AE82F44A86C00BA78C6 /* Assets.xcassets */; };
-		FACC6A312B163829E15C2439 /* asserts in Resources */ = {isa = PBXBuildFile; fileRef = BC5D82BE6AA6114C408C7257 /* asserts */; };
 		FA0B0000000000000000C003 /* SharedCatalog in Frameworks */ = {isa = PBXBuildFile; productRef = FA0B0000000000000000C002 /* SharedCatalog */; };
 		FA0B0000000000000000C005 /* SharedCatalog in Frameworks */ = {isa = PBXBuildFile; productRef = FA0B0000000000000000C004 /* SharedCatalog */; };
+		FACC6A312B163829E15C2439 /* asserts in Resources */ = {isa = PBXBuildFile; fileRef = BC5D82BE6AA6114C408C7257 /* asserts */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -1085,12 +1085,12 @@
 		};
 		FA0B0000000000000000C002 /* SharedCatalog */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = FA0B0000000000000000C001;
+			package = FA0B0000000000000000C001 /* XCLocalSwiftPackageReference "Packages/SharedCatalog" */;
 			productName = SharedCatalog;
 		};
 		FA0B0000000000000000C004 /* SharedCatalog */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = FA0B0000000000000000C001;
+			package = FA0B0000000000000000C001 /* XCLocalSwiftPackageReference "Packages/SharedCatalog" */;
 			productName = SharedCatalog;
 		};
 /* End XCSwiftPackageProductDependency section */
