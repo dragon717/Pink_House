@@ -17,6 +17,8 @@
 		A2F14AF62F44A86C00BA78C6 /* WidgetEntryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2F14AEC2F44A86C00BA78C6 /* WidgetEntryView.swift */; };
 		A2F14AF82F44A86C00BA78C6 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A2F14AE82F44A86C00BA78C6 /* Assets.xcassets */; };
 		FACC6A312B163829E15C2439 /* asserts in Resources */ = {isa = PBXBuildFile; fileRef = BC5D82BE6AA6114C408C7257 /* asserts */; };
+		FA0B0000000000000000C003 /* SharedCatalog in Frameworks */ = {isa = PBXBuildFile; productRef = FA0B0000000000000000C002 /* SharedCatalog */; };
+		FA0B0000000000000000C005 /* SharedCatalog in Frameworks */ = {isa = PBXBuildFile; productRef = FA0B0000000000000000C004 /* SharedCatalog */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -72,6 +74,7 @@
 		A2F14AEB2F44A86C00BA78C6 /* WidgetConfigurationIntent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetConfigurationIntent.swift; sourceTree = "<group>"; };
 		A2F14AEC2F44A86C00BA78C6 /* WidgetEntryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetEntryView.swift; sourceTree = "<group>"; };
 		BC5D82BE6AA6114C408C7257 /* asserts */ = {isa = PBXFileReference; lastKnownFileType = folder; path = asserts; sourceTree = "<group>"; };
+		FA0B0000000000000000D001 /* PinkHouseOps.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PinkHouseOps.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -121,6 +124,11 @@
 			path = ItemManagerUITests;
 			sourceTree = "<group>";
 		};
+		FA0B0000000000000000D006 /* PinkHouseOps */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = PinkHouseOps;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -129,6 +137,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				A280DB932F443697002CBC10 /* GoogleGenerativeAI in Frameworks */,
+				FA0B0000000000000000C003 /* SharedCatalog in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -155,6 +164,14 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		FA0B0000000000000000D004 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				FA0B0000000000000000C005 /* SharedCatalog in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -162,6 +179,7 @@
 			isa = PBXGroup;
 			children = (
 				A2AE58752F19377500B4B6EB /* ItemManager */,
+				FA0B0000000000000000D006 /* PinkHouseOps */,
 				A2AE58872F19377600B4B6EB /* ItemManagerTests */,
 				A2AE58912F19377600B4B6EB /* ItemManagerUITests */,
 				A2AE59C12F1EB85300B4B6EB /* Frameworks */,
@@ -175,6 +193,7 @@
 			isa = PBXGroup;
 			children = (
 				A2AE58732F19377500B4B6EB /* ItemManager.app */,
+				FA0B0000000000000000D001 /* PinkHouseOps.app */,
 				A2AE58842F19377600B4B6EB /* ItemManagerTests.xctest */,
 				A2AE588E2F19377600B4B6EB /* ItemManagerUITests.xctest */,
 				A2AE59C02F1EB85300B4B6EB /* 少女心愿衣橱Extension.appex */,
@@ -229,6 +248,7 @@
 			name = ItemManager;
 			packageProductDependencies = (
 				A280DB922F443697002CBC10 /* GoogleGenerativeAI */,
+				FA0B0000000000000000C002 /* SharedCatalog */,
 			);
 			productName = ItemManager;
 			productReference = A2AE58732F19377500B4B6EB /* ItemManager.app */;
@@ -299,6 +319,29 @@
 			productReference = A2AE59C02F1EB85300B4B6EB /* 少女心愿衣橱Extension.appex */;
 			productType = "com.apple.product-type.app-extension";
 		};
+		FA0B0000000000000000D002 /* PinkHouseOps */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = FA0B0000000000000000D007 /* Build configuration list for PBXNativeTarget "PinkHouseOps" */;
+			buildPhases = (
+				FA0B0000000000000000D003 /* Sources */,
+				FA0B0000000000000000D004 /* Frameworks */,
+				FA0B0000000000000000D005 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				FA0B0000000000000000D006 /* PinkHouseOps */,
+			);
+			name = PinkHouseOps;
+			packageProductDependencies = (
+				FA0B0000000000000000C004 /* SharedCatalog */,
+			);
+			productName = PinkHouseOps;
+			productReference = FA0B0000000000000000D001 /* PinkHouseOps.app */;
+			productType = "com.apple.product-type.application";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -323,6 +366,9 @@
 					A2AE59BF2F1EB85300B4B6EB = {
 						CreatedOnToolsVersion = 26.2;
 					};
+					FA0B0000000000000000D002 = {
+						CreatedOnToolsVersion = 26.2;
+					};
 				};
 			};
 			buildConfigurationList = A2AE586E2F19377500B4B6EB /* Build configuration list for PBXProject "ItemManager" */;
@@ -344,6 +390,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				A280DB912F443697002CBC10 /* XCRemoteSwiftPackageReference "generative-ai-swift" */,
+				FA0B0000000000000000C001 /* XCLocalSwiftPackageReference "Packages/SharedCatalog" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = A2AE58742F19377500B4B6EB /* Products */;
@@ -354,6 +401,7 @@
 				A2AE58832F19377600B4B6EB /* ItemManagerTests */,
 				A2AE588D2F19377600B4B6EB /* ItemManagerUITests */,
 				A2AE59BF2F1EB85300B4B6EB /* 少女心愿衣橱Extension */,
+				FA0B0000000000000000D002 /* PinkHouseOps */,
 			);
 		};
 /* End PBXProject section */
@@ -386,6 +434,13 @@
 			buildActionMask = 2147483647;
 			files = (
 				A2F14AF82F44A86C00BA78C6 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		FA0B0000000000000000D005 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -443,6 +498,13 @@
 				A2F14AF42F44A86C00BA78C6 /* Provider.swift in Sources */,
 				A2F14AF52F44A86C00BA78C6 /* WidgetConfigurationIntent.swift in Sources */,
 				A2F14AF62F44A86C00BA78C6 /* WidgetEntryView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		FA0B0000000000000000D003 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -876,6 +938,68 @@
 			};
 			name = Release;
 		};
+		FA0B0000000000000000D008 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = PinkHouseOps/PinkHouseOps.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 833FJ74GS2;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_PREVIEWS = YES;
+				ENABLE_USER_SELECTED_FILES = readwrite;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "Pink House Ops";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = "@executable_path/../Frameworks";
+				MACOSX_DEPLOYMENT_TARGET = 26.2;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = bugod2.ItemManager.Ops;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SUPPORTED_PLATFORMS = macosx;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		FA0B0000000000000000D009 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = PinkHouseOps/PinkHouseOps.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 833FJ74GS2;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_PREVIEWS = YES;
+				ENABLE_USER_SELECTED_FILES = readwrite;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "Pink House Ops";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = "@executable_path/../Frameworks";
+				MACOSX_DEPLOYMENT_TARGET = 26.2;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = bugod2.ItemManager.Ops;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SUPPORTED_PLATFORMS = macosx;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -924,7 +1048,23 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
+		FA0B0000000000000000D007 /* Build configuration list for PBXNativeTarget "PinkHouseOps" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				FA0B0000000000000000D008 /* Debug */,
+				FA0B0000000000000000D009 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 /* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		FA0B0000000000000000C001 /* XCLocalSwiftPackageReference "Packages/SharedCatalog" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/SharedCatalog;
+		};
+/* End XCLocalSwiftPackageReference section */
 
 /* Begin XCRemoteSwiftPackageReference section */
 		A280DB912F443697002CBC10 /* XCRemoteSwiftPackageReference "generative-ai-swift" */ = {
@@ -942,6 +1082,16 @@
 			isa = XCSwiftPackageProductDependency;
 			package = A280DB912F443697002CBC10 /* XCRemoteSwiftPackageReference "generative-ai-swift" */;
 			productName = GoogleGenerativeAI;
+		};
+		FA0B0000000000000000C002 /* SharedCatalog */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = FA0B0000000000000000C001;
+			productName = SharedCatalog;
+		};
+		FA0B0000000000000000C004 /* SharedCatalog */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = FA0B0000000000000000C001;
+			productName = SharedCatalog;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

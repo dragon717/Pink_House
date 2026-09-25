@@ -30,21 +30,21 @@ import CryptoKit
 
 // MARK: - 协议常量（与 protocol.py 逐字对齐，禁止两端各改各的）
 
-nonisolated enum ShopCatalogSyncProtocol {
+public nonisolated enum ShopCatalogSyncProtocol {
     /// 协议结构版本（Mac 端 `PROTOCOL_SCHEMA_VERSION`）
-    static let schemaVersion = 1
+    public static let schemaVersion = 1
     /// 本读取器支持的协议版本（Mac 端 `READER_VERSION`）
-    static let readerVersion = 1
+    public static let readerVersion = 1
     /// 发布头固定记录名（全库只有一条）
-    static let releaseRecordName = "th.release.catalog-v1"
+    public static let releaseRecordName = "th.release.catalog-v1"
     /// 商店目录分片的实体类型
-    static let shopCatalogEntityType = "shop-catalog"
+    public static let shopCatalogEntityType = "shop-catalog"
     /// 商店目录的内容源 brandID（运营自有内容源）
-    static let shopCatalogBrandID = "shaonv-xinyuan"
+    public static let shopCatalogBrandID = "shaonv-xinyuan"
     /// 商店目录分片的 partitionID（brandID/entityType/scope）
-    static var shopCatalogPartitionID: String { "\(shopCatalogBrandID)/\(shopCatalogEntityType)/all" }
+    public static var shopCatalogPartitionID: String { "\(shopCatalogBrandID)/\(shopCatalogEntityType)/all" }
 
-    static func packRecordName(payloadHash: String) -> String { "th.pack.\(payloadHash)" }
+    public static func packRecordName(payloadHash: String) -> String { "th.pack.\(payloadHash)" }
 
     // MARK: 远端媒体（THMedia）
 
@@ -53,17 +53,43 @@ nonisolated enum ShopCatalogSyncProtocol {
     ///
     /// 为什么必须改写：不改写的话引用仍指向 `local:`，换台设备解析不到文件 →
     /// 商品图一律显示占位图（2026-09-25 实测：数据都拉到了，图全空）。
-    static let mediaReferencePrefix = "thmedia:"
+    public static let mediaReferencePrefix = "thmedia:"
 
     /// 远端媒体记录名（THMedia，与 Mac 端 `th.media.{contentHash}` 一致）
-    static func mediaRecordName(contentHash: String) -> String { "th.media.\(contentHash)" }
+    public static func mediaRecordName(contentHash: String) -> String { "th.media.\(contentHash)" }
 
-    static func mediaReference(contentHash: String) -> String {
+    public static func mediaReference(contentHash: String) -> String {
         "\(mediaReferencePrefix)\(contentHash)"
     }
 
+    // MARK: 媒体输入约束（与 protocol.py 的 MEDIA_MIME_ALLOWLIST / MAX_MEDIA_BYTES 逐字对齐）
+
+    /// 单张媒体的字节上限（Mac 端 `MAX_MEDIA_BYTES` = 20 MiB）。
+    ///
+    /// 为什么要有：运营商品图经「长边 1600 / JPEG 0.85」处理后远小于此，
+    /// 超限基本可以判定是误选了相机原图。发布端会**硬报错**而不是压缩兜底 ——
+    /// 悄悄换掉运营选的图比构建失败危险得多。
+    public static let maxMediaBytes = 20 * 1024 * 1024
+
+    /// 允许进入公共库的图片类型（Mac 端 `MEDIA_MIME_ALLOWLIST`）。
+    ///
+    /// 只放客户端确实能解码的类型（`ShopCatalogMediaStore.inferredFileExtension`
+    /// 的魔数判定口径）：jpeg / png / gif / webp / heic。
+    /// 「传上去但客户端显示不出来」比「构建失败」难查得多。
+    public static let mediaMimeAllowlist: [String] = [
+        "image/jpeg",
+        "image/png",
+        "image/gif",
+        "image/webp",
+        "image/heic",
+    ]
+
+    public static func isAllowedMediaMimeType(_ mimeType: String) -> Bool {
+        mediaMimeAllowlist.contains(mimeType.lowercased())
+    }
+
     /// `thmedia:<contentHash>` → 内容摘要；不是本前缀或摘要不合法时返回 nil
-    static func mediaContentHash(in reference: String?) -> String? {
+    public static func mediaContentHash(in reference: String?) -> String? {
         guard let trimmed = reference?.trimmingCharacters(in: .whitespacesAndNewlines),
               trimmed.hasPrefix(mediaReferencePrefix) else { return nil }
         let hash = String(trimmed.dropFirst(mediaReferencePrefix.count))
@@ -71,7 +97,7 @@ nonisolated enum ShopCatalogSyncProtocol {
     }
 
     /// 校验 64 位小写十六进制 SHA-256
-    static func isPayloadHash(_ value: String) -> Bool {
+    public static func isPayloadHash(_ value: String) -> Bool {
         guard value.count == 64 else { return false }
         return value.allSatisfy { character in
             guard character.isASCII else { return false }
@@ -80,7 +106,7 @@ nonisolated enum ShopCatalogSyncProtocol {
     }
 
     /// 压缩字节的 SHA-256（hex 小写）——与 Mac 端 `sha256_hex` 同一口径
-    static func sha256Hex(_ data: Data) -> String {
+    public static func sha256Hex(_ data: Data) -> String {
         SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
     }
 }
@@ -89,56 +115,123 @@ nonisolated enum ShopCatalogSyncProtocol {
 
 /// 发布头：**唯一**的版本生效点。普通读取先只取元数据（不含资产），
 /// 确认 `releaseSeq` 变化后才去取根清单 —— 版本未变零下载（§11.2）。
-nonisolated struct ShopCatalogReleaseHeader: Equatable, Sendable {
-    var releaseSeq: Int
-    var schemaVersion: Int
-    var revocationEpoch: Int
-    var minimumReaderVersion: Int
-    var previousReleaseSeq: Int
-    var publishedAt: String?
-    var rootIndexHash: String
+public nonisolated struct ShopCatalogReleaseHeader: Equatable, Sendable {
+    public var releaseSeq: Int
+    public var schemaVersion: Int
+    public var revocationEpoch: Int
+    public var minimumReaderVersion: Int
+    public var previousReleaseSeq: Int
+    public var publishedAt: String?
+    public var rootIndexHash: String
+
+    // 跨模块构造入口：`public` 结构体的合成逐成员 init 是 internal，外部模块必须显式声明。
+    public init(
+        releaseSeq: Int,
+        schemaVersion: Int,
+        revocationEpoch: Int,
+        minimumReaderVersion: Int,
+        previousReleaseSeq: Int,
+        publishedAt: String?,
+        rootIndexHash: String
+    ) {
+        self.releaseSeq = releaseSeq
+        self.schemaVersion = schemaVersion
+        self.revocationEpoch = revocationEpoch
+        self.minimumReaderVersion = minimumReaderVersion
+        self.previousReleaseSeq = previousReleaseSeq
+        self.publishedAt = publishedAt
+        self.rootIndexHash = rootIndexHash
+    }
 }
 
 // MARK: - 根清单（root-index.json）
 
-nonisolated struct ShopCatalogRootIndex: Codable, Equatable, Sendable {
-    nonisolated struct Partition: Codable, Equatable, Sendable {
-        var partitionID: String
-        var brandID: String
-        var entityType: String
-        var partitionRevision: Int
-        var coverageStatus: String
-        var checkedThrough: String?
-        var packRecordName: String
-        var payloadHash: String
-        var recordCount: Int
-        var dependencyPackRecordNames: [String]?
+public nonisolated struct ShopCatalogRootIndex: Codable, Equatable, Sendable {
+    public nonisolated struct Partition: Codable, Equatable, Sendable {
+        public var partitionID: String
+        public var brandID: String
+        public var entityType: String
+        public var partitionRevision: Int
+        public var coverageStatus: String
+        public var checkedThrough: String?
+        public var packRecordName: String
+        public var payloadHash: String
+        public var recordCount: Int
+        public var dependencyPackRecordNames: [String]?
+
+        // 跨模块构造入口：`public` 结构体的合成逐成员 init 是 internal，外部模块必须显式声明。
+        public init(
+            partitionID: String,
+            brandID: String,
+            entityType: String,
+            partitionRevision: Int,
+            coverageStatus: String,
+            checkedThrough: String?,
+            packRecordName: String,
+            payloadHash: String,
+            recordCount: Int,
+            dependencyPackRecordNames: [String]?
+        ) {
+            self.partitionID = partitionID
+            self.brandID = brandID
+            self.entityType = entityType
+            self.partitionRevision = partitionRevision
+            self.coverageStatus = coverageStatus
+            self.checkedThrough = checkedThrough
+            self.packRecordName = packRecordName
+            self.payloadHash = payloadHash
+            self.recordCount = recordCount
+            self.dependencyPackRecordNames = dependencyPackRecordNames
+        }
 
         /// 覆盖状态（§5.2）：empty 是有版本的有效结论，不是缺数据
-        nonisolated enum Coverage {
-            static let complete = "complete"
-            static let empty = "empty"
-            static let partial = "partial"
+        public nonisolated enum Coverage {
+            public static let complete = "complete"
+            public static let empty = "empty"
+            public static let partial = "partial"
         }
     }
 
-    var schemaVersion: Int
-    var releaseSeq: Int
-    var publishedAt: String?
-    var revocationEpoch: Int
-    var partitions: [Partition]
+    public var schemaVersion: Int
+    public var releaseSeq: Int
+    public var publishedAt: String?
+    public var revocationEpoch: Int
+    public var partitions: [Partition]
     /// 撤回清单（§14.1：撤回优先于一切展示来源）。
     /// 本期商店目录的撤回在发布侧体现为「更高 releaseSeq 的新快照」，
     /// 根清单撤回字段保留解码兼容，消费端先记录、不单独展示。
-    var withdrawals: [Withdrawal]?
+    public var withdrawals: [Withdrawal]?
 
-    nonisolated struct Withdrawal: Codable, Equatable, Sendable {
-        var canonicalEntityID: String?
-        var withdrawnAt: String?
+    // 跨模块构造入口：`public` 结构体的合成逐成员 init 是 internal，外部模块必须显式声明。
+    public init(
+        schemaVersion: Int,
+        releaseSeq: Int,
+        publishedAt: String?,
+        revocationEpoch: Int,
+        partitions: [Partition],
+        withdrawals: [Withdrawal]?
+    ) {
+        self.schemaVersion = schemaVersion
+        self.releaseSeq = releaseSeq
+        self.publishedAt = publishedAt
+        self.revocationEpoch = revocationEpoch
+        self.partitions = partitions
+        self.withdrawals = withdrawals
+    }
+
+    public nonisolated struct Withdrawal: Codable, Equatable, Sendable {
+        public var canonicalEntityID: String?
+        public var withdrawnAt: String?
+
+        // 跨模块构造入口：`public` 结构体的合成逐成员 init 是 internal，外部模块必须显式声明。
+        public init(canonicalEntityID: String?, withdrawnAt: String?) {
+            self.canonicalEntityID = canonicalEntityID
+            self.withdrawnAt = withdrawnAt
+        }
     }
 
     /// 商店目录分片（整包单分片：最多一个；nil = 公共库还没有商店内容）
-    var shopCatalogPartition: Partition? {
+    public var shopCatalogPartition: Partition? {
         partitions.first { $0.entityType == ShopCatalogSyncProtocol.shopCatalogEntityType }
     }
 }
@@ -147,20 +240,41 @@ nonisolated struct ShopCatalogRootIndex: Codable, Equatable, Sendable {
 
 /// 商店目录分片负载。与画册分片的差别：载荷键是 `shopCatalog`（不是 `records`），
 /// 且一个分片承载**合并后的完整目录**（种子 + 覆盖层），引用全部包内可解析。
-nonisolated struct ShopCatalogPackPayload: Codable, Equatable, Sendable {
-    var schemaVersion: Int
-    var partitionID: String
-    var brandID: String
-    var entityType: String
-    var partitionRevision: Int
-    var coverageStatus: String
-    var checkedThrough: String?
-    var shopCatalog: ShopCatalog
+public nonisolated struct ShopCatalogPackPayload: Codable, Equatable, Sendable {
+    public var schemaVersion: Int
+    public var partitionID: String
+    public var brandID: String
+    public var entityType: String
+    public var partitionRevision: Int
+    public var coverageStatus: String
+    public var checkedThrough: String?
+    public var shopCatalog: ShopCatalog
+
+    // 跨模块构造入口：`public` 结构体的合成逐成员 init 是 internal，外部模块必须显式声明。
+    public init(
+        schemaVersion: Int,
+        partitionID: String,
+        brandID: String,
+        entityType: String,
+        partitionRevision: Int,
+        coverageStatus: String,
+        checkedThrough: String?,
+        shopCatalog: ShopCatalog
+    ) {
+        self.schemaVersion = schemaVersion
+        self.partitionID = partitionID
+        self.brandID = brandID
+        self.entityType = entityType
+        self.partitionRevision = partitionRevision
+        self.coverageStatus = coverageStatus
+        self.checkedThrough = checkedThrough
+        self.shopCatalog = shopCatalog
+    }
 }
 
 // MARK: - 校验（三层，与 Mac 端 build/validate 同源）
 
-nonisolated enum ShopCatalogSyncValidationError: LocalizedError, Equatable {
+public nonisolated enum ShopCatalogSyncValidationError: LocalizedError, Equatable {
     /// 发布头结构 / 协议版本不受支持（需要更新 App 才能读）
     case unsupportedSchema(String)
     /// 根清单与发布头互相矛盾
@@ -172,7 +286,7 @@ nonisolated enum ShopCatalogSyncValidationError: LocalizedError, Equatable {
     /// 分片内容结构不合法（重复 ID / 悬空引用 / 墓碑冲突 / 枚举非法）
     case structural([String])
 
-    var errorDescription: String? {
+    public var errorDescription: String? {
         switch self {
         case .unsupportedSchema(let detail):
             return "发布协议版本不受支持，需要更新 App 后才能获取商店上新：\(detail)"
@@ -188,7 +302,7 @@ nonisolated enum ShopCatalogSyncValidationError: LocalizedError, Equatable {
     }
 }
 
-nonisolated enum ShopCatalogCloudSyncValidator {
+public nonisolated enum ShopCatalogCloudSyncValidator {
 
     /// 三层校验 + 解码，全过才返回可安装的目录快照：
     ///   1. 发布头（协议版本 / 读取器版本）
@@ -196,7 +310,7 @@ nonisolated enum ShopCatalogCloudSyncValidator {
     ///   3. 分片（压缩字节摘要 → 契约 → 结构）
     ///
     /// 任何一层失败都抛错，调用方必须保留旧数据（§11.2 第 16 步）。
-    static func validatedShopCatalog(
+    public static func validatedShopCatalog(
         header: ShopCatalogReleaseHeader,
         rootIndexData: Data,
         packCompressed: Data
@@ -250,7 +364,7 @@ nonisolated enum ShopCatalogCloudSyncValidator {
     }
 
     /// 分片描述契约（§6.7）：分片 ID 必须能由 brandID/entityType 推出，防运维手写漂移
-    static func checkPartitionContract(_ partition: ShopCatalogRootIndex.Partition) throws {
+    public static func checkPartitionContract(_ partition: ShopCatalogRootIndex.Partition) throws {
         let knownCoverages: Set<String> = [
             ShopCatalogRootIndex.Partition.Coverage.complete,
             ShopCatalogRootIndex.Partition.Coverage.empty,
@@ -274,7 +388,7 @@ nonisolated enum ShopCatalogCloudSyncValidator {
     }
 
     /// 负载与根清单描述互相印证（防「清单说 A、包里装 B」）
-    static func checkPayload(
+    public static func checkPayload(
         _ payload: ShopCatalogPackPayload, matches partition: ShopCatalogRootIndex.Partition
     ) throws {
         guard payload.schemaVersion == ShopCatalogSyncProtocol.schemaVersion else {
@@ -298,7 +412,7 @@ nonisolated enum ShopCatalogCloudSyncValidator {
     /// ⚠️ 远端层只进内存（`ShopCatalogStore.installRemoteCatalog`），进程重启即丢失。
     /// 没有这条恢复路径就会出现「控制状态说已安装、界面上一个店家都没有」
     /// ——2026-09-25 真机「看不到店家上线数据」的直接成因之一。
-    static func catalog(fromVerifiedPack compressed: Data) -> ShopCatalog? {
+    public static func catalog(fromVerifiedPack compressed: Data) -> ShopCatalog? {
         guard let raw = try? decompress(compressed),
               let payload = try? ShopCatalogJSONCoding.decoder().decode(
                   ShopCatalogPackPayload.self, from: raw) else { return nil }
@@ -309,7 +423,7 @@ nonisolated enum ShopCatalogCloudSyncValidator {
 
     /// 结构校验。返回问题列表（空 = 通过）。
     /// 图片引用允许指向 Bundle 内置资源（`bundle:` 前缀），与 Mac 端一致**不**做资产引用校验。
-    static func structuralIssues(
+    public static func structuralIssues(
         _ catalog: ShopCatalog, coverageStatus: String
     ) -> [String] {
         var issues: [String] = []

@@ -630,7 +630,8 @@ final class ShopCatalogCloudSyncTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: url) }
 
         let (entries, missing) = ShopCatalogExportArchive.imageEntries(
-            forLocalReferences: ["local:\(name)", "bundle:seed.jpg", "local:img-MISSING.jpg"])
+            forLocalReferences: ["local:\(name)", "bundle:seed.jpg", "local:img-MISSING.jpg"],
+            imageDirectory: directory)
         XCTAssertEqual(entries.map(\.name), ["images/\(name)"])
         XCTAssertEqual(missing, ["img-MISSING.jpg"], "引用了但文件不在 → 如实列出，别静默跳过")
     }

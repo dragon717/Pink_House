@@ -22,18 +22,24 @@
 
 import Foundation
 
-nonisolated enum ShopCatalogExportArchive {
+public nonisolated enum ShopCatalogExportArchive {
 
     /// 归档内的一个条目
-    struct Entry {
-        let name: String   // 归档内路径（ASCII 安全名，如 "images/img-AB12.jpg"）
-        let data: Data
+    public struct Entry {
+        public let name: String   // 归档内路径（ASCII 安全名，如 "images/img-AB12.jpg"）
+        public let data: Data
+
+        // 跨模块构造入口：`public` 结构体的合成逐成员 init 是 internal，外部模块必须显式声明。
+        public init(name: String, data: Data) {
+            self.name = name
+            self.data = data
+        }
     }
 
     private static let blockSize = 512
 
     /// 打包成 tar（USTAR）。条目名必须是 ASCII 且不超 100 字符（超出用 prefix 拆分的场景本工程用不到）。
-    static func tarData(entries: [Entry]) -> Data {
+    public static func tarData(entries: [Entry]) -> Data {
         var output = Data()
         for entry in entries {
             output.append(header(for: entry))
@@ -49,9 +55,14 @@ nonisolated enum ShopCatalogExportArchive {
     /// 目录里哪些图片被引用了：只挑 `local:` 引用对应的文件，缺失的**如实列出**，
     /// 让运营在导出这一步就看见「有引用但没图」，而不是等发布端报错。
     /// - Returns: (可打包的条目, 缺失的文件名)
-    static func imageEntries(
+    ///
+    /// ⚠️ 默认值在迁入 SharedCatalog 时**移除**了：原来的默认值
+    /// `ShopCatalogImageStore.directory` 在 iOS App 里（依赖 UIKit 的落盘目录），
+    /// 共享层拿不到它。调用方必须显式传入自己的图片目录
+    /// （iOS 传 `ShopCatalogImageStore.directory`，Mac 传 staging 目录）。
+    public static func imageEntries(
         forLocalReferences references: Set<String>,
-        imageDirectory: URL = ShopCatalogImageStore.directory
+        imageDirectory: URL
     ) -> (entries: [Entry], missing: [String]) {
         var entries: [Entry] = []
         var missing: [String] = []
@@ -68,7 +79,7 @@ nonisolated enum ShopCatalogExportArchive {
     }
 
     /// `local:<文件名>` → 文件名；非 local 引用或非法名返回 nil
-    static func localFileName(in reference: String) -> String? {
+    public static func localFileName(in reference: String) -> String? {
         let prefix = "local:"
         guard reference.hasPrefix(prefix) else { return nil }
         let name = String(reference.dropFirst(prefix.count))

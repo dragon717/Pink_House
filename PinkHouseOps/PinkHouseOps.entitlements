@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>com.apple.security.app-sandbox</key>
+	<true/>
+	<!-- 运营要选自己的目录 JSON / 图片，也要把「待发布整包」写到用户挑的位置：
+	     只读权限不够，必须 read-write（对应 ENABLE_USER_SELECTED_FILES = readwrite）。 -->
+	<key>com.apple.security.files.user-selected.read-write</key>
+	<true/>
+	<!-- 发布走受控本地子进程（tools/time_hall/publication），子进程继承本 App 的沙箱，
+	     所以出网能力必须在这里开，否则 CLI 连不上 CloudKit。 -->
+	<key>com.apple.security.network.client</key>
+	<true/>
+</dict>
+</plist>

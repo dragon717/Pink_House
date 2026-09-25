@@ -25,12 +25,12 @@
 
 import Foundation
 
-nonisolated enum ShopCatalogJSONCoding {
+public nonisolated enum ShopCatalogJSONCoding {
 
     // MARK: 编码器
 
     /// 全链路统一编码器：日期一律 ISO8601（与 `decoder()` 的解析口径配对）。
-    static func encoder(prettyPrinted: Bool = false) -> JSONEncoder {
+    public static func encoder(prettyPrinted: Bool = false) -> JSONEncoder {
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
         encoder.outputFormatting = prettyPrinted
@@ -42,7 +42,7 @@ nonisolated enum ShopCatalogJSONCoding {
     // MARK: 解码器
 
     /// 全链路统一解码器：日期走宽容解析（见 `decodeDate`），兼容历史落盘格式。
-    static func decoder() -> JSONDecoder {
+    public static func decoder() -> JSONDecoder {
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .custom(decodeDate)
         return decoder
@@ -59,7 +59,7 @@ nonisolated enum ShopCatalogJSONCoding {
     ///
     /// 数值类型的秒 / 毫秒区分按量级判定：|v| ≥ 1e11 视为毫秒（1e11 秒 ≈ 公元 5138 年，
     /// 不可能是业务时间），否则按秒解释。
-    nonisolated static func decodeDate(_ decoder: Decoder) throws -> Date {
+    public nonisolated static func decodeDate(_ decoder: Decoder) throws -> Date {
         let container = try decoder.singleValueContainer()
 
         if let number = try? container.decode(Double.self) {
@@ -114,7 +114,7 @@ nonisolated enum ShopCatalogJSONCoding {
 
 // MARK: - 草稿文件损坏（R01：解码失败不得当成空库）
 
-nonisolated enum ShopCatalogDraftFileError: LocalizedError {
+public nonisolated enum ShopCatalogDraftFileError: LocalizedError {
     /// 草稿文件存在但无法解析。**原文件已保留**并备份到 `backupURL`，
     /// 在人工确认前不允许任何写回（防止空库覆盖掉还能抢救的旧文件）。
     case corrupt(original: URL, backup: URL?, reason: String)
@@ -125,7 +125,7 @@ nonisolated enum ShopCatalogDraftFileError: LocalizedError {
     /// 写盘失败：内存与磁盘均未变化，可直接重试
     case writeFailed(String)
 
-    var errorDescription: String? {
+    public var errorDescription: String? {
         switch self {
         case .corrupt(let original, let backup, let reason):
             var text = "草稿文件无法解析（\(reason)）。原文件已保留：\(original.lastPathComponent)"

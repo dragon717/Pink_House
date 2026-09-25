@@ -798,7 +798,9 @@ struct ShopCatalogOpsView: View {
         let references = Set((store.catalog?.assets ?? []).flatMap { asset in
             [asset.originalURL, asset.thumbnailURL, asset.previewURL].compactMap { $0 }
         })
-        let (imageEntries, missing) = ShopCatalogExportArchive.imageEntries(forLocalReferences: references)
+        let (imageEntries, missing) = ShopCatalogExportArchive.imageEntries(
+            forLocalReferences: references,
+            imageDirectory: ShopCatalogImageStore.directory)
 
         var entries = [ShopCatalogExportArchive.Entry(name: "shop-catalog.json",
                                                       data: Data(json.utf8))]
