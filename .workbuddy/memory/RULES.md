@@ -145,6 +145,16 @@
 - **墓碑（removed*IDs）必须下发，禁止剔除**：它是「已强制删除」的声明，客户端据此把本地 base/overlay 里的同名实体排除；剔除墓碑会让已删除内容在用户端复活。墓碑只记 id、不含条目，不构成悬空引用。运营端若用「强制删除」表达归档，那归档记录就是以墓碑 id 形式下发的。
 - 消费端兜底：存量包可能仍带归档条目，`ShopCatalogStore` 的 `latestActivityDate` / `latestSeriesActivity` / `currentSeries` 派生口径一律先过 `isLive`，否则已归档商品的档期会把「最近上新」推到未来、让已归档系列重新冒进「当前上新」。
 
+## 店家上新 · 图片随包走（THMedia，2026-09-25「数据到了、图全空」）
+- **根因**：商品图在设备里是 `local:<文件名>` 引用（Application Support/ShopCatalog/images/），**只在运营那台设备有效**。只导出 JSON 发布 → 包里仍是 `local:` → 其它设备解不出文件 → 商品图一律占位图。
+- **链路三段，缺一不可**：
+  1. 运营端 `ShopCatalogExportArchive`：导出 `.tar`（JSON + `images/`，USTAR 手写、不压缩；macOS `tar` 与 python `tarfile` 都能解，实测验证过）。只带**被 `local:` 引用到**的图，缺失的如实列出。入口 = 运营工具「导出整包（含图片）· 用于发布」。
+  2. 发布端 `build_release.collect_shop_catalog_media`：`local:` → 上传 THMedia（同图只传一次），引用改写为 `thmedia:<contentHash>`；`bundle:` / http(s) 原样保留；**缺图一律硬报错（退出码 5）**，绝不静默发一个没图的包。参数 `--shop-catalog-media <dir>` / `--shop-catalog-archive <tar>`（后者自动解开）。
+  3. 消费端 `ShopCatalogMediaStore` + `ShopCatalogPackCache` 媒体缓存：`thmedia:` 按需下载 → 落盘 Caches/ShopCatalogSync/media/ → 命中缓存不再打网络；本次会话内失败的摘要不重试（列表滚动会反复触发）。`ShopCatalogImageResolver` 对 `thmedia:` 明确返回 nil（交给下载层），且 `isUnavailable` 判 false（可用性取决于下载结果）。
+- 协议常量两端对齐：`thmedia:` 前缀 + `th.media.<contentHash>` 记录名 + 资产字段名 `asset`（THRelease 的资产字段才叫 `rootIndexAsset`）。
+- 自测：`publication/selftest_shop_catalog.py`（含媒体 10 项）；演练 `drill_offline.sh` 阶段 6 新增 6 项（带图构建 / 引用改写 / 媒体落盘 / 发布 / 读者回读 / 缺图硬失败）→ 34/34。
+- ⚠️ Swift 侧坑：`XCTAssertNil(await …)` 编译不过（autoclosure 不支持 async），先取值再断言。tar 校验可用 `xcrun swiftc` 把纯 Foundation 源文件 + `main.swift` 编成 macOS 小工具，再用 `tarfile` / `tar -tf` 验证（模拟器里没有 tar 命令）。
+
 ## 币种与发布幂等
 - `CatalogCurrency` cny/jpy/unknown 挂 SaleEvent/PriceCorrection.currency；旧 JSON 缺键=**unknown（不默认 CNY）**；两侧都 unknown 仍算差价；指纹含币种；跨币种抛 `crossCurrency`。
 - 幂等 ID = FNV(草稿ID｜类型｜**该类型自己的**价格指纹)；半成功恢复要全部命中；恒「先写覆盖层、后写草稿回执」。坏文件留原件+备份+`isBlockedByCorruptFile` 阻止写回。

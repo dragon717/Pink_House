@@ -152,6 +152,63 @@ nonisolated enum ShopCatalogPackCache {
         control.installedReleaseSeq != releaseSeq || control.installedPayloadHash != payloadHash
     }
 
+    // MARK: 远端媒体缓存（THMedia 按需下载）
+
+    /// 媒体目录（跟随 `ShopCatalogSyncStorage` 的测试隔离，不另开一套重定向）
+    static var mediaDirectory: URL {
+        let dir = ShopCatalogSyncStorage.directory.appendingPathComponent("media", isDirectory: true)
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        return dir
+    }
+
+    private static var mediaIndexURL: URL {
+        ShopCatalogSyncStorage.directory.appendingPathComponent("media-index.json")
+    }
+
+    /// 已缓存媒体的本地文件；nil = 还没下载过（或被系统清掉了）
+    static func cachedMediaURL(contentHash: String) -> URL? {
+        guard let fileName = loadMediaIndex()[contentHash] else { return nil }
+        let url = mediaDirectory.appendingPathComponent(fileName)
+        guard FileManager.default.fileExists(atPath: url.path) else { return nil }
+        return url
+    }
+
+    /// 落盘并记录索引（先写文件再写索引：反过来说会出现「索引说有、文件没了」）
+    @discardableResult
+    static func installMedia(_ data: Data, contentHash: String, fileExtension: String) throws -> URL {
+        let fileName = "\(contentHash).\(fileExtension)"
+        let url = mediaDirectory.appendingPathComponent(fileName)
+        try data.write(to: url, options: .atomic)
+        var index = loadMediaIndex()
+        index[contentHash] = fileName
+        saveMediaIndex(index)
+        return url
+    }
+
+    private static func loadMediaIndex() -> [String: String] {
+        guard let data = try? Data(contentsOf: mediaIndexURL) else { return [:] }
+        return (try? JSONDecoder().decode([String: String].self, from: data)) ?? [:]
+    }
+
+    private static func saveMediaIndex(_ index: [String: String]) {
+        guard let data = try? JSONEncoder().encode(index) else { return }
+        try? data.write(to: mediaIndexURL, options: .atomic)
+    }
+
+    /// 清理已下载媒体（与数据包一样可重下，不计入个人数据）
+    static func clearDownloadedMedia() -> Int {
+        var freed = 0
+        if let files = try? FileManager.default.contentsOfDirectory(
+            at: mediaDirectory, includingPropertiesForKeys: [.fileSizeKey]) {
+            for url in files {
+                let size = (try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
+                if (try? FileManager.default.removeItem(at: url)) != nil { freed += size }
+            }
+        }
+        try? FileManager.default.removeItem(at: mediaIndexURL)
+        return freed
+    }
+
     // MARK: 冷启动恢复
 
     /// 按控制状态记录的 `installedPayloadHash` 读回已验证的缓存包并解码。

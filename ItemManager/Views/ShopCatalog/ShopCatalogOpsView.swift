@@ -762,12 +762,58 @@ struct ShopCatalogOpsView: View {
     // MARK: 导出
 
     private var exportSection: some View {
-        Section("导出") {
+        Section(content: {
+            Button {
+                exportWholeBundleForPublishing()
+            } label: {
+                Label("导出整包（含图片）· 用于发布", systemImage: "square.and.arrow.up")
+            }
             Button {
                 exportWholeCatalogToFile()
             } label: {
-                Label("导出整包 JSON 文件（含覆盖层）", systemImage: "square.and.arrow.up")
+                Label("只导出 JSON（不含图片）", systemImage: "doc.text")
             }
+        }, header: {
+            Text("导出")
+        }, footer: {
+            Text("发布必须导出「含图片」那一版：商品图在包里是 local: 引用，不带图一起走的话，其它设备拉到目录也显示不出图。")
+        })
+    }
+
+    /// 整包导出（含图片，2026-09-25）：JSON + 引用到的图片打包成一个 .tar，
+    /// 走系统分享面板（AirDrop / 存到「文件」）。Mac 端解开后
+    /// `build_release.py --shop-catalog-archive <tar>` 即可发布（图片会上传成 THMedia）。
+    private func exportWholeBundleForPublishing() {
+        guard let json = draftStore.exportJSON(store: store) else {
+            toast = "导出失败：商店目录尚未加载"
+            return
+        }
+        let formatter = DateFormatter()
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyy-MM-dd-HH-mm"
+        let stamp = formatter.string(from: Date())
+
+        // 只带「被引用且是本地上传图」的那部分：bundle: / http(s) 不需要带
+        let references = Set((store.catalog?.assets ?? []).flatMap { asset in
+            [asset.originalURL, asset.thumbnailURL, asset.previewURL].compactMap { $0 }
+        })
+        let (imageEntries, missing) = ShopCatalogExportArchive.imageEntries(forLocalReferences: references)
+
+        var entries = [ShopCatalogExportArchive.Entry(name: "shop-catalog.json",
+                                                      data: Data(json.utf8))]
+        entries.append(contentsOf: imageEntries)
+
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("\(stamp)-shop-catalog-bundle.tar")
+        do {
+            try ShopCatalogExportArchive.tarData(entries: entries).write(to: url, options: .atomic)
+            activeSheet = .exportFile(url)
+            toast = missing.isEmpty
+                ? "已打包 \(imageEntries.count) 张图片"
+                : "已打包 \(imageEntries.count) 张图片，\(missing.count) 张缺失（发布端会报错）"
+        } catch {
+            toast = "导出失败：\(error.localizedDescription)"
         }
     }
 

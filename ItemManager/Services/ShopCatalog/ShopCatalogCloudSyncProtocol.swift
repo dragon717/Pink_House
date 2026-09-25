@@ -46,6 +46,30 @@ nonisolated enum ShopCatalogSyncProtocol {
 
     static func packRecordName(payloadHash: String) -> String { "th.pack.\(payloadHash)" }
 
+    // MARK: 远端媒体（THMedia）
+
+    /// 远端媒体引用前缀。发布端把运营上传图（`local:<文件名>`，只在原设备沙盒里有效）
+    /// 上传成 THMedia 后，把包里的引用改写成 `thmedia:<contentHash>`。
+    ///
+    /// 为什么必须改写：不改写的话引用仍指向 `local:`，换台设备解析不到文件 →
+    /// 商品图一律显示占位图（2026-09-25 实测：数据都拉到了，图全空）。
+    static let mediaReferencePrefix = "thmedia:"
+
+    /// 远端媒体记录名（THMedia，与 Mac 端 `th.media.{contentHash}` 一致）
+    static func mediaRecordName(contentHash: String) -> String { "th.media.\(contentHash)" }
+
+    static func mediaReference(contentHash: String) -> String {
+        "\(mediaReferencePrefix)\(contentHash)"
+    }
+
+    /// `thmedia:<contentHash>` → 内容摘要；不是本前缀或摘要不合法时返回 nil
+    static func mediaContentHash(in reference: String?) -> String? {
+        guard let trimmed = reference?.trimmingCharacters(in: .whitespacesAndNewlines),
+              trimmed.hasPrefix(mediaReferencePrefix) else { return nil }
+        let hash = String(trimmed.dropFirst(mediaReferencePrefix.count))
+        return isPayloadHash(hash) ? hash : nil
+    }
+
     /// 校验 64 位小写十六进制 SHA-256
     static func isPayloadHash(_ value: String) -> Bool {
         guard value.count == 64 else { return false }

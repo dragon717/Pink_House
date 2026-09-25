@@ -24,6 +24,7 @@
 from __future__ import annotations
 
 import argparse
+import copy
 import datetime as dt
 import json
 import shutil
@@ -87,6 +88,25 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
             "商店目录 JSON（店家上新整包，时光馆「商店」内容）。"
             "缺省时自动探测 <input>/shop-catalog.json；"
             "来源未批准时需配合 --allow-unapproved-local-fixture"
+        ),
+    )
+    parser.add_argument(
+        "--shop-catalog-media",
+        type=Path,
+        default=None,
+        help=(
+            "商店目录引用的图片目录（运营端「导出整包（含图片）」解出来的 images/）。"
+            "缺省时取 --shop-catalog 同级目录下的 images/。引用到的图缺失一律硬报错"
+        ),
+    )
+    parser.add_argument(
+        "--shop-catalog-archive",
+        type=Path,
+        default=None,
+        help=(
+            "商店目录整包归档（运营端「导出整包（含图片）」产出的 .tar，"
+            "内含 shop-catalog.json 与 images/）。给它就不需要分别指定"
+            " --shop-catalog / --shop-catalog-media"
         ),
     )
     parser.add_argument("--output", required=True, type=Path, help="发布产物输出目录")
@@ -324,6 +344,100 @@ def build_shop_catalog_pack(
         "dependencyPackRecordNames": [],
     }
     return descriptor, compressed, payload
+
+
+def collect_shop_catalog_media(
+    doc: Dict[str, Any], media_dir: Path
+) -> Tuple[Dict[str, Any], List[Dict[str, Any]], List[Tuple[str, Path]]]:
+    """把商店目录里 `local:<文件名>` 的图片上传为 THMedia，并把引用改写为 `thmedia:<contentHash>`。
+
+    `local:` 引用只在**运营那台设备**的沙盒里有效（Application Support/ShopCatalog/images/），
+    原样发布的话，其它设备解不出文件 → 商品图一律占位图（2026-09-25 实测现象）。
+    所以：图必须跟着发布一起上公共库，包里只留内容寻址的引用。
+
+      · 只处理 `local:`：`bundle:`（App 内置）与 http(s) 原样保留；
+      · 同一张图（同内容摘要）只上传一次，多个引用共享；
+      · **图片缺失一律硬报错**：静默跳过会让「图没传」以「用户看到空白」的形式暴露，
+        比构建失败难查得多。
+
+    返回 (改写后的目录, THMedia 记录, 待落盘文件)。
+    """
+    import mimetypes
+
+    rewritten = copy.deepcopy(doc)
+    records: List[Dict[str, Any]] = []
+    files: List[Tuple[str, Path]] = []
+    by_hash: Dict[str, Dict[str, Any]] = {}
+    resolution: Dict[str, str] = {}
+    missing: List[str] = []
+
+    def rewrite(value: Any) -> Any:
+        if not isinstance(value, str) or not value.startswith("local:"):
+            return value
+        if value in resolution:
+            return resolution[value]
+        file_name = value[len("local:"):].strip()
+        if not file_name or "/" in file_name or file_name.startswith("."):
+            missing.append(value)
+            return value
+        source = media_dir / file_name
+        if not source.exists():
+            missing.append(value)
+            return value
+        payload = source.read_bytes()
+        content_hash = sha256_hex(payload)
+        record = by_hash.get(content_hash)
+        if record is None:
+            suffix = source.suffix.lstrip(".") or "bin"
+            record = {
+                "mediaKey": value,
+                "contentHash": content_hash,
+                "mimeType": mimetypes.guess_type(file_name)[0] or "application/octet-stream",
+                "byteCount": len(payload),
+                "recordName": "th.media.{}".format(content_hash),
+                "fileName": "{}.{}".format(content_hash, suffix),
+            }
+            by_hash[content_hash] = record
+            records.append(record)
+            files.append((record["fileName"], source))
+        resolution[value] = "thmedia:{}".format(content_hash)
+        return resolution[value]
+
+    for item in rewritten.get("assets") or []:
+        if isinstance(item, dict):
+            for key in ("originalURL", "thumbnailURL", "previewURL"):
+                if item.get(key):
+                    item[key] = rewrite(item[key])
+    for item in rewritten.get("shops") or []:
+        if isinstance(item, dict):
+            for key in ("logo", "cover"):
+                if item.get(key):
+                    item[key] = rewrite(item[key])
+    for item in rewritten.get("series") or []:
+        if not isinstance(item, dict):
+            continue
+        if item.get("cover"):
+            item["cover"] = rewrite(item["cover"])
+        chart = item.get("priceChart")
+        if isinstance(chart, dict):
+            if chart.get("sourceImage"):
+                chart["sourceImage"] = rewrite(chart["sourceImage"])
+            if chart.get("sourceImages"):
+                chart["sourceImages"] = [rewrite(one) for one in chart["sourceImages"]]
+    for item in rewritten.get("sizeCharts") or []:
+        if isinstance(item, dict) and item.get("sourceImage"):
+            item["sourceImage"] = rewrite(item["sourceImage"])
+
+    if missing:
+        unique = sorted(set(missing))
+        raise ProtocolError(
+            "商店目录引用的图片在 {} 下找不到（{} 处，例如：{}）。"
+            "请确认导出时**带上了图片**（运营端「导出整包（含图片）」），"
+            "或用 --shop-catalog-media 指定图片目录。".format(
+                media_dir, len(unique), "、".join(unique[:5])
+            )
+        )
+    return rewritten, records, files
 
 
 def entity_month_scope(catalog: Dict[str, Any], entity_type: str) -> Dict[str, List[Dict[str, Any]]]:
@@ -635,8 +749,29 @@ def main(argv: Optional[List[str]] = None) -> int:
         built_brands.append(str(brand["brandID"]))
 
     # ---- 商店目录（店家上新）整包分片 ----
+    shop_media_records: List[Dict[str, Any]] = []
+    shop_media_files: List[Tuple[str, Path]] = []
     if shop_source:
         shop_input = Path(args.shop_catalog) if args.shop_catalog else args.input / "shop-catalog.json"
+        shop_unpack_root: Optional[Path] = None
+        if args.shop_catalog_archive:
+            # 运营端导出的是「整包归档」（JSON + images/），这里就地解开再走同一条路径
+            import tarfile
+            import tempfile
+
+            shop_unpack_root = Path(tempfile.mkdtemp(prefix="shop-catalog-archive-"))
+            with tarfile.open(str(args.shop_catalog_archive)) as archive:
+                try:
+                    archive.extractall(shop_unpack_root, filter="data")
+                except TypeError:  # Python < 3.12 没有 filter 参数
+                    archive.extractall(shop_unpack_root)
+            found = sorted(shop_unpack_root.rglob("shop-catalog.json"))
+            if not found:
+                print("❌ 归档里没有 shop-catalog.json：{}".format(args.shop_catalog_archive),
+                      file=sys.stderr)
+                return 2
+            shop_input = found[0]
+            print("  · 已解开整包归档：{}".format(args.shop_catalog_archive.name))
         if not shop_input.exists():
             if args.shop_catalog:
                 print("❌ --shop-catalog 指定的文件不存在：{}".format(shop_input), file=sys.stderr)
@@ -655,9 +790,34 @@ def main(argv: Optional[List[str]] = None) -> int:
             return 3
         else:
             shop_doc = json.loads(shop_input.read_text(encoding="utf-8"))
+            # 先裁掉归档条目（幂等，`build_shop_catalog_pack` 内部还会再跑一次），
+            # 这样「只被归档实体引用的图」不会被白上传一份。
+            shop_doc, _ = strip_archived_shop_catalog(shop_doc)
+            # 图片必须跟着一起发：`local:` 引用只在运营那台设备有效，
+            # 这里收集成 THMedia 并把引用改写成 `thmedia:<contentHash>`（缺图硬报错）。
+            media_dir = Path(args.shop_catalog_media) if args.shop_catalog_media \
+                else shop_input.parent / "images"
+            try:
+                shop_doc, shop_media_records, shop_media_files = collect_shop_catalog_media(
+                    shop_doc, media_dir)
+            except ProtocolError as error:
+                # 缺图是发布前置条件不满足，走与其它校验失败一致的退出码 5
+                # （未捕获会变成 traceback + exit 1，演练与调用方都按 5 判定）
+                print("❌ {}".format(error), file=sys.stderr)
+                return 5
+            if shop_media_records:
+                print(
+                    "  · 商店目录：{} 张图片将随本次发布上传（THMedia，共 {} 字节）".format(
+                        len(shop_media_records),
+                        sum(int(item["byteCount"]) for item in shop_media_records),
+                    )
+                )
+            else:
+                print("  · 商店目录：没有需要上传的本地图片（引用均为 bundle: / http(s) / 空）")
             built_shop = build_shop_catalog_pack(shop_source, shop_doc, args)
             if built_shop is None:
                 print("  · 商店目录：没有任何实体，跳过")
+                shop_media_records, shop_media_files = [], []
             else:
                 descriptor, compressed, _payload = built_shop
                 all_issues += collect_issues(shop_source, built_shop)
@@ -684,6 +844,9 @@ def main(argv: Optional[List[str]] = None) -> int:
         return 4
 
     media_records, media_files = load_media(args.input)
+    # 商店目录的图片与画册媒体共用同一条 THMedia 通道（发布端负责上传，客户端按需取）
+    media_records += shop_media_records
+    media_files += shop_media_files
     withdrawals = load_withdrawals(args.withdrawals)
 
     root_index = {

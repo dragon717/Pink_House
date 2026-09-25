@@ -517,6 +517,124 @@ final class ShopCatalogCloudSyncTests: XCTestCase {
         XCTAssertEqual(coldStore.shop(id: "shop-remote-new")?.name, "云端新店家")
     }
 
+    // MARK: - 远端媒体（THMedia，2026-09-25：数据到了但图全空）
+
+    /// 往返：引用改写 → 按需下载 → 落盘 → 命中缓存不再打网络
+    func testRemoteMediaResolvesDownloadsAndCaches() async throws {
+        let jpeg = Data([0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 0x4A, 0x46, 0x49, 0x46, 0x00, 0x01])
+        let hash = ShopCatalogSyncProtocol.sha256Hex(jpeg)
+        let reference = ShopCatalogSyncProtocol.mediaReference(contentHash: hash)
+
+        XCTAssertEqual(ShopCatalogSyncProtocol.mediaContentHash(in: reference), hash)
+        XCTAssertNil(ShopCatalogSyncProtocol.mediaContentHash(in: "local:img-AB.jpg"),
+                     "本地引用不该被当成远端媒体")
+        XCTAssertNil(ShopCatalogSyncProtocol.mediaContentHash(in: "thmedia:not-a-hash"))
+
+        final class MediaReader: ShopCatalogPublicReading, @unchecked Sendable {
+            let data: Data
+            var calls = 0
+            init(_ data: Data) { self.data = data }
+            func fetchReleaseHeader() async throws -> ShopCatalogReleaseHeader {
+                throw ShopCatalogSyncError.recordMissing(recordType: "THRelease", recordName: "-")
+            }
+            func fetchRootIndex() async throws -> Data { Data() }
+            func fetchPack(payloadHash: String) async throws -> Data { Data() }
+            func fetchMedia(contentHash: String) async throws -> Data {
+                calls += 1
+                return data
+            }
+        }
+        let reader = MediaReader(jpeg)
+        let store = ShopCatalogMediaStore(reader: reader)
+
+        XCTAssertNil(ShopCatalogPackCache.cachedMediaURL(contentHash: hash))
+        let first = await store.resolvedURL(for: reference)
+        XCTAssertNotNil(first, "远端媒体应能下载并落盘")
+        XCTAssertEqual(reader.calls, 1)
+        XCTAssertEqual(ShopCatalogPackCache.cachedMediaURL(contentHash: hash), first)
+
+        // 第二次：命中磁盘缓存，不再打网络
+        _ = await store.resolvedURL(for: reference)
+        XCTAssertEqual(reader.calls, 1, "同一张图不得重复下载")
+
+        // 后缀按魔数判定（只为文件名可读，UIImage 不靠后缀解码）
+        XCTAssertEqual(ShopCatalogMediaStore.inferredFileExtension(jpeg), "jpg")
+        XCTAssertEqual(
+            ShopCatalogMediaStore.inferredFileExtension(
+                Data([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A])), "png")
+    }
+
+    /// 下载失败的摘要在本次会话内不再重试：列表滚动会反复触发解析，
+    /// 「图没传」不该变成无限打网络。
+    func testFailedMediaIsNotRetriedInSameSession() async throws {
+        struct FailingReader: ShopCatalogPublicReading {
+            func fetchReleaseHeader() async throws -> ShopCatalogReleaseHeader {
+                throw ShopCatalogSyncError.recordMissing(recordType: "THRelease", recordName: "-")
+            }
+            func fetchRootIndex() async throws -> Data { Data() }
+            func fetchPack(payloadHash: String) async throws -> Data { Data() }
+            func fetchMedia(contentHash: String) async throws -> Data {
+                throw ShopCatalogSyncError.recordMissing(recordType: "THMedia", recordName: contentHash)
+            }
+        }
+        let hash = String(repeating: "a", count: 64)
+        let reference = ShopCatalogSyncProtocol.mediaReference(contentHash: hash)
+        let store = ShopCatalogMediaStore(reader: FailingReader())
+        let first = await store.resolvedURL(for: reference)
+        XCTAssertNil(first, "下载失败应回退到占位图")
+        let second = await store.resolvedURL(for: reference)
+        XCTAssertNil(second, "失败后不再重试同一个摘要")
+    }
+
+    // MARK: - 导出整包归档（tar）
+
+    func testExportArchiveProducesReadableTar() throws {
+        let json = Data("{\"version\":1}".utf8)
+        let entries = [
+            ShopCatalogExportArchive.Entry(name: "shop-catalog.json", data: json),
+            ShopCatalogExportArchive.Entry(name: "images/img-AB12.jpg", data: Data(repeating: 0x41, count: 1000)),
+        ]
+        let tar = ShopCatalogExportArchive.tarData(entries: entries)
+
+        XCTAssertEqual(tar.count % 512, 0, "tar 必须按 512 字节块对齐")
+        // 头 + 数据（补齐到 512）× 2 + 两个结束块
+        XCTAssertEqual(tar.count, 512 * 2 + 512 + 1024 + 512 * 2)
+
+        func field(_ block: Data, _ offset: Int, _ length: Int) -> String {
+            let slice = block[offset..<(offset + length)]
+            return String(decoding: slice.prefix { $0 != 0 && $0 != 0x20 }, as: UTF8.self)
+        }
+        let first = tar[0..<512]
+        XCTAssertEqual(field(first, 0, 100), "shop-catalog.json")
+        XCTAssertEqual(Int(field(first, 124, 12), radix: 8), json.count,
+                       "size 字段应是八进制的文件长度")
+        XCTAssertEqual(String(UnicodeScalar(first[156])), "0", "typeflag 应为普通文件")
+        // USTAR magic 在 257 处
+        XCTAssertEqual(field(first, 257, 6), "ustar")
+
+        // checksum：把校验字段按规范置成 8 个空格后求和，应与写入值一致
+        var block = Data(first)
+        for index in 148..<156 { block[index] = 0x20 }
+        var sum = 0
+        for byte in block { sum += Int(byte) }
+        XCTAssertEqual(Int(field(Data(first), 148, 6), radix: 8), sum, "checksum 必须与头部字节和一致")
+
+        XCTAssertTrue(tar[(tar.count - 1024)..<tar.count].allSatisfy { $0 == 0 }, "结尾必须是两个零块")
+    }
+
+    func testExportArchiveOnlyPicksReferencedLocalFiles() throws {
+        let directory = ShopCatalogImageStore.directory
+        let name = "img-EXPORT-TEST.jpg"
+        let url = directory.appendingPathComponent(name)
+        try Data([0xFF, 0xD8, 0xFF, 0xD9]).write(to: url)
+        defer { try? FileManager.default.removeItem(at: url) }
+
+        let (entries, missing) = ShopCatalogExportArchive.imageEntries(
+            forLocalReferences: ["local:\(name)", "bundle:seed.jpg", "local:img-MISSING.jpg"])
+        XCTAssertEqual(entries.map(\.name), ["images/\(name)"])
+        XCTAssertEqual(missing, ["img-MISSING.jpg"], "引用了但文件不在 → 如实列出，别静默跳过")
+    }
+
     func testSyncInstallsRemoteCatalogAndThrottlesNextCheck() async throws {
         let remote = try makeRemoteCatalog()
         let release = try validRelease(seq: 7, catalog: remote)

@@ -630,6 +630,10 @@ nonisolated enum ShopCatalogImageResolver {
         if name.lowercased().hasPrefix("local:") {
             return ShopCatalogImageStore.url(for: name)
         }
+        // 远端媒体（THMedia）：本地解析不出路径，交给 `ShopCatalogMediaStore` 按需下载
+        if name.lowercased().hasPrefix(ShopCatalogSyncProtocol.mediaReferencePrefix) {
+            return nil
+        }
         if name.lowercased().hasPrefix("bundle:") {
             name = String(name.dropFirst(7))
         }
@@ -652,6 +656,8 @@ nonisolated enum ShopCatalogImageResolver {
         guard let trimmed = reference?.trimmingCharacters(in: .whitespacesAndNewlines),
               !trimmed.isEmpty else { return true }
         if trimmed.lowercased().hasPrefix("http") { return false }
+        // 远端媒体：可用性取决于下载结果，本地无法判定 → 不算「不可用」
+        if trimmed.lowercased().hasPrefix(ShopCatalogSyncProtocol.mediaReferencePrefix) { return false }
         guard let url = url(for: trimmed) else { return true }
         if url.isFileURL { return !FileManager.default.fileExists(atPath: url.path) }
         return false
@@ -660,12 +666,23 @@ nonisolated enum ShopCatalogImageResolver {
 
 // MARK: - 图片视图
 
-/// CatalogAsset 引用的统一展示视图（Bundle 图 / 远程图 / 占位）
+/// CatalogAsset 引用的统一展示视图（Bundle 图 / 运营上传图 / 远端媒体 / 占位）
 struct ShopCatalogAssetImage: View {
     let reference: String?
     var contentMode: ContentMode = .fill
 
+    /// 远端媒体（THMedia）下载后的本地文件 —— 按需下载，屏内才拉
+    @State private var remoteMediaURL: URL?
+    /// 下载过且失败：本次展示周期内不再重试（列表滚动会反复触发 task）
+    @State private var remoteMediaFailed = false
+
     var body: some View {
+        content
+            .task(id: reference) { await loadRemoteMediaIfNeeded() }
+    }
+
+    @ViewBuilder
+    private var content: some View {
         if let url = remoteURL {
             AsyncImage(url: url, content: { phase in
                 switch phase {
@@ -675,7 +692,7 @@ struct ShopCatalogAssetImage: View {
                     placeholder
                 }
             })
-        } else if let path = localPath, let loaded = UIImage(contentsOfFile: path) {
+        } else if let path = remoteMediaPath ?? localPath, let loaded = UIImage(contentsOfFile: path) {
             // 文件存在且可解码才渲染；读失败（如沙盒重置后文件丢失）走占位图，
             // 不再渲染空白的 UIImage()（表现为整块空白/黑屏，用户无从判断原因）
             Image(uiImage: loaded)
@@ -686,9 +703,27 @@ struct ShopCatalogAssetImage: View {
         }
     }
 
+    private func loadRemoteMediaIfNeeded() async {
+        guard ShopCatalogSyncProtocol.mediaContentHash(in: reference) != nil else {
+            remoteMediaURL = nil
+            remoteMediaFailed = false
+            return
+        }
+        guard !remoteMediaFailed else { return }
+        if let url = await ShopCatalogMediaStore.shared.resolvedURL(for: reference) {
+            remoteMediaURL = url
+        } else {
+            remoteMediaFailed = true
+        }
+    }
+
     private var remoteURL: URL? {
         guard let reference, reference.lowercased().hasPrefix("http") else { return nil }
         return URL(string: reference)
+    }
+
+    private var remoteMediaPath: String? {
+        remoteMediaURL?.path
     }
 
     private var localPath: String? {

@@ -34,6 +34,18 @@ nonisolated protocol ShopCatalogPublicReading: Sendable {
     func fetchRootIndex() async throws -> Data
     /// 按载荷摘要取不可变数据包
     func fetchPack(payloadHash: String) async throws -> Data
+    /// 按内容摘要取不可变媒体（商品图 / 尺码表原图）
+    func fetchMedia(contentHash: String) async throws -> Data
+}
+
+extension ShopCatalogPublicReading {
+    /// 默认实现：不支持媒体的读者（如测试替身）不实现也不会编译失败，
+    /// 取用时如实报「找不到」，绝不静默返回空数据。
+    func fetchMedia(contentHash: String) async throws -> Data {
+        throw ShopCatalogSyncError.recordMissing(
+            recordType: "THMedia",
+            recordName: ShopCatalogSyncProtocol.mediaRecordName(contentHash: contentHash))
+    }
 }
 
 // MARK: - CloudKit 真实现
@@ -94,6 +106,16 @@ struct ShopCatalogPublicCloudReader: ShopCatalogPublicReading {
             recordName: ShopCatalogSyncProtocol.packRecordName(payloadHash: payloadHash)
         )
         return try data(from: record, assetKey: "asset", what: "数据包 \(payloadHash.prefix(12))")
+    }
+
+    // MARK: 媒体
+
+    func fetchMedia(contentHash: String) async throws -> Data {
+        let record = try await record(
+            recordType: "THMedia",
+            recordName: ShopCatalogSyncProtocol.mediaRecordName(contentHash: contentHash)
+        )
+        return try data(from: record, assetKey: "asset", what: "媒体 \(contentHash.prefix(12))")
     }
 
     // MARK: 内部

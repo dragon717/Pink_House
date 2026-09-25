@@ -163,6 +163,73 @@ check("非归档的悬空引用不被裁剪抹平（坏数据要留下来报错�
 check("…且会被结构校验如实报出", bool(validate_shop_catalog(kept, BRAND, COVERAGE_COMPLETE)))
 
 print()
+print("=== collect_shop_catalog_media（图片随包上传 THMedia） ===")
+
+
+def media_fixture(tmp: Path):
+    images = tmp / "images"
+    images.mkdir(parents=True, exist_ok=True)
+    (images / "img-ONE.jpg").write_bytes(b"\xff\xd8\xff\xe0-one")
+    (images / "img-TWO.png").write_bytes(b"\x89PNG\r\n\x1a\n-two")
+    doc = {
+        "version": 1,
+        "shops": [{"id": "shop-a", "name": "店家", "logo": "local:img-ONE.jpg"}],
+        "series": [{"id": "series-a", "shopID": "shop-a", "name": "系列"}],
+        "products": [{"id": "p-a", "shopID": "shop-a", "seriesID": "series-a",
+                      "name": "商品", "category": "JSK", "images": []}],
+        "assets": [
+            {"id": "asset-1", "type": "productImage", "originalURL": "local:img-ONE.jpg"},
+            {"id": "asset-2", "type": "productImage", "originalURL": "local:img-TWO.png"},
+            {"id": "asset-3", "type": "productImage", "originalURL": "bundle:seed.jpg"},
+            {"id": "asset-4", "type": "productImage", "originalURL": "https://example.com/a.jpg"},
+        ],
+        "sizeCharts": [{"id": "chart-a", "productID": "p-a", "sourceImage": "local:img-TWO.png"}],
+        "variants": [], "saleEvents": [], "styleProfiles": [],
+    }
+    return doc, images
+
+
+import tempfile  # noqa: E402
+
+from build_release import collect_shop_catalog_media  # noqa: E402
+
+with tempfile.TemporaryDirectory() as root_name:
+    root = Path(root_name)
+    doc, images = media_fixture(root)
+    rewritten, records, files = collect_shop_catalog_media(doc, images)
+
+    check("图片被收集成 THMedia 记录（同一张图只传一次）", len(records) == 2,
+          "records={}".format(len(records)))
+    check("待落盘文件与记录一一对应", len(files) == 2)
+    check("记录名符合协议 th.media.<contentHash>",
+          all(r["recordName"] == "th.media.{}".format(r["contentHash"]) for r in records))
+
+    def url_of(asset_id):
+        return next(a["originalURL"] for a in rewritten["assets"] if a["id"] == asset_id)
+
+    one_hash = next(r["contentHash"] for r in records if r["mediaKey"] == "local:img-ONE.jpg")
+    check("引用改写为 thmedia:<contentHash>", url_of("asset-1") == "thmedia:{}".format(one_hash),
+          url_of("asset-1"))
+    check("同图多处引用共享同一个 hash（logo 与 asset-1）",
+          rewritten["shops"][0]["logo"] == url_of("asset-1"))
+    check("尺码表原图引用也被改写",
+          rewritten["sizeCharts"][0]["sourceImage"].startswith("thmedia:"))
+    check("bundle: 引用原样保留", url_of("asset-3") == "bundle:seed.jpg")
+    check("http(s) 引用原样保留", url_of("asset-4") == "https://example.com/a.jpg")
+
+    # 缺图必须硬报错（静默跳过会让「图没传」以空白图的形式暴露，难查得多）
+    broken = copy.deepcopy(doc)
+    broken["assets"].append(
+        {"id": "asset-x", "type": "productImage", "originalURL": "local:img-MISSING.jpg"})
+    raised = False
+    try:
+        collect_shop_catalog_media(broken, images)
+    except Exception as error:  # noqa: BLE001 - 只关心有没有硬失败
+        raised = True
+        check("缺图报错信息点名缺失文件", "img-MISSING.jpg" in str(error), str(error)[:80])
+    check("引用到的图片缺失 → 构建硬失败（不静默跳过）", raised)
+
+print()
 if failures:
     print("❌ {} 项未通过：{}".format(len(failures), "、".join(failures)))
     sys.exit(1)

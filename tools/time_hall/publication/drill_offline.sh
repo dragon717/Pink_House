@@ -324,6 +324,65 @@ run "商店目录悬空引用应被拒绝" 5 \
     --input "$INPUT" --shop-catalog "$SHOP_BAD" --output "$WORK/release-bad" \
     --release-seq 1 --allow-unapproved-local-fixture
 
+# 图片随包走（2026-09-25）：只发 JSON 不发图 = 其它设备拉到目录也显示不出图。
+# 这里造一张假图，验证「收集 → 改写 thmedia: → 发布 → 读者回读」全链路。
+SHOP_MEDIA_INPUT="$WORK/shop-media-input"
+SHOP_MEDIA="$WORK/shop-catalog-with-media.json"
+mkdir -p "$SHOP_MEDIA_INPUT/images"
+printf '\377\330\377\340drill-image-bytes' > "$SHOP_MEDIA_INPUT/images/img-DRILL.jpg"
+"$PY" - "$SHOP_FIXTURE" "$SHOP_MEDIA" <<'PYEOF'
+import json
+import sys
+from pathlib import Path
+
+good = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+good["assets"] = [
+    {"id": "asset-drill", "type": "productImage", "originalURL": "local:img-DRILL.jpg"}
+]
+Path(sys.argv[2]).write_text(json.dumps(good, ensure_ascii=False, indent=2), encoding="utf-8")
+PYEOF
+
+RELEASE_MEDIA="$WORK/release-shop-media"
+LIVE_MEDIA="$WORK/live-shop-media"
+run "构建带图片的商店目录发布产物" 0 \
+  "$PY" "$SCRIPT_DIR/build_release.py" \
+    --input "$INPUT" --shop-catalog "$SHOP_MEDIA" \
+    --shop-catalog-media "$SHOP_MEDIA_INPUT/images" \
+    --output "$RELEASE_MEDIA" --release-seq 1 --allow-unapproved-local-fixture
+assert "引用已改写为 thmedia:（不再是 local:）" "数据包内不再有设备本地引用" \
+  "$PY" - "$RELEASE_MEDIA" <<'PYEOF'
+import gzip
+import json
+import sys
+from pathlib import Path
+
+root = Path(sys.argv[1])
+# 产物里还有画册分片（载荷键 records），只取商店目录那一个
+docs = [
+    json.loads(gzip.decompress(pack.read_bytes()))
+    for pack in sorted((root / "packs").glob("*.json.gz"))
+]
+shop = next(d for d in docs if "shopCatalog" in d)["shopCatalog"]
+urls = [a.get("originalURL") for a in shop.get("assets") or []]
+assert urls, "商店目录分片里没有图片资源"
+assert all(u.startswith("thmedia:") for u in urls), urls
+print("  分片内图片引用：", urls)
+PYEOF
+assert "图片随产物落盘（THMedia）" "media/ 目录含按内容摘要命名的文件" \
+  bash -c "ls '$RELEASE_MEDIA/media' | grep -q '^[0-9a-f]\{64\}\.jpg'"
+run "发布带图片的产物（filesystem）" 0 \
+  "$PY" "$SCRIPT_DIR/publish_cloudkit.py" \
+    --release "$RELEASE_MEDIA" --adapter filesystem --filesystem-root "$LIVE_MEDIA" \
+    --apply --quiet
+assert "读者可回读媒体" "THMedia 记录已上线" \
+  bash -c "ls '$LIVE_MEDIA/THMedia' | grep -q '^[0-9a-f]\{64\}\.jpg'"
+run "缺图必须硬失败（不能静默发一个没图的包）" 5 \
+  "$PY" "$SCRIPT_DIR/build_release.py" \
+    --input "$INPUT" --shop-catalog "$SHOP_MEDIA" \
+    --shop-catalog-media "$WORK/no-such-images" \
+    --output "$WORK/release-shop-missing-media" \
+    --release-seq 1 --allow-unapproved-local-fixture
+
 section "结果"
 echo "  通过 $PASS 项，失败 $FAIL 项"
 if [ "$FAIL" -gt 0 ]; then

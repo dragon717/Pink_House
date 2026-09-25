@@ -228,6 +228,35 @@ python3 build_release.py --input <目录> --shop-catalog <商店目录.json> \
 ⚠️ **运营导出输入时必须导出「合并视图」**（Bundle 种子 + 覆盖层）。
 只导覆盖层会因引用悬空被校验拒绝——这正是设计要拦住的错误，不是误报。
 
+### 图片必须跟着一起发（否则用户端「有目录、没图」）
+
+商品图在设备里的引用是 `local:<文件名>`，指向运营那台设备的沙盒
+（`Application Support/ShopCatalog/images/`）——**换台设备就解不出文件**。
+只发 JSON 的话，客户端目录数据全在、商品图一律占位图（2026-09-25 实测）。
+
+所以运营端要用**「导出整包（含图片）」**（产出 `.tar`，内含 `shop-catalog.json` + `images/`），
+发布端把引用到的图上传成 THMedia，并把包里的引用改写为 `thmedia:<contentHash>`：
+
+```bash
+# 方式一：直接给归档（推荐，自动解开取 JSON 与 images/）
+python3 build_release.py --input <目录> \
+    --shop-catalog-archive <运营导出的 .tar> \
+    --output <产物目录> --release-seq <N>
+
+# 方式二：已解开时分别指定
+python3 build_release.py --input <目录> \
+    --shop-catalog <shop-catalog.json> --shop-catalog-media <images 目录> \
+    --output <产物目录> --release-seq <N>
+```
+
+约定与行为：
+
+- 只处理 `local:`；`bundle:`（App 内置）与 http(s) 原样保留；
+- 同一张图（同内容摘要）只上传一次，多处引用共享；
+- **引用到的图缺失 → 构建硬失败（退出码 5）**，绝不静默发一个没图的包；
+- 归档条目（含其专属图）先被 `strip_archived_shop_catalog` 剔除，不会白传一份；
+- 客户端按需下载（屏内才拉），落 `Caches/ShopCatalogSync/media/`，命中缓存不再打网络。
+
 ## 发布顺序为什么是这个顺序（§9.1）
 
 ```
