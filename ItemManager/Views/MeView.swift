@@ -273,8 +273,13 @@ struct MeView: View {
                         }
 
                         // 运营工具（计划 §26：设置 → 运营工具 → 店家商品库，
-                        // 仅 Catalog Editor（创作者白名单）可见，普通用户完全看不到）
-                        if creatorAccess.isCreator {
+                        // 仅 Catalog Editor（创作者白名单）可见，普通用户完全看不到。
+                        // ⚠️ 必须用 isWhitelistedCreator（白名单明确命中），
+                        // 不能用 isCreator——后者在未登录 iCloud 时会被本机
+                        // 「创作者模式」开关放行（localSwitch），等于谁开了
+                        // 调试开关就能看到运营入口。未登录 = 不算白名单，
+                        // 哪怕该 Apple ID 本身在白名单里（用户 2026-09-25 明确）。
+                        if creatorAccess.isWhitelistedCreator {
                             NavigationLink(destination: ShopCatalogOpsView()) {
                                 SettingsGridItem(
                                     title: "运营工具",

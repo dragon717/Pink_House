@@ -265,6 +265,22 @@ nonisolated enum ShopCatalogCloudSyncValidator {
         }
     }
 
+    /// 已通过三层校验并落盘的缓存包 → 目录快照（**冷启动恢复**路径）。
+    ///
+    /// 缓存包是「校验通过才写盘」的（`ShopCatalogCloudSyncService` 第 7 步），
+    /// 所以恢复路径不重复做网络侧校验，只做「还解不开吗」的兜底：
+    /// 解不开返回 nil，调用方按「没有本地内容」处理并重新下载。
+    ///
+    /// ⚠️ 远端层只进内存（`ShopCatalogStore.installRemoteCatalog`），进程重启即丢失。
+    /// 没有这条恢复路径就会出现「控制状态说已安装、界面上一个店家都没有」
+    /// ——2026-09-25 真机「看不到店家上线数据」的直接成因之一。
+    static func catalog(fromVerifiedPack compressed: Data) -> ShopCatalog? {
+        guard let raw = try? decompress(compressed),
+              let payload = try? ShopCatalogJSONCoding.decoder().decode(
+                  ShopCatalogPackPayload.self, from: raw) else { return nil }
+        return payload.shopCatalog
+    }
+
     // MARK: 结构校验（与 Mac 端 validate_shop_catalog 同一口径的客户端版）
 
     /// 结构校验。返回问题列表（空 = 通过）。

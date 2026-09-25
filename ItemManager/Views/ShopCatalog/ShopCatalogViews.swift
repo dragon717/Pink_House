@@ -37,10 +37,17 @@ enum ShopCatalogFormat {
 /// 时光馆首屏「店家上新」（直接作为底部 Tab 根视图）。
 struct ShopCatalogBrowseView: View {
     @ObservedObject private var store = ShopCatalogStore.shared
+    /// 云端同步状态（首屏刷新按钮与状态条共用；失败原因必须可见，不再静默）
+    @ObservedObject private var syncService = ShopCatalogCloudSyncService.shared
     /// 尾款阶段同步需要显式传入 context（内部不默认拿生产容器）
     @Environment(\.modelContext) private var modelContext
     /// 开售提醒深链：通知点击 → TabNavigationManager → 本栈压入商品详情
     @ObservedObject private var tabNav = TabNavigationManager.shared
+
+    private var isSyncing: Bool {
+        if case .syncing = syncService.state { return true }
+        return false
+    }
 
     private var showsDeepLinkProduct: Binding<Bool> {
         Binding(
@@ -63,6 +70,22 @@ struct ShopCatalogBrowseView: View {
                     ShopCatalogProductView(productID: productID)
                 }
             }
+            // 手动刷新入口：同步失败此前完全静默（界面只表现为「列表空的」），
+            // 必须留一个用户能立刻重试并把原因看出来的地方。
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button {
+                        Task { await syncService.syncIfNeeded(force: true) }
+                    } label: {
+                        if case .syncing = syncService.state {
+                            ProgressView()
+                        } else {
+                            Image(systemName: "arrow.clockwise")
+                        }
+                    }
+                    .disabled(isSyncing)
+                }
+            }
         }
         .onAppear {
             store.loadFromBundleIfNeeded()
@@ -83,6 +106,7 @@ struct ShopCatalogBrowseView: View {
 struct ShopCatalogListView: View {
     @Environment(ThemeManager.self) private var themeManager
     @ObservedObject private var store = ShopCatalogStore.shared
+    @ObservedObject private var syncService = ShopCatalogCloudSyncService.shared
     @State private var keyword = ""
 
     private var shops: [CatalogShop] {
@@ -104,6 +128,7 @@ struct ShopCatalogListView: View {
         ScrollView(.vertical, showsIndicators: false) {
             LazyVStack(spacing: 10) {
                 searchBar
+                syncBanner
                 if shops.isEmpty {
                     emptyState
                 } else {
@@ -122,6 +147,73 @@ struct ShopCatalogListView: View {
         }
         // 底部悬浮 Dock 避让：店家列表最后一条会被 Dock 盖住。
         .avoidingBottomDock()
+    }
+
+    /// 云端同步状态条。**失败必须可见**：本链路曾经完全静默，界面上只表现为
+    /// 「列表是空的」，与「公共库没发布内容」「还没同步」无法区分，
+    /// 于是排查只能靠猜（2026-09-25 真机「看不到店家上线数据」）。
+    /// 正常态（idle / upToDate / updated）不占版面。
+    @ViewBuilder
+    private var syncBanner: some View {
+        switch syncService.state {
+        case .idle, .upToDate, .updated:
+            EmptyView()
+        case .syncing:
+            bannerRow(
+                icon: "arrow.triangle.2.circlepath",
+                text: "正在检查云端上新…",
+                tint: themeManager.secondaryTextColor) {
+                    EmptyView()
+                }
+        case .nothingPublished:
+            bannerRow(
+                icon: "icloud.slash",
+                text: "公共库还没有发布商店内容（运营发布后自动可见）",
+                tint: themeManager.secondaryTextColor) {
+                    retryButton
+                }
+        case .failed(let message):
+            bannerRow(icon: "exclamationmark.triangle",
+                      text: "云端上新拉取失败：\(message)",
+                      tint: .red) {
+                retryButton
+            }
+        }
+    }
+
+    private func bannerRow<Extra: View>(
+        icon: String,
+        text: String,
+        tint: Color,
+        @ViewBuilder extra: () -> Extra
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Image(systemName: icon)
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(tint)
+                Text(text)
+                    .font(.system(size: 12))
+                    .foregroundStyle(tint)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            extra()
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(tint.opacity(0.08))
+        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+    }
+
+    private var retryButton: some View {
+        Button {
+            Task { await syncService.syncIfNeeded(force: true) }
+        } label: {
+            Text("立即重试")
+                .font(.system(size: 12, weight: .medium))
+        }
+        .buttonStyle(.borderless)
     }
 
     private var searchBar: some View {

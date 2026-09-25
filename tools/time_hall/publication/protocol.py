@@ -637,6 +637,158 @@ def shop_catalog_entity_count(doc: Any) -> int:
     return sum(len(_shop_ids(doc, field)) for field in SHOP_CATALOG_ENTITY_FIELDS)
 
 
+def strip_archived_shop_catalog(doc: Any) -> Tuple[Dict[str, Any], Dict[str, int]]:
+    """剔除**已归档**条目（2026-09-25 需求：归档的不下发）。
+
+    归档 = `archivedAt` 非空 —— 运营端仍要能管理与追溯，用户端不再展示。
+    发布包是「给用户的快照」，所以整条链路连带剔除：
+
+        店家 → 系列 → 商品 → 规格 / 尺码表 / 销售事件 / 款式档案 → 图片资源
+
+    ⚠️ 不连带剔除的后果不只是「多传了点数据」：客户端结构校验要求
+    **引用必须包内可解析**（`validate_shop_catalog` 与 Swift 侧
+    `ShopCatalogCloudSyncValidator.structuralIssues` 同口径），
+    归档商品被剔除而它的规格/尺码表/销售事件还留着 → 悬空引用 →
+    整个包被客户端拒绝安装，表现为「所有人什么都看不到」。
+
+    墓碑（removed*IDs）**保留**：那是「已强制删除」的声明，与归档是两件事，
+    且墓碑指向的实体本来就不在包内，不构成悬空引用。
+
+    返回 (新目录, 各类剔除条数)；输入不是 dict 时原样返回。
+    """
+    if not isinstance(doc, dict):
+        return doc, {}
+
+    def archived(record: Dict[str, Any]) -> bool:
+        value = record.get("archivedAt")
+        return value is not None and value != ""
+
+    def records(field: str) -> List[Dict[str, Any]]:
+        value = doc.get(field) or []
+        return [item for item in value if isinstance(item, dict)]
+
+    all_shops = records("shops")
+    all_series = records("series")
+    all_products = records("products")
+    all_variants = records("variants")
+    all_charts = records("sizeCharts")
+    all_events = records("saleEvents")
+    all_profiles = records("styleProfiles")
+    all_assets = records("assets")
+
+    # ⚠️ 连坐判定只认「因归档而被剔除」的上级，**不**认「上级本来就缺失」。
+    # 后者是发布端的数据错误（商品指向不存在的系列），必须留下来让结构校验报错，
+    # 不能被裁剪悄悄抹平（否则坏数据会静默消失，演练第 28 项就是防这个的）。
+    live_shops = [item for item in all_shops if not archived(item)]
+    dropped_shop_ids = {str(item.get("id")) for item in all_shops if archived(item)}
+
+    live_series = [
+        item for item in all_series
+        if not archived(item) and str(item.get("shopID")) not in dropped_shop_ids
+    ]
+    dropped_series_ids = {
+        str(item.get("id")) for item in all_series
+        if archived(item) or str(item.get("shopID")) in dropped_shop_ids
+    }
+    live_products = [
+        item for item in all_products
+        if not archived(item)
+        and str(item.get("shopID")) not in dropped_shop_ids
+        and str(item.get("seriesID")) not in dropped_series_ids
+    ]
+    dropped_product_ids = {
+        str(item.get("id")) for item in all_products
+        if archived(item)
+        or str(item.get("shopID")) in dropped_shop_ids
+        or str(item.get("seriesID")) in dropped_series_ids
+    }
+    # 只有「上级存在但被归档连坐」的系列 id 才连坐款式档案
+    dropped_profile_series_ids = dropped_series_ids
+
+    live_variants = [
+        i for i in all_variants if str(i.get("productID")) not in dropped_product_ids]
+    live_charts = [
+        i for i in all_charts if str(i.get("productID")) not in dropped_product_ids]
+    live_events = [
+        i for i in all_events if str(i.get("productID")) not in dropped_product_ids]
+    live_profiles = [
+        i for i in all_profiles if str(i.get("seriesID")) not in dropped_profile_series_ids]
+
+    def asset_refs(
+        shops: List[Dict[str, Any]],
+        series: List[Dict[str, Any]],
+        products: List[Dict[str, Any]],
+        variants: List[Dict[str, Any]],
+        charts: List[Dict[str, Any]],
+    ) -> set:
+        refs: set = set()
+        for shop in shops:
+            for key in ("logo", "cover"):
+                if shop.get(key):
+                    refs.add(str(shop[key]))
+        for item in series:
+            if item.get("cover"):
+                refs.add(str(item["cover"]))
+            chart = item.get("priceChart")
+            if isinstance(chart, dict):
+                if chart.get("sourceImage"):
+                    refs.add(str(chart["sourceImage"]))
+                for one in chart.get("sourceImages") or []:
+                    if one:
+                        refs.add(str(one))
+        for product in products:
+            for one in product.get("images") or []:
+                if one:
+                    refs.add(str(one))
+        for variant in variants:
+            if variant.get("imageAssetID"):
+                refs.add(str(variant["imageAssetID"]))
+        for chart in charts:
+            if chart.get("sourceImage"):
+                refs.add(str(chart["sourceImage"]))
+        return refs
+
+    live_refs = asset_refs(live_shops, live_series, live_products, live_variants, live_charts)
+    # 「被剔除实体」= 因归档（含连坐）而消失的那部分
+    dropped_refs = asset_refs(
+        [i for i in all_shops if str(i.get("id")) in dropped_shop_ids],
+        [i for i in all_series if str(i.get("id")) in dropped_series_ids],
+        [i for i in all_products if str(i.get("id")) in dropped_product_ids],
+        [i for i in all_variants if str(i.get("productID")) in dropped_product_ids],
+        [i for i in all_charts if str(i.get("productID")) in dropped_product_ids],
+    )
+    # 只剔除「确定只被归档实体引用」的资源；两边都没引用的孤儿**保持原样**
+    # （引用形式可能有未覆盖的角落，宁可多传一张图，也不要把在用的图删掉）
+    exclusive_dropped = dropped_refs - live_refs
+    live_assets = [
+        item for item in all_assets
+        if str(item.get("id")) in live_refs or str(item.get("id")) not in exclusive_dropped
+    ]
+
+    new_doc = dict(doc)
+    new_doc.update({
+        "shops": live_shops,
+        "series": live_series,
+        "products": live_products,
+        "variants": live_variants,
+        "sizeCharts": live_charts,
+        "saleEvents": live_events,
+        "styleProfiles": live_profiles,
+        "assets": live_assets,
+    })
+    report = {
+        "shops": len(all_shops) - len(live_shops),
+        "series": len(all_series) - len(live_series),
+        "products": len(all_products) - len(live_products),
+        "variants": len(all_variants) - len(live_variants),
+        "sizeCharts": len(all_charts) - len(live_charts),
+        "saleEvents": len(all_events) - len(live_events),
+        "styleProfiles": len(all_profiles) - len(live_profiles),
+        "assets": len(all_assets) - len(live_assets),
+    }
+    return new_doc, report
+
+
 def validate_shop_catalog(
     doc: Any,
     brand_id: str,

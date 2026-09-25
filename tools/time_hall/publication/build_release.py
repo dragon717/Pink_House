@@ -58,6 +58,7 @@ from protocol import (  # noqa: E402
     partition_id,
     sha256_hex,
     shop_catalog_entity_count,
+    strip_archived_shop_catalog,
     validate_pack_payload,
     validate_partition_descriptor,
     validate_root_index,
@@ -270,6 +271,21 @@ def build_shop_catalog_pack(
         )
         for event_id in sorted(orphan_ids):
             print("    - {}".format(event_id))
+
+    # 归档不下发（2026-09-25 需求）：归档条目运营端留着追溯，用户端本来就不展示，
+    # 发布包里带着它们只是白耗流量；更关键的是连带剔除必须做干净 ——
+    # 只删商品不删它的规格/销售事件会留下悬空引用，客户端整个包拒绝安装。
+    doc, archived_report = strip_archived_shop_catalog(doc)
+    if any(archived_report.values()):
+        detail = "、".join(
+            "{} -{}".format(field, archived_report[field])
+            for field in (
+                "shops", "series", "products", "variants",
+                "sizeCharts", "saleEvents", "styleProfiles", "assets",
+            )
+            if archived_report[field]
+        )
+        print("  · 商店目录：剔除已归档条目（{}）".format(detail))
 
     count = shop_catalog_entity_count(doc)
     if count == 0:

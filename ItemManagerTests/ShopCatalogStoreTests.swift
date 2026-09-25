@@ -94,6 +94,60 @@ final class ShopCatalogStoreTests: XCTestCase {
         XCTAssertEqual(s.years(inShop: "shop-alice-girl"), [2026, 2025])
     }
 
+    // MARK: 归档条目不参与展示口径（2026-09-25：归档的不下发，存量包也要过滤）
+
+    /// 已发布到云端的旧包仍可能带着归档条目（发布端自 09-25 起构建时剔除），
+    /// 展示口径必须自己再过滤一遍：归档商品的档期不得推进「最近上新」。
+    func testArchivedProductDoesNotAdvanceLatestActivity() throws {
+        let json = #"""
+        {"version":1,"shops":[{"id":"shop-arch","name":"归档店"}],"series":[
+            {"id":"series-arch","shopID":"shop-arch","name":"归档系列","year":2026}],
+         "products":[
+            {"id":"p-live","shopID":"shop-arch","seriesID":"series-arch","name":"在售","category":"JSK","images":[]},
+            {"id":"p-arch","shopID":"shop-arch","seriesID":"series-arch","name":"已归档","category":"JSK","images":[],
+             "archivedAt":"2026-09-01T00:00:00Z"}],
+         "variants":[],"sizeCharts":[],
+         "saleEvents":[
+            {"id":"ev-live","productID":"p-live","type":"reservation","price":100,
+             "startAt":"2026-09-10T00:00:00Z"},
+            {"id":"ev-arch","productID":"p-arch","type":"reservation","price":200,
+             "startAt":"2026-09-24T00:00:00Z"}],
+         "assets":[]}
+        """#
+        let catalog = try ShopCatalogJSONCoding.decoder()
+            .decode(ShopCatalog.self, from: Data(json.utf8))
+        let s = ShopCatalogStore(baseCatalog: catalog)
+
+        let expected = ISO8601DateFormatter().date(from: "2026-09-10T00:00:00Z")
+        XCTAssertEqual(s.latestActivityDate(shopID: "shop-arch", now: now), expected,
+                       "归档商品的档期（09-24）不得把「最近上新」推到在售商品之后")
+        let series = try XCTUnwrap(s.series(id: "series-arch"))
+        XCTAssertEqual(s.latestSeriesActivity(series, now: now), expected)
+    }
+
+    /// 系列里只有**归档商品**有进行中的档期 → 不算「当前上新」
+    func testArchivedProductEventDoesNotMakeSeriesCurrent() throws {
+        let json = #"""
+        {"version":1,"shops":[{"id":"shop-arch2","name":"归档店 2"}],"series":[
+            {"id":"series-arch2","shopID":"shop-arch2","name":"只有归档商品在售的系列","year":2026}],
+         "products":[
+            {"id":"p-arch2","shopID":"shop-arch2","seriesID":"series-arch2","name":"已归档","category":"JSK",
+             "images":[],"archivedAt":"2026-09-01T00:00:00Z"}],
+         "variants":[],"sizeCharts":[],
+         "saleEvents":[
+            {"id":"ev-arch2","productID":"p-arch2","type":"stock","price":300,
+             "startAt":"2026-09-01T00:00:00Z","endAt":"2026-12-31T00:00:00Z"}],
+         "assets":[]}
+        """#
+        let catalog = try ShopCatalogJSONCoding.decoder()
+            .decode(ShopCatalog.self, from: Data(json.utf8))
+        let s = ShopCatalogStore(baseCatalog: catalog)
+
+        XCTAssertTrue(s.currentSeries(inShop: "shop-arch2", now: now).isEmpty,
+                      "归档商品的档期不算当前上新，否则已归档系列会重新冒出来")
+        XCTAssertEqual(s.archiveSeries(inShop: "shop-arch2", now: now).map(\.id), ["series-arch2"])
+    }
+
     // MARK: 分类筛选（§11）
 
     func testCategoryFilterAndOrder() {

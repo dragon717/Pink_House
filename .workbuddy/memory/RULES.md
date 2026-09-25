@@ -133,6 +133,14 @@
 - 同步只动「尾款中」（`effectivePhase == .balancePending`）系列下 `isFinalPaymentPlan` 的 Clothing 的 `finalPaymentDate/EndDate` + 备注留痕；**金额一个不碰**；商品已删 → 跳过（数据独立）；全款/已付清不进扫描。触发点：`ShopCatalogBrowseView.task`（云同步后）+ 批次详情页 `saveSeriesConfig` 保存成功后。
 - `ShopCatalogWardrobeBalanceSync` **不持有默认 ModelContext**，context 必须调用方显式传（防单测碰生产容器）。
 
+## 店家上新云同步 · 消费端（09-25 真机「看不到店家上线数据」根因）
+- **环境分离**：Xcode 调试读 Development，TestFlight/App Store 读 Production，两边数据不互通（`entitlements` 未指定 `com.apple.developer.icloud-container-environment`）。「Mac 发布过但 App 读不到」第一嫌疑永远是环境，其次才是数据。发布端 s2s key 也按环境隔离。
+- **远端层只进内存，冷启动必须自己恢复**：`ShopCatalogStore.remoteCatalog` 是内存态，控制状态（`sync-control.json`）+ 包缓存（Caches）才落盘。任何「序号未变 / payloadHash 未变 → return」的捷径都必须先判断**内存里到底有没有远端层**（`ShopCatalogCloudSyncService.hasRemoteLayer`），否则装过一次之后每次冷启动都是空列表。恢复唯一入口 `ShopCatalogPackCache.restoredCatalog()`（缓存包当初是校验通过才落盘的，恢复路径只做解码兜底；解不出 → 按没有本地内容处理并重新下载）。
+- **节流不得越过空态**：30 分钟节流只在「本地确实有远端层」时生效。本地没有内容（首次启动 / 换环境 / Caches 被系统清掉）时无条件放行——否则「上一次检查是空的」会把这一次真正有内容的检查一起吞掉（TestFlight→Xcode 换环境后 30 分钟内尤其致命）。
+- **失败必须可见**：同步链路一律走 `ShopCatalogCloudSyncService.log`（`[ShopCatalogSync]` 前缀，保留在发布版）+ 首屏状态条（`ShopCatalogListView.syncBanner`：syncing / nothingPublished / failed 带「立即重试」）+ 导航栏刷新按钮。历史上整条链路零日志、UI 无状态，失败只有「列表是空的」一种表现，与「没发布」「没触发」无法区分。
+- **`ShopCatalogCloudSyncService.store` 是 `unowned`**：调用方必须自己持有 Store 强引用，测试里把 `makeStore()` 直接塞进参数会立刻释放 → 访问即崩（表现为「用例 started 却没有 passed」）。
+- 定位手段：`tools/time_hall/publication/verify_publication.py --adapter cloudkit --environment <dev|production>`（读者视角回读）；按客户端口径逐条复核包内容用 `/tmp/ck_client_parity.py`（结构校验 + Swift Codable 必需键/枚举 + 归档墓碑过滤后的可见数）。
+
 ## 币种与发布幂等
 - `CatalogCurrency` cny/jpy/unknown 挂 SaleEvent/PriceCorrection.currency；旧 JSON 缺键=**unknown（不默认 CNY）**；两侧都 unknown 仍算差价；指纹含币种；跨币种抛 `crossCurrency`。
 - 幂等 ID = FNV(草稿ID｜类型｜**该类型自己的**价格指纹)；半成功恢复要全部命中；恒「先写覆盖层、后写草稿回执」。坏文件留原件+备份+`isBlockedByCorruptFile` 阻止写回。

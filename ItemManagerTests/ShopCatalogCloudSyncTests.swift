@@ -394,6 +394,129 @@ final class ShopCatalogCloudSyncTests: XCTestCase {
         }
     }
 
+    // MARK: - 冷启动恢复 / 节流（2026-09-25 真机「看不到店家上线数据」回归锁）
+
+    private final class Counter: @unchecked Sendable {
+        var value = 0
+    }
+
+    /// 记录「发布头被取了几次」的 stub：用来分辨同步到底有没有发起网络请求
+    private final class CountingStubReader: ShopCatalogPublicReading, @unchecked Sendable {
+        let header: ShopCatalogReleaseHeader
+        let rootData: Data
+        let pack: Data
+        let counter: Counter
+
+        init(release: (header: ShopCatalogReleaseHeader, rootData: Data, pack: Data, catalog: ShopCatalog),
+             counter: Counter) {
+            self.header = release.header
+            self.rootData = release.rootData
+            self.pack = release.pack
+            self.counter = counter
+        }
+
+        func fetchReleaseHeader() async throws -> ShopCatalogReleaseHeader {
+            counter.value += 1
+            return header
+        }
+        func fetchRootIndex() async throws -> Data { rootData }
+        func fetchPack(payloadHash: String) async throws -> Data { pack }
+    }
+
+    /// 远端层只在内存，进程重启即归零；包缓存是不可变正文、跨启动仍在。
+    /// 旧实现「序号没变 → 直接 return」，缓存里的包永远装不回 Store →
+    /// 装过一次之后每次冷启动商店内容都是空的。
+    func testColdStartRestoresRemoteLayerFromCache() async throws {
+        let release = try validRelease(seq: 7, catalog: try makeRemoteCatalog())
+        // ⚠️ service 持有 store 是 `unowned`：Store 必须有自己的强引用变量，
+        // 直接把 makeStore() 塞进参数会立刻释放 → 访问时崩溃（宿主被杀，
+        // 表现为「用例 started 却没有 passed」）。
+        let warmStore = ShopCatalogSeedFixture.makeStore()
+        let installing = ShopCatalogCloudSyncService(
+            reader: StubReader(header: release.header, rootData: release.rootData, pack: release.pack),
+            store: warmStore)
+        await installing.syncIfNeeded(force: true)
+        XCTAssertEqual(installing.state, .updated(releaseSeq: 7, recordCount: 5))
+
+        // 模拟进程重启：全新 Store（内存里没有远端层）+ 网络完全不可用
+        let coldStore = ShopCatalogSeedFixture.makeStore()
+        XCTAssertNil(coldStore.shop(id: "shop-remote-new"), "新实例不应凭空带着远端内容")
+        let cold = ShopCatalogCloudSyncService(
+            reader: StubReader(error: ShopCatalogSyncError.network("测试：不应联网")),
+            store: coldStore)
+        await cold.syncIfNeeded()
+
+        XCTAssertEqual(coldStore.shop(id: "shop-remote-new")?.name, "云端新店家",
+                       "冷启动必须从已验证的缓存包恢复远端层，不能只剩空列表")
+    }
+
+    /// 本地确实有内容时，节流窗口内不发起网络请求（原有行为保留）
+    func testThrottleSkipsNetworkWhenLocalHasRemoteLayer() async throws {
+        let release = try validRelease(seq: 7, catalog: try makeRemoteCatalog())
+        let warmStore = ShopCatalogSeedFixture.makeStore()
+        let service = ShopCatalogCloudSyncService(
+            reader: StubReader(header: release.header, rootData: release.rootData, pack: release.pack),
+            store: warmStore)
+        await service.syncIfNeeded(force: true)
+
+        let coldStore = ShopCatalogSeedFixture.makeStore()
+        let counter = Counter()
+        let cold = ShopCatalogCloudSyncService(
+            reader: CountingStubReader(release: release, counter: counter), store: coldStore)
+        await cold.syncIfNeeded()
+
+        XCTAssertEqual(counter.value, 0, "本地已有远端层且刚检查过 → 不应重复打发布头")
+        XCTAssertEqual(coldStore.shop(id: "shop-remote-new")?.name, "云端新店家")
+    }
+
+    /// 本地**还没有**内容时，节流不得吞掉检查：
+    /// 典型场景 = 上一个版本在另一套 CloudKit 环境跑过（空态，写了 lastCheckedAt），
+    /// 换环境后 30 分钟内打开 → 旧实现直接 return，永远看不到内容。
+    func testThrottleDoesNotSuppressCheckWhenLocalHasNoRemoteLayer() async throws {
+        let release = try validRelease(seq: 7, catalog: try makeRemoteCatalog())
+        // 「上一次检查过、但什么都没装」的控制状态
+        ShopCatalogPackCache.saveControl(ShopCatalogSyncControl(
+            installedReleaseSeq: 0, installedPayloadHash: nil, lastCheckedAt: Date()))
+
+        let store = ShopCatalogSeedFixture.makeStore()
+        let counter = Counter()
+        let service = ShopCatalogCloudSyncService(
+            reader: CountingStubReader(release: release, counter: counter), store: store)
+        await service.syncIfNeeded()   // 非 force：刻意落在节流窗口内
+
+        XCTAssertEqual(counter.value, 1, "本地还没有内容时，节流必须放行")
+        XCTAssertEqual(service.state, .updated(releaseSeq: 7, recordCount: 5))
+        XCTAssertEqual(store.shop(id: "shop-remote-new")?.name, "云端新店家")
+    }
+
+    /// 缓存包被系统清掉（Caches 可被回收）后必须重新下载，
+    /// 不能因为「序号没变 + payloadHash 相同」判定无需下载而永远空着。
+    func testMissingCachedPackTriggersRedownload() async throws {
+        let release = try validRelease(seq: 7, catalog: try makeRemoteCatalog())
+        let warmStore = ShopCatalogSeedFixture.makeStore()
+        let installing = ShopCatalogCloudSyncService(
+            reader: StubReader(header: release.header, rootData: release.rootData, pack: release.pack),
+            store: warmStore)
+        await installing.syncIfNeeded(force: true)
+
+        let control = ShopCatalogPackCache.loadControl()
+        XCTAssertNotNil(control.installedPayloadHash)
+        _ = ShopCatalogPackCache.clearDownloadedContent()
+        // 清缓存会置空 payloadHash，这里把它放回，模拟「索引说装过、文件已消失」
+        var restored = ShopCatalogPackCache.loadControl()
+        restored.installedPayloadHash = control.installedPayloadHash
+        ShopCatalogPackCache.saveControl(restored)
+
+        let coldStore = ShopCatalogSeedFixture.makeStore()
+        let counter = Counter()
+        let cold = ShopCatalogCloudSyncService(
+            reader: CountingStubReader(release: release, counter: counter), store: coldStore)
+        await cold.syncIfNeeded()
+
+        XCTAssertEqual(counter.value, 1, "缓存包丢失必须触发重新下载")
+        XCTAssertEqual(coldStore.shop(id: "shop-remote-new")?.name, "云端新店家")
+    }
+
     func testSyncInstallsRemoteCatalogAndThrottlesNextCheck() async throws {
         let remote = try makeRemoteCatalog()
         let release = try validRelease(seq: 7, catalog: remote)

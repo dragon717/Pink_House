@@ -152,6 +152,19 @@ nonisolated enum ShopCatalogPackCache {
         control.installedReleaseSeq != releaseSeq || control.installedPayloadHash != payloadHash
     }
 
+    // MARK: 冷启动恢复
+
+    /// 按控制状态记录的 `installedPayloadHash` 读回已验证的缓存包并解码。
+    ///
+    /// 远端层只存在于内存（`ShopCatalogStore.remoteCatalog`），进程重启即归零；
+    /// 而包缓存是不可变正文、跨启动仍在。这个方法是「重启后内容还在」的**唯一**来源。
+    /// nil = 没有可恢复内容（从未安装 / 包被系统清理 / 包损坏），调用方应重新下载。
+    static func restoredCatalog() -> ShopCatalog? {
+        guard let hash = loadControl().installedPayloadHash,
+              let data = cachedPackData(payloadHash: hash) else { return nil }
+        return ShopCatalogCloudSyncValidator.catalog(fromVerifiedPack: data)
+    }
+
     // MARK: 清理（§13.3：只清可重下的包，绝不动控制状态与个人数据）
 
     /// 清理下载数据包。返回释放的字节数。

@@ -218,7 +218,10 @@ final class ShopCatalogStore: ObservableObject {
     /// 没有任何已开始销售记录时回退为最新系列年份的年初（保证卡片始终有时间可展示）。
     func latestActivityDate(shopID: String, now: Date = Date()) -> Date? {
         guard let catalog else { return nil }
-        let productIDs = Set(catalog.products.filter { $0.shopID == shopID }.map(\.id))
+        // 归档商品不计入「最近上新」：已发布到云端的旧包仍可能带着归档条目
+        // （2026-09-25 起发布端构建时已剔除，存量包没有），展示口径必须自己再过滤一次。
+        let productIDs = Set(catalog.products
+            .filter { $0.shopID == shopID && Self.isLive($0.archivedAt) }.map(\.id))
         let dates = catalog.saleEvents
             .filter { productIDs.contains($0.productID) }
             .compactMap(\.startAt)
@@ -299,7 +302,9 @@ final class ShopCatalogStore: ObservableObject {
     /// 系列卡上的「yyyy.MM 上新」：该系列下已开始的最新 SaleEvent 时间（参考图4）
     func latestSeriesActivity(_ series: CatalogSeries, now: Date = Date()) -> Date? {
         guard let catalog else { return nil }
-        let productIDs = Set(catalog.products.filter { $0.seriesID == series.id }.map(\.id))
+        // 同上：归档商品不参与系列「上新时间」推导
+        let productIDs = Set(catalog.products
+            .filter { $0.seriesID == series.id && Self.isLive($0.archivedAt) }.map(\.id))
         return catalog.saleEvents
             .filter { productIDs.contains($0.productID) }
             .compactMap(\.startAt)
@@ -541,7 +546,9 @@ final class ShopCatalogStore: ObservableObject {
     func currentSeries(inShop shopID: String, now: Date = Date()) -> [CatalogSeries] {
         guard let catalog else { return [] }
         return series(inShop: shopID).filter { s in
-            let productIDs = Set(catalog.products.filter { $0.seriesID == s.id }.map(\.id))
+            // 同上：归档商品的档期不算「当前上新」，否则已归档系列会重新冒出来
+            let productIDs = Set(catalog.products
+                .filter { $0.seriesID == s.id && Self.isLive($0.archivedAt) }.map(\.id))
             let events = catalog.saleEvents.filter { productIDs.contains($0.productID) }
             return events.contains {
                 switch windowStatus(of: $0, now: now) {
