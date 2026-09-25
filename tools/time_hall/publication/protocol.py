@@ -157,6 +157,28 @@ PARTITION_ID_RE = re.compile(r"^[a-z0-9][a-z0-9._-]*(/[a-z0-9][a-z0-9._-]*){2,}$
 MAX_PACK_COMPRESSED_BYTES = 16 * 1024 * 1024
 MAX_PACK_UNCOMPRESSED_BYTES = 64 * 1024 * 1024
 
+# ---------------------------------------------------------------- 媒体（THMedia）
+#
+# 公共数据库字段配置方案 §2.3：mediamanifest 的输入约束必须明确化，
+# 构建时检查「文件存在 / MIME 白名单 / 字节数上限 / SHA-256 与 mediaKey 一致 /
+# 商品 JSON 里每个 mediaKey 都有 manifest 条目」。
+#
+# 白名单只放客户端确实能解码的图片类型（Swift `ShopCatalogMediaStore.inferredFileExtension`
+# 的魔数判定口径）：jpeg / png / gif / webp / heic。其余一律拒绝 ——
+# 「传上去但客户端显示不出来」比「构建失败」难查得多。
+MEDIA_MIME_ALLOWLIST: Tuple[str, ...] = (
+    "image/jpeg",
+    "image/png",
+    "image/gif",
+    "image/webp",
+    "image/heic",
+)
+# 单张媒体的字节上限。方案未给具体数字，这里取 20 MiB：
+# 运营商品图经「长边 1600 / JPEG 0.85」处理后远小于此，超过基本可以判定是误选原图。
+MAX_MEDIA_BYTES = 20 * 1024 * 1024
+# 远端媒体引用的前缀（与 Swift `ShopCatalogSyncProtocol.mediaReferencePrefix` 逐字一致）
+MEDIA_REFERENCE_PREFIX = "thmedia:"
+
 
 class ProtocolError(Exception):
     """协议级错误：产物不符合客户端与服务端共同遵守的契约。"""
@@ -978,6 +1000,107 @@ def validate_shop_catalog(
     for value in duplicates[:5]:
         issues.append(_issue("canonicalID.duplicate", "canonical ID 重复", value))
 
+    return issues
+
+
+def _shop_media_references(doc: Dict[str, Any]) -> List[Tuple[str, str, str]]:
+    """收集商店目录里所有图片引用。
+
+    返回 `(来源字段, 引用值, 实体 id)` 三元组 —— 出问题时要能指出**是哪一行的哪一个字段**，
+    只说「有引用没上传」运营无从下手。
+
+    字段清单与 `build_release.collect_shop_catalog_media` 的改写清单**必须保持一致**：
+    一边改写、另一边不认识，就会出现「改写了却没上传」或「上传了却没校验」。
+    """
+    found: List[Tuple[str, str, str]] = []
+
+    def push(field: str, value: Any, entity_id: str = "") -> None:
+        if isinstance(value, str) and value:
+            found.append((field, value, entity_id))
+
+    for item in doc.get("assets") or []:
+        if not isinstance(item, dict):
+            continue
+        entity_id = str(item.get("id", ""))
+        # canonical 媒体键（公共数据库字段配置方案 §2.2）
+        push("assets.mediaKey", item.get("mediaKey"), entity_id)
+        for key in ("originalURL", "thumbnailURL", "previewURL"):
+            push("assets.{}".format(key), item.get(key), entity_id)
+    for item in doc.get("shops") or []:
+        if not isinstance(item, dict):
+            continue
+        entity_id = str(item.get("id", ""))
+        for key in ("logo", "cover"):
+            push("shops.{}".format(key), item.get(key), entity_id)
+    for item in doc.get("series") or []:
+        if not isinstance(item, dict):
+            continue
+        entity_id = str(item.get("id", ""))
+        push("series.cover", item.get("cover"), entity_id)
+        chart = item.get("priceChart")
+        if isinstance(chart, dict):
+            push("series.priceChart.sourceImage", chart.get("sourceImage"), entity_id)
+            for one in chart.get("sourceImages") or []:
+                push("series.priceChart.sourceImages[]", one, entity_id)
+    for item in doc.get("sizeCharts") or []:
+        if isinstance(item, dict):
+            push("sizeCharts.sourceImage", item.get("sourceImage"), str(item.get("id", "")))
+    return found
+
+
+def validate_shop_catalog_media(
+    doc: Any,
+    known_media_hashes: set,
+) -> List[Dict[str, str]]:
+    """商品 JSON 的媒体引用 vs 已收集媒体清单（公共数据库字段配置方案 §2.3）。
+
+    方案原话：构建器此前对媒体引用「不做资产引用校验」，这是**必须补上的发布前错误**。
+    少了这一步，包里可以出现「指向不存在的 THMedia」的引用，发布成功但客户端图全空。
+
+    known_media_hashes = 本次发布实际会上传的媒体内容摘要集合（`contentHash`）。
+    每个引用都必须能命中其中一条；`local:` 引用**一律**判失败 —— 它只在运营那台
+    设备的沙盒里成立，进公共库就是其它设备的破图。
+    """
+    issues: List[Dict[str, str]] = []
+    if not isinstance(doc, dict):
+        return [_issue("media.doc.invalid", "商店目录必须是对象")]
+
+    for field, value, entity_id in _shop_media_references(doc):
+        if value.startswith("local:"):
+            issues.append(
+                _issue(
+                    "media.reference.local",
+                    "{} 仍是 {} —— 发布包不得依赖运营设备的本地路径".format(field, value),
+                    entity_id,
+                )
+            )
+            continue
+        if field.endswith(".mediaKey"):
+            digest = value
+        elif value.startswith(MEDIA_REFERENCE_PREFIX):
+            digest = value[len(MEDIA_REFERENCE_PREFIX):]
+        else:
+            # bundle: / http(s) / 空 —— 不走 THMedia，不在本校验范围内
+            continue
+        if not SHA256_HEX_RE.match(digest):
+            issues.append(
+                _issue(
+                    "media.reference.invalid",
+                    "{} 的媒体键 {} 不是 64 位小写 hex".format(field, digest),
+                    entity_id,
+                )
+            )
+            continue
+        if digest not in known_media_hashes:
+            issues.append(
+                _issue(
+                    "media.reference.missing",
+                    "{} 引用的媒体 {} 不在本次待上传清单里（图没随发布一起走）".format(
+                        field, digest[:12]
+                    ),
+                    entity_id,
+                )
+            )
     return issues
 
 

@@ -576,6 +576,18 @@ struct CatalogAsset: Codable, Identifiable, Hashable, Sendable {
     var originalURL: String
     var width: Int? = nil
     var height: Int? = nil
+    /// 公共库远端媒体的稳定关联键（公共数据库字段配置方案 §2.2）。
+    ///
+    /// 取值 = **图片字节的 SHA-256**（64 位小写 hex），用来推导 THMedia 记录名
+    /// `th.media.<mediaKey>`；**不是** CloudKit 返回的临时下载 URL。
+    /// 它位于 `THDataPack.asset` 内的 JSON，不是 CloudKit 记录的字段，
+    /// 因此不需要为每个商品新建公共 Record Type。
+    ///
+    /// · 可选、非必填：没有它的旧包继续按 `http(s)` / Bundle / `local:` 旧逻辑读取；
+    /// · `originalURL` 保留来源信息与旧版本兼容，不再承担「公共图片已上传」的语义；
+    /// · 第一版只有一个 canonical `mediaKey`，需要多分辨率时再补
+    ///   `thumbnailMediaKey` / `previewMediaKey`，或发布多条 `CatalogAsset`。
+    var mediaKey: String? = nil
 }
 
 // MARK: - Catalog 根（第一版整包结构）

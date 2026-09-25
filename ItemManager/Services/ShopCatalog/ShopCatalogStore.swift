@@ -669,12 +669,19 @@ nonisolated enum ShopCatalogImageResolver {
 /// CatalogAsset 引用的统一展示视图（Bundle 图 / 运营上传图 / 远端媒体 / 占位）
 struct ShopCatalogAssetImage: View {
     let reference: String?
+    /// 公共库远端媒体的 canonical 键（`CatalogAsset.mediaKey`，公共数据库字段配置方案 §2.2）。
+    /// 给了就优先按它取 THMedia；nil 时回退 `reference` 里的 `thmedia:` 旧写法
+    /// （解析一律走 `ShopCatalogSyncProtocol.resolvedMediaKey`，调用方不自己拆字符串）。
+    var mediaKey: String? = nil
     var contentMode: ContentMode = .fill
 
     /// 远端媒体（THMedia）下载后的本地文件 —— 按需下载，屏内才拉
     @State private var remoteMediaURL: URL?
     /// 下载过且失败：本次展示周期内不再重试（列表滚动会反复触发 task）
     @State private var remoteMediaFailed = false
+    /// http(s) 老引用的重载令牌 —— 点按重试时换一个 identity，
+    /// 逼 `AsyncImage` 重新发请求（同一个 URL 它不会自己重试）
+    @State private var asyncImageReloadToken = UUID()
 
     var body: some View {
         content
@@ -688,33 +695,58 @@ struct ShopCatalogAssetImage: View {
                 switch phase {
                 case .success(let image):
                     image.resizable().aspectRatio(contentMode: contentMode)
+                case .failure:
+                    // 网络图也要区分「拉失败」与「没有图」，否则用户以为商品图就是这样
+                    failedPlaceholder
                 default:
                     placeholder
                 }
             })
+            .id(asyncImageReloadToken)
         } else if let path = remoteMediaPath ?? localPath, let loaded = UIImage(contentsOfFile: path) {
             // 文件存在且可解码才渲染；读失败（如沙盒重置后文件丢失）走占位图，
             // 不再渲染空白的 UIImage()（表现为整块空白/黑屏，用户无从判断原因）
             Image(uiImage: loaded)
                 .resizable()
                 .aspectRatio(contentMode: contentMode)
+        } else if remoteMediaFailed {
+            // 本地兜底图也解不出来、远端又下失败 → 必须是「加载失败」而不是「没有图」（方案 §5）
+            failedPlaceholder
         } else {
             placeholder
         }
     }
 
     private func loadRemoteMediaIfNeeded() async {
-        guard ShopCatalogSyncProtocol.mediaContentHash(in: reference) != nil else {
+        let key = ShopCatalogSyncProtocol.resolvedMediaKey(mediaKey, fallbackReferences: [reference])
+        guard key != nil else {
             remoteMediaURL = nil
             remoteMediaFailed = false
             return
         }
         guard !remoteMediaFailed else { return }
-        if let url = await ShopCatalogMediaStore.shared.resolvedURL(for: reference) {
+        if let url = await ShopCatalogMediaStore.shared.resolvedURL(mediaKey: key) {
             remoteMediaURL = url
         } else {
             remoteMediaFailed = true
         }
+    }
+
+    /// 点按重试（iOS 运营上传实施方案 §5 的「重试入口」）。
+    ///
+    /// 两件事都必须做，缺一不可：
+    ///   1. 清掉 `ShopCatalogMediaStore` 里**本次会话失败记忆** —— 只把下面的
+    ///      `remoteMediaFailed` 置回 false 是没用的，store 会直接返回 nil，
+    ///      表现成「点了没反应」；
+    ///   2. 换 `asyncImageReloadToken`，让 http(s) 老引用的 `AsyncImage` 重建。
+    private func retryLoading() {
+        if let key = ShopCatalogSyncProtocol.resolvedMediaKey(
+            mediaKey, fallbackReferences: [reference]) {
+            ShopCatalogMediaStore.shared.clearSessionFailure(mediaKey: key)
+        }
+        remoteMediaFailed = false
+        asyncImageReloadToken = UUID()
+        Task { await loadRemoteMediaIfNeeded() }
     }
 
     private var remoteURL: URL? {
@@ -739,5 +771,32 @@ struct ShopCatalogAssetImage: View {
                 .font(.system(size: 20))
                 .foregroundStyle(Color(red: 0.72, green: 0.70, blue: 0.74))
         }
+    }
+
+    /// 加载失败的明确占位 —— 与上面的「本来就没有图」在视觉与可操作性上都要区分开：
+    /// 底色偏暖、图标是「重试」而不是「照片」，并且**可点按重试**。
+    /// 依据：iOS 运营上传实施方案 §5「下载失败显示明确占位和重试入口，
+    /// 不把图片当作没有图片」。
+    private var failedPlaceholder: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 0, style: .continuous)
+                .fill(Color(red: 0.97, green: 0.93, blue: 0.90))
+            VStack(spacing: 4) {
+                Image(systemName: "arrow.clockwise")
+                    .font(.system(size: 18))
+                Text("加载失败，点按重试")
+                    .font(.system(size: 11))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+                    .padding(.horizontal, 4)
+            }
+            .foregroundStyle(Color(red: 0.78, green: 0.52, blue: 0.40))
+        }
+        .contentShape(Rectangle())
+        .onTapGesture { retryLoading() }
+        .accessibilityElement()
+        .accessibilityLabel("图片加载失败")
+        .accessibilityHint("点按重试")
+        .accessibilityAddTraits(.isButton)
     }
 }

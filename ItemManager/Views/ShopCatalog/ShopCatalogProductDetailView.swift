@@ -130,6 +130,8 @@ struct ShopCatalogProductView: View {
     /// 颜色图片之间切换预览；slide 带颜色标注。
     private struct CarouselSlide: Equatable {
         let ref: String
+        /// 远端媒体 canonical 键（`CatalogAsset.mediaKey`）；nil = 走 ref 的旧解析
+        let mediaKey: String?
         let colorLabel: String?
     }
 
@@ -153,15 +155,20 @@ struct ShopCatalogProductView: View {
 
     private var carouselSlides: [CarouselSlide] {
         guard let product else { return [] }
-        var slides = product.images.map {
-            CarouselSlide(ref: store.asset(id: $0)?.originalURL ?? $0, colorLabel: ownColorLabel)
+        var slides = product.images.map { imageID in
+            let asset = store.asset(id: imageID)
+            return CarouselSlide(ref: asset?.originalURL ?? imageID,
+                                 mediaKey: asset?.mediaKey,
+                                 colorLabel: ownColorLabel)
         }
         for sibling in sameDesignSiblings {
             guard let first = sibling.images.first else { continue }
-            let ref = store.asset(id: first)?.originalURL ?? first
+            let siblingAsset = store.asset(id: first)
+            let ref = siblingAsset?.originalURL ?? first
             guard !slides.contains(where: { $0.ref == ref }) else { continue }
             slides.append(CarouselSlide(
                 ref: ref,
+                mediaKey: siblingAsset?.mediaKey,
                 colorLabel: ShopCatalogColorPresentation.label(
                     explicitColors: store.colors(forProduct: sibling.id),
                     name: sibling.name)))
@@ -192,7 +199,7 @@ struct ShopCatalogProductView: View {
             } else {
                 TabView(selection: $carouselIndex) {
                     ForEach(Array(carouselSlides.enumerated()), id: \.offset) { index, slide in
-                        ShopCatalogAssetImage(reference: slide.ref)
+                        ShopCatalogAssetImage(reference: slide.ref, mediaKey: slide.mediaKey)
                             .frame(height: 400)
                             .clipped()
                             .tag(index)

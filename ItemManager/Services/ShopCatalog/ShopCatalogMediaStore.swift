@@ -41,7 +41,15 @@ final class ShopCatalogMediaStore {
     /// - Returns: 本地文件 URL；**nil = 不是远端媒体引用 / 下载失败**，
     ///            调用方回退到既有解析（Bundle / 本地上传图）或占位图。
     func resolvedURL(for reference: String?) async -> URL? {
-        guard let hash = ShopCatalogSyncProtocol.mediaContentHash(in: reference) else { return nil }
+        await resolvedURL(
+            mediaKey: ShopCatalogSyncProtocol.resolvedMediaKey(nil, fallbackReferences: [reference]))
+    }
+
+    /// 按**媒体键**解析（公共数据库字段配置方案 §2.2 的 canonical 口径）。
+    /// 调用方应当先用 `ShopCatalogSyncProtocol.resolvedMediaKey(_:fallbackReferences:)`
+    /// 把 `mediaKey` 与旧 `thmedia:` 引用归一，再进这里。
+    func resolvedURL(mediaKey: String?) async -> URL? {
+        guard let hash = mediaKey else { return nil }
         if let cached = ShopCatalogPackCache.cachedMediaURL(contentHash: hash) { return cached }
         if failed.contains(hash) { return nil }
         if let task = inFlight[hash] { return await task.value }
@@ -57,6 +65,15 @@ final class ShopCatalogMediaStore {
     /// 测试用：清空本次会话的失败记忆
     func resetSessionFailuresForTesting() {
         failed.removeAll()
+    }
+
+    /// 清掉某个摘要的「本次会话内已失败」记忆，让下一次 `resolvedURL` 重新尝试。
+    ///
+    /// 供 UI 的「重试」入口调用（iOS 运营上传实施方案 §5：下载失败必须显示明确占位
+    /// **和重试入口**，不能把加载失败当成「这张图本来就没有」）。
+    /// 只清失败记忆，不动已装好的缓存 —— 缓存命中时 `resolvedURL` 根本不会走到网络。
+    func clearSessionFailure(mediaKey: String) {
+        failed.remove(mediaKey)
     }
 
     private func download(_ hash: String) async -> URL? {
