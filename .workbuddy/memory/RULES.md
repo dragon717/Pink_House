@@ -140,6 +140,10 @@
 - **失败必须可见**：同步链路一律走 `ShopCatalogCloudSyncService.log`（`[ShopCatalogSync]` 前缀，保留在发布版）+ 首屏状态条（`ShopCatalogListView.syncBanner`：syncing / nothingPublished / failed 带「立即重试」）+ 导航栏刷新按钮。历史上整条链路零日志、UI 无状态，失败只有「列表是空的」一种表现，与「没发布」「没触发」无法区分。
 - **`ShopCatalogCloudSyncService.store` 是 `unowned`**：调用方必须自己持有 Store 强引用，测试里把 `makeStore()` 直接塞进参数会立刻释放 → 访问即崩（表现为「用例 started 却没有 passed」）。
 - 定位手段：`tools/time_hall/publication/verify_publication.py --adapter cloudkit --environment <dev|production>`（读者视角回读）；按客户端口径逐条复核包内容用 `/tmp/ck_client_parity.py`（结构校验 + Swift Codable 必需键/枚举 + 归档墓碑过滤后的可见数）。
+- **归档条目不下发**（2026-09-25 用户要求）：发布端构建时统一由 `protocol.strip_archived_shop_catalog` 剔除 `archivedAt` 非空的实体，并**连带**剔除其规格 / 尺码表 / 销售事件 / 款式档案 / 专属图片（只删商品不删连带 = 悬空引用 → 客户端结构校验拒绝安装 → 所有人什么都看不到，这是最狠的一种事故）。孤儿图片（两边都没引用）保持原样不误删。自测 `publication/selftest_shop_catalog.py`（17 项，含反向用例）。
+- ⚠️ 连坐判定只认「上级**因归档**被剔除」，**不**认「上级本来就缺失」——后者是发布端数据错误，必须留下来让 `validate_shop_catalog` 报错，不能被裁剪悄悄抹平（演练第 28 项就是防这个的）。
+- **墓碑（removed*IDs）必须下发，禁止剔除**：它是「已强制删除」的声明，客户端据此把本地 base/overlay 里的同名实体排除；剔除墓碑会让已删除内容在用户端复活。墓碑只记 id、不含条目，不构成悬空引用。运营端若用「强制删除」表达归档，那归档记录就是以墓碑 id 形式下发的。
+- 消费端兜底：存量包可能仍带归档条目，`ShopCatalogStore` 的 `latestActivityDate` / `latestSeriesActivity` / `currentSeries` 派生口径一律先过 `isLive`，否则已归档商品的档期会把「最近上新」推到未来、让已归档系列重新冒进「当前上新」。
 
 ## 币种与发布幂等
 - `CatalogCurrency` cny/jpy/unknown 挂 SaleEvent/PriceCorrection.currency；旧 JSON 缺键=**unknown（不默认 CNY）**；两侧都 unknown 仍算差价；指纹含币种；跨币种抛 `crossCurrency`。
