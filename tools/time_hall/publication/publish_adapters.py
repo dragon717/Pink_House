@@ -20,14 +20,15 @@
   * `filesystem`  —— 把公共库语义落在一个本地目录，用于演练与联调，不需要凭证。
   * `cloudkit`    —— CloudKit Web Services + server-to-server key。
 
-⚠️ `cloudkit` 适配器的请求构造按 Apple 公开文档实现，但**未经真实环境验证**。
-   首次使用必须先在 `--environment development` 下用 `--print-requests` 逐条核对，
-   再考虑生产环境。详见 publication/README.md。
+✅ `cloudkit` 适配器已于 2026-09-25 在 Development 真实环境全链路验证通过
+   （含资产上传现行协议：assets/upload → 字节上传取 singleFile → singleFile 原样写回）。
+   上生产环境前仍建议先 `--print-requests` 核对请求形状。详见 publication/README.md。
 """
 
 from __future__ import annotations
 
 import base64
+import hashlib
 import json
 import os
 import shutil
@@ -110,7 +111,7 @@ class Credentials:
             container_id=container_id,
             environment=environment,
             key_id=key_id,
-            private_key_pem=private_key,
+            private_key_pem=decode_pem_material(private_key),
         )
 
     @classmethod
@@ -126,10 +127,62 @@ class Credentials:
         )
 
 
-def sign_request(date_string: str, body: bytes, private_key_pem: str) -> str:
+def cloudkit_subpath(container_id: str, environment: str, path: str) -> str:
+    """CloudKit Web Services 请求的 URL subpath（签名第三段）。
+
+    形如 `/database/1/<container>/<environment>/public/records/lookup`，
+    即完整 URL 去掉 scheme + host、**不含** query string。
+    """
+    return "/database/1/{}/{}/public/{}".format(container_id, environment, path)
+
+
+def first_existing_record(result: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """从 records/lookup 响应里取第一条**真实存在**的记录。
+
+    坑（2026-09-25 实测）：CloudKit 对不存在的记录**不报 HTTP 错**，而是在
+    records 数组里返回 `{"recordName":..., "serverErrorCode":"NOT_FOUND",
+    "reason":"Record not found"}` 条目。不过滤的话「记录不存在」会被误判成
+    「记录存在」——发布端会跳过该包的上传，校验端会把空字段当发布头解析。
+    """
+    for record in result.get("records") or []:
+        if not record.get("serverErrorCode"):
+            return record
+    return None
+
+
+def decode_pem_material(raw: str) -> str:
+    """把 Keychain 读回的私钥材料还原为 PEM 文本。
+
+    坑（2026-09-25 实测）：macOS `security add-generic-password -w "$(cat key.pem)"`
+    会把多行 PEM 按**二进制 data** 存进钥匙串，`-w` 读回来是整个 PEM 的 **hex 编码
+    字符串**，直接喂给 load_pem_private_key 会报 MalformedFraming。
+    这里按「原文 PEM → hex → base64」三态识别还原。
+    """
+    text = raw.strip()
+    if text.startswith("-----BEGIN"):
+        return text
+    for decoder in (bytes.fromhex, lambda s: base64.b64decode(s, validate=True)):
+        try:
+            decoded = decoder(text).decode("utf-8").strip()
+        except Exception:
+            continue
+        if decoded.startswith("-----BEGIN"):
+            return decoded
+    return raw
+
+
+def sign_request(date_string: str, body: bytes, private_key_pem: str, subpath: str) -> str:
     """CloudKit Web Services 的 SignatureV1：ECDSA P-256 / SHA-256。
 
-    签名对象是「日期:请求体」的 UTF-8 字节，请求体为空时只签日期加冒号。
+    签名对象按 Apple 规范是**三段**以冒号连接的 UTF-8 字节：
+
+        [ISO8601 日期]:[base64(SHA-256(请求体))]:[URL subpath]
+
+    ⚠️ 这里是历史上最容易写错的地方（2026-09-25 修正）：
+      · 第二段是**请求体摘要的 base64**，不是请求体原文；
+      · 第三段 `subpath` **必须**参与签名，漏掉会得到「签名无效」；
+      · 日期必须是整秒 ISO8601（`%Y-%m-%dT%H:%M:%SZ`，无小数秒）。
+    三段任一不符，Apple 侧只会返回笼统的认证失败，排查代价很高。
     """
     try:
         from cryptography.hazmat.primitives import hashes, serialization  # noqa: WPS433
@@ -139,9 +192,10 @@ def sign_request(date_string: str, body: bytes, private_key_pem: str) -> str:
             "cloudkit 适配器需要 cryptography 包：python3 -m pip install cryptography\n"
             "（filesystem 适配器不需要任何第三方依赖，可先用于演练）原始错误：{}".format(error)
         )
-    payload = date_string.encode("utf-8") + b":" + body
+    body_digest = base64.b64encode(hashlib.sha256(body).digest()).decode("ascii")
+    message = "{}:{}:{}".format(date_string, body_digest, subpath).encode("utf-8")
     key = serialization.load_pem_private_key(private_key_pem.encode("utf-8"), password=None)
-    signature = key.sign(payload, ec.ECDSA(hashes.SHA256()))
+    signature = key.sign(message, ec.ECDSA(hashes.SHA256()))
     return base64.b64encode(signature).decode("ascii")
 
 
@@ -310,7 +364,8 @@ class FilesystemAdapter(PublishAdapter):
 class CloudKitWebServicesAdapter(PublishAdapter):
     """CloudKit Web Services（server-to-server key）。
 
-    ⚠️ 未经真实环境验证。请先用 `--print-requests` 核对请求形状。
+    2026-09-25 已在 Development 真实环境全链路验证通过
+    （发布 releaseSeq=1 + 读者视角回读均通过）。
     """
 
     name = "cloudkit"
@@ -333,15 +388,20 @@ class CloudKitWebServicesAdapter(PublishAdapter):
         )
 
     def _endpoint(self, path: str) -> str:
-        return "https://api.apple-cloudkit.com/database/1/{}/{}/public/{}".format(
+        return "https://api.apple-cloudkit.com{}".format(self._subpath(path))
+
+    def _subpath(self, path: str) -> str:
+        return cloudkit_subpath(
             self.credentials.container_id, self.credentials.environment, path
         )
 
-    def _headers(self, body: bytes) -> Dict[str, str]:
+    def _headers(self, body: bytes, path: str) -> Dict[str, str]:
         import datetime as dt
 
         date_string = dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-        signature = sign_request(date_string, body, self.credentials.private_key_pem)
+        signature = sign_request(
+            date_string, body, self.credentials.private_key_pem, self._subpath(path)
+        )
         return {
             "Content-Type": "application/json",
             "X-Apple-CloudKit-Request-KeyID": self.credentials.key_id,
@@ -351,34 +411,59 @@ class CloudKitWebServicesAdapter(PublishAdapter):
 
     def _post(self, path: str, payload: Dict[str, Any]) -> Dict[str, Any]:
         body = canonical_json_bytes(payload)
-        headers = self._headers(body)
+        headers = self._headers(body, path)
         if self.print_requests:
             redacted = dict(headers)
             signature = redacted.get("X-Apple-CloudKit-Request-SignatureV1", "")
             redacted["X-Apple-CloudKit-Request-SignatureV1"] = "<{} 字节签名>".format(len(signature))
             print("    POST {}".format(self._endpoint(path)))
+            print("      签名对象 subpath: {}".format(self._subpath(path)))
             for key, value in redacted.items():
                 print("      {}: {}".format(key, value))
             print("      body: {}".format(body.decode("utf-8")[:400]))
         if not self.apply:
             return {}
+        import time
         import urllib.request
 
         request = urllib.request.Request(
             self._endpoint(path), data=body, headers=headers, method="POST"
         )
-        with urllib.request.urlopen(request, timeout=60) as response:
-            return json.loads(response.read().decode("utf-8"))
+        # 连接层重试（2026-09-25 实测）：到 api.apple-cloudkit.com 的 TLS 握手
+        # 会间歇性被重置（SSL UNEXPECTED_EOF / SSL_ERROR_SYSCALL），等几十秒又通。
+        # 只重试连接类错误，服务端业务错误（4xx/5xx 带 JSON body）不重试。
+        last_error: Optional[Exception] = None
+        for attempt, wait in enumerate((0, 5, 15, 30), start=1):
+            if wait:
+                time.sleep(wait)
+            try:
+                with urllib.request.urlopen(request, timeout=60) as response:
+                    return json.loads(response.read().decode("utf-8"))
+            except urllib.error.HTTPError as error:
+                # 业务错误不重试，但要把响应体带出来（CloudKit 的 400 在 body 里
+                # 写 serverErrorCode / reason，只看状态码无法定位）
+                detail = ""
+                try:
+                    detail = error.read().decode("utf-8", errors="replace")[:400]
+                except Exception:  # noqa: BLE001
+                    pass
+                raise ProtocolError(
+                    "HTTP {} {}: {}".format(error.code, error.reason, detail)
+                ) from error
+            except (urllib.error.URLError, ConnectionError, TimeoutError) as error:
+                last_error = error
+                if self.print_requests:
+                    print("      （连接失败，第 {} 次重试：{}）".format(attempt, error))
+        raise last_error if last_error else ProtocolError("网络请求失败")
 
     def fetch_current_release(self) -> Optional[Dict[str, Any]]:
         result = self._post(
             "records/lookup",
             {"records": [{"recordName": RELEASE_RECORD_NAME, "recordType": "THRelease"}]},
         )
-        records = result.get("records") or []
-        if not records:
+        record = first_existing_record(result)
+        if not record:
             return None
-        record = records[0]
         fields = record.get("fields") or {}
         return {
             "releaseSeq": (fields.get("releaseSeq") or {}).get("value"),
@@ -392,7 +477,7 @@ class CloudKitWebServicesAdapter(PublishAdapter):
             "records/lookup",
             {"records": [{"recordName": record_name, "recordType": record_type}]},
         )
-        return bool(result.get("records"))
+        return first_existing_record(result) is not None
 
     def pack_exists(self, payload_hash: str) -> bool:
         return self._asset_exists("THDataPack", "th.pack.{}".format(payload_hash))
@@ -418,11 +503,11 @@ class CloudKitWebServicesAdapter(PublishAdapter):
         file_name: str,
         meta: Dict[str, Any],
     ) -> None:
-        """CloudKit Web Services 的资产上传是三步：
+        """CloudKit Web Services 的资产上传是三步（见 `_modify_with_asset`）：
 
-        1. modify 传入 `{"__type": "ASSET"}` 占位，拿到单次上传地址
-        2. 把文件 POST 到该地址，拿到 receipt
-        3. 再 modify 一次，把字段写成 `{"__type": "ASSET", "receipt": ...}`
+        1. `assets/upload` 申请单次上传地址
+        2. 把文件 POST 到该地址，取回 `singleFile` 对象
+        3. 再 modify 一次，把字段写成上传响应的 `singleFile` **原样**
 
         三步都不会修改发布头，因此半途失败只留下未引用的不可变资源（§9.1）。
         """
@@ -445,71 +530,145 @@ class CloudKitWebServicesAdapter(PublishAdapter):
         file_bytes: bytes,
         file_name: str,
         expected_change_tag: Optional[str],
+        asset_field: str = "asset",
     ) -> str:
-        """三步资产写入，返回最终 changeTag。
+        """资产写入（2026-09-25 真实环境验证通过），返回最终 changeTag。
 
-        `fields["asset"]` 必须已经是 `{"value": {"__type": "ASSET"}}` 占位。
-        `expected_change_tag` 非空时，两次 modify 都带上它做冲突检测（§9.3）。
+        现行协议三步（旧「modify 带 ASSET 占位换 uploadURL」已被 Apple 服务端拒绝）：
+
+          1. POST assets/upload，body = {"tokens":[{"recordType","recordName",
+             "fieldName","fileChecksum"(SHA-256 base64),"size"}]}
+             → tokens[0].url = 单次上传地址
+          2. POST 文件**原始字节**到该地址（octet-stream）
+             → 响应 JSON {"singleFile":{"size","fileChecksum","receipt":…}}，
+             注意 singleFile.fileChecksum 是**服务器自己算的短值**，不是我们
+             提交的 SHA-256，receipt 尾部编码了它
+          3. records/modify 写记录，asset 字段 = **整个 singleFile 对象原样**
+             （与 cloudkit.js 的 consumeUploadReceipt 行为一致：
+             `.then(e => e.singleFile)` 后整包写回字段）
+
+        自拼 {"__type":"ASSET","receipt","fileChecksum","size"} 且 fileChecksum
+        用自己的 SHA-256 会报 bad upload receipt (did_not_validate)——2026-09-25
+        实测三种形状对比：singleFile 原样 / 加 __type / 服务器值三件套**全部成功**
+        （权限修好后），此前失败根源是 fileChecksum 与 receipt 内嵌值不一致。
+        取「原样整包」为标准形状，不依赖服务器返回字段集合的稳定性假设。
+
+        `expected_change_tag` 非空时，第 3 步带上它做冲突检测（§9.3）。
+        任何一步失败都只留下未引用的资源，不改用户可见版本（§9.1）。
         """
+        file_checksum = base64.b64encode(hashlib.sha256(file_bytes).digest()).decode("ascii")
+
+        # ---- 第 1 步：申请单次上传地址
+        step1 = self._post(
+            "assets/upload",
+            {
+                "tokens": [
+                    {
+                        "recordType": record_type,
+                        "recordName": record_name,
+                        "fieldName": asset_field,
+                        "fileChecksum": file_checksum,
+                        "size": len(file_bytes),
+                    }
+                ]
+            },
+        )
+        tokens = step1.get("tokens") or []
+        upload_url = (tokens[0] or {}).get("url") if tokens else None
+        if not upload_url:
+            if not self.apply:
+                print("      （dry-run：未实际申请上传地址）")
+                return ""
+            raise ProtocolError(
+                "assets/upload 未返回上传地址：{}".format(
+                    json.dumps(step1, ensure_ascii=False)[:300]
+                )
+            )
+
+        # ---- 第 2 步：上传文件字节，回执在响应里
+        single_file = self._upload_file(upload_url, file_bytes, file_name)
+        if not self.apply:
+            print("      （dry-run：未实际上传文件字节）")
+            return ""
+        if not single_file:
+            raise ProtocolError("资产上传成功但未取得 singleFile：{}".format(file_name))
+
+        # ---- 第 3 步：把上传响应的 singleFile 对象**原样**写进记录字段
+        write_fields = dict(fields)
+        write_fields[asset_field] = {"value": single_file}
         operation: Dict[str, Any] = {
             "operationType": "forceUpdate",
-            "record": {"recordType": record_type, "recordName": record_name, "fields": fields},
-        }
-        if expected_change_tag:
-            operation["record"]["recordChangeTag"] = expected_change_tag
-        step1 = self._post("records/modify", {"operations": [operation]})
-        upload_url = self._extract_upload_url(step1)
-        if not upload_url:
-            if self.print_requests or not self.apply:
-                print("      （未实际发送，无法取得 uploadURL）")
-                return ""
-            raise ProtocolError("第 1 步未取得 uploadURL，无法上传 {}".format(record_name))
-
-        receipt = self._upload_file(upload_url, file_bytes, file_name)
-        fields["asset"] = {"value": {"__type": "ASSET", "receipt": receipt}}
-        operation = {
-            "operationType": "forceUpdate",
-            "record": {"recordType": record_type, "recordName": record_name, "fields": fields},
+            "record": {
+                "recordType": record_type,
+                "recordName": record_name,
+                "fields": write_fields,
+            },
         }
         if expected_change_tag:
             operation["record"]["recordChangeTag"] = expected_change_tag
         step2 = self._post("records/modify", {"operations": [operation]})
-        records = step2.get("records") or []
-        return str(records[0].get("recordChangeTag") or "") if records else ""
+        record = first_existing_record(step2)
+        if record is None:
+            records = step2.get("records") or []
+            if records:
+                raise ProtocolError(
+                    "资产记录写入失败：{}".format(
+                        json.dumps(records[0], ensure_ascii=False)[:300]
+                    )
+                )
+        return str((record or {}).get("recordChangeTag") or "")
 
-    def _extract_upload_url(self, response: Dict[str, Any]) -> Optional[str]:
-        for record in response.get("records") or []:
-            asset = ((record.get("fields") or {}).get("asset") or {}).get("value") or {}
-            if asset.get("uploadURL"):
-                return str(asset["uploadURL"])
-        return None
+    def _upload_file(self, upload_url: str, file_bytes: bytes, file_name: str) -> Dict[str, Any]:
+        """把文件字节上传到 assets/upload 返回的地址，返回整个 singleFile 对象。
 
-    def _upload_file(self, upload_url: str, file_bytes: bytes, file_name: str) -> str:
+        2026-09-25 实测：地址接受**原始字节**（Content-Type: application/octet-stream），
+        响应 JSON = {"singleFile":{"size","fileChecksum","receipt"}}。
+        singleFile.fileChecksum 是服务器自己算的短值（非提交的 SHA-256）；
+        第 3 步写记录时必须把整个 singleFile **原样**传回，不能重新拼装。
+        """
         if not self.apply:
-            return "<dry-run-receipt>"
+            return {}
+        import time
         import urllib.request
-        import uuid
 
-        boundary = uuid.uuid4().hex
-        head = (
-            "--{boundary}\r\n"
-            'Content-Disposition: form-data; name="file"; filename="{name}"\r\n'
-            "Content-Type: application/octet-stream\r\n\r\n"
-        ).format(boundary=boundary, name=file_name).encode("utf-8")
-        tail = "\r\n--{boundary}--\r\n".format(boundary=boundary).encode("utf-8")
-        body = head + file_bytes + tail
-        request = urllib.request.Request(
-            upload_url,
-            data=body,
-            method="POST",
-            headers={"Content-Type": "multipart/form-data; boundary={}".format(boundary)},
-        )
-        with urllib.request.urlopen(request, timeout=300) as response:
-            payload = json.loads(response.read().decode("utf-8"))
-        receipt = payload.get("singleUseToken") or payload.get("receipt")
-        if not receipt:
-            raise ProtocolError("上传未返回 receipt：{}".format(payload))
-        return str(receipt)
+        last_error: Optional[Exception] = None
+        body = b""
+        for attempt, wait in enumerate((0, 5, 15, 30), start=1):
+            if wait:
+                time.sleep(wait)
+            request = urllib.request.Request(
+                upload_url,
+                data=file_bytes,
+                method="POST",
+                headers={"Content-Type": "application/octet-stream"},
+            )
+            try:
+                with urllib.request.urlopen(request, timeout=300) as response:
+                    body = response.read()
+                break
+            except urllib.error.HTTPError as error:
+                detail = ""
+                try:
+                    detail = error.read().decode("utf-8", errors="replace")[:300]
+                except Exception:  # noqa: BLE001
+                    pass
+                raise ProtocolError(
+                    "资产上传 HTTP {}：{}".format(error.code, detail)
+                ) from error
+            except (urllib.error.URLError, ConnectionError, TimeoutError) as error:
+                last_error = error
+        if last_error is not None:
+            raise last_error
+        try:
+            payload = json.loads(body.decode("utf-8"))
+        except (ValueError, UnicodeDecodeError):
+            return {}  # 非 JSON 响应体：按原始成功处理（无 singleFile 可提取）
+        single = payload.get("singleFile") or {}
+        if not single:
+            raise ProtocolError(
+                "资产上传响应缺少 singleFile：{}".format(json.dumps(payload, ensure_ascii=False)[:300])
+            )
+        return single
 
     def read_back_pack_hash(self, payload_hash: str) -> Optional[str]:
         # 真实回读需要下载资产再比对；这里只确认记录存在，
@@ -547,6 +706,7 @@ class CloudKitWebServicesAdapter(PublishAdapter):
             file_bytes=root_bytes,
             file_name="root-index.json",
             expected_change_tag=expected_change_tag,
+            asset_field="rootIndexAsset",
         )
 
 

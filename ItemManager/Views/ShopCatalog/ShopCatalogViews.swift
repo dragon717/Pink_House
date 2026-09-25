@@ -65,6 +65,11 @@ struct ShopCatalogBrowseView: View {
         .onAppear {
             store.loadFromBundleIfNeeded()
         }
+        .task {
+            // 云端商店目录同步（消费通道只读）：每次回到首屏都触发，
+            // 30 分钟节流在 ShopCatalogCloudSyncService 内部，重复调用是廉价的。
+            await ShopCatalogCloudSyncService.shared.syncIfNeeded()
+        }
     }
 }
 

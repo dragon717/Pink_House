@@ -60,6 +60,69 @@ COVERAGE_CONCLUSIVE = {
 
 SOURCE_COVERAGES = {"currentlyEnumerable", "curatedSelection", "historicalComplete"}
 
+# ---------------------------------------------------------------- 商店目录分片
+#
+# 「店家上新 / 公共 Catalog」（时光馆「商店」内容）走**整包单分片**：
+#   · entityType 固定为 `shop-catalog`，一个分片承载**合并后的完整目录**
+#     （shops/series/products/variants/sizeCharts/saleEvents/assets/styleProfiles
+#       + 三组删除墓碑），不按实体类型拆包；
+#   · 不拆包的原因：「商品 → 系列 → 店家」「规格/销售记录/尺码表 → 商品」是强引用，
+#     拆包会让引用跨包悬空、客户端必须一次取齐 8 个包才能渲染；
+#   · 载荷键为 `shopCatalog`（TimeHall 分片是 `records`），校验走本节专用函数，
+#     **禁止**与 TimeHall 实体机制混用（两边的日期口径、引用规则都不同）；
+#   · brandID 用运营自有内容源标识（`shaonv-xinyuan`），**不与画册品牌共用**：
+#     根清单 brands 按 brandID 去重，共用会让两边同时发布时报重复品牌。
+SHOP_CATALOG_ENTITY_TYPE = "shop-catalog"
+SHOP_CATALOG_SCOPE = "all"
+
+SHOP_CATALOG_ENTITY_FIELDS: Tuple[str, ...] = (
+    "shops",
+    "series",
+    "products",
+    "variants",
+    "sizeCharts",
+    "saleEvents",
+    "assets",
+    "styleProfiles",
+)
+SHOP_CATALOG_TOMBSTONE_FIELDS: Tuple[str, ...] = (
+    "removedShopIDs",
+    "removedSeriesIDs",
+    "removedProductIDs",
+)
+SHOP_CATALOG_ALL_FIELDS: Tuple[str, ...] = (
+    SHOP_CATALOG_ENTITY_FIELDS + SHOP_CATALOG_TOMBSTONE_FIELDS
+)
+
+# canonicalEntityID 第二段（撤回清单与客户端身份映射用）。与 TimeHall 的
+# ENTITY_TYPES 分开登记：商店实体**不**参与 TimeHall 的日期格式与引用规则。
+SHOP_ENTITY_TYPES: Tuple[str, ...] = (
+    "catalog-shop",
+    "catalog-series",
+    "catalog-product",
+    "catalog-variant",
+    "catalog-size-chart",
+    "catalog-sale-event",
+    "catalog-asset",
+    "catalog-style-profile",
+)
+SHOP_CANONICAL_TYPE_BY_FIELD: Dict[str, str] = {
+    "shops": "catalog-shop",
+    "series": "catalog-series",
+    "products": "catalog-product",
+    "variants": "catalog-variant",
+    "sizeCharts": "catalog-size-chart",
+    "saleEvents": "catalog-sale-event",
+    "assets": "catalog-asset",
+    "styleProfiles": "catalog-style-profile",
+}
+
+SHOP_SALE_EVENT_TYPES = {"reservation", "stock", "rerelease"}
+SHOP_CURRENCIES = {"CNY", "JPY", "UNKNOWN"}
+SHOP_SALE_PHASES = {"reservation_active", "reservation_ended", "balance_pending", "in_stock"}
+SHOP_BALANCE_DUE_KINDS = {"approximate", "exact"}
+
+
 # entityType -> catalog 中的数组字段
 ENTITY_FIELD: Dict[str, str] = {
     "event": "events",
@@ -138,7 +201,7 @@ def is_canonical_entity_id(value: str) -> bool:
     parts = value.split("/")
     if len(parts) != 3 or not all(parts):
         return False
-    return parts[1] in ENTITY_TYPES
+    return parts[1] in ENTITY_TYPES or parts[1] in SHOP_ENTITY_TYPES
 
 
 def partition_id(brand_id: str, entity_type: str, scope_key: str) -> str:
@@ -385,7 +448,7 @@ def validate_partition_descriptor(
 
     if not brand_id:
         issues.append(_issue("brandID.empty", "分片必须声明 brandID"))
-    if entity_type not in ENTITY_TYPES:
+    if entity_type not in ENTITY_TYPES and entity_type != SHOP_CATALOG_ENTITY_TYPE:
         issues.append(_issue("entityType.invalid", "未知实体类型 {}".format(entity_type)))
     if coverage not in COVERAGE_STATUSES:
         issues.append(_issue("coverageStatus.invalid", "未知覆盖状态 {}".format(coverage)))
@@ -421,7 +484,10 @@ def validate_partition_descriptor(
 
     # 数量一致性
     records = payload.get("records") or {}
-    own_count = len(entity_records(records, entity_type))
+    if entity_type == SHOP_CATALOG_ENTITY_TYPE:
+        own_count = shop_catalog_entity_count(payload.get("shopCatalog"))
+    else:
+        own_count = len(entity_records(records, entity_type))
     declared_count = descriptor.get("recordCount")
     if not isinstance(declared_count, int) or declared_count < 0:
         issues.append(_issue("recordCount.invalid", "recordCount 不得为负"))
@@ -548,3 +614,228 @@ def all_entity_ids(catalog: Dict[str, Any]) -> Iterable[Tuple[str, str]]:
     for entity_type in ENTITY_TYPES:
         for value in entity_stable_ids(entity_records(catalog, entity_type)):
             yield entity_type, value
+
+
+# ---------------------------------------------------------------- 商店目录校验
+
+
+def _shop_records(doc: Dict[str, Any], field: str) -> List[Dict[str, Any]]:
+    values = doc.get(field)
+    if not isinstance(values, list):
+        return []
+    return [item for item in values if isinstance(item, dict)]
+
+
+def _shop_ids(doc: Dict[str, Any], field: str) -> List[str]:
+    return [str(record.get("id", "")) for record in _shop_records(doc, field)]
+
+
+def shop_catalog_entity_count(doc: Any) -> int:
+    """商店目录的条目总数（只数实体，不数墓碑；墓碑不是条目）。"""
+    if not isinstance(doc, dict):
+        return 0
+    return sum(len(_shop_ids(doc, field)) for field in SHOP_CATALOG_ENTITY_FIELDS)
+
+
+def validate_shop_catalog(
+    doc: Any,
+    brand_id: str,
+    coverage_status: str,
+) -> List[Dict[str, str]]:
+    """商店目录整包分片的结构校验。
+
+    与 `validate_fragment`（TimeHall 实体）刻意分开：
+      · 商店实体的时间是 ISO8601 **日期时间**（Swift `.iso8601` 编解码），
+        不适用 TimeHall 的 `yyyy-MM-dd` 规则；
+      · 图片引用允许指向 Bundle 内置资源（`bundle:` 前缀），包内无法判定
+        是否存在，因此**只**校验纯 id→id 的实体引用，不做资产引用校验；
+      · 上架销售历史是 append-only，这里只校验它引用的商品存在。
+    """
+    issues: List[Dict[str, str]] = []
+    if not brand_id:
+        issues.append(_issue("brandID.empty", "brandID 不得为空"))
+    if not isinstance(doc, dict):
+        return issues + [_issue("shopCatalog.invalid", "商店目录分片负载必须是对象")]
+
+    total = shop_catalog_entity_count(doc)
+    if coverage_status == COVERAGE_EMPTY and total:
+        issues.append(_issue("empty.notEmpty", "覆盖状态为 empty 的商店目录分片不得携带任何条目"))
+    if coverage_status in (COVERAGE_COMPLETE, COVERAGE_PARTIAL) and total == 0:
+        issues.append(
+            _issue("records.empty", "覆盖状态为 {} 的商店目录分片不得为空".format(coverage_status))
+        )
+
+    # 数组字段类型（缺键视为空；类型错必须报）
+    for field in SHOP_CATALOG_ALL_FIELDS:
+        value = doc.get(field)
+        if value is not None and not isinstance(value, list):
+            issues.append(_issue("shopCatalog.fieldType", "{} 必须是数组".format(field), field))
+
+    # 每类实体 id 非空且唯一
+    for field in SHOP_CATALOG_ENTITY_FIELDS:
+        seen: set = set()
+        for value in _shop_ids(doc, field):
+            if not value:
+                issues.append(_issue("{}.id.empty".format(field), "{} 存在空 ID".format(field)))
+                continue
+            if value in seen:
+                issues.append(
+                    _issue("{}.id.duplicate".format(field), "{} 存在重复 ID".format(field), value)
+                )
+            seen.add(value)
+
+    shop_ids = set(_shop_ids(doc, "shops"))
+    series_ids = set(_shop_ids(doc, "series"))
+    product_ids = set(_shop_ids(doc, "products"))
+
+    # 引用完整性：整包发布，被引用实体必须同包可解析（§18.1 D09）
+    if shop_ids:
+        for record in _shop_records(doc, "series"):
+            if str(record.get("shopID", "")) not in shop_ids:
+                issues.append(
+                    _issue(
+                        "series.shopID.dangling",
+                        "系列引用了包内不存在的店家 {}".format(record.get("shopID")),
+                        str(record.get("id", "")),
+                    )
+                )
+        for record in _shop_records(doc, "products"):
+            if str(record.get("shopID", "")) not in shop_ids:
+                issues.append(
+                    _issue(
+                        "product.shopID.dangling",
+                        "商品引用了包内不存在的店家 {}".format(record.get("shopID")),
+                        str(record.get("id", "")),
+                    )
+                )
+    if series_ids:
+        for record in _shop_records(doc, "products"):
+            if str(record.get("seriesID", "")) not in series_ids:
+                issues.append(
+                    _issue(
+                        "product.seriesID.dangling",
+                        "商品引用了包内不存在的系列 {}".format(record.get("seriesID")),
+                        str(record.get("id", "")),
+                    )
+                )
+        for record in _shop_records(doc, "styleProfiles"):
+            if str(record.get("seriesID", "")) not in series_ids:
+                issues.append(
+                    _issue(
+                        "styleProfile.seriesID.dangling",
+                        "款式档案引用了包内不存在的系列 {}".format(record.get("seriesID")),
+                        str(record.get("id", "")),
+                    )
+                )
+    if product_ids:
+        for record in _shop_records(doc, "variants"):
+            if str(record.get("productID", "")) not in product_ids:
+                issues.append(
+                    _issue(
+                        "variant.productID.dangling",
+                        "规格引用了包内不存在的商品 {}".format(record.get("productID")),
+                        str(record.get("id", "")),
+                    )
+                )
+        for record in _shop_records(doc, "saleEvents"):
+            if str(record.get("productID", "")) not in product_ids:
+                issues.append(
+                    _issue(
+                        "saleEvent.productID.dangling",
+                        "销售记录引用了包内不存在的商品 {}".format(record.get("productID")),
+                        str(record.get("id", "")),
+                    )
+                )
+        for record in _shop_records(doc, "sizeCharts"):
+            if str(record.get("productID", "")) not in product_ids:
+                issues.append(
+                    _issue(
+                        "sizeChart.productID.dangling",
+                        "尺码表引用了包内不存在的商品 {}".format(record.get("productID")),
+                        str(record.get("id", "")),
+                    )
+                )
+
+    # 枚举取值（与 Swift 侧 CatalogSaleEventType / CatalogCurrency /
+    # CatalogSeriesSalePhase / CatalogBalanceDueKind 的 rawValue 对齐）
+    for record in _shop_records(doc, "saleEvents"):
+        event_type = str(record.get("type", ""))
+        if event_type not in SHOP_SALE_EVENT_TYPES:
+            issues.append(
+                _issue(
+                    "saleEvent.type.invalid",
+                    "销售记录类型 {} 不在 {} 内".format(event_type, sorted(SHOP_SALE_EVENT_TYPES)),
+                    str(record.get("id", "")),
+                )
+            )
+        currency = record.get("currency")
+        if currency is not None and str(currency) not in SHOP_CURRENCIES:
+            issues.append(
+                _issue(
+                    "saleEvent.currency.invalid",
+                    "币种 {} 不在 {} 内".format(currency, sorted(SHOP_CURRENCIES)),
+                    str(record.get("id", "")),
+                )
+            )
+        price = record.get("price")
+        if isinstance(price, bool) or not isinstance(price, (int, float)):
+            issues.append(
+                _issue("saleEvent.price.type", "price 必须是数字", str(record.get("id", "")))
+            )
+    for record in _shop_records(doc, "series"):
+        phase = record.get("salePhase")
+        if phase is not None and str(phase) not in SHOP_SALE_PHASES:
+            issues.append(
+                _issue(
+                    "series.salePhase.invalid",
+                    "发售阶段 {} 不在 {} 内".format(phase, sorted(SHOP_SALE_PHASES)),
+                    str(record.get("id", "")),
+                )
+            )
+        kind = record.get("balanceDueKind")
+        if kind is not None and str(kind) not in SHOP_BALANCE_DUE_KINDS:
+            issues.append(
+                _issue(
+                    "series.balanceDueKind.invalid",
+                    "尾款时间粒度 {} 不在 {} 内".format(kind, sorted(SHOP_BALANCE_DUE_KINDS)),
+                    str(record.get("id", "")),
+                )
+            )
+
+    # 墓碑与现存实体不得同 id（既「在售」又「已删除」= 数据自相矛盾）
+    for field, tombstone in (
+        ("shops", "removedShopIDs"),
+        ("series", "removedSeriesIDs"),
+        ("products", "removedProductIDs"),
+    ):
+        alive = set(_shop_ids(doc, field))
+        removed = {str(value) for value in (doc.get(tombstone) or [])}
+        for value in sorted(alive & removed)[:5]:
+            issues.append(
+                _issue("tombstone.conflict", "墓碑 {} 与现存实体同 id".format(tombstone), value)
+            )
+
+    # canonical ID 唯一（跨实体类型：同一个 id 同时当商品和系列也是错的）
+    canonical: List[str] = []
+    for field in SHOP_CATALOG_ENTITY_FIELDS:
+        entity_type = SHOP_CANONICAL_TYPE_BY_FIELD[field]
+        canonical += [
+            canonical_entity_id(brand_id, entity_type, value) for value in _shop_ids(doc, field)
+        ]
+    duplicates = sorted({value for value in canonical if canonical.count(value) > 1})
+    for value in duplicates[:5]:
+        issues.append(_issue("canonicalID.duplicate", "canonical ID 重复", value))
+
+    return issues
+
+
+def validate_pack_payload(
+    payload: Dict[str, Any],
+    brand_id: str,
+    entity_type: str,
+    coverage_status: str,
+) -> List[Dict[str, str]]:
+    """按分片类型分发结构校验（build / validate / verify 三处共用同一入口）。"""
+    if entity_type == SHOP_CATALOG_ENTITY_TYPE:
+        return validate_shop_catalog(payload.get("shopCatalog"), brand_id, coverage_status)
+    return validate_fragment(payload.get("records") or {}, brand_id, entity_type, coverage_status)

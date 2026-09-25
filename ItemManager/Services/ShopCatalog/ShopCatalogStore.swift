@@ -41,6 +41,11 @@ final class ShopCatalogStore: ObservableObject {
     private var baseCatalog: ShopCatalog?
     private var overlayCatalog: ShopCatalog?
 
+    /// 云端发布的商店目录（消费通道只读拉取，见 `ShopCatalogCloudSyncService`）。
+    /// 优先级低于本机覆盖层：覆盖层是运营**未发布**的最新编辑，必须赢过已发布快照；
+    /// 又高于 Bundle 种子：远端整包是运营批准发布后的最新事实。
+    private var remoteCatalog: ShopCatalog?
+
     /// 独立实例（单测 / 预览用）；App 内统一走 `shared`
     init() {}
 
@@ -89,30 +94,27 @@ final class ShopCatalogStore: ObservableObject {
         rebuildMergedCatalog()
     }
 
-    /// 合并规则（重构方案 §5.3）：
-    ///   · shops/series/products/variants/sizeCharts/assets/styleProfiles：覆盖层**同 id
-    ///     实体整体替换**基底（后写胜出）——支撑运营「编辑已发布实体」与「归档」
-    ///     （写 archivedAt 后同 id 替换即可生效）；新 id 实体追加。
-    ///   · saleEvents：**永远追加**，不做替换（硬约束：销售历史不可覆盖）。
-    ///   · 墓碑（2026-09-24 强制删除）：覆盖层记录的 removed*IDs 在合并结果里排除，
-    ///     使「种子实体 + 其覆盖层副本」一并从生效目录消失（规格/尺码表按商品连坐）。
-    private func rebuildMergedCatalog() {
-        guard let base = baseCatalog else {
-            // 基底未加载且覆盖层也没有 → catalog 保持 nil：
-            // `.shared` 的懒加载靠 `catalog == nil` 判定，这里置空对象会让
-            // `loadFromBundleIfNeeded` 永久短路、种子再也进不来（2026-09-24 踩到）。
-            guard let overlay = overlayCatalog else {
-                catalog = nil
-                return
-            }
-            catalog = Self.applyTombstones(overlay)
-            return
-        }
-        guard let overlay = overlayCatalog else {
-            catalog = base
-            return
-        }
-        var merged = base
+    /// 云端同步服务安装已通过三层校验的远端目录（消费通道只读）。
+    /// 传 nil = 公共库当前没有商店内容（清空远端层，回退到 base + overlay）。
+    /// 只进内存、不落盘：下次冷启动由同步服务按缓存/节流策略重新拉取，
+    /// 避免与包缓存（`ShopCatalogPackCache`）形成两份真相。
+    func installRemoteCatalog(_ remote: ShopCatalog?) {
+        remoteCatalog = remote
+        rebuildMergedCatalog()
+    }
+
+    // MARK: 三层合并
+
+    /// 把一层目录合并进已有结果：
+    ///   · shops/series/products/variants/sizeCharts/assets/styleProfiles：
+    ///     同 id 实体整体替换、新 id 追加（后写胜出，与覆盖层原规则一致）。
+    ///   · saleEvents：**追加 + 按 id 去重**。远端整包携带全部历史事件，
+    ///     与种子/既有层重叠的事件按 id 去重，不产生重复记录；
+    ///     同 id 不同内容时保留先到的（append-only 硬约束：销售历史永不改写）。
+    ///   · 墓碑：removed*IDs 求并集（任何一层声明删除即生效）。
+    /// `accumulated` 为 nil 时直接以 `layer` 为起点（`ShopCatalog` 是 struct 值类型）。
+    private static func merging(_ layer: ShopCatalog, into accumulated: ShopCatalog?) -> ShopCatalog {
+        guard var merged = accumulated else { return layer }
         func replaceOrAppend<T: Identifiable>(_ source: [T], into target: inout [T]) {
             for entity in source {
                 if let index = target.firstIndex(where: { $0.id == entity.id }) {
@@ -122,27 +124,51 @@ final class ShopCatalogStore: ObservableObject {
                 }
             }
         }
-        replaceOrAppend(overlay.shops, into: &merged.shops)
-        replaceOrAppend(overlay.series, into: &merged.series)
-        replaceOrAppend(overlay.products, into: &merged.products)
-        replaceOrAppend(overlay.variants, into: &merged.variants)
-        replaceOrAppend(overlay.sizeCharts, into: &merged.sizeCharts)
-        replaceOrAppend(overlay.assets, into: &merged.assets)
-        // 款式公共档案（SPU 面料 / 款式描述）：同款式键整体替换，后写胜出
-        replaceOrAppend(overlay.styleProfiles, into: &merged.styleProfiles)
-        merged.saleEvents.append(contentsOf: overlay.saleEvents)
-        // 墓碑并入 merged（并集去重）：墓碑是 struct 字段、不走 replaceOrAppend，
-        // 不并入的话 applyTombstones 读到的永远是种子里的空数组（09-24 踩到）
-        for id in overlay.removedShopIDs where !merged.removedShopIDs.contains(id) {
+        replaceOrAppend(layer.shops, into: &merged.shops)
+        replaceOrAppend(layer.series, into: &merged.series)
+        replaceOrAppend(layer.products, into: &merged.products)
+        replaceOrAppend(layer.variants, into: &merged.variants)
+        replaceOrAppend(layer.sizeCharts, into: &merged.sizeCharts)
+        replaceOrAppend(layer.assets, into: &merged.assets)
+        replaceOrAppend(layer.styleProfiles, into: &merged.styleProfiles)
+        var knownEventIDs = Set(merged.saleEvents.map(\.id))
+        for event in layer.saleEvents where knownEventIDs.insert(event.id).inserted {
+            merged.saleEvents.append(event)
+        }
+        for id in layer.removedShopIDs where !merged.removedShopIDs.contains(id) {
             merged.removedShopIDs.append(id)
         }
-        for id in overlay.removedSeriesIDs where !merged.removedSeriesIDs.contains(id) {
+        for id in layer.removedSeriesIDs where !merged.removedSeriesIDs.contains(id) {
             merged.removedSeriesIDs.append(id)
         }
-        for id in overlay.removedProductIDs where !merged.removedProductIDs.contains(id) {
+        for id in layer.removedProductIDs where !merged.removedProductIDs.contains(id) {
             merged.removedProductIDs.append(id)
         }
-        catalog = Self.applyTombstones(merged)
+        return merged
+    }
+
+    /// 合并规则（重构方案 §5.3 + 云同步三层扩展）：合并优先级 **base → remote → overlay**，
+    /// 后一层赢过前一层：
+    ///   · Bundle 种子（base）是出厂事实；远端整包（remote）是运营批准发布后的最新事实；
+    ///     本机覆盖层（overlay）是运营**未发布**的最新编辑，优先级最高。
+    ///   · 各层实体合并规则见 `merging(into:)`（同 id 替换 / 新 id 追加 / saleEvents
+    ///     按 id 去重追加 / 墓碑并集）；最后统一过 `applyTombstones` 排除已删除实体。
+    private func rebuildMergedCatalog() {
+        guard baseCatalog != nil || remoteCatalog != nil || overlayCatalog != nil else {
+            // 三层全空 → catalog 保持 nil：
+            // `.shared` 的懒加载靠 `catalog == nil` 判定，这里置空对象会让
+            // `loadFromBundleIfNeeded` 永久短路、种子再也进不来（2026-09-24 踩到）。
+            catalog = nil
+            return
+        }
+        var merged: ShopCatalog? = baseCatalog
+        if let remote = remoteCatalog {
+            merged = Self.merging(remote, into: merged)
+        }
+        if let overlay = overlayCatalog {
+            merged = Self.merging(overlay, into: merged)
+        }
+        catalog = merged.map(Self.applyTombstones)
     }
 
     /// 墓碑过滤（纯函数便于单测）：被强制删除的店家/系列/商品从生效目录排除，

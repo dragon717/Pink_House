@@ -40,21 +40,22 @@ catalog*.json（已审核输入）
 | `build_release.py` | 构建不可变产物 | 无第三方依赖 |
 | `validate_release.py` | 校验产物（发布者自检） | 无第三方依赖 |
 | `publish_adapters.py` | 发布适配层：`filesystem`（演练）/ `cloudkit`（真实） | cloudkit 需 `cryptography` |
+| `selftest_signing.py` | CloudKit SignatureV1 请求签名离线自检（已知答案 + 反向断言） | cloudkit 需 `cryptography` |
 | `publish_cloudkit.py` | 发布主入口（固定 7 步顺序） | 同上 |
 | `verify_publication.py` | 读者视角回读验证 | 同上 |
 | `rollback_release.py` | 回滚：历史内容 + 新更高发布号 | 无第三方依赖 |
 
 ## 快速演练（不需要凭证、不联网）
 
-**最省事的方式：一条命令跑完全链路 21 项断言。**
+**最省事的方式：一条命令跑完全链路 28 项断言。**
 
 ```bash
 cd /Users/sangyu/develop/Pink_House
 bash tools/time_hall/publication/drill_offline.sh
 ```
 
-覆盖：构建 → 自检 → dry-run 无副作用 → 发布 → 回读 → 4 条拒绝路径（重复发布号 / 回滚号不递增 / localFixture 发 CloudKit / 篡改分片）→ 回滚 → 再发布。
-成功标志是 `通过 21 项，失败 0 项`。加 `--verbose` 看每步完整输出，加 `--keep` 保留工作目录与日志。
+覆盖：构建 → 自检 → dry-run 无副作用 → 发布 → 回读 → 4 条拒绝路径（重复发布号 / 回滚号不递增 / localFixture 发 CloudKit / 篡改分片）→ 回滚 → 再发布 → **商店目录整包分片（含悬空引用拒绝）**。
+成功标志是 `通过 28 项，失败 0 项`。加 `--verbose` 看每步完整输出，加 `--keep` 保留工作目录与日志。
 
 如果你想逐步手动跑、观察每一步之间发生了什么，用下面的分步版本：
 
@@ -62,8 +63,19 @@ bash tools/time_hall/publication/drill_offline.sh
 cd tools/time_hall/publication
 PY=python3
 
-# 0) 准备输入（本地联调用 Bundle 里的 catalog）
-mkdir -p /tmp/th_in && cp ../../../ItemManager/Resources/TimeHall/catalog*.json /tmp/th_in/
+# 0) 准备输入（就地生成夹具；旧 `Resources/TimeHall/` 已随旧馆移除）
+mkdir -p /tmp/th_in
+python3 - /tmp/th_in <<'EOF'
+import json, sys
+from pathlib import Path
+# 文件名必须等于 sources.yaml 中该品牌的 resourceName（pink-house -> "catalog"）
+fixture = {
+    "version": 3, "brand": "PINK HOUSE",
+    "events": [{"id": "news-drill-001", "publishedOn": "2026-09-12", "title": "本地联调"}],
+    "commerceItems": [{"id": "drill-item-001", "observedAt": "2026-09-12", "name": "本地联调"}],
+}
+Path(sys.argv[1], "catalog.json").write_text(json.dumps(fixture, ensure_ascii=False), encoding="utf-8")
+EOF
 
 # 1) 构建（--allow-unapproved-local-fixture 会打上 localFixture 标记）
 $PY build_release.py --input /tmp/th_in --output /tmp/th_out --release-seq 1 \
@@ -94,13 +106,33 @@ $PY verify_publication.py --adapter filesystem --filesystem-root /tmp/th_fs
 
 ### 1. 凭证（绝不进命令行、绝不进日志）
 
+> ⚠️ **2026-09-25 修正**：凭证的密钥对在**你自己的 Mac 上生成，只把公钥上传到 Console**，
+> 私钥永不离开本机。Console 回填的只是一个 Key ID。
+> 完整步骤见 `docs/TIME_HALL_CLOUDKIT_CONSOLE_SETUP.md` §3。
+>
+> ```bash
+> openssl ecparam -name prime256v1 -genkey -noout -out pinkhouse-ck.pem  # 私钥，留本机
+> openssl ec -in pinkhouse-ck.pem -pubout                                # 公钥，粘进 Console → API Access → Server-to-Server Keys
+> ```
+
 优先 Keychain：
 
 ```bash
 security add-generic-password -s PinkHouseTimeHallPublisher -a keyID       -w '<KEY_ID>'
-security add-generic-password -s PinkHouseTimeHallPublisher -a privateKey  -w '<P-256 私钥 PEM 全文>'
+security add-generic-password -s PinkHouseTimeHallPublisher -a privateKey  -w "$(cat pinkhouse-ck.pem)"
 security add-generic-password -s PinkHouseTimeHallPublisher -a containerID -w 'iCloud.bugod2.ItemManager'
 ```
+
+> ⚠️ **Keychain hex 坑（2026-09-25 实测）**：`security -w "$(cat key.pem)"` 会把
+> 多行 PEM 按**二进制 data** 存进钥匙串，`-w` 读回来是整段 PEM 的 **hex 编码字符串**，
+> 直接喂给签名器会报 `MalformedFraming`。`publish_adapters.decode_pem_material`
+> 已做「原文 PEM → hex → base64」三态自动还原，无需处理；但排查认证问题时
+> 先想到这一层（症状：`selftest_signing.py` 全过、一读 Keychain 就加载失败）。
+>
+> 另一个实测坑：CloudKit `records/lookup` 对不存在的记录**不报 HTTP 错**，而是在
+> `records` 数组里返回 `serverErrorCode: "NOT_FOUND"` 条目。读取与发布端都必须
+> 过滤（`publish_adapters.first_existing_record`），否则「没发布过」会被误判成
+> 「发布头存在但资产缺失」，`_asset_exists` 甚至会让发布端跳过包上传。
 
 开发环境可改用环境变量指向的 JSON 文件（会在输出里明确警告）：
 
@@ -122,9 +154,20 @@ Record Type 与 Security Role：
 | `THDataPack` | `partitionID`(String) `releaseSeq`(Int64) `sha256`(String) `byteCount`(Int64) `asset`(Asset) | ✅ 允许 | ❌ 拒绝 |
 | `THMedia` | `mediaKey`(String) `mimeType`(String) `sha256`(String) `byteCount`(Int64) `asset`(Asset) | ✅ 允许 | ❌ 拒绝 |
 
-在 **Security Roles** 里给 `_world`（或等价的 public 角色）只赋 `Read`，
-`Write` 只留给发布用的 server-to-server key。**不要**给任何 authenticated 角色写权限——
-普通用户零写是设计 §0.3 的第一条硬约束。
+在 **Security Roles** 里给 `_world`（或等价的 public 角色）只赋 `Read`。
+**Write/Create 给谁见下——这里 2026-09-25 踩过实测坑**：
+
+> ⚠️ **s2s key 不绕过安全角色**。按 Apple 官方 CloudKit Catalog 的说法，
+> s2s 请求「inherit the privileges of the creator of the key」——继承**创建这把
+> key 的开发者用户**的权限，而开发者在权限矩阵里就是一个已认证用户。
+> 如果把所有角色的 Write/Create 全收掉，发布端 `records/modify` 会直接报
+> `CREATE operation not permitted`（ACCESS_DENIED）。
+>
+> - **Development**：给 Authenticated（已认证用户）行勾 Create+Write
+>   （开发环境只有团队成员能访问，放宽不泄漏给用户）；
+> - **Production**：建自定义角色（如 `TimeHallPublisher`）授 Create+Read+Write，
+>   把开发者自己的 User Record 加进去，再收掉 Authenticated 行的 Create/Write。
+> - `_world` 任何环境都只 Read。
 
 Query 索引（如果运营侧要用 query 拉取而非 lookup）：`THDataPack.partitionID`、
 `THMedia.mediaKey` 需要标记 Queryable。
@@ -146,6 +189,39 @@ python3 publish_cloudkit.py --release <产物目录> --adapter cloudkit \
 # 上线后自证
 python3 verify_publication.py --adapter cloudkit --environment development
 ```
+
+## 商店目录（店家上新）分片 —— 时光馆「商店」内容
+
+「店家上新 / 公共 Catalog」与画册共用同一套 CloudKit 记录类型（`THRelease` / `THDataPack` /
+`THMedia`）与同一个发布头，但走**整包单分片**：
+
+| 项 | 取值 |
+|---|---|
+| entityType | `shop-catalog` |
+| brandID | `shaonv-xinyuan`（运营自有内容源，**不与画册品牌共用**：根清单 brands 按 brandID 去重，共用会报重复品牌） |
+| partitionID | `shaonv-xinyuan/shop-catalog/all` |
+| 载荷键 | `shopCatalog`（TimeHall 画册分片是 `records`） |
+| 载荷内容 | 合并种子与覆盖层后的**完整**商店目录（shops / series / products / variants / sizeCharts / saleEvents / assets / styleProfiles + 三组 `removed*IDs` 墓碑） |
+| 审批 | `sources.yaml` 的 `shopCatalog.permissionStatus`，默认 `pending_review` |
+
+**为什么整包不拆分**：「商品 → 系列 → 店家」「规格 / 销售记录 / 尺码表 → 商品」是强引用，
+拆包会让引用跨包悬空、客户端必须一次取齐 8 个包才能渲染；商店目录体积远小于单包上限。
+
+```bash
+python3 build_release.py --input <目录> --shop-catalog <商店目录.json> \
+    --output <产物目录> --release-seq <N>
+
+# 未批准来源的本地联调：加 --allow-unapproved-local-fixture
+# （产物标记 localFixture，--adapter cloudkit 会被强制拒绝）
+```
+
+结构校验由 `protocol.validate_shop_catalog` 专门负责：实体 id 非空唯一、
+店家/系列/商品/规格/销售记录/尺码表/款式档案的引用**必须包内可解析**、
+墓碑不得与现存实体同 id、销售记录类型/币种与发售阶段/尾款粒度枚举合法。
+图片引用允许指向 Bundle 内置资源（`bundle:` 前缀），**不**做资产引用校验。
+
+⚠️ **运营导出输入时必须导出「合并视图」**（Bundle 种子 + 覆盖层）。
+只导覆盖层会因引用悬空被校验拒绝——这正是设计要拦住的错误，不是误报。
 
 ## 发布顺序为什么是这个顺序（§9.1）
 
@@ -192,20 +268,39 @@ python3 publish_cloudkit.py --release <新产物> --adapter cloudkit --environme
 
 ## 已知未验证部分
 
-- `publish_adapters.CloudKitWebServicesAdapter` 与
-  `verify_publication.CloudKitPublicReader` 的请求构造按 Apple 公开文档实现，
-  **未经真实环境验证**。首次使用必须在 `--environment development` 下用
-  `--print-requests` 逐条核对，再考虑生产。
-- 签名算法为 `SignatureV1`（ECDSA P-256 / SHA-256，签名对象为
-  `日期:请求体` 的 UTF-8 字节）。若 Apple 侧报签名错误，优先核对
-  日期格式（`%Y-%m-%dT%H:%M:%SZ`）与请求体是否为规范化 JSON 字节。
-- 资产上传按「三步：占位 → POST 上传地址 → 带 receipt 再 modify」实现。
+- ~~`publish_adapters.CloudKitWebServicesAdapter` 与
+  `verify_publication.CloudKitPublicReader` 的请求构造**未经真实环境验证**~~
+  → **2026-09-25 已在 Development 真实环境全链路验证通过**
+  （releaseSeq=1 发布 + 读者视角回读均通过）。
+- 签名算法为 `SignatureV1`（ECDSA P-256 / SHA-256）。**签名对象是三段**
+  `[ISO8601 日期]:[base64(SHA-256(请求体))]:[URL subpath]`（2026-09-25 修正：
+  旧实现只签「日期:请求体原文」，漏了摘要 base64 与 subpath，真机必然认证失败）。
+  该算法已由 `selftest_signing.py` 离线钉死（6 项断言，含两条反向断言）。
+  若仍报签名错误，优先核对日期格式（`%Y-%m-%dT%H:%M:%SZ`，无小数秒）
+  与请求体是否为规范化 JSON 字节。
+- 资产上传现行协议（**2026-09-25 真实环境逆向 + 验证通过**，旧「modify 带
+  ASSET 占位换 uploadURL」已被 Apple 服务端拒绝）：
+
+  1. `POST assets/upload`，body =
+     `{"tokens":[{"recordType","recordName","fieldName","fileChecksum","size"}]}`，
+     `fileChecksum` = 文件 SHA-256 的 base64 → `tokens[0].url` = 单次上传地址
+  2. `POST` 文件**原始字节**（`application/octet-stream`）到该地址
+     → 响应 `{"singleFile":{"size","fileChecksum","receipt"}}`
+     ⚠️ `singleFile.fileChecksum` 是**服务器自己算的短值**（不是提交的 SHA-256），
+     receipt 尾部编码了它
+  3. `records/modify` 写记录，asset 字段 = **整个 `singleFile` 对象原样**
+     （与 cloudkit.js `consumeUploadReceipt` 行为一致）
+
+  **`bad upload receipt (did_not_validate)` 的实测根因**：第 3 步自拼
+  `{__type, receipt, fileChecksum, size}` 且 fileChecksum 用自己的 SHA-256，
+  与 receipt 内嵌的服务器校验和不一致。用服务器返回的 singleFile 原样写回即过。
+  另注意：delete 操作必须带 `recordChangeTag`（先 lookup 拿 tag）。
 
 ## 验收对照（设计 §18.1）
 
 | 验收点 | 由谁保证 |
 |---|---|
-| D09 重复 ID / 悬空关系 / 错误品牌范围 | `protocol.validate_fragment` + `validate_release_references`，在 `build_release` 与 `validate_release` 各跑一次 |
+| D09 重复 ID / 悬空关系 / 错误品牌范围 | `protocol.validate_pack_payload`（TimeHall → `validate_fragment`；商店目录 → `validate_shop_catalog`）+ `validate_release_references`，在 `build_release` 与 `validate_release` 各跑一次 |
 | D10 partial 包少记录不当作删除 | `TimeHallRepository.composeLocalFragment`（客户端侧，见 Swift 实现） |
 | D11 complete 新快照的移除是有意行为 | `build_release.diff_summary` + `validate_release --previous` 输出条目数下降提示 |
 | D12 schema 不受支持时明确拒绝 | `check_release_header` 校验 `schemaVersion` / `minimumReaderVersion` |

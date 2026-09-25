@@ -44,6 +44,8 @@ from protocol import (  # noqa: E402
     PROTOCOL_SCHEMA_VERSION,
     READER_VERSION,
     RELEASE_RECORD_NAME,
+    SHOP_CATALOG_ENTITY_TYPE,
+    SHOP_CATALOG_SCOPE,
     ProtocolError,
     canonical_json_bytes,
     compute_checked_through,
@@ -55,7 +57,8 @@ from protocol import (  # noqa: E402
     pack_record_name,
     partition_id,
     sha256_hex,
-    validate_fragment,
+    shop_catalog_entity_count,
+    validate_pack_payload,
     validate_partition_descriptor,
     validate_root_index,
 )
@@ -75,6 +78,16 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
         description="从已批准的整馆 catalog 构建时光馆不可变发布产物（不写线上）"
     )
     parser.add_argument("--input", required=True, type=Path, help="已审核的输入目录（含 catalog*.json）")
+    parser.add_argument(
+        "--shop-catalog",
+        type=Path,
+        default=None,
+        help=(
+            "商店目录 JSON（店家上新整包，时光馆「商店」内容）。"
+            "缺省时自动探测 <input>/shop-catalog.json；"
+            "来源未批准时需配合 --allow-unapproved-local-fixture"
+        ),
+    )
     parser.add_argument("--output", required=True, type=Path, help="发布产物输出目录")
     parser.add_argument(
         "--sources",
@@ -220,6 +233,83 @@ def build_pack(
     return descriptor, compressed, payload
 
 
+def build_shop_catalog_pack(
+    brand: Dict[str, Any],
+    doc: Dict[str, Any],
+    args: argparse.Namespace,
+) -> Optional[Tuple[Dict[str, Any], bytes, Dict[str, Any]]]:
+    """构建**商店目录整包分片**（唯一分片；目录没有任何实体时返回 None）。
+
+    与 TimeHall 分片的三个差别（见 protocol.py 商店目录一节）：
+      · entityType 固定 `shop-catalog`、scope 固定 `all`，不按实体类型拆包；
+      · 载荷键是 `shopCatalog`（不是 `records`）；
+      · 没有 observedAt 这类「检查上界」字段 —— complete 模式的 checkedThrough
+        只能由 --checked-through 显式给出，与既有参数约束一致。
+    """
+    # 墓碑连坐（2026-09-25 实测踩到）：运营「强制删除」商品后，其销售事件因
+    # append-only 硬约束仍保留在导出里（商品本体已从合并视图移除）。
+    # 发布包要求引用包内可解析（客户端结构校验同样拒绝悬空引用），且商品不存在
+    # 时这些事件无处渲染 —— 发布语境里是死数据。构建时剔除并**如实上报数量**，
+    # 不影响 App 本地的历史保留。
+    product_ids = {str(item.get("id")) for item in (doc.get("products") or [])}
+    orphans = [
+        event for event in (doc.get("saleEvents") or [])
+        if str(event.get("productID")) not in product_ids
+    ]
+    if orphans:
+        orphan_ids = {str(event.get("id")) for event in orphans}
+        doc = dict(doc)
+        doc["saleEvents"] = [
+            event for event in (doc.get("saleEvents") or [])
+            if str(event.get("productID")) in product_ids
+        ]
+        print(
+            "  · 商店目录：剔除 {} 条孤儿销售事件（商品已被强制删除，包内无法解析）".format(
+                len(orphans)
+            )
+        )
+        for event_id in sorted(orphan_ids):
+            print("    - {}".format(event_id))
+
+    count = shop_catalog_entity_count(doc)
+    if count == 0:
+        return None
+
+    brand_id = str(brand["brandID"])
+    pid = partition_id(brand_id, SHOP_CATALOG_ENTITY_TYPE, SHOP_CATALOG_SCOPE)
+    coverage = COVERAGE_COMPLETE if args.coverage_mode == "complete" else COVERAGE_PARTIAL
+    payload = {
+        "schemaVersion": PROTOCOL_SCHEMA_VERSION,
+        "partitionID": pid,
+        "brandID": brand_id,
+        "entityType": SHOP_CATALOG_ENTITY_TYPE,
+        "partitionRevision": 1,
+        "coverageStatus": coverage,
+        "checkedThrough": args.checked_through,
+        "dayCoverage": {},
+        "shopCatalog": doc,
+    }
+
+    raw = canonical_json_bytes(payload)
+    compressed = gzip_bytes(raw)
+    payload_hash = sha256_hex(compressed)
+
+    descriptor = {
+        "partitionID": pid,
+        "brandID": brand_id,
+        "entityType": SHOP_CATALOG_ENTITY_TYPE,
+        "partitionRevision": 1,
+        "coverageStatus": coverage,
+        "checkedThrough": args.checked_through,
+        "dayCoverage": {},
+        "packRecordName": pack_record_name(payload_hash),
+        "payloadHash": payload_hash,
+        "recordCount": count,
+        "dependencyPackRecordNames": [],
+    }
+    return descriptor, compressed, payload
+
+
 def entity_month_scope(catalog: Dict[str, Any], entity_type: str) -> Dict[str, List[Dict[str, Any]]]:
     """按 `yyyy-MM` 归组实体（仅资讯按月分包时使用）"""
     grouped: Dict[str, List[Dict[str, Any]]] = {}
@@ -340,8 +430,12 @@ def collect_issues(
     brand: Dict[str, Any], built: Tuple[Dict[str, Any], bytes, Dict[str, Any]]
 ) -> List[Dict[str, str]]:
     descriptor, compressed, payload = built
-    structural = validate_fragment(
-        payload["records"], str(brand["brandID"]), descriptor["entityType"], descriptor["coverageStatus"]
+    # 结构校验按分片类型分发：TimeHall 实体分片 vs 商店目录整包分片
+    structural = validate_pack_payload(
+        payload,
+        str(brand["brandID"]),
+        str(descriptor["entityType"]),
+        str(descriptor["coverageStatus"]),
     )
     partition_level = validate_partition_descriptor(
         descriptor, payload, len(compressed), len(canonical_json_bytes(payload))
@@ -437,13 +531,30 @@ def main(argv: Optional[List[str]] = None) -> int:
         approved = [b for b in (config.get("brands") or []) if isinstance(b, dict)]
         print("⚠️  本地联调模式：已放开未批准来源，产物会被标记为 localFixture，不可发布。")
 
+    # 商店目录（店家上新）来源：独立于画册品牌审批，见 sources.yaml 的 shopCatalog 块
+    shop_source_raw = config.get("shopCatalog")
+    shop_source: Optional[Dict[str, Any]] = (
+        shop_source_raw if isinstance(shop_source_raw, dict) and shop_source_raw else None
+    )
+    shop_catalog_approved = bool(shop_source) and (
+        str(shop_source.get("permissionStatus", "")) == "approved"
+    )
+
     print("来源审批状态：")
     for line in rejected_summary(config):
         print("  ✗ {}".format(line))
     for brand in approved:
         print("  ✓ {}（已批准）".format(brand.get("brandID")))
+    if shop_source:
+        print(
+            "  {} 商店目录（{}）：permissionStatus={}".format(
+                "✓" if shop_catalog_approved else "✗",
+                shop_source.get("brandID", "?"),
+                shop_source.get("permissionStatus", "missing"),
+            )
+        )
 
-    if not approved:
+    if not approved and not (shop_catalog_approved or (shop_source and args.allow_unapproved_local_fixture)):
         print(
             "❌ 没有任何已批准来源，按默认禁止策略不生成产物。\n"
             "   请先在 sources.yaml 中把 permissionStatus 置为 approved，"
@@ -506,6 +617,51 @@ def main(argv: Optional[List[str]] = None) -> int:
         all_packs += packs
         all_issues += issues
         built_brands.append(str(brand["brandID"]))
+
+    # ---- 商店目录（店家上新）整包分片 ----
+    if shop_source:
+        shop_input = Path(args.shop_catalog) if args.shop_catalog else args.input / "shop-catalog.json"
+        if not shop_input.exists():
+            if args.shop_catalog:
+                print("❌ --shop-catalog 指定的文件不存在：{}".format(shop_input), file=sys.stderr)
+                return 2
+            print("  · 商店目录：输入缺失 {}，跳过".format(shop_input.name))
+        elif not shop_catalog_approved and not args.allow_unapproved_local_fixture:
+            # 显式指定 --shop-catalog = 运营明确要求发布 → 未批准必须硬报错，不能静默跳过
+            print(
+                "❌ 商店目录来源未批准（permissionStatus={}）。"
+                "请先在 sources.yaml 的 shopCatalog 块批准；"
+                "本地联调请加 --allow-unapproved-local-fixture。".format(
+                    shop_source.get("permissionStatus")
+                ),
+                file=sys.stderr,
+            )
+            return 3
+        else:
+            shop_doc = json.loads(shop_input.read_text(encoding="utf-8"))
+            built_shop = build_shop_catalog_pack(shop_source, shop_doc, args)
+            if built_shop is None:
+                print("  · 商店目录：没有任何实体，跳过")
+            else:
+                descriptor, compressed, _payload = built_shop
+                all_issues += collect_issues(shop_source, built_shop)
+                partitions.append(descriptor)
+                all_packs.append((descriptor["payloadHash"], compressed))
+                print(
+                    "  · 商店目录：1 个整包分片 / {} 条 / 压缩后 {} 字节".format(
+                        descriptor["recordCount"], len(compressed)
+                    )
+                )
+                brands.append(
+                    {
+                        "brandID": str(shop_source["brandID"]),
+                        "displayName": str(shop_source["displayName"]),
+                        "sourceTimeZone": str(shop_source["sourceTimeZone"]),
+                        "sourceCoverage": str(shop_source["sourceCoverage"]),
+                        "coverageDescription": str(shop_source["coverageDescription"]),
+                    }
+                )
+                built_brands.append(str(shop_source["brandID"]))
 
     if not partitions:
         print("❌ 没有生成任何分片，已中止（不会产出空发布）", file=sys.stderr)

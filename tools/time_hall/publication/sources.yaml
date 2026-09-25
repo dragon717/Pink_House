@@ -18,6 +18,24 @@ release:
   channel: catalog-v1
   schemaVersion: 1
 
+# 店家上新 / 公共 Catalog（时光馆「商店」内容）
+#
+# 与上面的 brands 刻意分开：
+#   · 这是**运营自有内容源**，不是画册品牌 —— brandID 不能与任何画册品牌相同
+#     （根清单 brands 按 brandID 去重，共用会让两边同时发布时报重复品牌）；
+#   · 走**整包单分片**（partitionID = <brandID>/shop-catalog/all），
+#     载荷 = 合并种子与覆盖层后的完整商店目录；
+#   · 审批口径与画册品牌一致：permissionStatus 必须精确为 approved 才能发布，
+#     本地联调用 --allow-unapproved-local-fixture（产物会被标记 localFixture，
+#     禁止发往真实 CloudKit）。
+shopCatalog:
+  brandID: shaonv-xinyuan
+  displayName: 少女心愿店家上新
+  sourceTimeZone: Asia/Shanghai
+  sourceCoverage: curatedSelection
+  coverageDescription: 运营录入并发布的店家商品档案（店家 / 系列 / 商品 / 规格 / 尺码表 / 历史价格）
+  permissionStatus: approved
+
 # 单个数据包与媒体的上限，必须与客户端 TimeHallCacheLimits 对齐
 limits:
   maxPackCompressedBytes: 16777216

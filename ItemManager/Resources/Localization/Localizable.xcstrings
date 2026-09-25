@@ -48832,9 +48832,6 @@
         }
       }
     },
-    "复制整包 JSON（含覆盖层）" : {
-
-    },
     "复古" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -53546,6 +53543,9 @@
           }
         }
       }
+    },
+    "导出整包 JSON 文件（含覆盖层）" : {
+
     },
     "导出模型分享" : {
       "extractionState" : "stale",

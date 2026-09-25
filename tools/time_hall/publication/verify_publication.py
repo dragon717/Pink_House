@@ -39,7 +39,7 @@ from protocol import (  # noqa: E402
     RELEASE_RECORD_NAME,
     canonical_json_bytes,
     sha256_hex,
-    validate_fragment,
+    validate_pack_payload,
     validate_partition_descriptor,
     validate_release_references,
     validate_root_index,
@@ -134,7 +134,12 @@ class CloudKitPublicReader(PublicReader):
         self.print_requests = print_requests
 
     def _endpoint(self, path: str) -> str:
-        return "https://api.apple-cloudkit.com/database/1/{}/{}/public/{}".format(
+        return "https://api.apple-cloudkit.com{}".format(self._subpath(path))
+
+    def _subpath(self, path: str) -> str:
+        from publish_adapters import cloudkit_subpath
+
+        return cloudkit_subpath(
             self.credentials.container_id, self.credentials.environment, path
         )
 
@@ -152,7 +157,7 @@ class CloudKitPublicReader(PublicReader):
             "X-Apple-CloudKit-Request-KeyID": self.credentials.key_id,
             "X-Apple-CloudKit-Request-ISO8601Date": date_string,
             "X-Apple-CloudKit-Request-SignatureV1": sign_request(
-                date_string, body, self.credentials.private_key_pem
+                date_string, body, self.credentials.private_key_pem, self._subpath(path)
             ),
         }
         if self.print_requests:
@@ -164,11 +169,14 @@ class CloudKitPublicReader(PublicReader):
             return json.loads(response.read().decode("utf-8"))
 
     def _lookup(self, record_type: str, record_name: str) -> Optional[Dict[str, Any]]:
+        from publish_adapters import first_existing_record
+
         result = self._post(
             "records/lookup", {"records": [{"recordName": record_name, "recordType": record_type}]}
         )
-        records = result.get("records") or []
-        return records[0] if records else None
+        # CloudKit 对不存在的记录在 records 数组里返回 serverErrorCode=NOT_FOUND
+        # 的条目（不报 HTTP 错），必须过滤，否则空字段条目会被当发布头解析
+        return first_existing_record(result)
 
     def fetch_release(self) -> Optional[Dict[str, Any]]:
         record = self._lookup("THRelease", RELEASE_RECORD_NAME)
@@ -333,8 +341,8 @@ def verify(args: argparse.Namespace) -> int:
         ]
         issues += [
             dict(issue, layer="structural")
-            for issue in validate_fragment(
-                payload.get("records") or {}, brand_id, entity_type, coverage_status
+            for issue in validate_pack_payload(
+                payload, brand_id, entity_type, coverage_status
             )
         ]
         packs.append((descriptor, payload))

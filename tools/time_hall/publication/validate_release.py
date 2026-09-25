@@ -34,7 +34,7 @@ from protocol import (  # noqa: E402
     is_safe_partition_id,
     pack_record_name,
     sha256_hex,
-    validate_fragment,
+    validate_pack_payload,
     validate_partition_descriptor,
     validate_release_references,
     validate_root_index,
@@ -124,8 +124,8 @@ def verify_pack(
     ]
     issues += [
         dict(issue, layer="structural")
-        for issue in validate_fragment(
-            payload.get("records") or {},
+        for issue in validate_pack_payload(
+            payload,
             str(descriptor.get("brandID", "")),
             str(descriptor.get("entityType", "")),
             str(descriptor.get("coverageStatus", "")),

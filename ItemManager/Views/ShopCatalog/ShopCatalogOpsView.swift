@@ -34,12 +34,15 @@ struct ShopCatalogOpsView: View {
         case batchDetail(CatalogBatchEntrySession)
         /// 点草稿行进入补录编辑器
         case draftEditor(CatalogProductDraft)
+        /// 整包 JSON 导出（写临时文件后交给系统分享面板）
+        case exportFile(URL)
 
         var id: String {
             switch self {
             case .manualBatch(let batch): return "manual-\(batch.id)"
             case .batchDetail(let batch): return "batch-\(batch.id)"
             case .draftEditor(let draft): return "draft-\(draft.id)"
+            case .exportFile(let url): return "export-\(url.lastPathComponent)"
             }
         }
     }
@@ -146,6 +149,9 @@ struct ShopCatalogOpsView: View {
                 ShopCatalogBatchDetailView(draftStore: draftStore, store: store, batch: batch)
             case .draftEditor(let draft):
                 ShopCatalogDraftDetailEditor(draft: draft, draftStore: draftStore, store: store)
+            case .exportFile(let url):
+                // 系统分享面板：AirDrop 到 Mac / 存到「文件」均可
+                ShareSheet(items: [url])
             }
         }
         .confirmationDialog(batchDeleteConfirmTitle,
@@ -758,13 +764,34 @@ struct ShopCatalogOpsView: View {
     private var exportSection: some View {
         Section("导出") {
             Button {
-                if let json = draftStore.exportJSON(store: store) {
-                    UIPasteboard.general.string = json
-                    toast = "整包 JSON 已复制到剪贴板"
-                }
+                exportWholeCatalogToFile()
             } label: {
-                Label("复制整包 JSON（含覆盖层）", systemImage: "doc.on.doc")
+                Label("导出整包 JSON 文件（含覆盖层）", systemImage: "square.and.arrow.up")
             }
+        }
+    }
+
+    /// 整包导出（2026-09-25 改版）：不再复制到剪贴板——目录会越来越大，
+    /// 剪贴板既放不下也容易被后续复制的内容冲掉。改为写临时文件 +
+    /// 系统分享面板（AirDrop / 存到「文件」皆可），文件名带导出时间。
+    private func exportWholeCatalogToFile() {
+        guard let json = draftStore.exportJSON(store: store) else {
+            toast = "导出失败：商店目录尚未加载"
+            return
+        }
+        // 文件名格式：2026-09-25-14-23导出时光馆上新.json
+        // （时间用「-」不用「:」——冒号在 iOS 文件名 / iCloud Drive / AirDrop 兼容性差）
+        let formatter = DateFormatter()
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyy-MM-dd-HH-mm"
+        let name = formatter.string(from: Date()) + "导出时光馆上新.json"
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent(name)
+        do {
+            try Data(json.utf8).write(to: url, options: .atomic)
+            activeSheet = .exportFile(url)
+        } catch {
+            toast = "导出失败：\(error.localizedDescription)"
         }
     }
 }

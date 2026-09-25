@@ -311,6 +311,20 @@ checkedThrough = 最近完成检查的时刻
 
 ## 6. CloudKit 结构：首版只建三种 Record Type
 
+> **⚠️ 2026-09-25 口径勘误（以实现为准）**
+> 本节 §6.3 / §6.4 的 `THDataPack` / `THMedia` 字段名是**早期草案**，与后来落地的实现不一致。
+> 权威口径 = `docs/TIME_HALL_CLOUDKIT_CONSOLE_SETUP.md` + `tools/time_hall/publication/`（`publish_cloudkit.py` 实际写入的字段）：
+>
+> | Record Type | 实际字段 |
+> |---|---|
+> | `THDataPack` | `partitionID`(String) `releaseSeq`(Int64) `sha256`(String) `byteCount`(Int64) `asset`(Asset) |
+> | `THMedia` | `mediaKey`(String) `mimeType`(String) `sha256`(String) `byteCount`(Int64) `asset`(Asset) |
+>
+> 在 Console 建 Schema 时**必须**按上表，否则客户端 `desiredKeys` 解码失败。
+> 另：本方案发布后新增了**商店目录整包分片**（时光馆「商店」内容，entityType = `shop-catalog`，
+> brandID = `shaonv-xinyuan`，载荷键 `shopCatalog`），同样复用这三种 Record Type，
+> 详见 `tools/time_hall/publication/README.md` 的「商店目录分片」一节。
+
 ### 6.1 容器与数据库
 
 优先使用已声明的 `iCloud.bugod2.ItemManager`，调用 `publicCloudDatabase`；时光馆使用 `TH` 前缀独立 Record Type。不要复用 `Notice`、私人 `Clothing` 或 `iCloud.bugod2.SkirtMarket` 的业务 schema。[^R6][^R7][^R8]

@@ -14,8 +14,8 @@
 set -u -o pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
-CATALOG_DIR="$REPO_ROOT/ItemManager/Resources/TimeHall"
+# 本脚本**不自带也不引用**任何随 App 版本变动的资源目录：
+# 演练夹具就地生成（见「准备输入」），因此旧馆资源被移除后演练依然可跑。
 
 VERBOSE=0
 KEEP=0
@@ -116,14 +116,41 @@ echo "时光馆发布流水线 · 离线全链路演练"
 echo "python : $PY"
 echo "工作区 : $WORK"
 
-section "准备输入（用仓库内置 Bundle catalog 作为本地联调素材）"
+section "准备输入（自带联调夹具；不依赖任何随 App 版本变动的资源目录）"
 mkdir -p "$INPUT"
-if ! ls "$CATALOG_DIR"/catalog*.json >/dev/null 2>&1; then
-  echo "❌ 找不到 $CATALOG_DIR/catalog*.json" >&2
+# 历史沿革：本步骤原先直接 cp `ItemManager/Resources/TimeHall/catalog*.json`。
+# 时光馆旧馆于 d84d983d 被移除后该目录已不存在，演练卡在第一步（2026-09-25 修）。
+# 现在改为**就地生成**夹具：日期与 id 全部写死，保证同一版本下 payloadHash 可复现；
+# 夹具形状与 build_release 期望的 V3 整馆 catalog 一致（entityType -> 数组字段）。
+"$PY" - "$INPUT" <<'PYEOF'
+import json
+import sys
+from pathlib import Path
+
+target = Path(sys.argv[1]) / "catalog.json"
+# 注意：文件名必须等于 sources.yaml 中该品牌的 resourceName（pink-house -> "catalog"）。
+fixture = {
+    "version": 3,
+    "brand": "PINK HOUSE",
+    "events": [
+        {"id": "news-drill-001", "publishedOn": "2026-09-12", "title": "演练夹具：资讯一"},
+        {"id": "news-drill-002", "publishedOn": "2026-09-14", "title": "演练夹具：资讯二"},
+    ],
+    "commerceItems": [
+        {"id": "drill-item-001", "observedAt": "2026-09-12", "name": "演练夹具：商品一"},
+    ],
+    "catalogues": [
+        {"id": "drill-cat-001", "observedAt": "2026-09-14", "name": "演练夹具：目录一"},
+    ],
+}
+target.write_text(json.dumps(fixture, ensure_ascii=False, indent=2), encoding="utf-8")
+print("  已生成夹具 {}".format(target))
+PYEOF
+if ! ls "$INPUT"/catalog*.json >/dev/null 2>&1; then
+  echo "❌ 夹具生成失败，无法继续演练" >&2
   exit 1
 fi
-cp "$CATALOG_DIR"/catalog*.json "$INPUT"/
-echo "  已复制 $(ls "$INPUT" | wc -l | tr -d ' ') 个 catalog 文件"
+echo "  已准备 $(ls "$INPUT" | wc -l | tr -d ' ') 个 catalog 文件"
 
 section "阶段 1 · 构建与校验产物"
 run "构建发布产物（releaseSeq=1，localFixture）" 0 \
@@ -224,6 +251,78 @@ run "回读确认回滚后的版本" 0 \
   "$PY" "$SCRIPT_DIR/verify_publication.py" --adapter filesystem --filesystem-root "$LIVE2"
 assert "发布号已推进到 5" "线上 releaseSeq 已递增" \
   bash -c "grep -q '\"releaseSeq\"[^0-9]*5' '$LIVE2/THRelease.json'"
+
+section "阶段 6 · 商店目录整包分片（时光馆「商店」内容 / 店家上新）"
+# 商店目录走整包单分片：entityType=shop-catalog、brandID=shaonv-xinyuan（运营自有内容源，
+# 不与画册品牌共用 —— 根清单 brands 按 brandID 去重）。夹具自洽：引用全部包内可解析。
+SHOP_FIXTURE="$WORK/shop-catalog.json"
+SHOP_BAD="$WORK/shop-catalog-dangling.json"
+"$PY" - "$SHOP_FIXTURE" "$SHOP_BAD" <<'PYEOF'
+import json
+import sys
+from pathlib import Path
+
+good = {
+    "version": 1,
+    "shops": [{"id": "shop-drill", "name": "演练店家"}],
+    "series": [
+        {"id": "series-drill", "shopID": "shop-drill", "name": "2026 秋冬", "year": 2026, "month": 9}
+    ],
+    "products": [
+        {
+            "id": "product-drill",
+            "shopID": "shop-drill",
+            "seriesID": "series-drill",
+            "name": "演练商品",
+            "category": "JSK",
+        }
+    ],
+    "variants": [{"id": "variant-drill", "productID": "product-drill", "color": "黑", "size": "M"}],
+    "saleEvents": [
+        {
+            "id": "event-drill",
+            "productID": "product-drill",
+            "type": "reservation",
+            "price": 1280,
+            "deposit": 300,
+            "balance": 980,
+            "currency": "CNY",
+        }
+    ],
+}
+# 反例：商品指向包内不存在的系列 → 结构校验必须拒绝
+bad = json.loads(json.dumps(good))
+bad["products"][0]["seriesID"] = "series-missing"
+
+Path(sys.argv[1]).write_text(json.dumps(good, ensure_ascii=False, indent=2), encoding="utf-8")
+Path(sys.argv[2]).write_text(json.dumps(bad, ensure_ascii=False, indent=2), encoding="utf-8")
+PYEOF
+
+RELEASE_SHOP="$WORK/release-shop"
+LIVE_SHOP="$WORK/live-shop"
+
+run "构建含商店目录的发布产物" 0 \
+  "$PY" "$SCRIPT_DIR/build_release.py" \
+    --input "$INPUT" --shop-catalog "$SHOP_FIXTURE" --output "$RELEASE_SHOP" \
+    --release-seq 1 --allow-unapproved-local-fixture
+assert "根清单含商店目录分片" "shaonv-xinyuan/shop-catalog/all 已声明" \
+  bash -c "grep -q 'shaonv-xinyuan/shop-catalog/all' '$RELEASE_SHOP/root-index.json'"
+assert "商店分片记录数正确" "recordCount = 5（店家/系列/商品/规格/销售记录）" \
+  bash -c "grep -q '\"recordCount\":5' '$RELEASE_SHOP/root-index.json'"
+
+run "校验含商店目录的产物" 0 \
+  "$PY" "$SCRIPT_DIR/validate_release.py" --release "$RELEASE_SHOP" --quiet
+run "发布含商店目录的产物（filesystem）" 0 \
+  "$PY" "$SCRIPT_DIR/publish_cloudkit.py" \
+    --release "$RELEASE_SHOP" --adapter filesystem --filesystem-root "$LIVE_SHOP" \
+    --apply --quiet
+run "读者回读含商店目录的线上内容" 0 \
+  "$PY" "$SCRIPT_DIR/verify_publication.py" --adapter filesystem --filesystem-root "$LIVE_SHOP"
+
+run "商店目录悬空引用应被拒绝" 5 \
+  "$PY" "$SCRIPT_DIR/build_release.py" \
+    --input "$INPUT" --shop-catalog "$SHOP_BAD" --output "$WORK/release-bad" \
+    --release-seq 1 --allow-unapproved-local-fixture
 
 section "结果"
 echo "  通过 $PASS 项，失败 $FAIL 项"
