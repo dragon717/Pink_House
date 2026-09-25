@@ -260,11 +260,16 @@ public nonisolated enum ShopCatalogPublicationGate {
         }
     }
 
-    // MARK: 引用遍历（与 build_release.py 的 rewrite 覆盖面一一对应）
+    // MARK: 引用遍历（字段清单唯一来源见 ShopCatalogMediaReferences）
 
-    /// 走遍目录里所有可能承载图片引用的字段。
+    /// 走遍目录里所有可能承载图片引用的字段，逐条给出判定。
     ///
-    /// ⚠️ 新增字段时必须同步这里 **和** `build_release.py:collect_shop_catalog_media`，
+    /// 字段清单**不在这里**：它只有一处定义 —— `ShopCatalogMediaReferences.all(in:)`，
+    /// 与 iOS 改写端 `ShopCatalogOpsMediaStaging.rewrite`、Python 发布端
+    /// `build_release.collect_shop_catalog_media` 共用同一份。
+    /// 这里只负责「按 `stagedFileNames` 判解不解得出图」。
+    ///
+    /// ⚠️ 新增图片字段时改 `ShopCatalogMediaReferences`，**不是**改这里；
     /// 漏一边就会出现「本地看着有图、发布后没图」。
     ///
     /// - Parameter stagedFileNames: staging 目录里现有的文件名集合。
@@ -274,82 +279,17 @@ public nonisolated enum ShopCatalogPublicationGate {
         assetIDs: Set<String>,
         stagedFileNames: Set<String>
     ) -> [ShopCatalogMediaReferenceFinding] {
-        var results: [ShopCatalogMediaReferenceFinding] = []
-
-        func resolve(
-            _ owner: String, _ reference: String, allowsAssetID: Bool
-        ) {
-            let trimmed = reference.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !trimmed.isEmpty else { return }
-            results.append(ShopCatalogMediaReferenceFinding(
-                owner: owner,
+        ShopCatalogMediaReferences.all(in: catalog).map { reference in
+            let trimmed = reference.reference.trimmingCharacters(in: .whitespacesAndNewlines)
+            return ShopCatalogMediaReferenceFinding(
+                owner: reference.owner,
                 reference: trimmed,
                 resolution: resolveReference(
                     trimmed,
                     assetIDs: assetIDs,
-                    allowsAssetID: allowsAssetID,
-                    stagedFileNames: stagedFileNames)))
+                    allowsAssetID: reference.allowsAssetID,
+                    stagedFileNames: stagedFileNames))
         }
-
-        // 1) 图片资源本体：三个 URL 字段
-        //
-        // ⚠️ 这里**刻意不读** `CatalogAsset.mediaKey`。发布路径上的事实来源是
-        // **URL**：`build_release.py:collect_shop_catalog_media` 会把 `local:`
-        // 改写成 `thmedia:<hash>`，媒体键是「改写后 URL」的派生结果，不是独立输入。
-        // 而且 `mediaKey` 字段目前由并行的另一条改动线在加，共享层不依赖它 ——
-        // 依赖会让「字段还没落地」变成共享包编不过。
-        for asset in catalog.assets {
-            let owner = "图片资源 \(asset.id)"
-            for (label, value) in [
-                ("原图", asset.originalURL),
-                ("预览图", asset.previewURL),
-                ("缩略图", asset.thumbnailURL),
-            ] {
-                if let value { resolve("\(owner) / \(label)", value, allowsAssetID: false) }
-            }
-        }
-
-        // 2) 店家 logo / 封面
-        for shop in catalog.shops {
-            if let logo = shop.logo { resolve("店家「\(shop.name)」/ 图标", logo, allowsAssetID: true) }
-            if let cover = shop.cover { resolve("店家「\(shop.name)」/ 封面", cover, allowsAssetID: true) }
-        }
-
-        // 3) 系列封面 / 价格表原图
-        for series in catalog.series {
-            if let cover = series.cover {
-                resolve("系列「\(series.name)」/ 封面", cover, allowsAssetID: true)
-            }
-            if let chart = series.priceChart {
-                if let source = chart.sourceImage {
-                    resolve("系列「\(series.name)」/ 价格表原图", source, allowsAssetID: true)
-                }
-                for (index, source) in (chart.sourceImages ?? []).enumerated() {
-                    resolve("系列「\(series.name)」/ 价格表原图 \(index + 1)", source, allowsAssetID: true)
-                }
-            }
-        }
-
-        // 4) 尺码表原图
-        for chart in catalog.sizeCharts {
-            if let source = chart.sourceImage {
-                resolve("尺码表 \(chart.id) / 原图", source, allowsAssetID: true)
-            }
-        }
-
-        // 5) 商品图（存的是 CatalogAsset id）与规格图绑定
-        for product in catalog.products {
-            for assetID in product.images {
-                resolve("商品「\(product.name)」/ 商品图", assetID, allowsAssetID: true)
-            }
-        }
-        for variant in catalog.variants {
-            if let assetID = variant.imageAssetID {
-                resolve("规格 \(variant.id) / 规格图", assetID, allowsAssetID: true)
-            }
-        }
-
-        return results
     }
 
     /// 单个引用的判定。`allowsAssetID = false` 用于「本来就是 URL」的字段

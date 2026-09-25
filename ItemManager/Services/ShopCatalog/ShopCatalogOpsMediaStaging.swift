@@ -76,8 +76,8 @@ nonisolated struct ShopCatalogOpsStagedMedia: Equatable, Sendable {
 
 nonisolated enum ShopCatalogOpsMediaStaging {
 
-    /// 引用前缀 `local:`
-    static let localReferencePrefix = "local:"
+    /// 引用前缀 `local:`（取自共享层，避免各处再写字面量）
+    static let localReferencePrefix = ShopCatalogMediaReferences.localPrefix
 
     // MARK: 扫描 + 暂存
 
@@ -107,9 +107,9 @@ nonisolated enum ShopCatalogOpsMediaStaging {
 
         for item in ownedReferences(in: catalog) {
             guard item.reference.hasPrefix(localReferencePrefix) else { continue }
-            let fileName = String(item.reference.dropFirst(localReferencePrefix.count))
-                .trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !fileName.isEmpty, !fileName.contains("/"), !fileName.hasPrefix(".") else {
+            // 文件名口径走共享层：空名 / 含 `/` / `.` 开头一律按「没有这个文件」处理，
+            // 与发布端 `collect_shop_catalog_media` 的 rewrite 同一判定。
+            guard let fileName = ShopCatalogMediaReferences.localFileName(in: item.reference) else {
                 throw ShopCatalogOpsMediaStagingError.fileMissing(item.reference)
             }
             guard let url = resolveFile(item.reference) else {
@@ -226,57 +226,33 @@ nonisolated enum ShopCatalogOpsMediaStaging {
         return rewritten
     }
 
-    // MARK: 引用枚举（与 Mac 端 `_shop_media_references` 必须逐字段一致）
+    // MARK: 引用枚举（**字段清单唯一来源在共享包**）
 
-    /// 目录里所有图片引用的位置。字段清单与发布端 `build_release.collect_shop_catalog_media`
-    /// 的改写清单**必须保持一致**：一边改写、另一边不认识，就会出现「改写了却没上传」
-    /// 或「上传了却没校验」。
+    /// 目录里所有「发布端会改写」的图片引用。
+    ///
+    /// 字段清单**不在这里**：它只有一处定义 —— `ShopCatalogMediaReferences.all(in:)`
+    /// （计划 §6 P4：「不要同时让 Python CLI、iOS App、Mac App 各自定义一套发布格式」）。
+    /// 与 Mac 门禁 `ShopCatalogPublicationGate`、Python 发布端
+    /// `build_release.collect_shop_catalog_media` 共用同一份。
+    ///
+    /// 只取 `isRewrittenByPublisher` 那一批：`products.images` /
+    /// `variants.imageAssetID` 存的是 `CatalogAsset.id` 而不是文件，改写它们会把
+    /// 资源 id 换成内容摘要，商品图直接丢。
     static func ownedReferences(in catalog: ShopCatalog) -> [ShopCatalogOpsMediaOwner] {
-        var found: [ShopCatalogOpsMediaOwner] = []
-
-        func push(productID: String, assetID: String, field: String, value: String?) {
-            guard let value, !value.isEmpty else { return }
-            found.append(ShopCatalogOpsMediaOwner(
-                productID: productID, assetID: assetID, field: field, reference: value))
+        ShopCatalogMediaReferences.publisherRewritten(in: catalog).map { reference in
+            ShopCatalogOpsMediaOwner(
+                productID: reference.productID,
+                assetID: reference.entityID,
+                field: reference.field,
+                reference: reference.reference)
         }
-
-        for asset in catalog.assets {
-            for (key, value) in [
-                ("assets.originalURL", asset.originalURL),
-                ("assets.thumbnailURL", asset.thumbnailURL),
-                ("assets.previewURL", asset.previewURL),
-            ] {
-                push(productID: "", assetID: asset.id, field: key, value: value)
-            }
-        }
-        for shop in catalog.shops {
-            push(productID: "", assetID: shop.id, field: "shops.logo", value: shop.logo)
-            push(productID: "", assetID: shop.id, field: "shops.cover", value: shop.cover)
-        }
-        for series in catalog.series {
-            push(productID: "", assetID: series.id, field: "series.cover", value: series.cover)
-            if let chart = series.priceChart {
-                push(productID: "", assetID: series.id,
-                     field: "series.priceChart.sourceImage", value: chart.sourceImage)
-                for (index, one) in (chart.sourceImages ?? []).enumerated() {
-                    push(productID: "", assetID: series.id,
-                         field: "series.priceChart.sourceImages[\(index)]", value: one)
-                }
-            }
-        }
-        for chart in catalog.sizeCharts {
-            push(productID: chart.productID, assetID: chart.id,
-                 field: "sizeCharts.sourceImage", value: chart.sourceImage)
-        }
-        return found
     }
 
-    /// `local:<文件名>` → 文件名（非本地引用返回 nil）
+    /// `local:<文件名>` → 文件名（非本地引用 / 名字不合法返回 nil）。
+    ///
+    /// 委托给共享口径，避免这里再维护一套「什么算合法的本地文件名」：
+    /// 发布端 Python 也会拒绝空名、含 `/`、以及 `.` 开头的名字。
     static func localFileName(in reference: String?) -> String? {
-        guard let reference, reference.hasPrefix(localReferencePrefix) else { return nil }
-        let name = String(reference.dropFirst(localReferencePrefix.count))
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !name.isEmpty, !name.contains("/") else { return nil }
-        return name
+        ShopCatalogMediaReferences.localFileName(in: reference)
     }
 }
