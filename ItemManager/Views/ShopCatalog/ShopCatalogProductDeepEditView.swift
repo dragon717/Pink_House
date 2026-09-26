@@ -97,17 +97,21 @@ struct ShopCatalogProductDeepEditView: View {
 
     private var productInfoSection: some View {
         Section {
-            TextEditor(text: $imagesText)
-                .frame(minHeight: 60)
-                .font(.system(size: 13))
+            // 2026-09-26 需求：商品图片直接渲染为缩略图网格（每张可移除），
+            // 不再以「每行一个文件名」的文本形式列出。载体仍是换行文本绑定，
+            // 保存口径（原位复用 asset id / 图文绑定）不变。
+            if !imagesText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                ShopCatalogMultiImagePreview(referencesText: $imagesText,
+                                             showsReferenceCaption: true)
+            }
             ShopCatalogImagePickerButton(mode: .append, text: $imagesText, label: "添加商品图片")
-            Text("图片：每行一个 Bundle 文件名或 http(s) 链接；originalURL 未变的行自动复用原图片资源（规格绑定与用户端缓存不断链）；也可点上方按钮从相册选图自动入库")
+            Text("图片从相册选入后自动入库并渲染为缩略图；也可用「粘贴文本录入」按每行一个文件名/URL 录入")
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)
             TextEditor(text: $variantsText)
                 .frame(minHeight: 60)
                 .font(.system(size: 13))
-            Text("配色尺码：每行「颜色,尺码[,图片]」，一侧可留空；第三段填图片行同一文件名/URL 即完成图文绑定")
+            Text("配色尺码：每行「颜色,尺码[,图片]」，一侧可留空；第三段填图片下方标注的引用（点引用可复制）即完成图文绑定")
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)
             // 2026-09-23 需求 M：整段文本粘贴录入，别让用户在这两个框里一点点手敲
@@ -123,7 +127,12 @@ struct ShopCatalogProductDeepEditView: View {
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)
             TextField("单位（cm）", text: $chartUnit)
-            TextField("尺码表原图（文件名/URL）", text: $chartImageText)
+            // 2026-09-26 需求：尺码表原图渲染为缩略图，不再显示文件名文本
+            if !chartImageText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                ShopCatalogSingleImagePreview(reference: chartImageText) {
+                    chartImageText = ""
+                }
+            }
             ShopCatalogImagePickerButton(mode: .replace, text: $chartImageText, label: "添加尺码表原图")
             Text("此处只登记**本商品**的尺码表原图；预约价格表归属系列（一张表全系列共用），上传入口在「实体管理 → 系列 → 编辑」，不要填在这里，否则尺码表卡会显示成价格表。")
                 .font(.system(size: 11))

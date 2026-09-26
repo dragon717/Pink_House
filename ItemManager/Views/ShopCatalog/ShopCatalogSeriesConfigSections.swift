@@ -392,7 +392,12 @@ struct ShopCatalogSeriesConfigSections: View {
 
     private var visualSection: some View {
         Section {
-            TextField("封面（Bundle 文件名/URL，可空）", text: $form.cover)
+            // 2026-09-26 需求：封面直接渲染缩略图，不再显示「local:xxx.jpg」文件名文本
+            if !form.cover.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                ShopCatalogSingleImagePreview(reference: form.cover) {
+                    form.cover = ""
+                }
+            }
             ShopCatalogImagePickerButton(mode: .replace, text: $form.cover, label: "添加封面图片")
             TextField("简介", text: $form.descriptionText)
         } header: {
@@ -412,6 +417,11 @@ struct ShopCatalogSeriesConfigSections: View {
             ShopCatalogImagePickerButton(mode: .append,
                                          text: $form.priceChartImageText,
                                          label: "上传价格表图片（可多选）")
+            // 2026-09-26 需求：已上传的价格表图渲染为缩略图（每张可单独移除）
+            if !form.priceChartImageText
+                .trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                ShopCatalogMultiImagePreview(referencesText: $form.priceChartImageText)
+            }
             ShopCatalogChartPasteButton(kind: .priceChart,
                                         columnsText: $form.priceChartColumnsText,
                                         rowsText: $form.priceChartRowsText)

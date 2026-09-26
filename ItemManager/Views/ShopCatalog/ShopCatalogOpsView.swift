@@ -1338,7 +1338,12 @@ struct ShopCatalogDraftDetailEditor: View {
                     }
                 }
             TextField("单位（cm）", text: $chartUnit)
-            TextField("尺码表原图（文件名/URL）", text: $chartImageText)
+            // 2026-09-26 需求：尺码表原图渲染为缩略图，不再显示文件名文本
+            if !chartImageText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                ShopCatalogSingleImagePreview(reference: chartImageText) {
+                    chartImageText = ""
+                }
+            }
             ShopCatalogImagePickerButton(mode: .replace, text: $chartImageText, label: "添加尺码表原图")
         } header: {
             Text("款式公共资料（同款共用，只需填一次）")

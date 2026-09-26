@@ -1282,9 +1282,18 @@ private struct ShopCatalogShopEditSheet: View {
                     TextField("别名（逗号分隔）", text: $aliases)
                 }
                 Section("视觉与简介") {
-                    TextField("Logo（Bundle 文件名/URL，可空）", text: $logo)
+                    // 2026-09-26 需求：Logo / 封面渲染为缩略图，不再显示文件名文本
+                    if !logo.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        ShopCatalogSingleImagePreview(reference: logo, height: 110) {
+                            logo = ""
+                        }
+                    }
                     ShopCatalogImagePickerButton(mode: .replace, text: $logo, label: "添加 Logo 图片")
-                    TextField("封面（Bundle 文件名/URL，可空）", text: $cover)
+                    if !cover.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        ShopCatalogSingleImagePreview(reference: cover) {
+                            cover = ""
+                        }
+                    }
                     ShopCatalogImagePickerButton(mode: .replace, text: $cover, label: "添加封面图片")
                     TextField("简介", text: $descriptionText)
                 }

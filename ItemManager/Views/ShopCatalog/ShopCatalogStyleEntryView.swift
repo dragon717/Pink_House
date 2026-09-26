@@ -201,6 +201,12 @@ struct ShopCatalogStyleEntrySheet: View {
                     }
                 }
             TextField("单位（cm）", text: $chartUnit)
+            // 2026-09-26 需求：尺码表原图渲染为缩略图，不再显示文件名文本
+            if !chartImageText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                ShopCatalogSingleImagePreview(reference: chartImageText) {
+                    chartImageText = ""
+                }
+            }
             ShopCatalogImagePickerButton(mode: .replace, text: $chartImageText, label: "添加尺码表原图")
 
             priceRows
@@ -299,11 +305,12 @@ struct ShopCatalogStyleEntrySheet: View {
                         }
                     }
                     ShopCatalogImagePickerButton(mode: .replace, text: entry.imageRef, label: "选择配色图")
+                    // 2026-09-26 需求：配色图直接渲染缩略图，不再显示引用文件名文本
                     if !entry.wrappedValue.imageRef.isEmpty {
-                        Text(entry.wrappedValue.imageRef)
-                            .font(.system(size: 11))
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
+                        ShopCatalogSingleImagePreview(reference: entry.wrappedValue.imageRef,
+                                                      height: 110) {
+                            entry.wrappedValue.imageRef = ""
+                        }
                     }
                     sizeChips(for: entry)
                 }
@@ -671,6 +678,12 @@ struct ShopCatalogStyleProfileEditor: View {
                             }
                         }
                     TextField("单位（cm）", text: $chartUnit)
+                    // 2026-09-26 需求：尺码表原图渲染为缩略图，不再显示文件名文本
+                    if !chartImageText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        ShopCatalogSingleImagePreview(reference: chartImageText) {
+                            chartImageText = ""
+                        }
+                    }
                     ShopCatalogImagePickerButton(mode: .replace, text: $chartImageText, label: "添加尺码表原图")
                 } header: {
                     Text("款式尺码表（全款共享）")
