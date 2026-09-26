@@ -225,7 +225,9 @@ struct OpsPreviewView: View {
 
     private func labelled(_ label: String, value: String) -> some View {
         VStack(alignment: .leading, spacing: 1) {
-            Text(label).font(.caption2).foregroundStyle(.secondary)
+            // `label` 是界面文案（预约价 / 现货价 / 差价…），过 opsMarkdown；
+            // `value` 是**数据**（金额、引用原文），必须逐字渲染 —— 不能解析 Markdown。
+            opsMarkdown(label).font(.caption2).foregroundStyle(.secondary)
             Text(value).font(.caption).lineLimit(1)
         }
     }
@@ -270,7 +272,8 @@ struct OpsPreviewView: View {
     private var disclaimerCard: some View {
         OpsCard(title: "这个预览不代表最终效果", systemImage: "exclamationmark.bubble") {
             VStack(alignment: .leading, spacing: 8) {
-                Text("· 不套 `ThemeSkin` 主题皮肤，也没有 iOS 端的同款颜色分组、"
+                // 拼接结果 = String 变量 → 必须过 `opsMarkdown`（单字面量才自动解析 Markdown）
+                opsMarkdown("· 不套 `ThemeSkin` 主题皮肤，也没有 iOS 端的同款颜色分组、"
                      + "尺码表共享、发售阶段「读取时推导」等展示逻辑；\n"
                      + "· 系列这里只显示**运营声明的**阶段（`salePhase`）；"
                      + "iOS 端还会按当前时间推导生效阶段（预约中 → 预约已结束 → 尾款中）；\n"

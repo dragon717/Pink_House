@@ -41,13 +41,68 @@ catalog*.json（已审核输入）
 | `validate_release.py` | 校验产物（发布者自检） | 无第三方依赖 |
 | `publish_adapters.py` | 发布适配层：`filesystem`（演练）/ `cloudkit`（真实） | cloudkit 需 `cryptography` |
 | `selftest_signing.py` | CloudKit SignatureV1 请求签名离线自检（已知答案 + 反向断言） | cloudkit 需 `cryptography` |
+| `selftest_cloudkit_read.py` | ⭐ **CloudKit 适配器读/写闸门离线回归锁**：`apply=False`（dry-run / 基线核对）时**读必须真的发出**、**写必须一个请求都不发** | 无第三方依赖（不签名、不联网） |
 | `publish_cloudkit.py` | 发布主入口（固定 7 步顺序） | 同上 |
 | `verify_publication.py` | 读者视角回读验证 | 同上 |
 | `rollback_release.py` | 回滚：历史内容 + 新更高发布号 | 无第三方依赖 |
+| `ops_publish_bridge.py` | **运营工作台（Mac App）↔ 流水线的机器可读入口**：只读一个冻结请求 JSON，吐 NDJSON 事件流。发布算法一行都不重实现（全部子进程透传）。四种模式：`baseline` / `publish` / `query` / **`pull-catalog`（只读回读线上商店目录）** | 无第三方依赖 |
+| `drill_bridge_offline.py` | 上面那个桥接器的离线全链路演练（基线只读 / 拉回基线 / 演练 / 发布 / 结果查询 / **R07 过期基线闸门** / 七类拒绝路径） | 无第三方依赖 |
+| `drill_offline.sh` | 发布流水线自身的离线全链路演练 | 无第三方依赖 |
+
+## 运行环境（`cryptography` 与仓库内的 `.venv`）
+
+`filesystem` 演练、以及桥接器本身**不需要任何第三方依赖**，系统 `python3` 就能跑。
+但**真打 CloudKit** 的路径（`publish_cloudkit.py --adapter cloudkit`、`selftest_signing.py`、
+以及桥接器的 `--mode baseline`）需要 `cryptography` 做 SignatureV1 签名。
+
+⚠️ **2026-09-27 实测：系统 `python3`（3.9.6）与用户级 site-packages 都没有它**，
+且候选列表里的 `/opt/homebrew/bin/python3`、`/usr/local/bin/python3` **在本机并不存在**
+（候选实际只剩 `/usr/bin/python3`）。所以仓库里固定放一个 venv：
+
+```bash
+cd tools/time_hall/publication
+/usr/bin/python3 -m venv .venv
+.venv/bin/python -m pip install cryptography
+.venv/bin/python selftest_signing.py           # 期望：通过 6 项，失败 0 项
+.venv/bin/python selftest_cloudkit_read.py     # 期望：通过 18 项，失败 0 项
+```
+
+**为什么 venv 必须放在仓库里**（不能是 `~/.venv`，也不能 `pip install --user`）：
+Mac 运营工具是**沙盒 App**，它只能读到自己被显式授权的那一个目录
+（用户在选择面板里选过之后生成的 security-scoped bookmark）。
+仓库目录就在授权范围内；`~` 下、`/Library/Python` 都不在 —— 放别处会让
+「App 驱动的发布」必然报「找不到解释器」，而错误信息看起来像配置写错了。
+该目录已加入 `.gitignore`。
+
+## ⭐ 一条不能破的不变量：**读必须无视 dry-run，写必须被 dry-run 拦住**
+
+`CloudKitWebServicesAdapter` 的 `apply=False` 语义是「**不许写**」，不是「不许联网」。
+这两者一旦混淆，就会产生**静默的错误结论**（2026-09-27 实测踩到）：
+
+CloudKit 连 `records/lookup` 这种**读**操作也用 POST 动词，早先的实现在**传输层**
+一刀切 `if not self.apply: return {}`，于是读被一起挡掉。而桥接器的
+`--mode baseline`（R07 只读基线核对）**恒为 `apply=False`**，后果是：
+
+    线上明明有 releaseSeq=1，App 却被告知「线上尚无商店发布头（本次将是首次发布）」
+
+更麻烦的是**离线演练抓不到**：`FilesystemAdapter` 的读不走 `apply` 判定，
+所以 `drill_offline.sh` / `drill_bridge_offline.py` 全绿。
+
+现行分工（改代码时不要合并回去）：
+
+| 方法 | 用途 | `apply=False` 时 |
+|---|---|---|
+| `_send` | **读**（`records/lookup`）、以及写操作的底层传输 | **照发** |
+| `_post` | **写路径**入口（`_modify_with_asset` 三步里的第 1/3 步） | 静默返回 `{}` |
+| `_upload_file` | 资产字节上传 | 静默返回 `{}` |
+
+回归锁是 `selftest_cloudkit_read.py`（18 项，含**反向断言**：把 `_post` 换成必然抛异常的桩，
+读仍须成功 —— 防止两条路又被合并）。它注入 `http_post` 传输层，所以
+**不联网、不需要凭证、也不需要 `cryptography`**。
 
 ## 快速演练（不需要凭证、不联网）
 
-**最省事的方式：一条命令跑完全链路 28 项断言。**
+**最省事的方式：一条命令跑完全链路 34 项断言。**
 
 ```bash
 cd /Users/sangyu/develop/Pink_House
@@ -55,7 +110,82 @@ bash tools/time_hall/publication/drill_offline.sh
 ```
 
 覆盖：构建 → 自检 → dry-run 无副作用 → 发布 → 回读 → 4 条拒绝路径（重复发布号 / 回滚号不递增 / localFixture 发 CloudKit / 篡改分片）→ 回滚 → 再发布 → **商店目录整包分片（含悬空引用拒绝）**。
-成功标志是 `通过 28 项，失败 0 项`。加 `--verbose` 看每步完整输出，加 `--keep` 保留工作目录与日志。
+成功标志是 `通过 34 项，失败 0 项`。加 `--verbose` 看每步完整输出，加 `--keep` 保留工作目录与日志。
+
+### 运营桥接协议（`ops_publish_bridge.py`）单独也有一份演练
+
+Mac 工作台走的是**桥接器**这条入口（不是直接调 `build_release.py`）。它自己有一份 49 项断言：
+
+```bash
+cd /Users/sangyu/develop/Pink_House
+python3 tools/time_hall/publication/drill_bridge_offline.py
+```
+
+覆盖：R07 基线只读核对（且**不产生副作用**）→ **拉回线上基线**（只读；线上是空的时如实说「没有可拉回的」、且**不产出** `shop-catalog.json`）→ 演练 dry-run（**不留线上副作用、结论绝不是 confirmed**）→ 发布到本机目录 → 回读确认（`readBackConfirmed`）→ R09 结果查询 → **R07 过期基线闸门（5 例）** → 七类拒绝路径：
+
+| 反例 | 期望退出码 | 断言的可读结论 |
+|---|---|---|
+| 归档在冻结后被改动 | 3 | 「摘要与请求不一致」，而不是笼统失败 |
+| `development` + `filesystem` 错配 | 2 | 点名环境/适配器，**不静默降级** |
+| 协议版本不符 | 2 | 提示更新 App |
+| 缺必填字段 | 2 | 带出字段名 |
+| 同一发布号重发 | 5 | 冲突类结论，不当成功 |
+| 缺图 | 3 | 「产物要修」，而不是可重试的网络失败 |
+| 线上无发布头时查询 | 0 | 结论 = **没有生效**（绝不把「没读到」当「已确认」），且 `retryable=true` |
+
+成功标志是 `通过 49 项，失败 0 项`。
+
+> 这条演练的存在理由：桥接器是「App 以为发出去了」与「线上真的变了」之间**唯一**的接缝。
+> 它一旦静默退化成「界面停在『上传中』」，看起来会像网络问题。
+
+#### ⭐ R07 的过期基线闸门（发布前、构建之前）
+
+`build_release.py` 只从**本地**已批准来源构建，**从不读线上**。所以拿一份旧导出去发布，
+会把线上后来的改动**整块覆盖** —— 而产物本身是合法完整的，线上看不出来。
+
+在补这条闸门之前，桥接器**一次都没有**读过 `baseReleaseSeq` / `baseRootIndexHash` /
+`baselineAcknowledged`：App 把它们写进请求，接收方完全不看。典型的「字段传了但没人用，
+看起来做了、实际没做」。现在 `run_publish` 在**构造产物之前**先比对：
+
+| 草稿记录的基线 | 线上 | 结论 |
+|---|---|---|
+| 空（两个字段都没填） | 任意 | 不一致：无法证明这份内容基于线上当前版本 |
+| 有 | 无发布头 | 不一致：草稿基于某个版本，线上却什么都没有 |
+| 发布号不同 | — | 不一致 |
+| 根清单摘要不同 | — | 不一致（**这是比发布号更强的那一条**） |
+| 线上摘要读不到 | — | 不一致：拿不到证据就不能当一致（只比发布号会漏判） |
+| 全一致 | — | 一致 |
+
+不一致且 `baselineAcknowledged` 不为真 → **退出码 5（冲突）+ 结论里点名「基线已过期」**，
+并提示「先读取线上基线回填，或先从线上拉回基线重建本地内容」。
+`baselineAcknowledged` 是 R07 给的**唯一显式出口**：它不是「检查通过」，只是「已留痕的例外」——
+放行时必须原样打 `warning`，绝不静默。**dry-run 也走同一判定**（演练不该绕过过期检测）。
+
+#### ⭐ `--mode pull-catalog`：只读把线上商店目录整份拉回
+
+方案 §5 要求发布 = 「**当前线上完整基线** + 变更集 → 合成完整 Catalog，保留未改动内容」。
+但在此之前 App 只有「导入 JSON」：基线**内容**全靠人手导出 / 导入，与线上是什么关系没有依据。
+
+```bash
+python3 ops_publish_bridge.py --mode pull-catalog --request request.json
+# 产物：<outputDirectory>/shop-catalog.json  +  pull-manifest.json
+# 事件：{"type":"catalog","path":"…","releaseSeq":N,"rootIndexHash":"…","payloadHash":"…","itemCounts":{…}}
+```
+
+四道**拿不到证据就不拉**的自证：① 根清单字节的 SHA-256 必须等于发布头的 `rootIndexHash`；
+② 分片必须按 `entityType == "shop-catalog"` 找，**不猜 `partitionID`**；
+③ 分片字节的 SHA-256 必须等于其 `payloadHash`；④ 只认**唯一一个**商店分片 ——
+多于一个说明口径被改过，此时静默取第一个只会拿到半份目录，**宁可中止**。
+
+线上确实没有发布头 / 没有商店分片时返回 **`EXIT_OK`** 并如实说明「线上是空的、
+本地内容不是从线上来的」—— 那是**事实**，不是失败；此时**不产出** `shop-catalog.json`
+（产出一份空目录会被当成「拉回了一份空目录」，正好是反的）。
+
+⚠️ 拉回的是**已下发口径**，必须显式告知、不能静默：
+`strip_archived_shop_catalog` 已剔除归档条目与孤儿销售事件，
+`collect_shop_catalog_media` 把 `local:` 引用改写成了 `thmedia:<内容摘要>`。
+所以拉回的内容**不含归档条目**、**图片没有本地文件**。这不是缺陷，是「下发给用户的
+东西」的定义 —— 但把它当「完整备份」用会出错。
 
 如果你想逐步手动跑、观察每一步之间发生了什么，用下面的分步版本：
 
@@ -211,6 +341,9 @@ python3 verify_publication.py --adapter cloudkit --environment development
 
 **为什么整包不拆分**：「商品 → 系列 → 店家」「规格 / 销售记录 / 尺码表 → 商品」是强引用，
 拆包会让引用跨包悬空、客户端必须一次取齐 8 个包才能渲染；商店目录体积远小于单包上限。
+
+**要拿「当前线上完整基线」就用 `--mode pull-catalog`**（见上面桥接协议那节），
+不要去手抄线上内容：它是本分片**唯一**有摘要自证的读取通道。
 
 ```bash
 python3 build_release.py --input <目录> --shop-catalog <商店目录.json> \

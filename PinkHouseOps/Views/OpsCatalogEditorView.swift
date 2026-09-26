@@ -24,7 +24,26 @@
 //  Mac 端就地再写一遍解析 = 出现第二个口径（正是要避免的事），
 //  所以这里只收数字年月，不提供自由文本解析。
 //
+//  ## 系列配置为什么只留一个入口（一站式）
+//
+//  发售阶段、预约/尾款区间、系列价格表都存放在**同一个** `CatalogSeries` 上。
+//  如果这里放一个「改阶段」的入口、商品页再放一个「改价格表」的入口，运营就会
+//  在两边各改一半，而两边都没有对方的字段 —— 最后谁也说不清「系列现在声明的是什么」。
+//  所以：系列的档期与价格表全部走 `SeriesConfigSheet` 一个 sheet，
+//  它内部只写自己负责的字段（`updateSeriesSalePhase` / `updateSeriesPriceChart`），
+//  **不碰任何价格、不碰批次与单品**。
+//
+//  ## 两个来自方案 R05/R06 的交互约束
+//
+//  3. **编辑命令成功才关窗。** 三个表单的「保存」不再无条件 `dismiss()`：
+//     命令返回 false（名称空、系列不属于店家、草稿处于隔离态…）时留在表单里，
+//     错误文案走全局 banner。旧实现无条件 dismiss，运营填完一整页才发现没保存。
+//  4. **父子选择要按 ID 变化收敛，不能只看数量。** 只监听 `count` 会漏掉
+//     「两个系列商品数刚好相同」的切换（数量没变 → 收敛逻辑不触发 → 右列
+//     停在旧系列的商品上）。所以改成同时监听父选择的 ID。
+//
 
+import AppKit
 import SwiftUI
 
 struct OpsCatalogEditorView: View {
@@ -48,6 +67,8 @@ struct OpsCatalogEditorView: View {
             case .seriesForm(let existingID):
                 SeriesFormSheet(
                     workspace: workspace, existingID: existingID, preferredShopID: selectedShopID)
+            case .seriesConfig(let seriesID):
+                SeriesConfigSheet(workspace: workspace, seriesID: seriesID)
             case .productForm(let existingID):
                 ProductFormSheet(
                     workspace: workspace, existingID: existingID,
@@ -57,6 +78,10 @@ struct OpsCatalogEditorView: View {
             }
         }
         .onAppear { clampSelection() }
+        // 父选择一换，下级选择必须立刻收敛（R06）—— 只盯 count 会漏掉
+        // 「两个系列商品数相同」的切换。
+        .onChange(of: selectedShopID) { _, _ in clampSelection() }
+        .onChange(of: selectedSeriesID) { _, _ in clampSelection() }
         .onChange(of: workspace.catalog.shops.count) { _, _ in clampSelection() }
         .onChange(of: workspace.catalog.series.count) { _, _ in clampSelection() }
         .onChange(of: workspace.catalog.products.count) { _, _ in clampSelection() }
@@ -112,8 +137,7 @@ struct OpsCatalogEditorView: View {
                     .contextMenu {
                         Button("编辑…") { sheet = .shopForm(existingID: shop.id) }
                         Button("删除店家", role: .destructive) {
-                            _ = workspace.removeShop(id: shop.id)
-                            clampSelection()
+                            if workspace.removeShop(id: shop.id) { clampSelection() }
                         }
                     }
                 }
@@ -147,17 +171,43 @@ struct OpsCatalogEditorView: View {
                     }
                     .tag(series.id)
                     .contextMenu {
-                        Button("编辑…") { sheet = .seriesForm(existingID: series.id) }
+                        Button("编辑系列…") { sheet = .seriesForm(existingID: series.id) }
+                        Button("配置发售阶段与价格表…") { sheet = .seriesConfig(seriesID: series.id) }
+                        Divider()
                         Button("删除系列", role: .destructive) {
-                            _ = workspace.removeSeries(id: series.id)
-                            clampSelection()
+                            if workspace.removeSeries(id: series.id) { clampSelection() }
                         }
                     }
                 }
             }
             .listStyle(.inset)
+            .safeAreaInset(edge: .bottom) { seriesFooter }
         }
         .frame(minWidth: 190, idealWidth: 215)
+    }
+
+    /// 系列列的底部：档期/价格表摘要 + 唯一入口。
+    /// 摘要放在这里而不是列表行里 —— 行是复用的，长文案会把列表挤散。
+    @ViewBuilder
+    private var seriesFooter: some View {
+        if let seriesID = selectedSeriesID,
+           let series = workspace.catalog.series.first(where: { $0.id == seriesID }) {
+            VStack(alignment: .leading, spacing: 6) {
+                Divider()
+                Text(series.name).font(.callout.weight(.medium)).lineLimit(1)
+                OpsFootnote(text: "发售阶段：\(series.salePhase?.displayName ?? "未声明")　·　"
+                            + "价格表：\(series.priceChart == nil ? "无" : "有")")
+                Button {
+                    sheet = .seriesConfig(seriesID: series.id)
+                } label: {
+                    Label("配置发售阶段与价格表…", systemImage: "calendar.badge.clock")
+                }
+                .controlSize(.small)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(10)
+            .background(.bar)
+        }
     }
 
     private func seriesSubtitle(_ series: CatalogSeries) -> String {
@@ -188,16 +238,25 @@ struct OpsCatalogEditorView: View {
             List(selection: $selectedProductID) {
                 ForEach(productsUnderSelectedSeries) { product in
                     productRow(product)
-                        .tag(product.id)
-                        .contextMenu {
-                            Button("编辑…") { sheet = .productForm(existingID: product.id) }
-                            Button("绑定商品图…") { sheet = .bindImages(productID: product.id) }
-                            Divider()
-                            Button("删除商品", role: .destructive) {
-                                workspace.removeProduct(id: product.id)
+                    .tag(product.id)
+                    .contextMenu {
+                        Button("编辑基本信息…") { sheet = .productForm(existingID: product.id) }
+                        Button("绑定商品图…") { sheet = .bindImages(productID: product.id) }
+                        Divider()
+                        if product.archivedAt == nil {
+                            Button("归档（下线）") {
+                                workspace.setArchived(true, kind: .product, id: product.id)
                                 clampSelection()
                             }
+                        } else {
+                            Button("恢复上线") {
+                                workspace.setArchived(false, kind: .product, id: product.id)
+                            }
                         }
+                        Button("删除商品", role: .destructive) {
+                            if workspace.removeProduct(id: product.id) { clampSelection() }
+                        }
+                    }
                 }
             }
             .listStyle(.inset)
@@ -244,13 +303,14 @@ struct OpsCatalogEditorView: View {
                         Label("绑定商品图", systemImage: "photo.badge.plus")
                     }
                     Button(role: .destructive) {
-                        workspace.removeProduct(id: selectedProductID)
-                        clampSelection()
+                        if workspace.removeProduct(id: selectedProductID) { clampSelection() }
                     } label: {
                         Label("删除", systemImage: "trash")
                     }
                 }
                 .controlSize(.small)
+                OpsFootnote(text: "这一列只做结构（谁挂在谁下面）。规格 / 尺码表 / 价格与销售记录"
+                            + "在「商品管理」里编排 —— 那也是**操作单位**所在的地方。")
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(10)
@@ -264,6 +324,7 @@ struct OpsCatalogEditorView: View {
 private enum EditorSheet: Identifiable {
     case shopForm(existingID: String?)
     case seriesForm(existingID: String?)
+    case seriesConfig(seriesID: String)
     case productForm(existingID: String?)
     case bindImages(productID: String)
 
@@ -271,6 +332,7 @@ private enum EditorSheet: Identifiable {
         switch self {
         case .shopForm(let existingID): return "shop-\(existingID ?? "new")"
         case .seriesForm(let existingID): return "series-\(existingID ?? "new")"
+        case .seriesConfig(let seriesID): return "seriesconfig-\(seriesID)"
         case .productForm(let existingID): return "product-\(existingID ?? "new")"
         case .bindImages(let productID): return "bind-\(productID)"
         }
@@ -343,12 +405,14 @@ private struct ShopFormSheet: View {
                 .split(separator: ",")
                 .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
                 .filter { !$0.isEmpty }
+            // R05：只有成功才关窗；失败留在表单里，原因在全局 banner
+            let ok: Bool
             if let existingID {
-                workspace.updateShop(id: existingID, name: name, aliases: aliases)
+                ok = workspace.updateShop(id: existingID, name: name, aliases: aliases)
             } else {
-                workspace.addShop(name: name)
+                ok = workspace.addShop(name: name)
             }
-            dismiss()
+            if ok { dismiss() }
         }
         .onAppear {
             guard let existingID,
@@ -396,14 +460,18 @@ private struct SeriesFormSheet: View {
             let month = Int(monthText.trimmingCharacters(in: .whitespacesAndNewlines))
             let trimmedSeason = season.trimmingCharacters(in: .whitespacesAndNewlines)
             let resolvedSeason = trimmedSeason.isEmpty ? nil : trimmedSeason
+            // R05：新建也要带上 season —— 旧实现只在编辑路径传，新建出来的系列
+            // 季节是空的，「新建后回显」这条验收因此永远过不了。
+            let ok: Bool
             if let existingID {
-                workspace.updateSeries(
+                ok = workspace.updateSeries(
                     id: existingID, shopID: shopID, name: name,
                     year: year, month: month, season: resolvedSeason)
             } else {
-                workspace.addSeries(shopID: shopID, name: name, year: year, month: month)
+                ok = workspace.addSeries(
+                    shopID: shopID, name: name, year: year, month: month, season: resolvedSeason)
             }
-            dismiss()
+            if ok { dismiss() }
         }
         .onAppear {
             if let existingID,
@@ -463,15 +531,17 @@ private struct ProductFormSheet: View {
         } onCancel: {
             dismiss()
         } onConfirm: {
+            // R05：只有成功才关窗
+            let ok: Bool
             if let existingID {
-                workspace.updateProduct(
+                ok = workspace.updateProduct(
                     id: existingID, shopID: shopID, seriesID: seriesID,
                     name: name, category: category)
             } else {
-                workspace.addProduct(
+                ok = workspace.addProduct(
                     shopID: shopID, seriesID: seriesID, name: name, category: category)
             }
-            dismiss()
+            if ok { dismiss() }
         }
         .onAppear {
             if let existingID,
@@ -488,88 +558,221 @@ private struct ProductFormSheet: View {
     }
 }
 
-// MARK: - 绑定商品图
+// MARK: - 绑定商品图（R04：每个商品自己的**有序**图片数组）
 
+/// 旧实现的两个问题（方案 R04）：
+///   1. 勾选状态是 `Set<String>`，提交时按 `catalog.assets` 的**全局顺序**回写 ——
+///      于是「商品图顺序」根本不是这个商品自己的顺序，而是素材库顺序。
+///      两个商品共享同样三张图、想要不同顺序时，永远保存不下来。
+///   2. 行里只显示 assetID / URL，运营要自己认 hash。
+///
+/// 现在：左边是**已选的有序列表**（顺序 = 商品图顺序，可上移/下移/移除/置首），
+/// 右边是尚未选中的素材（可「加入」或「加入并置首」），两边都带缩略图。
 private struct BindImagesSheet: View {
     @ObservedObject var workspace: OpsWorkspace
     let productID: String
     @Environment(\.dismiss) private var dismiss
 
-    @State private var selected: Set<String> = []
+    /// 已选图片的**有序**数组；提交时原样写入 `product.images`
+    @State private var selectedOrder: [String] = []
     @State private var didLoad = false
+
+    private var productName: String {
+        workspace.catalog.products.first { $0.id == productID }?.name ?? ""
+    }
+
+    private var unselectedAssets: [CatalogAsset] {
+        let chosen = Set(selectedOrder)
+        return workspace.catalog.assets.filter { !chosen.contains($0.id) }
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             VStack(alignment: .leading, spacing: 4) {
                 Text("绑定商品图").font(.headline)
-                Text(workspace.catalog.products.first { $0.id == productID }?.name ?? "")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
+                Text(productName).font(.callout).foregroundStyle(.secondary)
+                // 拼接结果 = String 变量 → 必须过 `opsMarkdown`（单字面量才自动解析 Markdown）
+                opsMarkdown("左边列表的顺序**就是**这个商品的图片顺序（第一张是首图）；"
+                     + "它只属于这个商品，与素材库的列出顺序无关。")
+                    .font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
 
             if workspace.catalog.assets.isEmpty {
                 Text("还没有图片资源。先到「概览」导入商品图。")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
+                    .font(.callout).foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
             } else {
-                Text("勾选的图片会成为这个商品的图片列表，顺序与这里的列出顺序一致。")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                List {
-                    ForEach(workspace.catalog.assets) { asset in
-                        HStack(spacing: 8) {
-                            Toggle(isOn: binding(for: asset.id)) {
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(asset.id).font(.callout)
-                                    Text("\(assetTypeLabel(asset.type)) · "
-                                         + "\(asset.width ?? 0)×\(asset.height ?? 0) · "
-                                         + (asset.originalURL.isEmpty ? "无原图" : asset.originalURL))
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                        .lineLimit(1)
-                                }
-                            }
-                            .toggleStyle(.checkbox)
-                        }
-                    }
+                HStack(alignment: .top, spacing: 12) {
+                    selectedColumn
+                    Divider()
+                    candidateColumn
                 }
-                .frame(minHeight: 220)
+                .frame(maxHeight: .infinity)
             }
 
-            HStack {
-                Text("已选 \(selected.count) 张")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                Spacer()
-                Button("取消") { dismiss() }
-                Button("确定") {
-                    // 按 assets 的列出顺序回写，保证「文件夹里的顺序 = 商品图顺序」
-                    let ordered = workspace.catalog.assets
-                        .map(\.id)
-                        .filter { selected.contains($0) }
-                    workspace.bindImages(ordered, toProduct: productID)
-                    dismiss()
-                }
-                .keyboardShortcut(.defaultAction)
-            }
+            footer
         }
         .padding(20)
-        .frame(width: 520, height: 460)
+        .frame(width: 760, height: 560)
         .onAppear {
             guard !didLoad else { return }
             didLoad = true
-            selected = Set(workspace.catalog.products
-                .first { $0.id == productID }?.images ?? [])
+            // 原样取当前顺序 —— 不排序、不去重
+            selectedOrder = workspace.catalog.products
+                .first { $0.id == productID }?.images ?? []
         }
     }
 
-    private func binding(for assetID: String) -> Binding<Bool> {
-        Binding(
-            get: { selected.contains(assetID) },
-            set: { isOn in
-                if isOn { selected.insert(assetID) } else { selected.remove(assetID) }
-            })
+    // MARK: 左：已选（有序）
+
+    private var selectedColumn: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text("已选（\(selectedOrder.count)）").font(.subheadline.weight(.semibold))
+                Spacer()
+                Button("清空") { selectedOrder = [] }
+                    .buttonStyle(.link).font(.caption)
+                    .disabled(selectedOrder.isEmpty)
+            }
+            if selectedOrder.isEmpty {
+                Text("还没选图。从右边加入。")
+                    .font(.caption).foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                    .padding(.top, 8)
+            } else {
+                List {
+                    ForEach(Array(selectedOrder.enumerated()), id: \.element) { index, assetID in
+                        HStack(spacing: 8) {
+                            Text("\(index + 1)")
+                                .font(.caption.monospacedDigit())
+                                .foregroundStyle(.secondary)
+                                .frame(width: 18, alignment: .trailing)
+                            OpsAssetThumbnail(url: previewURL(for: assetID))
+                            VStack(alignment: .leading, spacing: 1) {
+                                Text(assetLabel(assetID)).font(.callout).lineLimit(1)
+                                if index == 0 {
+                                    Text("首图")
+                                        .font(.caption2)
+                                        .padding(.horizontal, 5).padding(.vertical, 1)
+                                        .background(Color.accentColor.opacity(0.16), in: Capsule())
+                                }
+                            }
+                            Spacer(minLength: 4)
+                            Button { move(assetID, by: -1) } label: { Image(systemName: "arrow.up") }
+                                .buttonStyle(.borderless)
+                                .disabled(index == 0)
+                                .help("上移")
+                            Button { move(assetID, by: 1) } label: { Image(systemName: "arrow.down") }
+                                .buttonStyle(.borderless)
+                                .disabled(index == selectedOrder.count - 1)
+                                .help("下移")
+                            Button { selectedOrder.removeAll { $0 == assetID } } label: {
+                                Image(systemName: "minus.circle")
+                            }
+                            .buttonStyle(.borderless)
+                            .help("解除绑定（只从本商品移除，不删素材）")
+                        }
+                    }
+                }
+                .listStyle(.inset)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    // MARK: 右：候选素材
+
+    private var candidateColumn: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("素材库（\(unselectedAssets.count) 张可用）")
+                .font(.subheadline.weight(.semibold))
+            if unselectedAssets.isEmpty {
+                Text("素材都已经在这个商品上了。")
+                    .font(.caption).foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                    .padding(.top, 8)
+            } else {
+                List(unselectedAssets) { asset in
+                    HStack(spacing: 8) {
+                        OpsAssetThumbnail(url: previewURL(for: asset.id))
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text(assetLabel(asset.id)).font(.callout).lineLimit(1)
+                            Text("\(assetTypeLabel(asset.type)) · "
+                                 + "\(asset.width ?? 0)×\(asset.height ?? 0)")
+                                .font(.caption2).foregroundStyle(.secondary)
+                        }
+                        Spacer(minLength: 4)
+                        Button("加入") { selectedOrder.append(asset.id) }
+                            .buttonStyle(.link).font(.caption)
+                        Button("置首") { selectedOrder.insert(asset.id, at: 0) }
+                            .buttonStyle(.link).font(.caption)
+                    }
+                }
+                .listStyle(.inset)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var footer: some View {
+        HStack {
+            Text("已选 \(selectedOrder.count) 张")
+                .font(.caption).foregroundStyle(.secondary)
+            Spacer()
+            Button("取消") { dismiss() }
+            Button("确定") {
+                // R05：绑定失败（例如草稿处于只读隔离态）不关窗
+                if workspace.bindImages(selectedOrder, toProduct: productID) { dismiss() }
+            }
+            .keyboardShortcut(.defaultAction)
+        }
+    }
+
+    // MARK: 小工具
+
+    private func move(_ assetID: String, by delta: Int) {
+        guard let index = selectedOrder.firstIndex(of: assetID) else { return }
+        let target = index + delta
+        guard selectedOrder.indices.contains(target) else { return }
+        selectedOrder.swapAt(index, target)
+    }
+
+    /// 优先显示**源文件名** —— 运营认文件名，不认内容 hash
+    private func assetLabel(_ assetID: String) -> String {
+        guard let asset = workspace.catalog.assets.first(where: { $0.id == assetID }) else {
+            return assetID + "（素材已不存在）"
+        }
+        if let url = previewURL(for: assetID) { return url.lastPathComponent }
+        return asset.originalURL.replacingOccurrences(of: "local:", with: "")
+    }
+
+    private func previewURL(for assetID: String) -> URL? {
+        guard let asset = workspace.catalog.assets.first(where: { $0.id == assetID }) else { return nil }
+        return workspace.stagedFileURL(forReference: asset.originalURL)
+            ?? workspace.stagedFileURL(forReference: asset.previewURL)
+            ?? workspace.stagedFileURL(forReference: asset.thumbnailURL)
+    }
+}
+
+/// 素材缩略图。不确定的引用退化成占位图标，不留空白
+/// （空白会被读成「图丢了」，占位图标读成「这里本来就没图」）。
+private struct OpsAssetThumbnail: View {
+    let url: URL?
+
+    var body: some View {
+        Group {
+            if let url, let image = NSImage(contentsOf: url) {
+                Image(nsImage: image)
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+            } else {
+                Image(systemName: "photo").foregroundStyle(.secondary)
+            }
+        }
+        .frame(width: 40, height: 40)
+        .clipShape(RoundedRectangle(cornerRadius: 6))
+        .background(Color.secondary.opacity(0.12), in: RoundedRectangle(cornerRadius: 6))
     }
 }
 

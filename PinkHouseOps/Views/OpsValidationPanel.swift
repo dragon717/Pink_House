@@ -1,8 +1,13 @@
 //
-//  OpsValidationView.swift
+//  OpsValidationPanel.swift
 //  PinkHouseOps
 //
-//  发布前校验（P1 的核心交付）+ 导出「待发布包」。
+//  发布前校验 + 导出「待发布包」。
+//
+//  ⚠️ 这是一个**面板**（`VStack`，没有自己的 `ScrollView`），
+//  它由「发布中心」页面嵌进去 —— 校验是发布这一段的第一步，
+//  不该是侧栏里另一个和发布并排的分区：分开之后运营会在校验页点「通过」，
+//  然后以为「通过了就是发出去了」。
 //
 //  ## 为什么门禁必须在导出**之前**跑，而且必须能阻断
 //
@@ -25,19 +30,33 @@
 //
 //  ## 校验与导出的分工
 //
-//  · 本页 `review` = 「发之前，图都准备好了吗」；
+//  · 本面板 `review` = 「发之前，图都准备好了吗」；
 //  · 发布器在改写完 `local:` → `thmedia:` 之后还会做**后置校验**
 //    （`ShopCatalogPublicationGate.issuesInPublishedCatalog`）——
 //    「发之后，产物真的远端化了吗」。两者都要有，否则「上传步骤被跳过」
-//    这种 bug 会一路走到线上。后置校验跑在发布器里，不在本页。
+//    这种 bug 会一路走到线上。后置校验跑在发布器里，不在本面板。
+//
+//  ## 校验会过期（方案 R01）
+//
+//  校验结果与**编辑版本号**绑定。任何一次编辑都会作废它（`OpsWorkspace.markDirty`），
+//  所以这里必须把「这份结果是第几版的」显示出来，过期就红字提示 + 禁用导出。
+//  另外：**导出按钮被绕过也不等于能导出** —— `makePublicationArchive()` 自己会
+//  对着当前快照再跑一次门禁，做不到「校验 A、导出 B」。
+//
+//  ## 策略从哪来
+//
+//  校验用的是**发布中心**选定的严格策略与目标环境（`OpsPublishCenter`），
+//  不是这里自己再定一套 —— 否则会出现「校验按兼容口径通过、发布按严格口径被拒」，
+//  而运营看到的是一句互相矛盾的提示。
 //
 
 import AppKit
 import SwiftUI
 import UniformTypeIdentifiers
 
-struct OpsValidationView: View {
+struct OpsValidationPanel: View {
     @ObservedObject var workspace: OpsWorkspace
+    @ObservedObject var center: OpsPublishCenter
 
     @State private var showsExporter = false
     @State private var exportDocument = TarArchiveDocument(data: Data())
@@ -45,32 +64,35 @@ struct OpsValidationView: View {
 
     private var review: ShopCatalogPublicationReview? { workspace.review }
 
+    /// 能不能导出：必须有一份**没过期**的通过结果（R01）
+    private var canExport: Bool {
+        guard let review, !review.isBlocked else { return false }
+        return !workspace.isReviewStale
+    }
+
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
-                actionCard
-                if let review {
-                    conclusionCard(review)
-                    structuralCard(review)
-                    blockingCard(review)
-                    warningCard(review)
-                    requiredFilesCard(review)
-                    findingsCard(review)
-                } else {
-                    OpsCard(title: "还没跑过校验", systemImage: "questionmark.circle") {
-                        Text("点上面的「跑一次发布前校验」，本机会把目录里所有图片引用"
-                             + "逐条解一遍，告诉你哪几条解不出图。全过程不联网。")
-                            .font(.callout)
-                            .foregroundStyle(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
+        VStack(alignment: .leading, spacing: 16) {
+            actionCard
+            versionCard
+            if let review {
+                conclusionCard(review)
+                structuralCard(review)
+                blockingCard(review)
+                warningCard(review)
+                requiredFilesCard(review)
+                findingsCard(review)
+            } else {
+                OpsCard(title: "还没跑过校验（或校验已被编辑作废）",
+                        systemImage: "questionmark.circle") {
+                    Text("点上面的「跑一次发布前校验」，本机会把目录里所有图片引用"
+                         + "逐条解一遍，告诉你哪几条解不出图。全过程不联网。")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
-                layoutCard
             }
-            .padding(20)
-            .frame(maxWidth: 980, alignment: .leading)
+            layoutCard
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
         .fileExporter(
             isPresented: $showsExporter,
             document: exportDocument,
@@ -93,7 +115,7 @@ struct OpsValidationView: View {
             VStack(alignment: .leading, spacing: 10) {
                 HStack(spacing: 10) {
                     Button {
-                        workspace.validate()
+                        center.validateNow()
                     } label: {
                         Label("跑一次发布前校验", systemImage: "checkmark.shield")
                     }
@@ -104,37 +126,52 @@ struct OpsValidationView: View {
                     } label: {
                         Label("导出待发布包（tar）", systemImage: "shippingbox")
                     }
-                    .disabled(review?.isBlocked ?? true)
+                    .disabled(!canExport)
 
                     Button {
                         workspace.rescanStagingDirectory()
-                        workspace.validate()
+                        center.validateNow()
                     } label: {
                         Label("刷新素材后重跑", systemImage: "arrow.clockwise")
                     }
                 }
-                Text("· 校验只读本机目录，不联网、不写任何文件。\n"
-                     + "· 导出按钮在校验通过前是灰的 —— 这是**故意**的，"
-                     + "它替代了「先导出、发布时才发现缺图」的失败方式。")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
+                if workspace.isReviewStale {
+                    Label("校验结果已过期：这份结果是第 \(workspace.reviewedRevision ?? 0) 版做的，"
+                          + "当前已经是第 \(workspace.currentRevision) 版。请重新校验后再导出。",
+                          systemImage: "exclamationmark.triangle.fill")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                OpsFootnote(text: "· 校验只读本机目录，不联网、不写任何文件。\n"
+                            + "· 用的策略与目标环境来自本页上方的「发布参数」"
+                            + "（当前：\(center.strictPolicy.displayName) · "
+                            + "\(center.targetEnvironment.displayName)）—— 不在这里再定一套。\n"
+                            + "· 导出按钮要求「有一份没过期的通过结果」；"
+                            + "即使按钮被绕过，导出服务内部也会对当前快照再校验一次。\n"
+                            + "· 编辑过一次，旧结果立刻作废 —— 这是**故意**的。")
             }
         }
     }
 
     private func export() {
-        guard let result = review else { return }
-        guard !result.isBlocked else {
-            workspace.reportFailure("校验未通过，不能导出：\(result.blockingIssues.count + result.catalogIssues.count) 条问题待处理。")
+        // 先在当前快照上复校验一次：既拿到最新结论，也让界面上的 review 与版本对齐
+        let fresh = center.validateNow()
+        guard !fresh.isBlocked else {
+            workspace.reportFailure(
+                "校验未通过，不能导出："
+                + "\(fresh.blockingIssues.count + fresh.catalogIssues.count) 条问题待处理。")
             return
         }
         do {
-            exportDocument = TarArchiveDocument(data: try workspace.makePublicationArchive())
+            exportDocument = TarArchiveDocument(data: try workspace.makePublicationArchive(
+                strict: center.strictPolicy,
+                strictScope: workspace.strictScopeIDs,
+                targetEnvironmentName: center.targetEnvironment.displayName))
             exportFileName = exportName()
             showsExporter = true
-            // 后置校验的**前置版本**：本地产物里不该再有任何 `local:` 之外的意外，
-            // 但此刻 local: 是**正常**的（发布器负责改写）。这里只提示，不阻断。
+            // 后置校验的**前置版本**：本地产物里仍有 `local:` 是正常的（发布器负责改写）。
+            // 这里只导出，不声称已经发布。
         } catch {
             workspace.reportFailure(error.localizedDescription)
         }
@@ -145,6 +182,31 @@ struct OpsValidationView: View {
         let safe = title.replacingOccurrences(of: "/", with: "-")
             .replacingOccurrences(of: " ", with: "-")
         return "\(safe).tar"
+    }
+
+    // MARK: 版本与基线（R01 / R07 留痕）
+
+    private var versionCard: some View {
+        OpsCard(title: "这份草稿的版本与基线", systemImage: "number") {
+            VStack(alignment: .leading, spacing: 8) {
+                LabeledContent("当前编辑版本", value: "第 \(workspace.currentRevision) 版")
+                LabeledContent("已保存版本", value: workspace.hasUnsavedChanges
+                               ? "第 \(workspace.savedRevision) 版（有未保存修改）"
+                               : "第 \(workspace.savedRevision) 版（已同步）")
+                LabeledContent("最后校验版本",
+                               value: workspace.reviewedRevision.map { "第 \($0) 版" } ?? "未校验")
+                LabeledContent("线上基线版本",
+                               value: workspace.baseReleaseSeq.map { "releaseSeq \($0)" } ?? "未知（未回填）")
+                LabeledContent("线上基线根摘要",
+                               value: workspace.baseRootIndexHash.map { String($0.prefix(16)) + "…" }
+                                   ?? "未知（未回填）")
+                Divider()
+                OpsFootnote(text: "⚠️ 本工具**不直连公共库**：它读不到「线上现在是什么版本」，"
+                            + "只能通过受控发布器去问（发布中心的「读取线上基线」）。"
+                            + "上面这两个字段只有**确认发布过 / 采纳过线上头**才有值 —— "
+                            + "它们为空就是「不知道」，不是「线上是空的」。")
+            }
+        }
     }
 
     // MARK: 结论
@@ -164,7 +226,8 @@ struct OpsValidationView: View {
                 }
                 Text("共判定 \(review.findings.count) 处图片引用；"
                      + "本机需准备 \(review.requiredStagedFileNames.count) 个图片文件；"
-                     + "已远端化 \(review.remoteMediaKeys.count) 个媒体键。")
+                     + "已远端化 \(review.remoteMediaKeys.count) 个媒体键。"
+                     + "本结果对应第 \(workspace.reviewedRevision ?? 0) 版。")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -359,7 +422,7 @@ private struct IssueList: View {
                         .font(.system(size: 5))
                         .foregroundStyle(tint)
                         .padding(.top, 6)
-                    Text(item)
+                    opsMarkdown(item)
                         .font(.callout)
                         .lineLimit(maxLines)
                         .fixedSize(horizontal: false, vertical: true)

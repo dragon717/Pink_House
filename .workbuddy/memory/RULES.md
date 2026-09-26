@@ -383,3 +383,330 @@ Bundle 种子已空壳，验收前把 `ShopCatalogSeedFixture.jsonString`（+ �
 - 别在编译期间改源码（构建产物与源码就不一致了）；只改**注释**不影响行为，但仍要留意。
 - 长任务必须交由工具的后台机制托管；`nohup … &` 在本环境会随命令结束被回收（日志 0 字节、
   进程消失，看起来像「构建秒退」）。
+
+## 零散易踩清单（09-27 从 `MEMORY.md` 迁入，细节层）
+
+- **改名计划的基准必须是「改名前后两个不同的商品快照」**：写起来像「传入已改好 name 的那一份」更省事，
+  但那样「名称是否被改动」自己跟自己比永远相等 → **真改名被判成没改名**（09-24 实测两条端到端用例红）。
+  `plan(edited:basedOn:)` 两个入参缺一不可。
+- 颜色词有**两个**口径别混用：`ShopCatalogColorPresentation.derivedLabel`（守卫「剥离后须≠原名」，
+  用于「能不能当颜色标签」）vs `ShopCatalogProductRename.colorWord(in:)`（用于「改名别把颜色弄丢」）。
+- `CatalogProductDraft` 新增款式字段必须进 `publishOperationKey` 指纹，否则「改了再发布」被幂等入口吞掉；
+  `colorWords` 必须含**复合色**（`生成色`/`粉紫色`，长词优先），否则同款三色被拆成三款。
+- `ShopCatalogImageStore.url(for:)` **只拼路径、不查盘**，对不存在的文件也返回非 nil → 判「文件不存在」
+  必须自己补 `FileManager.fileExists`，否则会掉进 `unreadable` 而 `fileMissing` 永远不可达
+  （两者对运营含义不同：缺图→重新选图 / 读失败→重试）。
+- 持有 SwiftData 容器的 `@MainActor` store 进单测，**测试类本身要标 `@MainActor`**（光标在另一个类上不够）。
+- **不要在脚本运行中途编辑脚本**：bash 按字节偏移增量读取，改文件头会让它从错位处继续读
+  （`line N: syntax error`），收尾结论行静默丢失。
+- `xcodebuild` 参数误写相对路径会生成 `ItemManager.xcodeproj/-Xcc/`（26M clang 缓存），已 `gitignore`。
+- **`XCTestCase` 子类里不能有名叫 `hash` 的属性**（NSObject 的 `hash` 是只读 `Int`）→ 改用 `mediaHash` 之类。
+- **同名不同返回类型的重载会被判歧义**（Swift 重载解析不看返回类型）→ 必须改名。
+- ⭐ **`NSData.compressed(using: .zlib)` 是裸 deflate（RFC 1951），不是 zlib 封装**（名字骗人）：
+  0B→2B `03 00`、1B→3B `73 04 00`、512B→20B 首字节 `0x7B`，首字节**从不是** `0x78`。
+  写 `compress` 前先读同文件 `decompress` 的注释；若要判「是否 zlib 封装」，阈值**必须 ≥ 8**。
+- ⭐ **PATH 上的 `grep` 是 WorkBuddy 的 toybox shim**（不是 BSD/GNU）：`grep 'a\|b'`（BRE 交替）
+  **静默 0 命中、exit 1**，看起来像「这些符号根本不存在」，极易据此写错代码。
+  **一律用 `-E`，或直接调 `/usr/bin/grep`，或用 Grep 工具**；`sed`/`find` 同样被 shim。
+- ⚠️ **`pkill` / `killall` 是真 BSD 命令（`/usr/bin/pkill`），不是 shim**，但在受限 shell 里
+  **信号可能被静默拒绝**：`pkill -f "…" 2>/dev/null || true` 会看起来「执行成功却没杀掉」。
+  诊断这类「杀不掉」时**先去掉 `2>/dev/null`** 看真实报错；或用 `/usr/sbin/lsof` 反查进程
+  再 `kill -9 <pid>` 并核对退出码，不要靠「回来再看一眼进程还在不在」下结论。
+
+## Python 发布通道：读/写闸门 + 沙盒 App 驱动子进程的关口（09-27）
+
+### ⭐ 不变量：`apply=False` = 「不许写」，**不是**「不许联网」
+
+`CloudKitWebServicesAdapter.apply` 一旦被理解成「dry-run 就什么都别做」，就会产生
+**静默的错误结论**。CloudKit 连 `records/lookup`（读）也用 POST 动词，所以把
+`if not self.apply: return {}` 放在**传输层**会把读一起挡掉。
+
+实测后果：桥接器 `ops_publish_bridge.py --mode baseline`（R07 只读基线核对）**恒传
+`apply=False`** → `fetch_current_release()` 恒返回 None → App 被告知
+**「线上尚无商店发布头（本次将是首次发布）」**，而线上其实有 `releaseSeq=1`。
+
+**为什么离线演练抓不到**：`FilesystemAdapter` 的读不走 `apply` 判定
+（只有 `_write` 判），所以 `drill_offline.sh`（34 项）与 `drill_bridge_offline.py`（32 项）
+**全绿**。这是「演练绿灯 ≠ 真路径正确」的典型：演练用的是另一个适配器。
+
+分工（改代码时不要合并回去）：
+
+| 方法 | 用途 | `apply=False` |
+|---|---|---|
+| `_send` | **读** + 写操作的底层传输 | **照发** |
+| `_post` | 写路径入口 | 静默返回 `{}` |
+| `_upload_file` | 资产字节上传 | 静默返回 `{}` |
+
+回归锁 `selftest_cloudkit_read.py`（**18 项，离线、不需要凭证/cryptography**）：
+靠注入 `http_post` 传输层 + 覆盖 `_headers` 绕开签名；含**反向断言**
+（把 `_post` 换成必然抛异常的桩，读仍须成功）—— 防止两条路又被合并。
+
+### 沙盒 App 驱动 Python 子进程：六个关口，逐个可验
+
+Mac 运营工具（`app-sandbox = true`）要驱动 `tools/time_hall/publication/` 打 CloudKit，
+必须依次过这些关口。**任何一关没过，表现都是笼统的「跑不起来」**：
+
+| # | 关口 | 判据 | 现状 |
+|---|---|---|---|
+| ① | 线上基线读得到 | `--mode baseline` 返回真实 releaseSeq | ✅ 已修（原为谎报「首次发布」） |
+| ② | 子进程有 `cryptography` | `python -c "import cryptography"` | ✅ 仓库内 `.venv`（**必须排在系统解释器前**） |
+| ③ | 能连 CloudKit 并签名 | 只读 lookup 拿到发布头 | ✅ 实测 releaseSeq=1 |
+| ④ | 授权**先于**落盘判断 | Swift `run()` 里 scope 必须在可读性检查之前 | ✅ 已修（判据也换成了真读，见下） |
+| ⑤ | 用户授权过仓库目录 | 真实 UserDefaults 里有 `ops.publishBridgeSettings` | ❌ 从未授权（探针实测确认） |
+| ⑥ | 凭证能进沙盒 | 容器内凭证 JSON + `process.environment` 注入 | ⚠️ 文件不存在，机制已就绪 |
+| ⑥b | **子进程**能读仓库 | 授权后子进程 `ls` 仓库目录 | ⏳ **仍无法验**：必须建立在⑤之上 |
+
+- **④ 有两个坑，别只记住第一个**：
+  1. 顺序：不带 security-scoped 扩展时抛 `scriptNotFound`（文案「仓库目录选对了吗？」）——
+     把**「权限没打开」说成「文件不存在」**。
+  2. ⭐ **判据本身也会骗人**（09-27 探针实测）：沙盒下 `stat` 与 `open` **走两套判定**，
+     未授权时 `FileManager.fileExists` 返回 **`true`**，而
+     `Data(contentsOf:)` / 子进程 `ls` 都是 `Operation not permitted`。
+     所以「用 `fileExists` 当闸门」会**放行**，一路跑到 `process.run()`，
+     最后以「退出码 1、没有任何输出」（`noDiagnostics`）收场 —— 一句毫无指向性的结论。
+     唯一正确判据是 `OpsBridgeSettings.isReadableFile(_:)`（**能打开 + 读不抛错**）。
+     写法细节：**不能**用 `(try? handle.read(upToCount: 1)) != nil` ——
+     `read(upToCount:)` 在 EOF 本来就返回 `nil`，空文件会被误判成读不了；
+     要「打开成功 + 读这一步不抛错」（目录抛 `EISDIR`、无权限在 `FileHandle(...)` 就抛）。
+     `diagnosis()` 也**自己开一次授权**，否则已授权好的配置会被报成「找不到桥接脚本」。
+- **②a 解释器候选顺序（09-27 实测）**：`/usr/bin/python3` 在沙盒里子进程直接吐
+  `xcrun: error: cannot be used within an App Sandbox.`（它是 CLT 替身，不是真解释器），
+  而本机**没有** `/opt/homebrew/bin/python3` 也没有 `/usr/local/bin/python3` ——
+  旧候选顺序让「自动探测」在沙盒下 **100% 选错**。正确顺序：
+  用户显式设置 → **仓库内 `.venv/bin/python3`** → homebrew → usr/local → `/usr/bin`。
+  `pythonCandidates(explicit:publicationDirectory:)` 已按此改，并有回归锁
+  （`testRepoVenvBeatsSystemPythons` 等 4 例）。
+- **⑤ 判据**：`plutil -p ~/Library/Containers/bugod2.ItemManager.Ops/Data/Library/Preferences/bugod2.ItemManager.Ops.plist`
+  里有没有 `ops.publishBridgeSettings`。**没有 = 用户没在面板里确认过**，
+  此时 `beginAuthorizedRepoRootScope()` 拿不到 bookmark（`accessed=false`、`stop` 为空操作），
+  沙盒下仓库一概不可见。这一步只能用户点一次，替不了。
+  ⚠️ 临时注入 `{"repoRootPath":"…"}`（**不带 bookmark**）只能验证「没授权会失败」，
+  验证不了「授权后会成功」—— bookmark 必须来自用户手势，脚本造不出可用的 security-scoped bookmark。
+- **⑥ 凭证**：子进程**继承 App 沙盒**，而 App 的 entitlements 里**没有任何 keychain 权限**
+  → `security find-generic-password` 读不到登录钥匙串里的发布凭证。
+  可行通道：**App 容器**（App 可写、子进程可读，且不需要放宽任何权限）放一个凭证 JSON，
+  由 Swift 侧通过 `process.environment` 注入 `PINK_HOUSE_TIMEHALL_CREDENTIAL_FILE`
+  （`OpsPublisherBridge.credentialFileEnvironmentKey`，必须与
+  `publish_adapters.CREDENTIAL_ENV_VAR` **逐字一致**；写错名字 CLI 不会报错，
+  它会静默回退去读 Keychain 然后失败）。
+  代价：**私钥以文件落盘**，只建议 Development 用；生产仍走终端 + Keychain。
+- **⑥b 未验的一环**：子进程是否继承父进程的 security-scoped 扩展。
+  若**不**继承，则「App 授权仓库 → 子进程读仓库」这条设计不成立，
+  得改成「把工具与待发布包都搬进容器」。
+  ⚠️ **这一关没法在⑤之前验**：它要求先有一个真实 bookmark。所以探针在
+  「未授权」这一侧只能给出**对照**证据（子进程被拦，`Operation not permitted`），
+  不能给出「授权后能读」的结论。**别把对照当结论。**
+
+### 探针：沙盒行为只能在 App 里量（`PinkHouseOps/BridgeProbeHarness.swift`）
+
+本机 `sandbox-exec` 含 `deny` 就 `sandbox_apply: Operation not permitted`，
+所以「子进程能不能读仓库」只能在一个真签名 + 真沙盒的 App 进程里跑。
+工具：**文件触发**，与快照 harness 同机制。
+
+```bash
+CONTAINER=~/Library/Containers/bugod2.ItemManager.Ops/Data/Library/Application\ Support/PinkHouseOps
+printf 'probe-run1' > "$CONTAINER/bridge-probe.request"   # 内容是输出子目录名，可省
+open -n build/sym/Debug/PinkHouseOps.app
+# 跑完自杀；产物 = <容器>/Application Support/PinkHouseOps/<子目录>/probe.log + probe.json
+# 判据：进程还在 = 没消费到请求（同快照 harness）
+```
+
+九关逐条记录（S1 设置 → S2 **未授权对照** → S3 开授权 → S4 真读脚本 →
+S5 列发布目录 → S6 子进程读仓库 → S7 哪个解释器带 cryptography →
+S8 容器内凭证 → S9 端到端 `--mode baseline`）。
+
+三条设计不变量（改探针时别丢）：
+
+1. **每关必须成对**（未授权 vs 授权）。只跑一侧的话，在一个根本没沙盒的构建里
+   也会全绿 —— 什么都没证明。这就是本项目「演练绿灯 ≠ 真路径正确」的同一个坑。
+2. **判据是「真读」，不是 `fileExists`**（见④-2）。
+3. **只读**：探针只会用 `--mode baseline`，从不构造 `--mode publish`；
+   凭证只报**结构**（文件名/字节数/顶层键名），私钥与 keyID 一律不进日志
+   —— 探针日志是要被贴出来看的东西。
+
+探针**自己也有过缺陷**，值得记住这个形状：最早 S5 读不到目录列表就 `return`，
+于是 S6/S7 在「未授权」场景根本不跑 —— 只剩一句「S5 失败」，
+正是「只看到一个红叉、不知道红在哪」。**对照组数据缺一半 = 探针白跑。**
+
+### ⚠️ 本机**做不了沙盒实验**（与 `xcodebuild test` 挂起同源）
+
+`sandbox-exec` 存在，但**只要 profile 里含 `deny` 规则**就报
+`sandbox-exec: sandbox_apply: Operation not permitted`；纯 `(allow default)` 才行。
+`/System/Library/Sandbox/Profiles/application.sb` 需要参数，直接 `-f` 用不了
+（`invalid data type of path filter`）。
+**结论：沙盒行为只能在真实 App 里探，别在 shell 里试。**
+
+### 运行环境：`cryptography` 与仓库内的 `.venv`
+
+- 本机**系统 `python3`（3.9.6）与用户级 site-packages 都没有 `cryptography`**；
+  候选列表里的 `/opt/homebrew/bin/python3`、`/usr/local/bin/python3` **并不存在**
+  → 候选实际只剩 `/usr/bin/python3`。所以真打 CloudKit 的路径原先**根本跑不通**
+  （`selftest_signing.py` 直接 `需要 cryptography` 退出 2）。
+- 已建 **仓库内** `.venv`（`/usr/bin/python3 -m venv`，`pip install cryptography` → 50.0.1），
+  **必须放仓库内**：沙盒 App 只读得到被授权的那一个目录（bookmark），
+  `~/.venv`、`pip install --user` 的结果都在 `~` 下 → 读不到。
+  已 gitignore；建法与原因写在 `publication/README.md`「运行环境」。
+
+## R07 的「过期基线」与「拉回线上基线」（09-27 补洞，C = A+B）
+
+### 洞是什么（先说清，否则修法看着像多余）
+
+方案 §5 要求发布 = 「**当前线上完整基线** + 变更集 → 合成完整 Catalog，保留未改动内容」。
+但两件事同时缺失：
+
+1. **App 没有「从线上拉回目录」的通道** —— 只有「导入 JSON」。所以「基线**内容**」
+   全靠人手导出 / 导入，本地那份与线上是什么关系**没有任何依据**。
+2. ⭐ **桥接器从来不读** `baseReleaseSeq` / `baseRootIndexHash` / `baselineAcknowledged`。
+   在 `ops_publish_bridge.py` / `build_release.py` / `publish_cloudkit.py` 里
+   这三个名字**一次都没出现过**：App 把它们写进请求，接收方完全不看 ——
+   典型的「字段传了但没人用，看起来做了、实际没做」。
+   而 `build_release.py` 只从**本地** `sources.yaml` 构建、**从不读线上**，
+   所以拿一份旧导出去发布会把线上后来的改动**整块覆盖**，且线上看不出来
+   （产物本身是合法完整的）。唯一的事实性保护是 `publish_cloudkit.py` 的
+   「本地发布号不大于线上则拒绝」—— 只在选号**恰好撞车**时才生效（选 online+5 完全不拦）。
+
+**排查手法**（可复用）：`grep -E "request\[|request\.get" ops_publish_bridge.py`
+再看这些字段名有没有出现。请求结构体里存在 ≠ 接收方在读。
+
+### A：`--mode pull-catalog`（只读回读线上商店目录）
+
+```bash
+python3 ops_publish_bridge.py --mode pull-catalog --request request.json
+# 产物：<outputDirectory>/shop-catalog.json  +  pull-manifest.json
+# 事件：{"type":"catalog","path":…,"releaseSeq":…,"rootIndexHash":…,"payloadHash":…,"itemCounts":{…}}
+```
+
+四道**拿不到证据就不拉**的自证：① 根清单字节 SHA-256 必须 == 发布头 `rootIndexHash`；
+② 分片必须**按 `entityType == "shop-catalog"` 找**（**不猜 `partitionID`**）；
+③ 分片字节 SHA-256 必须 == 其 `payloadHash`；④ 只认**唯一一个**商店分片 ——
+多于一个说明口径被改过，静默取第一个只会拿到**半份目录**，**宁可中止**。
+
+- 线上没有发布头 / 没有商店分片 → **`EXIT_OK`** + 如实说「线上是空的、本地内容不是从线上来的」。
+  那是**事实**不是失败；且此时**不产出** `shop-catalog.json`
+  （产出一份空目录会被读成「拉回了一份空目录」，正好是反的）。
+- 适配器侧新增两个**必须实现**的只读方法：`fetch_root_index_bytes()` / `fetch_pack_bytes(hash)`。
+  CloudKit 侧靠 `_lookup_asset_value(record_type, record_name, field)` + `_download_asset(value)`
+  （纯 GET，**不走 `_post`**，所以 dry-run 闸门不受影响）。
+  ⚠️ **资产字段名不同**：`THRelease` 用 **`rootIndexAsset`**，`THDataPack` / `THMedia` 用 **`asset`**。
+  传错**不报错**，只会拿到空字典 → 表现成「线上没有这个资源」。
+- ⭐ 拉回的是**已下发口径**（必须显式告知、不能静默）：`strip_archived_shop_catalog`
+  已剔除归档条目与孤儿销售事件，`collect_shop_catalog_media` 把 `local:` 改写成了
+  `thmedia:<内容摘要>`。所以拉回的内容**不含归档条目**、**图片没有本地文件**。
+
+### B：发布前的过期基线闸门（`run_publish` 里，**构造产物之前**）
+
+`baseline_mismatches(request, head)` 的判定表：
+
+| 草稿基线 | 线上 | 结论 |
+|---|---|---|
+| 空（两个字段都空） | 任意 | 不一致：无法证明内容基于线上当前版本 |
+| 有 | 无发布头 | 不一致：草稿基于某版本，线上却什么都没有 |
+| 发布号不同 | — | 不一致 |
+| 根清单摘要不同 | — | 不一致（**比发布号更强的那一条**） |
+| 线上摘要读不到 | — | 不一致：拿不到证据就不能当一致（只比发布号会漏判） |
+| 全一致 | — | 一致 |
+
+- 不一致且 `baselineAcknowledged` 不为真 → **退出码 5（冲突）**，结论点名「基线已过期」
+  并给出两条出口（先「读取线上基线」回填 / 先「从线上拉回基线」重建本地内容）。
+- `baselineAcknowledged` 是 R07 给的**唯一显式出口**，语义是「已留痕的例外」，
+  **不是「检查通过」** → 放行时必须原样打 `warning`，绝不静默。
+- **`dry-run` 也走同一判定**（演练不该绕过过期检测）。读发布头失败 → `EXIT_REFUSED`（宁可挡住）。
+- 界面上它挡住的是「读完基线 → 切到别处 → 期间别人又发了一版 → 回来点发布」这个窗口；
+  App 侧本地的 `submissionBlockers` 挡不住它（那一个是几分钟前读到的快照）。
+
+### 离线回归锁
+
+`drill_bridge_offline.py` **49 项**（原 32 + 阶段 1b「线上还没发布头时拉回」+
+阶段 3b「R07 闸门 5 例」+ 阶段 3c「拉回有内容」）。其中一条专门证明**只读**：
+拉回前后 `live/THRelease.json` **逐字节未变**。
+
+```bash
+cd tools/time_hall/publication && python3 drill_bridge_offline.py   # 通过 49 项，失败 0 项
+```
+
+## ⭐ Mac 运营 UI 的 Markdown 渲染：`opsMarkdown` 以前是**坏的**（09-27 快照取证）
+
+**红线**：`Text(字面量)` 解析 Markdown，`Text(变量)` 不解析 → 所以变量文案必须过
+`opsMarkdown(_:)`。**但光过这一层不够** —— 这一层原来的实现是错的：
+
+```swift
+// ❌ 错的：LocalizedStringKey 的 Markdown 解析发生在字面量 / 字符串插值那条路径上，
+//    接运行时 String 的这个初始化器**不解析** → 星号照样逐字显示。
+func opsMarkdown(_ text: String) -> Text { Text(LocalizedStringKey(text)) }
+
+// ✅ 对的：显式解析。inlineOnly 与 PreservingWhitespace **两个都要**。
+func opsMarkdown(_ text: String) -> Text {
+    if let a = try? AttributedString(markdown: text, options: .init(
+        interpretedSyntax: .inlineOnlyPreservingWhitespace)) { return Text(a) }
+    return Text(text)   // 解析失败宁可显示星号，也不能把整句吞掉
+}
+```
+
+两个选项各自的理由（去掉任何一个都会静默坏掉）：
+
+- `inlineOnly` —— 这些文案是「一句话 / 一段话」不是文档。允许块级语法的话，
+  行首的 `#` `-` `1.`（我们的路径、日志行里都有）会被吃成标题 / 列表；
+- `PreservingWhitespace` —— 默认 `.full` 会把**换行折成空格**，而阻断项与结论是
+  `\n` 拼起来的多行，折了就读不成列表（**静默的版式损坏**）。
+
+**取证方式**（`publish.png` 应用内离屏快照，两处独立字符串、两个模块、同一条渲染路径）：
+`TargetEnvironment.localFixture.guidance` 的 `**不代表已上线**`、
+`ShopCatalogBaselineVerdict.unverified.guidance` 的 `本页**不会**替你声称…`，
+修复前在快照上都是**带星号**的原文。修完同一坐标再抓一次：星号消失、该短语变粗。
+
+**推论**：写任何「变量文案带 `**`」的界面代码后，**必须用快照复核** ——
+这类缺陷不崩不报错，编译与单测全绿，只有看图才发现。
+
+### 同一个坑的第二种形态：`Text("a" + "b")`（09-27 第二轮补齐）
+
+**字面量拼字面量**也会退化成变量 —— 拼接结果是一个 `String`，走逐字初始化器。
+只有**单个**字面量才自动走 `LocalizedStringKey`。所以：
+
+| 写法 | 解析 Markdown？ |
+|---|---|
+| `Text("…**…**…")` | ✅（单个字面量 → LocalizedStringKey） |
+| `Label("…**…**…", systemImage: "x")` | ✅（同上，`systemImage:` 只是参数标签） |
+| `Text("…**…" + "…")` | ❌ 拼接结果是变量 |
+| `Text(someString)` / `Text(cond ? "a" : "b")` | ❌ |
+| `opsMarkdown(…)` | ✅（显式解析，唯一正确口径） |
+
+### 全量盘点 + 可执行门禁（09-27 落完）
+
+修 `opsMarkdown` 之后又做了一次**全仓盘点**（`Views` / `Services` / `SnapshotHarness`），
+把「参数含 `**` 或来自叙事字段」的调用点逐个过了一遍。结论：**又抓到 7 处**，
+其中 3 处是**当天就在显示星号**的真缺陷：
+
+| # | 位置 | 形态 | 当时是否真坏 |
+|---|---|---|---|
+| 1 | `OpsOptionalDateField` 的 `Text(label)` | 变量 ←「预约结束时间（`**驱动自动流转**`）」 | ✅ 真坏 |
+| 2 | 同上 `Text(help)` | 变量（今天三个调用点都没星号） | ⚠️ 潜伏 |
+| 3 | `OpsPublishCenterView` 确认弹窗 `Text("…" + "…")` | 拼接 | ✅ 真坏 |
+| 4 | `OpsPublishCenterView` 变更集卡 `Label("…" + "…", systemImage:)` | 拼接 | ✅ 真坏 |
+| 5 | `OpsMediaLibraryView` 的 `Label(kind.guidance, …)` | 变量（`ShopCatalogMediaJob.guidance` 今天无星号） | ⚠️ 潜伏 |
+| 6 | `OpsPreviewView.labelled(_:value:)` 的 `Text(label)` | 变量（界面文案，非数据） | ⚠️ 潜伏 |
+| 7 | `OpsRootView.CountChip` 的 `Text(label)` | 变量（同上） | ⚠️ 潜伏 |
+
+**同时确认「不该动」的地方**（对**数据**做 Markdown 解析会把 `A_B` 变斜体 = 改坏数据）：
+`OpsTag(text:)` 会收到 `product.category`、`labelled(_:value:)` 的 `value` 是金额 / 引用原文
+—— 这两个**保持逐字渲染**，没改。
+
+**门禁**（新增，`tools/ops_ui/check_markdown_callsites.py`，纯静态、离线、无依赖）：
+
+```bash
+python3 tools/ops_ui/check_markdown_callsites.py            # 扫 PinkHouseOps/，退出码 1 = 有违规
+python3 tools/ops_ui/check_markdown_callsites.py --self-test # 内嵌 18 例自证（改检查器必跑）
+```
+
+两条规则：**R1** `Text`/`Label` 参数里含 `**` 且**不是一个完整字面量**（允许「单字面量」
+与「字面量 + 纯参数标签」两种形态，其余如 `+` / 三目 / `String(format:)` 一律报）；
+**R2** 把叙事字段（`guidance` / `lastErrorMessage` / `label` / `help` / `subtitle`）直接喂给
+`Text`/`Label`。**`value` / `text` / `title` 不进清单**（会承载数据）。
+
+⚠️ **R2 的能力边界（这条很重要）**：静态检查看不到**调用方传进来的字符串值**。
+`OpsOptionalDateField` 自己写的是 `Text(label)`，星号在**生产端**（`OpsSeriesConfigView`），
+两边分开看都没毛病 → 唯一能守住的形态是**组件自己也要把 `label`/`help` 过 `opsMarkdown`**，
+由 R2 拦「组件没这么做」。这是**按名字的约定**，不是语义分析。
+
+⚠️ **快照覆盖不到的地方**：`OpsSeriesConfigView` 是 `.sheet`、确认弹窗是 `confirmationDialog`
+—— **六个分区快照里都看不到**。所以 `**驱动自动流转**` 那一处的修复只有门禁 + 源码能证，
+**没有图证**。要图证就得让 harness 能打开 sheet / 弹窗（目前不支持）。

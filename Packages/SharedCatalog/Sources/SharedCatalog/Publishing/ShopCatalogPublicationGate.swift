@@ -91,10 +91,29 @@ public struct ShopCatalogMediaReferenceFinding: Hashable, Sendable {
     public let reference: String
     public let resolution: ShopCatalogReferenceResolution
 
-    public init(owner: String, reference: String, resolution: ShopCatalogReferenceResolution) {
+    /// 稳定字段路径（与 `ShopCatalogMediaReference.field` 同值）。
+    /// 严格策略要把「哪条规则拦了哪个字段」说清楚，所以这里必须带上。
+    public let field: String
+    /// 所属实体 id（asset / shop / series / sizeChart / product / variant）。
+    /// **严格策略的作用域判定就靠它** —— 不能靠解析 `owner` 文案（文案会改）。
+    public let entityID: String
+    /// 商品归属 id；无商品概念时为空串（与 `ShopCatalogMediaReference` 同口径）。
+    public let productID: String
+
+    public init(
+        owner: String,
+        reference: String,
+        resolution: ShopCatalogReferenceResolution,
+        field: String = "",
+        entityID: String = "",
+        productID: String = ""
+    ) {
         self.owner = owner
         self.reference = reference
         self.resolution = resolution
+        self.field = field
+        self.entityID = entityID
+        self.productID = productID
     }
 }
 
@@ -113,6 +132,9 @@ public nonisolated struct ShopCatalogPublicationReview: Sendable {
     public var requiredStagedFileNames: [String] = []
     /// 已经远端化的媒体键（可以跳过上传）
     public var remoteMediaKeys: [String] = []
+    /// 严格策略的作用结果（方案 R08）。界面据此解释「为什么这一条被阻断」，
+    /// 也据此明确声明「哪些媒体键还没在目标环境回读确认」。
+    public var strictAudit = ShopCatalogStrictAudit(policy: .compatibility)
 
     // 跨模块构造入口：`public` 结构体的合成逐成员 init 是 internal，外部模块必须显式声明。
     public init(
@@ -121,7 +143,8 @@ public nonisolated struct ShopCatalogPublicationReview: Sendable {
         warnings: [String] = [],
         findings: [ShopCatalogMediaReferenceFinding] = [],
         requiredStagedFileNames: [String] = [],
-        remoteMediaKeys: [String] = []
+        remoteMediaKeys: [String] = [],
+        strictAudit: ShopCatalogStrictAudit = ShopCatalogStrictAudit(policy: .compatibility)
     ) {
         self.catalogIssues = catalogIssues
         self.blockingIssues = blockingIssues
@@ -129,6 +152,7 @@ public nonisolated struct ShopCatalogPublicationReview: Sendable {
         self.findings = findings
         self.requiredStagedFileNames = requiredStagedFileNames
         self.remoteMediaKeys = remoteMediaKeys
+        self.strictAudit = strictAudit
     }
 
     public var isBlocked: Bool { !catalogIssues.isEmpty || !blockingIssues.isEmpty }
@@ -156,10 +180,21 @@ public nonisolated enum ShopCatalogPublicationGate {
     ///     内容核对由发布端按 SHA-256 做）。传空集 = 「本机没有可用图片」，
     ///     此时所有 `local:` 都会被判成缺图。
     ///   - coverageStatus: 目录覆盖状态，用于结构校验（整包发布固定 `complete`）。
+    ///   - strict: 引用校验策略（方案 R08）。默认 `.compatibility`，与旧版本逐字一致。
+    ///   - strictScope: **严格策略的作用域**（本次新增 / 修改过的实体 id）。
+    ///     只在这个集合里的实体才会被收紧；传空集 = 严格策略没有作用对象。
+    ///   - verifiedRemoteMediaKeys: 已在**目标环境**回读确认过的媒体键。
+    ///     只有受控发布器能产出这个集合 —— 本机离线判不出来，所以本机传空集时
+    ///     严格策略只会把这些键列成**告警**（真正的阻断在发布器第 5 步）。
+    ///   - targetEnvironmentName: 严格策略文案里要说的目标环境名（为空时不提环境）。
     public static func review(
         _ catalog: ShopCatalog,
         stagedFileNames: Set<String>,
-        coverageStatus: String = "complete"
+        coverageStatus: String = "complete",
+        strict: ShopCatalogStrictPolicy = .compatibility,
+        strictScope: Set<String> = [],
+        verifiedRemoteMediaKeys: Set<String> = [],
+        targetEnvironmentName: String = ""
     ) -> ShopCatalogPublicationReview {
         var review = ShopCatalogPublicationReview()
         review.catalogIssues = ShopCatalogCloudSyncValidator.structuralIssues(
@@ -170,6 +205,17 @@ public nonisolated enum ShopCatalogPublicationGate {
 
         var required: Set<String> = []
         var remoteKeys: Set<String> = []
+        var unverifiedKeys: Set<String> = []
+        var strictBlocked = 0
+        let environmentSuffix = targetEnvironmentName.isEmpty ? "" : "（\(targetEnvironmentName)）"
+
+        func isInStrictScope(_ finding: ShopCatalogMediaReferenceFinding) -> Bool {
+            guard strict.blocksUnverifiableReferences else { return false }
+            if !finding.entityID.isEmpty, strictScope.contains(finding.entityID) { return true }
+            if !finding.productID.isEmpty, strictScope.contains(finding.productID) { return true }
+            return false
+        }
+
         for finding in review.findings {
             switch finding.resolution {
             case .stagedLocal(let fileName):
@@ -182,29 +228,71 @@ public nonisolated enum ShopCatalogPublicationGate {
                     + "请重新选择这张图，或把文件放回图片目录。")
             case .remoteMedia(let mediaKey):
                 remoteKeys.insert(mediaKey)
+                if isInStrictScope(finding), !verifiedRemoteMediaKeys.contains(mediaKey) {
+                    unverifiedKeys.insert(mediaKey)
+                }
             case .canonicalMediaKey(let mediaKey):
                 remoteKeys.insert(mediaKey)
+                if isInStrictScope(finding), !verifiedRemoteMediaKeys.contains(mediaKey) {
+                    unverifiedKeys.insert(mediaKey)
+                }
             case .remoteURL(let url):
-                review.warnings.append(
-                    "\(finding.owner) 用的是外部图片地址（\(url)），不受本次发布控制；"
-                    + "撤回或换图请在源站处理。")
+                if isInStrictScope(finding) {
+                    // 新内容里塞外链 = 撤回与换图都不受本次发布控制。
+                    // 存量数据继续放行（兼容），只有本次动过的才阻断。
+                    strictBlocked += 1
+                    review.blockingIssues.append(
+                        "「严格策略」\(finding.owner) 用的是外部图片地址（\(url)），"
+                        + "不受本次发布控制。请把图导入本机素材库后再绑定。")
+                } else {
+                    review.warnings.append(
+                        "\(finding.owner) 用的是外部图片地址（\(url)），不受本次发布控制；"
+                        + "撤回或换图请在源站处理。")
+                }
             case .danglingAssetID(let id):
-                review.warnings.append(
-                    "\(finding.owner) 指向了不存在的图片资源 \(id)，客户端会显示占位图。")
+                if isInStrictScope(finding) {
+                    strictBlocked += 1
+                    review.blockingIssues.append(
+                        "「严格策略」\(finding.owner) 指向了不存在的图片资源 \(id)。"
+                        + "新内容必须引用真实存在的素材。")
+                } else {
+                    review.warnings.append(
+                        "\(finding.owner) 指向了不存在的图片资源 \(id)，客户端会显示占位图。")
+                }
             case .unverifiableBareName(let name):
-                review.warnings.append(
-                    "\(finding.owner) 写的是一个裸名字「\(name)」，既不是图片资源 id 也不是 "
-                    + "`bundle:` / `local:` / `thmedia:` 引用。按 App 内置资源放行，"
-                    + "但本机无法确认它真的存在 —— 如果目录该有图，请回来确认。")
+                if isInStrictScope(finding) {
+                    strictBlocked += 1
+                    review.blockingIssues.append(
+                        "「严格策略」\(finding.owner) 写的是裸名字「\(name)」，"
+                        + "既不是图片资源 id 也不是 `bundle:` / `local:` / `thmedia:` 引用。"
+                        + "存量数据按内置资源放行，但**本次新增 / 修改的内容不允许这样写**。")
+                } else {
+                    review.warnings.append(
+                        "\(finding.owner) 写的是一个裸名字「\(name)」，既不是图片资源 id 也不是 "
+                        + "`bundle:` / `local:` / `thmedia:` 引用。按 App 内置资源放行，"
+                        + "但本机无法确认它真的存在 —— 如果目录该有图，请回来确认。")
+                }
             case .bundled:
                 break
             }
+        }
+
+        for mediaKey in unverifiedKeys.sorted() {
+            review.warnings.append(
+                "「严格策略」媒体键 \(String(mediaKey.prefix(16)))… 已远端化，但本机无法确认它在"
+                + environmentSuffix + "真实存在。受控发布器会在第 5 步回读核对，"
+                + "对不上会中止发布 —— 在这之前不要把这理解为「已经上传好了」。")
         }
 
         review.requiredStagedFileNames = required.sorted()
         review.remoteMediaKeys = remoteKeys.sorted()
         review.blockingIssues = deduplicated(review.blockingIssues)
         review.warnings = deduplicated(review.warnings)
+        review.strictAudit = ShopCatalogStrictAudit(
+            policy: strict,
+            scopeEntityCount: strict.blocksUnverifiableReferences ? strictScope.count : 0,
+            unverifiedMediaKeys: unverifiedKeys.sorted(),
+            blockedReferenceCount: strictBlocked)
         return review
     }
 
@@ -288,7 +376,10 @@ public nonisolated enum ShopCatalogPublicationGate {
                     trimmed,
                     assetIDs: assetIDs,
                     allowsAssetID: reference.allowsAssetID,
-                    stagedFileNames: stagedFileNames))
+                    stagedFileNames: stagedFileNames),
+                field: reference.field,
+                entityID: reference.entityID,
+                productID: reference.productID)
         }
     }
 

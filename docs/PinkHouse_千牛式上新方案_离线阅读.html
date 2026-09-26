@@ -1,0 +1,1311 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Pink House｜千牛式上新方案</title><style>
+:root{--ink:#302832;--muted:#786673;--paper:#fffdfa;--accent:#8b4967;--line:#eadde3}
+*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:#f5f0f3;color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Noto Sans CJK SC","PingFang SC","Microsoft YaHei",sans-serif;line-height:1.8}
+a{color:#855071;text-underline-offset:3px}header{padding:58px max(6vw,24px) 40px;background:linear-gradient(125deg,#f4e4ed,#fff9f2);border-bottom:1px solid var(--line)}header .eyebrow{letter-spacing:2.5px;color:var(--accent);font-size:13px;font-weight:700}h1{font-size:clamp(28px,4vw,44px);line-height:1.35;margin:12px 0}header p{max-width:900px;color:#685461;font-size:17px}.meta{font-size:12px!important;word-break:break-word}.nav{position:sticky;top:0;z-index:3;padding:12px 5vw;background:#fffdfaed;border-bottom:1px solid var(--line);display:flex;gap:22px;flex-wrap:wrap;backdrop-filter:blur(12px)}.nav a{text-decoration:none;font-size:14px;font-weight:600}main{max-width:1320px;margin:auto;padding:32px 24px 70px}.intro{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-bottom:30px}.card{background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:22px}.card b{font-size:19px;color:var(--accent)}.card p{color:var(--muted);font-size:14px;margin-bottom:0}.document,.diagrams{background:var(--paper);padding:34px;border:1px solid var(--line);border-radius:16px;margin:28px 0;scroll-margin-top:85px}.document h1{font-size:28px}.document h2,.diagrams h2{font-size:23px;border-bottom:1px solid var(--line);padding-bottom:8px;margin-top:36px}.document h3{font-size:19px;margin-top:26px}.document h4{font-size:17px}.section-tag{font-size:11px;letter-spacing:2px;color:var(--accent);font-weight:700}.document p,.document li{font-size:15px}blockquote{margin:20px 0;padding:12px 18px;background:#f6f0f3;border-left:3px solid #b9819a;color:#705c69}blockquote p{margin:0}table{width:100%;border-collapse:collapse;font-size:14px;margin:20px 0;display:block;overflow-x:auto}th{background:#f1e6ed;text-align:left}td,th{border-bottom:1px solid var(--line);padding:12px;vertical-align:top;min-width:120px}tr:nth-child(even){background:#fcf7fa}code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.87em;overflow-wrap:anywhere;background:#f0e9ef;border-radius:3px;padding:1px 4px}pre{padding:18px;border-radius:9px;background:#f6f1f5;overflow:auto;line-height:1.65}pre code{background:transparent;padding:0;overflow-wrap:normal}.diagram-grid{display:grid;grid-template-columns:1fr 1fr;gap:28px}.diagram-grid article{border:1px solid var(--line);border-radius:12px;padding:20px;background:#fff}.diagram-grid h3{font-size:17px;margin-top:0}.svg-wrap{overflow:auto;display:flex;justify-content:center}.svg-wrap svg{width:100%;height:auto;max-height:none}.note{font-size:13px;color:var(--muted)}footer{color:var(--muted);font-size:12px;padding:24px;text-align:center}.button{border:1px solid var(--line);border-radius:7px;padding:6px 10px;background:white;font:inherit;cursor:pointer}.document img{max-width:100%}@media(max-width:800px){.intro,.diagram-grid{grid-template-columns:1fr}main{padding:15px}.document,.diagrams{padding:20px}.nav{gap:14px}.document h1{font-size:24px}td,th{min-width:145px}}@media print{.nav,.button{display:none}body{background:white}.document,.diagrams{border:0;break-before:page;margin:0;padding:0}header{background:white;padding:10px}.intro{display:none}.diagram-grid{display:block}.diagram-grid article{break-after:page}a{color:inherit}pre{white-space:pre-wrap}.document h2,.document h3{break-after:avoid}table{display:table;font-size:10px}td,th{padding:6px;min-width:0}footer{display:none}}
+</style></head><body><header><div class="eyebrow">PINK HOUSE / MAC OPERATIONS</div><h1>把“目录编辑器”补成<br>真正的上新工作台</h1><p>千牛式商品操作 · 复用 SharedCatalog · 接通现有受控发布器<br>三份交付：产品计划、流程图、实际代码改造与验收清单。</p><p class="meta">STATIC AUDIT · 2026-09-26 · main @ 051eca73172510136c9ddaed04d03eba0895fb69<br>未修改仓库或公共库；未运行项目构建与真机测试。图是目标设计，不是千牛官方截图。</p></header><nav class="nav"><a href="#visual">流程总览</a><a href="#doc1">01 复刻计划</a><a href="#doc2">02 流程图源</a><a href="#doc3">03 代码与验收</a><button class="button" onclick="window.print()">打印 / 保存</button></nav><main><div class="intro"><div class="card"><b>已有的，继续用</b><p>原生 Mac、SwiftData 草稿、共享领域模型、素材规范化、门禁、tar 与七步发布。</p></div><div class="card"><b>缺少的，补成闭环</b><p>丰富商品编辑、稳定恢复、可视化素材、版本差异、真实发布任务与回执。</p></div><div class="card"><b>成功标准，不能偷换</b><p>保存 ≠ 导出 ≠ 上线。发布头回读确认，才显示发布已确认。</p></div></div><section id="visual" class="diagrams"><div class="section-tag">WORKFLOW OVERVIEW</div><h2>两个流程，一条事实链</h2><p class="note">可离线查看；SVG 文字可选中放大。Mermaid 编辑源在第二份文档与随附 .mmd 文件。</p><div class="diagram-grid"><article><h3>A · 运营上新闭环</h3><div class="svg-wrap"><svg width="454pt" height="981pt"
+ viewBox="0.00 0.00 453.92 980.92" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+<g id="graph0" class="graph" transform="scale(1 1) rotate(0) translate(12.96 967.96)">
+<title>G</title>
+<!-- A -->
+<g id="node1" class="node">
+<title>A</title>
+<path fill="#fffafa" stroke="#d8bbc5" d="M358,-955C358,-955 164,-955 164,-955 158,-955 152,-949 152,-943 152,-943 152,-919 152,-919 152,-913 158,-907 164,-907 164,-907 358,-907 358,-907 364,-907 370,-913 370,-919 370,-919 370,-943 370,-943 370,-949 364,-955 358,-955"/>
+<text text-anchor="middle" x="261" y="-934.8" font-family="Noto Sans CJK SC" font-size="14.00" fill="#332b31">选择店家 / 系列</text>
+<text text-anchor="middle" x="261" y="-919.8" font-family="Noto Sans CJK SC" font-size="14.00" fill="#332b31">新建、复制或编辑已发布商品</text>
+</g>
+<!-- B -->
+<g id="node2" class="node">
+<title>B</title>
+<path fill="#fffafa" stroke="#d8bbc5" d="M377,-870C377,-870 145,-870 145,-870 139,-870 133,-864 133,-858 133,-858 133,-834 133,-834 133,-828 139,-822 145,-822 145,-822 377,-822 377,-822 383,-822 389,-828 389,-834 389,-834 389,-858 389,-858 389,-864 383,-870 377,-870"/>
+<text text-anchor="middle" x="261" y="-849.8" font-family="Noto Sans CJK SC" font-size="14.00" fill="#332b31">完整商品编辑</text>
+<text text-anchor="middle" x="261" y="-834.8" font-family="Noto Sans CJK SC" font-size="14.00" fill="#332b31">图文 · 规格 · 价格 · 表格 · 档期</text>
+</g>
+<!-- A&#45;&gt;B -->
+<g id="edge1" class="edge">
+<title>A&#45;&gt;B</title>
+<path fill="none" stroke="#927b86" d="M261,-906.88C261,-897.78 261,-887.21 261,-877.5"/>
+<polygon fill="#927b86" stroke="#927b86" points="263.45,-877.28 261,-870.28 258.55,-877.28 263.45,-877.28"/>
+</g>
+<!-- C -->
+<g id="node3" class="node">
+<title>C</title>
+<path fill="#fffafa" stroke="#d8bbc5" d="M237,-785C237,-785 129,-785 129,-785 123,-785 117,-779 117,-773 117,-773 117,-749 117,-749 117,-743 123,-737 129,-737 129,-737 237,-737 237,-737 243,-737 249,-743 249,-749 249,-749 249,-773 249,-773 249,-779 243,-785 237,-785"/>
+<text text-anchor="middle" x="183" y="-764.8" font-family="Noto Sans CJK SC" font-size="14.00" fill="#332b31">保存草稿与版本</text>
+<text text-anchor="middle" x="183" y="-749.8" font-family="Noto Sans CJK SC" font-size="14.00" fill="#332b31">失败保留输入</text>
+</g>
+<!-- B&#45;&gt;C -->
+<g id="edge2" class="edge">
+<title>B&#45;&gt;C</title>
+<path fill="none" stroke="#927b86" d="M239.27,-821.88C230.14,-812.16 219.42,-800.75 209.8,-790.51"/>
+<polygon fill="#927b86" stroke="#927b86" points="211.46,-788.71 204.88,-785.28 207.89,-792.06 211.46,-788.71"/>
+</g>
+<!-- D -->
+<g id="node4" class="node">
+<title>D</title>
+<path fill="#fffafa" stroke="#d8bbc5" d="M240,-689C240,-689 104,-689 104,-689 98,-689 92,-683 92,-677 92,-677 92,-665 92,-665 92,-659 98,-653 104,-653 104,-653 240,-653 240,-653 246,-653 252,-659 252,-665 252,-665 252,-677 252,-677 252,-683 246,-689 240,-689"/>
+<text text-anchor="middle" x="172" y="-667.3" font-family="Noto Sans CJK SC" font-size="14.00" fill="#332b31">当前快照校验 + 预览</text>
+</g>
+<!-- C&#45;&gt;D -->
+<g id="edge3" class="edge">
+<title>C&#45;&gt;D</title>
+<path fill="none" stroke="#927b86" d="M180.11,-736.88C178.55,-724.36 176.61,-708.91 175.03,-696.23"/>
+<polygon fill="#927b86" stroke="#927b86" points="177.44,-695.77 174.14,-689.13 172.58,-696.38 177.44,-695.77"/>
+</g>
+<!-- E -->
+<g id="node5" class="node">
+<title>E</title>
+<polygon fill="#fff1d8" stroke="#d8bbc5" points="231,-616 113,-583 231,-550 349,-583 231,-616"/>
+<text text-anchor="middle" x="231" y="-579.3" font-family="Noto Sans CJK SC" font-size="14.00" fill="#332b31">有阻断问题？</text>
+</g>
+<!-- D&#45;&gt;E -->
+<g id="edge4" class="edge">
+<title>D&#45;&gt;E</title>
+<path fill="none" stroke="#927b86" d="M183.94,-652.6C191,-642.3 200.17,-628.94 208.54,-616.74"/>
+<polygon fill="#927b86" stroke="#927b86" points="210.63,-618.02 212.57,-610.86 206.59,-615.25 210.63,-618.02"/>
+</g>
+<!-- E&#45;&gt;B -->
+<g id="edge5" class="edge">
+<title>E&#45;&gt;B</title>
+<path fill="none" stroke="#927b86" d="M248.13,-611.44C254.8,-623.67 261.64,-638.56 265,-653 278.02,-708.86 271.73,-776.35 266.21,-814.61"/>
+<polygon fill="#927b86" stroke="#927b86" points="263.74,-814.58 265.12,-821.86 268.58,-815.3 263.74,-814.58"/>
+<text text-anchor="middle" x="278" y="-710.2" font-family="Noto Sans CJK SC" font-size="11.00" fill="#69535f">有</text>
+</g>
+<!-- F -->
+<g id="node6" class="node">
+<title>F</title>
+<path fill="#fffafa" stroke="#d8bbc5" d="M328,-502C328,-502 134,-502 134,-502 128,-502 122,-496 122,-490 122,-490 122,-466 122,-466 122,-460 128,-454 134,-454 134,-454 328,-454 328,-454 334,-454 340,-460 340,-466 340,-466 340,-490 340,-490 340,-496 334,-502 328,-502"/>
+<text text-anchor="middle" x="231" y="-481.8" font-family="Noto Sans CJK SC" font-size="14.00" fill="#332b31">确认差异、目标环境与基线</text>
+<text text-anchor="middle" x="231" y="-466.8" font-family="Noto Sans CJK SC" font-size="14.00" fill="#332b31">合成完整目录，保留未改内容</text>
+</g>
+<!-- E&#45;&gt;F -->
+<g id="edge6" class="edge">
+<title>E&#45;&gt;F</title>
+<path fill="none" stroke="#927b86" d="M231,-549.97C231,-537.04 231,-522.19 231,-509.42"/>
+<polygon fill="#927b86" stroke="#927b86" points="233.45,-509.17 231,-502.17 228.55,-509.17 233.45,-509.17"/>
+<text text-anchor="middle" x="237" y="-523.2" font-family="Noto Sans CJK SC" font-size="11.00" fill="#69535f">无</text>
+</g>
+<!-- G -->
+<g id="node7" class="node">
+<title>G</title>
+<path fill="#eeeafa" stroke="#d8bbc5" d="M311.5,-417C311.5,-417 150.5,-417 150.5,-417 144.5,-417 138.5,-411 138.5,-405 138.5,-405 138.5,-381 138.5,-381 138.5,-375 144.5,-369 150.5,-369 150.5,-369 311.5,-369 311.5,-369 317.5,-369 323.5,-375 323.5,-381 323.5,-381 323.5,-405 323.5,-405 323.5,-411 317.5,-417 311.5,-417"/>
+<text text-anchor="middle" x="231" y="-396.8" font-family="Noto Sans CJK SC" font-size="14.00" fill="#332b31">受控发布任务</text>
+<text text-anchor="middle" x="231" y="-381.8" font-family="Noto Sans CJK SC" font-size="14.00" fill="#332b31">复用现有 Python 发布器</text>
+</g>
+<!-- F&#45;&gt;G -->
+<g id="edge7" class="edge">
+<title>F&#45;&gt;G</title>
+<path fill="none" stroke="#927b86" d="M231,-453.88C231,-444.78 231,-434.21 231,-424.5"/>
+<polygon fill="#927b86" stroke="#927b86" points="233.45,-424.28 231,-417.28 228.55,-424.28 233.45,-424.28"/>
+</g>
+<!-- H -->
+<g id="node8" class="node">
+<title>H</title>
+<polygon fill="#fff1d8" stroke="#d8bbc5" points="147,-332 29,-299 147,-266 265,-299 147,-332"/>
+<text text-anchor="middle" x="147" y="-295.3" font-family="Noto Sans CJK SC" font-size="14.00" fill="#332b31">回读已确认？</text>
+</g>
+<!-- G&#45;&gt;H -->
+<g id="edge8" class="edge">
+<title>G&#45;&gt;H</title>
+<path fill="none" stroke="#927b86" d="M209.8,-368.78C199.34,-357.33 186.58,-343.35 175.29,-330.99"/>
+<polygon fill="#927b86" stroke="#927b86" points="177.09,-329.32 170.56,-325.8 173.47,-332.62 177.09,-329.32"/>
+</g>
+<!-- I -->
+<g id="node9" class="node">
+<title>I</title>
+<path fill="#fffafa" stroke="#d8bbc5" d="M416,-212C416,-212 214,-212 214,-212 208,-212 202,-206 202,-200 202,-200 202,-188 202,-188 202,-182 208,-176 214,-176 214,-176 416,-176 416,-176 422,-176 428,-182 428,-188 428,-188 428,-200 428,-200 428,-206 422,-212 416,-212"/>
+<text text-anchor="middle" x="315" y="-190.3" font-family="Noto Sans CJK SC" font-size="14.00" fill="#332b31">查询状态 / 安全重试 / 处理冲突</text>
+</g>
+<!-- H&#45;&gt;I -->
+<g id="edge9" class="edge">
+<title>H&#45;&gt;I</title>
+<path fill="none" stroke="#927b86" d="M180.53,-274.98C198.29,-263.01 220.6,-248.35 241,-236 252.45,-229.07 265.12,-221.87 276.7,-215.49"/>
+<polygon fill="#927b86" stroke="#927b86" points="278.05,-217.54 283,-212.03 275.69,-213.25 278.05,-217.54"/>
+<text text-anchor="middle" x="268.5" y="-239.2" font-family="Noto Sans CJK SC" font-size="11.00" fill="#69535f">失败 / 不明</text>
+</g>
+<!-- J -->
+<g id="node10" class="node">
+<title>J</title>
+<path fill="#e4f3ea" stroke="#d8bbc5" d="M165,-218C165,-218 57,-218 57,-218 51,-218 45,-212 45,-206 45,-206 45,-182 45,-182 45,-176 51,-170 57,-170 57,-170 165,-170 165,-170 171,-170 177,-176 177,-182 177,-182 177,-206 177,-206 177,-212 171,-218 165,-218"/>
+<text text-anchor="middle" x="111" y="-197.8" font-family="Noto Sans CJK SC" font-size="14.00" fill="#332b31">已发布 + 回执</text>
+<text text-anchor="middle" x="111" y="-182.8" font-family="Noto Sans CJK SC" font-size="14.00" fill="#332b31">不是仅导出成功</text>
+</g>
+<!-- H&#45;&gt;J -->
+<g id="edge11" class="edge">
+<title>H&#45;&gt;J</title>
+<path fill="none" stroke="#927b86" d="M136.78,-268.76C132,-255.09 126.31,-238.82 121.5,-225.04"/>
+<polygon fill="#927b86" stroke="#927b86" points="123.69,-223.89 119.07,-218.1 119.07,-225.51 123.69,-223.89"/>
+<text text-anchor="middle" x="135" y="-239.2" font-family="Noto Sans CJK SC" font-size="11.00" fill="#69535f">是</text>
+</g>
+<!-- I&#45;&gt;G -->
+<g id="edge10" class="edge">
+<title>I&#45;&gt;G</title>
+<path fill="none" stroke="#927b86" d="M312.61,-212.23C308.42,-239 298.18,-291.68 278,-332 272.45,-343.08 264.68,-354.08 257.05,-363.58"/>
+<polygon fill="#927b86" stroke="#927b86" points="255.15,-362.02 252.59,-368.98 258.93,-365.14 255.15,-362.02"/>
+<text text-anchor="middle" x="329.5" y="-296.2" font-family="Noto Sans CJK SC" font-size="11.00" fill="#69535f">确认可恢复</text>
+</g>
+<!-- K -->
+<g id="node11" class="node">
+<title>K</title>
+<path fill="#fffafa" stroke="#d8bbc5" d="M210,-133C210,-133 12,-133 12,-133 6,-133 0,-127 0,-121 0,-121 0,-97 0,-97 0,-91 6,-85 12,-85 12,-85 210,-85 210,-85 216,-85 222,-91 222,-97 222,-97 222,-121 222,-121 222,-127 216,-133 210,-133"/>
+<text text-anchor="middle" x="111" y="-112.8" font-family="Noto Sans CJK SC" font-size="14.00" fill="#332b31">iOS 验证并读取公共目录</text>
+<text text-anchor="middle" x="111" y="-97.8" font-family="Noto Sans CJK SC" font-size="14.00" fill="#332b31">时光馆 → 店家 → 系列 → 商品</text>
+</g>
+<!-- J&#45;&gt;K -->
+<g id="edge12" class="edge">
+<title>J&#45;&gt;K</title>
+<path fill="none" stroke="#927b86" d="M111,-169.88C111,-160.78 111,-150.21 111,-140.5"/>
+<polygon fill="#927b86" stroke="#927b86" points="113.45,-140.28 111,-133.28 108.55,-140.28 113.45,-140.28"/>
+</g>
+<!-- L -->
+<g id="node12" class="node">
+<title>L</title>
+<path fill="#e4f3ea" stroke="#d8bbc5" d="M201,-48C201,-48 21,-48 21,-48 15,-48 9,-42 9,-36 9,-36 9,-12 9,-12 9,-6 15,0 21,0 21,0 201,0 201,0 207,0 213,-6 213,-12 213,-12 213,-36 213,-36 213,-42 207,-48 201,-48"/>
+<text text-anchor="middle" x="111" y="-27.8" font-family="Noto Sans CJK SC" font-size="14.00" fill="#332b31">沿用心愿 / 心愿尾款 / 衣橱</text>
+<text text-anchor="middle" x="111" y="-12.8" font-family="Noto Sans CJK SC" font-size="14.00" fill="#332b31">个人记录不被公共修价覆盖</text>
+</g>
+<!-- K&#45;&gt;L -->
+<g id="edge13" class="edge">
+<title>K&#45;&gt;L</title>
+<path fill="none" stroke="#927b86" d="M111,-84.88C111,-75.78 111,-65.21 111,-55.5"/>
+<polygon fill="#927b86" stroke="#927b86" points="113.45,-55.28 111,-48.28 108.55,-55.28 113.45,-55.28"/>
+</g>
+</g>
+</svg>
+</div></article><article><h3>B · 受控发布与失败恢复</h3><div class="svg-wrap"><svg width="585pt" height="823pt"
+ viewBox="0.00 0.00 584.92 822.92" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+<g id="graph0" class="graph" transform="scale(1 1) rotate(0) translate(12.96 809.96)">
+<title>G</title>
+<g id="clust1" class="cluster">
+<title>cluster_mac</title>
+<path fill="transparent" stroke="#d8bbc5" d="M293,-617C293,-617 539,-617 539,-617 545,-617 551,-623 551,-629 551,-629 551,-777 551,-777 551,-783 545,-789 539,-789 539,-789 293,-789 293,-789 287,-789 281,-783 281,-777 281,-777 281,-629 281,-629 281,-623 287,-617 293,-617"/>
+<text text-anchor="middle" x="416" y="-773.8" font-family="Noto Sans CJK SC" font-size="14.00">Mac：本次需补齐的编排</text>
+</g>
+<g id="clust2" class="cluster">
+<title>cluster_worker</title>
+<path fill="transparent" stroke="#c5bfd8" d="M50,-88C50,-88 260,-88 260,-88 266,-88 272,-94 272,-100 272,-100 272,-586 272,-586 272,-592 266,-598 260,-598 260,-598 50,-598 50,-598 44,-598 38,-592 38,-586 38,-586 38,-100 38,-100 38,-94 44,-88 50,-88"/>
+<text text-anchor="middle" x="155" y="-582.8" font-family="Noto Sans CJK SC" font-size="14.00">受控发布器：保留现有顺序</text>
+</g>
+<!-- A -->
+<g id="node1" class="node">
+<title>A</title>
+<path fill="#fffafa" stroke="#d8bbc5" d="M531,-758C531,-758 301,-758 301,-758 295,-758 289,-752 289,-746 289,-746 289,-722 289,-722 289,-716 295,-710 301,-710 301,-710 531,-710 531,-710 537,-710 543,-716 543,-722 543,-722 543,-746 543,-746 543,-752 537,-758 531,-758"/>
+<text text-anchor="middle" x="416" y="-737.8" font-family="Noto Sans CJK SC" font-size="14.00" fill="#332b31">冻结草稿</text>
+<text text-anchor="middle" x="416" y="-722.8" font-family="Noto Sans CJK SC" font-size="14.00" fill="#332b31">revision + baseRelease + requestID</text>
+</g>
+<!-- B -->
+<g id="node2" class="node">
+<title>B</title>
+<path fill="#fffafa" stroke="#d8bbc5" d="M506,-673C506,-673 326,-673 326,-673 320,-673 314,-667 314,-661 314,-661 314,-637 314,-637 314,-631 320,-625 326,-625 326,-625 506,-625 506,-625 512,-625 518,-631 518,-637 518,-637 518,-661 518,-661 518,-667 512,-673 506,-673"/>
+<text text-anchor="middle" x="416" y="-652.8" font-family="Noto Sans CJK SC" font-size="14.00" fill="#332b31">复校验、差异确认</text>
+<text text-anchor="middle" x="416" y="-637.8" font-family="Noto Sans CJK SC" font-size="14.00" fill="#332b31">完整目录合成与旧基线检查</text>
+</g>
+<!-- A&#45;&gt;B -->
+<g id="edge1" class="edge">
+<title>A&#45;&gt;B</title>
+<path fill="none" stroke="#927b86" d="M416,-709.88C416,-700.78 416,-690.21 416,-680.5"/>
+<polygon fill="#927b86" stroke="#927b86" points="418.45,-680.28 416,-673.28 413.55,-680.28 418.45,-680.28"/>
+</g>
+<!-- C -->
+<g id="node3" class="node">
+<title>C</title>
+<path fill="#fffafa" stroke="#d8bbc5" d="M237.5,-567C237.5,-567 100.5,-567 100.5,-567 94.5,-567 88.5,-561 88.5,-555 88.5,-555 88.5,-543 88.5,-543 88.5,-537 94.5,-531 100.5,-531 100.5,-531 237.5,-531 237.5,-531 243.5,-531 249.5,-537 249.5,-543 249.5,-543 249.5,-555 249.5,-555 249.5,-561 243.5,-567 237.5,-567"/>
+<text text-anchor="middle" x="169" y="-545.3" font-family="Noto Sans CJK SC" font-size="14.00" fill="#332b31">构建不可变发布产物</text>
+</g>
+<!-- B&#45;&gt;C -->
+<g id="edge7" class="edge">
+<title>B&#45;&gt;C</title>
+<path fill="none" stroke="#927b86" d="M357.78,-624.9C315.58,-608.16 259.11,-585.75 218.95,-569.82"/>
+<polygon fill="#927b86" stroke="#927b86" points="219.56,-567.43 212.15,-567.12 217.76,-571.98 219.56,-567.43"/>
+</g>
+<!-- X -->
+<g id="node9" class="node">
+<title>X</title>
+<path fill="#fff1d8" stroke="#d8bbc5" d="M540,-144C540,-144 360,-144 360,-144 354,-144 348,-138 348,-132 348,-132 348,-108 348,-108 348,-102 354,-96 360,-96 360,-96 540,-96 540,-96 546,-96 552,-102 552,-108 552,-108 552,-132 552,-132 552,-138 546,-144 540,-144"/>
+<text text-anchor="middle" x="450" y="-123.8" font-family="Noto Sans CJK SC" font-size="14.00" fill="#332b31">基线过期 / changeTag 冲突</text>
+<text text-anchor="middle" x="450" y="-108.8" font-family="Noto Sans CJK SC" font-size="14.00" fill="#332b31">合并并重新确认</text>
+</g>
+<!-- B&#45;&gt;X -->
+<g id="edge8" class="edge">
+<title>B&#45;&gt;X</title>
+<path fill="none" stroke="#927b86" d="M457.16,-624.88C481.65,-607.79 508,-581.97 508,-550 508,-550 508,-550 508,-215 508,-190.54 493.6,-167.11 479.14,-149.76"/>
+<polygon fill="#927b86" stroke="#927b86" points="480.69,-147.81 474.26,-144.12 476.99,-151.02 480.69,-147.81"/>
+<text text-anchor="middle" x="531" y="-382.2" font-family="Noto Sans CJK SC" font-size="11.00" fill="#69535f">基线过期</text>
+</g>
+<!-- D -->
+<g id="node4" class="node">
+<title>D</title>
+<path fill="#fffafa" stroke="#d8bbc5" d="M252,-494C252,-494 58,-494 58,-494 52,-494 46,-488 46,-482 46,-482 46,-458 46,-458 46,-452 52,-446 58,-446 58,-446 252,-446 252,-446 258,-446 264,-452 264,-458 264,-458 264,-482 264,-482 264,-488 258,-494 252,-494"/>
+<text text-anchor="middle" x="155" y="-473.8" font-family="Noto Sans CJK SC" font-size="14.00" fill="#332b31">1. 复校验产物</text>
+<text text-anchor="middle" x="155" y="-458.8" font-family="Noto Sans CJK SC" font-size="14.00" fill="#332b31">2. 读 THRelease + changeTag</text>
+</g>
+<!-- C&#45;&gt;D -->
+<g id="edge2" class="edge">
+<title>C&#45;&gt;D</title>
+<path fill="none" stroke="#927b86" d="M165.89,-530.91C164.31,-522.21 162.34,-511.37 160.51,-501.32"/>
+<polygon fill="#927b86" stroke="#927b86" points="162.88,-500.62 159.21,-494.17 158.06,-501.5 162.88,-500.62"/>
+</g>
+<!-- E -->
+<g id="node5" class="node">
+<title>E</title>
+<path fill="#fffafa" stroke="#d8bbc5" d="M240,-409C240,-409 76,-409 76,-409 70,-409 64,-403 64,-397 64,-397 64,-373 64,-373 64,-367 70,-361 76,-361 76,-361 240,-361 240,-361 246,-361 252,-367 252,-373 252,-373 252,-397 252,-397 252,-403 246,-409 240,-409"/>
+<text text-anchor="middle" x="158" y="-388.8" font-family="Noto Sans CJK SC" font-size="14.00" fill="#332b31">3. 上传缺失 THMedia</text>
+<text text-anchor="middle" x="158" y="-373.8" font-family="Noto Sans CJK SC" font-size="14.00" fill="#332b31">4. 上传缺失 THDataPack</text>
+</g>
+<!-- D&#45;&gt;E -->
+<g id="edge3" class="edge">
+<title>D&#45;&gt;E</title>
+<path fill="none" stroke="#927b86" d="M155.84,-445.88C156.16,-436.78 156.55,-426.21 156.9,-416.5"/>
+<polygon fill="#927b86" stroke="#927b86" points="159.35,-416.37 157.16,-409.28 154.46,-416.19 159.35,-416.37"/>
+</g>
+<!-- F -->
+<g id="node6" class="node">
+<title>F</title>
+<path fill="#fffafa" stroke="#d8bbc5" d="M242.5,-324C242.5,-324 91.5,-324 91.5,-324 85.5,-324 79.5,-318 79.5,-312 79.5,-312 79.5,-300 79.5,-300 79.5,-294 85.5,-288 91.5,-288 91.5,-288 242.5,-288 242.5,-288 248.5,-288 254.5,-294 254.5,-300 254.5,-300 254.5,-312 254.5,-312 254.5,-318 248.5,-324 242.5,-324"/>
+<text text-anchor="middle" x="167" y="-302.3" font-family="Noto Sans CJK SC" font-size="14.00" fill="#332b31">5. 回读资源并核对摘要</text>
+</g>
+<!-- E&#45;&gt;F -->
+<g id="edge4" class="edge">
+<title>E&#45;&gt;F</title>
+<path fill="none" stroke="#927b86" d="M160.7,-360.9C161.78,-351.67 163.02,-341.03 164.12,-331.65"/>
+<polygon fill="#927b86" stroke="#927b86" points="166.58,-331.69 164.96,-324.45 161.71,-331.12 166.58,-331.69"/>
+</g>
+<!-- G -->
+<g id="node7" class="node">
+<title>G</title>
+<path fill="#eadff4" stroke="#d8bbc5" stroke-width="2" d="M243,-240C243,-240 91,-240 91,-240 85,-240 79,-234 79,-228 79,-228 79,-204 79,-204 79,-198 85,-192 91,-192 91,-192 243,-192 243,-192 249,-192 255,-198 255,-204 255,-204 255,-228 255,-228 255,-234 249,-240 243,-240"/>
+<text text-anchor="middle" x="167" y="-219.8" font-family="Noto Sans CJK SC" font-size="14.00" fill="#332b31">6. 条件更新 THRelease</text>
+<text text-anchor="middle" x="167" y="-204.8" font-family="Noto Sans CJK SC" font-size="14.00" fill="#332b31">唯一版本生效点</text>
+</g>
+<!-- F&#45;&gt;G -->
+<g id="edge5" class="edge">
+<title>F&#45;&gt;G</title>
+<path fill="none" stroke="#927b86" d="M167,-287.61C167,-276.12 167,-260.74 167,-247.27"/>
+<polygon fill="#927b86" stroke="#927b86" points="169.45,-247.02 167,-240.02 164.55,-247.02 169.45,-247.02"/>
+</g>
+<!-- Y -->
+<g id="node10" class="node">
+<title>Y</title>
+<path fill="#fff1d8" stroke="#d8bbc5" d="M457.5,-240C457.5,-240 292.5,-240 292.5,-240 286.5,-240 280.5,-234 280.5,-228 280.5,-228 280.5,-204 280.5,-204 280.5,-198 286.5,-192 292.5,-192 292.5,-192 457.5,-192 457.5,-192 463.5,-192 469.5,-198 469.5,-204 469.5,-204 469.5,-228 469.5,-228 469.5,-234 463.5,-240 457.5,-240"/>
+<text text-anchor="middle" x="375" y="-219.8" font-family="Noto Sans CJK SC" font-size="14.00" fill="#332b31">切头前失败</text>
+<text text-anchor="middle" x="375" y="-204.8" font-family="Noto Sans CJK SC" font-size="14.00" fill="#332b31">旧版仍有效，保存恢复点</text>
+</g>
+<!-- F&#45;&gt;Y -->
+<g id="edge10" class="edge">
+<title>F&#45;&gt;Y</title>
+<path fill="none" stroke="#927b86" d="M207.6,-287.82C237.75,-275.07 279.39,-257.45 313.6,-242.98"/>
+<polygon fill="#927b86" stroke="#927b86" points="314.84,-245.11 320.33,-240.13 312.93,-240.6 314.84,-245.11"/>
+<text text-anchor="middle" x="306.5" y="-261.2" font-family="Noto Sans CJK SC" font-size="11.00" fill="#69535f">资源不完整</text>
+</g>
+<!-- H -->
+<g id="node8" class="node">
+<title>H</title>
+<path fill="#fffafa" stroke="#d8bbc5" d="M252,-144C252,-144 80,-144 80,-144 74,-144 68,-138 68,-132 68,-132 68,-108 68,-108 68,-102 74,-96 80,-96 80,-96 252,-96 252,-96 258,-96 264,-102 264,-108 264,-108 264,-132 264,-132 264,-138 258,-144 252,-144"/>
+<text text-anchor="middle" x="166" y="-123.8" font-family="Noto Sans CJK SC" font-size="14.00" fill="#332b31">7. 回读发布头</text>
+<text text-anchor="middle" x="166" y="-108.8" font-family="Noto Sans CJK SC" font-size="14.00" fill="#332b31">核对环境 / seq / rootHash</text>
+</g>
+<!-- G&#45;&gt;H -->
+<g id="edge6" class="edge">
+<title>G&#45;&gt;H</title>
+<path fill="none" stroke="#927b86" d="M166.75,-191.76C166.62,-179.56 166.46,-164.46 166.32,-151.35"/>
+<polygon fill="#927b86" stroke="#927b86" points="168.77,-151.27 166.25,-144.29 163.87,-151.32 168.77,-151.27"/>
+</g>
+<!-- G&#45;&gt;X -->
+<g id="edge9" class="edge">
+<title>G&#45;&gt;X</title>
+<path fill="none" stroke="#927b86" d="M236.59,-191.88C278.23,-178.06 331.17,-160.47 373.91,-146.27"/>
+<polygon fill="#927b86" stroke="#927b86" points="374.81,-148.56 380.68,-144.03 373.26,-143.91 374.81,-148.56"/>
+<text text-anchor="middle" x="336.5" y="-165.2" font-family="Noto Sans CJK SC" font-size="11.00" fill="#69535f">冲突</text>
+</g>
+<!-- Z -->
+<g id="node11" class="node">
+<title>Z</title>
+<path fill="#fff1d8" stroke="#d8bbc5" d="M192,-48C192,-48 12,-48 12,-48 6,-48 0,-42 0,-36 0,-36 0,-12 0,-12 0,-6 6,0 12,0 12,0 192,0 192,0 198,0 204,-6 204,-12 204,-12 204,-36 204,-36 204,-42 198,-48 192,-48"/>
+<text text-anchor="middle" x="102" y="-27.8" font-family="Noto Sans CJK SC" font-size="14.00" fill="#332b31">切头后结果不明</text>
+<text text-anchor="middle" x="102" y="-12.8" font-family="Noto Sans CJK SC" font-size="14.00" fill="#332b31">先回读，禁止直接换号重发</text>
+</g>
+<!-- H&#45;&gt;Z -->
+<g id="edge11" class="edge">
+<title>H&#45;&gt;Z</title>
+<path fill="none" stroke="#927b86" d="M116.52,-95.77C110.3,-90.79 104.8,-84.89 101,-78 97.22,-71.15 96.06,-63.01 96.2,-55.19"/>
+<polygon fill="#927b86" stroke="#927b86" points="98.65,-55.28 96.65,-48.14 93.76,-54.97 98.65,-55.28"/>
+<text text-anchor="middle" x="118" y="-69.2" font-family="Noto Sans CJK SC" font-size="11.00" fill="#69535f">待确认</text>
+</g>
+<!-- R -->
+<g id="node12" class="node">
+<title>R</title>
+<path fill="#e4f3ea" stroke="#d8bbc5" d="M421.5,-48C421.5,-48 240.5,-48 240.5,-48 234.5,-48 228.5,-42 228.5,-36 228.5,-36 228.5,-12 228.5,-12 228.5,-6 234.5,0 240.5,0 240.5,0 421.5,0 421.5,0 427.5,0 433.5,-6 433.5,-12 433.5,-12 433.5,-36 433.5,-36 433.5,-42 427.5,-48 421.5,-48"/>
+<text text-anchor="middle" x="331" y="-27.8" font-family="Noto Sans CJK SC" font-size="14.00" fill="#332b31">回执入库，Mac 显示已确认</text>
+<text text-anchor="middle" x="331" y="-12.8" font-family="Noto Sans CJK SC" font-size="14.00" fill="#332b31">iOS 验证后切换可见目录</text>
+</g>
+<!-- H&#45;&gt;R -->
+<g id="edge13" class="edge">
+<title>H&#45;&gt;R</title>
+<path fill="none" stroke="#927b86" d="M206.79,-95.76C230.28,-82.38 259.89,-65.51 284.31,-51.6"/>
+<polygon fill="#927b86" stroke="#927b86" points="285.53,-53.73 290.4,-48.13 283.1,-49.47 285.53,-53.73"/>
+<text text-anchor="middle" x="282" y="-69.2" font-family="Noto Sans CJK SC" font-size="11.00" fill="#69535f">确认一致</text>
+</g>
+<!-- Z&#45;&gt;H -->
+<g id="edge12" class="edge">
+<title>Z&#45;&gt;H</title>
+<path fill="none" stroke="#927b86" d="M123.22,-48.18C127.99,-53.84 132.86,-59.99 137,-66 142.07,-73.35 146.98,-81.68 151.27,-89.52"/>
+<polygon fill="#927b86" stroke="#927b86" points="149.25,-90.94 154.71,-95.95 153.57,-88.63 149.25,-90.94"/>
+<text text-anchor="middle" x="156.5" y="-69.2" font-family="Noto Sans CJK SC" font-size="11.00" fill="#69535f">查询</text>
+</g>
+</g>
+</svg>
+</div></article></div></section><section id="doc1" class="document"><div class="section-tag">DOCUMENT 01</div><h1>01｜Pink House Mac 千牛式上新复刻计划</h1>
+<blockquote>
+<p>核查仓库：<code>dragon717/Pink_House</code><br />
+基准：<code>main @ 051eca73172510136c9ddaed04d03eba0895fb69</code><br />
+提交时间：2026-09-26 13:29:10 UTC（日本时间 22:29:10）。<br />
+状态：静态代码核查与设计交付；未修改仓库、未运行 Xcode 构建/Swift 单测/真机测试、未读写实际 CloudKit 公共数据，也未检查你的本地未提交修改。<br />
+文中的“目标”“新增”“应改”为建议，不代表已经实现；不是阿里官方内部计划，也不是已验证的千牛最新界面像素复刻。</p>
+</blockquote>
+<h2>1. 结论与交付边界</h2>
+<p><strong>不重建一个 Mac App，不重建一套 Catalog，不重写已有发布器。把现有 PinkHouseOps 从“离线目录编辑与导出工具”，补成“以商品为中心的上新工作台”，并接通现有受控发布链路。</strong></p>
+<p>现有 Mac 入口已明确：导入 JSON/图片 → 本地编辑 → 离线校验 → 导出待发布包；真正写公共库由 <code>tools/time_hall/publication/</code> 执行。Mac 本地数据容器显式关闭 CloudKit 自动同步。[E01][E02]</p>
+<p>本轮“完整复刻”采用可验收定义：运营在 Mac 内完成新建/复制商品、编辑完整信息、选择素材、维护规格与价格、存草稿、校验预览、确认发布、看到真实回执、编辑已发布内容、归档恢复和追踪失败。不把“能导出 tar”当作完成发布，也不把“已有上传任务列表”当作已经有上传执行器。[E05][E06]</p>
+<p>不扩大到客服聊天、交易订单、付款、物流、退款、营销投放和真实扣库存。它们属于另一套业务，不是当前时光馆上新的必需项。普通用户继续消费公共目录并使用已有心愿、心愿尾款和衣橱；不变更 iOS 主导航与视觉风格，不恢复此前已下线的淘宝分享文本自动导入流程。</p>
+<p>**像素级对齐另设证据门槛：**本次核实的是千牛官方公开能力介绍，没有登录你的千牛 Mac，也没有当前账号、类目、版本对应的录屏。因此下面是可执行的千牛式交互方案，不将推测的表单顺序、按钮位置或样式标成官方事实。[Q01][Q02]</p>
+<h2>2. 千牛能力如何映射到 Pink House</h2>
+<table>
+<thead>
+<tr>
+<th>千牛参考能力</th>
+<th>Pink House 本轮落点</th>
+<th>不直接照搬的部分</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>工作台、分类导航、待处理事项</td>
+<td>上新概览、草稿数、待校验、发布异常、最近发布</td>
+<td>不虚构 GMV、订单量、库存周转率</td>
+</tr>
+<tr>
+<td>商品发布与已发布商品维护</td>
+<td>一个商品编辑器贯穿新建、草稿、修改、复制</td>
+<td>不把 JSON 文件编辑当成用户主流程</td>
+</tr>
+<tr>
+<td>图片空间与选图</td>
+<td>可视化素材库、主图排序、规格图、尺码原图与系列封面</td>
+<td>不要求运营认识 hash、assetID、local:</td>
+</tr>
+<tr>
+<td>多规格与批量操作</td>
+<td>规格矩阵、确认真实组合、批量填充、复制同款</td>
+<td>不凭颜色×尺码自动断言所有组合都在售</td>
+</tr>
+<tr>
+<td>草稿和上下架管理</td>
+<td>商品工作副本、归档/恢复、发布版本追踪</td>
+<td>不把普通归档等同于强制删除墓碑</td>
+</tr>
+<tr>
+<td>预售信息</td>
+<td>预约价/现货价、定金尾款、预约阶段与尾款时间</td>
+<td>不引入真实付款、发货及扣库存</td>
+</tr>
+</tbody>
+</table>
+<p>千牛桌面版的表单发品、商品编辑、上下架和预售能力由官方介绍直接支持；图片空间、草稿、复制同款及批量规格的细节以官方移动版能力介绍作为参考，不能据此声称 Mac 最新页面完全相同。[Q01][Q02]</p>
+<h2>3. 目标工作台结构</h2>
+<pre><code class="language-text">Pink House 运营
+├─ 工作台             待处理事项、最近发布、恢复上次草稿
+├─ 商品管理           搜索 / 店家 / 系列 / 品类 / 发布状态
+│  ├─ 全部商品
+│  ├─ 草稿与待发布
+│  ├─ 已发布
+│  └─ 已归档
+├─ 店家与系列         店家资料、系列阶段、系列价格表、款式档案
+├─ 素材库             缩略图、用途、引用关系、导入异常
+└─ 发布中心           校验、差异确认、真实任务、回执、回滚
+</code></pre>
+<p>保留现有 <code>NavigationSplitView</code>、本机工作区、页面级 sheet 和统一状态反馈。把“目录编辑”三级列表保留为店家/系列维护的辅助视图，主工作流改成商品管理 → 商品编辑页。不能为了高仿把现有 SwiftUI 工程另换成 Electron/Web，也不新建第四套商品数据。[E03][E04]</p>
+<p>商品列表建议列：缩略图、商品名、店家/系列、品类、款式名、规格数、预约/现货价格、销售阶段、编辑状态、最近成功发布版本。列表标签必须区分“本地已改”“已经上线”“线上待回读”，不能只放一个含义模糊的“已保存”。</p>
+<h2>4. 商品编辑页：一页闭环，不再多处寻找</h2>
+<p>编辑器采用左侧章节索引、中间编辑区、右侧当前商品预览、底部固定动作栏。建议章节如下：</p>
+<table>
+<thead>
+<tr>
+<th>章节</th>
+<th>必须能维护</th>
+<th>现有模型落点</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>基础信息</td>
+<td>店家、系列、商品名、品类、款式名、说明</td>
+<td>CatalogShop / CatalogSeries / CatalogProduct.designName、description</td>
+</tr>
+<tr>
+<td>图文素材</td>
+<td>有序主图、首图、详情图、规格图、来源说明</td>
+<td>CatalogProduct.images / CatalogAsset / CatalogProductVariant.imageAssetID</td>
+</tr>
+<tr>
+<td>规格</td>
+<td>颜色、尺码、真实组合、规格图、批量填充</td>
+<td>CatalogProductVariant</td>
+</tr>
+<tr>
+<td>价格与历史</td>
+<td>预约价与现货价并存、定金尾款、币种、再贩</td>
+<td>CatalogSaleEvent 与 CatalogPriceCorrection 分离</td>
+</tr>
+<tr>
+<td>系列档期</td>
+<td>预约中/结束、尾款中、现货；起止时间与大致说明</td>
+<td>CatalogSeries.salePhase 与预约/尾款字段</td>
+</tr>
+<tr>
+<td>两类表格</td>
+<td>商品尺码表与原图；系列共用价格表</td>
+<td>CatalogSizeChart / CatalogSeries.priceChart</td>
+</tr>
+<tr>
+<td>发布检查</td>
+<td>引用、价格、图片、来源、版本差异、目标环境</td>
+<td>SharedCatalog 门禁 + 发布任务记录</td>
+</tr>
+</tbody>
+</table>
+<p>这些领域字段多数已在共享模型里；缺的是 Mac 的编辑入口和部分可复用业务规则，不是从零设计全部数据结构。[E08]</p>
+<p>底部固定动作：<strong>保存草稿｜预览｜检查问题｜提交发布</strong>。保存失败保留编辑内容，不关闭编辑页；发布不是本地保存的同义词。</p>
+<h3>4.1 价格必须保留现有业务语义</h3>
+<p>“修正当前价格”和“新增一次预约/现货/再贩事件”必须是两个明确动作。修价写 <code>priceCorrection</code>，业务历史写 <code>saleEvents</code>，不能每次点保存都追加一条销售记录。金额与币种一起显示和验证；未知价留未知，不能写成 0；未知币种不静默当 CNY。[E08]</p>
+<p>**SKU 精确价格是一个真实协议缺口，不能用界面掩盖。**当前 <code>CatalogProductVariant</code> 只有配色、尺码与规格图，没有每 SKU 的价格和库存；销售记录是商品级，价格分档只保留区间。若要做到“每个规格一行不同价格”的千牛式矩阵，必须扩展共享合同，例如在销售事件上新增可选规格价格明细（variantID、价格、定金、尾款；币种继承该事件），再补消费者读取、导入导出与版本兼容。不能把 min/max 区间冒充每个 SKU 的实际报价。[E08]</p>
+<p>新规格价格扩展默认不启用；在明确来源数据和读者兼容前，只展示当前模型真实支持的商品级价格与区间。真实库存不在本轮范围，不伪造 0、999 或“无限库存”。</p>
+<h3>4.2 商品、款式与规格身份</h3>
+<p>保留已有实体 ID；改名、改价、换图都不重建 ID。复制同款是新商品，生成新商品/规格/新事件身份，复用有权限使用的素材引用，但不得复制旧发布回执或旧销售历史作为新发生的事实。多选加入衣橱的主衣物/小物规则不重写。</p>
+<p>已有同款不同色归组沿用 <code>designName</code> 与现行展示逻辑；不为了套用通用 SPU/SKU 教科书模型合并掉已经被个人衣橱引用的商品。[E08]</p>
+<h3>4.3 素材操作</h3>
+<p>商品图应直接拖入当前编辑器，自动入 staging 并选中为该商品素材；也可以从素材库复用。主图顺序是<strong>每个商品自己的有序数组</strong>，不是素材库的全局顺序。支持缩略图、放大、拖拽排序、设首图、解除绑定、查看被谁使用。</p>
+<p>目前 <code>BindImagesSheet</code> 用 Set 选图，再按全局 assets 顺序回写，不能稳定保存每件商品自己的图片排序；同时仍显示 assetID 与 URL，而非缩略图。这是 Mac 的明确改造点，不能根据最近提交标题就认定 Mac 已完成缩略图改造。[E04]</p>
+<p>继续复用已有图片规范化、内容 hash、立即拷贝到 staging、断点台账。当前规范化结果被同时用作 thumbnail/preview/original 引用；若产品承诺下载“原始上传文件”，需另存源文件或明确称为“发布高清图”，不要把重编码结果描述为字节不变的原图。[E02]</p>
+<h2>5. 两个范围必须分开：操作单位是商品，发布单位仍是整包</h2>
+<p>当前商店目录使用完整 <code>shopCatalog</code> 分片，和其他时光馆内容共用发布头。Mac 草稿也以完整 Catalog JSON 存储，coverageStatus 默认 complete。[E07][E11]</p>
+<p>因此不能把某个商品的新草稿直接标 complete 发出去。正确做法是：</p>
+<pre><code class="language-text">当前线上完整基线 + 本次商品变更集 + 显式归档/删除意图
+                     ↓
+合成新的完整 ShopCatalog，保留未改动店家/系列/商品
+                     ↓
+构建完整发布根清单，保留不属于本轮的其他时光馆分片
+</code></pre>
+<p>本地草稿应记录 baseReleaseSeq、baseRootIndexHash、draftRevision。本次编辑不能悄悄覆盖其他运营或其他设备后来发布的修改。发布前比较基线，过期时展示差异并合并/重新确认；不能只自动把 releaseSeq 加一继续覆盖。</p>
+<p>第一阶段仍可保持“一份完整目录工作区”，先把编辑体验商品化，不急着把 SwiftData 改成复杂实体关系库。之后的每商品工作副本也只是编辑层数据，不得成为第二套公共 Catalog。</p>
+<h2>6. 发布方案：复用本机受控发布器，先不强加一个服务器</h2>
+<p>**优先路线：Mac 原生工作台 → 受控本地发布桥接器 → 现有 Python 发布流水线 → CloudKit。**这与入口文件和 entitlements 中的既有本地发布方向一致。[E01][E12]</p>
+<p>需要新增的是任务编排与可观测回执，不是第二份 CloudKit 协议。桥接器只接受固定动作和经过验证的产物路径，调用固定可执行程序及参数列表；禁止把用户文本拼成 shell 命令。私钥由原发布器从受控凭证位置读取，不能进入 App 资源、Catalog、导出包、命令行或日志。</p>
+<p>**沙箱与打包是前置验收项。**当前已打开网络和用户选中文件读写权限，但这不等于外部 Python、依赖、Keychain 和 staging 访问已经全部可用。先在真实签名构建上验证固定运行时、文件访问、凭证读取和子进程回执；不允许静默依赖运营电脑上随意安装的 Python。若实际沙箱/签名方案不适配，再引入签名伴随发布助手，仍只保留一份 Python 发布逻辑。不能把取消沙箱、复制长期密钥进 App 当作修复。</p>
+<p>多名运营并发、无人值守定时发布、跨设备审批属于后续扩展，再把同一发布器搬到受控服务端。没有持续运行的执行器时，不能提供“关机后保证定时发布”的承诺；暂时只提供到时提醒，或把定时发布明确列为未开放能力。</p>
+<h3>6.1 真实发布顺序</h3>
+<p>现有 Python 已实现以下主顺序，应保留：[E10]</p>
+<ol>
+<li>复校验不可变产物。</li>
+<li>读当前 THRelease 与 changeTag。</li>
+<li>上传缺失 THMedia。</li>
+<li>上传缺失 THDataPack。</li>
+<li>回读校验资源可获取性与摘要。</li>
+<li>带 changeTag 条件更新 THRelease。</li>
+<li>回读确认新发布头。</li>
+</ol>
+<p>只有第 6 步之后线上头指向新版本；只有回读确认后 Mac 才显示“发布已确认”。这是一套应用层提交协议，不是对整个 CloudKit 公共库多记录事务能力的宣称。终端出现成功字符串也不等于每个离线用户已经刷新。</p>
+<p>要补的可靠性：结构化进度、持久化 jobID/产物 hash/目标环境、幂等请求、提交结果不明时先回读、发布回执入库、和草稿版本关联。现有 CLI 对小于等于线上版本号的请求直接拒绝；新增桥接幂等逻辑必须识别“同一产物已经成功”与“新版本已经取代它”，而不是失败后无脑换号重发。[E10]</p>
+<h3>6.2 状态设计</h3>
+<p>已有 <code>CatalogPublicationStatus</code> 不要复制一份同义模型。[E08] 另外两条不同状态轴必须独立：</p>
+<table>
+<thead>
+<tr>
+<th>状态轴</th>
+<th>语义</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>编辑/审核状态</td>
+<td>本地未保存、草稿、已提交审核、已审核；绑定 draftRevision</td>
+</tr>
+<tr>
+<td>发布执行状态</td>
+<td>等待、构建、上传、验证、切头、结果待确认、已确认、可重试失败、冲突</td>
+</tr>
+<tr>
+<td>系列销售阶段</td>
+<td>预约中、预约已结束、尾款中、现货；沿用共享领域规则</td>
+</tr>
+</tbody>
+</table>
+<p>“已发布”不代表“现货”；“有现货价”不代表预约历史应消失；“本地保存成功”不代表用户已经能看到。</p>
+<h2>7. 实施顺序与完成闸门</h2>
+<table>
+<thead>
+<tr>
+<th>阶段</th>
+<th>交付内容</th>
+<th>必须拿到的证据</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>M0 基线与范围</td>
+<td>当前 HEAD/工作区记录、草稿与 staging 备份、现有测试基线、必要的千牛授权参考截图</td>
+<td>基线报告；不覆盖你的本地未提交代码；参考版本与类目可追溯</td>
+</tr>
+<tr>
+<td>M1 可靠性地基</td>
+<td>保存错误不吞、坏草稿隔离、真实 dirty/revision、所有变更使校验失效、导出服务复校验</td>
+<td>故障注入失败用例转绿；关闭重启仍可恢复</td>
+</tr>
+<tr>
+<td>M2 商品编辑闭环</td>
+<td>商品列表、完整编辑器、素材可视化、规格、价格双流程、系列档期、两种表格</td>
+<td>同一份输入 Mac 编辑后 iOS 无损读取；图片顺序与币种正确</td>
+</tr>
+<tr>
+<td>M3 真实发布闭环</td>
+<td>本地受控桥接、基线差异、结构化任务、回读回执、断点与冲突处理</td>
+<td>Mac 点发布后无需手开终端；Development 中另一台设备可读到一致数据</td>
+</tr>
+<tr>
+<td>M4 运营效率与维护</td>
+<td>复制、批量修改、归档恢复、发布历史、回滚、可选 SKU 精确价扩展</td>
+<td>批量差异可审计、身份不漂移、旧个人记录不受影响</td>
+</tr>
+<tr>
+<td>M5 上线</td>
+<td>权限、签名运行时、Production 独立检查、消费者回归、文档统一</td>
+<td>实际验证记录，不用截图或旧“测试通过”文字代替真实测试</td>
+</tr>
+</tbody>
+</table>
+<p>M1 不能被“先把页面画得像”挤到最后；M3 未通过前，整体只能称“编辑端完成”，不能称“千牛式上新完整复刻完成”。</p>
+<h2>8. 给 Agent 的最终边界</h2>
+<p>先修可靠性，再完善编辑器，再接发布器，最后补批量和维护。遇到已有同等能力优先收口，不照建议路径重复造文件。只迁出 iOS 中可以共享的纯规则，不能把整个 iOS 界面和个人数据服务塞进共享包。保留原有商品、规格、销售事件和个人引用；新草稿不是重新编号的理由。</p>
+<p>配套阅读：<code>02_上新业务与发布流程图.md</code>、<code>03_PinkHouse实际代码修改与Agent验收清单.md</code>。</p>
+<h2>证据索引</h2>
+<p>事实引用固定到本次核查提交。文件路径存在不等于其中全部行为已被本次逐行验证；范围限制已在条目中注明。</p>
+<ul>
+<li>
+<p>[E01] <a href="https://github.com/dragon717/Pink_House/blob/051eca73172510136c9ddaed04d03eba0895fb69/PinkHouseOps/PinkHouseOpsApp.swift">Mac 入口与发布职责边界：<code>PinkHouseOps/PinkHouseOpsApp.swift</code></a></p>
+</li>
+<li>
+<p>[E02] <a href="https://github.com/dragon717/Pink_House/blob/051eca73172510136c9ddaed04d03eba0895fb69/PinkHouseOps/Services/OpsWorkspace.swift">工作区：草稿、编辑、素材、校验与导出：<code>PinkHouseOps/Services/OpsWorkspace.swift</code></a></p>
+</li>
+<li>
+<p>[E03] <a href="https://github.com/dragon717/Pink_House/blob/051eca73172510136c9ddaed04d03eba0895fb69/PinkHouseOps/Views/OpsRootView.swift">Mac 导航与统一反馈：<code>PinkHouseOps/Views/OpsRootView.swift</code></a></p>
+</li>
+<li>
+<p>[E04] <a href="https://github.com/dragon717/Pink_House/blob/051eca73172510136c9ddaed04d03eba0895fb69/PinkHouseOps/Views/OpsCatalogEditorView.swift">Mac 商品基础表单与图片绑定：<code>PinkHouseOps/Views/OpsCatalogEditorView.swift</code></a></p>
+</li>
+<li>
+<p>[E05] <a href="https://github.com/dragon717/Pink_House/blob/051eca73172510136c9ddaed04d03eba0895fb69/PinkHouseOps/Views/OpsMediaLibraryView.swift">素材任务台账；P1 不执行真实上传：<code>PinkHouseOps/Views/OpsMediaLibraryView.swift</code></a></p>
+</li>
+<li>
+<p>[E06] <a href="https://github.com/dragon717/Pink_House/blob/051eca73172510136c9ddaed04d03eba0895fb69/PinkHouseOps/Views/OpsValidationView.swift">Mac 校验与导出入口：<code>PinkHouseOps/Views/OpsValidationView.swift</code></a></p>
+</li>
+<li>
+<p>[E07] <a href="https://github.com/dragon717/Pink_House/blob/051eca73172510136c9ddaed04d03eba0895fb69/PinkHouseOps/Models/OpsCatalogDraftRecord.swift">本地整包草稿记录：<code>PinkHouseOps/Models/OpsCatalogDraftRecord.swift</code></a></p>
+</li>
+<li>
+<p>[E08] <a href="https://github.com/dragon717/Pink_House/blob/051eca73172510136c9ddaed04d03eba0895fb69/Packages/SharedCatalog/Sources/SharedCatalog/Models/ShopCatalogModels.swift">唯一共享目录模型、价格与阶段字段：<code>Packages/SharedCatalog/Sources/SharedCatalog/Models/ShopCatalogModels.swift</code></a></p>
+</li>
+<li>
+<p>[E09] <a href="https://github.com/dragon717/Pink_House/blob/051eca73172510136c9ddaed04d03eba0895fb69/Packages/SharedCatalog/Sources/SharedCatalog/Publishing/ShopCatalogPublicationGate.swift">共享发布前门禁：<code>Packages/SharedCatalog/Sources/SharedCatalog/Publishing/ShopCatalogPublicationGate.swift</code></a></p>
+</li>
+<li>
+<p>[E10] <a href="https://github.com/dragon717/Pink_House/blob/051eca73172510136c9ddaed04d03eba0895fb69/tools/time_hall/publication/publish_cloudkit.py">Python 七步发布实现：<code>tools/time_hall/publication/publish_cloudkit.py</code></a></p>
+</li>
+<li>
+<p>[E11] <a href="https://github.com/dragon717/Pink_House/blob/051eca73172510136c9ddaed04d03eba0895fb69/tools/time_hall/publication/README.md">现有流水线、产物协议与回滚说明：<code>tools/time_hall/publication/README.md</code></a></p>
+</li>
+<li>
+<p>[E12] <a href="https://github.com/dragon717/Pink_House/blob/051eca73172510136c9ddaed04d03eba0895fb69/PinkHouseOps/PinkHouseOps.entitlements">Mac 沙箱与网络权限：<code>PinkHouseOps/PinkHouseOps.entitlements</code></a></p>
+</li>
+<li>
+<p>[E13] <a href="https://github.com/dragon717/Pink_House/tree/051eca73172510136c9ddaed04d03eba0895fb69/Packages/SharedCatalog">已存在的共享包与测试目录：<code>Packages/SharedCatalog/</code></a></p>
+</li>
+<li>
+<p>[E14] <a href="https://github.com/dragon717/Pink_House/tree/051eca73172510136c9ddaed04d03eba0895fb69/ItemManager/Services/ShopCatalog">已存在的 iOS 领域辅助函数目录：<code>ItemManager/Services/ShopCatalog/</code></a></p>
+</li>
+<li>
+<p>[E15] <a href="https://github.com/dragon717/Pink_House/blob/051eca73172510136c9ddaed04d03eba0895fb69/PinkHouseOps/Views/OpsPreviewView.swift">已存在的 Mac 预览文件（本次未逐行审计）：<code>PinkHouseOps/Views/OpsPreviewView.swift</code></a></p>
+</li>
+<li>
+<p>[E16] <a href="https://github.com/dragon717/Pink_House/blob/051eca73172510136c9ddaed04d03eba0895fb69/PinkHouseOps/SnapshotHarness.swift">已存在的 Mac 快照工具（本次未逐行审计）：<code>PinkHouseOps/SnapshotHarness.swift</code></a></p>
+</li>
+<li>
+<p>[Q01] <a href="https://apps.apple.com/cn/app/id6449173707?mt=12">浙江淘宝网络有限公司：千牛 Mac 桌面版官方应用介绍</a>。公开介绍支持表单发品、已发布商品编辑、上下架及预售等；未据此推断登录后页面的精确布局。</p>
+</li>
+<li>
+<p>[Q02] <a href="https://apps.apple.com/cn/app/id590217303">浙江淘宝网络有限公司：千牛移动版官方应用介绍</a>。图片空间、保存草稿、复制同款、多规格、批量操作的能力参考；不把移动版介绍当成 Mac 截图。</p>
+</li>
+</ul>
+</section><section id="doc2" class="document"><div class="section-tag">DOCUMENT 02</div><h1>02｜上新业务与发布流程图</h1>
+<blockquote>
+<p>核查仓库：<code>dragon717/Pink_House</code><br />
+基准：<code>main @ 051eca73172510136c9ddaed04d03eba0895fb69</code><br />
+提交时间：2026-09-26 13:29:10 UTC（日本时间 22:29:10）。<br />
+状态：静态代码核查与设计交付；未修改仓库、未运行 Xcode 构建/Swift 单测/真机测试、未读写实际 CloudKit 公共数据，也未检查你的本地未提交修改。<br />
+文中的“目标”“新增”“应改”为建议，不代表已经实现；不是阿里官方内部计划，也不是已验证的千牛最新界面像素复刻。</p>
+</blockquote>
+<h2>1. 图例与事实边界</h2>
+<p>图 A 是本次设计的目标操作流程；图 B 是“新增 Mac 编排 + 复用现有七步发布器”的组合；图 C 说明提交与回读时序。它们不是千牛官方流程图。<code>build_release.py</code>、<code>publish_cloudkit.py</code>、THRelease/THDataPack/THMedia 来自当前仓库；requestID、基线绑定和 Mac 发布中心是建议补齐项。[E01][E10][E11]</p>
+<p>当前与目标的最大差别：</p>
+<pre><code class="language-text">当前：Mac 编辑 → 校验 → 导出 tar → 人工运行既有发布脚本 → CloudKit
+目标：Mac 编辑 → 校验与差异确认 → 受控任务桥接既有发布器 → 回执回到 Mac
+</code></pre>
+<h2>2. 图 A：运营上新闭环</h2>
+<pre><code class="language-mermaid">flowchart TD
+    A[选择店家与系列] --&gt; B{新建还是维护}
+    B --&gt;|新建或复制| C[创建草稿
+复制产生新身份]
+    B --&gt;|编辑已发布| D[读取线上基线
+保留现有身份]
+    C --&gt; E[完整商品编辑
+图文 · 规格 · 价格 · 表格 · 档期]
+    D --&gt; E
+    E --&gt; F[保存草稿与版本
+失败保留输入]
+    F --&gt; G[当前版本校验 + 预览]
+    G --&gt; H{全部阻断项已解决}
+    H --&gt;|否| E
+    H --&gt;|是| I[确认变更范围与环境
+检查过期基线]
+    I --&gt; J[合成完整目录
+保留未改内容]
+    J --&gt; K[提交受控发布任务]
+    K --&gt; L{回读确认成功}
+    L --&gt;|失败或不明| M[查询任务结果
+重试或处理冲突]
+    M --&gt; K
+    L --&gt;|是| N[更新已发布状态和回执]
+    N --&gt; O[iOS 拉取并验证公共目录]
+    O --&gt; P[时光馆 → 店家 → 系列 → 商品]
+    P --&gt; Q[沿用心愿 / 心愿尾款 / 衣橱]
+</code></pre>
+<p>读图要点：新建与复制产生新身份；编辑已发布商品保留身份。失败返回的是原草稿，不能重新生成商品。用户端使用时光馆既有链路，不另外创建一个“千牛商城”。</p>
+<h2>3. 图 B：发布技术流程</h2>
+<pre><code class="language-mermaid">flowchart TD
+    A[Mac 冻结草稿快照
+revision + baseRelease + requestID] --&gt; B[复校验与完整目录合成]
+    B --&gt; C{线上基线仍一致}
+    C --&gt;|否| X[展示冲突
+合并后重新确认]
+    X --&gt; A
+    C --&gt;|是| D[现有 build_release.py
+构建不可变产物]
+    D --&gt; E[现有 publish_cloudkit.py
+复校验并读 THRelease / changeTag]
+    E --&gt; F[上传缺失 THMedia]
+    F --&gt; G[上传缺失 THDataPack]
+    G --&gt; H[回读资源与摘要]
+    H --&gt; I{资源完整可读}
+    I --&gt;|否| Y[保存检查点
+旧线上版本不变]
+    Y --&gt; E
+    I --&gt;|是| J[条件更新 THRelease
+唯一版本生效点]
+    J --&gt;|changeTag 冲突| X
+    J --&gt; K[回读发布头
+确认环境 + seq + rootHash]
+    K --&gt; L{结果明确}
+    L --&gt;|成功| M[持久化回执
+Mac 显示发布已确认]
+    L --&gt;|不明确| Z[先查询提交结果
+禁止直接换号重发]
+    Z --&gt; K
+    M --&gt; N[iOS 校验后切换本地可见目录]
+</code></pre>
+<p>资源上传成功不是发布成功。发布头条件更新是线上版本生效点；回读成功才是工作台的已确认状态。若切头后客户端超时，必须先确定该请求是否已生效，不能把“没有拿到响应”当作“没有执行”。</p>
+<p>其中“旧线上版本不变”只适用于发布头切换前的失败；切换后的失败要进入“结果待确认”，不能误标成完整回滚。其他设备同时发了新版本时，先处理冲突，不用无条件覆盖兜底。[E10]</p>
+<h2>4. 图 C：端到端时序</h2>
+<pre><code class="language-mermaid">sequenceDiagram
+    actor O as 运营
+    participant M as Mac 工作台
+    participant W as 受控本地发布器
+    participant C as CloudKit
+    participant I as iOS 消费端
+    O-&gt;&gt;M: 保存与校验当前草稿版本
+    M--&gt;&gt;O: 预览、差异、环境及来源确认
+    O-&gt;&gt;M: 确认提交
+    M-&gt;&gt;W: 固定产物 + requestID + 基线版本
+    W-&gt;&gt;C: 读取当前发布头与 changeTag
+    W-&gt;&gt;W: 检查基线、构建并复校验
+    W-&gt;&gt;C: 上传缺失媒体与数据包
+    W-&gt;&gt;C: 回读资源，核对摘要
+    W-&gt;&gt;C: 使用 changeTag 条件更新 THRelease
+    alt 冲突
+        C--&gt;&gt;W: 拒绝覆盖
+        W--&gt;&gt;M: 冲突及最新版本
+        M--&gt;&gt;O: 要求合并并重新确认
+    else 请求成功或结果不明
+        W-&gt;&gt;C: 回读 seq、rootHash 与环境
+        C--&gt;&gt;W: 当前发布状态
+        W--&gt;&gt;M: 已确认回执 / 结果待确认
+    end
+    I-&gt;&gt;C: 按既有读路径获取发布头与数据
+    I-&gt;&gt;I: 验证并切换完整目录
+    Note over M,I: 本地草稿、公共目录与个人心愿/衣橱记录相互隔离
+</code></pre>
+<h2>5. 三种典型异常的处理图</h2>
+<pre><code class="language-text">校验通过 → 再改商品/图/系列 → draftRevision 递增 → 旧 review 失效 → 再校验
+
+图片上传半途失败 → 发布头未切换 → 留下检查点 → 校验已存在资源 → 继续缺失项
+
+发布头可能已写成功但响应丢失 → 状态=待确认 → 查询 seq+rootHash+环境
+                                      ├─ 与任务产物一致：确认成功
+                                      ├─ 已被更高版本取代：显示历史任务已被取代，禁止回写旧版
+                                      └─ 未生效：按原任务安全恢复
+</code></pre>
+<h2>6. 业务状态与发布状态不能合并</h2>
+<table>
+<thead>
+<tr>
+<th>你看到的文案</th>
+<th>能证明什么</th>
+<th>不能证明什么</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>草稿已保存</td>
+<td>本机恢复点存在</td>
+<td>商品已经上线</td>
+</tr>
+<tr>
+<td>校验通过</td>
+<td>指定草稿版本通过指定规则</td>
+<td>后续修改也自动有效、远端资源真实存在</td>
+</tr>
+<tr>
+<td>媒体已验证</td>
+<td>指定环境资源可读且摘要正确</td>
+<td>新目录已经生效</td>
+</tr>
+<tr>
+<td>发布已确认</td>
+<td>目标发布头与任务产物一致</td>
+<td>每一台离线设备已同步</td>
+</tr>
+<tr>
+<td>现货</td>
+<td>系列/商品的销售事实</td>
+<td>发布任务是否完成</td>
+</tr>
+</tbody>
+</table>
+<p>“导出 tar”“发布到 Development”“发布到 Production”“消费者已经拉取”必须分别展示，不合并成一个绿勾。[E06][E10]</p>
+<h2>7. 流程图维护规则</h2>
+<p>Markdown 中 Mermaid 是可编辑源；同时提供 <code>.mmd</code> 文件和离线 HTML 内的 SVG 渲染。Agent 修改流程时必须一起更新状态机、验收用例与图，不能只改图不改实际服务。</p>
+<h2>证据索引</h2>
+<p>事实引用固定到本次核查提交。文件路径存在不等于其中全部行为已被本次逐行验证；范围限制已在条目中注明。</p>
+<ul>
+<li>
+<p>[E01] <a href="https://github.com/dragon717/Pink_House/blob/051eca73172510136c9ddaed04d03eba0895fb69/PinkHouseOps/PinkHouseOpsApp.swift">Mac 入口与发布职责边界：<code>PinkHouseOps/PinkHouseOpsApp.swift</code></a></p>
+</li>
+<li>
+<p>[E02] <a href="https://github.com/dragon717/Pink_House/blob/051eca73172510136c9ddaed04d03eba0895fb69/PinkHouseOps/Services/OpsWorkspace.swift">工作区：草稿、编辑、素材、校验与导出：<code>PinkHouseOps/Services/OpsWorkspace.swift</code></a></p>
+</li>
+<li>
+<p>[E03] <a href="https://github.com/dragon717/Pink_House/blob/051eca73172510136c9ddaed04d03eba0895fb69/PinkHouseOps/Views/OpsRootView.swift">Mac 导航与统一反馈：<code>PinkHouseOps/Views/OpsRootView.swift</code></a></p>
+</li>
+<li>
+<p>[E04] <a href="https://github.com/dragon717/Pink_House/blob/051eca73172510136c9ddaed04d03eba0895fb69/PinkHouseOps/Views/OpsCatalogEditorView.swift">Mac 商品基础表单与图片绑定：<code>PinkHouseOps/Views/OpsCatalogEditorView.swift</code></a></p>
+</li>
+<li>
+<p>[E05] <a href="https://github.com/dragon717/Pink_House/blob/051eca73172510136c9ddaed04d03eba0895fb69/PinkHouseOps/Views/OpsMediaLibraryView.swift">素材任务台账；P1 不执行真实上传：<code>PinkHouseOps/Views/OpsMediaLibraryView.swift</code></a></p>
+</li>
+<li>
+<p>[E06] <a href="https://github.com/dragon717/Pink_House/blob/051eca73172510136c9ddaed04d03eba0895fb69/PinkHouseOps/Views/OpsValidationView.swift">Mac 校验与导出入口：<code>PinkHouseOps/Views/OpsValidationView.swift</code></a></p>
+</li>
+<li>
+<p>[E07] <a href="https://github.com/dragon717/Pink_House/blob/051eca73172510136c9ddaed04d03eba0895fb69/PinkHouseOps/Models/OpsCatalogDraftRecord.swift">本地整包草稿记录：<code>PinkHouseOps/Models/OpsCatalogDraftRecord.swift</code></a></p>
+</li>
+<li>
+<p>[E08] <a href="https://github.com/dragon717/Pink_House/blob/051eca73172510136c9ddaed04d03eba0895fb69/Packages/SharedCatalog/Sources/SharedCatalog/Models/ShopCatalogModels.swift">唯一共享目录模型、价格与阶段字段：<code>Packages/SharedCatalog/Sources/SharedCatalog/Models/ShopCatalogModels.swift</code></a></p>
+</li>
+<li>
+<p>[E09] <a href="https://github.com/dragon717/Pink_House/blob/051eca73172510136c9ddaed04d03eba0895fb69/Packages/SharedCatalog/Sources/SharedCatalog/Publishing/ShopCatalogPublicationGate.swift">共享发布前门禁：<code>Packages/SharedCatalog/Sources/SharedCatalog/Publishing/ShopCatalogPublicationGate.swift</code></a></p>
+</li>
+<li>
+<p>[E10] <a href="https://github.com/dragon717/Pink_House/blob/051eca73172510136c9ddaed04d03eba0895fb69/tools/time_hall/publication/publish_cloudkit.py">Python 七步发布实现：<code>tools/time_hall/publication/publish_cloudkit.py</code></a></p>
+</li>
+<li>
+<p>[E11] <a href="https://github.com/dragon717/Pink_House/blob/051eca73172510136c9ddaed04d03eba0895fb69/tools/time_hall/publication/README.md">现有流水线、产物协议与回滚说明：<code>tools/time_hall/publication/README.md</code></a></p>
+</li>
+<li>
+<p>[E12] <a href="https://github.com/dragon717/Pink_House/blob/051eca73172510136c9ddaed04d03eba0895fb69/PinkHouseOps/PinkHouseOps.entitlements">Mac 沙箱与网络权限：<code>PinkHouseOps/PinkHouseOps.entitlements</code></a></p>
+</li>
+<li>
+<p>[E13] <a href="https://github.com/dragon717/Pink_House/tree/051eca73172510136c9ddaed04d03eba0895fb69/Packages/SharedCatalog">已存在的共享包与测试目录：<code>Packages/SharedCatalog/</code></a></p>
+</li>
+<li>
+<p>[E14] <a href="https://github.com/dragon717/Pink_House/tree/051eca73172510136c9ddaed04d03eba0895fb69/ItemManager/Services/ShopCatalog">已存在的 iOS 领域辅助函数目录：<code>ItemManager/Services/ShopCatalog/</code></a></p>
+</li>
+<li>
+<p>[E15] <a href="https://github.com/dragon717/Pink_House/blob/051eca73172510136c9ddaed04d03eba0895fb69/PinkHouseOps/Views/OpsPreviewView.swift">已存在的 Mac 预览文件（本次未逐行审计）：<code>PinkHouseOps/Views/OpsPreviewView.swift</code></a></p>
+</li>
+<li>
+<p>[E16] <a href="https://github.com/dragon717/Pink_House/blob/051eca73172510136c9ddaed04d03eba0895fb69/PinkHouseOps/SnapshotHarness.swift">已存在的 Mac 快照工具（本次未逐行审计）：<code>PinkHouseOps/SnapshotHarness.swift</code></a></p>
+</li>
+<li>
+<p>[Q01] <a href="https://apps.apple.com/cn/app/id6449173707?mt=12">浙江淘宝网络有限公司：千牛 Mac 桌面版官方应用介绍</a>。公开介绍支持表单发品、已发布商品编辑、上下架及预售等；未据此推断登录后页面的精确布局。</p>
+</li>
+<li>
+<p>[Q02] <a href="https://apps.apple.com/cn/app/id590217303">浙江淘宝网络有限公司：千牛移动版官方应用介绍</a>。图片空间、保存草稿、复制同款、多规格、批量操作的能力参考；不把移动版介绍当成 Mac 截图。</p>
+</li>
+</ul>
+</section><section id="doc3" class="document"><div class="section-tag">DOCUMENT 03</div><h1>03｜Pink House 实际代码修改与 Agent 验收清单</h1>
+<blockquote>
+<p>核查仓库：<code>dragon717/Pink_House</code><br />
+基准：<code>main @ 051eca73172510136c9ddaed04d03eba0895fb69</code><br />
+提交时间：2026-09-26 13:29:10 UTC（日本时间 22:29:10）。<br />
+状态：静态代码核查与设计交付；未修改仓库、未运行 Xcode 构建/Swift 单测/真机测试、未读写实际 CloudKit 公共数据，也未检查你的本地未提交修改。<br />
+文中的“目标”“新增”“应改”为建议，不代表已经实现；不是阿里官方内部计划，也不是已验证的千牛最新界面像素复刻。</p>
+</blockquote>
+<h2>0. 本次核查得出的工程结论</h2>
+<p>现有工程不是空壳：有独立 Mac App、SwiftData 本地草稿、共享 Catalog 模型、图片规范化与任务状态机、离线引用门禁、tar 导出、Python 七步发布、回读验证及回滚工具。本轮是<strong>补齐编辑能力、修复可靠性并桥接现有发布器</strong>，不是这些能力的从零开发。[E01][E02][E05][E06][E08][E10][E11]</p>
+<p>本次详细阅读 Mac 入口、工作区、主要编辑/媒体/校验/导航代码、草稿记录、共享模型关键段、门禁前半段及发布器主体。预览、快照工具和部分辅助文件仅确认存在；未对所有消费者逻辑逐行审计。表内“待运行验证”不是已确认运行时缺陷。</p>
+<h2>1. 已有能力与真实缺口</h2>
+<table>
+<thead>
+<tr>
+<th>模块</th>
+<th>当前证据</th>
+<th>判断</th>
+<th>本轮处理</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>原生 Mac 工程</td>
+<td>PinkHouseOpsApp + 独立目录 + shared scheme</td>
+<td>已有</td>
+<td>不重复建 target</td>
+</tr>
+<tr>
+<td>主导航</td>
+<td>概览/目录编辑/图片任务/校验/本地预览</td>
+<td>已有，偏工具型</td>
+<td>升级为商品中心、素材中心、发布中心</td>
+</tr>
+<tr>
+<td>草稿</td>
+<td>SwiftData 保存整包 JSON，恢复最近草稿</td>
+<td>已有基础</td>
+<td>增加保存可靠性、版本、恢复与切换</td>
+</tr>
+<tr>
+<td>商品编辑</td>
+<td>店家、系列、名称、品类；图另绑定</td>
+<td>字段明显不足</td>
+<td>补共享模型已有的丰富字段</td>
+</tr>
+<tr>
+<td>素材</td>
+<td>staging、内容 hash、任务记录、缺失检查</td>
+<td>已有基础</td>
+<td>缩略图、排序、用途、真实执行反馈</td>
+</tr>
+<tr>
+<td>上传 UI</td>
+<td>当前文件明确 P1 不执行上传</td>
+<td>不是完整上传器</td>
+<td>从真实发布器事件更新台账</td>
+</tr>
+<tr>
+<td>门禁</td>
+<td>结构问题 + 图片引用 + 告警</td>
+<td>已有</td>
+<td>版本绑定、严格新内容策略、服务复校验</td>
+</tr>
+<tr>
+<td>发布底层</td>
+<td>复校验、资源、回读、changeTag 切头</td>
+<td>已有可复用实现</td>
+<td>加机器可读协议、恢复语义与 UI 桥接</td>
+</tr>
+<tr>
+<td>精确 SKU 价/库存</td>
+<td>当前 Variant 不含这些字段</td>
+<td>合同缺口</td>
+<td>SKU 价按需演进；库存不假做</td>
+</tr>
+</tbody>
+</table>
+<p>以上来自 [E01]–[E11]，不根据历史文档的“计划完成”字样计数。</p>
+<h2>2. 必须先修的代码问题</h2>
+<h3>R01｜校验结果可能过期，但导出仍使用它（P0）</h3>
+<p><strong>证据：</strong><code>OpsWorkspace.markDirty()</code> 只写状态文案，不清空 review、不递增已审查版本。<code>OpsValidationView.export()</code> 依赖已存在的 review。<code>makePublicationArchive()</code> 检查缺失本地图片，但不重新调用完整结构门禁。[E02][E06]</p>
+<p>**修改：**统一编辑命令入口递增 draftRevision；任何新增/删除/移动/换图/导入都使 review 失效。review 绑定当前规范化 Catalog hash 与素材指纹。导出/发布服务入口重新校验当前冻结快照，不能只靠按钮禁用；生成产物使用同一个快照，避免“校验 A，导出 B”。</p>
+<p>**验收：**先校验成功，再制造一个无效父子引用，即使直接调用导出服务也失败；先校验后删除 staging 图也失败；未修改内容的重复校验结果稳定。</p>
+<h3>R02｜保存失败有被后续成功文案覆盖的路径（P0）</h3>
+<p><strong>证据：</strong><code>saveDraft()</code> 内部捕获保存异常但返回 Void；<code>importImages()</code> 调用它后又基于图片导入 failures 重写 lastError。于是图片导入成功而草稿保存失败时，保存错误可能被清除。<code>createDraft()</code> / <code>persist()</code> 等还存在 <code>try? context.save()</code>。[E02]</p>
+<p>**修改：**保存返回 Result 或 throws；事务失败不更新已保存 revision，不报告成功；导图的“处理成功”与“落盘成功”分开汇总。SwiftData 内存对象在失败后的状态需恢复/标脏，不能仅改一条字符串。</p>
+<p>**验收：**模拟磁盘/持久化失败，仍保留输入并显示失败；重启不会把未落盘状态冒充已保存；错误不能被“新增 N 张”覆盖。</p>
+<h3>R03｜损坏草稿应硬隔离，不能只靠提示“不覆盖”（P0）</h3>
+<p><strong>证据：</strong><code>adopt()</code> 解码失败后把 catalog 设为空，但仍保留 draft 记录；后续保存路径没有解码失败只读状态保护。当前注释“不自动覆盖”不等于已从代码上禁止覆盖原始内容。[E02]</p>
+<p>**修改：**增加损坏草稿状态、原始字节备份与只读恢复界面。默认保存/导图/导出均不可覆盖损坏记录；恢复必须另存一份新草稿。加载失败不是合法空目录。</p>
+<p>**验收：**截断 catalogJSON 后打开，再点击所有可能保存的入口，原损坏字节及备份仍保留；显式恢复到新 ID 才能编辑。</p>
+<h3>R04｜图片排序被 Set 与全局顺序吞掉（P1）</h3>
+<p><strong>证据：</strong><code>BindImagesSheet</code> 读取产品 images 后转成 Set，提交时按 catalog.assets 的全局顺序输出。[E04]</p>
+<p>**修改：**每个商品维护有序选图数组；取消勾选仅删该项，新勾选追加，拖拽更新顺序；首图显式可见。素材库排序变化不得改变商品图顺序。</p>
+<p>**验收：**两个商品共享同三张图但顺序不同；重开绑定页、保存、导出、iOS 读取后顺序各自保持。</p>
+<h3>R05｜编辑完成不等于操作成功（P1）</h3>
+<p>**证据：**商品/系列 sheet 调用 workspace 更新后无条件 dismiss；workspace 部分验证失败只赋 lastError。系列新建表单有 season，但新建调用 addSeries 未传 season。当前 Workspace 中 addSeries 也未接收 season。[E02][E04]</p>
+<p>**修改：**编辑命令返回明确结果，成功才关闭。新增/编辑系列使用同一字段提交合同，包含 season 及新接入的档期字段。父子归属校验收口到命令层，不仅放 Picker 的 onChange。</p>
+<p>**验收：**无效名称留在编辑器；新建系列季节保存后可回显；改变系列店家时，要求显式迁移其子项或拒绝，不能留下产品与系列店家不一致。</p>
+<h3>R06｜父子选择变化缺少明确联动（P1，交互待运行复核）</h3>
+<p>**证据：**目录主页面的 clampSelection 由 onAppear 和实体数量变化触发；已读代码没有在 selectedShopID/selectedSeriesID 变化时相应收敛下级选择。[E04]</p>
+<p>**修改：**父选择变化时显式重设/收敛子选择，并在数据更新后重新验证当前 ID；列表不依赖“数量变化”来表达身份或归属变化。</p>
+<p>**验收：**两个同样商品数量的系列来回切换；不会继续操作旧系列的产品或出现假空态。本条为静态风险，未做 UI 运行复现。</p>
+<h3>R07｜本机可以编辑，不代表这份完整包能安全覆盖线上（P0）</h3>
+<p>**证据：**草稿是完整 JSON、coverageStatus 默认 complete；同一个发布头覆盖不止一类内容；现有发布器的 changeTag 读取发生在发布执行阶段，不能自动识别更早创建的草稿已落后。[E07][E10][E11]</p>
+<p>**修改：**草稿冻结 baseReleaseSeq/rootHash；单商品变更必须先合成完整 Catalog，保留未改内容与其他根分片；发布前检测过期基线，再使用现有 CAS 保护执行阶段并发。</p>
+<p>**验收：**A/B 从同一基线编辑不同商品，A 先发后 B 发，B 不能覆盖 A；仅改一家商品不能让其他店家或画册消失。</p>
+<h3>R08｜既有媒体键只是引用，不等于远端已验证（P1）</h3>
+<p>**证据：**离线门禁把符合形式的 mediaKey/thmedia 引用视为已远端化；它不读远端。对悬空 assetID/裸名称采用兼容性告警而非统一阻断。[E09]</p>
+<p>**修改：**保留旧包兼容读；为新创建/修改内容增加明确的严格发布策略：引用必须可解析，已上传状态需按目标环境回读确认，不能因有一串 hash 就跳过验证。若仍保留外链/内置资源，必须展示来源与兼容理由；严格策略同时落实到 Mac 与 Python 自检，不是只改 UI。</p>
+<p>**验收：**合法 hash 但远端无文件被阻断；Development 有图而 Production 无图不能误判已上传；旧数据兼容异常有明确迁移报告。</p>
+<h3>R09｜发布响应丢失需要“待确认”，不能一律重发（P0）</h3>
+<p>**证据：**现有发布器会在本地发布号不大于线上时拒绝；回读头的成功检查主要使用 releaseSeq，回执在流程尾部写出。[E10]</p>
+<p>**修改：**新增持久化 requestID、环境、rootHash、产物 hash 和任务结果。先查是否已经提交同一产物，再决定恢复；回读匹配 seq 与 hash，不能只看版本数字；更高版本已出现则标记已取代，不重发旧内容。发布后回执写盘失败同样进入可恢复查询流程。</p>
+<p>**验收：**切头成功后断网或杀进程，恢复不产生重复发布；新版本已被另一任务取代时不回写旧头。</p>
+<h2>3. 逐文件修改清单：已存在的文件</h2>
+<p>以下文件确实存在；“修改内容”是建议，不是本次已执行的补丁。</p>
+<table>
+<thead>
+<tr>
+<th>现有路径 / 符号</th>
+<th>本轮修改</th>
+<th>完成凭证</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>PinkHouseOps/Views/OpsRootView.swift</code> / OpsSection</td>
+<td>商品中心、素材库、发布中心；全局统一反馈保留；恢复当前草稿</td>
+<td>导航与窗口大小回归，错误始终可见</td>
+</tr>
+<tr>
+<td><code>PinkHouseOps/Views/OpsCatalogEditorView.swift</code> / ProductFormSheet、SeriesFormSheet、BindImagesSheet</td>
+<td>基础 sheet 收敛到完整编辑器；结果成功才 dismiss；修 season、父子选择、图顺序</td>
+<td>字段往返、取消、重开、排序与关联测试</td>
+</tr>
+<tr>
+<td><code>PinkHouseOps/Services/OpsWorkspace.swift</code></td>
+<td>修 R01–R03；统一变更/保存接口；冻结快照；合成完整目录；保留对 SharedCatalog 的委托</td>
+<td>单元/故障注入/恢复测试</td>
+</tr>
+<tr>
+<td><code>PinkHouseOps/Models/OpsCatalogDraftRecord.swift</code></td>
+<td>增加可迁移的 revision、基线、最后保存/发布关联、损坏恢复状态等元数据</td>
+<td>老 SwiftData 存量迁移可打开；不丢 catalogJSON</td>
+</tr>
+<tr>
+<td><code>PinkHouseOps/Views/OpsMediaLibraryView.swift</code></td>
+<td>图片为主、技术键为详情；引用关系；真实事件更新上传台账</td>
+<td>任务状态来自发布器，不伪造已上传</td>
+</tr>
+<tr>
+<td><code>PinkHouseOps/Views/OpsValidationView.swift</code></td>
+<td>保留现有明细，增加定位字段、当前版本校验、差异确认与发布入口</td>
+<td>编辑后旧结果不可用，绕 UI 也不能跳过校验</td>
+</tr>
+<tr>
+<td><code>PinkHouseOps/PinkHouseOpsApp.swift</code></td>
+<td>注册新增本地任务记录；保持 cloudKitDatabase.none</td>
+<td>用户私有库不出现运营草稿；旧库迁移通过</td>
+</tr>
+<tr>
+<td><code>PinkHouseOps/PinkHouseOps.entitlements</code></td>
+<td>验证而非盲加权限；受控运行时/凭证/文件访问验证</td>
+<td>实际签名构建端到端发布，不靠关沙箱</td>
+</tr>
+<tr>
+<td><code>Packages/SharedCatalog/Sources/SharedCatalog/Models/ShopCatalogModels.swift</code></td>
+<td>优先直接用已有丰富模型；确需 SKU 价格时增加可选兼容字段</td>
+<td>旧 JSON、新 JSON、缺字段、消费者兼容测试</td>
+</tr>
+<tr>
+<td><code>Packages/SharedCatalog/Sources/SharedCatalog/Publishing/ShopCatalogPublicationGate.swift</code></td>
+<td>维持兼容读，补严格新内容策略；导出与发布使用一致规则</td>
+<td>悬空图/伪远端/缺图测试</td>
+</tr>
+<tr>
+<td><code>tools/time_hall/publication/publish_cloudkit.py</code></td>
+<td>不改七步顺序；加结构化事件、幂等恢复与完整回执核对</td>
+<td>CLI 旧参数兼容；故障路径无重复/覆盖</td>
+</tr>
+<tr>
+<td><code>tools/time_hall/publication/build_release.py</code>、<code>validate_release.py</code>、<code>protocol.py</code></td>
+<td>共享合同演进时同步；完整 Catalog 与其他分片保留；新严格策略做对齐</td>
+<td>相同 fixture 在 Swift/Python 得到同样阻断结果</td>
+</tr>
+<tr>
+<td><code>tools/time_hall/publication/README.md</code></td>
+<td>说明 Mac 主路径、终端应急路径、环境、回执、失败恢复</td>
+<td>不再把导出等同发布</td>
+</tr>
+</tbody>
+</table>
+<p>另外，<code>OpsPreviewView.swift</code> 与 <code>SnapshotHarness.swift</code> 已存在。本次未逐行验证它们的所有逻辑；执行 Agent 必须先阅读，再扩展完整价格/规格/阶段预览及视觉回归，不要因这里列出路径就假定预览与 iOS 完全一致。[E15][E16]</p>
+<p>iOS 已存在 <code>CatalogAmountText.swift</code>、<code>CatalogSeriesReservationWindow.swift</code>、<code>CatalogSeriesBalanceDue.swift</code>、<code>CatalogChartParser.swift</code> 等辅助文件。应按依赖审查把可跨平台的纯逻辑迁进 SharedCatalog，同时改回原调用点；依赖 iOS 图像/视图/个人落库的部分保留平台适配。目录存在证据见 [E14]；本次没有把这些文件全部当作已审计完的实现。</p>
+<h2>4. 建议新增的位置：不是现有文件</h2>
+<p>先搜索等价实现，找到了就复用。下列名称是建议，不强制制造所有文件。</p>
+<table>
+<thead>
+<tr>
+<th>建议新增路径</th>
+<th>单一职责</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>PinkHouseOps/Views/Products/OpsProductListView.swift</code></td>
+<td>商品搜索、筛选、多选和行操作</td>
+</tr>
+<tr>
+<td><code>PinkHouseOps/Views/Products/OpsProductEditorView.swift</code></td>
+<td>完整编辑器容器；章节和页面级呈现</td>
+</tr>
+<tr>
+<td><code>PinkHouseOps/Views/Products/OpsVariantEditorView.swift</code></td>
+<td>真实规格组合与可选精确价格矩阵</td>
+</tr>
+<tr>
+<td><code>PinkHouseOps/Views/Products/OpsProductMediaEditorView.swift</code></td>
+<td>当前商品选图、排序和用途</td>
+</tr>
+<tr>
+<td><code>PinkHouseOps/Views/Publishing/OpsPublishCenterView.swift</code></td>
+<td>发布差异、任务与回执，不直接写公共库</td>
+</tr>
+<tr>
+<td><code>PinkHouseOps/Services/OpsPublisherBridge.swift</code></td>
+<td>受控可执行程序调用、结构化事件、取消/恢复查询</td>
+</tr>
+<tr>
+<td><code>PinkHouseOps/Services/OpsDraftRepository.swift</code></td>
+<td>可注入的持久化、事务结果、恢复与备份；从 Workspace 渐进提取</td>
+</tr>
+<tr>
+<td><code>PinkHouseOps/Models/OpsPublishJobRecord.swift</code></td>
+<td>本地发布任务；不复制商品领域事实</td>
+</tr>
+<tr>
+<td><code>Packages/SharedCatalog/Sources/SharedCatalog/Editing/</code></td>
+<td>确有必要时容纳跨平台编辑纯规则、变更集/差异计算</td>
+</tr>
+<tr>
+<td><code>tools/time_hall/publication/ops_publish_bridge.py</code></td>
+<td>可选的机器可读包装入口；调用已有模块，禁止另造发布算法</td>
+</tr>
+<tr>
+<td><code>PinkHouseOpsTests/</code></td>
+<td>建立实际 Mac 测试 target 后放草稿/命令/桥接测试；目录本身不能代替 target</td>
+</tr>
+</tbody>
+</table>
+<p>新增 SwiftData 字段需配迁移；新增测试目录需纳入工程 scheme。不要仅提交文件但未加入编译与测试目标。</p>
+<h2>5. 接口约束（设计合同，不是假定现有接口）</h2>
+<h3>5.1 编辑命令</h3>
+<p>所有增删改经统一入口返回成功/失败与变更范围。成功后更新 revision、使 review 失效；失败不关闭编辑器、不报告成功。自动保存如加入，采用合并保存、恢复点和撤销；不能用“自动保存会无法撤销”的旧注释否定恢复设计。</p>
+<h3>5.2 发布请求与回执</h3>
+<p>发布请求至少带：requestID、draftID、draftRevision、baseReleaseSeq、baseRootIndexHash、targetEnvironment、输入包摘要及受控文件句柄/路径。输入包不是可执行指令，禁止内含命令和凭证。</p>
+<p>进度事件至少带：jobID、stage、entityKey、completed/total、可重试分类、脱敏错误。回执至少带：environment、releaseSeq、rootIndexHash、实际生效状态、verifiedAt、产物摘要。上述是新增协议设计，不代表现有脚本已经接受这些字段。</p>
+<p>多次点击同一冻结快照重用 requestID；修改内容是新 revision/new request。素材内容幂等与发布请求幂等是两个问题，不能因为已有 mediaKey 就声称整条发布链路幂等。</p>
+<h3>5.3 发布与删除</h3>
+<p>默认普通下架走明确归档/隐藏语义，恢复保留商品身份；当前 force remove 会删关联公共子项并写墓碑，应保留为独立危险操作，展示范围并确认。强制删除不能删除用户已确认的私有衣橱和心愿事实。恢复已下架商品与回滚整版不是同一个按钮。</p>
+<h3>5.4 安全与性能</h3>
+<p>选择环境后固定本任务环境；任务中途不能切换。权限结果以真实受控发布通道为准，不能只靠客户端显示“管理员”。不在本次文档里擅自修改你已配置的 CloudKit 角色；Development/Production 分别实测并记录。</p>
+<p>导图当前在 @MainActor 同步读字节和规范化，批量大图可能影响交互；这是性能风险而非本次测得时长。将 I/O 与图片处理移到受控后台工作单元，保持限并发和可取消；UI 状态与 SwiftData 所属隔离域正确更新。不要为了速度一次性读入全部原图。[E02]</p>
+<h2>6. 必做验收矩阵</h2>
+<table>
+<thead>
+<tr>
+<th>编号</th>
+<th>输入/故障</th>
+<th>预期</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>T01</td>
+<td>新建含 JSK、KC、小物的系列</td>
+<td>商品身份独立；消费者已有合并入衣橱路径不破坏</td>
+</tr>
+<tr>
+<td>T02</td>
+<td>同一商品预约价与现货价并存</td>
+<td>都可保存展示；不是二选一覆盖</td>
+</tr>
+<tr>
+<td>T03</td>
+<td>修价 vs 新增再贩记录</td>
+<td>修价不增加业务历史；再贩有新事件并可防重复</td>
+</tr>
+<tr>
+<td>T04</td>
+<td>CNY、JPY、未知币种与缺价</td>
+<td>不隐式换汇；缺价不变 0；未知币种不当 CNY</td>
+</tr>
+<tr>
+<td>T05</td>
+<td>不存在的颜色×尺码组合</td>
+<td>不自动生成“确实在售”的虚构 SKU</td>
+</tr>
+<tr>
+<td>T06</td>
+<td>两商品复用同图但排序不同</td>
+<td>重开、导出、跨端显示均保持各自顺序</td>
+</tr>
+<tr>
+<td>T07</td>
+<td>尺码表原图与系列价格表</td>
+<td>归属与数据不混；结构化数据及原图可回显</td>
+</tr>
+<tr>
+<td>T08</td>
+<td>保存失败、损坏草稿、强杀重启</td>
+<td>错误可见；坏数据不覆盖；恢复点可用</td>
+</tr>
+<tr>
+<td>T09</td>
+<td>校验后修改、删除素材</td>
+<td>review 失效；服务复校验阻止导出/发布</td>
+</tr>
+<tr>
+<td>T10</td>
+<td>远端合法 hash 但资源缺失、跨环境素材</td>
+<td>发布前真实验证失败；不假绿</td>
+</tr>
+<tr>
+<td>T11</td>
+<td>图片/数据包上传中断</td>
+<td>发布头不变；缺失项恢复，已有资源验证复用</td>
+</tr>
+<tr>
+<td>T12</td>
+<td>切头后响应丢失、回执落盘失败</td>
+<td>待确认查询；不换号重复发布</td>
+</tr>
+<tr>
+<td>T13</td>
+<td>两份旧基线依次发布</td>
+<td>后一任务要求合并；不得覆盖前一任务</td>
+</tr>
+<tr>
+<td>T14</td>
+<td>单商品或单店修改</td>
+<td>完整目录与其他时光馆分片不丢</td>
+</tr>
+<tr>
+<td>T15</td>
+<td>归档/恢复/强制删除/整版回滚</td>
+<td>四种语义分开；回滚新号发布；私有记录不改</td>
+</tr>
+<tr>
+<td>T16</td>
+<td>改名、复制同款、重新导入</td>
+<td>改名留 ID；复制新 ID；导入不重复重建</td>
+</tr>
+<tr>
+<td>T17</td>
+<td>发布到 Development 并由另一台设备读取</td>
+<td>目录版本、图片、价格、规格、表格均一致</td>
+</tr>
+<tr>
+<td>T18</td>
+<td>实际签名 Mac 构建</td>
+<td>不手开终端也能完成真实发布与回读；无秘钥泄漏</td>
+</tr>
+<tr>
+<td>T19</td>
+<td>新增 SKU 价格合同（启用时）</td>
+<td>旧包可读、新包明细准确、摘要不假称精确报价</td>
+</tr>
+<tr>
+<td>T20</td>
+<td>切系列/改店家/新建 season</td>
+<td>下级选择正确；无跨店悬空；新建编辑字段对等</td>
+</tr>
+</tbody>
+</table>
+<h2>7. 执行命令与报告要求</h2>
+<p>这些是交给执行 Agent 的命令，<strong>本次未运行</strong>。先记录本地修改与工具版本，不重置你的工作区。</p>
+<pre><code class="language-bash">git rev-parse HEAD
+git status --short
+xcodebuild -list -project ItemManager.xcodeproj
+swift test --package-path Packages/SharedCatalog
+xcodebuild -project ItemManager.xcodeproj -scheme PinkHouseOps   -destination 'platform=macOS' build
+bash tools/time_hall/publication/drill_offline.sh
+</code></pre>
+<p>先跑现有测试，再加入新失败用例；当前共享包已有媒体规范化、引用、门禁和状态机测试。[E13] 离线演练只能证明本机协议与故障路径，不代表 CloudKit 权限、真实签名运行时及用户端体验通过。[E11]</p>
+<p>每次提交报告需写：基准 SHA、修改文件、规则变化、兼容说明、运行命令、真实输出、失败项目及原因、截图/回执位置。禁止把旧文档中的测试通过数写成本次结果。</p>
+<h2>8. 可直接交给 Agent 的执行指令</h2>
+<blockquote>
+<p>阅读本文件与 01/02 文档，再阅读仓库 AGENTS.md、当前 Mac 入口/工作区/编辑器、共享模型/门禁、现有 publication README 与发布器。以当前工作区为准检查和本文基线的差异，不覆盖未提交修改。先做 R01/R02/R03/R07/R09 的回归测试与修复，再做完整商品编辑和素材体验。复用现有 SharedCatalog 与 Python 七步发布，不创建第四套 Catalog，不把私钥放入 App，不改变 iOS 主 UI，不恢复已撤销的淘宝分享解析。所有发布使用冻结快照、过期基线检测和真实回读；导出成功不能标发布成功。新增路径先查等价实现，测试目录须纳入 target。按阶段提交小变更，每阶段交实际构建/测试/故障恢复证据。未通过真实 Mac 签名和跨设备 Development 发布验证前，不宣称完整复刻完成。</p>
+</blockquote>
+<h2>证据索引</h2>
+<p>事实引用固定到本次核查提交。文件路径存在不等于其中全部行为已被本次逐行验证；范围限制已在条目中注明。</p>
+<ul>
+<li>
+<p>[E01] <a href="https://github.com/dragon717/Pink_House/blob/051eca73172510136c9ddaed04d03eba0895fb69/PinkHouseOps/PinkHouseOpsApp.swift">Mac 入口与发布职责边界：<code>PinkHouseOps/PinkHouseOpsApp.swift</code></a></p>
+</li>
+<li>
+<p>[E02] <a href="https://github.com/dragon717/Pink_House/blob/051eca73172510136c9ddaed04d03eba0895fb69/PinkHouseOps/Services/OpsWorkspace.swift">工作区：草稿、编辑、素材、校验与导出：<code>PinkHouseOps/Services/OpsWorkspace.swift</code></a></p>
+</li>
+<li>
+<p>[E03] <a href="https://github.com/dragon717/Pink_House/blob/051eca73172510136c9ddaed04d03eba0895fb69/PinkHouseOps/Views/OpsRootView.swift">Mac 导航与统一反馈：<code>PinkHouseOps/Views/OpsRootView.swift</code></a></p>
+</li>
+<li>
+<p>[E04] <a href="https://github.com/dragon717/Pink_House/blob/051eca73172510136c9ddaed04d03eba0895fb69/PinkHouseOps/Views/OpsCatalogEditorView.swift">Mac 商品基础表单与图片绑定：<code>PinkHouseOps/Views/OpsCatalogEditorView.swift</code></a></p>
+</li>
+<li>
+<p>[E05] <a href="https://github.com/dragon717/Pink_House/blob/051eca73172510136c9ddaed04d03eba0895fb69/PinkHouseOps/Views/OpsMediaLibraryView.swift">素材任务台账；P1 不执行真实上传：<code>PinkHouseOps/Views/OpsMediaLibraryView.swift</code></a></p>
+</li>
+<li>
+<p>[E06] <a href="https://github.com/dragon717/Pink_House/blob/051eca73172510136c9ddaed04d03eba0895fb69/PinkHouseOps/Views/OpsValidationView.swift">Mac 校验与导出入口：<code>PinkHouseOps/Views/OpsValidationView.swift</code></a></p>
+</li>
+<li>
+<p>[E07] <a href="https://github.com/dragon717/Pink_House/blob/051eca73172510136c9ddaed04d03eba0895fb69/PinkHouseOps/Models/OpsCatalogDraftRecord.swift">本地整包草稿记录：<code>PinkHouseOps/Models/OpsCatalogDraftRecord.swift</code></a></p>
+</li>
+<li>
+<p>[E08] <a href="https://github.com/dragon717/Pink_House/blob/051eca73172510136c9ddaed04d03eba0895fb69/Packages/SharedCatalog/Sources/SharedCatalog/Models/ShopCatalogModels.swift">唯一共享目录模型、价格与阶段字段：<code>Packages/SharedCatalog/Sources/SharedCatalog/Models/ShopCatalogModels.swift</code></a></p>
+</li>
+<li>
+<p>[E09] <a href="https://github.com/dragon717/Pink_House/blob/051eca73172510136c9ddaed04d03eba0895fb69/Packages/SharedCatalog/Sources/SharedCatalog/Publishing/ShopCatalogPublicationGate.swift">共享发布前门禁：<code>Packages/SharedCatalog/Sources/SharedCatalog/Publishing/ShopCatalogPublicationGate.swift</code></a></p>
+</li>
+<li>
+<p>[E10] <a href="https://github.com/dragon717/Pink_House/blob/051eca73172510136c9ddaed04d03eba0895fb69/tools/time_hall/publication/publish_cloudkit.py">Python 七步发布实现：<code>tools/time_hall/publication/publish_cloudkit.py</code></a></p>
+</li>
+<li>
+<p>[E11] <a href="https://github.com/dragon717/Pink_House/blob/051eca73172510136c9ddaed04d03eba0895fb69/tools/time_hall/publication/README.md">现有流水线、产物协议与回滚说明：<code>tools/time_hall/publication/README.md</code></a></p>
+</li>
+<li>
+<p>[E12] <a href="https://github.com/dragon717/Pink_House/blob/051eca73172510136c9ddaed04d03eba0895fb69/PinkHouseOps/PinkHouseOps.entitlements">Mac 沙箱与网络权限：<code>PinkHouseOps/PinkHouseOps.entitlements</code></a></p>
+</li>
+<li>
+<p>[E13] <a href="https://github.com/dragon717/Pink_House/tree/051eca73172510136c9ddaed04d03eba0895fb69/Packages/SharedCatalog">已存在的共享包与测试目录：<code>Packages/SharedCatalog/</code></a></p>
+</li>
+<li>
+<p>[E14] <a href="https://github.com/dragon717/Pink_House/tree/051eca73172510136c9ddaed04d03eba0895fb69/ItemManager/Services/ShopCatalog">已存在的 iOS 领域辅助函数目录：<code>ItemManager/Services/ShopCatalog/</code></a></p>
+</li>
+<li>
+<p>[E15] <a href="https://github.com/dragon717/Pink_House/blob/051eca73172510136c9ddaed04d03eba0895fb69/PinkHouseOps/Views/OpsPreviewView.swift">已存在的 Mac 预览文件（本次未逐行审计）：<code>PinkHouseOps/Views/OpsPreviewView.swift</code></a></p>
+</li>
+<li>
+<p>[E16] <a href="https://github.com/dragon717/Pink_House/blob/051eca73172510136c9ddaed04d03eba0895fb69/PinkHouseOps/SnapshotHarness.swift">已存在的 Mac 快照工具（本次未逐行审计）：<code>PinkHouseOps/SnapshotHarness.swift</code></a></p>
+</li>
+<li>
+<p>[Q01] <a href="https://apps.apple.com/cn/app/id6449173707?mt=12">浙江淘宝网络有限公司：千牛 Mac 桌面版官方应用介绍</a>。公开介绍支持表单发品、已发布商品编辑、上下架及预售等；未据此推断登录后页面的精确布局。</p>
+</li>
+<li>
+<p>[Q02] <a href="https://apps.apple.com/cn/app/id590217303">浙江淘宝网络有限公司：千牛移动版官方应用介绍</a>。图片空间、保存草稿、复制同款、多规格、批量操作的能力参考；不把移动版介绍当成 Mac 截图。</p>
+</li>
+</ul>
+</section></main><footer>Pink House · 计划与代码核查包 · 证据固定到基准提交；执行前复核当前工作区。</footer></body></html>

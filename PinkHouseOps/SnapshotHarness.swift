@@ -22,8 +22,10 @@
 //      printf 'snapshots' > "$CONTAINER/snapshot.request"     # 内容是子目录名，可省
 //      open -n build/sym/Debug/PinkHouseOps.app
 //
-//  产物落在 `<容器>/Library/Application Support/PinkHouseOps/<子目录名>/`：
-//  `overview.png` / `catalog.png` / `media.png` / `validation.png` / `preview.png`。
+//  产物落在 `<容器>/Library/Application Support/PinkHouseOps/<子目录名>/`，
+//  每个分区一张：`workbench.png` / `catalog.png` / `products.png` /
+//  `media.png` / `publish.png` / `preview.png`（文件名 = `OpsSection.rawValue`），
+//  外加一份 `harness.log`（本次运行的完整日志，造数据失败的唯一出口 —— 见下）。
 //
 //  ## 三条刻意的设计
 //
@@ -32,7 +34,15 @@
 //    · **走公开入口造数据**：示例数据全走 `OpsWorkspace` 的公开方法，
 //      所以这个 harness 顺带验证了「新建草稿 → 加店家/系列/商品 → 导入图片」这条链路；
 //    · **渲染失败要出声**：抓不到位图就打印 `SNAPSHOT 渲染失败` 并**不写文件**，
-//      绝不写一张全空 PNG 当成功（那正是本项目反复出事的「假绿」）。
+//      绝不写一张全空 PNG 当成功（那正是本项目反复出事的「假绿」）；
+//    · **日志跟着产物走**：所有输出同时写进 `<输出目录>/harness.log`。
+//      只打 stdout 等于没打 —— 沙箱 App 经 LaunchServices 启动时 stdout 拿不到
+//      （`open --stdout` 不生效、直接 exec 被 SIGTRAP 拒），
+//      于是「造数据失败」在现场表现为一张空态截图，事后无法区分失败与空态；
+//    · **失败要盖回图上**：造数据失败时，每张 PNG 顶部会被盖一条红色横幅
+//      （`stampUntrusted`）。因为截图是会被**单独拿走看**的东西 ——
+//      验收动作就是「打开图片看一眼」，没人会同时打开 `harness.log`。
+//      没有失败时产物逐字节不变（`stampUntrusted` 返回 nil）。
 //
 
 import AppKit
@@ -73,14 +83,27 @@ enum OpsSnapshotHarness {
         do {
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         } catch {
+            // 目录都建不出来，日志**无处可写**，这里只能打 stdout（唯一一处例外）
             print("SNAPSHOT 建目录失败：\(error.localizedDescription)")
             return
         }
-        print("SNAPSHOT 开始，输出目录 \(directory.path)")
+        logLines.removeAll()
+        seedFailures.removeAll()
+        // 日志**跟着产物走**，而不是只打 stdout。
+        //
+        // 为什么必须如此：这个 App 是沙箱应用，由 `open -n` 经 LaunchServices 启动时
+        // stdout 根本拿不到（`open --stdout <path>` 实测不生成文件，直接 exec 二进制
+        // 会被 SIGTRAP 拒掉，退出码 133）。只打 stdout = 验收时看不到任何造数据失败，
+        // 于是失败又退化成「快照上是一张空态，看起来布局就这样」。
+        defer { writeLog(into: directory) }
+        log("SNAPSHOT 开始，输出目录 \(directory.path)")
 
         guard let container = makeContainer() else { return }
         let workspace = OpsWorkspace(context: container.mainContext)
         seed(workspace)
+        // 「发布中心」这一页的前置状态也造出来：桥接器就绪 + 已有发布台账。
+        // 不造的话这一页只能看到「桥接器不可用 + 台账为空」，看不出真正的布局。
+        seedPublishCenter(workspace)
         // 样例数据是**一次性的**：跑完把自己的暂存目录也带走。
         // 否则每次跑快照都会在运营本机的 staging 下留一堆没有对应草稿的图，
         // 之后打开「图片与上传任务」会被当成孤儿文件列出来。
@@ -90,61 +113,268 @@ enum OpsSnapshotHarness {
         for section in OpsSection.allCases {
             let view = OpsMainView(workspace: workspace, initialSection: section)
                 .modelContainer(container)
-            guard let data = render(view, size: size) else {
-                print("SNAPSHOT 渲染失败：\(section.rawValue)")
+            // 「发布中心」是一张**长页**（桥接自检 → 参数 → 基线 → 从线上拉回基线 →
+            // 阻断项 → 冻结 → 进度 → 差异 → 校验 → 台账 → 单条详情）。用默认高度抓的话，
+            // 「结果待确认时只有『查询结果』、没有『重发』」这条最贵的规则
+            // 正好落在折叠线以下 —— 而那恰恰是这张快照最该证明的东西。
+            // 所以只给它一张加高的画布，其余分区保持基准尺寸。
+            // ⚠️ 每加一张卡就要跟着抬：09-27 加「从线上拉回基线」那张时
+            // 2_300 → 2_700（不抬的话被顶下去的是阻断项与结论区）。
+            let size = section == .publish
+                ? NSSize(width: size.width, height: 2_700)
+                : size
+            guard let rendered = render(view, size: size) else {
+                log("SNAPSHOT 渲染失败：\(section.rawValue)")
                 continue
             }
+            // 造数据失败 → 把失败**盖回图上**（见 `stampUntrusted`）。
+            // 没有失败时 `stampUntrusted` 返回 nil，产物逐字节不变。
+            let data = stampUntrusted(rendered, failedSteps: seedFailures) ?? rendered
             let file = directory.appendingPathComponent("\(section.rawValue).png")
             do {
                 try data.write(to: file)
                 written += 1
-                print("SNAPSHOT 已写入 \(file.lastPathComponent)（\(data.count) 字节）")
+                log("SNAPSHOT 已写入 \(file.lastPathComponent)（\(data.count) 字节）")
             } catch {
-                print("SNAPSHOT 写文件失败 \(file.path)：\(error.localizedDescription)")
+                log("SNAPSHOT 写文件失败 \(file.path)：\(error.localizedDescription)")
             }
         }
-        print("SNAPSHOT 完成：\(written)/\(OpsSection.allCases.count) 张")
+        if seedFailures.isEmpty {
+            log("SNAPSHOT 完成：\(written)/\(OpsSection.allCases.count) 张")
+        } else {
+            log("SNAPSHOT 完成：\(written)/\(OpsSection.allCases.count) 张 —— "
+                + "⚠️ 本次有 \(seedFailures.count) 步造数据失败，**快照不可信**"
+                + "（每张图上已盖横幅）：" + seedFailures.joined(separator: "、"))
+        }
     }
 
     // MARK: - 容器与示例数据
 
     /// **内存**容器：快照不该改运营本机的草稿库（同 `PinkHouseOpsApp` 的理由，
     /// 只是这里连落盘都省了，保证可复现）。
+    ///
+    /// ⚠️ schema 必须与 `PinkHouseOpsApp` 一致：少一张表的话，发布中心一被
+    /// 构造（侧栏角标就会去读它）就会在没有该实体的容器上崩。
     private static func makeContainer() -> ModelContainer? {
         do {
-            let schema = Schema([OpsCatalogDraftRecord.self, OpsMediaJobRecord.self])
+            let schema = Schema([
+                OpsCatalogDraftRecord.self,
+                OpsMediaJobRecord.self,
+                OpsPublishJobRecord.self,
+            ])
             return try ModelContainer(
                 for: schema,
                 configurations: [ModelConfiguration(
                     schema: schema, isStoredInMemoryOnly: true, cloudKitDatabase: .none)])
         } catch {
-            print("SNAPSHOT 建内存容器失败：\(error.localizedDescription)")
+            log("SNAPSHOT 建内存容器失败：\(error.localizedDescription)")
             return nil
         }
     }
 
     /// 现场造一份有内容的目录，否则快照全是空态、看不出布局好坏。
+    ///
+    /// 覆盖到的东西（每一块都对应一个界面分区）：
+    ///   · 店家 / 系列（含**发售阶段 + 系列价格表**）；
+    ///   · 三个商品：一个配置齐全、一个故意**没有图**（演示门禁阻断）、
+    ///     一个**已归档**（演示归档态）；
+    ///   · 图片走真实导入入口 → 素材库与上传任务台账都不是空的；
+    ///   · 规格 / 尺码表 / 销售记录 / 价格修正（商品管理页的每一张卡都有内容）；
+    ///   · 一次**已确认发布**（写出基线快照）→ 之后新增一个商品、改一处描述，
+    ///     于是「差异清单」真的有「新增 / 已修改」可看；
+    ///   · 发布台账三条**不同状态**的任务（含「结果待确认」——R09 的界面出口）。
     private static func seed(_ workspace: OpsWorkspace) {
         workspace.createDraft(title: "2026-09-26 上新（快照样例）")
         workspace.addShop(name: "樱花小羊")
         guard let shop = workspace.catalog.shops.first else { return }
 
-        workspace.addSeries(shopID: shop.id, name: "星月夜", year: 2026, month: 9)
+        workspace.addSeries(shopID: shop.id, name: "星月夜", year: 2026, month: 9, season: "秋")
         guard let series = workspace.catalog.series.first else { return }
 
-        workspace.addProduct(
-            shopID: shop.id, seriesID: series.id, name: "星月夜 JSK 粉色", category: "JSK")
-        guard let product = workspace.catalog.products.first else { return }
+        seedStep("系列发售阶段", workspace.updateSeriesSalePhase(
+            id: series.id,
+            phase: .reservationActive,
+            reservationStartAt: Date().addingTimeInterval(-86_400 * 5),
+            reservationEndAt: Date().addingTimeInterval(86_400 * 9),
+            balanceDueKind: .approximate,
+            balanceDueText: "大货到后 1 个月",
+            balanceDueAt: nil,
+            balanceDueEndAt: nil))
 
-        // 图片走真实导入入口：这样「图片与上传任务」页与门禁页才不是空的
-        // （门禁要能看出「哪几个引用解不出图」）。
+        seedStep("新增商品 JSK", workspace.addProduct(
+            shopID: shop.id, seriesID: series.id, name: "星月夜 JSK 粉色", category: "JSK"))
+        seedStep("新增商品 OP", workspace.addProduct(
+            shopID: shop.id, seriesID: series.id, name: "星月夜 OP 蓝色", category: "OP"))
+        seedStep("新增商品 KC", workspace.addProduct(
+            shopID: shop.id, seriesID: series.id, name: "星月夜 KC（已归档）", category: "小物"))
+        guard let primary = workspace.catalog.products.first(where: { $0.category == "JSK" }),
+              let secondary = workspace.catalog.products.first(where: { $0.category == "OP" }),
+              let archived = workspace.catalog.products.first(where: { $0.category == "小物" })
+        else { return }
+
+        // 图片走真实导入入口：这样「素材库」与门禁页才不是空的
         if let urls = makeSampleImages() {
             workspace.importImages(from: urls)
             let assetIDs = workspace.catalog.assets.map(\.id)
             if !assetIDs.isEmpty {
-                workspace.bindImages(Array(assetIDs.prefix(2)), toProduct: product.id)
+                seedStep("绑定商品图", workspace.bindImages(
+                    Array(assetIDs.prefix(2)), toProduct: primary.id))
             }
+            // 系列价格表也要一张原图，否则价格表卡的「原图」是空的。
+            // ⚠️ 列数必须与每行的值数一致 —— 录入端会挡（实测：先写成 3 列 2 值，
+            // 结果这一项**静默**没建成，快照上只表现为「价格表：无」）。
+            seedStep("系列价格表", workspace.updateSeriesPriceChart(
+                seriesID: series.id,
+                unit: "cm",
+                columns: ["胸围", "腰围", "衣长"],
+                rows: [
+                    CatalogSizeRow(label: "M", values: ["92", "70", "58"]),
+                    CatalogSizeRow(label: "L", values: ["98", "76", "60"]),
+                ],
+                sourceImages: assetIDs.first.map { [$0] } ?? []))
         }
+
+        // 商品管理的每张卡都要有内容，否则看不到布局
+        seedStep("规格 粉色/M", workspace.addVariant(
+            productID: primary.id, color: "粉色", size: "M",
+            imageAssetID: workspace.catalog.assets.first?.id))
+        seedStep("规格 粉色/L", workspace.addVariant(
+            productID: primary.id, color: "粉色", size: "L", imageAssetID: nil))
+        seedStep("尺码表", workspace.setSizeChart(
+            productID: primary.id,
+            unit: "cm",
+            columns: ["胸围", "腰围", "衣长"],
+            rows: [
+                CatalogSizeRow(label: "M", values: ["92", "70", "58"]),
+                CatalogSizeRow(label: "L", values: ["98", "76", "60"]),
+            ],
+            sourceImage: nil))
+        seedStep("销售记录 预约价", workspace.appendSaleEvent(
+            productID: primary.id, type: .reservation, price: 680, deposit: 200, balance: 480,
+            currency: .cny, startAt: Date().addingTimeInterval(-86_400 * 5), endAt: nil,
+            batchLabel: "初贩"))
+        seedStep("销售记录 现货价", workspace.appendSaleEvent(
+            productID: primary.id, type: .stock, price: 748, deposit: nil, balance: nil,
+            currency: .cny, startAt: Date().addingTimeInterval(86_400 * 20), endAt: nil,
+            batchLabel: "现货"))
+        seedStep("价格修正", workspace.applyPriceCorrection(
+            productID: secondary.id, reservationPrice: 720, stockPrice: 790,
+            deposit: 220, balance: 500, currency: .cny))
+        seedStep("归档商品", workspace.setArchived(true, kind: .product, id: archived.id))
+
+        // 一次**已确认发布**：写出基线快照（之后新增/修改才有差分可看）
+        seedStep("保存草稿", workspace.saveDraft())
+        let revision = workspace.currentRevision
+        seedStep("记录已确认发布", workspace.recordConfirmedPublish(
+            releaseSeq: 41,
+            rootIndexHash: String(repeating: "9f1c", count: 16),
+            environment: "Production",
+            revision: revision))
+        guard let shop2 = workspace.catalog.shops.first,
+              let series2 = workspace.catalog.series.first else { return }
+        seedStep("新增商品 发夹", workspace.addProduct(
+            shopID: shop2.id, seriesID: series2.id, name: "星月夜 发夹（本次新增）",
+            category: "小物"))
+        seedStep("改一处描述", workspace.updateProductDetail(
+            id: secondary.id,
+            description: "深蓝渐变，配套有腰封与蝴蝶结。本次只改了这一句文案。",
+            designName: nil))
+        seedStep("保存草稿", workspace.saveDraft())
+    }
+
+    /// 造数据的每一步都要**出声**，并把失败的步骤记下来。
+    ///
+    /// 为什么不静默：样例数据造失败时，快照只会变成一张**空态**，
+    /// 而空态看起来「布局就是这样」—— 验收会直接放过去。
+    /// （实测：系列价格表因为列数/值数不齐被录入端挡住，快照上只表现为
+    /// 「价格表：无」，从截图里根本看不出这是一次失败。）
+    ///
+    /// 但「出声」还不够：截图是**会被单独拿走看**的东西，验收动作就是
+    /// 「打开图片看一眼」，没人会同时打开 `harness.log`。所以失败的清单
+    /// 会被攒进 `seedFailures`，最终由 `stampUntrusted` **盖回到每一张图上**。
+    private static func seedStep(_ label: String, _ result: Bool) {
+        guard !result else { return }
+        seedFailures.append(label)
+        log("SNAPSHOT 造数据失败：\(label)")
+    }
+
+    /// 本次运行中造数据失败的步骤名（按发生顺序）。空 = 快照可信。
+    private static var seedFailures: [String] = []
+
+    // MARK: - 失败横幅
+
+    /// 在产物上盖一条「本次快照不可信」的横幅。
+    ///
+    /// 返回 `nil` = **没有失败，不该动产物**（这是刻意的不变量：
+    /// 可信的截图必须与不加横幅时逐字节相同，否则横幅本身就成了一种噪声）。
+    ///
+    /// 为什么必须改图而不是只写日志：见 `seedStep` 的注释 ——
+    /// 「一张由失败产生的空态截图」和「一张正常的空态截图」必须能一眼分开。
+    static func stampUntrusted(_ png: Data, failedSteps: [String]) -> Data? {
+        guard !failedSteps.isEmpty else { return nil }
+        guard let source = NSBitmapImageRep(data: png),
+              let output = NSBitmapImageRep(
+                bitmapDataPlanes: nil,
+                pixelsWide: source.pixelsWide,
+                pixelsHigh: source.pixelsHigh,
+                bitsPerSample: 8,
+                samplesPerPixel: 4,
+                hasAlpha: true,
+                isPlanar: false,
+                colorSpaceName: .deviceRGB,
+                bytesPerRow: 0,
+                bitsPerPixel: 0)
+        else {
+            log("SNAPSHOT 盖失败横幅失败：无法建立位图上下文")
+            return nil
+        }
+
+        let width = CGFloat(source.pixelsWide)
+        let height = CGFloat(source.pixelsHigh)
+        NSGraphicsContext.saveGraphicsState()
+        NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: output)
+        source.draw(in: NSRect(x: 0, y: 0, width: width, height: height))
+
+        // 条带高度与字号都按图高取比例：publish 那张是 2300 高的加长画布，
+        // 写死像素会让它在别的尺寸上不是太大就是看不见。
+        let barHeight = max(56, height * 0.05)
+        NSColor.systemRed.withAlphaComponent(0.94).setFill()
+        NSRect(x: 0, y: height - barHeight, width: width, height: barHeight).fill()
+
+        let attributes: [NSAttributedString.Key: Any] = [
+            .font: NSFont.boldSystemFont(ofSize: max(18, height * 0.019)),
+            .foregroundColor: NSColor.white,
+        ]
+        let banner = "本次快照不可信 · 造数据有 \(failedSteps.count) 步失败："
+            + failedSteps.joined(separator: "、")
+        let textHeight = banner.size(withAttributes: attributes).height
+        banner.draw(
+            at: NSPoint(x: width * 0.012, y: height - barHeight + (barHeight - textHeight) / 2),
+            withAttributes: attributes)
+
+        NSGraphicsContext.restoreGraphicsState()
+        return output.representation(using: .png, properties: [:])
+    }
+
+    // MARK: - 日志
+
+    /// 本次运行的全部日志行。`run` 起手清空、收尾一次性落盘。
+    private static var logLines: [String] = []
+
+    /// 既出声（stdout，终端直跑时看得见）也留痕（`harness.log`，沙箱 GUI 启动时唯一出口）。
+    /// harness 里所有输出都该走这里，不要直接 `print`。
+    private static func log(_ message: String) {
+        print(message)
+        logLines.append(message)
+    }
+
+    /// 把日志写到产物目录旁边 —— 截图和它的诊断信息必须在一起，
+    /// 否则「这张空态是布局还是失败」在事后无从判断。
+    private static func writeLog(into directory: URL) {
+        guard !logLines.isEmpty else { return }
+        let text = logLines.joined(separator: "\n") + "\n"
+        try? text.data(using: .utf8)?
+            .write(to: directory.appendingPathComponent("harness.log"), options: .atomic)
     }
 
     /// 造两张真 PNG（不依赖任何既有素材）。
@@ -154,7 +384,7 @@ enum OpsSnapshotHarness {
         do {
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         } catch {
-            print("SNAPSHOT 样例图目录创建失败：\(error.localizedDescription)")
+            log("SNAPSHOT 样例图目录创建失败：\(error.localizedDescription)")
             return nil
         }
         var urls: [URL] = []
@@ -175,6 +405,134 @@ enum OpsSnapshotHarness {
             urls.append(url)
         }
         return urls.isEmpty ? nil : urls
+    }
+
+    // MARK: - 发布中心前置状态
+
+    /// 造发布中心的可见状态：桥接器可用性 + 三条**状态各不相同**的台账。
+    ///
+    /// 三条台账是刻意这么选的，因为这一页最贵的规则（R09）只有在
+    /// 「有一条任务停在结果待确认」时才看得见：
+    ///   · `pendingConfirmation` —— 界面**只能给它「查询结果」**，不能给「重发」；
+    ///   · `confirmed` —— 有回执、applied=true；
+    ///   · `refused` —— 校验被拒，重试无用。
+    private static func seedPublishCenter(_ workspace: OpsWorkspace) {
+        let center = workspace.publishCenter
+        // ⚠️ **刻意不写 settings**：它是 `@Published` + didSet 落 UserDefaults，
+        // 也就是运营真实的 App 偏好；快照 harness 只该读它、不该改它。
+        // 首启时 `OpsPublishCenter.loadSettings()` 已经会在仓库目录存在的情况下
+        // 自动填好 `repoRootPath`，所以桥接自检通常本来就是「就绪」。
+        guard let draftID = workspace.draft?.id else { return }
+        let now = Date()
+        let hash = String(repeating: "9f1c", count: 16)
+
+        let awaiting = OpsPublishJob(
+            requestID: "demo-request-awaiting",
+            jobID: "job-demo-1",
+            draftID: draftID,
+            draftRevision: 3,
+            baseReleaseSeq: 41,
+            baseRootIndexHash: hash,
+            baselineAcknowledged: true,
+            targetEnvironment: .production,
+            releaseSeq: 42,
+            payloadHash: String(repeating: "ab", count: 32),
+            state: .pendingConfirmation,
+            stage: .switchHead,
+            totalUnits: 7,
+            lastErrorMessage: "上次运行在切换发布头时中断，**结果不明**："
+                + "请先查询线上发布头再决定，不要直接重发。",
+            logLines: [
+                "已冻结：目标 Production · releaseSeq 42 · 第 3 版",
+                "— 开始发布（第 1 次）—",
+                "[1/7] 复校验产物：通过",
+                "[2/7] 读取发布头：releaseSeq 41",
+                "[3/7] 上传缺失图片：3 个",
+                "[4/7] 上传缺失数据包：2 个",
+                "[5/7] 回读核对资源：一致",
+                "[6/7] 切换发布头：未拿到响应（这一步之后线上可能已经变了）",
+            ],
+            createdAt: now.addingTimeInterval(-1_800),
+            updatedAt: now.addingTimeInterval(-1_740),
+            submittedAt: now.addingTimeInterval(-1_800),
+            attemptCount: 1)
+
+        let confirmed = OpsPublishJob(
+            requestID: "demo-request-confirmed",
+            jobID: "job-demo-2",
+            draftID: draftID,
+            draftRevision: 2,
+            baseReleaseSeq: 40,
+            baseRootIndexHash: nil,
+            baselineAcknowledged: true,
+            targetEnvironment: .production,
+            releaseSeq: 41,
+            payloadHash: String(repeating: "cd", count: 32),
+            state: .confirmed,
+            stage: .confirmHead,
+            completedUnits: 7,
+            totalUnits: 7,
+            receipt: ShopCatalogPublishReceipt(
+                adapter: "cloudkit",
+                environment: "production",
+                applied: true,
+                releaseSeq: 41,
+                rootIndexHash: hash,
+                previousChangeTag: "v40",
+                newChangeTag: "v41",
+                uploadedPacks: 2,
+                uploadedMedia: 3,
+                totalPacks: 2,
+                totalMedia: 3,
+                requestID: "demo-request-confirmed",
+                jobID: "job-demo-2",
+                draftID: draftID,
+                draftRevision: 2,
+                artifactDigest: String(repeating: "cd", count: 32),
+                readBackConfirmed: true,
+                verifiedAt: now.addingTimeInterval(-7_200),
+                itemCounts: ["shops": 1, "series": 1, "products": 3]),
+            createdAt: now.addingTimeInterval(-7_400),
+            updatedAt: now.addingTimeInterval(-7_200),
+            submittedAt: now.addingTimeInterval(-7_380),
+            finishedAt: now.addingTimeInterval(-7_200),
+            attemptCount: 1)
+
+        let refused = OpsPublishJob(
+            requestID: "demo-request-refused",
+            jobID: "job-demo-3",
+            draftID: draftID,
+            draftRevision: 4,
+            baseReleaseSeq: 41,
+            baseRootIndexHash: hash,
+            baselineAcknowledged: false,
+            targetEnvironment: .localFixture,
+            releaseSeq: 42,
+            payloadHash: String(repeating: "ef", count: 32),
+            state: .refused,
+            stage: .verifyArtifact,
+            totalUnits: 7,
+            lastErrorMessage: "严格策略拦下 1 条无法解析的图片引用（裸文件名 "
+                + "「dress.jpg」）：本次新增内容必须能解析出真实文件。",
+            logLines: [
+                "已冻结：目标 本机演练 · releaseSeq 42 · 第 4 版 · 本次为演练（不写线上）",
+                "— 开始发布（第 1 次）—",
+                "[1/7] 复校验产物：失败（1 条阻断）",
+            ],
+            createdAt: now.addingTimeInterval(-300),
+            updatedAt: now.addingTimeInterval(-290),
+            submittedAt: now.addingTimeInterval(-300),
+            finishedAt: now.addingTimeInterval(-290),
+            attemptCount: 1)
+
+        center.persist(awaiting)
+        center.persist(confirmed)
+        center.persist(refused)
+
+        // 「可以提交」的样子：发布号填好、基线核对勾上（读不到线上时的显式出口）
+        center.releaseSeqText = "42"
+        center.baselineAcknowledged = true
+        center.useDryRun = true
     }
 
     // MARK: - 离屏渲染

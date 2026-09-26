@@ -250,6 +250,26 @@ class PublishAdapter:
     def read_back_media_hash(self, content_hash: str) -> Optional[str]:
         raise NotImplementedError
 
+    def fetch_root_index_bytes(self) -> Optional[bytes]:
+        """回读**当前发布头指向的根清单字节**（只读，无任何副作用）。
+
+        为什么加在适配器上，而不是让调用方各写一套：R07 的基线核对与
+        「把线上商店目录拉回本地」都要读根清单，而两种落点的读法完全不同
+        （CloudKit 是 THRelease 的 `rootIndexAsset` + `downloadURL`，
+        filesystem 是一个 `root-index.json` 文件）。写成两套必然漂移，
+        而漂移的表现是「一边能读、一边说线上没有」。
+        """
+        raise NotImplementedError
+
+    def fetch_pack_bytes(self, payload_hash: str) -> Optional[bytes]:
+        """回读一个不可变数据包的**原始字节**（压缩态，只读）。
+
+        返回的是压缩后的字节（和服务端 `payloadHash` 对应的那份），
+        调用方要自己按 `payloadHash` 自证摘要后再解压 —— 只有压缩态才谈得上
+        「和服务端同一份字节」。
+        """
+        raise NotImplementedError
+
     def put_release(
         self, record: Dict[str, Any], root_bytes: bytes, expected_change_tag: Optional[str]
     ) -> str:
@@ -346,6 +366,14 @@ class FilesystemAdapter(PublishAdapter):
         self.root.mkdir(parents=True, exist_ok=True)
         (self.root / "root-index.json").write_bytes(root_bytes)
 
+    def fetch_root_index_bytes(self) -> Optional[bytes]:
+        path = self.root / "root-index.json"
+        return path.read_bytes() if path.exists() else None
+
+    def fetch_pack_bytes(self, payload_hash: str) -> Optional[bytes]:
+        path = self._asset_dir("THDataPack") / "{}.json.gz".format(payload_hash)
+        return path.read_bytes() if path.exists() else None
+
     def put_release(
         self, record: Dict[str, Any], root_bytes: bytes, expected_change_tag: Optional[str]
     ) -> str:
@@ -431,7 +459,27 @@ class CloudKitWebServicesAdapter(PublishAdapter):
             "X-Apple-CloudKit-Request-SignatureV1": signature,
         }
 
-    def _post(self, path: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+    def _send(self, path: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+        """**真实发出**一次请求，与 `apply` 无关（读操作用它）。
+
+        ⭐ 为什么要和 `_post` 分开（2026-09-27 实测）：
+
+        CloudKit 的 `records/lookup` 这种**读**操作，HTTP 动词也是 POST。
+        早先把「dry-run 一律不发请求」一刀切地实现在**传输层**，于是读被一起挡掉。
+        后果不是「少一次请求」，而是**把「没读」伪装成「线上没有」**：
+
+            `--mode baseline`（桥接器的只读基线核对）恒为 `apply=False`
+            → `fetch_current_release()` 恒返回 None
+            → App 被告知「线上尚无商店发布头（本次将是首次发布）」
+
+        而线上可能已经发过好几个版本 —— 于是 R07 的基线核对形同不存在，
+        且运营会以为自己在做「首次发布」。这正是本项目反复出事的
+        「失败伪装成正常」，而且**离线 filesystem 演练抓不到**：
+        `FilesystemAdapter` 的读不走 `apply` 判定，所以演练全绿。
+
+        修法：把 dry-run 的判定从**传输层**下移到**写操作**
+        （`_modify_with_asset` / `_upload_file`）—— 读一律放行，写一律拦住。
+        """
         body = canonical_json_bytes(payload)
         headers = self._headers(body, path)
         if self.print_requests:
@@ -443,8 +491,11 @@ class CloudKitWebServicesAdapter(PublishAdapter):
             for key, value in redacted.items():
                 print("      {}: {}".format(key, value))
             print("      body: {}".format(body.decode("utf-8")[:400]))
-        if not self.apply:
-            return {}
+        # 可注入的传输层（`http_post(url, body, headers) -> dict`）。
+        # 存在的意义是让「读在 dry-run 下也必须发出」这条不变量**能离线锁住**，
+        # 不必为了测一处分支去连真实容器。
+        if self._http_post is not None:
+            return self._http_post(self._endpoint(path), body, headers)
         import time
         import urllib.request
 
@@ -490,8 +541,19 @@ class CloudKitWebServicesAdapter(PublishAdapter):
                     print("      （连接失败，第 {} 次重试：{}）".format(attempt, error))
         raise last_error if last_error else ProtocolError("网络请求失败")
 
+    def _post(self, path: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+        """**写路径**专用：dry-run（`apply=False`）时静默不发请求。
+
+        读操作请用 `_send`（见那里的说明：读必须无视 dry-run）。
+        """
+        if not self.apply:
+            return {}
+        return self._send(path, payload)
+
     def fetch_current_release(self) -> Optional[Dict[str, Any]]:
-        result = self._post(
+        # 恒走 `_send`：读线上发布头是本适配器**唯一**没有副作用的操作，
+        # dry-run 与基线核对都必须真的读到（否则「没读」会被当成「线上没有」）。
+        result = self._send(
             "records/lookup",
             {"records": [{"recordName": RELEASE_RECORD_NAME, "recordType": "THRelease"}]},
         )
@@ -499,15 +561,25 @@ class CloudKitWebServicesAdapter(PublishAdapter):
         if not record:
             return None
         fields = record.get("fields") or {}
+        # `rootIndexHash` / `publishedAt` 是 2026-09-27 为运营工作台的基线核对（R07）
+        # 补上的**只增不改**字段：发布流程本身只用上面三个，
+        # 但「线上当前版本的根清单摘要」是 App 判断基线是否过期所必需的，
+        # 缺它就只能比发布号（会把「别人发了同一个号」误判成一致）。
+        root_hash = (fields.get("rootIndexHash") or {}).get("value")
+        published_at = (fields.get("publishedAt") or {}).get("value")
         return {
             "releaseSeq": (fields.get("releaseSeq") or {}).get("value"),
             "revocationEpoch": (fields.get("revocationEpoch") or {}).get("value"),
             "changeTag": record.get("recordChangeTag"),
             "recordName": record.get("recordName"),
+            "rootIndexHash": root_hash if isinstance(root_hash, str) else None,
+            "publishedAt": published_at if isinstance(published_at, str) else None,
         }
 
     def _asset_exists(self, record_type: str, record_name: str) -> bool:
-        result = self._post(
+        # 同样是**读**：dry-run 也必须真的问一次，否则「dry-run 说资源都在」
+        # 其实是「一个都没查」。
+        result = self._send(
             "records/lookup",
             {"records": [{"recordName": record_name, "recordType": record_type}]},
         )
@@ -715,6 +787,46 @@ class CloudKitWebServicesAdapter(PublishAdapter):
     def put_root_index(self, root_bytes: bytes, root_hash: str) -> None:
         # 根清单作为 THRelease 的 rootIndexAsset 一起提交，不单独占记录。
         return None
+
+    def _lookup_asset_value(self, record_type: str, record_name: str, field: str) -> Dict[str, Any]:
+        """lookup 一条记录并取出某个 ASSET 字段的 value（含 `downloadURL`）。
+
+        ⚠️ `field` 名字必须传对：THRelease 的资产字段叫 `rootIndexAsset`，
+        而 THDataPack / THMedia 的都叫 `asset`。传错不会报错 —— 只会拿到空字典，
+        然后表现成「线上没有这个资源」。
+        """
+        result = self._send(
+            "records/lookup",
+            {"records": [{"recordName": record_name, "recordType": record_type}]},
+        )
+        record = first_existing_record(result)
+        if not record:
+            return {}
+        value = ((record.get("fields") or {}).get(field) or {}).get("value")
+        return value if isinstance(value, dict) else {}
+
+    def _download_asset(self, value: Dict[str, Any]) -> Optional[bytes]:
+        """按 ASSET 字段里的 `downloadURL` 取回字节。**纯读**，不走 `_post`。"""
+        url = value.get("downloadURL")
+        if not url:
+            return None
+        import urllib.request
+
+        request = urllib.request.Request(url, method="GET")
+        with urllib.request.urlopen(request, timeout=300) as response:
+            return response.read()
+
+    def fetch_root_index_bytes(self) -> Optional[bytes]:
+        # 恒走 `_send`：回读根清单是**读**，dry-run 也必须真的读到
+        # （否则「没读」又会被当成「线上没有」，正是 09-27 修掉的那类假象）。
+        value = self._lookup_asset_value("THRelease", RELEASE_RECORD_NAME, "rootIndexAsset")
+        return self._download_asset(value)
+
+    def fetch_pack_bytes(self, payload_hash: str) -> Optional[bytes]:
+        value = self._lookup_asset_value(
+            "THDataPack", "th.pack.{}".format(payload_hash), "asset"
+        )
+        return self._download_asset(value)
 
     def put_release(
         self, record: Dict[str, Any], root_bytes: bytes, expected_change_tag: Optional[str]

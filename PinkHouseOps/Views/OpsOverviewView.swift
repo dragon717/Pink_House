@@ -32,6 +32,7 @@ struct OpsOverviewView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
+                pendingCard
                 draftCard
                 importCard
                 statisticsCard
@@ -62,6 +63,95 @@ struct OpsOverviewView: View {
         }
     }
 
+    // MARK: 待处理事项
+
+    /// 工作台的第一张卡必须是「现在有什么没处理完」。
+    ///
+    /// 顺序不是按模块排的，是按**后果的严重程度**排的：
+    ///   1. 结果待确认的发布 —— 不处理就可能重复发布（最贵）；
+    ///   2. 只读隔离的草稿 —— 继续在里面填内容会白填；
+    ///   3. 桥接器不可用 —— 发布这一整段根本走不通；
+    ///   4. 校验阻断 / 过期；
+    ///   5. 图片任务失败；
+    ///   6. 未保存的修改。
+    private var pendingCard: some View {
+        let center = workspace.publishCenter
+        let blockers = center.submissionBlockers
+        let awaiting = center.jobsNeedingAttention
+        let failedMedia = workspace.mediaProgress.failed
+
+        var items: [(String, String, Bool)] = []
+        if let awaitingQuery = center.jobs.first(where: { $0.state.requiresResultQuery }) {
+            items.append(("结果待确认的发布（releaseSeq \(awaitingQuery.releaseSeq)）",
+                          "**先去发布中心点「查询结果」**：切发布头之后结果不明时，"
+                          + "重发会造成重复发布，甚至用旧内容回写已经前进的线上版本。",
+                          true))
+        }
+        if workspace.isCorrupted {
+            items.append(("草稿处于只读隔离",
+                          "当前展示的是空目录，别在里面继续填：先「另存为新草稿并继续」。",
+                          true))
+        }
+        if !center.bridgeProblems.isEmpty {
+            items.append(("发布桥接不可用（\(center.bridgeProblems.count) 条）",
+                          center.bridgeProblems.first ?? "", true))
+        }
+        if workspace.isReviewStale {
+            items.append(("校验结果已过期",
+                          "这份结果是第 \(workspace.reviewedRevision ?? 0) 版做的，"
+                          + "当前是第 \(workspace.currentRevision) 版。导出/发布前要重新校验。",
+                          false))
+        } else if workspace.review?.isBlocked == true {
+            items.append(("校验未通过（\(workspace.review?.blockingIssues.count ?? 0) 条阻断）",
+                          "缺图的引用会被发布门禁拦下：到「发布中心」看逐条明细。", false))
+        }
+        if failedMedia > 0 {
+            items.append(("有 \(failedMedia) 个图片任务处于「失败」",
+                          "要么人工处理，要么它根本不该进这次发布。见「素材库」。", false))
+        }
+        if workspace.hasUnsavedChanges {
+            items.append(("草稿有未保存的修改",
+                          "发布的是**已保存**的内容：发布中心会因此拦住提交。", false))
+        }
+        if items.isEmpty, !blockers.isEmpty {
+            items.append(("发布前置条件还差 \(blockers.count) 项",
+                          blockers.first ?? "", false))
+        }
+
+        return OpsCard(title: items.isEmpty ? "现在没有待处理事项" : "待处理事项（\(items.count)）",
+                       systemImage: items.isEmpty ? "checkmark.circle" : "bell.badge") {
+            VStack(alignment: .leading, spacing: 10) {
+                if items.isEmpty {
+                    Text("草稿、素材、校验与发布都没有卡住的事情。可以走「导出待发布包」或直接去发布中心。")
+                        .font(.callout).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                } else {
+                    ForEach(Array(items.enumerated()), id: \.offset) { _, item in
+                        HStack(alignment: .top, spacing: 8) {
+                            Image(systemName: item.2
+                                  ? "exclamationmark.triangle.fill" : "circle.fill")
+                                .font(.system(size: item.2 ? 13 : 6))
+                                .foregroundStyle(item.2 ? Color.red : Color.orange)
+                                .padding(.top, item.2 ? 2 : 6)
+                            VStack(alignment: .leading, spacing: 2) {
+                                opsMarkdown(item.0).font(.callout.weight(.medium))
+                                if !item.1.isEmpty {
+                                    opsMarkdown(item.1)
+                                        .font(.caption).foregroundStyle(.secondary)
+                                        .fixedSize(horizontal: false, vertical: true)
+                                }
+                            }
+                        }
+                    }
+                }
+                if awaiting.isEmpty == false {
+                    OpsFootnote(text: "发布台账里有 \(awaiting.count) 条待处理的任务 —— "
+                                + "侧栏「发布中心」上有角标。")
+                }
+            }
+        }
+    }
+
     // MARK: 草稿
 
     private var draftCard: some View {
@@ -79,9 +169,15 @@ struct OpsOverviewView: View {
                 }
                 if let draft = workspace.draft {
                     LabeledContent("草稿 ID", value: draft.id)
-                    LabeledContent("最近保存", value: draft.updatedAt.formatted(date: .abbreviated, time: .shortened))
+                    LabeledContent("编辑版本", value: "第 \(draft.currentRevision) 版"
+                                   + (workspace.hasUnsavedChanges ? "（有未保存修改）" : "（已保存）"))
+                    LabeledContent("最近保存",
+                                   value: draft.updatedAt.formatted(date: .abbreviated, time: .shortened))
                 }
-                Text("所有编辑都只在**本机草稿**里，不会上传任何云端；"
+                // ⚠️ 这里**必须**用 `opsMarkdown`：`Text("a" + "b")` 的拼接结果是一个
+                // **String 变量**，走的是逐字初始化器 → 不解析 Markdown → `**本机草稿**`
+                // 会带着星号显示。只有**单个**字面量才自动走 LocalizedStringKey。
+                opsMarkdown("所有编辑都只在**本机草稿**里，不会上传任何云端；"
                      + "要发布必须显式导出「待发布包」并交给受控发布流水线。")
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -92,10 +188,9 @@ struct OpsOverviewView: View {
     }
 
     private func applyTitle() {
-        let trimmed = draftTitle.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty, let draft = workspace.draft else { return }
-        draft.title = trimmed
-        workspace.saveDraft()
+        // 走统一入口：改名也是内容变更，要带版本与失败反馈（R05）。
+        // 调用方不需要结果 —— 失败时错误已经进了全局 banner 的唯一反馈通道。
+        workspace.renameDraft(title: draftTitle)
     }
 
     // MARK: 导入
@@ -115,7 +210,9 @@ struct OpsOverviewView: View {
                         Label("导入商品图", systemImage: "photo.badge.plus")
                     }
                 }
-                Text("· 导入目录 JSON 会**整体替换**当前草稿内容（先保存再导入）。\n"
+                // 同上：拼接 = String 变量，`\n` 拼起来的多行尤其要过 `opsMarkdown`
+                // （它带了 `inlineOnlyPreservingWhitespace`，换行才不会被折成空格）。
+                opsMarkdown("· 导入目录 JSON 会**整体替换**当前草稿内容（先保存再导入）。\n"
                      + "· 图片会立刻按「长边 1600」重新编码、算出内容摘要（mediaKey）"
                      + "并复制进本机暂存目录；文件一旦导入就与原始位置无关。")
                     .font(.caption)
@@ -181,14 +278,14 @@ struct OpsOverviewView: View {
     private var nextStepsCard: some View {
         OpsCard(title: "接下来做什么", systemImage: "arrow.turn.down.right") {
             VStack(alignment: .leading, spacing: 8) {
-                StepRow(index: 1, text: "在「目录编辑」里补齐店家 / 系列 / 商品，并把商品图绑到商品上。")
-                StepRow(index: 2, text: "在「图片与上传任务」里确认图片都进了暂存目录（状态为「待上传」）。")
-                StepRow(index: 3, text: "在「发布前校验」里跑一次门禁：**缺图 / 结构问题必须清零**。")
-                StepRow(index: 4, text: "回到「发布前校验」导出「待发布包」（tar），交给受控发布流水线上传。")
-                Text("本工具不直接写公共库：发布由 tools/time_hall/publication 的发布器完成，"
-                     + "私钥只存在于 Keychain，不进 App、不进日志。")
-                    .font(.caption).foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
+                StepRow(index: 1, text: "「店家与系列」：建店家 → 建系列（档期、发售阶段、系列价格表都在这一处配）。")
+                StepRow(index: 2, text: "「商品管理」：逐商品补规格、尺码表、销售记录与价格修正，并把商品图绑上。")
+                StepRow(index: 3, text: "「素材库」：确认每张图都进了暂存目录，且没有被误删的引用。")
+                StepRow(index: 4, text: "「发布中心」：读取线上基线 → 确认发布号 → 冻结 → 提交 → **看回执**。")
+                StepRow(index: 5, text: "「本地预览」：发布前自己按 店家 › 系列 › 商品 看一遍结构与价格。")
+                OpsFootnote(text: "本工具不直接写公共库：发布由 tools/time_hall/publication 的受控发布器完成，"
+                            + "签名私钥只在 Keychain，不进 App、不进日志。"
+                            + "发布中心也是调它 —— 不是自己再实现一遍。")
             }
         }
     }
@@ -226,7 +323,8 @@ private struct StepRow: View {
                 .font(.caption.weight(.bold))
                 .frame(width: 18, height: 18)
                 .background(Color.accentColor.opacity(0.16), in: Circle())
-            Text(text).font(.callout).fixedSize(horizontal: false, vertical: true)
+            // `text` 是传进来的**变量**（导览文案里就有 `**看回执**`）→ 必须过 opsMarkdown
+            opsMarkdown(text).font(.callout).fixedSize(horizontal: false, vertical: true)
         }
     }
 }

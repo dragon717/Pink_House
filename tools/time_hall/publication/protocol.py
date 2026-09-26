@@ -700,7 +700,9 @@ def strip_archived_shop_catalog(doc: Any) -> Tuple[Dict[str, Any], Dict[str, int
 
     # ⚠️ 连坐判定只认「因归档而被剔除」的上级，**不**认「上级本来就缺失」。
     # 后者是发布端的数据错误（商品指向不存在的系列），必须留下来让结构校验报错，
-    # 不能被裁剪悄悄抹平（否则坏数据会静默消失，演练第 28 项就是防这个的）。
+    # 不能被裁剪悄悄抹平（否则坏数据会静默消失，`drill_offline.sh` 里
+    # 「商店目录悬空引用应被拒绝」那一步就是防这个的 —— 这里刻意写**步骤名**
+    # 而不是序号：序号会随着演练增删步骤而漂移，写死了就是一条会骗人的注释）。
     live_shops = [item for item in all_shops if not archived(item)]
     dropped_shop_ids = {str(item.get("id")) for item in all_shops if archived(item)}
 

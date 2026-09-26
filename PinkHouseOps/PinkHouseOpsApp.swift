@@ -33,10 +33,16 @@ struct PinkHouseOpsApp: App {
     /// delegate 回调的时序比 `.task` 更可控。
     @NSApplicationDelegateAdaptor(OpsAppDelegate.self) private var delegate
 
-    /// 本机模型容器：草稿 + 上传任务。`cloudKitDatabase: .none` 是有意的，
-    /// 不是忘了配（见文件头说明）。
+    /// 本机模型容器：草稿 + 上传任务 + **发布任务台账**。`cloudKitDatabase: .none`
+    /// 是有意的，不是忘了配（见文件头说明）。
     private let container: ModelContainer = {
-        let schema = Schema([OpsCatalogDraftRecord.self, OpsMediaJobRecord.self])
+        let schema = Schema([
+            OpsCatalogDraftRecord.self,
+            OpsMediaJobRecord.self,
+            // 发布任务台账（方案 R09）：切发布头之后结果不明时，重启后必须还知道
+            // 「有一条任务没下结论」——否则运营唯一的动作就是重发一次。
+            OpsPublishJobRecord.self,
+        ])
         let configuration = ModelConfiguration(
             schema: schema,
             isStoredInMemoryOnly: false,
@@ -66,13 +72,27 @@ struct PinkHouseOpsApp: App {
 @MainActor
 final class OpsAppDelegate: NSObject, NSApplicationDelegate {
 
-    /// 有快照触发文件就以快照模式跑一遍然后退出；没有则什么都不做。
+    /// 有触发文件就跑对应的 harness 然后退出；没有则什么都不做。
+    ///
+    /// 两个 harness 都是**文件触发 + 跑完自杀**，所以只会有一个生效（谁先命中谁跑，
+    /// 跑完 `terminate`）。顺序上快照排前面是**刻意保持既有的验收脚本行为逐字不变**：
+    /// 快照是视觉验收的入口，探针是沙盒取证的新入口，不该互相影响。
     func applicationDidFinishLaunching(_ notification: Notification) {
-        guard let directory = OpsSnapshotHarness.pendingRequest() else { return }
-        // 等首帧窗口布局完成再抓（0.9s 是 `render` 内部等待之外的额外余量）
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-            OpsSnapshotHarness.run(into: directory)
-            NSApp.terminate(nil)
+        if let directory = OpsSnapshotHarness.pendingRequest() {
+            // 等首帧窗口布局完成再抓（0.9s 是 `render` 内部等待之外的额外余量）
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                OpsSnapshotHarness.run(into: directory)
+                NSApp.terminate(nil)
+            }
+            return
+        }
+        if let directory = OpsBridgeProbeHarness.pendingRequest() {
+            // 探针不渲染任何 UI，但仍是**异步**的：桥接调用要等子进程，
+            // 在 applicationDidFinishLaunching 里同步等会拖住 AppKit 的启动序列。
+            Task {
+                await OpsBridgeProbeHarness.run(into: directory)
+                NSApp.terminate(nil)
+            }
         }
     }
 }

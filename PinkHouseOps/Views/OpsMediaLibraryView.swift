@@ -31,11 +31,22 @@
 //
 
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct OpsMediaLibraryView: View {
     @ObservedObject var workspace: OpsWorkspace
 
     @State private var selectedMediaKey: String?
+    @State private var showsImageImporter = false
+
+    /// 与概览页同源的白名单（`ShopCatalogSyncProtocol.mediaMimeAllowlist`）：
+    /// 不放宽到 `.image` —— 客户端解不出来的类型不该走到发布这一步。
+    private var importableImageTypes: [UTType] {
+        var types: [UTType] = [.jpeg, .png, .gif]
+        if let webp = UTType("org.webmproject.webp") { types.append(webp) }
+        if let heic = UTType("public.heic") { types.append(heic) }
+        return types
+    }
 
     private var jobs: [MediaUploadJob] {
         workspace.mediaJobs.sorted { $0.createdAt < $1.createdAt }
@@ -44,6 +55,7 @@ struct OpsMediaLibraryView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
+                assetsCard
                 progressCard
                 jobsCard
                 orphansCard
@@ -54,6 +66,104 @@ struct OpsMediaLibraryView: View {
             .frame(maxWidth: 900, alignment: .leading)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .fileImporter(
+            isPresented: $showsImageImporter,
+            allowedContentTypes: importableImageTypes,
+            allowsMultipleSelection: true
+        ) { result in
+            switch result {
+            case .success(let urls):
+                workspace.importImages(from: urls)
+            case .failure(let error):
+                workspace.reportFailure("选择图片失败：\(error.localizedDescription)")
+            }
+        }
+    }
+
+    // MARK: 素材（可视化）
+
+    /// 为什么要有这一块：之前素材只有「assetID + 状态」两列文字，
+    /// 运营要自己去认 hash 才能知道哪张是哪张，结果是**图都在、但没人敢删**。
+    /// 现在每张图直接显示缩略图、源文件名与「被谁引用」——
+    /// 删之前能一眼看出会影响谁。
+    private var assetsCard: some View {
+        let assets = workspace.catalog.assets
+        return OpsCard(title: "素材（\(assets.count)）", systemImage: "photo.on.rectangle.angled") {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(spacing: 10) {
+                    Button {
+                        showsImageImporter = true
+                    } label: {
+                        Label("导入商品图", systemImage: "photo.badge.plus")
+                    }
+                    .controlSize(.small)
+                    OpsFootnote(text: "导入会立刻按「长边 1600」重新编码、算出内容摘要（mediaKey），"
+                                + "并复制进本机暂存目录 —— 之后与原始位置无关。")
+                }
+                if assets.isEmpty {
+                    Text("素材库是空的。导入商品图之后，才谈得上「绑到商品上」。")
+                        .font(.callout).foregroundStyle(.secondary)
+                } else {
+                    LazyVGrid(
+                        columns: [GridItem(.adaptive(minimum: 168), spacing: 12)],
+                        spacing: 12
+                    ) {
+                        ForEach(assets) { asset in
+                            assetCell(asset)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private func assetCell(_ asset: CatalogAsset) -> some View {
+        let refs = workspace.references(toAsset: asset.id)
+        return VStack(alignment: .leading, spacing: 6) {
+            OpsThumbnail(url: thumbnailURL(asset), size: 152)
+            Text(fileLabel(asset)).font(.caption).lineLimit(1).truncationMode(.middle)
+            HStack(spacing: 6) {
+                Text("\(asset.width ?? 0)×\(asset.height ?? 0)")
+                    .font(.caption2).foregroundStyle(.secondary).monospacedDigit()
+                Spacer(minLength: 2)
+                OpsTag(text: refs.isEmpty ? "无人引用" : "被引 \(refs.count)",
+                       tint: refs.isEmpty ? .orange : .accentColor)
+            }
+            if refs.isEmpty {
+                OpsFootnote(text: "没有任何地方引用它 —— 发布时不会上传，可以安全移除。")
+            } else {
+                OpsFootnote(text: refs.prefix(2).map(\.owner).joined(separator: "；")
+                            + (refs.count > 2 ? " 等 \(refs.count) 处" : ""))
+            }
+            Button(role: .destructive) {
+                workspace.removeAsset(id: asset.id)
+            } label: {
+                Label("移除素材", systemImage: "trash")
+                    .font(.caption)
+            }
+            .buttonStyle(.link)
+            .help(refs.isEmpty
+                  ? "这张图没有任何引用，移除不会影响任何内容"
+                  : "还有 \(refs.count) 处引用它，移除会被拒绝并列出引用者")
+        }
+        .padding(8)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.secondary.opacity(0.06), in: RoundedRectangle(cornerRadius: 8))
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(Color.secondary.opacity(0.16), lineWidth: 1))
+    }
+
+    private func thumbnailURL(_ asset: CatalogAsset) -> URL? {
+        workspace.stagedFileURL(forReference: asset.originalURL)
+            ?? workspace.stagedFileURL(forReference: asset.previewURL)
+            ?? workspace.stagedFileURL(forReference: asset.thumbnailURL)
+    }
+
+    /// 优先显示**源文件名** —— 运营认文件名，不认内容 hash
+    private func fileLabel(_ asset: CatalogAsset) -> String {
+        if let url = thumbnailURL(asset) { return url.lastPathComponent }
+        return asset.originalURL.replacingOccurrences(of: "local:", with: "")
     }
 
     // MARK: 进度
@@ -170,13 +280,22 @@ struct OpsMediaLibraryView: View {
             }
 
             if let kind = job.failureKind {
-                Label(kind.guidance, systemImage: "info.circle")
+                // ⚠️ `guidance` 是变量（住共享包 `ShopCatalogMediaJob` 里）。
+                // 今天它的四种取值都没有 `**`，所以这一处**目前没坏** ——
+                // 但同一条路径上的兄弟字段（`ShopCatalogStrictPolicy.guidance`、
+                // `ShopCatalogBaselineVerdict.guidance`）都带星号，改文案的人一改就踩。
+                // 用 `Label { } icon: { }` 才能把 `Text` 换成 opsMarkdown 的结果。
+                Label {
+                    opsMarkdown(kind.guidance)
+                } icon: {
+                    Image(systemName: "info.circle")
+                }
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
             if let message = job.lastErrorMessage {
-                Text(message)
+                opsMarkdown(message)
                     .font(.caption2)
                     .foregroundStyle(.secondary)
                     .lineLimit(2)

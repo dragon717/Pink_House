@@ -21,5 +21,18 @@
 //  `ObservableObject` / `@Published` 属于 Combine，用到的文件仍要自己
 //  `import Combine`（同理由 MemberImportVisibility 强制）。
 //
+//  ## 为什么要导出两个模块
+//
+//  `PinkHouseOpsCore` 是 Mac 运营工具**可测的服务层**（受控发布桥接的调用端），
+//  2026-09-27 从 App target 抽进本地包 `Packages/PinkHouseOps`。抽出去的原因不是
+//  「架构更漂亮」，是**这里的逻辑之前无法被验证**：App 宿主式单测在本机跑不起来
+//  （`xcodebuild test` 永久挂起，取证见 skill
+//  `pink-house-xcodebuild-acceptance` 的 `references/mac-xctest-hang-forensics.md`），
+//  而这层恰恰出过「`markCancelled()` 无人调用 → 取消那条错误分支走不到」的事故。
+//  抽成纯逻辑包之后用 `swift test` 秒级覆盖。
+//
+//  注意模块名带 `Core` 后缀：App 的 target 已经叫 `PinkHouseOps`，
+//  库若同名，这里 `import PinkHouseOps` 就变成「自己 import 自己」。
 
 @_exported import SharedCatalog
+@_exported import PinkHouseOpsCore
