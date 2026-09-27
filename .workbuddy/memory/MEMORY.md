@@ -24,6 +24,7 @@
 - ⭐ **`fileExists` 在沙盒里会骗人** → 唯一判据 `OpsBridgeSettings.isReadableFile(_:)`；**禁** `(try? read(upToCount:1)) != nil`（空文件被误判）。
 - ⭐ **解释器候选顺序**：显式设置 → **仓库内 `.venv/bin/python3`** → homebrew → usr/local → `/usr/bin`（沙盒里报 `cannot be used within an App Sandbox`）。`cryptography` 只装 `tools/time_hall/publication/.venv`。
 - ⚠️ **本机做不了沙盒实验** → 只能在真实 App 里探：文件触发 `bridge-probe.request`（`BridgeProbeHarness.swift`），产物 `probe.log`/`probe.json`。本 target 开 `SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor` → 跨线程盒子必须显式 `nonisolated`。
+- ⭐ **系列上新向导（2026-09-27 重构后）**：录入单位=**系列级多类型条目**（`OpsSeriesEntryDraft`/`OpsSeriesEntryValidator`，无任务名称/批次/款式描述字段）；提交=`commitSeriesEntry()` 全量校验一票拦截 → 逐类型写现有链路；**首次=追加 SaleEvent，再次改价=走 applyPriceCorrection（修正≠追加）**；向导状态随 `seriesEntryJSON`（Optional 列，迁移已验）。ViewBuilder 分支禁 `var`/赋值语句（`type '()' cannot conform to 'View'`）；`@Published` 计算属性无 `$` 投影 → 用 `bind(_ keyPath:)`。
 ## iOS / 领域层
 
 - **测试隔离**：宿主=主 App，`FileManager.default` 就是**用户真实沙盒** → 落盘测试必须 `ShopCatalogStorage.useTemporaryForTesting()`；断言只比前后快照或按 `batchID` 收窄。

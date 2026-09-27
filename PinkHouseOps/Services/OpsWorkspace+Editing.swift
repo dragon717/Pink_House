@@ -195,14 +195,22 @@ extension OpsWorkspace {
     /// ⚠️ Mac 端按**商品**存尺码表，不做款式级归一化（见文件头第 3 条）。
     /// 同款多色要共用一张表，用 `copySizeChart(from:to:)` 显式指定目标。
     ///
-    /// 保留 `sourceImage`：尺码表原图与结构化数据缺一不可（计划 §12）。
+    /// 校验口径（需求 v1.2 §S3-B）：
+    ///   · 列与行必须**同时**填写或**同时**留空（只有原图时可以都为空）；
+    ///   · 每行的数值个数必须等于列数（否则客户端整列错位）。
+    ///
+    /// - Parameters:
+    ///   - allowShrinkingUsedSizes: 新表删掉了仍被现有规格（颜色）使用的尺码时是否放行。
+    ///     手工编辑保持 false（先去处理受影响的颜色）；系列向导传 true ——
+    ///     它写完尺码表后会**整体重建**该商品的规格，新表与规格必然一致。
     @discardableResult
     func setSizeChart(
         productID: String,
         unit: String?,
         columns: [String],
         rows: [CatalogSizeRow],
-        sourceImage: String?
+        sourceImage: String?,
+        allowShrinkingUsedSizes: Bool = false
     ) -> Bool {
         guard canMutate() else { return false }
         guard catalog.products.contains(where: { $0.id == productID }) else {
@@ -212,6 +220,12 @@ extension OpsWorkspace {
         let trimmedColumns = columns
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
+        // 需求 §S3-B：列和行必须同时存在，不能只填写一半；只有原图时可以都为空。
+        guard trimmedColumns.isEmpty == rows.isEmpty else {
+            lastError = "尺码表的列与行必须同时填写，或同时留空"
+                + "（只有尺码表原图时，结构化列和行可以都为空）。"
+            return false
+        }
         // 行列不齐是尺码表最常见的脏数据：客户端会整列错位，看起来像「数据全错」。
         // 这里挡在录入端，而不是等发布端结构校验去报一句更含糊的话。
         guard rows.allSatisfy({ $0.values.count == trimmedColumns.count }) else {
@@ -226,6 +240,29 @@ extension OpsWorkspace {
             return false
         }
         let unitValue = normalized(unit)
+
+        // 收缩保护（需求 §6.2）：新表删掉「正在被颜色使用」的尺码时，先列出受影响的
+        // 颜色并要求处理 —— 静默删规格会让那些颜色变成没有可售尺码的空壳。
+        if !allowShrinkingUsedSizes {
+            let oldLabels = Set(catalog.sizeCharts
+                .first(where: { $0.productID == productID })?.rows.map(\.label) ?? [])
+            let newLabels = Set(rows.map(\.label))
+            let removed = oldLabels.subtracting(newLabels)
+            if !removed.isEmpty {
+                let affected = catalog.variants
+                    .filter { $0.productID == productID && $0.size.map { removed.contains($0) } == true }
+                    .compactMap(\.color)
+                if !affected.isEmpty {
+                    var ordered: [String] = []
+                    for color in affected where !ordered.contains(color) { ordered.append(color) }
+                    lastError = "新尺码表删掉了仍被使用的尺码："
+                        + removed.sorted().joined(separator: "、")
+                        + "。受影响的颜色：" + ordered.joined(separator: "、")
+                        + "。请先处理这些颜色的可售尺码（或走系列向导整体重建规格）。"
+                    return false
+                }
+            }
+        }
 
         if let index = catalog.sizeCharts.firstIndex(where: { $0.productID == productID }) {
             catalog.sizeCharts[index].unit = unitValue

@@ -78,9 +78,16 @@ final class OpsWorkspace: ObservableObject {
     @Published private(set) var mediaJobs: [MediaUploadJob] = []
     /// 最近一次发布前校验结果（nil = 还没校验过，或校验后被编辑作废）
     @Published private(set) var review: ShopCatalogPublicationReview?
+    /// 「系列上新」向导的工作副本（S1–S5，需求 v1.2）。
+    /// 随草稿持久化在 `OpsCatalogDraftRecord.seriesEntryJSON`（见 OpsWorkspace+SeriesEntry.swift）。
+    @Published var seriesEntry = OpsSeriesEntryDraft()
 
-    private let context: ModelContext
-    private let fileManager = FileManager.default
+    /// 非 private：`OpsWorkspace+SeriesEntry.swift` 里的向导草稿持久化也要写同一个库
+    /// （两个 context 写同一个库会让「刚保存的草稿」在另一侧看不见）。
+    let context: ModelContext
+    let fileManager = FileManager.default
+    /// 向导草稿的防抖持久化（每次击键都整包编码太浪费，停顿 0.4s 落一次盘）
+    private var seriesEntryPersistCancellable: Any?
 
     /// 发布中心需要同一个 `ModelContext` 来写发布任务台账。
     /// 暴露只读访问而不是让它自己再建容器的第二个 context：两个 context
@@ -94,6 +101,12 @@ final class OpsWorkspace: ObservableObject {
     init(context: ModelContext) {
         self.context = context
         loadOrCreateDraft()
+        // 向导草稿：编辑停顿后自动落盘（失败只报告，绝不清空内存里的输入）
+        seriesEntryPersistCancellable = $seriesEntry
+            .dropFirst()
+            .removeDuplicates()
+            .debounce(for: .milliseconds(400), scheduler: DispatchQueue.main)
+            .sink { [weak self] _ in self?.persistSeriesEntryState() }
     }
 
     // MARK: 版本 / 状态派生（视图只读这些，不自己算）
@@ -194,6 +207,8 @@ final class OpsWorkspace: ObservableObject {
         }
         try? fileManager.createDirectory(
             at: stagingDirectory, withIntermediateDirectories: true)
+        // 向导工作副本跟着草稿走：换草稿 = 换向导状态（解不开就从空白开始，见 loadSeriesEntryState）
+        loadSeriesEntryState()
     }
 
     /// 显式换到另一份草稿（多草稿管理在 M4，这里先给恢复流程用）
@@ -221,6 +236,9 @@ final class OpsWorkspace: ObservableObject {
         try? context.save()
         review = nil
         adopt(record)
+        // 新草稿 = 空白向导（adopt 里会读 seriesEntryJSON，这里显式归零再落一次盘）
+        seriesEntry = OpsSeriesEntryDraft()
+        persistSeriesEntryState()
         statusMessage = "已新建草稿「\(title)」"
         lastError = nil
         return record
@@ -470,15 +488,24 @@ final class OpsWorkspace: ObservableObject {
 
     @discardableResult
     func addSeries(shopID: String, name: String, year: Int?, month: Int?, season: String?) -> Bool {
-        guard canMutate() else { return false }
+        addSeriesReturningID(shopID: shopID, name: name, year: year, month: month, season: season) != nil
+    }
+
+    /// 创建系列并返回新 id（`addSeries` 的返回 id 版，两条路径共用同一套校验）。
+    /// 系列级提交（S1 新建系列）需要拿到 id 才能继续挂商品。
+    @discardableResult
+    func addSeriesReturningID(
+        shopID: String, name: String, year: Int?, month: Int?, season: String?
+    ) -> String? {
+        guard canMutate() else { return nil }
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else {
             lastError = "系列名不能为空。"
-            return false
+            return nil
         }
         guard let shop = catalog.shops.first(where: { $0.id == shopID }) else {
             lastError = "请先选择一个店家。"
-            return false
+            return nil
         }
         let trimmedSeason = season?.trimmingCharacters(in: .whitespacesAndNewlines)
         var series = CatalogSeries(
@@ -488,32 +515,42 @@ final class OpsWorkspace: ObservableObject {
         series.season = (trimmedSeason?.isEmpty ?? true) ? nil : trimmedSeason
         catalog.series.append(series)
         markDirty()
-        return true
+        return series.id
     }
 
     @discardableResult
     func addProduct(shopID: String, seriesID: String, name: String, category: String) -> Bool {
-        guard canMutate() else { return false }
+        addProductReturningID(shopID: shopID, seriesID: seriesID, name: name, category: category) != nil
+    }
+
+    /// 创建商品并返回新 id（`addProduct` 的返回 id 版，同一套校验）。
+    /// 系列级提交需要拿到 id 才能继续挂规格 / 尺码表 / 销售记录。
+    @discardableResult
+    func addProductReturningID(
+        shopID: String, seriesID: String, name: String, category: String
+    ) -> String? {
+        guard canMutate() else { return nil }
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else {
             lastError = "商品名不能为空。"
-            return false
+            return nil
         }
         // 归属必须是一条链：商品 → 系列 → 店家。悬空结构发布端会拦，
         // 但那时运营已经填完一整页了，所以在命令层就拒。
         guard let series = catalog.series.first(where: { $0.id == seriesID }),
               series.shopID == shopID else {
             lastError = "所选系列不属于所选店家，请重新选择（商品必须挂在「店家 → 系列」下）。"
-            return false
+            return nil
         }
-        catalog.products.append(CatalogProduct(
+        let product = CatalogProduct(
             id: "product-\(shortID())",
             shopID: shopID,
             seriesID: seriesID,
             name: trimmed,
-            category: category.trimmingCharacters(in: .whitespacesAndNewlines)))
+            category: category.trimmingCharacters(in: .whitespacesAndNewlines))
+        catalog.products.append(product)
         markDirty()
-        return true
+        return product.id
     }
 
     /// 商品图绑定：**传入的顺序就是商品自己的图片顺序**（R04）。
@@ -856,7 +893,9 @@ final class OpsWorkspace: ObservableObject {
         }
     }
 
-    private func upsertAssetAndJob(
+    /// 非 private：`importSingleImage`（系列向导的封面/颜色图/尺码表原图导入）
+    /// 也走这条路径 —— 图的规范化与台账不允许多套写法。
+    func upsertAssetAndJob(
         for staged: ShopCatalogMediaStaging.StagedMedia, sourceName: String
     ) {
         // 1) 图片资源：mediaKey 存在 → 同一个媒体，只补 URL 字段

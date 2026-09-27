@@ -108,6 +108,13 @@ final class OpsCatalogDraftRecord {
     /// 上次在商品编辑器里打开的商品（工作台「继续编辑」用）。
     var workingProductID: String?
 
+    // MARK: 系列上新向导（2026-09-27，需求 v1.2）
+
+    /// 「系列上新」向导的工作副本（`OpsSeriesEntryDraft` 的 JSON）。
+    /// **必须 Optional**（同 R01 字段的理由）：存量库加列不能要求默认值推断。
+    /// 未完成类型不能进目录，但必须随草稿恢复 —— 见 OpsWorkspace+SeriesEntry.swift。
+    var seriesEntryJSON: Data?
+
     init(
         id: String = UUID().uuidString,
         title: String,

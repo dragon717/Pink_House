@@ -53,13 +53,23 @@ struct OpsCatalogEditorView: View {
     @State private var selectedSeriesID: String?
     @State private var selectedProductID: String?
     @State private var sheet: EditorSheet?
+    /// §6.1 系列列表筛选：「当前上新（未归档）/ 未标年份 / 指定年份」；"all" = 全部
+    @State private var seriesFilterID = "all"
+    /// 图1 顶部的搜索胶囊：过滤店家 / 系列 / 商品名
+    @State private var searchText = ""
 
     var body: some View {
-        HSplitView {
-            shopColumn
-            seriesColumn
-            productColumn
+        VStack(spacing: 12) {
+            pageHeader
+            HSplitView {
+                shopColumn
+                seriesColumn
+                productColumn
+            }
+            .frame(maxHeight: .infinity)
         }
+        .padding(12)
+        .background(OpsFlowPageBackground())
         .sheet(item: $sheet) { item in
             switch item {
             case .shopForm(let existingID):
@@ -87,16 +97,111 @@ struct OpsCatalogEditorView: View {
         .onChange(of: workspace.catalog.products.count) { _, _ in clampSelection() }
     }
 
+    // MARK: 页头（图1：粉紫渐变带 + 标题 + 搜索胶囊）
+
+    private var pageHeader: some View {
+        HStack(spacing: 14) {
+            VStack(alignment: .leading, spacing: 3) {
+                Text("店家与系列 · 商品查看与运营编辑")
+                    .font(.title3.weight(.bold))
+                    .foregroundStyle(.white)
+                Text("按「店家上新 → 系列 → 类型分组商品 → 详情」逐层查看；筛选支持当前上新、年份与未标年份。")
+                    .font(.caption)
+                    .foregroundStyle(.white.opacity(0.85))
+                    .lineLimit(1)
+            }
+            Spacer(minLength: 12)
+            HStack(spacing: 6) {
+                Image(systemName: "magnifyingglass")
+                    .foregroundStyle(OpsFlowPalette.textSecondary)
+                TextField("搜索店家、系列或商品", text: $searchText)
+                    .textFieldStyle(.plain)
+                    .frame(width: 220)
+                if !searchText.isEmpty {
+                    Button {
+                        searchText = ""
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundStyle(OpsFlowPalette.textSecondary)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 7)
+            .background(Color.white, in: Capsule())
+            .overlay(Capsule().stroke(OpsFlowPalette.accentPink.opacity(0.35), lineWidth: 1))
+        }
+        .padding(16)
+        .background(
+            LinearGradient(
+                colors: [OpsFlowPalette.accentPink.opacity(0.85),
+                         OpsFlowPalette.primaryPurple.opacity(0.55)],
+                startPoint: .topLeading, endPoint: .bottomTrailing),
+            in: RoundedRectangle(cornerRadius: 16))
+        .shadow(color: OpsFlowPalette.cardShadow, radius: 10, x: 0, y: 4)
+    }
+
+    private func matchesSearch(_ text: String) -> Bool {
+        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else { return true }
+        return text.localizedCaseInsensitiveContains(query)
+    }
+
     // MARK: 派生列表
 
     private var seriesUnderSelectedShop: [CatalogSeries] {
         guard let selectedShopID else { return [] }
-        return workspace.catalog.series.filter { $0.shopID == selectedShopID }
+        let all = workspace.catalog.series.filter { $0.shopID == selectedShopID }
+        let filtered: [CatalogSeries]
+        switch seriesFilterID {
+        case "current":
+            filtered = all.filter { $0.archivedAt == nil }
+        case "untagged":
+            filtered = all.filter { $0.year == nil }
+        case "all":
+            filtered = all
+        default:
+            // "year-2026" 形态
+            let year = Int(seriesFilterID.dropFirst("year-".count))
+            filtered = all.filter { $0.year == year }
+        }
+        return filtered.filter { matchesSearch($0.name) }
+    }
+
+    /// 筛选候选里的年份（**按该店系列首次出现顺序**，不用无序集合遍历序）
+    private var filterYearOptions: [Int] {
+        guard let selectedShopID else { return [] }
+        var ordered: [Int] = []
+        for series in workspace.catalog.series
+        where series.shopID == selectedShopID {
+            if let year = series.year, !ordered.contains(year) { ordered.append(year) }
+        }
+        return ordered
     }
 
     private var productsUnderSelectedSeries: [CatalogProduct] {
         guard let selectedSeriesID else { return [] }
-        return workspace.catalog.products.filter { $0.seriesID == selectedSeriesID }
+        return workspace.catalog.products
+            .filter { $0.seriesID == selectedSeriesID }
+            .filter { matchesSearch($0.name) }
+    }
+
+    /// 店家列（图1 第一步「店家一览」）：搜索命中名称或别名
+    private var filteredShops: [CatalogShop] {
+        workspace.catalog.shops.filter { shop in
+            matchesSearch(shop.name) || shop.aliases.contains { matchesSearch($0) }
+        }
+    }
+
+    /// 该系列下的类型分组（§6.1）：按商品**首次出现顺序**，绝不用无序集合遍历序
+    private var orderedCategoriesInSelectedSeries: [String] {
+        var ordered: [String] = []
+        for product in productsUnderSelectedSeries
+        where !ordered.contains(product.category) {
+            ordered.append(product.category)
+        }
+        return ordered
     }
 
     /// 选择态对不上数据时收敛回第一个 —— 列表是数据派生的，
@@ -118,33 +223,58 @@ struct OpsCatalogEditorView: View {
     private var shopColumn: some View {
         ColumnShell(
             title: "店家",
-            count: workspace.catalog.shops.count,
+            count: filteredShops.count,
+            tint: OpsFlowPalette.tilePink,
             emptyHint: "还没有店家。先建一个店家，再往里加系列。",
-            isEmpty: workspace.catalog.shops.isEmpty,
+            isEmpty: filteredShops.isEmpty,
             onAdd: { sheet = .shopForm(existingID: nil) },
             addHelp: "新增店家"
         ) {
             List(selection: $selectedShopID) {
-                ForEach(workspace.catalog.shops) { shop in
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(shop.name).lineLimit(1)
-                        Text("\(workspace.catalog.series.filter { $0.shopID == shop.id }.count) 系列 · "
-                             + "\(workspace.catalog.products.filter { $0.shopID == shop.id }.count) 商品")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                    .tag(shop.id)
-                    .contextMenu {
-                        Button("编辑…") { sheet = .shopForm(existingID: shop.id) }
-                        Button("删除店家", role: .destructive) {
-                            if workspace.removeShop(id: shop.id) { clampSelection() }
-                        }
-                    }
+                ForEach(filteredShops) { shop in
+                    shopRow(shop).tag(shop.id)
+                        .listRowBackground(Color.clear)
+                        .listRowSeparator(.hidden)
                 }
             }
-            .listStyle(.inset)
+            .listStyle(.plain)
+            .scrollContentBackground(.hidden)
         }
-        .frame(minWidth: 190, idealWidth: 215)
+        .frame(minWidth: 210, idealWidth: 240)
+    }
+
+    /// 店家行（图1 第一步）：粉色瓷片 + 头像圆 + 名称 + 元信息
+    private func shopRow(_ shop: CatalogShop) -> some View {
+        OpsFlowTile(color: OpsFlowPalette.tilePink, selected: shop.id == selectedShopID) {
+            HStack(spacing: 10) {
+                // 头像圆：取店名的第一个字符（图1 的圆形店家标识）
+                ZStack {
+                    Circle()
+                        .fill(OpsFlowPalette.accentPink.opacity(0.85))
+                    Text(String(shop.name.prefix(1)))
+                        .font(.callout.weight(.bold))
+                        .foregroundStyle(.white)
+                }
+                .frame(width: 30, height: 30)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(shop.name).lineLimit(1)
+                        .font(.callout.weight(.medium))
+                        .foregroundStyle(OpsFlowPalette.textPrimary)
+                    // §6.1：店家行显示最近上新时间（= 该店系列里最新的年月，无则「—」）
+                    Text("\(workspace.catalog.series.filter { $0.shopID == shop.id }.count) 系列 · "
+                         + "\(workspace.catalog.products.filter { $0.shopID == shop.id }.count) 商品 · "
+                         + "最近上新 \(latestUpdateText(for: shop.id))")
+                        .font(.caption)
+                        .foregroundStyle(OpsFlowPalette.textSecondary)
+                }
+            }
+        }
+        .contextMenu {
+            Button("编辑…") { sheet = .shopForm(existingID: shop.id) }
+            Button("删除店家", role: .destructive) {
+                if workspace.removeShop(id: shop.id) { clampSelection() }
+            }
+        }
     }
 
     // MARK: 系列列
@@ -153,6 +283,7 @@ struct OpsCatalogEditorView: View {
         ColumnShell(
             title: "系列",
             count: seriesUnderSelectedShop.count,
+            tint: OpsFlowPalette.tileLilac,
             emptyHint: selectedShopID == nil
                 ? "先选一个店家。"
                 : "这个店家下还没有系列。",
@@ -161,29 +292,79 @@ struct OpsCatalogEditorView: View {
             addHelp: "新增系列",
             addDisabled: selectedShopID == nil
         ) {
-            List(selection: $selectedSeriesID) {
-                ForEach(seriesUnderSelectedShop) { series in
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(series.name).lineLimit(1)
-                        Text(seriesSubtitle(series))
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                    .tag(series.id)
-                    .contextMenu {
-                        Button("编辑系列…") { sheet = .seriesForm(existingID: series.id) }
-                        Button("配置发售阶段与价格表…") { sheet = .seriesConfig(seriesID: series.id) }
-                        Divider()
-                        Button("删除系列", role: .destructive) {
-                            if workspace.removeSeries(id: series.id) { clampSelection() }
-                        }
+            VStack(spacing: 0) {
+                // §6.1：支持「当前上新 / 年份 / 未标年份」筛选
+                Picker("筛选", selection: $seriesFilterID) {
+                    Text("全部").tag("all")
+                    Text("当前上新").tag("current")
+                    Text("未标年份").tag("untagged")
+                    ForEach(filterYearOptions, id: \.self) { year in
+                        Text("\(year) 年").tag("year-\(year)")
                     }
                 }
+                .pickerStyle(.menu)
+                .controlSize(.small)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                List(selection: $selectedSeriesID) {
+                    ForEach(seriesUnderSelectedShop) { series in
+                        seriesRow(series).tag(series.id)
+                            .listRowBackground(Color.clear)
+                            .listRowSeparator(.hidden)
+                    }
+                }
+                .listStyle(.plain)
+                .scrollContentBackground(.hidden)
             }
-            .listStyle(.inset)
             .safeAreaInset(edge: .bottom) { seriesFooter }
         }
-        .frame(minWidth: 190, idealWidth: 215)
+        .frame(minWidth: 210, idealWidth: 240)
+    }
+
+    /// 系列行（图1 第二步）：瓷片 + 名称 + 年月/商品数 + 发售状态胶囊
+    private func seriesRow(_ series: CatalogSeries) -> some View {
+        OpsFlowTile(
+            color: series.archivedAt == nil
+                ? OpsFlowPalette.tileLilac : OpsFlowPalette.tileRed.opacity(0.7),
+            selected: series.id == selectedSeriesID) {
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 6) {
+                    Text(series.name).lineLimit(1)
+                        .font(.callout.weight(.medium))
+                        .foregroundStyle(OpsFlowPalette.textPrimary)
+                    OpsFlowChip(
+                        text: series.salePhase?.displayName ?? "未声明",
+                        tint: series.salePhase == nil
+                            ? OpsFlowPalette.textSecondary : OpsFlowPalette.primaryPurple)
+                }
+                Text(seriesSubtitle(series))
+                    .font(.caption)
+                    .foregroundStyle(OpsFlowPalette.textSecondary)
+            }
+        }
+        .contextMenu {
+            Button("编辑系列…") { sheet = .seriesForm(existingID: series.id) }
+            Button("配置发售阶段与价格表…") { sheet = .seriesConfig(seriesID: series.id) }
+            Divider()
+            Button("删除系列", role: .destructive) {
+                if workspace.removeSeries(id: series.id) { clampSelection() }
+            }
+        }
+    }
+
+    /// 最近上新文本（§6.1）：该店系列里最新的年月；没有年月信息则「—」
+    private func latestUpdateText(for shopID: String) -> String {
+        var latest: (year: Int, month: Int?)?
+        for series in workspace.catalog.series where series.shopID == shopID {
+            guard let year = series.year else { continue }
+            if latest == nil || year > latest!.year {
+                latest = (year, series.month)
+            }
+        }
+        guard let latest else { return "—" }
+        if let month = latest.month { return String(format: "%04d-%02d", latest.year, month) }
+        return "\(latest.year)"
     }
 
     /// 系列列的底部：档期/价格表摘要 + 唯一入口。
@@ -227,6 +408,7 @@ struct OpsCatalogEditorView: View {
         ColumnShell(
             title: "商品",
             count: productsUnderSelectedSeries.count,
+            tint: OpsFlowPalette.tilePink,
             emptyHint: selectedSeriesID == nil
                 ? "先选一个系列。"
                 : "这个系列下还没有商品。",
@@ -236,56 +418,102 @@ struct OpsCatalogEditorView: View {
             addDisabled: selectedSeriesID == nil
         ) {
             List(selection: $selectedProductID) {
-                ForEach(productsUnderSelectedSeries) { product in
-                    productRow(product)
-                    .tag(product.id)
-                    .contextMenu {
-                        Button("编辑基本信息…") { sheet = .productForm(existingID: product.id) }
-                        Button("绑定商品图…") { sheet = .bindImages(productID: product.id) }
-                        Divider()
-                        if product.archivedAt == nil {
-                            Button("归档（下线）") {
-                                workspace.setArchived(true, kind: .product, id: product.id)
-                                clampSelection()
-                            }
-                        } else {
-                            Button("恢复上线") {
-                                workspace.setArchived(false, kind: .product, id: product.id)
-                            }
+                // 需求 §6.1：商品列表按 JSK、OP、小物等**类型分组**。
+                // 分组顺序 = 该系列下商品的**首次出现顺序**（禁用 Set/Dictionary 遍历序派生
+                // —— 冷启动换排法是仓库红线的同类坑）。
+                ForEach(orderedCategoriesInSelectedSeries, id: \.self) { category in
+                    Section {
+                        ForEach(productsUnderSelectedSeries.filter { $0.category == category }) { product in
+                            productRow(product)
+                                .tag(product.id)
+                                .listRowBackground(Color.clear)
+                                .listRowSeparator(.hidden)
+                                .contextMenu {
+                                    Button("编辑基本信息…") { sheet = .productForm(existingID: product.id) }
+                                    Button("绑定商品图…") { sheet = .bindImages(productID: product.id) }
+                                    Divider()
+                                    if product.archivedAt == nil {
+                                        Button("归档（下线）") {
+                                            workspace.setArchived(true, kind: .product, id: product.id)
+                                            clampSelection()
+                                        }
+                                    } else {
+                                        Button("恢复上线") {
+                                            workspace.setArchived(false, kind: .product, id: product.id)
+                                        }
+                                    }
+                                    Button("删除商品", role: .destructive) {
+                                        if workspace.removeProduct(id: product.id) { clampSelection() }
+                                    }
+                                }
                         }
-                        Button("删除商品", role: .destructive) {
-                            if workspace.removeProduct(id: product.id) { clampSelection() }
-                        }
+                    } header: {
+                        // 类型分组标题 = 图1 的分类胶囊（粉色实心）
+                        OpsFlowChip(text: category.isEmpty ? "未分类" : category,
+                                    tint: OpsFlowPalette.accentPink, filled: true)
+                            .padding(.vertical, 2)
                     }
                 }
             }
-            .listStyle(.inset)
+            .listStyle(.plain)
+            .scrollContentBackground(.hidden)
             .safeAreaInset(edge: .bottom) { productFooter }
         }
-        .frame(minWidth: 260, idealWidth: 300)
+        .frame(minWidth: 280, idealWidth: 320)
     }
 
     private func productRow(_ product: CatalogProduct) -> some View {
-        VStack(alignment: .leading, spacing: 3) {
-            HStack(spacing: 6) {
-                Text(product.name).lineLimit(1)
-                if product.category.isEmpty == false {
-                    Text(product.category)
-                        .font(.caption2)
-                        .padding(.horizontal, 5)
-                        .padding(.vertical, 1)
-                        .background(Color.accentColor.opacity(0.14), in: Capsule())
-                }
-            }
-            HStack(spacing: 8) {
-                Label("\(product.images.count) 图", systemImage: "photo")
-                if let designName = product.designName, !designName.isEmpty {
-                    Text("款式 \(designName)")
-                }
-            }
-            .font(.caption)
-            .foregroundStyle(product.images.isEmpty ? AnyShapeStyle(.secondary) : AnyShapeStyle(.primary))
+        let archive = workspace.priceArchive(forProduct: product.id)
+        let variants = workspace.variants(forProduct: product.id)
+        // 颜色 / 尺码数：按**出现顺序**去重（不用无序集合遍历序）
+        var orderedColors: [String] = []
+        var orderedSizes: [String] = []
+        for variant in variants {
+            if let color = variant.color, !orderedColors.contains(color) { orderedColors.append(color) }
+            if let size = variant.size, !orderedSizes.contains(size) { orderedSizes.append(size) }
         }
+        let firstImageAsset = product.images.first.flatMap { id in
+            workspace.catalog.assets.first { $0.id == id }
+        }
+        let imageURL = firstImageAsset.flatMap { workspace.stagedFileURL(forReference: $0.originalURL) }
+        return OpsFlowTile(color: OpsFlowPalette.tilePink, selected: product.id == selectedProductID) {
+            HStack(spacing: 10) {
+                // 商品图（图1 商品卡左侧的图块）；无图 = 占位图标
+                OpsThumbnail(url: imageURL, size: 44)
+                VStack(alignment: .leading, spacing: 3) {
+                    HStack(spacing: 6) {
+                        Text(product.name).lineLimit(1)
+                            .font(.callout.weight(.medium))
+                            .foregroundStyle(OpsFlowPalette.textPrimary)
+                        if product.archivedAt != nil {
+                            OpsFlowChip(text: "已归档", tint: OpsFlowPalette.textSecondary)
+                        }
+                    }
+                    // §6.1：商品卡片显示价格与颜色/尺码摘要（胶囊标签）
+                    HStack(spacing: 6) {
+                        if let reservation = archive?.currentReservationPrice {
+                            OpsFlowChip(text: "预约 " + priceText(reservation, archive?.currentCurrency),
+                                        tint: OpsFlowPalette.accentPink)
+                        }
+                        if let stock = archive?.currentStockPrice {
+                            OpsFlowChip(text: "现货 " + priceText(stock, archive?.currentCurrency),
+                                        tint: OpsFlowPalette.okGreen)
+                        }
+                        if !orderedColors.isEmpty || !orderedSizes.isEmpty {
+                            Text("\(orderedColors.count) 色 · "
+                                 + (orderedSizes.isEmpty ? "均码" : orderedSizes.joined(separator: "/")))
+                                .font(.caption)
+                                .foregroundStyle(OpsFlowPalette.textSecondary)
+                        }
+                    }
+                    .lineLimit(1)
+                }
+            }
+        }
+    }
+
+    private func priceText(_ amount: Decimal, _ currency: CatalogCurrency?) -> String {
+        CatalogMoney(amount: amount, currency: currency ?? .unknown).displayText
     }
 
     @ViewBuilder
@@ -341,9 +569,11 @@ private enum EditorSheet: Identifiable {
 
 // MARK: - 列外壳
 
+/// 列外壳（图1 的分区卡）：白卡 + 粉彩标题条 + 粉色加号。
 private struct ColumnShell<Content: View>: View {
     let title: String
     let count: Int
+    var tint: Color = OpsFlowPalette.tilePink
     let emptyHint: String
     let isEmpty: Bool
     let onAdd: () -> Void
@@ -354,33 +584,48 @@ private struct ColumnShell<Content: View>: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 6) {
-                Text(title).font(.headline)
+                Text(title)
+                    .font(.headline)
+                    .foregroundStyle(OpsFlowPalette.textPrimary)
                 Text("\(count)")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .font(.caption.weight(.semibold))
                     .monospacedDigit()
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 1)
+                    .background(OpsFlowPalette.accentPink, in: Capsule())
                 Spacer(minLength: 4)
                 Button(action: onAdd) {
                     Image(systemName: "plus")
+                        .foregroundStyle(.white)
+                        .frame(width: 20, height: 20)
+                        .background(OpsFlowPalette.accentPink, in: Circle())
                 }
-                .buttonStyle(.borderless)
+                .buttonStyle(.plain)
                 .disabled(addDisabled)
+                .opacity(addDisabled ? 0.4 : 1)
                 .help(addHelp)
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 9)
-            Divider()
+            .background(tint)
+            Divider().overlay(OpsFlowPalette.cardBorder)
             if isEmpty {
                 Text(emptyHint)
                     .font(.callout)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(OpsFlowPalette.textSecondary)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                     .padding(14)
             } else {
                 content
             }
         }
-        .background(Color(nsColor: .controlBackgroundColor))
+        .background(OpsFlowPalette.cardBackground)
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(OpsFlowPalette.cardBorder, lineWidth: 1))
+        .shadow(color: OpsFlowPalette.cardShadow, radius: 10, x: 0, y: 4)
     }
 }
 

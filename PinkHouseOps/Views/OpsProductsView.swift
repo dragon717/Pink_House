@@ -1029,7 +1029,8 @@ private struct SizeChartFormSheet: View {
                         .font(.caption).foregroundStyle(.orange)
                         .fixedSize(horizontal: false, vertical: true)
                 }
-                OpsFootnote(text: "结构化数据与尺码表原图缺一不可：原图给用户看，结构化数据给客户端排版。")
+                OpsFootnote(text: "列和行必须**同时**填写或**同时**留空；只有尺码表原图时可以都为空"
+                            + "（原图给用户看，结构化数据给客户端排版）。")
             },
             onCancel: { dismiss() },
             onConfirm: { save() }
@@ -1053,8 +1054,19 @@ private struct SizeChartFormSheet: View {
             .split(whereSeparator: { $0 == "," || $0 == "，" || $0 == "|" || $0 == "｜" })
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
+        // 需求 §S3-B：只有原图时，结构化列和行可以都为空；只填一半仍拒绝
+        if columns.isEmpty, rowsText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            guard !sourceAssetID.isEmpty else {
+                localError = "结构化列/行与尺码表原图至少要有一项"
+                    + "（需求：只有原图时列和行可以都为空）。"
+                return false
+            }
+            return workspace.setSizeChart(
+                productID: productID, unit: unit, columns: [], rows: [],
+                sourceImage: sourceAssetID.isEmpty ? nil : sourceAssetID)
+        }
         guard !columns.isEmpty else {
-            localError = "至少要有一个列名。"
+            localError = "至少要有一个列名（或完全留空、只上传原图）。"
             return false
         }
         var rows: [CatalogSizeRow] = []

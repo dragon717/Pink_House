@@ -49,9 +49,10 @@ struct OpsRootView: View {
 
 // MARK: - 分区
 //
-// 分区顺序 = 方案 §4 里一次新上的**实际行走顺序**，不是按技术模块分类：
+// 分区顺序 = 一次新上的**实际行走顺序**，不是按技术模块分类：
 //
-//     工作台（要干什么） → 店家与系列（结构） → 商品管理（内容）
+//     系列上新（S1–S5 向导，需求 v1.2） → 工作台（要干什么）
+//     → 店家与系列（结构） → 商品管理（内容）
 //     → 素材库（图） → 发布中心（发出去） → 本地预览（发之前自己看一眼）
 //
 //  刻意把「发布中心」独立成一个分区，而不是塞进校验页的一个按钮：
@@ -59,6 +60,7 @@ struct OpsRootView: View {
 //  和被编辑的内容是两件事。混在一页里，运营分不清「校验通过」和「已经发出去」。
 
 enum OpsSection: String, CaseIterable, Identifiable {
+    case seriesEntry
     case workbench
     case catalog
     case products
@@ -70,6 +72,7 @@ enum OpsSection: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
+        case .seriesEntry: return "系列上新"
         case .workbench: return "工作台"
         case .catalog: return "店家与系列"
         case .products: return "商品管理"
@@ -81,6 +84,7 @@ enum OpsSection: String, CaseIterable, Identifiable {
 
     var symbolName: String {
         switch self {
+        case .seriesEntry: return "sparkles.rectangle.stack"
         case .workbench: return "square.grid.2x2"
         case .catalog: return "storefront"
         case .products: return "tshirt"
@@ -148,6 +152,8 @@ struct OpsMainView: View {
     @ViewBuilder
     private var content: some View {
         switch section {
+        case .seriesEntry:
+            OpsSeriesWizardView(workspace: workspace)
         case .workbench:
             OpsOverviewView(workspace: workspace)
         case .catalog:

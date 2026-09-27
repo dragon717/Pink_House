@@ -46,6 +46,10 @@ struct SeriesConfigSheet: View {
     @State private var balanceDueEndAt = Date()
     @State private var phaseError: String?
 
+    // 封面（§6.2 系列级可编辑）
+    @State private var coverAssetID: String?
+    @State private var coverMessage: String?
+
     // 价格表
     @State private var chartUnit = ""
     @State private var chartColumnsText = ""
@@ -74,6 +78,8 @@ struct SeriesConfigSheet: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     phaseSection
+                    Divider()
+                    coverSection
                     Divider()
                     priceChartSection
                 }
@@ -179,6 +185,41 @@ struct SeriesConfigSheet: View {
             balanceDueEndAt: declaresPhase && balanceDueKind == .exact && hasBalanceDueEndAt
                 ? balanceDueEndAt : nil)
         if !ok { phaseError = workspace.statusText ?? "保存失败，请看上方的提示。" }
+    }
+
+    // MARK: 封面（§6.2）
+
+    private var coverSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("系列封面").font(.subheadline.weight(.semibold))
+            HStack(spacing: 10) {
+                OpsThumbnail(
+                    url: coverAssetID.flatMap {
+                        workspace.stagedFileURL(forReference: workspace.asset(for: $0)?.originalURL)
+                    }, size: 48)
+                Picker("封面", selection: $coverAssetID) {
+                    Text("不指定").tag(String?.none)
+                    ForEach(workspace.catalog.assets) { asset in
+                        Text(assetLabel(asset)).tag(String?.some(asset.id))
+                    }
+                }
+                .controlSize(.small)
+                Button("保存封面") {
+                    if let coverAssetID,
+                       workspace.updateSeriesCover(seriesID: seriesID, assetID: coverAssetID) {
+                        coverMessage = nil
+                    } else if coverAssetID == nil {
+                        coverMessage = "请先选择一张图（封面不提供「清除」——要换就换一张）。"
+                    } else {
+                        coverMessage = workspace.statusText ?? "保存失败，请看上方的提示。"
+                    }
+                }
+                .controlSize(.small)
+            }
+            if let coverMessage {
+                Text(coverMessage).font(.caption).foregroundStyle(.orange)
+            }
+        }
     }
 
     // MARK: 价格表
@@ -309,6 +350,7 @@ struct SeriesConfigSheet: View {
         }
         balanceDueKind = series.balanceDueKind ?? .approximate
         balanceDueText = series.balanceDueText ?? ""
+        coverAssetID = series.cover
         if let at = series.balanceDueAt {
             hasBalanceDueAt = true
             balanceDueAt = at

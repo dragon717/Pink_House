@@ -302,14 +302,16 @@ struct OpsCard<Content: View>: View {
         VStack(alignment: .leading, spacing: 12) {
             Label(title, systemImage: systemImage)
                 .font(.headline)
+                .foregroundStyle(OpsFlowPalette.textPrimary)
             content
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(16)
-        .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 10))
+        .background(OpsFlowPalette.cardBackground, in: RoundedRectangle(cornerRadius: 16))
         .overlay(
-            RoundedRectangle(cornerRadius: 10)
-                .stroke(Color.secondary.opacity(0.18), lineWidth: 1))
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(OpsFlowPalette.cardBorder, lineWidth: 1))
+        .shadow(color: OpsFlowPalette.cardShadow, radius: 10, x: 0, y: 4)
     }
 }
 
