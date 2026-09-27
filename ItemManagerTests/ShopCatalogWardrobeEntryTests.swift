@@ -829,3 +829,121 @@ private extension Clothing {
         )
     }
 }
+
+// MARK: - 多入口统一的「加入方式」初始口径（2026-09-27 需求）
+
+/// 多选确认页（`ShopCatalogWardrobeMergeView`）每件商品的初始选中项与落库映射：
+/// 纯逻辑直接驱动 UI 候选与确认落库，这里把优先级与映射契约钉死。
+@MainActor
+final class ShopCatalogMergeEntryChoiceTests: XCTestCase {
+
+    // MARK: 初始选中：点菜页偏好 → 阶段默认 → 候选第一项 → nil
+
+    func testPreferredCardChoiceWinsWhenInCandidates() {
+        // 预约期（双价）：点菜页选了「预约」→ 定金+尾款（在候选里 → 用它）
+        XCTAssertEqual(
+            ShopCatalogWardrobeEntryPolicy.mergeEntryInitialOption(
+                preferredCardChoice: .reservation,
+                phase: .reservationActive,
+                hasReservationPrice: true, hasStockPrice: true),
+            .depositPaid)
+        // 现货期：点菜页选了「现货」→ 现货价全款（在候选 [预约价全款, 现货价全款] 里 → 用它）
+        XCTAssertEqual(
+            ShopCatalogWardrobeEntryPolicy.mergeEntryInitialOption(
+                preferredCardChoice: .stock,
+                phase: .inStock,
+                hasReservationPrice: true, hasStockPrice: true),
+            .fullStockPaid)
+    }
+
+    func testPreferenceFallsBackToPhaseDefaultWhenNotInCandidates() {
+        // 预约期候选只有 [定金+尾款, 预约价全款]（现货价不是该阶段选项）：
+        // 点菜页的「现货」偏好不在候选里 → 退回阶段默认（定金+尾款）
+        XCTAssertEqual(
+            ShopCatalogWardrobeEntryPolicy.mergeEntryInitialOption(
+                preferredCardChoice: .stock,
+                phase: .reservationActive,
+                hasReservationPrice: true, hasStockPrice: true),
+            .depositPaid)
+    }
+
+    func testNilPreferenceUsesPhaseDefaultPerPhase() {
+        // 预约中 → 定金+尾款；预约已结束 → 预约价全款；现货 → 现货价全款
+        XCTAssertEqual(
+            ShopCatalogWardrobeEntryPolicy.mergeEntryInitialOption(
+                preferredCardChoice: nil,
+                phase: .reservationActive,
+                hasReservationPrice: true, hasStockPrice: true),
+            .depositPaid)
+        XCTAssertEqual(
+            ShopCatalogWardrobeEntryPolicy.mergeEntryInitialOption(
+                preferredCardChoice: nil,
+                phase: .reservationEnded,
+                hasReservationPrice: true, hasStockPrice: true),
+            .fullPaid)
+        XCTAssertEqual(
+            ShopCatalogWardrobeEntryPolicy.mergeEntryInitialOption(
+                preferredCardChoice: nil,
+                phase: .inStock,
+                hasReservationPrice: true, hasStockPrice: true),
+            .fullStockPaid)
+    }
+
+    func testStockPhaseWithoutStockPriceFallsBackToReservationFull() {
+        // 现货阶段但没有现货价档案 → 默认「按预约价全款加入」
+        XCTAssertEqual(
+            ShopCatalogWardrobeEntryPolicy.mergeEntryInitialOption(
+                preferredCardChoice: .stock,
+                phase: .inStock,
+                hasReservationPrice: true, hasStockPrice: false),
+            .fullPaid)
+    }
+
+    func testNoPriceArchiveAtAllReturnsNil() {
+        // 无任何可用价格档案 → nil（调用方回退现货兜底，不渲染选择段）
+        XCTAssertNil(
+            ShopCatalogWardrobeEntryPolicy.mergeEntryInitialOption(
+                preferredCardChoice: nil,
+                phase: .neutral,
+                hasReservationPrice: false, hasStockPrice: false))
+        // 预约未开始：没有可记的成交价 → nil
+        XCTAssertNil(
+            ShopCatalogWardrobeEntryPolicy.mergeEntryInitialOption(
+                preferredCardChoice: .reservation,
+                phase: .reservationUpcoming,
+                hasReservationPrice: true, hasStockPrice: true))
+    }
+
+    // MARK: 落库映射：加入方式 → PriceMode
+
+    func testPriceModeMappingMatchesDetailSheet() {
+        XCTAssertEqual(
+            ShopCatalogWardrobeEntryPolicy.priceMode(for: .depositPaid, backendDeposit: 128),
+            .reservation(depositPaid: 128))
+        XCTAssertEqual(
+            ShopCatalogWardrobeEntryPolicy.priceMode(for: .fullPaid, backendDeposit: 128),
+            .fullReservation)
+        XCTAssertEqual(
+            ShopCatalogWardrobeEntryPolicy.priceMode(for: .fullStockPaid, backendDeposit: 128),
+            .fullStock)
+    }
+
+    // MARK: 后台已付定金：钳制在预约价以内、缺省 0
+
+    func testBackendDepositClampAndDefault() {
+        XCTAssertEqual(
+            ShopCatalogWardrobeEntryPolicy.backendDeposit(
+                currentDeposit: 128, reservationPrice: 428), 128)
+        // 后台定金被价格修正改得比预约价还大 → 钳到预约价
+        XCTAssertEqual(
+            ShopCatalogWardrobeEntryPolicy.backendDeposit(
+                currentDeposit: 500, reservationPrice: 428), 428)
+        // 缺省 → 0；负数 → 0
+        XCTAssertEqual(
+            ShopCatalogWardrobeEntryPolicy.backendDeposit(
+                currentDeposit: nil, reservationPrice: 428), 0)
+        XCTAssertEqual(
+            ShopCatalogWardrobeEntryPolicy.backendDeposit(
+                currentDeposit: -10, reservationPrice: 428), 0)
+    }
+}

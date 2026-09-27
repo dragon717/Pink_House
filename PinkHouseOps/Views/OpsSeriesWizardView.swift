@@ -16,8 +16,8 @@
 //  · 一个系列可以同时选择多个类型，仍在同一个系列流程内完成；
 //  · S4 只读；发现问题时「返回修改」回到对应步骤；
 //  · S5 的「提交」= 逐类型写入本地草稿（复用现有链路），**不是**发布：
-//    发布走「发布中心」，公共 CloudKit 上架状态以发布中心的回读为准，
-//    这里绝不显示虚假的「已上架」。
+//    发布走受控发布链路（导出待发布包 → 受控发布器），公共 CloudKit
+//    上架状态以回读确认为准，这里绝不显示虚假的「已上架」。
 //
 
 import SwiftUI
@@ -41,17 +41,6 @@ enum OpsSeriesWizardStep: Int, CaseIterable, Identifiable {
         case .typeEntries: return "S3·系列内多类型录入"
         case .review: return "S4·检查与预览"
         case .publish: return "S5·状态与发布"
-        }
-    }
-
-    /// 图2 的短标题（S5 页脚/说明用，不带前缀时会重复编号）
-    var shortTitle: String {
-        switch self {
-        case .selectShopSeries: return "选择店家与系列"
-        case .seriesProfile: return "系列资料与发售阶段"
-        case .typeEntries: return "系列内多类型录入"
-        case .review: return "检查与预览"
-        case .publish: return "状态与发布"
         }
     }
 
@@ -131,7 +120,7 @@ struct OpsSeriesWizardView: View {
         case .selectShopSeries: shopSeriesStep
         case .seriesProfile: seriesProfileStep
         case .typeEntries:
-            OpsSeriesWizardTypeEntriesView(workspace: workspace, onRequestReview: { step = .review })
+            OpsSeriesWizardTypeEntriesView(workspace: workspace)
         case .review:
             OpsSeriesWizardReviewView(
                 workspace: workspace,
@@ -161,11 +150,15 @@ struct OpsSeriesWizardView: View {
             VStack(alignment: .leading, spacing: 16) {
                 OpsCard(title: "店家与系列（必填）", systemImage: "storefront") {
                     VStack(alignment: .leading, spacing: 10) {
-                        Picker("店家", selection: bind(\.shopID)) {
+                        Picker("店家", selection: shopChoice) {
                             Text("请选择店家").tag("")
+                            Text("＋ 新建店家…").tag(Self.newShopChoiceTag)
                             ForEach(workspace.catalog.shops) { shop in
                                 Text(shop.name).tag(shop.id)
                             }
+                        }
+                        if draft.createsNewShop {
+                            newShopFields
                         }
                         Picker("系列", selection: seriesChoice) {
                             Text("请选择系列").tag("")
@@ -186,6 +179,36 @@ struct OpsSeriesWizardView: View {
             }
             .padding(18)
             .frame(maxWidth: 760, alignment: .leading)
+        }
+    }
+
+    /// 「＋ 新建店家…」在店家 Picker 里的哨兵 tag（与系列的 "__new__" 同一手法）
+    static let newShopChoiceTag = "__new_shop__"
+
+    /// 已有店家 id；「＋ 新建店家…」= createsNewShop 开关。选择态与草稿互转。
+    private var shopChoice: Binding<String> {
+        Binding(
+            get: { draft.createsNewShop ? Self.newShopChoiceTag : draft.shopID },
+            set: { newValue in
+                if newValue == Self.newShopChoiceTag {
+                    workspace.seriesEntry.createsNewShop = true
+                } else {
+                    workspace.seriesEntry.createsNewShop = false
+                    workspace.seriesEntry.shopID = newValue
+                }
+            })
+    }
+
+    /// 新建店家的内联字段（店名必填、别名可选）。
+    /// 输入随草稿持久化 —— 与新系列字段同一原则：失败不丢输入。
+    private var newShopFields: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            TextField("新店家名（必填）", text: bind(\.newShopName))
+                .textFieldStyle(.roundedBorder)
+            TextField("别名（英文逗号分隔，可空，用于搜索匹配）", text: bind(\.newShopAliasesText))
+                .textFieldStyle(.roundedBorder)
+            OpsFootnote(text: "提交时先建店家、再建系列：店家和系列会一起出现在「店家与系列」页，"
+                        + "后续操作里都能正常选用。")
         }
     }
 
@@ -229,8 +252,14 @@ struct OpsSeriesWizardView: View {
     }
 
     private var affiliationNames: (shop: String, series: String) {
-        let shop = workspace.catalog.shops.first { $0.id == draft.shopID }?.name
-            ?? "（未选择）"
+        let shop: String
+        if draft.createsNewShop {
+            let name = draft.newShopName.trimmingCharacters(in: .whitespacesAndNewlines)
+            shop = name.isEmpty ? "（新建）" : name + "（新建）"
+        } else {
+            shop = workspace.catalog.shops.first { $0.id == draft.shopID }?.name
+                ?? "（未选择）"
+        }
         let series: String
         if draft.seriesID.isEmpty {
             let name = draft.newSeriesName.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -339,7 +368,7 @@ struct OpsSeriesWizardView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
             } else {
                 OpsFlowFooterText(
-                    text: "所有编辑先写进本机草稿；发布在「发布中心」完成。",
+                    text: "所有编辑先写进本机草稿；发布走受控发布链路完成。",
                     dimmed: true)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
@@ -350,7 +379,7 @@ struct OpsSeriesWizardView: View {
                         step = previous
                     }
                 }
-                .buttonStyle(OpsFlowSecondaryButtonStyle(tint: .white))
+                .buttonStyle(OpsFlowSecondaryButtonStyle(tint: .white, ghost: true))
             }
             if step != OpsSeriesWizardStep.allCases.last {
                 Button("下一步") { goNext() }
@@ -407,7 +436,14 @@ struct OpsSeriesWizardReviewView: View {
     }
 
     private var seriesSummary: some View {
-        let shopName = workspace.catalog.shops.first { $0.id == draft.shopID }?.name ?? "（未选择）"
+        // 「＋ 新建店家」在 S4 还没落库（提交发生在 S5），按新建语义展示而不是「未选择」
+        let shopName: String
+        if draft.createsNewShop {
+            let name = draft.newShopName.trimmingCharacters(in: .whitespacesAndNewlines)
+            shopName = name.isEmpty ? "（新建）" : name + "（新建）"
+        } else {
+            shopName = workspace.catalog.shops.first { $0.id == draft.shopID }?.name ?? "（未选择）"
+        }
         let seriesName = draft.seriesID.isEmpty
             ? (draft.newSeriesName.isEmpty ? "（未选择）" : draft.newSeriesName + "（新建）")
             : (workspace.catalog.series.first { $0.id == draft.seriesID }?.name ?? "（不存在）")
@@ -599,7 +635,7 @@ struct OpsSeriesWizardPublishView: View {
         }
     }
 
-    /// 系列级沿用现有草稿状态机：写入草稿 → 发布中心（校验/构建/上传/回读）→ 线上
+    /// 系列级沿用现有草稿状态机：写入草稿 → 校验/构建待发布包 → 受控发布 → 回读 → 线上
     private var stateMachineCard: some View {
         OpsCard(title: "系列级状态", systemImage: "arrow.clockwise.circle") {
             VStack(alignment: .leading, spacing: 6) {
@@ -608,7 +644,7 @@ struct OpsSeriesWizardPublishView: View {
                     + (workspace.hasUnsavedChanges ? "（有未保存修改）" : "（已保存）"))
                 LabeledContent("系列内类型", value: draft.selectedCategorySummary)
                 OpsFootnote(text: "每个类型走同一条商品发布链路："
-                            + "草稿 → 提交审核 → 审核通过 → 发布（在「发布中心」完成）。")
+                            + "草稿 → 校验与构建待发布包 → 受控发布 → 回读确认。")
             }
         }
     }
@@ -681,9 +717,9 @@ struct OpsSeriesWizardPublishView: View {
             VStack(alignment: .leading, spacing: 6) {
                 LabeledContent("已写入本地草稿",
                                value: report?.allOK == true ? "是（逐类型）" : "尚未全部完成")
-                LabeledContent("App 侧发布", value: "在「发布中心」执行（校验 → 构建待发布包 → 受控发布）")
-                LabeledContent("公共 CloudKit 上架", value: "以发布中心的**回读确认**为准；未回读前一律显示「待回读」")
-                OpsFootnote(text: "本页**不会**声称「已上架」——上架与否只看发布中心的回读结果"
+                LabeledContent("App 侧发布", value: "本工具校验并构建待发布包 → 交给受控发布器")
+                LabeledContent("公共 CloudKit 上架", value: "以发布器的**回读确认**为准；未回读前一律显示「待回读」")
+                OpsFootnote(text: "本页**不会**声称「已上架」——上架与否只看受控发布器的回读结果"
                             + "（方案 R07/R09 的既有口径）。")
             }
         }

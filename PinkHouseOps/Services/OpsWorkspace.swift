@@ -2,7 +2,7 @@
 //  OpsWorkspace.swift
 //  PinkHouseOps
 //
-//  Mac 运营工具的**编排层**：草稿装载、素材导入、发布前校验、导出待发布包。
+//  Mac 运营工具的**编排层**：草稿装载、图片导入、发布前校验、导出待发布包。
 //
 //  ## 它在架构里的位置（计划 §3）
 //
@@ -13,9 +13,11 @@
 //  本文件只做编排与落盘，**不重新定义任何口径**：
 //    · 图片规范化与 mediaKey → `ShopCatalogMediaStaging`
 //    · 发布前门禁       → `ShopCatalogPublicationGate`
-//    · 任务状态机       → `MediaUploadJobMachine`
 //    · JSON 编解码      → `ShopCatalogJSONCoding`
 //    · 整包归档         → `ShopCatalogExportArchive`
+//
+//  （2026-09-27：上传任务台账随「素材库」分区一起移除——图片导入
+//  现在只产出 `CatalogAsset`；校验/导出仍保留为服务层能力。）
 //
 //  ## 为什么素材必须立刻复制进 staging
 //
@@ -74,8 +76,6 @@ final class OpsWorkspace: ObservableObject {
     /// 否则「点了没反应」会被当成功能坏了 —— 计划 §7 的「失败必须可见」）
     @Published var statusMessage: String?
     @Published var lastError: String?
-    /// 导入的图片任务（按 mediaKey 唯一）
-    @Published private(set) var mediaJobs: [MediaUploadJob] = []
     /// 最近一次发布前校验结果（nil = 还没校验过，或校验后被编辑作废）
     @Published private(set) var review: ShopCatalogPublicationReview?
     /// 「系列上新」向导的工作副本（S1–S5，需求 v1.2）。
@@ -88,15 +88,6 @@ final class OpsWorkspace: ObservableObject {
     let fileManager = FileManager.default
     /// 向导草稿的防抖持久化（每次击键都整包编码太浪费，停顿 0.4s 落一次盘）
     private var seriesEntryPersistCancellable: Any?
-
-    /// 发布中心需要同一个 `ModelContext` 来写发布任务台账。
-    /// 暴露只读访问而不是让它自己再建容器的第二个 context：两个 context
-    /// 写同一个库会让「刚保存的草稿」在另一侧看不见。
-    var modelContextForPublishing: ModelContext { context }
-
-    /// 发布中心。**懒建**：它需要 workspace 自己，构造期不能互相引用
-    /// （`OpsWorkspace.init` 里 `self` 还不完整）。
-    lazy var publishCenter = OpsPublishCenter(workspace: self)
 
     init(context: ModelContext) {
         self.context = context
@@ -170,7 +161,6 @@ final class OpsWorkspace: ObservableObject {
         } else {
             createDraft(title: defaultDraftTitle())
         }
-        loadMediaJobs()
     }
 
     private func defaultDraftTitle() -> String {
@@ -222,7 +212,6 @@ final class OpsWorkspace: ObservableObject {
         }
         review = nil
         adopt(record)
-        loadMediaJobs()
         return true
     }
 
@@ -475,15 +464,28 @@ final class OpsWorkspace: ObservableObject {
 
     @discardableResult
     func addShop(name: String) -> Bool {
-        guard canMutate() else { return false }
+        addShopReturningID(name: name) != nil
+    }
+
+    /// 创建店家并返回新 id（`addShop` 的返回 id 版，同一套校验）。
+    /// 目录页「新增店家」与向导 S1「＋ 新建店家」共用这一条链路，不另写第二套。
+    /// 别名在**创建时**就落进去 —— 旧实现只在建好之后的编辑路径才写 aliases，
+    /// 新建表单里填的别名被静默丢弃（与 R05「新建也要带上 season」同类坑）。
+    @discardableResult
+    func addShopReturningID(name: String, aliases: [String] = []) -> String? {
+        guard canMutate() else { return nil }
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else {
             lastError = "店家名不能为空。"
-            return false
+            return nil
         }
-        catalog.shops.append(CatalogShop(id: "shop-\(shortID())", name: trimmed))
+        let cleaned = aliases
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+        let shop = CatalogShop(id: "shop-\(shortID())", name: trimmed, aliases: cleaned)
+        catalog.shops.append(shop)
         markDirty()
-        return true
+        return shop.id
     }
 
     @discardableResult
@@ -827,78 +829,15 @@ final class OpsWorkspace: ObservableObject {
 
     // MARK: 导入图片
 
-    /// 导入图片：**规范化 → 内容寻址 → 立即复制进 staging**。
-    ///
-    /// 规范化在这里发生（而不是等发布端），因为：
-    ///   · `mediaKey` 要进草稿 JSON，越早定下来越好；
-    ///   · 长边 1600 的重编码很吃内存，一次导入一张比发布时批量处理更可控。
-    ///
-    /// 每张图同时创建一个 `CatalogAsset` 与一条上传任务；两者都用 `mediaKey` 做键，
-    /// 重复导入同一张图（哪怕文件名不同）只会得到一条记录。
-    func importImages(from urls: [URL]) {
-        guard canMutate() else { return }
-
-        var imported = 0
-        var skipped: [String] = []
-        var failures: [String] = []
-
-        try? fileManager.createDirectory(at: stagingDirectory, withIntermediateDirectories: true)
-
-        for url in urls {
-            let accessed = url.startAccessingSecurityScopedResource()
-            defer { if accessed { url.stopAccessingSecurityScopedResource() } }
-
-            let displayName = url.lastPathComponent
-            do {
-                let raw = try Data(contentsOf: url)
-                // 规范化在这里做（不是发布时批量做）：mediaKey 要进草稿 JSON，
-                // 越早定下来越好；长边 1600 的重编码很吃内存，逐张处理更可控。
-                //
-                // 「同一张图重复导入」不需要额外判重：规范化是确定性的
-                // （同字节 → 同字节），因此 fileName 相同 → 下面 fileExists 直接复用。
-                let staged = try ShopCatalogMediaStaging.stage(raw)
-
-                let target = stagingDirectory.appendingPathComponent(staged.fileName)
-                if fileManager.fileExists(atPath: target.path) {
-                    skipped.append(displayName)
-                } else {
-                    try staged.data.write(to: target, options: .atomic)
-                    imported += 1
-                }
-
-                upsertAssetAndJob(for: staged, sourceName: displayName)
-            } catch let error as ShopCatalogMediaStagingError {
-                failures.append("\(displayName)：\(error.errorDescription ?? "无法处理")")
-            } catch {
-                failures.append("\(displayName)：\(error.localizedDescription)")
-            }
-        }
-
-        // R02：先把草稿落盘结果拿到手，再拼文案。
-        // 旧实的顺序是「saveDraft() → 用图片失败信息重写 lastError」，
-        // 于是「导图成功、保存失败」时保存错误会被清掉。
-        let catalogSaved = saveDraft()
-
-        var parts = ["新增 \(imported) 张"]
-        if !skipped.isEmpty { parts.append("\(skipped.count) 张内容重复已复用") }
-        if !catalogSaved { parts.append("草稿落盘失败") }
-        statusMessage = parts.joined(separator: "，")
-
-        if catalogSaved {
-            lastError = failures.isEmpty ? nil : failures.joined(separator: "\n")
-        } else {
-            // 保存失败优先，绝不静默；图片处理失败也一并保留
-            let saveError = lastError ?? "草稿保存失败。"
-            lastError = ([saveError] + failures).joined(separator: "\n")
-        }
-    }
-
     /// 非 private：`importSingleImage`（系列向导的封面/颜色图/尺码表原图导入）
-    /// 也走这条路径 —— 图的规范化与台账不允许多套写法。
-    func upsertAssetAndJob(
-        for staged: ShopCatalogMediaStaging.StagedMedia, sourceName: String
+    /// 与快照 harness 都走这条路径 —— 图的规范化不允许多套写法。
+    ///
+    /// 2026-09-27：上传任务台账已随「素材库」分区移除，这里只产出
+    /// `CatalogAsset`（mediaKey 身份不变；staging 副本仍是唯一事实来源）。
+    func upsertAsset(
+        for staged: ShopCatalogMediaStaging.StagedMedia
     ) {
-        // 1) 图片资源：mediaKey 存在 → 同一个媒体，只补 URL 字段
+        // 图片资源：mediaKey 存在 → 同一个媒体，只补 URL 字段
         let assetID = "asset-\(String(staged.mediaKey.prefix(12)))"
         if let index = catalog.assets.firstIndex(where: { $0.id == assetID }) {
             catalog.assets[index].thumbnailURL = "local:\(staged.fileName)"
@@ -918,156 +857,6 @@ final class OpsWorkspace: ObservableObject {
                 height: staged.pixelHeight,
                 mediaKey: staged.mediaKey))
         }
-
-        // 2) 上传任务：同 mediaKey 只留一条
-        var job = mediaJobs.first { $0.mediaKey == staged.mediaKey }
-            ?? MediaUploadJob(
-                mediaKey: staged.mediaKey,
-                stagedFileName: staged.fileName,
-                byteCount: staged.byteCount,
-                mimeType: staged.mimeType)
-        job.stagedFileName = staged.fileName
-        job.byteCount = staged.byteCount
-        job.mimeType = staged.mimeType
-        persist(job)
-
-        _ = sourceName    // 原始文件名只用于报错文案，不参与身份判定（身份 = 内容摘要）
-    }
-
-    // MARK: 上传任务落盘
-
-    private func loadMediaJobs() {
-        guard let draftID = draft?.id else { mediaJobs = []; return }
-        let target = draftID
-        let descriptor = FetchDescriptor<OpsMediaJobRecord>(
-            predicate: #Predicate { $0.draftID == target },
-            sortBy: [SortDescriptor(\.createdAt, order: .forward)])
-        let records = (try? context.fetch(descriptor)) ?? []
-        // 启动恢复：上次进程被杀留下的 `uploading` 一律回退成 `retryable`。
-        // 保持 uploading 的话，新进程里它既不会前进也不会后退，界面永远卡在「上传中」。
-        mediaJobs = records.map { record in
-            let restored = MediaUploadJobMachine.recovered(record.job)
-            if restored.state != record.job.state { record.apply(restored) }
-            return restored
-        }
-        try? context.save()
-    }
-
-    /// 写回一条任务（存在则更新，不存在则插入）
-    func persist(_ job: MediaUploadJob) {
-        if let index = mediaJobs.firstIndex(where: { $0.mediaKey == job.mediaKey }) {
-            mediaJobs[index] = job
-        } else {
-            mediaJobs.append(job)
-        }
-        guard let draftID = draft?.id else { return }
-        let key = job.mediaKey
-        let descriptor = FetchDescriptor<OpsMediaJobRecord>(
-            predicate: #Predicate { $0.mediaKey == key && $0.draftID == draftID })
-        if let existing = (try? context.fetch(descriptor))?.first {
-            existing.apply(job)
-        } else {
-            context.insert(OpsMediaJobRecord(
-                mediaKey: job.mediaKey,
-                draftID: draftID,
-                stagedFileName: job.stagedFileName,
-                byteCount: job.byteCount,
-                mimeType: job.mimeType,
-                stateRawValue: job.state.rawValue,
-                attemptCount: job.attemptCount,
-                failureKindRawValue: job.failureKind?.rawValue,
-                lastErrorMessage: job.lastErrorMessage,
-                createdAt: job.createdAt,
-                updatedAt: job.updatedAt,
-                verifiedAt: job.verifiedAt))
-        }
-        try? context.save()
-    }
-
-    var mediaProgress: MediaUploadJobMachine.Progress {
-        MediaUploadJobMachine.progress(of: mediaJobs)
-    }
-
-    /// 台账里记着、但 staging 目录里已经没有文件的图片。
-    ///
-    /// 这三者（目录文件 / 台账 / 目录 JSON 引用）是三个独立事实，**必须能分别看见**：
-    ///   · 台账有、文件没有 → 别人手删过 staging，或者换过机器；
-    ///   · 文件有、台账没有 → 直接往 staging 目录里丢了图（没走导入流程）；
-    ///   · 目录 JSON 引用了不存在的文件 → 发布门禁会拦（`missingLocal`）。
-    /// 本方法只负责第 1 种；第 2 种由 `rescanStagingDirectory()` 补台账；
-    /// 第 3 种交给 `ShopCatalogPublicationGate`。
-    var mediaKeysMissingStagedFile: [String] {
-        let names = stagedFileNames
-        return mediaJobs
-            .filter { !names.contains($0.stagedFileName) }
-            .map(\.mediaKey)
-            .sorted()
-    }
-
-    /// 台账里没有、但 staging 目录里存在的文件名（孤儿素材）。
-    var orphanStagedFileNames: [String] {
-        let known = Set(mediaJobs.map(\.stagedFileName))
-        return stagedFileNames.filter { !known.contains($0) }.sorted()
-    }
-
-    /// 重新扫 staging 目录，给「目录里有文件但台账没记」的图片补一条任务。
-    ///
-    /// 为什么要有：`.fileImporter` 不是唯一的素材来源 —— 运营会把图直接拷进
-    /// staging 目录（尤其是「重新拿一份上次的素材」）。没有这一步，那些图
-    /// 在界面上就是隐形的，而发布端**照样会上传它们**（它按文件名找文件，
-    /// 不看台账）——「界面上没有、线上有图」是最难解释的一类不一致。
-    ///
-    /// 媒体键取自**文件名主干**：staging 的文件名由
-    /// `ShopCatalogMediaStaging.StagedMedia.fileName` 固定生成为 `<mediaKey>.<ext>`，
-    /// 所以主干就是媒体键。这里额外用 `isPayloadHash` 校验形态，
-    /// 形态不对的（例如运营手放了一个 `备注.txt`）直接跳过，不伪造台账。
-    @discardableResult
-    func rescanStagingDirectory() -> Int {
-        try? fileManager.createDirectory(at: stagingDirectory, withIntermediateDirectories: true)
-        var added: [String] = []
-        for name in stagedFileNames.sorted() {
-            let stem = (name as NSString).deletingPathExtension
-            guard ShopCatalogSyncProtocol.isPayloadHash(stem) else { continue }
-            if mediaJobs.contains(where: { $0.stagedFileName == name }) { continue }
-            let url = stagingDirectory.appendingPathComponent(name)
-            let attributes = try? fileManager.attributesOfItem(atPath: url.path)
-            let byteCount = (attributes?[.size] as? NSNumber)?.intValue ?? 0
-            persist(MediaUploadJob(
-                mediaKey: stem,
-                stagedFileName: name,
-                byteCount: byteCount,
-                mimeType: mimeType(forFileName: name)))
-            added.append(name)
-        }
-        if added.isEmpty {
-            statusMessage = "素材清单已是最新（台账 \(mediaJobs.count) 条）"
-        } else {
-            statusMessage = "已补记 \(added.count) 张原本只在目录里的图片"
-        }
-        return added.count
-    }
-
-    /// 删掉一条台账记录。**不动文件**，也不动目录 JSON 里的引用 ——
-    /// 引用与文件该不该在，由发布门禁判定；删台账只是「不再跟踪这条」。
-    func removeMediaJob(mediaKey: String) {
-        mediaJobs.removeAll { $0.mediaKey == mediaKey }
-        let key = mediaKey
-        guard let draftID = draft?.id else { return }
-        let descriptor = FetchDescriptor<OpsMediaJobRecord>(
-            predicate: #Predicate { $0.mediaKey == key && $0.draftID == draftID })
-        for record in (try? context.fetch(descriptor)) ?? [] {
-            context.delete(record)
-        }
-        try? context.save()
-        statusMessage = "已移除 1 条上传任务记录（文件与目录引用都没动）"
-    }
-
-    private func mimeType(forFileName name: String) -> String {
-        let ext = (name as NSString).pathExtension
-        if let type = UTType(filenameExtension: ext), let mime = type.preferredMIMEType {
-            return mime.lowercased()
-        }
-        return "application/octet-stream"
     }
 
     // MARK: 发布前校验（离线）
@@ -1217,7 +1006,6 @@ final class OpsWorkspace: ObservableObject {
         try? context.save()
         review = nil
         adopt(record)
-        loadMediaJobs()
         statusMessage = "已从损坏草稿另存出一份可编辑的新草稿；原草稿的原始字节与备份仍保留在库里。"
         return record
     }

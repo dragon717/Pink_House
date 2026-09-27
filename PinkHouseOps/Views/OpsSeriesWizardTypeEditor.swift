@@ -31,8 +31,6 @@ import UniformTypeIdentifiers
 
 struct OpsSeriesWizardTypeEntriesView: View {
     @ObservedObject var workspace: OpsWorkspace
-    /// 请求返回 S4 时由外壳回调（S4 的「返回修改」会跳进来）
-    var onRequestReview: () -> Void
 
     @State private var selectedEntryID: String?
     @State private var customCategoryText = ""

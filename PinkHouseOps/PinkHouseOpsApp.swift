@@ -33,15 +33,11 @@ struct PinkHouseOpsApp: App {
     /// delegate 回调的时序比 `.task` 更可控。
     @NSApplicationDelegateAdaptor(OpsAppDelegate.self) private var delegate
 
-    /// 本机模型容器：草稿 + 上传任务 + **发布任务台账**。`cloudKitDatabase: .none`
-    /// 是有意的，不是忘了配（见文件头说明）。
+    /// 本机模型容器：只存本机草稿（上传任务/发布台账已随「素材库 / 发布中心」
+    /// 分区移除）。`cloudKitDatabase: .none` 是有意的，不是忘了配（见文件头说明）。
     private let container: ModelContainer = {
         let schema = Schema([
             OpsCatalogDraftRecord.self,
-            OpsMediaJobRecord.self,
-            // 发布任务台账（方案 R09）：切发布头之后结果不明时，重启后必须还知道
-            // 「有一条任务没下结论」——否则运营唯一的动作就是重发一次。
-            OpsPublishJobRecord.self,
         ])
         let configuration = ModelConfiguration(
             schema: schema,

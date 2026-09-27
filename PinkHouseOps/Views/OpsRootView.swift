@@ -49,23 +49,18 @@ struct OpsRootView: View {
 
 // MARK: - 分区
 //
-// 分区顺序 = 一次新上的**实际行走顺序**，不是按技术模块分类：
+// 分区顺序 = 一次新上的**实际行走顺序**：
 //
-//     系列上新（S1–S5 向导，需求 v1.2） → 工作台（要干什么）
-//     → 店家与系列（结构） → 商品管理（内容）
-//     → 素材库（图） → 发布中心（发出去） → 本地预览（发之前自己看一眼）
+//     系列上新（S1–S5 向导，需求 v1.2） → 店家与系列（结构）
+//     → 商品管理（内容） → 本地预览（发之前自己看一眼）
 //
-//  刻意把「发布中心」独立成一个分区，而不是塞进校验页的一个按钮：
-//  发布有**自己的状态轴**（冻结 / 构建 / 上传 / 回读 / 结果待确认 / 已确认），
-//  和被编辑的内容是两件事。混在一页里，运营分不清「校验通过」和「已经发出去」。
+//  2026-09-27 移除了「工作台 / 素材库 / 发布中心」三个分区及其页面、
+//  路由与依赖代码；发布相关能力只保留服务层（校验 / 导出待发布包 / 基线）。
 
 enum OpsSection: String, CaseIterable, Identifiable {
     case seriesEntry
-    case workbench
     case catalog
     case products
-    case media
-    case publish
     case preview
 
     var id: String { rawValue }
@@ -73,11 +68,8 @@ enum OpsSection: String, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .seriesEntry: return "系列上新"
-        case .workbench: return "工作台"
         case .catalog: return "店家与系列"
         case .products: return "商品管理"
-        case .media: return "素材库"
-        case .publish: return "发布中心"
         case .preview: return "本地预览"
         }
     }
@@ -85,11 +77,8 @@ enum OpsSection: String, CaseIterable, Identifiable {
     var symbolName: String {
         switch self {
         case .seriesEntry: return "sparkles.rectangle.stack"
-        case .workbench: return "square.grid.2x2"
         case .catalog: return "storefront"
         case .products: return "tshirt"
-        case .media: return "photo.on.rectangle.angled"
-        case .publish: return "paperplane"
         case .preview: return "eye"
         }
     }
@@ -100,12 +89,12 @@ enum OpsSection: String, CaseIterable, Identifiable {
 struct OpsMainView: View {
     @ObservedObject var workspace: OpsWorkspace
 
-    /// 当前分区。默认「工作台」；快照 harness 需要从别的分区起手
+    /// 当前分区。默认「系列上新」；快照 harness 需要从别的分区起手
     /// （见 `OpsSnapshotHarness`），所以留了一个显式入口，
     /// 但它**只是初值**，之后完全由侧栏选择驱动。
     @State private var section: OpsSection
 
-    init(workspace: OpsWorkspace, initialSection: OpsSection = .workbench) {
+    init(workspace: OpsWorkspace, initialSection: OpsSection = .seriesEntry) {
         self.workspace = workspace
         _section = State(initialValue: initialSection)
     }
@@ -113,21 +102,8 @@ struct OpsMainView: View {
     var body: some View {
         NavigationSplitView {
             List(OpsSection.allCases, selection: $section) { item in
-                HStack(spacing: 6) {
-                    Label(item.title, systemImage: item.symbolName)
-                    Spacer(minLength: 4)
-                    // 发布中心有**需要人处理**的任务时在侧栏点一下 ——
-                    // 不点的话「结果待确认」会一直躺在没人看的页里，
-                    // 而它正是最不能忽略的那一类（R09）。
-                    if item == .publish, let badge = publishBadge {
-                        Text(badge)
-                            .font(.caption2.weight(.semibold))
-                            .padding(.horizontal, 5).padding(.vertical, 1)
-                            .background(Color.orange.opacity(0.22), in: Capsule())
-                            .foregroundStyle(.orange)
-                    }
-                }
-                .tag(item)
+                Label(item.title, systemImage: item.symbolName)
+                    .tag(item)
             }
             .navigationSplitViewColumnWidth(min: 190, ideal: 210, max: 260)
             .safeAreaInset(edge: .bottom) {
@@ -143,27 +119,15 @@ struct OpsMainView: View {
         .frame(minWidth: 980, minHeight: 620)
     }
 
-    /// 侧栏角标文案（nil = 不显示）
-    private var publishBadge: String? {
-        let count = workspace.publishCenter.jobsNeedingAttention.count
-        return count > 0 ? "\(count)" : nil
-    }
-
     @ViewBuilder
     private var content: some View {
         switch section {
         case .seriesEntry:
             OpsSeriesWizardView(workspace: workspace)
-        case .workbench:
-            OpsOverviewView(workspace: workspace)
         case .catalog:
             OpsCatalogEditorView(workspace: workspace)
         case .products:
             OpsProductsView(workspace: workspace)
-        case .media:
-            OpsMediaLibraryView(workspace: workspace)
-        case .publish:
-            OpsPublishCenterView(workspace: workspace, center: workspace.publishCenter)
         case .preview:
             OpsPreviewView(workspace: workspace)
         }

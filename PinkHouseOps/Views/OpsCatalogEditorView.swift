@@ -73,7 +73,15 @@ struct OpsCatalogEditorView: View {
         .sheet(item: $sheet) { item in
             switch item {
             case .shopForm(let existingID):
-                ShopFormSheet(workspace: workspace, existingID: existingID)
+                ShopFormSheet(
+                    workspace: workspace, existingID: existingID,
+                    onSaved: { id in
+                        // 保存成功即选中：新建的店家立刻出现在左列并成为当前操作对象，
+                        // 不用让运营自己去列表里找刚建的那一行（R06 的选择收敛口径）。
+                        selectedShopID = id
+                        selectedSeriesID = nil
+                        clampSelection()
+                    })
             case .seriesForm(let existingID):
                 SeriesFormSheet(
                     workspace: workspace, existingID: existingID, preferredShopID: selectedShopID)
@@ -129,7 +137,7 @@ struct OpsCatalogEditorView: View {
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 7)
-            .background(Color.white, in: Capsule())
+            .background(OpsFlowPalette.surfaceRaised, in: Capsule())
             .overlay(Capsule().stroke(OpsFlowPalette.accentPink.opacity(0.35), lineWidth: 1))
         }
         .padding(16)
@@ -634,6 +642,8 @@ private struct ColumnShell<Content: View>: View {
 private struct ShopFormSheet: View {
     @ObservedObject var workspace: OpsWorkspace
     let existingID: String?
+    /// 保存成功后回调（新建 = 新店家 id；编辑 = 该店家 id）。父视图据此选中。
+    let onSaved: (String) -> Void
     @Environment(\.dismiss) private var dismiss
 
     @State private var name = ""
@@ -641,7 +651,7 @@ private struct ShopFormSheet: View {
 
     var body: some View {
         SheetFrame(title: existingID == nil ? "新增店家" : "编辑店家") {
-            TextField("店家名", text: $name)
+            TextField("店家名（必填）", text: $name)
             TextField("别名（英文逗号分隔，用于搜索匹配）", text: $aliasesText)
         } onCancel: {
             dismiss()
@@ -650,14 +660,19 @@ private struct ShopFormSheet: View {
                 .split(separator: ",")
                 .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
                 .filter { !$0.isEmpty }
-            // R05：只有成功才关窗；失败留在表单里，原因在全局 banner
-            let ok: Bool
+            // R05：只有成功才关窗；失败留在表单里，原因在全局 banner。
+            // 新建与编辑都把别名带上 —— 新建时丢弃别名是旧实现的静默丢数据。
+            let savedID: String?
             if let existingID {
-                ok = workspace.updateShop(id: existingID, name: name, aliases: aliases)
+                savedID = workspace.updateShop(id: existingID, name: name, aliases: aliases)
+                    ? existingID : nil
             } else {
-                ok = workspace.addShop(name: name)
+                savedID = workspace.addShopReturningID(name: name, aliases: aliases)
             }
-            if ok { dismiss() }
+            if let savedID {
+                onSaved(savedID)
+                dismiss()
+            }
         }
         .onAppear {
             guard let existingID,
@@ -807,7 +822,7 @@ private struct ProductFormSheet: View {
 
 /// 旧实现的两个问题（方案 R04）：
 ///   1. 勾选状态是 `Set<String>`，提交时按 `catalog.assets` 的**全局顺序**回写 ——
-///      于是「商品图顺序」根本不是这个商品自己的顺序，而是素材库顺序。
+///      于是「商品图顺序」根本不是这个商品自己的顺序，而是图片列表顺序。
 ///      两个商品共享同样三张图、想要不同顺序时，永远保存不下来。
 ///   2. 行里只显示 assetID / URL，运营要自己认 hash。
 ///
@@ -838,13 +853,13 @@ private struct BindImagesSheet: View {
                 Text(productName).font(.callout).foregroundStyle(.secondary)
                 // 拼接结果 = String 变量 → 必须过 `opsMarkdown`（单字面量才自动解析 Markdown）
                 opsMarkdown("左边列表的顺序**就是**这个商品的图片顺序（第一张是首图）；"
-                     + "它只属于这个商品，与素材库的列出顺序无关。")
+                     + "它只属于这个商品，与可用图片列表的顺序无关。")
                     .font(.caption).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
 
             if workspace.catalog.assets.isEmpty {
-                Text("还没有图片资源。先到「概览」导入商品图。")
+                Text("还没有图片资源。先在「系列上新」导入商品图。")
                     .font(.callout).foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
             } else {
@@ -930,7 +945,7 @@ private struct BindImagesSheet: View {
 
     private var candidateColumn: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("素材库（\(unselectedAssets.count) 张可用）")
+            Text("可用图片（\(unselectedAssets.count) 张）")
                 .font(.subheadline.weight(.semibold))
             if unselectedAssets.isEmpty {
                 Text("素材都已经在这个商品上了。")

@@ -36,23 +36,67 @@ struct ShopCatalogWardrobeMergeView: View {
     @State private var primaryID: String?
     /// 小物勾选（checkbox）；默认全部小物勾选
     @State private var accessoryIDs: Set<String> = []
+    /// 各单品选定的「加入方式」（2026-09-27 需求：所有入口统一在确认页按阶段选择）。
+    /// 候选与默认都来自 `ShopCatalogWardrobeEntryPolicy`（与详情页弹窗同一份口径）。
+    @State private var entryOptionByProduct: [String: ShopCatalogWardrobeEntryOption] = [:]
+    /// 确认后的「加入方式」选择弹窗（用户需求：点「确认加入衣橱」后弹出两个选项）
+    @State private var showsEntryChoiceDialog = false
     @State private var errorText: String?
     @State private var isInserting = false
 
-    /// 展示价 = 用户选定口径对应的当前价（与落库口径一致）
+    // MARK: 加入方式（按阶段，与详情页弹窗同一口径）
+
+    /// 该商品的购买阶段（唯一共享口径）+ 价格档案是否有两个价
+    private func entryPhaseAndPrices(for productID: String)
+        -> (phase: ShopCatalogPurchasePhase,
+            hasReservationPrice: Bool,
+            hasStockPrice: Bool) {
+        let archive = store.priceArchive(forProduct: productID)
+        let series = store.product(id: productID).flatMap { store.series(id: $0.seriesID) }
+        let phase = ShopCatalogWardrobeEntryPolicy.purchasePhase(
+            for: productID, series: series, store: store)
+        return (phase,
+                (archive.currentReservationPrice ?? 0) > 0,
+                (archive.currentStockPrice ?? 0) > 0)
+    }
+
+    /// 该商品在该阶段的「加入方式」候选（空 = 无可用价格档案，走现货兜底）
+    private func entryCandidates(for productID: String) -> [ShopCatalogWardrobeEntryOption] {
+        let info = entryPhaseAndPrices(for: productID)
+        return ShopCatalogWardrobeEntryPolicy.options(
+            phase: info.phase,
+            hasReservationPrice: info.hasReservationPrice,
+            hasStockPrice: info.hasStockPrice)
+    }
+
+    /// 实际生效的加入方式：用户已选优先；尚未初始化（首帧渲染）时按阶段策略取
+    private func effectiveEntryOption(for productID: String) -> ShopCatalogWardrobeEntryOption? {
+        if let chosen = entryOptionByProduct[productID] { return chosen }
+        let info = entryPhaseAndPrices(for: productID)
+        return ShopCatalogWardrobeEntryPolicy.mergeEntryInitialOption(
+            preferredCardChoice: priceChoices[productID],
+            phase: info.phase,
+            hasReservationPrice: info.hasReservationPrice,
+            hasStockPrice: info.hasStockPrice)
+    }
+
+    /// 展示价 = 用户选定口径对应的当前价（与落库口径一致）：
+    /// 定金+尾款 / 预约价全款 → 预约价；现货价全款 → 现货价（缺则历史预约价）
     private func price(for productID: String) -> Decimal? {
         let archive = store.priceArchive(forProduct: productID)
-        if priceChoices[productID] == .reservation {
+        switch effectiveEntryOption(for: productID) {
+        case .fullStockPaid:
+            return archive.currentStockPrice ?? archive.historicalReservationPrice
+        default:
             return archive.currentReservationPrice ?? archive.reservation?.price
         }
-        return archive.currentStockPrice ?? archive.historicalReservationPrice
     }
 
     /// 价格标签：预约口径带「预约」前缀，便于和现货区分
     private func priceLabel(for productID: String) -> String {
         guard let price = price(for: productID) else { return "价格未填" }
         let amount = "¥\(NSDecimalNumber(decimal: price).stringValue)"
-        return priceChoices[productID] == .reservation ? "预约 \(amount)" : amount
+        return effectiveEntryOption(for: productID) == .fullStockPaid ? amount : "预约 \(amount)"
     }
 
     private var items: [(product: CatalogProduct, price: Decimal?)] {
@@ -86,6 +130,7 @@ struct ShopCatalogWardrobeMergeView: View {
         ScrollView(.vertical, showsIndicators: false) {
             VStack(spacing: 16) {
                 selectedSection
+                entryChoiceSection
                 primarySection
                 if !accessoryCandidates.isEmpty {
                     accessorySection
@@ -113,6 +158,26 @@ struct ShopCatalogWardrobeMergeView: View {
         } message: {
             Text(errorText ?? "")
         }
+        // 确认后的「加入方式」选择弹窗（用户需求：点「确认加入衣橱」后弹出两个选项）。
+        // confirmationDialog = iOS 原生底部选项弹窗，与工程内其他确认弹窗风格一致；
+        // 候选文案与详情页加购弹窗同一份 `choiceTitle`，选择后按所选方式落库。
+        .confirmationDialog(
+            "请选择加入方式",
+            isPresented: $showsEntryChoiceDialog,
+            titleVisibility: .visible
+        ) {
+            if let unified = unifiedEntryCandidates {
+                ForEach(unified.candidates, id: \.self) { candidate in
+                    Button(ShopCatalogWardrobeEntryPolicy.choiceTitle(
+                        for: candidate, phase: unified.phase).appLocalized) {
+                        applyChoiceAndInsert(candidate)
+                    }
+                }
+            }
+            Button("取消", role: .cancel) {}
+        } message: {
+            Text("加入后按所选方式记账，金额仍由系统自动读取".appLocalized)
+        }
         .onAppear {
             store.loadFromBundleIfNeeded()
             if primaryID == nil {
@@ -120,6 +185,11 @@ struct ShopCatalogWardrobeMergeView: View {
             }
             if accessoryIDs.isEmpty {
                 accessoryIDs = Set(accessoryCandidates.map { $0.product.id })
+            }
+            // 加入方式初始选中 = 阶段策略默认（点菜页自选口径优先）；
+            // 已初始化过的保持用户所选（幂等，不覆盖）
+            for item in items where entryOptionByProduct[item.product.id] == nil {
+                entryOptionByProduct[item.product.id] = effectiveEntryOption(for: item.product.id)
             }
         }
     }
@@ -159,6 +229,71 @@ struct ShopCatalogWardrobeMergeView: View {
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
         .themeSkinSectionCard(cornerRadius: 16)
+    }
+
+    // MARK: 加入方式（每件商品按阶段选择；2026-09-27 需求）
+
+    /// 「加入方式」选择段：候选与文案按阶段策略取（与详情页弹窗同一份
+    /// `ShopCatalogWardrobeEntryPolicy`），用户选定后金额预览与落库口径联动。
+    /// 候选为空（无可用价格档案）的商品不出现在这里，落库时走现货兜底。
+    private var entryChoiceSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("加入方式".appLocalized)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(themeManager.primaryTextColor)
+            Text("（按每件商品当前的销售阶段选择记账方式，金额仍由系统自动读取）".appLocalized)
+                .font(.system(size: 11))
+                .foregroundStyle(themeManager.tertiaryTextColor)
+            ForEach(items, id: \.product.id) { item in
+                let candidates = entryCandidates(for: item.product.id)
+                if !candidates.isEmpty {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(item.product.name)
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundStyle(themeManager.secondaryTextColor)
+                            .lineLimit(1)
+                        ForEach(candidates, id: \.self) { candidate in
+                            entryChoiceRow(
+                                productID: item.product.id,
+                                option: candidate,
+                                phase: entryPhaseAndPrices(for: item.product.id).phase
+                            )
+                        }
+                    }
+                    .padding(.vertical, 2)
+                }
+            }
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .themeSkinSectionCard(cornerRadius: 16)
+    }
+
+    /// 单个加入方式选项行（radio 风格，与详情页弹窗的选择段同款）
+    private func entryChoiceRow(productID: String,
+                                option: ShopCatalogWardrobeEntryOption,
+                                phase: ShopCatalogPurchasePhase) -> some View {
+        let isSelected = effectiveEntryOption(for: productID) == option
+        return Button {
+            entryOptionByProduct[productID] = option
+        } label: {
+            HStack(alignment: .top, spacing: 10) {
+                Image(systemName: isSelected ? "largecircle.fill.circle" : "circle")
+                    .font(.system(size: 17))
+                    .foregroundStyle(isSelected ? themeManager.accentTextColor : themeManager.tertiaryTextColor)
+                    .padding(.top, 1)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(ShopCatalogWardrobeEntryPolicy.choiceTitle(for: option, phase: phase).appLocalized)
+                        .font(.system(size: 13, weight: isSelected ? .semibold : .regular))
+                        .foregroundStyle(themeManager.primaryTextColor)
+                    Text(ShopCatalogWardrobeEntryPolicy.choiceCaption(for: option).appLocalized)
+                        .font(.system(size: 11))
+                        .foregroundStyle(themeManager.tertiaryTextColor)
+                }
+                Spacer(minLength: 0)
+            }
+        }
+        .buttonStyle(.plain)
     }
 
     // MARK: 主衣物（radio，§20）
@@ -272,7 +407,7 @@ struct ShopCatalogWardrobeMergeView: View {
 
     private var confirmButton: some View {
         Button {
-            confirmInsert()
+            handleConfirmTap()
         } label: {
             Group {
                 if isInserting {
@@ -291,6 +426,41 @@ struct ShopCatalogWardrobeMergeView: View {
 
     // MARK: 入库
 
+    // MARK: 确认后的「加入方式」选择弹窗（2026-09-27 需求）
+
+    /// 所有选中商品的「加入方式」候选是否一致（且非空）：
+    /// 一致 → 点「确认加入衣橱」弹出选择弹窗（两个选项，与详情页弹窗同一份文案）；
+    /// 不一致（多件商品混合阶段）→ 弹窗给不出统一的两个选项，
+    /// 不弹，按确认页里每件商品已选的方式直接落库（页内「加入方式」段兜底）。
+    private var unifiedEntryCandidates:
+        (candidates: [ShopCatalogWardrobeEntryOption], phase: ShopCatalogPurchasePhase)? {
+        guard let firstItem = items.first else { return nil }
+        let first = entryCandidates(for: firstItem.product.id)
+        guard !first.isEmpty else { return nil }
+        for item in items.dropFirst() where entryCandidates(for: item.product.id) != first {
+            return nil
+        }
+        return (first, entryPhaseAndPrices(for: firstItem.product.id).phase)
+    }
+
+    /// 确认按钮 action：候选统一 → 先弹选择弹窗；否则直接按页内已选落库
+    private func handleConfirmTap() {
+        if unifiedEntryCandidates != nil {
+            showsEntryChoiceDialog = true
+        } else {
+            confirmInsert()
+        }
+    }
+
+    /// 弹窗选定后：所选方式应用到所有候选包含它的商品
+    ///（不在候选的商品保持页内已选），随后落库
+    private func applyChoiceAndInsert(_ option: ShopCatalogWardrobeEntryOption) {
+        for item in items where entryCandidates(for: item.product.id).contains(option) {
+            entryOptionByProduct[item.product.id] = option
+        }
+        confirmInsert()
+    }
+
     private func confirmInsert() {
         isInserting = true
         defer { isInserting = false }
@@ -299,23 +469,36 @@ struct ShopCatalogWardrobeMergeView: View {
             return
         }
         let keptAccessoryIDs = accessoryIDs
-        // 价格口径（V1.3）：点菜页自选的口径优先；预约口径须有可用预约记录，否则回退现货
+        // 价格口径（2026-09-27 需求）：按用户在「加入方式」段选定的口径落库，
+        // 映射唯一口径 `ShopCatalogWardrobeEntryPolicy.priceMode`（与详情页弹窗共用）；
+        // 预约价口径须有可用预约记录（makeDraft 会 guard），缺记录回退现货兜底；
+        // 候选为空（无任何价格档案）的商品维持既有现货兜底。
         let selections = items.map { item -> ShopCatalogWardrobeDraftBuilder.Selection in
             let id = item.product.id
             let archive = store.priceArchive(forProduct: id)
-            if priceChoices[id] == .reservation, let event = archive.reservation {
-                return ShopCatalogWardrobeDraftBuilder.Selection(
-                    productID: id,
-                    color: colorByProduct[id],
-                    size: sizeByProduct[id],
-                    priceMode: .reservation(depositPaid: event.deposit ?? 0)
-                )
+            let resolvedMode: ShopCatalogWardrobeDraftBuilder.PriceMode
+            if let option = effectiveEntryOption(for: id) {
+                let deposit = ShopCatalogWardrobeEntryPolicy.backendDeposit(
+                    currentDeposit: archive.currentDeposit,
+                    reservationPrice: archive.currentReservationPrice ?? 0)
+                let mode = ShopCatalogWardrobeEntryPolicy.priceMode(
+                    for: option, backendDeposit: deposit)
+                // 预约价两个口径（定金+尾款 / 预约价全款）都挂在预约记录上取数，
+                // 缺记录（理论上候选已被 hasReservationPrice 挡住，这里防御）→ 回退现货
+                let needsReservationEvent = option == .depositPaid || option == .fullPaid
+                if needsReservationEvent && archive.reservation == nil {
+                    resolvedMode = .stock
+                } else {
+                    resolvedMode = mode
+                }
+            } else {
+                resolvedMode = .stock
             }
             return ShopCatalogWardrobeDraftBuilder.Selection(
                 productID: id,
                 color: colorByProduct[id],
                 size: sizeByProduct[id],
-                priceMode: .stock
+                priceMode: resolvedMode
             )
         }
         do {

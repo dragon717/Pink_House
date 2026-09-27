@@ -13,18 +13,22 @@
 - ✅ **R07 已拍板 C=A+B 并落完**：**A** 只读 `--mode pull-catalog`（四道摘要自证；线上空→`EXIT_OK` 且**不产出**文件；**已下发口径**：不含归档条目、图片已是 `thmedia:`）；**B** 写前比 `baseRootIndexHash` → 不一致则**退出码 5 拒绝**（`dry-run` 同判定）。CLI 49 / 包 50 / `drill_offline.sh` 34 / `selftest_cloudkit_read` 18 全绿。
 ## Mac 端（target `PinkHouseOps`）
 
+- ⭐ **2026-09-27 已移除三模块：工作台/素材库/发布中心**（用户拍板）。侧栏只剩 **4 分区**：系列上新/店家与系列/商品管理/本地预览（默认 `.seriesEntry`）。**删了** 7 个文件 + 上传任务台账整层（`mediaJobs`/`importImages` 等）+ `OpsMediaJobRecord`/`OpsPublishJobRecord`（Schema 只剩 `OpsCatalogDraftRecord`，删实体迁移安全已实测）。**保留为服务层（无 UI 入口）**：`validate`/`exportReleasePackage`/`recordConfirmedPublish`/基线差分。`OpsCard` 在 `OpsFormSupport.swift`。发布相关文案一律说「受控发布链路/发布器」，**不要再写「发布中心」「素材库」**。
+
 - **可靠性地基**：① `@Model` **新增字段一律 Optional**（推断失败=App `fatalError`）；② **编辑≠改文案**：变更必过 `markDirty()`，`isReviewStale` 时导出必须被拦；③ 导出服务**自己复校验当前快照**；④ 坏草稿**只提示不隔离=会被空目录覆盖** → 只读态+备份原始字节，四出口全拒，唯一出口「另存为新草稿」；⑤ 编辑命令返回 Bool，**成功才 `dismiss()`**；⑥ 父子归属链在命令层拒。
 - ⭐ **Markdown 渲染**：`Text(字面量)` 解析、`Text(变量)` 与 `Text("a"+"b")` **不解析** → 变量文案一律过 `opsMarkdown(_:)`（`inlineOnlyPreservingWhitespace`，两个参数都不能去）。**门禁 `python3 tools/ops_ui/check_markdown_callsites.py`**（R1 参数含 `**` 非单字面量；R2 叙事字段 `guidance/lastErrorMessage/label/help/subtitle` 直喂 `Text`/`Label`；**数据字段 `value`/`text`/`title` 不进清单**）。**编译与单测全绿也发现不了这类缺陷。**
 - ⭐ **基线快照是编码后产物**（`.iso8601` 秒精度）→ 直比会让带日期的实体都「已修改」→ **严格策略作用域被静默放大**；写基线前必须 `normalizeWorkingCopyToStoragePrecision()`。
 - ⭐ **沙箱 GUI 拿不到 stdout** → 日志落 `harness.log`，**失败还要盖到图上**（`stampUntrusted`）；判快照可信=先看有没有 `SNAPSHOT 造数据失败`。抓图窗口**必须 `.borderless`**，**触发必须走文件 `snapshot.request`**（命令行参数没用）。
-- ⭐ **超时/取消是抛出不是结果**：`OpsBridgeRunResult` 禁恒 false 的 `timedOut/cancelled`；中断唯一入口 `interrupt(_:)`，**先标记 collector 再发 SIGTERM**；按阶段保守判定走 `OpsPublishCenter.concludeInterruption`。
+- ⭐ **超时/取消是抛出不是结果**：`OpsBridgeRunResult` 禁恒 false 的 `timedOut/cancelled`；中断唯一入口 `interrupt(_:)`，**先标记 collector 再发 SIGTERM**；按阶段保守判定收敛（原 `OpsPublishCenter.concludeInterruption` 所在类已随分区移除，判定逻辑参考包内 `OpsPublisherBridge` 文档注释）。
 - **媒体门禁**：`thmedia:`/64hex=已远端化；`local:`+文件在=待上传；`local:`+**文件不在=阻断**；`bundle:`=内置；`http(s)://`=告警；**asset-id 字段里的裸名字=放行+告警，绝不阻断**。待发布包=`shop-catalog.json`+`images/<文件名>`，**不自创第二种格式**。
 - ⭐ **读/写闸门**：`apply=False`=**「不许写」不是「不许联网」** → 读走 `_send` 照发、写走 `_post` 静默拦住，**不要合并**（合并会让 `--mode baseline` 谎报「线上尚无发布头」）。锁 `selftest_cloudkit_read.py`。
 - ⭐ **子进程六关**：①读得到线上基线 ②有 `cryptography` ③能签名连 CloudKit ④授权先于落盘、判据只能「真读」 ⑤授权过仓库目录（`ops.publishBridgeSettings`）⑥凭证能进沙盒（**子进程读不到登录钥匙串** → 容器内凭证 JSON + `process.environment`，变量名与 `CREDENTIAL_ENV_VAR` 逐字一致）。
 - ⭐ **`fileExists` 在沙盒里会骗人** → 唯一判据 `OpsBridgeSettings.isReadableFile(_:)`；**禁** `(try? read(upToCount:1)) != nil`（空文件被误判）。
 - ⭐ **解释器候选顺序**：显式设置 → **仓库内 `.venv/bin/python3`** → homebrew → usr/local → `/usr/bin`（沙盒里报 `cannot be used within an App Sandbox`）。`cryptography` 只装 `tools/time_hall/publication/.venv`。
 - ⚠️ **本机做不了沙盒实验** → 只能在真实 App 里探：文件触发 `bridge-probe.request`（`BridgeProbeHarness.swift`），产物 `probe.log`/`probe.json`。本 target 开 `SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor` → 跨线程盒子必须显式 `nonisolated`。
+- ⭐ **主题跟随（2026-09-27 起）**：`OpsFlowPalette` 全 token 是**动态 NSColor**（`dynamic(light:dark:)`）→ 系统深/浅色切换自动重解析，**视图层零改动**。铁律：视图层不许用 `Color.white`/固定 hex 当**表面色**（背景/文字底），新颜色一律进色板加双值；彩色填充上的白字可保留。快照 harness：目录名 `-dark` 后缀（中划线）= 深色验收，默认钉 aqua。
 - ⭐ **系列上新向导（2026-09-27 重构后）**：录入单位=**系列级多类型条目**（`OpsSeriesEntryDraft`/`OpsSeriesEntryValidator`，无任务名称/批次/款式描述字段）；提交=`commitSeriesEntry()` 全量校验一票拦截 → 逐类型写现有链路；**首次=追加 SaleEvent，再次改价=走 applyPriceCorrection（修正≠追加）**；向导状态随 `seriesEntryJSON`（Optional 列，迁移已验）。ViewBuilder 分支禁 `var`/赋值语句（`type '()' cannot conform to 'View'`）；`@Published` 计算属性无 `$` 投影 → 用 `bind(_ keyPath:)`。
+- ⭐ **新建店家（2026-09-27 补齐，对齐新建系列）**：向导 S1 店家 Picker 有「＋ 新建店家…」（哨兵 `__new_shop__` ↔ `draft.createsNewShop`，内联店名/别名随草稿持久化）；`commitSeriesEntry` **先建店家再建系列**（外键顺序），落库后回写 `shopID`+`createsNewShop=false` 防重复提交重复建；唯一写入口 `addShopReturningID(name:aliases:)`（别名创建时就落库，`addShop` 只是包装）；目录页 `ShopFormSheet` 保存成功经 `onSaved` 回调**自动选中**新店家。校验：新建态只查 `newShopName` 非空。
 ## iOS / 领域层
 
 - **测试隔离**：宿主=主 App，`FileManager.default` 就是**用户真实沙盒** → 落盘测试必须 `ShopCatalogStorage.useTemporaryForTesting()`；断言只比前后快照或按 `batchID` 收窄。

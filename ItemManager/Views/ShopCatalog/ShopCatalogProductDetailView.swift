@@ -1014,38 +1014,16 @@ struct ShopCatalogProductView: View {
     // MARK: 购买阶段（按预约状态条件渲染的依据）
 
     private func purchasePhase(for productID: String) -> ShopCatalogPurchasePhase {
+        // 2026-09-27 起唯一共享口径在 `ShopCatalogWardrobeEntryPolicy.purchasePhase`：
+        // 多选确认页的「加入方式」候选也用它，保证同一商品两个入口的选项一致。
+        // 判定顺序（与原实现逐字等价）：
         // 1. 系列层「发售阶段」优先（2026-09-23 需求二）：运营在系列上显式声明，
         //    并且「过了预约结束时间」会自动流转为「预约已结束」（读取时判定，见
         //    `CatalogSeriesSalePhaseResolver` 的类型注释）。
-        //
-        //    未声明（旧数据 salePhase == nil）→ 落到下面第 2 步的档期推导，
+        //    未声明（旧数据 salePhase == nil）→ 落到第 2 步的档期推导，
         //    行为与改动前完全一致（不需要给存量系列做任何数据迁移）。
         // 2. 既有口径：按销售事件档期推导
-        if let series,
-           let declared = CatalogSeriesSalePhaseResolver.effectivePhase(of: series, now: Date()) {
-            // 生效阶段由「声明 + 预约结束时间 + 尾款时间 + 当前时间」共同决定（读取时判定）：
-            // 具体尾款时间到点 → 尾款中；无尾款时间则维持既有流转（预约中 → 预约已结束）。
-            switch declared {
-            case .reservationActive: return .reservationActive
-            case .reservationEnded: return .reservationEnded
-            case .balancePending: return .balancePending
-            case .inStock: return .inStock
-            }
-        }
-        let events = store.saleEvents(forProduct: productID)
-        let reservationStatuses = events
-            .filter { $0.type == .reservation }
-            .map { store.windowStatus(of: $0) }
-        let stockWindowOpen = events.contains {
-            $0.type != .reservation && store.windowStatus(of: $0).isOpenLike
-        }
-        let archive = store.priceArchive(forProduct: productID)
-        return ShopCatalogPurchasePhase.resolve(
-            reservationStatuses: reservationStatuses,
-            stockWindowOpen: stockWindowOpen,
-            hasStockPrice: archive.currentStockPrice != nil,
-            hasReservationPrice: archive.reservation != nil
-        )
+        ShopCatalogWardrobeEntryPolicy.purchasePhase(for: productID, series: series, store: store)
     }
 
     /// 是否有可买的现货（现货窗口进行中，或价格档案含现货价）
@@ -1196,10 +1174,8 @@ struct ShopCatalogProductView: View {
     }
 }
 
-/// 上新窗口状态的小辅助：open / ongoing 都视为「可操作」
-private extension ShopCatalogStore.SaleWindowStatus {
-    var isOpenLike: Bool { self == .open || self == .ongoing }
-}
+/// 上新窗口状态的小辅助已上移为 internal：`ShopCatalogWardrobeEntryPolicy.swift`
+/// 里的 `isOpenLike`（2026-09-27 阶段推导共享口径搬进 Policy 时一并共享）。
 
 // MARK: - 购买阶段（按预约状态条件渲染，纯逻辑便于单测）
 
@@ -1543,7 +1519,12 @@ struct ShopCatalogReservationSheet: View {
     private var hasReservationPrice: Bool { reservationPrice > 0 }
     private var hasStockPrice: Bool { stockPrice > 0 }
     /// 后台已付定金（只读：用户已经付给店家的钱，系统自己算）
-    private var backendDeposit: Decimal { min(max(0, archive.currentDeposit ?? 0), reservationPrice) }
+    /// —— 算法唯一口径 `ShopCatalogWardrobeEntryPolicy.backendDeposit`（与多选确认页共用）。
+    private var backendDeposit: Decimal {
+        ShopCatalogWardrobeEntryPolicy.backendDeposit(
+            currentDeposit: archive.currentDeposit,
+            reservationPrice: reservationPrice)
+    }
     /// 待付尾款（全款口径为 0，因为不存在待补任务）
     ///
     /// 走 `ShopCatalogWardrobeAmount`（需求 §II「尾款金额自动读取后台录入的『尾款』数据」），
@@ -1738,12 +1719,10 @@ struct ShopCatalogReservationSheet: View {
                 : "该商品没有预约价档案，无法加购"
             return
         }
-        let priceMode: ShopCatalogWardrobeDraftBuilder.PriceMode
-        switch effectiveOption {
-        case .fullPaid: priceMode = .fullReservation
-        case .fullStockPaid: priceMode = .fullStock
-        case .depositPaid, .wishlist: priceMode = .reservation(depositPaid: backendDeposit)
-        }
+        // 映射唯一口径 `ShopCatalogWardrobeEntryPolicy.priceMode`（与多选确认页共用）
+        let priceMode = ShopCatalogWardrobeEntryPolicy.priceMode(
+            for: effectiveOption,
+            backendDeposit: backendDeposit)
         let selection = ShopCatalogWardrobeDraftBuilder.Selection(
             productID: productID,
             color: selectedColor,

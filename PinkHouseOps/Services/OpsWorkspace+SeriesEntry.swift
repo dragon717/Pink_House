@@ -10,7 +10,7 @@
 //    （「不能假装全部完成」），错误逐条带类型名展示；
 //  · **提交 = 把通过校验的条目写入本地草稿目录**（复用现有编辑命令：
 //    addProduct / updateProduct / setSizeChart / addVariant / appendSaleEvent …），
-//    **不新增绕过校验的写入口**（需求 §S5）；真正的发布仍走发布中心那条链路；
+//    **不新增绕过校验的写入口**（需求 §S5）；真正的发布仍走受控发布链路（导出待发布包 → 受控发布器）；
 //  · **修正 ≠ 追加**：首次提交追加预约/现货销售记录；再次提交时若价格变了，
 //    走「价格修正」（完整快照），绝不再追加一条历史；
 //  · **失败不丢输入**：向导工作副本独立持久化（`seriesEntryJSON`），
@@ -42,6 +42,8 @@ struct OpsSeriesEntryCommitReport: Equatable {
     var blockedByValidation: [OpsSeriesEntryIssue] = []
     /// 逐条目结果（写入口径阶段的成功/失败）
     var entryResults: [OpsSeriesEntryCommitEntryResult] = []
+    /// 提交后确认的店家 id（S1「＋ 新建店家」落库后回填）
+    var shopID: String?
     /// 提交后确认的系列 id
     var seriesID: String?
     /// 草稿是否落盘成功
@@ -98,7 +100,7 @@ extension OpsWorkspace {
 extension OpsWorkspace {
 
     /// 导入一张图并返回 CatalogAsset id（失败返回 nil，原因在 `lastError`）。
-    /// 复用与 `importImages` 完全相同的规范化 + staging + 台账路径（不另写第二套）。
+    /// 复用与既有导入完全相同的规范化 + staging 路径（不另写第二套）。
     @discardableResult
     func importSingleImage(from url: URL) -> String? {
         guard canMutate() else { return nil }
@@ -112,7 +114,7 @@ extension OpsWorkspace {
             if !fileManager.fileExists(atPath: target.path) {
                 try staged.data.write(to: target, options: .atomic)
             }
-            upsertAssetAndJob(for: staged, sourceName: url.lastPathComponent)
+            upsertAsset(for: staged)
             let assetID = "asset-\(String(staged.mediaKey.prefix(12)))"
             let saved = saveDraft()
             if !saved {
@@ -157,6 +159,27 @@ extension OpsWorkspace {
             return report
         }
 
+        // ── 店家：新建或沿用（S1「＋ 新建店家」的决议在这里落定）──
+        // 店家必须先于系列存在（系列的 shopID 外键），所以它的落库排在最前。
+        var shopID = seriesEntry.shopID
+        if seriesEntry.createsNewShop {
+            let aliases = seriesEntry.newShopAliasesText
+                .split(separator: ",")
+                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                .filter { !$0.isEmpty }
+            guard let newShopID = addShopReturningID(
+                name: seriesEntry.newShopName, aliases: aliases) else {
+                report.blockedByValidation = [OpsSeriesEntryIssue(
+                    entryID: nil, entryName: "", message: "新建店家失败：" + (lastError ?? "未知原因"))]
+                return report
+            }
+            shopID = newShopID
+            // 回写决议结果：再点一次提交不会再建一个同名店家
+            seriesEntry.shopID = newShopID
+            seriesEntry.createsNewShop = false
+        }
+        report.shopID = shopID
+
         // ── 系列：新建或选用（S1 的决议在这里落定）──
         var seriesID = seriesEntry.seriesID
         if seriesID.isEmpty {
@@ -164,7 +187,7 @@ extension OpsWorkspace {
             let month = Int(seriesEntry.newSeriesMonthText.trimmingCharacters(in: .whitespacesAndNewlines))
             let season = seriesEntry.newSeriesSeason.trimmingCharacters(in: .whitespacesAndNewlines)
             guard let newID = addSeriesReturningID(
-                shopID: seriesEntry.shopID,
+                shopID: shopID,
                 name: seriesEntry.newSeriesName,
                 year: year, month: month,
                 season: season.isEmpty ? nil : season) else {
@@ -185,7 +208,7 @@ extension OpsWorkspace {
 
         // ── 逐类型提交（每个类型复用同一条商品写入链路）──
         for index in seriesEntry.typeEntries.indices {
-            let result = commitEntry(at: index, shopID: seriesEntry.shopID, seriesID: seriesID)
+            let result = commitEntry(at: index, shopID: shopID, seriesID: seriesID)
             report.entryResults.append(result)
             seriesEntry.typeEntries[index].lastCommitOK = result.ok
         }
@@ -198,7 +221,7 @@ extension OpsWorkspace {
         if report.allOK {
             let okCount = report.entryResults.count
             statusMessage = "系列级提交完成：\(okCount) 个类型已写入草稿（第 \(currentRevision) 版）。"
-                + "发布请到「发布中心」——公共 CloudKit 上架状态以发布中心的回读为准。"
+                + "发布请走受控发布链路——公共 CloudKit 上架状态以回读确认为准。"
             lastError = nil
         } else if !saved {
             lastError = "部分或全部类型已写入内存，但草稿落盘失败（内容仍在界面上）："
@@ -407,7 +430,7 @@ extension OpsWorkspace {
     func updateSeriesCover(seriesID: String, assetID: String) -> Bool {
         guard canMutate() else { return false }
         guard catalog.assets.contains(where: { $0.id == assetID }) else {
-            lastError = "封面引用的图片资源 \(assetID) 不存在，请先在素材库里导入。"
+            lastError = "封面引用的图片资源 \(assetID) 不存在，请先导入图片。"
             return false
         }
         guard let index = catalog.series.firstIndex(where: { $0.id == seriesID }) else {

@@ -34,6 +34,12 @@
 
 import Foundation
 
+/// 上新窗口状态的小辅助：open / ongoing 都视为「可操作」
+/// （2026-09-27 从详情页 fileprivate 提升为 internal：阶段推导共享口径要用它）
+extension ShopCatalogStore.SaleWindowStatus {
+    var isOpenLike: Bool { self == .open || self == .ongoing }
+}
+
 // MARK: - 加购分支
 
 /// 加购记账分支（详情页操作区按场景渲染其中的两个）
@@ -199,6 +205,111 @@ nonisolated enum ShopCatalogWardrobeEntryPolicy {
             if hasStockPrice { return .fullStockPaid }
             return hasReservationPrice ? .fullPaid : nil
         }
+    }
+
+    // MARK: 多入口统一的「加入方式」选择（2026-09-27 需求）
+
+    /// 商品当前购买阶段的**唯一共享口径**（2026-09-27 起）。
+    ///
+    /// 详情页操作区与多选确认页（`ShopCatalogWardrobeMergeView`）的「加入方式」候选
+    /// 都必须从这里取，禁止各自再写一套阶段推导——否则同一商品两个入口给出的
+    /// 选项不一致，确认页里看到的会跟详情页说的对不上。
+    ///
+    /// 判定顺序（与详情页原实现逐字等价，只是搬进来共享）：
+    ///   1. 系列层「发售阶段」声明优先（`CatalogSeriesSalePhaseResolver.effectivePhase`，
+    ///      读取时判定：过了预约结束 → 预约已结束；具体尾款时间到点 → 尾款中）；
+    ///   2. 未声明 → 按销售事件档期推导（`ShopCatalogPurchasePhase.resolve`）。
+    @MainActor
+    static func purchasePhase(
+        for productID: String,
+        series: CatalogSeries?,
+        store: ShopCatalogStore,
+        now: Date = Date()
+    ) -> ShopCatalogPurchasePhase {
+        if let series,
+           let declared = CatalogSeriesSalePhaseResolver.effectivePhase(of: series, now: now) {
+            switch declared {
+            case .reservationActive: return .reservationActive
+            case .reservationEnded: return .reservationEnded
+            case .balancePending: return .balancePending
+            case .inStock: return .inStock
+            }
+        }
+        let events = store.saleEvents(forProduct: productID)
+        let reservationStatuses = events
+            .filter { $0.type == .reservation }
+            .map { store.windowStatus(of: $0, now: now) }
+        let stockWindowOpen = events.contains {
+            $0.type != .reservation && store.windowStatus(of: $0, now: now).isOpenLike
+        }
+        let archive = store.priceArchive(forProduct: productID)
+        return ShopCatalogPurchasePhase.resolve(
+            reservationStatuses: reservationStatuses,
+            stockWindowOpen: stockWindowOpen,
+            hasStockPrice: archive.currentStockPrice != nil,
+            hasReservationPrice: archive.reservation != nil
+        )
+    }
+
+    /// 多选确认页里每件商品的**初始选中项**（nonisolated 可单测）。
+    ///
+    /// 优先级：
+    ///   1. 点菜页自选口径的偏好（`reservation` → 定金+尾款；`stock` → 现货价全款），
+    ///      前提是它在该阶段的候选里；
+    ///   2. 否则阶段默认（`defaultChoiceOption`）；
+    ///   3. 都不在候选里 → 候选第一项；
+    ///   4. 候选为空（无任何可用价格档案）→ `nil`，调用方回退现货兜底。
+    static func mergeEntryInitialOption(
+        preferredCardChoice: ShopCatalogCardPriceChoice?,
+        phase: ShopCatalogPurchasePhase,
+        hasReservationPrice: Bool,
+        hasStockPrice: Bool
+    ) -> ShopCatalogWardrobeEntryOption? {
+        // 「加入心愿」不是衣橱确认页的加入方式（它没有金额口径可记）——
+        // options() 只在预约未开始阶段返回它，这里统一过滤，避免确认页
+        // 给出一个「选定后落不了库」的候选。
+        let candidates = options(
+            phase: phase,
+            hasReservationPrice: hasReservationPrice,
+            hasStockPrice: hasStockPrice
+        ).filter { $0 != .wishlist }
+        guard !candidates.isEmpty else { return nil }
+        let preferred: ShopCatalogWardrobeEntryOption?
+        switch preferredCardChoice {
+        case .reservation: preferred = .depositPaid
+        case .stock: preferred = .fullStockPaid
+        case nil: preferred = nil
+        }
+        if let preferred, candidates.contains(preferred) { return preferred }
+        if let fallback = defaultChoiceOption(
+            phase: phase,
+            hasReservationPrice: hasReservationPrice,
+            hasStockPrice: hasStockPrice
+        ), candidates.contains(fallback) {
+            return fallback
+        }
+        return candidates.first
+    }
+
+    /// 加入方式 → 落库 `PriceMode`：多选确认页与详情页确认弹窗的**同一份映射**。
+    static func priceMode(
+        for option: ShopCatalogWardrobeEntryOption,
+        backendDeposit: Decimal
+    ) -> ShopCatalogWardrobeDraftBuilder.PriceMode {
+        switch option {
+        case .fullPaid: return .fullReservation
+        case .fullStockPaid: return .fullStock
+        case .depositPaid, .wishlist: return .reservation(depositPaid: backendDeposit)
+        }
+    }
+
+    /// 后台已付定金（修正后口径）：`currentDeposit`（含价格修正）优先，缺省 0，
+    /// 并钳制在预约价以内——与详情页确认弹窗同一份算法，不许两端各算各的。
+    static func backendDeposit(
+        currentDeposit: Decimal?,
+        reservationPrice: Decimal
+    ) -> Decimal {
+        min(max(0, currentDeposit ?? 0), max(0, reservationPrice))
     }
 }
 

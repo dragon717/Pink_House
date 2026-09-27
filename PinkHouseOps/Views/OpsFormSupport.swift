@@ -232,6 +232,32 @@ struct OpsFormFrame<Content: View>: View {
     }
 }
 
+// MARK: - 内容卡
+
+/// 统一的内容卡外壳（标题图标 + 内容）。
+/// 从已删除的「工作台」页迁到这里：向导 / 商品管理 / 本地预览等页都在用它。
+struct OpsCard<Content: View>: View {
+    let title: String
+    let systemImage: String
+    @ViewBuilder var content: Content
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Label(title, systemImage: systemImage)
+                .font(.headline)
+                .foregroundStyle(OpsFlowPalette.textPrimary)
+            content
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(16)
+        .background(OpsFlowPalette.cardBackground, in: RoundedRectangle(cornerRadius: 16))
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(OpsFlowPalette.cardBorder, lineWidth: 1))
+        .shadow(color: OpsFlowPalette.cardShadow, radius: 10, x: 0, y: 4)
+    }
+}
+
 // MARK: - 小标签
 
 struct OpsTag: View {

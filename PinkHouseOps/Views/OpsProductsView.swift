@@ -324,11 +324,11 @@ struct OpsProductsView: View {
                     }
                     .disabled(workspace.catalog.assets.isEmpty)
                     if workspace.catalog.assets.isEmpty {
-                        OpsFootnote(text: "素材库是空的：先到「素材库」导入商品图。")
+                        OpsFootnote(text: "还没有可用图片：先在「系列上新」导入商品图。")
                     }
                 }
                 OpsFootnote(text: "这个顺序**只属于这个商品**（第一张是首图），"
-                            + "与素材库里图片的排列顺序无关。")
+                            + "与可用图片列表的排列顺序无关。")
             }
         }
     }
@@ -801,7 +801,7 @@ private struct ProductImagesSheet: View {
                 Text(workspace.catalog.products.first { $0.id == productID }?.name ?? "")
                     .font(.callout).foregroundStyle(.secondary)
                 OpsFootnote(text: "左边列表的顺序**就是**这个商品的图片顺序（第一张是首图）；"
-                            + "它与素材库的排列顺序无关。")
+                            + "它与可用图片列表的排列顺序无关。")
             }
             HStack(alignment: .top, spacing: 12) {
                 selectedColumn
@@ -876,7 +876,7 @@ private struct ProductImagesSheet: View {
 
     private var candidateColumn: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("素材库（\(candidates.count) 张可用）").font(.subheadline.weight(.semibold))
+            Text("可用图片（\(candidates.count) 张）").font(.subheadline.weight(.semibold))
             if candidates.isEmpty {
                 Text("素材都已经在这个商品上了。")
                     .font(.caption).foregroundStyle(.secondary)

@@ -37,7 +37,7 @@ nonisolated enum ShopCatalogWardrobeCategory {
 @MainActor
 enum ShopCatalogWardrobeDraftBuilder {
 
-    enum PriceMode {
+    enum PriceMode: Equatable {
         /// 现货价（或无记录时的兜底价）→ 已拥有
         case stock
         /// 预约价（定金 + 尾款）→ 心愿尾款

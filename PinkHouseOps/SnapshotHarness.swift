@@ -23,8 +23,8 @@
 //      open -n build/sym/Debug/PinkHouseOps.app
 //
 //  产物落在 `<容器>/Library/Application Support/PinkHouseOps/<子目录名>/`，
-//  每个分区一张：`workbench.png` / `catalog.png` / `products.png` /
-//  `media.png` / `publish.png` / `preview.png`（文件名 = `OpsSection.rawValue`），
+//  每个分区一张：`seriesEntry.png` / `catalog.png` / `products.png` /
+//  `preview.png`（文件名 = `OpsSection.rawValue`），
 //  外加一份 `harness.log`（本次运行的完整日志，造数据失败的唯一出口 —— 见下）。
 //
 //  ## 三条刻意的设计
@@ -101,29 +101,20 @@ enum OpsSnapshotHarness {
         guard let container = makeContainer() else { return }
         let workspace = OpsWorkspace(context: container.mainContext)
         seed(workspace)
-        // 「发布中心」这一页的前置状态也造出来：桥接器就绪 + 已有发布台账。
-        // 不造的话这一页只能看到「桥接器不可用 + 台账为空」，看不出真正的布局。
-        seedPublishCenter(workspace)
         // 样例数据是**一次性的**：跑完把自己的暂存目录也带走。
         // 否则每次跑快照都会在运营本机的 staging 下留一堆没有对应草稿的图，
-        // 之后打开「图片与上传任务」会被当成孤儿文件列出来。
+        // 之后打开会被当成孤儿文件列出来。
         defer { try? FileManager.default.removeItem(at: workspace.stagingDirectory) }
 
         var written = 0
+        // 触发文件内容带 `-dark` 后缀 = 按**深色**外观渲染（验收主题跟随用）；
+        // 默认仍钉浅色，保证日常快照可复现（见 render 里的外观注释）。
+        let darkAppearance = directory.lastPathComponent.hasSuffix("-dark")
         for section in OpsSection.allCases {
             let view = OpsMainView(workspace: workspace, initialSection: section)
                 .modelContainer(container)
-            // 「发布中心」是一张**长页**（桥接自检 → 参数 → 基线 → 从线上拉回基线 →
-            // 阻断项 → 冻结 → 进度 → 差异 → 校验 → 台账 → 单条详情）。用默认高度抓的话，
-            // 「结果待确认时只有『查询结果』、没有『重发』」这条最贵的规则
-            // 正好落在折叠线以下 —— 而那恰恰是这张快照最该证明的东西。
-            // 所以只给它一张加高的画布，其余分区保持基准尺寸。
-            // ⚠️ 每加一张卡就要跟着抬：09-27 加「从线上拉回基线」那张时
-            // 2_300 → 2_700（不抬的话被顶下去的是阻断项与结论区）。
-            let size = section == .publish
-                ? NSSize(width: size.width, height: 2_700)
-                : size
-            guard let rendered = render(view, size: size) else {
+                .environment(\.colorScheme, darkAppearance ? .dark : .light)
+            guard let rendered = render(view, size: size, dark: darkAppearance) else {
                 log("SNAPSHOT 渲染失败：\(section.rawValue)")
                 continue
             }
@@ -153,14 +144,11 @@ enum OpsSnapshotHarness {
     /// **内存**容器：快照不该改运营本机的草稿库（同 `PinkHouseOpsApp` 的理由，
     /// 只是这里连落盘都省了，保证可复现）。
     ///
-    /// ⚠️ schema 必须与 `PinkHouseOpsApp` 一致：少一张表的话，发布中心一被
-    /// 构造（侧栏角标就会去读它）就会在没有该实体的容器上崩。
+    /// ⚠️ schema 必须与 `PinkHouseOpsApp` 一致。
     private static func makeContainer() -> ModelContainer? {
         do {
             let schema = Schema([
                 OpsCatalogDraftRecord.self,
-                OpsMediaJobRecord.self,
-                OpsPublishJobRecord.self,
             ])
             return try ModelContainer(
                 for: schema,
@@ -178,11 +166,10 @@ enum OpsSnapshotHarness {
     ///   · 店家 / 系列（含**发售阶段 + 系列价格表**）；
     ///   · 三个商品：一个配置齐全、一个故意**没有图**（演示门禁阻断）、
     ///     一个**已归档**（演示归档态）；
-    ///   · 图片走真实导入入口 → 素材库与上传任务台账都不是空的；
+    ///   · 图片走真实导入入口 → 商品图与价格表原图都不是空的；
     ///   · 规格 / 尺码表 / 销售记录 / 价格修正（商品管理页的每一张卡都有内容）；
     ///   · 一次**已确认发布**（写出基线快照）→ 之后新增一个商品、改一处描述，
-    ///     于是「差异清单」真的有「新增 / 已修改」可看；
-    ///   · 发布台账三条**不同状态**的任务（含「结果待确认」——R09 的界面出口）。
+    ///     于是商品页的「差异」真的有「新增 / 已修改」可看。
     private static func seed(_ workspace: OpsWorkspace) {
         workspace.createDraft(title: "2026-09-26 上新（快照样例）")
         workspace.addShop(name: "樱花小羊")
@@ -212,9 +199,11 @@ enum OpsSnapshotHarness {
               let archived = workspace.catalog.products.first(where: { $0.category == "小物" })
         else { return }
 
-        // 图片走真实导入入口：这样「素材库」与门禁页才不是空的
+        // 图片走真实导入入口：商品图与系列价格表原图才有内容
         if let urls = makeSampleImages() {
-            workspace.importImages(from: urls)
+            for url in urls {
+                _ = workspace.importSingleImage(from: url)
+            }
             let assetIDs = workspace.catalog.assets.map(\.id)
             if !assetIDs.isEmpty {
                 seedStep("绑定商品图", workspace.bindImages(
@@ -378,6 +367,12 @@ enum OpsSnapshotHarness {
     }
 
     /// 造两张真 PNG（不依赖任何既有素材）。
+    ///
+    /// 底色用**设计系统的两个品牌色**（品牌粉 #C9486F / 流程紫 #7B5BD6，
+    /// 与 `OpsFlowPalette.accentPink/primaryPurple` 浅色值同源）：
+    /// 旧实现用 `systemPink`/`systemIndigo`，那是系统强调色不是品牌色 ——
+    /// 亮红 + 亮蓝落在界面里与主题色直接冲突（深色模式下尤其扎眼，2026-09-27 用户点名）。
+    /// 构图保持不变：240×240 圆角色块 + 白色内芯（缩略图里读作「图片占位」）。
     private static func makeSampleImages() -> [URL]? {
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent("pinkhouse-snapshot-\(UUID().uuidString)", isDirectory: true)
@@ -388,7 +383,8 @@ enum OpsSnapshotHarness {
             return nil
         }
         var urls: [URL] = []
-        for (index, color) in [NSColor.systemPink, NSColor.systemIndigo].enumerated() {
+        let brandColors: [NSColor] = [NSColor(hex: 0xC9_486F), NSColor(hex: 0x7B_5BD6)]
+        for (index, color) in brandColors.enumerated() {
             let size = NSSize(width: 240, height: 240)
             let image = NSImage(size: size)
             image.lockFocus()
@@ -407,141 +403,13 @@ enum OpsSnapshotHarness {
         return urls.isEmpty ? nil : urls
     }
 
-    // MARK: - 发布中心前置状态
-
-    /// 造发布中心的可见状态：桥接器可用性 + 三条**状态各不相同**的台账。
-    ///
-    /// 三条台账是刻意这么选的，因为这一页最贵的规则（R09）只有在
-    /// 「有一条任务停在结果待确认」时才看得见：
-    ///   · `pendingConfirmation` —— 界面**只能给它「查询结果」**，不能给「重发」；
-    ///   · `confirmed` —— 有回执、applied=true；
-    ///   · `refused` —— 校验被拒，重试无用。
-    private static func seedPublishCenter(_ workspace: OpsWorkspace) {
-        let center = workspace.publishCenter
-        // ⚠️ **刻意不写 settings**：它是 `@Published` + didSet 落 UserDefaults，
-        // 也就是运营真实的 App 偏好；快照 harness 只该读它、不该改它。
-        // 首启时 `OpsPublishCenter.loadSettings()` 已经会在仓库目录存在的情况下
-        // 自动填好 `repoRootPath`，所以桥接自检通常本来就是「就绪」。
-        guard let draftID = workspace.draft?.id else { return }
-        let now = Date()
-        let hash = String(repeating: "9f1c", count: 16)
-
-        let awaiting = OpsPublishJob(
-            requestID: "demo-request-awaiting",
-            jobID: "job-demo-1",
-            draftID: draftID,
-            draftRevision: 3,
-            baseReleaseSeq: 41,
-            baseRootIndexHash: hash,
-            baselineAcknowledged: true,
-            targetEnvironment: .production,
-            releaseSeq: 42,
-            payloadHash: String(repeating: "ab", count: 32),
-            state: .pendingConfirmation,
-            stage: .switchHead,
-            totalUnits: 7,
-            lastErrorMessage: "上次运行在切换发布头时中断，**结果不明**："
-                + "请先查询线上发布头再决定，不要直接重发。",
-            logLines: [
-                "已冻结：目标 Production · releaseSeq 42 · 第 3 版",
-                "— 开始发布（第 1 次）—",
-                "[1/7] 复校验产物：通过",
-                "[2/7] 读取发布头：releaseSeq 41",
-                "[3/7] 上传缺失图片：3 个",
-                "[4/7] 上传缺失数据包：2 个",
-                "[5/7] 回读核对资源：一致",
-                "[6/7] 切换发布头：未拿到响应（这一步之后线上可能已经变了）",
-            ],
-            createdAt: now.addingTimeInterval(-1_800),
-            updatedAt: now.addingTimeInterval(-1_740),
-            submittedAt: now.addingTimeInterval(-1_800),
-            attemptCount: 1)
-
-        let confirmed = OpsPublishJob(
-            requestID: "demo-request-confirmed",
-            jobID: "job-demo-2",
-            draftID: draftID,
-            draftRevision: 2,
-            baseReleaseSeq: 40,
-            baseRootIndexHash: nil,
-            baselineAcknowledged: true,
-            targetEnvironment: .production,
-            releaseSeq: 41,
-            payloadHash: String(repeating: "cd", count: 32),
-            state: .confirmed,
-            stage: .confirmHead,
-            completedUnits: 7,
-            totalUnits: 7,
-            receipt: ShopCatalogPublishReceipt(
-                adapter: "cloudkit",
-                environment: "production",
-                applied: true,
-                releaseSeq: 41,
-                rootIndexHash: hash,
-                previousChangeTag: "v40",
-                newChangeTag: "v41",
-                uploadedPacks: 2,
-                uploadedMedia: 3,
-                totalPacks: 2,
-                totalMedia: 3,
-                requestID: "demo-request-confirmed",
-                jobID: "job-demo-2",
-                draftID: draftID,
-                draftRevision: 2,
-                artifactDigest: String(repeating: "cd", count: 32),
-                readBackConfirmed: true,
-                verifiedAt: now.addingTimeInterval(-7_200),
-                itemCounts: ["shops": 1, "series": 1, "products": 3]),
-            createdAt: now.addingTimeInterval(-7_400),
-            updatedAt: now.addingTimeInterval(-7_200),
-            submittedAt: now.addingTimeInterval(-7_380),
-            finishedAt: now.addingTimeInterval(-7_200),
-            attemptCount: 1)
-
-        let refused = OpsPublishJob(
-            requestID: "demo-request-refused",
-            jobID: "job-demo-3",
-            draftID: draftID,
-            draftRevision: 4,
-            baseReleaseSeq: 41,
-            baseRootIndexHash: hash,
-            baselineAcknowledged: false,
-            targetEnvironment: .localFixture,
-            releaseSeq: 42,
-            payloadHash: String(repeating: "ef", count: 32),
-            state: .refused,
-            stage: .verifyArtifact,
-            totalUnits: 7,
-            lastErrorMessage: "严格策略拦下 1 条无法解析的图片引用（裸文件名 "
-                + "「dress.jpg」）：本次新增内容必须能解析出真实文件。",
-            logLines: [
-                "已冻结：目标 本机演练 · releaseSeq 42 · 第 4 版 · 本次为演练（不写线上）",
-                "— 开始发布（第 1 次）—",
-                "[1/7] 复校验产物：失败（1 条阻断）",
-            ],
-            createdAt: now.addingTimeInterval(-300),
-            updatedAt: now.addingTimeInterval(-290),
-            submittedAt: now.addingTimeInterval(-300),
-            finishedAt: now.addingTimeInterval(-290),
-            attemptCount: 1)
-
-        center.persist(awaiting)
-        center.persist(confirmed)
-        center.persist(refused)
-
-        // 「可以提交」的样子：发布号填好、基线核对勾上（读不到线上时的显式出口）
-        center.releaseSeqText = "42"
-        center.baselineAcknowledged = true
-        center.useDryRun = true
-    }
-
     // MARK: - 离屏渲染
 
     /// 真实布局 + 抓位图。
     ///
     /// 用 `NSWindow` 而不是纯 `NSHostingView`：`List` / `Table` / `TextField`
     /// 这些 AppKit 支撑的控件需要真的进窗口才会完成布局与绘制。
-    private static func render<V: View>(_ view: V, size: NSSize) -> Data? {
+    private static func render<V: View>(_ view: V, size: NSSize, dark: Bool = false) -> Data? {
         let hosting = NSHostingView(rootView: view)
         hosting.frame = NSRect(origin: .zero, size: size)
 
@@ -554,6 +422,11 @@ enum OpsSnapshotHarness {
             styleMask: [.borderless],
             backing: .buffered,
             defer: false)
+        // ⭐ 默认钉死 aqua（浅色）外观：快照要求**可复现**，而窗口默认跟随系统外观
+        // —— 实测晚上（系统自动切深色后）跑快照，控件按 dark 样式渲染（白字/黑底
+        // 输入框），叠在设计系统的浅色产物上就是整页读不了。
+        // 主题跟随验收：触发内容带 `-dark` 后缀时按 darkAqua 渲染。
+        window.appearance = NSAppearance(named: dark ? .darkAqua : .aqua)
         window.contentView = hosting
         window.orderFrontRegardless()
 

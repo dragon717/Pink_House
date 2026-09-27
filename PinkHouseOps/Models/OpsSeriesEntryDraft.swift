@@ -212,6 +212,14 @@ extension OpsSeriesTypeEntry {
 struct OpsSeriesEntryDraft: Codable, Equatable {
     // S1：店家与系列
     var shopID: String
+    /// true = S1 选择「＋ 新建店家…」：忽略 shopID，提交时先建店家再建系列。
+    /// 与系列的「空 seriesID = 新建」不同——店家需要显式开关，
+    /// 因为 shopID == "" 同时承担「还没选」的含义，不能复用。
+    var createsNewShop: Bool
+    /// 新店家名（createsNewShop 时必填）
+    var newShopName: String
+    /// 新店家别名原文（英文逗号分隔，可空；提交时解析落库）
+    var newShopAliasesText: String
     /// 已有系列 id；空 = 新建系列
     var seriesID: String
     var newSeriesName: String
@@ -239,6 +247,9 @@ struct OpsSeriesEntryDraft: Codable, Equatable {
 
     init(
         shopID: String = "",
+        createsNewShop: Bool = false,
+        newShopName: String = "",
+        newShopAliasesText: String = "",
         seriesID: String = "",
         newSeriesName: String = "",
         newSeriesYearText: String = "",
@@ -256,6 +267,9 @@ struct OpsSeriesEntryDraft: Codable, Equatable {
         typeEntries: [OpsSeriesTypeEntry] = []
     ) {
         self.shopID = shopID
+        self.createsNewShop = createsNewShop
+        self.newShopName = newShopName
+        self.newShopAliasesText = newShopAliasesText
         self.seriesID = seriesID
         self.newSeriesName = newSeriesName
         self.newSeriesYearText = newSeriesYearText
@@ -276,7 +290,8 @@ struct OpsSeriesEntryDraft: Codable, Equatable {
 
 extension OpsSeriesEntryDraft {
     private enum Keys: String, CodingKey {
-        case shopID, seriesID, newSeriesName, newSeriesYearText, newSeriesMonthText, newSeriesSeason
+        case shopID, createsNewShop, newShopName, newShopAliasesText
+        case seriesID, newSeriesName, newSeriesYearText, newSeriesMonthText, newSeriesSeason
         case coverAssetID, declaresPhase, phaseRawValue
         case hasReservationEnd, reservationEndAt
         case hasBalanceStart, balanceStartAt, hasBalanceEnd, balanceEndAt
@@ -287,6 +302,9 @@ extension OpsSeriesEntryDraft {
         let c = try decoder.container(keyedBy: Keys.self)
         self.init(
             shopID: try c.decodeIfPresent(String.self, forKey: .shopID) ?? "",
+            createsNewShop: try c.decodeIfPresent(Bool.self, forKey: .createsNewShop) ?? false,
+            newShopName: try c.decodeIfPresent(String.self, forKey: .newShopName) ?? "",
+            newShopAliasesText: try c.decodeIfPresent(String.self, forKey: .newShopAliasesText) ?? "",
             seriesID: try c.decodeIfPresent(String.self, forKey: .seriesID) ?? "",
             newSeriesName: try c.decodeIfPresent(String.self, forKey: .newSeriesName) ?? "",
             newSeriesYearText: try c.decodeIfPresent(String.self, forKey: .newSeriesYearText) ?? "",
@@ -483,7 +501,12 @@ enum OpsSeriesEntryValidator {
         }
 
         // S1：店家与系列（必填；不显示、不保存任务名称与批次）
-        if draft.shopID.isEmpty || !catalog.shops.contains(where: { $0.id == draft.shopID }) {
+        if draft.createsNewShop {
+            // 新建店家路径：店名必填；shopID 此刻尚不存在，不按「未选择」拦
+            if OpsSeriesSizeChartParsing.normalized(draft.newShopName) == nil {
+                add("新店家名不能为空：请填写店名，或改选已有店家。", area: .shopSeries)
+            }
+        } else if draft.shopID.isEmpty || !catalog.shops.contains(where: { $0.id == draft.shopID }) {
             add("店家不能为空。", area: .shopSeries)
         }
         if draft.seriesID.isEmpty {

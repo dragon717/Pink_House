@@ -102,7 +102,7 @@ extension OpsWorkspace {
             return false
         }
         if let assetID = normalized(imageAssetID), !catalog.assets.contains(where: { $0.id == assetID }) {
-            lastError = "规格图绑定的图片资源 \(assetID) 不存在，请先在素材库里导入。"
+            lastError = "规格图绑定的图片资源 \(assetID) 不存在，请先导入商品图。"
             return false
         }
         catalog.variants.append(CatalogProductVariant(
@@ -637,7 +637,7 @@ extension OpsWorkspace {
         catalog.assets.removeAll { $0.id == id }
         markDirty()
         statusMessage = "已移除图片资源（未保存）。注意：staging 里的文件没有删，"
-            + "要释放磁盘请在素材库里单独处理。"
+            + "要释放磁盘请手动删除 staging 目录里的对应文件。"
         return true
     }
 }
@@ -734,7 +734,7 @@ extension OpsWorkspace {
                 || reference.hasPrefix("local:")
                 || reference.hasPrefix("thmedia:")
         }) else {
-            lastError = "价格表引用了不存在的图片资源，请先在素材库里导入。"
+            lastError = "价格表引用了不存在的图片资源，请先导入图片。"
             return false
         }
         // sourceImage 恒等于首图：单一展示口径继续成立，其余图供详情页补充展示
