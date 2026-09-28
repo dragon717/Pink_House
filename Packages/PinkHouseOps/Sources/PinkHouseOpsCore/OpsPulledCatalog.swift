@@ -65,7 +65,7 @@ public nonisolated struct OpsPulledCatalog: Equatable, Sendable {
 
     /// 写出的 `shop-catalog.json` 路径（App 容器内的绝对路径）
     public var path: String
-    /// 这个基线来自哪个环境（`development` / `production` / `localFixture`）
+    /// 这个基线来自哪个环境（`development` / `production`）
     public var environment: String
     /// 线上发布号（拉回时读到的那一个）
     public var releaseSeq: Int

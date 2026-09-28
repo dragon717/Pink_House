@@ -1242,8 +1242,9 @@ git status --short
 xcodebuild -list -project ItemManager.xcodeproj
 swift test --package-path Packages/SharedCatalog
 xcodebuild -project ItemManager.xcodeproj -scheme PinkHouseOps   -destination 'platform=macOS' build
-bash tools/time_hall/publication/drill_offline.sh
+bash tools/time_hall/publication/drill_offline.sh   # ⚠️ 已于 2026-09-29 删除
 </code></pre>
+<p><strong>2026-09-29 补记</strong>：上面最后一条 <code>drill_offline.sh</code> 连同桥接演练 <code>drill_bridge_offline.py</code>、<code>localFixture</code>（本机演练）环境已一并移除，改由「三份离线自检（<code>selftest_shop_catalog</code> 35 / <code>selftest_cloudkit_read</code> 18 / <code>selftest_signing</code> 6）+ 真连只读 <code>--mode baseline</code> / <code>--mode pull-catalog</code>」承担。下方 [E13] 那句「离线演练只能证明本机协议与故障路径」正是它被移除的理由。</p>
 <p>先跑现有测试，再加入新失败用例；当前共享包已有媒体规范化、引用、门禁和状态机测试。[E13] 离线演练只能证明本机协议与故障路径，不代表 CloudKit 权限、真实签名运行时及用户端体验通过。[E11]</p>
 <p>每次提交报告需写：基准 SHA、修改文件、规则变化、兼容说明、运行命令、真实输出、失败项目及原因、截图/回执位置。禁止把旧文档中的测试通过数写成本次结果。</p>
 <h2>8. 可直接交给 Agent 的执行指令</h2>

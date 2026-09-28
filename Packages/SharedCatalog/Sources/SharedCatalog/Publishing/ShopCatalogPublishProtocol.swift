@@ -31,12 +31,18 @@ import Foundation
 
 /// 发布目标环境。**选定后本任务内不得切换**（方案 §5.4），
 /// 因为切换环境会让「基线核对」与「回执核对」指向两份互不相干的事实。
+///
+/// ⚠️ 这里原本还有第三个环境 `.localFixture`（本机演练，走 filesystem 适配器，
+/// 不联网、到不了任何设备），2026-09-29 **已移除**：既定发布通道只有下面这两个
+/// 真实远端，多一个环境只会让运营在面板上多一个「点了也没意义」的选项，
+/// 而它派生出来的分支（`adapter` / `isRealRemote` / 免凭证）全是不可达的死代码。
+/// 桥接器（`ops_publish_bridge.py`）同步改成了 CloudKit-only：环境不是
+/// development / production 就直接报错，不再静默回落到 development，
+/// `filesystem` 那一支（含 `filesystemRoot`）在桥接器里已没有入口。
+/// 协议枚举里仍保留 `filesystem` 一项，只是**不再由任何环境派生**。
 public nonisolated enum ShopCatalogPublishTargetEnvironment: String, Codable, CaseIterable, Sendable, Identifiable {
     case development
     case production
-    /// 本机演练（`filesystem` 适配器）：不联网、不需要凭证，用于自证协议与故障路径。
-    /// **它绝不代表已上线**，回执里必须带上这个环境名。
-    case localFixture
 
     public var id: String { rawValue }
 
@@ -44,16 +50,7 @@ public nonisolated enum ShopCatalogPublishTargetEnvironment: String, Codable, Ca
         switch self {
         case .development: return "Development"
         case .production: return "Production"
-        case .localFixture: return "本机演练"
         }
-    }
-
-    /// 是否是真实的远端环境（决定了「已上线」这句话能不能说）
-    public var isRealRemote: Bool { self != .localFixture }
-
-    /// 该环境要求的适配器
-    public var adapter: ShopCatalogPublishAdapter {
-        self == .localFixture ? .filesystem : .cloudkit
     }
 
     public var guidance: String {
@@ -62,8 +59,6 @@ public nonisolated enum ShopCatalogPublishTargetEnvironment: String, Codable, Ca
             return "Development 只有团队成员与本地构建能读到；TestFlight / App Store 读的是 Production。"
         case .production:
             return "Production 面向全部用户。发之前请确认已在 Development 验证过同一份产物。"
-        case .localFixture:
-            return "本机演练只写一个本地目录，用来验证协议与失败路径，**不代表已上线**。"
         }
     }
 }
@@ -415,7 +410,8 @@ public nonisolated struct ShopCatalogPublishRequest: Codable, Equatable, Sendabl
         self.baseRootIndexHash = baseRootIndexHash
         self.baselineAcknowledged = baselineAcknowledged
         self.targetEnvironment = targetEnvironment
-        self.adapter = adapter ?? targetEnvironment.adapter
+        // 适配器不再由环境派生（两个环境都走 CloudKit）：想用 filesystem 就显式传。
+        self.adapter = adapter ?? .cloudkit
         self.releaseSeq = releaseSeq
         self.inputDirectory = inputDirectory
         self.archivePath = archivePath

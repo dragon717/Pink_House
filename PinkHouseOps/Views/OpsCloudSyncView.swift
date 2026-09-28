@@ -74,14 +74,6 @@ final class OpsCloudSyncModel: ObservableObject {
         }
     }
 
-    /// 面板里能选的目标环境：**只有真实远端**。
-    ///
-    /// `localFixture`（本机演练）刻意不给运营选：它走 filesystem 适配器、不联网、
-    /// 也到不了任何人的设备上 —— 在「同步云端」这件事上它没有可选的意义。
-    /// ⚠️ 但枚举本身**保留**：离线演练（`drill_bridge_offline.py`，53 项）用它
-    /// 自证协议与失败路径，删掉等于拆掉那条回归锁。**删入口，不删协议。**
-    static let selectableEnvironments: [ShopCatalogPublishTargetEnvironment] =
-        ShopCatalogPublishTargetEnvironment.allCases.filter { $0.isRealRemote }
     @Published var dryRun: Bool = true
     /// 运营是否显式确认「我知道线上变了，仍按本基线发布」（R07 的唯一出口）。
     @Published var baselineAcknowledged: Bool = false
@@ -162,8 +154,8 @@ final class OpsCloudSyncModel: ObservableObject {
     /// 「只注册过 Development 的 s2s key」，而它的处置是**去 Console 再注册一个**，
     /// 不是「再把同一个文件选一次」——指引必须指向真正能解决问题的那个动作。
     var credentialGuidance: String {
-        // 只有两个可选环境（见 `selectableEnvironments`），所以按「是否 Production」分流，
-        // 不再为本机演练留分支 —— 面板上选不到它，那条分支会是永远走不到的死代码。
+        // 协议里只有 Development / Production 两个环境（本机演练已移除），
+        // 所以按「是否 Production」分流，不需要再为第三个环境留分支。
         if targetEnvironment == .production {
             return "需要一份 **Production** 凭证 JSON。s2s key 是**按环境注册**的，"
                 + "Development 那一份打 Production 只会 401，必须单独注册："
@@ -702,8 +694,10 @@ struct OpsCloudSyncSheet: View {
                 HStack(spacing: 10) {
                     Button("选择仓库目录…") { model.chooseRepoRoot() }
                     Button("选择凭证 JSON…") { model.importCredentialFile() }
+                    // 协议里只有 Development / Production 两个真实远端
+                    // （原 `localFixture`「本机演练」已于 2026-09-29 连同离线演练一起移除）。
                     Picker("环境", selection: $model.targetEnvironment) {
-                        ForEach(OpsCloudSyncModel.selectableEnvironments) { environment in
+                        ForEach(ShopCatalogPublishTargetEnvironment.allCases) { environment in
                             Text(environment.displayName).tag(environment)
                         }
                     }
@@ -729,7 +723,7 @@ struct OpsCloudSyncSheet: View {
                             .font(.callout)
                     }
                 }
-                // 面板上能选的环境**都必须**有凭证（见 `selectableEnvironments`），
+                // 两个环境**都必须**有凭证（原先免凭证的本机演练已移除），
                 // 所以这里不再分「需要 / 不需要凭证」两支 —— 那支已经走不到了。
                 opsMarkdown(model.credentialText)
                     .font(.caption2)

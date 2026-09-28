@@ -41,7 +41,8 @@ import SwiftUI
 /// **不解析 Markdown**。后果是这一层等于没做，星号照样逐字显示。
 ///
 /// 取证（`PinkHouseOps` 的应用内离屏快照，`publish.png`）：
-/// `TargetEnvironment.localFixture.guidance` 里的 `**不代表已上线**`、
+/// `TargetEnvironment.localFixture.guidance` 里的 `**不代表已上线**`（该环境已于
+/// 2026-09-29 移除，取证本身仍然成立）、
 /// `ShopCatalogBaselineVerdict.unverified.guidance` 里的 `本页**不会**替你声称…`，
 /// 在快照上都是**带星号**的原文。两处来自不同模块、走同一条渲染路径 —— 结论明确。
 ///

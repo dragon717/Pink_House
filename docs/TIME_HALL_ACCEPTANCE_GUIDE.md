@@ -61,7 +61,9 @@ Library/Caches/TimeHall ─────────┘
 | `publish_cloudkit.py` | 发布主入口：**不可变资源先上、发布头最后切换** |
 | `verify_publication.py` | 以读者视角回读验证线上内容 |
 | `rollback_release.py` | 回滚：发布号继续递增，不倒退 |
-| `drill_offline.sh` | **一键离线全链路演练**（本文 L2） |
+| `selftest_shop_catalog.py` | 离线自检：归档裁剪不留下悬空引用、媒体门禁四类判定（35 项） |
+| `selftest_cloudkit_read.py` | 离线自检：CloudKit 适配器「读」不被 dry-run 闸门关掉（18 项） |
+| `selftest_signing.py` | 离线自检：Web Services 请求签名形状与验签（6 项，需 `cryptography`） |
 
 ### 测试
 
@@ -76,7 +78,7 @@ Library/Caches/TimeHall ─────────┘
 | 层 | 覆盖 | 需要什么 | 预计 |
 |---|---|---|---|
 | L1 | 协议 / 缓存 / 校验逻辑 | 模拟器 | 分钟级 |
-| L2 | 发布流水线全链路（含拒绝路径） | 无 | 数十秒 |
+| L2 | 离线自检：目录裁剪 / 媒体门禁 / 读闸门 / 请求签名 | 无（签名自检需仓库 `.venv`） | 秒级 |
 | L3 | App 内真实交互 | 模拟器 | 手动 |
 | L4 | 真实 CloudKit 读写 | 凭证 + Console 配置 | 需先做前置 |
 
@@ -117,31 +119,34 @@ xcodebuild -scheme ItemManager \
 
 ---
 
-### L2 · 发布流水线一键演练（推荐先跑这个）
+### L2 · 离线自检（推荐先跑这个）
+
+> 2026-09-29：原「一键离线全链路演练」`drill_offline.sh`（21 项，走 `filesystem` 适配器）
+> 已随 `localFixture` 一并移除 —— 演练用的 `filesystem` 通路和真实 CloudKit 通路不是同一份实现，
+> 全绿说明不了线上行为（典型反例见 `selftest_cloudkit_read.py` 文件头）。
+> 现在这一层只保留**锁不变量的离线自检**，全链路改由 L4 真实联调覆盖。
 
 ```bash
-cd /Users/sangyu/develop/Pink_House
-bash tools/time_hall/publication/drill_offline.sh
+cd /Users/sangyu/develop/Pink_House/tools/time_hall/publication
+PY=/Users/sangyu/.workbuddy/binaries/python/versions/3.13.12/bin/python3
+
+$PY selftest_shop_catalog.py      # 通过 35 项：归档裁剪不留下悬空引用 + 媒体引用门禁
+$PY selftest_cloudkit_read.py     # 通过 18 项：apply=False 时读必须真发请求、写必须为 0
+.venv/bin/python3 selftest_signing.py   # 通过 6 项：签名形状（需要 cryptography，用仓库 venv）
 ```
 
-一条命令跑完 **21 项断言**，全程离线、零凭据、不碰真实 CloudKit：
+三份都是**秒级、零凭据、不联网、不碰真实 CloudKit**：
 
-| 阶段 | 检查内容 | 期望 |
-|---|---|---|
-| 1 | 构建产物、根清单、分片目录、产物自洽 | 退出码 0 |
-| 2 | dry-run **不留副作用**；apply 后发布头/根清单/回执落地 | 退出码 0 |
-| 3 | 读者视角回读线上内容 | 退出码 0 |
-| 4 | **拒绝路径**：重复发布号 → 5；回滚号不递增 → 4；localFixture 发 CloudKit → 4；**篡改分片 → 回读 3** | 全部拦住 |
-| 5 | 回滚产物生成 → 校验 → 发布到干净目录 → 回读，发布号推进到 5 | 退出码 0 |
+| 脚本 | 锁住的不变量 |
+|---|---|
+| `selftest_shop_catalog.py` | 归档条目连带剔除、剔除后**无悬空引用**、非归档的悬空引用**不被裁剪抹平**（坏数据要留下来报错）、`local:` / `thmedia:` / `bundle:` / `http(s)` 四类媒体判定 |
+| `selftest_cloudkit_read.py` | 「`apply=False` = 不许写，不是不许联网」：读走 `_send` 照发、写走 `_post` 静默拦住，**读闸门与写闸门不得合并** |
+| `selftest_signing.py` | 签名是「日期 : 请求体摘要 : subpath」三段式、64 字节裸签名可验签、旧写法与漏 subpath 的写法验签**必须失败** |
 
-**成功标志**：`通过 21 项，失败 0 项`。
-
-调试用：
-
-```bash
-bash tools/time_hall/publication/drill_offline.sh --verbose   # 打印每步完整输出
-bash tools/time_hall/publication/drill_offline.sh --keep      # 保留工作目录与日志
-```
+**拒绝路径**（重复发布号 / 摘要不符 / 环境错配 / 缺图 / 篡改分片等）已不在离线层，
+需要在 L4 用真实 CloudKit 连接验 —— 见 `tools/time_hall/publication/README.md`
+「现在的自检方式」一节里那张只读模式的清单（`--mode baseline` / `--mode pull-catalog`，
+`apply=False`，不写库）。
 
 ---
 
@@ -272,13 +277,13 @@ $PY verify_publication.py --adapter cloudkit --environment development
 
 - `ItemManager` 主 target、`少女心愿衣橱Extension`、`ItemManagerTests` 编译通过，零错误
 - 43 个协议单测真跑通过（0 失败）
-- 发布流水线离线全链路 21 项断言通过，含 4 条拒绝路径
-- 篡改分片能被回读检出（退出码 3）
+- 三份离线自检全绿：商店目录裁剪与媒体门禁 **35 项**、CloudKit 读闸门 **18 项**、请求签名 **6 项**
 
 **未验证**
 
 | 项目 | 原因 | 首次怎么做 |
 |---|---|---|
+| 发布流水线**拒绝路径**（重复发布号 → 5、摘要不符 / 环境错配 → 4、缺图、篡改分片 → 回读 3） | 原离线演练 `drill_offline.sh` 已于 2026-09-29 移除；它走 `filesystem` 通路，与 CloudKit 不是同一份实现，全绿说明不了线上行为 | 在 L4 真实联调里逐条复验 |
 | `CloudKitWebServicesAdapter` 真实 HTTP 请求 | 无凭证，请求按 Apple 公开文档实现 | `--print-requests` 逐条核对后再 `--apply` |
 | `TimeHallPublicCloudReader` 真实读库 | 本机无凭证 | L4 步骤 5 回读验证 |
 | 模拟器 UI 视觉验收 | 本次只要求写代码 + 跑构建 | 按 L3 逐项手动过 |
@@ -294,9 +299,13 @@ $PY verify_publication.py --adapter cloudkit --environment development
 ## 四、一句话总结怎么测
 
 ```bash
-# 最快的两条
-bash tools/time_hall/publication/drill_offline.sh     # 流水线（无凭据，21 项断言）
+cd /Users/sangyu/develop/Pink_House/tools/time_hall/publication
+
+# 最快的两条：离线自检（无凭据、秒级）
+python3 selftest_shop_catalog.py      # 35 项
+python3 selftest_cloudkit_read.py     # 18 项
 # 然后按 L1 跑 43 个单测，再按 L3 在模拟器上点一遍
 ```
 
-L1 + L2 通过 = 逻辑正确；L3 通过 = 交互与降级正确；L4 要等你把 CloudKit Console 配好。
+L1 + L2 通过 = 逻辑正确；L3 通过 = 交互与降级正确；L4 要等你把 CloudKit Console 配好
+（**拒绝路径和真实读写只有 L4 能验** —— 离线演练已于 2026-09-29 移除）。

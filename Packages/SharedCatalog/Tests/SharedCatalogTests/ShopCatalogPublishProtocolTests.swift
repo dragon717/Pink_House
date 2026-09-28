@@ -175,7 +175,7 @@ final class ShopCatalogPublishProtocolTests: XCTestCase {
             baseReleaseSeq: 4,
             baseRootIndexHash: mediaHash,
             baselineAcknowledged: true,
-            targetEnvironment: .localFixture,
+            targetEnvironment: .development,
             releaseSeq: 5,
             inputDirectory: "/tmp/in",
             archivePath: "/tmp/in/catalog.tar",
@@ -190,14 +190,15 @@ final class ShopCatalogPublishProtocolTests: XCTestCase {
         XCTAssertEqual(decoded.draftRevision, 12)
         XCTAssertEqual(decoded.baseReleaseSeq, 4)
         XCTAssertEqual(decoded.baselineAcknowledged, true)
-        XCTAssertEqual(decoded.targetEnvironment, .localFixture)
-        XCTAssertEqual(decoded.adapter, .filesystem, "适配器默认由环境派生：本机演练走 filesystem")
+        XCTAssertEqual(decoded.targetEnvironment, .development)
+        // 适配器不再由环境派生（两个环境都走 CloudKit）：不显式传就是 cloudkit。
+        XCTAssertEqual(decoded.adapter, .cloudkit)
         XCTAssertEqual(decoded.filesystemRoot, "/tmp/fs")
     }
 
     func testReceiptSummaryDoesNotClaimLiveWithoutApply() {
         let rehearsal = ShopCatalogPublishReceipt(
-            adapter: "filesystem", environment: "localFixture", applied: false, releaseSeq: 5,
+            adapter: "cloudkit", environment: "development", applied: false, releaseSeq: 5,
             readBackConfirmed: true)
         XCTAssertTrue(rehearsal.summaryText.contains("演练"))
 
@@ -207,11 +208,10 @@ final class ShopCatalogPublishProtocolTests: XCTestCase {
         XCTAssertTrue(unconfirmed.summaryText.contains("未回读确认"))
     }
 
-    func testEnvironmentDecidesAdapter() {
-        XCTAssertEqual(ShopCatalogPublishTargetEnvironment.development.adapter, .cloudkit)
-        XCTAssertEqual(ShopCatalogPublishTargetEnvironment.production.adapter, .cloudkit)
-        XCTAssertEqual(ShopCatalogPublishTargetEnvironment.localFixture.adapter, .filesystem)
-        XCTAssertFalse(ShopCatalogPublishTargetEnvironment.localFixture.isRealRemote)
-        XCTAssertTrue(ShopCatalogPublishTargetEnvironment.production.isRealRemote)
+    func testEnvironmentsAreOnlyRealRemotes() {
+        // 环境派生适配器的那套（`localFixture` → filesystem）已随本机演练一并移除：
+        // 现在**只有**两个真实远端，面板上不会再出现「点了也不联网」的选项。
+        XCTAssertEqual(ShopCatalogPublishTargetEnvironment.allCases.map(\.rawValue),
+                       ["development", "production"])
     }
 }

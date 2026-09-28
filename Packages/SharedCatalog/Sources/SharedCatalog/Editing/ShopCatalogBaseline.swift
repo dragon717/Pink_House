@@ -36,7 +36,7 @@ public nonisolated struct ShopCatalogBaseline: Codable, Equatable, Sendable {
     public var releaseSeq: Int?
     /// 线上根清单摘要（64 位小写 hex）。nil = 未知。
     public var rootIndexHash: String?
-    /// 该基线来自哪个环境（`development` / `production` / `localFixture`）。
+    /// 该基线来自哪个环境（`development` / `production`）。
     /// **必须记录**：拿 Development 的基线去核对 Production 是必然误判。
     public var environment: String?
     /// 基线被记录 / 核对的时刻（审计用）。

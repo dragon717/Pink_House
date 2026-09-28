@@ -618,20 +618,19 @@ public final class OpsPublisherBridge: @unchecked Sendable {
         // keychain 权限），也拿不到我们这边刚打开的 security-scoped 扩展之外的路径。
         // 把凭证文件按 CLI 认的环境变量交给它 —— 不设就等于没配，CLI 仍按自己的
         // 顺序（Keychain）走，不静默改变它的行为（见 `credentialFileURL` 的说明）。
-        if Self.requiresCredentialFile(environmentName: environmentName) {
-            // 凭证**按环境取**：拿 Development 的 key 去打 Production 只会得到
-            // 一串看不出原因的 401。这里宁可先报「这个环境没配凭证」，
-            // 也不要让子进程静默回落到 Keychain（它继承沙盒，根本读不到）。
-            guard let credentialFile = Self.existingCredentialFile(
-                environmentName: environmentName,
-                credentialsDirectory: settings.credentialsDirectoryOverrideURL,
-                fileManager: fileManager) else {
-                throw OpsBridgeError.credentialMissing(environment: environmentName)
-            }
-            var environment = ProcessInfo.processInfo.environment
-            environment[Self.credentialFileEnvironmentKey] = credentialFile.path
-            process.environment = environment
+        // 凭证**按环境取**：拿 Development 的 key 去打 Production 只会得到
+        // 一串看不出原因的 401。这里宁可先报「这个环境没配凭证」，
+        // 也不要让子进程静默回落到 Keychain（它继承沙盒，根本读不到）。
+        // ⚠️ 两个真实远端**都必须**有凭证（原先 `localFixture` 免凭证，已随本机演练移除）。
+        guard let credentialFile = Self.existingCredentialFile(
+            environmentName: environmentName,
+            credentialsDirectory: settings.credentialsDirectoryOverrideURL,
+            fileManager: fileManager) else {
+            throw OpsBridgeError.credentialMissing(environment: environmentName)
         }
+        var environment = ProcessInfo.processInfo.environment
+        environment[Self.credentialFileEnvironmentKey] = credentialFile.path
+        process.environment = environment
 
         let pipe = Pipe()
         // stdout 与 stderr 合并成一条管道：单读者不可能与写者互锁，
@@ -781,15 +780,6 @@ public final class OpsPublisherBridge: @unchecked Sendable {
         return base
             .appendingPathComponent("PinkHouseOps", isDirectory: true)
             .appendingPathComponent("credentials", isDirectory: true)
-    }
-
-    /// 该环境是否**需要**凭证文件。
-    ///
-    /// `localFixture` 走 filesystem 适配器：不联网、不需要凭证。对它也要凭证的话，
-    /// 「本机演练」这个自证入口就在没配凭证时跑不起来 —— 而它存在的意义恰恰是
-    /// **不依赖任何外部条件**也能把协议跑一遍。
-    public static func requiresCredentialFile(environmentName: String) -> Bool {
-        environmentName != ShopCatalogPublishTargetEnvironment.localFixture.rawValue
     }
 
     /// 容器内**按环境分开**的凭证文件位置：

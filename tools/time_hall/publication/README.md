@@ -46,12 +46,10 @@ catalog*.json（已审核输入）
 | `verify_publication.py` | 读者视角回读验证 | 同上 |
 | `rollback_release.py` | 回滚：历史内容 + 新更高发布号 | 无第三方依赖 |
 | `ops_publish_bridge.py` | **运营工作台（Mac App）↔ 流水线的机器可读入口**：只读一个冻结请求 JSON，吐 NDJSON 事件流。发布算法一行都不重实现（全部子进程透传）。四种模式：`baseline` / `publish` / `query` / **`pull-catalog`（只读回读线上商店目录）** | 无第三方依赖 |
-| `drill_bridge_offline.py` | 上面那个桥接器的离线全链路演练（基线只读 / 拉回基线 / 演练 / 发布 / 结果查询 / **R07 过期基线闸门** / 七类拒绝路径） | 无第三方依赖 |
-| `drill_offline.sh` | 发布流水线自身的离线全链路演练 | 无第三方依赖 |
 
 ## 运行环境（`cryptography` 与仓库内的 `.venv`）
 
-`filesystem` 演练、以及桥接器本身**不需要任何第三方依赖**，系统 `python3` 就能跑。
+桥接器本身**不需要任何第三方依赖**，系统 `python3` 就能跑。
 但**真打 CloudKit** 的路径（`publish_cloudkit.py --adapter cloudkit`、`selftest_signing.py`、
 以及桥接器的 `--mode baseline`）需要 `cryptography` 做 SignatureV1 签名。
 
@@ -85,8 +83,8 @@ CloudKit 连 `records/lookup` 这种**读**操作也用 POST 动词，早先的�
 
     线上明明有 releaseSeq=1，App 却被告知「线上尚无商店发布头（本次将是首次发布）」
 
-更麻烦的是**离线演练抓不到**：`FilesystemAdapter` 的读不走 `apply` 判定，
-所以 `drill_offline.sh` / `drill_bridge_offline.py` 全绿。
+更麻烦的是**离线也抓不到**：`FilesystemAdapter` 的读不走 `apply` 判定，
+所以用 filesystem 适配器跑一遍照样全绿（这就是它必须靠下面那条回归锁的原因）。
 
 现行分工（改代码时不要合并回去）：
 
@@ -100,43 +98,36 @@ CloudKit 连 `records/lookup` 这种**读**操作也用 POST 动词，早先的�
 读仍须成功 —— 防止两条路又被合并）。它注入 `http_post` 传输层，所以
 **不联网、不需要凭证、也不需要 `cryptography`**。
 
-## 快速演练（不需要凭证、不联网）
+## 现在的自检方式（离线演练已于 2026-09-29 移除）
 
-**最省事的方式：一条命令跑完全链路 34 项断言。**
+原先这里放着 `drill_offline.sh`（34 项）与 `drill_bridge_offline.py`（53 项）两份
+**离线全链路演练** —— 它们靠 `localFixture`（本机演练）环境 + `filesystem` 适配器
+在不联网的前提下把整条流水线跑一遍。
 
-```bash
-cd /Users/sangyu/develop/Pink_House
-bash tools/time_hall/publication/drill_offline.sh
-```
+⚠️ **本机演练这个环境连同这两份演练已一并删除**（2026-09-29）：既定发布通道只有
+Development / Production 两个真实远端，留一个「不联网、到不了任何设备」的环境，
+代价是枚举上多一个永远不可达的分支、面板上多一个「点了也没意义」的选项。
+代价要说清楚：**流水线从此没有离线自证**，只能靠下面两条路。
 
-覆盖：构建 → 自检 → dry-run 无副作用 → 发布 → 回读 → 4 条拒绝路径（重复发布号 / 回滚号不递增 / localFixture 发 CloudKit / 篡改分片）→ 回滚 → 再发布 → **商店目录整包分片（含悬空引用拒绝）**。
-成功标志是 `通过 34 项，失败 0 项`。加 `--verbose` 看每步完整输出，加 `--keep` 保留工作目录与日志。
+| 路子 | 命令 | 覆盖 | 需要凭证 |
+|---|---|---|---|
+| 不联网 | `.venv/bin/python selftest_cloudkit_read.py`（18 项） | 读/写闸门（含反向断言） | 否 |
+| 不联网 | `.venv/bin/python selftest_signing.py`（6 项） | SignatureV1 签名 | 否（但要 `cryptography`） |
+| **真连** Development（只读） | `.venv/bin/python ops_publish_bridge.py --mode baseline --request <req.json>` | 发布头 | **是** |
+| **真连** Development（只读） | 同上 `--mode pull-catalog` | 拉回线上整份目录 | **是** |
 
-### 运营桥接协议（`ops_publish_bridge.py`）单独也有一份演练
+只读那两条 `--mode baseline` / `--mode pull-catalog` 全程 `apply=False`，
+**不会写线上任何东西**，可以放心当验收用。凭证走容器内
+`cloudkit.<env>.json`，或用 `PINK_HOUSE_TIMEHALL_CREDENTIAL_FILE` 指过去。
 
-Mac 工作台走的是**桥接器**这条入口（不是直接调 `build_release.py`）。它自己有一份 49 项断言：
+> 桥接器是「App 以为发出去了」与「线上真的变了」之间**唯一**的接缝。
+> 它一旦静默退化成「界面停在『上传中』」，看起来会像网络问题 —— 所以宁可真连一次
+> 只读模式，也不要拿「编译通过」当验收。
 
-```bash
-cd /Users/sangyu/develop/Pink_House
-python3 tools/time_hall/publication/drill_bridge_offline.py
-```
+### 运营桥接协议（`ops_publish_bridge.py`）的口径
 
-覆盖：R07 基线只读核对（且**不产生副作用**）→ **拉回线上基线**（只读；线上是空的时如实说「没有可拉回的」、且**不产出** `shop-catalog.json`）→ 演练 dry-run（**不留线上副作用、结论绝不是 confirmed**）→ 发布到本机目录 → 回读确认（`readBackConfirmed`）→ R09 结果查询 → **R07 过期基线闸门（5 例）** → 七类拒绝路径：
-
-| 反例 | 期望退出码 | 断言的可读结论 |
-|---|---|---|
-| 归档在冻结后被改动 | 3 | 「摘要与请求不一致」，而不是笼统失败 |
-| `development` + `filesystem` 错配 | 2 | 点名环境/适配器，**不静默降级** |
-| 协议版本不符 | 2 | 提示更新 App |
-| 缺必填字段 | 2 | 带出字段名 |
-| 同一发布号重发 | 5 | 冲突类结论，不当成功 |
-| 缺图 | 3 | 「产物要修」，而不是可重试的网络失败 |
-| 线上无发布头时查询 | 0 | 结论 = **没有生效**（绝不把「没读到」当「已确认」），且 `retryable=true` |
-
-成功标志是 `通过 49 项，失败 0 项`。
-
-> 这条演练的存在理由：桥接器是「App 以为发出去了」与「线上真的变了」之间**唯一**的接缝。
-> 它一旦静默退化成「界面停在『上传中』」，看起来会像网络问题。
+Mac 工作台走的是**桥接器**这条入口（不是直接调 `build_release.py`）。它原先由
+53 项离线演练守着；演练删除后，下面这些**判定**仍然是现行口径（改代码时照着走）：
 
 #### ⭐ R07 的过期基线闸门（发布前、构建之前）
 

@@ -12,8 +12,10 @@
     → `fetch_current_release()` 恒返回 None
     → App 被告知「线上尚无商店发布头（本次将是首次发布）」
 
-而线上可能已经发过好几个版本。更糟的是**离线演练抓不到**：
-`FilesystemAdapter` 的读不走 `apply` 判定，所以 `drill_bridge_offline.py` 全绿。
+而线上可能已经发过好几个版本。更糟的是**离线抓不到**：
+`FilesystemAdapter` 的读不走 `apply` 判定，而 CloudKit 的问题是「读也用 POST 动词」，
+两者不在同一条路径上 —— 当时那份离线演练脚本（已于 2026-09-29 连同
+`drill_bridge_offline.py` 一起移除）同样是全绿。
 
 本脚本把修好后的**不变量**钉死（双向断言，正反都测）：
 

@@ -10,7 +10,8 @@
 - ✅ 发布通道 = **Mac 导出待发布包 → Python CLI 打 CloudKit**；**不需要 Mac 直连 CloudKit**。
 - ✅ **「App 驱动 CLI」已闭环（2026-09-28 实测，不再是待办）**：用户授权仓库目录后，探针 **11 关全绿** —— **子进程真的继承 security-scoped 授权**（S2 未授权侧仍红、S6 授权后退出码 0，两侧不同才证明授权是决定性的）。所以**不必**改「把工具+包搬进 App 容器」那条备选。授权入口现在在**「云端同步」面板的「选择仓库目录…」**（发布中心已移除，那句话不再意味着「只能沿用存量」）。
 - ⚠️ **`local:` 改写仍两条路径**：iOS `ShopCatalogOpsPublisher` vs Mac 交 CLI。字段清单已统一，**状态机仍两套**。计划 §6 P4 二选一。
-- ✅ **R07 已拍板 C=A+B 并落完**：**A** 只读 `--mode pull-catalog`（四道摘要自证；线上空→`EXIT_OK` 且**不产出**文件；**已下发口径**：不含归档条目、图片已是 `thmedia:`）；**B** 写前比 `baseRootIndexHash` → 不一致则**退出码 5 拒绝**（`dry-run` 同判定）。CLI 49 / 包 50 / `drill_offline.sh` 34 / `selftest_cloudkit_read` 18 全绿。
+- ✅ **R07 已拍板 C=A+B 并落完**：**A** 只读 `--mode pull-catalog`（四道摘要自证；线上空→`EXIT_OK` 且**不产出**文件；**已下发口径**：不含归档条目）；**B** 写前比 `baseRootIndexHash` → 不一致则**退出码 5 拒绝**（`dry-run` 同判定）。
+- ✅ **本机演练 + 离线演练已全删（2026-09-29 用户拍板）**：`localFixture` 枚举 / `isRealRemote` / 环境派生 `adapter` / `requiresCredentialFile` / `selectableEnvironments` 全删；`drill_bridge_offline.py`(53) 与 `drill_offline.sh`(34) **删除**。理由一句话：**演练走 `filesystem` 通路、和 CloudKit 不是同一份实现，全绿说明不了线上行为**（`_post` 一刀切挡写时演练照样绿，而 baseline 恒报「线上尚无发布头」）。**代价：流水线从此没有离线自证，拒绝路径只能在真连上验。** 保留：`--allow-unapproved-local-fixture` 产物标记（安全闸门）+ 三份 `selftest_*`（35/18/6，锁不变量）。Python 桥接器现在只认 `development`/`production`，其它值**报错不回落**（退出码 4）。
 ## Mac 端（target `PinkHouseOps`）
 
 - ⭐ **2026-09-28 云端同步面板 `OpsCloudSyncView.swift`**（单例 `OpsCloudSyncModel`）：工具栏 + 向导 S5 两个入口开同一面板；自检三关（仓库目录 / 解释器 / 凭证）→ 读线上基线 → 拉回目录（blockers 与 caveats 后才许替换草稿）→ 上传（**先导出整包再写冻结请求**，只有 `dryRun==false && receipt.readBackConfirmed==true` 才记已发布）。**仓库目录仍需用户点一次授权**（bookmark 造不出来）。补 `@Published` 别忘了 `import Combine`（缺了报「ObservableObject 不合规」，看不出真因）。

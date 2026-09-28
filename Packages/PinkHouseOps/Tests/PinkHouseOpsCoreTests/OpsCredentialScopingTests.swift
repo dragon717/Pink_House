@@ -96,19 +96,6 @@ final class OpsCredentialScopingTests: XCTestCase {
                        "旧凭证给 Production 兜底 = 把 401 换个更隐蔽的位置")
     }
 
-    // MARK: - 本机演练
-
-    /// 本机演练走 filesystem 适配器，不联网 —— 不应该被要求配凭证。
-    func testLocalFixtureRequiresNoCredential() {
-        XCTAssertFalse(
-            OpsPublisherBridge.requiresCredentialFile(
-                environmentName: ShopCatalogPublishTargetEnvironment.localFixture.rawValue))
-        XCTAssertTrue(
-            OpsPublisherBridge.requiresCredentialFile(environmentName: "development"))
-        XCTAssertTrue(
-            OpsPublisherBridge.requiresCredentialFile(environmentName: "production"))
-    }
-
     // MARK: - 摘要
 
     /// 摘要里**只**放 containerID / keyID，私钥一个字都不能出现。

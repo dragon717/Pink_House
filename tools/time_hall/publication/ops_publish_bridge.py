@@ -210,15 +210,41 @@ def load_request(path: Path) -> Dict[str, Any]:
     return request
 
 
+#: 仅有的两个可发布环境。原 `localFixture`（本机演练，走 filesystem 适配器）
+#: 已于 2026-09-29 连同两份离线演练一并移除 —— 留着它的代价是：枚举上多一个
+#: 永远不可达的分支，且「写了本地目录」这种结果会和「真发到线上」混在一起。
+REAL_REMOTE_ENVIRONMENTS = ("development", "production")
+
+
+def ck_environment(request: Dict[str, Any]) -> str:
+    """`--environment` 只接受 development / production（本机演练已移除）。
+
+    环境不合法时**明确报错**，绝不静默回落到 development —— 静默回落会让
+    「我以为在发本机演练」变成「我真写了开发环境」，而这类错配的代价是
+    「以为发出去了」。
+    """
+    environment = str(request["targetEnvironment"])
+    if environment not in REAL_REMOTE_ENVIRONMENTS:
+        raise ProtocolError(
+            "环境 {!r} 不是可发布环境：只剩 {} 两个真实远端"
+            "（本机演练 `localFixture` 已于 2026-09-29 移除）".format(
+                environment, " / ".join(REAL_REMOTE_ENVIRONMENTS)
+            )
+        )
+    return environment
+
+
 def adapter_name(request: Dict[str, Any]) -> str:
     """适配器只由环境推导，**请求里那个字段仅作交叉校验**。
 
     为什么不让请求直接指定适配器：环境与适配器一旦可以分别指定，
     就存在「development + filesystem」这类组合 —— 运营以为在发开发环境，
     实际只写了个本地目录。这类错配的代价是「以为发出去了」。
+
+    两个真实远端都走 CloudKit，所以期望值恒为 `cloudkit`。
     """
-    environment = str(request["targetEnvironment"])
-    expected = "filesystem" if environment == "localFixture" else "cloudkit"
+    environment = ck_environment(request)
+    expected = "cloudkit"
     declared = request.get("adapter") or expected
     if declared != expected:
         raise ProtocolError(
@@ -227,12 +253,6 @@ def adapter_name(request: Dict[str, Any]) -> str:
             )
         )
     return expected
-
-
-def ck_environment(request: Dict[str, Any]) -> str:
-    """`--environment` 只接受 development / production；localFixture 走 filesystem。"""
-    environment = str(request["targetEnvironment"])
-    return "development" if environment == "localFixture" else environment
 
 
 def sha256_file(path: Path) -> str:
@@ -290,15 +310,8 @@ def read_head(request: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     所以「什么是线上当前版本」只有一处口径。`apply=False` 保证任何情况下都不写。
     """
     name = adapter_name(request)
-    filesystem_root = None
-    if name == "filesystem":
-        raw_root = request.get("filesystemRoot")
-        if not raw_root:
-            raise ProtocolError("localFixture 环境需要请求里给出 filesystemRoot")
-        filesystem_root = Path(str(raw_root))
-    adapter = make_adapter(
-        name, ck_environment(request), False, False, filesystem_root
-    )
+    # 两个真实远端都走 CloudKit，没有 filesystem 根目录这一说。
+    adapter = make_adapter(name, ck_environment(request), False, False, None)
     return adapter.fetch_current_release()
 
 
@@ -724,8 +737,11 @@ def run_pull_catalog(request: Dict[str, Any], quiet: bool) -> int:
     1. **绝不写线上**：全程 `apply=False` 适配器 + 只读方法（`fetch_*_bytes`）。
     2. ⚠️ **拿到的是「已下发口径」，不等于你本地那份**。构建时
        `strip_archived_shop_catalog` 已剔除归档条目、并剔除了孤儿销售事件，
-       图片引用也已被改写成 `thmedia:<内容摘要>`。所以拉回来的目录里：
-       **不会有归档过的店家/系列/商品**，图片也不再是 `local:` 文件名。
+       所以拉回来的目录里**不会有归档过的店家/系列/商品**。
+       图片引用**通常是** `thmedia:<内容摘要>`（受控发布器总是改写 `local:`），
+       但线上那一版若不是受控发布器产出的（例如早期种子发布），引用仍是
+       `local:` 文件名 —— 所以**不要在这里写死「一定是 thmedia:」**，
+       真实计数由 manifest 的 `mediaReferences` 实测给出。
        这不是丢数据，是「下发给用户的东西」的定义 —— 但必须**显式告知**。
     3. **摘要自证**：根清单字节的 SHA-256 必须等于发布头的 `rootIndexHash`；
        分片字节的 SHA-256 必须等于其 `payloadHash`。不符即中止（与
@@ -767,10 +783,7 @@ def run_pull_catalog(request: Dict[str, Any], quiet: bool) -> int:
         ))
         return EXIT_REFUSED
 
-    filesystem_root = (
-        Path(str(request["filesystemRoot"])) if name == "filesystem" else None
-    )
-    adapter = make_adapter(name, ck_environment(request), False, False, filesystem_root)
+    adapter = make_adapter(name, ck_environment(request), False, False, None)
 
     root_bytes = adapter.fetch_root_index_bytes()
     if root_bytes is None:
@@ -1077,8 +1090,6 @@ def run_publish(request: Dict[str, Any], quiet: bool) -> int:
         "--receipt",
         str(receipt_path),
     ]
-    if name == "filesystem":
-        publish_argv += ["--filesystem-root", str(request["filesystemRoot"])]
     if dry_run:
         publish_argv += ["--dry-run"]
     else:
