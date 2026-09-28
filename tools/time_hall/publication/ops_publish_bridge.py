@@ -47,6 +47,7 @@ Swift 侧 `ShopCatalogPublishProtocol.swift`）。**App 写请求文件就是唯
 
     0 成功（含 dry-run）      2 用法/配置      3 校验未通过
     4 被拒绝（权限/环境/来源） 5 冲突           6 桥接器内部错误
+    7 网络失败（不是程序错误；只读模式可原样重试）
 
 ## 用法
 
@@ -88,6 +89,7 @@ from protocol import (  # noqa: E402
     sha256_hex,
 )
 from publish_adapters import (  # noqa: E402
+    NETWORK_FAILURES,
     CredentialError,
     make_adapter,
 )
@@ -102,6 +104,7 @@ EXIT_VALIDATION = 3
 EXIT_REFUSED = 4
 EXIT_CONFLICT = 5
 EXIT_INTERNAL = 6
+EXIT_NETWORK = 7
 
 MODE_BASELINE = "baseline"
 MODE_PUBLISH = "publish"
@@ -1163,6 +1166,28 @@ def main(argv: Optional[List[str]] = None) -> int:
             "发布凭证不可用：{}。请按 docs/TIME_HALL_CLOUDKIT_CONSOLE_SETUP.md 配置后重试。".format(error),
         ))
         return EXIT_REFUSED
+    except NETWORK_FAILURES as error:
+        # ⭐ 网络失败**不是**桥接器的内部错误，两者必须分开报（2026-09-29 修）。
+        #
+        # 分开报的理由不是「文案更好看」：说成「内部错误」会让人去查代码、
+        # 查权限、查数据，而正确的动作是「原样重试一次」。反过来，
+        # **发布模式**下绝不能建议重试 —— 请求可能已经落到线上了，
+        # R09 要求先 `--mode query` 查清楚，换号重发会让线上出现两个候选人。
+        is_publish = args.mode == MODE_PUBLISH
+        emit(outcome_result(
+            "pendingConfirmation" if is_publish else "refused",
+            EXIT_NETWORK,
+            (
+                "网络请求失败：{}。**这次发布的结果不明**（请求可能已经发出去了），"
+                "请先用结果查询确认线上发布号，**不要**换号重发。"
+                if is_publish
+                else "网络请求失败（**不是程序错误**，本机到 api.apple-cloudkit.com 的"
+                     "连接被重置）：{}。原样重试一次即可；若连续多次都失败，"
+                     "再按「网络问题」排查（代理 / VPN / DNS），不要去查权限或数据。"
+            ).format(error),
+            retryable=not is_publish,
+        ))
+        return EXIT_NETWORK
     except Exception as error:  # noqa: BLE001 - 桥接器必须给出可读结论，不能只吐 traceback
         emit(outcome_result(
             "pendingConfirmation" if args.mode == MODE_PUBLISH else "refused",

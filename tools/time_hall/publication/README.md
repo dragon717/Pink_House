@@ -42,6 +42,7 @@ catalog*.json（已审核输入）
 | `publish_adapters.py` | 发布适配层：`filesystem`（演练）/ `cloudkit`（真实） | cloudkit 需 `cryptography` |
 | `selftest_signing.py` | CloudKit SignatureV1 请求签名离线自检（已知答案 + 反向断言） | cloudkit 需 `cryptography` |
 | `selftest_cloudkit_read.py` | ⭐ **CloudKit 适配器读/写闸门离线回归锁**：`apply=False`（dry-run / 基线核对）时**读必须真的发出**、**写必须一个请求都不发** | 无第三方依赖（不签名、不联网） |
+| `selftest_network_failover.py` | ⭐ **出网回退回归锁**：TLS 握手失败必须在多个解析地址之间回退（见本文「一个坏边缘 IP 掐死整次请求」一节） | 无第三方依赖（不联网） |
 | `publish_cloudkit.py` | 发布主入口（固定 7 步顺序） | 同上 |
 | `verify_publication.py` | 读者视角回读验证 | 同上 |
 | `rollback_release.py` | 回滚：历史内容 + 新更高发布号 | 无第三方依赖 |
@@ -63,6 +64,7 @@ cd tools/time_hall/publication
 .venv/bin/python -m pip install cryptography
 .venv/bin/python selftest_signing.py           # 期望：通过 6 项，失败 0 项
 .venv/bin/python selftest_cloudkit_read.py     # 期望：通过 18 项，失败 0 项
+.venv/bin/python selftest_network_failover.py  # 期望：通过 16 项，失败 0 项
 ```
 
 **为什么 venv 必须放在仓库里**（不能是 `~/.venv`，也不能 `pip install --user`）：
@@ -112,6 +114,7 @@ Development / Production 两个真实远端，留一个「不联网、到不了�
 | 路子 | 命令 | 覆盖 | 需要凭证 |
 |---|---|---|---|
 | 不联网 | `.venv/bin/python selftest_cloudkit_read.py`（18 项） | 读/写闸门（含反向断言） | 否 |
+| 不联网 | `.venv/bin/python selftest_network_failover.py`（16 项） | 出网回退（TLS 之后仍换地址） | 否 |
 | 不联网 | `.venv/bin/python selftest_signing.py`（6 项） | SignatureV1 签名 | 否（但要 `cryptography`） |
 | **真连** Development（只读） | `.venv/bin/python ops_publish_bridge.py --mode baseline --request <req.json>` | 发布头 | **是** |
 | **真连** Development（只读） | 同上 `--mode pull-catalog` | 拉回线上整份目录 | **是** |
@@ -123,6 +126,55 @@ Development / Production 两个真实远端，留一个「不联网、到不了�
 > 桥接器是「App 以为发出去了」与「线上真的变了」之间**唯一**的接缝。
 > 它一旦静默退化成「界面停在『上传中』」，看起来会像网络问题 —— 所以宁可真连一次
 > 只读模式，也不要拿「编译通过」当验收。
+
+## ⭐ 一个坏边缘 IP 能掐死整次请求（2026-09-29 修，含根因与验证）
+
+**症状**：App 面板点「拉回目录」/「读取线上基线」，得到
+
+```text
+refused · 桥接器内部错误：URLError: <urlopen error [Errno 54] Connection reset by peer>
+```
+
+**看着像桥接器有 bug，实际是 DNS 顺序问题。**
+
+`api.apple-cloudkit.com` 会解析出**多个边缘 IPv4**（实测 5–6 个），其中个别 IP 是
+「**TCP 连得上、TLS 握手被立刻 RST**」：
+
+```text
+17.248.216.28    TCP ✓ [0.06s]  TLS ✗ [0.01s] ConnectionResetError: [Errno 54]
+17.248.216.42    TCP ✓ [0.09s]  TLS ✓ [0.08s] TLSv1.2      ← 同一轮里其它地址都正常
+```
+
+而 `socket.create_connection()`（urllib 内部走的那条）**只在 TCP connect 失败时**
+才换下一个地址 —— **TLS 阶段炸掉不回退**，于是整次请求判死，其余健康地址一个都没试过。
+DNS 答案顺序是轮换的：坏 IP 排第一就失败，排后面就正常 —— 这就是
+「同一份请求一会儿行一会儿不行」的机制。而 4 次外层重试每次都重新解析、拿到同一份顺序，
+**全部撞同一个坏 IP**（耗时正好 = 重试等待之和 `0+5+15+30 = 50` 秒），最后吐一个
+「内部错误」——既不像是网络问题，也看不出应该重试。
+
+**修法**（`publish_adapters.py`）：
+
+1. `connect_first_ready()` 把「就绪」定义成 **TLS 握手完成之后**，在那一层做回退；
+2. 全项目**只留一个出网入口** `open_https()`（三处调用点全部改走它）——
+   回退必须和连接建立绑在一起，任何新写的 `urlopen` 都会悄悄绕过它；
+3. 失败时抛 `NetworkError` 并**点名试过哪些地址**，桥接器按网络失败分类
+   （**退出码 7**，只读模式 `retryable=true`；发布模式 `pendingConfirmation`，
+   因为「写没写进去」未知，R09 要求先查询而不是换号重发）。
+
+**验证**（同一份 DNS 顺序：坏 IP 排第一）：
+
+```text
+旧路径 ✗ [0.13s] ConnectionResetError: [Errno 54] Connection reset by peer
+新路径 ✓ [0.17s] TLSv1.2   ← 自动换到健康地址
+```
+
+离线回归锁是 `selftest_network_failover.py`（16 项，不联网）。
+
+> ⚠️ 排查这类问题时注意：**本机 shell 里可能装着代理**
+> （`http_proxy` / `https_proxy`，例如某些工具链会注入本机透明代理）。
+> 有代理时 urllib 连的是 `127.0.0.1`，**根本不会去解析 `api.apple-cloudkit.com`** ——
+> 这时你看到的 RST 是代理的，不是边缘 IP 的，很容易把根因认错。
+> 判断方法：打印 `urllib.request.getproxies()`，或者看连接目标的 host。
 
 ### 运营桥接协议（`ops_publish_bridge.py`）的口径
 

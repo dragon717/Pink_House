@@ -85,16 +85,58 @@ final class OpsCloudSyncModel: ObservableObject {
     @Published private(set) var logLines: [String] = []
     @Published private(set) var onlineHead: ShopCatalogOnlineHead?
     @Published private(set) var pulled: OpsPulledCatalog?
+    /// 上一次「拉回目录」**失败**的原因（成功时为 nil）。
+    ///
+    /// 为什么要单独存一份：下载卡片原先写成 `if let pulled` —— 拉回失败时那张卡片
+    /// **一个字都不显示**，运营点完按钮像没反应一样，唯一的线索浮在上传卡片的结果区里。
+    /// 「点了没反应」和「报错了」必须区分开，否则现场只会得到一句「还是没拉下来」。
+    @Published private(set) var pullFailure: String?
+    /// 这次拉回失败是不是**原样重试即可**（桥接器的 `retryable`）。
+    @Published private(set) var pullFailureRetryable = false
     @Published private(set) var outcome: ShopCatalogPublishOutcome?
     @Published private(set) var outcomeMessage: String?
+    /// 这次失败**原样重试是安全的**吗（桥接器的 `retryable`）。
+    ///
+    /// 刻意的区分：网络抖动属于「重试即可」，而被拒绝 / 校验未通过属于「改了再来」。
+    /// 把两者都说成「失败了」，运营就只能靠猜。发布模式下这个值恒为 false ——
+    /// 请求可能已经落到线上，这时正确的动作是**结果查询**，不是重发（R09）。
+    @Published private(set) var outcomeRetryable = false
     @Published private(set) var lastError: String?
     @Published private(set) var lastReceiptSeq: Int?
     @Published private(set) var lastReceiptConfirmed: Bool = false
+    /// 最近一次落盘的运行日志（`bridge/logs/latest.log`）。
+    ///
+    /// ## 为什么日志必须落盘（2026-09-29）
+    ///
+    /// 在这之前，桥接器的输出**只活在内存里**：`logLines` 上限 60 行、关掉面板
+    /// 或重启 App 就没了，而且那段红色报错在旧写法里连选中都做不到。
+    /// 结果就是「出了问题但拿不出日志」—— 现场只能截图，读的人只能靠放大截图认字
+    /// （我自己就这么干过）。日志是排查的**唯一凭据**，它不该是一次性的 UI 状态。
+    @Published private(set) var logFileURL: URL?
 
     /// 面板是否展开（由工具栏或 S5 触发）
     @Published var showsSheet = false
 
     private static let logLimit = 60
+
+    /// 本次运行的**完整**日志（不受 `logLimit` 截断），落盘与复制都用它。
+    private var runLog: [String] = []
+
+    /// 运行 ID 的时间部分（也是日志文件名）。用 POSIX locale 固定 24 小时制，
+    /// 免得用户在「中文 + 12 小时制」下拿到 `09-29-... PM` 这种没法排序的名字。
+    private static let runIDFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyyMMdd-HHmmss"
+        return formatter
+    }()
+
+    private static let logTimeFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+        return formatter
+    }()
 
     init() {
         if let data = UserDefaults.standard.data(forKey: OpsBridgeSettings.defaultsKey),
@@ -184,8 +226,11 @@ final class OpsCloudSyncModel: ObservableObject {
     ) {
         onlineHead = nil
         pulled = nil
+        pullFailure = nil
+        pullFailureRetryable = false
         outcome = nil
         outcomeMessage = nil
+        outcomeRetryable = false
         lastError = nil
         lastReceiptSeq = nil
         lastReceiptConfirmed = false
@@ -215,6 +260,12 @@ final class OpsCloudSyncModel: ObservableObject {
 
     private func jobDirectory(_ id: String) -> URL {
         jobsDirectory.appendingPathComponent(id, isDirectory: true)
+    }
+
+    /// 运行日志的落盘目录（`bridge/logs/`）。与 `bridge/<jobID>/` 平级：
+    /// 请求文件是**给子进程读的**，日志是**给人读的**，混在一起会互相干扰。
+    private var logsDirectory: URL {
+        jobsDirectory.appendingPathComponent("logs", isDirectory: true)
     }
 
     // MARK: 仓库目录授权
@@ -304,7 +355,7 @@ final class OpsCloudSyncModel: ObservableObject {
 
     /// 读线上发布头。**不写任何东西**（桥接器侧 `apply=False`）。
     func readOnlineBaseline() async {
-        guard await ensureReady() else { return }
+        guard await ensureReady(.baseline) else { return }
         let directory = jobDirectory("baseline-\(Int(Date().timeIntervalSince1970))")
         do {
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
@@ -328,6 +379,7 @@ final class OpsCloudSyncModel: ObservableObject {
             self.onlineHead = result.onlineHead
             self.outcome = result.outcome
             self.outcomeMessage = result.outcomeMessage ?? result.lastDisplayLine
+            self.outcomeRetryable = result.outcomeRetryable
         }
     }
 
@@ -343,7 +395,9 @@ final class OpsCloudSyncModel: ObservableObject {
     // MARK: 只读：从线上拉回整份目录
 
     func pullCatalog() async {
-        guard await ensureReady() else { return }
+        guard await ensureReady(.pullCatalog) else { return }
+        pullFailure = nil
+        pullFailureRetryable = false
         let directory = jobDirectory("pull-\(Int(Date().timeIntervalSince1970))")
         do {
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
@@ -367,8 +421,20 @@ final class OpsCloudSyncModel: ObservableObject {
             self.onlineHead = result.onlineHead ?? self.onlineHead
             self.outcome = result.outcome
             self.outcomeMessage = result.outcomeMessage ?? result.lastDisplayLine
+            self.outcomeRetryable = result.outcomeRetryable
             self.pulled = OpsPulledCatalog.from(
                 result: result, environment: self.targetEnvironment.rawValue)
+            // 失败时**必须**在下载卡片里留下一句话，否则「点了没反应」会被读成
+            // 「功能不存在」，而不是「这次请求失败了」。
+            self.pullFailure = self.pulled == nil
+                ? (result.outcomeMessage ?? result.lastDisplayLine)
+                : nil
+            self.pullFailureRetryable = self.pulled == nil && result.outcomeRetryable
+        }
+        // `perform` 里「超时 / 取消」走的是 catch（不是回调），那条路没有 outcome
+        // 事件可读 —— 这里兜一下，保证下载卡片**任何**失败都有话说。
+        if pulled == nil, pullFailure == nil {
+            pullFailure = lastError ?? "这次拉回没有拿到任何结果，请重试。"
         }
     }
 
@@ -403,22 +469,24 @@ final class OpsCloudSyncModel: ObservableObject {
     /// 顺序不能改：**先**由 App 复校验并导出（缺图会在这里硬失败，不会带上残缺产物），
     /// **再**写请求文件（请求文件就是唯一的「提交」动作）。
     func publish(workspace: OpsWorkspace) async {
-        guard await ensureReady() else { return }
+        guard await ensureReady(.publish) else { return }
         guard workspace.isCorrupted == false else {
-            lastError = "草稿处于只读隔离状态，不能发布。请先「另存为新草稿」。"
+            failBeforeBridge("草稿处于只读隔离状态，不能发布。请先「另存为新草稿」。", mode: .publish)
             return
         }
         guard let head = onlineHead else {
-            lastError = "还不知道线上当前版本：请先点「读取线上基线」，"
-                + "发布号必须严格大于线上（R07：不能拿一份不知道基于哪一版的整包去覆盖线上）。"
+            failBeforeBridge("还不知道线上当前版本：请先点「读取线上基线」，"
+                + "发布号必须严格大于线上（R07：不能拿一份不知道基于哪一版的整包去覆盖线上）。",
+                mode: .publish)
             return
         }
         // 发布号是**按环境**编号的：拿 Development 的号发 Production 会覆盖掉
         // 另一个环境的发布头，而这一步之前没有任何一层会拦。
         guard head.environment == targetEnvironment.rawValue else {
-            lastError = "读到的线上基线属于 \(head.environment)，"
+            failBeforeBridge("读到的线上基线属于 \(head.environment)，"
                 + "与当前目标环境 \(targetEnvironment.rawValue) 不一致。"
-                + "请先重新读取当前环境的线上基线（切换环境会自动清空上一次的结果）。"
+                + "请先重新读取当前环境的线上基线（切换环境会自动清空上一次的结果）。",
+                mode: .publish)
             return
         }
         let seq = head.releaseSeq + 1
@@ -427,7 +495,7 @@ final class OpsCloudSyncModel: ObservableObject {
         do {
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         } catch {
-            lastError = "创建工作目录失败：\(error.localizedDescription)"
+            failBeforeBridge("创建工作目录失败：\(error.localizedDescription)", mode: .publish)
             return
         }
 
@@ -437,14 +505,14 @@ final class OpsCloudSyncModel: ObservableObject {
             archive = try workspace.makePublicationArchive(
                 targetEnvironmentName: targetEnvironment.displayName)
         } catch {
-            lastError = "生成待发布整包失败：\(error.localizedDescription)"
+            failBeforeBridge("生成待发布整包失败：\(error.localizedDescription)", mode: .publish)
             return
         }
         let archiveURL = directory.appendingPathComponent("release.tar")
         do {
             try archive.write(to: archiveURL, options: .atomic)
         } catch {
-            lastError = "待发布整包落盘失败：\(error.localizedDescription)"
+            failBeforeBridge("待发布整包落盘失败：\(error.localizedDescription)", mode: .publish)
             return
         }
         let payloadHash = ShopCatalogSyncProtocol.sha256Hex(archive)
@@ -481,6 +549,7 @@ final class OpsCloudSyncModel: ObservableObject {
             guard let self else { return }
             self.outcome = result.outcome
             self.outcomeMessage = result.outcomeMessage ?? result.lastDisplayLine
+            self.outcomeRetryable = result.outcomeRetryable
             self.onlineHead = result.onlineHead ?? self.onlineHead
             let receipt = result.receipt
             self.lastReceiptSeq = receipt?.releaseSeq ?? result.artifactReleaseSeq
@@ -500,22 +569,23 @@ final class OpsCloudSyncModel: ObservableObject {
     // MARK: 内部
 
     /// 三关自检：仓库目录 / 解释器 / 凭证。不通过就不跑，且每一条单独说明。
-    private func ensureReady() async -> Bool {
+    private func ensureReady(_ mode: OpsBridgeMode) async -> Bool {
         let problems = diagnosis
         if !problems.isEmpty {
-            lastError = "受控发布器还没准备好：" + problems.joined(separator: " ")
+            failBeforeBridge("受控发布器还没准备好：" + problems.joined(separator: " "), mode: mode)
             return false
         }
         if credentialFileURL == nil {
-            lastError = "容器内没有 \(targetEnvironment.displayName) 的 CloudKit 凭证："
+            failBeforeBridge("容器内没有 \(targetEnvironment.displayName) 的 CloudKit 凭证："
                 + "子进程继承 App 沙盒，读不到登录钥匙串，只能靠容器里的这份文件。"
-                + "请先点「选择凭证 JSON…」把它放进 App 容器。"
+                + "请先点「选择凭证 JSON…」把它放进 App 容器。", mode: mode)
             return false
         }
         if let summary = credentialSummary, summary.declaredEnvironmentMatches == false {
-            lastError = "这份凭证自己声明的是 \(summary.declaredEnvironment ?? "（未知）")，"
+            failBeforeBridge("这份凭证自己声明的是 \(summary.declaredEnvironment ?? "（未知）")，"
                 + "与当前目标环境 \(targetEnvironment.rawValue) 不一致。"
-                + "CloudKit 的 s2s key 按环境注册，混用只会 401 —— 请导入对应环境的凭证。"
+                + "CloudKit 的 s2s key 按环境注册，混用只会 401 —— 请导入对应环境的凭证。",
+                mode: mode)
             return false
         }
         return true
@@ -556,7 +626,7 @@ final class OpsCloudSyncModel: ObservableObject {
             try request.encoded().write(to: url, options: .atomic)
             return url
         } catch {
-            lastError = "写请求文件失败：\(error.localizedDescription)"
+            failBeforeBridge("写请求文件失败：\(error.localizedDescription)", mode: .publish)
             return nil
         }
     }
@@ -571,7 +641,12 @@ final class OpsCloudSyncModel: ObservableObject {
         runningMode = mode
         outcome = nil
         outcomeMessage = nil
+        outcomeRetryable = false
         lastError = nil
+        // 每次运行从干净的一份开始：`runLog` 是**按运行**归属的，留着上一次的行
+        // 会让落盘的日志里混进两次运行的输出（跨环境时尤其误导）。
+        runLog = []
+        let runID = "\(Self.runIDFormatter.string(from: Date()))-\(mode.rawValue)"
         append("▶ \(mode.displayName)（\(targetEnvironment.displayName)）")
 
         let bridge = OpsPublisherBridge(settings: settings)
@@ -597,6 +672,9 @@ final class OpsCloudSyncModel: ObservableObject {
         }
         isRunning = false
         runningMode = nil
+        // 落盘放在最后：此时 `interpret(result)` 已经写好了结论、回执号与失败原因，
+        // 日志头部才能带上它们（否则文件里只有裸输出，拿到的人也判断不了该不该重试）。
+        persistLog(runID: runID, mode: mode)
     }
 
     private func append(_ line: String) {
@@ -604,9 +682,90 @@ final class OpsCloudSyncModel: ObservableObject {
         if logLines.count > Self.logLimit {
             logLines.removeFirst(logLines.count - Self.logLimit)
         }
+        runLog.append(line)
     }
 
-    func clearLog() { logLines = [] }
+    func clearLog() {
+        logLines = []
+        runLog = []
+        // `logFileURL` 刻意不清：那是一个**已经写在磁盘上的产物**，
+        // 清空面板不等于删文件，把链接一起抹掉只会让人更找不到它。
+    }
+
+    // MARK: 日志（复制 / 落盘）
+
+    /// 可以直接粘进聊天、Issue 或邮件里的完整日志文本。
+    ///
+    /// ## 为什么头部不能省
+    ///
+    /// 只贴一句「退出码 6」没人能判断是网络、凭证还是数据；而「该不该原样重试」
+    /// 恰恰取决于环境、模式与有没有写过线上。所以头部把这些**判定所需的最小事实**
+    /// 固定带上，正文才是桥接器的原始输出。
+    func copyableLogText(runID: String? = nil, mode: OpsBridgeMode? = nil) -> String {
+        var lines: [String] = []
+        lines.append("# PinkHouseOps 云端同步 · 受控发布器输出")
+        lines.append("导出时间：\(Self.logTimeFormatter.string(from: Date()))")
+        lines.append("目标环境：\(targetEnvironment.rawValue)（\(targetEnvironment.displayName)）")
+        if let runID { lines.append("本次运行：\(runID)") }
+        if let mode { lines.append("运行模式：\(mode.rawValue)") }
+        if let head = onlineHead {
+            lines.append("线上发布号：seq \(head.releaseSeq)"
+                + (head.rootIndexHash.map { " · 根清单摘要 \($0.prefix(12))…" } ?? ""))
+        }
+        if let seq = lastReceiptSeq {
+            lines.append("回执发布号：\(seq)"
+                + (lastReceiptConfirmed ? "（已回读确认）" : "（未回读确认）"))
+        }
+        if let failure = pullFailure {
+            lines.append("拉回失败：\(failure)"
+                + (pullFailureRetryable ? "（可原样重试）" : "（不可原样重试）"))
+        }
+        if let message = outcomeMessage { lines.append("结论文案：\(message)") }
+        if let error = lastError { lines.append("✖ 错误：\(error)") }
+        lines.append("--- 桥接器输出（最近一次运行，"
+            + "\(runLog.isEmpty ? logLines.count : runLog.count) 行）---")
+        lines.append(contentsOf: runLog.isEmpty ? logLines : runLog)
+        return lines.joined(separator: "\n")
+    }
+
+    /// 把本次运行的日志落成文件：`bridge/logs/<runID>.log` + 覆盖 `latest.log`。
+    ///
+    /// 写失败**刻意静默**：一次同步已经跑完了，不该因为「日志没写成」再报一个错。
+    /// 但此时 `logFileURL` 保持 nil，界面上的按钮会是灰的 —— 这一点要能看出来。
+    private func persistLog(runID: String, mode: OpsBridgeMode) {
+        let directory = logsDirectory
+        let manager = FileManager.default
+        guard (try? manager.createDirectory(
+            at: directory, withIntermediateDirectories: true)) != nil else { return }
+        let text = copyableLogText(runID: runID, mode: mode)
+        guard let data = text.data(using: .utf8) else { return }
+        let stamped = directory.appendingPathComponent("\(runID).log")
+        try? data.write(to: stamped, options: .atomic)
+        let latest = directory.appendingPathComponent("latest.log")
+        guard (try? data.write(to: latest, options: .atomic)) != nil else { return }
+        logFileURL = latest
+    }
+
+    /// 在访达里选中最近一次的日志文件。
+    func revealLogFile() {
+        guard let url = logFileURL else { return }
+        NSWorkspace.shared.activateFileViewerSelecting([url])
+    }
+
+    /// 记一次**没走到桥接器**的失败，并把它落盘。
+    ///
+    /// ## 为什么这条路径必须单独照顾（2026-09-29）
+    ///
+    /// `perform` 里的失败会自动落盘，但「发布」有多条**在桥接器之前就返回**的早退路径：
+    /// 门禁不过（草稿只读 / 没有线上基线 / 环境对不上）、导出整包失败、请求文件写不下去。
+    /// 旧写法只在 `perform` 里落盘 —— 结果**恰恰是最需要日志的那一次失败没有日志**：
+    /// 现场卡住的正是「导出整包失败：发布前校验未通过（560 条）」，而它一个文件都没留下。
+    private func failBeforeBridge(_ message: String, mode: OpsBridgeMode) {
+        lastError = message
+        persistLog(
+            runID: "\(Self.runIDFormatter.string(from: Date()))-\(mode.rawValue)-preflight",
+            mode: mode)
+    }
 }
 
 /// 某个环境的凭证配置状态（自检卡片里按环境逐条列出）。
@@ -622,6 +781,9 @@ struct OpsEnvironmentCredentialState: Identifiable {
 struct OpsCloudSyncSheet: View {
     @ObservedObject var workspace: OpsWorkspace
     @ObservedObject private var model = OpsCloudSyncModel.shared
+    /// 「复制日志」成功后的短提示。放在视图里而不是 model 里：
+    /// 它是一次交互反馈，不是跨入口共享的状态。
+    @State private var copyLogHint: String?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -814,6 +976,27 @@ struct OpsCloudSyncSheet: View {
                     Task { await model.pullCatalog() }
                 }
                 .disabled(model.isRunning)
+                // 失败时这张卡片**必须**有话说：原先只有 `if let pulled`，
+                // 拉回失败就一个字都不显示，看起来像「按钮不管用」。
+                if let failure = model.pullFailure {
+                    HStack(spacing: 6) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .foregroundStyle(Color.orange)
+                        Text("这次没拉回来").font(.callout)
+                        if model.pullFailureRetryable {
+                            Text("可原样重试")
+                                .font(.caption2)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(Color.orange.opacity(0.15), in: Capsule())
+                                .foregroundStyle(Color.orange)
+                        }
+                    }
+                    opsMarkdown(failure)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
                 if let pulled = model.pulled {
                     Divider()
                     Text(pulled.summaryText).font(.callout)
@@ -894,6 +1077,16 @@ struct OpsCloudSyncSheet: View {
                         Image(systemName: outcome == .confirmed ? "checkmark.circle.fill" : "exclamationmark.circle.fill")
                             .foregroundStyle(outcome == .confirmed ? Color.green : Color.orange)
                         Text(outcome.rawValue).font(.callout)
+                        // 「原样重试是安全的」必须和「失败了」分开说：前者是网络抖动，
+                        // 后者要改东西。混在一起运营只能靠猜（R07/R09 都栽在这类含糊上）。
+                        if model.outcomeRetryable {
+                            Text("可原样重试")
+                                .font(.caption2)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(Color.orange.opacity(0.15), in: Capsule())
+                                .foregroundStyle(Color.orange)
+                        }
                     }
                 }
                 if let message = model.outcomeMessage {
@@ -922,9 +1115,12 @@ struct OpsCloudSyncSheet: View {
         OpsCard(title: "受控发布器输出", systemImage: "terminal") {
             VStack(alignment: .leading, spacing: 6) {
                 if let error = model.lastError {
+                    // 与下面的日志行一样允许选中：这段是**最需要被带走**的一段文字，
+                    // 旧写法漏了 `.textSelection`，于是唯二的取字方式只剩截图。
                     opsMarkdown("✖ \(error)")
                         .font(.callout)
                         .foregroundStyle(.red)
+                        .textSelection(.enabled)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 if model.logLines.isEmpty {
@@ -942,9 +1138,42 @@ struct OpsCloudSyncSheet: View {
                     }
                     .frame(height: 160)
                 }
-                Button("清空") { model.clearLog() }
-                    .controlSize(.small)
+                HStack(spacing: 8) {
+                    Button("复制日志") { copyLog() }
+                        .controlSize(.small)
+                        .disabled(model.logLines.isEmpty && model.lastError == nil)
+                    Button("打开日志文件") { model.revealLogFile() }
+                        .controlSize(.small)
+                        .disabled(model.logFileURL == nil)
+                    Button("清空") { model.clearLog() }
+                        .controlSize(.small)
+                    if let hint = copyLogHint {
+                        Text(hint).font(.caption).foregroundStyle(.secondary)
+                    }
+                }
+                opsMarkdown(model.logFileURL == nil
+                    ? "运行一次后（读取基线 / 拉回目录 / 发布）日志会同时落到 "
+                        + "`bridge/logs/latest.log`，「复制日志」是一次性拿走全文的入口。"
+                    : "**「复制日志」= 头部 + 全文**（头部含环境、模式、线上发布号与失败原因，"
+                        + "贴出去别人才能判断该不该重试）；完整历史在 `bridge/logs/`。")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
+        }
+    }
+
+    /// 复制成功后的短提示（3 秒后自己消失，免得看起来像常驻状态）。
+    private func copyLog() {
+        let text = model.copyableLogText()
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        pasteboard.setString(text, forType: .string)
+        let lineCount = text.split(separator: "\n", omittingEmptySubsequences: false).count
+        copyLogHint = "已复制 \(lineCount) 行"
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 3_000_000_000)
+            copyLogHint = nil
         }
     }
 }

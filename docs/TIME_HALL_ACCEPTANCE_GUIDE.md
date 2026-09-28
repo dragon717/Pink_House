@@ -63,6 +63,7 @@ Library/Caches/TimeHall ─────────┘
 | `rollback_release.py` | 回滚：发布号继续递增，不倒退 |
 | `selftest_shop_catalog.py` | 离线自检：归档裁剪不留下悬空引用、媒体门禁四类判定（35 项） |
 | `selftest_cloudkit_read.py` | 离线自检：CloudKit 适配器「读」不被 dry-run 闸门关掉（18 项） |
+| `selftest_network_failover.py` | 离线自检：TLS 握手失败也会换下一个解析地址（16 项） |
 | `selftest_signing.py` | 离线自检：Web Services 请求签名形状与验签（6 项，需 `cryptography`） |
 
 ### 测试
@@ -130,17 +131,19 @@ xcodebuild -scheme ItemManager \
 cd /Users/sangyu/develop/Pink_House/tools/time_hall/publication
 PY=/Users/sangyu/.workbuddy/binaries/python/versions/3.13.12/bin/python3
 
-$PY selftest_shop_catalog.py      # 通过 35 项：归档裁剪不留下悬空引用 + 媒体引用门禁
-$PY selftest_cloudkit_read.py     # 通过 18 项：apply=False 时读必须真发请求、写必须为 0
+$PY selftest_shop_catalog.py         # 通过 35 项：归档裁剪不留下悬空引用 + 媒体引用门禁
+$PY selftest_cloudkit_read.py        # 通过 18 项：apply=False 时读必须真发请求、写必须为 0
+$PY selftest_network_failover.py     # 通过 16 项：TLS 握手失败也要换下一个解析地址
 .venv/bin/python3 selftest_signing.py   # 通过 6 项：签名形状（需要 cryptography，用仓库 venv）
 ```
 
-三份都是**秒级、零凭据、不联网、不碰真实 CloudKit**：
+四份都是**秒级、零凭据、不联网、不碰真实 CloudKit**：
 
 | 脚本 | 锁住的不变量 |
 |---|---|
 | `selftest_shop_catalog.py` | 归档条目连带剔除、剔除后**无悬空引用**、非归档的悬空引用**不被裁剪抹平**（坏数据要留下来报错）、`local:` / `thmedia:` / `bundle:` / `http(s)` 四类媒体判定 |
 | `selftest_cloudkit_read.py` | 「`apply=False` = 不许写，不是不许联网」：读走 `_send` 照发、写走 `_post` 静默拦住，**读闸门与写闸门不得合并** |
+| `selftest_network_failover.py` | **TLS 握手失败必须在多个解析地址之间回退**（`create_connection` 只在 TCP connect 失败时回退 —— 坏边缘 IP 排在 DNS 第一位就会掐死整次请求）；证书错误**不**参与回退；适配层里不得再出现裸 `urlopen(` |
 | `selftest_signing.py` | 签名是「日期 : 请求体摘要 : subpath」三段式、64 字节裸签名可验签、旧写法与漏 subpath 的写法验签**必须失败** |
 
 **拒绝路径**（重复发布号 / 摘要不符 / 环境错配 / 缺图 / 篡改分片等）已不在离线层，

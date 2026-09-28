@@ -29,13 +29,18 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import http.client
 import json
 import os
 import shutil
+import socket
+import ssl
 import subprocess
 import sys
+import urllib.error
+import urllib.request
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 
 from protocol import ProtocolError, RELEASE_RECORD_NAME, canonical_json_bytes, sha256_hex
 
@@ -45,6 +50,184 @@ CREDENTIAL_ENV_VAR = "PINK_HOUSE_TIMEHALL_CREDENTIAL_FILE"
 
 class CredentialError(Exception):
     pass
+
+
+class NetworkError(Exception):
+    """网络层失败：解析不到地址 / 连不上 / **TLS 握手被掐** / 传到一半断了。
+
+    ⭐ 为什么要有这个类型，而且**刻意不继承 `ProtocolError`**：
+
+    `ProtocolError` 会在 `run_baseline` / `run_pull_catalog` / `run_query` 里被就地
+    翻译成「读线上发布头失败」并返回 `EXIT_REFUSED`（4），于是：
+
+      · 运营看到的结论是「被拒绝」—— 会去怀疑权限、环境、数据；
+      · 「原样重试就能过」这层最有用的信息被丢掉了。
+
+    更糟的是它一旦冒到 `main()` 的兜底分支，就会被写成
+    **「桥接器内部错误」** —— 一次网络抖动伪装成程序 bug。这正是 2026-09-29
+    实际发生的事：App 里点「拉回目录」得到的是
+    `桥接器内部错误：URLError: <urlopen error [Errno 54] Connection reset by peer>`。
+"""
+
+
+#: 「这是一次网络失败」的判据。**按错误形状判、不按类型出处判**：
+#: 同一个连接被重置，从 `open_https` 出来可能是 `NetworkError`，被 urllib 包一层
+#: 之后又变成 `URLError(ConnectionResetError)`，解到一半断掉则是
+#: `http.client.RemoteDisconnected`（它同时是 `ConnectionResetError` 和
+#: `HTTPException`）。只认一种类型会漏掉大半。
+NETWORK_FAILURES = (
+    NetworkError,
+    urllib.error.URLError,
+    ConnectionError,
+    TimeoutError,
+    ssl.SSLError,
+    http.client.HTTPException,
+)
+
+
+# ------------------------------------------------------------------ 出网（唯一的入口）
+
+#: 只对**连接类**失败换下一个地址；证书问题与地址无关，换也没用（见 `connect_first_ready`）。
+_TLS_OK = Callable[[socket.socket], socket.socket]
+
+
+def resolved_tcp_addresses(host: str, port: int) -> List[Tuple[int, int, int, Any]]:
+    """按 `getaddrinfo` 顺序给出候选地址，去重。
+
+    抽成独立函数是为了**能被离线自检锁住**：这里只回答「候选有哪些、按什么顺序」，
+    不含任何 socket 副作用。
+    """
+    seen = set()
+    ordered: List[Tuple[int, int, int, Any]] = []
+    for family, socktype, proto, _, sockaddr in socket.getaddrinfo(
+        host, port, 0, socket.SOCK_STREAM
+    ):
+        key = (family, str(sockaddr))
+        if key in seen:
+            continue
+        seen.add(key)
+        ordered.append((family, socktype, proto, sockaddr))
+    return ordered
+
+
+def connect_first_ready(
+    candidates: Sequence[Tuple[int, int, int, Any]],
+    open_socket: Callable[[int, Any], socket.socket],
+    ready: _TLS_OK,
+) -> socket.socket:
+    """逐个候选地址尝试；`ready(sock)` 一抛错就换下一个，返回第一个真正就绪的 socket。
+
+    ⭐ 这里就是 2026-09-29 那个 bug 的修复本体。
+
+    `socket.create_connection()`（urllib 内部走的那条路）**只在 TCP connect 失败时**
+    才换下一个地址。实测 `api.apple-cloudkit.com` 解析出 5 个边缘 IPv4，其中一个
+    （`17.248.216.28`）是「**TCP 连得上、TLS 握手立刻被 RST**」（连续 3 轮 3/3 复现）：
+
+        TCP ✓ [0.06s]  TLS ✗ [0.01s] ConnectionResetError: [Errno 54]
+
+    这种失败在 `create_connection` 看来是「成功」，于是 TLS 一炸**整次请求就判死**，
+    另外 4 个健康地址一个都没试过。而每次重试都会重新解析、拿到同一份顺序 →
+    4 次重试全撞同一个坏 IP。**表现**:耗时正好等于重试等待之和 `0+5+15+30=50` 秒，
+    然后吐一个「桥接器内部错误」——既不像网络问题，也看不出该重试。
+
+    所以「就绪」必须定义成 **TLS 握手完成之后**，回退也必须在那一层做。
+    """
+    tried: List[str] = []
+    last_error: Optional[Exception] = None
+    for family, _, _, sockaddr in candidates:
+        address = sockaddr[0] if isinstance(sockaddr, tuple) else str(sockaddr)
+        tried.append(str(address))
+        sock: Optional[socket.socket] = None
+        try:
+            sock = open_socket(family, sockaddr)
+            return ready(sock)
+        except ssl.SSLCertVerificationError:
+            # 证书校验失败与「连的是哪个地址」无关：换地址不会好，也不该把一次
+            # 确定的证书错误伪装成「所有地址都不可用」。直接抛出去。
+            _close_quietly(sock)
+            raise
+        except OSError as error:
+            last_error = error
+            _close_quietly(sock)
+
+    if last_error is None:
+        raise NetworkError("域名解析不到任何可用地址（候选 0 个）")
+    raise NetworkError(
+        "已解析到 {} 个地址，逐个尝试（**含 TLS 握手**）后全部失败：{}；"
+        "最后错误 {}: {}".format(
+            len(tried), ", ".join(tried), type(last_error).__name__, last_error
+        )
+    )
+
+
+def _close_quietly(sock: Optional[socket.socket]) -> None:
+    if sock is None:
+        return
+    try:
+        sock.close()
+    except OSError:
+        pass
+
+
+class _FailoverHTTPSConnection(http.client.HTTPSConnection):
+    """`HTTPSConnection`，把「换下一个地址」做到 **TLS 之后**。
+
+    只覆盖 `connect()`：urllib 的其余机制（重定向、`HTTPError`、超时、
+    `CONNECT` 隧道）全部照旧走标准库，不自己重写一遍 HTTP。
+    """
+
+    def connect(self) -> None:
+        tcp_timeout = self.timeout
+        if tcp_timeout is getattr(socket, "_GLOBAL_DEFAULT_TIMEOUT", object()):
+            tcp_timeout = None
+        tunnel_host = getattr(self, "_tunnel_host", None)
+        server_hostname = tunnel_host or self.host
+        context = self._context or ssl.create_default_context()
+
+        def open_socket(family: int, sockaddr: Any) -> socket.socket:
+            sock = socket.socket(family, socket.SOCK_STREAM)
+            sock.settimeout(tcp_timeout)
+            sock.connect(sockaddr)
+            return sock
+
+        def tls_ready(sock: socket.socket) -> socket.socket:
+            if tunnel_host:
+                self.sock = sock
+                self._tunnel()
+                sock = self.sock
+            return context.wrap_socket(sock, server_hostname=server_hostname)
+
+        self.sock = connect_first_ready(
+            resolved_tcp_addresses(self.host, self.port), open_socket, tls_ready
+        )
+
+
+class _FailoverHTTPSHandler(urllib.request.HTTPSHandler):
+    """把 urllib 默认的 HTTPS 连接换成 `_FailoverHTTPSConnection`。"""
+
+    def https_open(self, req):  # type: ignore[override]
+        return self.do_open(
+            _FailoverHTTPSConnection,
+            req,
+            context=self._context,
+            check_hostname=self._check_hostname,
+        )
+
+
+#: 全项目唯一的出网入口所需的 opener。**单线程使用**（桥接器是单进程单线程）。
+_HTTPS_OPENER = urllib.request.build_opener(
+    _FailoverHTTPSHandler(context=ssl.create_default_context())
+)
+
+
+def open_https(request: urllib.request.Request, timeout: float):
+    """发一次 HTTPS 请求，**TLS 握手阶段也会在多个解析地址之间回退**。
+
+    ⭐ 为什么坚持「只有一个出网入口」而不是就地 `urlopen`：
+    回退这件事**必须和连接建立绑在一起**，任何一处新写的 `urlopen` 都会悄悄
+    绕过它、重新退回到「一个坏 IP 掐死整次请求」。三处调用点全部改走这里。
+    """
+    return _HTTPS_OPENER.open(request, timeout=timeout)
 
 
 class Credentials:
@@ -515,7 +698,6 @@ class CloudKitWebServicesAdapter(PublishAdapter):
         if self._http_post is not None:
             return self._http_post(self._endpoint(path), body, headers)
         import time
-        import urllib.request
 
         request = urllib.request.Request(
             self._endpoint(path), data=body, headers=headers, method="POST"
@@ -523,12 +705,16 @@ class CloudKitWebServicesAdapter(PublishAdapter):
         # 连接层重试（2026-09-25 实测）：到 api.apple-cloudkit.com 的 TLS 握手
         # 会间歇性被重置（SSL UNEXPECTED_EOF / SSL_ERROR_SYSCALL），等几十秒又通。
         # 只重试连接类错误，服务端业务错误（4xx/5xx 带 JSON body）不重试。
+        #
+        # ⚠️ 这一层**不是**地址回退的替代品：`open_https` 内部已经在一个请求里把
+        # 所有解析地址逐个试过（含 TLS）。这里的重试管的是「整段时间内所有地址都不行」
+        # 那种更长（分钟级）的抖动。两层分工见 `connect_first_ready` 的说明。
         last_error: Optional[Exception] = None
         for attempt, wait in enumerate((0, 5, 15, 30), start=1):
             if wait:
                 time.sleep(wait)
             try:
-                with urllib.request.urlopen(request, timeout=60) as response:
+                with open_https(request, timeout=60) as response:
                     return json.loads(response.read().decode("utf-8"))
             except urllib.error.HTTPError as error:
                 # 业务错误不重试，但要把响应体带出来（CloudKit 的 400 在 body 里
@@ -553,11 +739,16 @@ class CloudKitWebServicesAdapter(PublishAdapter):
                 raise ProtocolError(
                     "HTTP {} {}: {}".format(error.code, error.reason, detail)
                 ) from error
-            except (urllib.error.URLError, ConnectionError, TimeoutError) as error:
+            except NETWORK_FAILURES as error:
                 last_error = error
                 if self.print_requests:
                     print("      （连接失败，第 {} 次重试：{}）".format(attempt, error))
-        raise last_error if last_error else ProtocolError("网络请求失败")
+        if last_error is None:
+            raise NetworkError("网络请求失败（没有留下具体错误）")
+        # 全部重试都失败：原样抛出。`URLError` 包着的信息（例如
+        # `<urlopen error [Errno 54] Connection reset by peer>`）要保住，
+        # 它是运维判断「网络问题还是权限问题」的唯一线索。
+        raise last_error
 
     def _post(self, path: str, payload: Dict[str, Any]) -> Dict[str, Any]:
         """**写路径**专用：dry-run（`apply=False`）时静默不发请求。
@@ -753,7 +944,6 @@ class CloudKitWebServicesAdapter(PublishAdapter):
         if not self.apply:
             return {}
         import time
-        import urllib.request
 
         last_error: Optional[Exception] = None
         body = b""
@@ -767,7 +957,7 @@ class CloudKitWebServicesAdapter(PublishAdapter):
                 headers={"Content-Type": "application/octet-stream"},
             )
             try:
-                with urllib.request.urlopen(request, timeout=300) as response:
+                with open_https(request, timeout=300) as response:
                     body = response.read()
                 break
             except urllib.error.HTTPError as error:
@@ -779,7 +969,7 @@ class CloudKitWebServicesAdapter(PublishAdapter):
                 raise ProtocolError(
                     "资产上传 HTTP {}：{}".format(error.code, detail)
                 ) from error
-            except (urllib.error.URLError, ConnectionError, TimeoutError) as error:
+            except NETWORK_FAILURES as error:
                 last_error = error
         if last_error is not None:
             raise last_error
@@ -828,10 +1018,9 @@ class CloudKitWebServicesAdapter(PublishAdapter):
         url = value.get("downloadURL")
         if not url:
             return None
-        import urllib.request
 
         request = urllib.request.Request(url, method="GET")
-        with urllib.request.urlopen(request, timeout=300) as response:
+        with open_https(request, timeout=300) as response:
             return response.read()
 
     def fetch_root_index_bytes(self) -> Optional[bytes]:
