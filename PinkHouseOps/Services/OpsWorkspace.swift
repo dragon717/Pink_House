@@ -962,9 +962,15 @@ final class OpsWorkspace: ObservableObject {
             throw OpsWorkspaceError.blockedByGate(fresh.issues)
         }
 
-        let references = Set(catalog.assets.flatMap { asset in
-            [asset.originalURL, asset.thumbnailURL, asset.previewURL].compactMap { $0 }
-        })
+        // 图片引用字段清单**只此一处**（`ShopCatalogMediaReferences`），与
+        // 发布端 `collect_shop_catalog_media`、iOS 导出同口径。
+        //
+        // ⚠️ 这里曾经只扫 `assets` 的三个 URL 字段 —— 与 iOS 导出同一个毛病，
+        // 漏掉尺码表原图 / 系列价格表 / 系列封面 / 店家图标与封面。
+        // 后果是「本机门禁过了、包也打出来了，但发布端一收图就硬报错」，
+        // 而且错在别人那一步，本机看不出来（2026-09-28 实测：差 174 张）。
+        let references = Set(
+            ShopCatalogMediaReferences.publisherRewritten(in: catalog).map(\.reference))
         let (imageEntries, missing) = ShopCatalogExportArchive.imageEntries(
             forLocalReferences: references,
             imageDirectory: stagingDirectory)

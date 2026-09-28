@@ -615,6 +615,9 @@ struct OpsSeriesWizardPublishView: View {
     let onCommit: () -> Void
     let onResetWizard: () -> Void
 
+    /// 与工具栏那个按钮共享同一份状态：这里打开的也是同一个面板
+    @ObservedObject private var cloudSync = OpsCloudSyncModel.shared
+
     private var draft: OpsSeriesEntryDraft { workspace.seriesEntry }
 
     var body: some View {
@@ -718,9 +721,17 @@ struct OpsSeriesWizardPublishView: View {
                 LabeledContent("已写入本地草稿",
                                value: report?.allOK == true ? "是（逐类型）" : "尚未全部完成")
                 LabeledContent("App 侧发布", value: "本工具校验并构建待发布包 → 交给受控发布器")
+                // 线上真实状态：不是本页自己猜的，是受控发布器读回来的。
+                // 没读过就如实说「未读取」——不写「线上无内容」，那是另一种谎。
+                LabeledContent("线上当前版本",
+                               value: cloudSync.onlineHead.map { "releaseSeq \($0.releaseSeq)" }
+                                ?? "未读取（点「打开云端同步…」读一次）")
                 LabeledContent("公共 CloudKit 上架", value: "以发布器的**回读确认**为准；未回读前一律显示「待回读」")
-                OpsFootnote(text: "本页**不会**声称「已上架」——上架与否只看受控发布器的回读结果"
-                            + "（方案 R07/R09 的既有口径）。")
+                Button("打开云端同步…") { cloudSync.showsSheet = true }
+                    .controlSize(.small)
+                OpsFootnote(text: "写进草稿**不等于**上云：上架与否只看受控发布器的回读结果"
+                            + "（方案 R07/R09 的既有口径）。云端同步面板里可以做"
+                            + "「读取线上基线 / 从线上拉回目录 / 构建并发布」三件事。")
             }
         }
     }

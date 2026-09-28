@@ -137,6 +137,7 @@ enum OpsBridgeProbeHarness {
         probeAuthorized(settings)
         probeCredentialFile()
         await probeBaseline(settings)
+        await probePullCatalog(settings)
     }
 
     private static func write(_ directory: URL) {
@@ -315,9 +316,9 @@ enum OpsBridgeProbeHarness {
     // MARK: - S8 容器内凭证（关口⑥）
 
     private static func probeCredentialFile() {
-        guard let url = OpsPublisherBridge.existingCredentialFile() else {
+        guard let url = OpsPublisherBridge.existingCredentialFile(environmentName: "development") else {
             record("S8", "⑥容器内凭证文件", false,
-                   "不存在（约定位置 \(OpsPublisherBridge.credentialFileURL().path)）。"
+                   "不存在（约定位置 \(OpsPublisherBridge.credentialFileURL(environmentName: "development").path)）。"
                    + "CLI 会回退去读登录钥匙串，而子进程继承 App 沙盒 → 读不到 → 会报「凭证不可用」。")
             return
         }
@@ -405,6 +406,78 @@ enum OpsBridgeProbeHarness {
             record("S9", "端到端 baseline（只读）", false, "抛出：\(message)")
             log("S9 收到的最后几行事件："
                 + (box.snapshot().suffix(3).compactMap(\.displayLine).joined(separator: " / ")))
+        }
+    }
+
+    // MARK: - S10 端到端（只读的第二条链路：把线上目录**拉回本地**）
+
+    /// 「云端同步」面板的「从云端下载」走的就是这一条。
+    ///
+    /// 为什么 S9 已绿还要再来一关：S9 只证明「能读到发布头」，而下载这条链路上
+    /// 还多两件只有真跑才知道的事 ——
+    ///   ① CLI 得把整份目录落盘到**沙盒容器内**（写不进去就是下载不可用）；
+    ///   ② App 侧要靠 `catalog` 事件里的路径与条数把它解析成 `OpsPulledCatalog`
+    ///      （字段名一旦对不上，界面就永远显示「没拉到东西」，而 CLI 那边全是绿的）。
+    /// 所以这里**复用生产解析路径** `OpsPulledCatalog.from`，不另写一份判定。
+    ///
+    /// 仍是**只读**：`--mode pull-catalog` 全程 `apply=False`，不写线上任何东西。
+    private static func probePullCatalog(_ settings: OpsBridgeSettings) async {
+        let directory = rootDirectory().appendingPathComponent("bridge-probe-pull", isDirectory: true)
+        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+
+        let request = ShopCatalogPublishRequest(
+            requestID: "probe-pull",
+            jobID: "probe",
+            draftID: "probe",
+            draftRevision: 0,
+            baseReleaseSeq: nil,
+            baseRootIndexHash: nil,
+            baselineAcknowledged: false,
+            targetEnvironment: .development,
+            releaseSeq: 1,
+            inputDirectory: directory.appendingPathComponent("input").path,
+            archivePath: directory.appendingPathComponent("none.tar").path,
+            outputDirectory: directory.path,
+            receiptPath: directory.appendingPathComponent("receipt.json").path,
+            filesystemRoot: nil,
+            dryRun: true,
+            payloadHash: "probe-pull")
+        let requestURL = directory.appendingPathComponent("request.json")
+        do {
+            try request.encoded().write(to: requestURL, options: .atomic)
+        } catch {
+            record("S10", "端到端 pull-catalog（只读）", false, "写请求文件失败：\(error.localizedDescription)")
+            return
+        }
+
+        var probeSettings = settings
+        probeSettings.timeoutSeconds = probeTimeoutSeconds
+        let bridge = OpsPublisherBridge(settings: probeSettings)
+        do {
+            let result = try await Task.detached(priority: .userInitiated) { () throws -> OpsBridgeRunResult in
+                try bridge.run(mode: .pullCatalog, requestPath: requestURL, environmentName: "development") { _ in }
+            }.value
+
+            guard let pulled = OpsPulledCatalog.from(result: result, environment: "development") else {
+                // 「拉不到」有两种：线上确实没有目录（正常），或事件字段对不上（缺陷）。
+                // 不区分就等于把缺陷说成正常，所以两种形态都写进 detail。
+                record("S10", "端到端 pull-catalog（只读）", false,
+                       "exitCode=\(result.exitCode) · 但没有 catalog 事件（未拿到落盘路径）。"
+                       + "线上若确实没有商店目录，这是正常结果；"
+                       + "否则要查 `pulledCatalogPath` 的字段口径。"
+                       + " · 结论=\(result.outcome?.rawValue ?? "无")"
+                       + (result.outcomeMessage.map { " · \($0)" } ?? ""))
+                return
+            }
+            // 判据是**真读**，不是 fileExists（沙盒里 stat 与 open 不同源）。
+            let readable = OpsBridgeSettings.isReadableFile(URL(fileURLWithPath: pulled.path))
+            record("S10", "端到端 pull-catalog（只读）", readable,
+                   "exitCode=\(result.exitCode) · \(pulled.summaryText)"
+                   + " · 落盘文件可读=\(readable) · 路径=\(pulled.path)")
+            log("S10 各类条数：" + pulled.sortedItemCounts
+                .map { "\($0.field)=\($0.count)" }.joined(separator: " "))
+        } catch {
+            record("S10", "端到端 pull-catalog（只读）", false, "抛出：\(error.localizedDescription)")
         }
     }
 

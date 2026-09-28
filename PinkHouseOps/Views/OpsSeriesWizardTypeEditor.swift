@@ -71,13 +71,18 @@ struct OpsSeriesWizardTypeEntriesView: View {
     var body: some View {
         HSplitView {
             entryListColumn
-                .frame(minWidth: 250, idealWidth: 290, maxWidth: 360)
+                // 响应式硬约束：窗口最小 980 − 导航侧栏最大 260 → 详情区最窄 ~720。
+                // 两列 minWidth 之和**不得超过** 720，否则 NavigationSplitView 布局被撑爆
+                // （侧栏被顶出窗口、内容两侧裁切、底部「上一步/下一步」被挤出可视区），
+                // 且每次「上一步/下一步」重建 S3 时按 ideal 宽度重排，必然复现。
+                // 因此：左列 200 + 编辑器 460 = 660 ≤ 720；编辑器用 maxWidth: .infinity 吃掉余量。
+                .frame(minWidth: 200, idealWidth: 240, maxWidth: 320)
             if let entry = selectedEntry ?? draft.typeEntries.first {
                 OpsSeriesWizardTypeEditorView(workspace: workspace, entry: selectedBindingFor(entry))
-                    .frame(minWidth: 560, idealWidth: 760)
+                    .frame(minWidth: 460, idealWidth: 480, maxWidth: .infinity)
             } else {
                 emptyEditor
-                    .frame(minWidth: 480, idealWidth: 640)
+                    .frame(minWidth: 360, idealWidth: 420, maxWidth: .infinity)
             }
         }
         .onAppear { clampSelection() }
@@ -468,11 +473,24 @@ struct OpsSeriesWizardTypeEditorView: View {
                 }
                 .pickerStyle(.segmented)
                 .labelsHidden()
-                HStack(spacing: 10) {
-                    priceField("预约价", $entry.reservationPriceText)
-                    priceField("定金", $entry.depositText)
-                    priceField("尾款", $entry.balanceText)
-                    priceField("现货价", $entry.stockPriceText)
+                // 宽度够 → 一行四列；不够 → 两行各两列（窄列宽下不换行会横向撑爆容器）
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: 10) {
+                        priceField("预约价", $entry.reservationPriceText)
+                        priceField("定金", $entry.depositText)
+                        priceField("尾款", $entry.balanceText)
+                        priceField("现货价", $entry.stockPriceText)
+                    }
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack(spacing: 10) {
+                            priceField("预约价", $entry.reservationPriceText)
+                            priceField("定金", $entry.depositText)
+                        }
+                        HStack(spacing: 10) {
+                            priceField("尾款", $entry.balanceText)
+                            priceField("现货价", $entry.stockPriceText)
+                        }
+                    }
                 }
                 priceSummary
                 OpsFootnote(text: "预约价与现货价**至少填一项**且**互相独立**："
@@ -592,24 +610,18 @@ struct OpsSeriesWizardTypeEditorView: View {
         if entry.usesSizeChart, let chart = parsedChart {
             VStack(alignment: .leading, spacing: 4) {
                 Text("可售尺码（来自当前类型尺码表）").font(.caption).foregroundStyle(.secondary)
-                // 勾选项顺序 = 尺码表原始顺序（绝不用无序集合遍历序）
-                HStack(spacing: 10) {
-                    ForEach(chart.sizeLabels, id: \.self) { label in
-                        Toggle(label, isOn: Binding(
-                            get: { color.wrappedValue.selectedSizes.contains(label) },
-                            set: { isOn in
-                                var picked = color.wrappedValue.selectedSizes
-                                if isOn {
-                                    if !picked.contains(label) { picked.append(label) }
-                                } else {
-                                    picked.removeAll { $0 == label }
-                                }
-                                // 保存时立即归一成尺码表原始顺序
-                                color.wrappedValue.selectedSizes =
-                                    chart.sizeLabels.filter { picked.contains($0) }
-                            }))
-                            .toggleStyle(.checkbox)
-                            .font(.callout)
+                // 勾选项顺序 = 尺码表原始顺序（绝不用无序集合遍历序）；
+                // 尺码多时一行放不下 → 折成竖排（HStack 不换行会横向撑爆容器）
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: 10) {
+                        ForEach(chart.sizeLabels, id: \.self) { label in
+                            sizeToggle(label, sizeLabels: chart.sizeLabels, for: color)
+                        }
+                    }
+                    VStack(alignment: .leading, spacing: 4) {
+                        ForEach(chart.sizeLabels, id: \.self) { label in
+                            sizeToggle(label, sizeLabels: chart.sizeLabels, for: color)
+                        }
                     }
                 }
             }
@@ -649,6 +661,25 @@ struct OpsSeriesWizardTypeEditorView: View {
     }
 
     // MARK: 小工具
+
+    /// 单个可售尺码勾选项（保存时立即归一成尺码表原始顺序）
+    private func sizeToggle(_ label: String,
+                            sizeLabels: [String],
+                            for color: Binding<OpsSeriesColorSKU>) -> some View {
+        Toggle(label, isOn: Binding(
+            get: { color.wrappedValue.selectedSizes.contains(label) },
+            set: { isOn in
+                var picked = color.wrappedValue.selectedSizes
+                if isOn {
+                    if !picked.contains(label) { picked.append(label) }
+                } else {
+                    picked.removeAll { $0 == label }
+                }
+                color.wrappedValue.selectedSizes = sizeLabels.filter { picked.contains($0) }
+            }))
+            .toggleStyle(.checkbox)
+            .font(.callout)
+    }
 
     private func assetFileLabel(_ asset: CatalogAsset) -> String {
         workspace.stagedFileURL(forReference: asset.originalURL)?.lastPathComponent

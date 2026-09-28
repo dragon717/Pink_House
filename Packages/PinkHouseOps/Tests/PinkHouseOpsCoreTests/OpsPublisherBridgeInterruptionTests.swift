@@ -158,6 +158,20 @@ final class OpsPublisherBridgeInterruptionTests: XCTestCase {
         XCTAssertNil(result.outcome, "桩脚本没吐 result 事件，结论应为 nil")
     }
 
+    /// 目标环境没有凭证时，**必须在启动子进程之前**就拒绝。
+    ///
+    /// 为什么这条要存在（2026-09-28）：CloudKit 的 s2s key 按环境注册，
+    /// 拿 Development 的凭证去发 Production 只会得到一串看不出原因的 401；
+    /// 而在此之前这条路径是「没凭证就什么都不传，让 CLI 自己回退去读 Keychain」——
+    /// 子进程继承沙盒，Keychain 必然读不到，最后报一句笼统的「凭证不可用」。
+    func testMissingCredentialForTargetEnvironmentIsRefusedBeforeLaunch() throws {
+        let stub = try StubBridge(sleepSeconds: 0, providesCredential: false)
+        XCTAssertThrowsError(try stub.run()) { error in
+            XCTAssertEqual(error as? OpsBridgeError, .credentialMissing(environment: "test"),
+                           "缺凭证时应抛出 credentialMissing，而不是放它跑进子进程")
+        }
+    }
+
     // MARK: - 桩
 
     /// 一个「跑起来就不肯结束」的假桥接器，用来把中断路径逼出来。
@@ -180,7 +194,8 @@ final class OpsPublisherBridgeInterruptionTests: XCTestCase {
         }
 
         /// - Parameter sleepSeconds: 0 = 立即结束（用于「不该抛中断」那条用例）
-        init(sleepSeconds: Int = 30) throws {
+        /// - Parameter providesCredential: false = 不写凭证（用于「缺凭证必须先拦住」那条用例）
+        init(sleepSeconds: Int = 30, providesCredential: Bool = true) throws {
             let root = FileManager.default.temporaryDirectory
                 .appendingPathComponent("pinkhouse-bridge-stub-\(UUID().uuidString)", isDirectory: true)
             let publication = root.appendingPathComponent("tools/time_hall/publication", isDirectory: true)
@@ -208,6 +223,20 @@ final class OpsPublisherBridgeInterruptionTests: XCTestCase {
             // 也不保证本机装了哪种 python。而 run() 的参数形状与真实一致，
             // 所以测的仍是「同一个调用契约」。
             settings.pythonPath = "/bin/sh"
+            // 凭证目录指向本夹具自己的临时目录：默认位置在**用户真实容器**里，
+            // 测试往那儿写既不安全也不可控。环境名与 `start()` 里的 "test" 一致。
+            let credentials = root.appendingPathComponent("credentials", isDirectory: true)
+            try FileManager.default.createDirectory(at: credentials, withIntermediateDirectories: true)
+            if providesCredential {
+                let payload = """
+                {"keyID":"stub","privateKey":"-----BEGIN\\nstub\\n-----END\\n",
+                 "containerID":"iCloud.bugod2.ItemManager","environment":"test"}
+                """
+                try payload.write(
+                    to: credentials.appendingPathComponent("cloudkit.test.json"),
+                    atomically: true, encoding: .utf8)
+            }
+            settings.credentialsDirectoryOverride = credentials.path
             self.settings = settings
         }
 

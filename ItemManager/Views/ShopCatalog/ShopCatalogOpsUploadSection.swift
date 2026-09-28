@@ -50,6 +50,12 @@ struct ShopCatalogOpsUploadSection: View {
                 }
                 .disabled(isRunning)
             }
+            // 去重拦截必须可见：只说「图片 N 张」看不出是不是又全传了一遍
+            if let stats = publisher.lastMediaStats {
+                Text(stats.summaryText)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
         }, header: {
             Text("上传发布")
         }, footer: {
@@ -65,11 +71,65 @@ struct ShopCatalogOpsUploadSection: View {
         }
 
         if !uploadStore.jobs.isEmpty {
-            Section("上传任务（\(uploadStore.jobs.count)）") {
-                ForEach(uploadStore.jobs, id: \.jobID) { job in
-                    jobRow(job)
+            uploadTaskSection
+        }
+    }
+
+    // MARK: 任务分页（当前 / 失败 / 历史）
+
+    private enum UploadTaskTab: String, CaseIterable {
+        case current = "当前"
+        case failed = "失败"
+        case history = "历史"
+    }
+
+    /// 页签状态挂在这个 Section 级视图上（不是挂在 List 行视图上，
+    /// 行重建会把 `@State` 归零 —— 项目反模式清单第 4 条）
+    @State private var taskTab: UploadTaskTab = .current
+
+    private func jobs(for tab: UploadTaskTab) -> [ShopCatalogUploadJob] {
+        switch tab {
+        case .current: return uploadStore.currentJobs
+        case .failed: return uploadStore.failedJobs
+        case .history: return uploadStore.historyJobs
+        }
+    }
+
+    @ViewBuilder
+    private var uploadTaskSection: some View {
+        Section {
+            Picker("任务分页", selection: $taskTab) {
+                ForEach(UploadTaskTab.allCases, id: \.self) { tab in
+                    Text("\(tab.rawValue) \(jobs(for: tab).count)").tag(tab)
                 }
             }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+
+            let visible = jobs(for: taskTab)
+            if visible.isEmpty {
+                Text("这个页签暂时没有任务")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+            }
+            ForEach(visible, id: \.jobID) { job in
+                jobRow(job)
+            }
+        } header: {
+            Text("上传任务（共 \(uploadStore.jobs.count) 条）")
+        } footer: {
+            Text(taskTabFootnote)
+        }
+    }
+
+    private var taskTabFootnote: String {
+        switch taskTab {
+        case .current:
+            return "今天的任务。上次会话中断留下的「上传中」会在启动时自动复位成「待上传」。"
+        case .failed:
+            return "需要处理的失败任务（不分日期，避免被时间藏起来）。"
+        case .history:
+            return "非今天的任务，只作留痕。"
         }
     }
 

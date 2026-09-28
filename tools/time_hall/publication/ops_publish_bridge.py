@@ -373,6 +373,45 @@ def _short_hash(value: Any) -> str:
     return str(value)
 
 
+MEDIA_REFERENCE_PREFIXES = ("local:", "thmedia:", "bundle:", "http://", "https://")
+
+
+def _media_reference_census(doc: Any) -> Dict[str, int]:
+    """数一遍目录里的图片引用形态（`local:` / `thmedia:` / `bundle:` / http(s)）。
+
+    为什么必须**报事实**而不是写一句结论：拉回说明里原先写死「图片引用是
+    thmedia:<内容摘要>」—— 那只是**受控发布器**产出物的性质。而线上可能存在
+    不是它产出的版本：2026-09-28 实测 dev 线上 releaseSeq 1 的 **560 个引用全是
+    `local:`、thmedia: 为 0**（受控发布器的构建必然改写引用、缺图硬报错，
+    所以那一版根本没过它）。把「已改写」写成必然，运营就会以为拉回来的东西图上
+    没问题 —— 而 `local:` 那一版是**更糟**的一种：除原始设备外谁也解不出图。
+    """
+    census: Dict[str, int] = {}
+
+    def walk(node: Any) -> None:
+        if isinstance(node, dict):
+            for value in node.values():
+                walk(value)
+        elif isinstance(node, list):
+            for value in node:
+                walk(value)
+        elif isinstance(node, str):
+            for prefix in MEDIA_REFERENCE_PREFIXES:
+                if node.startswith(prefix):
+                    census[prefix] = census.get(prefix, 0) + 1
+                    return
+
+    walk(doc)
+    return census
+
+
+def _census_text(census: Dict[str, int]) -> str:
+    """把引用形态数成人读的一句话。空字典不写成空串 —— 「没有图片引用」也是结论。"""
+    if not census:
+        return "没有任何图片引用"
+    return "、".join("{} {}".format(prefix, count) for prefix, count in sorted(census.items()))
+
+
 def head_payload(request: Dict[str, Any], head: Optional[Dict[str, Any]]) -> Dict[str, Any]:
     if not head:
         return {
@@ -823,6 +862,10 @@ def run_pull_catalog(request: Dict[str, Any], quiet: bool) -> int:
     catalog_path = output_directory / "shop-catalog.json"
     catalog_path.write_text(
         json.dumps(doc, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    # 引用形态**实测出来**再写进产物与结论（见 `_media_reference_census` 的说明：
+    # 这里不替数据下结论，只报事实）。
+    census = _media_reference_census(doc)
+    local_reference_count = census.get("local:", 0)
     manifest = {
         "pulledAt": _now_iso(),
         "targetEnvironment": str(request["targetEnvironment"]),
@@ -833,9 +876,12 @@ def run_pull_catalog(request: Dict[str, Any], quiet: bool) -> int:
         "coverageStatus": partition.get("coverageStatus"),
         "publishedAt": head.get("publishedAt"),
         "itemCounts": counts,
+        "mediaReferences": census,
         "note": (
             "这是**已下发口径**：归档条目与孤儿销售事件在构建时已被剔除，"
-            "图片引用是 thmedia:<内容摘要>（不是 local: 文件名）。"
+            "图片引用通常已改写成 thmedia:<内容摘要>；"
+            "若线上那一版不是受控发布器产出的（例如早期种子发布），仍是 local: 文件名。"
+            "本次实际形态见 mediaReferences。"
         ),
     }
     (output_directory / "pull-manifest.json").write_text(
@@ -851,19 +897,33 @@ def run_pull_catalog(request: Dict[str, Any], quiet: bool) -> int:
         "payloadHash": payload_hash,
         "itemCounts": counts,
     })
-    log_line("info", "归档条目不会回来：线上分片是「已下发口径」，归档过的店家/系列/商品已被构建剔除；"
-                     "图片引用是 thmedia:<内容摘要>，本地没有对应文件。")
+    log_line("info", "归档条目不会回来：线上分片是「已下发口径」，归档过的店家/系列/商品已被构建剔除。"
+                     "图片引用形态（本次实测）：{}。".format(_census_text(census)))
+    if local_reference_count:
+        log_line(
+            "warning",
+            "⚠️ 有 {} 处引用仍是 `local:` 文件名 —— 那是**原始设备本地**的文件名，"
+            "除那台设备外都解不出图。受控发布器的构建必然把它们改写成 thmedia:"
+            "（且缺图会硬报错），所以线上这一版**不是受控发布器产出的**。".format(
+                local_reference_count))
     emit(outcome_result(
         "confirmed",
         EXIT_OK,
         "已把线上商店目录拉回本地（releaseSeq {}，店家 {} / 系列 {} / 商品 {}）。"
-        "这是**已下发口径** —— 归档条目不在其中，图片是 thmedia: 引用。"
-        "接下来把它作为本地基线导入，再在此基础上编辑。".format(
+        "这是**已下发口径** —— 归档条目不在其中；图片引用形态：{}。".format(
             online_seq,
             counts.get("shops", 0),
             counts.get("series", 0),
             counts.get("products", 0),
-        ),
+            _census_text(census),
+        )
+        + (
+            " ⚠️ 其中 {} 处仍是 `local:` 文件名（除原始设备外解不出图），"
+            "说明线上这一版不是受控发布器产出的。".format(local_reference_count)
+            if local_reference_count
+            else ""
+        )
+        + " 接下来把它作为本地基线导入，再在此基础上编辑。",
         release={"releaseSeq": online_seq, "rootIndexHash": root_index_hash},
     ))
     return EXIT_OK

@@ -298,6 +298,32 @@ def main() -> int:
         print("  整包归档 : {}".format(archive.name))
         print("  待发布摘要: {}".format(payload[:12] + "…"))
 
+        # ---------------------------------------------------------- 引用形态清点
+        # 这一段是**纯函数自证**（不起子进程）：拉回说明原先写死「图片引用是
+        # thmedia:<内容摘要>」—— 而线上可能存在不符的版本（2026-09-28 实测 dev
+        # releaseSeq 1 的 560 个引用**全是 `local:`**，受控发布器的构建必然改写它们）。
+        # 现在改成「实测出来再报」，所以清点本身的判定要有锁。
+        section("阶段 0 · 图片引用形态清点（纯函数自证）")
+        sys.path.insert(0, str(HERE))
+        import ops_publish_bridge as bridge_module  # noqa: E402
+
+        census = bridge_module._media_reference_census({
+            "assets": [{"originalURL": "local:img-A.jpg",
+                        "thumbnailURL": "thmedia:" + "a" * 64}],
+            "series": [{"cover": "bundle:cover.png",
+                        "priceChart": {"sourceImage": "local:img-A.jpg"}}],
+            "shops": [{"logo": "https://example.com/x.png"}],
+            "products": [{"note": "这句话不是引用"}],
+        })
+        check("同一文件被多处引用时逐处计数（local: = 2）",
+              census.get("local:") == 2, "local: 数了两处", json.dumps(census))
+        check("thmedia: / bundle: / http(s) 各自分桶",
+              census.get("thmedia:") == 1 and census.get("bundle:") == 1
+              and census.get("https://") == 1, "三个桶各 1", json.dumps(census))
+        check("空目录也给结论（不写成空串）",
+              bridge_module._census_text({}) == "没有任何图片引用",
+              bridge_module._census_text({}))
+
         # ---------------------------------------------------------- 基线（R07）
         section("阶段 1 · R07 基线核对（只读，不写任何东西）")
         req_baseline = write_request(work / "req-baseline.json", work,
@@ -474,6 +500,13 @@ def main() -> int:
         check("拉回是**只读**：线上发布头逐字节未变",
               (work / "live" / "THRelease.json").read_bytes() == before_release_bytes,
               "live/THRelease.json 前后字节相同")
+        # 引用形态必须是**实测出来的**，不能替数据下结论（见阶段 0 的说明）。
+        # 本夹具经受控发布器构建，所以这里应当数到 thmedia:（不是写死的期望，是事实核对）。
+        check("清单里带上实测的引用形态（mediaReferences）",
+              isinstance(pull_manifest.get("mediaReferences"), dict)
+              and int((pull_manifest.get("mediaReferences") or {}).get("thmedia:", 0)) >= 1,
+              "mediaReferences.thmedia: ≥ 1（这份确实是受控发布器产物）",
+              json.dumps(pull_manifest.get("mediaReferences"), ensure_ascii=False))
 
         # ---------------------------------------------------------- R09 查询
         section("阶段 4 · R09 结果查询（这是第一动作，不是重发）")

@@ -59,6 +59,8 @@ final class ShopCatalogOpsUploadStore: ObservableObject {
             print("[ShopCatalogUpload] \(unavailableReason ?? "")")
         }
         reload()
+        // 启动即修复：上一场会话留下的「上传中 / 发布头冲突」不属于任何进行中的运行
+        repairStaleTasks()
     }
 
     // MARK: 读
@@ -87,6 +89,57 @@ final class ShopCatalogOpsUploadStore: ObservableObject {
     /// 需要自动重试、且退避时间已到的任务（供 UI 与上传入口使用）
     func dueRetryableJobs(now: Date = Date()) -> [ShopCatalogUploadJob] {
         jobs.filter { $0.status == .retryable && ($0.nextRetryAt ?? .distantPast) <= now }
+    }
+
+    // MARK: 分页（当前 / 失败 / 历史，2026-09-28）
+
+    /// **失败**：需要人来处理的任务。**不分日期** —— 失败被时间藏进历史只会被遗忘。
+    /// （终态失败 + 可重试；`conflict` 在启动时已被 `repairStaleTasks()` 复位，正常不会出现在这。）
+    var failedJobs: [ShopCatalogUploadJob] {
+        jobs.filter { $0.status.isTerminalFailure || $0.status == .retryable }
+    }
+
+    /// **当前**：今天的非失败任务 —— 正在跑的，以及今天刚跑完的。
+    var currentJobs: [ShopCatalogUploadJob] {
+        let failedIDs = Set(failedJobs.map(\.jobID))
+        return jobs.filter {
+            !failedIDs.contains($0.jobID) && Calendar.current.isDateInToday($0.updatedAt)
+        }
+    }
+
+    /// **历史**：剩下的 —— 非今天的，以及更早的成功任务。只作留痕。
+    var historyJobs: [ShopCatalogUploadJob] {
+        let known = Set(failedJobs.map(\.jobID)).union(currentJobs.map(\.jobID))
+        return jobs.filter { !known.contains($0.jobID) }
+    }
+
+    // MARK: 启动时脏数据修复
+
+    /// 启动时把上一场会话留下的脏状态复位（2026-09-28）。
+    ///
+    /// 任务表是**本地**的（`cloudKitDatabase: .none`），App 被杀 / 崩溃 / 重启后，
+    /// 会留下一批「只有一次运行进行中才有意义」的状态，不修就会一直挂在列表里：
+    ///
+    ///   · `.uploading` —— 上次会话中断，进度毫无意义。内容寻址 + 幂等，重跑即可；
+    ///   · `.conflict` —— 发布头冲突（`changeTag`）只在一次运行里有意义：
+    ///     启动时根本没有运行在跑，留着的 conflict 全是脏数据
+    ///     （实测截图里连**媒体任务**都挂着「发布头冲突」，就是这个来源）。
+    ///
+    /// 统一复位成 `.staged`：下次发布重跑；**不清 `attemptCount`**（历史尝试次数是事实）。
+    ///
+    /// ⚠️ 只在启动路径调用（`init`）。发布运行中途调用会把正在跑的任务打回待办。
+    func repairStaleTasks() {
+        guard let context else { return }
+        let stale = jobs.filter { $0.status == .uploading || $0.status == .conflict }
+        guard !stale.isEmpty else { return }
+        for job in stale {
+            job.status = .staged
+            job.lastError = nil
+            job.nextRetryAt = nil
+            job.updatedAt = Date()
+        }
+        save(context)
+        reload()
     }
 
     // MARK: 写

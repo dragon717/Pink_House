@@ -55,6 +55,25 @@ nonisolated enum ShopCatalogOpsPublishResult: Equatable {
     }
 }
 
+// MARK: - 图片账
+
+/// 一次发布里图片的去重结果。
+///
+/// **拦截必须可见**：如果界面只说「图片 450 张」，运营看不出「是不是又全传了一遍」，
+/// 也就没法判断限流风险。这里把「新传 / 线上已有跳过 / 失败」分开报。
+nonisolated struct ShopCatalogOpsMediaStats: Equatable, Sendable {
+    /// 本次真的把字节传上去的张数
+    let uploaded: Int
+    /// 线上已存在且摘要一致、被拦截掉的张数
+    let skipped: Int
+    /// 未通过校验的张数（发布头不会切换）
+    let failed: Int
+
+    var summaryText: String {
+        "图片：新上传 \(uploaded) 张 · 线上已有跳过 \(skipped) 张 · 未通过 \(failed) 张"
+    }
+}
+
 // MARK: - 发布范围常量
 
 /// 商店目录分片的固定内容源（与 Mac 端 `sources.yaml` / 协议常量逐字一致）。
@@ -94,6 +113,12 @@ final class ShopCatalogOpsPublisher: ObservableObject {
 
     @Published private(set) var phase: Phase = .idle
     @Published private(set) var lastResult: ShopCatalogOpsPublishResult?
+    /// 上一次发布的分项图片账（新传 / 跳过 / 未通过）
+    @Published private(set) var lastMediaStats: ShopCatalogOpsMediaStats?
+
+    /// 本次运行里**已经回读校验过字节**的 mediaKey。
+    /// 末尾的端到端验证复用它，不再把同一张图下载第二遍。
+    private var verifiedThisRun: Set<String> = []
 
     private let writer: any ShopCatalogOpsCloudWriting
     private let reader: any ShopCatalogPublicReading
@@ -147,6 +172,8 @@ final class ShopCatalogOpsPublisher: ObservableObject {
         catalog: ShopCatalog, retryOnlyFailed: Bool
     ) async -> ShopCatalogOpsPublishResult {
         phase = .staging
+        verifiedThisRun = []
+        lastMediaStats = nil
         let staged: [ShopCatalogOpsStagedMedia]
         do {
             staged = try ShopCatalogOpsMediaStaging.plan(for: catalog)
@@ -171,6 +198,15 @@ final class ShopCatalogOpsPublisher: ObservableObject {
             return .notPublished(typed.localizedDescription ?? "无法写入公共库")
         }
 
+        // 先**成批**问一次公共库「哪些图已经在」。
+        // 逐张单点查询会让 450 张图变成 450 次请求，撞上限流后一部分任务落到
+        // retryable → unresolved 非空 → 整次发布在媒体阶段就被判失败、
+        // 发布头永远切不动（2026-09-28 实测：线上停在 seq 1 就是这么来的）。
+        let remoteIndex = await fetchRemoteMediaIndex(for: staged)
+
+        var uploaded = 0
+        var skipped = 0
+        var failed = 0
         for media in staged {
             let current = uploadStore.job(mediaKey: media.mediaKey)
             if current?.status == .mediaVerified || current?.status == .published { continue }
@@ -178,8 +214,14 @@ final class ShopCatalogOpsPublisher: ObservableObject {
                status != .retryable, status != .failed, status != .stagedFailed {
                 continue
             }
-            await uploadOne(media)
+            switch await uploadOne(media, remoteIndex: remoteIndex) {
+            case .uploaded: uploaded += 1
+            case .skippedAsRemoteDuplicate: skipped += 1
+            case .failed: failed += 1
+            }
         }
+        lastMediaStats = ShopCatalogOpsMediaStats(
+            uploaded: uploaded, skipped: skipped, failed: failed)
 
         let unresolved = staged.filter {
             uploadStore.job(mediaKey: $0.mediaKey)?.status != .mediaVerified
@@ -330,21 +372,67 @@ final class ShopCatalogOpsPublisher: ObservableObject {
 
     // MARK: 单张媒体
 
-    private func uploadOne(_ media: ShopCatalogOpsStagedMedia) async {
+    private enum MediaOutcome {
+        case uploaded
+        case skippedAsRemoteDuplicate
+        case failed
+    }
+
+    /// 批量问公共库「这些图哪些已经在」。失败时返回 nil —— 调用方退回逐张查询，
+    /// **不因为一次网络抖动就把整次发布作废**（慢，但不会误判成「图没传」）。
+    private func fetchRemoteMediaIndex(
+        for staged: [ShopCatalogOpsStagedMedia]
+    ) async -> [String: ShopCatalogOpsRemoteMediaMeta]? {
+        let keys = staged.map(\.mediaKey)
+        do {
+            var index: [String: ShopCatalogOpsRemoteMediaMeta] = [:]
+            for chunk in keys.chunked(into: Self.batchLookupSize) {
+                let part = try await writer.fetchMediaMetadata(mediaKeys: chunk)
+                index.merge(part) { existing, _ in existing }
+            }
+            return index
+        } catch {
+            print("[ShopCatalogOps] 批量查询已上传图片失败，退回逐张：\(error.localizedDescription)")
+            return nil
+        }
+    }
+
+    private func uploadOne(
+        _ media: ShopCatalogOpsStagedMedia,
+        remoteIndex: [String: ShopCatalogOpsRemoteMediaMeta]?
+    ) async -> MediaOutcome {
         uploadStore.update(mediaKey: media.mediaKey) { $0.markSuccess(.uploading) }
         do {
             // 幂等跳过（方案 §3.2 第 1 步）：已存在且 sha256 / 字节数一致
-            let existing = try await writer.fetchMediaMetadata(mediaKey: media.mediaKey)
+            let existing: ShopCatalogOpsRemoteMediaMeta?
+            if let remoteIndex {
+                existing = remoteIndex[media.mediaKey]
+            } else {
+                existing = try await writer.fetchMediaMetadata(mediaKey: media.mediaKey)
+            }
             let alreadyThere = existing?.sha256 == media.mediaKey
                 && existing?.byteCount == media.byteCount
-            if !alreadyThere {
-                try await writer.saveMedia(
-                    mediaKey: media.mediaKey,
-                    mimeType: media.mimeType,
-                    sha256: media.mediaKey,
-                    byteCount: media.byteCount,
-                    fileURL: URL(fileURLWithPath: media.filePath))
+
+            if alreadyThere {
+                // ⭐ 重复上传拦截（2026-09-28）：
+                // `THMedia` 是**按内容寻址的不可变记录** —— 记录名就是内容摘要，
+                // 摘要与字节数都对得上，内容就一定是同一份，
+                // 所以既不再传字节，也**不再把整张图下载回来做回读校验**。
+                //
+                // 旧写法对「线上已有」的图照样全量下载一遍：450 张就是 450 次下载，
+                // 撞上限流后一部分任务变 retryable → unresolved 非空 →
+                // 整次发布在媒体阶段就被判失败、**发布头永远切不动**。
+                // 只有**本次真上传**的才需要拉字节回读（写入到底生效没有，必须验）。
+                uploadStore.update(mediaKey: media.mediaKey) { $0.markSuccess(.mediaVerified) }
+                return .skippedAsRemoteDuplicate
             }
+
+            try await writer.saveMedia(
+                mediaKey: media.mediaKey,
+                mimeType: media.mimeType,
+                sha256: media.mediaKey,
+                byteCount: media.byteCount,
+                fileURL: URL(fileURLWithPath: media.filePath))
             // 回读校验（方案 §3.2 第 6 步）：hash 不一致一律不标 verified
             let readBack = try await writer.fetchMediaBytes(mediaKey: media.mediaKey)
             let digest = ShopCatalogSyncProtocol.sha256Hex(readBack)
@@ -353,16 +441,23 @@ final class ShopCatalogOpsPublisher: ObservableObject {
                     $0.markFailure(.failed, reason: "回读 hash 不一致（期望 \(media.mediaKey.prefix(12))…，"
                                    + "实际 \(digest.prefix(12))…）")
                 }
-                return
+                return .failed
             }
+            // 记下「这次已经验过字节」，末尾端到端验证就不再下载第二遍
+            verifiedThisRun.insert(media.mediaKey)
             uploadStore.update(mediaKey: media.mediaKey) { $0.markSuccess(.mediaVerified) }
+            return .uploaded
         } catch {
             let typed = ShopCatalogOpsUploadError.mapped(error, what: "上传图片")
             uploadStore.update(mediaKey: media.mediaKey) {
                 $0.markFailure(typed.status, reason: typed.localizedDescription ?? "未知错误")
             }
+            return .failed
         }
     }
+
+    /// 单次批量查询的分块大小（与写入端 `batchLookupSize` 同值）
+    private static let batchLookupSize = 200
 
     // MARK: 回读验证
 
@@ -394,6 +489,9 @@ final class ShopCatalogOpsPublisher: ObservableObject {
                     asset.mediaKey,
                     fallbackReferences: [asset.originalURL, asset.thumbnailURL, asset.previewURL]
                 ) else { continue }
+                // 本次已经回读校验过字节 → 不再下载第二遍（去重拦截的另一半）。
+                // 450 张图在末尾再全量拉一遍，是撞限流的主要来源。
+                if verifiedThisRun.contains(mediaKey) { continue }
                 let data = try await Self.retrying(times: 3, delay: 1.0) {
                     try await self.reader.fetchMedia(contentHash: mediaKey)
                 }

@@ -92,6 +92,13 @@ public struct OpsBridgeSettings: Codable, Equatable {
     public var repoRootBookmark: Data?
     /// `python3` 可执行文件路径。nil = 自动探测。
     public var pythonPath: String?
+    /// 凭证目录覆盖。**只给测试与排错用**：nil = 用 App 容器内的默认位置。
+    ///
+    /// 为什么要有这个：凭证目录默认是 `~/Library/Application Support/...`，
+    /// 测试若真用那个位置，就得往**用户真实容器**里写文件才跑得起来 ——
+    /// 于是「有没有凭证」这条判定在测试里永远测不了，只能靠手工点界面。
+    /// 给一个注入口，才能把「缺凭证必须先拦住」也变成回归锁。
+    public var credentialsDirectoryOverride: String?
     /// 单次调用的超时（秒）。默认 15 分钟：上传几十兆图片 + 切头足够，
     /// 又不至于让一次挂死拖到运营以为「工具坏了」。
     /// 实际生效值会被 `minimumTimeoutSeconds` 抬底，见 `effectiveTimeout(configured:)`。
@@ -102,12 +109,20 @@ public struct OpsBridgeSettings: Codable, Equatable {
         repoRootPath: String? = nil,
         repoRootBookmark: Data? = nil,
         pythonPath: String? = nil,
-        timeoutSeconds: Int = 900
+        timeoutSeconds: Int = 900,
+        credentialsDirectoryOverride: String? = nil
     ) {
         self.repoRootPath = repoRootPath
         self.repoRootBookmark = repoRootBookmark
         self.pythonPath = pythonPath
         self.timeoutSeconds = timeoutSeconds
+        self.credentialsDirectoryOverride = credentialsDirectoryOverride
+    }
+
+    /// 凭证目录覆盖的 URL 形式（nil = 用默认位置）
+    public var credentialsDirectoryOverrideURL: URL? {
+        guard let path = credentialsDirectoryOverride, !path.isEmpty else { return nil }
+        return URL(fileURLWithPath: path, isDirectory: true)
     }
 
     /// 超时的**安全下限**。误配成 1 秒会让每一次发布都在中途被打断，
@@ -346,6 +361,8 @@ public enum OpsBridgeError: LocalizedError, Equatable {
     case cancelled
     case protocolMismatch(bridge: Int?, app: Int)
     case noDiagnostics(exitCode: Int32)
+    /// 目标环境没有对应的凭证文件（按环境分文件的直接后果，也是它想提前暴露的问题）
+    case credentialMissing(environment: String)
 
     public var errorDescription: String? {
         switch self {
@@ -368,6 +385,10 @@ public enum OpsBridgeError: LocalizedError, Equatable {
         case .noDiagnostics(let exitCode):
             return "受控发布器以退出码 \(exitCode) 结束，但没有输出任何可读信息。"
                 + "请先在终端手动跑一次桥接脚本确认环境可用。"
+        case .credentialMissing(let environment):
+            return "**\(environment)** 环境还没有凭证：CloudKit 的 server-to-server key 是"
+                + "**按环境注册**的，Development 的 key 打 Production 的 URL 只会 401。"
+                + "请在上面的自检卡片里为这个环境单独导入一份凭证 JSON。"
         }
     }
 }
@@ -597,7 +618,16 @@ public final class OpsPublisherBridge: @unchecked Sendable {
         // keychain 权限），也拿不到我们这边刚打开的 security-scoped 扩展之外的路径。
         // 把凭证文件按 CLI 认的环境变量交给它 —— 不设就等于没配，CLI 仍按自己的
         // 顺序（Keychain）走，不静默改变它的行为（见 `credentialFileURL` 的说明）。
-        if let credentialFile = Self.existingCredentialFile(fileManager: fileManager) {
+        if Self.requiresCredentialFile(environmentName: environmentName) {
+            // 凭证**按环境取**：拿 Development 的 key 去打 Production 只会得到
+            // 一串看不出原因的 401。这里宁可先报「这个环境没配凭证」，
+            // 也不要让子进程静默回落到 Keychain（它继承沙盒，根本读不到）。
+            guard let credentialFile = Self.existingCredentialFile(
+                environmentName: environmentName,
+                credentialsDirectory: settings.credentialsDirectoryOverrideURL,
+                fileManager: fileManager) else {
+                throw OpsBridgeError.credentialMissing(environment: environmentName)
+            }
             var environment = ProcessInfo.processInfo.environment
             environment[Self.credentialFileEnvironmentKey] = credentialFile.path
             process.environment = environment
@@ -744,8 +774,36 @@ public final class OpsPublisherBridge: @unchecked Sendable {
     /// 然后在沙盒里失败，最终表现为笼统的「凭证不可用」—— 又是一次「失败伪装成正常」。
     public static let credentialFileEnvironmentKey = "PINK_HOUSE_TIMEHALL_CREDENTIAL_FILE"
 
-    /// 容器内的约定凭证文件位置：
-    /// `<App Support>/PinkHouseOps/credentials/cloudkit.json`
+    /// 凭证目录（App 容器内，子进程继承沙盒所以也读得到这里）
+    public static func defaultCredentialsDirectory(fileManager: FileManager) -> URL {
+        let base = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
+            ?? fileManager.temporaryDirectory
+        return base
+            .appendingPathComponent("PinkHouseOps", isDirectory: true)
+            .appendingPathComponent("credentials", isDirectory: true)
+    }
+
+    /// 该环境是否**需要**凭证文件。
+    ///
+    /// `localFixture` 走 filesystem 适配器：不联网、不需要凭证。对它也要凭证的话，
+    /// 「本机演练」这个自证入口就在没配凭证时跑不起来 —— 而它存在的意义恰恰是
+    /// **不依赖任何外部条件**也能把协议跑一遍。
+    public static func requiresCredentialFile(environmentName: String) -> Bool {
+        environmentName != ShopCatalogPublishTargetEnvironment.localFixture.rawValue
+    }
+
+    /// 容器内**按环境分开**的凭证文件位置：
+    /// `<App Support>/PinkHouseOps/credentials/cloudkit.<environment>.json`
+    ///
+    /// ## 为什么必须按环境分开（2026-09-28）
+    ///
+    /// CloudKit 的 server-to-server key 是**按环境注册**的：Development 环境创建的
+    /// key 打 Production 的 URL 会直接 HTTP 401（Apple："Tokens are specific to a
+    /// deployment environment"）。而 App 侧能给子进程的只有**一个**凭证文件
+    /// （环境变量是单值），所以「一份凭证打两个环境」在结构上就不可能正确 ——
+    /// 它表现为 Development 一直正常、Production 永远 401，
+    /// 而 401 的报错里看不出「这把 key 是 Development 的」。
+    /// 按环境分文件之后，「哪个环境没配凭证」是**跑之前**就能说清楚的事。
     ///
     /// ## 为什么走文件，而不是让子进程读 Keychain
     ///
@@ -757,21 +815,125 @@ public final class OpsPublisherBridge: @unchecked Sendable {
     ///
     /// ## 代价必须说清楚
     ///
-    /// **私钥会以文件形式落盘**（容器内）。所以这条路建议只给 Development 用；
-    /// 生产发布走终端 + Keychain，那才是 CLI 的默认路径，也是 runbook 写的那条。
-    /// 文件**不存在时什么都不做** —— 不创建目录、不猜、不把空壳路径塞给子进程。
-    public static func credentialFileURL(fileManager: FileManager = .default) -> URL {
-        let base = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
-            ?? fileManager.temporaryDirectory
-        return base
-            .appendingPathComponent("PinkHouseOps", isDirectory: true)
-            .appendingPathComponent("credentials", isDirectory: true)
+    /// **私钥会以文件形式落盘**（容器内）。生产发布更稳的做法是终端 + Keychain，
+    /// 那才是 CLI 的默认路径，也是 runbook 写的那条；文件通道是为了让 Mac 端
+    /// **在受控前提下**也能对 Production 直接读写。
+    public static func credentialFileURL(
+        environmentName: String,
+        credentialsDirectory: URL? = nil,
+        fileManager: FileManager = .default
+    ) -> URL {
+        (credentialsDirectory ?? defaultCredentialsDirectory(fileManager: fileManager))
+            .appendingPathComponent("cloudkit.\(environmentName).json")
+    }
+
+    /// 旧版约定的单一凭证文件（只有一份 `cloudkit.json`）。
+    ///
+    /// 它**只当作 Development 的凭证**用：给 Production 兜底等于把 401 这个坑
+    /// 原样保留下来，只是换了个更隐蔽的位置。
+    public static func legacyCredentialFileURL(
+        credentialsDirectory: URL? = nil,
+        fileManager: FileManager = .default
+    ) -> URL {
+        (credentialsDirectory ?? defaultCredentialsDirectory(fileManager: fileManager))
             .appendingPathComponent("cloudkit.json")
     }
 
-    /// 约定位置上的凭证文件（**存在才有值**）。UI 拿它显示「凭证来自容器文件 / 未配置」。
-    public static func existingCredentialFile(fileManager: FileManager = .default) -> URL? {
-        let url = credentialFileURL(fileManager: fileManager)
-        return fileManager.fileExists(atPath: url.path) ? url : nil
+    /// 该环境**真正存在且读得到**的凭证文件。
+    ///
+    /// 先找按环境命名的那一份；找不到再退回 legacy —— 且**只对 Development 生效**，
+    /// 这样旧配置不会无声失效，而 Production 绝不会被旧文件蒙混过关。
+    public static func existingCredentialFile(
+        environmentName: String,
+        credentialsDirectory: URL? = nil,
+        fileManager: FileManager = .default
+    ) -> URL? {
+        let primary = credentialFileURL(
+            environmentName: environmentName,
+            credentialsDirectory: credentialsDirectory,
+            fileManager: fileManager)
+        if OpsBridgeSettings.isReadableFile(primary, fileManager: fileManager) { return primary }
+        if environmentName == ShopCatalogPublishTargetEnvironment.development.rawValue {
+            let legacy = legacyCredentialFileURL(
+                credentialsDirectory: credentialsDirectory, fileManager: fileManager)
+            if OpsBridgeSettings.isReadableFile(legacy, fileManager: fileManager) { return legacy }
+        }
+        return nil
+    }
+
+    // MARK: - 凭证摘要（私钥永不进这里）
+
+    /// 凭证文件的**可显示摘要**。
+    ///
+    /// 只放 `containerID` 与 `keyID`：这两个不是秘密，而且恰恰是排查「为什么 401」
+    /// 的第一线索（「这把 key 是哪个容器、哪个环境的」）。
+    /// **私钥字段一个都不出现** —— 它不进界面、不进日志、也不进这里。
+    public struct OpsCredentialSummary: Sendable, Equatable {
+        public var path: String
+        public var containerID: String?
+        public var keyID: String?
+        /// 凭证文件里自己声明的环境（nil = 没声明）
+        public var declaredEnvironment: String?
+        /// 声明环境与目标环境是否一致（没声明时不据此判错）
+        public var declaredEnvironmentMatches: Bool
+        /// 解析不出来时的原因（能读出来就是 nil）
+        public var parseError: String?
+
+        public init(
+            path: String,
+            containerID: String? = nil,
+            keyID: String? = nil,
+            declaredEnvironment: String? = nil,
+            declaredEnvironmentMatches: Bool = true,
+            parseError: String? = nil
+        ) {
+            self.path = path
+            self.containerID = containerID
+            self.keyID = keyID
+            self.declaredEnvironment = declaredEnvironment
+            self.declaredEnvironmentMatches = declaredEnvironmentMatches
+            self.parseError = parseError
+        }
+
+        /// 容器与 key 的一行摘要（缺字段时如实说「缺」，不猜）
+        public var displayText: String {
+            var parts: [String] = []
+            parts.append("容器 \(containerID ?? "（缺 containerID）")")
+            parts.append("keyID \(keyID ?? "（缺 keyID）")")
+            if let declaredEnvironment {
+                parts.append("声明环境 \(declaredEnvironment)")
+            }
+            return parts.joined(separator: " · ")
+        }
+    }
+
+    /// 读一份凭证的摘要。**读不出来也返回一个带 `parseError` 的值**，
+    /// 因为「文件在但内容不对」比「文件不在」更需要被看见 ——
+    /// 后者界面已经会说，前者若返回 nil 就会被当成「没配」而一直没人管。
+    public static func credentialSummary(
+        environmentName: String,
+        credentialsDirectory: URL? = nil,
+        fileManager: FileManager = .default
+    ) -> OpsCredentialSummary? {
+        guard let url = existingCredentialFile(
+            environmentName: environmentName,
+            credentialsDirectory: credentialsDirectory,
+            fileManager: fileManager) else {
+            return nil
+        }
+        guard let data = fileManager.contents(atPath: url.path), !data.isEmpty else {
+            return OpsCredentialSummary(path: url.path, parseError: "文件是空的")
+        }
+        guard let object = try? JSONSerialization.jsonObject(with: data),
+              let dict = object as? [String: Any] else {
+            return OpsCredentialSummary(path: url.path, parseError: "不是合法的 JSON 对象")
+        }
+        let declared = (dict["environment"] as? String).flatMap { $0.isEmpty ? nil : $0 }
+        return OpsCredentialSummary(
+            path: url.path,
+            containerID: (dict["containerID"] as? String).flatMap { $0.isEmpty ? nil : $0 },
+            keyID: (dict["keyID"] as? String).flatMap { $0.isEmpty ? nil : $0 },
+            declaredEnvironment: declared,
+            declaredEnvironmentMatches: declared.map { $0 == environmentName } ?? true)
     }
 }

@@ -77,9 +77,25 @@ class Credentials:
             if not path.exists():
                 raise CredentialError("凭证文件不存在：{}".format(path))
             payload = json.loads(path.read_text(encoding="utf-8"))
-            payload.setdefault("environment", environment)
+            # ⭐ 凭证文件**不许改写目标环境**（2026-09-28）：
+            # 原来的写法是 `payload.setdefault("environment", environment)` 再让
+            # `_from_payload` 用 `payload.get("environment", environment)` —— 于是文件里
+            # 写了 environment=development 的凭证，在 `--environment production` 下会把
+            # 请求 subpath 里的环境段**换成 development**，打到 Development 库上，
+            # 而调用方以为自己在发 Production。比 401 更危险：它不报错。
+            # 现在只做硬校验：声明与目标不一致就直接拒绝，不给它静默生效的机会。
+            declared = payload.get("environment")
+            if declared and str(declared) != environment:
+                raise CredentialError(
+                    "凭证环境不匹配：这份凭证声明为 {}，本次目标环境是 {}。"
+                    "CloudKit 的 server-to-server key 按环境注册，混用只会 401；"
+                    "更糟的是若沿用文件里声明的环境，请求会打错库却不报错。"
+                    "请为 {} 单独准备一份凭证（并在 JSON 里写 \"environment\": \"{}\"）。".format(
+                        declared, environment, environment, environment
+                    )
+                )
             print(
-                "⚠️  使用文件凭证（{}）。文件凭证仅限开发环境，生产请改用 Keychain。".format(path)
+                "⚠️  使用文件凭证（{}）；目标环境 {}。".format(path, environment)
             )
             return cls._from_payload(payload, environment)
 
@@ -141,9 +157,11 @@ class Credentials:
         for key in ("keyID", "privateKey", "containerID"):
             if not payload.get(key):
                 raise CredentialError("凭证缺少字段 {}".format(key))
+        # 环境只认**调用方指定的目标环境**：凭证文件里声明的 environment 只用来做
+        # 一致性校验（见 `load`），绝不反客为主决定打到哪个库。
         return cls(
             container_id=str(payload["containerID"]),
-            environment=str(payload.get("environment", environment)),
+            environment=environment,
             key_id=str(payload["keyID"]),
             private_key_pem=str(payload["privateKey"]),
         )

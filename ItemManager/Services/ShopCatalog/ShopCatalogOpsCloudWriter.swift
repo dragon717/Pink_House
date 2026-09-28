@@ -80,7 +80,7 @@ nonisolated enum ShopCatalogOpsUploadError: LocalizedError, Equatable {
              .requestRateLimited, .zoneBusy, .internalError, .serverResponseLost:
             return .retryable("网络或服务暂不可用，\(what)失败：\(ckError.localizedDescription)")
         case .serverRecordChanged:
-            return .conflict("发布头已被其它发布覆盖（changeTag 冲突），\(what)未生效")
+            return .conflict("记录已被其它端覆盖（changeTag 冲突），\(what)未生效")
         default:
             return .failed("\(what)失败（CKError \(ckError.code.rawValue)）："
                            + ckError.localizedDescription)
@@ -129,6 +129,17 @@ nonisolated protocol ShopCatalogOpsCloudWriting: Sendable {
     /// 按精确 ID 读媒体元数据；nil = 不存在（→ 需要上传）
     func fetchMediaMetadata(mediaKey: String) async throws -> ShopCatalogOpsRemoteMediaMeta?
 
+    /// **批量**读媒体元数据；结果里没有的 key = 线上不存在（→ 需要上传）。
+    ///
+    /// ⚠️ 必须成批取，不能靠上面那个单点方法循环：
+    /// 一次发布要问 450 张图在不在公共库，逐张单点就是 450 次 `record(for:)`，
+    /// 必然撞 CloudKit 限流（`requestRateLimited`）→ 一部分任务落到 `retryable`
+    /// → `unresolved` 非空 → 整次发布在媒体阶段就被判失败、
+    /// **发布头永远切不动**（2026-09-28 实测：线上发布头停在 seq 1 就是这个原因）。
+    func fetchMediaMetadata(
+        mediaKeys: [String]
+    ) async throws -> [String: ShopCatalogOpsRemoteMediaMeta]
+
     /// 新建不可变媒体记录（`th.media.<mediaKey>`）
     func saveMedia(
         mediaKey: String, mimeType: String, sha256: String, byteCount: Int, fileURL: URL
@@ -155,6 +166,41 @@ nonisolated protocol ShopCatalogOpsCloudWriting: Sendable {
     ) async throws
 }
 
+// MARK: - 分块
+
+/// 内部可见：编排层（`ShopCatalogOpsPublisher`）也要按同样的块大小切分。
+extension Array {
+    /// 按固定大小切块（`stride` 版，避免手写下标越界）
+    func chunked(into size: Int) -> [[Element]] {
+        guard size > 0 else { return [self] }
+        return stride(from: 0, to: count, by: size).map {
+            Array(self[$0..<Swift.min($0 + size, count)])
+        }
+    }
+}
+
+// MARK: - 批量查询的默认实现
+
+extension ShopCatalogOpsCloudWriting {
+
+    /// 默认逐张查 —— 只给不需要改的替身兜底。
+    ///
+    /// 真实实现必须覆盖它（见 `ShopCatalogOpsPublicCloudWriter`）：
+    /// 默认实现只是为了**新增协议方法时不打断既有测试替身**，
+    /// 线上链路走它等于没做限流治理。
+    func fetchMediaMetadata(
+        mediaKeys: [String]
+    ) async throws -> [String: ShopCatalogOpsRemoteMediaMeta] {
+        var result: [String: ShopCatalogOpsRemoteMediaMeta] = [:]
+        for key in mediaKeys {
+            if let meta = try await fetchMediaMetadata(mediaKey: key) {
+                result[key] = meta
+            }
+        }
+        return result
+    }
+}
+
 // MARK: - CloudKit 真实现
 
 /// 与 Notice / 消费端同容器（entitlements 已声明），Schema 互不混用。
@@ -167,6 +213,9 @@ final class ShopCatalogOpsPublicCloudWriter: ShopCatalogOpsCloudWriting {
     /// struct 里 lazy var 的 getter 是 mutating 的，async 方法里访问会报
     /// 「cannot use mutating getter on immutable value」——用计算属性
     private var database: CKDatabase { container.publicCloudDatabase }
+
+    /// 单次批量查询的条数上限（分块发送，避免一次请求过大被拒）
+    private static let batchLookupSize = 200
 
     init(containerID: String = "iCloud.bugod2.ItemManager") {
         self.container = CKContainer(identifier: containerID)
@@ -211,6 +260,34 @@ final class ShopCatalogOpsPublicCloudWriter: ShopCatalogOpsCloudWriting {
         )
     }
 
+    func fetchMediaMetadata(
+        mediaKeys: [String]
+    ) async throws -> [String: ShopCatalogOpsRemoteMediaMeta] {
+        var result: [String: ShopCatalogOpsRemoteMediaMeta] = [:]
+        // 分块：单次批量取太多会被服务端拒，200 是 CloudKit 常见的稳妥档位
+        for chunk in mediaKeys.chunked(into: Self.batchLookupSize) {
+            let ids = chunk.map {
+                CKRecord.ID(recordName: ShopCatalogSyncProtocol.mediaRecordName(contentHash: $0))
+            }
+            let found: [CKRecord.ID: Result<CKRecord, Error>]
+            do {
+                found = try await database.records(for: ids)
+            } catch {
+                throw ShopCatalogOpsUploadError.mapped(error, what: "批量查询已上传图片")
+            }
+            for key in chunk {
+                let id = CKRecord.ID(
+                    recordName: ShopCatalogSyncProtocol.mediaRecordName(contentHash: key))
+                // 缺记录属于正常情况（还没传过），按「不存在」处理
+                guard case .success(let record)? = found[id] else { continue }
+                result[key] = ShopCatalogOpsRemoteMediaMeta(
+                    sha256: record["sha256"] as? String ?? "",
+                    byteCount: (record["byteCount"] as? NSNumber)?.intValue ?? 0)
+            }
+        }
+        return result
+    }
+
     func saveMedia(
         mediaKey: String, mimeType: String, sha256: String, byteCount: Int, fileURL: URL
     ) async throws {
@@ -225,8 +302,20 @@ final class ShopCatalogOpsPublicCloudWriter: ShopCatalogOpsCloudWriting {
         record["byteCount"] = NSNumber(value: byteCount)
         record["asset"] = CKAsset(fileURL: fileURL)
         do {
-            // 不可变：内容寻址的记录名天然幂等，重复上传同一张图只会命中上面已存在的分支
+            // 不可变：内容寻址的记录名天然幂等
             try await database.save(record)
+        } catch let error as CKError where error.code == .serverRecordChanged {
+            // ⭐ 重复上传拦截的最后一道（2026-09-28）：
+            // CloudKit 的 `save` **不是 upsert** —— 目标记录名已存在、而我们手里的
+            // CKRecord 是新建的（没有 change tag）时，就报 `serverRecordChanged`。
+            // 这恰好说明「线上已经有这条记录」。记录是**按内容寻址的不可变记录**，
+            // 所以直接当「已存在」放行，交给调用方的**回读校验**确认内容一致；
+            // 若线上那条真是别的内容，回读 hash 比对会如实失败，不会静默放过。
+            //
+            // （实测：上一场会话被杀时字节已到服务端、本地却没来得及记 `mediaVerified`；
+            //  下一次发布的批量/单点查询再漏判，save 就撞上它 —— 31 条媒体任务
+            //  被标成「发布头冲突」，而那明明是发布头才有的语义，纯属误导。）
+            return
         } catch {
             throw ShopCatalogOpsUploadError.mapped(error, what: "上传图片 \(mediaKey.prefix(12))")
         }
@@ -274,6 +363,10 @@ final class ShopCatalogOpsPublicCloudWriter: ShopCatalogOpsCloudWriting {
         record["asset"] = CKAsset(fileURL: fileURL)
         do {
             try await database.save(record)
+        } catch let error as CKError where error.code == .serverRecordChanged {
+            // 与 `saveMedia` 同理：数据包也是按内容寻址的不可变记录，
+            // 「已存在」不是失败 —— 回读端到端验证会确认内容一致
+            return
         } catch {
             throw ShopCatalogOpsUploadError.mapped(error, what: "上传数据包")
         }

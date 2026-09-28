@@ -88,6 +88,9 @@ enum OpsSection: String, CaseIterable, Identifiable {
 
 struct OpsMainView: View {
     @ObservedObject var workspace: OpsWorkspace
+    /// 云端同步面板是**单例**驱动：工具栏与向导 S5 打开的是同一份状态，
+    /// 否则两处会各记一份「线上基线」，又变成两处真相。
+    @StateObject private var cloudSync = OpsCloudSyncModel.shared
 
     /// 当前分区。默认「系列上新」；快照 harness 需要从别的分区起手
     /// （见 `OpsSnapshotHarness`），所以留了一个显式入口，
@@ -117,6 +120,22 @@ struct OpsMainView: View {
             }
         }
         .frame(minWidth: 980, minHeight: 620)
+        .toolbar {
+            // 「云端同步」是**唯一**的上下云入口（读线上基线 / 拉回目录 / 发布），
+            // 之所以放在工具栏而不是新增分区：发布中心区已在 09-27 按需求移除，
+            // 但「Mac 既不下云也不上云」这个洞必须有人能走通。
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    cloudSync.showsSheet = true
+                } label: {
+                    Label("云端同步", systemImage: "cloud")
+                }
+                .help("读取线上基线 / 从线上拉回目录 / 构建待发布包并发布（经受控发布器）")
+            }
+        }
+        .sheet(isPresented: $cloudSync.showsSheet) {
+            OpsCloudSyncSheet(workspace: workspace)
+        }
     }
 
     @ViewBuilder

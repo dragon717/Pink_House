@@ -787,7 +787,8 @@ struct ShopCatalogOpsView: View {
     /// 走系统分享面板（AirDrop / 存到「文件」）。Mac 端解开后
     /// `build_release.py --shop-catalog-archive <tar>` 即可发布（图片会上传成 THMedia）。
     private func exportWholeBundleForPublishing() {
-        guard let json = draftStore.exportJSON(store: store) else {
+        guard let catalog = store.catalog,
+              let json = draftStore.exportJSON(store: store) else {
             toast = "导出失败：商店目录尚未加载"
             return
         }
@@ -797,10 +798,19 @@ struct ShopCatalogOpsView: View {
         formatter.dateFormat = "yyyy-MM-dd-HH-mm"
         let stamp = formatter.string(from: Date())
 
-        // 只带「被引用且是本地上传图」的那部分：bundle: / http(s) 不需要带
-        let references = Set((store.catalog?.assets ?? []).flatMap { asset in
-            [asset.originalURL, asset.thumbnailURL, asset.previewURL].compactMap { $0 }
-        })
+        // 图片引用字段清单**只此一处**（`ShopCatalogMediaReferences`）。
+        //
+        // ⚠️ 这里曾经只扫 `assets` 的三个 URL 字段，于是导出的包漏掉 174 张图
+        // （尺码表原图 147 + 系列价格表 16 + 系列封面 9 + 店家图标/封面 2）——
+        // 而发布端 `collect_shop_catalog_media` 是按**四类实体**收图的，
+        // 所以整包一进发布端就硬报错「图片找不到」，**包根本发不出去**
+        // （2026-09-28 实测：iOS 导出的 276 张全在，发布端要 450 张）。
+        //
+        // 只带发布端**会改写**的那批（`publisherRewritten`）：
+        // `products.images` / `variants.imageAssetID` 存的是 `CatalogAsset.id`
+        // 而不是文件名，混进来会把 id 当文件名去打包。
+        let references = Set(
+            ShopCatalogMediaReferences.publisherRewritten(in: catalog).map(\.reference))
         let (imageEntries, missing) = ShopCatalogExportArchive.imageEntries(
             forLocalReferences: references,
             imageDirectory: ShopCatalogImageStore.directory)
