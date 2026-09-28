@@ -116,6 +116,13 @@ final class ShopCatalogOpsPublisher: ObservableObject {
     /// 上一次发布的分项图片账（新传 / 跳过 / 未通过）
     @Published private(set) var lastMediaStats: ShopCatalogOpsMediaStats?
 
+    /// 上一次「暂存」阶段的问题清单（一次列全：缺图 / 读不出 / 类型不许 / 超上限）。
+    ///
+    /// 2026-09-29 新增。**这是「上传失败」唯一的可见证据** ——
+    /// iOS 侧上传/发布流程本身不打日志（整个类只有 1 处 print），
+    /// 界面若不展示它，运营看到的就是「点了没反应」。
+    @Published private(set) var lastStagingIssues: [ShopCatalogOpsMediaIssue] = []
+
     /// 本次运行里**已经回读校验过字节**的 mediaKey。
     /// 末尾的端到端验证复用它，不再把同一张图下载第二遍。
     private var verifiedThisRun: Set<String> = []
@@ -136,16 +143,24 @@ final class ShopCatalogOpsPublisher: ObservableObject {
 
     // MARK: 对外入口
 
-    /// 只暂存（不碰网络）：让运营在真正上传前就看见「有引用但没图」这类问题
+    /// 只暂存（不碰网络）：让运营在真正上传前就看见「有引用但没图」这类问题。
+    ///
+    /// ⚠️ 2026-09-29 修复：本方法**必须把结果写进 `lastResult` / `lastStagingIssues`**。
+    /// 原先它只 `return` 结果，而界面按钮写的是 `_ = publisher.stageOnly(...)`
+    /// —— 返回值被丢弃，缺图时**一个字都不显示**，运营看到的就是「点了没反应」。
     @discardableResult
     func stageOnly(catalog: ShopCatalog) -> ShopCatalogOpsPublishResult {
-        do {
-            let staged = try ShopCatalogOpsMediaStaging.plan(for: catalog)
-            register(staged)
-            return .notPublished("已暂存 \(staged.count) 张图片，等待上传")
-        } catch {
-            return .notPublished(error.localizedDescription)
+        let diagnosis = ShopCatalogOpsMediaStaging.diagnose(for: catalog)
+        lastStagingIssues = diagnosis.issues
+        let result: ShopCatalogOpsPublishResult
+        if diagnosis.isBlocked {
+            result = .notPublished(diagnosis.summary)
+        } else {
+            register(diagnosis.staged)
+            result = .notPublished("已暂存 \(diagnosis.staged.count) 张图片，等待上传")
         }
+        lastResult = result
+        return result
     }
 
     /// 全流程：暂存 → 上传 → 发布 → 回读验证
@@ -174,14 +189,16 @@ final class ShopCatalogOpsPublisher: ObservableObject {
         phase = .staging
         verifiedThisRun = []
         lastMediaStats = nil
-        let staged: [ShopCatalogOpsStagedMedia]
-        do {
-            staged = try ShopCatalogOpsMediaStaging.plan(for: catalog)
-        } catch {
+        // **一次列全**：缺图往往不止一张（线上实测 174 张 / 560 处引用），
+        // 只说第一条等于没说 —— 运营没法据此补齐。
+        let diagnosis = ShopCatalogOpsMediaStaging.diagnose(for: catalog)
+        lastStagingIssues = diagnosis.issues
+        guard !diagnosis.isBlocked else {
             // 方案 §4 第 1 行：选图读取 / 压缩失败 → stagedFailed，允许重新选图。
-            // 缺图是**发布前置条件不满足**，不进入媒体上传阶段。
-            return .notPublished(error.localizedDescription)
+            // 缺图是**发布前置条件不满足**，不进入媒体上传阶段，也绝不碰发布头。
+            return .notPublished(diagnosis.summary)
         }
+        let staged = diagnosis.staged
         register(staged)
 
         // ---- 1) 媒体

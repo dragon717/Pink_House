@@ -202,6 +202,60 @@ final class ShopCatalogOpsMediaStagingTests: XCTestCase {
         }
     }
 
+    /// 2026-09-29 回归锁：缺图必须**一次列全**（原先抛第一条就停，
+    /// 线上 174 张缺图只报得出 1 张，运营无从下手）。
+    func testDiagnoseCollectsEveryMissingFileOnceAndAggregatesOwners() throws {
+        let catalog = ShopCatalog(
+            sizeCharts: [
+                CatalogSizeChart(id: "chart-1", productID: "p-1", sourceImage: "local:missing-a.jpg"),
+                CatalogSizeChart(id: "chart-2", productID: "p-2", sourceImage: "local:missing-b.jpg"),
+            ],
+            assets: [
+                CatalogAsset(id: "asset-1", type: .productImage, originalURL: "local:missing-c.jpg"),
+                CatalogAsset(id: "asset-2", type: .productImage, originalURL: "local:missing-c.jpg"),
+            ])
+
+        let diagnosis = ShopCatalogOpsMediaStaging.diagnose(for: catalog)
+
+        XCTAssertTrue(diagnosis.isBlocked)
+        XCTAssertTrue(diagnosis.staged.isEmpty)
+        XCTAssertEqual(diagnosis.issues.count, 3, "按文件去重：3 个不同的缺图文件")
+        XCTAssertEqual(diagnosis.missingFileCount, 3)
+
+        let repeated = try XCTUnwrap(diagnosis.issues.first { $0.reference == "local:missing-c.jpg" })
+        XCTAssertEqual(repeated.owners.count, 2, "同一个文件的每一处引用都要记下来")
+        XCTAssertEqual(repeated.fileName, "missing-c.jpg")
+
+        XCTAssertTrue(diagnosis.summary.contains("3 个图片文件"), diagnosis.summary)
+        XCTAssertTrue(diagnosis.summary.contains("线上仍是旧版本"),
+                      "失败必须说清「线上没被改动」，否则运营会以为发了一半")
+        XCTAssertTrue(repeated.displayText.contains("图片资源 asset-1"), repeated.displayText)
+    }
+
+    /// `plan` 保持「快速失败」语义不变（既有调用方的回归锁）。
+    func testPlanStillThrowsFirstIssueForFastFailCallers() {
+        let catalog = ShopCatalog(
+            assets: [
+                CatalogAsset(id: "a", type: .productImage, originalURL: "local:missing-1.jpg"),
+                CatalogAsset(id: "b", type: .productImage, originalURL: "local:missing-2.jpg"),
+            ])
+        XCTAssertThrowsError(try ShopCatalogOpsMediaStaging.plan(for: catalog)) { error in
+            guard case ShopCatalogOpsMediaStagingError.fileMissing = error else {
+                return XCTFail("plan 仍按旧语义抛第一条，实际 \(error)")
+            }
+        }
+    }
+
+    /// 图片齐全时 `diagnose` 必须放行，且不产生任何问题条目。
+    func testDiagnosePassesWhenAllFilesArePresent() throws {
+        let reference = try writeFakeJPEG(name: "img-ok.jpg")
+        let diagnosis = ShopCatalogOpsMediaStaging.diagnose(for: catalog(with: [reference]))
+        XCTAssertFalse(diagnosis.isBlocked)
+        XCTAssertTrue(diagnosis.issues.isEmpty)
+        XCTAssertEqual(diagnosis.staged.count, 1)
+        XCTAssertTrue(diagnosis.summary.contains("图片齐了"), diagnosis.summary)
+    }
+
     func testRewriteSetsCanonicalMediaKeyAndThmediaReference() throws {
         let reference = try writeFakeJPEG(name: "img-rewrite.jpg")
         let original = catalog(with: [reference])
@@ -574,6 +628,54 @@ final class ShopCatalogOpsPublisherTests: XCTestCase {
         }
         XCTAssertEqual(writer.savedReleaseCount, 0, "发布头绝不能切换（方案 §3.4 末段）")
         XCTAssertNil(backend.release)
+    }
+
+    /// 2026-09-29 回归锁：缺图要**一次列全**并暴露给界面，不能只说第一条。
+    /// （现场症状：点了「上传并发布到公共库」毫无反应，因为异常被吞、任务一条不落。）
+    func testMissingImagesAreListedAllAtOnceInsteadOfSilently() async throws {
+        let catalog = ShopCatalog(
+            assets: [
+                CatalogAsset(id: "a", type: .productImage, originalURL: "local:gone-1.jpg"),
+                CatalogAsset(id: "b", type: .productImage, originalURL: "local:gone-2.jpg"),
+            ])
+        let result = await publisher.publish(catalog: catalog)
+
+        guard case .notPublished(let reason) = result else {
+            return XCTFail("缺图必须挡在发布头之前，实际 \(result.summary)")
+        }
+        XCTAssertEqual(publisher.lastStagingIssues.count, 2,
+                       "两条缺图都要列出来（原先只报得出第一条）")
+        XCTAssertTrue(reason.contains("2 个图片文件"), reason)
+        XCTAssertTrue(reason.contains("线上仍是旧版本"), reason)
+        XCTAssertEqual(uploadStore.jobs.count, 0,
+                       "卡在暂存阶段：一条任务都不该建（这也是界面看不到任务表的原因）")
+        XCTAssertEqual(writer.savedReleaseCount, 0)
+    }
+
+    /// 「仅暂存图片」必须把结果写进 `lastResult` —— 界面 footer 靠它显示。
+    /// 原先它既不写状态、按钮又 `_ =` 丢弃返回值 = 缺图时一个字都不显示。
+    func testStageOnlyPublishesItsResultToTheUI() throws {
+        let missing = ShopCatalog(
+            assets: [CatalogAsset(id: "a", type: .productImage, originalURL: "local:gone.jpg")])
+        let failed = publisher.stageOnly(catalog: missing)
+
+        guard case .notPublished = failed else {
+            return XCTFail("缺图时必须返回未发布，实际 \(failed.summary)")
+        }
+        XCTAssertNotNil(publisher.lastResult, "必须写 lastResult（界面据此显示）")
+        XCTAssertEqual(publisher.lastStagingIssues.count, 1)
+
+        let (good, _) = try makeLocalImageCatalog(name: "img-stage-only.jpg")
+        let ok = publisher.stageOnly(catalog: good)
+
+        XCTAssertNotNil(publisher.lastResult)
+        XCTAssertTrue(publisher.lastStagingIssues.isEmpty, "问题清单要随本次结果刷新")
+        guard case .notPublished(let reason) = ok else {
+            return XCTFail("只暂存不发布，实际 \(ok.summary)")
+        }
+        XCTAssertTrue(reason.contains("已暂存 1 张图片"), reason)
+        XCTAssertEqual(uploadStore.jobs.count, 1, "成功的暂存要落任务，运营才能在任务表看到")
+        XCTAssertEqual(writer.savedReleaseCount, 0, "「仅暂存」不许碰发布头")
     }
 
     func testReleaseConflictIsReportedWithoutForcingOverwrite() async throws {

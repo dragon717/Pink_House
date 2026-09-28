@@ -10,6 +10,12 @@
 //    · **只有第 6 步（只读端回读）成功**才显示「已发布」—— 方案 §3.4 第 7 步；
 //    · 失败一定带原因和重试入口，绝不静默（项目既有「失败必须可见」口径）。
 //
+//  2026-09-29 补两条（修「点了没反应」）：
+//    · **上传前检查**：常态跑共享门禁 `ShopCatalogPublicationGate`（与 Mac 端同一份判定），
+//      不点按钮就能看到「有多少处图片引用解不出图」—— 缺图是常态，不该等点了才知道；
+//    · **一次列全**：`publisher.lastStagingIssues` 列出**所有**解不出图的文件。
+//      原先 `plan` 抛第一条就停、返回值又被按钮丢弃 ⇒ 缺图时界面一个字都不显示。
+//
 
 import SwiftUI
 
@@ -35,6 +41,9 @@ struct ShopCatalogOpsUploadSection: View {
 
             if let catalog {
                 Button {
+                    // 结果由 `publisher` 自己发布（`lastResult` / `lastStagingIssues`）——
+                    // 2026-09-29 之前这里是 `_ = …` 且 publisher 不写状态，缺图时**零反馈**，
+                    // 运营看到的就是「点了没反应」。
                     _ = publisher.stageOnly(catalog: catalog)
                 } label: {
                     Label("仅暂存图片（不上传）", systemImage: "photo.stack")
@@ -62,6 +71,17 @@ struct ShopCatalogOpsUploadSection: View {
             Text(footerText)
         })
 
+        // 上传前检查：**不点也能看到**能不能发。缺图是常态（换设备 / 清沙盒都会造成），
+        // 而「点下去才报错」会让运营以为是 App 卡了。
+        if let review = preflightReview {
+            preflightSection(review)
+        }
+
+        // 上次暂存 / 发布发现的问题：一次列全（不再只说第一条）
+        if !publisher.lastStagingIssues.isEmpty {
+            stagingIssueSection
+        }
+
         if let reason = uploadStore.unavailableReason {
             Section {
                 Text(reason)
@@ -72,6 +92,78 @@ struct ShopCatalogOpsUploadSection: View {
 
         if !uploadStore.jobs.isEmpty {
             uploadTaskSection
+        }
+    }
+
+    // MARK: 上传前检查（共享门禁）
+
+    /// 发布前图片门禁，判定**与 Mac 端同一份**（共享包 `ShopCatalogPublicationGate`，
+    /// 🚫 不要在这里另写一套「文件在不在」的判断）。
+    ///
+    /// 用 `stagedFileNames` 只比文件名、不读字节，所以每次渲染都算得起。
+    private var preflightReview: ShopCatalogPublicationReview? {
+        guard let catalog else { return nil }
+        return ShopCatalogPublicationGate.review(
+            catalog,
+            stagedFileNames: ShopCatalogImageStore.existingFileNames())
+    }
+
+    @ViewBuilder
+    private func preflightSection(_ review: ShopCatalogPublicationReview) -> some View {
+        Section {
+            if review.isBlocked {
+                Label("\(review.blockingIssues.count) 处图片引用解不出图，上传会被拦下",
+                      systemImage: "exclamationmark.triangle.fill")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(.red)
+                ForEach(Array(review.blockingIssues.prefix(3).enumerated()), id: \.offset) { pair in
+                    Text(pair.element)
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                        .textSelection(.enabled)
+                }
+                if review.blockingIssues.count > 3 {
+                    Text("还有 \(review.blockingIssues.count - 3) 条，按「仅暂存图片」可看全。")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                }
+            } else {
+                Label("图片齐了，可以上传", systemImage: "checkmark.circle.fill")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(.green)
+                Text("本机图片目录：\(ShopCatalogImageStore.existingFileNames().count) 个文件")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+            }
+        } header: {
+            Text("上传前检查")
+        } footer: {
+            Text("与 Mac 端发布门禁共用同一份判定：local: 图片必须能在本机图片目录里找到，"
+                 + "缺一张就整包不发（否则其它设备看到的是空白图）。")
+        }
+    }
+
+    // MARK: 暂存问题清单
+
+    /// 一次列全的问题清单。文案直接来自 `ShopCatalogOpsMediaIssue.displayText`
+    /// （含「是哪个商品 / 哪个字段」），并允许长按复制 —— 现场取字比截图强。
+    private var stagingIssueSection: some View {
+        Section {
+            ForEach(Array(publisher.lastStagingIssues.prefix(8).enumerated()), id: \.offset) { pair in
+                Text(pair.element.displayText)
+                    .font(.system(size: 11))
+                    .foregroundStyle(.red)
+                    .textSelection(.enabled)
+            }
+            if publisher.lastStagingIssues.count > 8 {
+                Text("还有 \(publisher.lastStagingIssues.count - 8) 条未显示（同一次上传会一并处理）。")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+            }
+        } header: {
+            Text("上传失败原因（\(publisher.lastStagingIssues.count) 个文件）")
+        } footer: {
+            Text("这里列的是全部解不出图的文件，不是只报第一条。补上图之后重新上传即可。")
         }
     }
 

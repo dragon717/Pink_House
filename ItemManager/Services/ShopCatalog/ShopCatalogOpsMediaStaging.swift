@@ -53,10 +53,41 @@ nonisolated enum ShopCatalogOpsMediaStagingError: LocalizedError, Equatable {
 
 /// 引用出现的**位置**：出问题时要能指出是哪一行，只说「有图没传」运营无从下手。
 nonisolated struct ShopCatalogOpsMediaOwner: Equatable, Sendable {
+    /// 人话归属（`图片资源 asset-1 / 原图`、`店家「樱花小羊」/ 封面`）。
+    /// 直接取共享包 `ShopCatalogMediaReference.owner` —— 不在这里另写一套文案，
+    /// 否则界面文案与 Mac 端会各说各话。
+    let owner: String
     let productID: String
     let assetID: String
     let field: String
     let reference: String
+}
+
+/// 一处**无法上传**的图片引用（按引用聚合，见 `diagnose`）。
+///
+/// 2026-09-29 新增，修的是「点了没反应」。原先 `plan` **抛第一条就停**，
+/// 界面只会看到第一张缺图（更常见的是异常被调用方吞掉、一个字都不显示），
+/// 而线上那份 dev 目录实际有 **174 张图**在本机解不出 —— 运营无从下手。
+nonisolated struct ShopCatalogOpsMediaIssue: Equatable, Sendable {
+    /// 引用原文（`local:img-x.jpg`）
+    let reference: String
+    /// 触发这条问题的原因
+    let reason: ShopCatalogOpsMediaStagingError
+    /// **同一个引用**出现在哪些位置。同一文件被多处引用时聚合成一条：
+    /// 线上实例是「174 个文件名 / 560 处引用」，逐处报会刷屏且看不出到底缺几张。
+    let owners: [ShopCatalogOpsMediaOwner]
+
+    /// 涉及的文件名（解不出时退回引用原文）
+    var fileName: String {
+        ShopCatalogOpsMediaReferences.localFileName(in: reference) ?? reference
+    }
+
+    /// 一行可读结论：先说**是谁**，再说为什么
+    var displayText: String {
+        let who = owners.first?.owner ?? reference
+        let suffix = owners.count > 1 ? "（同一个文件被 \(owners.count) 处引用）" : ""
+        return "\(who)：\(reason.errorDescription ?? reference)\(suffix)"
+    }
 }
 
 /// 一张待上传媒体（同一内容摘要只出现一次，多处引用共享）
@@ -72,6 +103,39 @@ nonisolated struct ShopCatalogOpsStagedMedia: Equatable, Sendable {
     let owners: [ShopCatalogOpsMediaOwner]
 }
 
+/// `diagnose` 的结果：能上传的 + **所有**不能上传的（一次列全）。
+nonisolated struct ShopCatalogOpsMediaDiagnosis: Equatable, Sendable {
+    let staged: [ShopCatalogOpsStagedMedia]
+    let issues: [ShopCatalogOpsMediaIssue]
+
+    var isBlocked: Bool { !issues.isEmpty }
+
+    /// 属于「本机找不到文件」的问题条数（与类型/大小问题分开报，处置方式不同）
+    var missingFileCount: Int {
+        issues.filter { issue in
+            if case .fileMissing = issue.reason { return true }
+            return false
+        }.count
+    }
+
+    /// 一句话结论 —— 直接给运营看，同时用作 `.notPublished` 的原因。
+    ///
+    /// 必须带上「线上没被改动」：运营看到失败的第一反应是「是不是已经发了一半」。
+    var summary: String {
+        guard isBlocked else {
+            return "图片齐了：\(staged.count) 张待上传"
+        }
+        let referenceCount = issues.reduce(0) { $0 + $1.owners.count }
+        var text = "\(issues.count) 个图片文件无法上传（涉及 \(referenceCount) 处引用）"
+        if missingFileCount == issues.count {
+            text += "：这些文件在本机找不到（换过设备或清过沙盒才会这样）"
+        } else if missingFileCount > 0 {
+            text += "：其中 \(missingFileCount) 个在本机找不到"
+        }
+        return text + "。发布头未切换，线上仍是旧版本。"
+    }
+}
+
 // MARK: - 暂存与改写
 
 nonisolated enum ShopCatalogOpsMediaStaging {
@@ -81,52 +145,72 @@ nonisolated enum ShopCatalogOpsMediaStaging {
 
     // MARK: 扫描 + 暂存
 
-    /// 扫描目录里所有 `local:` 引用并算出 `mediaKey` / MIME / 字节数。
+    /// 扫描目录里所有 `local:` 引用并算出 `mediaKey` / MIME / 字节数，
+    /// **一次列全所有问题**（2026-09-29 起）。
+    ///
+    /// 原先这里是「一发现问题就 throw」，运营只能看到第一张缺图；
+    /// 现在把**每一个**解不出图的文件都收集起来，与 Mac 端
+    /// `ShopCatalogPublicationGate.review` 的口径对齐（那边一直是一次列全）。
     ///
     /// - Parameters:
-    ///   - catalog: 合并后的完整目录（种子 + 覆盖层）
+    ///   - catalog: 合并后的完整目录（种子 + 覆盖层 + 远端层）
     ///   - resolveFile: `local:<文件名>` → 本地文件 URL，**只在文件确实存在时才返回非 nil**。
-    ///     默认走 `ShopCatalogImageStore`，并额外补一次存在性检查：
     ///     `ShopCatalogImageStore.url(for:)` 只拼路径、不查盘，直接用它会让「文件不存在」
-    ///     掉进下面的 `unreadable` 分支 —— 而这两件事对运营的含义完全不同
-    ///     （缺图 → 换过设备/清过沙盒，要重新选图；读不出来 → 文件在但读失败，要求重试）。
-    ///   - readData: 读文件字节；默认 `Data(contentsOf:)`。返回 nil 表示**文件在但读失败**，
-    ///     即 `unreadable` —— 因为不存在的情况已经被 `resolveFile` 拦掉了。
-    /// - Returns: 按 `mediaKey` 去重后的待上传媒体
-    /// - Throws: `ShopCatalogOpsMediaStagingError`（缺图 / 不可读 / 类型不许 / 超上限）
-    static func plan(
+    ///     掉进 `unreadable` 分支 —— 而这两件事对运营的含义完全不同
+    ///     （缺图 → 换过设备/清过沙盒，要重新选图；读不出来 → 文件在但读失败，重试即可）。
+    ///   - readData: 读文件字节；返回 nil 表示**文件在但读失败**（不存在的情况已被 `resolveFile` 拦掉）。
+    static func diagnose(
         for catalog: ShopCatalog,
-        resolveFile: (String) -> URL? = { reference in
-            guard let url = ShopCatalogImageStore.url(for: reference) else { return nil }
-            return FileManager.default.fileExists(atPath: url.path) ? url : nil
-        },
+        resolveFile: (String) -> URL? = resolveExistingFile,
         readData: (URL) -> Data? = { try? Data(contentsOf: $0) }
-    ) throws -> [ShopCatalogOpsStagedMedia] {
+    ) -> ShopCatalogOpsMediaDiagnosis {
         var byHash: [String: ShopCatalogOpsStagedMedia] = [:]
         var order: [String] = []
+
+        // 问题按**引用**聚合：线上实测是「174 个文件名 / 560 处引用」，
+        // 逐处报会刷屏，且看不出到底缺几张图。顺序 = 首次出现顺序（稳定）。
+        var issueOrder: [String] = []
+        var issueReasons: [String: ShopCatalogOpsMediaStagingError] = [:]
+        var issueOwners: [String: [ShopCatalogOpsMediaOwner]] = [:]
+
+        func note(_ error: ShopCatalogOpsMediaStagingError, at item: ShopCatalogOpsMediaOwner) {
+            if issueReasons[item.reference] == nil {
+                issueOrder.append(item.reference)
+                issueReasons[item.reference] = error
+                issueOwners[item.reference] = [item]
+            } else {
+                issueOwners[item.reference, default: []].append(item)
+            }
+        }
 
         for item in ownedReferences(in: catalog) {
             guard item.reference.hasPrefix(localReferencePrefix) else { continue }
             // 文件名口径走共享层：空名 / 含 `/` / `.` 开头一律按「没有这个文件」处理，
             // 与发布端 `collect_shop_catalog_media` 的 rewrite 同一判定。
             guard let fileName = ShopCatalogMediaReferences.localFileName(in: item.reference) else {
-                throw ShopCatalogOpsMediaStagingError.fileMissing(item.reference)
+                note(.fileMissing(item.reference), at: item)
+                continue
             }
             guard let url = resolveFile(item.reference) else {
-                throw ShopCatalogOpsMediaStagingError.fileMissing(item.reference)
+                note(.fileMissing(item.reference), at: item)
+                continue
             }
             guard let data = readData(url) else {
-                throw ShopCatalogOpsMediaStagingError.unreadable(item.reference)
+                note(.unreadable(item.reference), at: item)
+                continue
             }
             if data.count > ShopCatalogUploadPolicy.maxMediaBytes {
-                throw ShopCatalogOpsMediaStagingError.tooLarge(
-                    reference: item.reference, byteCount: data.count)
+                note(.tooLarge(reference: item.reference, byteCount: data.count), at: item)
+                continue
             }
             guard let mimeType = mimeType(for: data),
                   ShopCatalogUploadPolicy.isAllowedMimeType(mimeType) else {
-                throw ShopCatalogOpsMediaStagingError.unsupportedMimeType(
-                    reference: item.reference,
-                    mimeType: mimeType(for: data) ?? ShopCatalogMediaStore.inferredFileExtension(data))
+                note(.unsupportedMimeType(
+                        reference: item.reference,
+                        mimeType: mimeType(for: data)
+                            ?? ShopCatalogMediaStore.inferredFileExtension(data)),
+                     at: item)
+                continue
             }
 
             let digest = ShopCatalogSyncProtocol.sha256Hex(data)
@@ -150,7 +234,45 @@ nonisolated enum ShopCatalogOpsMediaStaging {
                 order.append(digest)
             }
         }
-        return order.compactMap { byHash[$0] }
+
+        let issues = issueOrder.map { reference in
+            ShopCatalogOpsMediaIssue(
+                reference: reference,
+                reason: issueReasons[reference] ?? .fileMissing(reference),
+                owners: issueOwners[reference] ?? [])
+        }
+        return ShopCatalogOpsMediaDiagnosis(
+            staged: order.compactMap { byHash[$0] },
+            issues: issues)
+    }
+
+    /// 默认的文件解析：拼路径**并且**查盘。
+    ///
+    /// 提出来是为了让 `diagnose` 与 `plan` 用**同一份**判定 —— 各写一次，
+    /// 迟早出现「一边认为有图、一边认为没图」。
+    static func resolveExistingFile(_ reference: String) -> URL? {
+        guard let url = ShopCatalogImageStore.url(for: reference) else { return nil }
+        return FileManager.default.fileExists(atPath: url.path) ? url : nil
+    }
+
+    /// 扫描 + 暂存，**遇到第一个问题就抛**（保留给需要「快速失败」的调用方）。
+    ///
+    /// ⚠️ 界面报错**不要**用它 —— 它只说得出第一条问题（线上实例是 174 张缺图里的第 1 张），
+    /// 而且调用方一旦丢弃返回值，失败就变成静默。要给运营看全貌请用 `diagnose`。
+    /// 保留本方法是为了不改既有调用方与回归用例的语义。
+    ///
+    /// - Returns: 按 `mediaKey` 去重后的待上传媒体
+    /// - Throws: `ShopCatalogOpsMediaStagingError`（缺图 / 不可读 / 类型不许 / 超上限）
+    static func plan(
+        for catalog: ShopCatalog,
+        resolveFile: (String) -> URL? = resolveExistingFile,
+        readData: (URL) -> Data? = { try? Data(contentsOf: $0) }
+    ) throws -> [ShopCatalogOpsStagedMedia] {
+        let diagnosis = diagnose(for: catalog, resolveFile: resolveFile, readData: readData)
+        if let first = diagnosis.issues.first {
+            throw first.reason
+        }
+        return diagnosis.staged
     }
 
     /// 按魔数判 MIME。复用 `ShopCatalogMediaStore.inferredFileExtension` 的判定口径，
@@ -241,6 +363,7 @@ nonisolated enum ShopCatalogOpsMediaStaging {
     static func ownedReferences(in catalog: ShopCatalog) -> [ShopCatalogOpsMediaOwner] {
         ShopCatalogMediaReferences.publisherRewritten(in: catalog).map { reference in
             ShopCatalogOpsMediaOwner(
+                owner: reference.owner,
                 productID: reference.productID,
                 assetID: reference.entityID,
                 field: reference.field,

@@ -602,6 +602,17 @@ nonisolated enum ShopCatalogImageStore {
         return directory.appendingPathComponent(name)
     }
 
+    /// 目录里**现有**的文件名集合。
+    ///
+    /// 给「发布前图片门禁」用（`ShopCatalogPublicationGate.review(stagedFileNames:)`）——
+    /// 它只比文件名、不读内容，所以列目录就够了，不必逐张读字节。
+    /// 于是「缺不缺图」在**点上传之前**就能算出来，而不是等点了才知道。
+    static func existingFileNames() -> Set<String> {
+        let contents = try? FileManager.default.contentsOfDirectory(
+            at: directory, includingPropertiesForKeys: nil)
+        return Set((contents ?? []).map(\.lastPathComponent))
+    }
+
     private static func scaledDown(_ image: UIImage, maxDimension: CGFloat) -> UIImage {
         let maxSide = max(image.size.width, image.size.height)
         guard maxSide > maxDimension, maxSide > 0 else { return image }
