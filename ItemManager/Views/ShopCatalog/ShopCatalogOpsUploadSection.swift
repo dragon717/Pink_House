@@ -26,10 +26,29 @@ struct ShopCatalogOpsUploadSection: View {
 
     @ObservedObject private var publisher = ShopCatalogOpsPublisher.shared
     @ObservedObject private var uploadStore = ShopCatalogOpsUploadStore.shared
+    /// 三层目录（含远端层）的状态从这里读 —— 「对齐」的线上来源必须是
+    /// **本机真的拉到过的那一版**，不能自己拼一份。
+    @ObservedObject private var catalogStore = ShopCatalogStore.shared
 
     @State private var isRunning = false
 
+    // MARK: 「与线上对齐」的本地状态
+    //
+    // 挂在这个 Section 级视图上（不是 List 行视图上）：行重建会把 @State 归零
+    // （项目反模式清单第 4 条）。
+
+    /// 点「查看差异」算出来的报告（**只读**算出来的，还没写任何东西）
+    @State private var reconcileOutcome: ShopCatalogReconcileOutcome?
+    /// 最近一次查看差异 / 对齐的失败原因（必须显示，不许静默）
+    @State private var reconcileError: String?
+    /// 对齐完成后的结论（含「本机是否真的等于线上」这一条自证）
+    @State private var alignResultText: String?
+
     var body: some View {
+        // 对齐放在最前面：它是「上传」的前置 —— 本机与线上那一版不一致时，
+        // 传上去的就是「本机这份」，而运营以为传的是线上那份。
+        alignmentSection
+
         Section(content: {
             Button {
                 Task { await runPublish() }
@@ -92,6 +111,124 @@ struct ShopCatalogOpsUploadSection: View {
 
         if !uploadStore.jobs.isEmpty {
             uploadTaskSection
+        }
+    }
+
+    // MARK: 与线上那一版对齐（2026-09-29）
+
+    /// 「让本机与线上那一版一模一样」——**逐条对账**，不是整份覆盖：
+    ///
+    ///   线上有、本机没有 → 加进来
+    ///   两边同一个 id    → 用线上那份覆盖
+    ///   本机有、线上没有 → 从本机移除
+    ///
+    /// 唯一实现在共享包 `ShopCatalogReconcile`（Mac 端走同一份判定）。
+    /// 这里**不许**自己写合并逻辑 —— 两端各写一份的下场本项目已经吃过一次
+    /// （2026-09-28：两端各手拼一份图片引用清单，双双漏掉 174 张）。
+    @ViewBuilder
+    private var alignmentSection: some View {
+        Section {
+            if let remote = catalogStore.installedRemoteCatalog {
+                Text("本机已有线上那一版：\(remote.shops.count) 店家 / "
+                     + "\(remote.series.count) 系列 / \(remote.products.count) 商品")
+                    .font(.system(size: 13))
+
+                Button {
+                    runReconcilePreview()
+                } label: {
+                    Label("查看差异（不改动本机）", systemImage: "arrow.left.arrow.right")
+                }
+
+                if let outcome = reconcileOutcome {
+                    Text(outcome.summaryText)
+                        .font(.system(size: 13, weight: .medium))
+                    ForEach(outcome.summaryLines, id: \.self) { line in
+                        // 这些句子是共享文案（Mac 端走 `opsMarkdown`），里面带 `**强调**`；
+                        // `Text(变量)` **不解析** Markdown，所以必须显式转一次，
+                        // 否则 iOS 上会逐字显示成星号。
+                        emphasisText("· " + line)
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                    }
+                    let details = outcome.detailLines(limit: 5)
+                    if !details.isEmpty {
+                        ForEach(details, id: \.self) { line in
+                            Text(line)
+                                .font(.system(size: 11))
+                                .foregroundStyle(.secondary)
+                                .textSelection(.enabled)
+                        }
+                    }
+                }
+
+                Button {
+                    runAlign()
+                } label: {
+                    Label("以线上为准对齐本机", systemImage: "arrow.triangle.2.circlepath")
+                }
+                // 先看差异再对齐：对齐会**移除**本机多出来的条目，
+                // 跳过预览就等于「点完才知道自己少了什么」。
+                .disabled(reconcileOutcome == nil)
+
+                if reconcileOutcome == nil {
+                    Text("先点「查看差异」—— 对齐会移除本机多出来的条目。")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                }
+            } else {
+                Text("本机还没有「线上那一版」：先让云端同步成功一次（商店页下拉刷新），再回来对齐。")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+            }
+
+            if let reconcileError {
+                Text(reconcileError)
+                    .font(.system(size: 12))
+                    .foregroundStyle(.red)
+                    .textSelection(.enabled)
+            }
+            if let alignResultText {
+                Text(alignResultText)
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+            }
+        } header: {
+            Text("与线上对齐")
+        } footer: {
+            Text("结果等于线上那一版，只有两处例外：销售记录只增不删、"
+                 + "本机独有的下架记录保留（都会在上面的差异清单里逐条列出来）。")
+        }
+    }
+
+    /// 只读：算出会改动什么，不写任何东西。
+    private func runReconcilePreview() {
+        alignResultText = nil
+        do {
+            reconcileOutcome = try catalogStore.reconcilePreviewAgainstRemote()
+            reconcileError = nil
+        } catch {
+            reconcileOutcome = nil
+            reconcileError = error.localizedDescription
+        }
+    }
+
+    /// 真正写盘（覆盖层 → 也就是本机内容）。
+    private func runAlign() {
+        guard reconcileOutcome != nil else { return }
+        do {
+            let executed = try catalogStore.alignLocalCatalogToRemote()
+            // 执行结果可能与预览不同（两次点击之间本机被改过）→ 用**实际执行**的那份
+            reconcileOutcome = nil
+            reconcileError = nil
+            var parts = ["已按线上那一版对齐本机：" + executed.summaryText + "。"]
+            if let aligned = catalogStore.isLocalCatalogAlignedWithRemote {
+                parts.append(aligned
+                    ? "自检通过：本机目录现在与线上那一版逐条一致。"
+                    : "自检未通过：本机目录与线上仍不一致（见下条说明）。")
+            }
+            alignResultText = parts.joined(separator: " ")
+        } catch {
+            reconcileError = error.localizedDescription
         }
     }
 
@@ -279,6 +416,22 @@ struct ShopCatalogOpsUploadSection: View {
     }
 
     // MARK: 文案
+
+    /// 把**变量**里的 `**强调**` 渲染成粗体。
+    ///
+    /// 根因（与 Mac 端 `opsMarkdown(_:)` 同一条）：`Text(字面量)` 会按 LocalizedStringKey
+    /// 解析 Markdown，而 `Text(变量)` 与 `Text("a" + "b")` **不解析** ——
+    /// 不转的话 `**不会被删**` 会逐字显示成星号，**不崩、不报错、编译与单测全绿**。
+    /// 参数（`.inlineOnlyPreservingWhitespace`）两个都不能去，理由同 Mac 端那一份。
+    private func emphasisText(_ text: String) -> Text {
+        if let attributed = try? AttributedString(
+            markdown: text,
+            options: AttributedString.MarkdownParsingOptions(
+                interpretedSyntax: .inlineOnlyPreservingWhitespace)) {
+            return Text(attributed)
+        }
+        return Text(text)
+    }
 
     private var hasFailedJobs: Bool {
         uploadStore.jobs.contains { $0.status.allowsManualRetry }

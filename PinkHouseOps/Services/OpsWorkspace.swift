@@ -363,33 +363,66 @@ final class OpsWorkspace: ObservableObject {
         }
     }
 
-    // MARK: 用「从线上拉回」的内容替换草稿（方案 §5 的「当前线上完整基线」）
+    // MARK: 以「从线上拉回」的那一版为准对齐草稿（方案 §5 的「当前线上完整基线」）
 
-    /// 用「从线上拉回」的一份目录**替换当前草稿的全部内容**，
-    /// 并**把这一版直接记为基线快照**。
+    /// 只读：算出「以线上那一版为准对齐」会做哪些改动（**不写任何东西**）。
     ///
-    /// ## 与 `importCatalog(from:)` 的唯一差别 —— 但很关键
+    /// 为什么必须有「先看差异」这一步：对齐**会移除**本地多出来的条目
+    /// （线上那一版里没有的那些），而这一步不可撤销。只给一个「对齐」按钮的话，
+    /// 运营点完才知道自己少了什么 —— 那就是静默删除。
     ///
-    /// 内容替换那段**复用**导入路径（`canMutate` 门禁 / 解码 / `markDirty` / 落盘
-    /// 都已经在那里做对了，不另写一份）。这里多做的只有一件事：**写基线快照**。
+    /// - Returns: 报告；nil = 读不出线上那份目录（原因在 `lastError` 里）。
+    func reconcilePreview(from url: URL) -> ShopCatalogReconcileOutcome? {
+        guard let remote = decodeCatalogFile(at: url, purpose: "对账预览") else { return nil }
+        lastError = nil
+        return ShopCatalogReconcile.outcome(local: catalog, remote: remote)
+    }
+
+    /// 以「从线上拉回」的那一版为准，把当前草稿**逐条对齐**过去，
+    /// 并把这一版记为基线快照。
     ///
-    /// 拉回来的内容就是线上那一份，所以它天然是「与线上比对过了的参照物」。
+    /// ## 语义是**逐条对账**，不是整份替换（2026-09-29 改口径）
+    ///
+    ///   线上有、本地没有 → 加进来（增量）
+    ///   两边同一个 id    → 用线上那份覆盖
+    ///   本地有、线上没有 → 从本地移除（这就是「被替换掉」的那一半）
+    ///
+    /// 结果**等于线上那一版**，只有两处例外 —— 销售历史只增不删
+    /// （append-only，且线上分片是已下发口径，归档商品的历史不在其中）、
+    /// 本地独有的下架记录保留。两条例外都由
+    /// `ShopCatalogReconcile.outcome(local:remote:)` 逐条列出来，绝不静默。
+    ///
+    /// 旧实现（`importCatalog` 整份替换）的问题不是「结果不对」，而是
+    /// **看不出发生了什么**：替换完只知道条数，不知道哪些被覆盖、哪些被抹掉。
+    ///
+    /// ## 基线快照在这里写
+    ///
     /// 不写快照的话，下一次发布的差分会把**整份目录**都算成「本次新增 / 修改」，
     /// 于是严格策略的作用域被放大到全部存量内容 —— 那正是 R08 要避免的
     /// （「顺手改一句文案，却被隔壁一个用了裸文件名的老商品卡住」）。
+    /// 快照记的是**对齐之后**的这份内容（也就是「自此以后改动集归零」），
+    /// 与旧口径一致；对齐保留的本地销售历史/墓碑因此不算本次改动。
     ///
-    /// ## 语义是**替换**，不是合并
+    /// ⚠️ 调用方必须先把 `reconcilePreview(from:)` 的结果给运营看过再确认。
     ///
-    /// 未发布的本地改动会丢掉。所以调用方必须先把
-    /// `OpsPulledCatalogAdoption.caveats(...)` 的每一条给运营看过并拿到明确确认 ——
-    /// 「替换」这个动作不该由一次点击悄悄完成。
+    /// - Returns: 实际执行的报告；nil = 失败，原因在 `lastError` 里。
     @discardableResult
-    func adoptPulledCatalogContent(from url: URL, baseline: ShopCatalogBaseline) -> Bool {
-        // 内容替换（含 canMutate 守卫 → 损坏草稿会被拒）
-        guard importCatalog(from: url) else { return false }
-        guard let draft else { return true }
+    func alignCatalogToPulledContent(
+        from url: URL,
+        baseline: ShopCatalogBaseline
+    ) -> ShopCatalogReconcileOutcome? {
+        // 写入门禁（损坏草稿一律拒绝 → R03 的隔离态不许被覆盖）
+        guard canMutate() else { return nil }
+        guard let remote = decodeCatalogFile(at: url, purpose: "对齐线上目录") else { return nil }
 
-        // 基线快照 = 刚拉回的这份内容；基线本身按环境记录（跨环境比对必然误判）
+        let (aligned, outcome) = ShopCatalogReconcile.align(local: catalog, remote: remote)
+        catalog = aligned
+        // 对齐是一次内容变更，同样要过版本与校验失效（R01）
+        markDirty()
+        guard saveDraft() else { return nil }
+        guard let draft else { return outcome }
+
+        // 基线快照 = 对齐之后这份内容；基线本身按环境记录（跨环境比对必然误判）
         draft.baselineCatalog = catalog
         draft.baseline = baseline
         // ⚠️ 顺序要紧：先把内存工作副本收敛到存储精度，再落盘。
@@ -399,15 +432,34 @@ final class OpsWorkspace: ObservableObject {
         do {
             try context.save()
             let seq = baseline.releaseSeq.map(String.init) ?? "未知"
-            statusMessage = "已用线上拉回的内容替换当前草稿，基线记为 releaseSeq \(seq)"
+            statusMessage = "已按线上那一版对齐当前草稿（\(outcome.summaryText)），"
+                + "基线记为 releaseSeq \(seq)"
                 + (baseline.environment.map { "（\($0)）" } ?? "")
-                + "。这次的改动集已归零，之后的编辑才算「本次新增 / 修改」。"
+                + "。之后的编辑才算「本次新增 / 修改」。"
             lastError = nil
-            return true
+            return outcome
         } catch {
-            lastError = "内容已替换，但基线没写进库：\(error.localizedDescription)"
+            lastError = "内容已对齐，但基线没写进库：\(error.localizedDescription)"
                 + "请重新拉一次，否则这次的修改会被当成整份目录的改动。"
-            return false
+            return nil
+        }
+    }
+
+    /// 读一份 `shop-catalog.json`（**只读**，不改任何状态）。失败写 `lastError`。
+    ///
+    /// 单独抽出来是因为「对账预览」与「真正对齐」必须读**同一份**文件、
+    /// 走同一条解码与 security-scoped 处理 —— 两条路径各写一遍，
+    /// 迟早出现「预览说删 3 条、执行时删了 5 条」。
+    private func decodeCatalogFile(at url: URL, purpose: String) -> ShopCatalog? {
+        let accessed = url.startAccessingSecurityScopedResource()
+        defer { if accessed { url.stopAccessingSecurityScopedResource() } }
+        do {
+            let data = try Data(contentsOf: url)
+            return try ShopCatalogJSONCoding.decoder().decode(ShopCatalog.self, from: data)
+        } catch {
+            lastError = "\(purpose)失败（目录 JSON 解不开，当前草稿未改动）："
+                + error.localizedDescription
+            return nil
         }
     }
 

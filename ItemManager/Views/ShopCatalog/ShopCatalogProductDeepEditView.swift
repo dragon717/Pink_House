@@ -118,12 +118,14 @@ struct ShopCatalogProductDeepEditView: View {
             ShopCatalogChartPasteButton(kind: .sizeChart,
                                         columnsText: $chartColumnsText,
                                         rowsText: $chartRowsText)
-            TextField("尺码表列名（逗号分隔，如：尺码,胸围,衣长）", text: $chartColumnsText)
+            // 「尺码」是行标签列，不写进列名（与 `CatalogChartTextSyntax.labelColumnNames` 同一口径）
+            TextField("尺码表列名（只写数据列，逗号分隔，如：胸围,衣长,肩宽）", text: $chartColumnsText)
                 .font(.system(size: 13))
             TextEditor(text: $chartRowsText)
                 .frame(minHeight: 60)
                 .font(.system(size: 13))
-            Text("尺码表行：每行「标签:值,值,…」与列一一对应（如「M:84,52」）")
+            // 示例值个数必须与上面的列名个数一致（尺码表列 = 胸围/衣长/肩宽 共 3 个）
+            Text("尺码表行：每行「标签:值,值,…」与列一一对应（如「M:84,52,38」）")
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)
             TextField("单位（cm）", text: $chartUnit)

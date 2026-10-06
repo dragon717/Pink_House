@@ -175,9 +175,10 @@ nonisolated enum CatalogChartParser {
 nonisolated enum CatalogManualChartText {
 
     /// 行标签列的列名（用户在列头里把标签列也写进去时，剔除以免与角落标签列重复）
-    static let labelColumnNames: Set<String> = [
-        "尺码", "尺寸", "规格", "型号", "项目", "款式", "商品", "名称", "颜色", "size", "item",
-    ]
+    ///
+    /// ⚠️ 名单已上收共享包 `CatalogChartTextSyntax.labelColumnNames`（**唯一口径**）——
+    /// Mac 侧要按同一份名单做同样的剔除，否则「Mac 放行、iOS 整列错位」（2026-10-01 实测）。
+    static var labelColumnNames: Set<String> { CatalogChartTextSyntax.labelColumnNames }
 
     /// 词元清洗：去掉尾部冒号（全半角）与逗号（全半角），如「86-92:」→「86-92」
     static func cleanToken(_ token: String) -> String {
@@ -220,15 +221,12 @@ nonisolated enum CatalogManualChartText {
 
     /// 全角 → 半角（：，｜、全角空格）+ 去 Markdown 强调符与反引号。
     /// 粘贴来源五花八门（微信 / 备忘录 / Excel / 模型回复），先归一再解析。
+    ///
+    /// ⚠️ 实现已上收到共享包 `CatalogChartTextSyntax.normalizedSeparators`（**唯一口径**）：
+    /// Mac 侧原先**只**在列名里认全角逗号、行值里不认，同一段文本 iOS 过 / Mac 不过
+    /// （2026-10-01 实测缺陷）。这里保留这个入口只为**不改 iOS 调用点**，行为与上收前逐字一致。
     static func normalizeSeparators(_ text: String) -> String {
-        var result = text
-        result = result.replacingOccurrences(of: "：", with: ":")
-        result = result.replacingOccurrences(of: "，", with: ",")
-        result = result.replacingOccurrences(of: "｜", with: "|")
-        result = result.replacingOccurrences(of: "　", with: " ")
-        result = result.replacingOccurrences(of: "**", with: "")
-        result = result.replacingOccurrences(of: "`", with: "")
-        return result
+        CatalogChartTextSyntax.normalizedSeparators(text)
     }
 
     /// 渲染 / 保存前的统一规范化（旧数据里已存入的重复标签列在此兜底修复）：
@@ -251,8 +249,9 @@ nonisolated enum CatalogManualChartText {
         return (Array(columns.dropFirst()), cleanedRows)
     }
 
+    /// 这个列名是不是「行标签列」（口径唯一出处：`CatalogChartTextSyntax.isLabelColumn`）
     static func isLabelColumn(_ name: String) -> Bool {
-        labelColumnNames.contains(name.lowercased())
+        CatalogChartTextSyntax.isLabelColumn(name)
     }
 
     // MARK: 整段文本 → 表格（「粘贴录入」与「多模态回复」共用口径，2026-09-23 需求 M）

@@ -119,6 +119,145 @@
   另：`priceChartImageText` state 必须留在系列编辑页——它承载既有 `priceChart.sourceImage`，
   删掉会让「打开→保存」把用户已上传的原图静默抹掉。
 
+### 识别结果提示：判定与文案只有一份（2026-10-01 需求）
+
+用户需求原文：提交数据后要按识别结果给明确提示，区分「识别成功 / 识别失败」；
+尺码表与价格表**各自**给对应提示；最终要在手机端以**可视化板块**展示，且移动端显示完整、适配良好。
+
+- ⭐ **唯一口径 = `SharedCatalog.CatalogChartRecognition`**（`Packages/SharedCatalog/Sources/SharedCatalog/Editing/CatalogChartRecognition.swift`）。
+  随它一起迁过去的还有 `CatalogChartKind`（原在 iOS `CatalogChartExtraction.swift`）与
+  `CatalogChartQuality.issue(columns:rows:kind:)`（入参刻意用 `[String] + [CatalogSizeRow]`
+  而不是 iOS 的 `Table`，好让 Mac 复用）。**判定逻辑一字未改，只是换住址。**
+- **界面不许自己拼结论**：`headline` 恒为 `kind.displayName + "识别成功/失败"`——
+  运营常同时录两张表，只说「识别成功」等于没说。iOS 与 Mac **都只许读** `headline/detail/guidance`；
+  `guidance` 已按来源分两套话术（图像通道承诺「不写入」，粘贴通道承诺「不清空已有内容」）。
+- **失败输入不写库**：`guidance` 只在 `isSuccess == false` 时非 nil；
+  ⚠️ 但 `ShopCatalogChartPasteSheet.apply()` **只在解析出内容时才覆盖对应输入框** ——
+  原实现无条件赋值，「未识别到列名行」会把用户手填的列名**静默清空**。
+- **两种文本语法**：Mac 等号（`S = 80, 78-83`，`OpsChartTextParsing`）vs iOS 冒号
+  （`S:80,78-83`，`CatalogManualChartText`）。**Mac 侧示例文案抄 iOS 那套 = 照着填必然识别失败**
+  （2026-10-01 实际踩到，`OpsSeriesConfigView` 已修）。
+  `OpsSeriesSizeChartParsing.parse(entry:)` 与新写的 `OpsChartTextParsing.parse(columnsText:rowsText:)`
+  是**同语法的两份实现**（消息文案与「列行必须同时填写」的宽松度不同，当时**有意未合并**）；
+  谁改其一都要顺手核另一个。
+- **移动端板块** `ItemManager/Views/ShopCatalog/CatalogChartRecognitionCard.swift`：
+  成功绿 / 失败红（`accent.opacity(0.10)` 底 + 描边，不写死表面色）、**不设固定宽度**、
+  长表走 `ScrollView(.horizontal)`（行标签列固定 88pt 常驻）、文案 `fixedSize(horizontal:false, vertical:true)`
+  **换行不截断**、字号一律语义字号（Dynamic Type 放大不许截断）。
+  `ShopCatalogChartPasteButton` 改成 `VStack`：按钮 + **下方常驻板块** → 一处改动覆盖 5 个录入点。
+- ⭐ **表格里的行标签与列名必须「换行显示完整」，绝不 `lineLimit(1)` 截断**。
+  价格表的**行标签就是款式名**（不是 S/M/L），截断成「大蝴蝶结…」等于吃掉最关键的信息；
+  商品详情页 `ShopCatalogProductDetailView.structuredTable` 一直是「固定宽 + 换行」，两处同一口径。
+  行标签列宽**必须固定**（88pt）——各行宽度不同会让后面的值列错位。
+  **只有值可以单行**（数字换行没意义）。回归锁：`testLongRowLabelWrapsInsteadOfTruncating`
+  （长标签更高 + **表宽不变**，两条一起才说明「换行」而不是「列宽被内容带跑」）。
+- **交互验收标识（稳定契约，别改）**：`CatalogChartRecognitionCard.rootIdentifier`
+  = `shopCatalog.chartRecognition.card`；`.headlineIdentifier` = `shopCatalog.chartRecognition.headline`
+  （它的无障碍 `label` == `summaryLine`，里面就带「识别成功 / 识别失败」）。
+  用例 `ItemManagerUITests/ShopCatalogChartRecognitionUITests.swift`。
+  ⚠️ 该板块的结论头用了 `.accessibilityElement(children: .ignore)`，因此**标题与徽标不是独立元素**，
+  断言只能按 identifier / label 查，别写 `app.staticTexts["预约价格表识别失败"]`。
+- ⚠️ **`CatalogChartExtraction` 的「上传图片识别」入口不能加回**（见上一条 09-23 需求一）。
+  2026-10-01 一轮误把它接回粘贴面板（甚至加了 `ShopCatalogImagePickerButton.onImagePicked`
+  与 `CatalogChartExtraction.recognize(image:kind:)`），已全部回退。**加任何「识别」相关 UI 前先读这一节。**
+
+### 图表文本录入的格式契约（2026-10-01 用户报障）
+
+> 用户原文：「还是不成功，请给我一个标准模板」。报错「行「XS」有 7 个值，而列名有 8 个」，
+> 而他写的列名是 `尺码,后衣长,胸围,腰围,肩宽,袖长,袖口,领围`。
+
+- ⭐ **切分 / 归一化 / 个数校验的唯一口径 = `SharedCatalog.CatalogChartTextSyntax`**：
+  `normalizedSeparators` · `splitColumns` · `splitValues` · `dataColumns(from:)` ·
+  `parseRowLine` / `parseRowLines`（返回 `Result<RowLine, RowLineIssue>`，**只报事实不带文案**，
+  措辞留给各端）。Mac 两个解析器与 iOS 的 `normalizeSeparators` 全部调它 ——
+  **禁止再各留一份**（原先 Mac 只在**列名**里认全角逗号、**行值**里不认）。
+- ⭐ **列名只写数据列**。「尺码 / 款式」是**行标签列**（渲染时占最左边那一列），
+  写进列名会被 `dataColumns` 剔除。`labelColumnNames` 也已上收共享包（iOS 原名单）。
+- ⭐ **行值个数必须等于「剔除行标签列后」的数据列个数**；分隔符先全角→半角归一。
+  **不要在 `=` 后为行标签留空位**。
+- ⭐⭐ **为什么这两条是硬规则（不是易用性问题）**：写错会让 Mac **放行**（按含标签列的列数校验）
+  而 iOS 渲染时 `CatalogManualChartText.normalized` 把该列**剔掉**、行值不剔 ⇒
+  **整列左移、末值丢弃**（实测：`胸围` 显示成后衣长的值），**界面全程显示「识别成功」**。
+  ⚠️ **改任何「列数 / 值个数」相关判定前，先确认校验口径与渲染口径是同一份。**
+- ⭐ **标准模板 = `CatalogChartTemplate.SizeChart` / `CatalogChartTemplate.PriceChart`**
+  （unit / columnsText / rowsText / 行标签 / `sampleRowText`；价格表另有 `extendedColumnsText` /
+  `extendedRowsText` 给「加一列备注」）。README：改模板**必须**跑
+  `Packages/SharedCatalog` 的 `swift test`。
+  Mac 两张卡（尺码表 / 系列价格表）的「用标准模板填入」按钮与回归测试**读同一份**。
+  它放在共享包而不是 Mac target，是为了能被 `swift test` 秒级验证 ——
+  `PinkHouseOpsTests` 是 **App 宿主式**，本机 `xcodebuild test` 会**永久挂起**
+  （2026-10-01 实测 6m37s 后 `The test runner hung before establishing connection.`）。
+- ⭐⭐ **界面示例必须与模板同源（2026-10-07 补）**。`placeholder` / 「每一行：…」提示 /
+  粘贴面板的 `example` 各写一份，必然互相矛盾 —— 实测两处：
+  价格表 placeholder 举例 **4 列**、同卡提示只写 **3 列**（`款式 = 预约价, 定金, 尾款`）；
+  尺码表 placeholder 举例 **3 列**、提示只给 **2 个值**（`S = 80, 78-83`）。
+  用户照哪一句填都可能失败。现在一律读
+  `CatalogChartTemplate.*.columnsText` / `.sampleRowText`（`firstRow(of:)` 取首行）；
+  iOS 的 `example` 由模板派生，**只做「等号 → 冒号」的等价替换**
+  （两端行语法不同：iOS `parseRows` 按**冒号**切，Mac `OpsChartTextParsing` 按**等号**切）。
+  锁：`CatalogChartTemplateTests` + `ShopCatalogChartPasteExampleTests`
+  （后者含**负向对照**：把 2026-10-01 那段旧坏示例拿来跑同一套口径，要求它**不合格**
+  —— 否则那些断言可能只是恒真）。
+- ⭐ **价格表的两条领域事实（别写错文案）**：
+  ①「单位」是**金额单位**（`元` / `¥`，客户端展示为「单位：元」），**不是**尺码表的 `cm`
+  —— Mac 价格表卡片原先的 placeholder 写的就是「如 cm / inch」，从旁边那张卡抄来的；
+  ② 价格表是**系列级展示表**，**不是定价来源** —— 真价格来自类型条目里的
+  预约价/定金/尾款/现货价（`CatalogSaleEvent`），**两者之间没有自动校验**，
+  靠运营自己保持一致（模板页里对用户明写了这一条）。
+- ⭐ **价格表的四列就是领域模型的四个价格槽**：预约价 / 定金 / 尾款 / 现货价
+  （预约价+定金+尾款 = 一条 reservation 记录；现货价 = 一条独立 stock 记录）。
+  没有「数量」「金额」两列 —— 数量由客户加购时选择，金额由应用按价格口径算。
+  列名是**自由文本**，想加列（如「备注」）可以，只要每行值个数跟着一致。
+  模板示例数字满足 **定金 + 尾款 = 预约价**（318=91+227 等），用户改数字前先看到的是自洽的一组。
+- ⭐ **界面上的示例文案就是隐式规范**。原 placeholder 写的
+  「列名（逗号分隔，如：**尺码**, 前裙长, 推荐胸围）」直接把用户教进坑（Mac + iOS 共 4 处，
+  已改成「只写数据列，如：前裙长,胸围,袖长」）。改示例前先想：照它写会不会失败。
+- 失败文案要**能照着改**：「有 N 个值，而数据列有 M 个 —— 请补齐到 M 个；列名里的「尺码」是**行标签列**、不占数据列的名额，不要再为它留空位。」
+
+### 系列价格表的「上传原图」入口在向导 S2（2026-10-07 用户需求）
+
+> 用户原文：「请把价格表的上传功能集成到当前页面中，实现文件选择与上传操作，
+> 上传成功后展示或解析价格表内容，并处理上传失败、文件格式不支持等异常情况。」
+> 他当时截图的是向导 **S1**，意思是「就在我正在用的这个向导里」。
+
+- ⭐ **落点是 S2·系列资料，不是 S1**：价格表是**系列级资料**，S1 只管选店家/选系列。
+  为防「功能改到哪去了」，S1「归属摘要」卡里加了一行**指路**（这是本条需求的另一半）。
+- ⭐⭐ **切系列必须重载/清空价格表块**（`reloadPriceChartFromSelectedSeries()`，在
+  `seriesChoice` 的 setter 里调）。`OpsSeriesEntryDraft` 长期持久化在
+  `OpsCatalogDraftRecord.seriesEntryJSON` 里 → 在 A 系列填/传的东西会被**原样写进 B**，
+  **全程无报错、界面看不出异常**。
+  ⚠️ **只在用户显式切系列时跑**；**不许做 `onAppear` 自动装载** —— 那会把手打了一半、
+  还没提交的向导内容用系列上的旧值覆盖掉（违反「失败不丢输入」）。
+  ⚠️ 同形状的既有隐患（本轮未修）：`coverAssetID` 切系列时同样不重载。
+- ⭐ **`declaresPriceChart` 是显式开关，不是多余**：「这一项没填」与「我要清空」在数据上
+  长得一样（都是空串）→ 没开关的话，走一次向导就**静默清掉**系列上已有的价格表。
+  关着 = 提交**一个字都不写**（`applySeriesPriceChartFromWizard` 直接 `return true`）。
+- ⭐ **「只有原图、没有结构化列行」是合法状态**，不是失败：
+  `CatalogPriceChart.hasStructuredContent == false` 时客户端直接展示原图（模型契约原文）。
+  所以 S4 摘要里不许把它显示成「0 列 · 0 行」，要说「只有原图…」。
+- ⭐ **上传结果三类必须分开**（仓库「点了没反应 ≠ 失败了」的又一例）：
+  取消 = **什么都不说**；全部失败 = 卡片内逐条 + `lastError`；部分成功 =
+  「已上传 N 张」**和**「M 个没能上传」**两句同时在卡片里**。
+- ⭐ **文件类型只有一份定义**（`OpsWorkspace.priceChartFileTypes`）：界面「支持 PNG / JPEG / …」
+  文案、文件选择器过滤器、导入前 `isSupportedPriceChartFile` 校验**共用它**；
+  格式清单从 `preferredFilenameExtension` 派生，不手打。
+  选择器**故意放宽到 PDF / 表格 / 文本** —— 很多人是拿 Excel 排好表再导出的，灰掉一片
+  只会让人以为功能坏了；选中后给一句**可执行的拒绝**。
+- ⭐ 导入走 `importSingleImage`（**不另写第二套规范化/staging 路径**），
+  **一张失败不中断其余**，返回**按选择顺序**的 asset id（`sourceImage` 恒取首图，顺序有意义）。
+- ⭐ 解析**唯一入口** `OpsSeriesEntryDraft.parsedPriceChart`（底层就是系列配置 sheet 保存时用的
+  `OpsChartTextParsing.parse`）→ 识别卡片、S2 校验、提交写回**看到的是同一份结构**。
+  规则放在 `OpsSeriesPriceChartValidation.issues(for:)`（Services），Models 只调一个纯函数，
+  免得 `OpsSeriesEntryDraft.swift` 反向依赖文本口径。
+- ⚠️ **`Label(变量, systemImage:)` 也不解析 Markdown**（与 `Text(变量)` 同坑，见上面的 Markdown 节）。
+  取消关联的提示里带 `**没有删除**` → 必须写成 `Label { opsMarkdown(变量) } icon: { … }`。
+  门禁只查它清单里的调用点，**新写的变量文案要自己过一遍**。
+- 取证：`OpsSnapshotHarness` 除四张分区图外**另拍**
+  `seriesEntry-profile.png` / `seriesEntry-profile-bad.png`（S2 正常态 + 故意造的值个数不齐失败态，
+  画布 1280×1180）。入口是初值参数 `OpsSeriesWizardView(workspace:initialStep:)` /
+  `OpsMainView(initialWizardStep:)`。⚠️ S2 卡片**不在 S1 上**，不单拍就永远看不到 ——
+  「看不到」和「没做」事后分不出来。
+
 ## 删除守卫
 - `previewProductDeletion` 与 `deleteProducts` 共用 `planProductDeletion`；**整批只写一次覆盖层**，禁循环调单品删除。守卫（09-25 需求一后）：**只剩种子不可删**；**用户引用不再拦截删除**——用户衣橱/心愿记录是加入时快照，删除发布内容不影响它们（数据独立），涉及条数走 `preservedRecordCount`（单品 `deleteProduct` 返回 Int）如实汇报；级联清 variants/sizeCharts，销售事件保留；部分成功绝不静默。`referencedOnlyArchive` 错误与 `.referencedByUserData` 拦截原因已删。
 - **`ShopCatalogReferenceGuard.referencedRecordCount` 谓词必须用存储属性 `deletedAt == nil`，禁用 `isDeleted`**——后者谓词下推会抛「No eligible connection available」（09-25 实测崩溃）。
@@ -614,15 +753,46 @@ python3 ops_publish_bridge.py --mode pull-catalog --request request.json
 - 界面上它挡住的是「读完基线 → 切到别处 → 期间别人又发了一版 → 回来点发布」这个窗口；
   App 侧本地的 `submissionBlockers` 挡不住它（那一个是几分钟前读到的快照）。
 
-### 离线回归锁
+### 回归锁（2026-09-29 起：**没有离线演练了，别去找 `drill_*`**）
 
-`drill_bridge_offline.py` **49 项**（原 32 + 阶段 1b「线上还没发布头时拉回」+
-阶段 3b「R07 闸门 5 例」+ 阶段 3c「拉回有内容」）。其中一条专门证明**只读**：
-拉回前后 `live/THRelease.json` **逐字节未变**。
+`drill_bridge_offline.py` / `drill_offline.sh` 与 `localFixture` 环境、`filesystem` 适配器
+分支**已随 09-29 清理一并删除**（走的是与 CloudKit 不同的实现，全绿说明不了线上行为）。
+现在只剩下四份**离线自检**，锁的是不变量、不碰网络：
 
 ```bash
-cd tools/time_hall/publication && python3 drill_bridge_offline.py   # 通过 49 项，失败 0 项
+cd tools/time_hall/publication
+python3 selftest_shop_catalog.py        # 35 项
+python3 selftest_cloudkit_read.py       # 18 项（读/写闸门）
+python3 selftest_network_failover.py    # 16 项（TLS 之后仍换地址）
+./.venv/bin/python selftest_signing.py  # 6 项（要 cryptography）
 ```
+
+**拒绝路径（摘要不符 / 同号重发 / 缺图 / 篡改）只能在真连上验**
+（`--mode baseline` / `--mode pull-catalog` 只读，见 skill 的 §1e）。
+
+### C：拉回之后**怎么落到本地** —— 以线上为准逐条对账（2026-09-29 补）
+
+`--mode pull-catalog` 只给出一份「线上那一版」的 JSON（已下发口径）。
+把它落到本地这件事，口径是**逐条对账**（不是整份替换，也不是「保本地并集」）：
+
+| 情形 | 结果 |
+|---|---|
+| 线上有、本地没有 | 加进来 |
+| 两边同一个 id | 用线上那份覆盖 |
+| 本地有、线上没有 | 从本地**移除** |
+| 本地独有的销售事件 | **保留**（append-only；线上剔过归档商品的事件） |
+| 本地独有的下架墓碑 | **保留**（并集，否则线上还带着的条目会在本机复活） |
+
+- 唯一口径：`SharedCatalog` 包的 `ShopCatalogReconcile`（`Editing/ShopCatalogReconcile.swift`）。
+  差分**复用** `ShopCatalogChangeSetCalculator.diff`，不另写第二套逐 id 比对；
+  `isAligned(_:with:)` 自证「结果等于线上那一版」；对账幂等。**两端都调它，不许各写一份。**
+- Mac：`OpsWorkspace.alignCatalogToPulledContent(from:baseline:)`
+  （旧名 `adoptPulledCatalogContent` 已删）+ 只读 `reconcilePreview(from:)`；
+  界面**先预览再执行**（没预览过按钮禁用）。
+- iOS：`ShopCatalogStore.alignLocalCatalogToRemote()`；写覆盖层时写的是
+  `localOnlyRemainder`（只留两条例外）—— 覆盖层优先级高于远端层，
+  **整份写进去会给本机盖一层快照，之后线上发新版本会被同 id 的旧副本挡住，界面看不出来**。
+- 这条动作**只改目录内容，不碰 staging 图片**：对齐之后照样可能缺图，由图片门禁拦。
 
 ## ⭐ Mac 运营 UI 的 Markdown 渲染：`opsMarkdown` 以前是**坏的**（09-27 快照取证）
 
@@ -710,3 +880,158 @@ python3 tools/ops_ui/check_markdown_callsites.py --self-test # 内嵌 18 例自�
 ⚠️ **快照覆盖不到的地方**：`OpsSeriesConfigView` 是 `.sheet`、确认弹窗是 `confirmationDialog`
 —— **六个分区快照里都看不到**。所以 `**驱动自动流转**` 那一处的修复只有门禁 + 源码能证，
 **没有图证**。要图证就得让 harness 能打开 sheet / 弹窗（目前不支持）。
+
+---
+
+## MIME 判定必须纯查表：`mimetypes` 让 App 内发布**必挂**（09-29 根因修复）
+
+### 症状（用户原文）
+
+App 内点「构建并发布到 Development」→ `build_release.py 退出码 1` → `退出码 3 · 结论 refused`：
+
+```
+File ".../build_release.py", line 396, in rewrite
+    mime_type = mimetypes.guess_type(file_name)[0] or "application/octet-stream"
+File ".../python3.9/mimetypes.py", line 291, in guess_type
+    init()
+File ".../python3.9/mimetypes.py", line 364, in init
+    db.read(file)
+File ".../python3.9/mimetypes.py", line 205, in read
+    with open(filename, encoding='utf-8') as fp:
+PermissionError: [Errno 1] Operation not permitted: '/etc/apache2/mime.types'
+```
+
+### 根因
+
+`mimetypes.guess_type()` **首次调用**会触发 `mimetypes.init()`，去读系统 mime 库
+（`/etc/apache2/mime.types`、`/etc/mime.types`、`/usr/share/mime/...`）。
+桥接器是 App 的**子进程、继承 App 沙盒** → 读 `/etc` 被拒。
+
+⭐ **这是「CLI 全绿、App 必挂」的典型**：终端里直跑桥接器**永远复现不出来**
+（终端有读 `/etc` 的权限），所以不能拿「CLI 跑得过」当验收。
+
+### 修法（唯一口径）
+
+- `protocol.MEDIA_SUFFIX_TO_MIME` + `protocol.media_mime_type(file_name)`：**纯查表**，
+  认不出来一律回落 `application/octet-stream`（不在白名单 → 上游按「不发布」处理）。
+- `build_release.py` **删掉 `import mimetypes`**，改调 `media_mime_type(file_name)`；
+  原处留警示注释。
+- ⭐ **白名单 `MEDIA_MIME_ALLOWLIST` 与映射同址、必须闭合**：加新后缀要两处一起改
+  （`selftest_shop_catalog.py` 有断言锁这条）。
+
+### 通用规则
+
+**App 子进程路径上的代码不许依赖任何系统文件库**。`mimetypes` 是第一个；
+`zoneinfo` / `locale` / `ssl` 默认 CA 库之类同理要留意。
+判据不是「CLI 跑得过」，而是「**在禁读 `/etc`、`/usr/share`、`/var/db` 的剖面下跑得过**」。
+
+### 剖面法（本机唯一能复现「App 沙盒读不到 X」的手段）
+
+App 的沙盒子进程**没法在本机单独拉起**（GUI 沙盒）。等价做法：同进程里 patch
+`builtins.open` / `io.open` / `os.open`，命中 `/etc/`、`/private/etc/`、`/usr/share/`、
+`/var/db/`、`/private/var/db/` 就抛 `PermissionError(1, "Operation not permitted", path)`，
+再用 `runpy.run_path(bridge, run_name="__main__")` 跑桥接器（`sys.argv` 自己摆好）。
+
+⭐ **必须做反向对照**：同剖面下直接调 `mimetypes.guess_type("a.png")`，**必须**抛
+同一条 `PermissionError` —— 否则说明剖面是「空过」，绿色毫无意义。
+
+### 回归锁
+
+`selftest_shop_catalog.py`（35 → **41 项**）新增 6 项：4 项锁 MIME（沙盒剖面 build 通过 /
+MIME 与无沙盒一致 / 纯查表语义 / 白名单 ↔ 映射闭合），2 项**静态**锁
+`ops_publish_bridge.py` 的 build_argv（必须传 `--previous-release-seq`，且取自线上头 `head`）。
+拦截用 `builtins.open` 打 `/etc/`、`/usr/share/`、`/var/db/`。
+
+### 现成工具
+
+`tools/time_hall/publication/sandbox_profile_run.py`：
+
+```bash
+.venv/bin/python3 sandbox_profile_run.py --self-test                    # 反向对照自证
+.venv/bin/python3 sandbox_profile_run.py --request req.json --mode publish
+```
+
+`sys.argv` 里 `--` 之后的参数原样透传给桥接器；跑完在 stderr 打「拦到哪几次」或
+「全程未尝试读取系统文件库」。
+
+---
+
+## `previousReleaseSeq` 两端必须同口径（09-29）
+
+产物里的 `previousReleaseSeq` 语义 =「本版取代了哪一版」。
+
+- iOS `ShopCatalogOpsPublisher` 写 `snapshot?.header.releaseSeq`（它读到的那份头）。
+- Python 桥接器此前**从不传** `--previous-release-seq` → `build_release.py` 默认 **0**
+  → Mac 发出去的每一版都自称「没有上一版」。
+
+修法：在 R07 基线闸门之后（`head` 已读到并比对过）、`stage("build", "started")` 之前
+取 `previous_release_seq = int((head or {}).get("releaseSeq") or 0)`，写进 `build_argv`。
+**用 `head` 而不是请求里的 `baseReleaseSeq`** —— 后者在「基线不一致但已显式确认继续」
+那条路径上可能不等于线上真实序号。
+
+## `rootIndexHash` 不是内容寻址键：它每次都变（09-29）
+
+`rootIndexHash` = `root-index.json` 字节的 SHA-256，而那份 JSON 里带 `publishedAt`
+（构建时刻，`build_release.py` 写入）。⇒ **同样输入重建两次，摘要是不同的**（实测
+`272e1798…` vs `f97927f8…`，而 `payloadHash` 逐字相同）。
+
+- 别写「同样输入 ⇒ 同摘要」的断言，别拿它当缓存/幂等键。
+- 真正需要比对的场合（R07）比的是**线上发布头里那个值**：App 记 `receipt.rootIndexHash`，
+  发布器 `_head_matches_release` 再回读比一次（`release.rootIndexHash == head.rootIndexHash`），
+  两边读的是同一份 `release.json` → 永远自洽。
+
+---
+
+## 可售尺码「自动勾选 vs 手动取消」+ 规格区默认只显示颜色（10-07 需求）
+
+用户原话：「实现尺码表识别上传成功后的自动勾选逻辑……**同时允许用户手动取消已勾选的尺码**；
+**规格颜色区域默认仅显示颜色信息**。请明确勾选与取消的触发时机、颜色规格的显示规则。」
+
+### 1. 唯一口径在共享包，别在视图里写
+
+- 判定 = `SharedCatalog.CatalogSizeSelectionPolicy`：`normalized` / `hasNoSelection`
+  / **`autoFilled`（幂等）** / `missing` / `selectAll`。
+- 写回 = `OpsWorkspace.autoSelectSellableSizes(entryID:) -> Int`（返回**真改动过的颜色数**，
+  一次写回）。
+- ⭐⭐ **判据是「一个有效尺码都没勾」，不是「缺哪些就补哪些」。** 后者会把用户**手动取消**
+  掉的尺码反复勾回来 —— 看起来像「我的点击没生效」。只勾了一部分 = 人的显式选择，**一个字都不许动**。
+- 归一顺序一律**尺码表原始顺序**（勾选项就按它渲染）。
+- 「全选」按钮是**唯一**允许覆盖手动取消的入口（`selectAll`），与 `autoFilled` **刻意不同**，
+  别合并成一个函数。
+
+### 2. 触发时机只有 5 个，全是**人的明确动作**
+
+| # | 时机 | 落点 |
+|---|---|---|
+| ① | 尺码表**原图上传成功**后 | `assignAsset` 的 `.chartSource` 分支 |
+| ② | 点「**用标准模板填入**」后 | `applyTemplate()` 末尾 |
+| ③ | 尺码表文本改动、且这次改动让它**第一次**变成有效 | `chartTextBinding(_:)`（**写完再判**，直接绑 `$entry.x` 只能在写之前判） |
+| ④ | 打开「**区分尺码**」开关后 | `usesSizeChartBinding` |
+| ⑤ | **新增颜色**后 / **切换当前类型**后 | `colorSKUCard` 的 `.onChange(of: entry.colors.count)` / `.onChange(of: entry.id)` |
+
+- ⛔ **禁**在 `body` / `onAppear` 里「渲染时对账」：在 body 改 `@Published` = 无限刷新。
+- 尺码表被**改动**时**不无条件补** —— 无法区分「新加的尺码」和「用户故意不要它」。
+  这种情况界面只给一句「**还有 N 个没勾**」+「**全选**」按钮（`CatalogSizeSelectionPolicy.missing`）。
+
+### 3. 规格区默认只显示颜色
+
+- 口径 = `SharedCatalog.CatalogVariantColorGrouping`（`groups` / `colorTitle` / `sizeSummary`
+  / `leadingImage` / `missingImageCount` / `shouldGroup` / `allExpanded`）。
+- **默认一行 = 一个颜色**：代表图 + 颜色名 + 尺码摘要 + 缺图条数；点一行才展开逐条「色 / 码」。
+- ⭐ **代表图 = 该颜色里第一条有图的规格**，不是 `items[0]`（否则首条没配图时，
+  明明有图的颜色显示成空框）。
+- `nil` / 空串 / 纯空白 → 同一组「**未区分颜色**」（不是被丢掉、也不是拆成三行）。
+- 组顺序 = **首次录入顺序**；禁颜色名字典序、禁 `Set`/`Dictionary` 遍历序。
+- 只有一个颜色组时**不套「展开」**（分组不提供信息量，多一层点击只是烦）。
+- 展开态存在 `@State expandedVariantColors: Set<String?>`，**换商品时清空**
+  （否则 A 的展开态会带到 B，且集合只增不减）。
+- ⛔ **展开后的逐条行一律用 `workspace.variantLabel(color:size:)`** ——
+  不许为了「省掉重复的颜色名」再发明第二种展示名（那是第二份口径）。
+
+### 4. 取证（两张图必须不一样）
+
+`OpsSnapshotHarness` 额外拍 `seriesEntry-types` / `products-variants-folded`
+/ `products-variants-expanded`；**S3 必须用 1900 高画布** ——
+可售尺码勾选项长在**最后一张卡**（颜色 SKU）上，用 1180 高会把它连同
+「还有 N 个没勾」+「全选」一起裁掉，那张快照就什么也没证明。
+`OpsSnapshotHarnessTests` 对收起/展开两张额外断言**字节不同**（都生成但长得一样 = 分组没生效）。

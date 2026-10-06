@@ -57,6 +57,12 @@ struct SeriesConfigSheet: View {
     @State private var chartSourceImage = ""
     @State private var chartError: String?
 
+    /// 「用标准模板填入」的确认弹窗：**已经填过内容时先问一句**。
+    /// 这个按钮会一次覆盖单位 / 列名 / 数据行三个字段 ——
+    /// 悄悄吃掉运营手打的一整张价格表是不能接受的
+    /// （与尺码表那个按钮同一口径，见 `OpsSeriesWizardTypeEditor`）。
+    @State private var confirmsTemplateFill = false
+
     @State private var didLoad = false
 
     private var series: CatalogSeries? {
@@ -233,10 +239,27 @@ struct SeriesConfigSheet: View {
             }
             OpsFootnote(text: "系列级价格表整包系列共用，单品的详情页自动读它 —— "
                         + "不需要在每个商品上再录一遍。")
-            TextField("单位（如 cm / inch）", text: $chartUnit)
-            TextField("列名（逗号分隔，如：尺码, 胸围, 衣长）", text: $chartColumnsText)
+            // ⚠️ 价格表的「单位」是**金额单位**（详情页展示为「单位：元」）。
+            // 原先这里写的是「单位（如 cm / inch）」—— 那是**尺码表**的长度单位，
+            // 从旁边那张卡抄过来的，照着填会把长度单位写到价格表上。
+            TextField("单位（如 元 / ¥）", text: $chartUnit)
+            // 示例列名/行格式原先抄的是**尺码表**那套（尺码 = 值1, 值2），
+            // 与价格表的实际结构不符，照着填必然识别失败。
+            // ⚠️ 「款式」是**行标签列**（渲染时在角落），不要写进列名 —— 与尺码表同一条口径。
+            // ⭐ 示例文本一律读共享包的标准模板：placeholder 与下面那句「每一行」提示
+            // **同源**，就不会再出现「placeholder 举例 4 列、提示却写 3 列」这种自相矛盾
+            // （2026-10-01 用户报障的直接原因之一）。
+            TextField("列名（只写数据列，逗号分隔，如：\(CatalogChartTemplate.PriceChart.columnsText)）",
+                      text: $chartColumnsText)
             VStack(alignment: .leading, spacing: 4) {
-                Text("每一行：`尺码 = 值1, 值2, …`").font(.callout)
+                HStack(spacing: 8) {
+                    Text("每一行：`\(CatalogChartTemplate.PriceChart.sampleRowText)`")
+                        .font(.caption)
+                    Spacer(minLength: 8)
+                    Button("用标准模板填入") { requestTemplateFill() }
+                        .controlSize(.small)
+                        .help("填入一份格式一定正确的价格表（4 个数据列 × 3 行），照着改数字即可")
+                }
                 TextEditor(text: $chartRowsText)
                     .font(.body.monospaced())
                     .frame(height: 120)
@@ -244,6 +267,12 @@ struct SeriesConfigSheet: View {
                         RoundedRectangle(cornerRadius: 6)
                             .stroke(Color.secondary.opacity(0.25), lineWidth: 1))
             }
+            OpsFootnote(text: "**款式写在「=」左边**，不写进列名（渲染时它单独占角落那一列）；"
+                        + "「=」右边的**值个数要和列名一样多**。分隔符用半角逗号「,」。")
+            // 识别结果（2026-10-01 需求）：填完就得知道「认出来了没有」。
+            // 判定与文案来自共享包；与上面的保存路径同一份解析。
+            OpsChartRecognitionBlock(recognition: priceChartRecognition,
+                                     isInputEmpty: isPriceChartInputEmpty)
             Picker("价格表原图（首图即 `sourceImage`）", selection: $chartSourceImage) {
                 Text("不指定").tag("")
                 ForEach(workspace.catalog.assets) { asset in
@@ -273,52 +302,74 @@ struct SeriesConfigSheet: View {
                 .disabled(series?.priceChart == nil)
             }
         }
+        .confirmationDialog("用标准模板填入价格表？",
+                            isPresented: $confirmsTemplateFill) {
+            Button("覆盖当前的单位 / 列名 / 数据行", role: .destructive) {
+                applyTemplate()
+            }
+            Button("取消", role: .cancel) {}
+        } message: {
+            Text("当前的列名与数据行会被模板替换掉，这一步不能撤销。")
+        }
     }
 
     private func savePriceChart() {
         chartError = nil
-        let columns = chartColumnsText
-            .split(whereSeparator: { $0 == "," || $0 == "，" || $0 == "|" || $0 == "｜" })
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { !$0.isEmpty }
-        var rows: [CatalogSizeRow] = []
-        for rawLine in chartRowsText.split(separator: "\n", omittingEmptySubsequences: true) {
-            let line = String(rawLine)
-            guard let separatorIndex = line.firstIndex(of: "=") else {
-                chartError = "这一行没有「=」，格式应为 `尺码 = 值1, 值2`：\(line)"
-                return
-            }
-            let label = String(line[line.startIndex..<separatorIndex])
-                .trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !label.isEmpty else {
-                chartError = "有一行没有写尺码标签：\(line)"
-                return
-            }
-            let valuesPart = String(line[line.index(after: separatorIndex)...])
-            let values = valuesPart
-                .split(separator: ",", omittingEmptySubsequences: false)
-                .map { part -> String? in
-                    let trimmed = part.trimmingCharacters(in: .whitespacesAndNewlines)
-                    return trimmed.isEmpty ? nil : trimmed
-                }
-            if !columns.isEmpty, values.count != columns.count {
-                chartError = "「\(label)」有 \(values.count) 个值，而列名有 \(columns.count) 个。"
-                return
-            }
-            rows.append(CatalogSizeRow(label: label, values: values))
-        }
-        guard !columns.isEmpty, !rows.isEmpty else {
-            chartError = "价格表至少要有列名与一行数据。"
+        // 解析口径与「识别结果」板块**共用同一份**（`OpsChartTextParsing`）——
+        // 预览即落库结果，不存在「卡片说成功、保存说不行」。
+        let (parsed, issue) = OpsChartTextParsing.parse(columnsText: chartColumnsText,
+                                                        rowsText: chartRowsText)
+        guard let parsed else {
+            chartError = issue ?? "价格表至少要有列名与一行数据。"
             return
         }
         let images = chartSourceImage.isEmpty ? [] : [chartSourceImage]
         let ok = workspace.updateSeriesPriceChart(
             seriesID: seriesID,
             unit: chartUnit,
-            columns: columns,
-            rows: rows,
+            columns: parsed.columns,
+            rows: parsed.rows,
             sourceImages: images)
         if !ok { chartError = workspace.statusText ?? "保存失败，请看上方的提示。" }
+    }
+
+    // MARK: 标准模板
+
+    /// 点「用标准模板填入」：空的就直接填，非空先确认（不静默覆盖运营手打的内容）。
+    private func requestTemplateFill() {
+        if isPriceChartInputEmpty {
+            applyTemplate()
+        } else {
+            confirmsTemplateFill = true
+        }
+    }
+
+    /// 模板内容**只从共享包读**（`CatalogChartTemplate.PriceChart`）——
+    /// 界面不自己拼一份，所以「模板内容」与「模板还能不能过识别」永远只有一个答案。
+    /// （那份常量由 `swift test` 的 `CatalogChartTemplateTests` 锁着。）
+    private func applyTemplate() {
+        chartUnit = CatalogChartTemplate.PriceChart.unit
+        chartColumnsText = CatalogChartTemplate.PriceChart.columnsText
+        chartRowsText = CatalogChartTemplate.PriceChart.rowsText
+    }
+
+    // MARK: 识别结果（2026-10-01 需求）
+
+    /// 两个价格表输入框是否都为空（为空不显示结论卡片）
+    private var isPriceChartInputEmpty: Bool {
+        chartColumnsText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && chartRowsText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    /// 价格表识别结论。结构与落库同一份解析，判定与文案交给共享包，
+    /// 本视图不许自己拼「识别成功 / 识别失败」。
+    private var priceChartRecognition: CatalogChartRecognition? {
+        let (parsed, issue) = OpsChartTextParsing.parse(columnsText: chartColumnsText,
+                                                        rowsText: chartRowsText)
+        return OpsChartRecognition.make(kind: .price,
+                                        columns: parsed?.columns ?? [],
+                                        rows: parsed?.rows ?? [],
+                                        issue: issue)
     }
 
     private func assetLabel(_ asset: CatalogAsset) -> String {

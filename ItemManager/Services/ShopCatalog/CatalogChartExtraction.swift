@@ -29,125 +29,22 @@
 //
 //  纯逻辑（门禁 / 模型回复解析）全部 `nonisolated`，可离线单测，不依赖网络。
 //
+//  2026-10-01 需求：「尺码表和价格表的识别都要分别给出『识别成功 / 识别失败』提示」。
+//  判定口径与文案已迁到共享包 `CatalogChartRecognition`（两端同一份），本文件只留
+//  平台相关的编排：Qwen 读图 / Vision OCR / 结果归一。
+//  ⚠️ **不要在本文件（或任何 iOS 文件）里重新拼「识别成功 / 识别失败」结论** ——
+//  一律走 `CatalogChartRecognition`，否则两张表的文案很快会各写各的。
+//
 
 import Foundation
 import UIKit
 
-// MARK: - 图表类型
+// MARK: - 质量门禁与判定口径
 
-/// 图表用途：决定多模态提示词口径与质量门禁的数值要求。
-nonisolated enum CatalogChartKind: String, Sendable {
-    /// 预约价格表（行 = 款式，列 = 预约价 / 定金 / 尾款 / 现货价…）
-    case price
-    /// 尺码表（行 = 尺码，列 = 胸围 / 衣长…）
-    case size
-
-    var displayName: String {
-        switch self {
-        case .price: return "预约价格表"
-        case .size: return "尺码表"
-        }
-    }
-}
-
-// MARK: - 质量门禁（纯逻辑，可单测）
-
-/// 识别结果的**可用性判定**。nil = 可用；非 nil = 不可用原因（可直接展示给用户）。
-///
-/// 这个类型是「不再把垃圾填进输入框」的唯一依据：任何通道的结果都要先过这里。
-nonisolated enum CatalogChartQuality {
-
-    /// 判定阈值：数据格填写率低于此值视为「多数单元格没识别出来」
-    static let minimumFillRatio = 0.4
-
-    /// 结果里不应出现的说明性文字（模型很爱输出「列名：」「备注：」这类行）
-    static let metaLabels: Set<String> = [
-        "列名", "表头", "行名", "说明", "备注", "注意", "示例", "格式", "注意：",
-        "columns", "header", "note", "notes", "remark", "example",
-    ]
-
-    /// 允许出现的纯拉丁词元（尺码 / 常见表头英文），避免把正常英文表头误判成乱码
-    static let allowedLatinTokens: Set<String> = [
-        "size", "sizes", "item", "color", "colour", "style", "price", "prices",
-        "deposit", "balance", "total", "bust", "waist", "hip", "length", "shoulder",
-        "sleeve", "chest", "cuff", "hem", "height", "width", "weight", "unit",
-        "cn", "us", "uk", "eu", "cm", "mm", "kg", "jpy", "cny", "rmb", "usd",
-    ]
-
-    /// 检查一张解析结果是否可以进入输入框 / 直接展示
-    static func issue(with table: CatalogChartParser.Table, kind: CatalogChartKind) -> String? {
-        if table.columns.count < 2 {
-            return "只识别出 \(table.columns.count) 列（至少需要 2 列）"
-        }
-        if table.rows.isEmpty {
-            return "没有识别到任何数据行"
-        }
-
-        // 覆盖度：数据格填写率（「只识别出第一列」的典型特征是标签有值、数值全空）
-        let totalCells = table.columns.count * table.rows.count
-        let filledValues = table.rows.flatMap { $0.values.compactMap { $0 } }
-        let ratio = Double(filledValues.count) / Double(max(totalCells, 1))
-        if ratio < minimumFillRatio {
-            return "多数单元格没识别出来（\(filledValues.count)/\(totalCells) 格有值）"
-        }
-
-        // 全表无数字：价格表 / 尺码表的数据格必然带数字
-        if !filledValues.contains(where: { $0.contains(where: \.isNumber) }) {
-            return "没有识别到任何数值"
-        }
-
-        // 乱码词元（G PROMOTTOI 型 OCR 噪声）
-        let labels = table.columns + table.rows.map(\.label)
-        let garbage = labels.filter { isGarbageToken($0) }
-        if !garbage.isEmpty {
-            return "识别到疑似乱码文字「\(garbage.prefix(3).joined(separator: "、"))」"
-        }
-
-        // 行列错位：行标签与列名重名（「定金:尼款」型错位会在这里暴露）
-        if let misplaced = table.rows.first(where: { row in table.columns.contains(row.label) }) {
-            return "行标签「\(misplaced.label)」与列名重复，行列可能错位"
-        }
-
-        // 混入说明文字
-        if let meta = table.rows.map(\.label).first(where: { metaLabels.contains($0) }) {
-            return "结果里混入了说明文字「\(meta)」，不是\(kind.displayName)内容"
-        }
-
-        return nil
-    }
-
-    /// 是否疑似乱码词元。口径（保守，尽量不误杀正常英文表头）：
-    ///   1. 含中文 → 不是乱码；
-    ///   2. 长度 < 3 → 不是（S / M / L / XL 等尺码）；
-    ///   3. 命中白名单 → 不是；
-    ///   4. 存在 ≥3 个连续大写拉丁字母 → 是（`PROMOTTOI` 型 OCR 噪声的典型形态）；
-    ///   5. 拉丁字母 ≥3 且完全不含元音 → 是（`GXF` 型）。
-    static func isGarbageToken(_ token: String) -> Bool {
-        let trimmed = token.trimmingCharacters(in: .whitespaces)
-        guard trimmed.count >= 3 else { return false }
-        if trimmed.contains(where: { $0.isCJK }) { return false }
-
-        let lower = trimmed.lowercased()
-        if allowedLatinTokens.contains(lower) { return false }
-
-        // 连续大写拉丁 ≥3
-        var run = 0
-        for character in trimmed {
-            if character.isUppercase, character.isLetter {
-                run += 1
-                if run >= 3 { return true }
-            } else {
-                run = 0
-            }
-        }
-
-        // 拉丁字母 ≥3 且无元音
-        let letters = trimmed.filter { $0.isLetter }
-        guard letters.count >= 3 else { return false }
-        let vowels: Set<Character> = ["a", "e", "i", "o", "u"]
-        return !lower.contains(where: { vowels.contains($0) })
-    }
-}
+// `CatalogChartKind` / `CatalogChartQuality` / `Character.isCJK` 已迁至
+// `SharedCatalog/Sources/SharedCatalog/Editing/CatalogChartRecognition.swift`
+// （判定逻辑一字未改，只是换了住址好让 Mac 运营端共用）。iOS 侧经
+// `ItemManager/SharedCatalogBridge.swift` 的 `@_exported import` 直接可见。
 
 // MARK: - 多模态回复 → 表格（纯逻辑，可单测）
 
@@ -243,26 +140,23 @@ nonisolated enum CatalogChartModelReply {
 
 // MARK: - 统一提取编排
 
-/// 图片 → 结构化表格。多模态优先 → 端上 OCR 兜底 → 统一质量门禁。
+/// 图片 → 结构化表格 → **识别结论**。多模态优先 → 端上 OCR 兜底 → 统一质量门禁。
 ///
-/// 失败一律抛 `Failure.notUsable`，**绝不返回未过门禁的结果**——
-/// 这是「识别失败不要往输入框填乱码」这条需求的执行点。
+/// ⚠️ **本模块在 App 内没有界面入口，而且是故意的**（2026-09-23 需求一：用户反馈
+/// 上传图片自动识别「频繁报错 + 常驻霸屏」，要求整条移除；价格表只走「粘贴文本录入」
+/// + 列名/行文本/单位手填）。文件与它的测试按「其他保留」留下，**别再借它把入口加回来**。
+/// 下面这套门禁口径是该模块自身的契约，供离线单测与将来复用，不是待接的活。
+///
+/// 对外只剩 `accept(...)`（`nonisolated`）：给单测与真实链路共用，
+/// 不过门禁就抛 `Failure.notUsable`，**绝不返回未过门禁的结果**。
+///
+/// 「识别失败不要往输入框填乱码」这条需求的执行点，就是这里**只**经过共享包的
+/// `CatalogChartQuality` —— 界面侧的识别结论（成功/失败提示）走 `CatalogChartRecognition`。
 enum CatalogChartExtraction {
 
-    /// 结果来源（用于 UI 提示，让用户知道该信几分）
-    enum Source: String, Sendable {
-        /// 多模态大模型（能理解行列关系，优先）
-        case multimodalAI
-        /// 端上 Vision OCR（兜底）
-        case onDeviceOCR
-
-        var displayName: String {
-            switch self {
-            case .multimodalAI: return "AI 表格识别"
-            case .onDeviceOCR: return "本机文字识别"
-            }
-        }
-    }
+    /// 结果来源：与结论文案同源（`CatalogChartRecognition.Source`），
+    /// **不再单开一个枚举**——两处各写一份必然漂移。
+    typealias Source = CatalogChartRecognition.Source
 
     struct Outcome: Sendable {
         let table: CatalogChartParser.Table
@@ -299,42 +193,19 @@ enum CatalogChartExtraction {
     nonisolated static func accept(kind: CatalogChartKind,
                                    table: CatalogChartParser.Table,
                                    source: Source) throws -> Outcome {
-        if let issue = CatalogChartQuality.issue(with: table, kind: kind) {
+        if let issue = CatalogChartQuality.issue(columns: table.columns,
+                                                 rows: table.rows,
+                                                 kind: kind) {
             throw Failure.notUsable(reasons: ["\(source.displayName)结果不可用：\(issue)"])
         }
         return Outcome(table: table, source: source)
     }
 
-    // MARK: 真实链路
-
-    /// 图片 → 表格。多模态优先，失败退端上 OCR，两者都不过门禁则抛错（不返回垃圾）。
-    @MainActor
-    static func extract(image: UIImage, kind: CatalogChartKind) async throws -> Outcome {
-        var reasons: [String] = []
-
-        // 1. 多模态大模型（理解行列关系，优先）
-        do {
-            let reply = try await QwenService.shared.analyzeImage(
-                image: image,
-                prompt: CatalogChartModelReply.prompt(for: kind))
-            do {
-                return try accept(kind: kind, modelReply: reply)
-            } catch {
-                reasons.append("AI 识别结果不可用：\(shortReason(error))")
-            }
-        } catch {
-            reasons.append("AI 识别不可用：\(shortReason(error))")
-        }
-
-        // 2. 端上 Vision OCR 兜底
-        do {
-            let table = try await CatalogChartParser.parse(image: image)
-            return try accept(kind: kind, table: table, source: .onDeviceOCR)
-        } catch {
-            reasons.append("本机文字识别不可用：\(shortReason(error))")
-        }
-
-        throw Failure.notUsable(reasons: reasons)
+    /// 过门禁的结果 → 用户可见的识别结论。`Table` → `CatalogChartRecognition` 的**唯一**转换点。
+    nonisolated static func recognition(kind: CatalogChartKind,
+                                        table: CatalogChartParser.Table,
+                                        source: Source) -> CatalogChartRecognition {
+        .verdict(kind: kind, source: source, columns: table.columns, rows: table.rows)
     }
 
     /// 压缩原因文本：去掉结果型错误的冗长前缀，便于拼进一句话
@@ -346,18 +217,5 @@ enum CatalogChartExtraction {
         return description.hasPrefix("表格解析失败：")
             ? String(description.dropFirst("表格解析失败：".count))
             : description
-    }
-}
-
-// MARK: - 小工具
-
-extension Character {
-    /// 是否中日韩文字（含常用扩展区），用于乱码判定
-    var isCJK: Bool {
-        unicodeScalars.contains { scalar in
-            (0x4E00...0x9FFF).contains(scalar.value)      // 基本区
-                || (0x3400...0x4DBF).contains(scalar.value)  // 扩展 A
-                || (0xF900...0xFAFF).contains(scalar.value)  // 兼容区
-        }
     }
 }

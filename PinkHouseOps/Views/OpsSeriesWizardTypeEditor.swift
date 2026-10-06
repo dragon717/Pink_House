@@ -318,8 +318,105 @@ struct OpsSeriesWizardTypeEditorView: View {
     @State private var importSlot: ImageSlot?
     @State private var showsImporter = false
 
+    /// 「用标准模板填入」的确认弹窗：**已经填过内容时先问一句**。
+    /// 这个按钮会一次覆盖三个字段（单位 / 列名 / 数据行），
+    /// 悄悄吃掉用户手打的一整张尺码表是不能接受的（仓库对「覆盖用户内容」一贯要求先确认）。
+    @State private var confirmsTemplateFill = false
+
+    /// 点「用标准模板填入」：空的就直接填，非空先确认。
+    private func requestTemplateFill() {
+        if isChartInputEmpty {
+            applyTemplate()
+        } else {
+            confirmsTemplateFill = true
+        }
+    }
+
+    private func applyTemplate() {
+        entry.chartUnit = CatalogChartTemplate.SizeChart.unit
+        entry.chartColumnsText = CatalogChartTemplate.SizeChart.columnsText
+        entry.chartRowsText = CatalogChartTemplate.SizeChart.rowsText
+        // 触发点 ②：模板一定识别成功 → 此刻把可售尺码补齐（幂等，见 autoSelectSellableSizes）
+        autoSelectSellableSizes()
+    }
+
+    // MARK: 自动勾选可售尺码（2026-10-07 需求）
+
+    /// 把「可售尺码」补齐到当前尺码表。
+    ///
+    /// ⭐ **判定在共享包 `CatalogSizeSelectionPolicy`，写回在 `OpsWorkspace`**，
+    /// 本视图只负责说「此刻该补了」。规则是**幂等**的：
+    /// 只对「一个有效尺码都没勾」的颜色补齐，**手动取消过的一律不动**。
+    ///
+    /// ## 触发时机（只有这几个，全部是**人的明确动作**）
+    ///
+    /// | # | 时机 | 为什么是它 |
+    /// |---|---|---|
+    /// | ① | 尺码表**原图上传成功**后 | 用户原话：「尺码表识别**并上传**成功后自动勾选」 |
+    /// | ② | 点「**用标准模板填入**」后 | 模板一定识别成功，等于用户声明「就按这张表」 |
+    /// | ③ | 尺码表文本改动、且这次改动让它**第一次**变成有效 | 覆盖「先贴数据行、再写列名」这类顺序 |
+    /// | ④ | 打开「**区分尺码**」开关后 | 此前是均码，可勾项刚出现 |
+    /// | ⑤ | **新增一个颜色**后 / **切换当前类型**后 | 新颜色一个尺码都没勾，不补就要手点 5 次 |
+    ///
+    /// ## 刻意**不做**的事
+    ///
+    /// · **不在 body / `onAppear` 里对账**：body 里改 `@Published` 会无限刷新，
+    ///   而且「为什么勾上了」变得无法解释；
+    /// · **不在尺码表被改动时无条件补**：改表之后无法区分「这是新加的尺码」和
+    ///   「用户故意不要这个尺码」—— 后者是显式意图，绝不能被自动改写。
+    ///   这种情况界面只给一句**提示**（「还有 N 个尺码没勾」）+ 一个「全选」按钮。
+    private func autoSelectSellableSizes() {
+        _ = workspace.autoSelectSellableSizes(entryID: entry.id)
+    }
+
+    /// 尺码表文本的绑定：**写入之后再判断**「这次改动是不是让它第一次变成有效」。
+    /// 直接绑 `$entry.chartColumnsText` 就只能在「写之前」判断，
+    /// 而「有效性」恰恰是写完之后才知道的。
+    private func chartTextBinding(
+        _ keyPath: WritableKeyPath<OpsSeriesTypeEntry, String>
+    ) -> Binding<String> {
+        Binding(
+            get: { entry[keyPath: keyPath] },
+            set: { newValue in
+                let wasValid = parsedChart != nil
+                entry[keyPath: keyPath] = newValue
+                // 触发点 ③
+                if !wasValid, parsedChart != nil { autoSelectSellableSizes() }
+            })
+    }
+
+    /// 「区分尺码」开关：打开时可能立刻就有了可勾项（尺码表文本早就填好了）。触发点 ④。
+    private var usesSizeChartBinding: Binding<Bool> {
+        Binding(
+            get: { entry.usesSizeChart },
+            set: { newValue in
+                entry.usesSizeChart = newValue
+                if newValue { autoSelectSellableSizes() }
+            })
+    }
+
     private var parsedChart: OpsSeriesParsedSizeChart? {
         OpsSeriesSizeChartParsing.parse(entry: entry).chart
+    }
+
+    /// 两个尺码表输入框是否都为空。为空时不显示识别结果卡片 ——
+    /// 还没填就说「识别失败」看着像出错。
+    private var isChartInputEmpty: Bool {
+        entry.chartColumnsText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && entry.chartRowsText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    /// 尺码表识别结论（2026-10-01 需求）。
+    ///
+    /// 结构与落库**同一份解析**（`OpsSeriesSizeChartParsing`），判定与文案交给共享包
+    /// `OpsChartRecognition` —— 本视图不许自己拼「识别成功 / 识别失败」。
+    private var chartRecognition: CatalogChartRecognition? {
+        guard entry.usesSizeChart else { return nil }
+        let parsed = OpsSeriesSizeChartParsing.parse(entry: entry)
+        return OpsChartRecognition.make(kind: .size,
+                                        columns: parsed.chart?.columns ?? [],
+                                        rows: parsed.chart?.rows ?? [],
+                                        issue: parsed.issue)
     }
 
     private var entryIssues: [OpsSeriesEntryIssue] {
@@ -358,12 +455,28 @@ struct OpsSeriesWizardTypeEditorView: View {
             }
             importSlot = nil
         }
+        // 触发点 ⑤（切换类型）：换到另一个类型时，它可能本来就有一张有效尺码表
+        // 而颜色还没勾过（例如草稿从别的会话恢复）。幂等规则在这儿也是安全的。
+        .onChange(of: entry.id) { _, _ in autoSelectSellableSizes() }
+        .confirmationDialog("用标准模板填入尺码表？",
+                            isPresented: $confirmsTemplateFill) {
+            Button("覆盖当前的单位 / 列名 / 数据行", role: .destructive) {
+                applyTemplate()
+            }
+            Button("取消", role: .cancel) {}
+        } message: {
+            Text("当前的列名与数据行会被模板替换掉，这一步不能撤销。")
+        }
     }
 
     private func assignAsset(_ assetID: String, to slot: ImageSlot) {
         switch slot {
         case .chartSource:
             entry.chartSourceImageAssetID = assetID
+            // 触发点 ①：用户原话就是「尺码表识别**并上传**成功后自动勾选」。
+            // 尺码表现在还没识别成功（`parsedChart == nil`）也不打紧 ——
+            // 文本那边一旦有效，触发点 ③ 会接手补上。
+            autoSelectSellableSizes()
         case .color(let colorID):
             if let index = entry.colors.firstIndex(where: { $0.id == colorID }) {
                 entry.colors[index].imageAssetID = assetID
@@ -406,29 +519,51 @@ struct OpsSeriesWizardTypeEditorView: View {
     private var sizeChartCard: some View {
         OpsCard(title: "尺码表（归属当前类型，不与其他类型共用）", systemImage: "ruler") {
             VStack(alignment: .leading, spacing: 10) {
-                Toggle(isOn: $entry.usesSizeChart) {
+                Toggle(isOn: usesSizeChartBinding) {
                     opsMarkdown("这个类型区分尺码（关闭 = **无尺码/均码**，如小物）")
                 }
                 if entry.usesSizeChart {
                     TextField("单位（如 cm）", text: $entry.chartUnit)
                         .textFieldStyle(.roundedBorder)
-                    TextField("列名（逗号分隔，如：尺码, 前裙长, 推荐胸围）",
-                              text: $entry.chartColumnsText)
+                    // ⭐ 示例文本一律读共享包的标准模板：placeholder 与下面那句「每一行一条」
+                    // **同源**。原先 placeholder 举例 3 列（后衣长, 胸围, 腰围）、
+                    // 下面提示却只给 2 个值（`S = 80, 78-83`）—— 两句话互相矛盾，
+                    // 用户照哪句填都可能失败（2026-10-01 价格表报障的同一种病）。
+                    TextField("列名（只写数据列，逗号分隔，如：\(CatalogChartTemplate.SizeChart.columnsText)）",
+                              text: chartTextBinding(\.chartColumnsText))
                         .textFieldStyle(.roundedBorder)
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("每一行一条：`S = 80, 78-83`").font(.callout)
-                        TextEditor(text: $entry.chartRowsText)
+                        HStack(spacing: 8) {
+                            Text("每一行一条：`\(CatalogChartTemplate.SizeChart.sampleRowText)`")
+                                .font(.caption)
+                            Spacer(minLength: 8)
+                            Button("用标准模板填入") { requestTemplateFill() }
+                                .controlSize(.small)
+                                .help("填入一份格式一定正确的尺码表（7 个数据列 × 5 行），照着改数字即可")
+                        }
+                        TextEditor(text: chartTextBinding(\.chartRowsText))
                             .font(.body.monospaced())
                             .frame(height: 110)
                             .overlay(
                                 RoundedRectangle(cornerRadius: 6)
                                     .stroke(Color.secondary.opacity(0.25), lineWidth: 1))
                     }
+                    // 「尺码不要写进列名」这条规则光靠一句提示说不清，而写错的后果很重
+                    // （Mac 按含标签列的列数放行 → iOS 渲染剔掉该列、值没剔 → **整列错位**），
+                    // 所以这里把口径写成一句可执行的话：尺码在「=」左边，只占「列名」以外的位置。
+                    OpsFootnote(text: "**尺码/款式写在「=」左边**，不写进列名（渲染时它单独占角落那一列）；"
+                                + "「=」右边的**值个数要和列名一样多**。分隔符用半角逗号「,」。")
                     chartSourceRow
+                    // 识别结果（2026-10-01 需求）：用户填完就得知道「认出来了没有」。
+                    // 判定与文案来自共享包，Mac 只负责画；两种表各自的提示由此派生。
+                    OpsChartRecognitionBlock(recognition: chartRecognition,
+                                             isInputEmpty: isChartInputEmpty)
                     if let chart = parsedChart {
                         OpsFootnote(text: "可售尺码勾选项将从这些行按**原始顺序**生成："
                                     + chart.sizeLabels.joined(separator: "、"))
-                    } else {
+                    } else if isChartInputEmpty {
+                        // 输入为空时不显示识别卡片（没有内容谈不上识别），
+                        // 但仍要说明「两条同时填或同时空」这条口径，所以这句保留。
                         OpsFootnote(text: "还没有结构化内容：列和行**同时**填写或**同时**留空；"
                                     + "只有原图时可以都为空。")
                     }
@@ -572,8 +707,18 @@ struct OpsSeriesWizardTypeEditorView: View {
                 OpsFootnote(text: "追加颜色时，本类型的公共资料、尺码表和价格**只读继承**，"
                             + "不会因为新增颜色被覆盖；颜色也不能追加到其他类型。"
                             + "颜色 SKU **不填**价格 / 任务名称 / 批次 / 独立尺码表 / 款式描述。")
+                OpsFootnote(text: "**可售尺码**：尺码表识别成功的那一刻自动勾满"
+                            + "（原图上传成功、点「用标准模板填入」、文本第一次变成有效、"
+                            + "打开「区分尺码」、新增颜色 —— 只有这几种时机）。"
+                            + "之后**手动取消的尺码不会被自动勾回**；"
+                            + "如果尺码表后来新增了尺码，这里只提示「还有 N 个没勾」，"
+                            + "想全要就点该颜色的「**全选**」。")
             }
         }
+        // 触发点 ⑤（新增颜色）：新颜色的 selectedSizes 是空的，不补就得手点 N 次。
+        // 幂等规则在这儿也安全 —— 已经勾过的颜色（含用户手动取消过的）一律不动；
+        // 删除颜色同样会走到这里，同样不改动剩下的颜色。
+        .onChange(of: entry.colors.count) { _, _ in autoSelectSellableSizes() }
     }
 
     private func colorRow(_ color: Binding<OpsSeriesColorSKU>) -> some View {
@@ -605,11 +750,41 @@ struct OpsSeriesWizardTypeEditorView: View {
 
     /// 可售尺码勾选：**只来自当前类型尺码表**，按尺码表原始顺序展示；
     /// 均码模式（无尺码表）不展示勾选。
+    ///
+    /// ## 勾选 vs 取消（2026-10-07 需求的「明确触发时机」）
+    ///
+    /// · **勾**：只有两个来源 —— ① 上面 `autoSelectSellableSizes()` 的**自动补齐**
+    ///   （**仅**在这个颜色「一个有效尺码都没勾」时发生，见 `CatalogSizeSelectionPolicy`）；
+    ///   ② 用户自己点某个尺码 / 点这里的「**全选**」。
+    /// · **取消**：只有用户点得动（或点掉「全选」里的某一个）。
+    ///   **自动补齐永远不会把取消过的尺码勾回来** —— 用户取消是显式意图。
+    /// · 所以「尺码表后来新增了一个尺码、用户不想要它」这种情况，界面只**提示**
+    ///   「还有 N 个没勾」+ 给一个「全选」按钮，绝不替用户决定。
     @ViewBuilder
     private func sizeChecklist(for color: Binding<OpsSeriesColorSKU>) -> some View {
         if entry.usesSizeChart, let chart = parsedChart {
+            // 缺勾清单：判定在共享包，这里只负责显示（顺序 = 尺码表原始顺序）
+            let missing = CatalogSizeSelectionPolicy.missing(
+                color.wrappedValue.selectedSizes, allLabels: chart.sizeLabels)
             VStack(alignment: .leading, spacing: 4) {
-                Text("可售尺码（来自当前类型尺码表）").font(.caption).foregroundStyle(.secondary)
+                HStack(spacing: 8) {
+                    Text("可售尺码（来自当前类型尺码表）").font(.caption).foregroundStyle(.secondary)
+                    Spacer(minLength: 8)
+                    // 「全选」是**人的明确动作** → 唯一被允许覆盖手动取消的入口
+                    //（与自动补齐恰好相反，别把两者合并成一个函数）
+                    if !missing.isEmpty {
+                        Text("还有 \(missing.count) 个没勾").font(.caption)
+                            .foregroundStyle(OpsFlowPalette.warnOrange)
+                        Button("全选") {
+                            color.wrappedValue.selectedSizes =
+                                CatalogSizeSelectionPolicy.selectAll(allLabels: chart.sizeLabels)
+                        }
+                        .buttonStyle(.borderless)
+                        .font(.caption)
+                        .help("把这张尺码表的 \(chart.sizeLabels.count) 个尺码全部勾上"
+                              + "（取消过的尺码也会被重新勾上）")
+                    }
+                }
                 // 勾选项顺序 = 尺码表原始顺序（绝不用无序集合遍历序）；
                 // 尺码多时一行放不下 → 折成竖排（HStack 不换行会横向撑爆容器）
                 ViewThatFits(in: .horizontal) {

@@ -98,7 +98,8 @@ struct OpsSeriesTypeEntry: Codable, Equatable, Identifiable {
     /// **绝不借用其他类型的尺码表。**
     var usesSizeChart: Bool
     var chartUnit: String
-    /// 列名原文（逗号/竖线分隔），如「尺码, 前裙长, 推荐胸围」
+    /// 列名原文（逗号/竖线分隔），**只写数据列**，如「后衣长, 胸围, 腰围」。
+    /// 首列若写成「尺码 / 款式」这类行标签列名会被自动忽略（见 `CatalogChartTextSyntax.dataColumns`）。
     var chartColumnsText: String
     /// 行原文（每行一条：`S = 80, 78-83`）
     var chartRowsText: String
@@ -242,6 +243,28 @@ struct OpsSeriesEntryDraft: Codable, Equatable {
     var hasBalanceEnd: Bool
     var balanceEndAt: Date
 
+    // MARK: S2：系列价格表（可选）
+    //
+    // 价格表躺在 `CatalogSeries` 上（系列级唯一存储，单品不复制副本），
+    // 所以向导这一页既可以**上传原图 + 录结构化列行**，也可以整块不管。
+    //
+    // ⚠️ `declaresPriceChart` 这个显式开关不是多余：与 `declaresPhase` 同一个理由。
+    // 「这一项我没填」和「我要把它清空」在数据上长得一样（都是空字符串），
+    // 没有开关的话，走一次向导就会把系列上已有的价格表**静默清掉** ——
+    // 而运营在界面上看不到任何「被清空」的提示。
+    /// true = 本次提交要把价格表写进系列；false = **完全不碰**系列已有的价格表。
+    var declaresPriceChart: Bool
+    /// 金额单位（如「元」「¥」）。注意：**不是**尺码表的长度单位。
+    var priceChartUnit: String
+    /// 列名原文（**只写数据列**，逗号分隔）
+    var priceChartColumnsText: String
+    /// 行原文（每行 `款式名 = 值1, 值2, …`）
+    var priceChartRowsText: String
+    /// 价格表原图（CatalogAsset id，**有序**：首图即 `sourceImage`）。
+    /// 只有原图、没有结构化列行是**合法状态**（`CatalogPriceChart.hasStructuredContent`
+    /// 为 false，客户端详情页会退化成展示原图）。
+    var priceChartImageAssetIDs: [String]
+
     // S3：类型条目
     var typeEntries: [OpsSeriesTypeEntry]
 
@@ -264,6 +287,11 @@ struct OpsSeriesEntryDraft: Codable, Equatable {
         balanceStartAt: Date = Date(),
         hasBalanceEnd: Bool = false,
         balanceEndAt: Date = Date(),
+        declaresPriceChart: Bool = false,
+        priceChartUnit: String = "",
+        priceChartColumnsText: String = "",
+        priceChartRowsText: String = "",
+        priceChartImageAssetIDs: [String] = [],
         typeEntries: [OpsSeriesTypeEntry] = []
     ) {
         self.shopID = shopID
@@ -284,6 +312,11 @@ struct OpsSeriesEntryDraft: Codable, Equatable {
         self.balanceStartAt = balanceStartAt
         self.hasBalanceEnd = hasBalanceEnd
         self.balanceEndAt = balanceEndAt
+        self.declaresPriceChart = declaresPriceChart
+        self.priceChartUnit = priceChartUnit
+        self.priceChartColumnsText = priceChartColumnsText
+        self.priceChartRowsText = priceChartRowsText
+        self.priceChartImageAssetIDs = priceChartImageAssetIDs
         self.typeEntries = typeEntries
     }
 }
@@ -295,6 +328,8 @@ extension OpsSeriesEntryDraft {
         case coverAssetID, declaresPhase, phaseRawValue
         case hasReservationEnd, reservationEndAt
         case hasBalanceStart, balanceStartAt, hasBalanceEnd, balanceEndAt
+        case declaresPriceChart, priceChartUnit, priceChartColumnsText, priceChartRowsText
+        case priceChartImageAssetIDs
         case typeEntries
     }
 
@@ -320,6 +355,11 @@ extension OpsSeriesEntryDraft {
             balanceStartAt: try c.decodeIfPresent(Date.self, forKey: .balanceStartAt) ?? Date(),
             hasBalanceEnd: try c.decodeIfPresent(Bool.self, forKey: .hasBalanceEnd) ?? false,
             balanceEndAt: try c.decodeIfPresent(Date.self, forKey: .balanceEndAt) ?? Date(),
+            declaresPriceChart: try c.decodeIfPresent(Bool.self, forKey: .declaresPriceChart) ?? false,
+            priceChartUnit: try c.decodeIfPresent(String.self, forKey: .priceChartUnit) ?? "",
+            priceChartColumnsText: try c.decodeIfPresent(String.self, forKey: .priceChartColumnsText) ?? "",
+            priceChartRowsText: try c.decodeIfPresent(String.self, forKey: .priceChartRowsText) ?? "",
+            priceChartImageAssetIDs: try c.decodeIfPresent([String].self, forKey: .priceChartImageAssetIDs) ?? [],
             typeEntries: try c.decodeIfPresent([OpsSeriesTypeEntry].self, forKey: .typeEntries) ?? [])
     }
 
@@ -337,6 +377,16 @@ extension OpsSeriesEntryDraft {
         var ordered: [String] = []
         for item in seen where !ordered.contains(item) { ordered.append(item) }
         return ordered.isEmpty ? "（未选择类型）" : ordered.joined(separator: " ✓　")
+    }
+
+    /// 价格表的两个文本输入框是否**都**为空。
+    ///
+    /// 用途是「还没填就别说识别失败」：一进 S2 就红一条「预约价格表识别失败」，
+    /// 用户会以为系统出错了（其实只是还没填）。
+    /// 口径与 `SeriesConfigSheet.isPriceChartInputEmpty` 逐字一致。
+    var isPriceChartTextEmpty: Bool {
+        priceChartColumnsText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && priceChartRowsText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 }
 
@@ -357,37 +407,34 @@ struct OpsSeriesParsedSizeChart: Equatable {
 enum OpsSeriesSizeChartParsing {
     /// 解析条目里的尺码表文本。返回 nil = 完全没有结构化内容（列行都空）。
     /// 列行只填一半、行值个数不齐等**结构错误**通过 `issue` 返回，不静默兜底。
+    ///
+    /// 切分、归一化、个数校验全部走共享包 `CatalogChartTextSyntax`（**唯一口径**，
+    /// 本机可用 `swift test` 秒级验证）；本类型只负责把它翻译成尺码表这边的措辞。
     static func parse(entry: OpsSeriesTypeEntry) -> (chart: OpsSeriesParsedSizeChart?, issue: String?) {
         guard entry.usesSizeChart else { return (nil, nil) }
-        let columns = entry.chartColumnsText
-            .split(whereSeparator: { $0 == "," || $0 == "，" || $0 == "|" || $0 == "｜" })
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { !$0.isEmpty }
-        var rows: [CatalogSizeRow] = []
-        for rawLine in entry.chartRowsText.split(separator: "\n", omittingEmptySubsequences: true) {
-            let line = String(rawLine).trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !line.isEmpty else { continue }
-            guard let separatorIndex = line.firstIndex(of: "=") else {
-                return (nil, "尺码表有一行没有「=」，格式应为 `S = 80, 78-83`：\(line)")
-            }
-            let label = String(line[line.startIndex..<separatorIndex])
-                .trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !label.isEmpty else {
-                return (nil, "尺码表有一行没有写尺码标签：\(line)")
-            }
-            let valuesPart = String(line[line.index(after: separatorIndex)...])
-            let values = valuesPart
-                .split(separator: ",", omittingEmptySubsequences: false)
-                .map { part -> String? in
-                    let trimmed = part.trimmingCharacters(in: .whitespacesAndNewlines)
-                    return trimmed.isEmpty ? nil : trimmed
-                }
-            if !columns.isEmpty, values.count != columns.count {
-                return (nil, "尺码表行「\(label)」有 \(values.count) 个值，而列名有 \(columns.count) 个 ——"
-                    + "客户端会整列错位，请补齐或用逗号留空占位。")
-            }
-            rows.append(CatalogSizeRow(label: label, values: values))
+
+        // ⭐ 列口径与 iOS 完全一致：首列若是「尺码 / 款式」这类**行标签列名**，剔除。
+        //
+        // 这条不是宽容，是**防错**：不剔除就会出现「Mac 按 8 列校验放行 → iOS 渲染时剔成 7 列，
+        // 而行的值仍是 8 个 → 整列错位」（2026-10-01 实测：胸围显示成后衣长的值）。
+        // 校验与渲染必须看到同一份列，否则「识别成功」会变成静默的数据损坏。
+        let rawColumns = CatalogChartTextSyntax.splitColumns(entry.chartColumnsText)
+        let columns = CatalogChartTextSyntax.dataColumns(from: entry.chartColumnsText)
+        // 用户在列名里写了行标签列 ⇒ 值列表里**不该**再为它留空位。报错时点明，
+        // 否则「列名 8 个、值 7 个」会让人以为是自己数错了。
+        let listedLabelColumn = rawColumns.first.flatMap {
+            CatalogChartTextSyntax.isLabelColumn($0) ? $0 : nil
         }
+
+        let rows: [CatalogSizeRow]
+        switch CatalogChartTextSyntax.parseRowLines(entry.chartRowsText,
+                                                   dataColumnCount: columns.count) {
+        case .failure(let issue):
+            return (nil, message(for: issue, listedLabelColumn: listedLabelColumn))
+        case .success(let lines):
+            rows = lines.map { CatalogSizeRow(label: $0.label, values: $0.values) }
+        }
+
         // 需求 §S3-B 校验：列和行必须同时存在，不能只填写一半；只有原图时可以都为空。
         if columns.isEmpty != rows.isEmpty {
             return (nil, "尺码表的列与行必须同时填写，或同时留空（只有原图时可以都为空）。")
@@ -398,6 +445,25 @@ enum OpsSeriesSizeChartParsing {
             columns: columns,
             rows: rows,
             sizeLabels: rows.map(\.label)), nil)
+    }
+
+    /// 共享层的事实 → 尺码表的措辞（**文案留在这里，规则不在这里**）。
+    private static func message(for issue: CatalogChartTextSyntax.RowLineIssue,
+                                listedLabelColumn: String?) -> String {
+        switch issue {
+        case .missingSeparator(let line):
+            return "尺码表有一行没有「=」，格式应为 `S = 80, 78-83`：\(line)"
+        case .emptyLabel(let line):
+            return "尺码表有一行没有写尺码标签：\(line)"
+        case .valueCountMismatch(let label, let actual, let expected):
+            var hint = "请把这一行补齐到 \(expected) 个值"
+                + "（值之间用半角逗号「,」分隔）。"
+            if let listedLabelColumn {
+                hint += "列名里的「\(listedLabelColumn)」是**行标签列**、不占数据列的名额，"
+                    + "所以「=」后面直接写 \(expected) 个数即可，不要再为它留空位。"
+            }
+            return "尺码表行「\(label)」有 \(actual) 个值，而数据列有 \(expected) 个 —— " + hint
+        }
     }
 
     static func normalized(_ value: String?) -> String? {
@@ -521,6 +587,13 @@ enum OpsSeriesEntryValidator {
         if let phase = draft.phase, phase == .reservationActive, !draft.hasReservationEnd {
             add("发售阶段是「预约中」时必须填预约结束时间 —— 缺了它系列会一直停在预约中。",
                 area: .seriesProfile)
+        }
+
+        // S2：系列价格表（开关关着时 `issues` 恒为空 —— 不碰就不校验）。
+        // 规则在 Services（`OpsSeriesPriceChartValidation`），因为它必须问**同一个**
+        // 文本解析器；这里只负责把它挂到 S2 这一页上。
+        for message in OpsSeriesPriceChartValidation.issues(for: draft) {
+            add(message, area: .seriesProfile)
         }
 
         // S3：至少选择一个类型

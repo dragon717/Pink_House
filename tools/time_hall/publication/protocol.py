@@ -179,6 +179,43 @@ MAX_MEDIA_BYTES = 20 * 1024 * 1024
 # 远端媒体引用的前缀（与 Swift `ShopCatalogSyncProtocol.mediaReferencePrefix` 逐字一致）
 MEDIA_REFERENCE_PREFIX = "thmedia:"
 
+# 扩展名 → MIME 的**唯一映射**（与 `MEDIA_MIME_ALLOWLIST` 同址，两者必须对齐）。
+#
+# ⚠️ 为什么**不许**用 `mimetypes.guess_type()`（2026-09-29 App 内实测，必挂）
+#
+# `mimetypes` 是**惰性初始化**的：第一次调用 `guess_type()` 时它会去读系统 mime 数据库
+# （macOS 上是 `/etc/apache2/mime.types`）。而发布桥接器是 Mac App 的**子进程、继承 App 沙盒**
+# —— 沙盒里读 `/etc/apache2/...` 直接
+# `PermissionError: [Errno 1] Operation not permitted`：
+#
+#     build_release.py 退出码 1 → 桥接器退出码 3（refused）→ 界面上「构建产物失败」
+#
+# 最坑的地方是**CLI 直跑永远复现不出来**（没有沙盒），所以自检全绿也没用；
+# 只有从 App 里点发布才会炸，而且炸在 800 行之外的一句 stdlib 调用上。
+# 所以这里改成**纯查表**：不读任何文件、不依赖平台、逐次一致。
+MEDIA_SUFFIX_TO_MIME: Dict[str, str] = {
+    "jpg": "image/jpeg",
+    "jpeg": "image/jpeg",
+    "png": "image/png",
+    "gif": "image/gif",
+    "webp": "image/webp",
+    "heic": "image/heic",
+}
+
+
+def media_mime_type(file_name: str) -> str:
+    """按扩展名判 MIME（**纯函数**：不读文件、不碰系统数据库）。
+
+    认不出来一律回 `application/octet-stream` —— 它不在 `MEDIA_MIME_ALLOWLIST` 里，
+    于是调用方会**硬报错**，不会「兜底放行」。这一点很重要：
+    兜底成 `image/jpeg` 会让一个 `.tiff` 静默进公共库，客户端显示不出来。
+    """
+    name = str(file_name or "").strip()
+    if "." not in name:
+        return "application/octet-stream"
+    suffix = name.rsplit(".", 1)[-1].strip().lower()
+    return MEDIA_SUFFIX_TO_MIME.get(suffix, "application/octet-stream")
+
 
 class ProtocolError(Exception):
     """协议级错误：产物不符合客户端与服务端共同遵守的契约。"""

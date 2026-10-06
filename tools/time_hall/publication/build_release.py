@@ -58,6 +58,7 @@ from protocol import (  # noqa: E402
     entity_stable_ids,
     fragment_for,
     gzip_bytes,
+    media_mime_type,
     pack_record_name,
     partition_id,
     sha256_hex,
@@ -366,7 +367,10 @@ def collect_shop_catalog_media(
 
     返回 (改写后的目录, THMedia 记录, 待落盘文件)。
     """
-    import mimetypes
+    # ⚠️ **不要**在这里 import mimetypes（2026-09-29 实测：App 内点发布必挂）。
+    # `mimetypes.guess_type()` 首次调用会去读 `/etc/apache2/mime.types`，
+    # 而桥接器是 App 沙盒的子进程 → `PermissionError: [Errno 1] Operation not permitted`。
+    # MIME 判定走 `protocol.media_mime_type()`（纯查表，读不到任何文件）。
 
     rewritten = copy.deepcopy(doc)
     records: List[Dict[str, Any]] = []
@@ -393,7 +397,7 @@ def collect_shop_catalog_media(
             raise ProtocolError(
                 "图片 {} 超出单张媒体上限（{} > {} 字节）：{}".format(
                     file_name, len(payload), MAX_MEDIA_BYTES, source))
-        mime_type = mimetypes.guess_type(file_name)[0] or "application/octet-stream"
+        mime_type = media_mime_type(file_name)
         if mime_type not in MEDIA_MIME_ALLOWLIST:
             raise ProtocolError(
                 "图片 {} 的 MIME {} 不在白名单 {} 内（客户端解不了的类型不许进公共库）".format(

@@ -96,10 +96,16 @@ struct OpsMainView: View {
     /// （见 `OpsSnapshotHarness`），所以留了一个显式入口，
     /// 但它**只是初值**，之后完全由侧栏选择驱动。
     @State private var section: OpsSection
+    /// 「系列上新」向导的起始步骤（同样只服务快照 harness：
+    /// S2 的系列价格表卡片不在 S1 上，不给入口就拍不到）。
+    private let initialWizardStep: OpsSeriesWizardStep
 
-    init(workspace: OpsWorkspace, initialSection: OpsSection = .seriesEntry) {
+    init(workspace: OpsWorkspace,
+         initialSection: OpsSection = .seriesEntry,
+         initialWizardStep: OpsSeriesWizardStep = .selectShopSeries) {
         self.workspace = workspace
         _section = State(initialValue: initialSection)
+        self.initialWizardStep = initialWizardStep
     }
 
     var body: some View {
@@ -142,7 +148,7 @@ struct OpsMainView: View {
     private var content: some View {
         switch section {
         case .seriesEntry:
-            OpsSeriesWizardView(workspace: workspace)
+            OpsSeriesWizardView(workspace: workspace, initialStep: initialWizardStep)
         case .catalog:
             OpsCatalogEditorView(workspace: workspace)
         case .products:

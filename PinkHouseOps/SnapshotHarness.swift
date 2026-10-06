@@ -25,7 +25,9 @@
 //  产物落在 `<容器>/Library/Application Support/PinkHouseOps/<子目录名>/`，
 //  每个分区一张：`seriesEntry.png` / `catalog.png` / `products.png` /
 //  `preview.png`（文件名 = `OpsSection.rawValue`），
-//  外加一份 `harness.log`（本次运行的完整日志，造数据失败的唯一出口 —— 见下）。
+//  外加一张 `seriesEntry-profile.png`（向导 **S2·系列资料**，因为
+//  「系列价格表」卡片不在 S1 上，不单拍一张就永远看不到它）
+//  和一份 `harness.log`（本次运行的完整日志，造数据失败的唯一出口 —— 见下）。
 //
 //  ## 三条刻意的设计
 //
@@ -127,9 +129,13 @@ enum OpsSnapshotHarness {
                 written += 1
                 log("SNAPSHOT 已写入 \(file.lastPathComponent)（\(data.count) 字节）")
             } catch {
-                log("SNAPSHOT 写文件失败 \(file.path)：\(error.localizedDescription)")
+                    log("SNAPSHOT 写文件失败 \(file.path)：\(error.localizedDescription)")
             }
         }
+        renderProfileSteps(workspace: workspace, container: container,
+                           into: directory, dark: darkAppearance)
+        renderFocusedSteps(workspace: workspace, container: container,
+                           into: directory, dark: darkAppearance)
         if seedFailures.isEmpty {
             log("SNAPSHOT 完成：\(written)/\(OpsSection.allCases.count) 张")
         } else {
@@ -138,6 +144,113 @@ enum OpsSnapshotHarness {
                 + "（每张图上已盖横幅）：" + seedFailures.joined(separator: "、"))
         }
     }
+
+    /// 向导 **S2·系列资料** 单独拍两张。
+    ///
+    /// 为什么必须单独拍：`OpsSection.seriesEntry` 渲染出来的向导停在 **S1**，
+    /// 而「系列价格表（上传原图 / 录表格）」卡片长在 **S2** 上 ——
+    /// 只拍分区图的话，这张卡片在验收产物里**根本不存在**，
+    /// 「看不到」和「没做」事后分不出来（本项目最反复吃亏的一件事）。
+    ///
+    /// 两张分别是**识别成功**与**识别失败**两种形态 —— 需求要的就是
+    /// 「区分成功与失败」两种提示，只拍一张证明不了它们在界面上长得不一样。
+    /// 第二张通过改同一份工作副本来造：坏例子用的是 2026-10-01 用户真实报障的那段
+    /// （列名 4 个、第二行只给 3 个值），**它在旧实现里会静默通过**。
+    private static func renderProfileSteps(
+        workspace: OpsWorkspace, container: ModelContainer,
+        into directory: URL, dark: Bool
+    ) {
+        // S2 比四个分区页都长（封面 + 价格表 + 发售阶段），用 `focusedSize`
+        //（更高的画布），否则「卡片下沿有没有被裁」在产物里读不出来
+        let size = focusedSize
+        func shot(_ suffix: String) {
+            let view = OpsMainView(workspace: workspace,
+                                   initialSection: .seriesEntry,
+                                   initialWizardStep: .seriesProfile)
+                .modelContainer(container)
+                .environment(\.colorScheme, dark ? .dark : .light)
+            guard let rendered = render(view, size: size, dark: dark) else {
+                log("SNAPSHOT 渲染失败：\(suffix)")
+                return
+            }
+            let data = stampUntrusted(rendered, failedSteps: seedFailures) ?? rendered
+            let file = directory.appendingPathComponent("\(suffix).png")
+            do {
+                try data.write(to: file)
+                log("SNAPSHOT 已写入 \(file.lastPathComponent)（\(data.count) 字节）")
+            } catch {
+                log("SNAPSHOT 写文件失败 \(file.path)：\(error.localizedDescription)")
+            }
+        }
+
+        shot("seriesEntry-profile")
+
+        // 第二张：把数据行改成**值个数不齐**的坏例子（列名 4 个 ÷ 行只给 3 个）。
+        // 不写 seedStep：这一次「失败」是故意的，不是造数据出错。
+        workspace.seriesEntry.priceChartRowsText = """
+        蝴蝶结半裙 = 268, 80, 188
+        """
+        shot("seriesEntry-profile-bad")
+    }
+
+    /// 另外三张**不在四个分区默认视图里**的形态（2026-10-07 需求）。
+    ///
+    /// 与 S2 那两张同一个理由：「这个形态在验收产物里根本不存在」和
+    /// 「这个形态没做」事后分不出来 ——
+    ///
+    ///   · **S3 可售尺码自动勾选**：S3 不在 S1 上，只拍分区图必然拍不到；
+    ///   · **规格卡默认收起（只显示颜色）** 与 **展开后**：卡片默认态就是收起，
+    ///     不给初值入口的话，「展开态」永远不会出现在任何一张图上。
+    private static func renderFocusedSteps(
+        workspace: OpsWorkspace, container: ModelContainer,
+        into directory: URL, dark: Bool
+    ) {
+        func write<V: View>(_ view: V, named suffix: String, size: NSSize = focusedSize) {
+            let hosted = view
+                .modelContainer(container)
+                .environment(\.colorScheme, dark ? .dark : .light)
+            guard let rendered = render(hosted, size: size, dark: dark) else {
+                log("SNAPSHOT 渲染失败：\(suffix)")
+                return
+            }
+            let data = stampUntrusted(rendered, failedSteps: seedFailures) ?? rendered
+            let file = directory.appendingPathComponent("\(suffix).png")
+            do {
+                try data.write(to: file)
+                log("SNAPSHOT 已写入 \(file.lastPathComponent)（\(data.count) 字节）")
+            } catch {
+                log("SNAPSHOT 写文件失败 \(file.path)：\(error.localizedDescription)")
+            }
+        }
+
+        // ① S3：尺码表一有效就自动勾满；月白是「用户手动取消过」的对照组
+        //
+        // ⚠️ S3 比 S2 还长（款式公共资料 + 尺码表 + 识别结果 + 价格 + **颜色 SKU**），
+        // 而要点名的**可售尺码勾选项长在最后一张卡上** —— 用 `focusedSize` 会把
+        // 它连同「还有 N 个没勾」+「全选」一起裁出画面，那张快照就什么也没证明。
+        write(OpsMainView(workspace: workspace,
+                          initialSection: .seriesEntry,
+                          initialWizardStep: .typeEntries),
+              named: "seriesEntry-types",
+              size: NSSize(width: 1280, height: 1900))
+
+        let productID = workspace.catalog.products.first(where: { $0.category == "JSK" })?.id
+
+        // ② 默认形态：一行一个颜色（4 组 / 7 条规格）
+        write(OpsProductsView(workspace: workspace,
+                              initialSelectedProductID: productID),
+              named: "products-variants-folded")
+
+        // ③ 展开「粉色」之后：逐条「色 / 码」+ 编辑 / 删除
+        write(OpsProductsView(workspace: workspace,
+                              initialSelectedProductID: productID,
+                              initialExpandedVariantColors: ["粉色"]),
+              named: "products-variants-expanded")
+    }
+
+    /// 聚焦图的画布：比分区图高，否则卡片下沿被裁 ——
+    /// 「下沿有没有被裁」在截图上是**读不出来**的，只会看起来像「卡片就到这儿」。
+    private static let focusedSize = NSSize(width: 1280, height: 1180)
 
     // MARK: - 容器与示例数据
 
@@ -224,11 +337,29 @@ enum OpsSnapshotHarness {
         }
 
         // 商品管理的每张卡都要有内容，否则看不到布局
+        //
+        // ⭐ 规格**刻意造多色多码**（4 组 / 7 条），因为「默认只显示颜色」
+        // 这张卡要证明的正是「15 条能收成 3 行」。只造 2 条的话，
+        // 收起与展开长得一样，快照根本看不出分组做过没有。
         seedStep("规格 粉色/M", workspace.addVariant(
             productID: primary.id, color: "粉色", size: "M",
             imageAssetID: workspace.catalog.assets.first?.id))
         seedStep("规格 粉色/L", workspace.addVariant(
             productID: primary.id, color: "粉色", size: "L", imageAssetID: nil))
+        seedStep("规格 粉色/S", workspace.addVariant(
+            productID: primary.id, color: "粉色", size: "S", imageAssetID: nil))
+        // 月白：**第一条没图、第二条有图** —— 专门压 `leadingImage`
+        //（代表图必须取「第一条有图的」，否则这一色会显示成空框）＋「缺图 1」角标
+        seedStep("规格 月白/S", workspace.addVariant(
+            productID: primary.id, color: "月白", size: "S", imageAssetID: nil))
+        seedStep("规格 月白/M", workspace.addVariant(
+            productID: primary.id, color: "月白", size: "M",
+            imageAssetID: workspace.catalog.assets.dropFirst().first?.id))
+        seedStep("规格 藏蓝/S", workspace.addVariant(
+            productID: primary.id, color: "藏蓝", size: "S", imageAssetID: nil))
+        // 颜色留空的规格 → 归到「未区分颜色」一组（不是被丢掉、也不是自成三行）
+        seedStep("规格 未区分颜色", workspace.addVariant(
+            productID: primary.id, color: nil, size: "M", imageAssetID: nil))
         seedStep("尺码表", workspace.setSizeChart(
             productID: primary.id,
             unit: "cm",
@@ -269,6 +400,70 @@ enum OpsSnapshotHarness {
             description: "深蓝渐变，配套有腰封与蝴蝶结。本次只改了这一句文案。",
             designName: nil))
         seedStep("保存草稿", workspace.saveDraft())
+
+        // ── 向导 S2 的工作副本（只服务 `seriesEntry-profile.png`）──
+        // 「系列价格表」卡片长在 S2，只拍 S1 的话它在验收产物里根本不存在。
+        // 草稿内容一律读共享模板 `CatalogChartTemplate.PriceChart`
+        // —— 与界面「用标准模板填入」按钮填进去的是**同一份常量**，
+        // 所以这张快照同时也在证「模板能过识别」。
+        workspace.seriesEntry.shopID = shop.id
+        workspace.seriesEntry.seriesID = series.id
+        workspace.seriesEntry.declaresPriceChart = true
+        workspace.seriesEntry.priceChartUnit = CatalogChartTemplate.PriceChart.unit
+        workspace.seriesEntry.priceChartColumnsText = CatalogChartTemplate.PriceChart.columnsText
+        workspace.seriesEntry.priceChartRowsText = CatalogChartTemplate.PriceChart.rowsText
+        workspace.seriesEntry.priceChartImageAssetIDs = Array(workspace.catalog.assets.prefix(2).map(\.id))
+
+        seedTypeEntriesWorkCopy(workspace, chartImageAssetID: workspace.catalog.assets.first?.id)
+    }
+
+    /// 向导 **S3** 的工作副本（只服务 `seriesEntry-types.png`）。
+    ///
+    /// ⭐ 这张快照要证的**不是**「界面长什么样」，而是两条**行为**：
+    ///
+    ///   1. 尺码表一有效，「可售尺码」就被**自动勾满**（用户原话的「自动勾选」）；
+    ///   2. 手动取消掉的尺码**不会被补回来**（用户原话的「允许用户手动取消」）——
+    ///      这一条比上一条更重要：写错的实现（每次都补齐成整张表）
+    ///      在上一条上照样通过，只有这一条能把它拦下来。
+    ///
+    /// 所以这里**故意**把「月白」手动取消成只剩前两个码：
+    /// 如果实现是「无脑补满」，快照上它会重新变成 5 个勾，
+    /// 而且 `seedStep` 会把这一步记成失败、再盖一条横幅到图上。
+    /// 图上还应该同时出现「还有 3 个没勾」+「全选」按钮 —— 那就是「提示而不替你决定」。
+    private static func seedTypeEntriesWorkCopy(_ workspace: OpsWorkspace,
+                                               chartImageAssetID: String?) {
+        var entry = OpsSeriesTypeEntry(category: "JSK", designName: "星月夜")
+        entry.usesSizeChart = true
+        entry.chartUnit = CatalogChartTemplate.SizeChart.unit
+        // 模板 = 界面「用标准模板填入」按钮填进去的**同一份常量**
+        //（`CatalogChartTemplate.SizeChart`），所以这张快照同时也在证模板能过识别。
+        entry.chartColumnsText = CatalogChartTemplate.SizeChart.columnsText
+        entry.chartRowsText = CatalogChartTemplate.SizeChart.rowsText
+        entry.chartSourceImageAssetID = chartImageAssetID
+        entry.colors = [
+            OpsSeriesColorSKU(name: "粉色"),
+            OpsSeriesColorSKU(name: "月白"),
+            OpsSeriesColorSKU(name: "藏蓝"),
+        ]
+        workspace.seriesEntry.typeEntries = [entry]
+
+        // 与界面上的触发点 ①②③④⑤ 调的是**同一个服务函数**（视图只负责说「此刻该补了」）
+        let filled = workspace.autoSelectSellableSizes(entryID: entry.id)
+        seedStep("S3 自动勾选可售尺码（3 个颜色应各补 1 次）", filled == 3)
+        seedStep("S3 补齐后 = 整张尺码表", workspace.seriesEntry.typeEntries.first?.colors
+            .allSatisfy { $0.selectedSizes == CatalogChartTemplate.SizeChart.sizeLabels } == true)
+
+        // 模拟「用户手动取消」：月白只留 XS / S
+        let manuallyTrimmed = ["XS", "S"]
+        workspace.seriesEntry.typeEntries[0].colors[1].selectedSizes = manuallyTrimmed
+        let after = workspace.autoSelectSellableSizes(entryID: entry.id)
+        seedStep("S3 手动取消的尺码必须被保留（幂等，不许回填）",
+                 after == 0
+                 && workspace.seriesEntry.typeEntries[0].colors[1].selectedSizes == manuallyTrimmed)
+        seedStep("S3 手动取消的尺码不再算作已勾（界面才会提示「还有 N 个没勾」）",
+                 CatalogSizeSelectionPolicy.missing(
+                    workspace.seriesEntry.typeEntries[0].colors[1].selectedSizes,
+                    allLabels: CatalogChartTemplate.SizeChart.sizeLabels).count == 3)
     }
 
     /// 造数据的每一步都要**出声**，并把失败的步骤记下来。

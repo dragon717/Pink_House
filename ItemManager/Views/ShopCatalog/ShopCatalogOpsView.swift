@@ -1333,7 +1333,9 @@ struct ShopCatalogDraftDetailEditor: View {
             ShopCatalogChartPasteButton(kind: .sizeChart,
                                         columnsText: $chartColumnsText,
                                         rowsText: $chartRowsText)
-            TextField("尺码表列名（逗号分隔，如：尺码,前裙长,胸围）", text: $chartColumnsText)
+            // 提示语里**不写「尺码」**：它是行标签列，写进列名会让列数与每行的值个数对不上
+            //（与 Mac 侧同一套口径）。
+            TextField("尺码表列名（只写数据列，逗号分隔，如：前裙长,胸围,袖长）", text: $chartColumnsText)
                 .font(.system(size: 13))
             TextEditor(text: $chartRowsText)
                 .frame(minHeight: 60)

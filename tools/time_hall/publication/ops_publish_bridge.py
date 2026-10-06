@@ -1042,6 +1042,14 @@ def run_publish(request: Dict[str, Any], quiet: bool) -> int:
             return EXIT_VALIDATION
 
     # ---------------- 构建（第 1 步的一半）
+    #
+    # ⭐ `--previous-release-seq` 必须传**线上真正那份头**的 seq。它写出产物里的
+    # `previousReleaseSeq`，语义 =「本版取代了哪一版」；iOS 侧 `ShopCatalogOpsPublisher`
+    # 写的是 `snapshot?.header.releaseSeq`，两端同一口径（红线：同一判定不许各写一份）。
+    # 2026-09-29 之前这里**不传** → `build_release.py` 用默认 0
+    # → Mac 发出去的每一版都自称「没有上一版」（运营追踪时看到 0 会误判）。
+    # 基线闸门（R07）就在上面几十行，`head` 已经读到并比对过，所以此处取值可信。
+    previous_release_seq = int((head or {}).get("releaseSeq") or 0)
     stage("build", "started", "构建不可变产物")
     build_argv = [
         sys.executable,
@@ -1054,6 +1062,8 @@ def run_publish(request: Dict[str, Any], quiet: bool) -> int:
         str(output_directory),
         "--release-seq",
         str(release_seq),
+        "--previous-release-seq",
+        str(previous_release_seq),
     ]
     build_code, build_steps = run_child(build_argv, quiet)
     if build_code != 0:

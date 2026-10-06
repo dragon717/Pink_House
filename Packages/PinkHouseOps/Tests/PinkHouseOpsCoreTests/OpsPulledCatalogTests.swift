@@ -219,11 +219,26 @@ final class OpsPulledCatalogTests: XCTestCase {
 
     /// ⭐ 最关键的一条：**「已下发口径」必须说出来**。
     /// 不说的后果是运营把拉回当成「完整备份」，然后发现归档内容没了、图全缺。
-    func testCaveatsAlwaysStateReplacementAndDownstreamScope() {
+    func testCaveatsStateReconcileAndDownstreamScope() {
         let notes = OpsPulledCatalogAdoption.caveats(pulled: makeCatalog()).joined(separator: "\n")
-        XCTAssertTrue(notes.contains("替换"), notes)
         XCTAssertTrue(notes.contains("归档"), notes)
         XCTAssertTrue(notes.contains("thmedia:"), notes)
+    }
+
+    /// ⭐ 2026-09-29 改口径：动作不再是「整份替换」，而是**以线上为准逐条对账**。
+    ///
+    /// 文案里必须同时出现三件事，缺一件运营就会理解错：
+    ///   · 「逐条对齐 / 不是整份覆盖」= 这是怎么做的；
+    ///   · 「同一个 id 用线上那份覆盖」= 本地同 id 的改动会被盖掉；
+    ///   · 「本地有而线上没有的会被移除」= **会删东西**（最容易被低估的一条）。
+    func testCaveatsDescribeReconcileNotWholesaleReplacement() {
+        let notes = OpsPulledCatalogAdoption.caveats(pulled: makeCatalog()).joined(separator: "\n")
+        XCTAssertTrue(notes.contains("逐条对齐"), notes)
+        XCTAssertTrue(notes.contains("整份覆盖"), notes)
+        XCTAssertTrue(notes.contains("覆盖"), notes)
+        XCTAssertTrue(notes.contains("会被移除"), notes)
+        XCTAssertFalse(notes.contains("替换当前草稿的全部内容"),
+                       "旧口径（整份替换）的文案必须已经改掉：\(notes)")
     }
 
     /// 摘要没读到时**不能**让界面有机会写「摘要一致」。

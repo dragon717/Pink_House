@@ -50,6 +50,41 @@ final class OpsSnapshotHarnessTests: XCTestCase {
             XCTAssertGreaterThanOrEqual(try Data(contentsOf: png).count, 1_000,
                                         "\(section.rawValue).png 小得不像一张真截图")
         }
+
+        // ⭐ 向导 **S2** 那两张必须也在（2026-10-07 补）。
+        //
+        // 理由与这个文件的开头同一件事：`OpsSection.seriesEntry` 渲染出来的向导停在 **S1**，
+        // 而「系列价格表（上传原图 / 录表格）」卡片长在 **S2** 上 —— 少了这两张，
+        // 那张卡片在验收产物里**根本不存在**，而「产物里没有」和「功能没做」
+        // 事后完全分不出来。所以这里把它变成一条断言，而不是靠人记得去看。
+        for name in ["seriesEntry-profile", "seriesEntry-profile-bad"] {
+            let png = directory.appendingPathComponent("\(name).png")
+            XCTAssertTrue(FileManager.default.fileExists(atPath: png.path),
+                          "缺 S2 快照：\(name)（S2 的卡片不在 S1 上，必须单独拍）")
+            XCTAssertGreaterThanOrEqual(try Data(contentsOf: png).count, 1_000,
+                                        "\(name).png 小得不像一张真截图")
+        }
+
+        // ⭐ 另外三张（2026-10-07 补：可售尺码自动勾选 / 规格卡收起与展开）。
+        //
+        // 同一类问题：S3 不在 S1 上、规格卡的默认态就是**收起** ——
+        // 没有这三张，「自动勾选做了什么」和「展开以后长什么样」在验收产物里
+        // 根本无迹可寻。这里同样把它变成断言，而不是靠人记得去看。
+        for name in ["seriesEntry-types",
+                     "products-variants-folded",
+                     "products-variants-expanded"] {
+            let png = directory.appendingPathComponent("\(name).png")
+            XCTAssertTrue(FileManager.default.fileExists(atPath: png.path),
+                          "缺聚焦快照：\(name)")
+            XCTAssertGreaterThanOrEqual(try Data(contentsOf: png).count, 1_000,
+                                        "\(name).png 小得不像一张真截图")
+        }
+        // 收起 / 展开必须是**两种形态**：否则等于「分组根本没生效」，
+        // 而两张图都还是会正常生成（只是长得一样）—— 这种失败只有比字节才看得见。
+        XCTAssertNotEqual(
+            try Data(contentsOf: directory.appendingPathComponent("products-variants-folded.png")),
+            try Data(contentsOf: directory.appendingPathComponent("products-variants-expanded.png")),
+            "规格卡的收起态与展开态渲染完全相同，等于分组没生效")
     }
 
     // MARK: - 横幅的不变量

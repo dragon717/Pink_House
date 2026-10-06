@@ -70,6 +70,14 @@ enum OpsSeriesWizardStep: Int, CaseIterable, Identifiable {
 struct OpsSeriesWizardView: View {
     @ObservedObject var workspace: OpsWorkspace
 
+    /// 起始步骤。默认 S1；快照 harness 需要从 S2 起手（拍「系列价格表」那张卡），
+    /// 所以留一个显式入口 —— 与 `OpsMainView(initialSection:)` 同一个手法：
+    /// **只是初值**，之后完全由「上一步 / 下一步」驱动。
+    init(workspace: OpsWorkspace, initialStep: OpsSeriesWizardStep = .selectShopSeries) {
+        _workspace = ObservedObject(wrappedValue: workspace)
+        _step = State(initialValue: initialStep)
+    }
+
     @State private var step: OpsSeriesWizardStep = .selectShopSeries
     /// 「下一步」被本步校验拦下时展示的问题（逐条、带定位）
     @State private var gateIssues: [OpsSeriesEntryIssue] = []
@@ -218,7 +226,38 @@ struct OpsSeriesWizardView: View {
             get: { draft.seriesID },
             set: { newValue in
                 workspace.seriesEntry.seriesID = newValue == "__new__" ? "" : newValue
+                // ⚠️ 切系列必须**重新装载价格表块**，否则就是数据损坏：
+                // 向导草稿是长期存在的（`seriesEntryJSON`），在 A 系列填/传的价格表
+                // 会被原样写进 B 系列，而界面上完全看不出异常。
+                reloadPriceChartFromSelectedSeries()
             })
+    }
+
+    /// 把 S2 的价格表块换成「当前所选系列此刻的样子」。
+    ///
+    /// · 系列已有价格表 → 开关自动打开、单位/列名/行/原图一并载入（进来就能改）；
+    /// · 系列没有价格表、或选了「新建系列」→ **清空**，绝不把上一个系列的表格带过去。
+    ///
+    /// ⭐ 只在**用户显式切换系列**时调用，不做 `onAppear` 自动装载 ——
+    /// 那会把手打了一半、还没提交的向导内容用系列上的旧值覆盖掉（违反「失败不丢输入」）。
+    private func reloadPriceChartFromSelectedSeries() {
+        guard let series = workspace.catalog.series.first(where: { $0.id == draft.seriesID }),
+              let chart = series.priceChart else {
+            workspace.seriesEntry.declaresPriceChart = false
+            workspace.seriesEntry.priceChartUnit = ""
+            workspace.seriesEntry.priceChartColumnsText = ""
+            workspace.seriesEntry.priceChartRowsText = ""
+            workspace.seriesEntry.priceChartImageAssetIDs = []
+            return
+        }
+        workspace.seriesEntry.declaresPriceChart = true
+        workspace.seriesEntry.priceChartUnit = chart.unit ?? ""
+        workspace.seriesEntry.priceChartColumnsText = chart.columns.joined(separator: ", ")
+        workspace.seriesEntry.priceChartRowsText = chart.rows
+            .map { $0.label + " = " + $0.values.map { $0 ?? "" }.joined(separator: ", ") }
+            .joined(separator: "\n")
+        workspace.seriesEntry.priceChartImageAssetIDs =
+            chart.sourceImages ?? chart.sourceImage.map { [$0] } ?? []
     }
 
     private var seriesUnderShop: [CatalogSeries] {
@@ -247,6 +286,11 @@ struct OpsSeriesWizardView: View {
                 LabeledContent("店家", value: names.shop)
                 LabeledContent("系列", value: names.series)
                 LabeledContent("已选类型", value: draft.selectedCategorySummary)
+                // ⭐ 指路：价格表是**系列级**资料，收在 S2。不写这一句，
+                // 在 S1 找「上传价格表」的人会以为这个功能不见了
+                // （2026-10-06 用户就是这么问的）。
+                OpsFootnote(text: "系列价格表在下一步「**S2·系列资料**」里上传图片或录表格 ——"
+                            + "本页只做选择，不收内容。")
             }
         }
     }
@@ -275,6 +319,16 @@ struct OpsSeriesWizardView: View {
 
     @State private var showsCoverImporter = false
 
+    // 系列价格表（S2）：上传原图 + 结构化列行。三处独立状态，因为它们是三件事：
+    @State private var showsPriceChartImporter = false
+    /// 上传**失败**的逐条原因（含格式不支持）。与下面的 note 分开存 ——
+    /// 「传上去 3 张、坏了 1 张」时两句话要同时看得见，不能只留一句。
+    @State private var priceChartUploadError: String?
+    /// 上一次上传**成功**的结果摘要
+    @State private var priceChartUploadNote: String?
+    /// 模板会一次覆盖单位/列名/数据行三个字段，已填内容时先问一句
+    @State private var confirmsPriceChartTemplateFill = false
+
     private var seriesProfileStep: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
@@ -300,6 +354,8 @@ struct OpsSeriesWizardView: View {
                     }
                 }
 
+                priceChartCard
+
                 OpsCard(title: "销售阶段与时间", systemImage: "calendar.badge.clock") {
                     VStack(alignment: .leading, spacing: 10) {
                         Picker("销售阶段", selection: phaseChoice) {
@@ -321,7 +377,8 @@ struct OpsSeriesWizardView: View {
                             isOn: bind(\.hasBalanceEnd),
                             date: bind(\.balanceEndAt))
                         OpsFootnote(text: "本页面**不填写商品价格** —— 价格统一放到下一步，"
-                                    + "按当前类型与该类型的颜色、尺码放在一起（需求 §S2）。")
+                                    + "按当前类型与该类型的颜色、尺码放在一起（需求 §S2）。"
+                                    + "上面那张「系列价格表」是给客户看的**展示表**，不是定价来源。")
                     }
                 }
             }
@@ -342,6 +399,229 @@ struct OpsSeriesWizardView: View {
                 workspace.reportFailure("图片上传失败：\(error.localizedDescription)")
             }
         }
+    }
+
+    // MARK: S2 系列价格表（上传原图 + 结构化列行）
+
+    private var priceChartCard: some View {
+        OpsCard(title: "系列价格表（可选）", systemImage: "tablecells") {
+            VStack(alignment: .leading, spacing: 10) {
+                Toggle(isOn: bind(\.declaresPriceChart)) {
+                    opsMarkdown("在本向导里维护系列价格表"
+                                + "（关闭 = 本次提交**完全不碰**系列已有的价格表）")
+                }
+                if draft.declaresPriceChart {
+                    priceChartEditor
+                } else {
+                    OpsFootnote(text: "价格表是**系列级**的：整包系列共用一份，单品的详情页自动读它，"
+                                + "不需要在每个商品上再录一遍。"
+                                + "想上传原图或改表格，打开上面这个开关即可（选到已有价格表的系列时会自动打开）。")
+                }
+            }
+        }
+        .confirmationDialog("用标准模板填入价格表？",
+                            isPresented: $confirmsPriceChartTemplateFill) {
+            Button("覆盖当前的单位 / 列名 / 数据行", role: .destructive) {
+                applyPriceChartTemplate()
+            }
+            Button("取消", role: .cancel) {}
+        } message: {
+            Text("当前的列名与数据行会被模板替换掉，这一步不能撤销。")
+        }
+    }
+
+    private var priceChartEditor: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            // 单位是**金额单位**，不是尺码表的长度单位 —— 从旁边那张卡抄过来会填错
+            TextField("单位（如 元 / ¥）", text: bind(\.priceChartUnit))
+                .textFieldStyle(.roundedBorder)
+            TextField("列名（只写数据列，逗号分隔，如：\(CatalogChartTemplate.PriceChart.columnsText)）",
+                      text: bind(\.priceChartColumnsText))
+                .textFieldStyle(.roundedBorder)
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 8) {
+                    Text("每一行：`\(CatalogChartTemplate.PriceChart.sampleRowText)`")
+                        .font(.caption)
+                    Spacer(minLength: 8)
+                    Button("用标准模板填入") { requestPriceChartTemplateFill() }
+                        .controlSize(.small)
+                        .help("填入一份格式一定正确的价格表（4 个数据列 × 3 行），照着改数字即可")
+                }
+                TextEditor(text: bind(\.priceChartRowsText))
+                    .font(.body.monospaced())
+                    .frame(height: 110)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 6)
+                            .stroke(Color.secondary.opacity(0.25), lineWidth: 1))
+            }
+            OpsFootnote(text: "**款式写在「=」左边**，不写进列名（渲染时它单独占角落那一列）；"
+                        + "「=」右边的**值个数要和列名一样多**。分隔符用半角逗号「,」。")
+
+            priceChartUploadArea
+
+            // 识别结论（判定与文案来自共享包，Mac 只负责画）——
+            // 与系列配置 sheet 那张卡、S3 的尺码表走的是同一个出口。
+            OpsChartRecognitionBlock(recognition: priceChartRecognition,
+                                     isInputEmpty: draft.isPriceChartTextEmpty)
+        }
+    }
+
+    // MARK: 上传 / 展示
+
+    private var priceChartUploadArea: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                Button {
+                    priceChartUploadError = nil
+                    showsPriceChartImporter = true
+                } label: {
+                    Label("选择价格表图片…", systemImage: "square.and.arrow.up")
+                }
+                .controlSize(.small)
+                .help("可一次选多张。第一张即客户端详情页展示的主图。")
+                Text("可多选；支持 \(OpsWorkspace.priceChartFileFormatList)")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                Spacer(minLength: 0)
+            }
+
+            if draft.priceChartImageAssetIDs.isEmpty {
+                OpsFootnote(text: "还没有原图。**只有原图、没有表格也是合法的**"
+                            + "（客户端会直接展示原图，而不是显示「暂无数据」）。")
+            } else {
+                Text("已关联 \(draft.priceChartImageAssetIDs.count) 张原图"
+                     + "（第一张即客户端详情页的主图）")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(alignment: .top, spacing: 10) {
+                        ForEach(Array(draft.priceChartImageAssetIDs.enumerated()),
+                                id: \.element) { index, assetID in
+                            priceChartThumbnail(assetID: assetID, index: index)
+                        }
+                    }
+                    .padding(.vertical, 2)
+                }
+            }
+
+            // 成功与失败**同时**可见（部分成功时两句话都得在）
+            // ⚠️ 两句都是**变量**，一律过 `opsMarkdown` —— 「取消关联」那条里带
+            // `**没有删除**`，用 `Label(变量, systemImage:)` 会把星号逐字显示出来
+            // （仓库铁律：变量文案不过这一层就不解析 Markdown）。
+            if let priceChartUploadNote {
+                Label {
+                    opsMarkdown(priceChartUploadNote)
+                        .fixedSize(horizontal: false, vertical: true)
+                } icon: {
+                    Image(systemName: "checkmark.circle.fill")
+                }
+                .font(.caption)
+                .foregroundStyle(OpsFlowPalette.okGreen)
+            }
+            if let priceChartUploadError {
+                Label {
+                    opsMarkdown(priceChartUploadError)
+                        .fixedSize(horizontal: false, vertical: true)
+                } icon: {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                }
+                .font(.caption)
+                .foregroundStyle(OpsFlowPalette.warnOrange)
+            }
+        }
+        .padding(10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(OpsFlowPalette.tileLilac, in: RoundedRectangle(cornerRadius: 10))
+        .overlay {
+            RoundedRectangle(cornerRadius: 10)
+                .stroke(OpsFlowPalette.tileBorder, lineWidth: 1)
+        }
+        .fileImporter(
+            isPresented: $showsPriceChartImporter,
+            allowedContentTypes: OpsWorkspace.priceChartPickerTypes,
+            allowsMultipleSelection: true) { result in
+            handlePriceChartImport(result)
+        }
+    }
+
+    private func priceChartThumbnail(assetID: String, index: Int) -> some View {
+        VStack(spacing: 3) {
+            ZStack(alignment: .topTrailing) {
+                OpsThumbnail(
+                    url: workspace.stagedFileURL(
+                        forReference: workspace.asset(for: assetID)?.originalURL),
+                    size: 64)
+                Button {
+                    workspace.removePriceChartImage(assetID: assetID)
+                    priceChartUploadError = nil
+                    priceChartUploadNote = "已取消关联 1 张原图（文件仍在素材里，**没有删除**）。"
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 14))
+                        .symbolRenderingMode(.palette)
+                        .foregroundStyle(.white, Color.black.opacity(0.55))
+                }
+                .buttonStyle(.plain)
+                .padding(2)
+                .help("取消关联这张原图（不会删除文件）")
+            }
+            Text(index == 0 ? "主图" : "#\(index + 1)")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    /// 文件选择的结果处理。三类结果**必须分开**（仓库铁律）：
+    /// 取消 = 什么都不说；部分失败 = 成功与失败两句同时在；全失败 = 逐条原因 + 顶部横幅。
+    private func handlePriceChartImport(_ result: Result<[URL], Error>) {
+        switch result {
+        case .success(let urls):
+            guard !urls.isEmpty else { return }
+            let outcome = workspace.appendPriceChartImages(from: urls)
+            priceChartUploadNote = outcome.addedCount > 0
+                ? "已上传 \(outcome.addedCount) 张价格表原图"
+                    + "（现共 \(draft.priceChartImageAssetIDs.count) 张）。"
+                : nil
+            if outcome.failures.isEmpty {
+                priceChartUploadError = nil
+            } else {
+                priceChartUploadError = "有 \(outcome.failures.count) 个文件没能上传：\n"
+                    + outcome.failures.map { "· " + $0 }.joined(separator: "\n")
+            }
+        case .failure(let error):
+            priceChartUploadNote = nil
+            let message = "没能读取所选文件：\(error.localizedDescription)"
+            priceChartUploadError = message
+            workspace.reportFailure("价格表原图上传失败：" + message)
+        }
+    }
+
+    // MARK: 标准模板 / 识别结论
+
+    /// 点「用标准模板填入」：空的就直接填，非空先确认（不静默覆盖已填内容）。
+    private func requestPriceChartTemplateFill() {
+        if draft.isPriceChartTextEmpty {
+            applyPriceChartTemplate()
+        } else {
+            confirmsPriceChartTemplateFill = true
+        }
+    }
+
+    /// 模板内容**只从共享包读**（`CatalogChartTemplate.PriceChart`）——
+    /// 界面不自己拼一份，所以「模板内容」与「模板还能不能过识别」永远只有一个答案。
+    private func applyPriceChartTemplate() {
+        workspace.seriesEntry.priceChartUnit = CatalogChartTemplate.PriceChart.unit
+        workspace.seriesEntry.priceChartColumnsText = CatalogChartTemplate.PriceChart.columnsText
+        workspace.seriesEntry.priceChartRowsText = CatalogChartTemplate.PriceChart.rowsText
+    }
+
+    /// 价格表识别结论。结构与落库**同一份解析**（`draft.parsedPriceChart`），
+    /// 判定与文案交给共享包 —— 本视图不许自己拼「识别成功 / 识别失败」。
+    private var priceChartRecognition: CatalogChartRecognition {
+        let parsed = draft.parsedPriceChart
+        return OpsChartRecognition.make(kind: .price,
+                                        parsed: parsed.parsed,
+                                        issue: parsed.issue)
     }
 
     private var phaseChoice: Binding<String?> {
@@ -468,10 +748,29 @@ struct OpsSeriesWizardReviewView: View {
                         .dateTime.year().month().day().hour().minute()))
                 }
                 LabeledContent("已选类型", value: draft.selectedCategorySummary)
+                LabeledContent("系列价格表", value: priceChartSummaryLine)
                 OpsFootnote(text: "本页**只读**，不重复编辑价格或尺码表；"
                             + "发现问题用每张卡右上角的「返回修改」。")
             }
         }
+    }
+
+    /// S4 的系列价格表摘要（只读）。
+    ///
+    /// 「只有原图」必须**说成一个合法状态**，不能显示成「0 列 · 0 行」——
+    /// 后者看起来像「没做成」，而它其实是模型允许的形态
+    /// （`CatalogPriceChart.hasStructuredContent == false`，客户端直接展示原图）。
+    private var priceChartSummaryLine: String {
+        guard draft.declaresPriceChart else { return "本次提交不改动（沿用系列上已有的）" }
+        let images = draft.priceChartImageAssetIDs.count
+        let imagePart = images == 0 ? "无原图" : "\(images) 张原图"
+        if let parsed = draft.parsedPriceChart.parsed {
+            return "\(parsed.columns.count) 列 · \(parsed.rows.count) 行 · " + imagePart
+        }
+        if images > 0 {
+            return "只有原图、没有结构化列行（客户端直接展示原图）· " + imagePart
+        }
+        return "（还没上传原图、也没有表格）"
     }
 
     private func entrySummary(_ entry: OpsSeriesTypeEntry) -> some View {
@@ -673,6 +972,20 @@ struct OpsSeriesWizardPublishView: View {
                             Text(result.entryName)
                             opsMarkdown(result.message)
                                 .font(.caption).foregroundStyle(.secondary)
+                        }
+                    }
+                    // 系列级（S2 价格表）也要逐项看得见 —— 条目全绿而价格表没写进去时，
+                    // 只报「系列级提交完成」就是谎报。
+                    if let priceChartError = report.priceChartError {
+                        HStack(alignment: .top, spacing: 8) {
+                            Image(systemName: "xmark.circle.fill")
+                                .foregroundStyle(Color.orange)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("系列价格表")
+                                opsMarkdown(priceChartError)
+                                    .font(.caption).foregroundStyle(.secondary)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
                         }
                     }
                     if !report.draftSaved {

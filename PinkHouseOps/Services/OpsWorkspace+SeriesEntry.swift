@@ -25,6 +25,7 @@
 
 import Foundation
 import SwiftData
+import UniformTypeIdentifiers
 
 // MARK: - 提交结果
 
@@ -48,10 +49,14 @@ struct OpsSeriesEntryCommitReport: Equatable {
     var seriesID: String?
     /// 草稿是否落盘成功
     var draftSaved: Bool = true
+    /// S2 系列价格表写回失败的原因（nil = 没写、或写成功）。
+    /// 与逐条目结果**并列展示** —— 不能因为它挂在系列级就悄悄吞掉。
+    var priceChartError: String?
 
     var blocked: Bool { !blockedByValidation.isEmpty }
     var allOK: Bool {
-        !blocked && !entryResults.isEmpty && entryResults.allSatisfy(\.ok) && draftSaved
+        !blocked && !entryResults.isEmpty && entryResults.allSatisfy(\.ok)
+            && draftSaved && priceChartError == nil
     }
 }
 
@@ -95,6 +100,59 @@ extension OpsWorkspace {
     }
 }
 
+// MARK: - S3：可售尺码的自动勾选（2026-10-07 用户需求）
+
+extension OpsWorkspace {
+
+    /// 把某个类型条目的「可售尺码」补齐到当前尺码表（**幂等**）。
+    ///
+    /// ## 规则（唯一一份，在共享包 `CatalogSizeSelectionPolicy`）
+    ///
+    /// · 该颜色**一个有效尺码都没勾** → 补齐为整张尺码表（按尺码表原始顺序）；
+    /// · 已经勾了一部分 → **一个字都不动**（那是用户手动取消的结果）；
+    /// · 顺带把「上一张尺码表留下的旧标签」归一掉。
+    ///
+    /// ## 为什么判定写在共享包、写回写在这里
+    ///
+    /// 判定要能被 `swift test` 秒级验证；写回要能被**视图层与快照 harness 共用** ——
+    /// harness 在真 App 里调它、把结果拍成图，于是「自动勾选到底会不会发生」
+    /// 有一份跑得起来、看得见的证据，而不是只写在视图的某个 `onChange` 里。
+    ///
+    /// ## 为什么不放在 body / onAppear 里「每次渲染对账」
+    ///
+    /// 两个理由：① 在 body 里改 `@Published` 会变成无限刷新；
+    /// ② 幂等规则虽然不怕重复调用，但「什么时候该发生」必须**可解释** ——
+    /// 运营问「为什么这几个尺码被勾上了」，答案得是一句话，不是一个渲染时机。
+    /// 所以调用点全部是**明确的人的动作**（见 `OpsSeriesWizardTypeEditorView`）。
+    ///
+    /// - Returns: 本次**真的改动过**的颜色数（0 = 无需补齐）。
+    @discardableResult
+    func autoSelectSellableSizes(entryID: String) -> Int {
+        guard let index = seriesEntry.typeEntries.firstIndex(where: { $0.id == entryID }) else {
+            return 0
+        }
+        let entry = seriesEntry.typeEntries[index]
+        guard entry.usesSizeChart, let chart = OpsSeriesSizeChartParsing.parse(entry: entry).chart else {
+            return 0
+        }
+        var colors = entry.colors
+        var changed = 0
+        for colorIndex in colors.indices {
+            let filled = CatalogSizeSelectionPolicy.autoFilled(
+                colors[colorIndex].selectedSizes, allLabels: chart.sizeLabels)
+            if filled != colors[colorIndex].selectedSizes {
+                colors[colorIndex].selectedSizes = filled
+                changed += 1
+            }
+        }
+        // 一次写回：逐个写会触发 N 次草稿防抖持久化，且中途状态会被渲染出去
+        if changed > 0 {
+            seriesEntry.typeEntries[index].colors = colors
+        }
+        return changed
+    }
+}
+
 // MARK: - 单图导入（封面 / 颜色图 / 尺码表原图）
 
 extension OpsWorkspace {
@@ -131,6 +189,157 @@ extension OpsWorkspace {
             lastError = "图片导入失败（\(url.lastPathComponent)）：\(error.localizedDescription)"
             return nil
         }
+    }
+}
+
+// MARK: - 价格表原图（S2）
+
+extension OpsWorkspace {
+
+    /// 价格表原图**允许**的文件类型。
+    ///
+    /// ⭐ 界面上的「支持 PNG / JPEG / …」提示、文件选择器的过滤器、
+    /// 以及导入前的那道格式校验**共用这一份** —— 三处各写一遍就会出现
+    /// 「说明里写了支持、实际却被拦」这种最让人上火的错。
+    static let priceChartFileTypes: [UTType] = [.png, .jpeg, .heic, .tiff, .gif, .bmp]
+
+    /// 给用户看的格式清单（从 `priceChartFileTypes` 派生，不手打）
+    static var priceChartFileFormatList: String {
+        priceChartFileTypes.map(\.preferredFilenameExtension).compactMap { $0?.uppercased() }
+            .joined(separator: " / ")
+    }
+
+    /// 文件选择器**允许选中**的类型。
+    ///
+    /// 刻意比 `priceChartFileTypes` 宽：把 PDF / 表格 / 文本也放进来，
+    /// 是为了让「选错了」能得到一句**可执行的拒绝**，而不是在系统面板里灰掉一整片文件 ——
+    /// 很多人是拿 Excel 排好价格表再导出的，灰掉只会让人以为「这个功能坏了」。
+    /// 选中后由 `isSupportedPriceChartFile` 拦下，逐条说明「只能是图片，不支持文档」。
+    static let priceChartPickerTypes: [UTType] =
+        priceChartFileTypes + [.pdf, .spreadsheet, .commaSeparatedText, .plainText]
+
+    /// 这个文件看起来是不是一张可用的价格表原图（**只看类型，不看内容**）。
+    ///
+    /// 为什么要有这一步：`ShopCatalogMediaStaging` 对非图片只会说
+    /// 「不是 ImageIO 能解码的图片数据（N 字节）」—— 对着一张 `.pdf` 说这句，
+    /// 用户读完不知道自己该换什么格式。先按类型拦一次，才能给出**可执行**的话。
+    static func isSupportedPriceChartFile(_ url: URL) -> Bool {
+        let ext = url.pathExtension.lowercased()
+        guard !ext.isEmpty, let type = UTType(filenameExtension: ext) else { return false }
+        return priceChartFileTypes.contains { type.conforms(to: $0) }
+    }
+
+    /// 批量导入价格表原图（S2 的文件选择 / 拖入都走这里）。
+    ///
+    /// 口径（三条都是刻意的）：
+    ///  · **逐张复用 `importSingleImage`** —— 规范化、内容寻址、写 staging、
+    ///    落草稿、报错全部是同一条路径，不另写第二套导入；
+    ///  · **一个文件失败不中断其余的** —— 选 5 张、坏 1 张，另外 4 张照样进；
+    ///    这与「逐条目结果」是同一个口径（不能把部分失败折成一句「上传失败」）；
+    ///  · **返回按选择顺序的 asset id** —— 价格表的 `sourceImage` 恒取首图，
+    ///    顺序是有意义的，不许用集合重排。
+    ///
+    /// 失败原因取自 `lastError`（类型不符 / staging 报的原文），
+    /// **不在这里另编一套措辞** —— 否则同一个原因在两张嘴上说两遍，早晚分叉。
+    @discardableResult
+    func importPriceChartImages(from urls: [URL]) -> (assetIDs: [String], failures: [String]) {
+        var assetIDs: [String] = []
+        var failures: [String] = []
+        for url in urls {
+            guard Self.isSupportedPriceChartFile(url) else {
+                failures.append("\(url.lastPathComponent)：格式不支持。"
+                    + "价格表原图只能是图片（\(Self.priceChartFileFormatList)），"
+                    + "不支持 PDF、Excel、Word 等文档。")
+                continue
+            }
+            // 上一张的失败原因必须先清掉，否则这一张成功时会误报上一张的错
+            lastError = nil
+            if let assetID = importSingleImage(from: url) {
+                assetIDs.append(assetID)
+            } else {
+                failures.append("\(url.lastPathComponent)：\(lastError ?? "导入失败，原因未知。")")
+            }
+        }
+        return (assetIDs, failures)
+    }
+
+    /// 把「选择 / 拖入」的图片追加进向导的价格表原图列表（**追加，不替换**）。
+    ///
+    /// 返回给界面的三类结果必须分开（仓库铁律：
+    /// 「点了没反应」和「失败了」不是一回事，「全失败」和「部分失败」也不是）：
+    ///   · 成功张数 + 是否有失败；
+    ///   · 失败逐条原文（界面要逐条列出来，不许折成「上传失败」一句话）。
+    @discardableResult
+    func appendPriceChartImages(from urls: [URL])
+        -> (addedCount: Int, failures: [String]) {
+        let outcome = importPriceChartImages(from: urls)
+        var ids = seriesEntry.priceChartImageAssetIDs
+        for id in outcome.assetIDs where !ids.contains(id) {
+            ids.append(id)
+        }
+        seriesEntry.priceChartImageAssetIDs = ids
+
+        // 顶部横幅只说一句汇总；**逐条原因由界面就地列出来**
+        //（那里才是用户点按钮的位置）。但「全部失败」必须升级成 lastError，
+        // 否则横幅会显示上一张成功导入的绿字，看起来像成功。
+        let added = outcome.assetIDs.count
+        if added > 0, outcome.failures.isEmpty {
+            lastError = nil
+            statusMessage = "已上传 \(added) 张价格表原图（价格表原图共 "
+                + "\(seriesEntry.priceChartImageAssetIDs.count) 张）。"
+        } else if added > 0 {
+            statusMessage = "已上传 \(added) 张价格表原图；"
+                + "另有 \(outcome.failures.count) 个文件没上传成功（原因见价格表卡片）。"
+            lastError = statusMessage
+        } else if !outcome.failures.isEmpty {
+            statusMessage = nil
+            lastError = "价格表原图上传失败：" + outcome.failures.joined(separator: "；")
+        }
+        return (added, outcome.failures)
+    }
+
+    /// 从向导价格表原图列表里移除一张（**只解除关联，不删文件**）。
+    ///
+    /// 为什么不连文件一起删：同一张图可能被商品图、系列封面或别的草稿引用着，
+    /// 「在这里取消勾选」的意思只能是「这张图不再是价格表原图」。
+    /// 真正的孤儿文件清理另有入口（草稿孤立素材）。
+    func removePriceChartImage(assetID: String) {
+        seriesEntry.priceChartImageAssetIDs.removeAll { $0 == assetID }
+    }
+
+    // MARK: 提交写回
+
+    /// S2 系列价格表 → 系列（提交的一部分）。
+    ///
+    /// ⚠️ 仅当 `declaresPriceChart` 打开时才动价格表；关着**一个字都不写**。
+    /// 这是本仓库对「一次编辑只写它负责的字段」的既有口径：
+    /// 合成一个「保存」，就会出现「我只是改了个档期，结果价格表被清空了」。
+    ///
+    /// 三种可提交形态（`OpsSeriesPriceChartValidation` 已经先拦掉了其它情况）：
+    ///   · 结构化列行 +（可选）原图；
+    ///   · 只有原图（`hasStructuredContent == false`，客户端退化成展示原图）；
+    ///   · 只有结构化列行（纯表格，无图）。
+    @discardableResult
+    func applySeriesPriceChartFromWizard(seriesID: String) -> Bool {
+        guard seriesEntry.declaresPriceChart else { return true }
+
+        let parsed = seriesEntry.parsedPriceChart.parsed
+        let images = seriesEntry.priceChartImageAssetIDs
+        guard parsed != nil || !images.isEmpty else {
+            // 上面那道校验会先拦下这种状态；这里再挡一次是为了「绝不用空表覆盖已有价格表」
+            lastError = "系列价格表既没有结构化列行、也没有原图，已跳过（未改动系列上已有的价格表）。"
+            return false
+        }
+        let ok = updateSeriesPriceChart(
+            seriesID: seriesID,
+            unit: seriesEntry.priceChartUnit,
+            columns: parsed?.columns ?? [],
+            rows: parsed?.rows ?? [],
+            sourceImages: images)
+        if !ok {
+            lastError = "系列价格表写入失败：" + (lastError ?? "未知原因")
+        }
+        return ok
     }
 }
 
@@ -205,6 +414,11 @@ extension OpsWorkspace {
         if let coverID = seriesEntry.coverAssetID {
             _ = updateSeriesCover(seriesID: seriesID, assetID: coverID)
         }
+        // S2 价格表：开关关着时这个调用是空操作（一个字都不写）。
+        // 失败原因**立刻取走**：后面的逐条目提交会覆盖 `lastError`。
+        if !applySeriesPriceChartFromWizard(seriesID: seriesID) {
+            report.priceChartError = lastError ?? "系列价格表写入失败。"
+        }
 
         // ── 逐类型提交（每个类型复用同一条商品写入链路）──
         for index in seriesEntry.typeEntries.indices {
@@ -226,6 +440,10 @@ extension OpsWorkspace {
         } else if !saved {
             lastError = "部分或全部类型已写入内存，但草稿落盘失败（内容仍在界面上）："
                 + report.entryResults.filter { !$0.ok }.map(\.message).joined(separator: "；")
+        } else if let priceChartError = report.priceChartError {
+            // 价格表失败也要出声：条目全 OK 但价格表没写进去时，
+            // 只报「系列级提交完成」就是谎报。
+            lastError = priceChartError
         } else {
             let failed = report.entryResults.filter { !$0.ok }
             lastError = failed.map { "\($0.entryName)：\($0.message)" }.joined(separator: "\n")

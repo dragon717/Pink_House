@@ -37,6 +37,25 @@ struct OpsProductsView: View {
     @State private var searchText = ""
     @State private var includeArchived = true
     @State private var sheet: ProductSheet?
+    /// 规格卡里**被手动点开**的颜色（`nil` = 「未区分颜色」那一组）。
+    /// 默认空 = 默认只显示颜色；只记用户点过的，不做任何推断。
+    @State private var expandedVariantColors: Set<String?> = []
+
+    /// 初始选中商品与初始展开的颜色 —— **只服务快照 harness**。
+    ///
+    /// 为什么必须是显式入口：规格卡的默认形态（收起 = 只显示颜色）与
+    /// 展开形态长得很不一样，而 `@State` 从外面够不到。
+    /// 不给入口的话，「展开后长什么样」在验收产物里**根本不存在** ——
+    /// 「看不到」和「没做」事后分不出来（与本仓库给向导 S2 留
+    /// `initialWizardStep` 的理由相同）。
+    /// 两者都只是**初值**，之后完全由页面自己的交互驱动。
+    init(workspace: OpsWorkspace,
+         initialSelectedProductID: String? = nil,
+         initialExpandedVariantColors: Set<String?> = []) {
+        self.workspace = workspace
+        _selectedProductID = State(initialValue: initialSelectedProductID)
+        _expandedVariantColors = State(initialValue: initialExpandedVariantColors)
+    }
 
     var body: some View {
         HSplitView {
@@ -71,6 +90,9 @@ struct OpsProductsView: View {
         .onChange(of: includeArchived) { _, _ in clampSelection() }
         .onChange(of: workspace.catalog.products.count) { _, _ in clampSelection() }
         .onChange(of: workspace.catalog.shops.count) { _, _ in clampSelection() }
+        // 换商品 = 回到「默认只显示颜色」。否则 A 商品的展开态会带到 B 商品上
+        // （颜色名撞名时看起来像「这个颜色怎么自己展开了」），而且集合只增不减。
+        .onChange(of: selectedProductID) { _, _ in expandedVariantColors = [] }
     }
 
     // MARK: 派生
@@ -335,51 +357,179 @@ struct OpsProductsView: View {
 
     // MARK: 规格
 
+    /// 规格卡：**默认只显示颜色**（2026-10-07 用户需求）。
+    ///
+    /// ## 显示规则（判定在共享包 `CatalogVariantColorGrouping`，这里只负责摆）
+    ///
+    /// · **默认一行 = 一个颜色**：代表缩略图（该色第一条有图的规格）+ 颜色名
+    ///   + 尺码摘要 + 缺图条数。点这一行才展开逐条「色 / 码」与「编辑 / 删除」。
+    /// · 颜色留空的规格归到 **「未区分颜色」** 一组（`nil` / 空串 / 纯空白是同一组）。
+    /// · 组顺序 = **首次录入顺序**，不是颜色名字典序、更不是集合遍历序。
+    /// · 只有**一个颜色**时不套「展开」：分组不提供信息量，多一层点击只会让人烦。
+    ///   但仍然把颜色抽成一行标题（同一个颜色名逐条重复是纯噪音）。
+    ///
+    /// ## 为什么默认收起
+    ///
+    /// 规格是「颜色 × 尺码」的笛卡尔积：3 色 × 5 码 = 15 行。而日常要看的问题
+    /// （「这个款有哪几个颜色」「哪几个颜色还没配图」）答案小一个数量级。
     private func variantsCard(_ product: CatalogProduct) -> some View {
         let variants = workspace.variants(forProduct: product.id)
+        let groups = CatalogVariantColorGrouping.groups(variants, color: { $0.color })
+        let grouped = CatalogVariantColorGrouping.shouldGroup(variants, color: { $0.color })
         return OpsCard(title: "规格（配色 / 尺码）· \(variants.count)", systemImage: "square.on.square") {
             VStack(alignment: .leading, spacing: 8) {
                 if variants.isEmpty {
                     Text("没有规格。单规格商品可以不填；多色多码（SKU）请逐条录入。")
                         .font(.callout).foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
-                } else {
+                } else if grouped {
                     VStack(spacing: 0) {
-                        ForEach(Array(variants.enumerated()), id: \.element.id) { _, variant in
-                            HStack(spacing: 8) {
-                                OpsThumbnail(url: workspace.stagedFileURL(
-                                    forReference: variant.imageAssetID.flatMap {
-                                        workspace.asset(for: $0)?.originalURL
-                                    }),
-                                             size: 30)
-                                Text(workspace.variantLabel(color: variant.color, size: variant.size))
-                                    .font(.callout)
-                                Spacer(minLength: 4)
-                                if variant.imageAssetID == nil {
-                                    OpsTag(text: "无规格图", tint: .orange)
-                                }
-                                Button("编辑") {
-                                    sheet = .variantForm(product.id, variant.id)
-                                }
-                                .buttonStyle(.link).font(.caption)
-                                Button("删除") {
-                                    workspace.removeVariant(id: variant.id)
-                                }
-                                .buttonStyle(.link).font(.caption)
-                            }
-                            .padding(.vertical, 4)
+                        ForEach(Array(groups.enumerated()), id: \.offset) { _, group in
+                            variantColorGroupRow(group, product: product, expandable: true)
+                            Divider()
+                        }
+                    }
+                } else if let only = groups.first {
+                    // 只有一个颜色：不套展开，但颜色只写一次
+                    variantColorGroupRow(only, product: product, expandable: false)
+                    VStack(spacing: 0) {
+                        ForEach(only.items, id: \.id) { variant in
+                            variantRow(variant, product: product)
                             Divider()
                         }
                     }
                 }
-                Button {
-                    sheet = .variantForm(product.id, nil)
-                } label: {
-                    Label("新增规格", systemImage: "plus")
+                HStack(spacing: 10) {
+                    Button {
+                        sheet = .variantForm(product.id, nil)
+                    } label: {
+                        Label("新增规格", systemImage: "plus")
+                    }
+                    .controlSize(.small)
+                    if grouped {
+                        Button(allVariantColorsExpanded(groups) ? "收起全部" : "展开全部") {
+                            if allVariantColorsExpanded(groups) {
+                                expandedVariantColors = []
+                            } else {
+                                expandedVariantColors = Set(groups.map(\.color))
+                            }
+                        }
+                        .controlSize(.small)
+                    }
                 }
-                .controlSize(.small)
+                if !variants.isEmpty {
+                    OpsFootnote(text: "**默认只显示颜色** —— \(groups.count) 个颜色 · \(variants.count) 条规格"
+                                + "（颜色 × 尺码 的乘积，平铺会是一条长列表）；"
+                                + "点一行颜色才展开逐条「色 / 码」。"
+                                + "颜色留空的规格归到「未区分颜色」，不会被当成一个真的颜色名。")
+                }
             }
         }
+    }
+
+    /// 一组颜色：收起时只显示颜色本身（代表图 / 颜色名 / 尺码摘要 / 缺图条数）。
+    @ViewBuilder
+    private func variantColorGroupRow(
+        _ group: CatalogVariantColorGroup<CatalogProductVariant>,
+        product: CatalogProduct,
+        expandable: Bool
+    ) -> some View {
+        let isExpanded = expandable && expandedVariantColors.contains(group.color)
+        VStack(spacing: 0) {
+            Button {
+                guard expandable else { return }
+                if isExpanded {
+                    expandedVariantColors.remove(group.color)
+                } else {
+                    expandedVariantColors.insert(group.color)
+                }
+            } label: {
+                HStack(spacing: 8) {
+                    OpsThumbnail(url: workspace.stagedFileURL(
+                        forReference: CatalogVariantColorGrouping.leadingImage(
+                            group.items, image: { $0.imageAssetID })
+                            .flatMap { workspace.asset(for: $0)?.originalURL }),
+                                 size: 30)
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(CatalogVariantColorGrouping.colorTitle(group.color))
+                            .font(.callout)
+                            .foregroundStyle(OpsFlowPalette.textPrimary)
+                        Text(CatalogVariantColorGrouping.sizeSummary(group.items.map(\.size)))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    Spacer(minLength: 4)
+                    variantMissingImageTag(group)
+                    Text("\(group.items.count) 条")
+                        .font(.caption).foregroundStyle(.secondary)
+                    if expandable {
+                        Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .padding(.vertical, 5)
+
+            if isExpanded {
+                VStack(spacing: 0) {
+                    ForEach(group.items, id: \.id) { variant in
+                        variantRow(variant, product: product)
+                        Divider()
+                    }
+                }
+                .padding(.leading, 38)
+            }
+        }
+    }
+
+    /// 缺图条数：这一组里有几条规格没配图（颜色下有 5 个码、只配了 2 张图时能一眼看出来）。
+    @ViewBuilder
+    private func variantMissingImageTag(_ group: CatalogVariantColorGroup<CatalogProductVariant>) -> some View {
+        let missing = CatalogVariantColorGrouping.missingImageCount(
+            group.items, image: { $0.imageAssetID })
+        if missing > 0 {
+            OpsTag(text: "缺图 \(missing)", tint: .orange)
+        }
+    }
+
+    private func allVariantColorsExpanded(
+        _ groups: [CatalogVariantColorGroup<CatalogProductVariant>]
+    ) -> Bool {
+        CatalogVariantColorGrouping.allExpanded(
+            groups.flatMap(\.items),
+            color: { $0.color },
+            isExpanded: { expandedVariantColors.contains($0) })
+    }
+
+    /// 单条规格：**规格展示名唯一口径在 `workspace.variantLabel(color:size:)`**
+    /// （`"色 / 码"` / `"色"` / `"尺码 码"` / `"未区分"`），视图不许自己拼。
+    private func variantRow(_ variant: CatalogProductVariant,
+                            product: CatalogProduct) -> some View {
+        HStack(spacing: 8) {
+            OpsThumbnail(url: workspace.stagedFileURL(
+                forReference: variant.imageAssetID.flatMap {
+                    workspace.asset(for: $0)?.originalURL
+                }),
+                         size: 30)
+            Text(workspace.variantLabel(color: variant.color, size: variant.size))
+                .font(.callout)
+            Spacer(minLength: 4)
+            if variant.imageAssetID == nil {
+                OpsTag(text: "无规格图", tint: .orange)
+            }
+            Button("编辑") {
+                sheet = .variantForm(product.id, variant.id)
+            }
+            .buttonStyle(.link).font(.caption)
+            Button("删除") {
+                workspace.removeVariant(id: variant.id)
+            }
+            .buttonStyle(.link).font(.caption)
+        }
+        .padding(.vertical, 4)
     }
 
     // MARK: 尺码表

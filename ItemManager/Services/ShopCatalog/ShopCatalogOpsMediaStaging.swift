@@ -79,7 +79,11 @@ nonisolated struct ShopCatalogOpsMediaIssue: Equatable, Sendable {
 
     /// 涉及的文件名（解不出时退回引用原文）
     var fileName: String {
-        ShopCatalogOpsMediaReferences.localFileName(in: reference) ?? reference
+        // 类型名是共享包里的 `ShopCatalogMediaReferences`（图片引用字段清单**唯一一处**定义）。
+        // 2026-09-29：这里原先写成 `ShopCatalogOpsMediaReferences` —— 那个类型在仓库里
+        // 根本不存在（`git log -S` 显示只有上一提交引入的这一个引用），
+        // 后果是 **iOS target 整体编不过**（`cannot find ... in scope`）。
+        ShopCatalogMediaReferences.localFileName(in: reference) ?? reference
     }
 
     /// 一行可读结论：先说**是谁**，再说为什么

@@ -425,12 +425,14 @@ struct ShopCatalogSeriesConfigSections: View {
             ShopCatalogChartPasteButton(kind: .priceChart,
                                         columnsText: $form.priceChartColumnsText,
                                         rowsText: $form.priceChartRowsText)
-            TextField("列名（逗号分隔，如：款式,预约价,定金,尾款）", text: $form.priceChartColumnsText)
+            // 「款式」是行标签列，不写进列名（与 `CatalogChartTextSyntax.labelColumnNames` 同一口径）
+            TextField("列名（只写数据列，逗号分隔，如：预约价,定金,尾款,现货价）", text: $form.priceChartColumnsText)
                 .font(.system(size: 13))
             TextEditor(text: $form.priceChartRowsText)
                 .frame(minHeight: 60)
                 .font(.system(size: 13))
-            Text("价格表行：每行「标签:值,值,…」与列一一对应（如「大蝴蝶结背心裙:318,91,227」）；可在「粘贴文本录入」里整段贴入，或在此手动修正后保存")
+            // 示例值个数必须与上面的列名个数一致（价格表列 = 预约价/定金/尾款/现货价 共 4 个）
+            Text("价格表行：每行「标签:值,值,…」与列一一对应（如「大蝴蝶结背心裙:318,91,227,368」）；可在「粘贴文本录入」里整段贴入，或在此手动修正后保存")
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)
             TextField("单位（可空，如 元）", text: $form.priceChartUnitText)

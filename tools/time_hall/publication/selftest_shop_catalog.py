@@ -229,6 +229,53 @@ with tempfile.TemporaryDirectory() as root_name:
         check("缺图报错信息点名缺失文件", "img-MISSING.jpg" in str(error), str(error)[:80])
     check("引用到的图片缺失 → 构建硬失败（不静默跳过）", raised)
 
+# ---- 沙盒：媒体构建**不许读系统文件**（2026-09-29 App 内实测就挂在这里） ----
+#
+# 桥接器是 Mac App 的**子进程、继承 App 沙盒**：`mimetypes.guess_type()` 首次调用会去读
+# `/etc/apache2/mime.types` 建数据库 → `PermissionError: [Errno 1] Operation not permitted`
+# → `build_release.py` 退出码 1 → 界面「构建产物失败」。
+# 这种缺陷 **CLI 直跑永远复现不出来**（没有沙盒），所以必须在自检里**造出那块拒绝**：
+# 把读 `/etc`、`/usr/share`、`/var/db` 的路堵死再跑一遍同一条构建路径。
+# 用法正确就照样通过；哪天有人把 mimetypes / platform / pwd 之类塞回媒体路径，这条会红。
+
+import builtins  # noqa: E402
+
+from protocol import MEDIA_MIME_ALLOWLIST, MEDIA_SUFFIX_TO_MIME, media_mime_type  # noqa: E402
+
+_real_open = builtins.open
+
+
+def _deny_system_files(path, *args, **kwargs):
+    target = str(path)
+    if target.startswith(("/etc/", "/usr/share/", "/var/db/")):
+        raise PermissionError(1, "Operation not permitted", target)
+    return _real_open(path, *args, **kwargs)
+
+
+builtins.open = _deny_system_files
+try:
+    with tempfile.TemporaryDirectory() as sandbox_root_name:
+        sandbox_doc, sandbox_images = media_fixture(Path(sandbox_root_name))
+        _, sandbox_records, _ = collect_shop_catalog_media(sandbox_doc, sandbox_images)
+    check("沙盒下（禁读 /etc、/usr/share、/var/db）媒体构建照样成功",
+          len(sandbox_records) == 2, "records={}".format(len(sandbox_records)))
+    check("…且 MIME 判定与无沙盒时逐字一致",
+          [r["mimeType"] for r in sandbox_records] == [r["mimeType"] for r in records],
+          "{} vs {}".format([r["mimeType"] for r in sandbox_records],
+                            [r["mimeType"] for r in records]))
+finally:
+    builtins.open = _real_open
+
+check("MIME 判定是纯查表：大小写不敏感、认不出来就报 octet-stream（不许兜底放行）",
+      media_mime_type("A.JPG") == "image/jpeg"
+      and media_mime_type("x.tiff") == "application/octet-stream"
+      and media_mime_type("noext") == "application/octet-stream"
+      and media_mime_type("") == "application/octet-stream")
+check("白名单里每个 MIME 都有扩展名能产出它（否则那条白名单永远走不到）",
+      set(MEDIA_MIME_ALLOWLIST) <= set(MEDIA_SUFFIX_TO_MIME.values()),
+      "白名单 {} / 映射 {}".format(list(MEDIA_MIME_ALLOWLIST),
+                                sorted(set(MEDIA_SUFFIX_TO_MIME.values()))))
+
 # ---- 公共数据库字段配置方案 §2.2 / §2.3 ----
 from protocol import validate_shop_catalog_media  # noqa: E402
 
@@ -268,6 +315,24 @@ bad_key["assets"][0]["mediaKey"] = "not-a-hash"
 check("媒体键不是 64 位 hex → 报格式错误",
       any(i["code"] == "media.reference.invalid"
           for i in validate_shop_catalog_media(bad_key, known)))
+
+# ---- 桥接器必须把「线上那一版」的 seq 传给构建（两端同一口径，2026-09-29 修） ----
+#
+# 产物里的 `previousReleaseSeq` =「本版取代了哪一版」。iOS 侧
+# `ShopCatalogOpsPublisher` 写 `snapshot?.header.releaseSeq`；Python 侧此前**从不传**
+# `--previous-release-seq`，`build_release.py` 用默认 0 → Mac 发出去的每一版都自称
+# 「没有上一版」。纯静态锁：桥接器的 build_argv 里必须出现这个参数，且取自线上头 head。
+_bridge_source = (Path(__file__).resolve().parent / "ops_publish_bridge.py").read_text(
+    encoding="utf-8")
+check("桥接器把 --previous-release-seq 传给 build_release（不许再退回默认 0）",
+      '"--previous-release-seq"' in _bridge_source,
+      "ops_publish_bridge.py 里找不到该参数")
+_prev_assignment_lines = [
+    line for line in _bridge_source.splitlines() if "previous_release_seq =" in line
+]
+check("…且取自线上发布头 head（不是请求里的 baseReleaseSeq）",
+      bool(_prev_assignment_lines) and all("head" in line for line in _prev_assignment_lines),
+      "；".join(_prev_assignment_lines))
 
 print()
 if failures:

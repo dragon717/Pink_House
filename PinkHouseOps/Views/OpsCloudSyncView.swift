@@ -93,6 +93,12 @@ final class OpsCloudSyncModel: ObservableObject {
     @Published private(set) var pullFailure: String?
     /// 这次拉回失败是不是**原样重试即可**（桥接器的 `retryable`）。
     @Published private(set) var pullFailureRetryable = false
+    /// 「以线上那一版对齐当前草稿」这次会改动什么（新增 / 覆盖 / 移除）。
+    ///
+    /// **必须由运营先点「看看会改动什么」才算出来**（`previewReconcile`），
+    /// 对齐按钮在它是 nil 时保持禁用 —— 这个动作会移除本地内容，
+    /// 不许出现「点完才知道自己少了什么」。切环境 / 重新拉回都会清掉它。
+    @Published private(set) var reconcileOutcome: ShopCatalogReconcileOutcome?
     @Published private(set) var outcome: ShopCatalogPublishOutcome?
     @Published private(set) var outcomeMessage: String?
     /// 这次失败**原样重试是安全的**吗（桥接器的 `retryable`）。
@@ -228,6 +234,9 @@ final class OpsCloudSyncModel: ObservableObject {
         pulled = nil
         pullFailure = nil
         pullFailureRetryable = false
+        // 对账预览也是**按环境**成立的（它比的是「本地草稿 vs 那个环境的线上那一版」）：
+        // 留到另一个环境上，界面就会显示一份不属于当前环境的差异清单。
+        reconcileOutcome = nil
         outcome = nil
         outcomeMessage = nil
         outcomeRetryable = false
@@ -398,6 +407,9 @@ final class OpsCloudSyncModel: ObservableObject {
         guard await ensureReady(.pullCatalog) else { return }
         pullFailure = nil
         pullFailureRetryable = false
+        // 上一次那份对账预览跟着作废：它算的是「本地草稿 vs **上一次拉回的那一版**」，
+        // 留着会让人以为已经看过这一次的差异。
+        reconcileOutcome = nil
         let directory = jobDirectory("pull-\(Int(Date().timeIntervalSince1970))")
         do {
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
@@ -438,7 +450,7 @@ final class OpsCloudSyncModel: ObservableObject {
         }
     }
 
-    /// 用拉回的内容替换当前草稿。**替换前必须让运营读到这些话**。
+    /// 采用之前必须让运营读到的那些话 + 拦住不该做的。**只读**。
     func adoptionBlockers(_ pulled: OpsPulledCatalog, workspace: OpsWorkspace) -> [String] {
         OpsPulledCatalogAdoption.blockers(
             pulled: pulled,
@@ -450,16 +462,51 @@ final class OpsCloudSyncModel: ObservableObject {
         OpsPulledCatalogAdoption.caveats(pulled: pulled, currentItemCounts: nil)
     }
 
+    /// 只读：算出「以线上那一版为准对齐」会做哪些改动（**不写任何东西**）。
+    ///
+    /// 这一步是**对齐按钮的前置条件** —— 对齐会移除本地多出来的条目，
+    /// 而「移除」是这个动作里唯一不可撤销的部分，必须先给运营看过。
     @discardableResult
-    func adoptPulled(_ pulled: OpsPulledCatalog, workspace: OpsWorkspace) -> Bool {
+    func previewReconcile(_ pulled: OpsPulledCatalog, workspace: OpsWorkspace) -> Bool {
+        let blockers = adoptionBlockers(pulled, workspace: workspace)
+        guard blockers.isEmpty else {
+            lastError = blockers.joined(separator: " ")
+            reconcileOutcome = nil
+            return false
+        }
+        guard let outcome = workspace.reconcilePreview(
+            from: URL(fileURLWithPath: pulled.path)) else {
+            // `reconcilePreview` 失败时已经写好 lastError（目录 JSON 解不开那类）
+            reconcileOutcome = nil
+            return false
+        }
+        reconcileOutcome = outcome
+        lastError = nil
+        return true
+    }
+
+    /// 以线上那一版为准对齐当前草稿（逐条：新增 / 覆盖 / 移除）。
+    ///
+    /// 预览没过就不许执行：少看一步的代价是「本地内容被删掉而运营不知道」。
+    /// 执行后把**实际执行**的那份报告显示出来（预览与执行之间草稿可能被改过，
+    /// 两者不一致时以实际为准）。
+    @discardableResult
+    func alignPulled(_ pulled: OpsPulledCatalog, workspace: OpsWorkspace) -> Bool {
         let blockers = adoptionBlockers(pulled, workspace: workspace)
         guard blockers.isEmpty else {
             lastError = blockers.joined(separator: " ")
             return false
         }
+        guard reconcileOutcome != nil else {
+            lastError = "请先点「看看会改动什么」：这一步会把本地多出来的条目移除，"
+                + "先看一眼要改动什么再对齐。"
+            return false
+        }
         let baseline = OpsPulledCatalogAdoption.baseline(afterAdopting: pulled)
-        return workspace.adoptPulledCatalogContent(
-            from: URL(fileURLWithPath: pulled.path), baseline: baseline)
+        guard let executed = workspace.alignCatalogToPulledContent(
+            from: URL(fileURLWithPath: pulled.path), baseline: baseline) else { return false }
+        reconcileOutcome = executed
+        return true
     }
 
     // MARK: 写：构建待发布包并发布
@@ -1021,10 +1068,44 @@ struct OpsCloudSyncSheet: View {
                                 .foregroundStyle(.secondary)
                                 .fixedSize(horizontal: false, vertical: true)
                         }
-                        Button("用拉回的内容替换当前草稿") {
-                            _ = model.adoptPulled(pulled, workspace: workspace)
+                        // 先看差异再对齐：这个动作会**移除**本地多出来的条目，
+                        // 「点完才知道少了什么」= 静默删除，不能这么干。
+                        Button("① 看看会改动什么") {
+                            _ = model.previewReconcile(pulled, workspace: workspace)
                         }
                         .controlSize(.small)
+
+                        if let outcome = model.reconcileOutcome {
+                            Text(outcome.summaryText)
+                                .font(.callout)
+                                .foregroundStyle(outcome.touchesExistingContent ? .primary : .secondary)
+                            ForEach(outcome.summaryLines, id: \.self) { text in
+                                opsMarkdown("· \(text)")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                            let details = outcome.detailLines(limit: 5)
+                            if !details.isEmpty {
+                                ForEach(details, id: \.self) { text in
+                                    Text(text)
+                                        .font(.caption2)
+                                        .foregroundStyle(.secondary)
+                                        .textSelection(.enabled)
+                                }
+                            }
+                        }
+
+                        Button("② 以线上那一版对齐当前草稿") {
+                            _ = model.alignPulled(pulled, workspace: workspace)
+                        }
+                        .controlSize(.small)
+                        .disabled(model.reconcileOutcome == nil)
+                        if model.reconcileOutcome == nil {
+                            Text("先点上面「看看会改动什么」—— 对齐会移除本地多出来的条目。")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
                     }
                 }
             }

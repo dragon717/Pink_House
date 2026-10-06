@@ -2741,6 +2741,19 @@ final class ShopCatalogDraftStore: ObservableObject {
         try data.write(to: overlayURL, options: .atomic)
     }
 
+    /// 用「以线上那一版为准对账」的结果**整体替换**覆盖层（2026-09-29）。
+    ///
+    /// 为什么需要它：覆盖层是**唯一落盘**的目录层（远端层只在内存里），
+    /// 要让本机内容确实等于线上那一版，就得把对账结果写回覆盖层。
+    /// 与 `saveOverlay` 放在同一处（同一条写盘路径），不另开第二个写入点 ——
+    /// 覆盖层有两处写法时，「哪一份才是本机内容」就说不清了。
+    ///
+    /// ⚠️ 调用方负责算对账结果（唯一口径 = `ShopCatalogReconcile`，在 `SharedCatalog` 包里），
+    /// 这里只负责写盘。
+    nonisolated static func replaceOverlay(with catalog: ShopCatalog) throws {
+        try saveOverlay(catalog)
+    }
+
     /// 导出整包（含 Bundle 种子 + 覆盖层），用于交接 / 备份
     func exportJSON(store: ShopCatalogStore) -> String? {
         guard let catalog = store.catalog else { return nil }
