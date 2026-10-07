@@ -24,6 +24,7 @@ import AppKit
 import SwiftData
 import SwiftUI
 import UniformTypeIdentifiers
+import PinkHouseOpsCore
 
 struct OpsRootView: View {
     @Environment(\.modelContext) private var modelContext
@@ -46,6 +47,7 @@ struct OpsRootView: View {
                 workspace = created
                 // 设置场景（Cmd+,）与主窗口共用这一份工作区 —— 另建一份就是两处真相。
                 OpsWorkspaceHolder.shared.workspace = created
+                OpsCloudSyncModel.shared.restoreSyncReport(workspace: created)
             }
         }
     }
@@ -134,27 +136,33 @@ struct OpsMainView: View {
         }
         .frame(minWidth: 980, minHeight: 620)
         .overlay(alignment: .top) {
-            if let toast = updateToast {
+            if let report = cloudSync.syncReport, showsSyncStatus,
+               report.draftID == workspace.draft?.id,
+               report.environment == cloudSync.targetEnvironment.rawValue {
+                OpsSyncProgressView(report: report, onDismiss: { showsSyncStatus = false; updateToast = nil })
+                    .padding(.top, 10).padding(.horizontal, 24)
+            } else if let toast = updateToast {
                 OpsUpdateToastView(toast: toast, onDismiss: { updateToast = nil },
                                    onExportMissing: exportMissingImages)
             }
         }
+        .onChange(of: cloudSync.isSyncing) { _, running in
+            if running { showsSyncStatus = true; updateToast = nil }
+        }
         .toolbar {
-            // 「云端更新」= **一键**：内部自动完成「取线上发布头 → 采用基线 →
-            // 构建整包 → 受控发布 → 回读确认」，运营无感，只看成功/失败（悬浮框）。
-            // 环境与凭证在 设置（Cmd+,）里配置 —— 分步卡片已于 2026-10-07 删除。
+            // 一键执行下载、上传、合并落盘，逐步展示结果与待修复数据。
             ToolbarItem(placement: .primaryAction) {
                 Button {
                     updateCloudNow()
                 } label: {
-                    if cloudSync.isRunning {
+                    if cloudSync.isRunning || cloudSync.isSyncing {
                         ProgressView().controlSize(.small)
                     } else {
                         Label("云端更新", systemImage: "arrow.triangle.2.circlepath.circle")
                     }
                 }
-                .disabled(cloudSync.isRunning || workspace.isCorrupted)
-                .help("一键把当前草稿发布到云端（环境与凭证在 设置 里配置）")
+                .disabled(cloudSync.isRunning || cloudSync.isSyncing || workspace.isCorrupted)
+                .help("下载平台内容、上传本地变更、合并保存，逐步显示结果（环境与凭证在设置里配置）")
             }
         }
     }
@@ -163,14 +171,20 @@ struct OpsMainView: View {
 
     @State private var updateToast: OpsCloudUpdateToast?
     @State private var isUpdatingCloud = false
+    @State private var showsSyncStatus = true
 
     private func updateCloudNow() {
         guard !isUpdatingCloud else { return }
         isUpdatingCloud = true
         updateToast = nil
+        showsSyncStatus = true
         Task { @MainActor in
             let result = await cloudSync.publishNow(workspace: workspace)
             isUpdatingCloud = false
+            if cloudSync.syncReport?.draftID == workspace.draft?.id,
+               cloudSync.syncReport?.environment == cloudSync.targetEnvironment.rawValue {
+                return
+            }
             switch result {
             case .confirmed(let seq):
                 updateToast = OpsCloudUpdateToast(
@@ -181,7 +195,7 @@ struct OpsMainView: View {
             case .failed(let reason):
                 updateToast = OpsCloudUpdateToast(
                     success: false,
-                    title: "云端更新失败",
+                    title: cloudSync.syncReport?.title ?? "同步未完成",
                     detail: reason,
                     logPath: cloudSync.lastRunLogURL?.path,
                     // 校验失败里若含悬空销售记录，直接给一键修复入口

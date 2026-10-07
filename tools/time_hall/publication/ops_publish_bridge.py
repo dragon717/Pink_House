@@ -36,6 +36,7 @@ Swift 侧 `ShopCatalogPublishProtocol.swift`）。**App 写请求文件就是唯
     {"type":"artifact","releaseSeq":7,"rootIndexHash":"...","payloadHash":"...","path":"..."}
     {"type":"baseline","releaseSeq":6,"rootIndexHash":"..."}
     {"type":"catalog","path":"...","releaseSeq":6,"rootIndexHash":"...","itemCounts":{...}}   ← pull-catalog
+    {"type":"media","path":"...","completed":8,"total":10}                                   ← fetch-media
     {"type":"receipt","path":"...","releaseSeq":7,"rootIndexHash":"..."}
     {"type":"result","outcome":"confirmed","exitCode":0,...}
 
@@ -64,6 +65,12 @@ Swift 侧 `ShopCatalogPublishProtocol.swift`）。**App 写请求文件就是唯
     #   shop-catalog.json   目录本体（**已下发口径**：归档条目已剔除）
     #   pull-manifest.json  发布号 / 根清单摘要 / 载荷摘要 / 计数 / 说明
     python3 ops_publish_bridge.py --mode pull-catalog --request request.json
+
+    # 只读下载远端图片字节（双向同步的「下载」那一档）。要下哪几张由请求里的
+    # `mediaHashes`（64 位 hex 内容摘要）指定；产物写到 outputDirectory：
+    #   <contentHash>.<ext>  一张一个文件（文件名即内容摘要，可直接进 staging）
+    #   fetch-manifest.json  成了几张 / 远端没有几张 / 坏了几张
+    python3 ops_publish_bridge.py --mode fetch-media --request request.json
 """
 
 from __future__ import annotations
@@ -113,6 +120,11 @@ MODE_QUERY = "query"
 #: 与 publish 是两条完全不同的路径：它连 dry-run 的「写」都不需要，
 #: 因为它**只有读**。见 `run_pull_catalog`。
 MODE_PULL_CATALOG = "pull-catalog"
+#: **只读**地把指定媒体（THMedia）的字节下载到本地 —— 双向同步里「下载」那一档。
+#: 与 publish 的「上传」成对：远端有、本机没有的图，靠它补齐，
+#: 落盘后本机既能预览，发布时又因内容寻址而幂等（同一个 hash 不会再传一遍）。
+#: 见 `run_fetch_media`。
+MODE_FETCH_MEDIA = "fetch-media"
 
 #: `publish_cloudkit.py` 的七步行首标记 → 协议里的阶段名。
 #: **只在这里出现一次**，App 不解析这些文字。
@@ -165,7 +177,7 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     parser.add_argument(
         "--mode",
         required=True,
-        choices=(MODE_BASELINE, MODE_PUBLISH, MODE_QUERY, MODE_PULL_CATALOG),
+        choices=(MODE_BASELINE, MODE_PUBLISH, MODE_QUERY, MODE_PULL_CATALOG, MODE_FETCH_MEDIA),
         help="baseline=只读线上发布头；publish=构建并发布；query=结果待确认时查询；"
              "pull-catalog=只读拉回线上商店目录（建立本地基线）",
     )
@@ -466,6 +478,41 @@ def _thmedia_hashes(doc: Any) -> List[str]:
 
     walk(doc)
     return found
+
+
+def _is_content_hash(value: str) -> bool:
+    """是不是一个合法的内容摘要（64 位小写 hex）。
+
+    判据**只看形状**：摘要是内容寻址的键，形状不对就一定不是我们存的那种键。
+    不查远端、不猜大小写（请求侧已 lower）。
+    """
+    if len(value) != 64:
+        return False
+    return all(character in "0123456789abcdef" for character in value)
+
+
+def _image_suffix_from_bytes(data: bytes) -> Optional[str]:
+    """按字节头部判图片格式后缀。认不出来返回 **None**（不是默认 jpg）。
+
+    ⚠️ **不许**用 `mimetypes`（沙盒子进程读 `/etc` 会被拒 → 发布必挂，
+    见 `protocol.py` 里那条长注释），也不许「猜一个默认值」。
+
+    为什么认不出来必须返回 None 而不是兜成 `jpg`：文件名后缀是 `build_release`
+    推 MIME 的**唯一**依据（`media_mime_type()` 纯查表）。兜成 jpg 会让一个
+    `.tiff` 以 `image/jpeg` 的名义进公共库，落盘那一刻没有任何一层报错，
+    直到客户端显示不出来才暴露 —— 而那时它已经是线上不可变资产了。
+    """
+    if data[:3] == b"\xff\xd8\xff":
+        return "jpg"
+    if data[:8] == b"\x89PNG\r\n\x1a\n":
+        return "png"
+    if data[:6] in (b"GIF87a", b"GIF89a"):
+        return "gif"
+    if data[:4] == b"RIFF" and data[8:12] == b"WEBP":
+        return "webp"
+    if data[4:8] == b"ftyp" and data[8:12] in (b"heic", b"heix", b"hevc", b"mif1", b"msf1"):
+        return "heic"
+    return None
 
 
 def _census_text(census: Dict[str, int]) -> str:
@@ -770,6 +817,23 @@ def find_shop_catalog_partitions(root_index: Any) -> List[Dict[str, Any]]:
     ]
 
 
+def write_empty_pulled_catalog(request: Dict[str, Any], head: Optional[Dict[str, Any]]) -> None:
+    """已证明该环境没有商店分片，交回可合并的空基线，而非没有产物。"""
+    directory = Path(str(request["outputDirectory"]))
+    directory.mkdir(parents=True, exist_ok=True)
+    doc = {field: [] for field in SHOP_CATALOG_ALL_FIELDS}
+    doc["version"] = 1
+    path = directory / "shop-catalog.json"
+    path.write_text(json.dumps(doc, ensure_ascii=False) + "\n", encoding="utf-8")
+    metadata = {"targetEnvironment": request["targetEnvironment"],
+                "releaseSeq": int((head or {}).get("releaseSeq") or 0),
+                "rootIndexHash": (head or {}).get("rootIndexHash"),
+                "itemCounts": {field: 0 for field in SHOP_CATALOG_ALL_FIELDS}}
+    (directory / "pull-manifest.json").write_text(
+        json.dumps(metadata, ensure_ascii=False) + "\n", encoding="utf-8")
+    emit(dict(metadata, type="catalog", path=str(path)))
+
+
 def run_pull_catalog(request: Dict[str, Any], quiet: bool) -> int:
     """**只读**回读线上商店目录整包，落成一份本地 JSON（建立/刷新本地基线）。
 
@@ -812,6 +876,7 @@ def run_pull_catalog(request: Dict[str, Any], quiet: bool) -> int:
     emit(head_payload(request, head))
 
     if not head:
+        write_empty_pulled_catalog(request, head)
         # 线上没有发布头 = 线上基线**确实是空的**。这是事实，不是失败：
         # 本地应当据此知道「我手上这份不是从线上来的」。
         emit(outcome_result(
@@ -860,6 +925,7 @@ def run_pull_catalog(request: Dict[str, Any], quiet: bool) -> int:
 
     partitions = find_shop_catalog_partitions(root_index)
     if not partitions:
+        write_empty_pulled_catalog(request, head)
         emit(outcome_result(
             "confirmed",
             EXIT_OK,
@@ -988,6 +1054,203 @@ def run_pull_catalog(request: Dict[str, Any], quiet: bool) -> int:
         )
         + " 接下来把它作为本地基线导入，再在此基础上编辑。",
         release={"releaseSeq": online_seq, "rootIndexHash": root_index_hash},
+    ))
+    return EXIT_OK
+
+
+def run_fetch_media(request: Dict[str, Any], quiet: bool) -> int:
+    """**只读**地把远端媒体按内容摘要下载到本机 —— 双向同步里「下载」那一档。
+
+    ## 为什么必须单开一条模式，而不是在 pull-catalog 里顺手把图也下了
+
+    拉回目录与拉回图片是**两种规模、两种失败语义**的动作：目录是**一个** gzip
+    分片（几百 KB，一次下载、摘要自证）；图片是**几百个**独立资产，任何一个都可能
+    单独失败（网络抖动、远端根本没有）。把它们捆在一起会有两个后果：
+
+      · 一张图下载失败 → 整份目录也拿不到（一次抖动毁掉全部进度）；
+      · 反过来，**部分成功**这件事无法表达 —— 而同步恰恰必须容许部分成功：
+        拿到 8 张里的 6 张也是进展，下次再跑只会补剩下 2 张（内容寻址天然幂等）。
+
+    所以这里每张图**独立成败**，最终只报「成了几个、远端没有几个、坏了几个」。
+
+    ## 三件必须说清楚才写成代码的事
+
+    1. **全程只读**：`make_adapter(..., apply=False)`，只调 `fetch_media_bytes`。
+    2. **摘要自证**：下载到的字节自己算一遍 SHA-256，必须等于请求里那个摘要。
+       不验的话，一次传输截断会产出一个**名字看起来完全正确**的坏文件，
+       而它要到「客户端显示不出来」那一刻才暴露 —— 那正是本项目最难查的一类问题。
+    3. **格式认不出来就跳过，绝不猜后缀**。后缀错了 → `build_release` 按
+       `media_mime_type()` 算出 `application/octet-stream` → 客户端解不出图。
+       而落盘那一刻没有任何一层会报错。宁可少一张，不要多一张坏图。
+
+    ## 产物
+
+    落到 `outputDirectory`：` <contentHash>.<ext>` 一个文件一张，加一份
+    `fetch-manifest.json`（App 读它，而不是去解析事件流）。
+    """
+    output_directory = Path(str(request["outputDirectory"]))
+    name = adapter_name(request)
+
+    raw_hashes = request.get("mediaHashes")
+    if not isinstance(raw_hashes, list) or not raw_hashes:
+        emit(outcome_result(
+            "refused",
+            EXIT_USAGE,
+            "请求里没有 `mediaHashes`（要下载的内容摘要清单）："
+            "下载哪几张必须由调用方明确列出，桥接器不替调用方猜。",
+        ))
+        return EXIT_USAGE
+
+    # 去重 + 保序：同一个 hash 被 10 个字段引用，只该下 1 次。
+    ordered: List[str] = []
+    seen: set = set()
+    invalid: List[str] = []
+    for value in raw_hashes:
+        digest = str(value or "").strip().lower()
+        if not _is_content_hash(digest):
+            invalid.append(str(value))
+            continue
+        if digest not in seen:
+            seen.add(digest)
+            ordered.append(digest)
+
+    if not ordered:
+        emit(outcome_result(
+            "refused",
+            EXIT_USAGE,
+            "`mediaHashes` 里没有一个合法的 64 位 hex 内容摘要"
+            "（共 {} 项，全部不合格：{}）。".format(
+                len(raw_hashes), "、".join(invalid[:3]) or "空"),
+        ))
+        return EXIT_USAGE
+    if invalid:
+        log_line("warning", "⚠️ `mediaHashes` 里有 {} 项不是 64 位 hex，已跳过：{}".format(
+            len(invalid), "、".join(invalid[:3])))
+
+    stage("fetchMedia", "started", "下载远端图片（{} 张）".format(len(ordered)))
+    adapter = make_adapter(name, ck_environment(request), False, False, None)
+
+    output_directory.mkdir(parents=True, exist_ok=True)
+    downloaded: List[Dict[str, Any]] = []
+    missing: List[str] = []
+    corrupt: List[str] = []
+    unrecognized: List[str] = []
+    pending: List[str] = []
+    failure_message = None
+    failure_exit = EXIT_OK
+
+    for index, digest in enumerate(ordered, start=1):
+        # 进度按 25 张一档播报：每张都发一条事件的话，几百张图会把日志刷满，
+        # 反倒看不见那几句真正重要的警告。
+        if index == 1 or index % 25 == 0 or index == len(ordered):
+            stage("fetchMedia", "started",
+                  "下载远端图片 {}/{}".format(index, len(ordered)))
+        emit({"type": "progress", "stage": "fetchMedia", "completed": index - 1, "total": len(ordered)})
+        try:
+            payload = adapter.fetch_media_bytes(digest)
+        except (ProtocolError, CredentialError) + NETWORK_FAILURES as error:
+            # 先结算已完成清单，让 App 收进 staging；剩余项下次只补缺。
+            pending = ordered[index - 1:]
+            failure_exit = EXIT_NETWORK if isinstance(error, NETWORK_FAILURES) else EXIT_REFUSED
+            failure_message = "下载第 {}/{} 张失败：{}；已完成 {} 张，未完成 {} 张。".format(
+                index, len(ordered), error, len(downloaded), len(pending))
+            break
+        if payload is None:
+            missing.append(digest)
+            continue
+        actual = sha256_hex(payload)
+        if actual != digest:
+            corrupt.append(digest)
+            log_line("error", "✖ 摘要不符，已丢弃：期望 {} / 实际 {}".format(
+                _short_hash(digest), _short_hash(actual)))
+            continue
+        suffix = _image_suffix_from_bytes(payload)
+        if suffix is None:
+            unrecognized.append(digest)
+            log_line("warning", "⚠️ 认不出图片格式，已跳过（不猜后缀）：{}".format(
+                _short_hash(digest)))
+            continue
+        file_name = "{}.{}".format(digest, suffix)
+        try:
+            (output_directory / file_name).write_bytes(payload)
+        except OSError as error:
+            corrupt.append(digest)
+            log_line("error", "✖ 落盘失败：{}（{}）".format(file_name, error))
+            continue
+        downloaded.append({"contentHash": digest, "fileName": file_name,
+                           "byteCount": len(payload)})
+
+    manifest = {
+        "fetchedAt": _now_iso(),
+        "targetEnvironment": str(request["targetEnvironment"]),
+        "requested": len(ordered),
+        "downloaded": downloaded,
+        "missing": missing,
+        "corrupt": corrupt,
+        "unrecognizedFormat": unrecognized,
+        "pending": pending,
+        "invalidRequestEntries": invalid,
+        "note": (
+            "downloaded = 已落盘并自证摘要；missing = 远端确实没有这条 THMedia；"
+            "corrupt = 摘要/落盘不符（已丢弃）；unrecognizedFormat = 认不出图片格式（已跳过）。"
+        ),
+    }
+    (output_directory / "fetch-manifest.json").write_text(
+        json.dumps(manifest, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+
+    emit({"type": "progress", "stage": "fetchMedia", "completed": len(ordered) - len(pending), "total": len(ordered)})
+    stage("fetchMedia", "failed" if failure_message or corrupt or unrecognized else "succeeded",
+          "已下载 {} 张".format(len(downloaded)))
+    emit({
+        "type": "media",
+        "path": str(output_directory),
+        "completed": len(downloaded),
+        "total": len(ordered),
+    })
+
+    if failure_message or corrupt or unrecognized:
+        emit(outcome_result(
+            "refused", failure_exit if failure_message else EXIT_VALIDATION,
+            failure_message or "下载未完整成功：{} 张摘要/落盘失败，{} 张格式不支持。".format(
+                len(corrupt), len(unrecognized)),
+            retryable=failure_exit == EXIT_NETWORK,
+        ))
+        return failure_exit if failure_message else EXIT_VALIDATION
+
+    if not downloaded:
+        # 一张都没拿到时要说清**是哪种空**：远端没有 vs 请求本身有问题。
+        # 这两种「空」的处置完全相反，混成一句「没下载到图」会让人反复重试。
+        detail = (
+            "远端没有这些媒体记录（{} 条全都不存在）".format(len(missing))
+            if missing and not (corrupt or unrecognized)
+            else "拿不到任何一张（缺 {} / 坏 {} / 认不出 {}）".format(
+                len(missing), len(corrupt), len(unrecognized))
+        )
+        emit(outcome_result(
+            "confirmed",
+            EXIT_OK,
+            "一张都没下载到：{}。这不是失败 —— 远端本来就可能没有这些图"
+            "（例如那一版发布时图就没上传）。清单见 fetch-manifest.json。".format(detail),
+        ))
+        return EXIT_OK
+
+    log_line("info", "缺 {} 张（远端没有）· 坏 {} 张 · 认不出格式 {} 张 —— "
+                     "详见 fetch-manifest.json，下次重跑只会补缺的。".format(
+                         len(missing), len(corrupt), len(unrecognized)))
+    emit(outcome_result(
+        "confirmed",
+        EXIT_OK,
+        "已下载 {} 张远端图片（请求 {} 张）到 {}。"
+        "{}".format(
+            len(downloaded),
+            len(ordered),
+            output_directory,
+            "另有 {} 张远端没有、{} 张摘要不符已丢弃、{} 张认不出格式已跳过。".format(
+                len(missing), len(corrupt), len(unrecognized))
+            if (missing or corrupt or unrecognized) else "全部拿到。",
+        ),
     ))
     return EXIT_OK
 
@@ -1257,6 +1520,8 @@ def main(argv: Optional[List[str]] = None) -> int:
             return run_query(request, args.quiet)
         if args.mode == MODE_PULL_CATALOG:
             return run_pull_catalog(request, args.quiet)
+        if args.mode == MODE_FETCH_MEDIA:
+            return run_fetch_media(request, args.quiet)
         return run_publish(request, args.quiet)
     except ProtocolError as error:
         emit(outcome_result("refused", EXIT_USAGE, str(error)))

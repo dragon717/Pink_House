@@ -390,7 +390,8 @@ enum OpsSnapshotHarness {
             releaseSeq: 41,
             rootIndexHash: String(repeating: "9f1c", count: 16),
             environment: "Production",
-            revision: revision))
+            revision: revision,
+            publishedCatalog: workspace.catalog))
         guard let shop2 = workspace.catalog.shops.first,
               let series2 = workspace.catalog.series.first else { return }
         seedStep("新增商品 发夹", workspace.addProduct(

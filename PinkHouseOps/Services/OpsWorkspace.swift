@@ -144,6 +144,125 @@ final class OpsWorkspace: ObservableObject {
         return Set(names)
     }
 
+    /// staging 里现有的**内容摘要**集合（文件名去掉后缀）。
+    ///
+    /// 为什么能这么取：staging 的文件名就是 `<mediaKey>.<ext>`
+    /// （`ShopCatalogMediaStaging.StagedMedia.fileName`），而 `mediaKey` 是
+    /// 规范化后字节的 SHA-256 —— 与远端 `thmedia:` 引用里的摘要**同一口径**。
+    /// 于是「本机有没有这张图」可以直接比摘要，不需要额外维护一张对照表。
+    ///
+    /// ⚠️ iOS 交接进来的图是**原文件名**（`OpsWorkspace+Handoff`），它们不在这个
+    /// 集合里 —— 那是既定的取舍（改名会让目录里的 `local:` 引用全部悬空）。
+    /// 所以这里只是「按内容寻址能找到的那些」，不是「本机图片全集」。
+    var stagedMediaKeys: Set<String> {
+        Set(stagedFileNames.compactMap { name in
+            let digest = (name as NSString).deletingPathExtension
+            guard ShopCatalogSyncProtocol.isPayloadHash(digest),
+                  let data = try? Data(contentsOf: stagingDirectory.appendingPathComponent(name)),
+                  ShopCatalogSyncProtocol.sha256Hex(data) == digest else { return nil }
+            return digest
+        })
+    }
+
+    // MARK: 从远端下载图片（双向同步的「下载」那一档）
+
+    /// 目录里引用到的**全部远端媒体摘要**（`thmedia:<hash>`，去重、顺序稳定）。
+    ///
+    /// 合并线上目录之后，远端那些条目的图片引用就是它 —— 本机没有对应字节，
+    /// 预览会显示成「远端」标记。下载那一档要补的就是这个集合减去 `stagedMediaKeys`。
+    func referencedRemoteMediaHashes(in source: ShopCatalog? = nil) -> [String] {
+        let catalog = source ?? self.catalog
+        var seen: Set<String> = []
+        var output: [String] = []
+        for reference in ShopCatalogMediaReferences.all(in: catalog) {
+            guard let hash = ShopCatalogSyncProtocol.mediaContentHash(in: reference.reference),
+                  seen.insert(hash).inserted else { continue }
+            output.append(hash)
+        }
+        for asset in catalog.assets {
+            if let hash = ShopCatalogSyncProtocol.resolvedMediaKey(asset.mediaKey),
+               seen.insert(hash).inserted { output.append(hash) }
+        }
+        return output
+    }
+
+    /// 引用到了、但**本机还没有字节**的远端媒体摘要（要下载的就是这些）。
+    ///
+    /// 已经在本机的一律跳过：内容寻址的东西重复下载没有意义，
+    /// 而且几百张图每次都全量重下一遍会让「同步」慢到没人愿意点。
+    func remoteMediaHashesMissingLocally() -> [String] {
+        let staged = stagedMediaKeys
+        return referencedRemoteMediaHashes().filter { !staged.contains($0) }
+    }
+
+    /// 把下载下来的图片字节**收进 staging**。
+    ///
+    /// ## 为什么可以直接拷，不用改名
+    ///
+    /// 桥接器落盘的文件名就是 `<内容摘要>.<后缀>`，与 staging 的命名口径逐字相同
+    /// （见 `stagedMediaKeys` 的说明），所以这里只需要拷过去。
+    ///
+    /// ## 为什么不顺手把目录里的 `thmedia:` 引用改写成 `local:`
+    ///
+    /// 改写会**制造一次内容变更**（版本 +1、校验作废），而它带来的收益是零：
+    /// `thmedia:` 在发布端不会被重新上传（内容寻址，远端已有同一份字节），
+    /// 在本机则由 `stagedFileURL(forReference:)` 按摘要解析成本机文件用于预览。
+    /// 换句话说：**下载是为了看得见，不是为了改数据**。
+    /// 把「看得见」做成一次全目录改写，等于给每次同步都附加一次无谓的版本抖动。
+    ///
+    /// - Returns: 新增进 staging 的张数；失败返回 0，原因在 `lastError` 里。
+    @discardableResult
+    func absorbDownloadedMedia(from directory: URL) -> Int {
+        let manager = fileManager
+        guard let names = try? manager.contentsOfDirectory(atPath: directory.path) else {
+            lastError = "读不到下载目录：\(directory.path)"
+            return 0
+        }
+        do {
+            try manager.createDirectory(at: stagingDirectory, withIntermediateDirectories: true)
+        } catch {
+            lastError = "建 staging 目录失败：\(error.localizedDescription)"
+            return 0
+        }
+
+        var added = 0
+        var skipped = 0
+        var failed = 0
+        for name in names where ShopCatalogSyncProtocol.isPayloadHash((name as NSString).deletingPathExtension) {
+            let source = directory.appendingPathComponent(name)
+            let target = stagingDirectory.appendingPathComponent(name)
+            let digest = (name as NSString).deletingPathExtension
+            if let existing = try? Data(contentsOf: target),
+               ShopCatalogSyncProtocol.sha256Hex(existing) == digest {
+                skipped += 1
+                continue
+            }
+            do {
+                let data = try Data(contentsOf: source)
+                guard ShopCatalogSyncProtocol.sha256Hex(data) == digest else {
+                    failed += 1
+                    continue
+                }
+                try data.write(to: target, options: .atomic)
+                added += 1
+            } catch {
+                failed += 1
+            }
+        }
+
+        if added == 0 && skipped == 0 && failed == 0 {
+            statusMessage = "下载目录里没有可收进本机的图片（文件名不是内容摘要）。"
+            lastError = nil
+            return 0
+        }
+        statusMessage = "已把 \(added) 张远端图片收进本机图片目录"
+            + (skipped > 0 ? "（\(skipped) 张本机已有，跳过）" : "")
+            + (failed > 0 ? "；\(failed) 张拷贝失败" : "")
+            + "。现在预览里能看到它们了。"
+        lastError = failed > 0 ? "有 \(failed) 张图拷贝进本机失败，请重跑一次下载。" : nil
+        return added
+    }
+
     // MARK: 草稿装载 / 保存
 
     private func loadOrCreateDraft() {
@@ -326,6 +445,7 @@ final class OpsWorkspace: ObservableObject {
     /// 所以严格策略的作用域会暂时按「整份目录」算 —— 这一点在界面上要说出来。
     func adoptBaseline(_ head: ShopCatalogOnlineHead) {
         guard let draft else { return }
+        draft.baselineCatalog = nil
         draft.baseline = ShopCatalogBaseline(
             releaseSeq: head.releaseSeq,
             rootIndexHash: head.rootIndexHash,
@@ -341,14 +461,15 @@ final class OpsWorkspace: ObservableObject {
         releaseSeq: Int,
         rootIndexHash: String?,
         environment: String,
-        revision: Int
+        revision: Int,
+        publishedCatalog: ShopCatalog
     ) -> Bool {
         guard let draft, !draft.isCorrupted else { return false }
         draft.recordConfirmedPublish(
             releaseSeq: releaseSeq,
             rootIndexHash: rootIndexHash,
             revision: revision,
-            catalog: catalog,
+            catalog: publishedCatalog,
             environment: environment)
         // ⚠️ 顺序要紧：先把内存里的工作副本收敛到「存储精度」，再落盘。
         // 不收敛的话，刚发布完的那段时间里 `changeSet` 会把**每一个带日期的
@@ -440,6 +561,121 @@ final class OpsWorkspace: ObservableObject {
             return outcome
         } catch {
             lastError = "内容已对齐，但基线没写进库：\(error.localizedDescription)"
+                + "请重新拉一次，否则这次的修改会被当成整份目录的改动。"
+            return nil
+        }
+    }
+
+    // MARK: 与远端双向合并（2026-10-07 重做：并集，不删本地）
+
+    /// 一次「与远端合并」会发生什么（预览 / 结果共用这一个形状）。
+    struct OpsMergeReport {
+        /// 远端有、本地没有 → 会补进来（这就是「下载」那一档）
+        var added: Int
+        /// 两端都有（同 id）→ 以远端为准
+        var overwritten: Int
+        /// 本地独有 → **保留**，不删除（这就是「上传」那一档的存量）
+        var keptLocalOnly: Int
+        var conflicts: [String]
+        var removed: Int
+
+        var summaryText: String {
+            "补进 \(added) 条、更新 \(overwritten) 条、本地独有保留 \(keptLocalOnly) 条、按删除标记移除 \(removed) 条"
+                + (conflicts.isEmpty ? "" : "；\(conflicts.count) 个字段冲突，确认时需选择保留本地或采用远端：" + conflicts.joined(separator: "、"))
+        }
+    }
+
+    /// **预览**与远端合并的结果（**只读**，不写任何东西）。
+    func mergePreview(from url: URL, environment: String) -> OpsMergeReport? {
+        guard let remote = decodeCatalogFile(at: url, purpose: "与远端合并预览") else { return nil }
+        guard let result = mergedCatalog(remote: remote, environment: environment) else { return nil }
+        return mergeReport(local: catalog, remote: remote, result: result)
+    }
+
+    private func mergedCatalog(remote: ShopCatalog, environment: String?, preferLocalOnConflict: Bool = false) -> ShopCatalogThreeWayMerge.Result? {
+        do {
+            let base = draft?.baseline.environment == environment ? baselineCatalog : nil
+            var mediaHashes: [String: String] = [:]
+            // 比较图的内容身份，避免 local: 文件名变成 thmedia: 后制造假冲突。
+            for item in ShopCatalogMediaReferences.all(in: base ?? ShopCatalog())
+                + ShopCatalogMediaReferences.all(in: catalog) where item.reference.hasPrefix("local:") {
+                if let url = stagedFileURL(forReference: item.reference),
+                   let data = try? Data(contentsOf: url) {
+                    mediaHashes[item.reference] = ShopCatalogSyncProtocol.sha256Hex(data)
+                }
+            }
+            return try ShopCatalogThreeWayMerge.merge(local: catalog, remote: remote,
+                                                       baseline: base, mediaHashesByLocalReference: mediaHashes,
+                                                       preferLocalOnConflict: preferLocalOnConflict)
+        } catch {
+            lastError = "合并失败（草稿未改动）：\(error.localizedDescription)"
+            return nil
+        }
+    }
+
+    private func mergeReport(local: ShopCatalog, remote: ShopCatalog,
+                             result: ShopCatalogThreeWayMerge.Result) -> OpsMergeReport {
+        let delta = ShopCatalogReconcile.outcome(local: local, remote: result.catalog)
+        let remoteIDs = ShopCatalogReconcile.outcome(local: local, remote: remote)
+        return OpsMergeReport(added: delta.added.count, overwritten: delta.overwritten.count,
+                              keptLocalOnly: remoteIDs.removed.count,
+                              conflicts: result.conflicts, removed: delta.removed.count)
+    }
+
+    /// 基于上一版快照合并字段，保留本地独有内容；争议字段由用户明确选择保留本地或采用远端。
+    /// 显式删除标记优先，公共包省略归档实体不会被误判成删除。
+    @discardableResult
+    func mergeRemoteIntoLocal(
+        from url: URL,
+        baseline: ShopCatalogBaseline,
+        preferLocalOnConflict: Bool = false,
+        advanceBaseline: Bool = true
+    ) -> OpsMergeReport? {
+        guard canMutate() else { return nil }
+        guard let remote = decodeCatalogFile(at: url, purpose: "与远端合并") else { return nil }
+
+        guard let result = mergedCatalog(remote: remote, environment: baseline.environment,
+                                         preferLocalOnConflict: preferLocalOnConflict) else { return nil }
+        let report = mergeReport(local: catalog, remote: remote, result: result)
+        let oldBaseSeq = draft?.baseReleaseSeq
+        let oldBaseHash = draft?.baseRootIndexHash
+        let oldBaseline = draft?.baselineJSON
+        let oldSnapshot = draft?.baselineCatalogJSON
+        let oldCatalogJSON = draft?.catalogJSON
+        let oldSavedRevision = draft?.savedRevision
+        catalog = result.catalog
+        markDirty()
+        guard let draft else { return nil }
+
+        // 基线必须是远端内容：本地新增、编辑、删除仍须留在待发布差分里。
+        if advanceBaseline {
+            draft.baselineCatalog = remote
+            draft.baseline = baseline
+        }
+        normalizeWorkingCopyToStoragePrecision()
+        do {
+            draft.catalogJSON = try ShopCatalogJSONCoding.encoder(prettyPrinted: true).encode(catalog)
+            draft.savedRevision = draft.currentRevision
+            draft.updatedAt = Date()
+            try context.save()
+            loadSeriesEntryState()
+            let seq = baseline.releaseSeq.map(String.init) ?? "未知"
+            let baselineMessage = advanceBaseline
+                ? "，基线记为 releaseSeq \(seq)" + (baseline.environment.map { "（\($0)）" } ?? "")
+                : "；冲突尚未确认，保留原共同基线"
+            statusMessage = "已与远端合并（\(report.summaryText)）" + baselineMessage
+                + "。本地独有的条目已保留，待修复内容确认后再上传。"
+            lastError = nil
+            return report
+        } catch {
+            // 保存失败后仍保留内存编辑，但不得把未落盘基线当成已同步版本。
+            draft.baselineJSON = oldBaseline
+            draft.baselineCatalogJSON = oldSnapshot
+            draft.baseReleaseSeq = oldBaseSeq
+            draft.baseRootIndexHash = oldBaseHash
+            if let oldCatalogJSON { draft.catalogJSON = oldCatalogJSON }
+            draft.savedRevision = oldSavedRevision
+            lastError = "合并未保存，内存内容仍保留：\(error.localizedDescription)"
                 + "请重新拉一次，否则这次的修改会被当成整份目录的改动。"
             return nil
         }
@@ -803,16 +1039,33 @@ final class OpsWorkspace: ObservableObject {
         catalog.assets.first { $0.id == id }
     }
 
-    /// 把 `local:<文件名>` 解析成 staging 目录里的真实文件 URL。
+    /// 把一处图片引用解析成本机可显示的 URL。
     ///
-    /// 只认 `local:` 前缀：`thmedia:` / `http(s)://` / `bundle:` 都不是本机文件，
-    /// 一律返回 nil（界面据此显示「非本机图」而不是空白）。
+    /// 两种能被本机解出来的情形：
+    ///   · `local:<文件名>` —— staging 里有这个文件（导入 / 本机选图的正常形态）；
+    ///   · `thmedia:<摘要>` —— **下载下来之后** staging 里有 `<摘要>.<后缀>`。
+    ///
+    /// 第二种是 2026-10-07 补的：合并线上目录之后，远端条目的引用是 `thmedia:`，
+    /// 在此之前它一律返回 nil，界面显示「远端」标记 —— 即使字节已经下载到本机了。
+    /// 解析只按摘要找文件，**不改目录里的引用**（理由见 `absorbDownloadedMedia`）。
+    ///
+    /// `http(s)://` / `bundle:` 都不是本机文件，一律 nil（界面据此显示标记而不是空白）。
     func stagedFileURL(forReference reference: String?) -> URL? {
-        guard let reference, reference.hasPrefix("local:") else { return nil }
-        let name = String(reference.dropFirst("local:".count))
-        guard !name.isEmpty else { return nil }
-        let url = stagingDirectory.appendingPathComponent(name)
-        return fileManager.fileExists(atPath: url.path) ? url : nil
+        guard let reference, !reference.isEmpty else { return nil }
+        var candidates: [String] = []
+        if reference.hasPrefix("local:") {
+            let name = String(reference.dropFirst("local:".count))
+            if !name.isEmpty { candidates.append(name) }
+        } else if let hash = ShopCatalogSyncProtocol.mediaContentHash(in: reference) {
+            // 后缀不定（jpg / png / webp / heic），逐个试 —— 只有 4 种，
+            // 比为了「知道后缀」再维护一张摘要→后缀的表省事，也不会写错。
+            candidates = ["jpg", "png", "webp", "heic", "gif"].map { "\(hash).\($0)" }
+        }
+        for name in candidates {
+            let url = stagingDirectory.appendingPathComponent(name)
+            if fileManager.fileExists(atPath: url.path) { return url }
+        }
+        return nil
     }
 
     /// 商品的图片引用 → 本机可显示的 URL（顺序与 `product.images` 一致，解不出的跳过）
@@ -1089,8 +1342,15 @@ final class OpsWorkspace: ObservableObject {
         // 漏掉尺码表原图 / 系列价格表 / 系列封面 / 店家图标与封面。
         // 后果是「本机门禁过了、包也打出来了，但发布端一收图就硬报错」，
         // 而且错在别人那一步，本机看不出来（2026-09-28 实测：差 174 张）。
-        let references = Set(
+        var references = Set(
             ShopCatalogMediaReferences.publisherRewritten(in: catalog).map(\.reference))
+        // 缓存的远端图也随包交给发布器：目标环境缺图时可以上传同一份字节。
+        let verifiedKeys = stagedMediaKeys
+        for hash in referencedRemoteMediaHashes() where verifiedKeys.contains(hash) {
+            if let url = stagedFileURL(forReference: ShopCatalogSyncProtocol.mediaReference(contentHash: hash)) {
+                references.insert("local:" + url.lastPathComponent)
+            }
+        }
         let (imageEntries, missing) = ShopCatalogExportArchive.imageEntries(
             forLocalReferences: references,
             imageDirectory: stagingDirectory)

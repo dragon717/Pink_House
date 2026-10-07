@@ -359,6 +359,34 @@ check("…且取自线上发布头 head（不是请求里的 baseReleaseSeq）",
       bool(_prev_assignment_lines) and all("head" in line for line in _prev_assignment_lines),
       "；".join(_prev_assignment_lines))
 
+# ---- fetch-media：下载那一档的三条口径（2026-10-07 加） ----
+#
+# 双向同步的「下载」档靠 `--mode fetch-media`。它最容易错的三处都不是网络：
+#   · 摘要形状判错 → 拿一个拼错的字符串去查远端，得到「远端没有」这种假结论；
+#   · **格式认不出来时兜成 jpg** → `.tiff` 以 image/jpeg 的名义进公共库，
+#     客户端显示不出来，而落盘那一刻没有任何一层报错；
+#   · 摘要不自证 → 一次传输截断产出一个「名字看起来完全正确」的坏文件。
+# 前两条在这里钉死（纯函数，能锁）；第三条是流程锁（静态）。
+import ops_publish_bridge as _bridge  # noqa: E402
+
+check("内容摘要：64 位小写 hex 才算（63 位 / 大写都不算）",
+      _bridge._is_content_hash("a" * 64)
+      and not _bridge._is_content_hash("a" * 63)
+      and not _bridge._is_content_hash("A" * 64))
+check("JPEG / PNG / GIF / WebP / HEIC 都能认出后缀",
+      [_bridge._image_suffix_from_bytes(bytes.fromhex(h) + b"\x00" * 4) for h in
+       ("ffd8ff", "89504e470d0a1a0a")] == ["jpg", "png"]
+      and _bridge._image_suffix_from_bytes(b"GIF89a") == "gif"
+      and _bridge._image_suffix_from_bytes(b"RIFF\x00\x00\x00\x00WEBP") == "webp"
+      and _bridge._image_suffix_from_bytes(b"\x00\x00\x00\x18ftypheic") == "heic")
+check("认不出的格式返回 None，**绝不兜成 jpg**（后缀错了 = 客户端解不出图）",
+      _bridge._image_suffix_from_bytes(b"not-an-image-at-all") is None)
+check("下载下来的字节必须自己算一遍摘要再落盘（静态锁：sha256_hex 出现在 run_fetch_media 里）",
+      "sha256_hex(payload)" in _bridge_source,
+      "run_fetch_media 里找不到摘要自证")
+check("fetch-media 走只读适配器（apply=False），不许写远端",
+      "make_adapter(name, ck_environment(request), False, False, None)" in _bridge_source)
+
 print()
 if failures:
     print("❌ {} 项未通过：{}".format(len(failures), "、".join(failures)))

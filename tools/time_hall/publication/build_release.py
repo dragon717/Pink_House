@@ -391,17 +391,30 @@ def collect_shop_catalog_media(
     missing: List[str] = []
 
     def rewrite(value: Any) -> Any:
-        if not isinstance(value, str) or not value.startswith("local:"):
+        if not isinstance(value, str):
             return value
         if value in resolution:
             return resolution[value]
-        file_name = value[len("local:"):].strip()
-        if not file_name or "/" in file_name or file_name.startswith("."):
-            missing.append(value)
-            return value
-        source = media_dir / file_name
-        if not source.exists():
-            missing.append(value)
+        expected_hash = None
+        if value.startswith(MEDIA_REFERENCE_PREFIX):
+            expected_hash = value[len(MEDIA_REFERENCE_PREFIX):]
+            if len(expected_hash) != 64 or any(c not in "0123456789abcdef" for c in expected_hash):
+                raise ProtocolError("远端媒体引用摘要无效：{}".format(value))
+            candidates = sorted(p for p in media_dir.glob(expected_hash + ".*") if p.is_file())
+            if not candidates:
+                return value  # 没有本地字节时仍要求真实远端存在性证明。
+            source = candidates[0]
+            file_name = source.name
+        elif value.startswith("local:"):
+            file_name = value[len("local:"):].strip()
+            if not file_name or "/" in file_name or file_name.startswith("."):
+                missing.append(value)
+                return value
+            source = media_dir / file_name
+            if not source.exists():
+                missing.append(value)
+                return value
+        else:
             return value
         payload = source.read_bytes()
         if len(payload) > MAX_MEDIA_BYTES:
@@ -414,6 +427,8 @@ def collect_shop_catalog_media(
                 "图片 {} 的 MIME {} 不在白名单 {} 内（客户端解不了的类型不许进公共库）".format(
                     file_name, mime_type, list(MEDIA_MIME_ALLOWLIST)))
         content_hash = sha256_hex(payload)
+        if expected_hash is not None and content_hash != expected_hash:
+            raise ProtocolError("缓存的远端媒体摘要不符：{}".format(value))
         record = by_hash.get(content_hash)
         if record is None:
             suffix = source.suffix.lstrip(".") or "bin"
@@ -433,6 +448,8 @@ def collect_shop_catalog_media(
 
     for item in rewritten.get("assets") or []:
         if isinstance(item, dict):
+            if item.get("mediaKey"):
+                rewrite(MEDIA_REFERENCE_PREFIX + str(item["mediaKey"]))
             for key in ("originalURL", "thumbnailURL", "previewURL"):
                 if item.get(key):
                     item[key] = rewrite(item[key])

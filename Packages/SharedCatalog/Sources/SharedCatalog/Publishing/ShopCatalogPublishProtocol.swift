@@ -97,13 +97,15 @@ public nonisolated enum ShopCatalogPublishStage: String, Codable, CaseIterable, 
     case confirmHead
     /// 读线上基线（只读，用于 R07 的过期检测）
     case baseline
+    /// 下载远端图片字节（只读，用于双向同步的「下载」那一档）
+    case fetchMedia
 
     public var id: String { rawValue }
 
     /// 七步里的序号（`baseline` 与 `freeze` 不在七步内，返回 nil）。
     public var stepOrdinal: Int? {
         switch self {
-        case .freeze, .baseline: return nil
+        case .freeze, .baseline, .fetchMedia: return nil
         case .build: return 1
         case .verifyArtifact: return 1
         case .readHead: return 2
@@ -127,6 +129,7 @@ public nonisolated enum ShopCatalogPublishStage: String, Codable, CaseIterable, 
         case .switchHead: return "切换发布头"
         case .confirmHead: return "回读确认发布头"
         case .baseline: return "读取线上基线"
+        case .fetchMedia: return "下载远端图片"
         }
     }
 
@@ -373,6 +376,15 @@ public nonisolated struct ShopCatalogPublishRequest: Codable, Equatable, Sendabl
     public var receiptPath: String
     /// `filesystem` 适配器的演练根目录
     public var filesystemRoot: String?
+    /// **`fetch-media` 模式专用**：要下载的内容摘要清单（64 位小写 hex）。
+    ///
+    /// 为什么**必须**由调用方列出来，而不是让桥接器自己去扫目录：
+    /// 「下载哪几张」是调用方的决定（它才知道本机缺哪几张），
+    /// 桥接器替它猜就等于把「本机缺什么」的判断挪到没有 staging 的那一侧 ——
+    /// 结果只会是「每次都全部重下一遍」。
+    ///
+    /// 其余三种模式忽略这个字段。
+    public var mediaHashes: [String]?
     /// 演练（不写入）
     public var dryRun: Bool
     /// 待发布包摘要（SHA-256，App 侧算好）——用于回执核对与「同一产物」判定
@@ -397,6 +409,7 @@ public nonisolated struct ShopCatalogPublishRequest: Codable, Equatable, Sendabl
         outputDirectory: String,
         receiptPath: String,
         filesystemRoot: String? = nil,
+        mediaHashes: [String]? = nil,
         dryRun: Bool = false,
         payloadHash: String,
         createdAt: Date = Date()
@@ -418,6 +431,7 @@ public nonisolated struct ShopCatalogPublishRequest: Codable, Equatable, Sendabl
         self.outputDirectory = outputDirectory
         self.receiptPath = receiptPath
         self.filesystemRoot = filesystemRoot
+        self.mediaHashes = mediaHashes
         self.dryRun = dryRun
         self.payloadHash = payloadHash
         self.createdAt = createdAt
@@ -594,6 +608,10 @@ public nonisolated struct ShopCatalogPublishEvent: Codable, Equatable, Sendable 
             return "已拉回线上商店目录：releaseSeq \(releaseSeq ?? 0) · 摘要 \(String((rootIndexHash ?? "").prefix(12)))…"
         case "receipt":
             return "发布回执已写入 \(path ?? "（路径未知）")"
+        case "media":
+            // 只有 `fetch-media` 会发这条。明细（缺几张 / 坏几张）在
+            // `fetch-manifest.json` 里，一行文案扛不下。
+            return "已下载远端图片 \(completed ?? 0)/\(total ?? 0)"
         case "result":
             guard let outcome else { return nil }
             return "结论：\(outcome.displayName)\(message.map { " —— \($0)" } ?? "")"

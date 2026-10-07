@@ -60,6 +60,12 @@ public enum OpsBridgeMode: String, Sendable {
     /// 桥接器也无从核对 `baseRootIndexHash`（它根本没见过线上那份内容）。
     /// 注意 rawValue 是 `pull-catalog`（带连字符），**不能**靠枚举名默认推导。
     case pullCatalog = "pull-catalog"
+    /// **只读**把指定媒体（THMedia）的字节下载到本机 —— 双向同步里「下载」那一档。
+    ///
+    /// 与 `publish`（上传）成对：远端有、本机没有的图靠它补齐。
+    /// 落盘文件名就是内容摘要（`<hash>.<ext>`），与 staging 的命名口径**逐字一致**，
+    /// 所以下载下来的文件可以直接进 staging，`thmedia:` 引用随之在本机可解。
+    case fetchMedia = "fetch-media"
 
     public var displayName: String {
         switch self {
@@ -67,6 +73,7 @@ public enum OpsBridgeMode: String, Sendable {
         case .publish: return "发布"
         case .query: return "查询发布结果"
         case .pullCatalog: return "从线上拉回基线"
+        case .fetchMedia: return "下载远端图片"
         }
     }
 
@@ -322,6 +329,12 @@ public struct OpsBridgeRunResult: Sendable {
     public var pulledCatalogPath: String?
     public var pulledCatalogItemCounts: [String: Int]?
     public var pulledCatalogPayloadHash: String?
+
+    /// 下载到的远端图片目录（`media` 事件，只有 `fetchMedia` 模式会有）。
+    /// 完整明细（缺几张 / 坏几张）在 `<path>/fetch-manifest.json` 里 ——
+    /// 事件里只带「下了几张」，不重复一遍清单。
+    public var fetchedMediaPath: String?
+    public var fetchedMediaCount: Int?
 
     /// 回执原文（`receipt` 事件里的路径读回来）
     public var receipt: ShopCatalogPublishReceipt?
@@ -716,6 +729,9 @@ public final class OpsPublisherBridge: @unchecked Sendable {
                 result.pulledCatalogPath = event.path
                 result.pulledCatalogItemCounts = event.itemCounts
                 result.pulledCatalogPayloadHash = event.payloadHash
+            case "media":
+                result.fetchedMediaPath = event.path
+                result.fetchedMediaCount = event.completed
             case "receipt":
                 result.receiptPathFromEvent = event.path
             case "result":

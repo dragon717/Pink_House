@@ -88,6 +88,9 @@ final class OpsCloudSyncModel: ObservableObject {
     // MARK: 运行态
 
     @Published private(set) var isRunning = false
+    @Published var isSyncing = false
+    @Published var syncReport: OpsSyncReport?
+    var syncEnvironmentGeneration: Int { environmentGeneration }
     @Published private(set) var runningMode: OpsBridgeMode?
     @Published private(set) var logLines: [String] = []
     @Published private(set) var onlineHead: ShopCatalogOnlineHead?
@@ -104,6 +107,11 @@ final class OpsCloudSyncModel: ObservableObject {
     @Published private(set) var lastReceiptConfirmed: Bool = false
     /// 最近一次拉回的线上目录（**只读**产物：落盘路径 + 条数摘要）
     @Published private(set) var pulledCatalog: OpsPulledCatalog?
+    /// 最近一次从远端下载的媒体（`fetchMedia` 模式；nil = 这次没跑 / 没拿到目录）。
+    ///
+    /// ⚠️ nil **不等于**「下载了 0 张」：桥接器没给目录通常意味着它没跑到那一步。
+    /// 明细（`OpsFetchedMedia`）从 `fetch-manifest.json` 读，不在事件流里重复一遍。
+    @Published private(set) var fetchedMedia: OpsFetchedMedia?
     /// 最近一次落盘的运行日志（`bridge/logs/latest.log`）。
     ///
     /// ## 为什么日志必须落盘（2026-09-29）
@@ -127,6 +135,7 @@ final class OpsCloudSyncModel: ObservableObject {
     /// 否则「把日志交给 Agent 修」时拿到的可能是另一次运行。失败提示里显示的是它。
     @Published private(set) var lastRunLogURL: URL?
 
+    private var environmentGeneration = 0
     private static let logLimit = 60
 
     /// 本次运行的**完整**日志（不受 `logLimit` 截断），落盘与复制都用它。
@@ -234,7 +243,10 @@ final class OpsCloudSyncModel: ObservableObject {
     private func resetEnvironmentScopedState(
         from previous: ShopCatalogPublishTargetEnvironment
     ) {
+        environmentGeneration += 1
         onlineHead = nil
+        pulledCatalog = nil
+        fetchedMedia = nil
         outcome = nil
         outcomeMessage = nil
         outcomeRetryable = false
@@ -264,7 +276,7 @@ final class OpsCloudSyncModel: ObservableObject {
     }
 
     private func jobDirectory(_ id: String) -> URL {
-        jobsDirectory.appendingPathComponent(id, isDirectory: true)
+        jobsDirectory.appendingPathComponent("\(id)-\(UUID().uuidString)", isDirectory: true)
     }
 
     /// 运行日志的落盘目录（`bridge/logs/`）。与 `bridge/<jobID>/` 平级：
@@ -325,6 +337,7 @@ final class OpsCloudSyncModel: ObservableObject {
 
     func readOnlineBaseline() async {
         guard await ensureReady(.baseline) else { return }
+        onlineHead = nil
         let directory = jobDirectory("baseline-\(Int(Date().timeIntervalSince1970))")
         do {
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
@@ -345,7 +358,7 @@ final class OpsCloudSyncModel: ObservableObject {
 
         await perform(mode: .baseline, requestPath: requestURL) { [weak self] result in
             guard let self else { return }
-            self.onlineHead = result.onlineHead
+            self.onlineHead = result.exitCode == 0 && result.outcome == .confirmed ? result.onlineHead : nil
             self.outcome = result.outcome
             self.outcomeMessage = result.outcomeMessage ?? result.lastDisplayLine
             self.outcomeRetryable = result.outcomeRetryable
@@ -358,11 +371,12 @@ final class OpsCloudSyncModel: ObservableObject {
     ///
     /// 2026-10-07 用户需求：同步要能双向 —— 远端有本地没有的拉下来、
     /// 本地有远端没有的传上去、本地删掉的在远端标记删除。这是第一步（拉回）。
-    /// ⚠️ 拉回**不等于**合并：合并要过 `reconcilePreview` 给运营看过再确认
-    /// （`alignCatalogToPulledContent` 会按线上覆盖同 id 条目并移除本地多出的）。
+    /// 拉回只生成目录文件；三步同步会自动合并无冲突字段，争议字段留给设置页确认。
     @discardableResult
     func pullCatalog() async -> OpsPulledCatalog? {
         guard await ensureReady(.pullCatalog) else { return nil }
+        pulledCatalog = nil
+        onlineHead = nil
         let directory = jobDirectory("pull-\(Int(Date().timeIntervalSince1970))")
         do {
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
@@ -384,6 +398,11 @@ final class OpsCloudSyncModel: ObservableObject {
         var pulled: OpsPulledCatalog?
         await perform(mode: .pullCatalog, requestPath: requestURL) { [weak self] result in
             guard let self else { return }
+            self.onlineHead = result.onlineHead
+            guard result.exitCode == 0, result.outcome == .confirmed else {
+                self.lastError = result.outcomeMessage ?? "拉回失败"
+                return
+            }
             pulled = OpsPulledCatalog.from(result: result, environment: self.targetEnvironment.rawValue)
             if pulled == nil {
                 // 「拉不到」两种可能：线上确实没目录（正常），或事件字段对不上（缺陷）。
@@ -398,38 +417,64 @@ final class OpsCloudSyncModel: ObservableObject {
         return pulled
     }
 
+    // MARK: 下载远端图片字节（只读）
+
+    /// 把远端有、本机没有的图片**下载到本机**（`--mode fetch-media`，全程只读）。
+    ///
+    /// 这是双向同步的另一半：`publish` 是「上传」（本地 → 远端），这里是「下载」
+    /// （远端 → 本地）。两半共用同一套内容寻址，所以：
+    ///   · 已经在本机的不会重复下载（调用方按 `stagedMediaKeys` 过滤）；
+    ///   · 下载下来的文件名就是内容摘要，可以直接进 staging
+    ///     （`OpsWorkspace.absorbDownloadedMedia(from:)`）。
+    ///
+    /// - Parameter hashes: 要下载的内容摘要（64 位 hex）。空数组**不跑** ——
+    ///   桥接器会把它当成「调用方没列清单」并拒绝，而那是调用方的 bug，
+    ///   不该靠一次注定失败的子进程去发现。
+    /// - Returns: 下载明细；nil = 没跑成（原因在 `lastError`）。
+    @discardableResult
+    func fetchMedia(hashes: [String]) async -> OpsFetchedMedia? {
+        guard !hashes.isEmpty else {
+            lastError = "没有要下载的图片：本机已经齐了（或目录里没有 `thmedia:` 引用）。"
+            return nil
+        }
+        guard await ensureReady(.fetchMedia) else { return nil }
+        let directory = jobDirectory("fetch-\(Int(Date().timeIntervalSince1970))")
+        do {
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        } catch {
+            lastError = "创建工作目录失败：\(error.localizedDescription)"
+            return nil
+        }
+        var request = makeRequest(
+            requestID: "fetch-\(UUID().uuidString)",
+            jobID: "fetch",
+            releaseSeq: max(1, (onlineHead?.releaseSeq ?? 0)),
+            archivePath: directory.appendingPathComponent("none.tar").path,
+            input: directory.appendingPathComponent("input"),
+            output: directory.appendingPathComponent("images"),
+            receipt: directory.appendingPathComponent("receipt.json"),
+            payloadHash: "fetch-media")
+        request.mediaHashes = hashes
+        guard let requestURL = write(request, to: directory) else { return nil }
+
+        var fetched: OpsFetchedMedia?
+        await perform(mode: .fetchMedia, requestPath: requestURL) { [weak self] result in
+            guard let self else { return }
+            fetched = OpsFetchedMedia.from(result: result, environment: self.targetEnvironment.rawValue)
+            if fetched == nil {
+                self.lastError = "没拿到下载结果（exitCode=\(result.exitCode)）："
+                    + (result.outcomeMessage ?? "没有 media 事件 / 读不到 fetch-manifest.json")
+            }
+        }
+        fetchedMedia = fetched
+        return fetched
+    }
+
     // MARK: 一键发布（云端更新 / 系列发布共用）
 
-    /// 运营点一次「发布整个系列」走的路：**内部自动完成整套流程**，对运营无感。
-    ///
-    /// 内部三步（都不需要运营再点任何东西）：
-    ///   1. 取一次线上发布头（**只读元数据**，几 KB）—— 发布号 = 线上号 + 1，
-    ///      `previousReleaseSeq` 也必须传线上那一版，发布器自己也要它
-    ///      （`ops_publish_bridge.py:955` / `:1052`）；
-    ///   2. **自动**把线上那一版采用为草稿基线 —— 否则 R07 在服务端比对必定拒绝
-    ///      （2026-10-07 实测：草稿基线 2 / 线上 4 → 退出码 5）；
-    ///   3. 真实发布（`dryRun=false`），一次请求写整个系列。
-    ///
-    /// ⚠️ **不拉回整份目录重建本地内容**（需求：移除「读线上 → 拉取 → 再发布」环节）。
-    /// 代价必须写清楚：这样发出去的是**本地整包取代线上那一版**，
-    /// 线上后来被别人加的内容会被覆盖。这是运营选定的「无感」口径，
-    /// 所以每一步都写进运行日志留痕，出事能回溯（日志路径在失败提示里给出）。
+    /// 工具栏与系列发布共用三步同步；上传受阻仍保留下载和本地合并结果。
     func publishNow(workspace: OpsWorkspace) async -> OpsPublishInvocationResult {
-        await readOnlineBaseline()
-        guard let head = onlineHead else {
-            return .failed("读不到线上发布头（发布号必须严格大于线上）—— "
-                           + (lastError ?? outcomeMessage ?? "受控发布器没有返回发布头"))
-        }
-        guard head.environment == targetEnvironment.rawValue else {
-            return .failed("线上基线属于 \(head.environment)，与当前目标环境 "
-                           + "\(targetEnvironment.rawValue) 不一致（不能拿一个环境的号发另一个环境）")
-        }
-        // 自动采用基线：**留痕**在日志里，不能静默 —— 这一步等于声明
-        // 「本次内容取代线上 releaseSeq \(head.releaseSeq)」。
-        workspace.adoptBaseline(head)
-        append("已自动采用线上 releaseSeq \(head.releaseSeq) 为本次发布基线"
-               + "（未拉回线上内容：本次是本地整包取代线上这一版）")
-        return await publish(workspace: workspace)
+        await synchronize(workspace: workspace)
     }
 
     /// 导出待发布整包 → 写冻结请求 → 交受控发布器。
@@ -494,6 +539,7 @@ final class OpsCloudSyncModel: ObservableObject {
 
         // ---- 2) 冻结请求（App 唯一的「提交」动作）
         let revision = workspace.currentRevision
+        let publishedCatalog = workspace.catalog
         let draftID = workspace.draft?.id ?? "draft"
         let request = ShopCatalogPublishRequest(
             requestID: ShopCatalogPublishRequestKey.make(
@@ -533,11 +579,16 @@ final class OpsCloudSyncModel: ObservableObject {
             // 只有「真的写了 + 回读确认过」才记一次已发布（R09：不承诺、不谎报）
             if let receipt, receipt.readBackConfirmed == true,
                let seq = receipt.releaseSeq {
+                guard workspace.draft?.id == draftID else {
+                    self.lastError = "发布已完成，但工作区已切换，未修改新草稿的基线。"
+                    return
+                }
                 _ = workspace.recordConfirmedPublish(
                     releaseSeq: seq,
                     rootIndexHash: receipt.rootIndexHash,
                     environment: self.targetEnvironment.rawValue,
-                    revision: revision)
+                    revision: revision,
+                    publishedCatalog: publishedCatalog)
             }
         }
 
@@ -561,6 +612,7 @@ final class OpsCloudSyncModel: ObservableObject {
 
     /// 三关自检：仓库目录 / 解释器 / 凭证。不通过就不跑，且每一条单独说明。
     private func ensureReady(_ mode: OpsBridgeMode) async -> Bool {
+        guard !isRunning else { return false }
         let problems = diagnosis
         if !problems.isEmpty {
             failBeforeBridge("受控发布器还没准备好：" + problems.joined(separator: " "), mode: mode)
@@ -628,6 +680,7 @@ final class OpsCloudSyncModel: ObservableObject {
         requestPath: URL,
         interpret: @escaping @MainActor (OpsBridgeRunResult) -> Void
     ) async {
+        guard !isRunning else { return }
         isRunning = true
         runningMode = mode
         outcome = nil
@@ -637,11 +690,12 @@ final class OpsCloudSyncModel: ObservableObject {
         // 每次运行从干净的一份开始：`runLog` 是**按运行**归属的，留着上一次的行
         // 会让落盘的日志里混进两次运行的输出（跨环境时尤其误导）。
         runLog = []
-        let runID = "\(Self.runIDFormatter.string(from: Date()))-\(mode.rawValue)"
+        let runID = "\(Self.runIDFormatter.string(from: Date()))-\(mode.rawValue)-\(UUID().uuidString.prefix(8))"
         append("▶ \(mode.displayName)（\(targetEnvironment.displayName)）")
 
         let bridge = OpsPublisherBridge(settings: settings)
         let environmentName = targetEnvironment.rawValue
+        let generation = environmentGeneration
         do {
             let result = try await Task.detached(priority: .userInitiated) { () throws -> OpsBridgeRunResult in
                 try bridge.run(
@@ -649,12 +703,22 @@ final class OpsCloudSyncModel: ObservableObject {
                     requestPath: requestPath,
                     environmentName: environmentName
                 ) { event in
-                    guard let line = event.displayLine else { return }
-                    Task { @MainActor in OpsCloudSyncModel.shared.append(line) }
+                    Task { @MainActor in
+                        guard self.environmentGeneration == generation else { return }
+                        self.receiveSyncProgress(event, mode: mode)
+                        if let line = event.displayLine { self.append(line) }
+                    }
                 }
             }.value
             append("退出码 \(result.exitCode)"
                 + (result.outcome.map { " · 结论 \($0.rawValue)" } ?? ""))
+            guard targetEnvironment.rawValue == environmentName, environmentGeneration == generation else {
+                lastError = "任务在 \(environmentName) 执行，期间目标环境已切换；请查询原环境结果。"
+                isRunning = false
+                runningMode = nil
+                persistLog(runID: runID, mode: mode)
+                return
+            }
             interpret(result)
         } catch {
             // 超时 / 取消不是「没发生」：文案里有「先查询再决定」的要求。

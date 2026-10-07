@@ -367,10 +367,32 @@ def first_existing_record(result: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     "reason":"Record not found"}` 条目。不过滤的话「记录不存在」会被误判成
     「记录存在」——发布端会跳过该包的上传，校验端会把空字段当发布头解析。
     """
-    for record in result.get("records") or []:
-        if not record.get("serverErrorCode"):
-            return record
-    return None
+    records = existing_records(result)
+    return records[0] if records else None
+
+
+def existing_records(result: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """只有 NOT_FOUND 代表不存在；权限/限流/损坏响应不能伪装成空库。"""
+    if result.get("serverErrorCode"):
+        raise ProtocolError("CloudKit lookup 失败：{}".format(result["serverErrorCode"]))
+    records = result.get("records")
+    if not isinstance(records, list) or not records:
+        raise ProtocolError("CloudKit lookup 缺少 records 响应")
+    found = []
+    for record in records:
+        if not isinstance(record, dict):
+            raise ProtocolError("CloudKit lookup 记录格式无效")
+        code = record.get("serverErrorCode")
+        if code == "NOT_FOUND":
+            continue
+        if code:
+            if code in ("TRY_AGAIN_LATER", "THROTTLED", "SERVICE_UNAVAILABLE"):
+                raise NetworkError("CloudKit 暂时无法读取：{}".format(code))
+            raise ProtocolError("CloudKit 记录读取失败：{}".format(code))
+        if not isinstance(record.get("recordName"), str) or not record["recordName"]:
+            raise ProtocolError("CloudKit lookup 缺少记录名")
+        found.append(record)
+    return found
 
 
 def decode_pem_material(raw: str) -> str:
@@ -770,6 +792,9 @@ class CloudKitWebServicesAdapter(PublishAdapter):
         if not record:
             return None
         fields = record.get("fields") or {}
+        seq = (fields.get("releaseSeq") or {}).get("value")
+        if not isinstance(seq, int) or isinstance(seq, bool) or seq < 1:
+            raise ProtocolError("CloudKit 发布头缺少合法 releaseSeq，不能按首次发布处理")
         # `rootIndexHash` / `publishedAt` 是 2026-09-27 为运营工作台的基线核对（R07）
         # 补上的**只增不改**字段：发布流程本身只用上面三个，
         # 但「线上当前版本的根清单摘要」是 App 判断基线是否过期所必需的，
@@ -825,7 +850,7 @@ class CloudKitWebServicesAdapter(PublishAdapter):
                     ]
                 },
             )
-            found = result.get("records") or []
+            found = existing_records(result)
             if isinstance(found, list):
                 names = {
                     str((item.get("recordName") or "")).replace("th.media.", "")
@@ -1024,6 +1049,15 @@ class CloudKitWebServicesAdapter(PublishAdapter):
         # 完整回读由 verify_publication.py 以「普通读者视角」执行（§8.2 步骤 9 / §20.2）。
         return payload_hash if self.pack_exists(payload_hash) else None
 
+    def fetch_media_bytes(self, content_hash: str) -> Optional[bytes]:
+        """按内容摘要取回 THMedia 的字节。**纯读**（同步 = 下载的那一档）。
+
+        字段名必须传 `asset`（THMedia / THDataPack 都叫这个；THRelease 才是
+        `rootIndexAsset`）—— 传错不报错，只拿到空字典，表现成「线上没有」。
+        """
+        value = self._lookup_asset_value("THMedia", "th.media.{}".format(content_hash), "asset")
+        return self._download_asset(value)
+
     def read_back_media_hash(self, content_hash: str) -> Optional[str]:
         return content_hash if self.media_exists(content_hash) else None
 
@@ -1046,7 +1080,9 @@ class CloudKitWebServicesAdapter(PublishAdapter):
         if not record:
             return {}
         value = ((record.get("fields") or {}).get(field) or {}).get("value")
-        return value if isinstance(value, dict) else {}
+        if not isinstance(value, dict) or not value.get("downloadURL"):
+            raise ProtocolError("CloudKit {} 记录缺少 {} 资产下载地址".format(record_type, field))
+        return value
 
     def _download_asset(self, value: Dict[str, Any]) -> Optional[bytes]:
         """按 ASSET 字段里的 `downloadURL` 取回字节。**纯读**，不走 `_post`。"""
