@@ -421,6 +421,53 @@ def _media_reference_census(doc: Any) -> Dict[str, int]:
     return census
 
 
+def _shop_catalog_doc(archive_path: Path, input_directory: Path) -> Any:
+    """读出商店目录 JSON —— **只用于统计与核对**，构建仍由 `build_release.py` 负责。
+
+    为什么这里要再读一遍：构建器不联网，而「远端已有哪些媒体」必须联网才知道，
+    所以核对只能在桥接器这一层做，就得先知道目录里引用了哪些 `thmedia:`。
+    读不出来返回 None（调用方按「无法核对」处理，判定更保守，不会漏报）。
+    """
+    import tarfile
+
+    if archive_path is not None and Path(archive_path).exists():
+        try:
+            with tarfile.open(str(archive_path)) as tar:
+                for member in tar.getmembers():
+                    if member.isfile() and member.name.rstrip("/").split("/")[-1] == "shop-catalog.json":
+                        handle = tar.extractfile(member)
+                        if handle is not None:
+                            return json.loads(handle.read().decode("utf-8"))
+        except (tarfile.TarError, OSError, ValueError):
+            return None
+    for candidate in sorted(input_directory.glob("*catalog*.json")):
+        try:
+            return json.loads(candidate.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+    return None
+
+
+def _thmedia_hashes(doc: Any) -> List[str]:
+    """目录里所有 `thmedia:` 引用的内容摘要（去重、顺序稳定）。"""
+    found: List[str] = []
+
+    def walk(node: Any) -> None:
+        if isinstance(node, dict):
+            for value in node.values():
+                walk(value)
+        elif isinstance(node, list):
+            for value in node:
+                walk(value)
+        elif isinstance(node, str) and node.startswith("thmedia:"):
+            digest = node[len("thmedia:"):].strip()
+            if digest:
+                found.append(digest)
+
+    walk(doc)
+    return found
+
+
 def _census_text(census: Dict[str, int]) -> str:
     """把引用形态数成人读的一句话。空字典不写成空串 —— 「没有图片引用」也是结论。"""
     if not census:
@@ -1049,6 +1096,49 @@ def run_publish(request: Dict[str, Any], quiet: bool) -> int:
     # 2026-09-29 之前这里**不传** → `build_release.py` 用默认 0
     # → Mac 发出去的每一版都自称「没有上一版」（运营追踪时看到 0 会误判）。
     # 基线闸门（R07）就在上面几十行，`head` 已经读到并比对过，所以此处取值可信。
+    # ---------------- 远端媒体核对（R5 修复）
+    #
+    # 构建器**从不读线上**（这是它的设计约束），但发布前校验要知道
+    # 「哪些媒体在目标环境**已经存在**」：拉回线上目录再编辑时，引用已经是
+    # `thmedia:`，那些图早就传过了、**不会**出现在本次待上传清单里 ——
+    # 不核对就会被逐条判成 `media.reference.missing`（2026-10-07 实测：
+    # 4 个资产 × 4 个字段 = 16 条假错误），「拉回 → 编辑 → 发布」一直是堵的。
+    #
+    # 所以由这一层（有网、有凭证）真读一次，把结果喂给构建器。
+    # ⚠️ 核对失败**不中止**，但必须在日志里说清楚：此时「已知」只剩本次上传清单，
+    # 结果是**可能误报**缺图（保守方向，安全），绝不会把缺失说成存在。
+    stage("remoteMedia", "started", "核对远端已存在的媒体（R5）")
+    remote_media_path = input_directory / "known-remote-media.json"
+    candidate_hashes = _thmedia_hashes(_shop_catalog_doc(archive_path, input_directory))
+    if not candidate_hashes:
+        stage("remoteMedia", "succeeded")
+        log_line("info", "目录里没有 thmedia: 引用，无需核对远端媒体")
+    else:
+        try:
+            remote_adapter = make_adapter(name, ck_environment(request), False, False, None)
+            existing = remote_adapter.media_exists_many(candidate_hashes)
+            remote_media_path.write_text(
+                json.dumps(sorted(existing), ensure_ascii=False), encoding="utf-8")
+            stage("remoteMedia", "succeeded")
+            log_line(
+                "info",
+                "远端媒体核对：目录引用 {} 个 thmedia，{} 个在 {} 确实存在"
+                "（另 {} 个不在，会按「本次待上传」再判一次）".format(
+                    len(set(candidate_hashes)), len(existing),
+                    ck_environment(request),
+                    len(set(candidate_hashes)) - len(existing),
+                ),
+            )
+        except (ProtocolError, CredentialError, OSError) as error:
+            # 不中止：少了这份清单只会让判定更保守（可能误报缺图），不会漏报。
+            stage("remoteMedia", "failed")
+            remote_media_path = None
+            log_line(
+                "warning",
+                "远端媒体核对失败（{}），本次只按「本次待上传」判定："
+                "已远端化的引用**可能**被误报成缺图。".format(error),
+            )
+
     previous_release_seq = int((head or {}).get("releaseSeq") or 0)
     stage("build", "started", "构建不可变产物")
     build_argv = [
@@ -1065,6 +1155,8 @@ def run_publish(request: Dict[str, Any], quiet: bool) -> int:
         "--previous-release-seq",
         str(previous_release_seq),
     ]
+    if remote_media_path is not None:
+        build_argv += ["--known-remote-media", str(remote_media_path)]
     build_code, build_steps = run_child(build_argv, quiet)
     if build_code != 0:
         stage("build", "failed")

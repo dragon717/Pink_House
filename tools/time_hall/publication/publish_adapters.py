@@ -800,6 +800,41 @@ class CloudKitWebServicesAdapter(PublishAdapter):
     def media_exists(self, content_hash: str) -> bool:
         return self._asset_exists("THMedia", "th.media.{}".format(content_hash))
 
+    def media_exists_many(self, content_hashes: List[str], chunk_size: int = 200) -> set:
+        """批量判断哪些媒体**已经存在于目标环境**。
+
+        为什么要批量：一次一条地 lookup，几百张图会把 CloudKit 打成
+        `requestRateLimited`（iOS 侧 450 张就是这么踩的）。`records/lookup`
+        本来就支持一次问多条，所以分块后每块一次请求。
+
+        ⚠️ 是**真读**（与 `media_exists` 同一条路径），不是查本地缓存 ——
+        「以为在远端」比「确实不在」危险得多：前者会让客户端拿到破图。
+
+        - Returns: 确实存在的那部分 `contentHash` 集合。
+        """
+        existing: set = set()
+        unique = sorted({str(one) for one in content_hashes if one})
+        for start in range(0, len(unique), chunk_size):
+            chunk = unique[start:start + chunk_size]
+            result = self._send(
+                "records/lookup",
+                {
+                    "records": [
+                        {"recordName": "th.media.{}".format(one), "recordType": "THMedia"}
+                        for one in chunk
+                    ]
+                },
+            )
+            found = result.get("records") or []
+            if isinstance(found, list):
+                names = {
+                    str((item.get("recordName") or "")).replace("th.media.", "")
+                    for item in found
+                    if isinstance(item, dict) and not item.get("serverErrorCode")
+                }
+                existing |= {one for one in chunk if one in names}
+        return existing
+
     def put_pack(self, payload_hash: str, file_path: Path, meta: Dict[str, Any]) -> None:
         self._upload_asset(
             "THDataPack", "th.pack.{}".format(payload_hash), file_path.read_bytes(), file_path.name, meta

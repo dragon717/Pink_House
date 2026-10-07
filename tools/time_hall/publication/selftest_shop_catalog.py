@@ -309,6 +309,31 @@ issues = validate_shop_catalog_media(leftover, known)
 check("残留 local: 引用 → 报发布包依赖本地路径",
       any(i["code"] == "media.reference.local" for i in issues), str(issues[:1]))
 
+# ---- R5（2026-10-07 修）：已远端化的引用不得被判「缺失」 ----
+#
+# 事故：只认「本次待上传」这一个来源时，拉回线上目录再编辑必定炸 ——
+# 线上那一版的引用已经是 thmedia:，图早传过、不在本次上传清单里，
+# 于是逐条判 media.reference.missing（实测 4 资产 × 4 字段 = 16 条假错误），
+# 「拉回 → 编辑 → 发布」这条链路因此长期走不通。
+#
+# 修法不是放宽校验（local: 一律失败这条不变），而是把「已知」补全为
+# 本次上传 ∪ 远端已存在。下面两条是这条修复的正反锁。
+remote_only = copy.deepcopy(rewritten)
+_remote_hash = "b" * 64
+remote_only["assets"][0]["mediaKey"] = _remote_hash
+remote_only["assets"][0]["originalURL"] = "thmedia:{}".format(_remote_hash)
+check("已远端化的引用 + 给了远端清单 → 不报缺失（R5 正向）",
+      validate_shop_catalog_media(remote_only, known, {_remote_hash}) == [],
+      str(validate_shop_catalog_media(remote_only, known, {_remote_hash}))[:200])
+check("已远端化但不在远端清单里 → 仍然报缺失（R5 负向：不许放宽成一律放行）",
+      any(i["code"] == "media.reference.missing"
+          for i in validate_shop_catalog_media(remote_only, known, set())),
+      str(validate_shop_catalog_media(remote_only, known, set()))[:200])
+check("不传远端清单时行为与修复前一致（只认本次上传）",
+      any(i["code"] == "media.reference.missing"
+          for i in validate_shop_catalog_media(remote_only, known)),
+      str(validate_shop_catalog_media(remote_only, known))[:200])
+
 # 非 64 位 hex 的媒体键（手填错 / 截断）必须报出来，不能放过
 bad_key = copy.deepcopy(rewritten)
 bad_key["assets"][0]["mediaKey"] = "not-a-hash"

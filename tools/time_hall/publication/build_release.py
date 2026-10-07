@@ -114,6 +114,17 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
             " --shop-catalog / --shop-catalog-media"
         ),
     )
+    parser.add_argument(
+        "--known-remote-media",
+        type=Path,
+        default=None,
+        help=(
+            "**已核对过确实存在于目标环境**的媒体内容摘要清单（JSON 数组，64 位 hex）。"
+            "由受控发布器在构建前用 th.media.<hash> 真读得出（构建器自己从不读线上）。"
+            "给它的理由：拉回线上目录再编辑时，引用已是 thmedia: 且图早传过，"
+            "它们不在本次待上传清单里，不给这份清单就会被误判成缺图（R5）"
+        ),
+    )
     parser.add_argument("--output", required=True, type=Path, help="发布产物输出目录")
     parser.add_argument(
         "--sources",
@@ -901,10 +912,29 @@ def main(argv: Optional[List[str]] = None) -> int:
     # 包里每个 mediaKey / thmedia 引用都必须命中本次**真的会上传**的媒体，
     # 否则发布头一切换，客户端就是「数据到了、图全空」。
     if shop_doc is not None:
+        # 「已知」= 本次会上传 ∪ 远端已存在（R5）。后者由受控发布器真读得出，
+        # 构建器自己从不联网；没给这份清单时行为与修复前一致（只认本次上传）。
+        remote_known: set = set()
+        if args.known_remote_media:
+            try:
+                loaded = json.loads(args.known_remote_media.read_text(encoding="utf-8"))
+                if isinstance(loaded, list):
+                    remote_known = {str(one) for one in loaded}
+                else:
+                    raise ProtocolError(
+                        "--known-remote-media 必须是 JSON 数组（64 位 hex 字符串），"
+                        "实际是 {}".format(type(loaded).__name__)
+                    )
+            except (OSError, ValueError) as error:
+                raise ProtocolError(
+                    "--known-remote-media 读不出来：{}".format(error)
+                )
         all_issues += [
             dict(issue, layer="structural")
             for issue in validate_shop_catalog_media(
-                shop_doc, {str(item["contentHash"]) for item in media_records}
+                shop_doc,
+                {str(item["contentHash"]) for item in media_records},
+                remote_known,
             )
         ]
     withdrawals = load_withdrawals(args.withdrawals)

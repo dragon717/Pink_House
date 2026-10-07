@@ -1092,19 +1092,34 @@ def _shop_media_references(doc: Dict[str, Any]) -> List[Tuple[str, str, str]]:
 def validate_shop_catalog_media(
     doc: Any,
     known_media_hashes: set,
+    known_remote_media_hashes: Optional[set] = None,
 ) -> List[Dict[str, str]]:
     """商品 JSON 的媒体引用 vs 已收集媒体清单（公共数据库字段配置方案 §2.3）。
 
     方案原话：构建器此前对媒体引用「不做资产引用校验」，这是**必须补上的发布前错误**。
     少了这一步，包里可以出现「指向不存在的 THMedia」的引用，发布成功但客户端图全空。
 
-    known_media_hashes = 本次发布实际会上传的媒体内容摘要集合（`contentHash`）。
-    每个引用都必须能命中其中一条；`local:` 引用**一律**判失败 —— 它只在运营那台
-    设备的沙盒里成立，进公共库就是其它设备的破图。
+    「已知」有**两个来源，必须取并集**：
+
+      · `known_media_hashes` = 本次发布**实际会上传**的媒体内容摘要（`contentHash`）；
+      · `known_remote_media_hashes` = **目标环境里已经存在**的媒体摘要
+        （由受控发布器用 `THMedia` 的 `th.media.<hash>` 真读核对后给出，
+        见 `ops_publish_bridge` 的远端媒体核对步骤）。
+
+    ⚠️ 2026-10-07 修 R5：此前只认第一个来源，于是「拉回线上目录 → 编辑 → 再发布」
+    必炸 —— 线上那一版的引用已经是 `thmedia:`，它们**不在本次上传清单里**
+    （图早就传过了），却被逐条判成 `media.reference.missing`（实测 4 资产×4 字段
+    = 16 条假错误），这条链路因此一直走不通。修法**不是放宽校验**（`local:`
+    一律失败这条不变），而是把「已知」的来源补全：本次上传 ∪ 远端已存在。
+
+    远端集合由**有网有凭证的那一层**（桥接器）给出：构建器本身从不读线上。
     """
     issues: List[Dict[str, str]] = []
     if not isinstance(doc, dict):
         return [_issue("media.doc.invalid", "商店目录必须是对象")]
+
+    # 并集 = 本次会上传 ∪ 远端已存在。少了后者就是把「已远端化」误判成「缺失」（R5）。
+    allowed = set(known_media_hashes) | set(known_remote_media_hashes or ())
 
     for field, value, entity_id in _shop_media_references(doc):
         if value.startswith("local:"):
@@ -1132,12 +1147,14 @@ def validate_shop_catalog_media(
                 )
             )
             continue
-        if digest not in known_media_hashes:
+        if digest not in allowed:
             issues.append(
                 _issue(
                     "media.reference.missing",
-                    "{} 引用的媒体 {} 不在本次待上传清单里（图没随发布一起走）".format(
-                        field, digest[:12]
+                    "{} 引用的媒体 {} 既不在本次待上传清单里、也不在{}目标环境的现存媒体里"
+                    "（图没随发布一起走，也没有传过）".format(
+                        field, digest[:12],
+                        "" if known_remote_media_hashes is None else "**已核对过的**"
                     ),
                     entity_id,
                 )
