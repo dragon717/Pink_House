@@ -36,6 +36,8 @@ struct OpsSettingsView: View {
     /// 上一次「数据修复」的结果（修复是破坏性的，结果必须出声）
     @State private var repairMessage: String?
     @State private var repairFailed = false
+    /// 缺图文件数（打开设置时算一次 —— 每次渲染都遍历全量引用太重）
+    @State private var missingCount = 0
     /// 清理悬空销售记录的**二级确认**框（弹窗快捷入口与设置按钮共用）
     @State private var showsRepairConfirm = false
 
@@ -162,6 +164,17 @@ struct OpsSettingsView: View {
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                 }
+                // 缺图不是「数据错误」，是**图不在这台机器上** —— 修不了，只能补。
+                // 日志只显示前几条阻断，完整名单必须能导出，否则对着 284 这个数字无从下手。
+                HStack(spacing: 10) {
+                    Button("导出缺图清单…") { exportMissingImages() }
+                        .disabled(missingCount == 0 || holder.workspace == nil)
+                    Text(missingCount > 0
+                         ? "当前有 \(missingCount) 个图片文件在本机找不到（每条引用都算一个阻断项）。"
+                         : "本机不缺图片文件。")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
                 // 拼接结果 = 变量式的 String，必须过 opsMarkdown（`Text(拼接)` 不解析 Markdown）
                 opsMarkdown("清理会**删除**这些销售记录（不可撤销），但它们的商品在目录里已不存在，"
                      + "本来也无从归属。整包重新导入会把它们带回来，需要再清一次。")
@@ -190,6 +203,8 @@ struct OpsSettingsView: View {
         }
         .formStyle(.grouped)
         .frame(width: 560, height: 720)
+        // 缺图数只在这里算一次：全量引用遍历不便宜，渲染期跑不划算
+        .task { missingCount = holder.workspace?.missingStagedImages().count ?? 0 }
         // 主窗口失败悬浮框的「数据修复」快捷入口落在这里：
         // 收到一次性指令 → 弹同一个二级确认框（指令用完即清，不残留）。
         .onReceive(OpsSettingsFocus.shared.$repairPromptRequested) { requested in
@@ -232,6 +247,21 @@ struct OpsSettingsView: View {
             // 0 条且无错误 = 确认期间数量变了，不算失败
             repairFailed = false
             repairMessage = workspace.statusText ?? "没有可清理的悬空销售记录。"
+        }
+    }
+
+    /// 导出缺图清单：拿到完整名单才能去 iOS 端 / 图源逐张核对。
+    /// 门禁日志只显示前几条阻断项，光看那个数字无从下手。
+    private func exportMissingImages() {
+        guard let workspace = holder.workspace else {
+            repairFailed = true
+            repairMessage = "还没有可用的工作区：请先打开主窗口（草稿库在主窗口里建）。"
+            return
+        }
+        // 与主窗口失败悬浮框共用 `OpsMissingImagesExport`（保存面板 + 文案只写一处）
+        if let message = OpsMissingImagesExport.save(from: workspace) {
+            repairFailed = message.hasPrefix("导出缺图清单失败")
+            repairMessage = message
         }
     }
 

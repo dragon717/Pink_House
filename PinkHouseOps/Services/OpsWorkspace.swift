@@ -918,6 +918,35 @@ final class OpsWorkspace: ObservableObject {
         return removed
     }
 
+    /// 缺图清单：引用写着 `local:<名>`、但本机 staging 里没有这个文件的条目。
+    ///
+    /// 「发布前校验未通过（N 条）」里的大头常常就是它，而日志只显示前几条 ——
+    /// 运营拿不到**完整名单**就没法逐张补。这里按「文件名 → 所有引用它的归属」聚合，
+    /// 便于拿着清单去 iOS 端（或图源）核对，而不是对着 284 这个数字干瞪眼。
+    func missingStagedImages() -> [(fileName: String, owners: [String])] {
+        let staged = stagedFileNames
+        var ownersByFile: [String: [String]] = [:]
+        for reference in ShopCatalogMediaReferences.all(in: catalog) {
+            guard let name = ShopCatalogMediaReferences.localFileName(in: reference.reference),
+                  !staged.contains(name) else { continue }
+            ownersByFile[name, default: []].append(reference.owner)
+        }
+        return ownersByFile
+            .map { (fileName: $0.key, owners: $0.value) }
+            .sorted { $0.fileName < $1.fileName }
+    }
+
+    /// 缺图清单的纯文本（给运营带去 iOS 端核对用）：一行一个文件，带归属。
+    var missingStagedImagesText: String {
+        let lines = missingStagedImages()
+        var output = ["# 缺图清单（\(lines.count) 个文件）",
+                      "# 格式：文件名 | 引用它的位置"]
+        for entry in lines {
+            output.append("\(entry.fileName) | \(entry.owners.joined(separator: " / "))")
+        }
+        return output.joined(separator: "\n")
+    }
+
     // MARK: 导入图片
 
     /// 非 private：`importSingleImage`（系列向导的封面/颜色图/尺码表原图导入）

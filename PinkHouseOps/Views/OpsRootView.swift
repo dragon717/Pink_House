@@ -135,7 +135,8 @@ struct OpsMainView: View {
         .frame(minWidth: 980, minHeight: 620)
         .overlay(alignment: .top) {
             if let toast = updateToast {
-                OpsUpdateToastView(toast: toast) { updateToast = nil }
+                OpsUpdateToastView(toast: toast, onDismiss: { updateToast = nil },
+                                   onExportMissing: exportMissingImages)
             }
         }
         .toolbar {
@@ -184,9 +185,18 @@ struct OpsMainView: View {
                     detail: reason,
                     logPath: cloudSync.lastRunLogURL?.path,
                     // 校验失败里若含悬空销售记录，直接给一键修复入口
-                    canRepairDangling: workspace.danglingSaleEventCount > 0)
+                    canRepairDangling: workspace.danglingSaleEventCount > 0,
+                    missingImageCount: workspace.missingStagedImages().count)
             }
             scheduleToastDismiss()
+        }
+    }
+
+    /// 导出缺图清单（设置页用的是同一份 `OpsMissingImagesExport`）。
+    /// 结果直接追加到当前这条失败悬浮框上 —— 反馈通道只有这一条，不另开弹窗。
+    private func exportMissingImages() {
+        if let message = OpsMissingImagesExport.save(from: workspace) {
+            updateToast?.detail = (updateToast?.detail ?? "") + "  · " + message
         }
     }
 
@@ -419,6 +429,9 @@ struct OpsCloudUpdateToast: Equatable {
     /// 失败原因里有「悬空引用」可清时显示「数据修复」快捷入口
     /// （一键打开设置并自动弹清理确认框）。
     var canRepairDangling: Bool = false
+    /// 失败原因里有「缺图」时显示「缺图清单」入口（缺图修不了，只能补 ——
+    /// 至少给一份完整名单，别让人对着 284 这个数字干瞪眼）。
+    var missingImageCount: Int = 0
 }
 
 /// 顶部悬浮的结果框：**一条**，新的更新会整体替换。
@@ -426,6 +439,8 @@ struct OpsCloudUpdateToast: Equatable {
 struct OpsUpdateToastView: View {
     let toast: OpsCloudUpdateToast
     let onDismiss: () -> Void
+    /// 导出缺图清单（失败原因里缺图条数 > 0 时才出现）
+    let onExportMissing: () -> Void
 
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
@@ -447,6 +462,14 @@ struct OpsUpdateToastView: View {
                         Button("打开日志") {
                             NSWorkspace.shared.activateFileViewerSelecting(
                                 [URL(fileURLWithPath: logPath)])
+                        }
+                        .controlSize(.small)
+                    }
+                    // 缺图**修不了**（图不在这台机器上），但完整名单能给 ——
+                    // 门禁日志只显示前几条，运营得拿着名单去 iOS 端 / 图源核对。
+                    if toast.missingImageCount > 0 {
+                        Button("缺图清单（\(toast.missingImageCount)）") {
+                            onExportMissing()
                         }
                         .controlSize(.small)
                     }
