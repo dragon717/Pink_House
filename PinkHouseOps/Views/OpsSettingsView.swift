@@ -36,6 +36,18 @@ struct OpsSettingsView: View {
     /// 上一次「数据修复」的结果（修复是破坏性的，结果必须出声）
     @State private var repairMessage: String?
     @State private var repairFailed = false
+    /// 预览里「会被移除」的条数（守卫用：数量不摆在面前不许确认）
+    private var removedCount: Int { preview?.removed.count ?? 0 }
+
+    /// 会被移除的条目按类型拆开（「商品 263 / 系列 10」这种人能看懂的形式）
+    private var removedBreakdown: String {
+        guard let preview, !preview.removed.isEmpty else { return "无" }
+        let counts = Dictionary(grouping: preview.removed, by: \.kind)
+            .mapValues(\.count)
+            .sorted { $0.value > $1.value }
+        return counts.map { "\($0.key.displayName) \($0.value)" }.joined(separator: " / ")
+    }
+
     /// 缺图文件数（打开设置时算一次 —— 每次渲染都遍历全量引用太重）
     @State private var missingCount = 0
     /// 与远端对齐：拉回后的**对账预览**（不写任何东西，先给人看）
@@ -152,6 +164,19 @@ struct OpsSettingsView: View {
                         .font(.caption)
                         .textSelection(.enabled)
                         .fixedSize(horizontal: false, vertical: true)
+                    // ⭐ 移除守卫：线上那一版可能比本地小得多（2026-10-07 实测：
+                    // 线上 seq 5 = 1 店家/1 系列/7 商品，本地是 3/11/270）——
+                    // 「本地多出的会被移除」在这种落差下等于**删掉几百个商品**。
+                    // 数量必须摆在预览里，不许让运营对着一句「合并」点确认。
+                    if !preview.removed.isEmpty {
+                        opsMarkdown("⚠️ 合并会**移除**本地这些条目：\(removedBreakdown)。"
+                                    + "若线上那一版比你本地小很多，这一步会删掉大量内容 —— "
+                                    + "确认前请先确认当前草稿已保存。")
+                            .font(.caption)
+                            .foregroundStyle(.red)
+                            .textSelection(.enabled)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                     Button("按上面的结果合并到本地…") { showsAlignConfirm = true }
                         .disabled(holder.workspace == nil)
                 }
@@ -262,7 +287,9 @@ struct OpsSettingsView: View {
         .confirmationDialog(
             "合并线上目录到本地", isPresented: $showsAlignConfirm, titleVisibility: .visible
         ) {
-            Button("确认合并（线上覆盖同 id，本地多出的移除）", role: .destructive) {
+            Button(removedCount > 0
+                   ? "确认合并并移除 \(removedCount) 条本地条目"
+                   : "确认合并（线上覆盖同 id）", role: .destructive) {
                 applyAlignment()
             }
             Button("取消", role: .cancel) {}
