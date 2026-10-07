@@ -33,8 +33,14 @@ struct OpsSettingsView: View {
     /// 上一次导入的结果（成功摘要 / 失败原因，二选一展示）
     @State private var importMessage: String?
     @State private var importFailed = false
+    /// 上一次「数据修复」的结果（修复是破坏性的，结果必须出声）
+    @State private var repairMessage: String?
+    @State private var repairFailed = false
+    /// 清理悬空销售记录的**二级确认**框（弹窗快捷入口与设置按钮共用）
+    @State private var showsRepairConfirm = false
 
     var body: some View {
+        let dangling = holder.workspace?.danglingSaleEventCount ?? 0
         Form {
             Section("发布环境") {
                 Picker("目标环境", selection: $model.targetEnvironment) {
@@ -137,6 +143,38 @@ struct OpsSettingsView: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
+            Section("数据修复（发布前的悬空引用）") {
+                // 「发布前校验未通过（N 条）」里若含「销售记录 X 引用了不存在的商品 Y」，
+                // 用这里清。这类记录挂不到任何商品上，客户端也显示不出来。
+                // ⚠️ 门禁是跨端口径（iOS / Python 共用），不放宽它，只清数据。
+                // ⚠️ 清理是**不可撤销**的删除 → 设置按钮与主窗口弹窗的快捷入口
+                //    都必须过同一个二级确认框，不允许一键直达。
+                HStack(spacing: 10) {
+                    Button(dangling > 0
+                           ? "清理悬空销售记录（\(dangling) 条）"
+                           : "清理悬空销售记录") {
+                        showsRepairConfirm = true
+                    }
+                    .disabled(dangling == 0 || holder.workspace == nil)
+                    Text(dangling > 0
+                         ? "当前有 \(dangling) 条销售记录指向不存在的商品，一律会被门禁拦下。"
+                         : "当前没有悬空销售记录。")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+                // 拼接结果 = 变量式的 String，必须过 opsMarkdown（`Text(拼接)` 不解析 Markdown）
+                opsMarkdown("清理会**删除**这些销售记录（不可撤销），但它们的商品在目录里已不存在，"
+                     + "本来也无从归属。整包重新导入会把它们带回来，需要再清一次。")
+                    .font(.caption2)
+                    .foregroundStyle(.orange)
+                if let repairMessage {
+                    opsMarkdown(repairMessage)
+                        .font(.caption)
+                        .foregroundStyle(repairFailed ? .red : .secondary)
+                        .textSelection(.enabled)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
             Section("日志（排查入口）") {
                 HStack(spacing: 10) {
                     Button("打开最近一次日志") { model.revealLogFile() }
@@ -152,6 +190,49 @@ struct OpsSettingsView: View {
         }
         .formStyle(.grouped)
         .frame(width: 560, height: 720)
+        // 主窗口失败悬浮框的「数据修复」快捷入口落在这里：
+        // 收到一次性指令 → 弹同一个二级确认框（指令用完即清，不残留）。
+        .onReceive(OpsSettingsFocus.shared.$repairPromptRequested) { requested in
+            guard requested else { return }
+            OpsSettingsFocus.shared.repairPromptRequested = false
+            if holder.workspace?.danglingSaleEventCount ?? 0 > 0 {
+                showsRepairConfirm = true
+            } else {
+                repairFailed = false
+                repairMessage = "当前没有悬空销售记录，无需清理。"
+            }
+        }
+        .confirmationDialog(
+            "清理悬空销售记录", isPresented: $showsRepairConfirm, titleVisibility: .visible
+        ) {
+            Button("清理 \(dangling) 条（不可撤销）", role: .destructive) {
+                repairDangling()
+            }
+            Button("取消", role: .cancel) {}
+        } message: {
+            Text("将删除 \(dangling) 条指向不存在商品的销售记录，删除后无法恢复。"
+                 + "整包重新导入会把它们带回来，需要再清一次。")
+        }
+    }
+
+    private func repairDangling() {
+        guard let workspace = holder.workspace else {
+            repairFailed = true
+            repairMessage = "还没有可修复的工作区：请先打开主窗口（草稿库在主窗口里建）。"
+            return
+        }
+        let removed = workspace.removeDanglingSaleEvents()
+        if removed > 0 {
+            repairFailed = false
+            repairMessage = workspace.statusText ?? "已清理 \(removed) 条。"
+        } else if let error = workspace.lastError {
+            repairFailed = true
+            repairMessage = error
+        } else {
+            // 0 条且无错误 = 确认期间数量变了，不算失败
+            repairFailed = false
+            repairMessage = workspace.statusText ?? "没有可清理的悬空销售记录。"
+        }
     }
 
     // MARK: 从 iOS 恢复

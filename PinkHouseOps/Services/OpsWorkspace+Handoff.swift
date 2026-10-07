@@ -95,8 +95,9 @@ extension OpsWorkspace {
         defer { if accessed { url.stopAccessingSecurityScopedResource() } }
 
         guard let layout = OpsHandoffLayout.resolve(url) else {
-            lastError = "没找到 shop-catalog.json：请选择 iOS 整包解开后的目录"
+            lastError = "没找到 shop-catalog.json：请选 iOS 整包解开后的目录"
                 + "（里面有 shop-catalog.json 和 images/），或直接选那个 JSON。"
+                + "若解压后外面还套了一层目录，选最里面那层（只套一层时这里会自动下钻）。"
             return nil
         }
 
@@ -187,8 +188,14 @@ enum OpsHandoffLayout {
             let inRoot = catalogURL.deletingLastPathComponent().appendingPathComponent(name)
             return OpsHandoffLayout.readable(inRoot, fileManager)
         case .singleFile(let catalogURL):
-            let sibling = catalogURL.deletingLastPathComponent().appendingPathComponent(name)
-            return OpsHandoffLayout.readable(sibling, fileManager)
+            let root = catalogURL.deletingLastPathComponent()
+            let sibling = root.appendingPathComponent(name)
+            if let url = OpsHandoffLayout.readable(sibling, fileManager) { return url }
+            // iOS tar 解开后图在 `images/` 子目录里 —— 选 JSON 本体（「仅 JSON」入口）
+            // 也要认这一层，否则同一个包、换个入口图就全「找不到了」。
+            return OpsHandoffLayout.readable(
+                root.appendingPathComponent("images", isDirectory: true)
+                    .appendingPathComponent(name), fileManager)
         }
     }
 
@@ -207,10 +214,27 @@ enum OpsHandoffLayout {
 
         if isDirectory.boolValue {
             let catalog = url.appendingPathComponent("shop-catalog.json")
-            guard readable(catalog, fileManager) != nil else { return nil }
-            return .directory(
-                catalogURL: catalog,
-                imagesDirectory: url.appendingPathComponent("images", isDirectory: true))
+            if readable(catalog, fileManager) != nil {
+                return .directory(
+                    catalogURL: catalog,
+                    imagesDirectory: url.appendingPathComponent("images", isDirectory: true))
+            }
+            // 双击解 tar 常见「套娃」：选到的是外层目录，整包其实在它唯一的子目录里。
+            // 只有一个候选子目录且里面真有 shop-catalog.json 时自动下钻一层 ——
+            // 省掉一次「选错层」的失败重试；有多个子目录时不猜（猜错就是把别的目录当包导入）。
+            let children = (try? fileManager.contentsOfDirectory(
+                at: url, includingPropertiesForKeys: [.isDirectoryKey])) ?? []
+            let childDirectories = children.filter {
+                (try? $0.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory == true
+            }
+            if childDirectories.count == 1,
+               let inner = childDirectories.first,
+               readable(inner.appendingPathComponent("shop-catalog.json"), fileManager) != nil {
+                return .directory(
+                    catalogURL: inner.appendingPathComponent("shop-catalog.json"),
+                    imagesDirectory: inner.appendingPathComponent("images", isDirectory: true))
+            }
+            return nil
         }
         guard url.pathExtension.lowercased() == "json",
               readable(url, fileManager) != nil else { return nil }

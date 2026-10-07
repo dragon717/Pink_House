@@ -85,7 +85,20 @@ extension OpsWorkspace {
         }
         if let decoded = try? ShopCatalogJSONCoding.decoder()
             .decode(OpsSeriesEntryDraft.self, from: data) {
-            seriesEntry = decoded
+            // 「从 iOS 恢复」等整包导入会把目录整个换掉，持久化的店家/系列指针
+            // 可能已经指向不存在的东西 —— 指着空气的 selection 会让 Picker
+            // 每次刷新都报 "selection is invalid"，提交也会把内容挂到悬空 id 上。
+            // 向导是短期工作副本：店家没了就整体重开；店家在、系列没了就保留
+            // 店家清空系列级字段（与 `resetSeriesEntry` 同口径），不保留半截状态。
+            let shopExists = catalog.shops.contains(where: { $0.id == decoded.shopID })
+            let seriesExists = catalog.series.contains(where: { $0.id == decoded.seriesID })
+            if !shopExists {
+                seriesEntry = OpsSeriesEntryDraft()
+            } else if !seriesExists {
+                seriesEntry = OpsSeriesEntryDraft(shopID: decoded.shopID)
+            } else {
+                seriesEntry = decoded
+            }
         } else {
             // 解不开就重新开始：向导是短期工作副本，不值得为它做隔离态；
             // 但旧字节留在记录里不覆盖（与 R03 同一个「不毁证据」原则）

@@ -872,11 +872,50 @@ final class OpsWorkspace: ObservableObject {
             if !saved { parts.append("但草稿落盘失败") }
             statusMessage = parts.joined(separator: "，")
             if saved { lastError = nil }
+            // 目录已被整体替换：向导里持久化的店家/系列指针很可能已悬空，
+            // 必须按新目录重新校验装载（否则 Picker 每帧刷 "selection is invalid"，
+            // S5 提交还会把内容挂到旧 id 上）。失败路径不动向导（内容没换）。
+            loadSeriesEntryState()
             return saved
         } catch {
             lastError = "导入失败（目录 JSON 解不开，已保留当前草稿）：\(error.localizedDescription)"
             return false
         }
+    }
+
+    // MARK: 数据修复：悬空引用
+    //
+    // 「发布前校验未通过（N 条）」里有一类是**悬空引用**：销售记录指向的商品
+    // 在目录里已经不存在（`removedProductIDs` 里也没有，即不是墓碑，是纯悬空）。
+    // 门禁 `ShopCatalogCloudSyncValidator.structuralIssues` 会逐条算作阻断项，
+    // 这类记录客户端本来就显示不出来（没有商品可挂），删掉是唯一出路。
+    // ⚠️ 门禁本身是**跨端口径**（iOS / Python 共用），绝不能为了放行去放宽它。
+
+    /// 悬空销售记录条数（界面先给数量，再让人决定要不要清）
+    var danglingSaleEventCount: Int {
+        let productIDs = Set(catalog.products.map(\.id))
+        return catalog.saleEvents.filter { !productIDs.contains($0.productID) }.count
+    }
+
+    /// 删掉所有指向不存在商品的销售记录。
+    /// - Returns: 清理条数；0 = 没有可清理的（或处于只读隔离态）。
+    @discardableResult
+    func removeDanglingSaleEvents() -> Int {
+        guard canMutate() else { return 0 }
+        let productIDs = Set(catalog.products.map(\.id))
+        let before = catalog.saleEvents.count
+        catalog.saleEvents.removeAll { !productIDs.contains($0.productID) }
+        let removed = before - catalog.saleEvents.count
+        guard removed > 0 else {
+            statusMessage = "没有悬空销售记录，无需清理。"
+            return 0
+        }
+        markDirty()
+        let saved = saveDraft()
+        statusMessage = "已清理 \(removed) 条悬空销售记录（指向不存在的商品），"
+            + (saved ? "草稿已保存。" : "但草稿落盘失败，请点「保存修改」重试。")
+        if saved { lastError = nil }
+        return removed
     }
 
     // MARK: 导入图片

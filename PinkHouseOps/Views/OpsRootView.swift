@@ -182,7 +182,9 @@ struct OpsMainView: View {
                     success: false,
                     title: "云端更新失败",
                     detail: reason,
-                    logPath: cloudSync.lastRunLogURL?.path)
+                    logPath: cloudSync.lastRunLogURL?.path,
+                    // 校验失败里若含悬空销售记录，直接给一键修复入口
+                    canRepairDangling: workspace.danglingSaleEventCount > 0)
             }
             scheduleToastDismiss()
         }
@@ -257,6 +259,16 @@ struct DraftSummaryFooter: View {
             .buttonStyle(.borderedProminent)
             .controlSize(.regular)
             .disabled(workspace.draft == nil || workspace.isCorrupted)
+            // 环境 / 凭证 / 从 iOS 恢复 / 数据修复都在设置里（Cmd+,）—— 侧栏常驻一个入口。
+            // ⚠️ 必须用 `SettingsLink`：`NSApp.sendAction(showSettingsWindow:)` 在新版
+            // SwiftUI 里不被响应（控制台刷 "Please use SettingsLink"，窗口打不开）。
+            SettingsLink {
+                Label("设置", systemImage: "gearshape")
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+            .help("打开设置（环境、凭证、日志、从 iOS 恢复、数据修复）")
         }
         .padding(12)
         .background(.bar)
@@ -404,6 +416,9 @@ struct OpsCloudUpdateToast: Equatable {
     var detail: String?
     /// 本次运行的日志文件路径（失败时这是排查入口，直接链过去）
     var logPath: String?
+    /// 失败原因里有「悬空引用」可清时显示「数据修复」快捷入口
+    /// （一键打开设置并自动弹清理确认框）。
+    var canRepairDangling: Bool = false
 }
 
 /// 顶部悬浮的结果框：**一条**，新的更新会整体替换。
@@ -434,6 +449,18 @@ struct OpsUpdateToastView: View {
                                 [URL(fileURLWithPath: logPath)])
                         }
                         .controlSize(.small)
+                    }
+                    // 一键数据修复：`SettingsLink` 开设置窗口，同时置一次性指令，
+                    // 设置场景收到后自动弹清理的二级确认框（两级都要用户亲手点）。
+                    if toast.canRepairDangling {
+                        SettingsLink {
+                            Label("数据修复", systemImage: "wrench.and.screwdriver")
+                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
+                        .simultaneousGesture(TapGesture().onEnded {
+                            OpsSettingsFocus.shared.repairPromptRequested = true
+                        })
                     }
                 }
                 .padding(.top, 2)
