@@ -38,6 +38,13 @@ struct OpsSettingsView: View {
     @State private var repairFailed = false
     /// 缺图文件数（打开设置时算一次 —— 每次渲染都遍历全量引用太重）
     @State private var missingCount = 0
+    /// 与远端对齐：拉回后的**对账预览**（不写任何东西，先给人看）
+    @State private var preview: ShopCatalogReconcileOutcome?
+    /// 对齐的结果文案（合并是破坏性的，结果必须出声）
+    @State private var alignMessage: String?
+    @State private var alignFailed = false
+    /// 合并的**二级确认**框
+    @State private var showsAlignConfirm = false
     /// 清理悬空销售记录的**二级确认**框（弹窗快捷入口与设置按钮共用）
     @State private var showsRepairConfirm = false
 
@@ -121,6 +128,41 @@ struct OpsSettingsView: View {
                     .foregroundStyle(.secondary)
             }
 
+            Section("与远端对齐（双向同步第一步）") {
+                // 2026-10-07 用户需求：远端有本地没有的 → 拉下来；本地有远端没有的 → 传上去；
+                // 本地删掉的 → 远端标记删除。这一节负责第一步「拉回 + 合并到本地」。
+                // ⚠️ 合并是**破坏性**的：线上会覆盖同 id 的条目，并且本地多出的条目会被移除。
+                // 所以必须先出对账预览（`reconcilePreview`），运营看过才允许确认。
+                HStack(spacing: 10) {
+                    Button("拉回线上目录") { Task { await pullOnline() } }
+                        .disabled(model.isRunning || holder.workspace == nil)
+                    if let pulled = model.pulledCatalog {
+                        Text(pulled.summaryText)
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(2)
+                    } else {
+                        Text("只读：不写线上任何东西。")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                if let preview {
+                    opsMarkdown(preview.summaryText)
+                        .font(.caption)
+                        .textSelection(.enabled)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Button("按上面的结果合并到本地…") { showsAlignConfirm = true }
+                        .disabled(holder.workspace == nil)
+                }
+                if let alignMessage {
+                    opsMarkdown(alignMessage)
+                        .font(.caption)
+                        .foregroundStyle(alignFailed ? .red : .secondary)
+                        .textSelection(.enabled)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
             Section("从 iOS 恢复（导入整包）") {
                 // 「误操作覆盖了 Mac 上的内容」就用这两个入口恢复。
                 // 图片**按原文件名**进 staging（引用名是交接方给的名字，
@@ -218,15 +260,69 @@ struct OpsSettingsView: View {
             }
         }
         .confirmationDialog(
-            "清理悬空销售记录", isPresented: $showsRepairConfirm, titleVisibility: .visible
+            "合并线上目录到本地", isPresented: $showsAlignConfirm, titleVisibility: .visible
         ) {
-            Button("清理 \(dangling) 条（不可撤销）", role: .destructive) {
-                repairDangling()
+            Button("确认合并（线上覆盖同 id，本地多出的移除）", role: .destructive) {
+                applyAlignment()
             }
             Button("取消", role: .cancel) {}
         } message: {
-            Text("将删除 \(dangling) 条指向不存在商品的销售记录，删除后无法恢复。"
-                 + "整包重新导入会把它们带回来，需要再清一次。")
+            Text("本地草稿会被线上那一版改写：线上有的会加进来、同 id 的以线上为准、"
+                 + "本地多出的会被移除（销售史与本地墓碑保留）。当前草稿请先保存。")
+        }
+    }
+
+    // MARK: 与远端对齐（拉回 → 预览 → 确认）
+
+    /// 拉回线上目录并立刻出**对账预览**（不写任何东西）。
+    private func pullOnline() async {
+        guard let workspace = holder.workspace else {
+            alignFailed = true
+            alignMessage = "还没有可对齐的工作区：请先打开主窗口（草稿库在主窗口里建）。"
+            return
+        }
+        alignMessage = nil
+        preview = nil
+        guard let pulled = await model.pullCatalog() else {
+            alignFailed = true
+            alignMessage = model.lastError ?? "拉回失败（受控发布器没有返回目录）。"
+            return
+        }
+        let url = URL(fileURLWithPath: pulled.path)
+        guard let outcome = workspace.reconcilePreview(from: url) else {
+            alignFailed = true
+            alignMessage = workspace.lastError ?? "对账预览失败（读不出线上那份目录）。"
+            return
+        }
+        preview = outcome
+        alignFailed = false
+        alignMessage = "已拉回线上目录（\(pulled.summaryText)）。下面是合并会发生的改动 —— 确认后才会写入。"
+    }
+
+    /// 真正执行合并（二级确认之后）。基线记为线上那一版，
+    /// 否则下一次差分会把整份目录都算成「本次改动」，严格策略作用域被放大。
+    private func applyAlignment() {
+        guard let workspace = holder.workspace,
+              let pulled = model.pulledCatalog,
+              let head = model.onlineHead else {
+            alignFailed = true
+            alignMessage = "缺少可对齐的输入（线上目录或发布头）。请先「拉回线上目录」。"
+            return
+        }
+        let baseline = ShopCatalogBaseline(
+            releaseSeq: head.releaseSeq,
+            rootIndexHash: head.rootIndexHash,
+            environment: head.environment,
+            observedAt: head.observedAt)
+        let url = URL(fileURLWithPath: pulled.path)
+        if let outcome = workspace.alignCatalogToPulledContent(from: url, baseline: baseline) {
+            alignFailed = false
+            alignMessage = (workspace.statusText ?? "已按线上那一版合并：\(outcome.summaryText)")
+                + " 之后「云端更新」会把本地多出的内容传上去。"
+            preview = nil
+        } else {
+            alignFailed = true
+            alignMessage = workspace.lastError ?? "合并失败（未说明原因）。"
         }
     }
 

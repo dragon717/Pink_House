@@ -102,6 +102,8 @@ final class OpsCloudSyncModel: ObservableObject {
     @Published private(set) var lastError: String?
     @Published private(set) var lastReceiptSeq: Int?
     @Published private(set) var lastReceiptConfirmed: Bool = false
+    /// 最近一次拉回的线上目录（**只读**产物：落盘路径 + 条数摘要）
+    @Published private(set) var pulledCatalog: OpsPulledCatalog?
     /// 最近一次落盘的运行日志（`bridge/logs/latest.log`）。
     ///
     /// ## 为什么日志必须落盘（2026-09-29）
@@ -348,6 +350,52 @@ final class OpsCloudSyncModel: ObservableObject {
             self.outcomeMessage = result.outcomeMessage ?? result.lastDisplayLine
             self.outcomeRetryable = result.outcomeRetryable
         }
+    }
+
+    // MARK: 拉回线上目录（只读）
+
+    /// 把线上那一版目录**拉回本机**（`--mode pull-catalog`，全程 `apply=False`，不写线上）。
+    ///
+    /// 2026-10-07 用户需求：同步要能双向 —— 远端有本地没有的拉下来、
+    /// 本地有远端没有的传上去、本地删掉的在远端标记删除。这是第一步（拉回）。
+    /// ⚠️ 拉回**不等于**合并：合并要过 `reconcilePreview` 给运营看过再确认
+    /// （`alignCatalogToPulledContent` 会按线上覆盖同 id 条目并移除本地多出的）。
+    @discardableResult
+    func pullCatalog() async -> OpsPulledCatalog? {
+        guard await ensureReady(.pullCatalog) else { return nil }
+        let directory = jobDirectory("pull-\(Int(Date().timeIntervalSince1970))")
+        do {
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        } catch {
+            lastError = "创建工作目录失败：\(error.localizedDescription)"
+            return nil
+        }
+        let request = makeRequest(
+            requestID: "pull-\(UUID().uuidString)",
+            jobID: "pull",
+            releaseSeq: max(1, (onlineHead?.releaseSeq ?? 0)),
+            archivePath: directory.appendingPathComponent("none.tar").path,
+            input: directory.appendingPathComponent("input"),
+            output: directory,
+            receipt: directory.appendingPathComponent("receipt.json"),
+            payloadHash: "pull-catalog")
+        guard let requestURL = write(request, to: directory) else { return nil }
+
+        var pulled: OpsPulledCatalog?
+        await perform(mode: .pullCatalog, requestPath: requestURL) { [weak self] result in
+            guard let self else { return }
+            pulled = OpsPulledCatalog.from(result: result, environment: self.targetEnvironment.rawValue)
+            if pulled == nil {
+                // 「拉不到」两种可能：线上确实没目录（正常），或事件字段对不上（缺陷）。
+                // 不区分就等于把缺陷说成正常 —— 两种都写进提示里。
+                self.lastError = "没拿到线上目录（exitCode=\(result.exitCode)）："
+                    + (result.outcomeMessage ?? "没有 catalog 事件")
+                    + "。若该环境线上确实没有商店目录，这是正常结果；"
+                    + "否则要查 `pulledCatalogPath` 的字段口径。"
+            }
+        }
+        pulledCatalog = pulled
+        return pulled
     }
 
     // MARK: 一键发布（云端更新 / 系列发布共用）
