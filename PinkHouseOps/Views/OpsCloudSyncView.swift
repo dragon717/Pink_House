@@ -2,7 +2,10 @@
 //  OpsCloudSyncView.swift
 //  PinkHouseOps
 //
-//  「云端同步」面板：让 Mac 端**真的能从云端下载、也能上传到云端**。
+//  云端发布的**编排层**（`OpsCloudSyncModel`，单例）。
+//  名字里还留着 View 是历史原因：2026-10-07 起「云端同步」面板已整块删除 ——
+//  发布是**一键**的（工具栏「云端更新」/ 向导 S5「发布整个系列」），
+//  环境与凭证在 设置（Cmd+,，`OpsSettingsView`）里配置。
 //
 //  ## 它补的是什么洞（2026-09-28 实测的根因）
 //
@@ -12,11 +15,7 @@
 //      但导出待发布包的入口随 09-27 的分区清理一起消失了（服务层还在）；
 //    · 受控发布器（`OpsPublisherBridge` + `ops_publish_bridge.py`）已经写好，
 //      却没有任何界面调它 —— 于是 CloudKit 发布头自 09-25 起纹丝未动；
-//    · 「读取线上基线 / 从线上拉回基线」两条只读模式同样只在 CLI 里存在，
-//      App 里看不到线上有什么，也就永远看不到 iOS 端上传的内容。
-//
-//  本文件只做一件事：把**已有的服务层与受控发布器接上界面**，
-//  不重写发布算法、不碰凭证内容、不新增第二条发布格式。
+//    · 「读取线上基线」这条只读模式同样只在 CLI 里存在，App 里看不到线上有什么。
 //
 //  ## 硬约束（与既有一致）
 //
@@ -24,15 +23,15 @@
 //    · 界面不能拼命令行：只有 `--mode` 与 `--request` 两个业务参数，
 //      业务内容写进**请求文件**（`ShopCatalogPublishRequest`）；
 //    · 上架状态只认回执里的**回读确认**，绝不显示虚假的「已上架」；
-//    · 失败必须可见：桥接器的每一条事件都落到日志区，结论按退出码给出。
+//    · 失败必须可见：每次运行的完整输出落到 `bridge/logs/<runID>.log`，
+//      失败提示（悬浮框 / 草稿箱）直接给日志文件路径。
 //
-//  ## 沙盒三关（缺一不可，界面上要分别说清楚）
+//  ## 沙盒三关（缺一不可；自检结果现在显示在 设置 里）
 //
 //    ① 仓库目录要用户授权（发布脚本在仓库里）；
 //    ② 解释器要能用（`cryptography` 只在仓库内 `.venv` 里）；
 //    ③ 凭证：子进程继承 App 沙盒，**读不到登录钥匙串**，
 //       所以必须有一份凭证 JSON 放在 App 容器内，由环境变量交给子进程。
-//    这三关的自检结果就是下面「桥接器自检」那张卡片，不合并、不笼统说「环境有问题」。
 //
 
 import AppKit
@@ -48,6 +47,18 @@ import PinkHouseOpsCore
 import SharedCatalog
 
 // MARK: - 编排层
+
+/// 一次「受控发布」调用的判定结果。
+///
+/// 只有两种结局：**回读确认过**（`.confirmed(releaseSeq:)`）与「其余一切」（`.failed(reason)`）。
+/// 「结果待确认」也落在 `.failed` 里 —— 按项目口径它绝不能被说成成功，
+/// 原因文案里会带上桥接器的结论名（如「结果待确认」），调用方原样透传。
+enum OpsPublishInvocationResult: Equatable {
+    /// `dryRun == false` 且回执 `readBackConfirmed == true`：云端与公共库都确认了。
+    case confirmed(releaseSeq: Int)
+    /// 没能确认成功。`reason` 带可定位来源（自检项 / 导出错误 / 桥接器结论与退出码）。
+    case failed(String)
+}
 
 /// 云端同步的编排与状态。
 ///
@@ -74,31 +85,12 @@ final class OpsCloudSyncModel: ObservableObject {
         }
     }
 
-    @Published var dryRun: Bool = true
-    /// 运营是否显式确认「我知道线上变了，仍按本基线发布」（R07 的唯一出口）。
-    @Published var baselineAcknowledged: Bool = false
-
     // MARK: 运行态
 
     @Published private(set) var isRunning = false
     @Published private(set) var runningMode: OpsBridgeMode?
     @Published private(set) var logLines: [String] = []
     @Published private(set) var onlineHead: ShopCatalogOnlineHead?
-    @Published private(set) var pulled: OpsPulledCatalog?
-    /// 上一次「拉回目录」**失败**的原因（成功时为 nil）。
-    ///
-    /// 为什么要单独存一份：下载卡片原先写成 `if let pulled` —— 拉回失败时那张卡片
-    /// **一个字都不显示**，运营点完按钮像没反应一样，唯一的线索浮在上传卡片的结果区里。
-    /// 「点了没反应」和「报错了」必须区分开，否则现场只会得到一句「还是没拉下来」。
-    @Published private(set) var pullFailure: String?
-    /// 这次拉回失败是不是**原样重试即可**（桥接器的 `retryable`）。
-    @Published private(set) var pullFailureRetryable = false
-    /// 「以线上那一版对齐当前草稿」这次会改动什么（新增 / 覆盖 / 移除）。
-    ///
-    /// **必须由运营先点「看看会改动什么」才算出来**（`previewReconcile`），
-    /// 对齐按钮在它是 nil 时保持禁用 —— 这个动作会移除本地内容，
-    /// 不许出现「点完才知道自己少了什么」。切环境 / 重新拉回都会清掉它。
-    @Published private(set) var reconcileOutcome: ShopCatalogReconcileOutcome?
     @Published private(set) var outcome: ShopCatalogPublishOutcome?
     @Published private(set) var outcomeMessage: String?
     /// 这次失败**原样重试是安全的**吗（桥接器的 `retryable`）。
@@ -118,10 +110,20 @@ final class OpsCloudSyncModel: ObservableObject {
     /// 或重启 App 就没了，而且那段红色报错在旧写法里连选中都做不到。
     /// 结果就是「出了问题但拿不出日志」—— 现场只能截图，读的人只能靠放大截图认字
     /// （我自己就这么干过）。日志是排查的**唯一凭据**，它不该是一次性的 UI 状态。
+    ///
+    /// ## 落盘发生在模型里，不在视图里（2026-10-07 修正）
+    ///
+    /// 早先的口径写着「日志落盘只在视图层（`OpsCloudSyncView.persistLog`）」，
+    /// 那是**错的**：`persistLog` 由 `perform` 调用，两者都在本模型内 ——
+    /// 谁发起桥接调用都会落盘（向导 S5、探针、面板都一样）。
+    /// 实测证据：容器内 `bridge/logs/` 里既有面板的日志，也有 S5 触发的
+    /// `20261007-162258-publish.log`。别再按旧口径去「补视图层调用」。
     @Published private(set) var logFileURL: URL?
-
-    /// 面板是否展开（由工具栏或 S5 触发）
-    @Published var showsSheet = false
+    /// 本次运行**专属**的日志文件（`bridge/logs/<runID>.log`）。
+    ///
+    /// `logFileURL` 是会被下一次覆盖的 `latest.log`；排查要给的是**这一次的**文件，
+    /// 否则「把日志交给 Agent 修」时拿到的可能是另一次运行。失败提示里显示的是它。
+    @Published private(set) var lastRunLogURL: URL?
 
     private static let logLimit = 60
 
@@ -231,22 +233,14 @@ final class OpsCloudSyncModel: ObservableObject {
         from previous: ShopCatalogPublishTargetEnvironment
     ) {
         onlineHead = nil
-        pulled = nil
-        pullFailure = nil
-        pullFailureRetryable = false
-        // 对账预览也是**按环境**成立的（它比的是「本地草稿 vs 那个环境的线上那一版」）：
-        // 留到另一个环境上，界面就会显示一份不属于当前环境的差异清单。
-        reconcileOutcome = nil
         outcome = nil
         outcomeMessage = nil
         outcomeRetryable = false
         lastError = nil
         lastReceiptSeq = nil
         lastReceiptConfirmed = false
-        // 「已知线上已变」是针对**那一版**的确认，换环境后它没有任何依据。
-        baselineAcknowledged = false
         append("⇄ 环境 \(previous.displayName) → \(targetEnvironment.displayName)："
-            + "已清空上一个环境的线上发布号 / 拉回内容 / 发布结论"
+            + "已清空上一个环境的线上发布号 / 发布结论"
             + "（它们只对原环境成立，请重新读取当前环境的线上基线）。")
     }
 
@@ -327,42 +321,6 @@ final class OpsCloudSyncModel: ObservableObject {
         }
     }
 
-    // MARK: 从 iOS 交接（不走云端的那条路）
-
-    /// 导入 iOS「导出整包（含图片）」的产物。
-    ///
-    /// 这是**云端之外的第二条路**，而且是当前唯一能走通的一条：
-    /// 线上发布头自 09-25 起停在 seq 1，iOS 的发布并没有切换它，
-    /// 所以「从云端拉回」拿不到 iOS 上新内容 —— 只能靠整包交接。
-    /// 图片会**按原文件名**进 staging，目录里的 `local:` 引用才不会悬空。
-    func importHandoff(workspace: OpsWorkspace) {
-        let panel = NSOpenPanel()
-        panel.canChooseFiles = true
-        panel.canChooseDirectories = true
-        panel.allowsMultipleSelection = false
-        panel.prompt = "选择整包"
-        panel.message = "请选择 iOS「导出整包（含图片）」解出来的目录"
-            + "（里面有 shop-catalog.json 与 images/），或直接选那个 shop-catalog.json。"
-        guard panel.runModal() == .OK, let url = panel.url else { return }
-
-        lastError = nil
-        append("⇢ 导入整包：\(url.lastPathComponent)")
-        if let report = workspace.importHandoffPackage(from: url) {
-            append("✓ \(report.summary)")
-            if let missing = report.missingText {
-                append("⚠️ \(missing)")
-                lastError = missing
-            }
-        } else {
-            let reason = workspace.lastError ?? "导入失败（未说明原因）"
-            append("✖ \(reason)")
-            lastError = reason
-        }
-    }
-
-    // MARK: 只读：线上基线
-
-    /// 读线上发布头。**不写任何东西**（桥接器侧 `apply=False`）。
     func readOnlineBaseline() async {
         guard await ensureReady(.baseline) else { return }
         let directory = jobDirectory("baseline-\(Int(Date().timeIntervalSince1970))")
@@ -392,140 +350,62 @@ final class OpsCloudSyncModel: ObservableObject {
         }
     }
 
-    /// 把读到的线上版本采用为这份草稿的基线（R07：运营的显式动作，不是自动回填）。
-    func adoptBaseline(_ workspace: OpsWorkspace) {
+    // MARK: 一键发布（云端更新 / 系列发布共用）
+
+    /// 运营点一次「发布整个系列」走的路：**内部自动完成整套流程**，对运营无感。
+    ///
+    /// 内部三步（都不需要运营再点任何东西）：
+    ///   1. 取一次线上发布头（**只读元数据**，几 KB）—— 发布号 = 线上号 + 1，
+    ///      `previousReleaseSeq` 也必须传线上那一版，发布器自己也要它
+    ///      （`ops_publish_bridge.py:955` / `:1052`）；
+    ///   2. **自动**把线上那一版采用为草稿基线 —— 否则 R07 在服务端比对必定拒绝
+    ///      （2026-10-07 实测：草稿基线 2 / 线上 4 → 退出码 5）；
+    ///   3. 真实发布（`dryRun=false`），一次请求写整个系列。
+    ///
+    /// ⚠️ **不拉回整份目录重建本地内容**（需求：移除「读线上 → 拉取 → 再发布」环节）。
+    /// 代价必须写清楚：这样发出去的是**本地整包取代线上那一版**，
+    /// 线上后来被别人加的内容会被覆盖。这是运营选定的「无感」口径，
+    /// 所以每一步都写进运行日志留痕，出事能回溯（日志路径在失败提示里给出）。
+    func publishNow(workspace: OpsWorkspace) async -> OpsPublishInvocationResult {
+        await readOnlineBaseline()
         guard let head = onlineHead else {
-            lastError = "还没有读到线上基线：请先点「读取线上基线」。"
-            return
+            return .failed("读不到线上发布头（发布号必须严格大于线上）—— "
+                           + (lastError ?? outcomeMessage ?? "受控发布器没有返回发布头"))
         }
+        guard head.environment == targetEnvironment.rawValue else {
+            return .failed("线上基线属于 \(head.environment)，与当前目标环境 "
+                           + "\(targetEnvironment.rawValue) 不一致（不能拿一个环境的号发另一个环境）")
+        }
+        // 自动采用基线：**留痕**在日志里，不能静默 —— 这一步等于声明
+        // 「本次内容取代线上 releaseSeq \(head.releaseSeq)」。
         workspace.adoptBaseline(head)
+        append("已自动采用线上 releaseSeq \(head.releaseSeq) 为本次发布基线"
+               + "（未拉回线上内容：本次是本地整包取代线上这一版）")
+        return await publish(workspace: workspace)
     }
-
-    // MARK: 只读：从线上拉回整份目录
-
-    func pullCatalog() async {
-        guard await ensureReady(.pullCatalog) else { return }
-        pullFailure = nil
-        pullFailureRetryable = false
-        // 上一次那份对账预览跟着作废：它算的是「本地草稿 vs **上一次拉回的那一版**」，
-        // 留着会让人以为已经看过这一次的差异。
-        reconcileOutcome = nil
-        let directory = jobDirectory("pull-\(Int(Date().timeIntervalSince1970))")
-        do {
-            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        } catch {
-            lastError = "创建工作目录失败：\(error.localizedDescription)"
-            return
-        }
-        let request = makeRequest(
-            requestID: "pull-\(UUID().uuidString)",
-            jobID: "pull",
-            releaseSeq: max(1, (onlineHead?.releaseSeq ?? 0)),
-            archivePath: directory.appendingPathComponent("none.tar").path,
-            input: directory.appendingPathComponent("input"),
-            output: directory,
-            receipt: directory.appendingPathComponent("receipt.json"),
-            payloadHash: "pull")
-        guard let requestURL = write(request, to: directory) else { return }
-
-        await perform(mode: .pullCatalog, requestPath: requestURL) { [weak self] result in
-            guard let self else { return }
-            self.onlineHead = result.onlineHead ?? self.onlineHead
-            self.outcome = result.outcome
-            self.outcomeMessage = result.outcomeMessage ?? result.lastDisplayLine
-            self.outcomeRetryable = result.outcomeRetryable
-            self.pulled = OpsPulledCatalog.from(
-                result: result, environment: self.targetEnvironment.rawValue)
-            // 失败时**必须**在下载卡片里留下一句话，否则「点了没反应」会被读成
-            // 「功能不存在」，而不是「这次请求失败了」。
-            self.pullFailure = self.pulled == nil
-                ? (result.outcomeMessage ?? result.lastDisplayLine)
-                : nil
-            self.pullFailureRetryable = self.pulled == nil && result.outcomeRetryable
-        }
-        // `perform` 里「超时 / 取消」走的是 catch（不是回调），那条路没有 outcome
-        // 事件可读 —— 这里兜一下，保证下载卡片**任何**失败都有话说。
-        if pulled == nil, pullFailure == nil {
-            pullFailure = lastError ?? "这次拉回没有拿到任何结果，请重试。"
-        }
-    }
-
-    /// 采用之前必须让运营读到的那些话 + 拦住不该做的。**只读**。
-    func adoptionBlockers(_ pulled: OpsPulledCatalog, workspace: OpsWorkspace) -> [String] {
-        OpsPulledCatalogAdoption.blockers(
-            pulled: pulled,
-            isDraftCorrupted: workspace.isCorrupted,
-            isCatalogFileReadable: OpsBridgeSettings.isReadableFile(URL(fileURLWithPath: pulled.path)))
-    }
-
-    func adoptionCaveats(_ pulled: OpsPulledCatalog, workspace: OpsWorkspace) -> [String] {
-        OpsPulledCatalogAdoption.caveats(pulled: pulled, currentItemCounts: nil)
-    }
-
-    /// 只读：算出「以线上那一版为准对齐」会做哪些改动（**不写任何东西**）。
-    ///
-    /// 这一步是**对齐按钮的前置条件** —— 对齐会移除本地多出来的条目，
-    /// 而「移除」是这个动作里唯一不可撤销的部分，必须先给运营看过。
-    @discardableResult
-    func previewReconcile(_ pulled: OpsPulledCatalog, workspace: OpsWorkspace) -> Bool {
-        let blockers = adoptionBlockers(pulled, workspace: workspace)
-        guard blockers.isEmpty else {
-            lastError = blockers.joined(separator: " ")
-            reconcileOutcome = nil
-            return false
-        }
-        guard let outcome = workspace.reconcilePreview(
-            from: URL(fileURLWithPath: pulled.path)) else {
-            // `reconcilePreview` 失败时已经写好 lastError（目录 JSON 解不开那类）
-            reconcileOutcome = nil
-            return false
-        }
-        reconcileOutcome = outcome
-        lastError = nil
-        return true
-    }
-
-    /// 以线上那一版为准对齐当前草稿（逐条：新增 / 覆盖 / 移除）。
-    ///
-    /// 预览没过就不许执行：少看一步的代价是「本地内容被删掉而运营不知道」。
-    /// 执行后把**实际执行**的那份报告显示出来（预览与执行之间草稿可能被改过，
-    /// 两者不一致时以实际为准）。
-    @discardableResult
-    func alignPulled(_ pulled: OpsPulledCatalog, workspace: OpsWorkspace) -> Bool {
-        let blockers = adoptionBlockers(pulled, workspace: workspace)
-        guard blockers.isEmpty else {
-            lastError = blockers.joined(separator: " ")
-            return false
-        }
-        guard reconcileOutcome != nil else {
-            lastError = "请先点「看看会改动什么」：这一步会把本地多出来的条目移除，"
-                + "先看一眼要改动什么再对齐。"
-            return false
-        }
-        let baseline = OpsPulledCatalogAdoption.baseline(afterAdopting: pulled)
-        guard let executed = workspace.alignCatalogToPulledContent(
-            from: URL(fileURLWithPath: pulled.path), baseline: baseline) else { return false }
-        reconcileOutcome = executed
-        return true
-    }
-
-    // MARK: 写：构建待发布包并发布
 
     /// 导出待发布整包 → 写冻结请求 → 交受控发布器。
     ///
     /// 顺序不能改：**先**由 App 复校验并导出（缺图会在这里硬失败，不会带上残缺产物），
     /// **再**写请求文件（请求文件就是唯一的「提交」动作）。
-    func publish(workspace: OpsWorkspace) async {
-        guard await ensureReady(.publish) else { return }
+    ///
+    /// ⚠️ 面板与「演练」开关已于 2026-10-07 随面板一起删除：本方法**恒为真实发布**。
+    /// - Returns: 回执回读确认过才返回 `.confirmed(releaseSeq:)`；
+    ///   其余一切（自检不过 / 导出失败 / 桥接器拒绝 / 结果待确认）都是 `.failed(原因)`。
+    @discardableResult
+    func publish(workspace: OpsWorkspace) async -> OpsPublishInvocationResult {
+        guard await ensureReady(.publish) else {
+            return .failed(lastError ?? "受控发布器还没准备好（自检未通过）。")
+        }
         guard workspace.isCorrupted == false else {
             failBeforeBridge("草稿处于只读隔离状态，不能发布。请先「另存为新草稿」。", mode: .publish)
-            return
+            return .failed(lastError ?? "草稿处于只读隔离状态。")
         }
         guard let head = onlineHead else {
             failBeforeBridge("还不知道线上当前版本：请先点「读取线上基线」，"
                 + "发布号必须严格大于线上（R07：不能拿一份不知道基于哪一版的整包去覆盖线上）。",
                 mode: .publish)
-            return
+            return .failed(lastError ?? "还不知道线上当前版本。")
         }
         // 发布号是**按环境**编号的：拿 Development 的号发 Production 会覆盖掉
         // 另一个环境的发布头，而这一步之前没有任何一层会拦。
@@ -534,7 +414,7 @@ final class OpsCloudSyncModel: ObservableObject {
                 + "与当前目标环境 \(targetEnvironment.rawValue) 不一致。"
                 + "请先重新读取当前环境的线上基线（切换环境会自动清空上一次的结果）。",
                 mode: .publish)
-            return
+            return .failed(lastError ?? "线上基线与目标环境不一致。")
         }
         let seq = head.releaseSeq + 1
 
@@ -543,7 +423,7 @@ final class OpsCloudSyncModel: ObservableObject {
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         } catch {
             failBeforeBridge("创建工作目录失败：\(error.localizedDescription)", mode: .publish)
-            return
+            return .failed(lastError ?? "创建工作目录失败。")
         }
 
         // ---- 1) 导出待发布整包（服务层自带复校验 + 缺图硬报错）
@@ -553,14 +433,14 @@ final class OpsCloudSyncModel: ObservableObject {
                 targetEnvironmentName: targetEnvironment.displayName)
         } catch {
             failBeforeBridge("生成待发布整包失败：\(error.localizedDescription)", mode: .publish)
-            return
+            return .failed(lastError ?? "生成待发布整包失败。")
         }
         let archiveURL = directory.appendingPathComponent("release.tar")
         do {
             try archive.write(to: archiveURL, options: .atomic)
         } catch {
             failBeforeBridge("待发布整包落盘失败：\(error.localizedDescription)", mode: .publish)
-            return
+            return .failed(lastError ?? "待发布整包落盘失败。")
         }
         let payloadHash = ShopCatalogSyncProtocol.sha256Hex(archive)
 
@@ -579,7 +459,6 @@ final class OpsCloudSyncModel: ObservableObject {
             draftRevision: revision,
             baseReleaseSeq: workspace.baseReleaseSeq,
             baseRootIndexHash: workspace.baseRootIndexHash,
-            baselineAcknowledged: baselineAcknowledged,
             targetEnvironment: targetEnvironment,
             releaseSeq: seq,
             inputDirectory: directory.appendingPathComponent("input").path,
@@ -587,9 +466,11 @@ final class OpsCloudSyncModel: ObservableObject {
             outputDirectory: directory.appendingPathComponent("output").path,
             receiptPath: directory.appendingPathComponent("receipt.json").path,
             filesystemRoot: nil,
-            dryRun: dryRun,
+            dryRun: false,
             payloadHash: payloadHash)
-        guard let requestURL = write(request, to: directory) else { return }
+        guard let requestURL = write(request, to: directory) else {
+            return .failed(lastError ?? "写请求文件失败。")
+        }
 
         // ---- 3) 交受控发布器
         await perform(mode: .publish, requestPath: requestURL) { [weak self] result in
@@ -602,7 +483,7 @@ final class OpsCloudSyncModel: ObservableObject {
             self.lastReceiptSeq = receipt?.releaseSeq ?? result.artifactReleaseSeq
             self.lastReceiptConfirmed = receipt?.readBackConfirmed ?? false
             // 只有「真的写了 + 回读确认过」才记一次已发布（R09：不承诺、不谎报）
-            if self.dryRun == false, let receipt, receipt.readBackConfirmed == true,
+            if let receipt, receipt.readBackConfirmed == true,
                let seq = receipt.releaseSeq {
                 _ = workspace.recordConfirmedPublish(
                     releaseSeq: seq,
@@ -611,6 +492,21 @@ final class OpsCloudSyncModel: ObservableObject {
                     revision: revision)
             }
         }
+
+        // ---- 判定：只有「真实发布 + 结论 confirmed + 回读确认」算成功
+        if outcome == .confirmed, lastReceiptConfirmed, let seq = lastReceiptSeq {
+            return .confirmed(releaseSeq: seq)
+        }
+        // 其余一律失败，原因 = 结论名 + 桥接器文案 + 内部错误（可定位的一条）。
+        // 超时 / 取消走 perform 的 catch（没有 outcome 事件），此时 lastError 一定有值。
+        var reasonParts: [String] = []
+        if let outcome { reasonParts.append(outcome.displayName) }
+        if let message = outcomeMessage { reasonParts.append(message) }
+        if let error = lastError, !reasonParts.contains(error) { reasonParts.append(error) }
+        let reason = reasonParts.isEmpty
+            ? "受控发布器没有返回结论（退出后无任何事件）。"
+            : reasonParts.joined(separator: "：")
+        return .failed(reason)
     }
 
     // MARK: 内部
@@ -763,12 +659,11 @@ final class OpsCloudSyncModel: ObservableObject {
             lines.append("回执发布号：\(seq)"
                 + (lastReceiptConfirmed ? "（已回读确认）" : "（未回读确认）"))
         }
-        if let failure = pullFailure {
-            lines.append("拉回失败：\(failure)"
-                + (pullFailureRetryable ? "（可原样重试）" : "（不可原样重试）"))
-        }
         if let message = outcomeMessage { lines.append("结论文案：\(message)") }
         if let error = lastError { lines.append("✖ 错误：\(error)") }
+        // 日志文件路径必须带在头部：排查的人（以及接手修的 Agent）第一件事
+        // 就是找到**这一次的**原始输出，而不是只看到一句结论文案。
+        if let url = lastRunLogURL { lines.append("日志文件：\(url.path)") }
         lines.append("--- 桥接器输出（最近一次运行，"
             + "\(runLog.isEmpty ? logLines.count : runLog.count) 行）---")
         lines.append(contentsOf: runLog.isEmpty ? logLines : runLog)
@@ -788,9 +683,16 @@ final class OpsCloudSyncModel: ObservableObject {
         guard let data = text.data(using: .utf8) else { return }
         let stamped = directory.appendingPathComponent("\(runID).log")
         try? data.write(to: stamped, options: .atomic)
+        // 先记本次专属文件：即使 `latest.log` 没写成，排查的人至少拿得到这一次的路径。
+        lastRunLogURL = stamped
         let latest = directory.appendingPathComponent("latest.log")
         guard (try? data.write(to: latest, options: .atomic)) != nil else { return }
         logFileURL = latest
+    }
+
+    /// 在访达里打开日志文件夹（`bridge/logs/`，设置页入口）。
+    func revealLogsFolder() {
+        NSWorkspace.shared.open(logsDirectory)
     }
 
     /// 在访达里选中最近一次的日志文件。
@@ -821,440 +723,4 @@ struct OpsEnvironmentCredentialState: Identifiable {
     let isConfigured: Bool
 
     var id: String { environment.rawValue }
-}
-
-// MARK: - 面板
-
-struct OpsCloudSyncSheet: View {
-    @ObservedObject var workspace: OpsWorkspace
-    @ObservedObject private var model = OpsCloudSyncModel.shared
-    /// 「复制日志」成功后的短提示。放在视图里而不是 model 里：
-    /// 它是一次交互反馈，不是跨入口共享的状态。
-    @State private var copyLogHint: String?
-
-    var body: some View {
-        VStack(spacing: 0) {
-            header
-            Divider()
-            ScrollView {
-                VStack(alignment: .leading, spacing: 14) {
-                    diagnosisCard
-                    onlineCard
-                    downloadCard
-                    handoffCard
-                    uploadCard
-                    logCard
-                }
-                .padding(16)
-                .frame(maxWidth: 820, alignment: .leading)
-            }
-        }
-        .frame(minWidth: 860, minHeight: 620)
-    }
-
-    private var header: some View {
-        HStack(spacing: 10) {
-            Image(systemName: "cloud.fill").font(.title3)
-            VStack(alignment: .leading, spacing: 2) {
-                Text("云端同步").font(.headline)
-                opsMarkdown("所有发布与回读都走**受控发布器**（仓库里的 Python CLI）；"
-                            + "本 App 不直连 CloudKit，私钥也不进 App。")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-            Spacer()
-            if model.isRunning {
-                ProgressView().controlSize(.small)
-                Text(model.runningMode?.displayName ?? "运行中")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-            Button("关闭") { model.showsSheet = false }
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
-    }
-
-    // MARK: 桥接器自检
-
-    private var diagnosisCard: some View {
-        let problems = model.diagnosis
-        return OpsCard(title: "桥接器自检（①仓库目录 ②解释器 ③凭证）", systemImage: "stethoscope") {
-            VStack(alignment: .leading, spacing: 8) {
-                if problems.isEmpty {
-                    Label("三关都通过，可以跑受控发布器。", systemImage: "checkmark.circle.fill")
-                        .foregroundStyle(.green)
-                        .font(.callout)
-                } else {
-                    ForEach(problems, id: \.self) { problem in
-                        HStack(alignment: .top, spacing: 6) {
-                            Image(systemName: "exclamationmark.triangle.fill")
-                                .foregroundStyle(.orange)
-                            opsMarkdown(problem)
-                                .font(.callout)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-                    }
-                }
-                Divider()
-                LabeledContent("仓库目录", value: model.settings.repoRootPath ?? "（未授权）")
-                LabeledContent("解释器", value: model.interpreterText)
-                LabeledContent("当前环境", value: model.targetEnvironment.displayName)
-                HStack(spacing: 10) {
-                    Button("选择仓库目录…") { model.chooseRepoRoot() }
-                    Button("选择凭证 JSON…") { model.importCredentialFile() }
-                    // 协议里只有 Development / Production 两个真实远端
-                    // （原 `localFixture`「本机演练」已于 2026-09-29 连同离线演练一起移除）。
-                    Picker("环境", selection: $model.targetEnvironment) {
-                        ForEach(ShopCatalogPublishTargetEnvironment.allCases) { environment in
-                            Text(environment.displayName).tag(environment)
-                        }
-                    }
-                    .labelsHidden()
-                    .frame(width: 150)
-                    // 跑到一半换环境会让「刚读到的线上基线」属于另一个环境
-                    .disabled(model.isRunning)
-                }
-                .controlSize(.small)
-                opsMarkdown(model.targetEnvironment.guidance)
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-
-                Divider()
-                Text("凭证（按环境分开，私钥不显示）")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                ForEach(model.credentialStates) { state in
-                    HStack(spacing: 6) {
-                        Image(systemName: state.isConfigured ? "checkmark.circle.fill" : "xmark.circle")
-                            .foregroundStyle(state.isConfigured ? Color.green : Color.orange)
-                        Text("\(state.environment.displayName)：\(state.isConfigured ? "已配置" : "未配置")")
-                            .font(.callout)
-                    }
-                }
-                // 两个环境**都必须**有凭证（原先免凭证的本机演练已移除），
-                // 所以这里不再分「需要 / 不需要凭证」两支 —— 那支已经走不到了。
-                opsMarkdown(model.credentialText)
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                if let summary = model.credentialSummary {
-                    if let parseError = summary.parseError {
-                        opsMarkdown("⚠️ 凭证文件读不出来：\(parseError)")
-                            .font(.caption2)
-                            .foregroundStyle(.red)
-                            .fixedSize(horizontal: false, vertical: true)
-                    } else {
-                        Text(summary.displayText)
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                        if summary.declaredEnvironmentMatches == false {
-                            opsMarkdown("⚠️ 这份凭证声明的是"
-                                        + " \(summary.declaredEnvironment ?? "（未知）")，"
-                                        + "与当前环境 \(model.targetEnvironment.rawValue) 不符，"
-                                        + "混用只会 401。")
-                                .font(.caption2)
-                                .foregroundStyle(.red)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-                    }
-                }
-                if model.credentialFileURL == nil {
-                    opsMarkdown(model.credentialGuidance)
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
-        }
-    }
-
-    // MARK: 线上状态
-
-    private var onlineCard: some View {
-        OpsCard(title: "线上基线（只读）", systemImage: "arrow.down.circle") {
-            VStack(alignment: .leading, spacing: 8) {
-                if let head = model.onlineHead {
-                    LabeledContent("环境", value: head.environment)
-                    if head.releaseSeq == 0 {
-                        // 「线上还没有发布头」不是错误，是**首次发布**的正常前置状态。
-                        // 不把它说清楚，运营会以为「读基线失败」而去反复重试。
-                        opsMarkdown("**\(head.environment) 线上还没有发布头**："
-                                    + "这个环境还没发过任何一版，首次发布会从 releaseSeq 1 开始。")
-                            .font(.callout)
-                            .fixedSize(horizontal: false, vertical: true)
-                        opsMarkdown("发之前请确认该环境的 Schema 已就绪 —— "
-                                    + "Production 需要先在 CloudKit Console 里把 Development 的 Schema "
-                                    + "**Deploy to Production**，否则记录类型不存在。")
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                    } else {
-                        LabeledContent("线上发布号", value: "releaseSeq \(head.releaseSeq)")
-                        LabeledContent("根清单摘要", value: head.hashText)
-                        if let publishedAt = head.publishedAt {
-                            LabeledContent("发布时间", value: publishedAt)
-                        }
-                        Button("把这一版采用为草稿基线") { model.adoptBaseline(workspace) }
-                            .controlSize(.small)
-                        OpsFootnote(text: "采用基线是**你的显式决定**（R07）：采用之后本机才知道"
-                                    + "「这份草稿基于哪一版」，严格策略的作用域才不会把存量内容全算进去。")
-                    }
-                } else {
-                    opsMarkdown("还不知道线上当前版本。**发布号必须严格大于线上**，"
-                                + "所以发布前必须先读一次。")
-                        .font(.callout)
-                        .foregroundStyle(.secondary)
-                }
-                Button("读取线上基线") {
-                    Task { await model.readOnlineBaseline() }
-                }
-                .disabled(model.isRunning)
-            }
-        }
-    }
-
-    // MARK: 从云端下载
-
-    private var downloadCard: some View {
-        OpsCard(title: "从云端下载（拉回线上目录）", systemImage: "icloud.and.arrow.down") {
-            VStack(alignment: .leading, spacing: 8) {
-                Button("从线上拉回基线") {
-                    Task { await model.pullCatalog() }
-                }
-                .disabled(model.isRunning)
-                // 失败时这张卡片**必须**有话说：原先只有 `if let pulled`，
-                // 拉回失败就一个字都不显示，看起来像「按钮不管用」。
-                if let failure = model.pullFailure {
-                    HStack(spacing: 6) {
-                        Image(systemName: "exclamationmark.triangle.fill")
-                            .foregroundStyle(Color.orange)
-                        Text("这次没拉回来").font(.callout)
-                        if model.pullFailureRetryable {
-                            Text("可原样重试")
-                                .font(.caption2)
-                                .padding(.horizontal, 6)
-                                .padding(.vertical, 2)
-                                .background(Color.orange.opacity(0.15), in: Capsule())
-                                .foregroundStyle(Color.orange)
-                        }
-                    }
-                    opsMarkdown(failure)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                if let pulled = model.pulled {
-                    Divider()
-                    Text(pulled.summaryText).font(.callout)
-                    ForEach(pulled.sortedItemCounts) { item in
-                        Text("· \(item.label) \(item.count)")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                    let blockers = model.adoptionBlockers(pulled, workspace: workspace)
-                    let caveats = model.adoptionCaveats(pulled, workspace: workspace)
-                    if !blockers.isEmpty {
-                        ForEach(blockers, id: \.self) { text in
-                            opsMarkdown("⚠️ \(text)")
-                                .font(.callout)
-                                .foregroundStyle(.red)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-                    } else {
-                        ForEach(caveats, id: \.self) { text in
-                            opsMarkdown("· \(text)")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-                        // 先看差异再对齐：这个动作会**移除**本地多出来的条目，
-                        // 「点完才知道少了什么」= 静默删除，不能这么干。
-                        Button("① 看看会改动什么") {
-                            _ = model.previewReconcile(pulled, workspace: workspace)
-                        }
-                        .controlSize(.small)
-
-                        if let outcome = model.reconcileOutcome {
-                            Text(outcome.summaryText)
-                                .font(.callout)
-                                .foregroundStyle(outcome.touchesExistingContent ? .primary : .secondary)
-                            ForEach(outcome.summaryLines, id: \.self) { text in
-                                opsMarkdown("· \(text)")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                                    .fixedSize(horizontal: false, vertical: true)
-                            }
-                            let details = outcome.detailLines(limit: 5)
-                            if !details.isEmpty {
-                                ForEach(details, id: \.self) { text in
-                                    Text(text)
-                                        .font(.caption2)
-                                        .foregroundStyle(.secondary)
-                                        .textSelection(.enabled)
-                                }
-                            }
-                        }
-
-                        Button("② 以线上那一版对齐当前草稿") {
-                            _ = model.alignPulled(pulled, workspace: workspace)
-                        }
-                        .controlSize(.small)
-                        .disabled(model.reconcileOutcome == nil)
-                        if model.reconcileOutcome == nil {
-                            Text("先点上面「看看会改动什么」—— 对齐会移除本地多出来的条目。")
-                                .font(.caption2)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    // MARK: 从 iOS 交接（整包导入）
-
-    private var handoffCard: some View {
-        OpsCard(title: "从 iOS 交接（导入整包 · 含图片）", systemImage: "shippingbox") {
-            VStack(alignment: .leading, spacing: 8) {
-                Button("选择 iOS 导出的整包…") { model.importHandoff(workspace: workspace) }
-                    .controlSize(.small)
-                opsMarkdown("在 iOS 端用「**导出整包（含图片）**」拿到一个 `.tar`，"
-                            + "在访达里双击解开，然后在这里选**解开出来的那个目录**"
-                            + "（里面有 `shop-catalog.json` 与 `images/`）。")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                OpsFootnote(text: "图片会**按原文件名**进 staging —— 目录里的 `local:` 引用"
-                            + "是交接方给的名字，改成哈希名会让所有引用悬空、发布时全报缺图。")
-                if let message = workspace.statusMessage {
-                    Text(message)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
-        }
-    }
-
-    // MARK: 上传到云端
-
-    private var uploadCard: some View {
-        OpsCard(title: "上传到云端（构建待发布包 → 受控发布）", systemImage: "icloud.and.arrow.up") {
-            VStack(alignment: .leading, spacing: 8) {
-                Toggle("演练（dry-run，不写云端）", isOn: $model.dryRun)
-                Toggle("已知线上已变，仍按本基线发布", isOn: $model.baselineAcknowledged)
-                opsMarkdown("发布号 = 线上当前号 + 1。缺图会在**导出那一步**硬失败"
-                            + "（不会带着残缺产物去发布），门禁由服务层自己复校验。")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                Button(model.dryRun ? "演练一次（不写云端）" : "构建并发布到 \(model.targetEnvironment.displayName)") {
-                    Task { await model.publish(workspace: workspace) }
-                }
-                .buttonStyle(.borderedProminent)
-                .disabled(model.isRunning || workspace.isCorrupted)
-                if let outcome = model.outcome {
-                    HStack(spacing: 6) {
-                        Image(systemName: outcome == .confirmed ? "checkmark.circle.fill" : "exclamationmark.circle.fill")
-                            .foregroundStyle(outcome == .confirmed ? Color.green : Color.orange)
-                        Text(outcome.rawValue).font(.callout)
-                        // 「原样重试是安全的」必须和「失败了」分开说：前者是网络抖动，
-                        // 后者要改东西。混在一起运营只能靠猜（R07/R09 都栽在这类含糊上）。
-                        if model.outcomeRetryable {
-                            Text("可原样重试")
-                                .font(.caption2)
-                                .padding(.horizontal, 6)
-                                .padding(.vertical, 2)
-                                .background(Color.orange.opacity(0.15), in: Capsule())
-                                .foregroundStyle(Color.orange)
-                        }
-                    }
-                }
-                if let message = model.outcomeMessage {
-                    opsMarkdown(message)
-                        .font(.callout)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                if let seq = model.lastReceiptSeq {
-                    // 变量文案必须过 opsMarkdown：`Text(变量)` 与 `Text("a" + "b")`
-                    // **不解析** Markdown，`**未**` 会逐字显示成星号。
-                    opsMarkdown("回执发布号 \(seq) · "
-                                + (model.lastReceiptConfirmed
-                                   ? "已回读确认"
-                                   : "**未**回读确认（先查询再下结论）"))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
-        }
-    }
-
-    // MARK: 日志
-
-    private var logCard: some View {
-        OpsCard(title: "受控发布器输出", systemImage: "terminal") {
-            VStack(alignment: .leading, spacing: 6) {
-                if let error = model.lastError {
-                    // 与下面的日志行一样允许选中：这段是**最需要被带走**的一段文字，
-                    // 旧写法漏了 `.textSelection`，于是唯二的取字方式只剩截图。
-                    opsMarkdown("✖ \(error)")
-                        .font(.callout)
-                        .foregroundStyle(.red)
-                        .textSelection(.enabled)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                if model.logLines.isEmpty {
-                    Text("（还没有输出）").font(.caption).foregroundStyle(.secondary)
-                } else {
-                    ScrollView {
-                        VStack(alignment: .leading, spacing: 2) {
-                            ForEach(Array(model.logLines.enumerated()), id: \.offset) { _, line in
-                                Text(line)
-                                    .font(.system(.caption, design: .monospaced))
-                                    .textSelection(.enabled)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                            }
-                        }
-                    }
-                    .frame(height: 160)
-                }
-                HStack(spacing: 8) {
-                    Button("复制日志") { copyLog() }
-                        .controlSize(.small)
-                        .disabled(model.logLines.isEmpty && model.lastError == nil)
-                    Button("打开日志文件") { model.revealLogFile() }
-                        .controlSize(.small)
-                        .disabled(model.logFileURL == nil)
-                    Button("清空") { model.clearLog() }
-                        .controlSize(.small)
-                    if let hint = copyLogHint {
-                        Text(hint).font(.caption).foregroundStyle(.secondary)
-                    }
-                }
-                opsMarkdown(model.logFileURL == nil
-                    ? "运行一次后（读取基线 / 拉回目录 / 发布）日志会同时落到 "
-                        + "`bridge/logs/latest.log`，「复制日志」是一次性拿走全文的入口。"
-                    : "**「复制日志」= 头部 + 全文**（头部含环境、模式、线上发布号与失败原因，"
-                        + "贴出去别人才能判断该不该重试）；完整历史在 `bridge/logs/`。")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-        }
-    }
-
-    /// 复制成功后的短提示（3 秒后自己消失，免得看起来像常驻状态）。
-    private func copyLog() {
-        let text = model.copyableLogText()
-        let pasteboard = NSPasteboard.general
-        pasteboard.clearContents()
-        pasteboard.setString(text, forType: .string)
-        let lineCount = text.split(separator: "\n", omittingEmptySubsequences: false).count
-        copyLogHint = "已复制 \(lineCount) 行"
-        Task { @MainActor in
-            try? await Task.sleep(nanoseconds: 3_000_000_000)
-            copyLogHint = nil
-        }
-    }
 }

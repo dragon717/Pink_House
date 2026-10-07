@@ -1,0 +1,197 @@
+//
+//  OpsSettingsView.swift
+//  PinkHouseOps
+//
+//  运营工具的**设置**（macOS `Settings` 场景，Cmd+,）。
+//
+//  ## 为什么这些东西在设置里
+//
+//  2026-10-07 起「云端同步」面板的分步卡片全部删除：运营点工具栏的
+//  「云端更新」就一键发布，**无感**。但发布有三关前置（仓库目录授权 /
+//  解释器 / 凭证）与一个环境选择 —— 它们是**配置**，不是「步骤」，
+//  所以全部收进这里。配好一次之后日常只需要点「云端更新」。
+//
+//  ## 环境切换的语义
+//
+//  `targetEnvironment` 的 `didSet` 会清空上一个环境的线上发布号等运行态
+//  （`resetEnvironmentScopedState`）—— 那份「线上 seq N」只对它读到的环境成立，
+//  拿着 Development 的号去发 Production 是**没有一层会报错**的错配。
+//
+
+import AppKit
+// MemberImportVisibility：`.json`（UTType）来自这个模块，不 import 会报
+// “static property 'json' is not available”，那个报错看不出真正原因。
+import UniformTypeIdentifiers
+import SwiftUI
+
+struct OpsSettingsView: View {
+    /// 与工具栏「云端更新」、系列发布共用同一份单例（同一处真相）
+    @ObservedObject private var model = OpsCloudSyncModel.shared
+    /// 主窗口那份工作区（另建一份 = 两处真相，导入完主窗口还显示旧内容）
+    @ObservedObject private var holder = OpsWorkspaceHolder.shared
+
+    /// 上一次导入的结果（成功摘要 / 失败原因，二选一展示）
+    @State private var importMessage: String?
+    @State private var importFailed = false
+
+    var body: some View {
+        Form {
+            Section("发布环境") {
+                Picker("目标环境", selection: $model.targetEnvironment) {
+                    ForEach(ShopCatalogPublishTargetEnvironment.allCases) { environment in
+                        Text(environment.displayName).tag(environment)
+                    }
+                }
+                // macOS 只有 `.radioGroup`（`.radio` 是 iOS 的写法，这里编译不过）
+                .pickerStyle(.radioGroup)
+                .disabled(model.isRunning)
+                opsMarkdown(model.targetEnvironment.guidance)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                // 切环境会清空线上发布号等运行态 —— 必须说出来，
+                // 否则「刚读到的 seq」消失会被当成 bug。
+                Text("切换环境会清空已读取的线上发布号与发布结论（它们只对原环境成立）。")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+
+            Section("受控发布器（三关自检）") {
+                let problems = model.diagnosis
+                if problems.isEmpty {
+                    Label("三关都通过，可以一键发布。", systemImage: "checkmark.circle.fill")
+                        .foregroundStyle(.green)
+                } else {
+                    ForEach(problems, id: \.self) { problem in
+                        HStack(alignment: .top, spacing: 6) {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .foregroundStyle(.orange)
+                            opsMarkdown(problem)
+                                .font(.callout)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                }
+                LabeledContent("仓库目录", value: model.settings.repoRootPath ?? "（未授权）")
+                Button("选择仓库目录…") { model.chooseRepoRoot() }
+                LabeledContent("解释器", value: model.interpreterText)
+            }
+
+            Section("CloudKit 凭证（按环境分开，私钥不进 App）") {
+                ForEach(model.credentialStates) { state in
+                    HStack(spacing: 6) {
+                        Image(systemName: state.isConfigured
+                              ? "checkmark.circle.fill" : "xmark.circle")
+                            .foregroundStyle(state.isConfigured ? Color.green : Color.orange)
+                        Text("\(state.environment.displayName)："
+                             + (state.isConfigured ? "已配置" : "未配置"))
+                    }
+                }
+                Button("导入 \(model.targetEnvironment.displayName) 凭证 JSON…") {
+                    model.importCredentialFile()
+                }
+                if let summary = model.credentialSummary {
+                    if let parseError = summary.parseError {
+                        opsMarkdown("⚠️ 凭证文件读不出来：\(parseError)")
+                            .font(.caption)
+                            .foregroundStyle(.red)
+                    } else {
+                        Text(summary.displayText)
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                        if summary.declaredEnvironmentMatches == false {
+                            opsMarkdown("⚠️ 这份凭证声明的是 "
+                                        + "\(summary.declaredEnvironment ?? "（未知）")，"
+                                        + "与当前环境 \(model.targetEnvironment.rawValue) 不符，"
+                                        + "混用只会 401。")
+                                .font(.caption)
+                                .foregroundStyle(.red)
+                        }
+                    }
+                }
+                opsMarkdown(model.credentialGuidance)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+
+            Section("从 iOS 恢复（导入整包）") {
+                // 「误操作覆盖了 Mac 上的内容」就用这两个入口恢复。
+                // 图片**按原文件名**进 staging（引用名是交接方给的名字，
+                // 改成哈希名会让目录里的 local: 引用全部悬空）。
+                HStack(spacing: 10) {
+                    Button("整包目录（含图片）…") { chooseAndImport(kind: .bundle) }
+                    Button("仅 JSON（不含图片）…") { chooseAndImport(kind: .jsonOnly) }
+                }
+                Text("压缩包先在访达里双击解开，再选解开出来的那个目录"
+                     + "（里面有 shop-catalog.json 和 images/）；只拿到 JSON 时选第二个。")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                // 破坏性动作必须写明：这正是「恢复」的语义，但同时会顶掉当前草稿。
+                Text("导入会用这份内容**替换**当前草稿 —— 这就是「恢复被覆盖的内容」。")
+                    .font(.caption2)
+                    .foregroundStyle(.orange)
+                if let importMessage {
+                    opsMarkdown(importMessage)
+                        .font(.caption)
+                        .foregroundStyle(importFailed ? .red : .secondary)
+                        .textSelection(.enabled)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            Section("日志（排查入口）") {
+                HStack(spacing: 10) {
+                    Button("打开最近一次日志") { model.revealLogFile() }
+                        .disabled(model.logFileURL == nil)
+                    Button("打开日志文件夹") { model.revealLogsFolder() }
+                }
+                Text("每次「云端更新 / 发布」的完整输出都落在 "
+                     + "`bridge/logs/<runID>.log`（latest.log 是最近一次的副本）。"
+                     + "失败时把这份文件交给 Agent 即可定位。")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .formStyle(.grouped)
+        .frame(width: 560, height: 720)
+    }
+
+    // MARK: 从 iOS 恢复
+
+    /// 两种形状：解开后的整包目录（带 images/）与单独的 JSON。
+    /// 服务层 `OpsWorkspace.importHandoffPackage(from:)` 两种都认
+    /// （`OpsHandoffLayout.resolve`），所以这里只负责把选择形状说清楚。
+    private enum ImportKind {
+        case bundle
+        case jsonOnly
+    }
+
+    private func chooseAndImport(kind: ImportKind) {
+        guard let workspace = holder.workspace else {
+            importFailed = true
+            importMessage = "还没有可导入的工作区：请先打开主窗口（草稿库在主窗口里建）。"
+            return
+        }
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = (kind == .jsonOnly)
+        panel.canChooseDirectories = (kind == .bundle)
+        panel.allowsMultipleSelection = false
+        switch kind {
+        case .bundle:
+            panel.message = "选择 iOS 整包解开后的目录（含 shop-catalog.json 与 images/）"
+            panel.prompt = "导入整包"
+        case .jsonOnly:
+            panel.allowedContentTypes = [.json]
+            panel.message = "选择那份 shop-catalog.json（同目录有图会一起拷）"
+            panel.prompt = "导入 JSON"
+        }
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        // ⚠️ 结果**必须**出声：只写 lastError 不动界面 = 运营点完像没反应。
+        if let report = workspace.importHandoffPackage(from: url) {
+            importFailed = false
+            importMessage = report.summary
+                + (report.missingText.map { " ⚠️ " + $0 } ?? "")
+        } else {
+            importFailed = true
+            importMessage = workspace.lastError ?? "导入失败（未说明原因）"
+        }
+    }
+}

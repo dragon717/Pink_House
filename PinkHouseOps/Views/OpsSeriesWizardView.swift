@@ -15,9 +15,10 @@
 //  · 找不到「任务名称」输入框；找不到「批次」输入框 —— 类型上没有这两个字段；
 //  · 一个系列可以同时选择多个类型，仍在同一个系列流程内完成；
 //  · S4 只读；发现问题时「返回修改」回到对应步骤；
-//  · S5 的「提交」= 逐类型写入本地草稿（复用现有链路），**不是**发布：
-//    发布走受控发布链路（导出待发布包 → 受控发布器），公共 CloudKit
-//    上架状态以回读确认为准，这里绝不显示虚假的「已上架」。
+//  · S5 的「提交」= **保存**：逐类型写入本地草稿并落盘。反馈只有一条、只有两种：
+//    保存成功 / 保存失败（带可定位原因）。**不顺手发布** —— R07 比对草稿基线，
+//    而 App 从不回填它，自动发布只会被稳定拒绝（2026-10-07 实测退出码 5）；
+//    发布 = 「发布整个系列」一键（或右上角「云端更新」），失败给日志文件路径。
 //
 
 import SwiftUI
@@ -81,8 +82,13 @@ struct OpsSeriesWizardView: View {
     @State private var step: OpsSeriesWizardStep = .selectShopSeries
     /// 「下一步」被本步校验拦下时展示的问题（逐条、带定位）
     @State private var gateIssues: [OpsSeriesEntryIssue] = []
-    /// S5 的提交报告（nil = 还没提交过）
-    @State private var commitReport: OpsSeriesEntryCommitReport?
+    /// S5 提交后的**唯一**结果反馈（nil = 还没提交过）。
+    /// 只有一个值 —— 新的提交会整体替换上一条，不会叠加。
+    @State private var submitFeedback: OpsSeriesSubmitFeedback?
+    /// 「发布整个系列」的结果反馈（nil = 还没发布过）。同样只保留一条。
+    @State private var publishFeedback: OpsSeriesPublishFeedback?
+    /// 发布进行中（落库草稿箱 → 受控发布 → 回读）。期间发布按钮禁用。
+    @State private var isPublishing = false
 
     private var draft: OpsSeriesEntryDraft { workspace.seriesEntry }
 
@@ -141,13 +147,11 @@ struct OpsSeriesWizardView: View {
             OpsSeriesWizardPublishView(
                 workspace: workspace,
                 issues: allIssues,
-                report: commitReport,
+                feedback: submitFeedback,
+                publishFeedback: publishFeedback,
+                isPublishing: isPublishing,
                 onCommit: { commit() },
-                onResetWizard: {
-                    commitReport = nil
-                    workspace.resetSeriesEntry()
-                    step = .selectShopSeries
-                })
+                onPublish: { publishSeries() })
         }
     }
 
@@ -686,8 +690,78 @@ struct OpsSeriesWizardView: View {
 
     // MARK: S5 提交
 
+    /// S5 提交后的**唯一**结果反馈。同一时刻只有一个值，新提交整体替换旧值。
+    ///
+    /// 只有两种结局（需求 2026-10-07 重做版）：
+    /// · `.saved` —— 「保存成功」：逐类型写入本地草稿并落盘成功；
+    /// · `.failed(reason)` —— 「保存失败：<原因>」：校验拦截 / 落盘失败 /
+    ///   系列价格表 / 单个类型写入失败，原因都带可定位来源。
+    ///
+    /// ## 为什么这里**不**顺手发布
+    ///
+    /// 发布要比对草稿的 `baseReleaseSeq` / `baseRootIndexHash`（R07），
+    /// 而 App 目前从不回填这两个字段 —— 自动发布只会稳定被 R07 拒（退出码 5，
+    /// 实测 2026-10-07 16:22）。把一条「永远失败的路径」塞进提交按钮，
+    /// 「发布整个系列」是一键的：内部自动完成基线那一套，失败提示带日志路径。
+    enum OpsSeriesSubmitFeedback: Equatable {
+        case saved
+        case failed(String)
+    }
+
+    /// 提交 = **保存**（同步）。失败不清空表单：草稿与向导内容原样留在界面上，
+    /// 改完直接再点一次，新提示替换旧提示。
     private func commit() {
-        commitReport = workspace.commitSeriesEntry()
+        let report = workspace.commitSeriesEntry()
+        if report.blocked {
+            let reasons = report.blockedByValidation
+                .map { ($0.entryName.isEmpty ? "" : $0.entryName + "：") + $0.message }
+                .joined(separator: "；")
+            submitFeedback = .failed("校验未通过（未写入任何内容）—— " + reasons)
+            return
+        }
+        if !report.draftSaved {
+            submitFeedback = .failed("草稿落盘失败（内容仍在表单中）—— "
+                                     + (workspace.lastError ?? "未知原因"))
+            return
+        }
+        if let priceChartError = report.priceChartError {
+            submitFeedback = .failed("系列价格表写入失败 —— " + priceChartError)
+            return
+        }
+        if let badEntry = report.entryResults.first(where: { !$0.ok }) {
+            submitFeedback = .failed("类型「\(badEntry.entryName)」写入失败 —— " + badEntry.message)
+            return
+        }
+        submitFeedback = .saved
+    }
+
+    // MARK: 发布整个系列（一键）
+
+    /// 发布结果反馈。运营只看两种：成功 / 失败（失败带原因、失败条目与日志路径）。
+    enum OpsSeriesPublishFeedback: Equatable {
+        case published(releaseSeq: Int)
+        /// `itemFailures` 为条目级明细（发布器整体失败时为空）
+        case failed(reason: String, itemFailures: [OpsSeriesPublishItem], logPath: String?)
+    }
+
+    /// 一键发布：整个系列一次提交（落库草稿箱 → 标记发布中 → 一次发布请求）。
+    /// 内部的「取线上发布头 / 采用基线」都在编排层自动完成，运营无感。
+    private func publishSeries() {
+        guard !isPublishing else { return }
+        isPublishing = true
+        publishFeedback = nil
+        let cloud = OpsCloudSyncModel.shared
+        Task { @MainActor in
+            let outcome = await workspace.publishSeries(cloud: cloud)
+            switch outcome {
+            case .published(let seq):
+                publishFeedback = .published(releaseSeq: seq)
+            case .failed(let reason, let items):
+                publishFeedback = .failed(
+                    reason: reason, itemFailures: items, logPath: cloud.lastRunLogURL?.path)
+            }
+            isPublishing = false
+        }
     }
 }
 
@@ -907,14 +981,24 @@ struct OpsSeriesWizardReviewView: View {
 
 // MARK: - S5 状态与发布
 
+/// S5 提交环节（需求 2026-10-07 重做版）：
+///
+/// · 提交 = **保存**。反馈只有一条，只有两种：保存成功 / 保存失败（带原因）；
+/// · 发布一键完成：点「发布整个系列」（或右上角「云端更新」），内部自动完成
+///   「取线上发布头 → 采用基线 → 整包发布 → 回读确认」，运营无感；
+/// · 禁止其他交互：不弹二次确认、没有成功引导、没有「重开向导」或跳转按钮 ——
+///   提交按钮就是这一步的全部交互；
+/// · 失败不清空表单（草稿与向导内容原样保留，改完直接再点提交，新提示替换旧提示）。
 struct OpsSeriesWizardPublishView: View {
     @ObservedObject var workspace: OpsWorkspace
     let issues: [OpsSeriesEntryIssue]
-    let report: OpsSeriesEntryCommitReport?
+    let feedback: OpsSeriesWizardView.OpsSeriesSubmitFeedback?
+    let publishFeedback: OpsSeriesWizardView.OpsSeriesPublishFeedback?
+    let isPublishing: Bool
     let onCommit: () -> Void
-    let onResetWizard: () -> Void
+    let onPublish: () -> Void
 
-    /// 与工具栏那个按钮共享同一份状态：这里打开的也是同一个面板
+    /// 线上版本号从这里读（只读展示，不提供任何入口）。
     @ObservedObject private var cloudSync = OpsCloudSyncModel.shared
 
     private var draft: OpsSeriesEntryDraft { workspace.seriesEntry }
@@ -923,14 +1007,12 @@ struct OpsSeriesWizardPublishView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 stateMachineCard
-                if let report {
-                    reportCard(report)
-                }
+                actionsCard
+                publishCard
+                honestyCard
                 if !issues.isEmpty {
                     issuesCard
                 }
-                actionsCard
-                honestyCard
             }
             .padding(18)
             .frame(maxWidth: 860, alignment: .leading)
@@ -945,55 +1027,8 @@ struct OpsSeriesWizardPublishView: View {
                 LabeledContent("编辑版本", value: "第 \(workspace.currentRevision) 版"
                     + (workspace.hasUnsavedChanges ? "（有未保存修改）" : "（已保存）"))
                 LabeledContent("系列内类型", value: draft.selectedCategorySummary)
-                OpsFootnote(text: "每个类型走同一条商品发布链路："
-                            + "草稿 → 校验与构建待发布包 → 受控发布 → 回读确认。")
-            }
-        }
-    }
-
-    @ViewBuilder
-    private func reportCard(_ report: OpsSeriesEntryCommitReport) -> some View {
-        OpsCard(title: "上次系列级提交结果（逐类型）", systemImage: "list.bullet.rectangle") {
-            VStack(alignment: .leading, spacing: 8) {
-                if report.blocked {
-                    opsMarkdown("整次提交被校验拦下，**没有写入任何内容**（需求 §S3-E："
-                                + "任何一个类型缺必填项时，不能假装全部完成）。")
-                        .font(.callout).foregroundStyle(.orange)
-                        .fixedSize(horizontal: false, vertical: true)
-                    ForEach(report.blockedByValidation) { issue in
-                        Text("· \(issue.entryName.isEmpty ? "" : issue.entryName + "：")\(issue.message)")
-                            .font(.callout)
-                    }
-                } else {
-                    ForEach(report.entryResults) { result in
-                        HStack(spacing: 8) {
-                            Image(systemName: result.ok ? "checkmark.circle.fill" : "xmark.circle.fill")
-                                .foregroundStyle(result.ok ? Color.green : Color.orange)
-                            Text(result.entryName)
-                            opsMarkdown(result.message)
-                                .font(.caption).foregroundStyle(.secondary)
-                        }
-                    }
-                    // 系列级（S2 价格表）也要逐项看得见 —— 条目全绿而价格表没写进去时，
-                    // 只报「系列级提交完成」就是谎报。
-                    if let priceChartError = report.priceChartError {
-                        HStack(alignment: .top, spacing: 8) {
-                            Image(systemName: "xmark.circle.fill")
-                                .foregroundStyle(Color.orange)
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("系列价格表")
-                                opsMarkdown(priceChartError)
-                                    .font(.caption).foregroundStyle(.secondary)
-                                    .fixedSize(horizontal: false, vertical: true)
-                            }
-                        }
-                    }
-                    if !report.draftSaved {
-                        opsMarkdown("⚠️ 草稿**落盘失败**：内容还在界面上，请重新保存（需求 §S5：提交失败不丢失输入）。")
-                            .font(.callout).foregroundStyle(.orange)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                }
+                OpsFootnote(text: "提交 = **保存**：逐类型写入本地草稿并落盘。"
+                            + "上云点下面的「发布整个系列」或右上角「云端更新」。")
             }
         }
     }
@@ -1013,38 +1048,115 @@ struct OpsSeriesWizardPublishView: View {
         OpsCard(title: "提交整个系列", systemImage: "paperplane.fill") {
             VStack(alignment: .leading, spacing: 8) {
                 Button(action: onCommit) {
-                    Label("提交整个系列（逐类型写入草稿）", systemImage: "tray.and.arrow.down")
+                    Label("提交整个系列（写入草稿）", systemImage: "tray.and.arrow.down")
                 }
                 .buttonStyle(.borderedProminent)
                 .disabled(!issues.isEmpty || workspace.isCorrupted)
-                if !issues.isEmpty {
-                    OpsFootnote(text: "还有校验问题未解决 —— 先到「S3 类型录入」逐条处理，"
-                                + "或回 S4 查看定位。**输入不会因为提交被拦而丢失**。")
-                }
-                if let report, report.allOK {
-                    Button("这个系列已完成，重开一个新向导") { onResetWizard() }
+                if let feedback {
+                    submitFeedbackLine(feedback)
                 }
             }
         }
     }
 
+    /// 发布整个系列：**一次点击**发整个系列（不逐条提交；内部自动完成基线那一套）。
+    private var publishCard: some View {
+        OpsCard(title: "发布整个系列", systemImage: "icloud.and.arrow.up") {
+            VStack(alignment: .leading, spacing: 8) {
+                Button(action: onPublish) {
+                    Label("发布整个系列", systemImage: "paperplane.fill")
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(!issues.isEmpty || workspace.isCorrupted || isPublishing)
+                if isPublishing {
+                    HStack(spacing: 6) {
+                        ProgressView().controlSize(.small)
+                        Text("发布中…")
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                if let publishFeedback {
+                    publishFeedbackLine(publishFeedback)
+                    // 明确的重试入口（需求 §4）：失败时就在同一处，
+                    // 运营不必去别处找「刚才那条去哪了」。
+                    if case .failed = publishFeedback {
+                        Button("重试发布") { onPublish() }
+                            .controlSize(.small)
+                            .disabled(isPublishing)
+                    }
+                }
+            }
+        }
+    }
+
+    /// 发布反馈：一条。成功 = 「发布成功」；失败 = 「发布失败：原因」（+ 日志路径）。
+    @ViewBuilder
+    private func publishFeedbackLine(_ feedback: OpsSeriesWizardView.OpsSeriesPublishFeedback)
+        -> some View {
+        switch feedback {
+        case .published(let seq):
+            Label("发布成功（releaseSeq \(seq)）", systemImage: "checkmark.circle.fill")
+                .font(.callout)
+                .foregroundStyle(.green)
+        case .failed(let reason, let items, let logPath):
+            VStack(alignment: .leading, spacing: 3) {
+                opsMarkdown("发布失败：" + reason)
+                    .font(.callout)
+                    .foregroundStyle(.red)
+                    .textSelection(.enabled)
+                    .fixedSize(horizontal: false, vertical: true)
+                // 条目级失败：不逐条列出来，运营不知道该改哪一条
+                ForEach(items.filter { !$0.ok }) { item in
+                    Text("· \(item.name.isEmpty ? item.id : item.name)："
+                         + (item.message ?? "未说明原因"))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .textSelection(.enabled)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                if let logPath {
+                    Text("日志：\(logPath)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .textSelection(.enabled)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+        }
+    }
+
+    /// 唯一的结果反馈：一条。同一时刻最多一条，新提交整体替换（同一个 `@State`）。
+    @ViewBuilder
+    private func submitFeedbackLine(_ feedback: OpsSeriesWizardView.OpsSeriesSubmitFeedback)
+        -> some View {
+        switch feedback {
+        case .saved:
+            Label("保存成功", systemImage: "checkmark.circle.fill")
+                .font(.callout)
+                .foregroundStyle(.green)
+        case .failed(let reason):
+            // 一条提示 = 「保存失败」+ 可定位原因，不拆成两块。
+            // 变量文案过 opsMarkdown（`Text(变量)` 不解析 Markdown）；
+            // 允许选中，方便把原因原样带走去改表单。
+            opsMarkdown("保存失败：" + reason)
+                .font(.callout)
+                .foregroundStyle(.red)
+                .textSelection(.enabled)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
     private var honestyCard: some View {
-        OpsCard(title: "发布与上架状态（不显示虚假的「已上架」）", systemImage: "cloud") {
+        OpsCard(title: "发布与上架状态", systemImage: "cloud") {
             VStack(alignment: .leading, spacing: 6) {
-                LabeledContent("已写入本地草稿",
-                               value: report?.allOK == true ? "是（逐类型）" : "尚未全部完成")
-                LabeledContent("App 侧发布", value: "本工具校验并构建待发布包 → 交给受控发布器")
-                // 线上真实状态：不是本页自己猜的，是受控发布器读回来的。
-                // 没读过就如实说「未读取」——不写「线上无内容」，那是另一种谎。
                 LabeledContent("线上当前版本",
                                value: cloudSync.onlineHead.map { "releaseSeq \($0.releaseSeq)" }
-                                ?? "未读取（点「打开云端同步…」读一次）")
-                LabeledContent("公共 CloudKit 上架", value: "以发布器的**回读确认**为准；未回读前一律显示「待回读」")
-                Button("打开云端同步…") { cloudSync.showsSheet = true }
-                    .controlSize(.small)
-                OpsFootnote(text: "写进草稿**不等于**上云：上架与否只看受控发布器的回读结果"
-                            + "（方案 R07/R09 的既有口径）。云端同步面板里可以做"
-                            + "「读取线上基线 / 从线上拉回目录 / 构建并发布」三件事。")
+                                ?? "未读取（云端同步面板里读）")
+                LabeledContent("公共 CloudKit 上架", value: "以受控发布器的回读确认为准")
+                OpsFootnote(text: "发布一键完成：点「发布整个系列」或右上角「云端更新」。"
+                            + "环境与凭证在 设置（Cmd+,）里配置。"
+                            + "失败时给出日志路径，把日志交给 Agent 即可定位。")
             }
         }
     }

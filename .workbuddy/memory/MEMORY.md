@@ -18,15 +18,24 @@
 - ⭐ **禁 `import mimetypes`**（沙盒子进程读 `/etc` 被拒 → 发布必挂，CLI 直跑复现不出；取证 `sandbox_profile_run.py`）。MIME 走 `protocol.media_mime_type()` 纯查表。**子进程路径上的代码不许依赖系统文件库。**
 - ⭐ `previousReleaseSeq` 必须传（取线上 `head.releaseSeq`），语义＝「本版取代哪一版」。
 - ⭐ `rootIndexHash` 每次重建都变（含 `publishedAt`）→ **别写「同输入同摘要」断言**，别当内容寻址键。
-- ⭐ 日志必须落盘（`bridge/logs/<runID>.log` + `latest.log`，可一次复制）；**`perform` 之外的早退路径也要落盘**（`failBeforeBridge`）。
+- ⭐ 日志必须落盘（`bridge/logs/<runID>.log` + `latest.log`，可一次复制）；**`perform` 之外的早退路径也要落盘**（`failBeforeBridge`）。✅ **落盘在模型层**（`OpsCloudSyncModel.perform` → `persistLog`），任何调用方（面板 / S5 / 探针）都落盘 —— 旧口径写的「只在视图层、绕过视图没有日志」**是错的**（10-07 实测容器里既有面板日志也有 S5 触发的 `20261007-162258-publish.log`）。排查要拿**本次专属**文件用 `lastRunLogURL`，不是会被覆盖的 `latest.log`。
+- ⭐⭐ **发布门禁分不清「已在公共库」与「缺失」**（10-07）：`build_release.py:383` 的 `rewrite()` 对非 `local:` 值**原样返回** → 拉回的 `thmedia:` 引用不产生 `media_records`，而 `:907` 的 `known_media_hashes` **只**来自本次 `media_records` → 全判 `media.reference.missing`（4 资产×4 字段＝**16 条假错误**）。后果：**「拉回→编辑→发布」走不通**（＝ R4 要求的每次发布第一步挂着）；首次全 `local:` 发布才正常。**未修。**
 - ⭐ **「点了没反应」与「失败了」必须分开**：操作型卡片必须有失败分支。
 - ⭐ **切环境必须清空** `onlineHead`/`pulled`/`outcome`/`lastReceiptSeq`/`baselineAcknowledged`/`lastError`/`pullFailure`（双锁：`didSet` + `publish()` 校验 `head.environment`）。
-- ⭐ 上传现状：拉回 seq 1 = 2 店家/9 系列/263 商品；导出卡在缺 **174 张**图 → 线上未被改动、重试安全。补齐 = iOS 重编 → 导出整包 → Mac 导入 → 发 seq 2。**CloudKit 记录 not indexable，无法从云端反推。**
+- ⭐ 上传现状（**10-07 已更新**）：dev 线上 **seq 4**（seq 3 = 首次受控发布；seq 4 = 删一个商品）。**「缺 174 张图」是假前提**（那是我审计脚本的 set 比对 bug）——实测 0 缺、4 引用、1 孤儿。09-29 App 内发布真失败过，死因是沙盒 `import mimetypes`（已修，且 10-07 已在沙盒内复验通过）。⚠️ 别拿 seq 1/seq 2 的口径互相套：seq 1 = 2 店家/9 系列/263 商品；seq 2 只有 1 店家。**CloudKit 记录 not indexable，无法从云端反推。**
+- ⭐ App 沙盒取证有两个 harness（文件触发 + 跑完自杀）：`snapshot.request`（视觉）、`bridge-probe.request`（只读探针 S1–S10）、**`publish-probe.request`（10-07 新增：发布演练 S11，固定 `dryRun=true`）**。⚠️ 三者**必须各用自己的触发文件** —— 只读探针的承诺是「从不构造 `--mode publish`」，合并就等于作废。演练整包要放**容器内** `publish-probe-stage/release.tar`（沙盒读不到 `/tmp`）。`osascript` 无辅助功能授权（-10004）→ **不能靠点击驱动 UI**。
+- ⭐ `stageTrail` **只收 `state == .started`** 的阶段事件 → Python 的 `freeze`/`verifyArtifact` **只发 succeeded、本来就不该在轨迹里**（拿它们当断言＝假失败）。⚠️ 于是**演练也会播报到 `switchHead`/`confirmHead`**（`run_child` 按子进程步骤标记翻译，与 `dryRun` 无关）：今天无害（`reachedHeadSwitch` **无任何消费方**，记已发布受 `dryRun==false && readBackConfirmed==true` 门禁），但谁照它那句「R09 判定关键输入」把它接进「结果待确认」判定，演练就会被误判成「可能已切头」。
 - ⭐ dev 线上 seq 1 **不是受控发布器产物**（引用全 `local:`）→ 别写死「引用是 thmedia:」，**实测再报**（`_media_reference_census`）。
 - ⭐ 凭证按环境分文件 `cloudkit.<env>.json`（legacy 只对 development 兜底），缺则抛 `credentialMissing` 不回落 Keychain，私钥永不进 `OpsCredentialSummary`。⚠️ 导入按**当前选中环境**命名 → 唯一拦截 `credentialSummary.declaredEnvironmentMatches`。
 - ⭐ iOS→Mac 整包交接（tar = `shop-catalog.json` + `images/<原文件名>`）；**哈希命名会让 `local:` 引用悬空**。
 - ⭐ 侧栏只剩 4 分区（系列上新/店家与系列/商品管理/本地预览）；`validate`/`exportReleasePackage`/`recordConfirmedPublish`/基线差分保留为无 UI 服务层。
-- ⭐ 云端同步面板 `OpsCloudSyncView`（单例 Model，工具栏 + 向导 S5）：自检三关 → 读基线 → 拉回 → 上传（**先导出整包再写冻结请求**；仅 `dryRun==false && readBackConfirmed==true` 记已发布）。仓库目录需用户授权一次。加 `@Published` 记得 `import Combine`。
+- ⭐⭐ **「云端同步」面板已整块删除**（10-07 定案）：工具栏 = **「云端更新」一键**
+  （`OpsCloudSyncModel.publishNow`，内部取发布头 → 自动采用基线 → 恒真实发布，
+  `dryRun`/`baselineAcknowledged`/拉回目录/iOS 交接的分步 UI 与模型方法全删）；
+  结果 = 顶部**悬浮框**（成功 15s 自动消失，失败常驻 + 「打开日志」）。
+  环境选择 / 仓库授权 / 凭证 / 日志入口全在 **设置（Cmd+,，`OpsSettingsView`）**。
+  服务层能力（`alignCatalogToPulledContent` 等）保留但无 UI 入口；探针 harness 自建请求不受影响。
+  加 `@Published` 记得 `import Combine`。
 - 可靠性地基：① `@Model` 新字段一律 Optional；② 变更必 `markDirty()`，`isReviewStale` 拦导出；③ 导出服务自复校验；④ 坏草稿只读 + 备份原始字节，唯一出口「另存为新草稿」；⑤ 编辑命令返回 Bool，成功才 `dismiss()`；⑥ 父子归属链在命令层拒。
 - ⭐ **Markdown**：`Text(字面量)` 才解析；变量文案一律过 `opsMarkdown(_:)`（`Label` 用闭包形态）。门禁 `tools/ops_ui/check_markdown_callsites.py`。⚠️ 门禁**只覆盖 Mac** —— iOS 共享文案要自己过 `AttributedString(markdown:options:.inlineOnlyPreservingWhitespace)`，否则 `**` 显示成星号。
 - ⭐ 媒体门禁：`thmedia:`/64hex 已远端化；`local:`+文件在＝待上传；`local:`+**文件不在＝阻断**；`bundle:` 内置；`http(s)://` 告警。待发布包格式不自创。
@@ -38,6 +47,13 @@
 - ⭐ 超时/取消是**抛出**不是结果；中断唯一入口 `interrupt(_:)`（先标记 collector 再 SIGTERM）。
 - ⭐ 基线快照是编码后产物（`.iso8601` 秒精度）→ 写基线前 `normalizeWorkingCopyToStoragePrecision()`。
 - ⭐ 主题跟随：`OpsFlowPalette` 全动态 NSColor；视图层禁用 `Color.white`/固定 hex 当**表面色**。快照 `-dark` 后缀 = 深色验收。
+- ⭐⭐ **系列发布 = 一键无感**（10-07 定案）：入口 `OpsWorkspace.publishSeries(cloud:)`
+  → 草稿箱记录 `OpsSeriesPublishJob`（SwiftData，新模型已加进两处 schema）→ 标记「发布中」
+  → `OpsCloudSyncModel.publishSeriesAuto`（内部 readOnlineBaseline + `adoptBaseline` 自动回填基线
+  + `publish(forceLiveRun:true)`）→ **全成功才删草稿记录**，失败/部分成功保留 + 条目级状态
+  + 日志路径 + 重试。前端入口：侧栏「发布草稿箱」= `OpsSeriesPublishQueueView`。
+  ⚠️ 不拉回整份目录（运营要求），代价 = 本地整包**取代**线上那一版，已在日志留痕。
+- ⭐⭐ **S5 提交 = 保存，不顺手发布**（10-07 重做定案）：反馈只有一条两态「保存成功 / 保存失败：<原因>」（`OpsSeriesWizardView.OpsSeriesSubmitFeedback`，单一 `@State` 替换式；失败不清空表单）。**根因**：R07 比的是草稿 `baseReleaseSeq`/`baseRootIndexHash`，而 App **从不回填**它们（`readOnlineBaseline()` 只写 `model.onlineHead`）→ 自动发布必被拒（实测退出码 5，草稿基线 2 / 线上 4）。**解法**：发布前自动 `adoptBaseline(head)` 回填（见上面「系列发布」那条），不再是阻塞。
 - ⭐ 系列上新向导：`OpsSeriesEntryDraft`/`OpsSeriesEntryValidator`，提交走 `commitSeriesEntry()` 一票拦截；**首次 = 追加 SaleEvent，再次改价 = `applyPriceCorrection`**。价格表上传入口在 **S2**（`importPriceChartImages`/`appendPriceChartImages`），S1 只选择。ViewBuilder 分支禁 `var`；`@Published` 计算属性无 `$` → 用 `bind(_ keyPath:)`。
 - ⭐⭐ **可售尺码勾选**：唯一口径 `CatalogSizeSelectionPolicy.autoFilled`（幂等），判据是「**一个有效尺码都没勾**」——**不是「缺哪些补哪些」**（后者会把用户手动取消的勾回来）；只勾一部分**一个字都不动**。触发**只有 5 个且全是人的动作**；**禁**在 body/onAppear 里对账。写回 `OpsWorkspace.autoSelectSellableSizes(entryID:)`。
 - ⭐ 规格卡默认只显示颜色：口径 `CatalogVariantColorGrouping`；**代表图 = 该色第一条有图的规格**（不是 `items[0]`）；`nil`/空串/空白同一组；展开态 `Set<String?>` 换商品必清空；逐条行仍用 `variantLabel`。**S3 快照必须 1900 高**（1180 会被裁 ⇒ 什么也没证明）。

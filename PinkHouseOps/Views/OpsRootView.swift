@@ -20,6 +20,7 @@
 //  并且**提供出口**（另存为新草稿 / 导出原始字节），而不是只告诉用户「出事了」。
 //
 
+import AppKit
 import SwiftData
 import SwiftUI
 import UniformTypeIdentifiers
@@ -41,7 +42,10 @@ struct OpsRootView: View {
         }
         .task {
             if workspace == nil {
-                workspace = OpsWorkspace(context: modelContext)
+                let created = OpsWorkspace(context: modelContext)
+                workspace = created
+                // 设置场景（Cmd+,）与主窗口共用这一份工作区 —— 另建一份就是两处真相。
+                OpsWorkspaceHolder.shared.workspace = created
             }
         }
     }
@@ -61,6 +65,7 @@ enum OpsSection: String, CaseIterable, Identifiable {
     case seriesEntry
     case catalog
     case products
+    case publishQueue
     case preview
 
     var id: String { rawValue }
@@ -70,6 +75,7 @@ enum OpsSection: String, CaseIterable, Identifiable {
         case .seriesEntry: return "系列上新"
         case .catalog: return "店家与系列"
         case .products: return "商品管理"
+        case .publishQueue: return "发布草稿箱"
         case .preview: return "本地预览"
         }
     }
@@ -79,6 +85,7 @@ enum OpsSection: String, CaseIterable, Identifiable {
         case .seriesEntry: return "sparkles.rectangle.stack"
         case .catalog: return "storefront"
         case .products: return "tshirt"
+        case .publishQueue: return "tray.2"
         case .preview: return "eye"
         }
     }
@@ -126,21 +133,67 @@ struct OpsMainView: View {
             }
         }
         .frame(minWidth: 980, minHeight: 620)
-        .toolbar {
-            // 「云端同步」是**唯一**的上下云入口（读线上基线 / 拉回目录 / 发布），
-            // 之所以放在工具栏而不是新增分区：发布中心区已在 09-27 按需求移除，
-            // 但「Mac 既不下云也不上云」这个洞必须有人能走通。
-            ToolbarItem(placement: .primaryAction) {
-                Button {
-                    cloudSync.showsSheet = true
-                } label: {
-                    Label("云端同步", systemImage: "cloud")
-                }
-                .help("读取线上基线 / 从线上拉回目录 / 构建待发布包并发布（经受控发布器）")
+        .overlay(alignment: .top) {
+            if let toast = updateToast {
+                OpsUpdateToastView(toast: toast) { updateToast = nil }
             }
         }
-        .sheet(isPresented: $cloudSync.showsSheet) {
-            OpsCloudSyncSheet(workspace: workspace)
+        .toolbar {
+            // 「云端更新」= **一键**：内部自动完成「取线上发布头 → 采用基线 →
+            // 构建整包 → 受控发布 → 回读确认」，运营无感，只看成功/失败（悬浮框）。
+            // 环境与凭证在 设置（Cmd+,）里配置 —— 分步卡片已于 2026-10-07 删除。
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    updateCloudNow()
+                } label: {
+                    if cloudSync.isRunning {
+                        ProgressView().controlSize(.small)
+                    } else {
+                        Label("云端更新", systemImage: "arrow.triangle.2.circlepath.circle")
+                    }
+                }
+                .disabled(cloudSync.isRunning || workspace.isCorrupted)
+                .help("一键把当前草稿发布到云端（环境与凭证在 设置 里配置）")
+            }
+        }
+    }
+
+    // MARK: 云端更新（一键）+ 悬浮框
+
+    @State private var updateToast: OpsCloudUpdateToast?
+    @State private var isUpdatingCloud = false
+
+    private func updateCloudNow() {
+        guard !isUpdatingCloud else { return }
+        isUpdatingCloud = true
+        updateToast = nil
+        Task { @MainActor in
+            let result = await cloudSync.publishNow(workspace: workspace)
+            isUpdatingCloud = false
+            switch result {
+            case .confirmed(let seq):
+                updateToast = OpsCloudUpdateToast(
+                    success: true,
+                    title: "云端更新完成",
+                    detail: "线上已是 releaseSeq \(seq)。",
+                    logPath: cloudSync.lastRunLogURL?.path)
+            case .failed(let reason):
+                updateToast = OpsCloudUpdateToast(
+                    success: false,
+                    title: "云端更新失败",
+                    detail: reason,
+                    logPath: cloudSync.lastRunLogURL?.path)
+            }
+            scheduleToastDismiss()
+        }
+    }
+
+    /// 悬浮框 15 秒后自己消失（失败的留着手动关，防止没人看到就没了）。
+    private func scheduleToastDismiss() {
+        guard updateToast?.success == true else { return }
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 15_000_000_000)
+            if updateToast?.success == true { updateToast = nil }
         }
     }
 
@@ -153,6 +206,8 @@ struct OpsMainView: View {
             OpsCatalogEditorView(workspace: workspace)
         case .products:
             OpsProductsView(workspace: workspace)
+        case .publishQueue:
+            OpsSeriesPublishQueueView(workspace: workspace)
         case .preview:
             OpsPreviewView(workspace: workspace)
         }
@@ -337,5 +392,69 @@ struct RawDataDocument: FileDocument {
 
     func fileWrapper(configuration: WriteConfiguration) throws -> FileWrapper {
         FileWrapper(regularFileWithContents: data)
+    }
+}
+
+// MARK: - 云端更新悬浮框（2026-10-07）
+
+/// 一次「云端更新」的结果（工具栏一键按钮的反馈）。
+struct OpsCloudUpdateToast: Equatable {
+    var success: Bool
+    var title: String
+    var detail: String?
+    /// 本次运行的日志文件路径（失败时这是排查入口，直接链过去）
+    var logPath: String?
+}
+
+/// 顶部悬浮的结果框：**一条**，新的更新会整体替换。
+/// 成功自动消失；失败常驻直到手动关闭 —— 「失败了」不许没人看见。
+struct OpsUpdateToastView: View {
+    let toast: OpsCloudUpdateToast
+    let onDismiss: () -> Void
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: toast.success ? "checkmark.circle.fill" : "xmark.circle.fill")
+                .foregroundStyle(toast.success ? Color.green : Color.red)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(toast.title)
+                    .font(.callout.weight(.semibold))
+                if let detail = toast.detail {
+                    // 变量文案过 opsMarkdown：`Text(变量)` 不解析 Markdown
+                    opsMarkdown(detail)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .textSelection(.enabled)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                HStack(spacing: 10) {
+                    if let logPath = toast.logPath {
+                        Button("打开日志") {
+                            NSWorkspace.shared.activateFileViewerSelecting(
+                                [URL(fileURLWithPath: logPath)])
+                        }
+                        .controlSize(.small)
+                    }
+                }
+                .padding(.top, 2)
+            }
+            Spacer(minLength: 8)
+            Button {
+                onDismiss()
+            } label: {
+                Image(systemName: "xmark.circle.fill")
+                    .foregroundStyle(.secondary)
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(12)
+        .frame(maxWidth: 560, alignment: .leading)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .strokeBorder(OpsFlowPalette.cardBorder, lineWidth: 1))
+        .shadow(color: .black.opacity(0.12), radius: 10, y: 4)
+        .padding(.horizontal, 24)
+        .padding(.top, 10)
     }
 }

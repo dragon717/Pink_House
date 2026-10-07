@@ -38,6 +38,8 @@ struct PinkHouseOpsApp: App {
     private let container: ModelContainer = {
         let schema = Schema([
             OpsCatalogDraftRecord.self,
+            // 系列发布的草稿箱（2026-10-07 需求：整系列一次发布 + 失败留痕可重试）
+            OpsSeriesPublishJob.self,
         ])
         let configuration = ModelConfiguration(
             schema: schema,
@@ -60,6 +62,11 @@ struct PinkHouseOpsApp: App {
             // 运营工具的草稿由侧栏管理，系统「新建文稿」在这里没有意义
             CommandGroup(replacing: .newItem) { }
         }
+        Settings {
+            // 环境选择 / 仓库授权 / 凭证 / 日志入口都在这里（Cmd+,）。
+            // 「云端同步」面板的分步卡片已删（2026-10-07）：发布是一键的，配置是静态的。
+            OpsSettingsView()
+        }
     }
 }
 
@@ -70,14 +77,29 @@ final class OpsAppDelegate: NSObject, NSApplicationDelegate {
 
     /// 有触发文件就跑对应的 harness 然后退出；没有则什么都不做。
     ///
-    /// 两个 harness 都是**文件触发 + 跑完自杀**，所以只会有一个生效（谁先命中谁跑，
-    /// 跑完 `terminate`）。顺序上快照排前面是**刻意保持既有的验收脚本行为逐字不变**：
+    /// 三个 harness 都是**文件触发 + 跑完自杀**，各自用**不同的触发文件名**，
+    /// 所以任意时刻最多只有一个生效（谁先命中谁跑，跑完 `terminate`）。
+    ///
+    /// 顺序上快照排前面是**刻意保持既有的验收脚本行为逐字不变**：
     /// 快照是视觉验收的入口，探针是沙盒取证的新入口，不该互相影响。
+    ///
+    /// ⚠️ 发布演练（`publish-probe.request`）**必须有自己的触发文件**，
+    /// 不能并进只读探针 —— 理由见 `BridgeProbeHarness` 文件头。
     func applicationDidFinishLaunching(_ notification: Notification) {
         if let directory = OpsSnapshotHarness.pendingRequest() {
             // 等首帧窗口布局完成再抓（0.9s 是 `render` 内部等待之外的额外余量）
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
                 OpsSnapshotHarness.run(into: directory)
+                NSApp.terminate(nil)
+            }
+            return
+        }
+        if let directory = OpsBridgeProbeHarness.pendingPublishRequest() {
+            // 发布演练：会真跑 `build_release.py`，比只读探针慢得多，
+            // 所以它排在只读探针**前面**判断 —— 两个触发文件同时存在时，
+            // 先跑「更重、更需要人盯着」的那一个。
+            Task {
+                await OpsBridgeProbeHarness.runPublish(into: directory)
                 NSApp.terminate(nil)
             }
             return

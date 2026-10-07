@@ -262,6 +262,7 @@ enum OpsSnapshotHarness {
         do {
             let schema = Schema([
                 OpsCatalogDraftRecord.self,
+                OpsSeriesPublishJob.self,   // 与 PinkHouseOpsApp 的 schema 保持一致
             ])
             return try ModelContainer(
                 for: schema,

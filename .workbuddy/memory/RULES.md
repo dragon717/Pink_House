@@ -1035,3 +1035,117 @@ MIME 与无沙盒一致 / 纯查表语义 / 白名单 ↔ 映射闭合），2 �
 可售尺码勾选项长在**最后一张卡**（颜色 SKU）上，用 1180 高会把它连同
 「还有 N 个没勾」+「全选」一起裁掉，那张快照就什么也没证明。
 `OpsSnapshotHarnessTests` 对收起/展开两张额外断言**字节不同**（都生成但长得一样 = 分组没生效）。
+
+---
+
+## ⭐⭐ 发布门禁分不清「已在公共库」与「缺失」：「拉回 → 编辑 → 发布」整条路走不通（10-07 发现，**未修**）
+
+### 现象
+拿**从线上拉回来的**目录做成整包去发布，`build_release.py` 以一堆**假错误**收场：
+
+```
+❌ 产物未通过协议校验，共 16 条问题：
+   [structural] media.reference.missing asset-7b654ca88839 assets.mediaKey
+     引用的媒体 7b654ca88839 不在本次待上传清单里（图没随发布一起走）
+   …（4 个资产 × 4 个字段 = 16 条）
+· 商店目录：没有需要上传的本地图片（引用均为 bundle: / http(s) / 空）
+```
+
+同一条命令换成「本地手头有原图、引用是 `local:`」的整包 → **通过**。
+所以不是「图真丢了」，是**门禁的判据太窄**。
+
+### 根因（两处，缺一不可）
+| 位置 | 行为 |
+|---|---|
+| `build_release.py:382-384` | `rewrite()` 开头 `if not value.startswith("local:"): return value` —— 拉回的 `thmedia:<64hex>` 被**原样返回**：既不重算摘要，也**不登记进 `media_records`** |
+| `build_release.py:903-909` | `validate_shop_catalog_media(shop_doc, {str(item["contentHash"]) for item in media_records})` —— `known_media_hashes` **只**来自本次运行产出的 `media_records` |
+
+于是凡是「引用指向线上已有的图」的字段，一律落进 `media.reference.missing`。
+
+### 为什么这是缺陷而不是「不支持的输入」
+`thmedia:<hash>` 是**内容寻址 + 不可变**（`THMedia` 记录名 `th.media.<hash>`）。
+「本次不上传」与「公共库里没有」是**两件事**，门禁把后者当成了唯一的解释。
+最坏的是**它给出的文案**：「图没随发布一起走」把一个「不需要再传」说成「漏传」——
+正是本项目最忌讳的那一类假证词（把没做说成做了 / 把做了说成没做）。
+
+### 后果（为什么必须优先修）
+- **首次发布必过、之后必挂**：第一版全是 `local:`（图在本地）→ 过；线上有了图之后，
+  本地通常已经没有原图（`pull-catalog` **不下载媒体**，这是既定行为）→ 挂。
+- **它顶掉了「先拉回，再发布」**：拉回是防「整块覆盖线上」的**唯一**手段（见 R07 一节），
+  而拉回后的产物发不出去 → 运营只有两条路：要么不拉回（危险），要么强推（更危险）。
+- B/C/D 三个阶段各自都要再做一次上传，不修等于后面全卡住。
+
+### 修法方向（别只改一半）
+判据要能表达「该摘要**已在公共库**」。可选：
+1. 发布前 `--mode pull-catalog` 拿到线上 root index，把线上已知的媒体摘要并进
+   `known_media_hashes`（最贴合语义：**证据来自线上**）；
+2. 或让 `rewrite()` 对 `thmedia:<hash>` 也**登记一条 `media_records`（`alreadyRemote: true`）**，
+   供门禁识别 —— 注意**不能**顺手把它塞进上传清单，否则每次发布都会重传一遍全量图。
+⚠️ 无论选哪条，**必须同时加一条反证测试**：真缺图（引用 `thmedia:` 但线上没有该记录）
+仍然要**阻断**。否则修完就是「怎么都放行」——那比现在更糟。
+
+---
+
+## App 沙盒内「发布链路」怎么取证：三个触发文件 + 一场演练（10-07 落地）
+
+### 背景：CLI 能发 ≠ App 能发
+App 侧真实发布最后一次是 **09-29 02:23**，死在这里：
+`build_release.py` → `mimetypes.guess_type()` → `PermissionError: '/etc/apache2/mime.types'`。
+**那个 bug 只在沙盒里出现，shell 直跑复现不出**（见 MIME 判定那一节）。
+所以修复之后，「运行记录」必须是**从 App 里发出来的**才算数 ——
+2026-10-07 在 CLI 里连发两版（seq 3 / seq 4）都对这条链路**一张证书都不算**。
+
+### 三个触发文件（都在容器 `Application Support/PinkHouseOps/` 下）
+| 触发文件 | 跑什么 | 会不会写线上 |
+|---|---|---|
+| `snapshot.request` | 视觉快照（9 张 PNG + `harness.log`） | 不会 |
+| `bridge-probe.request` | 只读探针 S1–S10（baseline / pull-catalog） | 不会（全程 `apply=False`） |
+| `publish-probe.request` | **发布演练 S11**（`--mode publish` + `dryRun=true`） | 不会（发布器走 `--dry-run`） |
+
+⛔ **三者必须各用自己的触发文件。** 只读探针在文件头给出的承诺是
+「只会用 `--mode baseline`……从不构造 `--mode publish`」——把演练并进
+`bridge-probe.request`，那句承诺当场作废：谁为看一眼 S9/S10 写下触发文件，
+都会顺带跑一遍完整发布链路。**约束写在注释里，而注释不拦人。**
+
+启动钩子顺序（`PinkHouseOpsApp.applicationDidFinishLaunching`）：
+快照 → **发布演练** → 只读探针。演练排前面是因为「更重、更需要人盯着」。
+
+### S11 的设计要点（照抄就行）
+- **为什么 dry run 就够**：`run_publish` **即使 dry run 也先跑 `build_release.py`**
+  （`ops_publish_bridge.py` 里就是 `--dry-run` / `--apply` 一个分支之差），
+  而那正是当年炸掉的那一步。`publish_cloudkit.py --dry-run` 不写库。
+- **判据落在「构建那段真的走完了」**：`exitCode == 0` **不够** ——
+  被 R07 拒掉也是非 0，那种非 0 什么也没证明。要看轨迹里有没有 `build`。
+  ⛔ **不要要求 `verifyArtifact`**：`stageTrail` 只收 `state == .started` 的事件
+  （`OpsPublisherBridge._stages`），而 Python 的 `freeze` / `verifyArtifact`
+  **只发 `succeeded`、从不发 `started`** → 它们**本来就不该**出现在轨迹里。拿它们当断言 = 假失败。
+- **基线不许旁路**：用 `--mode baseline` 读回的**真** `releaseSeq` / `rootIndexHash` 回填，
+  且 `baselineAcknowledged = false` —— 让 R07 闸门自己走出「一致」，
+  旁路掉就等于再也证明不了「App 与线上口径对得上」。
+- **必须配反证**：演练前后各读一次线上发布头，**发布号必须不变**。
+  没有这一步，「没写线上」只是我们的声明，不是观察到的事实。
+- **整包必须在容器内**：沙盒 App 读不到 `/tmp`，而且**不会报错**，只是读不到
+  （表现为「整包不存在」，很容易误判成探针写错了路径）。
+
+### 已知缺口：演练也会播报 `switchHead` / `confirmHead`
+`run_child` 是按**子进程打印的步骤标记**翻译阶段的，与 `dryRun` 无关；
+`publish_cloudkit.py --dry-run` 照样把七步的名字都打出来。于是演练日志里会出现
+「切换发布头」，`OpsBridgeRunResult.reachedHeadSwitch` 在演练中为 `true`。
+
+**今天为什么不判它失败**：
+- `reachedHeadSwitch` 全仓**只有它自己的声明、没有任何消费方**（死代码）；
+- App 侧「记一次已发布」受 `dryRun == false && receipt.readBackConfirmed == true` 门禁；
+- 回执是诚实的：演练回执写着 `readBackConfirmed=false`、上传 **0/4** 张、**0/1** 个包。
+
+**真正的风险在命名与文档**：它自称「R09 判定的关键输入」。谁照这句话把它接进
+「结果待确认」的判定，演练（以及**演练之后被打断**的那条路径）就会被误判成
+「可能已经切过头了」，进而禁止重发。**接之前先让它认得 `dryRun`。**
+
+### 顺带两条（不是缺陷，但会误导排查）
+- **Mac 的日志落盘只在视图层做**（`OpsCloudSyncView.persistLog`）→
+  任何绕过视图的调用方（探针、将来的其它入口）**不会**留 `bridge/logs/<runID>.log`。
+  排查「怎么没有日志」时先想这一条。
+- **无辅助功能授权，不能靠点击驱动 UI**：`osascript` 对 `System Events` 报
+  `权限违例 (-10004)`；`screencapture` 也没有屏幕录制授权。要「自己操控电脑测试」
+  只能走上面三个文件触发的 harness。受限 shell 里 `ps` 也被拒
+  （`operation not permitted`），用 `pgrep -fl` 代替。

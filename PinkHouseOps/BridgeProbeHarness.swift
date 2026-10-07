@@ -26,16 +26,32 @@
 //
 //  两边结果**不同**才说明「授权是那个决定性的东西」。都一样就是探针本身失效（记 `inconclusive`）。
 //
-//  ## 只做只读
+//  ## 只读探针 vs 发布演练（**两个触发文件，绝不合并**）
 //
-//  探针**只会**用 `--mode baseline`（只读线上发布头）。它从不构造 `--mode publish`，
-//  也不设 `dryRun` 以外的任何东西 —— 探针绝不允许成为「误发一次」的来源。
-//  写入只发生在容器内（`probe.log` / `probe.json`）。
+//  只读探针（`bridge-probe.request`）：**只会**用 `--mode baseline` / `--mode pull-catalog`
+//  （两者都 `apply=False`）。它从不构造 `--mode publish` ——
+//  探针绝不允许成为「误发一次」的来源。
+//
+//  发布演练（`publish-probe.request`，2026-10-07 补）：会构造 `--mode publish`，
+//  但**固定 `dryRun=true`** —— 于是它真跑 `build_release.py`（这正是 09-29
+//  在沙盒里炸掉的那一步），而发布器走 `--dry-run` 不写库。收尾还有一道反证：
+//  演练前后各读一次线上发布头，**发布号必须不变**。
+//
+//  ⭐ 两条链路坚持用两个触发文件，是因为「只读」这句承诺依赖「谁也不会顺手跑它」。
+//  合并的话，为看一眼 S9/S10 而写下触发文件的人就会顺带跑一遍发布链路 ——
+//  那正是本项目最贵的一课（演练绿灯 ≠ 真路径正确）的另一种翻版：
+//  约束写在注释里，而注释不拦人。
 //
 //  ## 触发方式：文件（与快照 harness 同机制）
 //
 //      CONTAINER=~/Library/Containers/bugod2.ItemManager.Ops/Data/Library/Application\ Support/PinkHouseOps
 //      printf 'bridge-probe' > "$CONTAINER/bridge-probe.request"     # 内容是输出子目录名，可省
+//      open -n build/sym/Debug/PinkHouseOps.app
+//
+//  发布演练另需先把整包放进容器（沙盒读不到 /tmp）：
+//
+//      cp release.tar "$CONTAINER/publish-probe-stage/release.tar"
+//      printf 'publish-probe' > "$CONTAINER/publish-probe.request"
 //      open -n build/sym/Debug/PinkHouseOps.app
 //
 //  产物：`<容器>/Library/Application Support/PinkHouseOps/<子目录名>/probe.log`（人读）
@@ -81,6 +97,42 @@ enum OpsBridgeProbeHarness {
             .trimmingCharacters(in: .whitespacesAndNewlines)
         try? FileManager.default.removeItem(at: marker)
         let folder = (requested?.isEmpty == false) ? requested! : defaultOutputFolderName
+        return root.appendingPathComponent(folder, isDirectory: true)
+    }
+
+    // MARK: - 发布演练的触发文件（与只读探针**刻意分成两个**）
+
+    /// 发布演练（S11）的触发文件名。
+    ///
+    /// ⭐ 为什么不复用 `bridge-probe.request`：本文件开头对只读探针的承诺是
+    /// 「只会用 `--mode baseline`……从不构造 `--mode publish`，也不设 `dryRun`
+    /// 以外的任何东西 —— 探针绝不允许成为『误发一次』的来源」。
+    /// 把演练挂在同一个触发文件上，那句承诺当场作废：谁为了看一眼 S9/S10
+    /// 写下 `bridge-probe.request`，都会顺带跑一遍完整发布链路。
+    /// 拆成两个文件之后，「看只读」与「看发布」是两个**显式**动作。
+    static let publishRequestFileName = "publish-probe.request"
+
+    /// 演练整包目录名（操作者先把 `release.tar` 放进这里）。
+    ///
+    /// 必须在**容器内**：沙盒 App 读不到容器外的路径（如 `/tmp`），
+    /// 而且**不会报错**，只是读不到 —— 于是表现为「整包不存在」。
+    static let publishStageFolderName = "publish-probe-stage"
+
+    /// 演练输出子目录的缺省名（触发文件为空时用它）。
+    static let defaultPublishOutputFolderName = "publish-probe"
+
+    /// 演练超时。比只读探针（120s）宽得多：这一关要真的跑
+    /// `build_release.py`（规范化图片 + 打包 + 复校验），几十兆图片要几分钟。
+    static let publishProbeTimeoutSeconds = 600
+
+    static func pendingPublishRequest() -> URL? {
+        let root = rootDirectory()
+        let marker = root.appendingPathComponent(publishRequestFileName)
+        guard FileManager.default.fileExists(atPath: marker.path) else { return nil }
+        let requested = (try? String(contentsOf: marker, encoding: .utf8))?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        try? FileManager.default.removeItem(at: marker)
+        let folder = (requested?.isEmpty == false) ? requested! : defaultPublishOutputFolderName
         return root.appendingPathComponent(folder, isDirectory: true)
     }
 
@@ -478,6 +530,268 @@ enum OpsBridgeProbeHarness {
                 .map { "\($0.field)=\($0.count)" }.joined(separator: " "))
         } catch {
             record("S10", "端到端 pull-catalog（只读）", false, "抛出：\(error.localizedDescription)")
+        }
+    }
+
+    // MARK: - 入口（发布演练）
+
+    /// 发布演练的入口。与 `run(into:)` 是**两个独立入口**，互不隐含。
+    ///
+    /// 前面几关（设置 / 未授权对照 / 凭证）刻意复用同一批函数：
+    /// 它们是「这个进程真的在沙盒里」的前提证明 —— 少了 S2 的对照组，
+    /// 后面「沙盒内能跑通发布」这句话可以被一个**没沙盒**的构建伪造出来。
+    static func runPublish(into directory: URL) async {
+        do {
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        } catch {
+            print("PROBE 建目录失败：\(error.localizedDescription)")
+            return
+        }
+        steps.removeAll()
+        logLines.removeAll()
+        defer { write(directory) }
+
+        log("PROBE（发布演练）开始，输出目录 \(directory.path)")
+        log("PROBE 用 --mode publish + dryRun=true：**会**真跑 build_release.py，"
+            + "但发布器走 --dry-run，不写线上任何内容。")
+
+        // 「不依赖授权」的几关必须排在前面（见 `run(into:)` 的顺序说明）。
+        probeSettings()
+        probeUnauthorizedControl()
+        probeCredentialFile()
+        guard let settings = decodedSettings() else {
+            record("S11d", "沙盒内跑发布链路（dry run）", false,
+                   "没有可解码的桥接设置，跳过（先过 S1）")
+            return
+        }
+        await probePublishDryRun(settings)
+    }
+
+    // MARK: - S11 沙盒内真跑一次发布链路（dry run，不写线上）
+
+    /// 这一关只回答一个问题：**「在真 App 沙盒里，`--mode publish` 那条链路跑得通吗？」**
+    ///
+    /// ## 为什么非要有它（2026-10-07 补）
+    ///
+    /// App 侧最后一次真实发布是 **09-29 02:23**，死在 `build_release.py:396` 的
+    /// `mimetypes.guess_type()` → `PermissionError: '/etc/apache2/mime.types'`。
+    /// 之后 MIME 判定改走 `protocol.media_mime_type()`（纯查表），
+    /// **但修复之后再没在沙盒里重跑过**。而那个 bug 只在沙盒里出现
+    /// （shell 直跑复现不出）—— 也就是说「CLI 能发」完全证明不了「App 能发」。
+    /// 2026-10-07 我在 CLI 里连发了 seq 3 / seq 4 都成功，那两张证书对这条链路
+    /// **一张都不算**。
+    ///
+    /// ## 为什么是 dry run 就够
+    ///
+    /// `run_publish` **即使 dry run 也会先跑 `build_release.py`**
+    /// （`ops_publish_bridge.py` 里就是 `--dry-run` / `--apply` 一个分支的差别），
+    /// 而 `build_release.py` 恰恰就是当年炸掉的那一步。之后
+    /// `publish_cloudkit.py --dry-run` 不写库 —— 探针仍然不是「误发一次」的来源。
+    ///
+    /// ## 反证（这一步不能省）
+    ///
+    /// 演练前后各读一次线上发布头，**发布号必须不变**。没有这一步，
+    /// 「没写线上」只是我们的声明，不是观察到的事实。
+    private static func probePublishDryRun(_ settings: OpsBridgeSettings) async {
+        let root = rootDirectory()
+        let stage = root.appendingPathComponent(publishStageFolderName, isDirectory: true)
+        let archive = stage.appendingPathComponent("release.tar")
+
+        var probeSettings = settings
+        probeSettings.timeoutSeconds = publishProbeTimeoutSeconds
+        let bridge = OpsPublisherBridge(settings: probeSettings)
+
+        // ---- 11a 整包就位（**真读**，不用 fileExists —— 沙盒里它骗人）
+        guard let archiveData = try? Data(contentsOf: archive) else {
+            record("S11a", "演练整包就位（容器内）", false,
+                   "读不到 \(archive.path) —— 沙盒 App 读不到容器外的路径（如 /tmp，"
+                   + "且不会报错）。请先把 release.tar 放进这个目录再跑。")
+            return
+        }
+        let payloadHash = ShopCatalogSyncProtocol.sha256Hex(archiveData)
+        record("S11a", "演练整包就位（容器内）", true,
+               "\(archiveData.count) 字节 · sha256=\(payloadHash.prefix(12))…")
+
+        // ---- 11b 演练前：读线上发布头（同时就是 R07 要回填的那份基线）
+        let beforeDirectory = root.appendingPathComponent("publish-probe-before", isDirectory: true)
+        guard let before = await readHeadOnce(
+            bridge: bridge, directory: beforeDirectory, tag: "publish-probe-before"),
+            let head = before.onlineHead else {
+            record("S11b", "演练前读线上发布头", false,
+                   "没读到发布头 → 基线回填不出来 → 演练会因 R07 被拒。"
+                   + "那说明「读」这一半坏了，**不能**据此说「发布链路坏了」。")
+            return
+        }
+        record("S11b", "演练前读线上发布头", true,
+               "releaseSeq=\(head.releaseSeq) · rootIndexHash=\(head.rootIndexHash?.prefix(12) ?? "未读到")…")
+
+        // ---- 11c 构造发布请求
+        let runDirectory = root.appendingPathComponent("publish-probe-run", isDirectory: true)
+        let inputDirectory = runDirectory.appendingPathComponent("input", isDirectory: true)
+        let outputDirectory = runDirectory.appendingPathComponent("output", isDirectory: true)
+        let receiptPath = runDirectory.appendingPathComponent("receipt.json")
+        try? FileManager.default.createDirectory(at: inputDirectory, withIntermediateDirectories: true)
+        // 产物目录必须是「空」或「看起来就是发布产物」，否则桥接器会拒绝
+        // （它不替运营删东西）。每次演练从干净的一份开始，结论才可比。
+        try? FileManager.default.removeItem(at: outputDirectory)
+
+        let request = ShopCatalogPublishRequest(
+            requestID: "publish-probe-\(UUID().uuidString)",
+            jobID: "probe",
+            draftID: "probe",
+            draftRevision: 0,
+            // 基线用**真线上**的号与摘要回填，并且**不**勾「已知线上已变」——
+            // 让 R07 闸门自己走出「一致」这条路，而不是被那条例外旁路掉。
+            // （旁路掉的话，这一关就再也证明不了「App 与线上口径对得上」。）
+            baseReleaseSeq: head.releaseSeq,
+            baseRootIndexHash: head.rootIndexHash,
+            baselineAcknowledged: false,
+            targetEnvironment: .development,
+            releaseSeq: head.releaseSeq + 1,
+            inputDirectory: inputDirectory.path,
+            archivePath: archive.path,
+            outputDirectory: outputDirectory.path,
+            receiptPath: receiptPath.path,
+            filesystemRoot: nil,
+            dryRun: true,
+            payloadHash: payloadHash)
+        let requestURL = runDirectory.appendingPathComponent("request.json")
+        do {
+            try request.encoded().write(to: requestURL, options: .atomic)
+        } catch {
+            record("S11c", "构造发布请求", false, "写请求文件失败：\(error.localizedDescription)")
+            return
+        }
+        record("S11c", "构造发布请求", true,
+               "seq \(head.releaseSeq) → \(head.releaseSeq + 1) · dryRun=true"
+               + " · 基线由桥接器自己读回，未旁路 R07")
+
+        // ---- 11d 真跑（只有这一步会启动 build_release.py 的子进程）
+        let box = OpsBridgeProbeEventBox()
+        do {
+            let result = try await Task.detached(priority: .userInitiated) { () throws -> OpsBridgeRunResult in
+                try bridge.run(
+                    mode: .publish,
+                    requestPath: requestURL,
+                    environmentName: "development"
+                ) { event in
+                    box.append(event)
+                }
+            }.value
+
+            let trail = result.stageTrail.map(\.rawValue)
+            // 判据落在**构建那一段真的走完了**上：只断言 `exitCode == 0` 不够 ——
+            // 被 R07 拒掉也是非 0，而那种非 0 什么也没证明；反过来，
+            // `build` 出现在轨迹里 = `build_release.py` 在沙盒里跑到了发 `succeeded`。
+            //
+            // ⚠️ 不要在这里要求 `verifyArtifact`（我第一版就写错了）：`stageTrail`
+            // 只收 `state == .started` 的事件（见 `OpsPublisherBridge._stages`），
+            // 而 Python 的 `freeze` 与 `verifyArtifact` **只发 `succeeded`、从不发 `started`**
+            // —— 于是这两个阶段**本来就不该**出现在轨迹里，拿它当判据是假失败。
+            let builtInsideSandbox = trail.contains(ShopCatalogPublishStage.build.rawValue)
+            var detail = "exitCode=\(result.exitCode) · 阶段轨迹=\(trail.joined(separator: " → "))"
+            detail += " · 产物 rootIndexHash=\(result.artifactRootIndexHash?.prefix(12) ?? "无")"
+            if let value = result.artifactReleaseSeq { detail += " · 产物 seq=\(value)" }
+            detail += " · 结论=\(result.outcome?.rawValue ?? "dry-run 成功不发 outcome 事件")"
+            if !result.nonJSONLines.isEmpty {
+                detail += " · 非 JSON 行 \(result.nonJSONLines.count) 条"
+            }
+            record("S11d", "沙盒内跑 build_release.py（dry run）",
+                   result.exitCode == 0 && builtInsideSandbox && result.artifactRootIndexHash != nil,
+                   detail)
+            // ⭐ 已知缺口（**不是**本关的判据，但必须写下来，否则读日志的人会误判）：
+            // 轨迹里有 `switchHead` / `confirmHead`，而这是一次**什么都没写**的演练。
+            // 成因：`run_child` 是按子进程打印的步骤标记翻译阶段的，与 dry_run 无关，
+            // 而 `publish_cloudkit.py --dry-run` 照样把七步的名字都打出来。
+            // 为什么现在不判它失败：`OpsBridgeRunResult.reachedHeadSwitch` 全仓
+            // **只有声明、没有任何消费方**（死代码），而 App 侧「记一次已发布」
+            // 受 `dryRun == false && receipt.readBackConfirmed == true` 门禁 ——
+            // 所以演练的状态判定是对的（回执也如实写着上传 0/4 张、0/1 个包）。
+            // 真正的风险是**文档与命名**：它自称「R09 判定的关键输入」，
+            // 一旦有人照这句话把它接进「结果待确认」的判定，演练（以及演练后被打断
+            // 的那条路径）就会被误判成「可能已经切过头」。接之前必须先让它认得 dryRun。
+            if result.reachedHeadSwitch {
+                log("注：dry run 的轨迹也播报到了 \(trail.last ?? "-")（reachedHeadSwitch=true）。"
+                    + "这是文案层面的已知缺口，不影响判定（该属性无消费方）。")
+            }
+            if result.exitCode != 0 {
+                log("S11d 最后几行："
+                    + box.snapshot().suffix(4).compactMap(\.displayLine).joined(separator: " / "))
+            }
+            if let receipt = result.receipt {
+                log("S11d 回执：releaseSeq=\(String(describing: receipt.releaseSeq))"
+                    + " · readBackConfirmed=\(String(describing: receipt.readBackConfirmed))"
+                    + " · 上传媒体 \(String(describing: receipt.uploadedMedia))/"
+                    + "\(String(describing: receipt.totalMedia))"
+                    + " · 上传包 \(String(describing: receipt.uploadedPacks))/"
+                    + "\(String(describing: receipt.totalPacks))")
+            }
+        } catch {
+            record("S11d", "沙盒内跑 build_release.py（dry run）", false,
+                   "抛出：\(error.localizedDescription)")
+            log("S11d 收到的最后几行事件："
+                + box.snapshot().suffix(3).compactMap(\.displayLine).joined(separator: " / "))
+            return
+        }
+
+        // ---- 11e 反证：线上发布号必须**没变**
+        let afterDirectory = root.appendingPathComponent("publish-probe-after", isDirectory: true)
+        guard let after = await readHeadOnce(
+            bridge: bridge, directory: afterDirectory, tag: "publish-probe-after"),
+            let afterHead = after.onlineHead else {
+            record("S11e", "反证：演练后线上发布号未变", false,
+                   "演练后读不到发布头 —— 「没写线上」这句话**没有观察到**，因此不算已证。")
+            return
+        }
+        let unchanged = afterHead.releaseSeq == head.releaseSeq
+        record("S11e", "反证：演练后线上发布号未变", unchanged,
+               "演练前 seq=\(head.releaseSeq)，演练后 seq=\(afterHead.releaseSeq)"
+               + (unchanged
+                  ? " —— dry run 确实没有动线上。"
+                  : " —— ⚠️ 发布号变了：dry run 没有生效，**立即停止一切发布动作**。"))
+    }
+
+    /// 一次只读的「读线上发布头」。S11 前后各用一次：
+    /// 前面用它取基线（回填请求），后面用它做反证。
+    ///
+    /// 刻意**不**复用 `probeBaseline`：那一关有自己的结论与计数器口径，
+    /// 把它的记录逻辑抽出来会在两处之间造出「同一条判定两份实现」的漂移面。
+    private static func readHeadOnce(
+        bridge: OpsPublisherBridge, directory: URL, tag: String
+    ) async -> OpsBridgeRunResult? {
+        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let request = ShopCatalogPublishRequest(
+            requestID: tag,
+            jobID: "probe",
+            draftID: "probe",
+            draftRevision: 0,
+            baseReleaseSeq: nil,
+            baseRootIndexHash: nil,
+            baselineAcknowledged: false,
+            targetEnvironment: .development,
+            releaseSeq: 1,
+            inputDirectory: directory.appendingPathComponent("input").path,
+            archivePath: directory.appendingPathComponent("none.tar").path,
+            outputDirectory: directory.appendingPathComponent("output").path,
+            receiptPath: directory.appendingPathComponent("receipt.json").path,
+            filesystemRoot: nil,
+            dryRun: true,
+            payloadHash: "probe")
+        let requestURL = directory.appendingPathComponent("request.json")
+        do {
+            try request.encoded().write(to: requestURL, options: .atomic)
+        } catch {
+            log("读基线：写请求文件失败 \(error.localizedDescription)")
+            return nil
+        }
+        do {
+            return try await Task.detached(priority: .userInitiated) { () throws -> OpsBridgeRunResult in
+                try bridge.run(
+                    mode: .baseline, requestPath: requestURL, environmentName: "development") { _ in }
+            }.value
+        } catch {
+            log("读基线抛出：\(error.localizedDescription)")
+            return nil
         }
     }
 
