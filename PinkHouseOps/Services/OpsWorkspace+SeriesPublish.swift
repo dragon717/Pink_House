@@ -52,7 +52,8 @@ extension OpsWorkspace {
     ///
     /// - Parameter cloud: 受控发布器的编排（单例，与云端同步面板同一份状态）
     @MainActor
-    func publishSeries(cloud: OpsCloudSyncModel) async -> OpsSeriesPublishOutcome {
+    func publishSeries(cloud: OpsCloudSyncModel,
+                       publishNow: ((OpsWorkspace) async -> OpsPublishInvocationResult)? = nil) async -> OpsSeriesPublishOutcome {
         // ── ① 整个系列一次落库（逐类型写进目录 + 落盘）──
         // 这是一次调用写完整个系列，不是让运营逐条点。
         let report = commitSeriesEntry()
@@ -60,71 +61,89 @@ extension OpsWorkspace {
         let items: [OpsSeriesPublishItem] = itemStates(from: report)
         let failed = items.filter { !$0.ok }
 
-        // 草稿箱记录：**先建**（内容已经在目录里了），再决定发不发。
-        let snapshot = try? ShopCatalogJSONCoding.encoder().encode(catalog)
-        let job = upsertSeriesPublishJob(
-            seriesID: report.seriesID ?? seriesEntry.seriesID,
-            seriesName: seriesDisplayName,
-            shopID: report.shopID ?? seriesEntry.shopID,
-            items: items,
-            catalogSnapshot: snapshot)
-
-        // ── ② 条目有失败 → 不发起发布（发了就是「线上只有半个系列」）──
-        if !failed.isEmpty || report.blocked {
-            let status: OpsSeriesPublishStatus = report.blocked ? .failed : .partialFailed
-            let reason = report.blocked
-                ? (report.blockedByValidation
-                    .map { ($0.entryName.isEmpty ? "" : $0.entryName + "：") + $0.message }
-                    .joined(separator: "；"))
-                : failed.map { ($0.name.isEmpty ? $0.id : $0.name) + "：" + ($0.message ?? "未说明原因") }
-                    .joined(separator: "；")
-            job.markFailed(status, error: reason, logPath: nil)
-            job.items = items
-            persistJob(job)
+        // 完整落盘草稿箱后才能开始网络发布；保存失败保留输入。
+        let job: OpsSeriesPublishJob
+        do {
+            let staged = try stageSeriesPublishJob(report: report)
+            job = staged.job
+            if !failed.isEmpty || report.blocked {
+                let reason = report.blocked
+                    ? report.blockedByValidation
+                        .map { ($0.entryName.isEmpty ? "" : $0.entryName + "：") + $0.message }
+                        .joined(separator: "；")
+                    : failed.map { ($0.name.isEmpty ? $0.id : $0.name) + "：" + ($0.message ?? "未说明原因") }
+                        .joined(separator: "；")
+                job.markFailed(report.blocked ? .failed : .partialFailed, error: reason, logPath: nil)
+                do { try saveCatalogContext(context) } catch { staged.undo(); throw error }
+                return .failed(reason: reason, itemFailures: failed)
+            }
+            job.markPublishing()
+            do { try saveCatalogContext(context) } catch { staged.undo(); throw error }
+        } catch {
+            let reason = "存入发布草稿箱失败（填写内容已保留）：\(error.localizedDescription)"
+            lastError = reason
             return .failed(reason: reason, itemFailures: failed)
         }
+        let submissionID = job.submissionID
 
-        // ── ③ 内容已完整落库 → 标记「发布中」再发 ──
-        job.markPublishing()
-        job.items = items
-        persistJob(job)
-
+        // 冻结完成操作对应的输入；网络等待期间允许继续编辑。
+        let completedEntry = seriesEntry
+        let completedDraftID = draft?.id
+        let completedName = job.seriesName
+        // 可替换的发布调用供离线回归；默认仍走同一受控发布器。
+        let result: OpsPublishInvocationResult
+        if let publishNow {
+            result = await publishNow(self)
+        } else {
+            result = await cloud.publishNow(workspace: self)
+        }
         // ── ④ 一次发布（内部自动取发布头 / 采用基线 / 真实发布）──
-        switch await cloud.publishNow(workspace: self) {
+        switch result {
         case .confirmed(let seq):
             // 只有**整个系列全部成功**才删草稿箱记录
-            deleteJob(job)
-            statusMessage = "系列「\(seriesDisplayName)」已发布（releaseSeq \(seq)）。"
+            if job.submissionID == submissionID { deleteJob(job) }
+            statusMessage = "系列「\(completedName)」已发布（releaseSeq \(seq)）。"
             lastError = nil
+            finishSeriesEntry(expected: completedEntry, draftID: completedDraftID)
             return .published(releaseSeq: seq)
         case .failed(let reason):
-            job.markFailed(.failed, error: reason, logPath: cloud.lastRunLogURL?.path)
-            persistJob(job)
+            if job.submissionID == submissionID {
+                job.markFailed(.failed, error: reason, logPath: cloud.lastRunLogURL?.path)
+                persistJob(job)
+            }
             return .failed(reason: reason, itemFailures: [])
         }
     }
 
     /// 重试一次草稿箱里的失败任务：**复用同一条记录**，不新建（否则草稿箱会越堆越多）。
     @MainActor
-    func retrySeriesPublish(job: OpsSeriesPublishJob, cloud: OpsCloudSyncModel) async
+    func retrySeriesPublish(job: OpsSeriesPublishJob, cloud: OpsCloudSyncModel,
+                            publishNow: ((OpsWorkspace) async -> OpsPublishInvocationResult)? = nil) async
         -> OpsSeriesPublishOutcome {
-        // ⚠️ 归属校验：重试的是**这条记录里的系列**，不是「向导当前打开的系列」。
-        // 少了这道判断，运营在 A 系列的记录上点重试、而向导停在 B 系列时，
-        // 会把 B 的内容当成 A 发出去 —— 这类错配改起来比失败贵得多。
-        if !seriesEntry.seriesID.isEmpty && seriesEntry.seriesID != job.seriesID {
-            let reason = "当前向导打开的是另一个系列（\(seriesDisplayName)），"
-                + "不能替「\(job.seriesName)」重试：请先切到那个系列再点重试。"
-            job.markFailed(.failed, error: reason, logPath: nil)
-            persistJob(job)
-            return .failed(reason: reason, itemFailures: job.failedItems)
+        guard !cloud.isRunning, !cloud.isSyncing, job.status != .publishing,
+              job.status != .published else {
+            return .failed(reason: "已有发布进行中或此系列已经发布，请先查看结果。", itemFailures: [])
         }
-
+        guard job.draftID == nil || job.draftID == draft?.id else {
+            return .failed(reason: "此系列属于另一份本机草稿，请先打开所属草稿再发布。", itemFailures: [])
+        }
+        guard job.environment == nil || job.environment == cloud.targetEnvironment.rawValue else {
+            return .failed(reason: "请先切换到此草稿记录的目标环境（\(job.environment ?? "")）再发布。", itemFailures: [])
+        }
+        let needsRecommit = !job.failedItems.isEmpty || job.status == .partialFailed
+        guard (!job.seriesID.isEmpty && catalog.series.contains(where: { $0.id == job.seriesID }))
+                || needsRecommit, !isCorrupted else {
+            return .failed(reason: "当前草稿中找不到此系列或草稿不可编辑，不能发布此记录。", itemFailures: [])
+        }
         // 「条目没落成」的重试要重新落一次（运营可能刚改完）；
         // 「发布本身失败」的重试不需要再写目录 —— 内容上次就落好了。
-        let needsRecommit = !job.failedItems.isEmpty || job.status == .partialFailed
         var items = job.items
         if needsRecommit {
+            guard seriesEntry.seriesID == job.seriesID else {
+                return .failed(reason: "此系列还有条目需要修正，请在上新向导打开对应系列后重试。", itemFailures: job.failedItems)
+            }
             let report = commitSeriesEntry()
+            if report.allOK, let seriesID = report.seriesID { job.seriesID = seriesID }
             items = itemStates(from: report)
             job.items = items
             let failed = items.filter { !$0.ok }
@@ -140,48 +159,139 @@ extension OpsWorkspace {
                 return .failed(reason: reason, itemFailures: failed)
             }
         }
+        let previousStatus = job.status
+        let previousAttempts = job.attemptCount
+        let previousUpdatedAt = job.updatedAt
+        let previousSnapshot = job.catalogSnapshotJSON
         job.markPublishing()
-        persistJob(job)
-        switch await cloud.publishNow(workspace: self) {
+        do {
+            // 从所属目录的最新保存内容发布；不把旧快照覆盖到运营的新编辑上。
+            job.catalogSnapshotJSON = try ShopCatalogJSONCoding.encoder().encode(catalog)
+            try saveCatalogContext(context)
+        } catch {
+            job.status = previousStatus
+            job.attemptCount = previousAttempts
+            job.updatedAt = previousUpdatedAt
+            job.catalogSnapshotJSON = previousSnapshot
+            return .failed(reason: "发布状态保存失败，尚未上传：\(error.localizedDescription)", itemFailures: [])
+        }
+        let submissionID = job.submissionID
+        let completedEntry = seriesEntry
+        let completedDraftID = draft?.id
+        let result: OpsPublishInvocationResult
+        if let publishNow { result = await publishNow(self) }
+        else { result = await cloud.publishNow(workspace: self) }
+        switch result {
         case .confirmed(let seq):
-            deleteJob(job)
+            let completedSeriesID = job.seriesID
+            let completedName = job.seriesName
+            if job.submissionID == submissionID { deleteJob(job) }
+            statusMessage = "系列「\(completedName)」已发布（releaseSeq \(seq)）。"
+            lastError = nil
+            if completedEntry.seriesID == completedSeriesID {
+                finishSeriesEntry(expected: completedEntry, draftID: completedDraftID)
+            }
             return .published(releaseSeq: seq)
         case .failed(let reason):
-            job.markFailed(.failed, error: reason, logPath: cloud.lastRunLogURL?.path)
-            persistJob(job)
+            if job.submissionID == submissionID {
+                job.markFailed(.failed, error: reason, logPath: cloud.lastRunLogURL?.path)
+                persistJob(job)
+            }
             return .failed(reason: reason, itemFailures: [])
         }
     }
 
     // MARK: 草稿箱读写
 
-    /// 同一个系列只保留一条发布任务（重试沿用旧记录，不堆新的）。
-    private func upsertSeriesPublishJob(
-        seriesID: String,
-        seriesName: String,
-        shopID: String?,
-        items: [OpsSeriesPublishItem],
-        catalogSnapshot: Data?
-    ) -> OpsSeriesPublishJob {
-        let descriptor = FetchDescriptor<OpsSeriesPublishJob>(
-            predicate: #Predicate { $0.seriesID == seriesID })
-        if let existing = (try? context.fetch(descriptor))?.first {
-            existing.items = items
-            existing.catalogSnapshotJSON = catalogSnapshot
-            existing.updatedAt = Date()
-            try? context.save()
-            return existing
+    /// 从草稿箱显式切到记录所属的目录；先保存当前工作，避免覆盖正在填写的下一份系列。
+    func openSeriesPublishDraft(job: OpsSeriesPublishJob) -> Bool {
+        guard let ownerID = job.draftID else {
+            lastError = "此旧记录没有所属草稿信息，请打开原草稿后发布。"
+            return false
         }
-        let job = OpsSeriesPublishJob(
-            seriesID: seriesID,
-            seriesName: seriesName,
-            shopID: shopID,
-            shopName: catalog.shops.first(where: { $0.id == shopID })?.name,
-            items: items,
-            catalogSnapshotJSON: catalogSnapshot)
-        context.insert(job)
-        try? context.save()
-        return job
+        if ownerID == draft?.id { return true }
+        guard !OpsCloudSyncModel.shared.isRunning, !OpsCloudSyncModel.shared.isSyncing,
+              let current = draft, !current.isCorrupted else { return false }
+        if hasUnsavedChanges, !saveDraft() { return false }
+        let previousJSON = current.seriesEntryJSON
+        do {
+            current.seriesEntryJSON = try ShopCatalogJSONCoding.encoder().encode(seriesEntry)
+            try saveCatalogContext(context)
+        } catch {
+            current.seriesEntryJSON = previousJSON
+            lastError = "当前填写内容保存失败，未切换草稿：\(error.localizedDescription)"
+            return false
+        }
+        return adoptDraft(id: ownerID)
+    }
+
+    /// 草稿箱记录与空白向导一起落盘：只有这一步成功才清空界面。
+    func storeSubmittedSeriesDraft(report: OpsSeriesEntryCommitReport) -> Bool {
+        guard report.allOK else { return false }
+        do {
+            let staged = try stageSeriesPublishJob(report: report)
+            guard finishSeriesEntry(expected: seriesEntry, draftID: draft?.id) else {
+                staged.undo()
+                lastError = "存入发布草稿箱失败，已保留填写内容：" + (lastError ?? "未能保存空白表单")
+                return false
+            }
+            return true
+        } catch {
+            lastError = "存入发布草稿箱失败，已保留填写内容：\(error.localizedDescription)"
+            return false
+        }
+    }
+
+    /// 同一目录草稿中的同一系列复用记录；修改暂存于当前 context，调用方负责
+    /// 检查落盘结果，失败只回退这条记录，不能回滚运营的其它编辑。
+    private func stageSeriesPublishJob(report: OpsSeriesEntryCommitReport) throws
+        -> (job: OpsSeriesPublishJob, undo: () -> Void) {
+        let seriesID = report.seriesID ?? seriesEntry.seriesID
+        let snapshot = try ShopCatalogJSONCoding.encoder().encode(catalog)
+        let matches = try context.fetch(FetchDescriptor<OpsSeriesPublishJob>(
+            predicate: #Predicate { $0.seriesID == seriesID }))
+        let ownerID = draft?.id
+        let existing = matches.first { $0.draftID == ownerID }
+        let shopID = report.shopID ?? seriesEntry.shopID
+        let job = existing ?? OpsSeriesPublishJob(seriesID: seriesID, seriesName: seriesDisplayName)
+        let old = (name: job.seriesName, shop: job.shopID, shopName: job.shopName,
+                   draft: job.draftID, submission: job.submissionID, status: job.statusRaw,
+                   items: job.itemsJSON, snapshot: job.catalogSnapshotJSON, environment: job.environment,
+                   error: job.lastError, log: job.logPath, seq: job.releaseSeq, attempts: job.attemptCount, updated: job.updatedAt)
+        if existing == nil { context.insert(job) }
+        job.seriesName = seriesDisplayName
+        job.shopID = shopID
+        job.shopName = catalog.shops.first { $0.id == shopID }?.name
+        job.draftID = ownerID
+        job.submissionID = UUID().uuidString
+        job.status = .pending
+        job.items = itemStates(from: report)
+        job.catalogSnapshotJSON = snapshot
+        job.environment = OpsCloudSyncModel.shared.targetEnvironment.rawValue
+        job.lastError = nil
+        job.logPath = nil
+        job.releaseSeq = nil
+        job.updatedAt = Date()
+        return (job, { [context] in
+            if existing == nil {
+                context.delete(job)
+            } else {
+                job.seriesName = old.name
+                job.shopID = old.shop
+                job.shopName = old.shopName
+                job.draftID = old.draft
+                job.submissionID = old.submission
+                job.statusRaw = old.status
+                job.itemsJSON = old.items
+                job.catalogSnapshotJSON = old.snapshot
+                job.environment = old.environment
+                job.lastError = old.error
+                job.logPath = old.log
+                job.releaseSeq = old.seq
+                job.attemptCount = old.attempts
+                job.updatedAt = old.updated
+            }
+        })
     }
 
     private func persistJob(_ job: OpsSeriesPublishJob) {

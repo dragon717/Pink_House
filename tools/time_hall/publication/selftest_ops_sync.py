@@ -4,6 +4,8 @@ import contextlib
 import hashlib
 import io
 import json
+import subprocess
+import tarfile
 from pathlib import Path
 import tempfile
 import unittest
@@ -12,10 +14,82 @@ from unittest.mock import patch
 import ops_publish_bridge as bridge
 from build_release import collect_shop_catalog_media
 from protocol import ProtocolError
-from publish_adapters import CloudKitWebServicesAdapter, Credentials, NetworkError, existing_records
+from publish_adapters import CredentialError, CloudKitWebServicesAdapter, Credentials, NetworkError, existing_records
 
 
 class SyncTests(unittest.TestCase):
+    def test_first_publication_builds_without_remote_manifest_even_if_stale_file_exists(self):
+        # 真跑构建器，发布器截断：复现首次发布传入不存在清单造成的失败，
+        # 同时确保上次环境留下的清单不会污染这次纯本地输入。
+        doc = {"version": 1, "shops": [{"id": "shop", "name": "验收店家"}],
+               "series": [], "products": [], "variants": [], "sizeCharts": [],
+               "saleEvents": [], "assets": [], "styleProfiles": []}
+        with tempfile.TemporaryDirectory() as tmp:
+            directory = Path(tmp)
+            archive = directory / 'fixture.tar'
+            data = json.dumps(doc).encode('utf-8')
+            with tarfile.open(archive, 'w', format=tarfile.USTAR_FORMAT) as tar:
+                member = tarfile.TarInfo('shop-catalog.json')
+                member.size = len(data)
+                tar.addfile(member, io.BytesIO(data))
+            for stale in (False, True):
+                input_dir = directory / ('stale-input' if stale else 'fresh-input')
+                input_dir.mkdir()
+                if stale:
+                    (input_dir / 'known-remote-media.json').write_text('invalid stale evidence')
+                request = {"requestID": "first-publish", "jobID": "first-publish",
+                           "draftID": "first-publish", "targetEnvironment": "production", "dryRun": True,
+                           "archivePath": str(archive), "inputDirectory": str(input_dir),
+                           "outputDirectory": str(directory / ('stale-output' if stale else 'fresh-output')),
+                           "receiptPath": str(directory / 'receipt.json'), "releaseSeq": 1,
+                           "payloadHash": bridge.sha256_file(archive), "baseReleaseSeq": 0}
+                build_results = []
+                def run_child(argv, quiet):
+                    if Path(argv[1]).name == 'build_release.py':
+                        result = subprocess.run(argv, capture_output=True, text=True, encoding='utf-8')
+                        build_results.append(result)
+                        return result.returncode, []
+                    return 1, []  # 不执行远端发布
+                with patch.object(bridge, 'read_head', return_value=None), \
+                     patch.object(bridge, 'run_child', side_effect=run_child), \
+                     contextlib.redirect_stdout(io.StringIO()):
+                    bridge.run_publish(request, True)
+                self.assertEqual(len(build_results), 1)
+                self.assertEqual(build_results[0].returncode, 0,
+                                 build_results[0].stdout + build_results[0].stderr)
+
+    def test_observed_empty_baseline_allows_first_publication(self):
+        self.assertEqual(bridge.baseline_mismatches(
+            {"baseReleaseSeq": 0, "baseRootIndexHash": None}, None), [])
+        self.assertEqual(bridge.baseline_mismatches(
+            {"baseReleaseSeq": "0", "baseRootIndexHash": ""}, None), [])
+
+    def test_unknown_or_previously_published_baseline_never_becomes_empty_baseline(self):
+        for request in ({}, {"baseReleaseSeq": 2},
+                        {"baseReleaseSeq": 0, "baseRootIndexHash": "a" * 64}):
+            self.assertTrue(bridge.baseline_mismatches(request, None))
+
+    def test_empty_baseline_is_stale_if_another_publisher_created_head(self):
+        self.assertTrue(bridge.baseline_mismatches(
+            {"baseReleaseSeq": 0, "baseRootIndexHash": None},
+            {"releaseSeq": 1, "rootIndexHash": "a" * 64}))
+
+    def test_authentication_failure_cannot_be_treated_as_empty_production(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            directory = Path(tmp)
+            archive = directory / 'release.tar'
+            archive.write_bytes(b'frozen archive')
+            request = {"targetEnvironment": "production", "dryRun": False,
+                       "archivePath": str(archive), "inputDirectory": str(directory / 'input'),
+                       "outputDirectory": str(directory / 'output'),
+                       "receiptPath": str(directory / 'receipt.json'), "releaseSeq": 1,
+                       "payloadHash": bridge.sha256_file(archive),
+                       "baseReleaseSeq": 0, "baseRootIndexHash": None}
+            with patch.object(bridge, 'read_head', side_effect=CredentialError('HTTP 401')), \
+                 patch.object(bridge, 'run_child') as child, contextlib.redirect_stdout(io.StringIO()):
+                self.assertEqual(bridge.run_publish(request, True), bridge.EXIT_REFUSED)
+                child.assert_not_called()
+
     def test_only_not_found_is_absent(self):
         self.assertEqual(existing_records({"records": [{"serverErrorCode": "NOT_FOUND"}]}), [])
         for response in ({}, {"records": []}, {"records": [{}]}, {"serverErrorCode": "ACCESS_DENIED"},

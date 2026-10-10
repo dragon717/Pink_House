@@ -149,6 +149,37 @@ final class ShopCatalogMediaReferenceTests: XCTestCase {
 
     // MARK: 夹具
 
+    func testCompleteHandoffIncludesNonAssetImageFieldsAndDeduplicates() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let catalog = makeFullCatalog()
+        let expected = Set(["asset-1.png", "asset-1-thumb.png", "asset-1-preview.png",
+                            "logo.png", "shop-cover.png", "series-cover.png",
+                            "price-1.png", "price-2.png", "size-1.png"])
+        for name in expected { try Data(name.utf8).write(to: directory.appendingPathComponent(name)) }
+        let entries = try ShopCatalogExportArchive.completeHandoffEntries(for: catalog, imageDirectory: directory)
+        XCTAssertEqual(entries.count, expected.count + 1)
+        XCTAssertEqual(Set(entries.dropFirst().map(\.name)), Set(expected.map { "images/" + $0 }))
+        XCTAssertEqual(entries.first?.name, "shop-catalog.json")
+        let restored = try ShopCatalogJSONCoding.decoder().decode(ShopCatalog.self, from: entries[0].data)
+        XCTAssertEqual(restored, catalog)
+    }
+
+    func testCompleteHandoffFailsWhenOnlyProductAssetImagesExist() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        for name in ["asset-1.png", "asset-1-thumb.png", "asset-1-preview.png"] {
+            try Data(name.utf8).write(to: directory.appendingPathComponent(name))
+        }
+        XCTAssertThrowsError(try ShopCatalogExportArchive.completeHandoffEntries(
+            for: makeFullCatalog(), imageDirectory: directory)) { error in
+            XCTAssertEqual(error as? ShopCatalogHandoffExportError, .missingImages(
+                ["logo.png", "price-1.png", "price-2.png", "series-cover.png", "shop-cover.png", "size-1.png"]))
+        }
+    }
+
     private func makeFullCatalog() -> ShopCatalog {
         var series = CatalogSeries(id: "series-1", shopID: "shop-1", name: "星月夜")
         series.cover = "local:series-cover.png"

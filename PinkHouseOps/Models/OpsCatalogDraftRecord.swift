@@ -103,6 +103,13 @@ final class OpsCatalogDraftRecord {
     var lastPublishedRevision: Int?
     var lastPublishedAt: Date?
 
+    // 显式编辑保存的同步意图；可空列兼容已有 SwiftData 草稿。
+    var catalogSyncRequestID: String?
+    var catalogSyncRevision: Int?
+    var catalogSyncEnvironment: String?
+    var catalogSyncAttemptedID: String?
+    var catalogSyncError: String?
+
     // MARK: 工作台恢复
 
     /// 上次在商品编辑器里打开的商品（工作台「继续编辑」用）。
@@ -114,6 +121,10 @@ final class OpsCatalogDraftRecord {
     /// **必须 Optional**（同 R01 字段的理由）：存量库加列不能要求默认值推断。
     /// 未完成类型不能进目录，但必须随草稿恢复 —— 见 OpsWorkspace+SeriesEntry.swift。
     var seriesEntryJSON: Data?
+
+    /// 上传素材的原文件名与资源快照，独立于短期向导及可替换的目录内容。
+    /// 可空列兼容已有草稿；图片字节继续使用所属草稿的 staging 副本。
+    var uploadedImageHistoryJSON: Data?
 
     init(
         id: String = UUID().uuidString,

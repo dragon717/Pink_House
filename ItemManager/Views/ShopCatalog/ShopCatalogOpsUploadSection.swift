@@ -176,7 +176,7 @@ struct ShopCatalogOpsUploadSection: View {
                         .foregroundStyle(.secondary)
                 }
             } else {
-                Text("本机还没有「线上那一版」：先让云端同步成功一次（商店页下拉刷新），再回来对齐。")
+                Text("本机还没有「线上那一版」：云端内容会自动同步，请稍后回来查看差异并对齐。")
                     .font(.system(size: 12))
                     .foregroundStyle(.secondary)
             }

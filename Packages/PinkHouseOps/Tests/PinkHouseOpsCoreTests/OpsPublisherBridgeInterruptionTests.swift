@@ -35,6 +35,38 @@ import SharedCatalog
 
 final class OpsPublisherBridgeInterruptionTests: XCTestCase {
 
+    func testOnlyIncreasingCompletedCountsExtendTransferDeadline() {
+        var ledger = OpsBridgeActivityLedger()
+        func progress(_ completed: Int) -> ShopCatalogPublishEvent {
+            .init(type: "progress", stage: .uploadMedia, completed: completed, total: 442)
+        }
+        XCTAssertFalse(ledger.observe(progress(0)))
+        XCTAssertTrue(ledger.observe(progress(1)))
+        XCTAssertFalse(ledger.observe(progress(1)))
+        XCTAssertFalse(ledger.observe(progress(0)))
+        XCTAssertTrue(ledger.observe(progress(442)))
+        XCTAssertFalse(ledger.observe(progress(443)))
+    }
+
+    func testStageTransitionsExtendDeadlineButRepeatedLogsDoNot() {
+        var ledger = OpsBridgeActivityLedger()
+        let started = ShopCatalogPublishEvent(type: "stage", stage: .fetchMedia, state: .started)
+        XCTAssertTrue(ledger.observe(started))
+        XCTAssertFalse(ledger.observe(started))
+        XCTAssertFalse(ledger.observe(.init(type: "log", message: "still waiting")))
+        XCTAssertTrue(ledger.observe(.init(type: "stage", stage: .fetchMedia, state: .succeeded)))
+    }
+
+    func testReadOnlyInterruptionNeverClaimsPublishOutcomeIsUnknown() {
+        for mode in [OpsBridgeMode.fetchMedia, .pullCatalog, .baseline, .query] {
+            let detail = OpsBridgeError.timedOut(seconds: 900).diagnostic(for: mode)
+            XCTAssertTrue(detail.contains("只读"))
+            XCTAssertFalse(detail.contains("切换发布头"))
+            XCTAssertFalse(OpsBridgeError.cancelled.diagnostic(for: mode).contains("查询结果"))
+        }
+        XCTAssertTrue(OpsBridgeError.timedOut(seconds: 900).diagnostic(for: .publish).contains("查询结果"))
+    }
+
     // MARK: - 中断账本（纯逻辑）
 
     func testEmptyLedgerResolvesToNothing() {

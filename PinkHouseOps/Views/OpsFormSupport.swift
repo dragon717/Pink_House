@@ -176,6 +176,24 @@ struct OpsThumbnail: View {
     }
 }
 
+/// 可点击的图片上传入口：已选图片和空占位框都能打开同一个文件选择器。
+struct OpsImageUploadThumbnail: View {
+    let url: URL?
+    var size: CGFloat = 40
+    let title: String
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            OpsThumbnail(url: url, size: size)
+                .contentShape(RoundedRectangle(cornerRadius: size * 0.14))
+        }
+        .buttonStyle(.plain)
+        .help(title)
+        .accessibilityLabel(Text(title))
+    }
+}
+
 // MARK: - 表单外壳
 
 /// 统一的表单外壳（标题 + 内容 + 取消/保存）。

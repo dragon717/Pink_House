@@ -33,6 +33,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -204,6 +205,28 @@ def collect_assets(
     return packs, media
 
 
+def upload_missing_media(adapter: PublishAdapter, media: List[Dict[str, Any]]) -> int:
+    uploaded_media = 0
+    existing_media = adapter.media_exists_many([item["contentHash"] for item in media])
+    missing_media = [item for item in media if item["contentHash"] not in existing_media]
+    for item in missing_media:
+        if not item["filePath"].exists():
+            raise FileNotFoundError("媒体文件缺失：{}".format(item["filePath"]))
+    # 只并发不可变媒体。数据包、回读和条件切换发布头仍依次执行。
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        for start in range(0, len(missing_media), 4):
+            futures = [pool.submit(adapter.put_media, item["contentHash"], item["filePath"], item["meta"])
+                       for item in missing_media[start:start + 4]]
+            for future in as_completed(futures):
+                future.result()  # 任一失败直接停止，不能进入切头。
+                uploaded_media += 1
+                print(json.dumps({"type": "progress", "stage": "uploadMedia",
+                                  "completed": uploaded_media, "total": len(missing_media)}), flush=True)
+                if uploaded_media == 1 or uploaded_media % 25 == 0 or uploaded_media == len(missing_media):
+                    print("       媒体上传 {}/{}".format(uploaded_media, len(missing_media)), flush=True)
+    return uploaded_media
+
+
 def publish(args: argparse.Namespace) -> int:
     release_dir: Path = args.release
     apply_changes = bool(args.apply and not args.dry_run)
@@ -293,15 +316,11 @@ def publish(args: argparse.Namespace) -> int:
 
     # ---- 第 3 步：媒体
     print("[3/7] 上传缺失媒体（不可变，只增不改）")
-    uploaded_media = 0
-    for item in media:
-        if adapter.media_exists(item["contentHash"]):
-            continue
-        if not item["filePath"].exists():
-            print("❌ 媒体文件缺失：{}".format(item["filePath"]), file=sys.stderr)
-            return EXIT_VALIDATION
-        adapter.put_media(item["contentHash"], item["filePath"], item["meta"])
-        uploaded_media += 1
+    try:
+        uploaded_media = upload_missing_media(adapter, media)
+    except FileNotFoundError as error:
+        print("❌ {}".format(error), file=sys.stderr)
+        return EXIT_VALIDATION
     print("       新增 {} / 共 {} 个".format(uploaded_media, len(media)))
 
     # ---- 第 4 步：数据包
@@ -330,9 +349,9 @@ def publish(args: argparse.Namespace) -> int:
             got = adapter.read_back_pack_hash(item["payloadHash"])
             if got != item["payloadHash"]:
                 missing.append(item["recordName"])
+        available_media = adapter.media_exists_many([item["contentHash"] for item in media])
         for item in media:
-            got = adapter.read_back_media_hash(item["contentHash"])
-            if got != item["contentHash"]:
+            if item["contentHash"] not in available_media:
                 missing.append(item["recordName"])
         if missing:
             print(

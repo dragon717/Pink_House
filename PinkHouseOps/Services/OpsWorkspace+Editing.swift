@@ -235,7 +235,8 @@ extension OpsWorkspace {
             return false
         }
         let assetID = normalized(sourceImage)
-        if let assetID, !catalog.assets.contains(where: { $0.id == assetID }) {
+        if let assetID, !catalog.assets.contains(where: { $0.id == assetID }),
+           !assetID.hasPrefix("thmedia:"), !assetID.hasPrefix("local:") {
             lastError = "尺码表原图绑定的图片资源 \(assetID) 不存在。"
             return false
         }

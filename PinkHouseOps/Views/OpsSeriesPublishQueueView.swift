@@ -31,11 +31,33 @@ struct OpsSeriesPublishQueueView: View {
     @ObservedObject private var cloud = OpsCloudSyncModel.shared
     @State private var isRetrying = false
     @State private var retryMessage: String?
+    @State private var selectedJobIDs: Set<String>
+    @State private var activeJobIDs: Set<String> = []
+
+    init(workspace: OpsWorkspace, selectedJobIDs: Set<String> = []) {
+        self.workspace = workspace
+        _selectedJobIDs = State(initialValue: selectedJobIDs)
+    }
+
+    private var isBusy: Bool { isRetrying || cloud.isRunning || cloud.isSyncing }
+    private var eligibleJobs: [OpsSeriesPublishJob] {
+        jobs.filter { workspace.seriesBatchPublishBlockReason(job: $0, cloud: cloud) == nil }
+    }
+    private var selectedJobs: [OpsSeriesPublishJob] {
+        eligibleJobs.filter { selectedJobIDs.contains($0.id) }
+    }
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 explainCard
+                if !jobs.isEmpty { selectionControls }
+                if let retryMessage {
+                    opsMarkdown(retryMessage)
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                        .textSelection(.enabled)
+                }
                 if jobs.isEmpty {
                     emptyCard
                 } else {
@@ -47,14 +69,32 @@ struct OpsSeriesPublishQueueView: View {
             .padding(18)
             .frame(maxWidth: 880, alignment: .leading)
         }
+        .onChange(of: workspace.draft?.id) { _, _ in selectedJobIDs.removeAll() }
+        .onChange(of: cloud.targetEnvironment.rawValue) { _, _ in selectedJobIDs.removeAll() }
+        .onChange(of: jobs.map(\.id)) { _, ids in selectedJobIDs.formIntersection(ids) }
+    }
+
+    private var selectionControls: some View {
+        HStack(spacing: 12) {
+            Button("全选可发布系列") { selectedJobIDs = Set(eligibleJobs.map(\.id)) }
+                .disabled(isBusy || eligibleJobs.isEmpty)
+            Button("清除选择") { selectedJobIDs.removeAll() }
+                .disabled(isBusy || selectedJobIDs.isEmpty)
+            Text(isRetrying ? "正在发布 \(activeJobIDs.count) 个系列" : "已选 \(selectedJobs.count) 个系列")
+                .font(.callout).foregroundStyle(.secondary)
+            Spacer()
+            Button("发布所选系列（\(isRetrying ? activeJobIDs.count : selectedJobs.count)）", systemImage: "paperplane") { publishSelected() }
+                .buttonStyle(.borderedProminent)
+                .disabled(isBusy || selectedJobs.isEmpty)
+        }
     }
 
     private var explainCard: some View {
         OpsCard(title: "发布草稿箱", systemImage: "tray.2") {
             VStack(alignment: .leading, spacing: 4) {
-                OpsFootnote(text: "点「发布整个系列」时，内容会**先完整落进这里**再发。"
-                            + "发成功了记录就没了；失败或部分成功会一直留着，"
-                            + "逐条标出是哪一条没发成，改完直接重试。")
+                OpsFootnote(text: "在系列上新点「提交整个系列（写入草稿）」后，系列会出现在这里，状态为「待发布」。"
+                            + "可勾选多个系列，点「发布所选系列」一起上传；成功后移除记录，失败时保留内容和原因供重试。")
+                OpsFootnote(text: "可一起发布当前草稿、当前环境中已完整提交的系列。同步可在后台运行，期间仍可继续编辑。")
             }
         }
     }
@@ -71,17 +111,29 @@ struct OpsSeriesPublishQueueView: View {
         OpsCard(title: job.seriesName, systemImage: statusSymbol(job.status)) {
             VStack(alignment: .leading, spacing: 8) {
                 HStack(spacing: 8) {
+                    Toggle("选择此系列", isOn: Binding(
+                        get: { selectedJobIDs.contains(job.id) },
+                        set: { if $0 { selectedJobIDs.insert(job.id) } else { selectedJobIDs.remove(job.id) } }))
+                        .toggleStyle(.checkbox)
+                        .disabled(isBusy || workspace.seriesBatchPublishBlockReason(job: job, cloud: cloud) != nil)
                     statusBadge(job.status)
                     if let environment = job.environment {
                         Text(environment)
                             .font(.caption2)
                             .foregroundStyle(.secondary)
                     }
-                    Text("第 \(job.attempts) 次尝试")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
+                    if job.attempts > 0 {
+                        Text("第 \(job.attempts) 次尝试")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
                     Spacer()
                 }
+                if let reason = workspace.seriesBatchPublishBlockReason(job: job, cloud: cloud),
+                   job.status != .publishing, job.status != .published {
+                    Text(reason).font(.caption).foregroundStyle(.secondary)
+                }
+                if let shopName = job.shopName { LabeledContent("店家", value: shopName) }
                 LabeledContent("线上发布号",
                                value: job.releaseSeq.map { "releaseSeq \($0)" } ?? "—")
 
@@ -123,10 +175,21 @@ struct OpsSeriesPublishQueueView: View {
                         .textSelection(.enabled)
                         .fixedSize(horizontal: false, vertical: true)
                 }
+                if let ownerID = job.draftID, ownerID != workspace.draft?.id {
+                    Text("此系列属于另一份草稿，打开所属草稿后可发布。")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                    Button("打开所属草稿") {
+                        if workspace.openSeriesPublishDraft(job: job) { retryMessage = nil }
+                        else { retryMessage = workspace.lastError }
+                    }
+                    .disabled(isBusy)
+                }
                 HStack(spacing: 8) {
-                    Button("重试发布") { retry(job) }
+                    Button(job.status == .pending ? "发布整个系列" : "重试发布") { retry(job) }
                         .buttonStyle(.borderedProminent)
-                        .disabled(isRetrying)
+                        .disabled(isBusy || job.status == .publishing || job.status == .published
+                                  || (job.draftID != nil && job.draftID != workspace.draft?.id))
                     Button("打开日志文件") {
                         if let logPath = job.logPath {
                             NSWorkspace.shared.activateFileViewerSelecting(
@@ -134,13 +197,8 @@ struct OpsSeriesPublishQueueView: View {
                         }
                     }
                     .disabled(job.logPath == nil)
-                    if isRetrying {
+                    if isRetrying && activeJobIDs.contains(job.id) {
                         ProgressView().controlSize(.small)
-                    }
-                    if let retryMessage {
-                        opsMarkdown(retryMessage)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
                     }
                 }
             }
@@ -178,16 +236,40 @@ struct OpsSeriesPublishQueueView: View {
     private func retry(_ job: OpsSeriesPublishJob) {
         guard !isRetrying else { return }
         isRetrying = true
+        activeJobIDs = [job.id]
         retryMessage = nil
         Task { @MainActor in
             let outcome = await workspace.retrySeriesPublish(job: job, cloud: cloud)
             switch outcome {
             case .published(let seq):
-                retryMessage = "发布成功（releaseSeq \(seq)），草稿箱记录已删除。"
+                selectedJobIDs.remove(job.id)
+                retryMessage = workspace.lastError ?? "发布成功（releaseSeq \(seq)），草稿箱记录已删除。"
             case .failed(let reason, _):
                 retryMessage = "发布失败：" + reason
             }
             isRetrying = false
+            activeJobIDs.removeAll()
+        }
+    }
+
+    private func publishSelected() {
+        guard !isBusy, !selectedJobs.isEmpty else { return }
+        let batch = selectedJobs
+        let ids = Set(batch.map(\.id))
+        isRetrying = true
+        activeJobIDs = ids
+        retryMessage = nil
+        Task { @MainActor in
+            let outcome = await workspace.publishSelectedSeries(jobs: batch, cloud: cloud)
+            switch outcome {
+            case .published(let seq):
+                selectedJobIDs.subtract(ids)
+                retryMessage = workspace.lastError ?? "所选 \(batch.count) 个系列发布成功（releaseSeq \(seq)）。"
+            case .failed(let reason, _):
+                retryMessage = "批量发布未完成：" + reason
+            }
+            isRetrying = false
+            activeJobIDs.removeAll()
         }
     }
 }

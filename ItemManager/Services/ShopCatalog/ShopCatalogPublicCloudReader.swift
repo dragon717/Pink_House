@@ -54,6 +54,7 @@ struct ShopCatalogPublicCloudReader: ShopCatalogPublicReading {
 
     /// 与 Notice 公共公告同容器（entitlements 已声明），Schema 互不混用
     private let container: CKContainer
+    private let retryGate = ShopCatalogCloudReadRetryGate()
     /// 注意：struct 里 lazy var 的 getter 是 mutating 的，async 方法里访问会报
     /// 「cannot use mutating getter on immutable value」——必须用计算属性
     private var database: CKDatabase { container.publicCloudDatabase }
@@ -62,12 +63,19 @@ struct ShopCatalogPublicCloudReader: ShopCatalogPublicReading {
         self.container = CKContainer(identifier: containerID)
     }
 
+    // 频繁检查只取元数据，不能每次把 rootIndexAsset 一并下载。
+    static let releaseHeaderKeys = [
+        "releaseSeq", "schemaVersion", "revocationEpoch", "minimumReaderVersion",
+        "previousReleaseSeq", "publishedAt", "rootIndexHash"
+    ]
+
     // MARK: 发布头
 
     func fetchReleaseHeader() async throws -> ShopCatalogReleaseHeader {
         let record = try await record(
             recordType: "THRelease",
-            recordName: ShopCatalogSyncProtocol.releaseRecordName
+            recordName: ShopCatalogSyncProtocol.releaseRecordName,
+            desiredKeys: Self.releaseHeaderKeys
         )
         // CKRecord 没有 `.fields` 字典：字段经下标 `record[key]` 逐个取
         func int32(_ key: String) -> Int {
@@ -120,10 +128,22 @@ struct ShopCatalogPublicCloudReader: ShopCatalogPublicReading {
 
     // MARK: 内部
 
-    private func record(recordType: String, recordName: String) async throws -> CKRecord {
+    private func record(
+        recordType: String, recordName: String, desiredKeys: [String]? = nil
+    ) async throws -> CKRecord {
+        let remaining = await retryGate.remainingDelay()
+        guard remaining <= 0 else {
+            throw ShopCatalogSyncError.network("云端要求稍后重试（约 \(Int(ceil(remaining))) 秒）")
+        }
         do {
-            return try await database.record(for: CKRecord.ID(recordName: recordName))
+            let id = CKRecord.ID(recordName: recordName)
+            let results = try await database.records(for: [id], desiredKeys: desiredKeys)
+            guard let result = results[id] else {
+                throw ShopCatalogSyncError.malformedRecord("读取结果缺少 \(recordType)")
+            }
+            return try result.get()
         } catch let error as CKError {
+            await retryGate.recordRetry(after: error.retryAfterSeconds)
             switch error.code {
             case .unknownItem:
                 // 记录不存在 ≠ 网络故障：发布头缺失 = 公共库还没发布过（正常空态）
@@ -151,6 +171,20 @@ struct ShopCatalogPublicCloudReader: ShopCatalogPublicReading {
         } catch {
             throw ShopCatalogSyncError.malformedRecord("\(what) 资产读取失败：\(error.localizedDescription)")
         }
+    }
+}
+
+/// 自动轮询和推送都尊重 CloudKit 的 Retry-After，不能用 force 绕过服务端退避。
+actor ShopCatalogCloudReadRetryGate {
+    private var nextRequestAt = Date.distantPast
+
+    func remainingDelay(at now: Date = Date()) -> TimeInterval {
+        max(0, nextRequestAt.timeIntervalSince(now))
+    }
+
+    func recordRetry(after seconds: TimeInterval?, at now: Date = Date()) {
+        guard let seconds, seconds > 0 else { return }
+        nextRequestAt = max(nextRequestAt, now.addingTimeInterval(seconds))
     }
 }
 

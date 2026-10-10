@@ -106,14 +106,30 @@ struct OpsSeriesTypeEntry: Codable, Equatable, Identifiable {
     /// 尺码表原图（CatalogAsset id，可空）。只有原图时结构化列行可以都为空。
     var chartSourceImageAssetID: String?
 
-    // MARK: 价格（S3-C：同屏填写，互相独立）
+    // MARK: 价格（S3-C：尾款随预约价 / 定金计算，现货价独立）
 
-    var reservationPriceText: String
-    var depositText: String
+    var reservationPriceText: String {
+        didSet { recalculateBalance() }
+    }
+    var depositText: String {
+        didSet { recalculateBalance() }
+    }
     var balanceText: String
     var stockPriceText: String
     /// 币种 rawValue（CatalogCurrency）。默认人民币。
     var currencyRawValue: String
+
+    /// 在字段写入时同步更新，尾款与输入一起自动保存；不同类型只修改各自的草稿。
+    /// 恢复旧草稿的 init 不触发观察器，保留其已保存金额，直到运营修改输入。
+    private mutating func recalculateBalance() {
+        guard case .value(let reservation) = opsParseDecimal(reservationPriceText),
+              case .value(let deposit) = opsParseDecimal(depositText),
+              reservation >= 0, deposit >= 0, deposit <= reservation else {
+            balanceText = ""
+            return
+        }
+        balanceText = NSDecimalNumber(decimal: reservation - deposit).stringValue
+    }
 
     // MARK: 颜色 SKU（S3-D）
 
@@ -165,6 +181,17 @@ struct OpsSeriesTypeEntry: Codable, Equatable, Identifiable {
 }
 
 extension OpsSeriesTypeEntry {
+    /// 只应用本次窗口管理的颜色图片，保留颜色名称、尺码及其他资料。
+    /// 颜色已被删除时整批拒绝，避免部分写入或按行号串到另一个颜色。
+    mutating func applyColorImages(colorIDs: Set<String>, assignments: [String: String]) -> Bool {
+        guard colorIDs.isSubset(of: Set(colors.map(\.id))),
+              Set(assignments.keys).isSubset(of: colorIDs) else { return false }
+        for index in colors.indices where colorIDs.contains(colors[index].id) {
+            colors[index].imageAssetID = assignments[colors[index].id]
+        }
+        return true
+    }
+
     private enum Keys: String, CodingKey {
         case id, category, designName, usesSizeChart, chartUnit
         case chartColumnsText, chartRowsText, chartSourceImageAssetID
@@ -221,6 +248,9 @@ struct OpsSeriesEntryDraft: Codable, Equatable {
     var newShopName: String
     /// 新店家别名原文（英文逗号分隔，可空；提交时解析落库）
     var newShopAliasesText: String
+    /// 未管理时保留店家已有 Logo；管理时 nil 表示清除。
+    var managesShopLogo: Bool
+    var shopLogoReference: String?
     /// 已有系列 id；空 = 新建系列
     var seriesID: String
     var newSeriesName: String
@@ -273,6 +303,8 @@ struct OpsSeriesEntryDraft: Codable, Equatable {
         createsNewShop: Bool = false,
         newShopName: String = "",
         newShopAliasesText: String = "",
+        managesShopLogo: Bool = false,
+        shopLogoReference: String? = nil,
         seriesID: String = "",
         newSeriesName: String = "",
         newSeriesYearText: String = "",
@@ -298,6 +330,8 @@ struct OpsSeriesEntryDraft: Codable, Equatable {
         self.createsNewShop = createsNewShop
         self.newShopName = newShopName
         self.newShopAliasesText = newShopAliasesText
+        self.managesShopLogo = managesShopLogo
+        self.shopLogoReference = shopLogoReference
         self.seriesID = seriesID
         self.newSeriesName = newSeriesName
         self.newSeriesYearText = newSeriesYearText
@@ -324,6 +358,7 @@ struct OpsSeriesEntryDraft: Codable, Equatable {
 extension OpsSeriesEntryDraft {
     private enum Keys: String, CodingKey {
         case shopID, createsNewShop, newShopName, newShopAliasesText
+        case managesShopLogo, shopLogoReference
         case seriesID, newSeriesName, newSeriesYearText, newSeriesMonthText, newSeriesSeason
         case coverAssetID, declaresPhase, phaseRawValue
         case hasReservationEnd, reservationEndAt
@@ -340,6 +375,8 @@ extension OpsSeriesEntryDraft {
             createsNewShop: try c.decodeIfPresent(Bool.self, forKey: .createsNewShop) ?? false,
             newShopName: try c.decodeIfPresent(String.self, forKey: .newShopName) ?? "",
             newShopAliasesText: try c.decodeIfPresent(String.self, forKey: .newShopAliasesText) ?? "",
+            managesShopLogo: try c.decodeIfPresent(Bool.self, forKey: .managesShopLogo) ?? false,
+            shopLogoReference: try c.decodeIfPresent(String.self, forKey: .shopLogoReference),
             seriesID: try c.decodeIfPresent(String.self, forKey: .seriesID) ?? "",
             newSeriesName: try c.decodeIfPresent(String.self, forKey: .newSeriesName) ?? "",
             newSeriesYearText: try c.decodeIfPresent(String.self, forKey: .newSeriesYearText) ?? "",
@@ -514,6 +551,9 @@ enum OpsSeriesPriceParsing {
         if reservation == nil && stock == nil {
             issues.append("预约价与现货价至少填一项。")
         }
+        if let reservation, let deposit, deposit > reservation {
+            issues.append("定金不能大于预约价，请修改预约价或定金后再计算尾款。")
+        }
         // 需求 §S3-C：三者全部填写时 定金 + 尾款 = 预约价
         if let reservation, let deposit, let balance,
            deposit + balance != reservation {
@@ -574,6 +614,12 @@ enum OpsSeriesEntryValidator {
             }
         } else if draft.shopID.isEmpty || !catalog.shops.contains(where: { $0.id == draft.shopID }) {
             add("店家不能为空。", area: .shopSeries)
+        }
+        if draft.managesShopLogo, let reference = draft.shopLogoReference,
+           !catalog.assets.contains(where: { $0.id == reference }),
+           !reference.hasPrefix("thmedia:"), !reference.hasPrefix("local:"),
+           !reference.hasPrefix("https://") {
+            add("店家 Logo 图片不存在，请重新上传。", area: .shopSeries)
         }
         if draft.seriesID.isEmpty {
             if OpsSeriesSizeChartParsing.normalized(draft.newSeriesName) == nil {

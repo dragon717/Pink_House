@@ -64,6 +64,33 @@ struct OpsSeriesEntryCommitReport: Equatable {
 
 extension OpsWorkspace {
 
+    /// 复制当前表单原文，不重新解析价格/尺码，也不复制已提交商品的身份。
+    /// 先把原条目和副本一起保存，成功后才插入列表并交给界面选中。
+    func duplicateSeriesTypeEntry(id: String) -> String? {
+        guard canMutate(), let draft,
+              let index = seriesEntry.typeEntries.firstIndex(where: { $0.id == id }) else { return nil }
+        var copy = seriesEntry.typeEntries[index]
+        copy.id = UUID().uuidString
+        for colorIndex in copy.colors.indices { copy.colors[colorIndex].id = UUID().uuidString }
+        copy.committedProductID = nil
+        copy.lastCommitOK = nil
+        var updated = seriesEntry
+        updated.typeEntries.insert(copy, at: index + 1)
+        let previousJSON = draft.seriesEntryJSON
+        do {
+            draft.seriesEntryJSON = try ShopCatalogJSONCoding.encoder().encode(updated)
+            try saveCatalogContext(context)
+        } catch {
+            draft.seriesEntryJSON = previousJSON
+            lastError = "复制款式保存失败，原内容已保留：\(error.localizedDescription)"
+            return nil
+        }
+        seriesEntry = updated
+        lastError = nil
+        statusMessage = "已复制款式「\(copy.displayName)」，可直接修改副本。"
+        return copy.id
+    }
+
     /// 把向导工作副本写进当前草稿记录。**与目录内容分开保存**：
     /// 未完成类型不能进目录，但必须能恢复。
     func persistSeriesEntryState() {
@@ -89,12 +116,14 @@ extension OpsWorkspace {
             // 可能已经指向不存在的东西 —— 指着空气的 selection 会让 Picker
             // 每次刷新都报 "selection is invalid"，提交也会把内容挂到悬空 id 上。
             // 向导是短期工作副本：店家没了就整体重开；店家在、系列没了就保留
-            // 店家清空系列级字段（与 `resetSeriesEntry` 同口径），不保留半截状态。
+            // 店家清空系列级字段，不保留半截状态。
             let shopExists = catalog.shops.contains(where: { $0.id == decoded.shopID })
             let seriesExists = catalog.series.contains(where: { $0.id == decoded.seriesID })
-            if !shopExists {
+            if decoded.createsNewShop || decoded.shopID.isEmpty {
+                seriesEntry = decoded
+            } else if !shopExists {
                 seriesEntry = OpsSeriesEntryDraft()
-            } else if !seriesExists {
+            } else if !decoded.seriesID.isEmpty && !seriesExists {
                 seriesEntry = OpsSeriesEntryDraft(shopID: decoded.shopID)
             } else {
                 seriesEntry = decoded
@@ -106,10 +135,38 @@ extension OpsWorkspace {
         }
     }
 
-    /// 重定向：系列级提交成功后重开一个空白向导（旧状态已全部落进目录）
-    func resetSeriesEntry() {
-        seriesEntry = OpsSeriesEntryDraft(shopID: seriesEntry.shopID)
-        persistSeriesEntryState()
+    /// 显式「写入草稿」完成后准备下一份系列。发布前的内部提交不能清空，
+    /// 因为网络失败还要用原表单修正和重试。
+    func saveSeriesEntryToDraft() -> OpsSeriesEntryCommitReport {
+        var report = commitSeriesEntry()
+        guard report.allOK else { return report }
+        if !storeSubmittedSeriesDraft(report: report) {
+            report.draftSaved = false
+        } else {
+            statusMessage = "系列已存入「发布草稿箱」，可在那里发布；已为下一份系列准备空白表单。"
+        }
+        return report
+    }
+
+    /// 先持久化空白表单，再改变界面。后台发布期间新填的内容及切换后的
+    /// 其它草稿不属于这次完成操作，必须保留。
+    @discardableResult
+    func finishSeriesEntry(expected: OpsSeriesEntryDraft, draftID: String?) -> Bool {
+        guard let draft, draft.id == draftID, !draft.isCorrupted,
+              seriesEntry == expected else { return false }
+        let previousJSON = draft.seriesEntryJSON
+        let empty = OpsSeriesEntryDraft()
+        do {
+            draft.seriesEntryJSON = try ShopCatalogJSONCoding.encoder().encode(empty)
+            try saveCatalogContext(context)
+            seriesEntry = empty
+            seriesEntryResetID = UUID()
+            return true
+        } catch {
+            draft.seriesEntryJSON = previousJSON
+            lastError = "系列已保存，但空白表单保存失败；已保留填写内容：\(error.localizedDescription)"
+            return false
+        }
     }
 }
 
@@ -175,21 +232,12 @@ extension OpsWorkspace {
     @discardableResult
     func importSingleImage(from url: URL) -> String? {
         guard canMutate() else { return nil }
-        let accessed = url.startAccessingSecurityScopedResource()
-        defer { if accessed { url.stopAccessingSecurityScopedResource() } }
         do {
-            let raw = try Data(contentsOf: url)
-            let staged = try ShopCatalogMediaStaging.stage(raw)
-            try fileManager.createDirectory(at: stagingDirectory, withIntermediateDirectories: true)
-            let target = stagingDirectory.appendingPathComponent(staged.fileName)
-            if !fileManager.fileExists(atPath: target.path) {
-                try staged.data.write(to: target, options: .atomic)
-            }
-            upsertAsset(for: staged)
-            let assetID = "asset-\(String(staged.mediaKey.prefix(12)))"
-            let saved = saveDraft()
+            let assetID = try stageImageAsset(from: url)
+            markDirty()
+            let saved = saveImportedImageHistory([(assetID, url.lastPathComponent)])
             if !saved {
-                lastError = "图片已导入，但草稿落盘失败：" + (lastError ?? "未知原因")
+                lastError = "图片已导入，但上传历史落盘失败：" + (lastError ?? "未知原因")
             } else {
                 lastError = nil
                 statusMessage = "已导入图片（\(url.lastPathComponent)）"
@@ -202,6 +250,83 @@ extension OpsWorkspace {
             lastError = "图片导入失败（\(url.lastPathComponent)）：\(error.localizedDescription)"
             return nil
         }
+    }
+
+    /// 批量导入共用单图的规范化入口，整批保存一次；失败原因逐文件保留。
+    func importColorImages(from urls: [URL]) async -> (assetIDs: [String], names: [String: String], failures: [String]) {
+        guard canMutate() else { return ([], [:], [lastError ?? "草稿不可编辑。"]) }
+        let directory = stagingDirectory
+        let draftID = draft?.id
+        var ids: [String] = []
+        var names: [String: String] = [:]
+        var failures: [String] = []
+        for url in urls {
+            do {
+                let staged = try await Task.detached(priority: .userInitiated) {
+                    try Self.stageImageMedia(from: url, directory: directory)
+                }.value
+                guard draft?.id == draftID, canEdit else {
+                    failures.append("草稿已变化，停止导入，请重新打开批量配图。")
+                    break
+                }
+                upsertAsset(for: staged)
+                let id = "asset-\(String(staged.mediaKey.prefix(12)))"
+                if !ids.contains(id) { ids.append(id) }
+                names[id] = url.lastPathComponent
+            } catch {
+                failures.append("\(url.lastPathComponent)：\(error.localizedDescription)")
+            }
+        }
+        if !ids.isEmpty, draft?.id == draftID, canEdit {
+            markDirty()
+            if !saveImportedImageHistory(ids.map { ($0, names[$0] ?? $0) }) {
+                failures.append(lastError ?? "图片已导入，但上传历史保存失败。")
+            }
+        }
+        lastError = failures.isEmpty ? nil : failures.joined(separator: "\n")
+        statusMessage = "已导入 \(ids.count) 张图片，请为颜色分配图片后确认。"
+        return (ids, names, failures)
+    }
+
+    private func stageImageAsset(from url: URL) throws -> String {
+        let staged = try Self.stageImageMedia(from: url, directory: stagingDirectory)
+        upsertAsset(for: staged)
+        return "asset-\(String(staged.mediaKey.prefix(12)))"
+    }
+
+    private nonisolated static func stageImageMedia(
+        from url: URL, directory: URL
+    ) throws -> ShopCatalogMediaStaging.StagedMedia {
+        let accessed = url.startAccessingSecurityScopedResource()
+        defer { if accessed { url.stopAccessingSecurityScopedResource() } }
+        let staged = try ShopCatalogMediaStaging.stage(Data(contentsOf: url))
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let target = directory.appendingPathComponent(staged.fileName)
+        if !FileManager.default.fileExists(atPath: target.path) {
+            try staged.data.write(to: target, options: .atomic)
+        }
+        return staged
+    }
+
+    @discardableResult
+    func applyColorImages(entryID: String, colorIDs: Set<String>, assignments: [String: String]) -> Bool {
+        guard canMutate() else { return false }
+        guard let index = seriesEntry.typeEntries.firstIndex(where: { $0.id == entryID }),
+              Set(assignments.values).isSubset(of: Set(catalog.assets.map(\.id))) else {
+            lastError = "当前类型或所选图片已不存在，请重新打开批量配图。"
+            return false
+        }
+        var updated = seriesEntry.typeEntries[index]
+        guard updated.applyColorImages(colorIDs: colorIDs, assignments: assignments) else {
+            lastError = "颜色列表已变化，请重新打开批量配图。"
+            return false
+        }
+        seriesEntry.typeEntries[index] = updated
+        lastError = nil
+        persistSeriesEntryState()
+        guard lastError == nil else { return false }
+        statusMessage = "已保存「\(updated.displayName)」的颜色配图。"
+        return true
     }
 }
 
@@ -401,6 +526,12 @@ extension OpsWorkspace {
             seriesEntry.createsNewShop = false
         }
         report.shopID = shopID
+        if seriesEntry.managesShopLogo,
+           !updateShopLogo(id: shopID, reference: seriesEntry.shopLogoReference) {
+            report.blockedByValidation = [OpsSeriesEntryIssue(
+                entryID: nil, entryName: "", message: lastError ?? "店家 Logo 保存失败。")]
+            return report
+        }
 
         // ── 系列：新建或选用（S1 的决议在这里落定）──
         var seriesID = seriesEntry.seriesID

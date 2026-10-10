@@ -16,8 +16,12 @@ struct OpsSyncProgressView: View {
                 Label(report.title, systemImage: report.isComplete ? "checkmark.icloud" : "arrow.triangle.2.circlepath")
                     .font(.headline)
                 Spacer()
-                if let onDismiss, !report.isRunning {
-                    Button(action: onDismiss) { Image(systemName: "xmark") }.buttonStyle(.plain)
+                if let onDismiss {
+                    Button(action: onDismiss) {
+                        Label(report.isRunning ? "后台运行" : "收起", systemImage: "xmark")
+                    }
+                    .controlSize(.small)
+                    .help(report.isRunning ? "收起进度窗口，同步继续运行" : "收起同步结果")
                 }
             }
             ForEach(report.steps) { step in
@@ -32,7 +36,7 @@ struct OpsSyncProgressView: View {
                     } else {
                         ProgressView(value: step.progress ?? 0).tint(color(step.state))
                     }
-                    Text(step.detail).font(.caption).foregroundStyle(.secondary)
+                    opsMarkdown(step.detail).font(.caption).foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true).textSelection(.enabled)
                 }
             }
@@ -57,7 +61,7 @@ struct OpsSyncProgressView: View {
                 OpsSyncProgressView(report: report, detailed: true)
                 HStack {
                     Button("导出问题清单…") { exportIssues() }
-                    SettingsLink { Label("打开设置处理合并冲突与数据", systemImage: "wrench.and.screwdriver") }
+                    SettingsLink { Label("打开设置补图与处理冲突", systemImage: "wrench.and.screwdriver") }
                     Spacer()
                     Button("关闭") { showsIssues = false }.keyboardShortcut(.cancelAction)
                 }
@@ -74,7 +78,7 @@ struct OpsSyncProgressView: View {
                 ForEach(report.issues) { issue in
                     VStack(alignment: .leading, spacing: 4) {
                         Text("\(issue.step.title) · \(issue.owner)").font(.callout.weight(.medium))
-                        Text(issue.message).font(.caption).foregroundStyle(.secondary)
+                        opsMarkdown(issue.message).font(.caption).foregroundStyle(.secondary)
                             .textSelection(.enabled).fixedSize(horizontal: false, vertical: true)
                     }
                     Divider()

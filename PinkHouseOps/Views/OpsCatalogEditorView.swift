@@ -12,10 +12,10 @@
 //     问题专门收口过）。所以本页所有 sheet 合并成一个 `EditorSheet` 枚举，
 //     统一挂在最外层。
 //
-//  2. **删除用墓碑表达，且有下级引用时拒绝删除。**
+//  2. **运营删除店家 / 系列时级联删除下级，并用墓碑表达。**
 //     `removedShopIDs` / `removedSeriesIDs` / `removedProductIDs` 是发布端的
 //     「下架」信号；删干净了发布端只会以为是「这次漏传了」，线上不会下架。
-//     级联删除会把「删 1 个店家」变成「悄悄删掉 20 个商品」，这里一律拒绝并说明。
+//     菜单说明删除范围，成功反馈汇报删除数量；不再要求运营先处理下级商品。
 //
 //  ## 年月为什么是数字输入
 //
@@ -93,6 +93,8 @@ struct OpsCatalogEditorView: View {
                     preferredShopID: selectedShopID, preferredSeriesID: selectedSeriesID)
             case .bindImages(let productID):
                 BindImagesSheet(workspace: workspace, productID: productID)
+            case .productTables(let productID):
+                OpsProductTablesSheet(workspace: workspace, productID: productID)
             }
         }
         .onAppear { clampSelection() }
@@ -255,15 +257,19 @@ struct OpsCatalogEditorView: View {
     private func shopRow(_ shop: CatalogShop) -> some View {
         OpsFlowTile(color: OpsFlowPalette.tilePink, selected: shop.id == selectedShopID) {
             HStack(spacing: 10) {
-                // 头像圆：取店名的第一个字符（图1 的圆形店家标识）
-                ZStack {
-                    Circle()
-                        .fill(OpsFlowPalette.accentPink.opacity(0.85))
-                    Text(String(shop.name.prefix(1)))
-                        .font(.callout.weight(.bold))
-                        .foregroundStyle(.white)
+                if let logo = shop.logo,
+                   let url = workspace.stagedFileURL(forReference: workspace.asset(for: logo)?.originalURL ?? logo) {
+                    OpsThumbnail(url: url, size: 30)
+                } else {
+                    ZStack {
+                        Circle()
+                            .fill(OpsFlowPalette.accentPink.opacity(0.85))
+                        Text(String(shop.name.prefix(1)))
+                            .font(.callout.weight(.bold))
+                            .foregroundStyle(.white)
+                    }
+                    .frame(width: 30, height: 30)
                 }
-                .frame(width: 30, height: 30)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(shop.name).lineLimit(1)
                         .font(.callout.weight(.medium))
@@ -279,8 +285,8 @@ struct OpsCatalogEditorView: View {
         }
         .contextMenu {
             Button("编辑…") { sheet = .shopForm(existingID: shop.id) }
-            Button("删除店家", role: .destructive) {
-                if workspace.removeShop(id: shop.id) { clampSelection() }
+            Button("删除店家（含系列和商品）", role: .destructive) {
+                if workspace.removeShop(id: shop.id), workspace.saveCatalogEditorChanges() { clampSelection() }
             }
         }
     }
@@ -336,27 +342,31 @@ struct OpsCatalogEditorView: View {
             color: series.archivedAt == nil
                 ? OpsFlowPalette.tileLilac : OpsFlowPalette.tileRed.opacity(0.7),
             selected: series.id == selectedSeriesID) {
-            VStack(alignment: .leading, spacing: 4) {
-                HStack(spacing: 6) {
-                    Text(series.name).lineLimit(1)
-                        .font(.callout.weight(.medium))
-                        .foregroundStyle(OpsFlowPalette.textPrimary)
-                    OpsFlowChip(
-                        text: series.salePhase?.displayName ?? "未声明",
-                        tint: series.salePhase == nil
-                            ? OpsFlowPalette.textSecondary : OpsFlowPalette.primaryPurple)
+            HStack(spacing: 10) {
+                OpsThumbnail(url: workspace.stagedImageURL(forReference: series.cover), size: 44)
+                    .accessibilityLabel("系列封面")
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 6) {
+                        Text(series.name).lineLimit(1)
+                            .font(.callout.weight(.medium))
+                            .foregroundStyle(OpsFlowPalette.textPrimary)
+                        OpsFlowChip(
+                            text: series.salePhase?.displayName ?? "未声明",
+                            tint: series.salePhase == nil
+                                ? OpsFlowPalette.textSecondary : OpsFlowPalette.primaryPurple)
+                    }
+                    Text(seriesSubtitle(series))
+                        .font(.caption)
+                        .foregroundStyle(OpsFlowPalette.textSecondary)
                 }
-                Text(seriesSubtitle(series))
-                    .font(.caption)
-                    .foregroundStyle(OpsFlowPalette.textSecondary)
             }
         }
         .contextMenu {
             Button("编辑系列…") { sheet = .seriesForm(existingID: series.id) }
             Button("配置发售阶段与价格表…") { sheet = .seriesConfig(seriesID: series.id) }
             Divider()
-            Button("删除系列", role: .destructive) {
-                if workspace.removeSeries(id: series.id) { clampSelection() }
+            Button("删除系列（含商品）", role: .destructive) {
+                if workspace.removeSeries(id: series.id), workspace.saveCatalogEditorChanges() { clampSelection() }
             }
         }
     }
@@ -439,19 +449,22 @@ struct OpsCatalogEditorView: View {
                                 .contextMenu {
                                     Button("编辑基本信息…") { sheet = .productForm(existingID: product.id) }
                                     Button("绑定商品图…") { sheet = .bindImages(productID: product.id) }
+                                    Button("查看价格表与尺码表…") { sheet = .productTables(productID: product.id) }
                                     Divider()
                                     if product.archivedAt == nil {
                                         Button("归档（下线）") {
-                                            workspace.setArchived(true, kind: .product, id: product.id)
-                                            clampSelection()
+                                            if workspace.setArchived(true, kind: .product, id: product.id),
+                                               workspace.saveCatalogEditorChanges() { clampSelection() }
                                         }
                                     } else {
                                         Button("恢复上线") {
-                                            workspace.setArchived(false, kind: .product, id: product.id)
+                                            if workspace.setArchived(false, kind: .product, id: product.id) {
+                                                workspace.saveCatalogEditorChanges()
+                                            }
                                         }
                                     }
                                     Button("删除商品", role: .destructive) {
-                                        if workspace.removeProduct(id: product.id) { clampSelection() }
+                                        if workspace.removeProduct(id: product.id), workspace.saveCatalogEditorChanges() { clampSelection() }
                                     }
                                 }
                         }
@@ -539,14 +552,26 @@ struct OpsCatalogEditorView: View {
                         Label("绑定商品图", systemImage: "photo.badge.plus")
                     }
                     Button(role: .destructive) {
-                        if workspace.removeProduct(id: selectedProductID) { clampSelection() }
+                        if workspace.removeProduct(id: selectedProductID), workspace.saveCatalogEditorChanges() { clampSelection() }
                     } label: {
                         Label("删除", systemImage: "trash")
                     }
                 }
                 .controlSize(.small)
-                OpsFootnote(text: "这一列只做结构（谁挂在谁下面）。规格 / 尺码表 / 价格与销售记录"
-                            + "在「商品管理」里编排 —— 那也是**操作单位**所在的地方。")
+                Button {
+                    sheet = .productTables(productID: selectedProductID)
+                } label: {
+                    Label("查看价格表与尺码表…", systemImage: "tablecells")
+                }
+                .controlSize(.small)
+                let product = workspace.catalog.products.first { $0.id == selectedProductID }
+                let chart = workspace.catalog.series.first { $0.id == product?.seriesID }?.priceChart
+                let sizeChart = workspace.sizeChart(forProduct: selectedProductID)
+                let priceState = chart == nil ? "未录入" :
+                    (chart?.sourceImage == nil && (chart?.sourceImages ?? []).isEmpty ? "缺原图" : "已录入")
+                let sizeState = sizeChart == nil ? "未录入" : (sizeChart?.sourceImage == nil ? "缺原图" : "已录入")
+                Text("价格表：\(priceState) · 尺码表：\(sizeState)")
+                    .font(.caption).foregroundStyle(.secondary)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(10)
@@ -563,6 +588,7 @@ private enum EditorSheet: Identifiable {
     case seriesConfig(seriesID: String)
     case productForm(existingID: String?)
     case bindImages(productID: String)
+    case productTables(productID: String)
 
     var id: String {
         switch self {
@@ -571,6 +597,7 @@ private enum EditorSheet: Identifiable {
         case .seriesConfig(let seriesID): return "seriesconfig-\(seriesID)"
         case .productForm(let existingID): return "product-\(existingID ?? "new")"
         case .bindImages(let productID): return "bind-\(productID)"
+        case .productTables(let productID): return "tables-\(productID)"
         }
     }
 }
@@ -639,7 +666,7 @@ private struct ColumnShell<Content: View>: View {
 
 // MARK: - 店家表单
 
-private struct ShopFormSheet: View {
+struct ShopFormSheet: View {
     @ObservedObject var workspace: OpsWorkspace
     let existingID: String?
     /// 保存成功后回调（新建 = 新店家 id；编辑 = 该店家 id）。父视图据此选中。
@@ -648,11 +675,17 @@ private struct ShopFormSheet: View {
 
     @State private var name = ""
     @State private var aliasesText = ""
+    @State private var logoReference: String?
+    @State private var error: String?
+    @State private var createdID: String?
 
     var body: some View {
         SheetFrame(title: existingID == nil ? "新增店家" : "编辑店家") {
             TextField("店家名（必填）", text: $name)
             TextField("别名（英文逗号分隔，用于搜索匹配）", text: $aliasesText)
+            OpsShopLogoPicker(workspace: workspace, reference: $logoReference)
+            Text("保存后自动同步到 App").font(.caption).foregroundStyle(.secondary)
+            if let error { Text(error).font(.caption).foregroundStyle(.orange) }
         } onCancel: {
             dismiss()
         } onConfirm: {
@@ -663,22 +696,24 @@ private struct ShopFormSheet: View {
             // R05：只有成功才关窗；失败留在表单里，原因在全局 banner。
             // 新建与编辑都把别名带上 —— 新建时丢弃别名是旧实现的静默丢数据。
             let savedID: String?
-            if let existingID {
-                savedID = workspace.updateShop(id: existingID, name: name, aliases: aliases)
-                    ? existingID : nil
+            if let id = existingID ?? createdID {
+                savedID = workspace.updateShopProfile(id: id, name: name, aliases: aliases,
+                                                      logo: logoReference) ? id : nil
             } else {
-                savedID = workspace.addShopReturningID(name: name, aliases: aliases)
+                savedID = workspace.addShopReturningID(name: name, aliases: aliases, logo: logoReference)
+                createdID = savedID // 写盘失败后重试不能重复创建店家。
             }
-            if let savedID {
+            if let savedID, workspace.saveCatalogEditorChanges() {
                 onSaved(savedID)
                 dismiss()
-            }
+            } else { error = workspace.statusText ?? "保存失败。" }
         }
         .onAppear {
             guard let existingID,
                   let shop = workspace.catalog.shops.first(where: { $0.id == existingID }) else { return }
             name = shop.name
             aliasesText = shop.aliases.joined(separator: ", ")
+            logoReference = shop.logo
         }
     }
 }
@@ -690,6 +725,8 @@ private struct SeriesFormSheet: View {
     let existingID: String?
     let preferredShopID: String?
     @Environment(\.dismiss) private var dismiss
+    @State private var formError: String?
+    @State private var createdID: String?
 
     @State private var shopID = ""
     @State private var name = ""
@@ -713,6 +750,8 @@ private struct SeriesFormSheet: View {
             Text("月份留空 = 只记年份（与旧数据的口径一致）。")
                 .font(.caption)
                 .foregroundStyle(.secondary)
+            Text("保存后自动同步到 App").font(.caption).foregroundStyle(.secondary)
+            if let formError { Text(formError).font(.caption).foregroundStyle(.orange) }
         } onCancel: {
             dismiss()
         } onConfirm: {
@@ -723,15 +762,17 @@ private struct SeriesFormSheet: View {
             // R05：新建也要带上 season —— 旧实现只在编辑路径传，新建出来的系列
             // 季节是空的，「新建后回显」这条验收因此永远过不了。
             let ok: Bool
-            if let existingID {
+            if let existingID = existingID ?? createdID {
                 ok = workspace.updateSeries(
                     id: existingID, shopID: shopID, name: name,
                     year: year, month: month, season: resolvedSeason)
             } else {
-                ok = workspace.addSeries(
+                createdID = workspace.addSeriesReturningID(
                     shopID: shopID, name: name, year: year, month: month, season: resolvedSeason)
+                ok = createdID != nil
             }
-            if ok { dismiss() }
+            if ok && workspace.saveCatalogEditorChanges() { dismiss() }
+            else { formError = workspace.statusText ?? "保存失败。" }
         }
         .onAppear {
             if let existingID,
@@ -756,6 +797,8 @@ private struct ProductFormSheet: View {
     let preferredShopID: String?
     let preferredSeriesID: String?
     @Environment(\.dismiss) private var dismiss
+    @State private var formError: String?
+    @State private var createdID: String?
 
     @State private var shopID = ""
     @State private var seriesID = ""
@@ -788,20 +831,24 @@ private struct ProductFormSheet: View {
             }
             TextField("商品名（如「星月夜 JSK 蓝色」）", text: $name)
             TextField("品类（如 JSK / OP / SK / 小物）", text: $category)
+            Text("保存后自动同步到 App").font(.caption).foregroundStyle(.secondary)
+            if let formError { Text(formError).font(.caption).foregroundStyle(.orange) }
         } onCancel: {
             dismiss()
         } onConfirm: {
             // R05：只有成功才关窗
             let ok: Bool
-            if let existingID {
+            if let existingID = existingID ?? createdID {
                 ok = workspace.updateProduct(
                     id: existingID, shopID: shopID, seriesID: seriesID,
                     name: name, category: category)
             } else {
-                ok = workspace.addProduct(
+                createdID = workspace.addProductReturningID(
                     shopID: shopID, seriesID: seriesID, name: name, category: category)
+                ok = createdID != nil
             }
-            if ok { dismiss() }
+            if ok && workspace.saveCatalogEditorChanges() { dismiss() }
+            else { formError = workspace.statusText ?? "保存失败。" }
         }
         .onAppear {
             if let existingID,
@@ -983,7 +1030,8 @@ private struct BindImagesSheet: View {
             Button("取消") { dismiss() }
             Button("确定") {
                 // R05：绑定失败（例如草稿处于只读隔离态）不关窗
-                if workspace.bindImages(selectedOrder, toProduct: productID) { dismiss() }
+                if workspace.bindImages(selectedOrder, toProduct: productID),
+                   workspace.saveCatalogEditorChanges() { dismiss() }
             }
             .keyboardShortcut(.defaultAction)
         }

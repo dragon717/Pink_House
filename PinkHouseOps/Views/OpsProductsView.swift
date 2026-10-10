@@ -28,6 +28,7 @@
 //
 
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct OpsProductsView: View {
     @ObservedObject var workspace: OpsWorkspace
@@ -1138,9 +1139,10 @@ private struct VariantFormSheet: View {
 ///
 /// 行列不齐是尺码表最常见的脏数据（客户端整列错位 → 看起来「数据全错」），
 /// 所以在**录入端**就挡：这里先按列数校验一遍，服务层还会再挡一次。
-private struct SizeChartFormSheet: View {
+struct SizeChartFormSheet: View {
     @ObservedObject var workspace: OpsWorkspace
     let productID: String
+    var syncOnSave = false
     @Environment(\.dismiss) private var dismiss
 
     @State private var unit = ""
@@ -1149,6 +1151,7 @@ private struct SizeChartFormSheet: View {
     /// 每行一条：`标签 = 值1, 值2, …`
     @State private var rowsText = ""
     @State private var localError: String?
+    @State private var importsSource = false
 
     var body: some View {
         OpsFormFrame(
@@ -1170,10 +1173,19 @@ private struct SizeChartFormSheet: View {
                 }
                 Picker("尺码表原图（可空）", selection: $sourceAssetID) {
                     Text("不指定").tag("")
+                    if !sourceAssetID.isEmpty, !workspace.catalog.assets.contains(where: { $0.id == sourceAssetID }) {
+                        Text("当前原图").tag(sourceAssetID)
+                    }
                     ForEach(workspace.catalog.assets) { asset in
                         Text(assetLabel(asset)).tag(asset.id)
                     }
                 }
+                Button { importsSource = true } label: {
+                    OpsThumbnail(url: workspace.stagedFileURL(forReference:
+                        workspace.asset(for: sourceAssetID)?.originalURL ?? sourceAssetID), size: 72)
+                }
+                .buttonStyle(.plain).help("点击上传或替换尺码表原图")
+                Text("点击图片上传或替换尺码表原图").font(.caption).foregroundStyle(.secondary)
                 if let localError {
                     Label(localError, systemImage: "exclamationmark.triangle.fill")
                         .font(.caption).foregroundStyle(.orange)
@@ -1183,9 +1195,24 @@ private struct SizeChartFormSheet: View {
                             + "（原图给用户看，结构化数据给客户端排版）。")
             },
             onCancel: { dismiss() },
-            onConfirm: { save() }
+            onConfirm: {
+                guard save() else { localError = localError ?? workspace.lastError; return false }
+                guard !syncOnSave || workspace.saveCatalogEditorChanges() else {
+                    localError = workspace.lastError; return false
+                }
+                return true
+            }
         )
         .onAppear(perform: load)
+        .fileImporter(isPresented: $importsSource, allowedContentTypes: [.image]) { result in
+            do {
+                let url = try result.get()
+                let access = url.startAccessingSecurityScopedResource()
+                defer { if access { url.stopAccessingSecurityScopedResource() } }
+                if let id = workspace.importSingleImage(from: url) { sourceAssetID = id }
+                localError = workspace.lastError
+            } catch { localError = error.localizedDescription }
+        }
     }
 
     private func load() {
@@ -1352,9 +1379,10 @@ private struct SaleEventFormSheet: View {
 ///
 /// 表单里必须把这句话写在明面上，否则运营会以为「留空 = 不改这一项」，
 /// 于是改一次价格就把另外两个字段清掉了，而界面上只会显示「暂无」。
-private struct PriceCorrectionFormSheet: View {
+struct PriceCorrectionFormSheet: View {
     @ObservedObject var workspace: OpsWorkspace
     let productID: String
+    var syncOnSave = false
     @Environment(\.dismiss) private var dismiss
 
     @State private var reservationText = ""
@@ -1373,9 +1401,11 @@ private struct PriceCorrectionFormSheet: View {
             width: 540,
             contentHeight: 380,
             content: {
-                TextField("预约价（留空 = 清除）", text: $reservationText)
+                TextField("预约价（留空 = 清除）", text: Binding(
+                    get: { reservationText }, set: { reservationText = $0; updateBalance() }))
                 TextField("现货价（留空 = 清除）", text: $stockText)
-                TextField("定金（留空 = 清除）", text: $depositText)
+                TextField("定金（留空 = 清除）", text: Binding(
+                    get: { depositText }, set: { depositText = $0; updateBalance() }))
                 TextField("尾款（留空 = 清除）", text: $balanceText)
                 Toggle("声明币种（跨币种修正会被拒绝）", isOn: $usesCurrency)
                 if usesCurrency {
@@ -1392,19 +1422,33 @@ private struct PriceCorrectionFormSheet: View {
                 }
             },
             onCancel: { dismiss() },
-            onConfirm: { save() }
+            onConfirm: {
+                guard save() else { localError = localError ?? workspace.lastError; return false }
+                guard !syncOnSave || workspace.saveCatalogEditorChanges() else {
+                    localError = workspace.lastError; return false
+                }
+                return true
+            }
         )
         .onAppear(perform: load)
     }
 
+    private func updateBalance() {
+        guard case .value(let reservation) = opsParseDecimal(reservationText),
+              case .value(let deposit) = opsParseDecimal(depositText),
+              reservation >= 0, deposit >= 0, deposit <= reservation else {
+            balanceText = ""; return
+        }
+        balanceText = NSDecimalNumber(decimal: reservation - deposit).stringValue
+    }
+
     private func load() {
-        guard let correction = workspace.catalog.products
-            .first(where: { $0.id == productID })?.priceCorrection else { return }
-        reservationText = text(correction.reservationPrice)
-        stockText = text(correction.stockPrice)
-        depositText = text(correction.deposit)
-        balanceText = text(correction.balance)
-        if let existing = correction.currency {
+        guard let archive = workspace.priceArchive(forProduct: productID) else { return }
+        reservationText = text(archive.currentReservationPrice)
+        stockText = text(archive.currentStockPrice)
+        depositText = text(archive.currentDeposit)
+        balanceText = text(archive.currentBalance)
+        if let existing = archive.currentCurrency {
             usesCurrency = true
             currency = existing.isUnknown ? .cny : existing
         }

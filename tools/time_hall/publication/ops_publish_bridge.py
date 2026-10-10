@@ -76,11 +76,15 @@ Swift 侧 `ShopCatalogPublishProtocol.swift`）。**App 写请求文件就是唯
 from __future__ import annotations
 
 import argparse
+from concurrent.futures import ThreadPoolExecutor
 import datetime as dt
 import gzip
 import hashlib
 import json
+import os
 import re
+import signal
+import threading
 import subprocess
 import sys
 from pathlib import Path
@@ -288,32 +292,68 @@ def run_child(argv: List[str], quiet: bool) -> Tuple[int, List[int]]:
     退出码知道），否则「一直在开始、从不结束」的阶段会在界面上永远转圈。
     """
     stages_seen: List[int] = []
-    process = subprocess.Popen(
-        argv,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-        bufsize=1,
-    )
-    assert process.stdout is not None
-    for raw in process.stdout:
-        line = raw.rstrip()
-        if not line:
-            continue
-        marker = STEP_LINE_RE.match(line.strip())
-        if marker:
-            step = int(marker.group(1))
-            if stages_seen:
-                stage(STEP_TO_STAGE[stages_seen[-1]], "succeeded")
-            stages_seen.append(step)
-            stage(STEP_TO_STAGE[step], "started", marker.group(2))
-            continue
-        if not quiet:
-            log_line("info", line)
-    exit_code = process.wait()
-    return exit_code, stages_seen
+    environment = dict(os.environ, PYTHONUNBUFFERED="1")
+    process = None
+    # App 终止桥接进程时，必须一并停止其发布子进程；不能留下后台继续切头的孤儿。
+    def terminate_child(signum, frame):
+        raise SystemExit(128 + signum)
+
+    manages_signal = threading.current_thread() is threading.main_thread()
+    previous = signal.signal(signal.SIGTERM, terminate_child) if manages_signal else None
+    try:
+        process = subprocess.Popen(
+            argv,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            bufsize=1,
+            env=environment,
+            start_new_session=True,
+        )
+        assert process.stdout is not None
+        for raw in process.stdout:
+            line = raw.rstrip()
+            if not line:
+                continue
+            if line.startswith('{'):
+                try:
+                    event = json.loads(line)
+                except ValueError:
+                    event = None
+                if isinstance(event, dict) and event.get("type") == "progress" and event.get("stage") == "uploadMedia":
+                    emit(event)
+                    continue
+            marker = STEP_LINE_RE.match(line.strip())
+            if marker:
+                step = int(marker.group(1))
+                if stages_seen:
+                    stage(STEP_TO_STAGE[stages_seen[-1]], "succeeded")
+                stages_seen.append(step)
+                stage(STEP_TO_STAGE[step], "started", marker.group(2))
+                continue
+            if not quiet:
+                log_line("info", line)
+        exit_code = process.wait()
+        return exit_code, stages_seen
+    finally:
+        if process is not None and process.poll() is None:
+            try:
+                os.killpg(process.pid, signal.SIGTERM)
+                process.wait(timeout=3)
+            except subprocess.TimeoutExpired:
+                try:
+                    os.killpg(process.pid, signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
+                process.wait()
+            except ProcessLookupError:
+                pass
+        if process is not None and process.stdout is not None:
+            process.stdout.close()
+        if manages_signal:
+            signal.signal(signal.SIGTERM, previous)
 
 
 # ------------------------------------------------------------------ 线上发布头
@@ -348,6 +388,7 @@ def baseline_mismatches(request: Dict[str, Any], head: Optional[Dict[str, Any]])
     | 草稿基线 | 线上 | 结论 |
     |---|---|---|
     | 空 | 有 | 不一致：无法证明这份内容基于线上当前版本 |
+    | 已拉回空库（发布号 0、无摘要） | 无发布头 | 一致：首次发布 |
     | 有 | 无发布头 | 不一致：草稿基于某个版本，线上却什么都没有 |
     | 发布号不同 | — | 不一致 |
     | 摘要不同 | — | 不一致（**这是比发布号更强的那一条**） |
@@ -370,6 +411,10 @@ def baseline_mismatches(request: Dict[str, Any], head: Optional[Dict[str, Any]])
         ]
 
     if not head:
+        # pull-catalog 已明确观察到空库时记录 seq=0；这不是「从未核对」。
+        # read_head 出错会在调用方直接拒绝，只有真实 NOT_FOUND 能到这里。
+        if base_seq in (0, "0") and not base_hash:
+            return []
         return [
             "线上尚无商店发布头（看起来是首次发布），但草稿记录的基线是 "
             "releaseSeq={} / 摘要={}".format(base_seq, _short_hash(base_hash))
@@ -1058,6 +1103,30 @@ def run_pull_catalog(request: Dict[str, Any], quiet: bool) -> int:
     return EXIT_OK
 
 
+def fetch_media_items(adapter, ordered):
+    """元数据分块读取；每组最多四个下载，按请求顺序结算，限制内存与请求量。"""
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        for start in range(0, len(ordered), 200):
+            chunk = ordered[start:start + 200]
+            try:
+                assets = adapter.media_assets_many(chunk) if hasattr(adapter, "media_assets_many") else None
+            except (ProtocolError, CredentialError) + NETWORK_FAILURES as error:
+                yield chunk[0], error
+                return
+            for offset in range(0, len(chunk), 4):
+                futures = []
+                for digest in chunk[offset:offset + 4]:
+                    future = (pool.submit(adapter.fetch_media_bytes, digest) if assets is None
+                              else pool.submit(adapter._download_asset, assets.get(digest, {})))
+                    futures.append((digest, future))
+                for digest, future in futures:
+                    try:
+                        payload = future.result()
+                    except (ProtocolError, CredentialError) + NETWORK_FAILURES as error:
+                        payload = error
+                    yield digest, payload
+
+
 def run_fetch_media(request: Dict[str, Any], quiet: bool) -> int:
     """**只读**地把远端媒体按内容摘要下载到本机 —— 双向同步里「下载」那一档。
 
@@ -1139,7 +1208,33 @@ def run_fetch_media(request: Dict[str, Any], quiet: bool) -> int:
     failure_message = None
     failure_exit = EXIT_OK
 
-    for index, digest in enumerate(ordered, start=1):
+    def checkpoint():
+        manifest = {
+            "fetchedAt": _now_iso(),
+            "targetEnvironment": str(request["targetEnvironment"]),
+            "requested": len(ordered),
+            "downloaded": downloaded,
+            "missing": missing,
+            "corrupt": corrupt,
+            "unrecognizedFormat": unrecognized,
+            "pending": pending,
+            "invalidRequestEntries": invalid,
+            "note": (
+                "downloaded = 已落盘并自证摘要；missing = 远端确实没有这条 THMedia；"
+                "corrupt = 摘要/落盘不符（已丢弃）；unrecognizedFormat = 认不出图片格式（已跳过）。"
+            ),
+        }
+        temporary = output_directory / "fetch-manifest.json.tmp"
+        temporary.write_text(
+            json.dumps(manifest, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+        temporary.replace(output_directory / "fetch-manifest.json")
+        emit({"type": "progress", "stage": "fetchMedia", "completed": len(ordered) - len(pending), "total": len(ordered)})
+
+    pending = list(ordered)
+    checkpoint()
+    for index, (digest, payload) in enumerate(fetch_media_items(adapter, ordered), start=1):
         # 进度按 25 张一档播报：每张都发一条事件的话，几百张图会把日志刷满，
         # 反倒看不见那几句真正重要的警告。
         if index == 1 or index % 25 == 0 or index == len(ordered):
@@ -1147,28 +1242,33 @@ def run_fetch_media(request: Dict[str, Any], quiet: bool) -> int:
                   "下载远端图片 {}/{}".format(index, len(ordered)))
         emit({"type": "progress", "stage": "fetchMedia", "completed": index - 1, "total": len(ordered)})
         try:
-            payload = adapter.fetch_media_bytes(digest)
+            if isinstance(payload, Exception):
+                raise payload
         except (ProtocolError, CredentialError) + NETWORK_FAILURES as error:
             # 先结算已完成清单，让 App 收进 staging；剩余项下次只补缺。
-            pending = ordered[index - 1:]
+            checkpoint()
             failure_exit = EXIT_NETWORK if isinstance(error, NETWORK_FAILURES) else EXIT_REFUSED
             failure_message = "下载第 {}/{} 张失败：{}；已完成 {} 张，未完成 {} 张。".format(
                 index, len(ordered), error, len(downloaded), len(pending))
             break
+        pending.remove(digest)
         if payload is None:
             missing.append(digest)
+            checkpoint()
             continue
         actual = sha256_hex(payload)
         if actual != digest:
             corrupt.append(digest)
             log_line("error", "✖ 摘要不符，已丢弃：期望 {} / 实际 {}".format(
                 _short_hash(digest), _short_hash(actual)))
+            checkpoint()
             continue
         suffix = _image_suffix_from_bytes(payload)
         if suffix is None:
             unrecognized.append(digest)
             log_line("warning", "⚠️ 认不出图片格式，已跳过（不猜后缀）：{}".format(
                 _short_hash(digest)))
+            checkpoint()
             continue
         file_name = "{}.{}".format(digest, suffix)
         try:
@@ -1176,29 +1276,13 @@ def run_fetch_media(request: Dict[str, Any], quiet: bool) -> int:
         except OSError as error:
             corrupt.append(digest)
             log_line("error", "✖ 落盘失败：{}（{}）".format(file_name, error))
+            checkpoint()
             continue
         downloaded.append({"contentHash": digest, "fileName": file_name,
                            "byteCount": len(payload)})
+        checkpoint()
 
-    manifest = {
-        "fetchedAt": _now_iso(),
-        "targetEnvironment": str(request["targetEnvironment"]),
-        "requested": len(ordered),
-        "downloaded": downloaded,
-        "missing": missing,
-        "corrupt": corrupt,
-        "unrecognizedFormat": unrecognized,
-        "pending": pending,
-        "invalidRequestEntries": invalid,
-        "note": (
-            "downloaded = 已落盘并自证摘要；missing = 远端确实没有这条 THMedia；"
-            "corrupt = 摘要/落盘不符（已丢弃）；unrecognizedFormat = 认不出图片格式（已跳过）。"
-        ),
-    }
-    (output_directory / "fetch-manifest.json").write_text(
-        json.dumps(manifest, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
-        encoding="utf-8",
-    )
+    checkpoint()
 
     emit({"type": "progress", "stage": "fetchMedia", "completed": len(ordered) - len(pending), "total": len(ordered)})
     stage("fetchMedia", "failed" if failure_message or corrupt or unrecognized else "succeeded",
@@ -1374,6 +1458,8 @@ def run_publish(request: Dict[str, Any], quiet: bool) -> int:
     remote_media_path = input_directory / "known-remote-media.json"
     candidate_hashes = _thmedia_hashes(_shop_catalog_doc(archive_path, input_directory))
     if not candidate_hashes:
+        # 首次发布只有本地图片时没有清单；也不能沿用输入目录里旧环境的清单。
+        remote_media_path = None
         stage("remoteMedia", "succeeded")
         log_line("info", "目录里没有 thmedia: 引用，无需核对远端媒体")
     else:
@@ -1548,9 +1634,7 @@ def main(argv: Optional[List[str]] = None) -> int:
                 "网络请求失败：{}。**这次发布的结果不明**（请求可能已经发出去了），"
                 "请先用结果查询确认线上发布号，**不要**换号重发。"
                 if is_publish
-                else "网络请求失败（**不是程序错误**，本机到 api.apple-cloudkit.com 的"
-                     "连接被重置）：{}。原样重试一次即可；若连续多次都失败，"
-                     "再按「网络问题」排查（代理 / VPN / DNS），不要去查权限或数据。"
+                else "网络请求失败：{}。请检查系统代理、VPN 或网络连接后重试。"
             ).format(error),
             retryable=not is_publish,
         ))

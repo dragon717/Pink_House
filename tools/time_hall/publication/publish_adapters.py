@@ -30,6 +30,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import http.client
+import ipaddress
 import json
 import os
 import shutil
@@ -37,6 +38,8 @@ import socket
 import ssl
 import subprocess
 import sys
+import threading
+import time
 import urllib.error
 import urllib.request
 from pathlib import Path
@@ -80,12 +83,19 @@ NETWORK_FAILURES = (
     urllib.error.URLError,
     ConnectionError,
     TimeoutError,
+    socket.timeout,
     ssl.SSLError,
     http.client.HTTPException,
 )
 
 
 # ------------------------------------------------------------------ 出网（唯一的入口）
+
+# 仅缓存已成功的直连路由，避免批量任务逐文件等待同一个失效的本机代理。
+_DIRECT_ROUTES: Dict[Tuple[str, int, str], float] = {}
+_ROUTE_LOCK = threading.Lock()
+_CONNECTION_BUDGET = 20.0
+_ADDRESS_TIMEOUT = 5.0
 
 #: 只对**连接类**失败换下一个地址；证书问题与地址无关，换也没用（见 `connect_first_ready`）。
 _TLS_OK = Callable[[socket.socket], socket.socket]
@@ -157,7 +167,7 @@ def connect_first_ready(
         "最后错误 {}: {}".format(
             len(tried), ", ".join(tried), type(last_error).__name__, last_error
         )
-    )
+    ) from last_error
 
 
 def _close_quietly(sock: Optional[socket.socket]) -> None:
@@ -183,23 +193,108 @@ class _FailoverHTTPSConnection(http.client.HTTPSConnection):
         tunnel_host = getattr(self, "_tunnel_host", None)
         server_hostname = tunnel_host or self.host
         context = self._context or ssl.create_default_context()
+        deadline = time.monotonic() + _CONNECTION_BUDGET
+
+        def connection_timeout() -> float:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise TimeoutError("建立 HTTPS 连接超过 20 秒")
+            return min(_ADDRESS_TIMEOUT, remaining, tcp_timeout or _ADDRESS_TIMEOUT)
 
         def open_socket(family: int, sockaddr: Any) -> socket.socket:
+            timeout = connection_timeout()
             sock = socket.socket(family, socket.SOCK_STREAM)
-            sock.settimeout(tcp_timeout)
-            sock.connect(sockaddr)
+            sock.settimeout(timeout)
+            try:
+                sock.connect(sockaddr)
+            except OSError:
+                _close_quietly(sock)
+                raise
             return sock
 
         def tls_ready(sock: socket.socket) -> socket.socket:
+            sock.settimeout(connection_timeout())
             if tunnel_host:
                 self.sock = sock
                 self._tunnel()
                 sock = self.sock
+            sock.settimeout(connection_timeout())
             return context.wrap_socket(sock, server_hostname=server_hostname)
 
-        self.sock = connect_first_ready(
-            resolved_tcp_addresses(self.host, self.port), open_socket, tls_ready
-        )
+        def direct_ready(sock: socket.socket) -> socket.socket:
+            sock.settimeout(connection_timeout())
+            return context.wrap_socket(sock, server_hostname=tunnel_host)
+
+        route = (self.host, self.port, tunnel_host or "")
+        eligible = bool(tunnel_host and _is_loopback_proxy(self.host) and _is_cloudkit_host(tunnel_host))
+        with _ROUTE_LOCK:
+            use_direct = eligible and _DIRECT_ROUTES.get(route, 0) > time.monotonic()
+        if use_direct:
+            try:
+                self.sock = connect_first_ready(
+                    resolved_tcp_addresses(tunnel_host, self._tunnel_port), open_socket, direct_ready)
+            except NETWORK_FAILURES:
+                with _ROUTE_LOCK:
+                    _DIRECT_ROUTES.pop(route, None)
+                raise
+            self.sock.settimeout(tcp_timeout)
+            return
+
+        try:
+            self.sock = connect_first_ready(
+                resolved_tcp_addresses(self.host, self.port), open_socket, tls_ready
+            )
+        except NetworkError as proxy_error:
+            if not tunnel_host:
+                raise
+            # 127.0.0.1 是系统代理入口，不能把它报成 CloudKit 的 DNS 地址。
+            # 只在本机代理的连接 / TLS 中断时回退，且尚未发送业务请求。
+            # 证书错误、代理明确拒绝（如 CONNECT 407）和远程代理不参与回退。
+            cause = proxy_error.__cause__
+            if not (
+                _is_loopback_proxy(self.host)
+                and _is_cloudkit_host(tunnel_host)
+                and isinstance(cause, (ConnectionError, TimeoutError, socket.timeout, ssl.SSLError))
+                and not isinstance(cause, ssl.SSLCertVerificationError)
+            ):
+                raise NetworkError(
+                    "代理 {}:{} 到 {} 的连接失败：{}".format(
+                        self.host, self.port, tunnel_host, proxy_error
+                    )
+                ) from proxy_error
+            self.sock = None
+            try:
+                # 保留目标域名的 SNI 与默认的证书验证；不固化 Apple IP，
+                # 不重发已经传出的 POST，也不改动系统代理配置。
+                self.sock = connect_first_ready(
+                    resolved_tcp_addresses(tunnel_host, self._tunnel_port),
+                    open_socket,
+                    direct_ready,
+                )
+                with _ROUTE_LOCK:
+                    _DIRECT_ROUTES[route] = time.monotonic() + 300
+            except NetworkError as direct_error:
+                raise NetworkError(
+                    "本机代理 {}:{} 连接失败：{}；直连 {} 也失败：{}".format(
+                        self.host, self.port, proxy_error, tunnel_host, direct_error
+                    )
+                ) from direct_error
+        # 建连短超时与文件传输的读写超时分别管理。
+        self.sock.settimeout(tcp_timeout)
+
+
+def _is_loopback_proxy(host: str) -> bool:
+    if host.lower() == "localhost":
+        return True
+    try:
+        return ipaddress.ip_address(host).is_loopback
+    except ValueError:
+        return False
+
+
+def _is_cloudkit_host(host: str) -> bool:
+    host = host.lower().rstrip(".")
+    return host == "api.apple-cloudkit.com" or host.endswith(".icloud-content.com")
 
 
 class _FailoverHTTPSHandler(urllib.request.HTTPSHandler):
@@ -463,6 +558,9 @@ class PublishAdapter:
 
     def media_exists(self, content_hash: str) -> bool:
         raise NotImplementedError
+
+    def media_exists_many(self, content_hashes: List[str]) -> set:
+        return {digest for digest in content_hashes if self.media_exists(digest)}
 
     def put_media(self, content_hash: str, file_path: Path, meta: Dict[str, Any]) -> None:
         raise NotImplementedError
@@ -1019,6 +1117,7 @@ class CloudKitWebServicesAdapter(PublishAdapter):
             try:
                 with open_https(request, timeout=300) as response:
                     body = response.read()
+                last_error = None
                 break
             except urllib.error.HTTPError as error:
                 detail = ""
@@ -1058,6 +1157,26 @@ class CloudKitWebServicesAdapter(PublishAdapter):
         value = self._lookup_asset_value("THMedia", "th.media.{}".format(content_hash), "asset")
         return self._download_asset(value)
 
+    def media_assets_many(self, content_hashes: List[str], chunk_size: int = 200) -> Dict[str, Dict[str, Any]]:
+        """批量获取下载地址；错误与真实 NOT_FOUND 保持不同，不缓存临时下载 URL。"""
+        assets: Dict[str, Dict[str, Any]] = {}
+        for start in range(0, len(content_hashes), chunk_size):
+            chunk = content_hashes[start:start + chunk_size]
+            result = self._send("records/lookup", {"records": [
+                {"recordName": "th.media." + digest, "recordType": "THMedia"} for digest in chunk]})
+            expected = {"th.media." + digest: digest for digest in chunk}
+            found = existing_records(result)
+            returned = {record.get("recordName") for record in result.get("records", []) if isinstance(record, dict)}
+            if returned != set(expected):
+                raise ProtocolError("CloudKit THMedia 批量响应不完整，不能将未返回的记录当作不存在")
+            for record in found:
+                digest = expected.get(record["recordName"])
+                value = ((record.get("fields") or {}).get("asset") or {}).get("value")
+                if digest is None or not isinstance(value, dict) or not value.get("downloadURL"):
+                    raise ProtocolError("CloudKit THMedia 批量响应缺少有效的资产地址或记录名")
+                assets[digest] = value
+        return assets
+
     def read_back_media_hash(self, content_hash: str) -> Optional[str]:
         return content_hash if self.media_exists(content_hash) else None
 
@@ -1091,7 +1210,7 @@ class CloudKitWebServicesAdapter(PublishAdapter):
             return None
 
         request = urllib.request.Request(url, method="GET")
-        with open_https(request, timeout=300) as response:
+        with open_https(request, timeout=60) as response:
             return response.read()
 
     def fetch_root_index_bytes(self) -> Optional[bytes]:

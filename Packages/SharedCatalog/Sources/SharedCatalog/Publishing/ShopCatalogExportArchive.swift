@@ -22,6 +22,17 @@
 
 import Foundation
 
+public nonisolated enum ShopCatalogHandoffExportError: LocalizedError, Equatable {
+    case missingImages([String])
+
+    public var errorDescription: String? {
+        switch self {
+        case .missingImages(let names):
+            return "整包未导出：本机缺少 \(names.count) 张图片（\(names.prefix(5).joined(separator: "、"))）。请在保留原图的设备补齐后再导出。"
+        }
+    }
+}
+
 public nonisolated enum ShopCatalogExportArchive {
 
     /// 归档内的一个条目
@@ -76,6 +87,17 @@ public nonisolated enum ShopCatalogExportArchive {
             entries.append(Entry(name: "images/\(name)", data: data))
         }
         return (entries, missing)
+    }
+
+    /// 整包交接必须包含所有本地图片字段，缺图时不产出可被误认为完整的包。
+    public static func completeHandoffEntries(
+        for catalog: ShopCatalog, imageDirectory: URL
+    ) throws -> [Entry] {
+        let references = Set(ShopCatalogMediaReferences.publisherRewritten(in: catalog).map(\.reference))
+        let (images, missing) = imageEntries(forLocalReferences: references, imageDirectory: imageDirectory)
+        guard missing.isEmpty else { throw ShopCatalogHandoffExportError.missingImages(missing) }
+        let json = try ShopCatalogJSONCoding.encoder(prettyPrinted: true).encode(catalog)
+        return [Entry(name: "shop-catalog.json", data: json)] + images
     }
 
     /// `local:<文件名>` → 文件名；非 local 引用或非法名返回 nil

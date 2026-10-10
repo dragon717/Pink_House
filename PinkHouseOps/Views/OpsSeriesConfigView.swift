@@ -25,6 +25,7 @@
 //
 
 import SwiftUI
+import PinkHouseOpsCore
 
 struct SeriesConfigSheet: View {
     @ObservedObject var workspace: OpsWorkspace
@@ -76,6 +77,10 @@ struct SeriesConfigSheet: View {
                 if let series {
                     Text("\(workspace.shopName(for: series.shopID)) › \(series.name)")
                         .font(.callout).foregroundStyle(.secondary)
+                }
+                if let message = workspace.catalogEditSyncMessage {
+                    Text(message).font(.caption).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
                 OpsFootnote(text: "这里是这一份系列配置的**唯一入口**。保存只写各自负责的字段："
                             + "第一阶段那组**不碰任何价格**，价格表那组**不碰阶段与区间**。")
@@ -170,26 +175,26 @@ struct SeriesConfigSheet: View {
             phaseError = "声明「预约中」必须填预约结束时间 —— 自动流转靠它。"
             return
         }
-        if declaresPhase, balanceDueKind == .exact, !hasBalanceDueAt {
+        if balanceDueKind == .exact, hasBalanceDueEndAt, !hasBalanceDueAt {
             phaseError = "尾款时间选了「具体时间」，请填上时间。"
             return
         }
-        if declaresPhase, balanceDueKind == .approximate,
-           balanceDueText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            phaseError = "尾款时间选了「大致时间」，请写上描述。"
-            return
-        }
+        let input = OpsSeriesSalePhaseInput(
+            declaresPhase: declaresPhase, phase: phase,
+            reservationStartAt: hasReservationStart ? reservationStartAt : nil,
+            reservationEndAt: hasReservationEnd ? reservationEndAt : nil,
+            balanceDueKind: balanceDueKind, balanceDueText: balanceDueText,
+            balanceDueAt: hasBalanceDueAt ? balanceDueAt : nil,
+            balanceDueEndAt: hasBalanceDueEndAt ? balanceDueEndAt : nil)
         let ok = workspace.updateSeriesSalePhase(
             id: seriesID,
-            phase: declaresPhase ? phase : nil,
-            reservationStartAt: declaresPhase && hasReservationStart ? reservationStartAt : nil,
-            reservationEndAt: declaresPhase && hasReservationEnd ? reservationEndAt : nil,
-            balanceDueKind: declaresPhase ? balanceDueKind : nil,
-            balanceDueText: declaresPhase && balanceDueKind == .approximate ? balanceDueText : nil,
-            balanceDueAt: declaresPhase && balanceDueKind == .exact && hasBalanceDueAt
-                ? balanceDueAt : nil,
-            balanceDueEndAt: declaresPhase && balanceDueKind == .exact && hasBalanceDueEndAt
-                ? balanceDueEndAt : nil)
+            phase: input.phase,
+            reservationStartAt: input.reservationStartAt,
+            reservationEndAt: input.reservationEndAt,
+            balanceDueKind: input.balanceDueKind,
+            balanceDueText: input.balanceDueText,
+            balanceDueAt: input.balanceDueAt,
+            balanceDueEndAt: input.balanceDueEndAt) && workspace.saveCatalogEditorChanges()
         if !ok { phaseError = workspace.statusText ?? "保存失败，请看上方的提示。" }
     }
 
@@ -200,9 +205,7 @@ struct SeriesConfigSheet: View {
             Text("系列封面").font(.subheadline.weight(.semibold))
             HStack(spacing: 10) {
                 OpsThumbnail(
-                    url: coverAssetID.flatMap {
-                        workspace.stagedFileURL(forReference: workspace.asset(for: $0)?.originalURL)
-                    }, size: 48)
+                    url: workspace.stagedImageURL(forReference: coverAssetID), size: 48)
                 Picker("封面", selection: $coverAssetID) {
                     Text("不指定").tag(String?.none)
                     ForEach(workspace.catalog.assets) { asset in
@@ -212,7 +215,8 @@ struct SeriesConfigSheet: View {
                 .controlSize(.small)
                 Button("保存封面") {
                     if let coverAssetID,
-                       workspace.updateSeriesCover(seriesID: seriesID, assetID: coverAssetID) {
+                       workspace.updateSeriesCover(seriesID: seriesID, assetID: coverAssetID),
+                       workspace.saveCatalogEditorChanges() {
                         coverMessage = nil
                     } else if coverAssetID == nil {
                         coverMessage = "请先选择一张图（封面不提供「清除」——要换就换一张）。"
@@ -292,7 +296,10 @@ struct SeriesConfigSheet: View {
                 }
                 .controlSize(.small)
                 Button("清空价格表") {
-                    workspace.clearSeriesPriceChart(seriesID: seriesID)
+                    guard workspace.clearSeriesPriceChart(seriesID: seriesID),
+                          workspace.saveCatalogEditorChanges() else {
+                        chartError = workspace.statusText; return
+                    }
                     chartUnit = ""
                     chartColumnsText = ""
                     chartRowsText = ""
@@ -329,7 +336,7 @@ struct SeriesConfigSheet: View {
             unit: chartUnit,
             columns: parsed.columns,
             rows: parsed.rows,
-            sourceImages: images)
+            sourceImages: images) && workspace.saveCatalogEditorChanges()
         if !ok { chartError = workspace.statusText ?? "保存失败，请看上方的提示。" }
     }
 

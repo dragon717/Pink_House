@@ -16,10 +16,9 @@
 //
 //  ## 边界
 //
-//    · 本服务只读公共库；写入只在运营 Mac 发布流水线（tools/time_hall/publication/）。
+//    · 本服务只读公共库；运营写入在独立的 Mac 发布器或 iOS 运营发布器。
 //    · 清缓存不删控制状态；缓存目录被系统清理后按「未安装」恢复（索引与文件同时校验）。
-//    · 媒体（商品图）本期不下载：包内 `local:` 引用在本机解析失败时展示占位图，
-//      远端媒体走 THMedia 的按需获取在后续版本接入（见 publication/README.md 的坑位说明）。
+//    · 商品图由 ShopCatalogMediaStore 按需下载 THMedia、校验并缓存；清缓存后可重下。
 //
 
 import Foundation
@@ -59,7 +58,8 @@ final class ShopCatalogCloudSyncService: ObservableObject {
     private unowned let store: ShopCatalogStore
 
     /// 是否正在同步（防并发重入：同分片并发请求合并为一项，§11.6）
-    private var isSyncing = false
+    private var syncTask: Task<Void, Never>?
+    private var followUpRequested = false
 
     /// 本次进程生命周期内，Store 里是否已经装有远端层。
     ///
@@ -87,16 +87,37 @@ final class ShopCatalogCloudSyncService: ObservableObject {
 
     // MARK: 入口
 
-    /// 检查并同步商店内容。可安全重复调用（节流 + 重入保护）。
-    /// - Parameter force: 用户手动刷新时置 true，跳过 30 分钟节流（但不绕过服务端重试约束）
+    /// 自动检查、发布通知和手动刷新共享同一条安装链路。
+    /// force 可跳过页面检查的 30 分钟节流；同步中收到发布通知必须再检查一次，
+    /// 避免当前请求已读到旧发布头时把新发布吞掉。
     func syncIfNeeded(force: Bool = false) async {
-        guard !isSyncing else { return }
-        isSyncing = true
+        if let running = syncTask {
+            if force { followUpRequested = true }
+            await running.value
+            return
+        }
+        let task = Task { [self] in
+            var checkImmediately = force
+            repeat {
+                followUpRequested = false
+                await syncOnce(force: checkImmediately)
+                checkImmediately = true
+            } while followUpRequested
+            syncTask = nil
+        }
+        syncTask = task
+        await task.value
+    }
+
+    private func syncOnce(force: Bool) async {
         state = .syncing
         defer {
-            isSyncing = false
             if state == .syncing { state = .idle }
         }
+
+        // 自动同步可以早于首次打开商品页，须先恢复基底和本机运营覆盖层。
+        // 否则远端安装使 catalog 非空，页面的懒加载会跳过未发布的本机编辑。
+        store.loadFromBundleIfNeeded()
 
         var control = ShopCatalogPackCache.loadControl()
 

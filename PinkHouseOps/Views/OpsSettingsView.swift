@@ -251,9 +251,9 @@ struct OpsSettingsView: View {
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                 }
-                // 缺图不是「数据错误」，是**图不在这台机器上** —— 修不了，只能补。
-                // 日志只显示前几条阻断，完整名单必须能导出，否则对着 284 这个数字无从下手。
                 HStack(spacing: 10) {
+                    Button("补齐缺失图片…") { chooseAndRepairImages() }
+                        .disabled(missingCount == 0 || holder.workspace == nil || model.isRunning || model.isSyncing)
                     Button("导出缺图清单…") { exportMissingImages() }
                         .disabled(missingCount == 0 || holder.workspace == nil)
                     Text(missingCount > 0
@@ -262,6 +262,9 @@ struct OpsSettingsView: View {
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                 }
+                Text("选择原 iOS 整包解压目录或 images 文件夹，按原文件名补图；当前草稿和已有图片保留。补齐后再次点击「云端更新」。")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
                 // 拼接结果 = 变量式的 String，必须过 opsMarkdown（`Text(拼接)` 不解析 Markdown）
                 opsMarkdown("清理会**删除**这些销售记录（不可撤销），但它们的商品在目录里已不存在，"
                      + "本来也无从归属。整包重新导入会把它们带回来，需要再清一次。")
@@ -500,6 +503,26 @@ struct OpsSettingsView: View {
         if let message = OpsMissingImagesExport.save(from: workspace) {
             repairFailed = message.hasPrefix("导出缺图清单失败")
             repairMessage = message
+        }
+    }
+
+    private func chooseAndRepairImages() {
+        guard let workspace = holder.workspace else { return }
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.allowsMultipleSelection = false
+        panel.message = "选择完整图片包的解压目录或 images 文件夹，只补当前缺失的图片"
+        panel.prompt = "补齐图片"
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        if let report = workspace.repairMissingImages(from: url) {
+            refreshCounters()
+            repairFailed = missingCount > 0 || !report.failures.isEmpty
+            repairMessage = (workspace.statusText ?? report.summary)
+                + (workspace.lastError.map { "\n" + $0 } ?? "")
+        } else {
+            repairFailed = true
+            repairMessage = workspace.lastError ?? "补图失败"
         }
     }
 

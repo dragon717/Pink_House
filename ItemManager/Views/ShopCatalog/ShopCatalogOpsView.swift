@@ -787,8 +787,7 @@ struct ShopCatalogOpsView: View {
     /// 走系统分享面板（AirDrop / 存到「文件」）。Mac 端解开后
     /// `build_release.py --shop-catalog-archive <tar>` 即可发布（图片会上传成 THMedia）。
     private func exportWholeBundleForPublishing() {
-        guard let catalog = store.catalog,
-              let json = draftStore.exportJSON(store: store) else {
+        guard let catalog = store.catalog else {
             toast = "导出失败：商店目录尚未加载"
             return
         }
@@ -809,24 +808,14 @@ struct ShopCatalogOpsView: View {
         // 只带发布端**会改写**的那批（`publisherRewritten`）：
         // `products.images` / `variants.imageAssetID` 存的是 `CatalogAsset.id`
         // 而不是文件名，混进来会把 id 当文件名去打包。
-        let references = Set(
-            ShopCatalogMediaReferences.publisherRewritten(in: catalog).map(\.reference))
-        let (imageEntries, missing) = ShopCatalogExportArchive.imageEntries(
-            forLocalReferences: references,
-            imageDirectory: ShopCatalogImageStore.directory)
-
-        var entries = [ShopCatalogExportArchive.Entry(name: "shop-catalog.json",
-                                                      data: Data(json.utf8))]
-        entries.append(contentsOf: imageEntries)
-
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent("\(stamp)-shop-catalog-bundle.tar")
         do {
+            let entries = try ShopCatalogExportArchive.completeHandoffEntries(
+                for: catalog, imageDirectory: ShopCatalogImageStore.directory)
             try ShopCatalogExportArchive.tarData(entries: entries).write(to: url, options: .atomic)
             activeSheet = .exportFile(url)
-            toast = missing.isEmpty
-                ? "已打包 \(imageEntries.count) 张图片"
-                : "已打包 \(imageEntries.count) 张图片，\(missing.count) 张缺失（发布端会报错）"
+            toast = "已打包 \(entries.count - 1) 张图片"
         } catch {
             toast = "导出失败：\(error.localizedDescription)"
         }

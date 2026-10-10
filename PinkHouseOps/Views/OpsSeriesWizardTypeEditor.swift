@@ -10,7 +10,7 @@
 //      右列：当前类型的完整编辑区
 //            S3-A 公共资料（款式名；类型由多选结果确定）
 //            S3-B 尺码表（结构化列/行 + 单位 + 原图；或「无尺码/均码」）
-//            S3-C 价格（预约价/定金/尾款/现货价同屏；互相独立）
+//            S3-C 价格（预约价/定金/尾款/现货价同屏；尾款自动计算，现货价独立）
 //            S3-D 颜色 SKU（颜色名 + 颜色图 + 可售尺码勾选）
 //
 //  ## 从需求逐条落下的交互约束
@@ -79,6 +79,9 @@ struct OpsSeriesWizardTypeEntriesView: View {
                 .frame(minWidth: 200, idealWidth: 240, maxWidth: 320)
             if let entry = selectedEntry ?? draft.typeEntries.first {
                 OpsSeriesWizardTypeEditorView(workspace: workspace, entry: selectedBindingFor(entry))
+                    // 每个条目拥有自己的编辑器状态；切到副本不会触发旧编辑器的
+                    // 颜色数量/身份变化回调，把复制保留的尺码勾选重新补满。
+                    .id(entry.id)
                     .frame(minWidth: 460, idealWidth: 480, maxWidth: .infinity)
             } else {
                 emptyEditor
@@ -280,6 +283,13 @@ struct OpsSeriesWizardTypeEntriesView: View {
                     } else if entry.lastCommitOK == false {
                         OpsFlowChip(text: "上次提交失败", tint: OpsFlowPalette.warnOrange)
                     }
+                    Spacer(minLength: 2)
+                    Button { duplicateEntry(entry.id) } label: {
+                        Image(systemName: "doc.on.doc")
+                    }
+                    .buttonStyle(.borderless)
+                    .help("复制款式（保留全部填写内容）")
+                    .accessibilityLabel("复制款式「\(entry.displayName)」")
                 }
                 HStack(spacing: 8) {
                     Text("\(entry.colors.count) 颜色")
@@ -299,8 +309,14 @@ struct OpsSeriesWizardTypeEntriesView: View {
             }
         }
         .contextMenu {
+            Button("复制款式", systemImage: "doc.on.doc") { duplicateEntry(entry.id) }
+            Divider()
             Button("删除这个类型…", role: .destructive) { entryPendingRemoval = entry }
         }
+    }
+
+    private func duplicateEntry(_ id: String) {
+        if let copiedID = workspace.duplicateSeriesTypeEntry(id: id) { selectedEntryID = copiedID }
     }
 }
 
@@ -313,10 +329,15 @@ struct OpsSeriesWizardTypeEditorView: View {
     /// 图片导入的目标槽位（封面在 S2，这里只有尺码表原图与颜色图）
     private enum ImageSlot: Equatable {
         case chartSource
-        case color(String)
     }
     @State private var importSlot: ImageSlot?
     @State private var showsImporter = false
+    @State private var batchImageTarget: BatchImageTarget?
+
+    private struct BatchImageTarget: Identifiable {
+        let id: String
+        var colorID: String?
+    }
 
     /// 「用标准模板填入」的确认弹窗：**已经填过内容时先问一句**。
     /// 这个按钮会一次覆盖三个字段（单位 / 列名 / 数据行），
@@ -439,6 +460,17 @@ struct OpsSeriesWizardTypeEditorView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .background(OpsFlowPageBackground())
+        .sheet(item: $batchImageTarget) { target in
+            if let targetEntry = workspace.seriesEntry.typeEntries.first(where: { $0.id == target.id }) {
+                OpsColorImagesSheet(workspace: workspace, entry: targetEntry, initialColorID: target.colorID)
+            } else {
+                VStack(spacing: 12) {
+                    Text("当前类型已不存在，请重新打开批量配图。")
+                    Button("关闭") { batchImageTarget = nil }
+                }
+                .padding(20)
+            }
+        }
         .fileImporter(
             isPresented: $showsImporter,
             allowedContentTypes: [.image],
@@ -477,10 +509,6 @@ struct OpsSeriesWizardTypeEditorView: View {
             // 尺码表现在还没识别成功（`parsedChart == nil`）也不打紧 ——
             // 文本那边一旦有效，触发点 ③ 会接手补上。
             autoSelectSellableSizes()
-        case .color(let colorID):
-            if let index = entry.colors.firstIndex(where: { $0.id == colorID }) {
-                entry.colors[index].imageAssetID = assetID
-            }
         }
     }
 
@@ -577,20 +605,18 @@ struct OpsSeriesWizardTypeEditorView: View {
 
     private var chartSourceRow: some View {
         HStack(spacing: 8) {
-            OpsThumbnail(
+            OpsImageUploadThumbnail(
                 url: entry.chartSourceImageAssetID.flatMap {
                     workspace.stagedFileURL(forReference: workspace.asset(for: $0)?.originalURL)
-                }, size: 40)
+                }, size: 40, title: "点击上传或更换尺码表原图") {
+                    importSlot = .chartSource
+                    showsImporter = true
+                }
             Picker("尺码表原图", selection: $entry.chartSourceImageAssetID) {
                 Text("不指定").tag(String?.none)
                 ForEach(workspace.catalog.assets) { asset in
                     Text(assetFileLabel(asset)).tag(String?.some(asset.id))
                 }
-            }
-            .controlSize(.small)
-            Button("上传原图…") {
-                importSlot = .chartSource
-                showsImporter = true
             }
             .controlSize(.small)
         }
@@ -630,6 +656,7 @@ struct OpsSeriesWizardTypeEditorView: View {
                 priceSummary
                 OpsFootnote(text: "预约价与现货价**至少填一项**且**互相独立**："
                             + "改现货价不清空、不覆盖、不重算预约价；改预约价不改现货价。"
+                            + "填写预约价和定金后**自动计算尾款**，修改任一项会同步更新。"
                             + "三者全填时校验「定金 + 尾款 = 预约价」。"
                             + "颜色 SKU 页**不重复填写价格**。")
             }
@@ -698,10 +725,18 @@ struct OpsSeriesWizardTypeEditorView: View {
                         Divider()
                     }
                 }
-                Button {
-                    entry.colors.append(OpsSeriesColorSKU())
-                } label: {
-                    Label("添加颜色", systemImage: "plus")
+                HStack(spacing: 12) {
+                    Button {
+                        entry.colors.append(OpsSeriesColorSKU())
+                    } label: {
+                        Label("添加颜色", systemImage: "plus")
+                    }
+                    Button {
+                        batchImageTarget = BatchImageTarget(id: entry.id)
+                    } label: {
+                        Label("批量配图…", systemImage: "photo.on.rectangle.angled")
+                    }
+                    .disabled(entry.colors.isEmpty)
                 }
                 .controlSize(.small)
                 OpsFootnote(text: "追加颜色时，本类型的公共资料、尺码表和价格**只读继承**，"
@@ -724,17 +759,14 @@ struct OpsSeriesWizardTypeEditorView: View {
     private func colorRow(_ color: Binding<OpsSeriesColorSKU>) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 8) {
-                OpsThumbnail(
+                OpsImageUploadThumbnail(
                     url: color.wrappedValue.imageAssetID.flatMap {
                         workspace.stagedFileURL(forReference: workspace.asset(for: $0)?.originalURL)
-                    }, size: 36)
+                    }, size: 36, title: "点击打开颜色批量配图") {
+                        batchImageTarget = BatchImageTarget(id: entry.id, colorID: color.wrappedValue.id)
+                    }
                 TextField("颜色名称（必填，如「绯红」）", text: color.name)
                     .textFieldStyle(.roundedBorder)
-                Button("上传图…") {
-                    importSlot = .color(color.wrappedValue.id)
-                    showsImporter = true
-                }
-                .controlSize(.small)
                 Button(role: .destructive) {
                     entry.colors.removeAll { $0.id == color.wrappedValue.id }
                 } label: {

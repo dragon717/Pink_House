@@ -8,6 +8,7 @@
 import SwiftUI
 import SwiftData
 import os
+import CloudKit
 
 class AppDelegate: NSObject, UIApplicationDelegate {
     static var orientationLock = UIInterfaceOrientationMask.all
@@ -27,7 +28,49 @@ class AppDelegate: NSObject, UIApplicationDelegate {
             print("📱 [AppDelegate] 收到内存警告通知")
         }
 
+        if !ShopCatalogAutoRefresh.isTestHost {
+            application.registerForRemoteNotifications()
+            NotificationCenter.default.addObserver(
+                forName: .CKAccountChanged, object: nil, queue: .main
+            ) { _ in
+                Task { @MainActor in ShopCatalogAutoRefresh.shared.accountDidChange() }
+            }
+        }
         return true
+    }
+
+    func application(
+        _ application: UIApplication,
+        didReceiveRemoteNotification userInfo: [AnyHashable: Any],
+        fetchCompletionHandler completionHandler: @escaping (UIBackgroundFetchResult) -> Void
+    ) {
+        guard ShopCatalogReleaseNotifications.accepts(userInfo) else {
+            completionHandler(.noData)
+            return
+        }
+        Task { @MainActor in
+            // 静默通知的后台执行预算有限；弱网下载可在安装链路中继续，
+            // 但回调须及时且仅执行一次，回到前台仍会检查最新发布。
+            var completed = false
+            let deadline = Task { @MainActor in
+                do { try await Task.sleep(for: .seconds(25)) } catch { return }
+                guard !completed else { return }
+                completed = true
+                completionHandler(.noData)
+            }
+            let previousSeq = ShopCatalogPackCache.loadControl().installedReleaseSeq
+            let service = ShopCatalogCloudSyncService.shared
+            await service.syncIfNeeded(force: true)
+            deadline.cancel()
+            guard !completed else { return }
+            completed = true
+            if service.state.isFailure {
+                completionHandler(.failed)
+            } else {
+                completionHandler(ShopCatalogPackCache.loadControl().installedReleaseSeq != previousSeq
+                    ? .newData : .noData)
+            }
+        }
     }
     
 }
@@ -195,6 +238,10 @@ struct MainContentView: View {
                     completeLaunchPresentationIfNeeded(trigger: "auto_timeout")
                 }
             }
+        }
+        .task(id: scenePhase) {
+            guard scenePhase == .active, !ShopCatalogAutoRefresh.isTestHost else { return }
+            await ShopCatalogAutoRefresh.shared.runWhileActive()
         }
         .onChange(of: scenePhase) { _, newPhase in
             if newPhase == .background || newPhase == .inactive {

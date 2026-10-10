@@ -44,6 +44,7 @@
 import Combine
 import Foundation
 import Observation
+import PinkHouseOpsCore
 import SwiftData
 import SwiftUI
 import UniformTypeIdentifiers
@@ -81,16 +82,26 @@ final class OpsWorkspace: ObservableObject {
     /// 「系列上新」向导的工作副本（S1–S5，需求 v1.2）。
     /// 随草稿持久化在 `OpsCatalogDraftRecord.seriesEntryJSON`（见 OpsWorkspace+SeriesEntry.swift）。
     @Published var seriesEntry = OpsSeriesEntryDraft()
+    /// 仅在已完成表单清空并落盘后改变，让向导同时回到 S1。
+    @Published var seriesEntryResetID = UUID()
+    /// 所有本机草稿中保留的上传素材；上新归零不清理这份历史。
+    @Published var imageUploadHistory: [OpsImageLibraryItem] = []
 
     /// 非 private：`OpsWorkspace+SeriesEntry.swift` 里的向导草稿持久化也要写同一个库
     /// （两个 context 写同一个库会让「刚保存的草稿」在另一侧看不见）。
     let context: ModelContext
+    /// 目录保存及完成后的表单归零使用同一持久化入口，失败时保留原输入。
+    let saveCatalogContext: (ModelContext) throws -> Void
     let fileManager = FileManager.default
     /// 向导草稿的防抖持久化（每次击键都整包编码太浪费，停顿 0.4s 落一次盘）
     private var seriesEntryPersistCancellable: Any?
 
-    init(context: ModelContext) {
+    lazy var catalogEditSyncQueue = makeCatalogEditSyncQueue()
+    @Published var catalogEditSyncMessage: String?
+
+    init(context: ModelContext, saveCatalogContext: @escaping (ModelContext) throws -> Void = { try $0.save() }) {
         self.context = context
+        self.saveCatalogContext = saveCatalogContext
         loadOrCreateDraft()
         // 向导草稿：编辑停顿后自动落盘（失败只报告，绝不清空内存里的输入）
         seriesEntryPersistCancellable = $seriesEntry
@@ -318,6 +329,7 @@ final class OpsWorkspace: ObservableObject {
             at: stagingDirectory, withIntermediateDirectories: true)
         // 向导工作副本跟着草稿走：换草稿 = 换向导状态（解不开就从空白开始，见 loadSeriesEntryState）
         loadSeriesEntryState()
+        loadImageUploadHistory()
     }
 
     /// 显式换到另一份草稿（多草稿管理在 M4，这里先给恢复流程用）
@@ -365,17 +377,23 @@ final class OpsWorkspace: ObservableObject {
                 + "请先「另存为新草稿」。"
             return false
         }
+        let previousJSON = draft.catalogJSON
+        let previousSavedRevision = draft.savedRevision
+        let previousUpdatedAt = draft.updatedAt
         do {
             draft.catalogJSON = try ShopCatalogJSONCoding.encoder(prettyPrinted: true)
                 .encode(catalog)
             draft.updatedAt = Date()
             draft.savedRevision = draft.currentRevision
-            try context.save()
+            try saveCatalogContext(context)
             statusMessage = "已保存草稿（第 \(draft.currentRevision) 版：\(catalog.shops.count) 店家 / "
                 + "\(catalog.series.count) 系列 / \(catalog.products.count) 商品）"
             lastError = nil
             return true
         } catch {
+            draft.catalogJSON = previousJSON
+            draft.savedRevision = previousSavedRevision
+            draft.updatedAt = previousUpdatedAt
             lastError = "保存失败（编辑内容仍保留在界面上，没有写盘）：\(error.localizedDescription)"
             return false
         }
@@ -465,6 +483,15 @@ final class OpsWorkspace: ObservableObject {
         publishedCatalog: ShopCatalog
     ) -> Bool {
         guard let draft, !draft.isCorrupted else { return false }
+        let previousPublish = (draft.lastPublishedReleaseSeq, draft.lastPublishedRootIndexHash,
+                               draft.lastPublishedRevision, draft.lastPublishedAt)
+        let previousBaseline = (draft.baselineJSON, draft.baselineCatalogJSON,
+                                draft.baseReleaseSeq, draft.baseRootIndexHash)
+        let previousSync = (draft.catalogSyncRequestID, draft.catalogSyncRevision,
+                            draft.catalogSyncEnvironment, draft.catalogSyncError)
+        let coversEditorSave = draft.catalogSyncRequestID != nil
+            && draft.catalogSyncEnvironment == environment
+            && (draft.catalogSyncRevision ?? Int.max) <= revision
         draft.recordConfirmedPublish(
             releaseSeq: releaseSeq,
             rootIndexHash: rootIndexHash,
@@ -475,10 +502,26 @@ final class OpsWorkspace: ObservableObject {
         // 不收敛的话，刚发布完的那段时间里 `changeSet` 会把**每一个带日期的
         // 实体**都报成「已修改」（原因见下面那个方法的注释）。
         normalizeWorkingCopyToStoragePrecision()
+        if coversEditorSave {
+            draft.catalogSyncRequestID = nil
+            draft.catalogSyncRevision = nil
+            draft.catalogSyncEnvironment = nil
+            draft.catalogSyncError = nil
+        }
         do {
-            try context.save()
+            try saveCatalogContext(context)
+            if coversEditorSave {
+                let name = ShopCatalogPublishTargetEnvironment(rawValue: environment)?.displayName ?? environment
+                catalogEditSyncMessage = "已同步到 App（\(name)，发布号 \(releaseSeq)）"
+            }
             return true
         } catch {
+            (draft.lastPublishedReleaseSeq, draft.lastPublishedRootIndexHash,
+             draft.lastPublishedRevision, draft.lastPublishedAt) = previousPublish
+            (draft.baselineJSON, draft.baselineCatalogJSON,
+             draft.baseReleaseSeq, draft.baseRootIndexHash) = previousBaseline
+            (draft.catalogSyncRequestID, draft.catalogSyncRevision,
+             draft.catalogSyncEnvironment, draft.catalogSyncError) = previousSync
             lastError = "记录发布结果失败（发布本身已完成，但本机没记下来）：\(error.localizedDescription)"
             return false
         }
@@ -760,7 +803,7 @@ final class OpsWorkspace: ObservableObject {
     /// 别名在**创建时**就落进去 —— 旧实现只在建好之后的编辑路径才写 aliases，
     /// 新建表单里填的别名被静默丢弃（与 R05「新建也要带上 season」同类坑）。
     @discardableResult
-    func addShopReturningID(name: String, aliases: [String] = []) -> String? {
+    func addShopReturningID(name: String, aliases: [String] = [], logo: String? = nil) -> String? {
         guard canMutate() else { return nil }
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else {
@@ -770,7 +813,9 @@ final class OpsWorkspace: ObservableObject {
         let cleaned = aliases
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
-        let shop = CatalogShop(id: "shop-\(shortID())", name: trimmed, aliases: cleaned)
+        guard validShopLogo(logo) else { return nil }
+        let shop = CatalogShop(id: "shop-\(shortID())", name: trimmed, aliases: cleaned,
+                               logo: logo.flatMap { asset(for: $0)?.originalURL ?? $0 })
         catalog.shops.append(shop)
         markDirty()
         return shop.id
@@ -861,14 +906,9 @@ final class OpsWorkspace: ObservableObject {
     @discardableResult
     func removeProduct(id: String) -> Bool {
         guard canMutate() else { return false }
-        guard catalog.products.contains(where: { $0.id == id }) else { return false }
-        catalog.products.removeAll { $0.id == id }
-        catalog.variants.removeAll { $0.productID == id }
-        catalog.sizeCharts.removeAll { $0.productID == id }
-        catalog.saleEvents.removeAll { $0.productID == id }
-        // 与 iOS 端口径一致：删除靠「墓碑」表达，发布端才知道这是「下架」而不是「漏传」
-        if !catalog.removedProductIDs.contains(id) { catalog.removedProductIDs.append(id) }
+        guard ShopCatalogDraftDeletion.removeProduct(id: id, from: &catalog) else { return false }
         markDirty()
+        lastError = nil
         statusMessage = "已删除商品（已记入删除墓碑，发布端会把它当作下架；未保存）"
         return true
     }
@@ -877,6 +917,12 @@ final class OpsWorkspace: ObservableObject {
 
     @discardableResult
     func updateShop(id: String, name: String, aliases: [String]) -> Bool {
+        updateShopProfile(id: id, name: name, aliases: aliases,
+                          logo: catalog.shops.first { $0.id == id }?.logo)
+    }
+
+    @discardableResult
+    func updateShopProfile(id: String, name: String, aliases: [String], logo: String?) -> Bool {
         guard canMutate() else { return false }
         guard let index = catalog.shops.firstIndex(where: { $0.id == id }) else {
             lastError = "找不到店家 \(id)。"
@@ -887,8 +933,10 @@ final class OpsWorkspace: ObservableObject {
             lastError = "店家名不能为空。"
             return false
         }
+        guard validShopLogo(logo) else { return false }
         catalog.shops[index].name = trimmed
         catalog.shops[index].aliases = aliases
+        catalog.shops[index].logo = logo.flatMap { asset(for: $0)?.originalURL ?? $0 }
         markDirty()
         return true
     }
@@ -986,42 +1034,27 @@ final class OpsWorkspace: ObservableObject {
             + "本版 Mac 端支持的是：新录入内容的编辑、规格、尺码表、价格与归档。"
     }
 
-    // MARK: 删除店家 / 系列（有下级引用时**拒绝**，不做静默级联）
+    // MARK: 删除店家 / 系列（运营可直接级联删除全部下级）
 
-    /// 删除店家。有系列或商品还挂在它下面时**拒绝**并说明原因。
-    ///
-    /// 为什么不做级联删除：级联会一次改掉一大片实体，运营点一下「删店家」
-    /// 却丢掉 20 个商品，是「部分成功/静默扩大影响」的典型。这里要求运营
-    /// 自己先把下级挪走或删掉，每一步都看得见。
+    /// 删除店家及其系列、商品，整批只记一次编辑版本。
     @discardableResult
     func removeShop(id: String) -> Bool {
         guard canMutate() else { return false }
-        let seriesCount = catalog.series.filter { $0.shopID == id }.count
-        let productCount = catalog.products.filter { $0.shopID == id }.count
-        guard seriesCount == 0, productCount == 0 else {
-            lastError = "这个店家下面还有 \(seriesCount) 个系列、\(productCount) 个商品，"
-                + "先挪走或删除它们再删店家（不做级联删除）。"
-            return false
-        }
-        catalog.shops.removeAll { $0.id == id }
-        if !catalog.removedShopIDs.contains(id) { catalog.removedShopIDs.append(id) }
+        guard let deleted = ShopCatalogDraftDeletion.removeShop(id: id, from: &catalog) else { return false }
         markDirty()
-        statusMessage = "已删除店家（已记入删除墓碑；未保存）"
+        lastError = nil
+        statusMessage = "已删除店家及其 \(deleted.seriesCount) 个系列、\(deleted.productCount) 个商品"
+            + "（已记入删除墓碑；未保存）"
         return true
     }
 
     @discardableResult
     func removeSeries(id: String) -> Bool {
         guard canMutate() else { return false }
-        let productCount = catalog.products.filter { $0.seriesID == id }.count
-        guard productCount == 0 else {
-            lastError = "这个系列下面还有 \(productCount) 个商品，先挪走或删除它们再删系列。"
-            return false
-        }
-        catalog.series.removeAll { $0.id == id }
-        if !catalog.removedSeriesIDs.contains(id) { catalog.removedSeriesIDs.append(id) }
+        guard let deleted = ShopCatalogDraftDeletion.removeSeries(id: id, from: &catalog) else { return false }
         markDirty()
-        statusMessage = "已删除系列（已记入删除墓碑；未保存）"
+        lastError = nil
+        statusMessage = "已删除系列及其 \(deleted.productCount) 个商品（已记入删除墓碑；未保存）"
         return true
     }
 
@@ -1037,6 +1070,15 @@ final class OpsWorkspace: ObservableObject {
 
     func asset(for id: String) -> CatalogAsset? {
         catalog.assets.first { $0.id == id }
+    }
+
+    /// 封面等字段可以是资源 ID，也可以是直接引用；下载后的 canonical 媒体也可显示。
+    func stagedImageURL(forReference reference: String?) -> URL? {
+        let source = ShopCatalogImageSource.resolve(reference, asset: { asset(for: $0) })
+        let references = source.references + (source.mediaKey.map {
+            [ShopCatalogSyncProtocol.mediaReference(contentHash: $0)]
+        } ?? [])
+        return references.lazy.compactMap { self.stagedFileURL(forReference: $0) }.first
     }
 
     /// 把一处图片引用解析成本机可显示的 URL。

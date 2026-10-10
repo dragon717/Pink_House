@@ -114,6 +114,12 @@ struct OpsSeriesWizardView: View {
             footer
         }
         .background(OpsFlowPageBackground())
+        .onChange(of: workspace.seriesEntryResetID) { _, _ in
+            step = .selectShopSeries
+            gateIssues = []
+            submitFeedback = nil
+            publishFeedback = nil
+        }
     }
 
     // MARK: 步骤条（图2 顶部：数字圆徽 + 连接线 + 标题）
@@ -172,6 +178,16 @@ struct OpsSeriesWizardView: View {
                         if draft.createsNewShop {
                             newShopFields
                         }
+                        if draft.createsNewShop || !draft.shopID.isEmpty {
+                            OpsShopLogoPicker(workspace: workspace, reference: Binding(
+                                get: {
+                                    draft.managesShopLogo ? draft.shopLogoReference
+                                        : workspace.catalog.shops.first { $0.id == draft.shopID }?.logo
+                                }, set: { reference in
+                                    workspace.seriesEntry.managesShopLogo = true
+                                    workspace.seriesEntry.shopLogoReference = reference
+                                }))
+                        }
                         Picker("系列", selection: seriesChoice) {
                             Text("请选择系列").tag("")
                             Text("＋ 新建系列…").tag("__new__")
@@ -202,6 +218,12 @@ struct OpsSeriesWizardView: View {
         Binding(
             get: { draft.createsNewShop ? Self.newShopChoiceTag : draft.shopID },
             set: { newValue in
+                let oldValue = draft.createsNewShop ? Self.newShopChoiceTag : draft.shopID
+                if oldValue != newValue {
+                    workspace.seriesEntry.managesShopLogo = false
+                    workspace.seriesEntry.shopLogoReference = nil
+                    workspace.seriesEntry.seriesID = ""
+                }
                 if newValue == Self.newShopChoiceTag {
                     workspace.seriesEntry.createsNewShop = true
                 } else {
@@ -339,11 +361,10 @@ struct OpsSeriesWizardView: View {
                 OpsCard(title: "系列封面", systemImage: "photo") {
                     VStack(alignment: .leading, spacing: 8) {
                         HStack(spacing: 10) {
-                            OpsThumbnail(
-                                url: draft.coverAssetID.flatMap {
-                                    workspace.stagedFileURL(
-                                        forReference: workspace.asset(for: $0)?.originalURL)
-                                }, size: 64)
+                            OpsImageUploadThumbnail(
+                                url: workspace.stagedImageURL(forReference: draft.coverAssetID), size: 64, title: "点击上传或更换系列封面") {
+                                    showsCoverImporter = true
+                                }
                             Picker("封面", selection: bind(\.coverAssetID)) {
                                 Text("不指定").tag(String?.none)
                                 ForEach(workspace.catalog.assets) { asset in
@@ -351,8 +372,6 @@ struct OpsSeriesWizardView: View {
                                 }
                             }
                             .controlSize(.small)
-                            Button("上传封面…") { showsCoverImporter = true }
-                                .controlSize(.small)
                         }
                         OpsFootnote(text: "没有封面也能继续；发布门禁会按「商品没有图」等口径另行提示。")
                     }
@@ -475,17 +494,18 @@ struct OpsSeriesWizardView: View {
     private var priceChartUploadArea: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 8) {
-                Button {
+                OpsImageUploadThumbnail(
+                    url: nil, size: 64, title: "点击添加价格表原图（可多选）") {
                     priceChartUploadError = nil
                     showsPriceChartImporter = true
-                } label: {
-                    Label("选择价格表图片…", systemImage: "square.and.arrow.up")
                 }
-                .controlSize(.small)
-                .help("可一次选多张。第一张即客户端详情页展示的主图。")
-                Text("可多选；支持 \(OpsWorkspace.priceChartFileFormatList)")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("点击图片框添加原图（可多选）")
+                        .font(.caption)
+                    Text("支持 \(OpsWorkspace.priceChartFileFormatList)")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
                 Spacer(minLength: 0)
             }
 
@@ -551,10 +571,13 @@ struct OpsSeriesWizardView: View {
     private func priceChartThumbnail(assetID: String, index: Int) -> some View {
         VStack(spacing: 3) {
             ZStack(alignment: .topTrailing) {
-                OpsThumbnail(
+                OpsImageUploadThumbnail(
                     url: workspace.stagedFileURL(
                         forReference: workspace.asset(for: assetID)?.originalURL),
-                    size: 64)
+                    size: 64, title: "点击添加价格表原图（可多选）") {
+                        priceChartUploadError = nil
+                        showsPriceChartImporter = true
+                    }
                 Button {
                     workspace.removePriceChartImage(assetID: assetID)
                     priceChartUploadError = nil
@@ -711,7 +734,7 @@ struct OpsSeriesWizardView: View {
     /// 提交 = **保存**（同步）。失败不清空表单：草稿与向导内容原样留在界面上，
     /// 改完直接再点一次，新提示替换旧提示。
     private func commit() {
-        let report = workspace.commitSeriesEntry()
+        let report = workspace.saveSeriesEntryToDraft()
         if report.blocked {
             let reasons = report.blockedByValidation
                 .map { ($0.entryName.isEmpty ? "" : $0.entryName + "：") + $0.message }
@@ -1027,8 +1050,8 @@ struct OpsSeriesWizardPublishView: View {
                 LabeledContent("编辑版本", value: "第 \(workspace.currentRevision) 版"
                     + (workspace.hasUnsavedChanges ? "（有未保存修改）" : "（已保存）"))
                 LabeledContent("系列内类型", value: draft.selectedCategorySummary)
-                OpsFootnote(text: "提交 = **保存**：逐类型写入本地草稿并落盘。"
-                            + "上云点下面的「发布整个系列」或右上角「云端更新」。")
+                OpsFootnote(text: "写入草稿后，系列会保存在「发布草稿箱」，上新表单自动恢复默认状态。"
+                            + "稍后可在草稿箱发布，也可直接点下面的「发布整个系列」。")
             }
         }
     }
@@ -1052,6 +1075,9 @@ struct OpsSeriesWizardPublishView: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .disabled(!issues.isEmpty || workspace.isCorrupted)
+                Text("保存后可到左侧「发布草稿箱」查看和发布。")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
                 if let feedback {
                     submitFeedbackLine(feedback)
                 }

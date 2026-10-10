@@ -7,7 +7,7 @@
 //  ## 它存的是什么
 //
 //  一次「发布整个系列」的**整份待发布内容**与它的**条目级状态**。
-//  运营点一次「发布」，这里就留下一条记录；**只有整个系列全部条目都发布成功**，
+//  运营「写入草稿」或「发布整个系列」时，都会留下记录；**只有整个系列全部条目都发布成功**，
 //  这条记录才被删除（需求 2026-10-07 §4）。失败或部分成功时它一直留着，
 //  于是「哪些条目没发出去」永远查得到，而不是只留一句「发布失败」。
 //
@@ -37,7 +37,7 @@ import SwiftData
 
 /// 一次系列发布的终态/中间态。
 enum OpsSeriesPublishStatus: String, Codable, CaseIterable, Sendable {
-    /// 已落库草稿箱，还没开始发布（理论上只在进程被杀时留下）
+    /// 已存入发布草稿箱，等待运营发布
     case pending
     /// **发布中**：内容已完整落库，正在经受控发布器发布
     case publishing
@@ -83,6 +83,10 @@ final class OpsSeriesPublishJob {
     var seriesName: String
     var shopID: String?
     var shopName: String?
+    /// 归属的目录草稿；Optional 兼容旧草稿箱记录。
+    var draftID: String?
+    /// 每次重新提交都换一个标识，旧发布回执不能删掉新提交。
+    var submissionID: String?
 
     /// `OpsSeriesPublishStatus.rawValue`
     var statusRaw: String
@@ -121,6 +125,8 @@ final class OpsSeriesPublishJob {
         self.seriesName = seriesName
         self.shopID = shopID
         self.shopName = shopName
+        self.draftID = nil
+        self.submissionID = UUID().uuidString
         self.statusRaw = status.rawValue
         self.itemsJSON = try? JSONEncoder().encode(items)
         self.catalogSnapshotJSON = catalogSnapshotJSON

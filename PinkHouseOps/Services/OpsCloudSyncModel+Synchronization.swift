@@ -36,6 +36,11 @@ extension OpsCloudSyncModel {
                     return .init(.failed, "目录下载后无法解析：\(error.localizedDescription)", canContinue: false)
                 }
                 var logs = self.syncLogPaths
+                // 接回旧版本超时前已落盘的图片。absorb 会逐文件核对 SHA-256，
+                // 只有与文件名内容摘要相符的字节能进入 staging。
+                for directory in OpsDownloadedMediaRecovery.directories(in: self.jobsDirectory, environment: environment) {
+                    workspace.absorbDownloadedMedia(from: directory)
+                }
                 let stagedHashes = workspace.stagedMediaKeys
                 let hashes = workspace.referencedRemoteMediaHashes(in: remote)
                     .filter { !stagedHashes.contains($0) }
@@ -127,7 +132,7 @@ extension OpsCloudSyncModel {
             let names = workspace.catalog.products.filter { products.contains($0.id) }.map(\.name)
             return OpsSyncIssue(id: "local-\(file.fileName)", step: .upload,
                                 owner: (names + file.owners).joined(separator: " / "),
-                                message: "缺少本机文件 \(file.fileName)，需补图或在对应资料中明确清除该图片引用",
+                                message: "缺少本机文件 \(file.fileName)，请在设置 → 数据修复 → 补齐缺失图片选择完整图片目录；补齐后再次云端更新",
                                 productIDs: products.sorted())
         }
         let structure = workspace.review(targetEnvironmentName: targetEnvironment.displayName).catalogIssues
@@ -146,10 +151,14 @@ extension OpsCloudSyncModel {
             syncReport?.steps[index].progress = Double(completed) / Double(total)
             syncReport?.steps[index].detail = "目录已下载；远端图片 \(completed)/\(total) 项已处理"
         } else if event.type == "stage", let stage = event.stage {
-            syncReport?.steps[index].detail = event.displayLine ?? stage.displayName
+            syncReport?.steps[index].detail = event.message ?? event.displayLine ?? stage.displayName
             if mode == .publish, let ordinal = stage.stepOrdinal {
                 syncReport?.steps[index].progress = Double(ordinal - 1) / 7
             }
+        } else if mode == .publish, event.type == "progress", event.stage == .uploadMedia,
+                  let completed = event.completed, let total = event.total, total > 0 {
+            syncReport?.steps[index].detail = "上传图片 \(completed)/\(total) 张"
+            syncReport?.steps[index].progress = (2 + Double(completed) / Double(total)) / 7
         }
     }
 

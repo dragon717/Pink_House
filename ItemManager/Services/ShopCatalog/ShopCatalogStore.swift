@@ -775,42 +775,46 @@ struct ShopCatalogAssetImage: View {
     /// （解析一律走 `ShopCatalogSyncProtocol.resolvedMediaKey`，调用方不自己拆字符串）。
     var mediaKey: String? = nil
     var contentMode: ContentMode = .fill
+    @ObservedObject var store = ShopCatalogStore.shared
+
+    /// 系列封面等可能存的是资源 ID；目录更新但 ID 不变时也必须重新解析。
+    var resolvedSource: ShopCatalogImageSource {
+        ShopCatalogImageSource.resolve(reference, mediaKey: mediaKey, asset: { store.asset(id: $0) })
+    }
 
     /// 远端媒体（THMedia）下载后的本地文件 —— 按需下载，屏内才拉
     @State private var remoteMediaURL: URL?
     /// 下载过且失败：本次展示周期内不再重试（列表滚动会反复触发 task）
     @State private var remoteMediaFailed = false
+    @State private var loadedMediaKey: String?
     /// http(s) 老引用的重载令牌 —— 点按重试时换一个 identity，
     /// 逼 `AsyncImage` 重新发请求（同一个 URL 它不会自己重试）
     @State private var asyncImageReloadToken = UUID()
 
     var body: some View {
         content
-            .task(id: reference) { await loadRemoteMediaIfNeeded() }
+            .task(id: resolvedSource) { await loadRemoteMediaIfNeeded() }
     }
 
     @ViewBuilder
     private var content: some View {
-        if let url = remoteURL {
+        if let path = remoteMediaPath, let loaded = UIImage(contentsOfFile: path) {
+            Image(uiImage: loaded).resizable().aspectRatio(contentMode: contentMode)
+        } else if let loaded = localImage {
+            Image(uiImage: loaded).resizable().aspectRatio(contentMode: contentMode)
+        } else if let url = remoteURL {
             AsyncImage(url: url, content: { phase in
                 switch phase {
                 case .success(let image):
                     image.resizable().aspectRatio(contentMode: contentMode)
                 case .failure:
-                    // 网络图也要区分「拉失败」与「没有图」，否则用户以为商品图就是这样
                     failedPlaceholder
                 default:
                     placeholder
                 }
             })
             .id(asyncImageReloadToken)
-        } else if let path = remoteMediaPath ?? localPath, let loaded = UIImage(contentsOfFile: path) {
-            // 文件存在且可解码才渲染；读失败（如沙盒重置后文件丢失）走占位图，
-            // 不再渲染空白的 UIImage()（表现为整块空白/黑屏，用户无从判断原因）
-            Image(uiImage: loaded)
-                .resizable()
-                .aspectRatio(contentMode: contentMode)
-        } else if remoteMediaFailed {
+        } else if remoteMediaFailed && loadedMediaKey == resolvedSource.mediaKey {
             // 本地兜底图也解不出来、远端又下失败 → 必须是「加载失败」而不是「没有图」（方案 §5）
             failedPlaceholder
         } else {
@@ -819,18 +823,18 @@ struct ShopCatalogAssetImage: View {
     }
 
     private func loadRemoteMediaIfNeeded() async {
-        let key = ShopCatalogSyncProtocol.resolvedMediaKey(mediaKey, fallbackReferences: [reference])
-        guard key != nil else {
+        let key = resolvedSource.mediaKey
+        if loadedMediaKey != key {
             remoteMediaURL = nil
             remoteMediaFailed = false
-            return
+            loadedMediaKey = key
         }
+        guard let key else { return }
         guard !remoteMediaFailed else { return }
-        if let url = await ShopCatalogMediaStore.shared.resolvedURL(mediaKey: key) {
-            remoteMediaURL = url
-        } else {
-            remoteMediaFailed = true
-        }
+        let url = await ShopCatalogMediaStore.shared.resolvedURL(mediaKey: key)
+        guard !Task.isCancelled, resolvedSource.mediaKey == key else { return }
+        remoteMediaURL = url
+        remoteMediaFailed = url == nil
     }
 
     /// 点按重试（iOS 运营上传实施方案 §5 的「重试入口」）。
@@ -841,8 +845,7 @@ struct ShopCatalogAssetImage: View {
     ///      表现成「点了没反应」；
     ///   2. 换 `asyncImageReloadToken`，让 http(s) 老引用的 `AsyncImage` 重建。
     private func retryLoading() {
-        if let key = ShopCatalogSyncProtocol.resolvedMediaKey(
-            mediaKey, fallbackReferences: [reference]) {
+        if let key = resolvedSource.mediaKey {
             ShopCatalogMediaStore.shared.clearSessionFailure(mediaKey: key)
         }
         remoteMediaFailed = false
@@ -851,17 +854,19 @@ struct ShopCatalogAssetImage: View {
     }
 
     private var remoteURL: URL? {
-        guard let reference, reference.lowercased().hasPrefix("http") else { return nil }
-        return URL(string: reference)
+        resolvedSource.references.first { $0.lowercased().hasPrefix("http") }.flatMap(URL.init(string:))
     }
 
     private var remoteMediaPath: String? {
-        remoteMediaURL?.path
+        loadedMediaKey == resolvedSource.mediaKey ? remoteMediaURL?.path : nil
     }
 
-    private var localPath: String? {
-        guard let url = ShopCatalogImageResolver.url(for: reference) else { return nil }
-        return url.path
+    private var localImage: UIImage? {
+        for reference in resolvedSource.references {
+            if let url = ShopCatalogImageResolver.url(for: reference), url.isFileURL,
+               let image = UIImage(contentsOfFile: url.path) { return image }
+        }
+        return nil
     }
 
     private var placeholder: some View {

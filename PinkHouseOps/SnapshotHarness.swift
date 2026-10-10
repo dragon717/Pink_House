@@ -234,6 +234,11 @@ enum OpsSnapshotHarness {
               named: "seriesEntry-types",
               size: NSSize(width: 1280, height: 1900))
 
+        if let entry = workspace.seriesEntry.typeEntries.first {
+            write(OpsColorImagesSheet(workspace: workspace, entry: entry),
+                  named: "color-images-batch", size: NSSize(width: 960, height: 650))
+        }
+
         let productID = workspace.catalog.products.first(where: { $0.category == "JSK" })?.id
 
         // ② 默认形态：一行一个颜色（4 组 / 7 条规格）

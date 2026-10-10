@@ -81,6 +81,7 @@ final class OpsCloudSyncModel: ObservableObject {
     @Published var targetEnvironment: ShopCatalogPublishTargetEnvironment = .development {
         didSet {
             guard oldValue != targetEnvironment else { return }
+            UserDefaults.standard.set(targetEnvironment.rawValue, forKey: "ops.cloud.target_environment")
             resetEnvironmentScopedState(from: oldValue)
         }
     }
@@ -163,6 +164,10 @@ final class OpsCloudSyncModel: ObservableObject {
             settings = loaded
         } else {
             settings = OpsBridgeSettings()
+        }
+        if let raw = UserDefaults.standard.string(forKey: "ops.cloud.target_environment"),
+           let environment = ShopCatalogPublishTargetEnvironment(rawValue: raw) {
+            targetEnvironment = environment
         }
     }
 
@@ -268,7 +273,7 @@ final class OpsCloudSyncModel: ObservableObject {
     // MARK: 目录
 
     /// 桥接器产物的根目录（全部落在 App 容器内：子进程继承沙盒，读得到这里）。
-    private var jobsDirectory: URL {
+    var jobsDirectory: URL {
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
             ?? FileManager.default.temporaryDirectory
         return base.appendingPathComponent("PinkHouseOps", isDirectory: true)
@@ -458,6 +463,8 @@ final class OpsCloudSyncModel: ObservableObject {
         guard let requestURL = write(request, to: directory) else { return nil }
 
         var fetched: OpsFetchedMedia?
+        let requestedEnvironment = targetEnvironment.rawValue
+        let requestedGeneration = environmentGeneration
         await perform(mode: .fetchMedia, requestPath: requestURL) { [weak self] result in
             guard let self else { return }
             fetched = OpsFetchedMedia.from(result: result, environment: self.targetEnvironment.rawValue)
@@ -465,6 +472,11 @@ final class OpsCloudSyncModel: ObservableObject {
                 self.lastError = "没拿到下载结果（exitCode=\(result.exitCode)）："
                     + (result.outcomeMessage ?? "没有 media 事件 / 读不到 fetch-manifest.json")
             }
+        }
+        // 超时/取消不会产生最终 media 事件，但逐张落盘的原子清单仍可恢复。
+        if fetched == nil, targetEnvironment.rawValue == requestedEnvironment,
+           environmentGeneration == requestedGeneration {
+            fetched = OpsFetchedMedia.load(directory: request.outputDirectory, environment: requestedEnvironment)
         }
         fetchedMedia = fetched
         return fetched
@@ -567,6 +579,7 @@ final class OpsCloudSyncModel: ObservableObject {
         }
 
         // ---- 3) 交受控发布器
+        var localReceiptSaved = false
         await perform(mode: .publish, requestPath: requestURL) { [weak self] result in
             guard let self else { return }
             self.outcome = result.outcome
@@ -583,17 +596,21 @@ final class OpsCloudSyncModel: ObservableObject {
                     self.lastError = "发布已完成，但工作区已切换，未修改新草稿的基线。"
                     return
                 }
-                _ = workspace.recordConfirmedPublish(
+                localReceiptSaved = workspace.recordConfirmedPublish(
                     releaseSeq: seq,
                     rootIndexHash: receipt.rootIndexHash,
                     environment: self.targetEnvironment.rawValue,
                     revision: revision,
                     publishedCatalog: publishedCatalog)
+                if !localReceiptSaved { self.lastError = workspace.lastError }
             }
         }
 
         // ---- 判定：只有「真实发布 + 结论 confirmed + 回读确认」算成功
         if outcome == .confirmed, lastReceiptConfirmed, let seq = lastReceiptSeq {
+            guard localReceiptSaved else {
+                return .failed(lastError ?? "云端已发布，本地回执尚未保存；请先查看结果。")
+            }
             return .confirmed(releaseSeq: seq)
         }
         // 其余一律失败，原因 = 结论名 + 桥接器文案 + 内部错误（可定位的一条）。
@@ -706,7 +723,9 @@ final class OpsCloudSyncModel: ObservableObject {
                     Task { @MainActor in
                         guard self.environmentGeneration == generation else { return }
                         self.receiveSyncProgress(event, mode: mode)
-                        if let line = event.displayLine { self.append(line) }
+                        if let line = event.displayLine {
+                            self.append(event.type == "stage" ? (event.message ?? line) : line)
+                        }
                     }
                 }
             }.value
@@ -722,8 +741,9 @@ final class OpsCloudSyncModel: ObservableObject {
             interpret(result)
         } catch {
             // 超时 / 取消不是「没发生」：文案里有「先查询再决定」的要求。
-            lastError = error.localizedDescription
-            append("✖ \(error.localizedDescription)")
+            let detail = (error as? OpsBridgeError)?.diagnostic(for: mode) ?? error.localizedDescription
+            lastError = detail
+            append("✖ \(detail)")
         }
         isRunning = false
         runningMode = nil
@@ -775,7 +795,8 @@ final class OpsCloudSyncModel: ObservableObject {
         if let error = lastError { lines.append("✖ 错误：\(error)") }
         // 日志文件路径必须带在头部：排查的人（以及接手修的 Agent）第一件事
         // 就是找到**这一次的**原始输出，而不是只看到一句结论文案。
-        if let url = lastRunLogURL { lines.append("日志文件：\(url.path)") }
+        let diagnosticURL = runID.map { logsDirectory.appendingPathComponent("\($0).log") } ?? lastRunLogURL
+        if let url = diagnosticURL { lines.append("日志文件：\(url.path)") }
         lines.append("--- 桥接器输出（最近一次运行，"
             + "\(runLog.isEmpty ? logLines.count : runLog.count) 行）---")
         lines.append(contentsOf: runLog.isEmpty ? logLines : runLog)

@@ -10,6 +10,7 @@
 //
 
 import XCTest
+import Combine
 @testable import ItemManager
 
 @MainActor
@@ -299,7 +300,9 @@ final class ShopCatalogCloudSyncTests: XCTestCase {
 
     // MARK: - Store 三层合并（base → remote → overlay）
 
-    func testInstallRemoteCatalogMergesOverBase() throws {
+    // Xcode 27 的 MainActor 隔离析构在旧系统上需要 Swift task 上下文。
+    // async XCTest 提供该上下文，避免同步 Objective-C invocation 析构夹具时崩溃。
+    func testInstallRemoteCatalogMergesOverBase() async throws {
         let store = ShopCatalogSeedFixture.makeStore()
         let baseProductCount = store.catalog?.products.count ?? -1
         let remote = try makeRemoteCatalog()
@@ -317,7 +320,7 @@ final class ShopCatalogCloudSyncTests: XCTestCase {
         XCTAssertEqual(store.catalog?.products.count, baseProductCount + 1)
     }
 
-    func testRemoteSaleEventsDedupByIDKeepFirstArrival() throws {
+    func testRemoteSaleEventsDedupByIDKeepFirstArrival() async throws {
         let store = ShopCatalogSeedFixture.makeStore()
         let baseEventCount = store.catalog?.saleEvents.count ?? -1
         let anchor = try XCTUnwrap(store.saleEvent(id: "ev-ag-jsk-resv-2026"), "夹具锚点事件应存在")
@@ -334,7 +337,7 @@ final class ShopCatalogCloudSyncTests: XCTestCase {
         XCTAssertEqual(store.catalog?.saleEvents.count, baseEventCount + 1, "只应多出真正的新事件")
     }
 
-    func testRemoteTombstoneRemovesBaseProductWithVariants() throws {
+    func testRemoteTombstoneRemovesBaseProductWithVariants() async throws {
         let store = ShopCatalogSeedFixture.makeStore()
         var remote = try makeRemoteCatalog()
         remote.removedProductIDs = ["prod-ag-xueguo-jsk"]
@@ -347,7 +350,7 @@ final class ShopCatalogCloudSyncTests: XCTestCase {
         XCTAssertNotNil(store.product(id: "prod-ag-xueguo-kc"), "其余商品不受影响")
     }
 
-    func testOverlayWinsOverRemoteAndInstallNilClearsRemote() throws {
+    func testOverlayWinsOverRemoteAndInstallNilClearsRemote() async throws {
         let store = ShopCatalogSeedFixture.makeStore()
         store.installRemoteCatalog(try makeRemoteCatalog())
         XCTAssertEqual(store.shop(id: "shop-alice-girl")?.name, "Alice Girl（云端改名）")
@@ -398,6 +401,7 @@ final class ShopCatalogCloudSyncTests: XCTestCase {
 
     private final class Counter: @unchecked Sendable {
         var value = 0
+        var packReads = 0
     }
 
     /// 记录「发布头被取了几次」的 stub：用来分辨同步到底有没有发起网络请求
@@ -420,7 +424,10 @@ final class ShopCatalogCloudSyncTests: XCTestCase {
             return header
         }
         func fetchRootIndex() async throws -> Data { rootData }
-        func fetchPack(payloadHash: String) async throws -> Data { pack }
+        func fetchPack(payloadHash: String) async throws -> Data {
+            counter.packReads += 1
+            return pack
+        }
     }
 
     /// 远端层只在内存，进程重启即归零；包缓存是不可变正文、跨启动仍在。
@@ -694,4 +701,108 @@ final class ShopCatalogCloudSyncTests: XCTestCase {
         XCTAssertEqual(ShopCatalogPackCache.loadControl().installedReleaseSeq, 0,
                        "安装失败不得推进控制状态")
     }
+    /// 第一轮已读旧发布头、下载尚未结束时，新通知必须排队再取一次头。
+    private actor PublishingDuringDownloadReader: ShopCatalogPublicReading {
+        typealias Release = (header: ShopCatalogReleaseHeader, rootData: Data, pack: Data)
+        let first: Release
+        let next: Release
+        var headerReads = 0
+        var packStarted = false
+        var onPackStarted: CheckedContinuation<Void, Never>?
+        var unblockPack: CheckedContinuation<Void, Never>?
+
+        init(first: Release, next: Release) { self.first = first; self.next = next }
+
+        func fetchReleaseHeader() async throws -> ShopCatalogReleaseHeader {
+            headerReads += 1
+            return headerReads == 1 ? first.header : next.header
+        }
+        func fetchRootIndex() async throws -> Data {
+            headerReads == 1 ? first.rootData : next.rootData
+        }
+        func fetchPack(payloadHash: String) async throws -> Data {
+            if headerReads == 1 {
+                packStarted = true
+                onPackStarted?.resume()
+                onPackStarted = nil
+                await withCheckedContinuation { unblockPack = $0 }
+                return first.pack
+            }
+            return next.pack
+        }
+        func waitForFirstPack() async {
+            if !packStarted { await withCheckedContinuation { onPackStarted = $0 } }
+        }
+        func finishFirstDownload() { unblockPack?.resume(); unblockPack = nil }
+    }
+
+    func testPublishNotificationDuringSyncInstallsNewerReleaseAndPublishesStoreChange() async throws {
+        let first = try validRelease(seq: 7, catalog: ShopCatalogSeedFixture.makeCatalog())
+        let next = try validRelease(seq: 8, catalog: makeRemoteCatalog())
+        let reader = PublishingDuringDownloadReader(
+            first: (first.header, first.rootData, first.pack),
+            next: (next.header, next.rootData, next.pack))
+        let store = ShopCatalogSeedFixture.makeStore()
+        let service = ShopCatalogCloudSyncService(reader: reader, store: store)
+        var publishedNames: [String] = []
+        let observation = store.$catalog.sink { catalog in
+            publishedNames.append(catalog?.shops.first(where: { $0.id == "shop-alice-girl" })?.name ?? "")
+        }
+        let initial = Task { await service.syncIfNeeded(force: true) }
+        await reader.waitForFirstPack()
+        let entered = expectation(description: "同步中收到发布更新")
+        let notification = Task {
+            entered.fulfill()
+            await service.syncIfNeeded(force: true)
+        }
+        await fulfillment(of: [entered], timeout: 2)
+        await reader.finishFirstDownload()
+        await initial.value
+        await notification.value
+        let reads = await reader.headerReads
+        XCTAssertEqual(reads, 2)
+        XCTAssertEqual(ShopCatalogPackCache.loadControl().installedReleaseSeq, 8)
+        XCTAssertEqual(store.shop(id: "shop-alice-girl")?.name, "Alice Girl（云端改名）")
+        XCTAssertTrue(publishedNames.contains("Alice Girl（云端改名）"), "已有页面观察到目录变化即可自动刷新")
+        withExtendedLifetime(observation) {}
+    }
+
+    func testAutomaticForegroundCheckBypassesPageThrottleWithoutRedownloadingUnchangedPack() async throws {
+        let release = try validRelease(seq: 7, catalog: makeRemoteCatalog())
+        let counter = Counter()
+        let store = ShopCatalogSeedFixture.makeStore()
+        let service = ShopCatalogCloudSyncService(
+            reader: CountingStubReader(release: release, counter: counter), store: store)
+        await service.syncIfNeeded(force: true)
+        await service.syncIfNeeded()
+        XCTAssertEqual(counter.value, 1)
+        let automatic = ShopCatalogAutoRefresh(
+            refresh: { await service.syncIfNeeded(force: true) },
+            installSubscription: {}, sleep: { throw CancellationError() })
+        await automatic.runWhileActive()
+        XCTAssertEqual(counter.value, 2, "自动刷新不被页面的 30 分钟节流挡住")
+        XCTAssertEqual(counter.packReads, 1, "序号未变的自动检查不重复下载目录包")
+        XCTAssertEqual(service.state, .upToDate(releaseSeq: 7))
+        XCTAssertEqual(store.shop(id: "shop-alice-girl")?.name, "Alice Girl（云端改名）")
+    }
+
+    func testAutomaticSyncBeforeFirstPagePreservesSavedLocalOverlay() async throws {
+        let release = try validRelease(seq: 7, catalog: makeRemoteCatalog())
+        let overlay = #"""
+        {"version":1,"shops":[{"id":"shop-alice-girl","name":"本机未发布的编辑"}],
+         "series":[],"products":[],"variants":[],"sizeCharts":[],"saleEvents":[],"assets":[]}
+        """#
+        try Data(overlay.utf8).write(to: ShopCatalogDraftStore.overlayURL, options: .atomic)
+        let store = ShopCatalogStore()
+        let service = ShopCatalogCloudSyncService(
+            reader: StubReader(header: release.header, rootData: release.rootData, pack: release.pack),
+            store: store)
+        let automatic = ShopCatalogAutoRefresh(
+            refresh: { await service.syncIfNeeded(force: true) },
+            installSubscription: {}, sleep: { throw CancellationError() })
+        await automatic.runWhileActive()
+        XCTAssertEqual(store.shop(id: "shop-alice-girl")?.name, "本机未发布的编辑")
+        XCTAssertNotNil(store.shop(id: "shop-remote-new"), "远端新增内容仍须自动生效")
+    }
+
 }

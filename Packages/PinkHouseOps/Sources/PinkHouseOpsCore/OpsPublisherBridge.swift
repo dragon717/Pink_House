@@ -106,8 +106,7 @@ public struct OpsBridgeSettings: Codable, Equatable {
     /// 于是「有没有凭证」这条判定在测试里永远测不了，只能靠手工点界面。
     /// 给一个注入口，才能把「缺凭证必须先拦住」也变成回归锁。
     public var credentialsDirectoryOverride: String?
-    /// 单次调用的超时（秒）。默认 15 分钟：上传几十兆图片 + 切头足够，
-    /// 又不至于让一次挂死拖到运营以为「工具坏了」。
+    /// 没有真实阶段/数量进展的超时（秒）。持续传输的大批图片不会被总时长截断。
     /// 实际生效值会被 `minimumTimeoutSeconds` 抬底，见 `effectiveTimeout(configured:)`。
     public var timeoutSeconds: Int = 900
 
@@ -377,6 +376,17 @@ public enum OpsBridgeError: LocalizedError, Equatable {
     /// 目标环境没有对应的凭证文件（按环境分文件的直接后果，也是它想提前暴露的问题）
     case credentialMissing(environment: String)
 
+    public func diagnostic(for mode: OpsBridgeMode) -> String {
+        guard mode != .publish else { return localizedDescription }
+        switch self {
+        case .timedOut(let seconds):
+            return "\(mode.displayName)连续 \(seconds) 秒没有进展，已终止。本次只读操作没有发布云端变更；已下载的图片保留，下次只补未完成项。"
+        case .cancelled:
+            return "\(mode.displayName)已取消。本次只读操作没有发布云端变更；已下载的图片保留，下次只补未完成项。"
+        default: return localizedDescription
+        }
+    }
+
     public var errorDescription: String? {
         switch self {
         case .executableNotFound(let tried):
@@ -387,7 +397,7 @@ public enum OpsBridgeError: LocalizedError, Equatable {
         case .launchFailed(let reason):
             return "无法启动受控发布器：\(reason)"
         case .timedOut(let seconds):
-            return "受控发布器超过 \(seconds) 秒仍未结束，已终止。"
+            return "受控发布器连续 \(seconds) 秒没有进展，已终止。"
                 + "**这不等于失败**：如果它已经走到切换发布头，结果就不确定了 —— 请用「查询结果」确认，不要直接重发。"
         case .cancelled:
             return "受控发布已取消。**这不等于没发生**："
@@ -467,11 +477,32 @@ public struct OpsBridgeInterruptionLedger: Equatable, Sendable {
 
 // MARK: - 事件收集器（跨线程）
 
+/// 重复的日志/心跳不算进展；只有新阶段状态或严格增加的完成数量延续任务。
+struct OpsBridgeActivityLedger {
+    private var stages: Set<String> = []
+    private var counts: [String: Int] = [:]
+
+    mutating func observe(_ event: ShopCatalogPublishEvent) -> Bool {
+        if event.type == "stage", let stage = event.stage, let state = event.state {
+            return stages.insert(stage.rawValue + ":" + state.rawValue).inserted
+        }
+        if event.type == "progress", let stage = event.stage, let completed = event.completed,
+           let total = event.total, completed > 0, completed <= total,
+           completed > counts[stage.rawValue, default: 0] {
+            counts[stage.rawValue] = completed
+            return true
+        }
+        return false
+    }
+}
+
 /// 收集子进程输出。`Process` 的管道读取在后台线程，所以这个盒子要能跨线程用。
 private final class OpsBridgeOutputCollector: @unchecked Sendable {
 
     private let lock = NSLock()
     private let onEvent: (ShopCatalogPublishEvent) -> Void
+    private let onProgress: () -> Void
+    private var activity = OpsBridgeActivityLedger()
 
     private var _events: [ShopCatalogPublishEvent] = []
     private var _nonJSONLines: [String] = []
@@ -481,8 +512,9 @@ private final class OpsBridgeOutputCollector: @unchecked Sendable {
 
     private static let maxTailLines = 400
 
-    public init(onEvent: @escaping (ShopCatalogPublishEvent) -> Void) {
+    public init(onEvent: @escaping (ShopCatalogPublishEvent) -> Void, onProgress: @escaping () -> Void) {
         self.onEvent = onEvent
+        self.onProgress = onProgress
     }
 
     /// 消费一行。JSON 就解成事件，解不出来就原样留痕（**不静默丢**）。
@@ -492,11 +524,13 @@ private final class OpsBridgeOutputCollector: @unchecked Sendable {
         if let event = ShopCatalogPublishEvent.decoded(fromLine: trimmed) {
             lock.lock()
             _events.append(event)
+            let progressed = activity.observe(event)
             if event.type == "stage", let stage = event.stage, event.state == .started,
                _stages.last != stage {
                 _stages.append(stage)
             }
             lock.unlock()
+            if progressed { onProgress() }
             onEvent(event)
         } else {
             lock.lock()
@@ -651,9 +685,11 @@ public final class OpsPublisherBridge: @unchecked Sendable {
         process.standardOutput = pipe
         process.standardError = pipe
 
-        let collector = OpsBridgeOutputCollector(onEvent: onEvent)
         let timeout = OpsBridgeSettings.effectiveTimeout(configured: settings.timeoutSeconds)
         let timer = DispatchSource.makeTimerSource(queue: .global(qos: .utility))
+        let collector = OpsBridgeOutputCollector(onEvent: onEvent) {
+            timer.schedule(deadline: .now() + .seconds(timeout))
+        }
         timer.schedule(deadline: .now() + .seconds(timeout))
         timer.setEventHandler { [weak self] in
             // 走同一个入口，只是原因不同 —— 不存在「超时忘了标记」这种可能。

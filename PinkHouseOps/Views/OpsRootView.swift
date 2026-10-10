@@ -125,7 +125,7 @@ struct OpsMainView: View {
             }
             .navigationSplitViewColumnWidth(min: 190, ideal: 210, max: 260)
             .safeAreaInset(edge: .bottom) {
-                DraftSummaryFooter(workspace: workspace)
+                DraftSummaryFooter(workspace: workspace, syncCatalogEdits: section == .catalog)
             }
         } detail: {
             VStack(spacing: 0) {
@@ -136,33 +136,61 @@ struct OpsMainView: View {
         }
         .frame(minWidth: 980, minHeight: 620)
         .overlay(alignment: .top) {
-            if let report = cloudSync.syncReport, showsSyncStatus,
-               report.draftID == workspace.draft?.id,
-               report.environment == cloudSync.targetEnvironment.rawValue {
-                OpsSyncProgressView(report: report, onDismiss: { showsSyncStatus = false; updateToast = nil })
-                    .padding(.top, 10).padding(.horizontal, 24)
-            } else if let toast = updateToast {
+            if let toast = updateToast {
                 OpsUpdateToastView(toast: toast, onDismiss: { updateToast = nil },
                                    onExportMissing: exportMissingImages)
             }
         }
+        .onAppear {
+            workspace.resumeCatalogEditorSync()
+            if cloudSync.isSyncing { OpsSyncProgressWindowController.shared.syncDidStart() }
+        }
+        .onChange(of: workspace.draft?.id) { _, _ in
+            workspace.catalogEditSyncMessage = nil
+            workspace.resumeCatalogEditorSync()
+        }
+        .onChange(of: cloudSync.targetEnvironment) { _, _ in workspace.resumeCatalogEditorSync() }
+        .onChange(of: cloudSync.isRunning) { _, running in
+            if !running { workspace.resumeCatalogEditorSync() }
+        }
         .onChange(of: cloudSync.isSyncing) { _, running in
-            if running { showsSyncStatus = true; updateToast = nil }
+            if running {
+                updateToast = nil
+                OpsSyncProgressWindowController.shared.syncDidStart()
+            }
+            else { workspace.resumeCatalogEditorSync() }
         }
         .toolbar {
             // 一键执行下载、上传、合并落盘，逐步展示结果与待修复数据。
             ToolbarItem(placement: .primaryAction) {
                 Button {
-                    updateCloudNow()
+                    if cloudSync.isRunning || cloudSync.isSyncing {
+                        OpsSyncProgressWindowController.shared.showProgress()
+                    } else { updateCloudNow() }
                 } label: {
                     if cloudSync.isRunning || cloudSync.isSyncing {
-                        ProgressView().controlSize(.small)
+                        HStack(spacing: 6) {
+                            ProgressView().controlSize(.small)
+                            Text("同步中")
+                        }
                     } else {
                         Label("云端更新", systemImage: "arrow.triangle.2.circlepath.circle")
                     }
                 }
-                .disabled(cloudSync.isRunning || cloudSync.isSyncing || workspace.isCorrupted)
-                .help("下载平台内容、上传本地变更、合并保存，逐步显示结果（环境与凭证在设置里配置）")
+                .disabled(workspace.isCorrupted && !cloudSync.isRunning && !cloudSync.isSyncing)
+                .help(cloudSync.isRunning || cloudSync.isSyncing
+                      ? "后台同步中，点击查看进度"
+                      : "下载平台内容、上传本地变更、合并保存（环境与凭证在设置里配置）")
+            }
+            if cloudSync.syncReport != nil, !cloudSync.isRunning, !cloudSync.isSyncing {
+                ToolbarItem(placement: .primaryAction) {
+                    Button {
+                        OpsSyncProgressWindowController.shared.showProgress()
+                    } label: {
+                        Label("查看同步结果", systemImage: "clock.arrow.circlepath")
+                    }
+                    .help("查看最近一次同步的步骤、问题与日志")
+                }
             }
         }
     }
@@ -171,13 +199,12 @@ struct OpsMainView: View {
 
     @State private var updateToast: OpsCloudUpdateToast?
     @State private var isUpdatingCloud = false
-    @State private var showsSyncStatus = true
 
     private func updateCloudNow() {
         guard !isUpdatingCloud else { return }
         isUpdatingCloud = true
         updateToast = nil
-        showsSyncStatus = true
+        OpsSyncProgressWindowController.shared.showProgress()
         Task { @MainActor in
             let result = await cloudSync.publishNow(workspace: workspace)
             isUpdatingCloud = false
@@ -244,6 +271,7 @@ struct OpsMainView: View {
 
 struct DraftSummaryFooter: View {
     @ObservedObject var workspace: OpsWorkspace
+    var syncCatalogEdits = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -273,8 +301,12 @@ struct DraftSummaryFooter: View {
                 CountChip(label: "商品", value: workspace.catalog.products.count)
                 CountChip(label: "图片", value: workspace.catalog.assets.count)
             }
+            if syncCatalogEdits, let message = workspace.catalogEditSyncMessage {
+                Text(message).font(.caption2).foregroundStyle(.secondary).lineLimit(3)
+            }
             Button {
-                workspace.saveDraft()
+                if syncCatalogEdits { workspace.saveCatalogEditorChanges() }
+                else { workspace.saveDraft() }
             } label: {
                 Label(workspace.hasUnsavedChanges ? "保存修改" : "保存草稿",
                       systemImage: "square.and.arrow.down")
@@ -319,6 +351,7 @@ struct OpsStatusBanner: View {
 
     @State private var showsBackupExporter = false
     @State private var backupDocument = RawDataDocument(data: Data())
+    @State private var errorDetails: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -331,8 +364,11 @@ struct OpsStatusBanner: View {
                         .foregroundStyle(.orange)
                     opsMarkdown(error)
                         .font(.callout)
+                        .lineLimit(3)
                         .fixedSize(horizontal: false, vertical: true)
                     Spacer(minLength: 8)
+                    Button("查看详情…") { errorDetails = error }
+                        .buttonStyle(.link)
                     Button("知道了") { workspace.clearError() }
                         .buttonStyle(.link)
                 }
@@ -356,6 +392,19 @@ struct OpsStatusBanner: View {
         .padding(.horizontal, 14)
         .padding(.vertical, 9)
         .background(backgroundStyle)
+        .sheet(isPresented: Binding(get: { errorDetails != nil },
+                                    set: { if !$0 { errorDetails = nil } })) {
+            VStack(alignment: .leading, spacing: 14) {
+                Text("操作未完成 · 详细原因").font(.headline)
+                ScrollView {
+                    opsMarkdown(errorDetails ?? "")
+                        .textSelection(.enabled)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                HStack { Spacer(); Button("关闭") { errorDetails = nil } }
+            }
+            .padding(20).frame(width: 640, height: 480)
+        }
         .fileExporter(
             isPresented: $showsBackupExporter,
             document: backupDocument,

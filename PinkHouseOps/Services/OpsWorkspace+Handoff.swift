@@ -39,6 +39,7 @@ import Foundation
 
 // MemberImportVisibility：用到哪些类型就在本文件里显式 import 哪些。
 import SharedCatalog
+import PinkHouseOpsCore
 
 // MARK: - 导入结果
 
@@ -76,6 +77,26 @@ struct OpsHandoffImportReport {
 // MARK: - 接收整包
 
 extension OpsWorkspace {
+
+    /// 补图不会替换目录，也不推进发布/合并基线。
+    @discardableResult
+    func repairMissingImages(from directory: URL) -> OpsLocalImageRepair.Report? {
+        guard canMutate() else { return nil }
+        let accessed = directory.startAccessingSecurityScopedResource()
+        defer { if accessed { directory.stopAccessingSecurityScopedResource() } }
+        do {
+            let names = Set(missingStagedImages().map(\.fileName))
+            let report = try OpsLocalImageRepair.restore(
+                fileNames: names, from: directory, to: stagingDirectory)
+            statusMessage = report.summary + "当前草稿内容已保留，可再次运行「云端更新」。"
+            lastError = report.failures.isEmpty ? nil : report.failures.sorted { $0.key < $1.key }
+                .map { "\($0.key)：\($0.value)" }.joined(separator: "\n")
+            return report
+        } catch {
+            lastError = "补图失败：\(error.localizedDescription)"
+            return nil
+        }
+    }
 
     /// 导入一份 iOS 交接过来的整包。
     ///
