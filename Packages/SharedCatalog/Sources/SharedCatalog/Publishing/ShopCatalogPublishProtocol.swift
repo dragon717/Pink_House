@@ -48,17 +48,17 @@ public nonisolated enum ShopCatalogPublishTargetEnvironment: String, Codable, Ca
 
     public var displayName: String {
         switch self {
-        case .development: return "Development"
-        case .production: return "Production"
+        case .development: return "开发环境 Development"
+        case .production: return "线上环境 Production"
         }
     }
 
     public var guidance: String {
         switch self {
         case .development:
-            return "Development 只有团队成员与本地构建能读到；TestFlight / App Store 读的是 Production。"
+            return "开发环境 Development 只有团队成员与本地构建能读到；TestFlight / App Store 读的是线上环境 Production。"
         case .production:
-            return "Production 面向全部用户。发之前请确认已在 Development 验证过同一份产物。"
+            return "线上环境 Production 面向全部用户。发布前请在开发环境 Development 验证内容。"
         }
     }
 }
@@ -97,6 +97,8 @@ public nonisolated enum ShopCatalogPublishStage: String, Codable, CaseIterable, 
     case confirmHead
     /// 读线上基线（只读，用于 R07 的过期检测）
     case baseline
+    /// 构建前核对目标环境已有的媒体（桥接器 R5）。
+    case remoteMedia
     /// 下载远端图片字节（只读，用于双向同步的「下载」那一档）
     case fetchMedia
 
@@ -105,7 +107,7 @@ public nonisolated enum ShopCatalogPublishStage: String, Codable, CaseIterable, 
     /// 七步里的序号（`baseline` 与 `freeze` 不在七步内，返回 nil）。
     public var stepOrdinal: Int? {
         switch self {
-        case .freeze, .baseline, .fetchMedia: return nil
+        case .freeze, .baseline, .fetchMedia, .remoteMedia: return nil
         case .build: return 1
         case .verifyArtifact: return 1
         case .readHead: return 2
@@ -130,6 +132,7 @@ public nonisolated enum ShopCatalogPublishStage: String, Codable, CaseIterable, 
         case .confirmHead: return "回读确认发布头"
         case .baseline: return "读取线上基线"
         case .fetchMedia: return "下载远端图片"
+        case .remoteMedia: return "检查目标环境已有图片"
         }
     }
 
@@ -385,6 +388,8 @@ public nonisolated struct ShopCatalogPublishRequest: Codable, Equatable, Sendabl
     ///
     /// 其余三种模式忽略这个字段。
     public var mediaHashes: [String]?
+    /// 跨环境增量同步保留目标根清单中的其他分片、撤回与版本门槛。
+    public var preserveTargetPartitions: Bool?
     /// 演练（不写入）
     public var dryRun: Bool
     /// 待发布包摘要（SHA-256，App 侧算好）——用于回执核对与「同一产物」判定
@@ -410,6 +415,7 @@ public nonisolated struct ShopCatalogPublishRequest: Codable, Equatable, Sendabl
         receiptPath: String,
         filesystemRoot: String? = nil,
         mediaHashes: [String]? = nil,
+        preserveTargetPartitions: Bool? = nil,
         dryRun: Bool = false,
         payloadHash: String,
         createdAt: Date = Date()
@@ -432,6 +438,7 @@ public nonisolated struct ShopCatalogPublishRequest: Codable, Equatable, Sendabl
         self.receiptPath = receiptPath
         self.filesystemRoot = filesystemRoot
         self.mediaHashes = mediaHashes
+        self.preserveTargetPartitions = preserveTargetPartitions
         self.dryRun = dryRun
         self.payloadHash = payloadHash
         self.createdAt = createdAt

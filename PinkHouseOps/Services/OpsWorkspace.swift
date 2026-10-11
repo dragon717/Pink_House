@@ -166,13 +166,7 @@ final class OpsWorkspace: ObservableObject {
     /// 集合里 —— 那是既定的取舍（改名会让目录里的 `local:` 引用全部悬空）。
     /// 所以这里只是「按内容寻址能找到的那些」，不是「本机图片全集」。
     var stagedMediaKeys: Set<String> {
-        Set(stagedFileNames.compactMap { name in
-            let digest = (name as NSString).deletingPathExtension
-            guard ShopCatalogSyncProtocol.isPayloadHash(digest),
-                  let data = try? Data(contentsOf: stagingDirectory.appendingPathComponent(name)),
-                  ShopCatalogSyncProtocol.sha256Hex(data) == digest else { return nil }
-            return digest
-        })
+        Set(OpsCachedMedia.files(in: stagingDirectory).keys)
     }
 
     // MARK: 从远端下载图片（双向同步的「下载」那一档）
@@ -1017,18 +1011,14 @@ final class OpsWorkspace: ObservableObject {
     /// `http(s)://` / `bundle:` 都不是本机文件，一律 nil（界面据此显示标记而不是空白）。
     func stagedFileURL(forReference reference: String?) -> URL? {
         guard let reference, !reference.isEmpty else { return nil }
-        var candidates: [String] = []
         if reference.hasPrefix("local:") {
             let name = String(reference.dropFirst("local:".count))
-            if !name.isEmpty { candidates.append(name) }
-        } else if let hash = ShopCatalogSyncProtocol.mediaContentHash(in: reference) {
-            // 后缀不定（jpg / png / webp / heic），逐个试 —— 只有 4 种，
-            // 比为了「知道后缀」再维护一张摘要→后缀的表省事，也不会写错。
-            candidates = ["jpg", "png", "webp", "heic", "gif"].map { "\(hash).\($0)" }
-        }
-        for name in candidates {
+            guard !name.isEmpty else { return nil }
             let url = stagingDirectory.appendingPathComponent(name)
-            if fileManager.fileExists(atPath: url.path) { return url }
+            return fileManager.fileExists(atPath: url.path) ? url : nil
+        }
+        if let hash = ShopCatalogSyncProtocol.mediaContentHash(in: reference) {
+            return OpsCachedMedia.files(in: stagingDirectory, hash: hash)[hash]
         }
         return nil
     }
@@ -1310,9 +1300,9 @@ final class OpsWorkspace: ObservableObject {
         var references = Set(
             ShopCatalogMediaReferences.publisherRewritten(in: catalog).map(\.reference))
         // 缓存的远端图也随包交给发布器：目标环境缺图时可以上传同一份字节。
-        let verifiedKeys = stagedMediaKeys
-        for hash in referencedRemoteMediaHashes() where verifiedKeys.contains(hash) {
-            if let url = stagedFileURL(forReference: ShopCatalogSyncProtocol.mediaReference(contentHash: hash)) {
+        let cachedFiles = OpsCachedMedia.files(in: stagingDirectory)
+        for hash in referencedRemoteMediaHashes() {
+            if let url = cachedFiles[hash] {
                 references.insert("local:" + url.lastPathComponent)
             }
         }

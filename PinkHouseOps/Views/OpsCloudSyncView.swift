@@ -90,9 +90,11 @@ final class OpsCloudSyncModel: ObservableObject {
 
     @Published private(set) var isRunning = false
     @Published var isSyncing = false
+    @Published var isPromotingEnvironment = false
     @Published var syncReport: OpsSyncReport?
     var syncEnvironmentGeneration: Int { environmentGeneration }
     @Published private(set) var runningMode: OpsBridgeMode?
+    @Published private(set) var operationProgress: OpsDataSyncProgress?
     @Published private(set) var logLines: [String] = []
     @Published private(set) var onlineHead: ShopCatalogOnlineHead?
     @Published private(set) var outcome: ShopCatalogPublishOutcome?
@@ -141,6 +143,10 @@ final class OpsCloudSyncModel: ObservableObject {
 
     /// 本次运行的**完整**日志（不受 `logLimit` 截断），落盘与复制都用它。
     private var runLog: [String] = []
+    private var operationLog: OpsOperationLog?
+    private var runEnvironment: ShopCatalogPublishTargetEnvironment?
+    private var runBridgeResult: OpsBridgeRunResult?
+    private var activeBridgeRunID: String?
 
     /// 运行 ID 的时间部分（也是日志文件名）。用 POSIX locale 固定 24 小时制，
     /// 免得用户在「中文 + 12 小时制」下拿到 `09-29-... PM` 这种没法排序的名字。
@@ -437,12 +443,13 @@ final class OpsCloudSyncModel: ObservableObject {
     ///   不该靠一次注定失败的子进程去发现。
     /// - Returns: 下载明细；nil = 没跑成（原因在 `lastError`）。
     @discardableResult
-    func fetchMedia(hashes: [String]) async -> OpsFetchedMedia? {
+    func fetchMedia(hashes: [String], environment: ShopCatalogPublishTargetEnvironment? = nil) async -> OpsFetchedMedia? {
         guard !hashes.isEmpty else {
             lastError = "没有要下载的图片：本机已经齐了（或目录里没有 `thmedia:` 引用）。"
             return nil
         }
-        guard await ensureReady(.fetchMedia) else { return nil }
+        let sourceEnvironment = environment ?? targetEnvironment
+        guard await ensureReady(.fetchMedia, environment: sourceEnvironment) else { return nil }
         let directory = jobDirectory("fetch-\(Int(Date().timeIntervalSince1970))")
         do {
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
@@ -460,21 +467,23 @@ final class OpsCloudSyncModel: ObservableObject {
             receipt: directory.appendingPathComponent("receipt.json"),
             payloadHash: "fetch-media")
         request.mediaHashes = hashes
+        request.targetEnvironment = sourceEnvironment
         guard let requestURL = write(request, to: directory) else { return nil }
 
         var fetched: OpsFetchedMedia?
-        let requestedEnvironment = targetEnvironment.rawValue
+        let selectedEnvironment = targetEnvironment.rawValue
+        let requestedEnvironment = sourceEnvironment.rawValue
         let requestedGeneration = environmentGeneration
-        await perform(mode: .fetchMedia, requestPath: requestURL) { [weak self] result in
+        await perform(mode: .fetchMedia, requestPath: requestURL, environment: sourceEnvironment) { [weak self] result in
             guard let self else { return }
-            fetched = OpsFetchedMedia.from(result: result, environment: self.targetEnvironment.rawValue)
+            fetched = OpsFetchedMedia.from(result: result, environment: requestedEnvironment)
             if fetched == nil {
                 self.lastError = "没拿到下载结果（exitCode=\(result.exitCode)）："
                     + (result.outcomeMessage ?? "没有 media 事件 / 读不到 fetch-manifest.json")
             }
         }
         // 超时/取消不会产生最终 media 事件，但逐张落盘的原子清单仍可恢复。
-        if fetched == nil, targetEnvironment.rawValue == requestedEnvironment,
+        if fetched == nil, targetEnvironment.rawValue == selectedEnvironment,
            environmentGeneration == requestedGeneration {
             fetched = OpsFetchedMedia.load(directory: request.outputDirectory, environment: requestedEnvironment)
         }
@@ -628,22 +637,27 @@ final class OpsCloudSyncModel: ObservableObject {
     // MARK: 内部
 
     /// 三关自检：仓库目录 / 解释器 / 凭证。不通过就不跑，且每一条单独说明。
-    private func ensureReady(_ mode: OpsBridgeMode) async -> Bool {
+    private func ensureReady(_ mode: OpsBridgeMode,
+                             environment: ShopCatalogPublishTargetEnvironment? = nil) async -> Bool {
         guard !isRunning else { return false }
+        let environment = environment ?? targetEnvironment
+        runEnvironment = environment
+        runBridgeResult = nil
         let problems = diagnosis
         if !problems.isEmpty {
             failBeforeBridge("受控发布器还没准备好：" + problems.joined(separator: " "), mode: mode)
             return false
         }
-        if credentialFileURL == nil {
-            failBeforeBridge("容器内没有 \(targetEnvironment.displayName) 的 CloudKit 凭证："
+        if OpsPublisherBridge.existingCredentialFile(environmentName: environment.rawValue) == nil {
+            failBeforeBridge("容器内没有 \(environment.displayName) 的 CloudKit 凭证："
                 + "子进程继承 App 沙盒，读不到登录钥匙串，只能靠容器里的这份文件。"
                 + "请先点「选择凭证 JSON…」把它放进 App 容器。", mode: mode)
             return false
         }
-        if let summary = credentialSummary, summary.declaredEnvironmentMatches == false {
+        if let summary = OpsPublisherBridge.credentialSummary(environmentName: environment.rawValue),
+           summary.declaredEnvironmentMatches == false {
             failBeforeBridge("这份凭证自己声明的是 \(summary.declaredEnvironment ?? "（未知）")，"
-                + "与当前目标环境 \(targetEnvironment.rawValue) 不一致。"
+                + "与目标环境 \(environment.displayName) 不一致。"
                 + "CloudKit 的 s2s key 按环境注册，混用只会 401 —— 请导入对应环境的凭证。",
                 mode: mode)
             return false
@@ -691,10 +705,31 @@ final class OpsCloudSyncModel: ObservableObject {
         }
     }
 
+    /// 跨环境任务显式绑定请求环境，不切换日常发布设置、不写其缓存基线。
+    func runEnvironmentBridge(mode: OpsBridgeMode, request: ShopCatalogPublishRequest,
+                              requestURL: URL) async -> OpsBridgeRunResult? {
+        runEnvironment = request.targetEnvironment
+        guard await ensureReady(mode, environment: request.targetEnvironment) else { return nil }
+        do {
+            try FileManager.default.createDirectory(at: requestURL.deletingLastPathComponent(),
+                                                    withIntermediateDirectories: true)
+            try request.encoded().write(to: requestURL, options: .atomic)
+        } catch {
+            failBeforeBridge("环境同步请求保存失败：\(error.localizedDescription)", mode: mode)
+            return nil
+        }
+        var result: OpsBridgeRunResult?
+        await perform(mode: mode, requestPath: requestURL, environment: request.targetEnvironment) {
+            result = $0
+        }
+        return result
+    }
+
     /// 跑一次桥接调用。**在后台线程阻塞执行**（`OpsPublisherBridge.run` 是同步的）。
     private func perform(
         mode: OpsBridgeMode,
         requestPath: URL,
+        environment: ShopCatalogPublishTargetEnvironment? = nil,
         interpret: @escaping @MainActor (OpsBridgeRunResult) -> Void
     ) async {
         guard !isRunning else { return }
@@ -707,11 +742,16 @@ final class OpsCloudSyncModel: ObservableObject {
         // 每次运行从干净的一份开始：`runLog` 是**按运行**归属的，留着上一次的行
         // 会让落盘的日志里混进两次运行的输出（跨环境时尤其误导）。
         runLog = []
+        runBridgeResult = nil
         let runID = "\(Self.runIDFormatter.string(from: Date()))-\(mode.rawValue)-\(UUID().uuidString.prefix(8))"
-        append("▶ \(mode.displayName)（\(targetEnvironment.displayName)）")
+        activeBridgeRunID = runID
+        defer { activeBridgeRunID = nil }
+        let selectedEnvironment = environment ?? targetEnvironment
+        runEnvironment = selectedEnvironment
+        append("▶ \(mode.displayName)（\(selectedEnvironment.displayName)）")
 
         let bridge = OpsPublisherBridge(settings: settings)
-        let environmentName = targetEnvironment.rawValue
+        let environmentName = selectedEnvironment.rawValue
         let generation = environmentGeneration
         do {
             let result = try await Task.detached(priority: .userInitiated) { () throws -> OpsBridgeRunResult in
@@ -721,7 +761,14 @@ final class OpsCloudSyncModel: ObservableObject {
                     environmentName: environmentName
                 ) { event in
                     Task { @MainActor in
-                        guard self.environmentGeneration == generation else { return }
+                        guard self.environmentGeneration == generation,
+                              self.activeBridgeRunID == runID else { return }
+                        let previous = self.operationProgress
+                        self.operationProgress?.receive(event, mode: mode, environment: selectedEnvironment)
+                        if event.type == "progress", self.operationProgress != previous,
+                           let progress = self.operationProgress {
+                            self.append(progress.title + (progress.countText.map { " · " + $0 } ?? ""))
+                        }
                         self.receiveSyncProgress(event, mode: mode)
                         if let line = event.displayLine {
                             self.append(event.type == "stage" ? (event.message ?? line) : line)
@@ -731,7 +778,9 @@ final class OpsCloudSyncModel: ObservableObject {
             }.value
             append("退出码 \(result.exitCode)"
                 + (result.outcome.map { " · 结论 \($0.rawValue)" } ?? ""))
-            guard targetEnvironment.rawValue == environmentName, environmentGeneration == generation else {
+            runBridgeResult = result
+            guard (environment != nil || targetEnvironment.rawValue == environmentName),
+                  environmentGeneration == generation else {
                 lastError = "任务在 \(environmentName) 执行，期间目标环境已切换；请查询原环境结果。"
                 isRunning = false
                 runningMode = nil
@@ -758,6 +807,8 @@ final class OpsCloudSyncModel: ObservableObject {
             logLines.removeFirst(logLines.count - Self.logLimit)
         }
         runLog.append(line)
+        // 正在运行时同一日志也能读取；完整事件和结论仍在桥接结束时追加。
+        appendOperationLog(line)
     }
 
     func clearLog() {
@@ -780,26 +831,46 @@ final class OpsCloudSyncModel: ObservableObject {
         var lines: [String] = []
         lines.append("# PinkHouseOps 云端同步 · 受控发布器输出")
         lines.append("导出时间：\(Self.logTimeFormatter.string(from: Date()))")
-        lines.append("目标环境：\(targetEnvironment.rawValue)（\(targetEnvironment.displayName)）")
+        let environment = runEnvironment ?? targetEnvironment
+        lines.append("目标环境：\(environment.rawValue)（\(environment.displayName)）")
         if let runID { lines.append("本次运行：\(runID)") }
+        if let result = runBridgeResult { lines.append("退出码：\(result.exitCode)") }
         if let mode { lines.append("运行模式：\(mode.rawValue)") }
-        if let head = onlineHead {
+        if let head = runBridgeResult?.onlineHead ?? (isPromotingEnvironment ? nil : onlineHead),
+           head.environment == environment.rawValue {
             lines.append("线上发布号：seq \(head.releaseSeq)"
                 + (head.rootIndexHash.map { " · 根清单摘要 \($0.prefix(12))…" } ?? ""))
         }
-        if let seq = lastReceiptSeq {
+        let receiptSeq = isPromotingEnvironment ? runBridgeResult?.receipt?.releaseSeq : lastReceiptSeq
+        let receiptConfirmed = isPromotingEnvironment
+            ? runBridgeResult?.receipt?.readBackConfirmed == true : lastReceiptConfirmed
+        if let seq = receiptSeq {
             lines.append("回执发布号：\(seq)"
-                + (lastReceiptConfirmed ? "（已回读确认）" : "（未回读确认）"))
+                + (receiptConfirmed ? "（已回读确认）" : "（未回读确认）"))
         }
-        if let message = outcomeMessage { lines.append("结论文案：\(message)") }
+        if let message = runBridgeResult?.outcomeMessage ?? outcomeMessage { lines.append("结论文案：\(message)") }
         if let error = lastError { lines.append("✖ 错误：\(error)") }
         // 日志文件路径必须带在头部：排查的人（以及接手修的 Agent）第一件事
         // 就是找到**这一次的**原始输出，而不是只看到一句结论文案。
-        let diagnosticURL = runID.map { logsDirectory.appendingPathComponent("\($0).log") } ?? lastRunLogURL
+        let diagnosticURL = operationLog?.url
+            ?? runID.map { logsDirectory.appendingPathComponent("\($0).log") } ?? lastRunLogURL
         if let url = diagnosticURL { lines.append("日志文件：\(url.path)") }
-        lines.append("--- 桥接器输出（最近一次运行，"
-            + "\(runLog.isEmpty ? logLines.count : runLog.count) 行）---")
-        lines.append(contentsOf: runLog.isEmpty ? logLines : runLog)
+        lines.append("--- 桥接器输出 ---")
+        lines.append(contentsOf: runBridgeResult?.events.compactMap(\.displayLine)
+            ?? (runLog.isEmpty ? logLines : runLog))
+        if let result = runBridgeResult {
+            lines.append("--- 事件明细 ---")
+            let encoder = JSONEncoder()
+            encoder.dateEncodingStrategy = .iso8601
+            encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+            lines.append(contentsOf: result.events.compactMap {
+                (try? encoder.encode($0)).flatMap { String(data: $0, encoding: .utf8) }
+            })
+            if !result.nonJSONLines.isEmpty {
+                lines.append("--- 非 JSON 输出 ---")
+                lines.append(contentsOf: result.nonJSONLines)
+            }
+        }
         return lines.joined(separator: "\n")
     }
 
@@ -807,7 +878,37 @@ final class OpsCloudSyncModel: ObservableObject {
     ///
     /// 写失败**刻意静默**：一次同步已经跑完了，不该因为「日志没写成」再报一个错。
     /// 但此时 `logFileURL` 保持 nil，界面上的按钮会是灰的 —— 这一点要能看出来。
+    @discardableResult
+    func beginOperationLog(_ title: String) -> Bool {
+        guard operationLog == nil else { return false }
+        operationLog = try? OpsOperationLog(directory: logsDirectory, title: title)
+        operationProgress = OpsDataSyncProgress(title: "准备连接…")
+        logFileURL = operationLog?.url
+        lastRunLogURL = operationLog?.url
+        return true
+    }
+
+    func appendOperationLog(_ text: String) { try? operationLog?.append(text) }
+
+    func updateOperationProgress(_ title: String) {
+        operationProgress?.advance(to: title)
+        appendOperationLog(title)
+    }
+
+    func finishOperationLog(_ result: String) {
+        try? operationLog?.finish(result)
+        logFileURL = operationLog?.url
+        lastRunLogURL = operationLog?.url
+        operationLog = nil
+    }
+
     private func persistLog(runID: String, mode: OpsBridgeMode) {
+        if let operationLog {
+            try? operationLog.append(copyableLogText(runID: runID, mode: mode))
+            logFileURL = operationLog.url
+            lastRunLogURL = operationLog.url
+            return
+        }
         let directory = logsDirectory
         let manager = FileManager.default
         guard (try? manager.createDirectory(
@@ -843,6 +944,8 @@ final class OpsCloudSyncModel: ObservableObject {
     /// 旧写法只在 `perform` 里落盘 —— 结果**恰恰是最需要日志的那一次失败没有日志**：
     /// 现场卡住的正是「导出整包失败：发布前校验未通过（560 条）」，而它一个文件都没留下。
     private func failBeforeBridge(_ message: String, mode: OpsBridgeMode) {
+        runBridgeResult = nil
+        runLog = ["✖ " + message]
         lastError = message
         persistLog(
             runID: "\(Self.runIDFormatter.string(from: Date()))-\(mode.rawValue)-preflight",

@@ -1,474 +1,83 @@
-//
-//  OpsSettingsView.swift
-//  PinkHouseOps
-//
-//  运营工具的**设置**（macOS `Settings` 场景，Cmd+,）。
-//
-//  ## 为什么这些东西在设置里
-//
-//  2026-10-07 起「云端同步」面板的分步卡片全部删除：运营点工具栏的
-//  「云端更新」就一键发布，**无感**。但发布有三关前置（仓库目录授权 /
-//  解释器 / 凭证）与一个环境选择 —— 它们是**配置**，不是「步骤」，
-//  所以全部收进这里。配好一次之后日常只需要点「云端更新」。
-//
-//  ## 环境切换的语义
-//
-//  `targetEnvironment` 的 `didSet` 会清空上一个环境的线上发布号等运行态
-//  （`resetEnvironmentScopedState`）—— 那份「线上 seq N」只对它读到的环境成立，
-//  拿着 Development 的号去发 Production 是**没有一层会报错**的错配。
-//
-
 import AppKit
-// MemberImportVisibility：`.json`（UTType）来自这个模块，不 import 会报
-// “static property 'json' is not available”，那个报错看不出真正原因。
 import UniformTypeIdentifiers
 import SwiftUI
+import SharedCatalog
 
 struct OpsSettingsView: View {
-    /// 与工具栏「云端更新」、系列发布共用同一份单例（同一处真相）
     @ObservedObject private var model = OpsCloudSyncModel.shared
-    /// 主窗口那份工作区（另建一份 = 两处真相，导入完主窗口还显示旧内容）
     @ObservedObject private var holder = OpsWorkspaceHolder.shared
-
-    /// 上一次导入的结果（成功摘要 / 失败原因，二选一展示）
     @State private var importMessage: String?
     @State private var importFailed = false
-    /// 上一次「数据修复」的结果（修复是破坏性的，结果必须出声）
     @State private var repairMessage: String?
     @State private var repairFailed = false
-    /// 预览里「会被移除」的条数（守卫用：数量不摆在面前不许确认）
-    private var removedCount: Int { mergeReport?.removed ?? 0 }
-
-    /// 缺图文件数（打开设置时算一次 —— 每次渲染都遍历全量引用太重）
     @State private var missingCount = 0
-    /// 拉回后的**合并预览**（不写任何东西，先给人看）
-    @State private var mergeReport: OpsWorkspace.OpsMergeReport?
-    @State private var mergePreviewRevision: Int?
-    @State private var mergePreviewPath: String?
-    @State private var mergePreviewDraftID: String?
-    /// 对齐的结果文案（合并是破坏性的，结果必须出声）
-    @State private var alignMessage: String?
-    @State private var alignFailed = false
-    /// 合并的**二级确认**框
-    @State private var showsAlignConfirm = false
-    /// 「下载远端图片」的结果（网络动作，结果必须出声）
-    @State private var downloadMessage: String?
-    @State private var downloadFailed = false
-    /// 本机缺多少张远端图片的字节（打开设置 / 每步操作后算一次）
-    @State private var pendingDownloadCount = 0
-    /// 清理悬空销售记录的**二级确认**框（弹窗快捷入口与设置按钮共用）
     @State private var showsRepairConfirm = false
 
     var body: some View {
-        let dangling = holder.workspace?.danglingSaleEventCount ?? 0
         Form {
+            OpsDataSyncSection()
             Section("发布环境") {
-                Picker("目标环境", selection: $model.targetEnvironment) {
-                    ForEach(ShopCatalogPublishTargetEnvironment.allCases) { environment in
-                        Text(environment.displayName).tag(environment)
+                Picker("编辑内容发布到", selection: $model.targetEnvironment) {
+                    ForEach(ShopCatalogPublishTargetEnvironment.allCases) {
+                        Text($0.displayName).tag($0)
                     }
-                }
-                // macOS 只有 `.radioGroup`（`.radio` 是 iOS 的写法，这里编译不过）
-                .pickerStyle(.radioGroup)
-                .disabled(model.isRunning || model.isSyncing)
-                opsMarkdown(model.targetEnvironment.guidance)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                // 切环境会清空线上发布号等运行态 —— 必须说出来，
-                // 否则「刚读到的 seq」消失会被当成 bug。
-                Text("切换环境会清空已读取的线上发布号与发布结论（它们只对原环境成立）。")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-            }
-
-            Section("受控发布器（三关自检）") {
-                let problems = model.diagnosis
-                if problems.isEmpty {
-                    Label("三关都通过，可以一键发布。", systemImage: "checkmark.circle.fill")
-                        .foregroundStyle(.green)
-                } else {
-                    ForEach(problems, id: \.self) { problem in
-                        HStack(alignment: .top, spacing: 6) {
-                            Image(systemName: "exclamationmark.triangle.fill")
-                                .foregroundStyle(.orange)
-                            opsMarkdown(problem)
-                                .font(.callout)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-                    }
-                }
-                LabeledContent("仓库目录", value: model.settings.repoRootPath ?? "（未授权）")
-                Button("选择仓库目录…") { model.chooseRepoRoot() }
-                LabeledContent("解释器", value: model.interpreterText)
-            }
-
-            Section("CloudKit 凭证（按环境分开，私钥不进 App）") {
+                }.pickerStyle(.radioGroup).disabled(model.isRunning || model.isSyncing)
                 ForEach(model.credentialStates) { state in
-                    HStack(spacing: 6) {
-                        Image(systemName: state.isConfigured
-                              ? "checkmark.circle.fill" : "xmark.circle")
-                            .foregroundStyle(state.isConfigured ? Color.green : Color.orange)
-                        Text("\(state.environment.displayName)："
-                             + (state.isConfigured ? "已配置" : "未配置"))
+                    Label(state.environment.displayName + (state.isConfigured ? "：已配置" : "：未配置"),
+                          systemImage: state.isConfigured ? "checkmark.circle" : "exclamationmark.circle")
+                        .foregroundStyle(state.isConfigured ? Color.secondary : Color.orange)
+                }
+                Button("导入当前环境凭证…") { model.importCredentialFile() }
+                    .disabled(model.isRunning || model.isSyncing)
+                DisclosureGroup("连接配置") {
+                    ForEach(model.diagnosis, id: \.self) {
+                        Text($0).font(.caption).foregroundStyle(.orange)
                     }
-                }
-                Button("导入 \(model.targetEnvironment.displayName) 凭证 JSON…") {
-                    model.importCredentialFile()
-                }
-                if let summary = model.credentialSummary {
-                    if let parseError = summary.parseError {
-                        opsMarkdown("⚠️ 凭证文件读不出来：\(parseError)")
-                            .font(.caption)
-                            .foregroundStyle(.red)
-                    } else {
-                        Text(summary.displayText)
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                        if summary.declaredEnvironmentMatches == false {
-                            opsMarkdown("⚠️ 这份凭证声明的是 "
-                                        + "\(summary.declaredEnvironment ?? "（未知）")，"
-                                        + "与当前环境 \(model.targetEnvironment.rawValue) 不符，"
-                                        + "混用只会 401。")
-                                .font(.caption)
-                                .foregroundStyle(.red)
-                        }
-                    }
-                }
-                opsMarkdown(model.credentialGuidance)
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-            }
-
-            Section("与远端双向同步") {
-                // 2026-10-07 用户需求：远端有本地没有的 → 拉下来；本地有远端没有的 → 传上去。
-                // 这里负责「拉下来」的**两个半步**：目录（实体）与图片字节分开走 ——
-                // 目录是一个 gzip 分片（一次下载、摘要自证），图片是几百个独立资产
-                // （任何一个都可能单独失败），捆在一起会让「一张图失败」毁掉整份目录。
-                //
-                // 独立字段编辑自动合并；双方都改同一字段时先预览，再明确选择来源。
-                // （「移除本地独有条目」这一档已废弃：真连实测线上只有 7 个商品、
-                // 本地 270 个，按远端对齐等于删掉 263 个 —— 那不是同步，是覆盖。）
-                HStack(spacing: 10) {
-                    Button("① 拉回线上目录") { Task { await pullOnline() } }
-                        .disabled((model.isRunning || model.isSyncing) || holder.workspace == nil)
-                    if let pulled = model.pulledCatalog {
-                        Text(pulled.summaryText)
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(2)
-                    } else {
-                        Text("只读：不写线上任何东西。")
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                if let mergeReport {
-                    opsMarkdown("合并结果：\(mergeReport.summaryText)")
-                        .font(.caption)
-                        .textSelection(.enabled)
-                        .fixedSize(horizontal: false, vertical: true)
-                    Button("② 按上面的结果合并到本地…") { showsAlignConfirm = true }
-                        .disabled(holder.workspace == nil || model.isRunning || model.isSyncing)
-                }
-                if let alignMessage {
-                    opsMarkdown(alignMessage)
-                        .font(.caption)
-                        .foregroundStyle(alignFailed ? .red : .secondary)
-                        .textSelection(.enabled)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-
-                Divider()
-                // 「上传」那一档 = 主窗口工具栏的「云端更新」（本地整包发布上去）。
-                // 这里只补「下载」那一档的图片字节 —— 缺了它，合并进来的远端条目
-                // 在本机预览里就是一堆「远端」标记，看不出图长什么样。
-                HStack(spacing: 10) {
-                    Button(pendingDownloadCount > 0
-                           ? "③ 下载远端图片（\(pendingDownloadCount) 张）"
-                           : "③ 下载远端图片") {
-                        Task { await downloadRemoteImages() }
-                    }
-                    .disabled((model.isRunning || model.isSyncing) || holder.workspace == nil
-                              || pendingDownloadCount == 0)
-                    Text(pendingDownloadCount > 0
-                         ? "把这些图的字节下到本机，预览里就能看见（不改目录内容）。"
-                         : "本机已经有了目录里引用的全部远端图片。")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                }
-                if let downloadMessage {
-                    opsMarkdown(downloadMessage)
-                        .font(.caption)
-                        .foregroundStyle(downloadFailed ? .red : .secondary)
-                        .textSelection(.enabled)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                opsMarkdown("本地独有的条目**不会**被删除：下一次「云端更新」会把它们传上去；"
-                     + "远端有本地没有的，靠上面三步补下来。")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-            }
-            Section("从 iOS 恢复（导入整包）") {
-                // 「误操作覆盖了 Mac 上的内容」就用这两个入口恢复。
-                // 图片**按原文件名**进 staging（引用名是交接方给的名字，
-                // 改成哈希名会让目录里的 local: 引用全部悬空）。
-                HStack(spacing: 10) {
-                    Button("整包目录（含图片）…") { chooseAndImport(kind: .bundle) }
-                    Button("仅 JSON（不含图片）…") { chooseAndImport(kind: .jsonOnly) }
-                }
-                Text("压缩包先在访达里双击解开，再选解开出来的那个目录"
-                     + "（里面有 shop-catalog.json 和 images/）；只拿到 JSON 时选第二个。")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                // 破坏性动作必须写明：这正是「恢复」的语义，但同时会顶掉当前草稿。
-                Text("导入会用这份内容**替换**当前草稿 —— 这就是「恢复被覆盖的内容」。")
-                    .font(.caption2)
-                    .foregroundStyle(.orange)
-                if let importMessage {
-                    opsMarkdown(importMessage)
-                        .font(.caption)
-                        .foregroundStyle(importFailed ? .red : .secondary)
-                        .textSelection(.enabled)
-                        .fixedSize(horizontal: false, vertical: true)
+                    LabeledContent("仓库", value: model.settings.repoRootPath ?? "未授权")
+                    Button("选择仓库目录…") { model.chooseRepoRoot() }
+                    Text(model.interpreterText).font(.caption).foregroundStyle(.secondary)
                 }
             }
-            Section("数据修复（发布前的悬空引用）") {
-                // 「发布前校验未通过（N 条）」里若含「销售记录 X 引用了不存在的商品 Y」，
-                // 用这里清。这类记录挂不到任何商品上，客户端也显示不出来。
-                // ⚠️ 门禁是跨端口径（iOS / Python 共用），不放宽它，只清数据。
-                // ⚠️ 清理是**不可撤销**的删除 → 设置按钮与主窗口弹窗的快捷入口
-                //    都必须过同一个二级确认框，不允许一键直达。
-                HStack(spacing: 10) {
-                    Button(dangling > 0
-                           ? "清理悬空销售记录（\(dangling) 条）"
-                           : "清理悬空销售记录") {
-                        showsRepairConfirm = true
+            Section {
+                DisclosureGroup("导入与数据修复") {
+                    HStack {
+                        Button("导入整包…") { chooseAndImport(kind: .bundle) }
+                        Button("导入 JSON…") { chooseAndImport(kind: .jsonOnly) }
                     }
-                    .disabled(dangling == 0 || holder.workspace == nil)
-                    Text(dangling > 0
-                         ? "当前有 \(dangling) 条销售记录指向不存在的商品，一律会被门禁拦下。"
-                         : "当前没有悬空销售记录。")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                }
-                HStack(spacing: 10) {
-                    Button("补齐缺失图片…") { chooseAndRepairImages() }
-                        .disabled(missingCount == 0 || holder.workspace == nil || model.isRunning || model.isSyncing)
+                    Text("导入会替换当前草稿。整包需先解压，再选择包含 shop-catalog.json 与 images 的目录。")
+                        .font(.caption).foregroundStyle(.secondary)
+                    if let importMessage {
+                        Text(importMessage).foregroundStyle(importFailed ? Color.red : Color.secondary)
+                    }
+                    Divider()
+                    Button("补齐本机缺失图片…") { chooseAndRepairImages() }
+                        .disabled(missingCount == 0 || holder.workspace == nil)
                     Button("导出缺图清单…") { exportMissingImages() }
                         .disabled(missingCount == 0 || holder.workspace == nil)
-                    Text(missingCount > 0
-                         ? "当前有 \(missingCount) 个图片文件在本机找不到（每条引用都算一个阻断项）。"
-                         : "本机不缺图片文件。")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                }
-                Text("选择原 iOS 整包解压目录或 images 文件夹，按原文件名补图；当前草稿和已有图片保留。补齐后再次点击「云端更新」。")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                // 拼接结果 = 变量式的 String，必须过 opsMarkdown（`Text(拼接)` 不解析 Markdown）
-                opsMarkdown("清理会**删除**这些销售记录（不可撤销），但它们的商品在目录里已不存在，"
-                     + "本来也无从归属。整包重新导入会把它们带回来，需要再清一次。")
-                    .font(.caption2)
-                    .foregroundStyle(.orange)
-                if let repairMessage {
-                    opsMarkdown(repairMessage)
-                        .font(.caption)
-                        .foregroundStyle(repairFailed ? .red : .secondary)
-                        .textSelection(.enabled)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
-            if let report = model.syncReport,
-               report.draftID == holder.workspace?.draft?.id,
-               report.environment == model.targetEnvironment.rawValue {
-                Section("最近同步的分步结果") {
-                    OpsSyncProgressView(report: report)
-                }
-            }
-            Section("日志（排查入口）") {
-                HStack(spacing: 10) {
-                    Button("打开最近一次日志") { model.revealLogFile() }
-                        .disabled(model.logFileURL == nil)
-                    Button("打开日志文件夹") { model.revealLogsFolder() }
-                }
-                Text("每次「云端更新 / 发布」的完整输出都落在 "
-                     + "`bridge/logs/<runID>.log`（latest.log 是最近一次的副本）。"
-                     + "失败时把这份文件交给 Agent 即可定位。")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
+                    Button("清理悬空销售记录…") { showsRepairConfirm = true }
+                        .disabled((holder.workspace?.danglingSaleEventCount ?? 0) == 0)
+                    if let repairMessage {
+                        Text(repairMessage).foregroundStyle(repairFailed ? Color.red : Color.secondary)
+                    }
+                }.disabled(model.isRunning || model.isSyncing)
             }
         }
         .formStyle(.grouped)
-        .frame(width: 560, height: 720)
-        // 两个计数只在这里算一次：都要遍历全量引用，渲染期跑不划算
+        .frame(width: 620, height: 580)
         .task { refreshCounters() }
-        // 主窗口失败悬浮框的「数据修复」快捷入口落在这里：
-        // 收到一次性指令 → 弹同一个二级确认框（指令用完即清，不残留）。
-        .onReceive(OpsSettingsFocus.shared.$repairPromptRequested) { requested in
-            guard requested else { return }
-            OpsSettingsFocus.shared.repairPromptRequested = false
-            if holder.workspace?.danglingSaleEventCount ?? 0 > 0 {
-                showsRepairConfirm = true
-            } else {
-                repairFailed = false
-                repairMessage = "当前没有悬空销售记录，无需清理。"
-            }
-        }
-        .confirmationDialog(
-            "合并线上目录到本地", isPresented: $showsAlignConfirm, titleVisibility: .visible
-        ) {
-            if (mergeReport?.conflicts.count ?? 0) > 0 {
-                Button("合并并保留本地冲突字段（按删除标记移除 \(removedCount) 条）") {
-                    applyAlignment(preferLocalOnConflict: true)
-                }
-            }
-            Button((mergeReport?.conflicts.count ?? 0) > 0
-                   ? "确认合并（\(mergeReport?.conflicts.count ?? 0) 个冲突字段采用远端，移除 \(removedCount) 条）"
-                   : removedCount > 0
-                   ? "确认合并并移除 \(removedCount) 条本地条目"
-                   : "确认合并（补远端有的，保留本地独有的）", role: .destructive) {
-                applyAlignment()
+        .onChange(of: holder.workspace?.currentRevision) { _, _ in refreshCounters() }
+        .confirmationDialog("清理悬空销售记录", isPresented: $showsRepairConfirm, titleVisibility: .visible) {
+            Button("删除 \(holder.workspace?.danglingSaleEventCount ?? 0) 条记录", role: .destructive) {
+                repairDangling()
             }
             Button("取消", role: .cancel) {}
         } message: {
-            Text("本地单独编辑的字段保留，远端单独编辑的字段补入。冲突字段由你选择保留本地或采用远端；显式删除标记优先。")
+            Text("这些记录引用的商品已不存在。删除后无法撤销。")
         }
     }
 
-    // MARK: 与远端双向同步（拉回 → 合并 → 下载图片字节）
-
-    /// 两个「要不要给按钮」的计数。合并 / 下载之后都要重算 ——
-    /// 否则「下载」按钮在下载完之后还写着「有 N 张要下载」，看着像没生效。
     private func refreshCounters() {
-        let workspace = holder.workspace
-        missingCount = workspace?.missingStagedImages().count ?? 0
-        pendingDownloadCount = workspace?.remoteMediaHashesMissingLocally().count ?? 0
-    }
-
-    /// 拉回线上目录并立刻出**合并预览**（不写任何东西）。
-    private func pullOnline() async {
-        guard let workspace = holder.workspace else {
-            alignFailed = true
-            alignMessage = "还没有可对齐的工作区：请先打开主窗口（草稿库在主窗口里建）。"
-            return
-        }
-        alignMessage = nil
-        mergeReport = nil
-        guard let pulled = await model.pullCatalog() else {
-            alignFailed = true
-            alignMessage = model.lastError ?? "拉回失败（受控发布器没有返回目录）。"
-            return
-        }
-        let url = URL(fileURLWithPath: pulled.path)
-        guard let report = workspace.mergePreview(from: url, environment: pulled.environment) else {
-            alignFailed = true
-            alignMessage = workspace.lastError ?? "合并预览失败（读不出线上那份目录）。"
-            return
-        }
-        mergeReport = report
-        mergePreviewRevision = workspace.currentRevision
-        mergePreviewPath = pulled.path
-        mergePreviewDraftID = workspace.draft?.id
-        alignFailed = false
-        alignMessage = "已拉回线上目录（\(pulled.summaryText)）。下面是合并会发生的改动 —— "
-            + "本地独有的条目会**保留**，不会被删除。"
-    }
-
-    /// 真正执行合并（二级确认之后）。基线记为线上那一版，
-    /// 否则下一次差分会把整份目录都算成「本次改动」，严格策略作用域被放大。
-    private func applyAlignment(preferLocalOnConflict: Bool = false) {
-        guard let workspace = holder.workspace,
-              let pulled = model.pulledCatalog,
-              pulled.environment == model.targetEnvironment.rawValue else {
-            alignFailed = true
-            alignMessage = "缺少可对齐的输入（线上目录或发布头）。请先「拉回线上目录」。"
-            return
-        }
-        guard workspace.currentRevision == mergePreviewRevision,
-              pulled.path == mergePreviewPath,
-              workspace.draft?.id == mergePreviewDraftID else {
-            alignFailed = true
-            alignMessage = "预览后草稿或远端输入已改变，请重新拉回并预览，避免覆盖未确认的编辑。"
-            return
-        }
-        let baseline = ShopCatalogBaseline(
-            releaseSeq: pulled.releaseSeq,
-            rootIndexHash: pulled.rootIndexHash,
-            environment: pulled.environment,
-            observedAt: pulled.pulledAt)
-        let url = URL(fileURLWithPath: pulled.path)
-        if let report = workspace.mergeRemoteIntoLocal(from: url, baseline: baseline,
-                                                       preferLocalOnConflict: preferLocalOnConflict) {
-            alignFailed = false
-            alignMessage = (workspace.statusText ?? "已与远端合并：\(report.summaryText)")
-                + " 之后「云端更新」会把本地独有的内容传上去。"
-            mergeReport = nil
-            // 合并可能带进来新的远端条目 → 要下载的张数变了
-            refreshCounters()
-        } else {
-            alignFailed = true
-            alignMessage = workspace.lastError ?? "合并失败（未说明原因）。"
-        }
-    }
-
-    /// 下载「引用到了、但本机还没有字节」的那批远端图片。
-    ///
-    /// 两段式：**先**下载到 App 容器的作业目录（受控发布器的产物），
-    /// **再**由工作区收进 staging。为什么不一步到位让桥接器直接写 staging：
-    /// 桥接器只认请求里的 `outputDirectory`，而 staging 的路径属于草稿状态
-    /// （换草稿就换目录）—— 让子进程去写「当前草稿的目录」等于把草稿状态
-    /// 泄漏进协议。中间目录是桥接器的产物，收不收进 staging 由 App 决定。
-    private func downloadRemoteImages() async {
-        guard let workspace = holder.workspace else {
-            downloadFailed = true
-            downloadMessage = "还没有可同步的工作区：请先打开主窗口（草稿库在主窗口里建）。"
-            return
-        }
-        downloadMessage = nil
-        let draftID = workspace.draft?.id
-        let hashes = workspace.remoteMediaHashesMissingLocally()
-        guard !hashes.isEmpty else {
-            downloadFailed = false
-            downloadMessage = "本机已经有了目录里引用的全部远端图片，无需下载。"
-            return
-        }
-        guard let fetched = await model.fetchMedia(hashes: hashes) else {
-            downloadFailed = true
-            downloadMessage = model.lastError ?? "下载失败（受控发布器没有返回结果）。"
-            return
-        }
-        guard workspace.draft?.id == draftID,
-              fetched.environment == model.targetEnvironment.rawValue else {
-            downloadFailed = true
-            downloadMessage = "下载期间草稿或环境已切换，请在目标草稿重新下载。"
-            return
-        }
-        let added = workspace.absorbDownloadedMedia(from: fetched.directoryURL)
-        refreshCounters()
-        if let error = workspace.lastError {
-            downloadFailed = true
-            downloadMessage = error
-            return
-        }
-        if fetched.hasAnomalies {
-            downloadFailed = true
-            downloadMessage = (workspace.statusText ?? fetched.summaryText)
-                + " ⚠️ 有 \(fetched.corrupt.count) 张摘要不符已丢弃、"
-                + "\(fetched.unrecognizedFormat.count) 张认不出格式已跳过、\(fetched.pending.count) 张未完成 —— "
-                + "明细见 \(fetched.directory)/fetch-manifest.json。"
-            return
-        }
-        if added == 0 && fetched.files.isEmpty {
-            downloadFailed = false
-            downloadMessage = fetched.summaryText
-                + "：远端没有这些媒体记录（那一版发布时图就没上传）。清单见日志。"
-            return
-        }
-        downloadFailed = false
-        downloadMessage = (workspace.statusText ?? fetched.summaryText)
-            + (fetched.missing.isEmpty
-               ? ""
-               : " 其中 \(fetched.missing.count) 张远端没有 —— 那几张线上确实不存在。")
+        missingCount = holder.workspace?.missingStagedImages().count ?? 0
     }
 
     private func repairDangling() {
@@ -526,7 +135,7 @@ struct OpsSettingsView: View {
         }
     }
 
-    // MARK: 从 iOS 恢复
+    // 从 iOS 恢复
 
     /// 两种形状：解开后的整包目录（带 images/）与单独的 JSON。
     /// 服务层 `OpsWorkspace.importHandoffPackage(from:)` 两种都认

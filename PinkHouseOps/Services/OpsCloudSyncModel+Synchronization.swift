@@ -9,8 +9,10 @@ extension OpsCloudSyncModel {
         guard let draftID = workspace.draft?.id, !workspace.isCorrupted else {
             return .failed("没有可同步的草稿，或草稿已损坏。")
         }
+        let ownsLog = beginOperationLog("发布到" + targetEnvironment.displayName)
         isSyncing = true
         defer { isSyncing = false }
+
         let environment = targetEnvironment.rawValue
         let generation = syncEnvironmentGeneration
         func stillCurrent() -> Bool {
@@ -21,6 +23,7 @@ extension OpsCloudSyncModel {
         var remote: ShopCatalog?
         var uploadResult: OpsPublishInvocationResult = .failed("尚未上传")
         var mergeFailed: String?
+        var mediaIssues: [OpsSyncIssue] = []
         let final = await OpsSyncWorkflow.run(
             report: OpsSyncReport(draftID: draftID, environment: environment),
             download: {
@@ -41,33 +44,13 @@ extension OpsCloudSyncModel {
                 for directory in OpsDownloadedMediaRecovery.directories(in: self.jobsDirectory, environment: environment) {
                     workspace.absorbDownloadedMedia(from: directory)
                 }
-                let stagedHashes = workspace.stagedMediaKeys
-                let hashes = workspace.referencedRemoteMediaHashes(in: remote)
-                    .filter { !stagedHashes.contains($0) }
-                self.syncReport?.update(.download, state: .running,
-                                        detail: "目录已下载（\(content.summaryText)），正在补齐 \(hashes.count) 张远端图片")
-                guard !hashes.isEmpty else {
-                    return .init(.completed, "目录已下载（\(content.summaryText)）；远端图片本机已齐", logPaths: logs)
-                }
-                guard let fetched = await self.fetchMedia(hashes: hashes), stillCurrent() else {
-                    logs += self.syncLogPaths
-                    return .init(.partial, "目录已下载；图片下载未完成：\(self.lastError ?? "环境或草稿已切换")",
-                                 canContinue: stillCurrent(), issues: [.init(id: "download-network", step: .download,
-                                 owner: "远端图片", message: self.lastError ?? "图片下载未完成")], logPaths: logs)
-                }
-                let added = workspace.absorbDownloadedMedia(from: fetched.directoryURL)
-                logs += self.syncLogPaths
-                var issues = (fetched.missing + fetched.corrupt + fetched.unrecognizedFormat + fetched.pending).map {
-                    OpsSyncIssue(id: "remote-\($0)", step: .download, owner: "图片 \($0)",
-                                 message: fetched.missing.contains($0) ? "远端媒体记录不存在，需要回源补图" : "下载未完成或字节校验未通过，可核对日志并补缺")
-                }
-                if let error = workspace.lastError {
-                    issues.append(.init(id: "download-staging", step: .download, owner: "本机图片目录", message: error))
-                }
-                return .init(issues.isEmpty ? .completed : .partial,
-                             "目录已下载；本次收进 \(added) 张图片，\(fetched.summaryText)",
-                             issues: issues, logPaths: logs,
-                             progress: fetched.requested > 0 ? Double(fetched.files.count) / Double(fetched.requested) : nil)
+                let recovery = await self.recoverSyncMedia(workspace: workspace, remote: remote!,
+                    environment: environment, stillCurrent: stillCurrent)
+                logs += recovery.logPaths
+                mediaIssues = recovery.issues
+                return .init(mediaIssues.isEmpty ? .completed : .partial,
+                             "目录已下载；" + recovery.detail, canContinue: stillCurrent(),
+                             issues: mediaIssues, logPaths: logs, progress: recovery.progress)
             }, upload: {
                 guard stillCurrent(), let pulled, remote != nil else {
                     return .init(.blocked, "草稿或环境已切换，未尝试上传")
@@ -85,9 +68,9 @@ extension OpsCloudSyncModel {
                     mergeFailed = workspace.lastError ?? "合并预处理保存失败"
                     return .init(.blocked, "合并预处理受阻，尚未尝试上传：\(mergeFailed!)")
                 }
-                let issues = self.uploadIssues(workspace: workspace) + preview.conflicts.map {
+                let issues = mediaIssues + self.uploadIssues(workspace: workspace) + preview.conflicts.map {
                     OpsSyncIssue(id: "conflict-\($0)", step: .upload, owner: $0,
-                                 message: "双方都修改了此字段，暂保留本地值；到设置的合并预览选择来源后再上传")
+                                 message: "双方都修改了此字段，暂保留本地值；请核对双方修改后再发布")
                 }
                 if !issues.isEmpty {
                     return .init(.blocked, "上传前待修复 \(issues.count) 项，尚未发送发布请求；下载内容已保留", issues: issues)
@@ -117,6 +100,9 @@ extension OpsCloudSyncModel {
             })
         syncReport = final
         persistSyncReport(final, workspace: workspace)
+        appendOperationLog(final.steps.map { "\($0.step.title)：\($0.detail)" }.joined(separator: "\n")
+            + "\n" + final.issues.map { "\($0.owner)：\($0.message)" }.joined(separator: "\n"))
+        if ownsLog { finishOperationLog(final.summary) }
         if final.isComplete, case .confirmed = uploadResult { return uploadResult }
         // 系列草稿箱不能因为下载/合并成功就删除待发布任务。
         return .failed(final.summary)
@@ -132,7 +118,7 @@ extension OpsCloudSyncModel {
             let names = workspace.catalog.products.filter { products.contains($0.id) }.map(\.name)
             return OpsSyncIssue(id: "local-\(file.fileName)", step: .upload,
                                 owner: (names + file.owners).joined(separator: " / "),
-                                message: "缺少本机文件 \(file.fileName)，请在设置 → 数据修复 → 补齐缺失图片选择完整图片目录；补齐后再次云端更新",
+                                message: "缺少本机文件 \(file.fileName)，请在设置 → 导入与数据修复补齐图片，再发布",
                                 productIDs: products.sorted())
         }
         let structure = workspace.review(targetEnvironmentName: targetEnvironment.displayName).catalogIssues
@@ -143,7 +129,8 @@ extension OpsCloudSyncModel {
     }
 
     func receiveSyncProgress(_ event: ShopCatalogPublishEvent, mode: OpsBridgeMode) {
-        guard isSyncing, let index = syncReport?.steps.firstIndex(where: { $0.state == .running }) else { return }
+        guard isSyncing, !isPromotingEnvironment,
+              let index = syncReport?.steps.firstIndex(where: { $0.state == .running }) else { return }
         let step = syncReport?.steps[index].step
         guard (step == .download && (mode == .pullCatalog || mode == .fetchMedia))
                 || (step == .upload && mode == .publish) else { return }

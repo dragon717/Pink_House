@@ -18,6 +18,27 @@ from publish_adapters import CredentialError, CloudKitWebServicesAdapter, Creden
 
 
 class SyncTests(unittest.TestCase):
+    def test_baseline_emits_confirmed_result_for_published_and_verified_empty_environment(self):
+        for head in ({"releaseSeq": 21, "rootIndexHash": "a" * 64}, None):
+            output = io.StringIO()
+            with patch.object(bridge, 'read_head', return_value=head), contextlib.redirect_stdout(output):
+                code = bridge.run_baseline({"targetEnvironment": "development"}, True)
+            events = [json.loads(line) for line in output.getvalue().splitlines()]
+            self.assertEqual(code, 0)
+            self.assertEqual(events[-1]['type'], 'result')
+            self.assertEqual(events[-1]['outcome'], 'confirmed')
+            baseline = next(event for event in events if event['type'] == 'baseline')
+            self.assertEqual(baseline['releaseSeq'], 21 if head else 0)
+
+    def test_failed_baseline_read_never_emits_success(self):
+        output = io.StringIO()
+        with patch.object(bridge, 'read_head', side_effect=CredentialError('HTTP 401')), contextlib.redirect_stdout(output):
+            code = bridge.run_baseline({"targetEnvironment": "production"}, True)
+        events = [json.loads(line) for line in output.getvalue().splitlines()]
+        self.assertEqual(code, bridge.EXIT_REFUSED)
+        self.assertEqual(events[-1]['outcome'], 'refused')
+        self.assertFalse(any(event['type'] == 'baseline' for event in events))
+
     def test_empty_parent_lists_still_reject_orphans_but_keep_deleted_history(self):
         product = {"id": "p", "shopID": "s", "seriesID": "se", "name": "粉色 OP"}
         issues = validate_shop_catalog({"products": [product]}, "brand", "complete")

@@ -766,6 +766,8 @@ def run_baseline(request: Dict[str, Any], quiet: bool) -> int:
         return EXIT_REFUSED
     stage("baseline", "succeeded")
     emit(head_payload(request, head))
+    # 调用端以 result 判断只读任务是否完成，不能只有退出码与 baseline。
+    emit(outcome_result("confirmed", EXIT_OK, "已读取目标环境发布头。", head))
     return EXIT_OK
 
 
@@ -1527,6 +1529,16 @@ def run_publish(request: Dict[str, Any], quiet: bool) -> int:
             "请按上面的日志修产物后重试。".format(build_code),
         ))
         return EXIT_VALIDATION
+    if request.get("preserveTargetPartitions") is True:
+        try:
+            from preserve_target_partitions import preserve_target_partitions
+            reader = make_adapter(name, ck_environment(request), False, False, None)
+            preserve_target_partitions(output_directory, reader, head)
+        except (ProtocolError, CredentialError, OSError, ValueError, KeyError) as error:
+            stage("build", "failed")
+            emit(outcome_result("refused", EXIT_VALIDATION,
+                                "保留线上已有内容失败，未发布：{}".format(error)))
+            return EXIT_VALIDATION
     release = load_release_artifact(output_directory)
     stage("build", "succeeded")
     emit({

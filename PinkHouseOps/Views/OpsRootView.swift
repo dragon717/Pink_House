@@ -100,6 +100,7 @@ struct OpsMainView: View {
     /// 云端同步面板是**单例**驱动：工具栏与向导 S5 打开的是同一份状态，
     /// 否则两处会各记一份「线上基线」，又变成两处真相。
     @StateObject private var cloudSync = OpsCloudSyncModel.shared
+    @ObservedObject private var dataSync = OpsDataSyncModel.shared
 
     /// 当前分区。默认「系列上新」；快照 harness 需要从别的分区起手
     /// （见 `OpsSnapshotHarness`），所以留了一个显式入口，
@@ -135,118 +136,23 @@ struct OpsMainView: View {
             }
         }
         .frame(minWidth: 980, minHeight: 620)
-        .overlay(alignment: .top) {
-            if let toast = updateToast {
-                OpsUpdateToastView(toast: toast, onDismiss: { updateToast = nil },
-                                   onExportMissing: exportMissingImages)
-            }
-        }
-        .onAppear {
-            workspace.resumeCatalogEditorSync()
-            if cloudSync.isSyncing { OpsSyncProgressWindowController.shared.syncDidStart() }
-        }
+        .onAppear { workspace.resumeCatalogEditorSync() }
         .onChange(of: workspace.draft?.id) { _, _ in
             workspace.catalogEditSyncMessage = nil
             workspace.resumeCatalogEditorSync()
         }
         .onChange(of: cloudSync.targetEnvironment) { _, _ in workspace.resumeCatalogEditorSync() }
         .onChange(of: cloudSync.isRunning) { _, running in
-            if !running { workspace.resumeCatalogEditorSync() }
+            if !running, !dataSync.isRunning { workspace.resumeCatalogEditorSync() }
         }
         .onChange(of: cloudSync.isSyncing) { _, running in
-            if running {
-                updateToast = nil
-                OpsSyncProgressWindowController.shared.syncDidStart()
-            }
-            else { workspace.resumeCatalogEditorSync() }
+            if !running, !dataSync.isRunning { workspace.resumeCatalogEditorSync() }
         }
         .toolbar {
-            // 一键执行下载、上传、合并落盘，逐步展示结果与待修复数据。
             ToolbarItem(placement: .primaryAction) {
-                Button {
-                    if cloudSync.isRunning || cloudSync.isSyncing {
-                        OpsSyncProgressWindowController.shared.showProgress()
-                    } else { updateCloudNow() }
-                } label: {
-                    if cloudSync.isRunning || cloudSync.isSyncing {
-                        HStack(spacing: 6) {
-                            ProgressView().controlSize(.small)
-                            Text("同步中")
-                        }
-                    } else {
-                        Label("云端更新", systemImage: "arrow.triangle.2.circlepath.circle")
-                    }
-                }
-                .disabled(workspace.isCorrupted && !cloudSync.isRunning && !cloudSync.isSyncing)
-                .help(cloudSync.isRunning || cloudSync.isSyncing
-                      ? "后台同步中，点击查看进度"
-                      : "下载平台内容、上传本地变更、合并保存（环境与凭证在设置里配置）")
+                SettingsLink { Label("数据同步", systemImage: "arrow.triangle.2.circlepath") }
+                    .help("拉取开发环境、拉取线上环境或迁移到线上")
             }
-            if cloudSync.syncReport != nil, !cloudSync.isRunning, !cloudSync.isSyncing {
-                ToolbarItem(placement: .primaryAction) {
-                    Button {
-                        OpsSyncProgressWindowController.shared.showProgress()
-                    } label: {
-                        Label("查看同步结果", systemImage: "clock.arrow.circlepath")
-                    }
-                    .help("查看最近一次同步的步骤、问题与日志")
-                }
-            }
-        }
-    }
-
-    // MARK: 云端更新（一键）+ 悬浮框
-
-    @State private var updateToast: OpsCloudUpdateToast?
-    @State private var isUpdatingCloud = false
-
-    private func updateCloudNow() {
-        guard !isUpdatingCloud else { return }
-        isUpdatingCloud = true
-        updateToast = nil
-        OpsSyncProgressWindowController.shared.showProgress()
-        Task { @MainActor in
-            let result = await cloudSync.publishNow(workspace: workspace)
-            isUpdatingCloud = false
-            if cloudSync.syncReport?.draftID == workspace.draft?.id,
-               cloudSync.syncReport?.environment == cloudSync.targetEnvironment.rawValue {
-                return
-            }
-            switch result {
-            case .confirmed(let seq):
-                updateToast = OpsCloudUpdateToast(
-                    success: true,
-                    title: "云端更新完成",
-                    detail: "线上已是 releaseSeq \(seq)。",
-                    logPath: cloudSync.lastRunLogURL?.path)
-            case .failed(let reason):
-                updateToast = OpsCloudUpdateToast(
-                    success: false,
-                    title: cloudSync.syncReport?.title ?? "同步未完成",
-                    detail: reason,
-                    logPath: cloudSync.lastRunLogURL?.path,
-                    // 校验失败里若含悬空销售记录，直接给一键修复入口
-                    canRepairDangling: workspace.danglingSaleEventCount > 0,
-                    missingImageCount: workspace.missingStagedImages().count)
-            }
-            scheduleToastDismiss()
-        }
-    }
-
-    /// 导出缺图清单（设置页用的是同一份 `OpsMissingImagesExport`）。
-    /// 结果直接追加到当前这条失败悬浮框上 —— 反馈通道只有这一条，不另开弹窗。
-    private func exportMissingImages() {
-        if let message = OpsMissingImagesExport.save(from: workspace) {
-            updateToast?.detail = (updateToast?.detail ?? "") + "  · " + message
-        }
-    }
-
-    /// 悬浮框 15 秒后自己消失（失败的留着手动关，防止没人看到就没了）。
-    private func scheduleToastDismiss() {
-        guard updateToast?.success == true else { return }
-        Task { @MainActor in
-            try? await Task.sleep(nanoseconds: 15_000_000_000)
-            if updateToast?.success == true { updateToast = nil }
         }
     }
 
@@ -477,97 +383,5 @@ struct RawDataDocument: FileDocument {
 
     func fileWrapper(configuration: WriteConfiguration) throws -> FileWrapper {
         FileWrapper(regularFileWithContents: data)
-    }
-}
-
-// MARK: - 云端更新悬浮框（2026-10-07）
-
-/// 一次「云端更新」的结果（工具栏一键按钮的反馈）。
-struct OpsCloudUpdateToast: Equatable {
-    var success: Bool
-    var title: String
-    var detail: String?
-    /// 本次运行的日志文件路径（失败时这是排查入口，直接链过去）
-    var logPath: String?
-    /// 失败原因里有「悬空引用」可清时显示「数据修复」快捷入口
-    /// （一键打开设置并自动弹清理确认框）。
-    var canRepairDangling: Bool = false
-    /// 失败原因里有「缺图」时显示「缺图清单」入口（缺图修不了，只能补 ——
-    /// 至少给一份完整名单，别让人对着 284 这个数字干瞪眼）。
-    var missingImageCount: Int = 0
-}
-
-/// 顶部悬浮的结果框：**一条**，新的更新会整体替换。
-/// 成功自动消失；失败常驻直到手动关闭 —— 「失败了」不许没人看见。
-struct OpsUpdateToastView: View {
-    let toast: OpsCloudUpdateToast
-    let onDismiss: () -> Void
-    /// 导出缺图清单（失败原因里缺图条数 > 0 时才出现）
-    let onExportMissing: () -> Void
-
-    var body: some View {
-        HStack(alignment: .top, spacing: 10) {
-            Image(systemName: toast.success ? "checkmark.circle.fill" : "xmark.circle.fill")
-                .foregroundStyle(toast.success ? Color.green : Color.red)
-            VStack(alignment: .leading, spacing: 3) {
-                Text(toast.title)
-                    .font(.callout.weight(.semibold))
-                if let detail = toast.detail {
-                    // 变量文案过 opsMarkdown：`Text(变量)` 不解析 Markdown
-                    opsMarkdown(detail)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .textSelection(.enabled)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                HStack(spacing: 10) {
-                    if let logPath = toast.logPath {
-                        Button("打开日志") {
-                            NSWorkspace.shared.activateFileViewerSelecting(
-                                [URL(fileURLWithPath: logPath)])
-                        }
-                        .controlSize(.small)
-                    }
-                    // 缺图**修不了**（图不在这台机器上），但完整名单能给 ——
-                    // 门禁日志只显示前几条，运营得拿着名单去 iOS 端 / 图源核对。
-                    if toast.missingImageCount > 0 {
-                        Button("缺图清单（\(toast.missingImageCount)）") {
-                            onExportMissing()
-                        }
-                        .controlSize(.small)
-                    }
-                    // 一键数据修复：`SettingsLink` 开设置窗口，同时置一次性指令，
-                    // 设置场景收到后自动弹清理的二级确认框（两级都要用户亲手点）。
-                    if toast.canRepairDangling {
-                        SettingsLink {
-                            Label("数据修复", systemImage: "wrench.and.screwdriver")
-                        }
-                        .buttonStyle(.bordered)
-                        .controlSize(.small)
-                        .simultaneousGesture(TapGesture().onEnded {
-                            OpsSettingsFocus.shared.repairPromptRequested = true
-                        })
-                    }
-                }
-                .padding(.top, 2)
-            }
-            Spacer(minLength: 8)
-            Button {
-                onDismiss()
-            } label: {
-                Image(systemName: "xmark.circle.fill")
-                    .foregroundStyle(.secondary)
-            }
-            .buttonStyle(.plain)
-        }
-        .padding(12)
-        .frame(maxWidth: 560, alignment: .leading)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .strokeBorder(OpsFlowPalette.cardBorder, lineWidth: 1))
-        .shadow(color: .black.opacity(0.12), radius: 10, y: 4)
-        .padding(.horizontal, 24)
-        .padding(.top, 10)
     }
 }

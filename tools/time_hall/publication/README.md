@@ -586,3 +586,7 @@ python3 publish_cloudkit.py --release <新产物> --adapter cloudkit --environme
 ## 运营存量币种修复
 
 `repair_operator_currencies.py` 在用户确认运营未明确币种为人民币后，读取并冻结完整当前发布，仅补填币种，再复用现有发布器条件发布新版本；默认不写云端。回归入口 `selftest_operator_currencies.py`。规则、命令与真实验收见 `docs/SHOP_CATALOG_OPERATOR_CURRENCY_REPAIR_2026-10-11.md`。不要把通用 JSON 缺币种解码改成 CNY，也不要把明确的日元价格数字改标人民币。
+
+## 开发环境增量同步到线上
+
+Mac 设置「数据同步」只保留「拉取开发环境」「拉取线上环境」「开发环境 → 线上环境」三个入口，每轮合并输出为一份日志。迁移复用原桥接模式，按稳定 ID 合并两份已发布商店目录，保留线上独有内容及墓碑。冻结发布请求带 `preserveTargetPartitions: true`，构建后经 `preserve_target_partitions.py` 保留线上其他分片、撤回记录与版本门槛，验摘要及完整复校验后交原发布器。离线回归 `selftest_environment_promotion.py`；使用、实现、构建与验收见 [增量同步说明](../../../docs/SHOP_CATALOG_ENVIRONMENT_PROMOTION_2026-10-11.md)。
