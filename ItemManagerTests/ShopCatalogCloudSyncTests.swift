@@ -324,9 +324,10 @@ final class ShopCatalogCloudSyncTests: XCTestCase {
         ShopCatalogPackCache.saveControl(control)
         XCTAssertEqual(ShopCatalogPackCache.loadControl(), control)
 
-        // 下载判定：同序号同摘要 → 不下；序号或摘要任一变化 → 下
+        // 下载判定：正文摘要相同就复用包；摘要变化才下载。
         XCTAssertFalse(ShopCatalogPackCache.needsDownload(releaseSeq: 7, payloadHash: hash, control: control))
-        XCTAssertTrue(ShopCatalogPackCache.needsDownload(releaseSeq: 8, payloadHash: hash, control: control))
+        XCTAssertFalse(ShopCatalogPackCache.needsDownload(releaseSeq: 8, payloadHash: hash, control: control),
+                       "发布号变化而商店正文不变时复用包")
         XCTAssertTrue(ShopCatalogPackCache.needsDownload(releaseSeq: 7, payloadHash: String(hash.reversed()), control: control))
 
         // 清理：包删除 + installedPayloadHash 置空，但 installedReleaseSeq 保留
@@ -455,9 +456,10 @@ final class ShopCatalogCloudSyncTests: XCTestCase {
 
     /// 记录「发布头被取了几次」的 stub：用来分辨同步到底有没有发起网络请求
     private final class CountingStubReader: ShopCatalogPublicReading, @unchecked Sendable {
-        let header: ShopCatalogReleaseHeader
-        let rootData: Data
-        let pack: Data
+        var header: ShopCatalogReleaseHeader
+        var rootData: Data
+        var pack: Data
+        var error: ShopCatalogSyncError?
         let counter: Counter
 
         init(release: (header: ShopCatalogReleaseHeader, rootData: Data, pack: Data, catalog: ShopCatalog),
@@ -470,6 +472,7 @@ final class ShopCatalogCloudSyncTests: XCTestCase {
 
         func fetchReleaseHeader() async throws -> ShopCatalogReleaseHeader {
             counter.value += 1
+            if let error { throw error }
             return header
         }
         func fetchRootIndex() async throws -> Data { rootData }
@@ -711,9 +714,9 @@ final class ShopCatalogCloudSyncTests: XCTestCase {
         XCTAssertEqual(ShopCatalogPackCache.cachedPackData(payloadHash: control.installedPayloadHash ?? ""),
                        release.pack, "包文件应原子落盘")
 
-        // 节流窗口内第二次检查：零下载，直接 upToDate
+        // 节流窗口内第二次检查不联网，保留最近一次真实检查的结果。
         await service.syncIfNeeded()
-        XCTAssertEqual(service.state, .upToDate(releaseSeq: 7))
+        XCTAssertEqual(service.state, .updated(releaseSeq: 7, recordCount: 5))
     }
 
     func testSyncNothingPublishedIsNormalEmptyState() async {
@@ -816,23 +819,152 @@ final class ShopCatalogCloudSyncTests: XCTestCase {
         withExtendedLifetime(observation) {}
     }
 
-    func testAutomaticForegroundCheckBypassesPageThrottleWithoutRedownloadingUnchangedPack() async throws {
+    func testAutomaticForegroundCheckSharesRecentPageCheckAndChecksAgainAfterOneMinute() async throws {
         let release = try validRelease(seq: 7, catalog: makeRemoteCatalog())
         let counter = Counter()
         let store = ShopCatalogSeedFixture.makeStore()
+        var clock = Date(timeIntervalSince1970: 1_000)
         let service = ShopCatalogCloudSyncService(
-            reader: CountingStubReader(release: release, counter: counter), store: store)
+            reader: CountingStubReader(release: release, counter: counter), store: store, now: { clock })
         await service.syncIfNeeded(force: true)
         await service.syncIfNeeded()
         XCTAssertEqual(counter.value, 1)
         let automatic = ShopCatalogAutoRefresh(
-            refresh: { await service.syncIfNeeded(force: true) },
+            refresh: { await service.syncIfNeeded() },
             installSubscription: {}, sleep: { throw CancellationError() })
         await automatic.runWhileActive()
-        XCTAssertEqual(counter.value, 2, "自动刷新不被页面的 30 分钟节流挡住")
+        XCTAssertEqual(counter.value, 1, "页面和前台触发共用 1 分钟内的检查")
+        clock.addTimeInterval(60)
+        await automatic.runWhileActive()
+        XCTAssertEqual(counter.value, 2, "1 分钟后进入页面或前台自动检查，不等待 30 分钟")
         XCTAssertEqual(counter.packReads, 1, "序号未变的自动检查不重复下载目录包")
         XCTAssertEqual(service.state, .upToDate(releaseSeq: 7))
         XCTAssertEqual(store.shop(id: "shop-alice-girl")?.name, "Alice Girl（云端改名）")
+    }
+
+    func testAutomaticEntryInstallsNewVersionAfterCooldownWithoutManualRefresh() async throws {
+        let first = try validRelease(seq: 7, catalog: ShopCatalogSeedFixture.makeCatalog())
+        let next = try validRelease(seq: 8, catalog: makeRemoteCatalog())
+        let counter = Counter()
+        let reader = CountingStubReader(release: first, counter: counter)
+        let store = ShopCatalogSeedFixture.makeStore()
+        var clock = Date(timeIntervalSince1970: 1_000)
+        let service = ShopCatalogCloudSyncService(reader: reader, store: store, now: { clock })
+        await service.syncIfNeeded()
+        reader.header = next.header; reader.rootData = next.rootData; reader.pack = next.pack
+        clock.addTimeInterval(59)
+        await service.syncIfNeeded()
+        XCTAssertEqual(counter.value, 1)
+        clock.addTimeInterval(1)
+        await service.syncIfNeeded()
+        XCTAssertEqual(counter.value, 2)
+        XCTAssertEqual(store.shop(id: "shop-remote-new")?.name, "云端新店家")
+        XCTAssertEqual(ShopCatalogPackCache.loadControl().installedReleaseSeq, 8)
+    }
+
+    func testNewReleaseWithUnchangedShopPackAdvancesVersionWithoutDownloadingAgain() async throws {
+        let catalog = try makeRemoteCatalog()
+        let first = try validRelease(seq: 7, catalog: catalog)
+        let next = try validRelease(seq: 8, catalog: catalog)
+        let counter = Counter()
+        let reader = CountingStubReader(release: first, counter: counter)
+        let store = ShopCatalogSeedFixture.makeStore()
+        var clock = Date(timeIntervalSince1970: 1_000)
+        let service = ShopCatalogCloudSyncService(reader: reader, store: store, now: { clock })
+        await service.syncIfNeeded()
+        reader.header = next.header; reader.rootData = next.rootData; reader.pack = next.pack
+        clock.addTimeInterval(60)
+        await service.syncIfNeeded()
+        XCTAssertEqual(counter.packReads, 1)
+        XCTAssertEqual(ShopCatalogPackCache.loadControl().installedReleaseSeq, 8)
+        XCTAssertEqual(service.state, .upToDate(releaseSeq: 8))
+    }
+
+    func testReusedPackStillRejectsNewHeaderWithStaleRootIndex() async throws {
+        let release = try validRelease(seq: 7, catalog: makeRemoteCatalog())
+        let counter = Counter()
+        let reader = CountingStubReader(release: release, counter: counter)
+        let store = ShopCatalogSeedFixture.makeStore()
+        let service = ShopCatalogCloudSyncService(reader: reader, store: store)
+        await service.syncIfNeeded(force: true)
+        reader.header.releaseSeq = 8 // 根清单和包仍为原版本，摘要有效但序号矛盾。
+        await service.syncIfNeeded(force: true)
+        XCTAssertTrue(service.state.isFailure)
+        XCTAssertEqual(counter.packReads, 1, "复用缓存校验，无需再次下载")
+        XCTAssertEqual(ShopCatalogPackCache.loadControl().installedReleaseSeq, 7)
+        XCTAssertEqual(store.shop(id: "shop-remote-new")?.name, "云端新店家")
+    }
+
+    func testNewReleaseRedownloadsCorruptedCacheWhileStoreStillHasRemoteCatalog() async throws {
+        let catalog = try makeRemoteCatalog()
+        let first = try validRelease(seq: 7, catalog: catalog)
+        let next = try validRelease(seq: 8, catalog: catalog)
+        let counter = Counter()
+        let reader = CountingStubReader(release: first, counter: counter)
+        let store = ShopCatalogSeedFixture.makeStore()
+        let service = ShopCatalogCloudSyncService(reader: reader, store: store)
+        await service.syncIfNeeded(force: true)
+        try Data("损坏缓存".utf8).write(to: ShopCatalogPackCache.packURL(
+            payloadHash: ShopCatalogSyncProtocol.sha256Hex(first.pack)))
+        reader.header = next.header; reader.rootData = next.rootData; reader.pack = next.pack
+        await service.syncIfNeeded(force: true)
+        XCTAssertFalse(service.state.isFailure)
+        XCTAssertEqual(counter.packReads, 2, "坏缓存重新下载，不能一直复用失败")
+        XCTAssertEqual(ShopCatalogPackCache.loadControl().installedReleaseSeq, 8)
+        XCTAssertEqual(ShopCatalogPackCache.cachedPackData(
+            payloadHash: ShopCatalogSyncProtocol.sha256Hex(next.pack)), next.pack)
+    }
+
+    func testReusedPackStillRejectsNewPartitionRevisionMismatch() async throws {
+        let release = try validRelease(seq: 7, catalog: makeRemoteCatalog())
+        let counter = Counter()
+        let reader = CountingStubReader(release: release, counter: counter)
+        let store = ShopCatalogSeedFixture.makeStore()
+        let service = ShopCatalogCloudSyncService(reader: reader, store: store)
+        await service.syncIfNeeded(force: true)
+        reader.rootData = try rootIndexData(seq: 8, partition: partition(for: release.pack, revision: 4))
+        reader.header = header(seq: 8, rootHash: ShopCatalogSyncProtocol.sha256Hex(reader.rootData))
+        await service.syncIfNeeded(force: true)
+        XCTAssertTrue(service.state.isFailure)
+        XCTAssertEqual(counter.packReads, 1)
+        XCTAssertEqual(ShopCatalogPackCache.loadControl().installedReleaseSeq, 7,
+                       "清单与包契约不符不能推进版本号")
+    }
+
+    func testFailedAutomaticCheckRetainsFailureAndRetriesAfterCooldown() async throws {
+        let release = try validRelease(seq: 7, catalog: makeRemoteCatalog())
+        let counter = Counter()
+        let reader = CountingStubReader(release: release, counter: counter)
+        reader.error = .network("断网")
+        let store = ShopCatalogSeedFixture.makeStore()
+        var clock = Date(timeIntervalSince1970: 1_000)
+        let service = ShopCatalogCloudSyncService(reader: reader, store: store, now: { clock })
+        await service.syncIfNeeded()
+        clock.addTimeInterval(30)
+        await service.syncIfNeeded()
+        XCTAssertEqual(counter.value, 1)
+        XCTAssertEqual(service.state, .failed(ShopCatalogSyncError.network("断网").localizedDescription))
+        XCTAssertNil(ShopCatalogPackCache.loadControl().lastCheckedAt)
+        reader.error = nil
+        clock.addTimeInterval(30)
+        await service.syncIfNeeded()
+        XCTAssertEqual(counter.value, 2)
+        XCTAssertEqual(store.shop(id: "shop-remote-new")?.name, "云端新店家")
+    }
+
+    func testEmptyEnvironmentDoesNotRetryOnEveryPageEntryButForceStillChecks() async throws {
+        let release = try validRelease(seq: 7, catalog: makeRemoteCatalog())
+        let counter = Counter()
+        let reader = CountingStubReader(release: release, counter: counter)
+        reader.error = .recordMissing(recordType: "THRelease", recordName: ShopCatalogSyncProtocol.releaseRecordName)
+        let store = ShopCatalogSeedFixture.makeStore()
+        let service = ShopCatalogCloudSyncService(reader: reader, store: store)
+        await service.syncIfNeeded()
+        await service.syncIfNeeded()
+        XCTAssertEqual(counter.value, 1)
+        XCTAssertEqual(service.state, .nothingPublished)
+        await service.syncIfNeeded(force: true)
+        XCTAssertEqual(counter.value, 2, "手动刷新和发布通知立即检查")
     }
 
     func testAutomaticSyncBeforeFirstPagePreservesSavedLocalOverlay() async throws {

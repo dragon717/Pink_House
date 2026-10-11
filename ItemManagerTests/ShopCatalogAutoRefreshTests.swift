@@ -32,7 +32,7 @@ final class ShopCatalogAutoRefreshTests: XCTestCase {
             }, now: { clock })
         await refresher.runWhileActive()
         XCTAssertEqual(checks, 4, "订阅受阻仍然能自动读取公开商品")
-        XCTAssertEqual(subscriptions, 2, "失败订阅不能每 30 秒重试")
+        XCTAssertEqual(subscriptions, 2, "失败订阅不能在冷却期内重复请求")
     }
 
     func testLeavingForegroundCancelsPolling() async {

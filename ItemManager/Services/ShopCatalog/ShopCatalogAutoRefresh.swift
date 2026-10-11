@@ -36,11 +36,11 @@ enum ShopCatalogReleaseNotifications {
 }
 
 /// 全 App 前台运行，不依赖用户进入商品页。静默推送可能被系统延迟，
-/// 因而前台每 30 秒查一次发布头；回到前台先立即检查，再等待下一轮。
+/// 因而前台每 5 分钟查一次发布头；回到前台先检查，再等待下一轮。
 @MainActor
 final class ShopCatalogAutoRefresh {
     static let shared = ShopCatalogAutoRefresh()
-    static let foregroundInterval: Duration = .seconds(30)
+    static let foregroundInterval: Duration = .seconds(5 * 60)
     // 单测通过注入的实例驱动调度，不让宿主启动时访问真实云端或写测试缓存。
     static var isTestHost: Bool {
         ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
@@ -58,7 +58,7 @@ final class ShopCatalogAutoRefresh {
 
     init(
         refresh: @escaping @MainActor () async -> Void = {
-            await ShopCatalogCloudSyncService.shared.syncIfNeeded(force: true)
+            await ShopCatalogCloudSyncService.shared.syncIfNeeded()
         },
         installSubscription: @escaping @MainActor () async throws -> Void = {
             try await ShopCatalogReleaseNotifications.install()

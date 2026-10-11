@@ -39,6 +39,8 @@ struct ShopCatalogBrowseView: View {
     @ObservedObject private var store = ShopCatalogStore.shared
     /// 尾款阶段同步需要显式传入 context（内部不默认拿生产容器）
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.isRoutePageActive) private var isRoutePageActive
+    @Environment(\.scenePhase) private var scenePhase
     /// 开售提醒深链：通知点击 → TabNavigationManager → 本栈压入商品详情
     @ObservedObject private var tabNav = TabNavigationManager.shared
 
@@ -67,9 +69,10 @@ struct ShopCatalogBrowseView: View {
         .onAppear {
             store.loadFromBundleIfNeeded()
         }
-        .task {
-            // 页面打开时静默检查；全 App 的前台轮询和发布通知由
-            // ShopCatalogAutoRefresh 驱动，不在浏览页面展示同步控件或状态。
+        .task(id: isRoutePageActive && scenePhase == .active) {
+            // 系统 TabView 会缓存页面；明确随路由再次进入和回到前台检查。
+            // 近期检查由服务合并，后台及隐藏页面不从这里发起请求。
+            guard isRoutePageActive, scenePhase == .active, !ShopCatalogAutoRefresh.isTestHost else { return }
             await ShopCatalogCloudSyncService.shared.syncIfNeeded()
             // 2026-09-25 需求二/三：目录更新（或本地已是最新）后，把「尾款中」
             // 系列的尾款窗口同步进用户衣橱条目（幂等；大致时间估算成固定具体日期）。

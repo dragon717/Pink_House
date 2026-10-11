@@ -6,7 +6,7 @@
 //
 //  ## 读取算法（设计文档 §11.2 的商店版收敛）
 //
-//    1. 节流：距上次检查不足 30 分钟直接返回（手动刷新可跳过节流）
+//    1. 节流：自动检查在 1 分钟内合并（手动刷新和发布通知可跳过）
 //    2. 取发布头元数据 → 协议版本不受支持就停（提示更新 App）
 //    3. 序号未变 → 只刷新「已检查」时间，零下载
 //    4. 序号变了 → 取根清单 → 校验 rootIndexHash
@@ -51,11 +51,13 @@ final class ShopCatalogCloudSyncService: ObservableObject {
 
     @Published private(set) var state: State = .idle
 
-    /// 发布头最短自动检查间隔（§11.6 初始值；产品参数，待测量调整）
-    static let minimumCheckInterval: TimeInterval = 30 * 60
+    /// 页面进入与前台检查共用的最短间隔，避免快速切页密集请求。
+    static let minimumCheckInterval: TimeInterval = 60
 
     private let reader: any ShopCatalogPublicReading
     private unowned let store: ShopCatalogStore
+    private let now: () -> Date
+    private var lastAttemptedAt: Date?
 
     /// 是否正在同步（防并发重入：同分片并发请求合并为一项，§11.6）
     private var syncTask: Task<Void, Never>?
@@ -79,16 +81,18 @@ final class ShopCatalogCloudSyncService: ObservableObject {
     /// 首帧访问即崩溃（宿主被杀，表现为「用例 started 却没有 passed」，2026-09-25 实测）。
     init(
         reader: any ShopCatalogPublicReading = ShopCatalogPublicCloudReader(),
-        store: ShopCatalogStore = .shared
+        store: ShopCatalogStore = .shared,
+        now: @escaping () -> Date = Date.init
     ) {
         self.reader = reader
         self.store = store
+        self.now = now
     }
 
     // MARK: 入口
 
     /// 自动检查、发布通知和手动刷新共享同一条安装链路。
-    /// force 可跳过页面检查的 30 分钟节流；同步中收到发布通知必须再检查一次，
+    /// force 可跳过自动检查的 1 分钟节流；同步中收到发布通知必须再检查一次，
     /// 避免当前请求已读到旧发布头时把新发布吞掉。
     func syncIfNeeded(force: Bool = false) async {
         if let running = syncTask {
@@ -110,11 +114,6 @@ final class ShopCatalogCloudSyncService: ObservableObject {
     }
 
     private func syncOnce(force: Bool) async {
-        state = .syncing
-        defer {
-            if state == .syncing { state = .idle }
-        }
-
         // 自动同步可以早于首次打开商品页，须先恢复基底和本机运营覆盖层。
         // 否则远端安装使 catalog 非空，页面的懒加载会跳过未发布的本机编辑。
         store.loadFromBundleIfNeeded()
@@ -135,16 +134,30 @@ final class ShopCatalogCloudSyncService: ObservableObject {
             }
         }
 
-        // 1) 节流：**只有本地确实有远端内容时才允许跳过检查**。
+        // 1) 自动检查合并：失败或空环境也不能因反复切页而密集重试。
+        //    只记本进程的尝试，不把失败持久化成「已检查到最新」。
+        let checkedAt = now()
+        if !force, let lastAttemptedAt {
+            let elapsed = checkedAt.timeIntervalSince(lastAttemptedAt)
+            if elapsed >= 0, elapsed < Self.minimumCheckInterval { return }
+        }
+        //    持久化节流：**只有本地确实有远端内容时才允许跳过检查**。
         //    本地还没有内容（首次启动 / 换环境 / 缓存被清）时不节流 —— 否则
         //    「上一次检查是空的」会把这一次真正有内容的检查一起吞掉。
         if !force, hasRemoteLayer, let lastChecked = control.lastCheckedAt,
-           Date().timeIntervalSince(lastChecked) < Self.minimumCheckInterval {
+           checkedAt >= lastChecked,
+           checkedAt.timeIntervalSince(lastChecked) < Self.minimumCheckInterval {
             state = control.installedReleaseSeq > 0
                 ? .upToDate(releaseSeq: control.installedReleaseSeq)
                 : .idle
-            Self.log("节流命中（\(Int(Self.minimumCheckInterval / 60)) 分钟内且本地已有内容），跳过检查")
+            Self.log("节流命中（1 分钟内且本地已有内容），跳过检查")
             return
+        }
+
+        lastAttemptedAt = checkedAt
+        state = .syncing
+        defer {
+            if state == .syncing { state = .idle }
         }
 
         do {
@@ -165,7 +178,7 @@ final class ShopCatalogCloudSyncService: ObservableObject {
             // 3) 序号未变**且**本地确实有远端层 → 零下载。
             //    序号未变但内存里没有（缓存恢复失败/首次启动）时不能跳过，否则永远装不上。
             guard header.releaseSeq != control.installedReleaseSeq || !hasRemoteLayer else {
-                control.lastCheckedAt = Date()
+                control.lastCheckedAt = now()
                 ShopCatalogPackCache.saveControl(control)
                 state = header.releaseSeq > 0
                     ? .upToDate(releaseSeq: header.releaseSeq)
@@ -190,7 +203,7 @@ final class ShopCatalogCloudSyncService: ObservableObject {
 
             // 5) 商店分片（nil = 这版发布没带商店内容，只推进序号）
             guard let partition = rootIndex.shopCatalogPartition else {
-                control.lastCheckedAt = Date()
+                control.lastCheckedAt = now()
                 control.installedReleaseSeq = header.releaseSeq
                 control.installedPayloadHash = nil
                 ShopCatalogPackCache.saveControl(control)
@@ -202,16 +215,21 @@ final class ShopCatalogCloudSyncService: ObservableObject {
             }
             try ShopCatalogCloudSyncValidator.checkPartitionContract(partition)
 
-            //    内容没变**且**内存里有远端层才跳过下载；
-            //    内存里没有（首次启动 / 缓存恢复失败）时按「需要下载」处理。
-            let needsDownload = !hasRemoteLayer
-                || ShopCatalogPackCache.needsDownload(
-                    releaseSeq: header.releaseSeq, payloadHash: partition.payloadHash, control: control)
-            if !needsDownload {
-                control.lastCheckedAt = Date()
+            //    内容没变且已有远端层时复用缓存，仍与新清单完整互证。
+            //    文件被清、内存没恢复或摘要变化时重新下载。
+            if hasRemoteLayer,
+               !ShopCatalogPackCache.needsDownload(
+                    releaseSeq: header.releaseSeq, payloadHash: partition.payloadHash, control: control),
+               let cached = ShopCatalogPackCache.cachedPackData(payloadHash: partition.payloadHash),
+               ShopCatalogSyncProtocol.sha256Hex(cached) == partition.payloadHash {
+                _ = try ShopCatalogCloudSyncValidator.validatedShopCatalog(
+                    header: header, rootIndexData: rootData, packCompressed: cached)
+                control.installedReleaseSeq = header.releaseSeq
+                control.revocationEpoch = max(control.revocationEpoch, header.revocationEpoch)
+                control.lastCheckedAt = now()
                 ShopCatalogPackCache.saveControl(control)
                 state = .upToDate(releaseSeq: header.releaseSeq)
-                Self.log("分片内容未变且本地已有内容，跳过下载")
+                Self.log("分片内容未变且缓存通过新清单校验，跳过下载")
                 return
             }
             Self.log("开始下载分片 hash=\(partition.payloadHash.prefix(12)) "
@@ -231,7 +249,7 @@ final class ShopCatalogCloudSyncService: ObservableObject {
             control.installedReleaseSeq = header.releaseSeq
             control.installedPayloadHash = partition.payloadHash
             control.revocationEpoch = max(control.revocationEpoch, header.revocationEpoch)
-            control.lastCheckedAt = Date()
+            control.lastCheckedAt = now()
             ShopCatalogPackCache.saveControl(control)
 
             store.installRemoteCatalog(catalog)
@@ -242,7 +260,7 @@ final class ShopCatalogCloudSyncService: ObservableObject {
         } catch let error as ShopCatalogSyncError {
             // 发布头缺失 = 公共库还没有发布过任何内容（正常空态）
             if case .recordMissing(let recordType, _) = error, recordType == "THRelease" {
-                control.lastCheckedAt = Date()
+                control.lastCheckedAt = now()
                 ShopCatalogPackCache.saveControl(control)
                 state = .nothingPublished
                 // 环境提示：Xcode 调试构建读 Development，TestFlight / App Store 读 Production。

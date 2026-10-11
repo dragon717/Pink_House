@@ -147,9 +147,9 @@ nonisolated enum ShopCatalogPackCache {
         try? data.write(to: controlURL, options: .atomic)
     }
 
-    /// 判断某次发布是否需要下载：序号或载荷摘要任一变化都要
-    static func needsDownload(releaseSeq: Int, payloadHash: String, control: ShopCatalogSyncControl) -> Bool {
-        control.installedReleaseSeq != releaseSeq || control.installedPayloadHash != payloadHash
+    /// 发布号变化先查根清单；商店正文摘要相同就复用已校验的包。
+    static func needsDownload(releaseSeq _: Int, payloadHash: String, control: ShopCatalogSyncControl) -> Bool {
+        control.installedPayloadHash != payloadHash
     }
 
     // 运营草稿的来源版本：仅在同步合并或发布成功后推进，普通刷新不能推进它。
