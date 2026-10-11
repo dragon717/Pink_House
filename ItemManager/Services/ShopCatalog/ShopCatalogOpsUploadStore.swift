@@ -26,6 +26,8 @@ import SwiftData
 @MainActor
 final class ShopCatalogOpsUploadStore: ObservableObject {
 
+    nonisolated deinit {}
+
     static let shared = ShopCatalogOpsUploadStore()
 
     /// 任务列表（按更新时间倒序）。SwiftData 的 `@Query` 需要视图环境，
@@ -206,11 +208,13 @@ final class ShopCatalogOpsUploadStore: ObservableObject {
         stage: ShopCatalogUploadStage,
         mimeType: String = "",
         byteCount: Int = 0,
-        releaseSeq: Int = 0
+        releaseSeq: Int = 0,
+        catalogSummary: String = ""
     ) -> ShopCatalogUploadJob? {
         guard let context else { return nil }
         if let existing = task(jobID: jobID) {
             existing.stage = stage
+            if !catalogSummary.isEmpty { existing.catalogSummary = catalogSummary }
             if releaseSeq > 0 { existing.releaseSeq = releaseSeq }
             existing.updatedAt = Date()
             save(context)
@@ -228,6 +232,7 @@ final class ShopCatalogOpsUploadStore: ObservableObject {
             releaseSeq: releaseSeq
         )
         context.insert(created)
+        created.catalogSummary = catalogSummary
         save(context)
         reload()
         return created

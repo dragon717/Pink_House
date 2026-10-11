@@ -904,72 +904,70 @@ def validate_shop_catalog(
     product_ids = set(_shop_ids(doc, "products"))
 
     # 引用完整性：整包发布，被引用实体必须同包可解析（§18.1 D09）
-    if shop_ids:
-        for record in _shop_records(doc, "series"):
-            if str(record.get("shopID", "")) not in shop_ids:
-                issues.append(
-                    _issue(
-                        "series.shopID.dangling",
-                        "系列引用了包内不存在的店家 {}".format(record.get("shopID")),
-                        str(record.get("id", "")),
-                    )
+    for record in _shop_records(doc, "series"):
+        if str(record.get("shopID", "")) not in shop_ids:
+            issues.append(
+                _issue(
+                    "series.shopID.dangling",
+                    "系列引用了包内不存在的店家 {}".format(record.get("shopID")),
+                    str(record.get("id", "")),
                 )
-        for record in _shop_records(doc, "products"):
-            if str(record.get("shopID", "")) not in shop_ids:
-                issues.append(
-                    _issue(
-                        "product.shopID.dangling",
-                        "商品引用了包内不存在的店家 {}".format(record.get("shopID")),
-                        str(record.get("id", "")),
-                    )
+            )
+    for record in _shop_records(doc, "products"):
+        if str(record.get("shopID", "")) not in shop_ids:
+            issues.append(
+                _issue(
+                    "product.shopID.dangling",
+                    "商品引用了包内不存在的店家 {}".format(record.get("shopID")),
+                    str(record.get("id", "")),
                 )
-    if series_ids:
-        for record in _shop_records(doc, "products"):
-            if str(record.get("seriesID", "")) not in series_ids:
-                issues.append(
-                    _issue(
-                        "product.seriesID.dangling",
-                        "商品引用了包内不存在的系列 {}".format(record.get("seriesID")),
-                        str(record.get("id", "")),
-                    )
+            )
+    for record in _shop_records(doc, "products"):
+        if str(record.get("seriesID", "")) not in series_ids:
+            issues.append(
+                _issue(
+                    "product.seriesID.dangling",
+                    "商品引用了包内不存在的系列 {}".format(record.get("seriesID")),
+                    str(record.get("id", "")),
                 )
-        for record in _shop_records(doc, "styleProfiles"):
-            if str(record.get("seriesID", "")) not in series_ids:
-                issues.append(
-                    _issue(
-                        "styleProfile.seriesID.dangling",
-                        "款式档案引用了包内不存在的系列 {}".format(record.get("seriesID")),
-                        str(record.get("id", "")),
-                    )
+            )
+    for record in _shop_records(doc, "styleProfiles"):
+        if str(record.get("seriesID", "")) not in series_ids:
+            issues.append(
+                _issue(
+                    "styleProfile.seriesID.dangling",
+                    "款式档案引用了包内不存在的系列 {}".format(record.get("seriesID")),
+                    str(record.get("id", "")),
                 )
-    if product_ids:
-        for record in _shop_records(doc, "variants"):
-            if str(record.get("productID", "")) not in product_ids:
-                issues.append(
-                    _issue(
-                        "variant.productID.dangling",
-                        "规格引用了包内不存在的商品 {}".format(record.get("productID")),
-                        str(record.get("id", "")),
-                    )
+            )
+    for record in _shop_records(doc, "variants"):
+        if str(record.get("productID", "")) not in product_ids:
+            issues.append(
+                _issue(
+                    "variant.productID.dangling",
+                    "规格引用了包内不存在的商品 {}".format(record.get("productID")),
+                    str(record.get("id", "")),
                 )
-        for record in _shop_records(doc, "saleEvents"):
-            if str(record.get("productID", "")) not in product_ids:
-                issues.append(
-                    _issue(
-                        "saleEvent.productID.dangling",
-                        "销售记录引用了包内不存在的商品 {}".format(record.get("productID")),
-                        str(record.get("id", "")),
-                    )
+            )
+    for record in _shop_records(doc, "saleEvents"):
+        if (str(record.get("productID", "")) not in product_ids
+                and str(record.get("productID", "")) not in set(doc.get("removedProductIDs") or [])):
+            issues.append(
+                _issue(
+                    "saleEvent.productID.dangling",
+                    "销售记录引用了包内不存在的商品 {}".format(record.get("productID")),
+                    str(record.get("id", "")),
                 )
-        for record in _shop_records(doc, "sizeCharts"):
-            if str(record.get("productID", "")) not in product_ids:
-                issues.append(
-                    _issue(
-                        "sizeChart.productID.dangling",
-                        "尺码表引用了包内不存在的商品 {}".format(record.get("productID")),
-                        str(record.get("id", "")),
-                    )
+            )
+    for record in _shop_records(doc, "sizeCharts"):
+        if str(record.get("productID", "")) not in product_ids:
+            issues.append(
+                _issue(
+                    "sizeChart.productID.dangling",
+                    "尺码表引用了包内不存在的商品 {}".format(record.get("productID")),
+                    str(record.get("id", "")),
                 )
+            )
 
     # 枚举取值（与 Swift 侧 CatalogSaleEventType / CatalogCurrency /
     # CatalogSeriesSalePhase / CatalogBalanceDueKind 的 rawValue 对齐）

@@ -175,6 +175,8 @@ final class ShopCatalogUploadJob {
     /// 发布头序号（方案 §4：冲突时要能重算并留档）
     var releaseSeq: Int
     var updatedAt: Date
+    /// 冻结业务名称，历史任务不会随着后续商品改名而变成另一件。
+    var catalogSummary: String = ""
 
     init(
         jobID: String,
@@ -249,7 +251,9 @@ final class ShopCatalogUploadJob {
         case .media:
             return "图片 " + String(mediaKey.prefix(12))
         case .pack, .release:
-            return "商品包与发布头"
+            return catalogSummary.isEmpty
+                ? "目录发布" + (releaseSeq > 0 ? " · 第 \(releaseSeq) 版" : "")
+                : catalogSummary
         }
     }
 

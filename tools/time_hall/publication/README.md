@@ -1,5 +1,7 @@
 # 时光馆静态内容发布流水线（Mac 端）
 
+2026-10-11 安全同步与商品恢复见 [正式记录](../../../docs/SHOP_CATALOG_SYNC_RECOVERY_2026-10-11.md)：运营更新先拉取再合并，不再执行删除式对齐。
+
 对应 `docs/Pink_House_TimeHall_Static_CloudKit_Design.md` 的 §8 / §9 / §18 / §20。
 
 把「已审核的整馆 catalog」变成「公共库里可被普通读者拉取的不可变发布产物」。

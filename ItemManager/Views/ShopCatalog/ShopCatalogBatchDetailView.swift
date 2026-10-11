@@ -382,10 +382,23 @@ struct ShopCatalogBatchDetailView: View {
     /// 手动会话加款式：新建空草稿挂入本批次，点进去就是「款式 + 多颜色」表单
     /// （整批归属 / 批量提交与其余款式同流程，V1.1 §4.1.2）
     private func addManualItem() {
-        var draft = CatalogProductDraft()
-        draft.batchID = batch.id
         do {
-            try draftStore.upsert(draft)
+            if let error = CatalogYearMonthText.validationErrorText(for: newSeriesYearMonthText) {
+                errorText = error
+                return
+            }
+            var attribution = draftStore.batches.first { $0.id == batch.id } ?? batch
+            attribution.shopID = shopID.isEmpty ? nil : shopID
+            attribution.newShopName = newShopName.trimmingCharacters(in: .whitespacesAndNewlines)
+            attribution.newShopAliases = newShopAliases
+            attribution.seriesID = seriesID.isEmpty ? nil : seriesID
+            attribution.newSeriesName = newSeriesName.trimmingCharacters(in: .whitespacesAndNewlines)
+            let yearMonth = CatalogYearMonthText.parse(newSeriesYearMonthText)
+            attribution.newSeriesYear = yearMonth?.year
+            attribution.newSeriesMonth = yearMonth?.month
+            attribution.newSeriesSeason = newSeriesSeason
+            // 新单品继承当前输入，已有单品的单独归属不被改写。
+            _ = try draftStore.addItemToBatch(batch.id, attribution: attribution)
         } catch {
             errorText = error.localizedDescription
             return

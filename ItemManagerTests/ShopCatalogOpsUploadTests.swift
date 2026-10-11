@@ -379,6 +379,17 @@ final class ShopCatalogUploadJobTests: XCTestCase {
 
 final class ShopCatalogOpsPublishScopeTests: XCTestCase {
 
+    func testPublicationTitleIdentifiesBrandSeriesAndChangedProduct() {
+        var catalog = ShopCatalog(
+            shops: [CatalogShop(id: "s", name: "1304")],
+            series: [CatalogSeries(id: "se", shopID: "s", name: "PAD")])
+        let baseline = catalog
+        catalog.products = [CatalogProduct(id: "p", shopID: "s", seriesID: "se", name: "粉色 OP", category: "OP")]
+        XCTAssertEqual(ShopCatalogOpsPublisher.publicationTitle(catalog: catalog, baseline: baseline),
+                       "1304 · PAD · 粉色 OP")
+        XCTAssertTrue(ShopCatalogOpsPublisher.publicationTitle(catalog: ShopCatalog(), baseline: nil).contains("商品 0"))
+    }
+
     func testPayloadCarriesAgreedPartitionContract() {
         let catalog = ShopCatalog(shops: [CatalogShop(id: "shop-1", name: "店家")])
         let payload = ShopCatalogOpsPublisher.makePayload(catalog: catalog)
@@ -387,12 +398,15 @@ final class ShopCatalogOpsPublishScopeTests: XCTestCase {
         XCTAssertEqual(payload.entityType, ShopCatalogSyncProtocol.shopCatalogEntityType)
         XCTAssertEqual(payload.partitionID, ShopCatalogSyncProtocol.shopCatalogPartitionID)
         XCTAssertEqual(payload.coverageStatus, ShopCatalogRootIndex.Partition.Coverage.complete)
+        XCTAssertFalse(payload.checkedThrough?.isEmpty ?? true,
+                       "Mac 公共协议要求完整分片声明检查时间")
     }
 
     func testEmptyCatalogDeclaresEmptyCoverage() {
         let payload = ShopCatalogOpsPublisher.makePayload(catalog: ShopCatalog())
         XCTAssertEqual(payload.coverageStatus, ShopCatalogRootIndex.Partition.Coverage.empty,
                        "空目录必须声明 empty，不能报 complete（客户端结构校验会拒）")
+        XCTAssertFalse(payload.checkedThrough?.isEmpty ?? true)
     }
 
     func testRootIndexMatchesProtocolContract() throws {
@@ -407,6 +421,7 @@ final class ShopCatalogOpsPublishScopeTests: XCTestCase {
         XCTAssertEqual(rootIndex.schemaVersion, ShopCatalogSyncProtocol.schemaVersion)
         let partition = try XCTUnwrap(rootIndex.shopCatalogPartition)
         XCTAssertEqual(partition.recordCount, 3)
+        XCTAssertFalse(partition.checkedThrough?.isEmpty ?? true)
         XCTAssertEqual(partition.packRecordName,
                        ShopCatalogSyncProtocol.packRecordName(payloadHash: payloadHash))
         // 契约校验（消费端与 Mac 端共用同一口径）
@@ -437,6 +452,7 @@ private final class FakeCloudBackend {
     var conflictOnReleaseSave = false
     /// 构造「Asset 上传成功但回读拿不到」
     var hideMediaOnRead = false
+    var hideRootOnRead = false
 }
 
 private final class FakeWriter: ShopCatalogOpsCloudWriting {
@@ -518,7 +534,7 @@ private final class FakeReader: ShopCatalogPublicReading {
     }
 
     func fetchRootIndex() async throws -> Data {
-        guard let data = backend.rootIndex else {
+        guard !backend.hideRootOnRead, let data = backend.rootIndex else {
             throw ShopCatalogSyncError.recordMissing(recordType: "THRelease", recordName: "root")
         }
         return data
@@ -550,6 +566,8 @@ final class ShopCatalogOpsPublisherTests: XCTestCase {
     override func setUp() {
         super.setUp()
         ShopCatalogStorage.useTemporaryForTesting()
+        try! ShopCatalogPackCache.savePublicationBaseline(ShopCatalogBaseline(
+            releaseSeq: 0, environment: ShopCatalogOpsPublisher.environmentName))
         backend = FakeCloudBackend()
         writer = FakeWriter(backend: backend)
         uploadStore = ShopCatalogOpsUploadStore(inMemory: true)
@@ -580,6 +598,181 @@ final class ShopCatalogOpsPublisherTests: XCTestCase {
                                       name: "商品", category: "其他")],
             assets: [CatalogAsset(id: "asset-1", type: .productImage, originalURL: reference)])
         return (catalog, reference)
+    }
+
+    func testUnknownBaselineBlocksBeforeAnyCloudWrite() async throws {
+        try ShopCatalogPackCache.clearPublicationBaseline()
+        backend.release = ShopCatalogReleaseHeader(
+            releaseSeq: 1, schemaVersion: 1, revocationEpoch: 0,
+            minimumReaderVersion: 1, previousReleaseSeq: 0,
+            publishedAt: nil, rootIndexHash: String(repeating: "a", count: 64))
+        let (catalog, _) = try makeLocalImageCatalog(name: "unknown-baseline.jpg")
+        let result = await publisher.publish(catalog: catalog)
+        XCTAssertFalse(result.isSuccess)
+        XCTAssertTrue(result.summary.contains("先取回"))
+        XCTAssertEqual(writer.savedMediaCount, 0)
+        XCTAssertEqual(writer.savedPackCount, 0)
+        XCTAssertEqual(writer.savedReleaseCount, 0)
+    }
+
+    func testSyncKeepsLocalAndRemoteAdditionsAndPublishesTogether() async throws {
+        let remote = ShopCatalog(shops: [CatalogShop(id: "remote", name: "线上店家")])
+        let initial = await publisher.publish(catalog: remote)
+        XCTAssertTrue(initial.isSuccess)
+        let local = ShopCatalog(shops: [CatalogShop(id: "local", name: "本机新店家")])
+        try ShopCatalogDraftStore.replaceOverlay(with: local)
+        let store = ShopCatalogStore(baseCatalog: ShopCatalog())
+        store.reloadWithOverlay()
+        switch await publisher.synchronizeAndPublish(store: store) {
+        case .finished(let result): XCTAssertTrue(result.isSuccess, result.summary)
+        case .conflicts: XCTFail("互不重叠的新增不应冲突")
+        }
+        XCTAssertEqual(Set(store.catalog?.shops.map(\.id) ?? []), ["remote", "local"])
+        XCTAssertEqual(writer.savedReleaseCount, 2)
+    }
+
+    func testSyncConflictRequiresChoiceAndPreservesUnrelatedLocalAddition() async throws {
+        let original = ShopCatalog(shops: [CatalogShop(id: "s", name: "原名")])
+        _ = await publisher.publish(catalog: original)
+        var remote = original
+        remote.shops[0].name = "远端修改"
+        _ = await publisher.publish(catalog: remote)
+        // 两边共同起点仍是原名，不是新拉下来的线上版本。
+        try ShopCatalogPackCache.savePublicationBaseline(ShopCatalogBaseline(
+            releaseSeq: 1, rootIndexHash: "old", environment: ShopCatalogOpsPublisher.environmentName), catalog: original)
+        var local = original
+        local.shops[0].name = "本机修改"
+        local.shops.append(CatalogShop(id: "new", name: "本机新增"))
+        try ShopCatalogDraftStore.replaceOverlay(with: local)
+        let store = ShopCatalogStore(baseCatalog: ShopCatalog())
+        store.reloadWithOverlay()
+        let before = writer.savedReleaseCount
+        guard case .conflicts(let fields, let token) = await publisher.synchronizeAndPublish(store: store) else {
+            return XCTFail("必须先报告冲突")
+        }
+        XCTAssertEqual(fields, ["shops.s.name"])
+        XCTAssertEqual(writer.savedReleaseCount, before)
+        XCTAssertEqual(ShopCatalogDraftStore.loadOverlay()?.shops, local.shops)
+        // 确认后本机又修改，旧选择不能自动应用到新的内容。
+        local.shops[0].name = "再次修改"
+        try ShopCatalogDraftStore.replaceOverlay(with: local)
+        store.reloadWithOverlay()
+        guard case .conflicts(_, let freshToken) = await publisher.synchronizeAndPublish(
+            store: store, resolution: .init(token: token, preferLocal: true)) else {
+            return XCTFail("过期选择必须重新核对")
+        }
+        guard case .finished(let result) = await publisher.synchronizeAndPublish(
+            store: store, resolution: .init(token: freshToken, preferLocal: false)) else {
+            return XCTFail("明确选择后应继续上传")
+        }
+        XCTAssertTrue(result.isSuccess, result.summary)
+        XCTAssertEqual(store.catalog?.shops.first { $0.id == "s" }?.name, "远端修改")
+        XCTAssertNotNil(store.catalog?.shops.first { $0.id == "new" })
+    }
+
+    func testFailedRemoteReadDoesNotWriteLocalCatalogOrPublish() async throws {
+        let remote = ShopCatalog(shops: [CatalogShop(id: "remote", name: "线上")])
+        _ = await publisher.publish(catalog: remote)
+        let local = ShopCatalog(shops: [CatalogShop(id: "local", name: "新增")])
+        try ShopCatalogDraftStore.replaceOverlay(with: local)
+        let store = ShopCatalogStore(baseCatalog: ShopCatalog())
+        store.reloadWithOverlay()
+        backend.hideRootOnRead = true
+        guard case .finished(let result) = await publisher.synchronizeAndPublish(store: store) else {
+            return XCTFail("读取失败须显示原因")
+        }
+        XCTAssertFalse(result.isSuccess)
+        XCTAssertEqual(ShopCatalogDraftStore.loadOverlay()?.shops, local.shops)
+        XCTAssertEqual(writer.savedReleaseCount, 1)
+    }
+
+    func testSyncWithoutChangesDoesNotRepublish() async throws {
+        let remote = ShopCatalog(shops: [CatalogShop(id: "s", name: "店家")])
+        _ = await publisher.publish(catalog: remote)
+        let store = ShopCatalogStore(baseCatalog: ShopCatalog())
+        store.installRemoteCatalog(remote)
+        guard case .finished(.upToDate(let seq)) = await publisher.synchronizeAndPublish(store: store) else {
+            return XCTFail("没有修改应直接完成同步")
+        }
+        XCTAssertEqual(seq, 1)
+        XCTAssertEqual(writer.savedReleaseCount, 1)
+        XCTAssertTrue(ShopCatalogDraftStore.loadOverlay()?.shops.isEmpty == true)
+    }
+
+    func testDeletedHistoryStaysLocalAndPublicPackRemainsReadableByExistingClients() async throws {
+        var catalog = ShopCatalog(shops: [CatalogShop(id: "s", name: "店家")])
+        catalog.saleEvents = [CatalogSaleEvent(id: "history", productID: "deleted", type: .stock, price: 888)]
+        catalog.removedProductIDs = ["deleted"]
+        try ShopCatalogDraftStore.replaceOverlay(with: catalog)
+        let store = ShopCatalogStore(baseCatalog: ShopCatalog())
+        store.reloadWithOverlay()
+        guard case .finished(let result) = await publisher.synchronizeAndPublish(store: store) else {
+            return XCTFail("明确删除的历史不应阻塞发布")
+        }
+        XCTAssertTrue(result.isSuccess, result.summary)
+        XCTAssertEqual(store.catalog?.saleEvents, catalog.saleEvents)
+        let hash = try XCTUnwrap(backend.packs.keys.first)
+        let publicCatalog = try XCTUnwrap(ShopCatalogCloudSyncValidator.catalog(fromVerifiedPack: backend.packs[hash]!))
+        XCTAssertTrue(publicCatalog.saleEvents.isEmpty)
+        guard case .finished(.upToDate) = await publisher.synchronizeAndPublish(store: store) else {
+            return XCTFail("保留本机历史不会制造重复上传")
+        }
+        XCTAssertEqual(store.catalog?.saleEvents, catalog.saleEvents)
+        XCTAssertEqual(writer.savedReleaseCount, 1)
+    }
+
+    func testRootUpdatePreservesOtherPartitionsAndWithdrawalMetadata() throws {
+        let previous = Data("""
+        {"schemaVersion":1,"releaseSeq":4,"revocationEpoch":2,"partitions":[
+          {"partitionID":"other","payloadHash":"unchanged","custom":"retain"}
+        ],"brands":[{"brandID":"other"}],"withdrawals":[{"id":"removed"}],"custom":"keep"}
+        """.utf8)
+        let result = try ShopCatalogOpsPublisher.makeRootIndexData(
+            releaseSeq: 5, revocationEpoch: 2, payloadHash: String(repeating: "a", count: 64),
+            compressedByteCount: 100, recordCount: 3, previousRootData: previous)
+        let object = try JSONSerialization.jsonObject(with: result) as! [String: Any]
+        XCTAssertEqual(object["custom"] as? String, "keep")
+        let partitions = object["partitions"] as! [[String: Any]]
+        XCTAssertEqual(partitions.count, 2)
+        XCTAssertEqual(partitions[0]["payloadHash"] as? String, "unchanged")
+        XCTAssertEqual((object["withdrawals"] as! [[String: String]])[0]["id"], "removed")
+    }
+
+    func testOrphanEventWithoutProductBlocksBeforeAnyCloudWrite() async {
+        let catalog = ShopCatalog(saleEvents: [CatalogSaleEvent(
+            id: "event", productID: "lost-product", type: .stock, price: 888)])
+        let result = await publisher.publish(catalog: catalog)
+        XCTAssertFalse(result.isSuccess)
+        XCTAssertTrue(result.summary.contains("恢复缺失商品"))
+        XCTAssertEqual(writer.savedMediaCount, 0)
+        XCTAssertEqual(writer.savedPackCount, 0)
+        XCTAssertEqual(writer.savedReleaseCount, 0)
+    }
+
+    func testConfirmedEmptyCloudAllowsFirstPublicationWithoutOldBaseline() async throws {
+        try ShopCatalogPackCache.clearPublicationBaseline()
+        let (catalog, _) = try makeLocalImageCatalog(name: "confirmed-empty.jpg")
+        let result = await publisher.publish(catalog: catalog)
+        XCTAssertTrue(result.isSuccess, result.summary)
+        XCTAssertEqual(writer.savedReleaseCount, 1)
+
+        let releaseJob = uploadStore.jobs.first { $0.stage == .release }
+        XCTAssertEqual(releaseJob?.catalogSummary, "店家 · 系列 · 商品")
+        XCTAssertEqual(ShopCatalogPackCache.loadPublicationBaseline()?.releaseSeq, 1)
+    }
+
+    func testStaleBaselineBlocksBeforeAnyCloudWrite() async throws {
+        backend.release = ShopCatalogReleaseHeader(
+            releaseSeq: 1, schemaVersion: 1, revocationEpoch: 0,
+            minimumReaderVersion: 1, previousReleaseSeq: 0,
+            publishedAt: nil, rootIndexHash: String(repeating: "a", count: 64))
+        let (catalog, _) = try makeLocalImageCatalog(name: "stale-baseline.jpg")
+        let result = await publisher.publish(catalog: catalog)
+        XCTAssertFalse(result.isSuccess)
+        XCTAssertTrue(result.summary.contains("线上内容已更新"))
+        XCTAssertEqual(writer.savedMediaCount, 0)
+        XCTAssertEqual(writer.savedPackCount, 0)
+        XCTAssertEqual(writer.savedReleaseCount, 0)
     }
 
     func testPublishHappyPathSwitchesReleaseAndVerifies() async throws {
@@ -652,32 +845,6 @@ final class ShopCatalogOpsPublisherTests: XCTestCase {
         XCTAssertEqual(writer.savedReleaseCount, 0)
     }
 
-    /// 「仅暂存图片」必须把结果写进 `lastResult` —— 界面 footer 靠它显示。
-    /// 原先它既不写状态、按钮又 `_ =` 丢弃返回值 = 缺图时一个字都不显示。
-    func testStageOnlyPublishesItsResultToTheUI() throws {
-        let missing = ShopCatalog(
-            assets: [CatalogAsset(id: "a", type: .productImage, originalURL: "local:gone.jpg")])
-        let failed = publisher.stageOnly(catalog: missing)
-
-        guard case .notPublished = failed else {
-            return XCTFail("缺图时必须返回未发布，实际 \(failed.summary)")
-        }
-        XCTAssertNotNil(publisher.lastResult, "必须写 lastResult（界面据此显示）")
-        XCTAssertEqual(publisher.lastStagingIssues.count, 1)
-
-        let (good, _) = try makeLocalImageCatalog(name: "img-stage-only.jpg")
-        let ok = publisher.stageOnly(catalog: good)
-
-        XCTAssertNotNil(publisher.lastResult)
-        XCTAssertTrue(publisher.lastStagingIssues.isEmpty, "问题清单要随本次结果刷新")
-        guard case .notPublished(let reason) = ok else {
-            return XCTFail("只暂存不发布，实际 \(ok.summary)")
-        }
-        XCTAssertTrue(reason.contains("已暂存 1 张图片"), reason)
-        XCTAssertEqual(uploadStore.jobs.count, 1, "成功的暂存要落任务，运营才能在任务表看到")
-        XCTAssertEqual(writer.savedReleaseCount, 0, "「仅暂存」不许碰发布头")
-    }
-
     func testReleaseConflictIsReportedWithoutForcingOverwrite() async throws {
         let (catalog, _) = try makeLocalImageCatalog(name: "img-conflict.jpg")
         backend.conflictOnReleaseSave = true
@@ -693,7 +860,7 @@ final class ShopCatalogOpsPublisherTests: XCTestCase {
 
     func testReadBackFailureAfterSwitchIsMarkedUnverified() async throws {
         let (catalog, _) = try makeLocalImageCatalog(name: "img-unverified.jpg")
-        backend.hideMediaOnRead = true
+        backend.hideRootOnRead = true
         let result = await publisher.publish(catalog: catalog)
 
         guard case .publishedButUnverified(let releaseSeq, _) = result else {
@@ -702,6 +869,32 @@ final class ShopCatalogOpsPublisherTests: XCTestCase {
         XCTAssertEqual(releaseSeq, 1)
         XCTAssertEqual(uploadStore.jobs.first { $0.stage == .release }?.status,
                        .publishedButUnverified)
+    }
+
+    func testNewImageUnavailableToPublicReaderBlocksReleaseSwitch() async throws {
+        let (catalog, _) = try makeLocalImageCatalog(name: "img-public-unavailable.jpg")
+        backend.hideMediaOnRead = true
+        let result = await publisher.publish(catalog: catalog)
+        guard case .notPublished = result else {
+            return XCTFail("普通读取拿不到新图片时不能发布，实际 \(result.summary)")
+        }
+        XCTAssertEqual(writer.savedMediaCount, 1)
+        XCTAssertEqual(writer.savedPackCount, 0)
+        XCTAssertEqual(writer.savedReleaseCount, 0)
+    }
+
+    func testExistingShopLogoIsVerifiedThroughPublicReader() async throws {
+        let bytes = Data("existing-shop-logo".utf8)
+        let hash = ShopCatalogSyncProtocol.sha256Hex(bytes)
+        backend.media[hash] = bytes
+        backend.hideMediaOnRead = true
+        let catalog = ShopCatalog(shops: [CatalogShop(id: "shop", name: "店家", logo: "thmedia:" + hash)])
+        let result = await publisher.publish(catalog: catalog)
+        guard case .publishedButUnverified = result else {
+            return XCTFail("已有店家图标也必须回读，实际 \(result.summary)")
+        }
+        XCTAssertEqual(writer.savedMediaCount, 0)
+        XCTAssertEqual(writer.savedReleaseCount, 1)
     }
 }
 

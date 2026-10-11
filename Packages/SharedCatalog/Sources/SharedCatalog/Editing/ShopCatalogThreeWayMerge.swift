@@ -75,8 +75,7 @@ public nonisolated enum ShopCatalogThreeWayMerge {
         merged.products.removeAll { products.contains($0.id) }
         merged.variants.removeAll { products.contains($0.productID) }
         merged.sizeCharts.removeAll { products.contains($0.productID) }
-        // 显式删除沿用 removeProduct 的级联口径；其余销售历史只增不删。
-        merged.saleEvents.removeAll { products.contains($0.productID) }
+        // 已删商品的销售历史按墓碑保留，合并不改写或删除既有记录。
         merged.styleProfiles.removeAll { series.contains($0.seriesID) }
         return Result(catalog: merged, conflicts: conflicts)
     }

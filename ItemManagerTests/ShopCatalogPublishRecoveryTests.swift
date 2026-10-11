@@ -66,6 +66,65 @@ final class ShopCatalogPublishRecoveryTests: XCTestCase {
 
     // MARK: T12 重复提交
 
+    func testRetainedEventDoesNotProveProductExistsAndRestoreKeepsItsID() throws {
+        let draft = try reviewedDraft(name: "粉色 OP")
+        _ = try draftStore.publish(draft, store: store)
+        let published = try XCTUnwrap(draftStore.drafts.first { $0.id == draft.id })
+        let original = try XCTUnwrap(ShopCatalogDraftStore.loadOverlay())
+        let productID = try XCTUnwrap(published.publishedResult?.productID)
+        var lost = ShopCatalog()
+        lost.saleEvents = original.saleEvents
+        try ShopCatalogDraftStore.replaceOverlay(with: lost)
+        store.reloadWithOverlay()
+        XCTAssertNil(try draftStore.recoverPendingPublish(draft, store: store))
+        XCTAssertEqual(draftStore.recoverablePublishedDrafts(store: store).map(\.id), [draft.id])
+        _ = try draftStore.restoreMissingPublishedDraft(published, store: store)
+        XCTAssertEqual(store.product(id: productID)?.name, "粉色 OP")
+        XCTAssertEqual(ShopCatalogDraftStore.loadOverlay()?.saleEvents, original.saleEvents)
+        XCTAssertTrue(draftStore.recoverablePublishedDrafts(store: store).isEmpty)
+    }
+
+    func testExplicitlyDeletedProductIsNotRecoverable() throws {
+        let draft = try reviewedDraft(name: "明确下架款")
+        _ = try draftStore.publish(draft, store: store)
+        let published = try XCTUnwrap(draftStore.drafts.first { $0.id == draft.id })
+        var overlay = try XCTUnwrap(ShopCatalogDraftStore.loadOverlay())
+        overlay.removedProductIDs = [try XCTUnwrap(published.publishedResult?.productID)]
+        overlay.products.removeAll()
+        try ShopCatalogDraftStore.replaceOverlay(with: overlay)
+        store.reloadWithOverlay()
+        XCTAssertTrue(draftStore.recoverablePublishedDrafts(store: store).isEmpty)
+        XCTAssertThrowsError(try draftStore.restoreMissingPublishedDraft(published, store: store))
+    }
+
+    /// 仅显式提供隔离输入时执行；导出恢复快照，不写设备原资料、不访问云端。
+    func testExportRecoveredCatalogForExplicitOfflineFixture() throws {
+        let environment = ProcessInfo.processInfo.environment
+        guard let input = environment["PINK_HOUSE_CATALOG_REPAIR_INPUT"],
+              let output = environment["PINK_HOUSE_CATALOG_REPAIR_OUTPUT"],
+              let draftID = environment["PINK_HOUSE_CATALOG_REPAIR_DRAFT_ID"] else {
+            throw XCTSkip("未指定离线恢复输入")
+        }
+        let directory = URL(fileURLWithPath: input)
+        let decoder = ShopCatalogJSONCoding.decoder()
+        let catalog = try decoder.decode(ShopCatalog.self, from: Data(contentsOf: directory.appendingPathComponent("current-catalog.json")))
+        let overlay = try decoder.decode(ShopCatalog.self, from: Data(contentsOf: directory.appendingPathComponent("shop-catalog-override.json")))
+        let drafts = try decoder.decode([CatalogProductDraft].self, from: Data(contentsOf: directory.appendingPathComponent("shop-catalog-drafts.json")))
+        let draft = try XCTUnwrap(drafts.first { $0.id == draftID })
+        store = ShopCatalogStore(baseCatalog: ShopCatalog())
+        try draftStore.upsert(draft)
+        try ShopCatalogDraftStore.replaceOverlay(with: overlay)
+        store.reloadWithOverlay()
+        store.installRemoteCatalog(catalog)
+        _ = try draftStore.restoreMissingPublishedDraft(draft, store: store)
+        let recovered = try XCTUnwrap(store.catalog)
+        XCTAssertEqual(recovered.products.filter { $0.id == draft.publishedResult?.productID }.count, 1)
+        XCTAssertEqual(recovered.saleEvents, catalog.saleEvents)
+        XCTAssertTrue(ShopCatalogCloudSyncValidator.structuralIssues(recovered, coverageStatus: "complete").isEmpty)
+        try ShopCatalogJSONCoding.encoder(prettyPrinted: true).encode(recovered)
+            .write(to: URL(fileURLWithPath: output), options: .atomic)
+    }
+
     func testPublishingSameReviewedSnapshotTwiceProducesOneEffect() throws {
         let draft = try reviewedDraft(name: "重复点击款")
         _ = try draftStore.publish(draft, store: store)

@@ -54,7 +54,7 @@ struct ShopCatalogBrowseView: View {
             ZStack {
                 LiquidBackground(themeSkinWallpaperContext: .timeHall)
                     .ignoresSafeArea()
-                ShopCatalogListView()
+                ShopCatalogListView(onRefresh: refreshCatalog)
             }
             .navigationTitle("店家上新")
             .navigationBarTitleDisplayMode(.inline)
@@ -76,11 +76,24 @@ struct ShopCatalogBrowseView: View {
             ShopCatalogWardrobeBalanceSync.syncIfNeeded(store: .shared, modelContext: modelContext)
         }
     }
+
+    private func refreshCatalog() async {
+        await ShopCatalogCloudSyncService.shared.syncIfNeeded(force: true)
+        ShopCatalogWardrobeBalanceSync.syncIfNeeded(store: store, modelContext: modelContext)
+        switch ShopCatalogCloudSyncService.shared.state {
+        case .failed(let message): ToastManager.shared.showError(message)
+        case .nothingPublished: ToastManager.shared.show(message: "线上暂未发布店家商品")
+        default: break
+        }
+    }
 }
 
 // MARK: - 店家列表（计划 §9，参考图3）
 
 struct ShopCatalogListView: View {
+    var onRefresh: () async -> Void = {
+        await ShopCatalogCloudSyncService.shared.syncIfNeeded(force: true)
+    }
     @Environment(ThemeManager.self) private var themeManager
     @ObservedObject private var store = ShopCatalogStore.shared
     @State private var keyword = ""
@@ -90,19 +103,16 @@ struct ShopCatalogListView: View {
     }
 
     var body: some View {
-        Group {
-            if case let .failed(message) = store.status {
-                ContentUnavailableView("店家商品库暂不可用", systemImage: "shippingbox",
-                                       description: Text(message))
-            } else {
-                listContent
-            }
-        }
+        listContent
     }
 
     private var listContent: some View {
         ScrollView(.vertical, showsIndicators: false) {
             LazyVStack(spacing: 10) {
+                if case let .failed(message) = store.status {
+                    ContentUnavailableView("店家商品库暂不可用", systemImage: "shippingbox",
+                                           description: Text(message))
+                }
                 searchBar
                 if shops.isEmpty {
                     emptyState
@@ -122,6 +132,8 @@ struct ShopCatalogListView: View {
         }
         // 底部悬浮 Dock 避让：店家列表最后一条会被 Dock 盖住。
         .avoidingBottomDock()
+        .scrollBounceBehavior(.always, axes: .vertical)
+        .refreshable { await onRefresh() }
     }
 
     private var searchBar: some View {

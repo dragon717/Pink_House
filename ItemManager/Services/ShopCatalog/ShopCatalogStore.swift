@@ -23,6 +23,9 @@ import Combine
 
 @MainActor
 final class ShopCatalogStore: ObservableObject {
+
+    // 无 actor 收尾业务；避免 SDK 27 的主 actor 析构回部署在旧运行时崩溃。
+    nonisolated deinit {}
     static let shared = ShopCatalogStore()
 
     enum LoadStatus: Equatable {
@@ -103,94 +106,27 @@ final class ShopCatalogStore: ObservableObject {
         rebuildMergedCatalog()
     }
 
-    // MARK: 以线上那一版为准对齐本机（2026-09-29）
-
-    /// 本机已装入的**远端层**（消费通道拉回来的那一版）。
-    /// nil = 还没同步到 / 线上确实没有内容。
-    ///
-    /// 只读暴露的理由：「对齐」需要一个**明确的**线上来源，它只能是这台机器
-    /// 真正拉到过的那一份 —— 不允许调用方自己拼一份「大概长这样」的线上目录。
+    /// 已通过校验的远端层；普通刷新不会修改运营编辑基线。
     var installedRemoteCatalog: ShopCatalog? { remoteCatalog }
 
-    /// 对齐动作失败的原因。**不允许用 nil 糊过去** ——
-    /// 「本机还没有线上那一版」与「写盘失败」是两件完全不同的事，
-    /// 前者让运营去同步、后者是要修的故障。
-    enum AlignFailure: LocalizedError {
-        case noRemoteLayer
-        case writeFailed(String)
-
-        var errorDescription: String? {
-            switch self {
-            case .noRemoteLayer:
-                return "本机还没有「线上那一版」：先让云端同步成功一次"
-                    + "（下拉刷新或重开商店页），再回来对齐。"
-            case .writeFailed(let reason):
-                return "对齐结果没写进本机（本机内容未改变）：\(reason)"
-            }
+    /// 合并结果只保存本机新增/修改；与远端相同的实体不留副本，后续刷新可继续更新。
+    func installMergedCatalog(_ merged: ShopCatalog, remote: ShopCatalog) throws {
+        func edits<T: Equatable>(_ values: [T], comparedWith online: [T]) -> [T] {
+            values.filter { !online.contains($0) }
         }
-    }
-
-    /// 只读：算出「以线上那一版为准对齐」会做哪些改动（**不写任何东西**）。
-    ///
-    /// 与 `alignLocalCatalogToRemote()` 共用同一个线上来源与同一份对账口径 ——
-    /// 「预览」与「执行」必须算的是同一件事，否则预览就成了安慰剂。
-    /// 界面必须先拿到它再允许对齐：这个动作会移除本机内容。
-    func reconcilePreviewAgainstRemote() throws -> ShopCatalogReconcileOutcome {
-        guard let remote = remoteCatalog else { throw AlignFailure.noRemoteLayer }
-        // 比的是**本机现在生效的那份目录**（三层合并结果）——
-        // 只比覆盖层会漏掉「远端层已经提供的那些」，运营看到的就不是本机的真实差异。
-        return ShopCatalogReconcile.outcome(local: catalog ?? ShopCatalog(), remote: remote)
-    }
-
-    /// 以线上那一版为准对齐本机：线上有本机没有的加进来、同一个 id 用线上那份覆盖、
-    /// 本机多出来的移除 —— 对齐完成后 `catalog` 逐条等于线上那一版
-    /// （自证见 `isLocalCatalogAlignedWithRemote`）。
-    ///
-    /// ## 为什么落到覆盖层、而且只写「余量」
-    ///
-    /// 三层结构里 `remote` 只活在内存（进程重启即归零，见
-    /// `ShopCatalogCloudSyncService`），**唯一落盘**的目录层是覆盖层
-    /// （`shop-catalog-override.json`），所以这件事只能落实成对覆盖层的一次写入。
-    ///
-    /// 但写进去的**不是整个对账结果**，而是收敛后的余量
-    /// （`ShopCatalogReconcile.localOnlyRemainder`：只剩本地独有的销售事件与下架墓碑）。
-    /// 原因：覆盖层优先级**高于**远端层，整份写进去等于给本机盖了一层快照，
-    /// 之后线上再发新版本时同 id 会被这层旧的副本挡住 —— **界面完全看不出来**，
-    /// 「与线上一样」就只成立于点按钮的那一刻。实体一律交给远端层提供。
-    ///
-    /// 种子层（Bundle）不可写：本机为空，所以结果确实等于线上那一版；
-    /// 若哪天种子层非空，结果会比线上多出种子独有的条目 ——
-    /// 这一点由 `isLocalCatalogAlignedWithRemote` 如实报出来，不假装一致。
-    ///
-    /// - Throws: `AlignFailure`
-    /// - Returns: 实际做了什么（新增 / 覆盖 / 移除 / 保留）。
-    @discardableResult
-    func alignLocalCatalogToRemote() throws -> ShopCatalogReconcileOutcome {
-        guard let remote = remoteCatalog else { throw AlignFailure.noRemoteLayer }
-        let current = catalog ?? ShopCatalog()
-        let outcome = ShopCatalogReconcile.outcome(local: current, remote: remote)
-        let remainder = ShopCatalogReconcile.localOnlyRemainder(local: current, remote: remote)
-        do {
-            // 写盘成功之后才改内存：反过来的话界面会显示一份没落盘的内容
-            // （下次冷启动又变回去，看起来像「对齐失效」）。
-            try ShopCatalogDraftStore.replaceOverlay(with: remainder)
-        } catch {
-            throw AlignFailure.writeFailed(error.localizedDescription)
-        }
+        var remainder = merged
+        remainder.shops = edits(merged.shops, comparedWith: remote.shops)
+        remainder.series = edits(merged.series, comparedWith: remote.series)
+        remainder.products = edits(merged.products, comparedWith: remote.products)
+        remainder.variants = edits(merged.variants, comparedWith: remote.variants)
+        remainder.sizeCharts = edits(merged.sizeCharts, comparedWith: remote.sizeCharts)
+        remainder.assets = edits(merged.assets, comparedWith: remote.assets)
+        remainder.styleProfiles = edits(merged.styleProfiles, comparedWith: remote.styleProfiles)
+        remainder.saleEvents = edits(merged.saleEvents, comparedWith: remote.saleEvents)
+        try ShopCatalogDraftStore.replaceOverlay(with: remainder)
         overlayCatalog = remainder
+        remoteCatalog = remote
         rebuildMergedCatalog()
-        return outcome
-    }
-
-    /// 本机**当前生效**目录（三层合并结果）是否已经等于已装入的线上那一版。
-    /// nil = 还没有远端层可比。
-    ///
-    /// 为什么单独给这一个判据：对齐的是覆盖层，而生效目录还要过一次三层合并。
-    /// 不报这一条就容易出现「界面说已对齐、实际显示的比线上多/少」——
-    /// 那正是「信一个错的事实」。
-    var isLocalCatalogAlignedWithRemote: Bool? {
-        guard let remote = remoteCatalog, let catalog else { return nil }
-        return ShopCatalogReconcile.isAligned(catalog, with: remote)
     }
 
     // MARK: 三层合并

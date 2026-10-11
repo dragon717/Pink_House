@@ -527,95 +527,13 @@ final class OpsWorkspace: ObservableObject {
         }
     }
 
-    // MARK: 以「从线上拉回」的那一版为准对齐草稿（方案 §5 的「当前线上完整基线」）
-
-    /// 只读：算出「以线上那一版为准对齐」会做哪些改动（**不写任何东西**）。
-    ///
-    /// 为什么必须有「先看差异」这一步：对齐**会移除**本地多出来的条目
-    /// （线上那一版里没有的那些），而这一步不可撤销。只给一个「对齐」按钮的话，
-    /// 运营点完才知道自己少了什么 —— 那就是静默删除。
-    ///
-    /// - Returns: 报告；nil = 读不出线上那份目录（原因在 `lastError` 里）。
-    func reconcilePreview(from url: URL) -> ShopCatalogReconcileOutcome? {
-        guard let remote = decodeCatalogFile(at: url, purpose: "对账预览") else { return nil }
-        lastError = nil
-        return ShopCatalogReconcile.outcome(local: catalog, remote: remote)
-    }
-
-    /// 以「从线上拉回」的那一版为准，把当前草稿**逐条对齐**过去，
-    /// 并把这一版记为基线快照。
-    ///
-    /// ## 语义是**逐条对账**，不是整份替换（2026-09-29 改口径）
-    ///
-    ///   线上有、本地没有 → 加进来（增量）
-    ///   两边同一个 id    → 用线上那份覆盖
-    ///   本地有、线上没有 → 从本地移除（这就是「被替换掉」的那一半）
-    ///
-    /// 结果**等于线上那一版**，只有两处例外 —— 销售历史只增不删
-    /// （append-only，且线上分片是已下发口径，归档商品的历史不在其中）、
-    /// 本地独有的下架记录保留。两条例外都由
-    /// `ShopCatalogReconcile.outcome(local:remote:)` 逐条列出来，绝不静默。
-    ///
-    /// 旧实现（`importCatalog` 整份替换）的问题不是「结果不对」，而是
-    /// **看不出发生了什么**：替换完只知道条数，不知道哪些被覆盖、哪些被抹掉。
-    ///
-    /// ## 基线快照在这里写
-    ///
-    /// 不写快照的话，下一次发布的差分会把**整份目录**都算成「本次新增 / 修改」，
-    /// 于是严格策略的作用域被放大到全部存量内容 —— 那正是 R08 要避免的
-    /// （「顺手改一句文案，却被隔壁一个用了裸文件名的老商品卡住」）。
-    /// 快照记的是**对齐之后**的这份内容（也就是「自此以后改动集归零」），
-    /// 与旧口径一致；对齐保留的本地销售历史/墓碑因此不算本次改动。
-    ///
-    /// ⚠️ 调用方必须先把 `reconcilePreview(from:)` 的结果给运营看过再确认。
-    ///
-    /// - Returns: 实际执行的报告；nil = 失败，原因在 `lastError` 里。
-    @discardableResult
-    func alignCatalogToPulledContent(
-        from url: URL,
-        baseline: ShopCatalogBaseline
-    ) -> ShopCatalogReconcileOutcome? {
-        // 写入门禁（损坏草稿一律拒绝 → R03 的隔离态不许被覆盖）
-        guard canMutate() else { return nil }
-        guard let remote = decodeCatalogFile(at: url, purpose: "对齐线上目录") else { return nil }
-
-        let (aligned, outcome) = ShopCatalogReconcile.align(local: catalog, remote: remote)
-        catalog = aligned
-        // 对齐是一次内容变更，同样要过版本与校验失效（R01）
-        markDirty()
-        guard saveDraft() else { return nil }
-        guard let draft else { return outcome }
-
-        // 基线快照 = 对齐之后这份内容；基线本身按环境记录（跨环境比对必然误判）
-        draft.baselineCatalog = catalog
-        draft.baseline = baseline
-        // ⚠️ 顺序要紧：先把内存工作副本收敛到存储精度，再落盘。
-        // 不收敛的话，紧接其后的差分会把每个带日期的实体都报成「已修改」，
-        // 而严格策略的作用域是从差分推出来的 —— 作用域被静默放大。
-        normalizeWorkingCopyToStoragePrecision()
-        do {
-            try context.save()
-            let seq = baseline.releaseSeq.map(String.init) ?? "未知"
-            statusMessage = "已按线上那一版对齐当前草稿（\(outcome.summaryText)），"
-                + "基线记为 releaseSeq \(seq)"
-                + (baseline.environment.map { "（\($0)）" } ?? "")
-                + "。之后的编辑才算「本次新增 / 修改」。"
-            lastError = nil
-            return outcome
-        } catch {
-            lastError = "内容已对齐，但基线没写进库：\(error.localizedDescription)"
-                + "请重新拉一次，否则这次的修改会被当成整份目录的改动。"
-            return nil
-        }
-    }
-
     // MARK: 与远端双向合并（2026-10-07 重做：并集，不删本地）
 
     /// 一次「与远端合并」会发生什么（预览 / 结果共用这一个形状）。
     struct OpsMergeReport {
         /// 远端有、本地没有 → 会补进来（这就是「下载」那一档）
         var added: Int
-        /// 两端都有（同 id）→ 以远端为准
+        /// 同 ID 的内容经三方合并后发生变化
         var overwritten: Int
         /// 本地独有 → **保留**，不删除（这就是「上传」那一档的存量）
         var keptLocalOnly: Int
@@ -658,11 +576,16 @@ final class OpsWorkspace: ObservableObject {
 
     private func mergeReport(local: ShopCatalog, remote: ShopCatalog,
                              result: ShopCatalogThreeWayMerge.Result) -> OpsMergeReport {
-        let delta = ShopCatalogReconcile.outcome(local: local, remote: result.catalog)
-        let remoteIDs = ShopCatalogReconcile.outcome(local: local, remote: remote)
-        return OpsMergeReport(added: delta.added.count, overwritten: delta.overwritten.count,
-                              keptLocalOnly: remoteIDs.removed.count,
-                              conflicts: result.conflicts, removed: delta.removed.count)
+        let delta = ShopCatalogChangeSetCalculator.diff(baseline: local, current: result.catalog)
+        let remoteDelta = ShopCatalogChangeSetCalculator.diff(baseline: local, current: remote)
+        let kinds = ShopCatalogEntityKind.allCases
+        let removableKinds = kinds.filter { $0 != .saleEvent }
+        return OpsMergeReport(
+            added: kinds.reduce(0) { $0 + delta.delta(of: $1).addedIDs.count },
+            overwritten: kinds.reduce(0) { $0 + delta.delta(of: $1).modifiedIDs.count },
+            keptLocalOnly: removableKinds.reduce(0) { $0 + remoteDelta.delta(of: $1).removedIDs.count },
+            conflicts: result.conflicts,
+            removed: removableKinds.reduce(0) { $0 + delta.delta(of: $1).removedIDs.count })
     }
 
     /// 基于上一版快照合并字段，保留本地独有内容；争议字段由用户明确选择保留本地或采用远端。
@@ -726,7 +649,7 @@ final class OpsWorkspace: ObservableObject {
 
     /// 读一份 `shop-catalog.json`（**只读**，不改任何状态）。失败写 `lastError`。
     ///
-    /// 单独抽出来是因为「对账预览」与「真正对齐」必须读**同一份**文件、
+    /// 合并预览与执行读取同一份经过校验的文件、
     /// 走同一条解码与 security-scoped 处理 —— 两条路径各写一遍，
     /// 迟早出现「预览说删 3 条、执行时删了 5 条」。
     private func decodeCatalogFile(at url: URL, purpose: String) -> ShopCatalog? {

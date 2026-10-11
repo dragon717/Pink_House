@@ -26,53 +26,45 @@ struct ShopCatalogOpsUploadSection: View {
 
     @ObservedObject private var publisher = ShopCatalogOpsPublisher.shared
     @ObservedObject private var uploadStore = ShopCatalogOpsUploadStore.shared
-    /// 三层目录（含远端层）的状态从这里读 —— 「对齐」的线上来源必须是
-    /// **本机真的拉到过的那一版**，不能自己拼一份。
     @ObservedObject private var catalogStore = ShopCatalogStore.shared
-
     @State private var isRunning = false
-
-    // MARK: 「与线上对齐」的本地状态
-    //
-    // 挂在这个 Section 级视图上（不是 List 行视图上）：行重建会把 @State 归零
-    // （项目反模式清单第 4 条）。
-
-    /// 点「查看差异」算出来的报告（**只读**算出来的，还没写任何东西）
-    @State private var reconcileOutcome: ShopCatalogReconcileOutcome?
-    /// 最近一次查看差异 / 对齐的失败原因（必须显示，不许静默）
-    @State private var reconcileError: String?
-    /// 对齐完成后的结论（含「本机是否真的等于线上」这一条自证）
-    @State private var alignResultText: String?
+    @State private var pendingConflicts: [String] = []
+    @State private var conflictToken: String?
 
     var body: some View {
-        // 对齐放在最前面：它是「上传」的前置 —— 本机与线上那一版不一致时，
-        // 传上去的就是「本机这份」，而运营以为传的是线上那份。
-        alignmentSection
+        let missingDrafts = ShopCatalogDraftStore.shared.recoverablePublishedDrafts(store: catalogStore)
+        if !missingDrafts.isEmpty {
+            Section("待恢复商品") {
+                Text("\(missingDrafts.count) 件商品有入库回执，但当前目录缺少商品实体。")
+                ForEach(missingDrafts) { draft in
+                    Text("\(draft.newShopName) · \(draft.newSeriesName) · \(draft.name)")
+                }
+                Button("从保留的草稿恢复商品") {
+                    do {
+                        for draft in missingDrafts {
+                            _ = try ShopCatalogDraftStore.shared.restoreMissingPublishedDraft(draft, store: catalogStore)
+                        }
+                        ToastManager.shared.showSuccess("商品已恢复到本机，请上传并发布")
+                    } catch {
+                        ToastManager.shared.showError(error.localizedDescription)
+                    }
+                }
+                .disabled(isRunning)
+            }
+        }
 
         Section(content: {
             Button {
                 Task { await runPublish() }
             } label: {
-                Label(isRunning ? "\(publisher.phase.displayName)…" : "上传并发布到公共库",
+                Label(isRunning ? "\(publisher.phase.displayName)…" : "同步更新并上传",
                       systemImage: "icloud.and.arrow.up")
             }
             .disabled(isRunning || catalog == nil)
 
-            if let catalog {
-                Button {
-                    // 结果由 `publisher` 自己发布（`lastResult` / `lastStagingIssues`）——
-                    // 2026-09-29 之前这里是 `_ = …` 且 publisher 不写状态，缺图时**零反馈**，
-                    // 运营看到的就是「点了没反应」。
-                    _ = publisher.stageOnly(catalog: catalog)
-                } label: {
-                    Label("仅暂存图片（不上传）", systemImage: "photo.stack")
-                }
-                .disabled(isRunning)
-            }
-
             if hasFailedJobs {
                 Button {
-                    Task { await runRetry() }
+                    Task { await runPublish() }
                 } label: {
                     Label("重试失败项", systemImage: "arrow.clockwise")
                 }
@@ -89,6 +81,8 @@ struct ShopCatalogOpsUploadSection: View {
         }, footer: {
             Text(footerText)
         })
+
+        conflictSection
 
         // 上传前检查：**不点也能看到**能不能发。缺图是常态（换设备 / 清沙盒都会造成），
         // 而「点下去才报错」会让运营以为是 App 卡了。
@@ -114,122 +108,41 @@ struct ShopCatalogOpsUploadSection: View {
         }
     }
 
-    // MARK: 与线上那一版对齐（2026-09-29）
-
-    /// 「让本机与线上那一版一模一样」——**逐条对账**，不是整份覆盖：
-    ///
-    ///   线上有、本机没有 → 加进来
-    ///   两边同一个 id    → 用线上那份覆盖
-    ///   本机有、线上没有 → 从本机移除
-    ///
-    /// 唯一实现在共享包 `ShopCatalogReconcile`（Mac 端走同一份判定）。
-    /// 这里**不许**自己写合并逻辑 —— 两端各写一份的下场本项目已经吃过一次
-    /// （2026-09-28：两端各手拼一份图片引用清单，双双漏掉 174 张）。
     @ViewBuilder
-    private var alignmentSection: some View {
-        Section {
-            if let remote = catalogStore.installedRemoteCatalog {
-                Text("本机已有线上那一版：\(remote.shops.count) 店家 / "
-                     + "\(remote.series.count) 系列 / \(remote.products.count) 商品")
-                    .font(.system(size: 13))
-
-                Button {
-                    runReconcilePreview()
-                } label: {
-                    Label("查看差异（不改动本机）", systemImage: "arrow.left.arrow.right")
+    private var conflictSection: some View {
+        if let token = conflictToken {
+            Section("需要解决冲突") {
+                Text("双方修改了以下字段。请选择这些冲突字段采用哪一方，其余新增和修改都会保留。")
+                ForEach(pendingConflicts, id: \.self) { field in
+                    Text(conflictDescription(field)).font(.caption).textSelection(.enabled)
                 }
-
-                if let outcome = reconcileOutcome {
-                    Text(outcome.summaryText)
-                        .font(.system(size: 13, weight: .medium))
-                    ForEach(outcome.summaryLines, id: \.self) { line in
-                        // 这些句子是共享文案（Mac 端走 `opsMarkdown`），里面带 `**强调**`；
-                        // `Text(变量)` **不解析** Markdown，所以必须显式转一次，
-                        // 否则 iOS 上会逐字显示成星号。
-                        emphasisText("· " + line)
-                            .font(.system(size: 11))
-                            .foregroundStyle(.secondary)
-                    }
-                    let details = outcome.detailLines(limit: 5)
-                    if !details.isEmpty {
-                        ForEach(details, id: \.self) { line in
-                            Text(line)
-                                .font(.system(size: 11))
-                                .foregroundStyle(.secondary)
-                                .textSelection(.enabled)
-                        }
-                    }
+                Button("冲突字段保留本机修改并上传") {
+                    Task { await runPublish(resolution: .init(token: token, preferLocal: true)) }
                 }
-
-                Button {
-                    runAlign()
-                } label: {
-                    Label("以线上为准对齐本机", systemImage: "arrow.triangle.2.circlepath")
+                Button("冲突字段采用线上修改并上传") {
+                    Task { await runPublish(resolution: .init(token: token, preferLocal: false)) }
                 }
-                // 先看差异再对齐：对齐会**移除**本机多出来的条目，
-                // 跳过预览就等于「点完才知道自己少了什么」。
-                .disabled(reconcileOutcome == nil)
-
-                if reconcileOutcome == nil {
-                    Text("先点「查看差异」—— 对齐会移除本机多出来的条目。")
-                        .font(.system(size: 11))
-                        .foregroundStyle(.secondary)
-                }
-            } else {
-                Text("本机还没有「线上那一版」：云端内容会自动同步，请稍后回来查看差异并对齐。")
-                    .font(.system(size: 12))
-                    .foregroundStyle(.secondary)
             }
-
-            if let reconcileError {
-                Text(reconcileError)
-                    .font(.system(size: 12))
-                    .foregroundStyle(.red)
-                    .textSelection(.enabled)
-            }
-            if let alignResultText {
-                Text(alignResultText)
-                    .font(.system(size: 12))
-                    .foregroundStyle(.secondary)
-            }
-        } header: {
-            Text("与线上对齐")
-        } footer: {
-            Text("结果等于线上那一版，只有两处例外：销售记录只增不删、"
-                 + "本机独有的下架记录保留（都会在上面的差异清单里逐条列出来）。")
+            .disabled(isRunning)
         }
     }
 
-    /// 只读：算出会改动什么，不写任何东西。
-    private func runReconcilePreview() {
-        alignResultText = nil
-        do {
-            reconcileOutcome = try catalogStore.reconcilePreviewAgainstRemote()
-            reconcileError = nil
-        } catch {
-            reconcileOutcome = nil
-            reconcileError = error.localizedDescription
+    private func conflictDescription(_ path: String) -> String {
+        let parts = path.split(separator: ".").map(String.init)
+        guard parts.count >= 3 else { return path }
+        let id = parts[1]
+        let name: String
+        switch parts[0] {
+        case "shops": name = catalogStore.shop(id: id)?.name ?? id
+        case "series": name = catalogStore.series(id: id)?.name ?? id
+        case "products": name = catalogStore.product(id: id)?.name ?? id
+        default: name = id
         }
-    }
-
-    /// 真正写盘（覆盖层 → 也就是本机内容）。
-    private func runAlign() {
-        guard reconcileOutcome != nil else { return }
-        do {
-            let executed = try catalogStore.alignLocalCatalogToRemote()
-            // 执行结果可能与预览不同（两次点击之间本机被改过）→ 用**实际执行**的那份
-            reconcileOutcome = nil
-            reconcileError = nil
-            var parts = ["已按线上那一版对齐本机：" + executed.summaryText + "。"]
-            if let aligned = catalogStore.isLocalCatalogAlignedWithRemote {
-                parts.append(aligned
-                    ? "自检通过：本机目录现在与线上那一版逐条一致。"
-                    : "自检未通过：本机目录与线上仍不一致（见下条说明）。")
-            }
-            alignResultText = parts.joined(separator: " ")
-        } catch {
-            reconcileError = error.localizedDescription
-        }
+        let labels = ["name": "名称", "category": "分类", "shopID": "关联店家",
+                      "seriesID": "关联系列", "images": "图片", "designName": "款式名",
+                      "price": "价格", "fabric": "面料", "logo": "店家图标",
+                      "coverImage": "系列封面", "description": "描述"]
+        return name + " · " + (labels[parts.last!] ?? parts.dropFirst(2).joined(separator: "."))
     }
 
     // MARK: 上传前检查（共享门禁）
@@ -260,7 +173,7 @@ struct ShopCatalogOpsUploadSection: View {
                         .textSelection(.enabled)
                 }
                 if review.blockingIssues.count > 3 {
-                    Text("还有 \(review.blockingIssues.count - 3) 条，按「仅暂存图片」可看全。")
+                    Text("还有 \(review.blockingIssues.count - 3) 条，同步失败时下方会列出完整原因。")
                         .font(.system(size: 11))
                         .foregroundStyle(.secondary)
                 }
@@ -370,7 +283,7 @@ struct ShopCatalogOpsUploadSection: View {
             HStack(spacing: 6) {
                 Text(job.displayTitle)
                     .font(.system(size: 13, weight: .medium))
-                    .lineLimit(1)
+                    .lineLimit(3)
                 Spacer(minLength: 6)
                 Text(job.status.displayName)
                     .font(.system(size: 11, weight: .semibold))
@@ -401,18 +314,21 @@ struct ShopCatalogOpsUploadSection: View {
 
     // MARK: 动作
 
-    private func runPublish() async {
-        guard let catalog else { return }
+    private func runPublish(
+        resolution: ShopCatalogOpsPublisher.ConflictResolution? = nil
+    ) async {
+        guard !isRunning, catalog != nil else { return }
         isRunning = true
         defer { isRunning = false }
-        _ = await publisher.publish(catalog: catalog)
-    }
-
-    private func runRetry() async {
-        guard let catalog else { return }
-        isRunning = true
-        defer { isRunning = false }
-        _ = await publisher.retryFailed(catalog: catalog)
+        switch await publisher.synchronizeAndPublish(
+            store: catalogStore, resolution: resolution) {
+        case .conflicts(let fields, let token):
+            pendingConflicts = fields
+            conflictToken = token
+        case .finished:
+            pendingConflicts = []
+            conflictToken = nil
+        }
     }
 
     // MARK: 文案
@@ -441,8 +357,7 @@ struct ShopCatalogOpsUploadSection: View {
         if let result = publisher.lastResult {
             return result.summary
         }
-        return "上传会把「local: 图片」→ THMedia、「商品 JSON」→ THDataPack、"
-            + "最后条件切换 THRelease；只有只读端回读成功才会显示「已发布」。"
+        return "自动拉取线上内容并合并，保留本机新增和修改；有冲突时先选择，再上传。回读验证成功后显示已发布。"
     }
 
     private func color(for status: ShopCatalogUploadStatus) -> Color {

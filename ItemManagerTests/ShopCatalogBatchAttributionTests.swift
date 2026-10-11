@@ -20,6 +20,7 @@ final class ShopCatalogBatchAttributionTests: XCTestCase {
         super.setUp()
         // 存储重定向到临时目录：测试不得触碰用户真实沙盒（2026-09-21 事故防线）
         ShopCatalogStorage.useTemporaryForTesting()
+        draftStore.loadDrafts()
         store = ShopCatalogStore()
         XCTAssertNotNil(store.loadFromBundleIfNeeded())
         CreatorAccess.setTestOverride(.creator)
@@ -54,6 +55,39 @@ final class ShopCatalogBatchAttributionTests: XCTestCase {
     }
 
     // MARK: 整批归属同步
+
+    func testAddedItemInheritsLatestBatchAttributionAndKeepsExistingOverrides() throws {
+        let session = CatalogBatchEntrySession()
+        try draftStore.createBatch(session, drafts: [makeDraft(name: "原单品")])
+        _ = try apply(session.id, newShop: "1304", newSeries: "PAD")
+        var existing = try XCTUnwrap(draftStore.drafts.first { $0.batchID == session.id })
+        existing.newShopName = "单独指定店家"
+        try draftStore.upsert(existing)
+        let added = try draftStore.addItemToBatch(session.id)
+        XCTAssertEqual(added.newShopName, "1304")
+        XCTAssertEqual(added.newSeriesName, "PAD")
+        XCTAssertEqual(added.newSeriesYear, 2026)
+        XCTAssertEqual(draftStore.drafts.first { $0.id == existing.id }?.newShopName, "单独指定店家")
+        draftStore.loadDrafts()
+        let reloaded = try XCTUnwrap(draftStore.drafts.first { $0.id == added.id })
+        XCTAssertEqual(reloaded.newShopName, "1304")
+    }
+
+    func testAddedItemUsesUnsavedAttributionWithoutRewritingOlderItems() throws {
+        var session = CatalogBatchEntrySession()
+        try draftStore.createBatch(session, drafts: [makeDraft(name: "原单品")])
+        session.newShopName = "刚输入的店家"
+        session.newSeriesName = "刚输入的系列"
+        session.newSeriesMonth = 10
+        let added = try draftStore.addItemToBatch(session.id, attribution: session)
+        XCTAssertEqual(added.newShopName, session.newShopName)
+        XCTAssertEqual(added.newSeriesMonth, 10)
+        XCTAssertEqual(draftStore.drafts.first {
+            $0.batchID == session.id && $0.name == "原单品"
+        }?.newShopName, "")
+        XCTAssertEqual(ShopCatalogDraftStore.loadBatches().first { $0.id == session.id }?.newShopName,
+                       session.newShopName)
+    }
 
     func testApplyBatchAttributionSyncsAllDraftsAndSession() throws {
         let session = CatalogBatchEntrySession()

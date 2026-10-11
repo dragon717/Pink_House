@@ -906,6 +906,10 @@ class CloudKitWebServicesAdapter(PublishAdapter):
             "recordName": record.get("recordName"),
             "rootIndexHash": root_hash if isinstance(root_hash, str) else None,
             "publishedAt": published_at if isinstance(published_at, str) else None,
+            # 元数据修复需要沿用原发布协议，不能猜测或降低最低客户端版本。
+            "schemaVersion": (fields.get("schemaVersion") or {}).get("value"),
+            "minimumReaderVersion": (fields.get("minimumReaderVersion") or {}).get("value"),
+            "previousReleaseSeq": (fields.get("previousReleaseSeq") or {}).get("value"),
         }
 
     def _asset_exists(self, record_type: str, record_name: str) -> bool:

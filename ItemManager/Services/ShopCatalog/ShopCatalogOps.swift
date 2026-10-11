@@ -947,6 +947,35 @@ final class ShopCatalogDraftStore: ObservableObject {
         return "已生成 \(prepared.count) 条单品草稿"
     }
 
+    /// 新增单品读取当前持久化批次，避免详情页持有的旧 session 丢失后续归属。
+    @discardableResult
+    func addItemToBatch(_ batchID: String, attribution: CatalogBatchEntrySession? = nil) throws -> CatalogProductDraft {
+        var sessions = Self.loadBatches()
+        guard let index = sessions.firstIndex(where: { $0.id == batchID }) else {
+            throw ShopCatalogDraftFileError.writeFailed("批次不存在，请重新打开批次详情")
+        }
+        if let attribution {
+            guard attribution.id == batchID else {
+                throw ShopCatalogDraftFileError.writeFailed("批次归属不匹配")
+            }
+            sessions[index] = attribution
+            try saveBatches(sessions)
+        }
+        let session = sessions[index]
+        var draft = CatalogProductDraft()
+        draft.batchID = batchID
+        draft.shopID = session.shopID
+        draft.newShopName = session.newShopName
+        draft.newShopAliases = session.newShopAliases
+        draft.seriesID = session.seriesID
+        draft.newSeriesName = session.newSeriesName
+        draft.newSeriesYear = session.newSeriesYear
+        draft.newSeriesMonth = session.newSeriesMonth
+        draft.newSeriesSeason = session.newSeriesSeason
+        try upsert(draft)
+        return draft
+    }
+
     /// 批量提交（§4.1）：本批次全部草稿态条目 → 提交；单品状态互不耦合
     func submitBatch(_ batchID: String) throws -> Int {
         try CreatorAccess.requireCreator(.listingStatus)
@@ -1559,6 +1588,11 @@ final class ShopCatalogDraftStore: ObservableObject {
         // 只命中一部分说明内容变了（例如只改了预约价）：现货事件 ID 不变所以还在，
         // 但新的预约事件还没写。此时若按恢复处理，本次真实变更就会被吞掉。
         guard hit.count == candidateIDs.count else { return nil }
+        // 历史销售记录可独立保留，不能用它证明商品实体仍然存在。
+        guard Set(hit.map(\.productID)).count == 1,
+              let product = store.product(id: hit[0].productID),
+              store.shop(id: product.shopID) != nil,
+              store.series(id: product.seriesID) != nil else { return nil }
 
         // 款式档案补齐：本方法等价于「产物已落、收尾没做完」，因此除了草稿回执，
         // 还要把草稿携带的款式面料/描述写进款式档案 —— 否则「只改了面料再发布」
@@ -1628,7 +1662,9 @@ final class ShopCatalogDraftStore: ObservableObject {
 
         // ── 幂等入口 ①：草稿已记录过同一份内容的发布结果 ────────────────────
         let operationKey = draft.publishOperationKey
-        if let recorded = draft.publishedResult, recorded.operationKey == operationKey {
+        if let recorded = draft.publishedResult, recorded.operationKey == operationKey,
+           let product = store.product(id: recorded.productID),
+           store.shop(id: product.shopID) != nil, store.series(id: product.seriesID) != nil {
             store.reloadWithOverlay()
             if draft.status != .published {
                 var settled = draft
@@ -1763,7 +1799,21 @@ final class ShopCatalogDraftStore: ObservableObject {
             if draft.effectiveStockPrice != nil { appendedKinds.append("现货价") }
             summary = "已向既有商品「\(existing.name)」追加\(appendedKinds.joined(separator: " + "))记录"
         } else {
-            productID = "prod-ops-\(UUID().uuidString.prefix(8))"
+            // 对齐误移除实体后，复用保留下来的事件归属 ID，恢复同一件商品与历史。
+            let eventIDs = Set(Self.publishEventIDs(for: draft).values)
+            let retainedIDs = Set(((catalog?.saleEvents ?? []) + overlay.saleEvents)
+                .filter { eventIDs.contains($0.id) }.map(\.productID))
+            if let receipt = draft.publishedResult, receipt.operationKey == operationKey,
+               !overlay.removedProductIDs.contains(receipt.productID),
+               !(catalog?.removedProductIDs.contains(receipt.productID) ?? false) {
+                productID = receipt.productID
+            } else if retainedIDs.count == 1, let retained = retainedIDs.first,
+               !overlay.removedProductIDs.contains(retained),
+               !(store.catalog?.removedProductIDs.contains(retained) ?? false) {
+                productID = retained
+            } else {
+                productID = "prod-ops-\(UUID().uuidString.prefix(8))"
+            }
             let assetIDs = draft.images.map { asset -> String in
                 var a = asset
                 if overlay.assets.contains(where: { $0.id == a.id }) {
@@ -1883,6 +1933,24 @@ final class ShopCatalogDraftStore: ObservableObject {
                 detail: error.localizedDescription)
         }
         return summary + "（\(shop.name) · \(series.name)）"
+    }
+
+    func recoverablePublishedDrafts(store: ShopCatalogStore) -> [CatalogProductDraft] {
+        drafts.filter { draft in
+            guard draft.status == .published, let receipt = draft.publishedResult else { return false }
+            return store.product(id: receipt.productID) == nil
+                && !(store.catalog?.removedProductIDs.contains(receipt.productID) ?? false)
+        }
+    }
+
+    @discardableResult
+    func restoreMissingPublishedDraft(_ draft: CatalogProductDraft, store: ShopCatalogStore) throws -> String {
+        guard recoverablePublishedDrafts(store: store).contains(where: { $0.id == draft.id }) else {
+            throw ShopCatalogDraftFileError.writeFailed("商品已存在或已明确下架，无需恢复")
+        }
+        var pending = draft
+        pending.status = .reviewed
+        return try publish(pending, store: store)
     }
 
     // MARK: 实体编辑 / 归档 / 删除（V1.1 §4.2 + 重构方案 §5.5 引用保护）
@@ -2741,15 +2809,7 @@ final class ShopCatalogDraftStore: ObservableObject {
         try data.write(to: overlayURL, options: .atomic)
     }
 
-    /// 用「以线上那一版为准对账」的结果**整体替换**覆盖层（2026-09-29）。
-    ///
-    /// 为什么需要它：覆盖层是**唯一落盘**的目录层（远端层只在内存里），
-    /// 要让本机内容确实等于线上那一版，就得把对账结果写回覆盖层。
-    /// 与 `saveOverlay` 放在同一处（同一条写盘路径），不另开第二个写入点 ——
-    /// 覆盖层有两处写法时，「哪一份才是本机内容」就说不清了。
-    ///
-    /// ⚠️ 调用方负责算对账结果（唯一口径 = `ShopCatalogReconcile`，在 `SharedCatalog` 包里），
-    /// 这里只负责写盘。
+    /// 原子保存覆盖层；合并与恢复调用方先完成业务校验。
     nonisolated static func replaceOverlay(with catalog: ShopCatalog) throws {
         try saveOverlay(catalog)
     }

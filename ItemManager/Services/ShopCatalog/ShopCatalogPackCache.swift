@@ -152,6 +152,43 @@ nonisolated enum ShopCatalogPackCache {
         control.installedReleaseSeq != releaseSeq || control.installedPayloadHash != payloadHash
     }
 
+    // 运营草稿的来源版本：仅在同步合并或发布成功后推进，普通刷新不能推进它。
+    static var publicationBaselineURL: URL {
+        ShopCatalogStorage.directory.appendingPathComponent("publication-baseline.json")
+    }
+
+    static func loadPublicationBaseline() -> ShopCatalogBaseline? {
+        guard let data = try? Data(contentsOf: publicationBaselineURL) else { return nil }
+        if let record = try? ShopCatalogJSONCoding.decoder().decode(PublicationBaselineRecord.self, from: data) {
+            return record.baseline
+        }
+        return try? ShopCatalogJSONCoding.decoder().decode(ShopCatalogBaseline.self, from: data)
+    }
+
+    private struct PublicationBaselineRecord: Codable {
+        var baseline: ShopCatalogBaseline
+        var catalog: ShopCatalog?
+    }
+
+    static func loadPublicationCatalog() -> ShopCatalog? {
+        guard let data = try? Data(contentsOf: publicationBaselineURL),
+              let record = try? ShopCatalogJSONCoding.decoder().decode(PublicationBaselineRecord.self, from: data)
+        else { return nil }
+        return record.catalog
+    }
+
+    static func savePublicationBaseline(_ baseline: ShopCatalogBaseline, catalog: ShopCatalog? = nil) throws {
+        // 版本与正文同一个原子快照，旧的只有版本号的文件仍可读取。
+        try ShopCatalogJSONCoding.encoder().encode(PublicationBaselineRecord(baseline: baseline, catalog: catalog))
+            .write(to: publicationBaselineURL, options: .atomic)
+    }
+
+    static func clearPublicationBaseline() throws {
+        if FileManager.default.fileExists(atPath: publicationBaselineURL.path) {
+            try FileManager.default.removeItem(at: publicationBaselineURL)
+        }
+    }
+
     // MARK: 远端媒体缓存（THMedia 按需下载）
 
     /// 媒体目录（跟随 `ShopCatalogSyncStorage` 的测试隔离，不另开一套重定向）

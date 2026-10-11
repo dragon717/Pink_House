@@ -33,20 +33,25 @@ import CryptoKit
 nonisolated enum ShopCatalogOpsPublishResult: Equatable {
     /// 全链路成功：发布头已切换且只读端回读验证通过
     case published(releaseSeq: Int, mediaCount: Int)
+    case upToDate(releaseSeq: Int)
     /// **发布头未切换**：媒体或数据包阶段失败 → 线上仍是旧版本（方案 §3.4 末段）
     case notPublished(String)
     /// 发布头已切换但只读端回读失败 → 只计数「已发布未验证」（方案 §4 最后一行）
     case publishedButUnverified(releaseSeq: Int, detail: String)
 
     var isSuccess: Bool {
-        if case .published = self { return true }
-        return false
+        switch self {
+        case .published, .upToDate: return true
+        default: return false
+        }
     }
 
     var summary: String {
         switch self {
         case .published(let releaseSeq, let mediaCount):
             return "已发布并验证成功（发布序号 \(releaseSeq)，图片 \(mediaCount) 张）"
+        case .upToDate(let releaseSeq):
+            return "已是最新（发布序号 \(releaseSeq)），没有待上传的修改"
         case .notPublished(let reason):
             return "未发布：\(reason)"
         case .publishedButUnverified(let releaseSeq, let detail):
@@ -90,11 +95,14 @@ nonisolated enum ShopCatalogOpsPublishScope {
 @MainActor
 final class ShopCatalogOpsPublisher: ObservableObject {
 
+    nonisolated deinit {}
+
     static let shared = ShopCatalogOpsPublisher()
 
     /// 粗粒度进度（UI 只用来做「正在做什么」的提示，细状态看任务表）
     enum Phase: Equatable {
         case idle
+        case synchronizing
         case staging
         case uploadingMedia
         case publishing
@@ -103,6 +111,7 @@ final class ShopCatalogOpsPublisher: ObservableObject {
         var displayName: String {
             switch self {
             case .idle: return "空闲"
+            case .synchronizing: return "拉取与合并"
             case .staging: return "暂存图片"
             case .uploadingMedia: return "上传图片"
             case .publishing: return "发布商品包"
@@ -141,41 +150,125 @@ final class ShopCatalogOpsPublisher: ObservableObject {
         self.uploadStore = uploadStore ?? .shared
     }
 
+    #if DEBUG
+    static let environmentName = "development"
+    #else
+    static let environmentName = "production"
+    #endif
+
+    private func checkBaseline(_ baseline: ShopCatalogBaseline?,
+                               against snapshot: ShopCatalogOpsReleaseSnapshot?) throws {
+        guard let baseline, let seq = baseline.releaseSeq,
+              baseline.environment == Self.environmentName,
+              seq == 0 || !(baseline.rootIndexHash ?? "").isEmpty else {
+            throw ShopCatalogOpsUploadError.conflict("请先取回线上内容，再同步更新。")
+        }
+        let onlineSeq = snapshot?.header.releaseSeq ?? 0
+        guard seq == onlineSeq,
+              (seq == 0 ? snapshot == nil : baseline.rootIndexHash == snapshot?.header.rootIndexHash) else {
+            throw ShopCatalogOpsUploadError.conflict("线上内容已更新，请再次同步更新，合并最新修改。")
+        }
+    }
+
     // MARK: 对外入口
 
-    /// 只暂存（不碰网络）：让运营在真正上传前就看见「有引用但没图」这类问题。
-    ///
-    /// ⚠️ 2026-09-29 修复：本方法**必须把结果写进 `lastResult` / `lastStagingIssues`**。
-    /// 原先它只 `return` 结果，而界面按钮写的是 `_ = publisher.stageOnly(...)`
-    /// —— 返回值被丢弃，缺图时**一个字都不显示**，运营看到的就是「点了没反应」。
-    @discardableResult
-    func stageOnly(catalog: ShopCatalog) -> ShopCatalogOpsPublishResult {
-        let diagnosis = ShopCatalogOpsMediaStaging.diagnose(for: catalog)
-        lastStagingIssues = diagnosis.issues
-        let result: ShopCatalogOpsPublishResult
-        if diagnosis.isBlocked {
-            result = .notPublished(diagnosis.summary)
-        } else {
-            register(diagnosis.staged)
-            result = .notPublished("已暂存 \(diagnosis.staged.count) 张图片，等待上传")
+    struct ConflictResolution {
+        let token: String
+        let preferLocal: Bool
+    }
+
+    enum SyncResult {
+        case conflicts(fields: [String], token: String)
+        case finished(ShopCatalogOpsPublishResult)
+    }
+
+    /// 唯一运营更新入口：完整读取远端、三方合并、本机落盘，再条件发布。
+    /// 冲突选择只适用于本次看到的远端版本和本机内容；重试也必须先重新拉取。
+    func synchronizeAndPublish(
+        store: ShopCatalogStore, resolution: ConflictResolution? = nil
+    ) async -> SyncResult {
+        phase = .synchronizing
+        lastResult = nil
+        lastStagingIssues = []
+        lastMediaStats = nil
+        defer { phase = .idle }
+        do {
+            let header: ShopCatalogReleaseHeader?
+            do { header = try await reader.fetchReleaseHeader() }
+            catch let error as ShopCatalogSyncError {
+                guard case .recordMissing(let type, let name) = error,
+                      type == "THRelease", name == ShopCatalogSyncProtocol.releaseRecordName else { throw error }
+                header = nil
+            }
+            let remote: ShopCatalog
+            if let header {
+                guard header.schemaVersion == ShopCatalogSyncProtocol.schemaVersion,
+                      header.minimumReaderVersion <= ShopCatalogSyncProtocol.readerVersion else {
+                    throw ShopCatalogSyncValidationError.unsupportedSchema("请更新 App 后再同步更新")
+                }
+                let rootData = try await reader.fetchRootIndex()
+                guard ShopCatalogSyncProtocol.sha256Hex(rootData) == header.rootIndexHash else {
+                    throw ShopCatalogSyncValidationError.rootIndexMismatch("线上版本正在变化，请重新同步更新")
+                }
+                let root = try ShopCatalogJSONCoding.decoder().decode(ShopCatalogRootIndex.self, from: rootData)
+                guard root.releaseSeq == header.releaseSeq else {
+                    throw ShopCatalogSyncValidationError.rootIndexMismatch("根清单版本与发布头不一致")
+                }
+                if let partition = root.shopCatalogPartition {
+                    let pack = try await reader.fetchPack(payloadHash: partition.payloadHash)
+                    remote = try ShopCatalogCloudSyncValidator.validatedShopCatalog(
+                        header: header, rootIndexData: rootData, packCompressed: pack)
+                } else { remote = ShopCatalog() }
+            } else { remote = ShopCatalog() }
+
+            let local = store.catalog ?? ShopCatalog()
+            let diagnosis = ShopCatalogOpsMediaStaging.diagnose(for: local)
+            var hashes: [String: String] = [:]
+            for media in diagnosis.staged {
+                for owner in media.owners { hashes[owner.reference] = media.mediaKey }
+            }
+            let baseline = ShopCatalogPackCache.loadPublicationBaseline()
+            let token = ShopCatalogSyncProtocol.sha256Hex(
+                try ShopCatalogJSONCoding.encoder().encode(local)) + ":" + (header?.rootIndexHash ?? "empty")
+            let merged = try ShopCatalogThreeWayMerge.merge(
+                local: local, remote: remote,
+                baseline: baseline?.environment == Self.environmentName
+                    ? ShopCatalogPackCache.loadPublicationCatalog() : nil,
+                mediaHashesByLocalReference: hashes,
+                preferLocalOnConflict: resolution?.preferLocal ?? false)
+            if !merged.conflicts.isEmpty, resolution?.token != token {
+                return .conflicts(fields: merged.conflicts, token: token)
+            }
+            let issues = ShopCatalogCloudSyncValidator.structuralIssues(
+                merged.catalog, coverageStatus: Self.entityCount(of: merged.catalog) > 0 ? "complete" : "empty")
+            guard issues.isEmpty else {
+                throw ShopCatalogOpsUploadError.blocked("目录关联不完整，请先恢复缺失商品：" + issues.prefix(3).joined(separator: "；"))
+            }
+            let unchanged = header != nil && !diagnosis.isBlocked
+                && Self.catalogForPublication(ShopCatalogOpsMediaStaging.rewrite(merged.catalog, mediaKeys: hashes)) == remote
+            try store.installMergedCatalog(merged.catalog, remote: remote)
+            try ShopCatalogPackCache.savePublicationBaseline(ShopCatalogBaseline(
+                releaseSeq: header?.releaseSeq ?? 0, rootIndexHash: header?.rootIndexHash,
+                environment: Self.environmentName, observedAt: Date()), catalog: remote)
+            if unchanged, let header {
+                let result = ShopCatalogOpsPublishResult.upToDate(releaseSeq: header.releaseSeq)
+                lastResult = result
+                return .finished(result)
+            }
+            let result = await run(catalog: merged.catalog)
+            lastResult = result
+            return .finished(result)
+        } catch {
+            let result = ShopCatalogOpsPublishResult.notPublished(error.localizedDescription)
+            lastResult = result
+            return .finished(result)
         }
-        lastResult = result
-        return result
     }
 
     /// 全流程：暂存 → 上传 → 发布 → 回读验证
     @discardableResult
     func publish(catalog: ShopCatalog) async -> ShopCatalogOpsPublishResult {
-        let result = await run(catalog: catalog, retryOnlyFailed: false)
-        lastResult = result
-        phase = .idle
-        return result
-    }
-
-    /// 只重试未成功的任务（方案 §4：失败后重跑是幂等的）
-    @discardableResult
-    func retryFailed(catalog: ShopCatalog) async -> ShopCatalogOpsPublishResult {
-        let result = await run(catalog: catalog, retryOnlyFailed: true)
+        let result = await run(catalog: catalog)
         lastResult = result
         phase = .idle
         return result
@@ -183,15 +276,20 @@ final class ShopCatalogOpsPublisher: ObservableObject {
 
     // MARK: 主流程
 
-    private func run(
-        catalog: ShopCatalog, retryOnlyFailed: Bool
-    ) async -> ShopCatalogOpsPublishResult {
+    private func run(catalog: ShopCatalog) async -> ShopCatalogOpsPublishResult {
         phase = .staging
         verifiedThisRun = []
         lastMediaStats = nil
+        let structure = ShopCatalogCloudSyncValidator.structuralIssues(
+            catalog, coverageStatus: Self.entityCount(of: catalog) > 0 ? "complete" : "empty")
+        guard structure.isEmpty else {
+            return .notPublished("目录关联不完整，请先恢复缺失商品或修复归属："
+                + structure.prefix(3).joined(separator: "；"))
+        }
         // **一次列全**：缺图往往不止一张（线上实测 174 张 / 560 处引用），
         // 只说第一条等于没说 —— 运营没法据此补齐。
-        let diagnosis = ShopCatalogOpsMediaStaging.diagnose(for: catalog)
+        let publication = Self.catalogForPublication(catalog)
+        let diagnosis = ShopCatalogOpsMediaStaging.diagnose(for: publication)
         lastStagingIssues = diagnosis.issues
         guard !diagnosis.isBlocked else {
             // 方案 §4 第 1 行：选图读取 / 压缩失败 → stagedFailed，允许重新选图。
@@ -199,6 +297,26 @@ final class ShopCatalogOpsPublisher: ObservableObject {
             return .notPublished(diagnosis.summary)
         }
         let staged = diagnosis.staged
+        // 在任何云端写入前冻结来源版本；上传期间再次检查，随后仍使用 changeTag。
+        var baseline = ShopCatalogPackCache.loadPublicationBaseline()
+        var previousRootData: Data?
+        do {
+            let initial = try await writer.fetchRelease()
+            // 真正读到空公共库才允许首次发布；读取失败不能落到这条分支。
+            if baseline == nil, initial == nil {
+                baseline = ShopCatalogBaseline(releaseSeq: 0, environment: Self.environmentName)
+            }
+            try checkBaseline(baseline, against: initial)
+            if let initial {
+                let data = try await reader.fetchRootIndex()
+                guard ShopCatalogSyncProtocol.sha256Hex(data) == initial.header.rootIndexHash else {
+                    throw ShopCatalogOpsUploadError.conflict("线上内容已更新，请再次同步更新")
+                }
+                previousRootData = data
+            }
+        } catch {
+            return .notPublished(error.localizedDescription)
+        }
         register(staged)
 
         // ---- 1) 媒体
@@ -227,10 +345,6 @@ final class ShopCatalogOpsPublisher: ObservableObject {
         for media in staged {
             let current = uploadStore.job(mediaKey: media.mediaKey)
             if current?.status == .mediaVerified || current?.status == .published { continue }
-            if retryOnlyFailed, let status = current?.status,
-               status != .retryable, status != .failed, status != .stagedFailed {
-                continue
-            }
             switch await uploadOne(media, remoteIndex: remoteIndex) {
             case .uploaded: uploaded += 1
             case .skippedAsRemoteDuplicate: skipped += 1
@@ -261,7 +375,7 @@ final class ShopCatalogOpsPublisher: ObservableObject {
                 keys[owner.reference] = media.mediaKey
             }
         }
-        let rewritten = ShopCatalogOpsMediaStaging.rewrite(catalog, mediaKeys: keys)
+        let rewritten = ShopCatalogOpsMediaStaging.rewrite(publication, mediaKeys: keys)
 
         let payload: ShopCatalogPackPayload
         let compressed: Data
@@ -278,12 +392,15 @@ final class ShopCatalogOpsPublisher: ObservableObject {
         // 发布任务：把「商品包 + 发布头」这一步也落成一条可展示、可重跑的任务
         // （方案 §4 的 `阶段` 字段取值就来自这里）。
         let releaseJobID = "release:\(payloadHash)"
+        let catalogSummary = Self.publicationTitle(catalog: rewritten,
+            baseline: ShopCatalogPackCache.loadPublicationCatalog())
         uploadStore.upsertTask(
             jobID: releaseJobID,
             mediaKey: payloadHash,
             stage: .pack,
             mimeType: "application/gzip",
-            byteCount: compressed.count)
+            byteCount: compressed.count,
+            catalogSummary: catalogSummary)
 
         func markReleaseJob(
             stage: ShopCatalogUploadStage, status: ShopCatalogUploadStatus,
@@ -295,7 +412,8 @@ final class ShopCatalogOpsPublisher: ObservableObject {
                 stage: stage,
                 mimeType: "application/gzip",
                 byteCount: compressed.count,
-                releaseSeq: releaseSeq)
+                releaseSeq: releaseSeq,
+                catalogSummary: catalogSummary)
             uploadStore.updateTask(jobID: releaseJobID) { job in
                 if let reason { job.markFailure(status, reason: reason) }
                 else { job.markSuccess(status) }
@@ -321,13 +439,14 @@ final class ShopCatalogOpsPublisher: ObservableObject {
 
             // 发布头：读当前 → 条件更新（§3.4 第 4 步）
             let snapshot = try await writer.fetchRelease()
+            try checkBaseline(baseline, against: snapshot)
             let newSeq = (snapshot?.header.releaseSeq ?? 0) + 1
             let rootIndexData = try Self.makeRootIndexData(
                 releaseSeq: newSeq,
                 revocationEpoch: snapshot?.header.revocationEpoch ?? 0,
                 payloadHash: payloadHash,
                 compressedByteCount: compressed.count,
-                recordCount: Self.entityCount(of: rewritten)
+                recordCount: Self.entityCount(of: rewritten), previousRootData: previousRootData
             )
             let rootIndexHash = ShopCatalogSyncProtocol.sha256Hex(rootIndexData)
             let update = ShopCatalogOpsReleaseUpdate(
@@ -373,6 +492,16 @@ final class ShopCatalogOpsPublisher: ObservableObject {
                 markReleaseJob(stage: .release, status: .publishedButUnverified,
                                reason: failure, releaseSeq: newSeq)
                 return .publishedButUnverified(releaseSeq: newSeq, detail: failure)
+            }
+            do {
+                try ShopCatalogPackCache.savePublicationBaseline(ShopCatalogBaseline(
+                    releaseSeq: newSeq, rootIndexHash: rootIndexHash,
+                    environment: Self.environmentName, observedAt: Date()), catalog: rewritten)
+            } catch {
+                let detail = "线上发布已验证，但本机未保存核对结果：\(error.localizedDescription)。请再次同步更新。"
+                markReleaseJob(stage: .release, status: .publishedButUnverified,
+                               reason: detail, releaseSeq: newSeq)
+                return .publishedButUnverified(releaseSeq: newSeq, detail: detail)
             }
             markReleaseJob(stage: .release, status: .published, releaseSeq: newSeq)
             return .published(releaseSeq: newSeq, mediaCount: staged.count)
@@ -450,8 +579,10 @@ final class ShopCatalogOpsPublisher: ObservableObject {
                 sha256: media.mediaKey,
                 byteCount: media.byteCount,
                 fileURL: URL(fileURLWithPath: media.filePath))
-            // 回读校验（方案 §3.2 第 6 步）：hash 不一致一律不标 verified
-            let readBack = try await writer.fetchMediaBytes(mediaKey: media.mediaKey)
+            // 用普通消费读取通道确认图片已可取回，不能只验证写入账号能读。
+            let readBack = try await Self.retrying(times: 3, delay: 1.0) {
+                try await self.reader.fetchMedia(contentHash: media.mediaKey)
+            }
             let digest = ShopCatalogSyncProtocol.sha256Hex(readBack)
             guard digest == media.mediaKey else {
                 uploadStore.update(mediaKey: media.mediaKey) {
@@ -460,7 +591,7 @@ final class ShopCatalogOpsPublisher: ObservableObject {
                 }
                 return .failed
             }
-            // 记下「这次已经验过字节」，末尾端到端验证就不再下载第二遍
+            // 已经通过普通消费路径验过字节，末尾不重复下载。
             verifiedThisRun.insert(media.mediaKey)
             uploadStore.update(mediaKey: media.mediaKey) { $0.markSuccess(.mediaVerified) }
             return .uploaded
@@ -497,15 +628,20 @@ final class ShopCatalogOpsPublisher: ObservableObject {
                 return "回读根清单 SHA-256 与发布头不符"
             }
             let packCompressed = try await reader.fetchPack(payloadHash: payloadHash)
-            _ = try ShopCatalogCloudSyncValidator.validatedShopCatalog(
+            let installed = try ShopCatalogCloudSyncValidator.validatedShopCatalog(
                 header: header, rootIndexData: rootData, packCompressed: packCompressed)
+            guard installed == catalog else { return "回读目录与本次提交的商品内容不一致" }
 
             // 图片链路**独立**校验：数据包校验成功不等于图片能拉到（方案 §5）
-            for asset in catalog.assets {
-                guard let mediaKey = ShopCatalogSyncProtocol.resolvedMediaKey(
-                    asset.mediaKey,
-                    fallbackReferences: [asset.originalURL, asset.thumbnailURL, asset.previewURL]
-                ) else { continue }
+            // 同时覆盖店家图标、系列封面、尺码表和资源的各个图片字段。
+            var mediaKeys = Set(ShopCatalogMediaReferences.publisherRewritten(in: catalog).compactMap {
+                ShopCatalogSyncProtocol.resolvedMediaKey(nil, fallbackReferences: [$0.reference])
+            })
+            mediaKeys.formUnion(catalog.assets.compactMap {
+                ShopCatalogSyncProtocol.resolvedMediaKey($0.mediaKey,
+                    fallbackReferences: [$0.originalURL, $0.thumbnailURL, $0.previewURL])
+            })
+            for mediaKey in mediaKeys.sorted() {
                 // 本次已经回读校验过字节 → 不再下载第二遍（去重拦截的另一半）。
                 // 450 张图在末尾再全量拉一遍，是撞限流的主要来源。
                 if verifiedThisRun.contains(mediaKey) { continue }
@@ -524,6 +660,38 @@ final class ShopCatalogOpsPublisher: ObservableObject {
 
     // MARK: 纯逻辑（可单测）
 
+    /// 原目录已先通过结构门禁。下架商品的历史留在本机与旧不可变包，
+    /// 公共包只携带可关联商品的事件，与 Mac 构建器口径一致，兼容现有读取器。
+    nonisolated static func catalogForPublication(_ catalog: ShopCatalog) -> ShopCatalog {
+        var output = catalog
+        let products = Set(catalog.products.map(\.id))
+        output.saleEvents = catalog.saleEvents.filter { products.contains($0.productID) }
+        return output
+    }
+
+    nonisolated static func publicationTitle(catalog: ShopCatalog, baseline: ShopCatalog?) -> String {
+        let changed = catalog.products.filter { product in
+            guard let baseline else { return true }
+            return !baseline.products.contains(product)
+                || catalog.saleEvents.filter { $0.productID == product.id }
+                    != baseline.saleEvents.filter { $0.productID == product.id }
+                || catalog.shops.first { $0.id == product.shopID }
+                    != baseline.shops.first { $0.id == product.shopID }
+                || catalog.series.first { $0.id == product.seriesID }
+                    != baseline.series.first { $0.id == product.seriesID }
+        }
+        let products = changed.isEmpty ? catalog.products : changed
+        let labels = products.prefix(3).map { product in
+            [catalog.shops.first { $0.id == product.shopID }?.name,
+             catalog.series.first { $0.id == product.seriesID }?.name, product.name]
+                .compactMap { $0 }.joined(separator: " · ")
+        }
+        if !labels.isEmpty {
+            return labels.joined(separator: "；") + (products.count > 3 ? " 等 \(products.count) 件" : "")
+        }
+        return "店家 \(catalog.shops.count) · 系列 \(catalog.series.count) · 商品 0（无商品）"
+    }
+
     /// 组装分片负载。载荷键是 `shopCatalog`（不是画册分片的 `records`）
     nonisolated static func makePayload(catalog: ShopCatalog) -> ShopCatalogPackPayload {
         ShopCatalogPackPayload(
@@ -535,7 +703,7 @@ final class ShopCatalogOpsPublisher: ObservableObject {
             coverageStatus: entityCount(of: catalog) > 0
                 ? ShopCatalogRootIndex.Partition.Coverage.complete
                 : ShopCatalogRootIndex.Partition.Coverage.empty,
-            checkedThrough: nil,
+            checkedThrough: timestamp(),
             shopCatalog: catalog
         )
     }
@@ -545,7 +713,8 @@ final class ShopCatalogOpsPublisher: ObservableObject {
     /// `build_release.py`（`root_bytes = canonical_json_bytes(root_index)`）同口径。
     nonisolated static func makeRootIndexData(
         releaseSeq: Int, revocationEpoch: Int,
-        payloadHash: String, compressedByteCount: Int, recordCount: Int
+        payloadHash: String, compressedByteCount: Int, recordCount: Int,
+        previousRootData: Data? = nil
     ) throws -> Data {
         let partition = ShopCatalogRootIndex.Partition(
             partitionID: ShopCatalogOpsPublishScope.partitionID,
@@ -555,7 +724,7 @@ final class ShopCatalogOpsPublisher: ObservableObject {
             coverageStatus: recordCount > 0
                 ? ShopCatalogRootIndex.Partition.Coverage.complete
                 : ShopCatalogRootIndex.Partition.Coverage.empty,
-            checkedThrough: nil,
+            checkedThrough: timestamp(),
             packRecordName: ShopCatalogSyncProtocol.packRecordName(payloadHash: payloadHash),
             payloadHash: payloadHash,
             recordCount: recordCount,
@@ -569,7 +738,20 @@ final class ShopCatalogOpsPublisher: ObservableObject {
             partitions: [partition],
             withdrawals: nil
         )
-        return try ShopCatalogJSONCoding.encoder().encode(rootIndex)
+        let fresh = try ShopCatalogJSONCoding.encoder().encode(rootIndex)
+        guard let previousRootData else { return fresh }
+        var previous = try JSONSerialization.jsonObject(with: previousRootData) as! [String: Any]
+        let update = try JSONSerialization.jsonObject(with: fresh) as! [String: Any]
+        for key in ["schemaVersion", "releaseSeq", "publishedAt", "revocationEpoch"] {
+            previous[key] = update[key]
+        }
+        let replacement = (update["partitions"] as! [[String: Any]])[0]
+        var partitions = previous["partitions"] as? [[String: Any]] ?? []
+        if let index = partitions.firstIndex(where: { $0["partitionID"] as? String == ShopCatalogOpsPublishScope.partitionID }) {
+            partitions[index] = replacement
+        } else { partitions.append(replacement) }
+        previous["partitions"] = partitions
+        return try JSONSerialization.data(withJSONObject: previous, options: [.sortedKeys])
     }
 
     /// 条目数口径与 Mac 端 `shop_catalog_entity_count` / 客户端结构校验保持一致

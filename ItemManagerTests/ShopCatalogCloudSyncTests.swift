@@ -139,6 +139,55 @@ final class ShopCatalogCloudSyncTests: XCTestCase {
 
     // MARK: - 校验器 · 正例
 
+    func testEmptyParentCollectionsCannotHideDanglingReferences() {
+        let orphanProduct = CatalogProduct(id: "p", shopID: "s", seriesID: "se", name: "粉色 OP", category: "OP")
+        let issues = ShopCatalogCloudSyncValidator.structuralIssues(
+            ShopCatalog(products: [orphanProduct]), coverageStatus: "complete")
+        XCTAssertEqual(issues.count, 2)
+        let event = CatalogSaleEvent(id: "event", productID: "p", type: .stock, price: 888)
+        XCTAssertFalse(ShopCatalogCloudSyncValidator.structuralIssues(
+            ShopCatalog(saleEvents: [event]), coverageStatus: "complete").isEmpty)
+        XCTAssertTrue(ShopCatalogCloudSyncValidator.structuralIssues(
+            ShopCatalog(saleEvents: [event], removedProductIDs: ["p"]), coverageStatus: "complete").isEmpty)
+    }
+
+    func testSafeMergeKeepsNewProductWhenOnlineCatalogIsEmpty() throws {
+        let local = ShopCatalogSeedFixture.makeCatalog()
+        try ShopCatalogDraftStore.replaceOverlay(with: local)
+        let store = ShopCatalogStore(baseCatalog: ShopCatalog())
+        store.reloadWithOverlay()
+        store.installRemoteCatalog(ShopCatalog())
+        let result = try ShopCatalogThreeWayMerge.merge(local: local, remote: ShopCatalog(), baseline: nil)
+        try store.installMergedCatalog(result.catalog, remote: ShopCatalog())
+        XCTAssertTrue(result.conflicts.isEmpty)
+        XCTAssertEqual(store.catalog?.products, local.products)
+        XCTAssertEqual(ShopCatalogDraftStore.loadOverlay()?.products, local.products)
+    }
+
+    func testSafeMergeDoesNotPinUnchangedRemoteEntityOverFutureUpdates() throws {
+        let remote = ShopCatalogSeedFixture.makeCatalog()
+        let store = ShopCatalogStore(baseCatalog: ShopCatalog())
+        store.installRemoteCatalog(remote)
+        try store.installMergedCatalog(remote, remote: remote)
+        XCTAssertEqual(ShopCatalogDraftStore.loadOverlay()?.products.count, 0)
+        var next = remote
+        next.products[0].name = "线上下一版新名称"
+        store.installRemoteCatalog(next)
+        XCTAssertEqual(store.catalog?.products[0].name, "线上下一版新名称")
+    }
+
+    func testPublicationVersionAndCatalogSnapshotRoundTripTogether() throws {
+        let baseline = ShopCatalogBaseline(releaseSeq: 9, rootIndexHash: "hash", environment: "production")
+        let catalog = ShopCatalogSeedFixture.makeCatalog()
+        try ShopCatalogPackCache.savePublicationBaseline(baseline, catalog: catalog)
+        XCTAssertEqual(ShopCatalogPackCache.loadPublicationBaseline(), baseline)
+        XCTAssertEqual(ShopCatalogPackCache.loadPublicationCatalog(), catalog)
+        try ShopCatalogJSONCoding.encoder().encode(baseline)
+            .write(to: ShopCatalogPackCache.publicationBaselineURL)
+        XCTAssertEqual(ShopCatalogPackCache.loadPublicationBaseline(), baseline)
+        XCTAssertNil(ShopCatalogPackCache.loadPublicationCatalog())
+    }
+
     func testValidatorAcceptsValidPack() throws {
         let release = try validRelease(seq: 7, catalog: ShopCatalogSeedFixture.makeCatalog())
         let installed = try ShopCatalogCloudSyncValidator.validatedShopCatalog(

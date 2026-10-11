@@ -13,11 +13,45 @@ from unittest.mock import patch
 
 import ops_publish_bridge as bridge
 from build_release import collect_shop_catalog_media
-from protocol import ProtocolError
+from protocol import ProtocolError, validate_shop_catalog
 from publish_adapters import CredentialError, CloudKitWebServicesAdapter, Credentials, NetworkError, existing_records
 
 
 class SyncTests(unittest.TestCase):
+    def test_empty_parent_lists_still_reject_orphans_but_keep_deleted_history(self):
+        product = {"id": "p", "shopID": "s", "seriesID": "se", "name": "粉色 OP"}
+        issues = validate_shop_catalog({"products": [product]}, "brand", "complete")
+        self.assertEqual({x['code'] for x in issues},
+                         {'product.shopID.dangling', 'product.seriesID.dangling'})
+        event = {"id": "event", "productID": "p", "type": "stock", "price": 888}
+        self.assertTrue(validate_shop_catalog({"saleEvents": [event]}, "brand", "complete"))
+        self.assertEqual(validate_shop_catalog(
+            {"saleEvents": [event], "removedProductIDs": ["p"]}, "brand", "complete"), [])
+
+    def test_pull_rejects_verified_bytes_with_missing_product_before_emitting_catalog(self):
+        import gzip
+        with tempfile.TemporaryDirectory() as tmp:
+            directory = Path(tmp)
+            payload = gzip.compress(json.dumps({'shopCatalog': {'saleEvents': [
+                {'id': 'event', 'productID': 'lost-product', 'type': 'stock', 'price': 888}]}}).encode())
+            digest = hashlib.sha256(payload).hexdigest()
+            root = json.dumps({'partitions': [{'brandID': 'brand', 'entityType': 'shop-catalog',
+                'payloadHash': digest, 'coverageStatus': 'complete'}]}).encode()
+            head = {'releaseSeq': 9, 'rootIndexHash': hashlib.sha256(root).hexdigest()}
+            class Reader:
+                def fetch_root_index_bytes(self): return root
+                def fetch_pack_bytes(self, _): return payload
+            output = io.StringIO()
+            with patch.object(bridge, 'read_head', return_value=head), \
+                 patch.object(bridge, 'make_adapter', return_value=Reader()), \
+                 contextlib.redirect_stdout(output):
+                result = bridge.run_pull_catalog({'outputDirectory': str(directory),
+                                                 'targetEnvironment': 'production'}, True)
+            self.assertEqual(result, bridge.EXIT_VALIDATION)
+            self.assertFalse((directory / 'shop-catalog.json').exists())
+            events = [json.loads(line) for line in output.getvalue().splitlines()]
+            self.assertFalse(any(x['type'] == 'catalog' for x in events))
+
     def test_first_publication_builds_without_remote_manifest_even_if_stale_file_exists(self):
         # 真跑构建器，发布器截断：复现首次发布传入不存在清单造成的失败，
         # 同时确保上次环境留下的清单不会污染这次纯本地输入。

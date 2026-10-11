@@ -94,9 +94,9 @@ final class ShopCatalogThreeWayMergeTests: XCTestCase {
         XCTAssertTrue(result.catalog.shops.isEmpty)
         XCTAssertTrue(result.catalog.series.isEmpty)
         XCTAssertTrue(result.catalog.products.isEmpty)
-        XCTAssertTrue(result.catalog.saleEvents.isEmpty)
+        XCTAssertEqual(result.catalog.saleEvents.map(\.id), ["event"])
         XCTAssertEqual(result.catalog.removedProductIDs, ["p"])
-        XCTAssertTrue(ShopCatalogCloudSyncValidator.structuralIssues(result.catalog, coverageStatus: "empty").isEmpty)
+        XCTAssertTrue(ShopCatalogCloudSyncValidator.structuralIssues(result.catalog, coverageStatus: "complete").isEmpty)
     }
 
     func testDuplicateIDsRefuseMerge() {

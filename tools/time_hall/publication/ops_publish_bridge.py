@@ -98,6 +98,7 @@ from protocol import (  # noqa: E402
     SHOP_CATALOG_ENTITY_TYPE,
     ProtocolError,
     sha256_hex,
+    validate_shop_catalog,
 )
 from publish_adapters import (  # noqa: E402
     NETWORK_FAILURES,
@@ -1024,6 +1025,14 @@ def run_pull_catalog(request: Dict[str, Any], quiet: bool) -> int:
     if not isinstance(doc, dict):
         emit(outcome_result(
             "refused", EXIT_VALIDATION, "数据包里没有 shopCatalog 载荷，已中止。"))
+        return EXIT_VALIDATION
+
+    issues = validate_shop_catalog(doc, str(partition.get("brandID") or ""),
+                                   str(partition.get("coverageStatus") or ""))
+    if issues:
+        emit(outcome_result("refused", EXIT_VALIDATION,
+                            "线上目录关联损坏，未导入本机基线：{}".format(
+                                "；".join(str(issue.get("message", issue)) for issue in issues[:3]))))
         return EXIT_VALIDATION
 
     counts: Dict[str, int] = {}

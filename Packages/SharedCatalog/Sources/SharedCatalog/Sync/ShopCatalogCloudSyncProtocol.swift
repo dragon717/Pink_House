@@ -486,32 +486,29 @@ public nonisolated enum ShopCatalogCloudSyncValidator {
         let seriesIDs = Set(catalog.series.map(\.id))
         let productIDs = Set(catalog.products.map(\.id))
 
-        if !shopIDs.isEmpty {
-            for series in catalog.series where !shopIDs.contains(series.shopID) {
-                issues.append("系列「\(series.name)」引用了不存在的店家 \(series.shopID)")
-            }
-            for product in catalog.products where !shopIDs.contains(product.shopID) {
-                issues.append("商品「\(product.name)」引用了不存在的店家 \(product.shopID)")
-            }
+        for series in catalog.series where !shopIDs.contains(series.shopID) {
+            issues.append("系列「\(series.name)」引用了不存在的店家 \(series.shopID)")
         }
-        if !seriesIDs.isEmpty {
-            for product in catalog.products where !seriesIDs.contains(product.seriesID) {
-                issues.append("商品「\(product.name)」引用了不存在的系列 \(product.seriesID)")
-            }
-            for profile in catalog.styleProfiles where !seriesIDs.contains(profile.seriesID) {
-                issues.append("款式档案「\(profile.designName)」引用了不存在的系列 \(profile.seriesID)")
-            }
+        for product in catalog.products where !shopIDs.contains(product.shopID) {
+            issues.append("商品「\(product.name)」引用了不存在的店家 \(product.shopID)")
         }
-        if !productIDs.isEmpty {
-            for variant in catalog.variants where !productIDs.contains(variant.productID) {
-                issues.append("规格 \(variant.id) 引用了不存在的商品 \(variant.productID)")
-            }
-            for event in catalog.saleEvents where !productIDs.contains(event.productID) {
-                issues.append("销售记录 \(event.id) 引用了不存在的商品 \(event.productID)")
-            }
-            for chart in catalog.sizeCharts where !productIDs.contains(chart.productID) {
-                issues.append("尺码表 \(chart.id) 引用了不存在的商品 \(chart.productID)")
-            }
+        for product in catalog.products where !seriesIDs.contains(product.seriesID) {
+            issues.append("商品「\(product.name)」引用了不存在的系列 \(product.seriesID)")
+        }
+        for profile in catalog.styleProfiles where !seriesIDs.contains(profile.seriesID) {
+            issues.append("款式档案「\(profile.designName)」引用了不存在的系列 \(profile.seriesID)")
+        }
+        for variant in catalog.variants where !productIDs.contains(variant.productID) {
+            issues.append("规格 \(variant.id) 引用了不存在的商品 \(variant.productID)")
+        }
+        // 明确删除商品的历史可以保留；未删除的商品缺实体就是发布损坏。
+        let removedProductIDs = Set(catalog.removedProductIDs)
+        for event in catalog.saleEvents
+        where !productIDs.contains(event.productID) && !removedProductIDs.contains(event.productID) {
+            issues.append("销售记录 \(event.id) 引用了不存在的商品 \(event.productID)")
+        }
+        for chart in catalog.sizeCharts where !productIDs.contains(chart.productID) {
+            issues.append("尺码表 \(chart.id) 引用了不存在的商品 \(chart.productID)")
         }
 
         // 墓碑与现存实体不得同 id（既「在售」又「已删除」= 数据自相矛盾）

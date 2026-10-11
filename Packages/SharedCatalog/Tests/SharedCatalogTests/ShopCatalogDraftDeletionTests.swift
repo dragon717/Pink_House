@@ -153,7 +153,8 @@ final class ShopCatalogDraftDeletionTests: XCTestCase {
             XCTAssertEqual(merged.catalog.products, local.products)
             XCTAssertEqual(merged.catalog.variants, local.variants)
             XCTAssertEqual(merged.catalog.sizeCharts, local.sizeCharts)
-            XCTAssertEqual(merged.catalog.saleEvents, local.saleEvents)
+            // 商品删除记录保持生效；拉取合并不会清掉远端已有的销售历史。
+            XCTAssertEqual(merged.catalog.saleEvents, remote.saleEvents)
             XCTAssertEqual(merged.catalog.styleProfiles, local.styleProfiles)
             XCTAssertEqual(merged.catalog.removedShopIDs, local.removedShopIDs)
             XCTAssertEqual(merged.catalog.removedSeriesIDs, local.removedSeriesIDs)
