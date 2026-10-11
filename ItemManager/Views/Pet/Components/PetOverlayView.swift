@@ -10,7 +10,6 @@ struct PetOverlayView: View {
     
     var action: () -> Void
     var petName: String = "小伙伴"
-    var bottomAvoidanceLift: CGFloat = 0
     
     // MARK: - 依赖管理器
     
@@ -121,7 +120,7 @@ struct PetOverlayView: View {
             x: petPosition.x - (catWidth + 28) / 2,
             y: petPosition.y - (catWidth + 44) / 2,
             width: catWidth + 28,
-            height: catWidth + 44
+            height: 44
         )
 
         ZStack {
@@ -134,12 +133,13 @@ struct PetOverlayView: View {
                 rotation: getRotationAngle()
             )
             .opacity(isHiddenForSnapshot || shouldHide ? 0 : 1)
+            .allowsHitTesting(false)
 
-            // 将拖拽起点限制在宠物附近，避免整屏手势覆盖底层热区。
+            // 触控区向上收拢，移除伸向底部导航栏的下沿；图片层不接收触控。
             Color.clear
-                .frame(width: catWidth + 28, height: catWidth + 44)
+                .frame(width: hitRect.width, height: hitRect.height)
                 .contentShape(Rectangle())
-                .position(petPosition)
+                .position(x: hitRect.midX, y: hitRect.midY)
                 .gesture(dragGesture(in: geometry))
                 .allowsHitTesting(!(isHiddenForSnapshot || shouldHide))
         }
@@ -329,7 +329,6 @@ struct PetOverlayView: View {
         let y = geometry.size.height
             - geometry.safeAreaInsets.bottom
             - (catWidth / 2)
-            - max(0, bottomAvoidanceLift)
         return CGPoint(x: x, y: y)
     }
     

@@ -4,7 +4,7 @@ import CoreLocation
 import UIKit
 import Combine
 
-// MARK: - iOS 18以下版本
+// MARK: - 原生 TabView 中的萌宠对话页
 struct PetChatViewLegacy: View {
     @Binding var searchText: String
     var onHide: () -> Void = { }
@@ -17,7 +17,6 @@ struct PetChatViewLegacy: View {
     @StateObject private var guideManager = AppFirstLaunchGuideManager.shared
     @State private var messages: [PetChatMessage] = []
     @State private var inputText = ""
-    @State private var keyboardOverlap: CGFloat = 0
     @State private var isThinking = false
     @State private var isThinkingLongWait = false
     @State private var thinkingDelayWorkItem: DispatchWorkItem?
@@ -59,10 +58,6 @@ struct PetChatViewLegacy: View {
         return "和%@对话、搜索裙子...".appLocalized(petName)
     }
 
-    private var petDialogueInputBottomPadding: CGFloat {
-        keyboardOverlap > 0 ? 12 : 80
-    }
-
     private var quickMenuOwnedPets: [PetCharacter] {
         let owned = Set(PetDataManager.shared.status.ownedPetIds)
         return PetCharacter.allCases.filter { owned.contains($0.id) }
@@ -80,17 +75,6 @@ struct PetChatViewLegacy: View {
 
     private var latestAssistantMessageID: UUID? {
         messages.last(where: { !$0.isUser })?.id
-    }
-
-    private var petDialogueStageSize: CGFloat {
-        if UIDevice.current.userInterfaceIdiom == .pad {
-            return 260
-        }
-        return 188
-    }
-
-    private var petDialogueBottomPadding: CGFloat {
-        128
     }
 
     private var inputTokens: PetDialogueInputThemeTokens {
@@ -372,21 +356,13 @@ struct PetChatViewLegacy: View {
             .onChange(of: messages.count) { _, _ in
                 PetChatTranscriptStore.save(messages: messages)
             }
-            .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillChangeFrameNotification)) { notification in
-                updateKeyboardOverlap(from: notification)
-            }
-            .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in
-                withAnimation(.easeOut(duration: 0.2)) {
-                    keyboardOverlap = 0
-                }
-            }
             .onReceive(petDialogueAmbientTimer) { _ in
                 syncPetDialogueAmbientAction()
             }
         }
     }
 
-    // 萌宠对话框样式的输入区域（iOS18 版本）- 放在底部导航栏上方
+    // 输入区域随原生 TabView 和键盘安全区布局。
     private var petDialogueInputArea: some View {
         VStack(spacing: 0) {
             // 使用萌宠对话框样式
@@ -463,24 +439,7 @@ struct PetChatViewLegacy: View {
             RoundedRectangle(cornerRadius: 30)
                 .stroke(inputTokens.containerStroke, lineWidth: 1)
         )
-        // 添加底部安全区域间距，避免与底部导航栏重叠
-        .padding(.bottom, petDialogueInputBottomPadding)
-    }
-
-    private func updateKeyboardOverlap(from notification: Notification) {
-        guard
-            let userInfo = notification.userInfo,
-            let endFrame = userInfo[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect
-        else {
-            return
-        }
-
-        let screenHeight = UIScreen.main.bounds.height
-        let overlap = max(0, screenHeight - endFrame.minY)
-        let duration = userInfo[UIResponder.keyboardAnimationDurationUserInfoKey] as? Double ?? 0.25
-        withAnimation(.easeOut(duration: duration)) {
-            keyboardOverlap = overlap
-        }
+        .padding(.bottom, 12)
     }
 
     @ViewBuilder
@@ -1770,46 +1729,6 @@ struct PetChatViewLegacy: View {
             )
         }
         return true
-    }
-
-    private var petDialogueVideoStage: some View {
-        let stageSize = petDialogueStageSize
-        return VStack {
-            Spacer()
-            HStack {
-                Spacer()
-                if let videoName = petDialogueResolvedVideoName {
-                    SeamlessVideoPlayer(
-                        videoName: videoName,
-                        isLooping: petDialogueVideoLoops,
-                        isMuted: true,
-                        volume: 0,
-                        onFinished: { handlePetDialogueVideoFinished() }
-                    )
-                    .frame(width: stageSize, height: stageSize)
-                    .contentShape(Rectangle())
-                    .gesture(
-                        DragGesture(minimumDistance: 0)
-                            .onChanged { value in
-                                startPetDialogueTouching(
-                                    at: value.location,
-                                    in: CGSize(width: stageSize, height: stageSize)
-                                )
-                            }
-                            .onEnded { _ in
-                                stopPetDialogueTouching()
-                            }
-                    )
-                } else {
-                    Image(currentCharacter.happyImageName)
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: stageSize * 0.62, height: stageSize * 0.62)
-                }
-            }
-            .padding(.trailing, 8)
-            .padding(.bottom, petDialogueBottomPadding)
-        }
     }
 
     private func setPetDialogueAction(_ action: String) {
