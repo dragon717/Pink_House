@@ -120,8 +120,6 @@ struct ShopCatalogOpsView: View {
             // 排在「导出」之后：导出仍然是离线交接路径，上传是直连路径，两条并存。
             ShopCatalogOpsUploadSection(catalog: store.catalog)
         }
-        // 底部悬浮 Dock 避让：表单最后一段（上传发布）会被 Dock 盖住。
-        .avoidingBottomDock()
         .overlay(alignment: .bottom) {
             if let toast {
                 Text(toast)
@@ -1604,7 +1602,7 @@ struct ShopCatalogDraftDetailEditor: View {
         reservationPriceText = snapshot.reservationPriceText
         stockPriceText = snapshot.stockPriceText
         depositText = snapshot.depositText
-        currency = snapshot.currency
+        currency = snapshot.currency ?? .cny
         colors = snapshot.colors
     }
 

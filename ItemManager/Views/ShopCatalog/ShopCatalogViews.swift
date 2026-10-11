@@ -130,8 +130,6 @@ struct ShopCatalogListView: View {
             .padding(16)
             .padding(.bottom, 40)
         }
-        // 底部悬浮 Dock 避让：店家列表最后一条会被 Dock 盖住。
-        .avoidingBottomDock()
         .scrollBounceBehavior(.always, axes: .vertical)
         .refreshable { await onRefresh() }
     }
@@ -266,8 +264,6 @@ struct ShopCatalogShopView: View {
                 .padding(16)
                 .padding(.bottom, 40)
             }
-            // 底部悬浮 Dock 避让：系列列表最后一张卡会被 Dock 盖住。
-            .avoidingBottomDock()
         }
         .navigationTitle(shop?.name ?? "")
         .navigationBarTitleDisplayMode(.inline)

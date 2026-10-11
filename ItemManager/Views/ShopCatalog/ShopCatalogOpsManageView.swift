@@ -116,8 +116,6 @@ struct ShopCatalogOpsManageView: View {
                 }
                 .listStyle(.insetGrouped)
                 .scrollDismissesKeyboard(.immediately)
-                // 底部悬浮 Dock 避让：本页在 tab 内容层内 push，最后一行会被 Dock 盖住（2026-09-24）。
-                .avoidingBottomDock()
                 .overlay(alignment: .trailing) {
                     // 有搜索词时隐藏索引（符合系统搜索交互）
                     if trimmedQuery.isEmpty, !indexLetters.isEmpty {
@@ -469,8 +467,6 @@ private struct ShopCatalogSeriesProductsView: View {
             }
             .listStyle(.insetGrouped)
             .scrollDismissesKeyboard(.immediately)
-            // 底部悬浮 Dock 避让：截图标注的「毛绒拉夫领针织内搭」被 Dock 盖住即此页（2026-09-24）。
-            .avoidingBottomDock()
         }
         .navigationTitle(series.name)
         .navigationBarTitleDisplayMode(.inline)

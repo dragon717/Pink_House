@@ -64,8 +64,7 @@ enum ShopCatalogWardrobeDraftBuilder {
     /// 单件草稿。失败（查不到商品）返回 nil。
     static func makeDraft(
         selection: Selection,
-        store: ShopCatalogStore,
-        modelContext: ModelContext
+        store: ShopCatalogStore
     ) -> ClothingEditDraft? {
         guard let product = store.product(id: selection.productID) else { return nil }
         let series = store.series(id: product.seriesID)
@@ -228,8 +227,8 @@ enum ShopCatalogWardrobeDraftBuilder {
             length: "",
             condition: "全新",
             accessories: "",
-            // 2026-09-24 根因修复：把商品图物化成 ImageManager 文件，衣橱卡片才有图可显示
-            imagePaths: materializeImagePaths(for: product, store: store, modelContext: modelContext),
+            // 草稿只组装资料；确认入库时异步下载并保存商品图片。
+            imagePaths: [],
             isShared: false,
             // R02：金额写进**币种对应**的字段。日元进 originalPriceJPY 并标 JPY，
             // 不写进「人民币原价」——否则 24800 日元会变成 24800 元人民币。
@@ -254,40 +253,6 @@ enum ShopCatalogWardrobeDraftBuilder {
         return draft
     }
 
-    /// 商品图引用 → 衣橱图片文件名（2026-09-24 根因修复）。
-    ///
-    /// 根因：`makeDraft` 曾硬编码 `imagePaths: []`，加购落库的 `Clothing` 没有任何图片，
-    /// 而衣橱卡片走 `ImageManager` 文件名体系 —— 引用再完整也无处取图，表现为「衣橱不显示图片」。
-    ///
-    /// 引用推导与详情页同一口径：`store.asset(id:)?.originalURL ?? 原值`，随后分类解析：
-    ///   · `local:` 运营上传图 → Application Support/ShopCatalog/images/
-    ///   · 其余视为 Bundle 画册图（含 "bundle:" 前缀）
-    ///   · http(s) 远程图 → 不在主线程同步拉网络，跳过（详情页轮播仍可看原图）
-    /// 单张失败不阻塞其余图片；全部失败返回空数组（卡片展示占位，与旧行为一致）。
-    /// 物化是「复制」不是「搬移」：Catalog 侧引用原样保留。
-    @MainActor
-    static func materializeImagePaths(
-        for product: CatalogProduct,
-        store: ShopCatalogStore,
-        modelContext: ModelContext,
-        maxCount: Int = 6
-    ) -> [String] {
-        var fileNames: [String] = []
-        for assetID in product.images {
-            guard fileNames.count < maxCount else { break }
-            let reference = store.asset(id: assetID)?.originalURL ?? assetID
-            let trimmed = reference.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !trimmed.isEmpty else { continue }
-            if trimmed.lowercased().hasPrefix("http") { continue }
-            guard let url = ShopCatalogImageResolver.url(for: trimmed),
-                  let image = UIImage(contentsOfFile: url.path),
-                  let fileName = ImageManager.shared.saveImage(image, context: modelContext)
-            else { continue }
-            fileNames.append(fileName)
-        }
-        return fileNames
-    }
-
     /// 系列页多选 → 按计划 §19-24 生成草稿组：
     ///   · 每件主衣物（JSK/OP/SK/Blouse）各自成为一条衣橱记录（§23：拆成多条，
     ///     不能把 OP 当小物）；无主衣物时以第一件为主。
@@ -298,7 +263,7 @@ enum ShopCatalogWardrobeDraftBuilder {
         selections: [Selection],
         accessoryProductIDs: Set<String>,
         store: ShopCatalogStore,
-        modelContext: ModelContext
+        primaryProductID: String? = nil
     ) throws -> [(draft: ClothingEditDraft, selection: Selection)] {
         guard !selections.isEmpty else {
             throw ShopCatalogWardrobeError.emptySelection
@@ -307,15 +272,18 @@ enum ShopCatalogWardrobeDraftBuilder {
         var built: [(selection: Selection, draft: ClothingEditDraft, product: CatalogProduct)] = []
         for selection in selections {
             guard let product = store.product(id: selection.productID),
-                  let draft = makeDraft(selection: selection, store: store, modelContext: modelContext)
+                  let draft = makeDraft(selection: selection, store: store)
             else { throw ShopCatalogWardrobeError.productNotFound(selection.productID) }
             built.append((selection, draft, product))
         }
 
         let accessorySet = accessoryProductIDs
         // 主衣物 = 分类可作主、且未被用户勾为小物的勾选项（§23：主衣物决定主类型）
-        let primaryEntries = built.filter {
+        var primaryEntries = built.filter {
             ShopCatalogWardrobeCategory.isPrimary($0.product.category) && !accessorySet.contains($0.product.id)
+        }
+        if let index = primaryEntries.firstIndex(where: { $0.product.id == primaryProductID }) {
+            primaryEntries.insert(primaryEntries.remove(at: index), at: 0)
         }
         // §23「不能把 OP 当小物」：主衣物分类被勾为小物属于非法勾选，
         // 必须显式报错而不是静默丢弃（否则该商品会凭空消失）。
@@ -330,9 +298,10 @@ enum ShopCatalogWardrobeDraftBuilder {
             !ShopCatalogWardrobeCategory.isPrimary($0.product.category) && accessorySet.contains($0.product.id)
         }
 
-        // 至少要有一个主条目；全被勾成小物时回退第一条为主
+        // 单独入橱小物时，以确认页选定的商品作为主条目。
         let entryHeads: [(selection: Selection, draft: ClothingEditDraft, product: CatalogProduct)] =
-            primaryEntries.isEmpty ? [built[0]] : primaryEntries
+            primaryEntries.isEmpty
+                ? [built.first { $0.product.id == primaryProductID } ?? built[0]] : primaryEntries
 
         func accessoryPriceLine(_ product: CatalogProduct) -> String {
             let archive = store.priceArchive(forProduct: product.id)
@@ -400,6 +369,7 @@ enum ShopCatalogWardrobeDraftBuilder {
 extension ClothingEditDraft {
     func with(
         name: String? = nil,
+        imagePaths: [String]? = nil,
         accessories: String? = nil,
         accessoriesPrice: Double? = nil,
         priceTotal: Double? = nil,
@@ -419,7 +389,7 @@ extension ClothingEditDraft {
             length: length,
             condition: condition,
             accessories: accessories ?? self.accessories,
-            imagePaths: imagePaths,
+            imagePaths: imagePaths ?? self.imagePaths,
             isShared: isShared,
             originalPrice: originalPrice,
             originalPriceJPY: originalPriceJPY,
@@ -486,7 +456,13 @@ enum ShopCatalogWardrobeInserter {
                 break
             }
         }
-        try? modelContext.save()
+        do {
+            try modelContext.save()
+        } catch {
+            modelContext.delete(clothing)
+            try? modelContext.save()
+            throw error
+        }
         return clothing
     }
 
@@ -498,22 +474,31 @@ enum ShopCatalogWardrobeInserter {
         drafts: [(draft: ClothingEditDraft, selection: ShopCatalogWardrobeDraftBuilder.Selection?)],
         accessoryProductIDs: Set<String>,
         store: ShopCatalogStore,
-        modelContext: ModelContext
+        modelContext: ModelContext,
+        accessoryImagePaths: [String: [String]] = [:]
     ) throws -> [Clothing] {
         var inserted: [Clothing] = []
-        for (index, entry) in drafts.enumerated() {
-            let clothing = try insert(draft: entry.draft, selection: entry.selection, store: store, modelContext: modelContext)
-            if index == 0, !accessoryProductIDs.isEmpty {
-                persistAccessoryItems(
-                    accessoryProductIDs: accessoryProductIDs,
-                    onto: clothing,
-                    store: store
-                )
+        do {
+            for (index, entry) in drafts.enumerated() {
+                let clothing = try insert(draft: entry.draft, selection: entry.selection, store: store, modelContext: modelContext)
+                inserted.append(clothing)
+                if index == 0, !accessoryProductIDs.isEmpty {
+                    persistAccessoryItems(
+                        accessoryProductIDs: accessoryProductIDs,
+                        onto: clothing,
+                        store: store,
+                        imagePaths: accessoryImagePaths
+                    )
+                }
             }
-            inserted.append(clothing)
+            try modelContext.save()
+            return inserted
+        } catch {
+            // 图片层会释放本次取得的引用；不能留下仍引用这些图片的半套入橱记录。
+            for clothing in inserted { modelContext.delete(clothing) }
+            try? modelContext.save()
+            throw error
         }
-        try? modelContext.save()
-        return inserted
     }
 
     /// 把勾选的小物按 Catalog 价格档案写成 `AccessoryItem`（§21：单价可空时记 0，
@@ -521,7 +506,8 @@ enum ShopCatalogWardrobeInserter {
     private static func persistAccessoryItems(
         accessoryProductIDs: Set<String>,
         onto clothing: Clothing,
-        store: ShopCatalogStore
+        store: ShopCatalogStore,
+        imagePaths: [String: [String]]
     ) {
         let headCurrency = clothing.originalPriceCurrencyCode
         var sortIndex = 0
@@ -543,7 +529,8 @@ enum ShopCatalogWardrobeInserter {
                 price: sameCurrency ? price : 0,
                 deposit: isReservation ? (archive.reservation?.deposit ?? 0) : 0,
                 balance: isReservation ? max(0, price - (archive.reservation?.deposit ?? 0)) : 0,
-                sortIndex: sortIndex
+                sortIndex: sortIndex,
+                imagePaths: imagePaths[productID] ?? []
             )
             modelContextInsert(item, clothing: clothing)
             sortIndex += 1

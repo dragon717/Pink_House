@@ -31,7 +31,6 @@ struct ShopCatalogSeriesMenuView: View {
     /// 用户自选的加购价格口径（预约结束后双价并存的卡片可改；缺省走阶段默认）
     @State private var priceChoiceByProduct: [String: ShopCatalogCardPriceChoice] = [:]
     @State private var showsMerge = false
-    @State private var mergeToast: String?
     /// 大图预览：正在查看的单品（点击行内缩略图弹出，关闭即返回原页面）
     @State private var viewerProduct: CatalogProduct?
 
@@ -79,8 +78,7 @@ struct ShopCatalogSeriesMenuView: View {
                         sizeByProduct: checked.reduce(into: [:]) { dict, id in
                             if let p = store.product(id: id) { dict[id] = effectiveSize(for: p) }
                         }
-                    ) { count in
-                        mergeToast = "已加入少女衣橱（\(count) 条记录）"
+                    ) { _ in
                         checked = []
                     }
                 }
@@ -90,21 +88,7 @@ struct ShopCatalogSeriesMenuView: View {
                 ShopCatalogImageViewer(references: viewerReferences(for: product),
                                        startIndex: viewerStartIndex(for: product))
             }
-            .overlay(alignment: .bottom) {
-                if let mergeToast {
-                    Text(mergeToast)
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 8)
-                        .background(Capsule().fill(Color.black.opacity(0.75)))
-                        .padding(.bottom, 70)
-                        .task {
-                            try? await Task.sleep(nanoseconds: 1_600_000_000)
-                            await MainActor.run { self.mergeToast = nil }
-                        }
-                }
-            }
+
         }
     }
 

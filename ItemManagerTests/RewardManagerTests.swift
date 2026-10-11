@@ -1,152 +1,125 @@
-
 import XCTest
 @testable import ItemManager
 
 final class RewardManagerTests: XCTestCase {
-    
-    var defaults: UserDefaults!
-    var initialFishCoin = 1000
-    let statusKey = "PetStatus_Data"
-    
-    override func setUp() {
-        super.setUp()
-        // Use a temporary suite for testing
-        defaults = UserDefaults(suiteName: "RewardManagerTests")
-        defaults.removePersistentDomain(forName: "RewardManagerTests")
-        
-        // Inject into RewardManager
-        RewardManager.shared.defaults = defaults
-        
-        // Seed initial PetStatus
+    @MainActor
+    func testOldPetPageSavePreservesPreviouslyGrantedRewardHistory() async {
+        var latest = PetStatus()
+        latest.claimedOperationRewards = ["wardrobe-add:1"]
+        var stalePage = PetStatus()
+        stalePage.claimedOperationRewards = ["guide:1"]
+        stalePage.hunger = 45
+        let saved = PetDataManager.statusForOrdinarySave(stalePage, previous: latest)
+        XCTAssertEqual(saved.claimedOperationRewards, ["wardrobe-add:1", "guide:1"])
+        XCTAssertEqual(saved.hunger, 45)
+    }
+
+    @MainActor
+    private func withLedger(_ body: (RewardManager, UserDefaults) throws -> Void) rethrows {
+        let name = "RewardManagerTests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: name)!
+        defer { defaults.removePersistentDomain(forName: name) }
         var status = PetStatus()
-        status.fishCoin = initialFishCoin
+        status.fishCoin = 1000
         status.dailyFishCoinEarned = 0
         status.lastDailyResetDate = Date()
-        
-        if let data = try? JSONEncoder().encode(status) {
-            defaults.set(data, forKey: statusKey)
+        defaults.set(try! JSONEncoder().encode(status), forKey: "PetStatus_Data")
+        try body(RewardManager(defaults: defaults), defaults)
+    }
+
+    @MainActor
+    private func status(_ defaults: UserDefaults) -> PetStatus {
+        try! JSONDecoder().decode(PetStatus.self, from: defaults.data(forKey: "PetStatus_Data")!)
+    }
+
+    @MainActor
+    func testFirstTimeFeatures() async {
+        withLedger { manager, defaults in
+            XCTAssertEqual(manager.grant(type: .firstTimeFeature("Layout")).actualAmount, 100)
+            XCTAssertEqual(manager.grant(type: .firstTimeFeature("Layout")).status, .duplicate)
+            XCTAssertEqual(manager.grant(type: .firstTimeFeature("Stats")).actualAmount, 100)
+            XCTAssertEqual(status(defaults).fishCoin, 1200)
         }
     }
-    
-    override func tearDown() {
-        defaults.removePersistentDomain(forName: "RewardManagerTests")
-        super.tearDown()
-    }
-    
-    // Helper to get current status
-    func getCurrentStatus() -> PetStatus? {
-        guard let data = defaults.data(forKey: statusKey) else { return nil }
-        return try? JSONDecoder().decode(PetStatus.self, from: data)
-    }
-    
-    func testFirstTimeFeatures() {
-        print("--- Testing First Time Features ---")
-        
-        // 1. First time "ViewLayoutChange"
-        RewardManager.shared.triggerReward(type: .firstTimeFeature("ViewLayoutChange"))
-        
-        var status = getCurrentStatus()
-        XCTAssertEqual(status?.fishCoin, initialFishCoin + 100, "First time ViewLayoutChange should add 100 coins")
-        print("First trigger: +100 OK")
-        
-        // 2. Second time "ViewLayoutChange"
-        RewardManager.shared.triggerReward(type: .firstTimeFeature("ViewLayoutChange"))
-        status = getCurrentStatus()
-        XCTAssertEqual(status?.fishCoin, initialFishCoin + 100, "Second time ViewLayoutChange should NOT add coins")
-        print("Second trigger: +0 OK")
-        
-        // 3. First time "OOTDSidebar"
-        RewardManager.shared.triggerReward(type: .firstTimeFeature("OOTDSidebar"))
-        status = getCurrentStatus()
-        XCTAssertEqual(status?.fishCoin, initialFishCoin + 200, "First time OOTDSidebar should add another 100 coins")
-        print("Another feature trigger: +100 OK")
-    }
-    
-    func testDailyLimit() {
-        print("--- Testing Daily Limit ---")
-        // Limit is 10000
-        let limit = PetStatus.dailyFishCoinLimit
-        let rewardPerAction = 200 // payBalance
-        let actionsNeeded = (limit / rewardPerAction) + 5 // Exceed limit
-        
-        print("Simulating \(actionsNeeded) actions...")
-        for _ in 0..<actionsNeeded {
-            RewardManager.shared.triggerReward(type: .payBalance)
+
+    @MainActor
+    func testDailyLimitAndActualReceipt() async {
+        withLedger { manager, defaults in
+            var initial = status(defaults)
+            initial.dailyFishCoinEarned = PetStatus.dailyFishCoinLimit - 20
+            defaults.set(try! JSONEncoder().encode(initial), forKey: "PetStatus_Data")
+            let receipt = manager.grant(type: .addClothing, operationID: "new:1")
+            XCTAssertEqual(receipt.requestedAmount, 50)
+            XCTAssertEqual(receipt.actualAmount, 20)
+            XCTAssertTrue(receipt.isLimited)
+            XCTAssertEqual(status(defaults).fishCoin, 1020)
+            XCTAssertEqual(manager.grant(type: .payBalance).actualAmount, 0)
+            XCTAssertEqual(status(defaults).dailyFishCoinEarned, PetStatus.dailyFishCoinLimit)
         }
-        
-        let status = getCurrentStatus()
-        XCTAssertEqual(status?.dailyFishCoinEarned, limit, "Daily earned should be capped at limit")
-        XCTAssertEqual(status?.fishCoin, initialFishCoin + limit, "Total coins should increase by limit")
-        print("Limit reached: \(status?.dailyFishCoinEarned ?? 0)/\(limit) OK")
     }
-    
-    func testHighIntensityScenario() {
-        print("--- Testing High Intensity Scenario ---")
-        // High Intensity: 50 new clothes, 10 balance payments, 5 OOTDs, 3 first-time features
-        // New Clothes: 50 * 50 = 2500
-        // Balance: 10 * 200 = 2000
-        // OOTD: 5 * 100 = 500
-        // First Time: 3 * 100 = 300
-        // Total Expected: 5300
-        
-        print("Adding 50 clothes...")
-        for _ in 0..<50 {
-            RewardManager.shared.triggerReward(type: .addClothing)
+
+    @MainActor
+    func testIdempotenceSurvivesNewManagerAndDailyReset() async {
+        withLedger { manager, defaults in
+            XCTAssertEqual(manager.grant(type: .addClothing, operationID: "clothing:1").actualAmount, 50)
+            var saved = status(defaults)
+            saved.lastDailyResetDate = Date().addingTimeInterval(-172800)
+            defaults.set(try! JSONEncoder().encode(saved), forKey: "PetStatus_Data")
+            let restored = RewardManager(defaults: defaults)
+            XCTAssertEqual(restored.grant(type: .addClothing, operationID: "clothing:1").status, .duplicate)
+            XCTAssertEqual(restored.grant(type: .addClothing, operationID: "clothing:2").actualAmount, 50)
+            XCTAssertEqual(status(defaults).fishCoin, 1100)
+            XCTAssertEqual(status(defaults).dailyFishCoinEarned, 50)
         }
-        
-        print("Paying 10 balances...")
-        for _ in 0..<10 {
-            RewardManager.shared.triggerReward(type: .payBalance)
-        }
-        
-        print("Creating 5 OOTDs...")
-        for _ in 0..<5 {
-            RewardManager.shared.triggerReward(type: .createOOTD(itemCount: 3))
-        }
-        
-        print("Triggering 3 first-time features...")
-        RewardManager.shared.triggerReward(type: .firstTimeFeature("F1"))
-        RewardManager.shared.triggerReward(type: .firstTimeFeature("F2"))
-        RewardManager.shared.triggerReward(type: .firstTimeFeature("F3"))
-        
-        let status = getCurrentStatus()
-        let expectedEarned = 2500 + 2000 + 500 + 300
-        
-        print("Expected: \(expectedEarned), Actual: \(status?.dailyFishCoinEarned ?? 0)")
-        
-        XCTAssertEqual(status?.dailyFishCoinEarned, expectedEarned)
-        XCTAssertEqual(status?.fishCoin, initialFishCoin + expectedEarned)
     }
-    
-    func testMediumIntensityScenario() {
-        print("--- Testing Medium Intensity Scenario ---")
-        // Medium: 5 new clothes, 1 OOTD
-        // Clothes: 5 * 50 = 250
-        // OOTD: 1 * 100 = 100
-        // Total: 350
-        
-        for _ in 0..<5 {
-            RewardManager.shared.triggerReward(type: .addClothing)
+
+    @MainActor
+    func testInvalidAndUnavailableRewardsDoNotConsumeFirstTime() async {
+        withLedger { manager, defaults in
+            XCTAssertEqual(manager.grant(type: .custom(amount: -50, message: "x")).status, .invalid)
+            XCTAssertEqual(status(defaults).fishCoin, 1000)
+            defaults.set(Data("broken".utf8), forKey: "PetStatus_Data")
+            XCTAssertEqual(manager.grant(type: .firstTimeFeature("A")).status, .unavailable)
+            XCTAssertFalse(defaults.bool(forKey: "hasTriggeredFirstTime_A"))
+            defaults.removeObject(forKey: "PetStatus_Data")
+            XCTAssertEqual(manager.grant(type: .addClothing).status, .unavailable)
         }
-        
-        RewardManager.shared.triggerReward(type: .createOOTD(itemCount: 2))
-        
-        let status = getCurrentStatus()
-        print("Expected: 350, Actual: \(status?.dailyFishCoinEarned ?? 0)")
-        XCTAssertEqual(status?.dailyFishCoinEarned, 350)
-        XCTAssertEqual(status?.fishCoin, initialFishCoin + 350)
     }
-    
-    func testLowIntensityScenario() {
-        print("--- Testing Low Intensity Scenario ---")
-        // Low: Just 1 first time feature
-        // Total: 100
-        
-        RewardManager.shared.triggerReward(type: .firstTimeFeature("LowIntensity"))
-        
-        let status = getCurrentStatus()
-        print("Expected: 100, Actual: \(status?.dailyFishCoinEarned ?? 0)")
-        XCTAssertEqual(status?.dailyFishCoinEarned, 100)
-        XCTAssertEqual(status?.fishCoin, initialFishCoin + 100)
+
+    @MainActor
+    func testCappedOperationCannotClaimAgainTomorrow() async {
+        withLedger { manager, defaults in
+            var saved = status(defaults)
+            saved.dailyFishCoinEarned = PetStatus.dailyFishCoinLimit
+            defaults.set(try! JSONEncoder().encode(saved), forKey: "PetStatus_Data")
+            XCTAssertEqual(manager.grant(type: .addClothing, operationID: "capped").actualAmount, 0)
+            saved = status(defaults)
+            saved.lastDailyResetDate = Date().addingTimeInterval(-172800)
+            defaults.set(try! JSONEncoder().encode(saved), forKey: "PetStatus_Data")
+            XCTAssertEqual(manager.grant(type: .addClothing, operationID: "capped").status, .duplicate)
+            XCTAssertEqual(status(defaults).fishCoin, 1000)
+        }
+    }
+
+    @MainActor
+    func testOldSnapshotWithoutRewardLedgerStillDecodes() async throws {
+        var object = try JSONSerialization.jsonObject(with: JSONEncoder().encode(PetStatus())) as! [String: Any]
+        object.removeValue(forKey: "claimedOperationRewards")
+        let decoded = try JSONDecoder().decode(PetStatus.self, from: JSONSerialization.data(withJSONObject: object))
+        XCTAssertTrue(decoded.claimedOperationRewards.isEmpty)
+    }
+
+    @MainActor
+    func testHighIntensityScenarioAndOtherCurrenciesUnchanged() async {
+        withLedger { manager, defaults in
+            for _ in 0..<50 { manager.grant(type: .addClothing) }
+            for _ in 0..<10 { manager.grant(type: .payBalance) }
+            for _ in 0..<5 { manager.grant(type: .createOOTD(itemCount: 3)) }
+            for feature in ["A", "B", "C"] { manager.grant(type: .firstTimeFeature(feature)) }
+            XCTAssertEqual(status(defaults).fishCoin, 6300)
+            XCTAssertEqual(status(defaults).dailyFishCoinEarned, 5300)
+            XCTAssertEqual(status(defaults).meowCoin, 0)
+            XCTAssertEqual(status(defaults).boneCoin, 0)
+        }
     }
 }

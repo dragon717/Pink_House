@@ -1,11 +1,8 @@
-# 萌宠移动动画冻结与底部菱形轨迹复用指南
+# 萌宠移动动画冻结指南
 
-本文档沉淀两类在 `Pink_House` 内高频复用的萌宠动画方案：
+本文档说明按素材时间轴冻结位移：视频继续播放，在指定时间段内暂停位移。
 
-1. **按素材时间轴冻结位移**：视频继续播放，但在指定时间段内不产生位移。
-2. **iPhone iOS 26 底部导航最小化时的菱形轨迹猫**：悬浮猫进入底部中间留白区做菱形巡航。
-
-目标是让后续实现同类需求时，直接复用统一思路，而不是在业务层到处打补丁。
+2026-10-11：底部菱形巡航方案及其 UIKit 私有视图探测已删除。底部导航由系统 TabView 管理；悬浮宠物继续使用 PetOverlayView，不再根据底栏内部结构切换巡航方式。
 
 ---
 
@@ -28,15 +25,6 @@
 
 - 播放器暂停
 - 或者 5 秒后瞬间追赶到理论位置
-
-### 1.2 iOS 26 底部导航分散后，中间区域放一只巡航猫
-
-典型例子：
-
-- iPhone + iOS 26
-- 底部 TabBar 在向下滚动后进入 compact/minimized 形态
-- 左右按钮分散，中间留出一块空间
-- 希望悬浮猫进入该区域，沿菱形轨迹巡航
 
 ---
 
@@ -144,92 +132,6 @@
   - `lastMovementTick`
   - `isTranslationFrozenByClip`
 
-#### B. 底部菱形轨迹猫
-
-- ViewModel：`ItemManager/ViewModels/BottomAccessoryCatDiamondOrbitViewModel.swift`
-- View：`ItemManager/Views/Pet/Components/BottomAccessoryCatDiamondOrbitView.swift`
-
-接法：
-
-- `SeamlessVideoPlayer.onProgress`
-- `viewModel.updateMotionClipProgress(current:duration:)`
-- Orbit ViewModel 内维护：
-  - `lapElapsed`
-  - `lastMovementTick`
-  - `isTranslationFrozenByClip`
-
----
-
-## 4. iOS 26 底部菱形轨迹的设计要点
-
-### 4.1 优先保留旧悬浮猫逻辑作为 fallback
-
-推荐策略：
-
-- compact/minimized 状态：显示菱形轨迹猫
-- 非 compact/minimized 状态：继续显示旧 `PetOverlayView`
-
-这样风险最低，也便于灰度调整。
-
-### 4.2 不要优先使用 `tabViewBottomAccessory`
-
-在本项目里，`tabViewBottomAccessory` 会引入额外的液态玻璃区域，视觉上不符合目标。
-
-更稳妥的方案：
-
-- 使用普通 overlay 渲染猫
-- 用 UIKit introspection 读取当前 tab bar 状态
-
-### 4.3 compact/minimized 状态识别要看真实 UIKit 结构
-
-本项目最终采用的判断思路是：
-
-- 通过 `TabBarItemAnchorResolver.compactCenterPlatterState()`
-- 结合：
-  - 主 `UIKit._UITabBarPlatterView` 的 `isHidden`
-  - alpha
-  - width ratio
-
-原因：
-
-- 单靠 frame 宽度不稳定
-- UIKit 在 iOS 26 的 compact 形态下，真实可见性变化比尺寸阈值更可靠
-
-### 4.4 菱形轨迹的起点必须先明确
-
-常见两种需求：
-
-- **顶部点启动**：旧悬浮猫看起来位于菱形上边
-- **底部点启动**：旧悬浮猫看起来位于菱形下边
-
-做法不要硬编码在 View 里，建议放到配置：
-
-- `BottomAccessoryCatDiamondOrbitConfig.startAnchor`
-
-### 4.5 菱形整体位置不要直接绑定 compact frame 中心
-
-更稳妥的做法：
-
-- 先算“旧悬浮猫基准锚点”
-- 再反推 overlay 的 center 和 diamond center
-
-这样调位置时更直观，只需要调锚点高度，而不是到处改 ratio。
-
-当前关键参数位置：
-
-- `ItemManager/Views/MainTabView.swift`
-- `diamondOrbitLayout(frame:)`
-- `LegacyCustomTabBarLayout.floatingElementLift`：自定义底部导航栏场景下，旧 `PetOverlayView` 与共享底部悬浮控件避让底栏的上移量；默认环境值为 `0`，避免非自定义底栏容器误上移。
-
-建议优先调这些参数：
-
-- `floatingCatAnchor.y`
-- `overlayCenter.y`
-- `diamondHeightRatio`
-- `speedScale`
-
----
-
 ## 5. 推荐实现步骤
 
 ### 5.1 做“素材时间轴冻结位移”时
@@ -241,15 +143,6 @@
 5. ViewModel 改成单独维护 `movementElapsed`
 6. 冻结时只停 `movementElapsed`，不要停视频播放
 7. 确认循环播放时，每一轮都能重复命中冻结窗口
-
-### 5.2 做“底部菱形轨迹猫”时
-
-1. 先确认 iPhone + iOS 26 可用性门槛
-2. 保留旧悬浮猫 fallback
-3. 用 introspection 判断 compact/minimized 状态
-4. 把轨迹参数收敛到 `BottomAccessoryCatDiamondOrbitConfig`
-5. 保持点击猫仍能跳到萌宠对话
-6. 调整位置时优先改 anchor，不要先改动画逻辑
 
 ---
 
@@ -271,19 +164,6 @@
 
 不要把两者混在一起改。
 
-### 6.2 调“菱形太低/太高”
-
-优先级建议：
-
-1. 改 `floatingCatAnchor.y`
-2. 再看是否要改 `overlayCenter.y`
-3. 最后才改 `diamondHeightRatio`
-
-原因：
-
-- 改 anchor 最容易保持轨迹形状不变
-- 改 ratio 容易连带影响转向和可点击区域
-
 ### 6.3 调“冻结窗口不自然”
 
 优先调：
@@ -303,8 +183,6 @@
 
 ### 7.1 适合保留的日志
 
-- compact 状态变化日志
-- orbit layout 日志
 - 当前视频名 + 当前 clip time + 是否冻结位移
 
 ### 7.2 不要长期保留的日志
@@ -325,13 +203,11 @@
 - 5 秒后从当前停住的位置继续移动
 - 循环下一轮时仍会再次冻结
 - 小世界移动猫行为正常
-- 底部菱形轨迹猫行为正常
-- 点击菱形猫仍能跳转到萌宠对话
-- 非 compact 状态下旧悬浮猫正常显示
+- 悬浮猫正常显示，点击仍能跳转到萌宠对话
 - iOS 可用性判断没有破坏低版本编译
 
 ---
 
 ## 9. 一句话复用口诀
 
-> 播放器给进度，运动层管位移；冻结停时间轴，不停视频；底部轨迹先定锚点，再调菱形参数。
+> 播放器给进度，运动层管位移；冻结停时间轴，不停视频。

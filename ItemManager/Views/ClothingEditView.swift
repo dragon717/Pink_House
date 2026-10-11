@@ -1178,31 +1178,7 @@ struct ClothingEditView: View {
     @State private var suppressNextDraftObservationAsSystemChange = false
     @State private var programmaticDraftObservationKey: DraftObservationKey?
 
-    // Toast 提示状态
-    @State private var showToast = false
-    @State private var toastMessage = ""
-    @State private var toastType: ToastType = .error
-
-    // Toast 类型
-    enum ToastType {
-        case success, error, warning
-
-        var icon: String {
-            switch self {
-            case .success: return "checkmark.circle.fill"
-            case .error: return "exclamationmark.triangle.fill"
-            case .warning: return "info.circle.fill"
-            }
-        }
-
-        var color: Color {
-            switch self {
-            case .success: return .green
-            case .error: return .red
-            case .warning: return .orange
-            }
-        }
-    }
+    typealias ToastType = ToastManager.ToastType
 
     private var initialBrandID: UUID?
     private var initialTypes: Set<String>?
@@ -1613,8 +1589,6 @@ struct ClothingEditView: View {
                 ShareLoadingOverlay(message: editorPreparingMessage)
             }
 
-            // Toast 提示层
-            toastOverlay
         }
         .navigationTitle((isEditing ? "编辑" : "手动创建").appLocalized)
         .navigationBarTitleDisplayMode(.inline)
@@ -2612,51 +2586,8 @@ struct ClothingEditView: View {
 
     // MARK: - Toast 提示
 
-    /// 显示提示信息
     private func showToastMessage(_ message: String, type: ToastType) {
-        toastMessage = message
-        toastType = type
-        withAnimation(.spring(response: 0.3)) {
-            showToast = true
-        }
-        // 2.5秒后自动隐藏
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
-            withAnimation(.easeOut(duration: 0.2)) {
-                showToast = false
-            }
-        }
-    }
-
-    /// Toast 提示视图
-    @ViewBuilder
-    private var toastOverlay: some View {
-        if showToast {
-            VStack {
-                Spacer()
-                HStack(spacing: 12) {
-                    Image(systemName: toastType.icon)
-                        .font(.title3)
-                        .foregroundStyle(toastType.color)
-
-                    Text(toastMessage)
-                        .font(.subheadline)
-                        .foregroundStyle(.primary)
-                        .multilineTextAlignment(.leading)
-
-                    Spacer()
-                }
-                .padding()
-                .background(
-                    RoundedRectangle(cornerRadius: 16)
-                        .fill(.ultraThinMaterial)
-                        .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 5)
-                )
-                .padding(.horizontal, 16)
-                .padding(.bottom, 16)
-            }
-            .transition(.move(edge: .bottom).combined(with: .opacity))
-            .zIndex(100)
-        }
+        ToastManager.shared.show(message: message, type: type, duration: 2.5)
     }
 
     private func getAllOptions(for field: ClothingField) -> [String] {
@@ -2946,8 +2877,6 @@ struct ClothingEditView: View {
             modelContext.insert(newClothing)
             notificationTarget = newClothing
 
-            // Trigger Reward for adding new clothing
-            RewardManager.shared.triggerReward(type: .addClothing)
         }
 
         // Save context and sync widget
@@ -2961,6 +2890,11 @@ struct ClothingEditView: View {
 
             // 更新衣物数量缓存，用于魔法任务进度实时显示
             updateClothingCountCache()
+            if !isEditing, let notificationTarget {
+                WardrobeOperationFeedback.added([notificationTarget])
+            } else {
+                ToastManager.shared.showSuccess("保存成功".appLocalized)
+            }
         } catch {
             AppLogger.error("Failed to save context: \(error)")
             showToastMessage("保存失败，请稍后重试".appLocalized, type: .error)

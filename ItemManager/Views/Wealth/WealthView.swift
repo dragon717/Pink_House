@@ -340,8 +340,6 @@ struct WealthStorageContainerView: View {
                 }
                 .tabViewStyle(.page(indexDisplayMode: .never))
             }
-            // 底部悬浮 Dock 避让：口径收口到 `avoidingBottomDock()`（唯一实现）。
-            .avoidingBottomDock()
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         }
         .onChange(of: selectedStorageTab) { _, newValue in

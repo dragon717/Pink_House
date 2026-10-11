@@ -217,6 +217,12 @@ struct ShopCatalogSaleRecordAppendSheet: View {
 
     private var history: [CatalogSaleEvent] { store.saleHistory(forProduct: product.id) }
 
+    /// 追加沿用明确的来源币种；尚无明确币种的新录入默认人民币。
+    private var currency: CatalogCurrency {
+        let existing = store.priceArchive(forProduct: product.id).currentCurrency
+        return existing == .unknown ? .cny : existing ?? .cny
+    }
+
     /// 重复提交预检：与待写入记录业务维度完全一致的记录已存在 → 拦截
     private var isDuplicate: Bool {
         guard let price = priceDecimal(priceText), price > 0 else { return false }
@@ -225,7 +231,7 @@ struct ShopCatalogSaleRecordAppendSheet: View {
             deposit: priceDecimal(depositText),
             balance: type == .reservation ? (priceDecimal(balanceText) ?? (price - (priceDecimal(depositText) ?? 0))) : nil,
             startAt: startAt, endAt: hasEndAt ? endAt : nil,
-            batchLabel: nil, recordedAt: nil)
+            batchLabel: nil, recordedAt: nil, currency: currency)
         let fingerprint = probe.appendFingerprint
         return history.contains { $0.appendFingerprint == fingerprint }
     }
@@ -341,7 +347,8 @@ struct ShopCatalogSaleRecordAppendSheet: View {
                 balance: type == .reservation ? priceDecimal(balanceText) : nil,
                 startAt: startAt,
                 endAt: hasEndAt ? endAt : nil,
-                batchLabel: batchLabel)
+                batchLabel: batchLabel,
+                currency: currency)
             toast = "已为「\(product.name)」追加\(type.displayName)记录（\(event.batchDisplay)），已有记录未改动"
             dismiss()
         } catch {

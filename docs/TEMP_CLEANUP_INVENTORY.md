@@ -1,5 +1,7 @@
 # temp 文档清理盘点
 
+> 2026-10-11：底栏实现及核对口径以 `docs/iOS26_导航栏统一与异形底栏方案.md` 为准；本表中的旧底栏源码路径仅是历史记录。
+
 > 盘点日期：2026-05-25
 > 范围：主要阅读 `temp/` 下文档、manifest、RESULT/REPORT、提示词与配置；其中 iOS26 unify 项已在 2026-05-25 额外静态核对 `ItemManager/` 相关源码，但未跑构建 / 模拟器 / 真机。
 > 追加核对：2026-05-25 P2 Worker 1 已对“产品框架体验”行只读核对当前 Swift 实现；2026-05-25 P3 Explorer H 已只读核对 runtime / 工程配置未直接依赖 `temp/design`、`temp/_harness`、`temp/主题1|2`、`temp/商品图`、`temp/人台.png`，并确认 Rococo / 图标两处历史口径差异。

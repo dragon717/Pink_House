@@ -40,6 +40,16 @@ enum AppFeatureRoute {
     case smallWorld(SmallWorldDestination)
 }
 
+extension AppFeatureRoute {
+    var tabIndex: Int {
+        switch self {
+        case .tab(let index): return index
+        case .wardrobe: return 0
+        case .smallWorld: return 1
+        }
+    }
+}
+
 struct AppFeatureDescriptor: Identifiable {
     let id: AppFeatureID
     let title: String

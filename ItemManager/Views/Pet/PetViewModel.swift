@@ -462,6 +462,8 @@ class PetViewModel: ObservableObject {
         self.status.boneCoin = newStatus.boneCoin
         self.status.dailyFishCoinEarned = newStatus.dailyFishCoinEarned
         self.status.dailyBoneCoinEarned = newStatus.dailyBoneCoinEarned
+        self.status.lastDailyResetDate = newStatus.lastDailyResetDate
+        self.status.claimedOperationRewards = newStatus.claimedOperationRewards
         self.status.isAutoWorkEnabled = newStatus.isAutoWorkEnabled
         self.status.autoWorkStrategy = newStatus.autoWorkStrategy
         self.status.autoWorkRewardMode = newStatus.autoWorkRewardMode

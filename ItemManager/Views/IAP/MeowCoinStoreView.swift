@@ -45,12 +45,7 @@ struct MeowCoinStoreView: View {
                     .padding(.vertical)
                 }
 
-                // 成功提示
-                if viewModel.showSuccessToast {
-                    SuccessToast(message: viewModel.successMessage) {
-                        viewModel.dismissSuccessToast()
-                    }
-                }
+
             }
             .navigationTitle("获取喵币".appLocalized)
             .navigationBarTitleDisplayMode(.large)
@@ -742,43 +737,6 @@ struct EmptyProductPlaceholder: View {
             RoundedRectangle(cornerRadius: 16)
                 .fill(Color(uiColor: .secondarySystemBackground))
         )
-    }
-}
-
-// MARK: - 成功提示
-struct SuccessToast: View {
-    let message: String
-    let onDismiss: () -> Void
-
-    var body: some View {
-        VStack {
-            Spacer()
-
-            HStack(spacing: 12) {
-                Image(systemName: "checkmark.circle.fill")
-                    .font(.title2)
-                    .foregroundStyle(.green)
-
-                Text(message)
-                    .font(.subheadline.bold())
-                    .foregroundStyle(.primary)
-
-                Spacer()
-            }
-            .padding()
-            .background(
-                RoundedRectangle(cornerRadius: 16)
-                    .fill(.ultraThinMaterial)
-                    .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 5)
-            )
-            .padding()
-        }
-        .transition(.move(edge: .bottom).combined(with: .opacity))
-        .onAppear {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-                onDismiss()
-            }
-        }
     }
 }
 

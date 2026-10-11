@@ -18,11 +18,11 @@
 
 ---
 
-## 二、仓库 source of truth（⚠️ 待确认，动工前必问）
+## 二、仓库 source of truth（本机已确认）
 
-- `AGENTS.md` 声明 Swift/Xcode 源仓库在 iCloud：`/Users/muniao/Library/Mobile Documents/com~apple~CloudDocs/游戏/github/Pink_House`
-- 本工作区实际路径：`/Users/sangyu/develop/Pink_House`
-- **两者谁是本次开发目标仓库尚未确认**，已在 `Agent.md` 顶部标为"动工前必须先问用户"。确认后请把结论写回这里并删掉本条告警。
+- 本机 Swift/Xcode 开发目录：`/Users/sangyu/develop/Pink_House`，由用户明确确认。
+- muniao 的 iCloud 路径属于另一台机器，在本机不读写，不重复询问。
+- 2026-10-11 核验：`/Applications/Xcode.app` 为 Xcode 27 正式版；构建显式设置 `DEVELOPER_DIR`，不改全局 xcode-select。
 
 ---
 
@@ -89,3 +89,18 @@
 ## 七、待裁决
 
 - （空）审查中出现争议且用户未裁决时，在这里登记一行，格式：`YYYY-MM-DD | 议题 | 选项A / 选项B`。
+
+## 八、操作反馈与鱼币（2026-10-11）
+
+- 已统一普通提示、复制与奖励队列；时光馆单件/批量/心愿确认入橱保存成功后显示一次成功及实际到账鱼币。
+- 根因：时光馆部分成功入口没有反馈；旧奖励发布计划金额，额度不足也显示全额；手动新建在保存前发奖；页面订阅在导航切换时可能丢奖励。
+- 现在使用持久化业务 ID 防重，余额/日计数/领取标识同钱包快照保存；每日上限 10000，新增记录既有奖励 50，尾款付清 200；这些是鱼币，不是充值喵币。
+- 新操作如何选弹窗、哪些系统联动，先读 [使用指南](docs/OPERATION_FEEDBACK_AND_FISH_COIN_GUIDE.md)；验证见 [执行计划](docs/OPERATION_FEEDBACK_AND_FISH_COIN_EXEC_PLAN.md)。不要再写本地 Toast 或按弹窗自动加币。
+
+## 时光馆入橱与运营默认值（2026-10-11）
+
+入橱默认主衣物，小物由用户主动勾选；重复出现不得重置用户取消结果。运营新草稿/新价格录入默认人民币（CNY），保留明确币种与历史来源。正式规则与验证见 `docs/SHOP_CATALOG_ENTRY_DEFAULTS_2026-10-11.md`。
+
+2026-10-11 用户截图确认：入橱方式只保留确认页内单选，点击确认直接按已选方式保存，删除右侧重复选择弹窗及其状态/分支；取代 2026-09-27 二次弹窗旧要求。成功后仍统一提示与发放实际到账鱼币。
+
+2026-10-11 用户明确确认：运营已上传商品的未明确币种全部补为人民币，不能仅修改新录入默认值。Development 存量已修复发布 seq 21：26 件商品、38 条销售记录及 3 份价格修正；明确币种与金额保持原值。正式规则与证据：`docs/SHOP_CATALOG_OPERATOR_CURRENCY_REPAIR_2026-10-11.md`。

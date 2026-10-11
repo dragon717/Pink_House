@@ -22,6 +22,11 @@ enum ThemeSkinSlot: String, Codable, CaseIterable, Identifiable, Hashable {
 
     var id: String { rawValue }
 
+    /// 两个导航槽只保留存档标识；导航外观和布局交给系统 TabView。
+    var isThemeRendered: Bool {
+        self != .tabBarMain && self != .tabBarItem
+    }
+
     var displayName: String {
         switch self {
         case .topBarMain: return "顶部栏容器".appLocalized

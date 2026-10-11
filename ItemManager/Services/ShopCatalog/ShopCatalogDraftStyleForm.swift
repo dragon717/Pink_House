@@ -144,7 +144,7 @@ nonisolated enum ShopCatalogDraftStyleForm {
         var balance: Double? = nil
         var startAt: Date? = nil
         var endAt: Date? = nil
-        var currency: CatalogCurrency? = nil
+        var currency: CatalogCurrency? = .cny
 
         // 归属（店家 / 系列 / 批次）——由「应用到整批」管，这里只透传，不改语义
         var shopID: String? = nil

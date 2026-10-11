@@ -276,9 +276,6 @@
     "…" : {
 
     },
-    "…共 %lld 行" : {
-
-    },
     "。" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -3421,6 +3418,29 @@
         }
       }
     },
+    "%@已收进我的背包" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ added to my inventory"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@已收进我的背包"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@已收進我的背包"
+          }
+        }
+      }
+    },
     "%@已经在%@啦，先下班再换工作吧。" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -6076,6 +6096,9 @@
     "%lld 件" : {
 
     },
+    "%lld 件商品有入库回执，但当前目录缺少商品实体。" : {
+
+    },
     "%lld 像素" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -6134,6 +6157,9 @@
           }
         }
       }
+    },
+    "%lld 处图片引用解不出图，上传会被拦下" : {
+
     },
     "%lld 字节" : {
 
@@ -10140,6 +10166,7 @@
       }
     },
     "+%lld 鱼币" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -10403,6 +10430,7 @@
       }
     },
     "✨ %@" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -17009,7 +17037,13 @@
     "上传任务（共 %lld 条）" : {
 
     },
+    "上传前检查" : {
+
+    },
     "上传发布" : {
+
+    },
+    "上传失败原因（%lld 个文件）" : {
 
     },
     "上传数据..." : {
@@ -21971,6 +22005,9 @@
         }
       }
     },
+    "仍要填入" : {
+
+    },
     "从 %@ 出发" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -22096,6 +22133,9 @@
           }
         }
       }
+    },
+    "从保留的草稿恢复商品" : {
+
     },
     "从剪贴板填入" : {
 
@@ -22426,6 +22466,29 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "從衣櫥選擇"
+          }
+        }
+      }
+    },
+    "付完尾款啦！" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Final payment completed!"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "付完尾款啦！"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "付完尾款啦！"
           }
         }
       }
@@ -23109,7 +23172,7 @@
         }
       }
     },
-    "价格表行：每行「标签:值,值,…」与列一一对应（如「大蝴蝶结背心裙:318,91,227」）；可在「粘贴文本录入」里整段贴入，或在此手动修正后保存" : {
+    "价格表行：每行「标签:值,值,…」与列一一对应（如「大蝴蝶结背心裙:318,91,227,368」）；可在「粘贴文本录入」里整段贴入，或在此手动修正后保存" : {
 
     },
     "价格计算正确，无需调整" : {
@@ -24521,6 +24584,29 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "體驗任務"
+          }
+        }
+      }
+    },
+    "体验任务完成" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Experience task completed"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "体验任务完成"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "體驗任務完成"
           }
         }
       }
@@ -27546,6 +27632,29 @@
         }
       }
     },
+    "保存失败：找不到原图" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Could not save: original image unavailable"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "保存失败：找不到原图"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "儲存失敗：找不到原圖"
+          }
+        }
+      }
+    },
     "保存失败：无法清理旧尾款记录" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -27601,6 +27710,29 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "儲存失敗：無法清理舊尾款記錄"
+          }
+        }
+      }
+    },
+    "保存失败：请允许添加照片到相册" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Could not save: allow adding photos"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "保存失败：请允许添加照片到相册"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "儲存失敗：請允許新增照片到相簿"
           }
         }
       }
@@ -33792,6 +33924,12 @@
         }
       }
     },
+    "冲突字段保留本机修改并上传" : {
+
+    },
+    "冲突字段采用线上修改并上传" : {
+
+    },
     "冻干" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -34947,13 +35085,10 @@
     "列与行都清空 = 删除该款式的尺码表。" : {
 
     },
-    "列名：%@" : {
+    "列名（只写数据列，逗号分隔，如：前裙长,胸围,袖长）" : {
 
     },
-    "列名（逗号分隔，如：尺码,前裙长,推荐胸围）" : {
-
-    },
-    "列名（逗号分隔，如：款式,预约价,定金,尾款）" : {
+    "列名（只写数据列，逗号分隔，如：预约价,定金,尾款,现货价）" : {
 
     },
     "列表项 1" : {
@@ -36894,6 +37029,7 @@
       }
     },
     "前往魔法任务获得更多" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -37613,6 +37749,52 @@
     },
     "加入少女衣橱" : {
 
+    },
+    "加入心愿失败：%@" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Could not add to wishlist: %@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "加入心愿失败：%@"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "加入心願失敗：%@"
+          }
+        }
+      }
+    },
+    "加入心愿失败：商品暂无价格档案" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Could not add to wishlist: no price information"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "加入心愿失败：商品暂无价格档案"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "加入心願失敗：商品暫無價格檔案"
+          }
+        }
+      }
     },
     "加入方式" : {
 
@@ -40829,6 +41011,9 @@
         }
       }
     },
+    "双方修改了以下字段。请选择这些冲突字段采用哪一方，其余新增和修改都会保留。" : {
+
+    },
     "发售阶段" : {
 
     },
@@ -42982,6 +43167,9 @@
           }
         }
       }
+    },
+    "同步更新并上传" : {
+
     },
     "同步状态" : {
       "extractionState" : "stale",
@@ -46809,6 +46997,9 @@
         }
       }
     },
+    "图片齐了，可以上传" : {
+
+    },
     "图纸设置" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -50393,6 +50584,29 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "頭等艙"
+          }
+        }
+      }
+    },
+    "奖励暂未到账" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reward has not been credited yet"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "奖励暂未到账"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "獎勵暫未到帳"
           }
         }
       }
@@ -55924,13 +56138,10 @@
     "尺码表 / 面料 / 款式描述属于**款式**，只需录一次；颜色图与尺码选择属于**颜色**，每加一个颜色填一次。" : {
 
     },
-    "尺码表列名（逗号分隔，如：尺码,前裙长,推荐胸围）" : {
+    "尺码表列名（只写数据列，逗号分隔，如：前裙长,胸围,袖长）" : {
 
     },
-    "尺码表列名（逗号分隔，如：尺码,前裙长,胸围）" : {
-
-    },
-    "尺码表列名（逗号分隔，如：尺码,胸围,衣长）" : {
+    "尺码表列名（只写数据列，逗号分隔，如：胸围,衣长,肩宽）" : {
 
     },
     "尺码表可后补；填了列与行，第 2 步的颜色就能直接勾选尺码。" : {
@@ -55939,7 +56150,7 @@
     "尺码表按**款式共享**：同款（同系列 + 同品类 + 同款式名）任意一个颜色填写，其余颜色自动共用同一套，无需重复填写；这里留空保存 = **清空整款**的尺码表。" : {
 
     },
-    "尺码表行：每行「标签:值,值,…」与列一一对应（如「M:84,52」）" : {
+    "尺码表行：每行「标签:值,值,…」与列一一对应（如「M:84,52,38」）" : {
 
     },
     "尾" : {
@@ -57212,6 +57423,29 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "已付定金總額"
+          }
+        }
+      }
+    },
+    "已保存 %@ 张到相册" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Saved %@ photos"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已保存 %@ 张到相册"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已儲存 %@ 張到相簿"
           }
         }
       }
@@ -59739,6 +59973,29 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "已跳過"
+          }
+        }
+      }
+    },
+    "已达到今日鱼币奖励上限" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Daily Fish Coin reward limit reached"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已达到今日鱼币奖励上限"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已達今日魚幣獎勵上限"
           }
         }
       }
@@ -62706,6 +62963,29 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "開啟自動打工"
+          }
+        }
+      }
+    },
+    "开售时间待公布，暂无法定时提醒" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sale date is not announced; a reminder cannot be scheduled yet"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "开售时间待公布，暂无法定时提醒"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "開售時間待公布，暫無法定時提醒"
           }
         }
       }
@@ -66265,6 +66545,9 @@
           }
         }
       }
+    },
+    "待恢复商品" : {
+
     },
     "待提醒" : {
       "extractionState" : "stale",
@@ -79870,6 +80153,29 @@
         }
       }
     },
+    "搭配完成！" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Outfit completed!"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "搭配完成！"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "搭配完成！"
+          }
+        }
+      }
+    },
     "搭配小物" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -83219,6 +83525,29 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "新建手帳本..."
+          }
+        }
+      }
+    },
+    "新建搭配" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "New outfit created"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新建搭配"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新增搭配"
           }
         }
       }
@@ -90643,9 +90972,6 @@
     "未设置（沿用销售记录）" : {
 
     },
-    "未识别到列名行，将按你填写的列名对照保存" : {
-
-    },
     "未读" : {
       "localizations" : {
         "en" : {
@@ -91202,6 +91528,9 @@
           }
         }
       }
+    },
+    "本机图片目录：%lld 个文件" : {
+
     },
     "本次入橱（全款·%@）" : {
 
@@ -98904,6 +99233,98 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "添加圖片"
+          }
+        }
+      }
+    },
+    "添加成功，已加入少女衣橱" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Added to wardrobe"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "添加成功，已加入少女衣橱"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新增成功，已加入少女衣櫥"
+          }
+        }
+      }
+    },
+    "添加成功，已加入少女衣橱（%@ 条记录）" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Added to wardrobe (%@ records)"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "添加成功，已加入少女衣橱（%@ 条记录）"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新增成功，已加入少女衣櫥（%@ 筆記錄）"
+          }
+        }
+      }
+    },
+    "添加成功，已加入心愿" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Added to wishlist"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "添加成功，已加入心愿"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新增成功，已加入心願"
+          }
+        }
+      }
+    },
+    "添加新衣" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "New clothing added"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "添加新衣"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新增新衣"
           }
         }
       }
@@ -111454,9 +111875,6 @@
         }
       }
     },
-    "立即重试" : {
-
-    },
     "第 %lld 次尝试" : {
 
     },
@@ -115197,6 +115615,9 @@
           }
         }
       }
+    },
+    "结论与保存用的是同一套判定：预览即落库结果。识别失败时下方输入框仍可继续手工修正。" : {
+
     },
     "给%@洗香香要花%d%@，我现在%@还不够，先带你去充值。" : {
       "extractionState" : "stale",
@@ -124815,9 +125236,6 @@
         }
       }
     },
-    "识别预览（确认后即为保存内容）" : {
-
-    },
     "试用可体验" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -127477,9 +127895,6 @@
           }
         }
       }
-    },
-    "请选择加入方式" : {
-
     },
     "请重新选择一张图片以进行裁剪和移动。" : {
       "localizations" : {
@@ -130441,6 +130856,12 @@
         }
       }
     },
+    "还有 %lld 条，同步失败时下方会列出完整原因。" : {
+
+    },
+    "还有 %lld 条未显示（同一次上传会一并处理）。" : {
+
+    },
     "还没开定金" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -132272,6 +132693,9 @@
           }
         }
       }
+    },
+    "这里列的是全部解不出图的文件，不是只报第一条。补上图之后重新上传即可。" : {
+
     },
     "这里是衣橱的手动创建入口，你可以一件一件添加你的裙子。\n\n当然，我们也支持批量创建，一次导入多件衣物，省时省力！" : {
       "extractionState" : "stale",
@@ -134706,6 +135130,29 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "通用設定"
+          }
+        }
+      }
+    },
+    "通知权限未开启，请到系统设置开启后才能收到开售提醒" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enable notifications in Settings to receive sale reminders"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "通知权限未开启，请到系统设置开启后才能收到开售提醒"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "通知權限未開啟，請到系統設定開啟後才能收到開售提醒"
           }
         }
       }
@@ -138028,6 +138475,9 @@
           }
         }
       }
+    },
+    "需要解决冲突" : {
+
     },
     "需要通知权限" : {
       "extractionState" : "stale",
@@ -141352,6 +141802,29 @@
         }
       }
     },
+    "首次体验新功能" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "First use of a new feature"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "首次体验新功能"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "首次體驗新功能"
+          }
+        }
+      }
+    },
     "首次启用 iCloud 同步需要一些时间..." : {
       "localizations" : {
         "en" : {
@@ -141370,6 +141843,29 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "首次啓用 iCloud 同步需要一些時間..."
+          }
+        }
+      }
+    },
+    "首次完成新手引导" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "First onboarding completed"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "首次完成新手引导"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "首次完成新手引導"
           }
         }
       }
@@ -142373,6 +142869,29 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "魚幣"
+          }
+        }
+      }
+    },
+    "鱼币 +%@" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fish Coins +%@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "鱼币 +%@"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "魚幣 +%@"
           }
         }
       }

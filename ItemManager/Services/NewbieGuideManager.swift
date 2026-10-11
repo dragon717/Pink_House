@@ -421,8 +421,8 @@ final class AppFirstLaunchGuideManager: ObservableObject {
                     RewardManager.shared.triggerReward(
                         type: .custom(
                             amount: reward,
-                            message: "体验任务完成，鱼币 +\(reward)"
-                        )
+                            message: "体验任务完成"
+                        ), operationID: "feature-experience:\(completionFeature.rawValue)"
                     )
                 }
             }
@@ -797,13 +797,15 @@ final class AppFirstLaunchGuideManager: ObservableObject {
     private func grantFirstCompletionRewardIfNeeded() {
         guard !UserDefaults.standard.bool(forKey: firstCompletionRewardClaimedKey) else { return }
 
-        UserDefaults.standard.set(true, forKey: firstCompletionRewardClaimedKey)
-        RewardManager.shared.triggerReward(
+        let receipt = RewardManager.shared.triggerReward(
             type: .custom(
                 amount: firstCompletionRewardAmount,
-                message: "首次完成新手引导，鱼币 +\(firstCompletionRewardAmount)"
-            )
+                message: "首次完成新手引导"
+            ), operationID: "newbie-guide:first-completion"
         )
+        if receipt.actualAmount > 0 || receipt.status == .duplicate {
+            UserDefaults.standard.set(true, forKey: firstCompletionRewardClaimedKey)
+        }
     }
 }
 

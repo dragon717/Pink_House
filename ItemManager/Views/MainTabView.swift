@@ -21,26 +21,6 @@ private struct IsRoutePageActiveKey: EnvironmentKey {
     static let defaultValue: Bool = true
 }
 
-enum LegacyCustomTabBarLayout {
-    static let barHeight: CGFloat = 56
-    static let bottomSpacingWithSafeArea: CGFloat = 2
-    static let bottomSpacingWithoutSafeArea: CGFloat = 4
-    static let floatingSurfaceGap: CGFloat = 12
-    static let floatingElementLift: CGFloat = 20
-
-    static var floatingSurfaceBottomInset: CGFloat {
-        barHeight + max(bottomSpacingWithSafeArea, bottomSpacingWithoutSafeArea) + floatingSurfaceGap
-    }
-}
-
-private struct CustomBottomFloatingLiftKey: EnvironmentKey {
-    static let defaultValue: CGFloat = 0
-}
-
-private struct CustomBottomNavigationAvoidanceInsetKey: EnvironmentKey {
-    static let defaultValue: CGFloat = 0
-}
-
 extension EnvironmentValues {
     var isSimulationActive: Bool {
         get { self[IsSimulationActiveKey.self] }
@@ -57,15 +37,7 @@ extension EnvironmentValues {
         set { self[IsRoutePageActiveKey.self] = newValue }
     }
 
-    var customBottomFloatingLift: CGFloat {
-        get { self[CustomBottomFloatingLiftKey.self] }
-        set { self[CustomBottomFloatingLiftKey.self] = newValue }
-    }
 
-    var customBottomNavigationAvoidanceInset: CGFloat {
-        get { self[CustomBottomNavigationAvoidanceInsetKey.self] }
-        set { self[CustomBottomNavigationAvoidanceInsetKey.self] = newValue }
-    }
 }
 
 private func performWithoutRouteContentAnimation(_ updates: () -> Void) {
@@ -76,220 +48,54 @@ private func performWithoutRouteContentAnimation(_ updates: () -> Void) {
     }
 }
 
-// MARK: - 衣橱 Tab 内容
-struct WardrobeTabContent: View {
-    @Binding var homeTabSelection: HomeTab
-    
-    var body: some View {
-        NavigationStack {
-            HomeView(selectedTab: $homeTabSelection)
-        }
-    }
-}
-
-// MARK: - House Tab 内容
-struct SmallWorldTabContent: View {
-    @Binding var selectedTab: Int
-    @Binding var homeTab: HomeTab
-    @Binding var destination: SmallWorldDestination
-    @Binding var isPlayingOpeningAnimation: Bool
-    
-    var body: some View {
-        NavigationStack {
-            SmallWorldContainerView(
-                selectedTab: $selectedTab,
-                homeTab: $homeTab,
-                destination: $destination,
-                isPlayingOpeningAnimation: $isPlayingOpeningAnimation
-            )
-            .toolbarBackground(.hidden, for: .navigationBar)
-        }
-    }
-}
-
-// MARK: - 我 Tab 内容
-struct MeTabContent: View {
-    var body: some View {
-        NavigationStack {
-            MeView()
-                .toolbarBackground(.hidden, for: .navigationBar)
-        }
-    }
-}
-
-// MARK: - House容器视图
-struct SmallWorldContainerView: View {
-    @Binding var selectedTab: Int
-    @Binding var homeTab: HomeTab
-    @Binding var destination: SmallWorldDestination
-    @Binding var isPlayingOpeningAnimation: Bool
-    @Environment(\.isRoutePageActive) private var isRoutePageActive
-    
-    var body: some View {
-        if isRoutePageActive {
-            content
-        } else {
-            Color.clear
-        }
-    }
-    
-    @ViewBuilder
-    private var content: some View {
-        switch destination {
-        case .menu:
-            SmallWorldView(
-                selectedTab: $selectedTab,
-                homeTab: $homeTab,
-                destination: $destination,
-                isPlayingOpeningAnimation: $isPlayingOpeningAnimation
-            )
-        case .ootd:
-            if #available(iOS 18.0, *) {
-                OOTDViewWithBackButton(
-                    selectedTab: $selectedTab,
-                    homeTab: $homeTab,
-                    destination: $destination
-                )
-            } else {
-                OOTDViewWithBackButtonLegacy(
-                    selectedTab: $selectedTab,
-                    homeTab: $homeTab,
-                    destination: $destination
-                )
-            }
-        case .ootdDefaultBook:
-            if #available(iOS 18.0, *) {
-                OOTDDefaultBookViewWithBackButton(
-                    selectedTab: $selectedTab,
-                    homeTab: $homeTab,
-                    destination: $destination
-                )
-            } else {
-                OOTDDefaultBookViewWithBackButtonLegacy(
-                    selectedTab: $selectedTab,
-                    homeTab: $homeTab,
-                    destination: $destination
-                )
-            }
-        case .pet:
-            if #available(iOS 18.0, *) {
-                PetHomeViewWithBackButton(
-                    selectedTab: $selectedTab,
-                    homeTab: $homeTab,
-                    destination: $destination
-                )
-            } else {
-                PetHomeViewWithBackButtonLegacy(
-                    selectedTab: $selectedTab,
-                    homeTab: $homeTab,
-                    destination: $destination
-                )
-            }
-        case .wealth(let initialTab):
-            if #available(iOS 18.0, *) {
-                WealthViewWithBackButton(
-                    selectedTab: $selectedTab,
-                    homeTab: $homeTab,
-                    destination: $destination,
-                    initialTab: initialTab
-                )
-            } else {
-                WealthViewWithBackButtonLegacy(
-                    selectedTab: $selectedTab,
-                    homeTab: $homeTab,
-                    destination: $destination,
-                    initialTab: initialTab
-                )
-            }
-        case .calendar:
-            if #available(iOS 18.0, *) {
-                DreamDressCalendarViewWithBackButton(
-                    selectedTab: $selectedTab,
-                    homeTab: $homeTab,
-                    destination: $destination
-                )
-            } else {
-                DreamDressCalendarViewWithBackButtonLegacy(
-                    selectedTab: $selectedTab,
-                    homeTab: $homeTab,
-                    destination: $destination
-                )
-            }
-        case .recycleBin:
-            if #available(iOS 18.0, *) {
-                RecycleBinViewWithBackButton(
-                    selectedTab: $selectedTab,
-                    homeTab: $homeTab,
-                    destination: $destination
-                )
-            } else {
-                RecycleBinViewWithBackButtonLegacy(
-                    selectedTab: $selectedTab,
-                    homeTab: $homeTab,
-                    destination: $destination
-                )
-            }
-        case .wardrobe, .depositPlan:
-            // 这些功能直接跳转到 Tab 0，不会在这里显示
-            EmptyView()
-        }
-    }
-}
-
 // MARK: - 主 Tab 视图
-// MARK: - iOS 18以下 自定义椭圆胶囊底部导航栏
-struct LegacyTabView: View {
+// 系统 TabView 负责导航栏外观与安全区。
+struct NativeTabNavigation: View {
     @Binding var selectedTab: Int
     @Binding var homeTabSelection: HomeTab
     @Binding var smallWorldDestination: SmallWorldDestination
     @Binding var isPlayingOpeningAnimation: Bool
-    @Environment(ThemeManager.self) private var themeManager
-    @Environment(\.colorScheme) private var colorScheme
-    @ObservedObject private var themeSkinManager = ThemeSkinManager.shared
     @ObservedObject private var petDataManager = PetDataManager.shared
-    @StateObject private var mediaStateManager = MediaStateManager.shared
     @StateObject private var tabNavigationManager = TabNavigationManager.shared
     @StateObject private var bottomDockSettingsManager = BottomDockSettingsManager.shared
     @StateObject private var floatingPetVisibilityManager = FloatingPetVisibilityManager.shared
     @StateObject private var guideManager = AppFirstLaunchGuideManager.shared
-    
+
     // 搜索文本状态
     @State private var searchText = ""
-    @State private var loadedTabs: Set<Int> = [0]
+    @State private var selectedFeatureID: AppFeatureID = .wardrobe
     @State private var petChatReturnTab = 0
     @State private var isRouteTransitionCoolingDown = false
-    @State private var routeTransitionQuietWorkItem: DispatchWorkItem?
-
-    private let routeTransitionQuietDuration: TimeInterval = 0.4
-
-    private var magicPalette: MagicThemePalette {
-        MagicThemeDesignSystem.palette(themeManager: themeManager, colorScheme: colorScheme)
-    }
-
-    private var themedTabBarDescriptor: ThemeSkinDescriptor? {
-        resolveTabBarDescriptor(for: .tabBarMain)
-    }
-
-    private var themedTabItemDescriptor: ThemeSkinDescriptor? {
-        resolveTabBarDescriptor(for: .tabBarItem)
-    }
+    @State private var routeTransitionGeneration = 0
 
     var body: some View {
-        ZStack {
-            // 内容区域
-            contentView
-
-            // 自定义底部导航栏
-            VStack {
-                Spacer()
-                customTabBar
+        Group {
+            if #available(iOS 18, *) {
+                TabView(selection: nativeSelection) {
+                    ForEach(navigationFeatures) { feature in
+                        Tab(value: feature.id) {
+                            tabContent(for: feature)
+                        } label: {
+                            Label(tabTitle(for: feature), systemImage: tabIcon(for: feature))
+                        }
+                    }
+                }
+                .tabViewStyle(.tabBarOnly)
+            } else {
+                // 最低部署版本为 iOS 17.4；旧系统同样使用原生 TabView。
+                TabView(selection: nativeSelection) {
+                    ForEach(navigationFeatures) { feature in
+                        tabContent(for: feature)
+                            .tabItem {
+                                Label(tabTitle(for: feature), systemImage: tabIcon(for: feature))
+                            }
+                            .tag(feature.id)
+                    }
+                }
             }
-            .ignoresSafeArea(.keyboard, edges: .bottom)
         }
+        .tint(.accentColor)
         .overlay {
-            if !isRouteTransitionCoolingDown {
-                RewardBubbleView()
-            }
             // The floating pet is a root companionship layer; task, guide, and modal
             // flows report blockers through FloatingPetVisibilityManager.
             if effectiveFloatingPetHiddenReasons.isEmpty && !isRouteTransitionCoolingDown {
@@ -299,8 +105,7 @@ struct LegacyTabView: View {
                         selectedTab = 3
                     }
                 },
-                petName: petDataManager.status.displayName,
-                bottomAvoidanceLift: LegacyCustomTabBarLayout.floatingElementLift)
+                petName: petDataManager.status.displayName)
             }
         }
         .onReceive(tabNavigationManager.$navigateToTab) { tab in
@@ -334,10 +139,10 @@ struct LegacyTabView: View {
             }
         }
         .onAppear {
-            markTabLoaded(selectedTab)
+            synchronizeNativeSelection()
         }
         .onChange(of: selectedTab) { _, newTab in
-            markTabLoaded(newTab)
+            synchronizeNativeSelection()
             if newTab != 3 {
                 petChatReturnTab = newTab
             }
@@ -360,88 +165,66 @@ struct LegacyTabView: View {
             )
         }
         .onChange(of: homeTabSelection) { _, _ in
+            synchronizeNativeSelection()
             beginRouteTransitionQuietPeriod()
         }
         .onChange(of: smallWorldDestination) { _, _ in
+            synchronizeNativeSelection()
             beginRouteTransitionQuietPeriod()
         }
-        .onDisappear {
-            routeTransitionQuietWorkItem?.cancel()
-            routeTransitionQuietWorkItem = nil
+        .onChange(of: bottomDockSettingsManager.selectedFeatureIDs) { _, _ in
+            synchronizeNativeSelection()
+        }
+        .task(id: routeTransitionGeneration) {
+            guard isRouteTransitionCoolingDown else { return }
+            let generation = routeTransitionGeneration
+            do {
+                try await Task.sleep(for: .milliseconds(400))
+                try Task.checkCancellation()
+                guard generation == routeTransitionGeneration else { return }
+                isRouteTransitionCoolingDown = false
+            } catch {
+                // 新路由或离开视图会取消本轮冷却，由下一轮任务继续管理。
+            }
         }
     }
 
-    @ViewBuilder
-    private var contentView: some View {
-        ZStack {
-            if shouldRenderTab(0) {
-                persistentTabPage(tab: 0) {
-                    HomeView(selectedTab: $homeTabSelection)
-                }
-            }
+    private var navigationFeatures: [AppFeatureDescriptor] {
+        bottomDockSettingsManager.slots.map { bottomDockSettingsManager.feature(at: $0) }
+    }
 
-            if shouldRenderTab(1) {
-                persistentTabPage(tab: 1) {
-                    NavigationStack {
-                        SmallWorldContainerViewLegacy(
-                            selectedTab: $selectedTab,
-                            homeTab: $homeTabSelection,
-                            destination: $smallWorldDestination,
-                            isPlayingOpeningAnimation: $isPlayingOpeningAnimation
-                        )
-                        .toolbarBackground(.hidden, for: .navigationBar)
-                    }
-                }
-            }
+    private var nativeSelection: Binding<AppFeatureID> {
+        Binding(get: { selectedFeatureID }, set: { id in
+            guard let feature = navigationFeatures.first(where: { $0.id == id }),
+                  feature.isUnlocked else { return }
+            selectedFeatureID = id
+            activateBottomDockFeature(feature)
+        })
+    }
 
-            if shouldRenderTab(2) {
-                persistentTabPage(tab: 2) {
-                    NavigationStack {
-                        MeView()
-                            .toolbarBackground(.hidden, for: .navigationBar)
-                    }
-                }
-            }
-
-            if shouldRenderTab(3) {
-                persistentTabPage(tab: 3) {
-                    PetChatViewLegacy(
-                        searchText: $searchText,
-                        onHide: hidePetChat
-                    )
-                }
-            }
-
-            if shouldRenderTab(4) {
-                persistentTabPage(tab: 4) {
-                    NavigationStack {
-                        TimeHallView()
-                            .toolbarBackground(.hidden, for: .navigationBar)
-                    }
-                }
-            }
-        }
-        .transaction { transaction in
-            transaction.animation = nil
-            transaction.disablesAnimations = true
+    private func synchronizeNativeSelection() {
+        if let feature = navigationFeatures.first(where: { isFeatureActive($0) }) {
+            selectedFeatureID = feature.id
+        } else if !navigationFeatures.contains(where: { $0.id == selectedFeatureID }),
+                  let first = navigationFeatures.first {
+            selectedFeatureID = first.id
         }
     }
 
-    private func shouldRenderTab(_ tab: Int) -> Bool {
-        loadedTabs.contains(tab) || selectedTab == tab
-    }
-
-    private func markTabLoaded(_ tab: Int) {
-        guard !loadedTabs.contains(tab) else { return }
-        loadedTabs.insert(tab)
-    }
-
-    private func isActiveTab(_ tab: Int) -> Bool {
-        selectedTab == tab
+    private func tabContent(for feature: AppFeatureDescriptor) -> some View {
+        NativeTabPage(
+            feature: feature,
+            isActive: selectedFeatureID == feature.id,
+            isCoolingDown: isRouteTransitionCoolingDown,
+            selectedTab: $selectedTab,
+            homeTabSelection: $homeTabSelection,
+            smallWorldDestination: $smallWorldDestination,
+            isPlayingOpeningAnimation: $isPlayingOpeningAnimation,
+            searchText: $searchText,
+            hidePetChat: hidePetChat)
     }
 
     private func beginRouteTransitionQuietPeriod() {
-        routeTransitionQuietWorkItem?.cancel()
         _ = PerformanceSignpost.event(
             .routeTransition,
             label: "tab=\(selectedTab)",
@@ -452,110 +235,7 @@ struct LegacyTabView: View {
             isRouteTransitionCoolingDown = true
         }
 
-        let workItem = DispatchWorkItem {
-            isRouteTransitionCoolingDown = false
-        }
-        routeTransitionQuietWorkItem = workItem
-
-        DispatchQueue.main.asyncAfter(
-            deadline: .now() + routeTransitionQuietDuration,
-            execute: workItem
-        )
-    }
-
-    private func persistentTabPage<Content: View>(
-        tab: Int,
-        @ViewBuilder content: () -> Content
-    ) -> some View {
-        let isActive = isActiveTab(tab)
-
-        return content()
-            .environment(\.isRoutePageActive, isActive)
-            .environment(\.isSimulationActive, isActive && !isRouteTransitionCoolingDown)
-            .environment(\.isRouteTransitionCoolingDown, isRouteTransitionCoolingDown)
-            .opacity(isActive ? 1 : 0)
-            .allowsHitTesting(isActive)
-            .accessibilityHidden(!isActive)
-            .toolbar(isActive ? .automatic : .hidden, for: .navigationBar)
-            .zIndex(isActive ? 1 : 0)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-    }
-
-    private var customTabBar: some View {
-        GeometryReader { geometry in
-            let safeAreaBottom = geometry.safeAreaInsets.bottom
-
-            // 使用VStack将内容推到底部
-            VStack {
-                Spacer()
-                // 椭圆胶囊容器
-                HStack(spacing: -8) {
-                    ForEach(bottomDockSettingsManager.slots, id: \.self) { slotIndex in
-                        bottomDockButton(slotIndex: slotIndex)
-                    }
-                }
-                .frame(height: LegacyCustomTabBarLayout.barHeight)
-                .background {
-                    if themedTabBarDescriptor != nil {
-                        ThemeSkinTabBarBackdrop(
-                            descriptor: themedTabBarDescriptor,
-                            safeAreaBottom: 0,
-                            horizontalPadding: 0,
-                            bottomPadding: 0
-                        )
-                    } else {
-                        Capsule()
-                            .fill(.ultraThinMaterial)
-                            .overlay(
-                                Capsule()
-                                    .fill(magicPalette.navigationBackground.opacity(colorScheme == .dark ? 0.78 : 0.88))
-                            )
-                            .overlay(
-                                Capsule()
-                                    .stroke(magicPalette.quickOptionStroke.opacity(0.55), lineWidth: 1)
-                            )
-                            .shadow(color: .black.opacity(0.1), radius: 8, x: 0, y: -2)
-                    }
-                }
-                .padding(.horizontal, 16)
-                // 往下挪，紧贴底部（减小安全区域间距）
-                .padding(.bottom, safeAreaBottom > 0 ? LegacyCustomTabBarLayout.bottomSpacingWithSafeArea : LegacyCustomTabBarLayout.bottomSpacingWithoutSafeArea)
-            }
-        }
-    }
-
-    private func bottomDockButton(slotIndex: Int) -> some View {
-        let feature = bottomDockSettingsManager.feature(at: slotIndex)
-        let isSelected = isFeatureActive(feature)
-
-        return Button {
-            activateBottomDockFeature(feature)
-        } label: {
-            ThemeSkinLegacyTabLabel(
-                descriptor: themedTabItemDescriptor,
-                title: tabTitle(for: feature),
-                systemImage: tabIcon(for: feature),
-                isSelected: isSelected,
-                selectedColor: Color(hex: feature.tintHex),
-                inactiveColor: magicPalette.secondaryText,
-                tabRole: tabRole(for: feature)
-            )
-            .captureGuideTarget(feature.id == .house ? GuideTargetKey.homeHouseTab : nil)
-            .overlay {
-                Color.clear
-                    .frame(width: 68, height: LegacyCustomTabBarLayout.barHeight)
-                    .allowsHitTesting(false)
-                    .captureGuideTarget(feature.id == .petChat ? .homePetChatTab : nil)
-            }
-        }
-    }
-
-    private func resolveTabBarDescriptor(for slot: ThemeSkinSlot) -> ThemeSkinDescriptor? {
-        guard let descriptor = themeSkinManager.activeThemeDescriptor(for: slot, state: .default),
-              WardrobeThemeSkinSupport.isThemeSkinDescriptor(descriptor) else {
-            return nil
-        }
-        return descriptor
+        routeTransitionGeneration += 1
     }
 
     private var isHouseRouteActive: Bool {
@@ -620,19 +300,6 @@ struct LegacyTabView: View {
     private var hasActiveSpecificSmallWorldFeature: Bool {
         bottomDockSettingsManager.selectedFeatureIDs.contains { featureID in
             featureID != .house && routeMatches(AppFeatureRegistry.descriptor(for: featureID))
-        }
-    }
-
-    private func tabRole(for feature: AppFeatureDescriptor) -> ThemeSkinTabRole {
-        switch feature.id {
-        case .wardrobe, .depositPlan:
-            return .wardrobe
-        case .house, .petHome, .magicSticker, .outfitJournal, .wealth, .calendar, .recycleBin, .timeHall:
-            return .house
-        case .me:
-            return .me
-        case .petChat:
-            return .petChat
         }
     }
 
@@ -717,8 +384,66 @@ struct LegacyTabView: View {
     }
 }
 
-// MARK: - iOS 18以下 SmallWorld容器视图
-struct SmallWorldContainerViewLegacy: View {
+// 每个 Tab 的内容独立观察页面主题，避免主题刷新重建整个导航容器。
+private struct NativeTabPage: View {
+    let feature: AppFeatureDescriptor
+    let isActive: Bool
+    let isCoolingDown: Bool
+    @Binding var selectedTab: Int
+    @Binding var homeTabSelection: HomeTab
+    @Binding var smallWorldDestination: SmallWorldDestination
+    @Binding var isPlayingOpeningAnimation: Bool
+    @Binding var searchText: String
+    let hidePetChat: () -> Void
+    @Environment(ThemeManager.self) private var themeManager
+
+    var body: some View {
+        content
+            .tint(themeManager.accentTextColor)
+            .environment(\.isRoutePageActive, isActive)
+            .environment(\.isSimulationActive, isActive && !isCoolingDown)
+            .environment(\.isRouteTransitionCoolingDown, isCoolingDown)
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        switch isActive ? selectedTab : feature.route.tabIndex {
+        case 0:
+            HomeView(selectedTab: homeSelection(for: feature, isActive: isActive))
+        case 1:
+            NavigationStack {
+                SmallWorldRouteContent(
+                    selectedTab: $selectedTab, homeTab: $homeTabSelection,
+                    destination: worldSelection(for: feature, isActive: isActive),
+                    isPlayingOpeningAnimation: $isPlayingOpeningAnimation)
+            }
+        case 2:
+            NavigationStack { MeView() }
+        case 3:
+            PetChatViewLegacy(searchText: $searchText, onHide: hidePetChat)
+        case 4:
+            NavigationStack { TimeHallView() }
+        default:
+            EmptyView()
+        }
+    }
+
+    private func homeSelection(for feature: AppFeatureDescriptor, isActive: Bool) -> Binding<HomeTab> {
+        if isActive { return $homeTabSelection }
+        if case .wardrobe(let homeTab) = feature.route { return .constant(homeTab) }
+        return .constant(.wardrobe)
+    }
+
+    private func worldSelection(for feature: AppFeatureDescriptor, isActive: Bool) -> Binding<SmallWorldDestination> {
+        if isActive { return $smallWorldDestination }
+        if case .smallWorld(let destination) = feature.route { return .constant(destination) }
+        return .constant(.menu)
+    }
+
+}
+
+// MARK: - House 路由内容
+struct SmallWorldRouteContent: View {
     @Binding var selectedTab: Int
     @Binding var homeTab: HomeTab
     @Binding var destination: SmallWorldDestination
@@ -736,38 +461,38 @@ struct SmallWorldContainerViewLegacy: View {
                     isPlayingOpeningAnimation: $isPlayingOpeningAnimation
                 )
             case .ootd:
-                OOTDViewWithBackButtonLegacy(
+                OOTDViewWithBackButton(
                     selectedTab: $selectedTab,
                     homeTab: $homeTab,
                     destination: $destination
                 )
             case .ootdDefaultBook:
-                OOTDDefaultBookViewWithBackButtonLegacy(
+                OOTDDefaultBookViewWithBackButton(
                     selectedTab: $selectedTab,
                     homeTab: $homeTab,
                     destination: $destination
                 )
             case .pet:
-                PetHomeViewWithBackButtonLegacy(
+                PetHomeViewWithBackButton(
                     selectedTab: $selectedTab,
                     homeTab: $homeTab,
                     destination: $destination
                 )
             case .wealth(let initialTab):
-                WealthViewWithBackButtonLegacy(
+                WealthViewWithBackButton(
                     selectedTab: $selectedTab,
                     homeTab: $homeTab,
                     destination: $destination,
                     initialTab: initialTab
                 )
             case .calendar:
-                DreamDressCalendarViewWithBackButtonLegacy(
+                DreamDressCalendarViewWithBackButton(
                     selectedTab: $selectedTab,
                     homeTab: $homeTab,
                     destination: $destination
                 )
             case .recycleBin:
-                RecycleBinViewWithBackButtonLegacy(
+                RecycleBinViewWithBackButton(
                     selectedTab: $selectedTab,
                     homeTab: $homeTab,
                     destination: $destination
@@ -781,8 +506,8 @@ struct SmallWorldContainerViewLegacy: View {
     }
 }
 
-// MARK: - iOS 18以下 返回按钮包装视图
-struct SmallWorldBackButtonLegacy: View {
+// MARK: - House 路由返回
+struct SmallWorldBackButton: View {
     @Binding var selectedTab: Int
     @Binding var homeTab: HomeTab
     var onBackToMenu: () -> Void
@@ -815,7 +540,7 @@ struct SmallWorldBackButtonLegacy: View {
     }
 }
 
-struct OOTDViewWithBackButtonLegacy: View {
+struct OOTDViewWithBackButton: View {
     @Binding var selectedTab: Int
     @Binding var homeTab: HomeTab
     @Binding var destination: SmallWorldDestination
@@ -827,7 +552,7 @@ struct OOTDViewWithBackButtonLegacy: View {
             .toolbar {
                 if !isBookSelected && !isSpaceBookSelected {
                     ToolbarItem(placement: .topBarLeading) {
-                        SmallWorldBackButtonLegacy(
+                        SmallWorldBackButton(
                             selectedTab: $selectedTab,
                             homeTab: $homeTab,
                             onBackToMenu: { destination = .menu }
@@ -838,7 +563,7 @@ struct OOTDViewWithBackButtonLegacy: View {
     }
 }
 
-struct OOTDDefaultBookViewWithBackButtonLegacy: View {
+struct OOTDDefaultBookViewWithBackButton: View {
     @Binding var selectedTab: Int
     @Binding var homeTab: HomeTab
     @Binding var destination: SmallWorldDestination
@@ -848,7 +573,7 @@ struct OOTDDefaultBookViewWithBackButtonLegacy: View {
         OOTDDefaultBookView()
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    MagicStickerBackButtonLegacy(
+                    MagicStickerBackButton(
                         selectedTab: $selectedTab,
                         homeTab: $homeTab,
                         destination: $destination
@@ -865,7 +590,7 @@ struct OOTDDefaultBookViewWithBackButtonLegacy: View {
 }
 
 // MARK: - 魔法贴纸返回按钮（带菜单）- iOS 18以下
-struct MagicStickerBackButtonLegacy: View {
+struct MagicStickerBackButton: View {
     @Binding var selectedTab: Int
     @Binding var homeTab: HomeTab
     @Binding var destination: SmallWorldDestination
@@ -900,7 +625,7 @@ struct MagicStickerBackButtonLegacy: View {
             Text("当前书页在'默认手帐'中，您可以选择保持现状或移动到其他手帐")
         }
         .sheet(isPresented: $showingBookPicker) {
-            BookPickerSheetLegacy(
+            BookPickerSheet(
                 books: otherBooks,
                 onSelect: { selectedBook in
                     moveCurrentPage(to: selectedBook)
@@ -973,12 +698,12 @@ struct MagicStickerBackButtonLegacy: View {
     }
 }
 
-// MARK: - 手帐选择Sheet - iOS 18以下
-struct BookPickerSheetLegacy: View {
+// MARK: - 手帐选择Sheet
+struct BookPickerSheet: View {
     let books: [BookGroup]
     let onSelect: (BookGroup) -> Void
     let onCancel: () -> Void
-    
+
     var body: some View {
         NavigationStack {
             List(books) { book in
@@ -1009,7 +734,7 @@ struct BookPickerSheetLegacy: View {
     }
 }
 
-struct PetHomeViewWithBackButtonLegacy: View {
+struct PetHomeViewWithBackButton: View {
     @Binding var selectedTab: Int
     @Binding var homeTab: HomeTab
     @Binding var destination: SmallWorldDestination
@@ -1018,7 +743,7 @@ struct PetHomeViewWithBackButtonLegacy: View {
         PetHomeView()
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    SmallWorldBackButtonLegacy(
+                    SmallWorldBackButton(
                         selectedTab: $selectedTab,
                         homeTab: $homeTab,
                         onBackToMenu: { destination = .menu }
@@ -1028,7 +753,7 @@ struct PetHomeViewWithBackButtonLegacy: View {
     }
 }
 
-struct WealthViewWithBackButtonLegacy: View {
+struct WealthViewWithBackButton: View {
     @Binding var selectedTab: Int
     @Binding var homeTab: HomeTab
     @Binding var destination: SmallWorldDestination
@@ -1038,7 +763,7 @@ struct WealthViewWithBackButtonLegacy: View {
         WealthView(initialTab: initialTab)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    SmallWorldBackButtonLegacy(
+                    SmallWorldBackButton(
                         selectedTab: $selectedTab,
                         homeTab: $homeTab,
                         onBackToMenu: { destination = .menu }
@@ -1048,7 +773,7 @@ struct WealthViewWithBackButtonLegacy: View {
     }
 }
 
-struct DreamDressCalendarViewWithBackButtonLegacy: View {
+struct DreamDressCalendarViewWithBackButton: View {
     @Binding var selectedTab: Int
     @Binding var homeTab: HomeTab
     @Binding var destination: SmallWorldDestination
@@ -1058,7 +783,7 @@ struct DreamDressCalendarViewWithBackButtonLegacy: View {
         DreamDressCalendarView()
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    SmallWorldBackButtonLegacy(
+                    SmallWorldBackButton(
                         selectedTab: $selectedTab,
                         homeTab: $homeTab,
                         onBackToMenu: { destination = .menu }
@@ -1068,7 +793,7 @@ struct DreamDressCalendarViewWithBackButtonLegacy: View {
     }
 }
 
-struct RecycleBinViewWithBackButtonLegacy: View {
+struct RecycleBinViewWithBackButton: View {
     @Binding var selectedTab: Int
     @Binding var homeTab: HomeTab
     @Binding var destination: SmallWorldDestination
@@ -1077,7 +802,7 @@ struct RecycleBinViewWithBackButtonLegacy: View {
         RecycleBinView()
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    SmallWorldBackButtonLegacy(
+                    SmallWorldBackButton(
                         selectedTab: $selectedTab,
                         homeTab: $homeTab,
                         onBackToMenu: { destination = .menu }
@@ -1097,7 +822,7 @@ struct MainTabView: View {
     @StateObject private var unlockNotificationManager = FeatureUnlockNotificationManager.shared
 
     var body: some View {
-        LegacyTabView(
+        NativeTabNavigation(
             selectedTab: $selectedTab,
             homeTabSelection: $homeTabSelection,
             smallWorldDestination: $smallWorldDestination,
@@ -1106,8 +831,6 @@ struct MainTabView: View {
         .floatingPetHidden(.noticeModal, isActive: noticePopupManager.isShowing)
         .floatingPetHidden(.unlockNotification, isActive: unlockNotificationManager.isShowing)
         .floatingPetHidden(.immersiveMedia, isActive: isPlayingOpeningAnimation)
-        .environment(\.customBottomFloatingLift, LegacyCustomTabBarLayout.floatingElementLift)
-        .environment(\.customBottomNavigationAvoidanceInset, LegacyCustomTabBarLayout.floatingSurfaceBottomInset)
         .overlay {
             if isPlayingOpeningAnimation {
                 OpeningVideoOverlay(
@@ -1347,11 +1070,11 @@ struct MainTabView: View {
 struct OpeningVideoOverlay: View {
     @Binding var isPlaying: Bool
     let onComplete: () -> Void
-    
+
     var body: some View {
         ZStack(alignment: .topTrailing) {
             Color.black.ignoresSafeArea()
-            
+
             PetVideoPlayer(videoName: "open_dress", isLooping: false, onFinished: {
                 onComplete()
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
@@ -1361,7 +1084,7 @@ struct OpeningVideoOverlay: View {
                 }
             })
             .ignoresSafeArea()
-            
+
             Button {
                 onComplete()
                 withAnimation(.easeOut(duration: 0.5)) {
@@ -1383,351 +1106,4 @@ struct OpeningVideoOverlay: View {
         .zIndex(200)
         .id("OpeningVideoOverlay")
     }
-}
-
-// MARK: - House页面返回按钮包装视图
-// 这些包装视图用于在House页面显示自定义返回按钮，智能返回上一页
-
-@available(iOS 18.0, *)
-struct SmallWorldBackButton: View {
-    @Binding var selectedTab: Int
-    @Binding var homeTab: HomeTab
-    var onBackToMenu: () -> Void
-    
-    @ObservedObject private var tabNavigationManager = TabNavigationManager.shared
-    
-    var body: some View {
-        Button {
-            performWithoutRouteContentAnimation {
-                switch tabNavigationManager.currentSmallWorldSource {
-                case .wardrobe:
-                    // 返回衣橱
-                    homeTab = .wardrobe
-                    selectedTab = 0
-                case .depositPlan:
-                    // 返回心愿尾款
-                    homeTab = .depositPlan
-                    selectedTab = 0
-                case .smallWorld:
-                    // 小屋下线时退回衣橱，避免回到 House 菜单
-                    if AppFeatureID.house.isShipHidden {
-                        homeTab = .wardrobe
-                        selectedTab = 0
-                    } else {
-                        onBackToMenu()
-                    }
-                }
-            }
-        } label: {
-            Image(systemName: "chevron.left")
-                .font(.system(size: 16, weight: .medium))
-                .foregroundStyle(.primary)
-        }
-    }
-}
-
-// MARK: - OOTDView 带返回按钮
-@available(iOS 18.0, *)
-struct OOTDViewWithBackButton: View {
-    @Binding var selectedTab: Int
-    @Binding var homeTab: HomeTab
-    @Binding var destination: SmallWorldDestination
-    
-    // 监听当前是否选中了书（书页列表模式下隐藏全局导航返回按钮）
-    @State private var isBookSelected: Bool = false
-    
-    // 监听当前是否选中了空间书（空间书页列表模式下隐藏全局导航返回按钮）
-    @State private var isSpaceBookSelected: Bool = false
-    
-    var body: some View {
-        OOTDView(hideBackButton: true, isBookSelected: $isBookSelected, isSpaceBookSelected: $isSpaceBookSelected)
-            .toolbar {
-                // 只在书架列表模式下显示全局导航返回按钮
-                // 选中书时（平面或空间书页列表），使用自定义的返回按钮
-                if !isBookSelected && !isSpaceBookSelected {
-                    ToolbarItem(placement: .topBarLeading) {
-                        SmallWorldBackButton(
-                            selectedTab: $selectedTab,
-                            homeTab: $homeTab,
-                            onBackToMenu: {
-                                destination = .menu
-                            }
-                        )
-                    }
-                }
-            }
-    }
-}
-
-// MARK: - OOTDDefaultBookView 带返回按钮
-@available(iOS 18.0, *)
-struct OOTDDefaultBookViewWithBackButton: View {
-    @Binding var selectedTab: Int
-    @Binding var homeTab: HomeTab
-    @Binding var destination: SmallWorldDestination
-    @Environment(\.modelContext) private var modelContext
-
-    var body: some View {
-        OOTDDefaultBookView()
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    MagicStickerBackButton(
-                        selectedTab: $selectedTab,
-                        homeTab: $homeTab,
-                        destination: $destination
-                    )
-                }
-            }
-            .onReceive(NotificationCenter.default.publisher(for: .navigateToBook)) { _ in
-                // 导航到 OOTD 手帐列表
-                performWithoutRouteContentAnimation {
-                    destination = .ootd
-                }
-            }
-    }
-}
-
-// MARK: - 魔法贴纸返回按钮（带菜单）
-@available(iOS 18.0, *)
-struct MagicStickerBackButton: View {
-    @Binding var selectedTab: Int
-    @Binding var homeTab: HomeTab
-    @Binding var destination: SmallWorldDestination
-    @Environment(\.modelContext) private var modelContext
-    @Query(filter: #Predicate<BookGroup> { $0.deletedAt == nil && $0.title != "默认手帐" }, sort: \BookGroup.sortIndex) private var otherBooks: [BookGroup]
-
-    @ObservedObject private var tabNavigationManager = TabNavigationManager.shared
-    @State private var showingMoveOptions = false
-    @State private var showingBookPicker = false
-
-    var body: some View {
-        Button {
-            showingMoveOptions = true
-        } label: {
-            Image(systemName: "chevron.left")
-                .font(.system(size: 16, weight: .medium))
-                .foregroundStyle(.primary)
-        }
-        .confirmationDialog("书页管理", isPresented: $showingMoveOptions, titleVisibility: .visible) {
-            Button("保持在默认手帐") {
-                // 直接返回，不做任何操作
-                goBack()
-            }
-
-            if !otherBooks.isEmpty {
-                Button("加入其他手帐") {
-                    showingBookPicker = true
-                }
-            }
-
-            Button("取消", role: .cancel) {}
-        } message: {
-            Text("当前书页在'默认手帐'中，您可以选择保持现状或移动到其他手帐")
-        }
-        .sheet(isPresented: $showingBookPicker) {
-            BookPickerSheet(
-                books: otherBooks,
-                onSelect: { selectedBook in
-                    moveCurrentPage(to: selectedBook)
-                },
-                onCancel: {
-                    showingBookPicker = false
-                }
-            )
-        }
-    }
-
-    private func goBack() {
-        performWithoutRouteContentAnimation {
-            switch tabNavigationManager.currentSmallWorldSource {
-            case .wardrobe:
-                homeTab = .wardrobe
-                selectedTab = 0
-            case .depositPlan:
-                homeTab = .depositPlan
-                selectedTab = 0
-            case .smallWorld:
-                if AppFeatureID.house.isShipHidden {
-                    homeTab = .wardrobe
-                    selectedTab = 0
-                } else {
-                    destination = .menu
-                }
-            }
-        }
-    }
-
-    private func moveCurrentPage(to book: BookGroup) {
-        // 获取当前默认手帐
-        let bookDescriptor = FetchDescriptor<BookGroup>(
-            predicate: #Predicate<BookGroup> { $0.title == "默认手帐" && $0.deletedAt == nil }
-        )
-        guard let defaultBook = try? modelContext.fetch(bookDescriptor).first else { return }
-
-        // 获取默认手帐的第一页 - 使用bookID避免在Predicate中捕获外部变量
-        let defaultBookID = defaultBook.id
-        let outfitDescriptor = FetchDescriptor<Outfit>(
-            predicate: #Predicate<Outfit> { outfit in
-                outfit.isDeleted == false
-            },
-            sortBy: [SortDescriptor(\.sortIndex)]
-        )
-        let allOutfits = (try? modelContext.fetch(outfitDescriptor)) ?? []
-        guard let firstOutfit = allOutfits.first(where: { $0.book?.id == defaultBookID }) else { return }
-
-        // 移动书页到选中的手帐
-        firstOutfit.book = book
-        firstOutfit.lastModified = Date()
-
-        // 重新计算sortIndex - 使用bookID避免在Predicate中捕获外部变量
-        let targetBookID = book.id
-        let existingPages = allOutfits.filter { $0.book?.id == targetBookID && $0.isDeleted == false }
-            .sorted { $0.sortIndex > $1.sortIndex }
-        firstOutfit.sortIndex = (existingPages.first?.sortIndex ?? 0) + 1
-
-        try? modelContext.save()
-
-        showingBookPicker = false
-
-        // 发送通知让 OOTDDefaultBookView 显示 Toast 并导航
-        NotificationCenter.default.post(
-            name: .magicStickerPageMoved,
-            object: nil,
-            userInfo: ["bookTitle": book.title, "bookID": book.id]
-        )
-    }
-}
-
-// MARK: - 手帐选择Sheet
-@available(iOS 18.0, *)
-struct BookPickerSheet: View {
-    let books: [BookGroup]
-    let onSelect: (BookGroup) -> Void
-    let onCancel: () -> Void
-    @Environment(\.colorScheme) private var colorScheme
-    
-    var body: some View {
-        NavigationStack {
-            List(books) { book in
-                Button {
-                    onSelect(book)
-                } label: {
-                    HStack {
-                        Image(systemName: "book.closed")
-                            .foregroundStyle(.pink)
-                        Text(book.title)
-                        Spacer()
-                        Image(systemName: "chevron.right")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-            }
-            .navigationTitle("选择目标手帐")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button("取消") {
-                        onCancel()
-                    }
-                }
-            }
-        }
-    }
-}
-
-// MARK: - PetHomeView 带返回按钮
-@available(iOS 18.0, *)
-struct PetHomeViewWithBackButton: View {
-    @Binding var selectedTab: Int
-    @Binding var homeTab: HomeTab
-    @Binding var destination: SmallWorldDestination
-    
-    var body: some View {
-        PetHomeView()
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    SmallWorldBackButton(
-                        selectedTab: $selectedTab,
-                        homeTab: $homeTab,
-                        onBackToMenu: {
-                            destination = .menu
-                        }
-                    )
-                }
-            }
-    }
-}
-
-// MARK: - WealthView 带返回按钮
-@available(iOS 18.0, *)
-struct WealthViewWithBackButton: View {
-    @Binding var selectedTab: Int
-    @Binding var homeTab: HomeTab
-    @Binding var destination: SmallWorldDestination
-    var initialTab: WealthMainTab? = nil
-
-    var body: some View {
-        WealthView(initialTab: initialTab)
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    SmallWorldBackButton(
-                        selectedTab: $selectedTab,
-                        homeTab: $homeTab,
-                        onBackToMenu: {
-                            destination = .menu
-                        }
-                    )
-                }
-            }
-    }
-}
-
-// MARK: - DreamDressCalendarView 带返回按钮
-@available(iOS 18.0, *)
-struct DreamDressCalendarViewWithBackButton: View {
-    @Binding var selectedTab: Int
-    @Binding var homeTab: HomeTab
-    @Binding var destination: SmallWorldDestination
-
-    var body: some View {
-        // 使用toolbar添加返回按钮，与其他视图保持一致
-        DreamDressCalendarView()
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    SmallWorldBackButton(
-                        selectedTab: $selectedTab,
-                        homeTab: $homeTab,
-                        onBackToMenu: { destination = .menu }
-                    )
-                }
-            }
-    }
-}
-
-// MARK: - RecycleBinView 带返回按钮
-@available(iOS 18.0, *)
-struct RecycleBinViewWithBackButton: View {
-    @Binding var selectedTab: Int
-    @Binding var homeTab: HomeTab
-    @Binding var destination: SmallWorldDestination
-    
-    var body: some View {
-        RecycleBinView()
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    SmallWorldBackButton(
-                        selectedTab: $selectedTab,
-                        homeTab: $homeTab,
-                        onBackToMenu: {
-                            destination = .menu
-                        }
-                    )
-                }
-            }
-    }
-}
-
-#Preview {
-    MainTabView()
 }

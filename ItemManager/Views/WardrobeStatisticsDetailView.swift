@@ -65,8 +65,6 @@ struct WardrobeStatisticsDetailView: View {
                 .padding()
                 .padding(.bottom, 40)
             }
-            // 底部悬浮 Dock 避让：本页由衣橱 push 进入，最后一张卡片会被 Dock 盖住。
-            .avoidingBottomDock()
         }
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {

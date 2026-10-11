@@ -170,13 +170,10 @@ struct MainContentView: View {
             GlobalUnlockNotificationOverlay()
                 .zIndex(3)
             
-            // 全局拷贝提示覆盖层
-            GlobalCopyToast()
-                .zIndex(4)
-            
-            // 全局 Toast 提示覆盖层
-            GlobalToast()
-                .zIndex(5)
+            OperationFeedbackSceneInstaller(isEnabled: !showSplash && !migrationManager.isMigrating)
+                .frame(width: 0, height: 0)
+                .allowsHitTesting(false)
+
         }
         .sheet(isPresented: $showDailyCheckIn) {
             DailyCheckInView()

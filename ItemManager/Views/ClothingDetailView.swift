@@ -50,32 +50,30 @@ struct ClothingDetailView: View {
                     .environment(\.containerPalette, containerPalette)
                 
                 ScrollView {
+                    // 图片和信息卡按正常布局顺序排列；offset 只移动绘制位置，
+                    // 不会预留空间，负偏移会从首帧开始遮住图片下沿。
                     VStack(spacing: 16) {
                         // MARK: - Image Carousel
                         // Adjust height based on orientation (portrait vs landscape)
                         // Ensure height is at least 1 to avoid "Failed to create image slot" warnings
-                        let carouselHeight = max(1, geometry.size.height > geometry.size.width ? 400.0 : geometry.size.height * 0.7)
+                        let carouselHeight = DetailImageLayout.height(in: geometry.size)
                         imageCarousel(height: carouselHeight, width: geometry.size.width)
                         
                         // MARK: - Main Info Card
                         mainInfoCard
                             .padding(.horizontal)
-                            .offset(y: -40) // Overlap the image slightly
                         
                         // MARK: - Detail Info
                         detailInfoCard
                             .padding(.horizontal)
-                            .offset(y: -40)
                         
                         // MARK: - Price Info
                         priceInfoCard
                             .padding(.horizontal)
-                            .offset(y: -40)
                         
                         // MARK: - Purchase Info
                         purchaseInfoCard
                             .padding(.horizontal)
-                            .offset(y: -40)
 
                         // MARK: - Reservation Action / Status
                         if clothing.isFullPaymentReservation {
@@ -86,7 +84,6 @@ struct ClothingDetailView: View {
                             }
                             .buttonStyle(ThemeSkinPrimaryButtonStyle(fallbackTint: .green, cornerRadius: 16, verticalPadding: 15))
                             .padding(.horizontal)
-                            .offset(y: -40)
                         } else if WealthSavingLedger.shouldShowFinalPaymentPayoffAction(for: clothing) {
                             Button {
                                 showingFinalPaymentSheet = true
@@ -96,7 +93,6 @@ struct ClothingDetailView: View {
                             }
                             .buttonStyle(ThemeSkinPrimaryButtonStyle(fallbackTint: .pink, cornerRadius: 16, verticalPadding: 15))
                             .padding(.horizontal)
-                            .offset(y: -40)
                         }
                         
                         // MARK: - Metadata Info (Created/Updated)
@@ -110,7 +106,6 @@ struct ClothingDetailView: View {
                         .foregroundStyle(.tertiary)
                         .frame(maxWidth: .infinity)
                         .padding(.bottom, 20)
-                        .offset(y: -20)
                         
                         // Bottom Padding for FAB
                         Color.clear.frame(height: 80)
@@ -398,7 +393,7 @@ struct ClothingDetailView: View {
             }
 
             if result.paidOff {
-                finalizeFinalPaymentAfterPaidOff()
+                finalizeFinalPaymentAfterPaidOff(paymentID: result.paymentEntry.id)
             } else {
                 Task { await SharedPersistence.shared.syncWidgetData(reason: "final-payment-partial-recorded") }
             }
@@ -407,7 +402,7 @@ struct ClothingDetailView: View {
         }
     }
 
-    private func finalizeFinalPaymentAfterPaidOff() {
+    private func finalizeFinalPaymentAfterPaidOff(paymentID: UUID) {
         // Cancel notification since it's no longer a deposit plan
         NotificationManager.shared.cancelNotification(for: clothing)
         NotificationManager.shared.handlePaymentConfirmed(for: clothing.id, modelContext: modelContext)
@@ -429,7 +424,7 @@ struct ClothingDetailView: View {
         }
 
         // Trigger Reward only after cumulative payment is fully settled.
-        RewardManager.shared.triggerReward(type: .payBalance)
+        WardrobeOperationFeedback.paidBalance(for: clothing, paymentID: paymentID)
     }
     
     /// 更新衣物数量缓存，用于魔法任务进度实时显示
@@ -555,7 +550,7 @@ struct ClothingDetailView: View {
                 .padding(.horizontal, 12)
                 .padding(.vertical, 6)
                 .background(Capsule().fill(Color.black.opacity(0.5)))
-                .padding(.bottom, 60) // Adjust based on overlap
+                .padding(.bottom, 12)
             }
         }
     }

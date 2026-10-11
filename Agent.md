@@ -6,7 +6,7 @@
 > - 本机事实类（路径、命令、SDK 版本）→ 以 `AGENTS.md` 为准；
 > - 规范流程类（分层、命名、审查、提交）→ **以本文件为准**。
 >
-> ⚠️ 动工前先确认一件事：`AGENTS.md` 声明的 Swift/Xcode 源仓库在 iCloud（`/Users/muniao/Library/Mobile Documents/...`），而本工作区是 `/Users/sangyu/develop/Pink_House`。**两者谁是本次开发的目标仓库，必须先向用户确认再动手**，不要凭猜测往 iCloud 路径写文件。
+> 本机 Swift/Xcode 开发目录已由用户确认：`/Users/sangyu/develop/Pink_House`。另一台机器的 muniao/iCloud 路径不适用于本机；不要再次要求用户确认此路径。
 
 ---
 
@@ -66,7 +66,7 @@
 - `ThemeSkinSlot.rawValue` 不改（持久化兼容）
 - `ThemeSkinManager` 存档 key 不改：`theme_skin.owned` / `theme_skin.active_selection`
 - 主题素材必须进 `Assets.xcassets/ThemeSkin/<namespace>/`，不走 Bundle 文件路径
-- 三件套 Components（Home / TabBar / Wardrobe）的程序化绘制兜底**必须保留**
+- 现行 Home / Wardrobe 程序化绘制兜底**必须保留**；TabBar 历史 slot 保留存档兼容，但不再渲染主题底栏
 - 主题未启用时，禁止任何主题装饰泄漏到默认皮肤
 - 不允许跨主题混搭组件
 - slot 数量固定 **18** 个，禁止增减
@@ -81,7 +81,7 @@
 ```text
 ┌──────────────────────────────────────────────────────┐
 │  Views/          页面与组件（SwiftUI）                │
-│  ├ MainTabView（容器 + 自绘 TabBar）                  │
+│  ├ MainTabView（容器 + 系统原生 TabView）                  │
 │  ├ Wardrobe / OOTD / Pet / PetChat / Wealth / …      │
 │  └ DesignSystem / Components（复用件）                │
 └───────────────▲──────────────────────────────────────┘
@@ -203,7 +203,7 @@
 - 「最近一条数据」：`items.first(where: { $0.date >= now }) ?? items.last`。
 - 复用组件：用**命名元组**传参，如 `(month: Int, count: Int, hasData: Bool)`。
 - 导航：统一由 `MainTabView` 容器调度，模块内不自建第二套 Tab。
-- 底部异形 TabBar 的避让用 `customBottomNavigationAvoidanceInset`，不要硬编码高度。
+- 底部导航使用系统原生 TabView 和安全区；主题不接管底栏，不恢复旧 Dock 避让环境键或固定高度。
 
 ### 2.4 禁止清单
 
@@ -333,3 +333,20 @@ git commit -m "feat: 中文一句话"
 | 查历史踩坑 | [MEMORY.md](MEMORY.md) |
 | 做主题皮肤 | `docs/少女衣橱主题皮肤重构方案.md` + `docs/THEME_SKIN_REPLICATION_BEST_PRACTICES.md` |
 | 清理 temp | `docs/TEMP_GOVERNANCE_AND_KNOWLEDGE_MIGRATION.md` |
+
+## 操作反馈与鱼币统一规则（2026-10-11）
+
+- 唯一指南：`docs/OPERATION_FEEDBACK_AND_FISH_COIN_GUIDE.md`；执行与验收：`docs/OPERATION_FEEDBACK_AND_FISH_COIN_EXEC_PLAN.md`。
+- 保存业务/图片成功后，先完成相关系统收尾，再显示一次成功结果。失败、取消、复制不自动发鱼币。
+- 普通反馈统一 `OperationFeedbackCenter`；Toast/Copy 为适配入口；禁止另建局部气泡和隐藏计时器。
+- 时光馆用户确认入橱唯一入口 `ShopCatalogWardrobeAddition.add/addSet`，自动合并成功与实际到账鱼币；纯导入/恢复仍用 Inserter，不发奖励。
+- 奖励只展示 `FishCoinRewardReceipt.actualAmount`，按稳定衣物/支付流水 ID 防重。奖励余额、日计数、防重集合与钱包同快照保存；不改充值喵币。
+- 解锁/任务交互、系统确认弹窗、萌宠动作动画遵循指南的职责矩阵，不能靠弹窗显示来判定业务完成或再次发奖。
+
+## 时光馆入橱与运营默认值（2026-10-11）
+
+入橱默认主衣物，小物由用户主动勾选；重复出现不得重置用户取消结果。运营新草稿/新价格录入默认人民币（CNY），保留明确币种与历史来源。正式规则与验证见 `docs/SHOP_CATALOG_ENTRY_DEFAULTS_2026-10-11.md`。
+
+2026-10-11 用户截图确认：入橱方式只保留确认页内单选，点击确认直接按已选方式保存，删除右侧重复选择弹窗及其状态/分支；取代 2026-09-27 二次弹窗旧要求。成功后仍统一提示与发放实际到账鱼币。
+
+2026-10-11 用户明确确认：运营已上传商品的未明确币种全部补为人民币，不能仅修改新录入默认值。Development 存量已修复发布 seq 21：26 件商品、38 条销售记录及 3 份价格修正；明确币种与金额保持原值。正式规则与证据：`docs/SHOP_CATALOG_OPERATOR_CURRENCY_REPAIR_2026-10-11.md`。

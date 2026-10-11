@@ -80,7 +80,7 @@ final class ShopCatalogCurrencyTests: XCTestCase {
 
     // MARK: A. 币种枚举与展示
 
-    func testCurrencyDisplayAndClothingCodeAlignment() {
+    func testCurrencyDisplayAndClothingCodeAlignment() async {
         XCTAssertEqual(CatalogCurrency.cny.displayName, "人民币")
         XCTAssertEqual(CatalogCurrency.jpy.displayName, "日元")
         XCTAssertEqual(CatalogCurrency.unknown.displayName, "币种待确认")
@@ -105,7 +105,7 @@ final class ShopCatalogCurrencyTests: XCTestCase {
 
     // MARK: B. 旧数据兼容：缺币种 → 待确认，不是默认人民币
 
-    func testLegacyEventWithoutCurrencyIsUnknownNotCNY() throws {
+    func testLegacyEventWithoutCurrencyIsUnknownNotCNY() async throws {
         let product = try publish(name: "旧数据无币种款", reservation: 300, stock: 380)
         let archive = store.priceArchive(forProduct: product.id)
 
@@ -119,7 +119,7 @@ final class ShopCatalogCurrencyTests: XCTestCase {
 
     /// 两侧都是存量旧数据（都没标币种）→ 仍回答差价。
     /// 若一并拒绝，V1.1 的「预约‑现货差价」会对所有存量商品整体失效。
-    func testLegacyBothSidesUnknownStillComputesDelta() {
+    func testLegacyBothSidesUnknownStillComputesDelta() async {
         let reservation = CatalogSaleEvent(id: "ev-r", productID: "px", type: .reservation,
                                            price: 300, deposit: 100, balance: 200,
                                            startAt: day(-10), endAt: day(-1))
@@ -134,7 +134,7 @@ final class ShopCatalogCurrencyTests: XCTestCase {
     }
 
     /// 一侧明确、一侧待确认 → 真不知道该按哪种钱算，必须拒绝并说明
-    func testMixedKnownAndUnknownCurrencyRefusesDelta() {
+    func testMixedKnownAndUnknownCurrencyRefusesDelta() async {
         let reservation = CatalogSaleEvent(id: "ev-r", productID: "px", type: .reservation,
                                            price: 24800, deposit: 5000, balance: 19800,
                                            startAt: day(-10), endAt: day(-1), currency: .jpy)
@@ -147,7 +147,7 @@ final class ShopCatalogCurrencyTests: XCTestCase {
         XCTAssertNotNil(archive.deltaUnavailableReason)
     }
 
-    func testCurrencyDecodesFromJSONAndRoundTrips() throws {
+    func testCurrencyDecodesFromJSONAndRoundTrips() async throws {
         var event = CatalogSaleEvent(id: "ev-x", productID: "p1", type: .reservation,
                                      price: 24800, deposit: 5000, balance: 19800,
                                      startAt: day(0), endAt: nil,
@@ -172,7 +172,7 @@ final class ShopCatalogCurrencyTests: XCTestCase {
 
     // MARK: C. 跨币种：不比较、不合计
 
-    func testCrossCurrencyDeltaIsRefusedWithReason() throws {
+    func testCrossCurrencyDeltaIsRefusedWithReason() async throws {
         // 预约 24800 JPY / 现货 1580 CNY —— 旧实现会算出 -23220 的「差价」
         let product = try publish(name: "跨币种差价款", reservation: 24800, currency: .jpy)
         try ShopCatalogDraftStore.appendSaleRecord(
@@ -204,7 +204,7 @@ final class ShopCatalogCurrencyTests: XCTestCase {
         XCTAssertEqual(archive.currentStockPrice, 1580)
     }
 
-    func testSameCurrencyDeltaStillComputes() {
+    func testSameCurrencyDeltaStillComputes() async {
         let reservation = CatalogSaleEvent(id: "ev-r", productID: "px", type: .reservation,
                                            price: 300, deposit: 100, balance: 200,
                                            startAt: day(-10), endAt: day(-1), currency: .cny)
@@ -219,7 +219,7 @@ final class ShopCatalogCurrencyTests: XCTestCase {
 
     // MARK: D. 写入侧的币种约束
 
-    func testPublishCarriesCurrencyIntoEvents() throws {
+    func testPublishCarriesCurrencyIntoEvents() async throws {
         let product = try publish(name: "日元发布款", reservation: 24800, deposit: 5000,
                                   currency: .jpy)
         let events = store.saleEvents(forProduct: product.id)
@@ -229,7 +229,7 @@ final class ShopCatalogCurrencyTests: XCTestCase {
         XCTAssertEqual(store.priceArchive(forProduct: product.id).currentCurrency, .jpy)
     }
 
-    func testAppendSaleRecordInheritsExistingCurrency() throws {
+    func testAppendSaleRecordInheritsExistingCurrency() async throws {
         let product = try publish(name: "币种继承款", reservation: 24800, currency: .jpy)
         // 再贩记录不显式传币种 → 沿用商品既有币种，而不是塌成「待确认」或 CNY
         let event = try ShopCatalogDraftStore.appendSaleRecord(
@@ -237,7 +237,7 @@ final class ShopCatalogCurrencyTests: XCTestCase {
         XCTAssertEqual(event.effectiveCurrency, .jpy, "追加记录必须继承商品既有币种")
     }
 
-    func testAppendSaleRecordFallsBackToUnknownWhenNoSource() throws {
+    func testAppendSaleRecordFallsBackToUnknownWhenNoSource() async throws {
         let product = try publish(name: "无来源币种款", reservation: 300)
         let event = try ShopCatalogDraftStore.appendSaleRecord(
             productID: product.id, type: .stock, price: 380, startAt: day(30))
@@ -245,7 +245,7 @@ final class ShopCatalogCurrencyTests: XCTestCase {
                        "没有任何币种来源时必须标「待确认」，不得默认 CNY")
     }
 
-    func testCrossCurrencyAppendIsRejected() throws {
+    func testCrossCurrencyAppendIsRejected() async throws {
         let product = try publish(name: "跨币种追加款", reservation: 24800, currency: .jpy)
         XCTAssertThrowsError(
             try ShopCatalogDraftStore.appendSaleRecord(
@@ -261,7 +261,7 @@ final class ShopCatalogCurrencyTests: XCTestCase {
         XCTAssertEqual(store.saleEvents(forProduct: product.id).count, 1)
     }
 
-    func testCrossCurrencyCorrectionIsRejected() throws {
+    func testCrossCurrencyCorrectionIsRejected() async throws {
         let product = try publish(name: "跨币种修正款", reservation: 24800, currency: .jpy)
         XCTAssertThrowsError(
             try ShopCatalogDraftStore.correctCurrentPrice(
@@ -274,7 +274,7 @@ final class ShopCatalogCurrencyTests: XCTestCase {
         }
     }
 
-    func testSameCurrencyCorrectionKeepsCurrency() throws {
+    func testSameCurrencyCorrectionKeepsCurrency() async throws {
         let product = try publish(name: "同币种修正款", reservation: 24800, deposit: 5000,
                                   currency: .jpy)
         let correction = try ShopCatalogDraftStore.correctCurrentPrice(
@@ -286,7 +286,7 @@ final class ShopCatalogCurrencyTests: XCTestCase {
         XCTAssertEqual(store.priceArchive(forProduct: product.id).currentReservationPrice, 26000)
     }
 
-    func testCorrectionOnUnknownCurrencyCanDeclareCurrency() throws {
+    func testCorrectionOnUnknownCurrencyCanDeclareCurrency() async throws {
         // 币种待确认的商品，允许在修正时把币种补明确（这是唯一合法的「改币种」入口）
         let product = try publish(name: "补币种款", reservation: 300)
         XCTAssertEqual(store.priceArchive(forProduct: product.id).currentCurrency, .unknown)
@@ -301,7 +301,7 @@ final class ShopCatalogCurrencyTests: XCTestCase {
 
     // MARK: E. 去重指纹含币种
 
-    func testAppendFingerprintDistinguishesCurrency() throws {
+    func testAppendFingerprintDistinguishesCurrency() async throws {
         let product = try publish(name: "指纹币种款", reservation: 300, currency: .cny)
         _ = try ShopCatalogDraftStore.appendSaleRecord(
             productID: product.id, type: .stock, price: 380, startAt: day(10), currency: .cny)
@@ -322,7 +322,7 @@ final class ShopCatalogCurrencyTests: XCTestCase {
 
     // MARK: F. 分档价格（R05）
 
-    func testPriceTierIsCarriedButNotFaked() {
+    func testPriceTierIsCarriedButNotFaked() async {
         let tiered = CatalogSaleEvent(id: "ev-t", productID: "px", type: .reservation,
                                       price: 21800, deposit: 5000, balance: 16800,
                                       startAt: day(0), endAt: nil, currency: .jpy,

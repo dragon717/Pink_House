@@ -21,7 +21,7 @@ description: Pink_House 主题皮肤复刻与主题扩展技能。用于接入 s
 
 ## 必守规则
 
-- 不改 `ThemeSkinSlot.rawValue`，不增减 18 个 slot。
+- 不改 `ThemeSkinSlot.rawValue`，不增减 18 个 slot。`tabBarMain` / `tabBarItem` 仅保留存档标识；底部导航使用系统 TabView，主题禁止修改其外观。
 - 不改 `theme_skin.owned` / `theme_skin.active_selection`。
 - 不新增 manifest 必需 imageset；优先复用现有 assets、贴纸和程序化 fallback。
 - 不让主题装饰泄漏到默认皮肤；不跨主题混搭。
@@ -36,7 +36,6 @@ description: Pink_House 主题皮肤复刻与主题扩展技能。用于接入 s
 2. 先查 `tools/theme_skin/theme_manifest.yaml` 和正式文档中的主题 namespace、imageset、默认 slot、装饰 PNG 命名；缺字段时再对照历史 manifest。
 3. SwiftUI 接入优先复用：
    - `HomeThemeSkinComponents.swift`
-   - `TabBarThemeSkinComponents.swift`
    - `WardrobeThemeSkinComponents.swift`
    - `ThemeSkinSharedComponents.swift`
 4. 新页面主题化时，读取对应 slot descriptor；slot 关闭必须回退默认样式。

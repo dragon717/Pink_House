@@ -8,9 +8,6 @@ enum ThemeSkinAssetName {
     static let topBarIconButton = "top_bar_icon_button_default"
     static let topBarSegment = "top_bar_segment_default"
     static let searchBarCompact = "search_bar_compact_default"
-    static let tabBarMain = "tab_bar_main_default"
-    static let tabBarItemDefault = "tab_bar_item_default"
-    static let tabBarItemSelected = "tab_bar_item_selected"
     static let cardStatsDefault = "card_stats_default"
     static let cardWardrobeItem = "card_wardrobe_item_default"
     static let cardWardrobeRibbonTopLeft = "card_wardrobe_item_ribbon_top_left"
@@ -21,8 +18,6 @@ enum ThemeSkinAssetName {
         switch name {
         case topBarMain:
             return EdgeInsets(top: 40, leading: 60, bottom: 40, trailing: 60)
-        case tabBarMain:
-            return EdgeInsets(top: 80, leading: 90, bottom: 80, trailing: 90)
         case searchBarCompact:
             return EdgeInsets(top: 30, leading: 60, bottom: 30, trailing: 60)
         case cardWardrobeItem:

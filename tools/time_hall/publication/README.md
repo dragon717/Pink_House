@@ -2,6 +2,7 @@
 
 2026-10-11 安全同步与商品恢复见 [正式记录](../../../docs/SHOP_CATALOG_SYNC_RECOVERY_2026-10-11.md)：运营更新先拉取再合并，不再执行删除式对齐。
 
+
 对应 `docs/Pink_House_TimeHall_Static_CloudKit_Design.md` 的 §8 / §9 / §18 / §20。
 
 把「已审核的整馆 catalog」变成「公共库里可被普通读者拉取的不可变发布产物」。
@@ -581,3 +582,7 @@ python3 publish_cloudkit.py --release <新产物> --adapter cloudkit --environme
 | 只增不改与最后切换 | `publish_cloudkit` 的 7 步顺序 |
 | 冲突不吃掉 | `put_release(expected_change_tag)` |
 | 回滚不倒退 | `rollback_release.py` + `publish_cloudkit` 递增校验 |
+
+## 运营存量币种修复
+
+`repair_operator_currencies.py` 在用户确认运营未明确币种为人民币后，读取并冻结完整当前发布，仅补填币种，再复用现有发布器条件发布新版本；默认不写云端。回归入口 `selftest_operator_currencies.py`。规则、命令与真实验收见 `docs/SHOP_CATALOG_OPERATOR_CURRENCY_REPAIR_2026-10-11.md`。不要把通用 JSON 缺币种解码改成 CNY，也不要把明确的日元价格数字改标人民币。

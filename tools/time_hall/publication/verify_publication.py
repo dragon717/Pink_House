@@ -147,7 +147,7 @@ class CloudKitPublicReader(PublicReader):
     def _post(self, path: str, payload: Dict[str, Any]) -> Dict[str, Any]:
         import urllib.request
 
-        from publish_adapters import sign_request
+        from publish_adapters import open_https, sign_request
 
         body = canonical_json_bytes(payload)
         import datetime as dt
@@ -167,7 +167,7 @@ class CloudKitPublicReader(PublicReader):
             self._endpoint(path), data=body, headers=headers, method="POST"
         )
         try:
-            with urllib.request.urlopen(request, timeout=60) as response:
+            with open_https(request, timeout=60) as response:
                 return json.loads(response.read().decode("utf-8"))
         except urllib.error.HTTPError as error:
             if error.code == 401:
@@ -215,11 +215,12 @@ class CloudKitPublicReader(PublicReader):
 
     def _download(self, asset: Dict[str, Any]) -> Optional[bytes]:
         import urllib.request
+        from publish_adapters import open_https
 
         url = asset.get("downloadURL")
         if not url:
             return None
-        with urllib.request.urlopen(url, timeout=300) as response:
+        with open_https(urllib.request.Request(url), timeout=300) as response:
             return response.read()
 
     def fetch_root_index(self) -> Optional[bytes]:

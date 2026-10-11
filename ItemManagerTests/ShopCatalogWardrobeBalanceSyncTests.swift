@@ -248,7 +248,7 @@ final class ShopCatalogWardrobeBalanceSyncTests: XCTestCase {
         let draft = try XCTUnwrap(ShopCatalogWardrobeDraftBuilder.makeDraft(
             selection: .init(productID: fixture.productID,
                              priceMode: .reservation(depositPaid: 128)),
-            store: store, modelContext: context))
+            store: store))
 
         let expected = try XCTUnwrap(CatalogBalanceDueApproximation.estimatedDate(
             text: "10月上旬", anchor: reservationEnd))
@@ -259,7 +259,7 @@ final class ShopCatalogWardrobeBalanceSyncTests: XCTestCase {
         // 心愿（未付定金）同样适用：不能用加购当天占位
         let wishDraft = try XCTUnwrap(ShopCatalogWardrobeDraftBuilder.makeDraft(
             selection: .init(productID: fixture.productID, priceMode: .wishlist),
-            store: store, modelContext: context))
+            store: store))
         XCTAssertEqual(wishDraft.finalPaymentDate, expected)
         XCTAssertEqual(Decimal(wishDraft.balance), 428, "心愿金额口径不变（金额零手输红线不受影响）")
     }
@@ -271,7 +271,7 @@ final class ShopCatalogWardrobeBalanceSyncTests: XCTestCase {
         let draft = try XCTUnwrap(ShopCatalogWardrobeDraftBuilder.makeDraft(
             selection: .init(productID: fixture.productID,
                              priceMode: .reservation(depositPaid: 128)),
-            store: store, modelContext: context))
+            store: store))
         XCTAssertEqual(draft.finalPaymentDate, reservationEnd)
         XCTAssertFalse(draft.note.contains("估算"))
     }

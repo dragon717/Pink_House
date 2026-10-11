@@ -1,5 +1,7 @@
 # iOS 18+ SwiftUI TabView 最佳实践
 
+> 本文是历史通用 API 研究。2026-10-11 起，本项目现役规则见 [系统底部导航约定](iOS26_导航栏统一与异形底栏方案.md)；不采用文中的 Modern / Legacy 双分支、toolbar 背景定制或底栏兼容 helper。
+
 ## 核心原则：拥抱原生 API
 
 ### ❌ 避免的做法
@@ -250,18 +252,8 @@ struct ModernTabView: View {
     }
 }
 
-// MARK: - 主入口
-struct MainTabView: View {
-    var body: some View {
-        Group {
-            if #available(iOS 18.0, *) {
-                ModernTabView()
-            } else {
-                LegacyTabView()  // iOS 18 及以下回退
-            }
-        }
-    }
-}
+// 本项目入口直接使用 NativeTabNavigation；系统负责底栏外观与安全区。
+// 不再按系统版本切换 Modern / Legacy 导航实现。
 ```
 
 ---

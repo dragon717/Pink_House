@@ -364,7 +364,7 @@ struct MagicTaskCompletionStackView: View {
         GeometryReader { geometry in
             ZStack(alignment: .top) {
                 // 透明背景用于捕获点击（仅在展开时）
-                if manager.isExpanded && !manager.completions.isEmpty {
+                if manager.isExpanded && !manager.completions.isEmpty && OperationFeedbackCenter.shared.current == nil {
                     Color.black.opacity(0.01)
                         .ignoresSafeArea()
                         .onTapGesture {
@@ -373,7 +373,7 @@ struct MagicTaskCompletionStackView: View {
                 }
                 
                 // 任务卡片堆叠
-                if !manager.completions.isEmpty {
+                if !manager.completions.isEmpty && OperationFeedbackCenter.shared.current == nil {
                     VStack(spacing: 0) {
                         if manager.isExpanded {
                             // 展开状态：垂直排列所有卡片

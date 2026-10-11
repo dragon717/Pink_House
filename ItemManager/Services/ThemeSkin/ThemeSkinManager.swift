@@ -206,7 +206,8 @@ final class ThemeSkinManager: ObservableObject, ThemeSkinProviding {
     }
 
     func descriptor(forThemeId themeId: String, slot: ThemeSkinSlot, state: ThemeSkinState = .default) -> ThemeSkinDescriptor? {
-        guard let product = product(for: themeId), product.supportedSlots.contains(slot) else { return nil }
+        guard slot.isThemeRendered,
+              let product = product(for: themeId), product.supportedSlots.contains(slot) else { return nil }
 
         let descriptorCode = "skin.\(product.assetNamespace).\(slot.descriptorNamespace).\(slot.descriptorVariant).\(state.rawValue)"
         return ThemeSkinDescriptor(

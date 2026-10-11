@@ -38,10 +38,6 @@ struct PetChatViewLegacy: View {
     @State private var showingOutfitStickerFlow = false
     
     // 保存成功提示状态
-    @State private var showingSaveSuccessToast = false
-    @State private var showingPurchaseSuccessToast = false
-    @State private var purchaseSuccessMessage = ""
-    @State private var purchaseToastHideWorkItem: DispatchWorkItem?
     @State private var isSavingOutfit = false
     @State private var showingThemeSwitchOverlay = false
     @State private var activeFeedAnimation: PetFeedAnimationPayload?
@@ -324,28 +320,6 @@ struct PetChatViewLegacy: View {
                             .zIndex(90)
                     }
 
-                    if showingSaveSuccessToast {
-                        OutfitSaveSuccessToast(message: "已保存到默认手帐")
-                            .transition(.asymmetric(
-                                insertion: .scale(scale: 0.8).combined(with: .opacity),
-                                removal: .scale(scale: 0.9).combined(with: .opacity)
-                            ))
-                            .zIndex(100)
-                    }
-
-                    if showingPurchaseSuccessToast {
-                        PetActionSuccessToast(
-                            title: "购买成功".appLocalized,
-                            message: purchaseSuccessMessage,
-                            systemImage: "cart.badge.plus"
-                        )
-                        .transition(.asymmetric(
-                            insertion: .scale(scale: 0.82).combined(with: .opacity),
-                            removal: .scale(scale: 0.9).combined(with: .opacity)
-                        ))
-                        .zIndex(105)
-                    }
-
                     if let payload = activeFeedAnimation {
                         PetFeedAnimationOverlay(payload: payload)
                             .transition(.opacity)
@@ -386,8 +360,6 @@ struct PetChatViewLegacy: View {
             .onDisappear {
                 thinkingDelayWorkItem?.cancel()
                 isThinkingLongWait = false
-                purchaseToastHideWorkItem?.cancel()
-                showingPurchaseSuccessToast = false
                 petDialogueTouchReleaseWorkItem?.cancel()
                 petDialogueTouchReleaseWorkItem = nil
                 isPetDialogueTouching = false
@@ -766,29 +738,18 @@ struct PetChatViewLegacy: View {
                         modelContext.insert(item)
                     }
                 }
-                try? modelContext.save()
+                do { try modelContext.save() } catch {
+                    isSavingOutfit = false
+                    ToastManager.shared.showError("保存失败，请稍后重试".appLocalized)
+                    return
+                }
                 
                 // 显示成功提示
                 isSavingOutfit = false
                 selectedOutfitClothings = []
                 
-                withAnimation(.spring(response: 0.6, dampingFraction: 0.7)) {
-                    showingSaveSuccessToast = true
-                }
-                
-                // 播放成功音效和震动
-                let generator = UINotificationFeedbackGenerator()
-                generator.notificationOccurred(.success)
-                
-                // 发送通知，跳转到魔法平面书页
+                ToastManager.shared.showSuccess("已保存到默认手帐".appLocalized)
                 NotificationCenter.default.post(name: .navigateToBook, object: nil)
-                
-                // 3秒后自动关闭提示
-                DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
-                    withAnimation(.easeOut(duration: 0.3)) {
-                        showingSaveSuccessToast = false
-                    }
-                }
             }
             
         } catch {
@@ -1486,23 +1447,8 @@ struct PetChatViewLegacy: View {
     }
 
     private func showPurchaseSuccessToast(itemName: String) {
-        purchaseToastHideWorkItem?.cancel()
-        purchaseSuccessMessage = "\(itemName)已收进我的背包"
-
-        withAnimation(.spring(response: 0.55, dampingFraction: 0.72)) {
-            showingPurchaseSuccessToast = true
-        }
-
-        let generator = UINotificationFeedbackGenerator()
-        generator.notificationOccurred(.success)
-
-        let hideWorkItem = DispatchWorkItem {
-            withAnimation(.easeOut(duration: 0.25)) {
-                showingPurchaseSuccessToast = false
-            }
-        }
-        purchaseToastHideWorkItem = hideWorkItem
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.8, execute: hideWorkItem)
+        OperationFeedbackCenter.shared.show("购买成功".appLocalized, kind: .success,
+            detail: "%@已收进我的背包".appLocalized(itemName))
     }
 
     private func canAffordShopItem(_ item: PetItemDefinition) -> Bool {

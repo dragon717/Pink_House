@@ -32,15 +32,11 @@ struct ShopCatalogWardrobeMergeView: View {
     @Environment(ThemeManager.self) private var themeManager
     @ObservedObject private var store = ShopCatalogStore.shared
 
-    /// 主衣物选择（radio）；默认第一件主衣物
-    @State private var primaryID: String?
-    /// 小物勾选（checkbox）；默认全部小物勾选
-    @State private var accessoryIDs: Set<String> = []
+    /// 默认第一件主衣物；小物不预选，保留用户每次勾选 / 取消的结果。
+    @State private var selection = ShopCatalogWardrobeMergeSelection()
     /// 各单品选定的「加入方式」（2026-09-27 需求：所有入口统一在确认页按阶段选择）。
     /// 候选与默认都来自 `ShopCatalogWardrobeEntryPolicy`（与详情页弹窗同一份口径）。
     @State private var entryOptionByProduct: [String: ShopCatalogWardrobeEntryOption] = [:]
-    /// 确认后的「加入方式」选择弹窗（用户需求：点「确认加入衣橱」后弹出两个选项）
-    @State private var showsEntryChoiceDialog = false
     @State private var errorText: String?
     @State private var isInserting = false
 
@@ -111,7 +107,15 @@ struct ShopCatalogWardrobeMergeView: View {
     }
 
     private var accessoryCandidates: [(product: CatalogProduct, price: Decimal?)] {
-        items.filter { !ShopCatalogWardrobeCategory.isPrimary($0.product.category) }
+        items.filter {
+            !ShopCatalogWardrobeCategory.isPrimary($0.product.category)
+                && $0.product.id != selection.primaryID
+        }
+    }
+
+    private var includedItems: [(product: CatalogProduct, price: Decimal?)] {
+        let ids = Set(selection.includedProducts(in: items.map(\.product)).map(\.id))
+        return items.filter { ids.contains($0.product.id) }
     }
 
     /// 拆分条数（§23）：每件主衣物一条
@@ -119,11 +123,7 @@ struct ShopCatalogWardrobeMergeView: View {
 
     /// 本套实际入手 = 全部主衣物条目 + 勾选小物（§23：主衣物各自成条，都计入）
     private var totalPrice: Decimal {
-        let primarySum = primaryItems.reduce(Decimal(0)) { $0 + ($1.price ?? 0) }
-        let accessorySum = accessoryCandidates
-            .filter { accessoryIDs.contains($0.product.id) }
-            .reduce(Decimal(0)) { $0 + ($1.price ?? 0) }
-        return primarySum + accessorySum
+        includedItems.reduce(Decimal(0)) { $0 + ($1.price ?? 0) }
     }
 
     var body: some View {
@@ -148,6 +148,8 @@ struct ShopCatalogWardrobeMergeView: View {
             LiquidBackground(themeSkinWallpaperContext: .timeHall)
                 .ignoresSafeArea()
         )
+        .interactiveDismissDisabled(isInserting)
+        .disabled(isInserting)
         .navigationTitle("加入少女衣橱")
         .navigationBarTitleDisplayMode(.inline)
         .alert("无法加入衣橱", isPresented: Binding(
@@ -158,34 +160,9 @@ struct ShopCatalogWardrobeMergeView: View {
         } message: {
             Text(errorText ?? "")
         }
-        // 确认后的「加入方式」选择弹窗（用户需求：点「确认加入衣橱」后弹出两个选项）。
-        // confirmationDialog = iOS 原生底部选项弹窗，与工程内其他确认弹窗风格一致；
-        // 候选文案与详情页加购弹窗同一份 `choiceTitle`，选择后按所选方式落库。
-        .confirmationDialog(
-            "请选择加入方式",
-            isPresented: $showsEntryChoiceDialog,
-            titleVisibility: .visible
-        ) {
-            if let unified = unifiedEntryCandidates {
-                ForEach(unified.candidates, id: \.self) { candidate in
-                    Button(ShopCatalogWardrobeEntryPolicy.choiceTitle(
-                        for: candidate, phase: unified.phase).appLocalized) {
-                        applyChoiceAndInsert(candidate)
-                    }
-                }
-            }
-            Button("取消", role: .cancel) {}
-        } message: {
-            Text("加入后按所选方式记账，金额仍由系统自动读取".appLocalized)
-        }
         .onAppear {
             store.loadFromBundleIfNeeded()
-            if primaryID == nil {
-                primaryID = primaryItems.first?.product.id
-            }
-            if accessoryIDs.isEmpty {
-                accessoryIDs = Set(accessoryCandidates.map { $0.product.id })
-            }
+            selection.initializePrimary(in: items.map(\.product))
             // 加入方式初始选中 = 阶段策略默认（点菜页自选口径优先）；
             // 已初始化过的保持用户所选（幂等，不覆盖）
             for item in items where entryOptionByProduct[item.product.id] == nil {
@@ -244,7 +221,7 @@ struct ShopCatalogWardrobeMergeView: View {
             Text("（按每件商品当前的销售阶段选择记账方式，金额仍由系统自动读取）".appLocalized)
                 .font(.system(size: 11))
                 .foregroundStyle(themeManager.tertiaryTextColor)
-            ForEach(items, id: \.product.id) { item in
+            ForEach(includedItems, id: \.product.id) { item in
                 let candidates = entryCandidates(for: item.product.id)
                 if !candidates.isEmpty {
                     VStack(alignment: .leading, spacing: 6) {
@@ -310,12 +287,12 @@ struct ShopCatalogWardrobeMergeView: View {
             let candidates = primaryItems.isEmpty ? items : primaryItems
             ForEach(candidates, id: \.product.id) { item in
                 Button {
-                    primaryID = item.product.id
+                    selection.primaryID = item.product.id
                 } label: {
                     HStack(spacing: 10) {
-                        Image(systemName: primaryID == item.product.id ? "largecircle.fill.circle" : "circle")
+                        Image(systemName: selection.primaryID == item.product.id ? "largecircle.fill.circle" : "circle")
                             .font(.system(size: 17))
-                            .foregroundStyle(primaryID == item.product.id ? themeManager.accentTextColor : themeManager.tertiaryTextColor)
+                            .foregroundStyle(selection.primaryID == item.product.id ? themeManager.accentTextColor : themeManager.tertiaryTextColor)
                         VStack(alignment: .leading, spacing: 2) {
                             Text(item.product.name)
                                 .font(.system(size: 14, weight: .medium))
@@ -347,16 +324,16 @@ struct ShopCatalogWardrobeMergeView: View {
                 .foregroundStyle(themeManager.tertiaryTextColor)
             ForEach(accessoryCandidates, id: \.product.id) { item in
                 Button {
-                    if accessoryIDs.contains(item.product.id) {
-                        accessoryIDs.remove(item.product.id)
+                    if selection.accessoryIDs.contains(item.product.id) {
+                        selection.accessoryIDs.remove(item.product.id)
                     } else {
-                        accessoryIDs.insert(item.product.id)
+                        selection.accessoryIDs.insert(item.product.id)
                     }
                 } label: {
                     HStack(spacing: 10) {
-                        Image(systemName: accessoryIDs.contains(item.product.id) ? "checkmark.square.fill" : "square")
+                        Image(systemName: selection.accessoryIDs.contains(item.product.id) ? "checkmark.square.fill" : "square")
                             .font(.system(size: 16))
-                            .foregroundStyle(accessoryIDs.contains(item.product.id) ? themeManager.accentTextColor : themeManager.tertiaryTextColor)
+                            .foregroundStyle(selection.accessoryIDs.contains(item.product.id) ? themeManager.accentTextColor : themeManager.tertiaryTextColor)
                         Text(item.product.name)
                             .font(.system(size: 14, weight: .medium))
                             .foregroundStyle(themeManager.primaryTextColor)
@@ -407,7 +384,7 @@ struct ShopCatalogWardrobeMergeView: View {
 
     private var confirmButton: some View {
         Button {
-            handleConfirmTap()
+            confirmInsert()
         } label: {
             Group {
                 if isInserting {
@@ -426,54 +403,27 @@ struct ShopCatalogWardrobeMergeView: View {
 
     // MARK: 入库
 
-    // MARK: 确认后的「加入方式」选择弹窗（2026-09-27 需求）
-
-    /// 所有选中商品的「加入方式」候选是否一致（且非空）：
-    /// 一致 → 点「确认加入衣橱」弹出选择弹窗（两个选项，与详情页弹窗同一份文案）；
-    /// 不一致（多件商品混合阶段）→ 弹窗给不出统一的两个选项，
-    /// 不弹，按确认页里每件商品已选的方式直接落库（页内「加入方式」段兜底）。
-    private var unifiedEntryCandidates:
-        (candidates: [ShopCatalogWardrobeEntryOption], phase: ShopCatalogPurchasePhase)? {
-        guard let firstItem = items.first else { return nil }
-        let first = entryCandidates(for: firstItem.product.id)
-        guard !first.isEmpty else { return nil }
-        for item in items.dropFirst() where entryCandidates(for: item.product.id) != first {
-            return nil
-        }
-        return (first, entryPhaseAndPrices(for: firstItem.product.id).phase)
-    }
-
-    /// 确认按钮 action：候选统一 → 先弹选择弹窗；否则直接按页内已选落库
-    private func handleConfirmTap() {
-        if unifiedEntryCandidates != nil {
-            showsEntryChoiceDialog = true
-        } else {
-            confirmInsert()
-        }
-    }
-
-    /// 弹窗选定后：所选方式应用到所有候选包含它的商品
-    ///（不在候选的商品保持页内已选），随后落库
-    private func applyChoiceAndInsert(_ option: ShopCatalogWardrobeEntryOption) {
-        for item in items where entryCandidates(for: item.product.id).contains(option) {
-            entryOptionByProduct[item.product.id] = option
-        }
-        confirmInsert()
-    }
-
+    /// 按页内每件商品已选的加入方式直接保存，不再次要求选择。
     private func confirmInsert() {
+        guard !isInserting else { return }
         isInserting = true
-        defer { isInserting = false }
-        guard primaryID != nil || !items.isEmpty else {
+        Task { @MainActor in
+            defer { isInserting = false }
+            await performInsert()
+        }
+    }
+
+    private func performInsert() async {
+        guard selection.primaryID != nil || !items.isEmpty else {
             errorText = "请先选择主衣物"
             return
         }
-        let keptAccessoryIDs = accessoryIDs
+        let keptAccessoryIDs = selection.includedAccessoryIDs
         // 价格口径（2026-09-27 需求）：按用户在「加入方式」段选定的口径落库，
         // 映射唯一口径 `ShopCatalogWardrobeEntryPolicy.priceMode`（与详情页弹窗共用）；
         // 预约价口径须有可用预约记录（makeDraft 会 guard），缺记录回退现货兜底；
         // 候选为空（无任何价格档案）的商品维持既有现货兜底。
-        let selections = items.map { item -> ShopCatalogWardrobeDraftBuilder.Selection in
+        let selections = includedItems.map { item -> ShopCatalogWardrobeDraftBuilder.Selection in
             let id = item.product.id
             let archive = store.priceArchive(forProduct: id)
             let resolvedMode: ShopCatalogWardrobeDraftBuilder.PriceMode
@@ -506,9 +456,9 @@ struct ShopCatalogWardrobeMergeView: View {
                 selections: selections,
                 accessoryProductIDs: keptAccessoryIDs,
                 store: store,
-                modelContext: modelContext
+                primaryProductID: selection.primaryID
             )
-            _ = try ShopCatalogWardrobeInserter.insertSet(
+            _ = try await ShopCatalogWardrobeAddition.addSet(
                 drafts: pairs,
                 accessoryProductIDs: keptAccessoryIDs,
                 store: store,

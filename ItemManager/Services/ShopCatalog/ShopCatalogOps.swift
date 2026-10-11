@@ -121,10 +121,9 @@ nonisolated struct CatalogProductDraft: Codable, Identifiable, Hashable, Sendabl
     var balance: Double?
     var startAt: Date? = nil
     var endAt: Date? = nil
-    /// 金额币种（R02）。nil = 未标注 → 发布时按「币种待确认」入库，
-    /// **不做全局默认 CNY**（§5.2 步骤 6：币种必须明确）。
-    /// Optional + 默认 nil，合成解码对旧 JSON 自动兜底。
-    var currency: CatalogCurrency? = nil
+    /// 新运营草稿默认人民币；显式选择的币种原样保留。
+    /// Optional 保持旧 JSON 兼容：解码缺键仍为 nil，不改写历史金额语义。
+    var currency: CatalogCurrency? = .cny
 
     /// 完整商品资料（V1.1 G5：手动录入必须能完成全部业务）
     /// 图片以 CatalogAsset 表达（originalURL 必填）；发布时一并写入覆盖层

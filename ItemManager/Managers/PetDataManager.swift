@@ -67,7 +67,7 @@ class PetDataManager: ObservableObject {
     func saveStatus(_ newStatus: PetStatus? = nil) {
         let previousStatus = self.status
         if let newStatus = newStatus {
-            self.status = Self.sanitizeStatus(newStatus)
+            self.status = Self.statusForOrdinarySave(newStatus, previous: previousStatus)
         } else {
             self.status = Self.sanitizeStatus(self.status)
         }
@@ -96,9 +96,39 @@ class PetDataManager: ObservableObject {
         writeSnapshot(encoded, modifiedAt: modifiedAt, mirrorToCloud: true)
     }
 
+    /// 普通宠物页面可能保存旧快照；不能清掉已发奖励的历史标识。
+    /// 明确备份恢复/云快照替换仍走既有 replaceStatus 管线。
+    static func statusForOrdinarySave(_ candidate: PetStatus, previous: PetStatus) -> PetStatus {
+        var updated = sanitizeStatus(candidate)
+        updated.claimedOperationRewards.formUnion(previous.claimedOperationRewards)
+        return updated
+    }
+
     func saveStatusAndNotify(_ newStatus: PetStatus, fullReload: Bool, source: String) {
         saveStatus(newStatus)
         postExternalUpdate(fullReload: fullReload, source: source)
+    }
+
+    /// 操作奖励：余额与幂等标识先同快照写入本地，再发布到账通知。
+    @MainActor
+    func persistOperationReward(_ newStatus: PetStatus) -> Bool {
+        let sanitized = Self.sanitizeStatus(newStatus)
+        guard let encoded = try? JSONEncoder().encode(sanitized) else { return false }
+        let modifiedAt = Date()
+        persistenceQueue.sync {
+            UserDefaults.standard.set(encoded, forKey: statusKey)
+            UserDefaults.standard.set(modifiedAt.timeIntervalSince1970, forKey: statusModifiedAtKey)
+        }
+        status = sanitized
+        persistenceQueue.async { [weak self] in
+            guard let self else { return }
+            if self.isCloudRealtimeSyncEnabled {
+                self.writeCloudSnapshot(encoded, modifiedAt: modifiedAt)
+            }
+            self.checkAutoBackup(using: encoded)
+        }
+        postExternalUpdate(fullReload: false, source: "operationReward")
+        return true
     }
     
     // MARK: - Backup & Restore

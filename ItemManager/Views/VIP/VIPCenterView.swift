@@ -9,7 +9,6 @@ struct VIPCenterView: View {
     @ObservedObject private var themeSkinManager = ThemeSkinManager.shared
     @Environment(\.dismiss) private var dismiss
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
-    @Environment(\.customBottomFloatingLift) private var customBottomFloatingLift
 
     @State private var showingPurchaseAlert = false
     @State private var alertMessage = ""
@@ -34,12 +33,6 @@ struct VIPCenterView: View {
 
     private var visualTheme: VIPVisualTheme {
         vipManager.preferredVisualTheme
-    }
-
-    private var floatingPurchaseBarBottomLift: CGFloat {
-        let sharedLift = max(0, customBottomFloatingLift)
-        let vipExtraLift: CGFloat = sharedLift > 0 ? 12 : 0
-        return sharedLift + vipExtraLift
     }
 
     private var themeSkinDescriptor: ThemeSkinDescriptor? {
@@ -370,7 +363,7 @@ struct VIPCenterView: View {
             .background(purchasePanelBackground)
             .padding(.horizontal, 18)
             .padding(.top, 4)
-            .padding(.bottom, 8 + floatingPurchaseBarBottomLift)
+            .padding(.bottom, 8)
         }
         .frame(maxWidth: 560)
         .frame(maxWidth: .infinity)

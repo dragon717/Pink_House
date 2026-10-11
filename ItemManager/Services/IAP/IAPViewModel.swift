@@ -18,8 +18,6 @@ class IAPViewModel: ObservableObject {
     @Published var vipExpireDate: Date?
     @Published var isLoading: Bool = false
     @Published var isPurchasing: Bool = false
-    @Published var showSuccessToast: Bool = false
-    @Published var successMessage: String = ""
     @Published var showErrorAlert: Bool = false
     @Published var errorMessage: String = ""
     @Published var firstPurchaseStatusVersion: Int = 0
@@ -188,8 +186,7 @@ class IAPViewModel: ObservableObject {
             break
         case .pending:
             activePurchaseAttemptID = nil
-            showSuccessToast = true
-            successMessage = "购买请求已提交，正在等待 App Store 处理。到账后会自动更新余额。".appLocalized
+            ToastManager.shared.show(message: "购买请求已提交，正在等待 App Store 处理。到账后会自动更新余额。".appLocalized, duration: 3)
             Task {
                 await IAPDiagnosticStore.shared.record(
                     category: .flow,
@@ -254,8 +251,7 @@ class IAPViewModel: ObservableObject {
             return
         }
 
-        showSuccessToast = true
-        successMessage = context.message
+        ToastManager.shared.showSuccess(context.message, duration: 3)
         activePurchaseAttemptID = nil
 
         Task {
@@ -290,10 +286,6 @@ class IAPViewModel: ObservableObject {
     }
 
     // MARK: - 关闭提示
-    func dismissSuccessToast() {
-        showSuccessToast = false
-    }
-
     func dismissErrorAlert() {
         showErrorAlert = false
         storeManager.clearError()

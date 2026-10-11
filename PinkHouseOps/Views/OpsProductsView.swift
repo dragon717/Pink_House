@@ -1298,7 +1298,7 @@ private struct SaleEventFormSheet: View {
     @State private var priceText = ""
     @State private var depositText = ""
     @State private var balanceText = ""
-    @State private var currency: CatalogCurrency = .unknown
+    @State private var currency: CatalogCurrency = .cny
     @State private var hasStartAt = true
     @State private var startAt = Date()
     @State private var hasEndAt = false

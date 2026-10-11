@@ -66,7 +66,7 @@
 - 删除与录入：预检与执行**共用** `plan*Deletion`，批量只写一次覆盖层；同款家族必须同源 `sameStyleFamily`。
 - 加购记账：**金额零手输**；唯一口径 `ShopCatalogWardrobeEntryPolicy`；四阶段都必须弹选择弹窗；判付清只用 `isFinalPaymentPlan`。
 - 系列：`salePhase`/`reservationEndAt` Optional；**自动流转 = 读取时判定 `effectivePhase`**，不做定时回写；阶段/图文/价格表**只有一处存储**；`publishOperationKey` 年份逐字 `"2026"`。
-- 表单：`.sheet` 禁挂 `ForEach`/`List` 行视图 → 合成 `enum XxxSheet` 挂页面级；`.onChange(of:)` 对程序化赋值也触发 → 挂 `Binding` setter。Dock 避让高度只有 `floatingSurfaceBottomInset` = **72**。
+- 表单：`.sheet` 禁挂 `ForEach`/`List` 行视图 → 合成 `enum XxxSheet` 挂页面级；`.onChange(of:)` 对程序化赋值也触发 → 挂 `Binding` setter。当前底栏是系统原生 TabView，使用系统安全区，旧 Dock 高度和避让规则已废止。
 - 商品改名 = **款式级**：标题只读 `designName`；唯一口径 `ShopCatalogProductRename.plan(...)`；**必须扇出整款**；`applyRenamePlan` **先于** `applySizeChart`。
 - ⭐ **iOS 上传/发布不打日志** → 判「上传成功」只能看 ①任务表阶段=发布头且状态=`published` ②线上 `releaseSeq` 是否 +1。
 - ⭐ 查线上发布头（只读）：`env -u http_proxy … PINK_HOUSE_TIMEHALL_CREDENTIAL_FILE=<容器>/credentials/cloudkit.development.json .venv/bin/python3 ops_publish_bridge.py --mode baseline --request <req.json>`；凭证在 Mac App **容器**里，仓库没有。⚠️ agent shell 自带 `http_proxy`，不摘掉会连到 127.0.0.1 并误判根因。
@@ -78,3 +78,20 @@
 
 - `SharedCatalog`（领域/门禁，只 Foundation/CryptoKit/ImageIO/CoreGraphics）、`PinkHouseOps`（桥接，**产品名 `PinkHouseOpsCore`**，不能与 App target 同名）。
 - 四坑：`public` 类型**不会**让成员 public；合成逐成员 init 是 internal；`MemberImportVisibility` 下必须**在使用文件里** import（`UTType` → `UniformTypeIdentifiers`、`@Published` → `Combine`）；带协议一致性的 extension 不许加 `public`。包内无 `@_exported` → 每个文件自己 `import SharedCatalog`。
+
+## 操作反馈与鱼币统一规则（2026-10-11）
+
+- 唯一指南：`docs/OPERATION_FEEDBACK_AND_FISH_COIN_GUIDE.md`；执行与验收：`docs/OPERATION_FEEDBACK_AND_FISH_COIN_EXEC_PLAN.md`。
+- 保存业务/图片成功后，先完成相关系统收尾，再显示一次成功结果。失败、取消、复制不自动发鱼币。
+- 普通反馈统一 `OperationFeedbackCenter`；Toast/Copy 为适配入口；禁止另建局部气泡和隐藏计时器。
+- 时光馆用户确认入橱唯一入口 `ShopCatalogWardrobeAddition.add/addSet`，自动合并成功与实际到账鱼币；纯导入/恢复仍用 Inserter，不发奖励。
+- 奖励只展示 `FishCoinRewardReceipt.actualAmount`，按稳定衣物/支付流水 ID 防重。奖励余额、日计数、防重集合与钱包同快照保存；不改充值喵币。
+- 解锁/任务交互、系统确认弹窗、萌宠动作动画遵循指南的职责矩阵，不能靠弹窗显示来判定业务完成或再次发奖。
+
+## 时光馆入橱与运营默认值（2026-10-11）
+
+入橱默认主衣物，小物由用户主动勾选；重复出现不得重置用户取消结果。运营新草稿/新价格录入默认人民币（CNY），保留明确币种与历史来源。正式规则与验证见 `docs/SHOP_CATALOG_ENTRY_DEFAULTS_2026-10-11.md`。
+
+2026-10-11 用户截图确认：入橱方式只保留确认页内单选，点击确认直接按已选方式保存，删除右侧重复选择弹窗及其状态/分支；取代 2026-09-27 二次弹窗旧要求。成功后仍统一提示与发放实际到账鱼币。
+
+2026-10-11 用户明确确认：运营已上传商品的未明确币种全部补为人民币，不能仅修改新录入默认值。Development 存量已修复发布 seq 21：26 件商品、38 条销售记录及 3 份价格修正；明确币种与金额保持原值。正式规则与证据：`docs/SHOP_CATALOG_OPERATOR_CURRENCY_REPAIR_2026-10-11.md`。

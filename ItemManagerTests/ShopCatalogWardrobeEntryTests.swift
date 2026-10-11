@@ -10,6 +10,7 @@
 //
 
 import XCTest
+import UIKit
 import SwiftData
 @testable import ItemManager
 
@@ -44,7 +45,7 @@ final class ShopCatalogWardrobeEntryTests: XCTestCase {
         let context = modelContext()
         let draft = try XCTUnwrap(ShopCatalogWardrobeDraftBuilder.makeDraft(
             selection: .init(productID: "prod-ag-xueguo-jsk", priceMode: .reservation(depositPaid: backendDeposit)),
-            store: store, modelContext: context
+            store: store
         ))
         XCTAssertTrue(draft.isDepositPlan)
         XCTAssertEqual(Decimal(draft.deposit), 128)
@@ -71,7 +72,7 @@ final class ShopCatalogWardrobeEntryTests: XCTestCase {
         let context = modelContext()
         let draft = try XCTUnwrap(ShopCatalogWardrobeDraftBuilder.makeDraft(
             selection: .init(productID: "prod-ag-xueguo-jsk", priceMode: .fullReservation),
-            store: store, modelContext: context
+            store: store
         ))
         // 金额 = 后台预约价（定金 + 尾款总和），无需用户填写
         XCTAssertEqual(Decimal(draft.priceTotal), 428)
@@ -100,11 +101,11 @@ final class ShopCatalogWardrobeEntryTests: XCTestCase {
         let context = modelContext()
         let depositDraft = try XCTUnwrap(ShopCatalogWardrobeDraftBuilder.makeDraft(
             selection: .init(productID: "prod-ag-xueguo-jsk", priceMode: .reservation(depositPaid: 128)),
-            store: store, modelContext: context
+            store: store
         ))
         let fullDraft = try XCTUnwrap(ShopCatalogWardrobeDraftBuilder.makeDraft(
             selection: .init(productID: "prod-ag-xueguo-jsk", priceMode: .fullReservation),
-            store: store, modelContext: context
+            store: store
         ))
         // 总价一致（都是后台预约价），差别只在「谁待付尾款」
         XCTAssertEqual(Decimal(depositDraft.priceTotal), Decimal(fullDraft.priceTotal))
@@ -118,7 +119,7 @@ final class ShopCatalogWardrobeEntryTests: XCTestCase {
         let context = modelContext()
         let draft = try XCTUnwrap(ShopCatalogWardrobeDraftBuilder.makeDraft(
             selection: .init(productID: "prod-ag-xueguo-jsk", priceMode: .stock),
-            store: store, modelContext: context
+            store: store
         ))
         XCTAssertFalse(draft.isDepositPlan)
         XCTAssertEqual(Decimal(draft.priceTotal), 568)
@@ -143,7 +144,7 @@ final class ShopCatalogWardrobeEntryTests: XCTestCase {
         let context = modelContext()
         let draft = try XCTUnwrap(ShopCatalogWardrobeDraftBuilder.makeDraft(
             selection: .init(productID: "prod-ag-xueguo-jsk", color: "夜空蓝", priceMode: .stock),
-            store: store, modelContext: context
+            store: store
         ))
         // 款式名「雪国来信 JSK」已含系列名「雪国来信」→ 不重复前置
         XCTAssertEqual(draft.name, "雪国来信 JSK 夜空蓝")
@@ -155,7 +156,7 @@ final class ShopCatalogWardrobeEntryTests: XCTestCase {
         func name(_ color: String) throws -> String {
             try XCTUnwrap(ShopCatalogWardrobeDraftBuilder.makeDraft(
                 selection: .init(productID: "prod-ag-xueguo-jsk", color: color, priceMode: .stock),
-                store: store, modelContext: context
+                store: store
             )).name
         }
         let blue = try name("夜空蓝")
@@ -171,7 +172,7 @@ final class ShopCatalogWardrobeEntryTests: XCTestCase {
         let context = modelContext()
         let draft = try XCTUnwrap(ShopCatalogWardrobeDraftBuilder.makeDraft(
             selection: .init(productID: "prod-ag-xueguo-jsk", priceMode: .stock),
-            store: store, modelContext: context
+            store: store
         ))
         XCTAssertEqual(store.colors(forProduct: "prod-ag-xueguo-jsk").first, "夜空蓝")
         XCTAssertEqual(draft.name, "雪国来信 JSK 夜空蓝")
@@ -184,7 +185,7 @@ final class ShopCatalogWardrobeEntryTests: XCTestCase {
         XCTAssertTrue(store.colors(forProduct: "prod-unniq-yunduo-op").isEmpty)
         let draft = try XCTUnwrap(ShopCatalogWardrobeDraftBuilder.makeDraft(
             selection: .init(productID: "prod-unniq-yunduo-op", priceMode: .stock),
-            store: store, modelContext: context
+            store: store
         ))
         XCTAssertEqual(draft.name, "云朵邮局 OP")
         XCTAssertEqual(draft.colors, "")
@@ -198,8 +199,7 @@ final class ShopCatalogWardrobeEntryTests: XCTestCase {
                 .init(productID: "prod-ag-xueguo-kc", priceMode: .stock),
             ],
             accessoryProductIDs: ["prod-ag-xueguo-kc"],
-            store: store, modelContext: modelContext()
-        )
+            store: store)
         XCTAssertEqual(results.count, 1)
         let name = results[0].draft.name
         XCTAssertTrue(name.hasPrefix("雪国来信 JSK 夜空蓝"), "合并名应以主衣物记录名开头：\(name)")
@@ -318,7 +318,7 @@ final class ShopCatalogWardrobeEntryTests: XCTestCase {
         let context = modelContext()
         let draft = try XCTUnwrap(ShopCatalogWardrobeDraftBuilder.makeDraft(
             selection: .init(productID: "prod-ag-xueguo-jsk", priceMode: .stock),
-            store: store, modelContext: context
+            store: store
         )).with(isResaleTransfer: true)
 
         let clothing = try ShopCatalogWardrobeInserter.insert(
@@ -587,7 +587,7 @@ final class ShopCatalogWardrobeEntryTests: XCTestCase {
         let context = modelContext()
         let draft = try XCTUnwrap(ShopCatalogWardrobeDraftBuilder.makeDraft(
             selection: .init(productID: "p-odd", priceMode: .reservation(depositPaid: 128)),
-            store: oddStore, modelContext: context
+            store: oddStore
         ))
         XCTAssertEqual(Decimal(draft.deposit), 128)
         XCTAssertEqual(Decimal(draft.balance), 300, "尾款必须取后台录入值，而不是 430 − 128")
@@ -615,7 +615,7 @@ final class ShopCatalogWardrobeEntryTests: XCTestCase {
         func draft(_ mode: ShopCatalogWardrobeDraftBuilder.PriceMode) throws -> ClothingEditDraft {
             try XCTUnwrap(ShopCatalogWardrobeDraftBuilder.makeDraft(
                 selection: .init(productID: "prod-spot", priceMode: mode),
-                store: spotStore, modelContext: context))
+                store: spotStore))
         }
 
         let byReservation = try draft(.fullReservation)
@@ -656,7 +656,7 @@ final class ShopCatalogWardrobeEntryTests: XCTestCase {
         let selection = ShopCatalogWardrobeDraftBuilder.Selection(
             productID: "prod-ag-xueguo-jsk", priceMode: .fullStock)
         let draft = try XCTUnwrap(ShopCatalogWardrobeDraftBuilder.makeDraft(
-            selection: selection, store: store, modelContext: context))
+            selection: selection, store: store))
         // 金额 = 后台现货价 568（种子 ev-ag-jsk-stock-2026），用户零输入
         XCTAssertEqual(Decimal(draft.priceTotal), 568)
         XCTAssertEqual(Decimal(draft.deposit), 568)
@@ -679,7 +679,7 @@ final class ShopCatalogWardrobeEntryTests: XCTestCase {
     }
 
     /// 现货价档案缺失时不得硬编一个数：拿不到价就返回 nil，由视图回退（不静默记 0 元）
-    func testFullStockModeWithoutStockPriceReturnsNil() {
+    func testFullStockModeWithoutStockPriceReturnsNil() async {
         let noStockStore = ShopCatalogStore(catalog: ShopCatalog(
             products: [
                 CatalogProduct(id: "prod-no-stock", shopID: "s1", seriesID: "ser1",
@@ -692,7 +692,7 @@ final class ShopCatalogWardrobeEntryTests: XCTestCase {
         ))
         XCTAssertNil(ShopCatalogWardrobeDraftBuilder.makeDraft(
             selection: .init(productID: "prod-no-stock", priceMode: .fullStock),
-            store: noStockStore, modelContext: modelContext()))
+            store: noStockStore))
     }
 
     // MARK: - 需求：定金+尾款入心愿尾款列表 → 付完尾款自动进衣橱
@@ -705,7 +705,7 @@ final class ShopCatalogWardrobeEntryTests: XCTestCase {
         let selection = ShopCatalogWardrobeDraftBuilder.Selection(
             productID: "prod-ag-xueguo-jsk", priceMode: .reservation(depositPaid: 128))
         let draft = try XCTUnwrap(ShopCatalogWardrobeDraftBuilder.makeDraft(
-            selection: selection, store: store, modelContext: context))
+            selection: selection, store: store))
         let clothing = try ShopCatalogWardrobeInserter.insert(
             draft: draft, selection: selection, store: store, modelContext: context)
 
@@ -739,38 +739,25 @@ final class ShopCatalogWardrobeEntryTests: XCTestCase {
 
     // MARK: - 图片物化（2026-09-24 根因修复回归）
 
-    /// 加购草稿必须携带商品图：曾硬编码 `imagePaths: []`，
-    /// 导致「时光馆加购 → 衣橱卡片无图可显示」（衣橱走 ImageManager 文件名体系）。
-    func testMakeDraftMaterializesProductImagesIntoWardrobe() throws {
+    /// 确认加购时，Bundle 图也应进入衣橱持久化文件体系。
+    func testInsertionMaterializesProductImagesIntoWardrobe() async throws {
         let context = modelContext()
+        let selection = ShopCatalogWardrobeDraftBuilder.Selection(
+            productID: "prod-ag-xueguo-jsk", priceMode: .stock)
         let draft = try XCTUnwrap(ShopCatalogWardrobeDraftBuilder.makeDraft(
-            selection: .init(productID: "prod-ag-xueguo-jsk", priceMode: .stock),
-            store: store, modelContext: context
-        ))
-        // 种子商品挂 3 张 Bundle 画册图（asset-ag-jsk-1/2/3），必须全部物化成衣橱图片
-        XCTAssertEqual(draft.imagePaths.count, 3, "商品图必须物化进草稿，而不是空数组")
-        // 物化 = 真实写入 ImageManager 文件体系（衣橱卡片读取的就是它）
-        let imagesDirectory = ImageManager.shared.imagesDirectory
-        for fileName in draft.imagePaths {
-            XCTAssertTrue(
-                FileManager.default.fileExists(
-                    atPath: imagesDirectory.appendingPathComponent(fileName).path),
-                "物化后的图片文件必须存在：\(fileName)")
+            selection: selection, store: store))
+        XCTAssertTrue(draft.imagePaths.isEmpty, "组装金额资料时不应产生图片文件")
+        let clothing = try await ShopCatalogWardrobeInserter.insertWithImages(
+            draft: draft, selection: selection, store: store, modelContext: context)
+        XCTAssertEqual(clothing.imagePaths.count, 3)
+        for path in clothing.imagePaths {
+            XCTAssertNotNil(UIImage(contentsOfFile: ImageManager.shared.imagesDirectory
+                .appendingPathComponent(path).path))
         }
-
-        // 落库后 Clothing.imagePaths 原样携带，卡片才能直接渲染
-        let clothing = try ShopCatalogWardrobeInserter.insert(
-            draft: draft, store: store, modelContext: context
-        )
-        XCTAssertEqual(clothing.imagePaths, draft.imagePaths)
-
-        // 清理：测试写入宿主沙盒 Images 目录的文件随手删掉，不污染真实数据
-        for fileName in draft.imagePaths {
-            try? FileManager.default.removeItem(
-                at: imagesDirectory.appendingPathComponent(fileName))
-        }
+        let paths = clothing.imagePaths
         context.delete(clothing)
-        try? context.save()
+        ShopCatalogWardrobeImageImporter.release(paths, modelContext: context)
+        try context.save()
     }
 
     // MARK: helpers
@@ -781,7 +768,7 @@ final class ShopCatalogWardrobeEntryTests: XCTestCase {
 
     private func modelContext() -> ModelContext {
         let config = ModelConfiguration(isStoredInMemoryOnly: true)
-        let schema = Schema([Clothing.self, Brand.self, Tag.self])
+        let schema = Schema([Clothing.self, Brand.self, Tag.self, StoredImage.self])
         let container = try! ModelContainer(for: schema, configurations: config)
         retainedContainers.append(container)
         return ModelContext(container)

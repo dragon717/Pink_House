@@ -273,9 +273,6 @@ private struct ThemeSkinProductStoreCard: View {
         if product.supportedSlots.contains(where: { [.topBarMain, .topBarSegment, .topBarIconButton, .topBarAddButton, .searchBar].contains($0) }) {
             tags.append("顶栏".appLocalized)
         }
-        if product.supportedSlots.contains(where: { [.tabBarMain, .tabBarItem].contains($0) }) {
-            tags.append("底栏".appLocalized)
-        }
         if product.supportedSlots.contains(where: { [.statsCard, .wardrobeItemCard, .settingsGridCard, .sectionCard].contains($0) }) {
             tags.append("卡片".appLocalized)
         }
@@ -290,9 +287,9 @@ private struct ThemeSkinProductStoreCard: View {
 
     private var componentCaption: String {
         guard !componentSummaryTags.isEmpty else {
-            return "%@ 项组件可单独开关".appLocalized("\(product.supportedSlots.count)")
+            return "%@ 项组件可单独开关".appLocalized("\(product.supportedSlots.filter(\.isThemeRendered).count)")
         }
-        return "覆盖 %@ · %@ 项组件".appLocalized(componentSummaryTags.joined(separator: " · "), "\(product.supportedSlots.count)")
+        return "覆盖 %@ · %@ 项组件".appLocalized(componentSummaryTags.joined(separator: " · "), "\(product.supportedSlots.filter(\.isThemeRendered).count)")
     }
 
     var body: some View {

@@ -460,8 +460,6 @@ struct SpatialBookShelfView: View {
                     .padding(24)
                     .animation(.default, value: editableBooks)
                 }
-                // 底部悬浮 Dock 避让（编辑态）；正常态由 SpaceBookGridView 自己避让，不要在此 Group 上加。
-                .avoidingBottomDock()
             } else if isBatchEditingBooks {
                 batchBookGridContent
             } else {
@@ -505,8 +503,6 @@ struct SpatialBookShelfView: View {
             .padding(24)
             .animation(.default, value: selectedBookIDs)
         }
-        // 底部悬浮 Dock 避让（批量态）。
-        .avoidingBottomDock()
     }
 
     private func batchEditingBookCell(for book: SpaceBookGroup) -> some View {

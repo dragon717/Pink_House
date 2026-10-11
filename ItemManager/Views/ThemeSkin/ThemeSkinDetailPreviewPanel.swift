@@ -18,7 +18,7 @@ struct ThemeSkinDetailPreviewPanel: View {
     }
 
     private var highlightedAnchor: ThemeSkinPreviewAnchor? {
-        focusedSlot.map(ThemeSkinPreviewAnchor.anchor(for:))
+        focusedSlot.flatMap(ThemeSkinPreviewAnchor.anchor(for:))
     }
 
     private var noticeDescriptor: ThemeSkinDescriptor? {
@@ -196,13 +196,9 @@ private struct ThemeSkinPreviewPhoneFrame: View {
             .scrollIndicators(.hidden)
         }
         .overlay(alignment: .bottom) {
-            ThemeSkinPreviewHotspot(anchor: .tabBar, highlightedAnchor: highlightedAnchor) {
-                onPreviewSlotTap(.tabBarMain)
-            } content: {
-                ThemeSkinPreviewTabBar(context: context)
-                    .padding(.horizontal, 10)
-                    .padding(.bottom, 10)
-            }
+            SystemNavigationPreview()
+                .padding(.horizontal, 10)
+                .padding(.bottom, 10)
         }
     }
 
@@ -435,35 +431,21 @@ private struct ThemeSkinPreviewSearchBar: View {
     }
 }
 
-private struct ThemeSkinPreviewTabBar: View {
-    let context: ThemeSkinPreviewContext
-
-    @Environment(\.colorScheme) private var colorScheme
-
-    private var descriptor: ThemeSkinDescriptor? { context.descriptor(for: .tabBarMain) }
-
+private struct SystemNavigationPreview: View {
     var body: some View {
-        HStack(spacing: 8) {
-            tab("衣", selected: false)
-            tab("屋", selected: true)
-            tab("我", selected: false)
+        HStack {
+            Label("衣橱".appLocalized, systemImage: "cabinet.fill")
+            Spacer()
+            Label("时光馆".appLocalized, systemImage: "clock")
+            Spacer()
+            Label("我".appLocalized, systemImage: "person.fill")
         }
-        .padding(.horizontal, 18)
+        .labelStyle(.iconOnly)
+        .font(.system(size: 16))
+        .foregroundStyle(.secondary)
+        .padding(.horizontal, 24)
         .padding(.vertical, 12)
-        .themeSkinLegibilityBackdrop(level: .preview, slot: .tabBarMain, cornerRadius: 18, descriptor: descriptor)
-        .background(previewAsset(ThemeSkinAssetName.tabBarMain, context: context, slot: .tabBarMain, cornerRadius: 24))
-    }
-
-    private func tab(_ title: String, selected: Bool) -> some View {
-        VStack(spacing: 3) {
-            Circle()
-                .fill(selected ? SkyConcertThemeSkin.accent(for: descriptor, colorScheme: colorScheme) : SkyConcertThemeSkin.labelColor(for: descriptor, colorScheme: colorScheme).opacity(0.24))
-                .frame(width: 15, height: 15)
-            Text(title.appLocalized)
-                .font(.system(size: 9, weight: selected ? .bold : .medium, design: .rounded))
-                .foregroundStyle(selected ? SkyConcertThemeSkin.accent(for: descriptor, colorScheme: colorScheme) : SkyConcertThemeSkin.labelColor(for: descriptor, colorScheme: colorScheme).opacity(0.72))
-                .themeSkinLegibleText(level: selected ? .chip : .inline, slot: .tabBarMain, descriptor: descriptor)
-        }
-        .frame(maxWidth: .infinity)
+        .background(.thinMaterial, in: Capsule())
+        .accessibilityLabel("系统导航栏，外观不随主题改变".appLocalized)
     }
 }

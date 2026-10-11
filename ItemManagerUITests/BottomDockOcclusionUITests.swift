@@ -14,7 +14,7 @@
 //    B. 系列商品页（截图 2 的真实页面 = 运营端 `ShopCatalogSeriesProductsView`，
 //       路径：我 → 运营工具 → 店家 / 系列 / 商品管理 → 系列 → 某个系列）。
 //       滚到最底后，最后一行必须完整落在底部悬浮 Dock **之上**。
-//       判定用几何量：Dock 顶边 = 底部 dock tab 按钮的 frame.minY。
+//       判定用几何量：底栏顶边 = 系统 TabBar 的 frame.minY。
 //
 //  数据前提：仓库 Bundle 种子已于 2026-09-24 清空，验收时把
 //  `ItemManagerTests/ShopCatalogSeedFixture.swift` 的 JSON + 合成店家 / 合成商品
@@ -36,6 +36,7 @@ final class BottomDockOcclusionUITests: XCTestCase {
     @MainActor
     func testProductDetailCarouselOverlaysClearInfoCard() throws {
         let app = XCUIApplication()
+        app.launchArguments += ["-newbieGuide.hasSeenWelcome", "YES", "-AppleLanguages", "(zh-Hans)"]
         app.launch()
         dismissSystemPrompts(app)
         dismissDailyCheckIn(app)
@@ -65,9 +66,9 @@ final class BottomDockOcclusionUITests: XCTestCase {
         attach(text: """
         [商品详情 · 截图量几何用]
         窗口高度            = \(app.frame.height)
-        轮播底部标注留白     = 36(上提量) − 16(卡片间距) + 12(视觉间隙) = 32pt
-        卡片顶边(相对轮播底边) = 16 − 36 = −20pt
-        → 标注底边应比卡片顶边**高 12pt**，与修复前（留白 12pt → 标注被卡片顶边半埋）同法可比
+        轮播底部标注留白     = 12pt
+        卡片顶边(相对轮播底边) = +16pt（正常布局，无负 offset）
+        → 卡片必须完整落在轮播下方；标注底边比卡片顶边高 28pt
         """, name: "A-量法定量")
     }
 
@@ -76,14 +77,13 @@ final class BottomDockOcclusionUITests: XCTestCase {
     @MainActor
     func testSeriesProductsLastRowClearsBottomDock() throws {
         let app = XCUIApplication()
-        // 运营工具入口（我 → 运营工具）只对创作者渲染；模拟器取不到 iCloud 身份，
-        // 用工程内置的 UI 测试开关解闸门（CreatorMode.enableLaunchArgument）。
-        app.launchArguments.append("-ui-test-enable-creator-mode")
+        app.launchArguments += ["-newbieGuide.hasSeenWelcome", "YES", "-AppleLanguages", "(zh-Hans)"]
+        // 运营工具需要真实白名单身份；本机创作者开关不能放行这个入口。
         app.launch()
         dismissSystemPrompts(app)
         dismissDailyCheckIn(app)
 
-        let dockTab = try openOpsSeriesProductsPage(app)
+        try openOpsSeriesProductsPage(app)
 
         // 滚到最底：固定 5 次受控拖动（列表到底会钳住，不会滚过头）
         let lastRow = app.staticTexts["ZZ 验收商品 12"].firstMatch
@@ -91,7 +91,7 @@ final class BottomDockOcclusionUITests: XCTestCase {
         Thread.sleep(forTimeInterval: 1.5)
         capture(app, "B1-系列商品页-滚到最底")
 
-        let dockTop = dockTab.frame.minY
+        let dockTop = app.tabBars.firstMatch.frame.minY
         attach(text: """
         [系列商品页 滚到底几何]
         窗口高度      = \(app.frame.height)
@@ -144,6 +144,9 @@ final class BottomDockOcclusionUITests: XCTestCase {
         // 运营工具入口（创作者可见）
         let opsEntry = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "运营工具")).firstMatch
         scrollUntilVisible(app, opsEntry, maxSwipes: 4)
+        guard opsEntry.exists else {
+            throw XCTSkip("当前模拟器没有运营白名单身份，无法进入系列商品管理；本机创作者开关不放行此入口。")
+        }
         XCTAssertTrue(opsEntry.isHittable, "「我」页应有「运营工具」入口（需创作者模式）")
         opsEntry.tap()
 

@@ -33,7 +33,6 @@ enum ThemeSkinPreviewScene: String, CaseIterable, Identifiable {
 enum ThemeSkinPreviewAnchor: String, CaseIterable, Identifiable {
     case topBar
     case searchBar
-    case tabBar
     case statsCard
     case wardrobeCard
     case settingsGrid
@@ -52,7 +51,6 @@ enum ThemeSkinPreviewAnchor: String, CaseIterable, Identifiable {
         switch self {
         case .topBar: return "顶部".appLocalized
         case .searchBar: return "搜索".appLocalized
-        case .tabBar: return "底栏".appLocalized
         case .statsCard: return "统计卡".appLocalized
         case .wardrobeCard: return "衣橱卡".appLocalized
         case .settingsGrid: return "豆腐块".appLocalized
@@ -71,7 +69,6 @@ enum ThemeSkinPreviewAnchor: String, CaseIterable, Identifiable {
         switch self {
         case .topBar: return .topBarMain
         case .searchBar: return .searchBar
-        case .tabBar: return .tabBarMain
         case .statsCard: return .statsCard
         case .wardrobeCard: return .wardrobeItemCard
         case .settingsGrid: return .settingsGridCard
@@ -86,14 +83,14 @@ enum ThemeSkinPreviewAnchor: String, CaseIterable, Identifiable {
         }
     }
 
-    nonisolated static func anchor(for slot: ThemeSkinSlot) -> ThemeSkinPreviewAnchor {
+    nonisolated static func anchor(for slot: ThemeSkinSlot) -> ThemeSkinPreviewAnchor? {
         switch slot {
         case .topBarMain, .topBarSegment, .topBarIconButton, .topBarAddButton:
             return .topBar
         case .searchBar:
             return .searchBar
         case .tabBarMain, .tabBarItem:
-            return .tabBar
+            return nil
         case .statsCard:
             return .statsCard
         case .wardrobeItemCard:

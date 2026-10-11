@@ -4,6 +4,8 @@
 > 范围：Pink_House iOS `ThemeSkin` 主题复刻、主题扩展与主题验收。
 > 目标：让后续主题接入从正式文档/工具、同一组 slot、同一条验收链路出发，避免素材/代码/验收各自发散；历史 `temp/_harness` 只作为待迁移参考。
 
+> 2026-10-11：底部导航统一使用系统 TabView；主题不再渲染 tabBarMain / tabBarItem，两项仅保留存档标识，不提供开关或素材接入。
+
 ## 1. Source of Truth
 
 - `docs/THEME_SKIN_REPLICATION_BEST_PRACTICES.md` 承接长期主题复刻规则；脚本、生成器和可执行清单应迁入 `tools/` 或正式 docs 后再删除 `temp`。
@@ -44,7 +46,7 @@ ruby tools/theme_skin/materialize_manual_image2_assets.rb --theme-id "$THEME_ID"
 
 ## 4. SwiftUI 接入原则
 
-- 首选复用现有主题容器：`HomeThemeSkin*`、`TabBarThemeSkin*`、`WardrobeTheme*`、`ThemeSkinSectionCardContainer`、`ThemeSkinPrimaryButtonStyle`、`ThemeSkinIconBadge`、`ThemeSkinEmptyStateSurface`。
+- 首选复用现有主题容器：`HomeThemeSkin*`、`WardrobeTheme*`、`ThemeSkinSectionCardContainer`、`ThemeSkinPrimaryButtonStyle`、`ThemeSkinIconBadge`、`ThemeSkinEmptyStateSurface`。
 - 主题激活时读取对应 slot descriptor；slot 关闭时必须回退默认皮肤。
 - 滚动热路径优先用程序化渐变/描边/低阴影，不在 cell 内加载大装饰 PNG、不加高成本动画、不引入 cell 级 `@ObservedObject` / `@StateObject`。
 - 衣橱商品卡、单行详细、单行简略统一使用 `.wardrobeItemCard`；不要为了 list row 新增 slot。

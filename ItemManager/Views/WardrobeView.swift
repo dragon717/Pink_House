@@ -529,8 +529,6 @@ struct WardrobeView: View {
     @Binding var searchText: String
     @Binding var isSelectionMode: Bool
     @Binding var isEditing: Bool
-    @Environment(\.customBottomFloatingLift) private var customBottomFloatingLift
-    @Environment(\.customBottomNavigationAvoidanceInset) private var customBottomNavigationAvoidanceInset
     @Environment(\.isRoutePageActive) private var isRoutePageActive
     @Environment(\.modelContext) private var modelContext
     @Environment(ThemeManager.self) private var themeManager
@@ -1021,19 +1019,8 @@ struct WardrobeView: View {
         content.safeAreaInset(edge: .bottom) {
             if isSelectionMode {
                 selectionModeBottomBar
-                    .padding(.bottom, selectionModeBottomBarBottomInset)
             }
         }
-    }
-
-    private var selectionModeBottomBarBottomInset: CGFloat {
-        let bottomNavigationInset = max(0, customBottomNavigationAvoidanceInset)
-        if bottomNavigationInset > 0 {
-            return bottomNavigationInset
-        }
-
-        let sharedLift = max(0, customBottomFloatingLift)
-        return sharedLift > 0 ? sharedLift + 12 : 0
     }
 
     private var selectionModeBottomBar: some View {
@@ -2476,8 +2463,7 @@ struct WardrobeView: View {
                 NotificationManager.shared.updateApplicationBadge(modelContext: modelContext)
                 NotificationCenter.default.post(name: .depositPlanDataDidChange, object: item.id)
                 Task { await SharedPersistence.shared.syncWidgetData(reason: "wardrobe-quick-final-payment-paid") }
-                RewardManager.shared.triggerReward(type: .payBalance)
-                ToastManager.shared.showSuccess("已标记为已付尾款".appLocalized)
+                WardrobeOperationFeedback.paidBalance(for: item, paymentID: result.paymentEntry.id)
             }
         } catch {
             print("WardrobeView: Failed to record final payment: \(error)")

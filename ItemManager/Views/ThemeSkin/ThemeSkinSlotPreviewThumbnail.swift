@@ -46,9 +46,9 @@ struct ThemeSkinSlotPreviewThumbnail: View {
         case .searchBar:
             miniSearchBar
         case .tabBarMain:
-            miniTabBar(showSelected: false)
+            systemNavigationThumbnail
         case .tabBarItem:
-            miniTabBar(showSelected: true)
+            systemNavigationThumbnail
         case .segmentedControl:
             miniSegmented
         case .filterChip:
@@ -126,20 +126,9 @@ struct ThemeSkinSlotPreviewThumbnail: View {
             .overlay(Circle().stroke(SkyConcertThemeSkin.shellStroke(for: descriptor).opacity(0.88), lineWidth: 1))
     }
 
-    private func miniTabBar(showSelected: Bool) -> some View {
-        optionalResizableAsset(showSelected ? ThemeSkinAssetName.tabBarItemSelected : ThemeSkinAssetName.tabBarMain) {
-            RoundedRectangle(cornerRadius: 11, style: .continuous).fill(themedGradient)
-        }
-        .frame(height: 18)
-        .overlay {
-            HStack(spacing: 3) {
-                ForEach(0..<3, id: \.self) { index in
-                    Circle()
-                        .fill(index == 1 || showSelected ? accentColor : labelColor.opacity(0.25))
-                        .frame(width: index == 1 || showSelected ? 5 : 4, height: index == 1 || showSelected ? 5 : 4)
-                }
-            }
-        }
+    private var systemNavigationThumbnail: some View {
+        Image(systemName: "rectangle.bottomthird.inset.filled")
+            .foregroundStyle(.secondary)
     }
 
     private var miniStatsCard: some View {

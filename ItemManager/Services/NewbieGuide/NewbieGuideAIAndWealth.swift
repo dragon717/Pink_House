@@ -23,14 +23,10 @@ extension FeatureExperienceGuideOverlay {
     func wealthStep1Content(in geometry: GeometryProxy) -> some View {
         let screenBounds = geometry.size
         let safeAreaBottom = geometry.safeAreaInsets.bottom
-        let safeAreaTop = geometry.safeAreaInsets.top
-        let isIPad = UIDevice.current.userInterfaceIdiom == .pad
         let houseSlotIndex = BottomDockSettingsManager.shared.houseSlotIndex ?? 1
-        let fallbackHouseTabFrame = SmallWorldMenuOverlay.buildFallbackFrame(
+        let fallbackHouseTabFrame = TabBarItemAnchorResolver.fallbackFrame(
             screenSize: screenBounds,
-            safeAreaTop: safeAreaTop,
             safeAreaBottom: safeAreaBottom,
-            isIPad: isIPad,
             houseSlotIndex: houseSlotIndex
         )
 

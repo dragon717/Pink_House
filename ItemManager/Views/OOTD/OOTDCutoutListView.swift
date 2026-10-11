@@ -43,9 +43,6 @@ struct OOTDCutoutListView: View {
     @State private var alertMessage = ""
     @State private var showAlert = false
     
-    // Toast State
-    @State private var showToast = false
-    @State private var toastMessage = ""
     
     // 完全隐藏状态
     @State private var isCompletelyHidden = false
@@ -487,13 +484,7 @@ struct OOTDCutoutListView: View {
             // 初始加载时更新显示项目（无动画）
             displayItems = cutouts
         }
-        .overlay(alignment: .bottom) {
-            if showToast {
-                toastView
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
-                    .zIndex(100)
-            }
-        }
+
     }
     
     private func menuForItem(_ item: CutoutItem) -> some View {
@@ -604,11 +595,7 @@ struct OOTDCutoutListView: View {
                 selectedItems.removeAll()
                 updateDisplayItems()
             }
-            toastMessage = "已删除 %d 个贴纸".appLocalized(itemsToDelete.count)
-            withAnimation { showToast = true }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-                withAnimation { showToast = false }
-            }
+            ToastManager.shared.showSuccess("已删除 %d 个贴纸".appLocalized(itemsToDelete.count))
         } catch {
             alertMessage = "批量删除失败，请稍后重试。".appLocalized
             showAlert = true
@@ -655,18 +642,7 @@ struct OOTDCutoutListView: View {
             // selectedItems.removeAll() // User requested to keep selection
         }
         
-        // Show Toast
-        toastMessage = "已添加 %d 个贴纸".appLocalized(itemsToAdd.count)
-        withAnimation {
-            showToast = true
-        }
-        
-        // Auto hide
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-            withAnimation {
-                showToast = false
-            }
-        }
+        ToastManager.shared.showSuccess("已添加 %d 个贴纸".appLocalized(itemsToAdd.count))
     }
     
     // MARK: - Drag Selection Logic
@@ -806,25 +782,7 @@ struct OOTDCutoutListView: View {
         }
     }
     
-    private var toastView: some View {
-        HStack(spacing: 12) {
-            Image(systemName: "checkmark")
-                .font(.system(size: 16, weight: .bold))
-                .foregroundColor(.white)
-            
-            Text(toastMessage)
-                .font(.system(size: 14, weight: .medium))
-                .foregroundColor(.white)
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
-        .background(
-            Capsule()
-                .fill(Color.black.opacity(0.8))
-                .shadow(color: .black.opacity(0.15), radius: 10, x: 0, y: 5)
-        )
-        .padding(.bottom, 60) // Lift up a bit
-    }
+
 }
 
 struct CutoutThumbnail: View {

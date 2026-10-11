@@ -466,6 +466,15 @@ class ImageManager {
             let results = try context.fetch(descriptor)
             
             if let existingImage = results.first {
+                // 元数据可随同步先到达，文件也可能已丢失；去重不能只认数据库里的哈希。
+                let existingURL = imagesDirectory.appendingPathComponent(existingImage.fileName)
+                let existingData = try? Data(contentsOf: existingURL, options: .mappedIfSafe)
+                if existingData.map({ computeHash(data: $0) == hash }) != true {
+                    try data.write(to: existingURL, options: .atomic)
+                    if isICloudAvailable {
+                        try? ensureFileUploadedToiCloud(fileURL: existingURL)
+                    }
+                }
                 // Already exists: Increment ref count
                 existingImage.refCount += 1
                 existingImage.updatedAt = Date()

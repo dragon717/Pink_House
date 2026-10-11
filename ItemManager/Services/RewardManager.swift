@@ -1,5 +1,5 @@
 
-import SwiftUI
+import Foundation
 import Combine
 
 enum RewardType {
@@ -27,86 +27,105 @@ enum RewardType {
     var message: String {
         switch self {
         case .addClothing:
-            return "添加新衣，鱼币 +\(rewardAmount)"
+            return "添加新衣"
         case .payBalance:
-            return "付完尾款啦！鱼币 +\(rewardAmount)"
+            return "付完尾款啦！"
         case .createOOTD(let count):
-            return count >= 2 ? "搭配完成！鱼币 +\(rewardAmount)" : "新建搭配，鱼币 +\(rewardAmount)"
+            return count >= 2 ? "搭配完成！" : "新建搭配"
         case .firstTimeFeature:
-            return "首次体验新功能，鱼币 +\(rewardAmount)"
+            return "首次体验新功能"
         case .custom(_, let msg):
             return msg
         }
     }
 }
 
-class RewardManager: ObservableObject {
+/// 奖励到账回执；展示层不能从 RewardType.rewardAmount 推测实际到账数量。
+struct FishCoinRewardReceipt: Equatable {
+    enum Status { case granted, limited, duplicate, unavailable, invalid }
+    let requestedAmount: Int
+    let actualAmount: Int
+    let status: Status
+    var isLimited: Bool { status == .limited }
+}
+
+@MainActor
+final class RewardManager: ObservableObject {
     static let shared = RewardManager()
-    
-    // 允许测试注入 UserDefaults
-    var defaults: UserDefaults = .standard
-    
-    private let statusKey = "PetStatus_Data"
-    
-    // 发布奖励事件，UI 监听此发布者来显示气泡
-    let rewardPublisher = PassthroughSubject<(Int, String), Never>()
-    
-    private init() {}
-    
-    func triggerReward(type: RewardType) {
-        // 1. 对于首次功能，检查是否已触发过
-        if case .firstTimeFeature(let featureName) = type {
-            let key = "hasTriggeredFirstTime_\(featureName)"
-            if defaults.bool(forKey: key) {
-                return // 已经触发过，不再奖励
-            }
-            defaults.set(true, forKey: key)
-        }
-        
-        let amount = type.rewardAmount
-        let message = type.message
-        
-        // 2. 增加鱼币
-        addFishCoin(amount: amount)
-        
-        // 3. 发送 UI 通知
-        DispatchQueue.main.async {
-            self.rewardPublisher.send((amount, message))
-        }
+    /// 独立实例允许测试注入，不改写 shared 或真实钱包。
+    let defaults: UserDefaults
+    private let usesPetDataManager: Bool
+
+    init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
+        usesPetDataManager = defaults === UserDefaults.standard
     }
-    
-    private func addFishCoin(amount: Int) {
-        // 读取 PetStatus
-        if let data = defaults.data(forKey: statusKey),
-           var status = try? JSONDecoder().decode(PetStatus.self, from: data) {
-            
-            // 每日上限检查
-            checkDailyReset(status: &status)
-            
-            let remainingQuota = PetStatus.dailyFishCoinLimit - status.dailyFishCoinEarned
-            let actualEarned = min(amount, remainingQuota)
-            
-            if actualEarned > 0 {
-                status.fishCoin += actualEarned
-                status.dailyFishCoinEarned += actualEarned
-                
-                // 保存
-                if let newData = try? JSONEncoder().encode(status) {
-                    defaults.set(newData, forKey: statusKey)
-                    
-                    // 通知 PetViewModel 刷新 (如果它在监听 UserDefaults 或者我们需要发送 Notification)
-                    // PetViewModel 似乎没有自动监听 UserDefaults，所以我们发送一个 Notification
-                    NotificationCenter.default.post(name: Notification.Name("PetStatusDidUpdateExternally"), object: nil)
-                }
-            }
+
+    @discardableResult
+    func grant(type: RewardType, operationID: String? = nil) -> FishCoinRewardReceipt {
+        let requested = type.rewardAmount
+        func receipt(_ amount: Int, _ status: FishCoinRewardReceipt.Status) -> FishCoinRewardReceipt {
+            FishCoinRewardReceipt(requestedAmount: requested, actualAmount: amount, status: status)
         }
-    }
-    
-    private func checkDailyReset(status: inout PetStatus) {
-        let calendar = Calendar.current
-        if !calendar.isDateInToday(status.lastDailyResetDate) {
+        guard requested > 0 else { return receipt(0, .invalid) }
+        var firstTimeKey: String?
+        var identity = operationID
+        if case .firstTimeFeature(let feature) = type {
+            firstTimeKey = "hasTriggeredFirstTime_\(feature)"
+            identity = "first-feature:\(feature)"
+            if defaults.bool(forKey: firstTimeKey!) { return receipt(0, .duplicate) }
+        }
+        var status: PetStatus
+        if usesPetDataManager {
+            // 使用内存中的最新状态，避免连续奖励读到尚未异步写盘的旧余额。
+            status = PetDataManager.shared.status
+        } else {
+            guard let data = defaults.data(forKey: "PetStatus_Data"),
+                  let decoded = try? JSONDecoder().decode(PetStatus.self, from: data) else {
+                return receipt(0, .unavailable)
+            }
+            status = decoded
+        }
+        if let identity, status.claimedOperationRewards.contains(identity) {
+            return receipt(0, .duplicate)
+        }
+        if !Calendar.current.isDateInToday(status.lastDailyResetDate) {
             status.dailyFishCoinEarned = 0
+            status.dailyBoneCoinEarned = 0
             status.lastDailyResetDate = Date()
         }
+        let quota = max(0, PetStatus.dailyFishCoinLimit - max(0, status.dailyFishCoinEarned))
+        let actual = min(requested, quota)
+        guard status.fishCoin <= Int.max - actual else { return receipt(0, .invalid) }
+        status.fishCoin += actual
+        status.dailyFishCoinEarned = max(0, status.dailyFishCoinEarned) + actual
+        // 已成功的业务操作即使触顶也消费幂等标识；首次体验则允许之后补领。
+        if let identity, firstTimeKey == nil || actual > 0 {
+            status.claimedOperationRewards.insert(identity)
+        }
+        if usesPetDataManager {
+            guard PetDataManager.shared.persistOperationReward(status) else {
+                return receipt(0, .unavailable)
+            }
+        } else {
+            guard let data = try? JSONEncoder().encode(status) else { return receipt(0, .unavailable) }
+            defaults.set(data, forKey: "PetStatus_Data")
+        }
+        if let firstTimeKey, actual > 0 { defaults.set(true, forKey: firstTimeKey) }
+        return receipt(actual, actual < requested ? .limited : .granted)
+    }
+
+    /// 旧功能入口也走统一展示，不再依赖视图生命周期中的 Publisher 订阅。
+    @discardableResult
+    func triggerReward(type: RewardType, operationID: String? = nil) -> FishCoinRewardReceipt {
+        let result = grant(type: type, operationID: operationID)
+        guard result.status != .duplicate, result.status != .invalid else { return result }
+        OperationFeedbackCenter.shared.show(type.message.appLocalized,
+            kind: result.status == .unavailable ? .warning : .success,
+            fishCoins: result.actualAmount,
+            detail: result.isLimited ? "已达到今日鱼币奖励上限".appLocalized
+                : result.status == .unavailable ? "奖励暂未到账".appLocalized : nil,
+            duration: 3)
+        return result
     }
 }

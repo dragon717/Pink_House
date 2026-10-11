@@ -470,58 +470,13 @@
   `年月（选填…）` 输入框就**合法隐藏**），写死会把它误判成「状态丢失」。
   验收命令与三个驱动侧坑见 `docs/表单状态丢失_根源修复说明.md` §6.4 / §6.6。
 
-## 界面遮挡与底部 Dock 避让（09-24 全量排查）
+## 界面遮挡与系统导航（2026-10-11 更新）
 
-**根因**：`MainTabView` 的底部导航 Dock（`customTabBar`）放在 body 的 `ZStack` 里叠在
-`contentView` **之上**，**不是系统 TabBar、不参与安全区计算**。所以「给 Dock 留底部空间」
-是每个可滚动页面自己的责任 —— 漏一个就有一个页面最后一行被吞。
-`BookHouseSmallWorldView` / `SmallWorldView` 是固定舞台，无滚动容器，天然不触底。
+09-24 自绘 Dock 的避让规则已废止。当前底栏为原生 TabView，主题不改底部导航；旧 72pt 高度、avoidingBottomDock 和避让环境键不得恢复。布局遵循系统安全区与窗口尺寸。
 
-**唯一口径**：`Views/Components/BottomDockAvoidance.swift` 的 `avoidingBottomDock()`。
-- 高度只有一处：`LegacyCustomTabBarLayout.floatingSurfaceBottomInset`
-  = 56(Dock 高) + **max(2, 4)**(贴底；**取的是 max，不是 WithSafeArea 的 2**) + 12(间隙) = **72**，
-  由 `MainTabView` 经 `\.customBottomNavigationAvoidanceInset` 下发。页面**不写数字**。
-  （曾把 72 误记成 70 —— 那种「差 2pt」的笔误会让净空算错，改这块务必回读 `MainTabView` 常量。）
-- **绝不再判断系统版本**。旧实现 `legacyCustomTabBarAvoidanceInset`（`AdaptiveSettingsView` 与
-  `WealthView` **各有一份**）在 iOS 26+ 直接 `return 0` → 全部设置页 + 安财页在新系统上
-  底部预留恒为 0。两份都已删除，回归锁 `ItemManagerTests/BottomDockAvoidanceTests` 扫源码树禁止复活。
-- 在 tab 之外（sheet / fullScreenCover）环境值退化为 0，误加无副作用。
-- **不要和自带贴底操作条叠加**（`ShopCatalogSeriesMenuView` 的 `safeAreaInset` 选择条）；
-  尾部已有 `padding(.bottom,N≥72)` 的页面（`WardrobeView` 100 / `DepositPlanView` 100 /
-  `ClothingDetailView` 80 / `ThemeSkinStoreView` 126）不要重复加。
-- **只用 `List`/`Form`/`ScrollView` 根容器**；`Group` 上挂会作用到每个 child（回收站 4 个 List 共用一处，
-  但书架 `bookGridContent` 的 Group **不能**挂 —— 正常态子视图 `BookGridView` 自带避让，会双倍）。
+衣橱详情和商品详情的信息卡片已经取消向上压图，按正常垂直间距排列；主图按实际窗口高度适配，轮播按稳定资产 ID 保持选中态。不能再把卡片覆盖主图解释为有意设计。
 
-**模态页一律不改**（浮在 Dock 之上）：`ShopCatalogSeriesMenuView`(sheet)、`MoneyCountingView`(fullScreenCover)、
-各种 `*Sheet` / `*Picker` / `Alert`。判断模板：**上溯它到底是被 push 还是被 modal 呈现**。
-
-**Dock 几何（实测）**：iPhone 18 Pro 屏高 874、底部安全区 34 → Dock 胶囊占 `[782, 838]`；
-避让 72 后内容底边落在 `768`，比 Dock 顶边高 **14pt**。截图判「有没有被吞」就量这两个数。
-落点基数：源码里 `.avoidingBottomDock()` 共 **35 处 / 28 个文件**（剥离注释后统计）。
-
-**同类但成因不同的第二类遮挡 —— 浮层与卡片顶边重叠**（商品详情轮播）：
-卡片靠 `.offset(y:)` 上提覆盖图片下沿是**有意设计**，但轮播里**底对齐**的浮层（颜色胶囊、分页胶囊）
-会落进同一条覆盖带。算法：`卡片顶边 = 轮播底边 − (上提量 − VStack 间距)`，
-浮层底部留白必须 > 这个值 + 视觉间隙。几何常量收口在 `ShopCatalogProductView`
-（`cardLiftOverCarousel` / `cardStackSpacing` / `carouselOverlayBottomInset`），
-两个浮层**必须共用同一个底部留白**（原来一个 0、一个 12，本身就没对齐）。
-
-**验收要点**：这类问题的主观感是「元素被吞」，单测覆盖不到 —— 必须模拟器真交互 + 截图量几何。
-Bundle 种子已空壳，验收前把 `ShopCatalogSeedFixture.jsonString`（+ 补足数量让列表溢出屏幕）
-**注入构建产物**的 `shop-catalog.json`（改产物、不改仓库资源），再 `build-for-testing` →
-注入 → `test-without-building`（顺序不能反，重新构建会把种子覆盖回去）。
-
-**⚠️ 本机内存是硬约束（09-24 实测卡了一整天）**：`sysctl vm.swapusage` 总 7G，常年已用 6G+。
-- `xcodebuild test`（**不是** `test-without-building`）会跑 `PruneExplicitPrecompiledModules`，
-  把显式模块缓存清掉 → 触发**整模块全量重编**（441 个 Swift 文件一次 `SwiftEmitModule`），
-  单进程要几 G → swap 打满 → **静默卡死**（日志停在 `SwiftEmitModule`、产物目录也不再变动，
-  但进程还在，看起来像「慢」）。判据：`wc -c <log>` 与 `find build/DerivedData -newermt`
-  **双双静止 5 分钟以上**才算挂；只看时间长短会误杀。
-- 省内存顺序：**先只跑 `build-for-testing`（且先 `xcrun simctl shutdown all`，模拟器自身吃 2–4G）
-  → 编完再启模拟器 → 再 `test-without-building`**。模拟器与编译器同时在场是最容易崩的组合。
-- 别在编译期间改源码（构建产物与源码就不一致了）；只改**注释**不影响行为，但仍要留意。
-- 长任务必须交由工具的后台机制托管；`nohup … &` 在本环境会随命令结束被回收（日志 0 字节、
-  进程消失，看起来像「构建秒退」）。
+正式实现与验收见 `docs/界面元素遮挡全量排查与修复_需求实现说明.md`、`docs/SWIFTUI_OFFICIAL_UPDATE_2026-10-11.md`。操作结果气泡统一遵循 `docs/OPERATION_FEEDBACK_AND_FISH_COIN_GUIDE.md`。
 
 ## 零散易踩清单（09-27 从 `MEMORY.md` 迁入，细节层）
 
@@ -1149,3 +1104,18 @@ App 侧真实发布最后一次是 **09-29 02:23**，死在这里：
   `权限违例 (-10004)`；`screencapture` 也没有屏幕录制授权。要「自己操控电脑测试」
   只能走上面三个文件触发的 harness。受限 shell 里 `ps` 也被拒
   （`operation not permitted`），用 `pgrep -fl` 代替。
+
+## 操作反馈与鱼币统一规则（2026-10-11）
+
+- 唯一指南：`docs/OPERATION_FEEDBACK_AND_FISH_COIN_GUIDE.md`；执行与验收：`docs/OPERATION_FEEDBACK_AND_FISH_COIN_EXEC_PLAN.md`。
+- 保存业务/图片成功后，先完成相关系统收尾，再显示一次成功结果。失败、取消、复制不自动发鱼币。
+- 普通反馈统一 `OperationFeedbackCenter`；Toast/Copy 为适配入口；禁止另建局部气泡和隐藏计时器。
+- 时光馆用户确认入橱唯一入口 `ShopCatalogWardrobeAddition.add/addSet`，自动合并成功与实际到账鱼币；纯导入/恢复仍用 Inserter，不发奖励。
+- 奖励只展示 `FishCoinRewardReceipt.actualAmount`，按稳定衣物/支付流水 ID 防重。奖励余额、日计数、防重集合与钱包同快照保存；不改充值喵币。
+- 解锁/任务交互、系统确认弹窗、萌宠动作动画遵循指南的职责矩阵，不能靠弹窗显示来判定业务完成或再次发奖。
+
+2026-10-11 默认规则补充：入橱主衣物默认入选、小物主动勾选；运营新录入币种默认 CNY。具体实现、历史币种边界与回归命令见 `docs/SHOP_CATALOG_ENTRY_DEFAULTS_2026-10-11.md`。
+
+2026-10-11 用户截图确认：入橱方式只保留确认页内单选，点击确认直接按已选方式保存，删除右侧重复选择弹窗及其状态/分支；取代 2026-09-27 二次弹窗旧要求。成功后仍统一提示与发放实际到账鱼币。
+
+2026-10-11 用户明确确认：运营已上传商品的未明确币种全部补为人民币，不能仅修改新录入默认值。Development 存量已修复发布 seq 21：26 件商品、38 条销售记录及 3 份价格修正；明确币种与金额保持原值。正式规则与证据：`docs/SHOP_CATALOG_OPERATOR_CURRENCY_REPAIR_2026-10-11.md`。

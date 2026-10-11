@@ -59,8 +59,6 @@ struct BrandManagementView: View {
             }
         }
         .scrollContentBackground(.hidden)
-        // 底部悬浮 Dock 避让：品牌列表最后一条会被 Dock 盖住。
-        .avoidingBottomDock()
         .background {
             LiquidBackground()
         }
@@ -211,8 +209,6 @@ struct TagModelManagementView: View {
             }
         }
         .scrollContentBackground(.hidden)
-        // 底部悬浮 Dock 避让：标签列表最后一条会被 Dock 盖住。
-        .avoidingBottomDock()
         .background {
             LiquidBackground()
         }

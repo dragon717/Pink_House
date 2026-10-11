@@ -23,10 +23,13 @@
 
 ## Xcode 27 beta / SDK 27
 
+- 当前本机核验（2026-10-11）：`/Applications/Xcode.app` 为 Xcode 27.0 正式版 build `27A266a`，本期构建与官方技能导出使用 `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer`。下面 beta 条目仅为历史记录；先核验实际安装，再选择路径。
+
 - 使用 Xcode beta 时默认显式设置 `DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer`，不要为单次构建改全局 `xcode-select`。
 - 本机核验时间：2026-06-24。`/Applications/Xcode-beta.app` 为 Xcode 27.0 build `27A5194q`，带 iOS/iPhoneSimulator 27.0 SDK 与 Swift 6.4；当时已安装模拟器 runtime 只有 iOS 17.5 / 18.2 / 18.6 / 26.4 / 26.5，未安装 iOS 27 runtime。
 - Apple 官方 Xcode agent skills 用 Xcode 导出，不把导出副本当长期 source of truth：`DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer xcrun agent skills export --output-dir <dir> --replace-existing`。
-- Xcode 27 导出的官方 skills 包括：`swiftui-whats-new-27`、`swiftui-specialist`、`uikit-app-modernization`、`test-modernizer`、`device-interaction`、`audit-xcode-security-settings`、`c-bounds-safety`。
+- 2026-06-24 beta 导出的官方 skills 包括：`swiftui-whats-new-27`、`swiftui-specialist`、`uikit-app-modernization`、`test-modernizer`、`device-interaction`、`audit-xcode-security-settings`、`c-bounds-safety`。
+- 当前正式版还导出 `modernize-tests`、`adopt-c-bounds-safety`、`building-document-based-swiftui-applications`、`app-intents-specialist` 和 `app-intents-whats-new-27`；以本机每次导出的目录为准。
 - SDK 27 SwiftUI 变更优先查 `swiftui-whats-new-27` / `swiftui-specialist`：尤其是 `@State` macro、`ContentBuilder`、reorderable、AsyncImage 缓存、toolbar、item-binding alert/dialog、swipe actions、Document API。
 - iOS 27 UIKit 适配优先查 `uikit-app-modernization`：不要用 `UIScreen.main`、interface orientation、user interface idiom 做布局依据；优先 scene/window、trait collection、size class、view bounds；用最新 SDK 构建时检查 scene lifecycle。
 
@@ -121,10 +124,11 @@ Codex prompt 顶端写 `THEME_ID = <value>`，再按历史 `EXEC_PLAN.md` / `ACC
 - `ThemeSkinManager` 存档 key 不改（`theme_skin.owned` / `theme_skin.active_selection`）
 - 旧下线主题商品静态定义不改（历史归档兼容），但不要重新注册到商店列表
 - 素材必须进 `Assets.xcassets/ThemeSkin/<namespace>/`，不走 Bundle 文件路径
-- 三件套 Components（Home/TabBar/Wardrobe）的程序化绘制兜底**保留**，图缺失也得能跑
+- Home / Wardrobe Components 的程序化绘制兜底**保留**，图缺失也得能跑。
+- 底部导航统一使用系统 `TabView`，主题不修改其外观；不恢复自绘 TabBar、异形 shape、固定高度避让或 UIKit 私有 platter 探测。
 - 主题未启用时，禁止任何主题装饰泄漏到默认皮肤
 - 不允许跨主题混搭组件（`ThemeSkinManager` 已强制；UI 层别绕过）
-- slot 列表所有主题统一 18 个，禁止增减
+- slot 列表所有主题统一 18 个，禁止增减；`tabBarMain` / `tabBarItem` 只保留历史存档标识，不渲染或提供开关。
 
 ## Git / 分支
 
@@ -171,3 +175,20 @@ xcrun simctl launch booted "$BUNDLE_ID"
 - PSD 图层导出全空 → `psd-tools` 默认只导可见层，先 `layer.visible = True`
 - iCloud 同步锁文件 → `find "$PROJ" -name "*.icloud"` 或 `brctl download "$PROJ"`
 - 模拟器键盘不响应 → 模拟器是 click 层，输入用 `xcrun simctl io booted setText`
+
+## 操作反馈与鱼币统一规则（2026-10-11）
+
+- 唯一指南：`docs/OPERATION_FEEDBACK_AND_FISH_COIN_GUIDE.md`；执行与验收：`docs/OPERATION_FEEDBACK_AND_FISH_COIN_EXEC_PLAN.md`。
+- 保存业务/图片成功后，先完成相关系统收尾，再显示一次成功结果。失败、取消、复制不自动发鱼币。
+- 普通反馈统一 `OperationFeedbackCenter`；Toast/Copy 为适配入口；禁止另建局部气泡和隐藏计时器。
+- 时光馆用户确认入橱唯一入口 `ShopCatalogWardrobeAddition.add/addSet`，自动合并成功与实际到账鱼币；纯导入/恢复仍用 Inserter，不发奖励。
+- 奖励只展示 `FishCoinRewardReceipt.actualAmount`，按稳定衣物/支付流水 ID 防重。奖励余额、日计数、防重集合与钱包同快照保存；不改充值喵币。
+- 解锁/任务交互、系统确认弹窗、萌宠动作动画遵循指南的职责矩阵，不能靠弹窗显示来判定业务完成或再次发奖。
+
+## 时光馆入橱与运营默认值（2026-10-11）
+
+入橱默认主衣物，小物由用户主动勾选；重复出现不得重置用户取消结果。运营新草稿/新价格录入默认人民币（CNY），保留明确币种与历史来源。正式规则与验证见 `docs/SHOP_CATALOG_ENTRY_DEFAULTS_2026-10-11.md`。
+
+2026-10-11 用户截图确认：入橱方式只保留确认页内单选，点击确认直接按已选方式保存，删除右侧重复选择弹窗及其状态/分支；取代 2026-09-27 二次弹窗旧要求。成功后仍统一提示与发放实际到账鱼币。
+
+2026-10-11 用户明确确认：运营已上传商品的未明确币种全部补为人民币，不能仅修改新录入默认值。Development 存量已修复发布 seq 21：26 件商品、38 条销售记录及 3 份价格修正；明确币种与金额保持原值。正式规则与证据：`docs/SHOP_CATALOG_OPERATOR_CURRENCY_REPAIR_2026-10-11.md`。

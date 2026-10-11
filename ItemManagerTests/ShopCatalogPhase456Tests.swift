@@ -39,8 +39,7 @@ final class ShopCatalogPhase456Tests: XCTestCase {
     func testStockDraftIsOwned() throws {
         let draft = try XCTUnwrap(ShopCatalogWardrobeDraftBuilder.makeDraft(
             selection: .init(productID: "prod-ag-xueguo-jsk", color: "夜空蓝", size: "M", priceMode: .stock),
-            store: store, modelContext: modelContext()
-        ))
+            store: store))
         XCTAssertFalse(draft.isDepositPlan)
         XCTAssertEqual(draft.priceTotal, 568)
         XCTAssertEqual(draft.deposit, 0)
@@ -54,8 +53,7 @@ final class ShopCatalogPhase456Tests: XCTestCase {
         // 预约 ¥428 = 定金 128 + 尾款 300（§17：待付尾款自动计算）
         let draft = try XCTUnwrap(ShopCatalogWardrobeDraftBuilder.makeDraft(
             selection: .init(productID: "prod-ag-xueguo-jsk", priceMode: .reservation(depositPaid: 128)),
-            store: store, modelContext: modelContext()
-        ))
+            store: store))
         XCTAssertTrue(draft.isDepositPlan)
         XCTAssertEqual(draft.priceTotal, 428)
         XCTAssertEqual(draft.deposit, 128)
@@ -72,8 +70,7 @@ final class ShopCatalogPhase456Tests: XCTestCase {
         // 价格口径 = 当前可获得价：现货价优先（568），无现货回退预约价。
         let draft = try XCTUnwrap(ShopCatalogWardrobeDraftBuilder.makeDraft(
             selection: .init(productID: "prod-ag-xueguo-jsk", priceMode: .wishlist),
-            store: store, modelContext: modelContext()
-        ))
+            store: store))
         XCTAssertTrue(draft.isDepositPlan)
         XCTAssertEqual(draft.deposit, 0)
         XCTAssertEqual(draft.balance, 568)
@@ -93,8 +90,7 @@ final class ShopCatalogPhase456Tests: XCTestCase {
             accessoryProductIDs: [
                 "prod-ag-xueguo-kc", "prod-ag-xueguo-armwarmer", "prod-ag-xueguo-bag",
             ],
-            store: store, modelContext: modelContext()
-        )
+            store: store)
         // 只有一件主衣物 → 仅一条记录
         XCTAssertEqual(results.count, 1)
         let draft = results[0].draft
@@ -117,8 +113,7 @@ final class ShopCatalogPhase456Tests: XCTestCase {
                 .init(productID: "prod-unniq-yunduo-op", priceMode: .stock),
             ],
             accessoryProductIDs: [],
-            store: store, modelContext: modelContext()
-        )
+            store: store)
         XCTAssertEqual(results.count, 2)
         XCTAssertEqual(results[0].draft.types, "JSK")
         XCTAssertEqual(results[1].draft.types, "OP")
@@ -132,8 +127,7 @@ final class ShopCatalogPhase456Tests: XCTestCase {
                 .init(productID: "prod-unniq-yunduo-op", priceMode: .stock),
             ],
             accessoryProductIDs: ["prod-unniq-yunduo-op"],
-            store: store, modelContext: modelContext()
-        )) { error in
+            store: store)) { error in
             guard case ShopCatalogWardrobeError.primaryMarkedAsAccessory = error else {
                 return XCTFail("应抛 primaryMarkedAsAccessory，实际：\(error)")
             }
@@ -146,7 +140,7 @@ final class ShopCatalogPhase456Tests: XCTestCase {
         let context = modelContext()
         let draft = try XCTUnwrap(ShopCatalogWardrobeDraftBuilder.makeDraft(
             selection: .init(productID: "prod-ag-xueguo-jsk", color: "夜空蓝", size: "M", priceMode: .stock),
-            store: store, modelContext: context
+            store: store
         ))
         let clothing = try ShopCatalogWardrobeInserter.insert(
             draft: draft,

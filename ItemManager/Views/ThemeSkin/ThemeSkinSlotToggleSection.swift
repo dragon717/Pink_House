@@ -39,13 +39,6 @@ struct ThemeSkinSlotToggleSection: View {
             slots: [.topBarMain, .topBarSegment, .topBarIconButton, .topBarAddButton, .searchBar]
         ),
         SlotGroup(
-            id: "tabbar",
-            title: "底部导航",
-            subtitle: "底栏容器、Tab 项与异形轮廓",
-            icon: "rectangle.bottomthird.inset.filled",
-            slots: [.tabBarMain, .tabBarItem]
-        ),
-        SlotGroup(
             id: "cards",
             title: "卡片与列表",
             subtitle: "详情页、我界面、手帐与书页列表的核心卡片",

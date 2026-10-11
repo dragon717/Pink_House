@@ -692,6 +692,8 @@ struct PetStatus: Codable {
     var boneCoin: Int = 0 // 骨头币 (狗专用基础货币)
 
     // 每日限制
+    /// 与余额同一快照持久化，防止成功回调重放重复发奖。
+    var claimedOperationRewards: Set<String> = []
     var dailyFishCoinEarned: Int = 0
     var dailyBoneCoinEarned: Int = 0
     var lastDailyResetDate: Date = Date()
@@ -731,7 +733,7 @@ struct PetStatus: Codable {
         case petName, petNames, selectedPetId, ownedPetIds
         case hunger, hygiene, energy, mood, intimacy, lastUpdateTime
         case meowCoin, fishCoin, boneCoin
-        case dailyFishCoinEarned, dailyBoneCoinEarned, lastDailyResetDate
+        case dailyFishCoinEarned, dailyBoneCoinEarned, lastDailyResetDate, claimedOperationRewards
         case inventory
         case currentJob, jobStartTime, currentJobEarnedFishCoin
         case currentJobEarnedAmount, currentJobRewardCurrency, currentJobStartedAutomatically
@@ -755,6 +757,7 @@ struct PetStatus: Codable {
         meowCoin = try container.decodeIfPresent(Int.self, forKey: .meowCoin) ?? 0
         fishCoin = try container.decodeIfPresent(Int.self, forKey: .fishCoin) ?? 1000
         boneCoin = try container.decodeIfPresent(Int.self, forKey: .boneCoin) ?? 0
+        claimedOperationRewards = try container.decodeIfPresent(Set<String>.self, forKey: .claimedOperationRewards) ?? []
         dailyFishCoinEarned = try container.decodeIfPresent(Int.self, forKey: .dailyFishCoinEarned) ?? 0
         dailyBoneCoinEarned = try container.decodeIfPresent(Int.self, forKey: .dailyBoneCoinEarned) ?? 0
         lastDailyResetDate = try container.decodeIfPresent(Date.self, forKey: .lastDailyResetDate) ?? Date()
@@ -815,6 +818,7 @@ struct PetStatus: Codable {
         try container.encode(meowCoin, forKey: .meowCoin)
         try container.encode(fishCoin, forKey: .fishCoin)
         try container.encode(boneCoin, forKey: .boneCoin)
+        try container.encode(claimedOperationRewards, forKey: .claimedOperationRewards)
         try container.encode(dailyFishCoinEarned, forKey: .dailyFishCoinEarned)
         try container.encode(dailyBoneCoinEarned, forKey: .dailyBoneCoinEarned)
         try container.encode(lastDailyResetDate, forKey: .lastDailyResetDate)

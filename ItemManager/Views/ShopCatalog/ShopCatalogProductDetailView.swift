@@ -43,6 +43,7 @@ struct ShopCatalogProductView: View {
     @State private var viewerIndex = 0
     @State private var showsViewer = false
     @State private var showsMergeSheet = false
+    @State private var isSavingToWardrobe = false
     /// 价格表卡片展开状态（Request 14：默认收起，点击展开查看表格 + 原图）
     @State private var isPriceChartExpanded = false
     /// 尺码表**原图**展开状态（Request D：默认收起，仅留一个入口；点开看完整原图，
@@ -54,61 +55,49 @@ struct ShopCatalogProductView: View {
     private var series: CatalogSeries? { product.map { store.series(id: $0.seriesID) } ?? nil }
     private var shop: CatalogShop? { series.map { store.shop(id: $0.shopID) } ?? nil }
 
-    // MARK: 轮播 / 卡片的重叠几何（唯一口径）
-    //
-    //  详情页的视觉设计是「卡片压住图片下沿」：轮播之后的每张卡片都靠 `.offset(y:)`
-    //  整体上提，于是卡片顶边落在轮播底边**之上**。轮播底部那两个悬浮标注
-    //  （颜色胶囊、分页胶囊）也是底对齐的 —— 如果不把它们抬到卡片顶边之上，
-    //  就会被半埋进卡片顶边、并压住标题首行（2026-09-24 截图标注的遮挡问题）。
-    //
-    //  卡片顶边相对轮播底边的位置 = 上提量 − 卡片间距，所以标注的留白必须大于它。
-
-    /// 卡片相对轮播的上提量（`.offset(y:)`），5 张卡片统一使用。
-    private static let cardLiftOverCarousel: CGFloat = 36
-    /// 轮播与卡片之间的 VStack 间距。
+    // 图片和信息卡按正常布局顺序排列，不用负 offset 覆盖图片下沿。
     private static let cardStackSpacing: CGFloat = 16
-    /// 轮播底部悬浮标注（颜色胶囊 / 分页胶囊）距轮播底边的留白：
-    /// 上提量 − 间距 + 12 视觉间隙，保证标注整体落在图片区内、不碰卡片顶边与标题。
-    private static var carouselOverlayBottomInset: CGFloat {
-        cardLiftOverCarousel - cardStackSpacing + 12
-    }
-
-    /// 图集引用：product.images 存的是 CatalogAsset id，经 originalURL 解析
-    private var imageReferences: [String] {
-        guard let product else { return [] }
-        return product.images.map { store.asset(id: $0)?.originalURL ?? $0 }
-    }
 
     var body: some View {
-        ZStack {
-            LiquidBackground(themeSkinWallpaperContext: .timeHall)
-                .ignoresSafeArea()
+        GeometryReader { geometry in
+            ZStack {
+                LiquidBackground(themeSkinWallpaperContext: .timeHall)
+                    .ignoresSafeArea()
 
-            ScrollView(.vertical, showsIndicators: false) {
-                VStack(spacing: Self.cardStackSpacing) {
-                    carousel
-                    mainInfoCard
-                        .padding(.horizontal)
-                        .offset(y: -Self.cardLiftOverCarousel)
-                    sizeChartCard
-                        .padding(.horizontal)
-                        .offset(y: -Self.cardLiftOverCarousel)
-                    seriesPriceChartCard
-                        .padding(.horizontal)
-                        .offset(y: -Self.cardLiftOverCarousel)
-                    priceArchiveCard
-                        .padding(.horizontal)
-                        .offset(y: -Self.cardLiftOverCarousel)
-                    actionSection
-                        .padding(.horizontal)
-                        .offset(y: -Self.cardLiftOverCarousel)
-                    Color.clear.frame(height: 24)
+                ScrollView(.vertical, showsIndicators: false) {
+                    VStack(spacing: Self.cardStackSpacing) {
+                        ShopCatalogProductGallery(
+                            slides: carouselSlides,
+                            height: DetailImageLayout.height(in: geometry.size)
+                        ) { references, index in
+                            viewerReferences = references
+                            viewerIndex = index
+                            showsViewer = true
+                        }
+                        ShopCatalogProductInfoCard(
+                            title: productTitle, name: product?.name ?? "",
+                            shopName: shop?.name, yearMonth: series?.yearMonthText,
+                            season: series?.season, category: product?.category,
+                            colors: colors, sizes: sizes,
+                            fabric: styleFabric, description: styleDescription)
+                            .padding(.horizontal)
+                        sizeChartCard
+                            .padding(.horizontal)
+                        seriesPriceChartCard
+                            .padding(.horizontal)
+                        priceArchiveCard
+                            .padding(.horizontal)
+                        actionSection
+                            .padding(.horizontal)
+                            .disabled(isSavingToWardrobe)
+                        if isSavingToWardrobe {
+                            ProgressView("正在保存图片…".appLocalized)
+                        }
+                        Color.clear.frame(height: 24)
+                    }
                 }
+                .ignoresSafeArea(edges: .top)
             }
-            // 底部悬浮 Dock 避让：本页从「时光馆 → 店家上新」是 push（会看到 Dock），
-            // 底部操作区「加入衣橱」会被 Dock 盖住；从系列菜单 sheet 进入时环境值为 0，自动无副作用。
-            .avoidingBottomDock()
-            .ignoresSafeArea(edges: .top)
         }
         .navigationTitle("商品详情")
         .navigationBarTitleDisplayMode(.inline)
@@ -122,18 +111,6 @@ struct ShopCatalogProductView: View {
     }
 
     // MARK: 图集（§14，同现有详情页轮播样式）
-
-    @State private var carouselIndex = 0
-
-    /// 轮播 slide（V1.4 同款不同色）：本商品图片在前（进入详情默认展示当前所选
-    /// 颜色的主图），之后追加同款其他颜色商品的主图——左右滑动即可在多个
-    /// 颜色图片之间切换预览；slide 带颜色标注。
-    private struct CarouselSlide: Equatable {
-        let ref: String
-        /// 远端媒体 canonical 键（`CatalogAsset.mediaKey`）；nil = 走 ref 的旧解析
-        let mediaKey: String?
-        let colorLabel: String?
-    }
 
     /// 同款其他颜色商品（同系列 + 同品类 + 同款式名 + 未归档）。
     /// 标题的「· N 色」、配色行、轮播的「其它颜色主图」都取这一份 —— 三个数字不可能对不上。
@@ -153,11 +130,12 @@ struct ShopCatalogProductView: View {
         return ShopCatalogTitleResolver.title(product: product, siblings: sameDesignSiblings)
     }
 
-    private var carouselSlides: [CarouselSlide] {
+    private var carouselSlides: [ShopCatalogCarouselSlide] {
         guard let product else { return [] }
-        var slides = product.images.map { imageID in
+        var seenImageIDs = Set<String>()
+        var slides = product.images.filter { seenImageIDs.insert($0).inserted }.map { imageID in
             let asset = store.asset(id: imageID)
-            return CarouselSlide(ref: asset?.originalURL ?? imageID,
+            return ShopCatalogCarouselSlide(id: imageID, ref: asset?.originalURL ?? imageID,
                                  mediaKey: asset?.mediaKey,
                                  colorLabel: ownColorLabel)
         }
@@ -165,9 +143,10 @@ struct ShopCatalogProductView: View {
             guard let first = sibling.images.first else { continue }
             let siblingAsset = store.asset(id: first)
             let ref = siblingAsset?.originalURL ?? first
-            guard !slides.contains(where: { $0.ref == ref }) else { continue }
-            slides.append(CarouselSlide(
-                ref: ref,
+            guard seenImageIDs.insert(first).inserted,
+                  !slides.contains(where: { $0.ref == ref }) else { continue }
+            slides.append(ShopCatalogCarouselSlide(
+                id: first, ref: ref,
                 mediaKey: siblingAsset?.mediaKey,
                 colorLabel: ShopCatalogColorPresentation.label(
                     explicitColors: store.colors(forProduct: sibling.id),
@@ -183,132 +162,6 @@ struct ShopCatalogProductView: View {
         return ShopCatalogColorPresentation.label(
             explicitColors: store.colors(forProduct: product.id),
             name: product.name)
-    }
-
-    private var carousel: some View {
-        ZStack(alignment: .bottom) {
-            if carouselSlides.isEmpty {
-                Rectangle()
-                    .fill(Color.gray.opacity(0.2))
-                    .overlay {
-                        Image(systemName: "tshirt")
-                            .font(.system(size: 60))
-                            .foregroundStyle(.pink.opacity(0.3))
-                    }
-                    .frame(height: 400)
-            } else {
-                TabView(selection: $carouselIndex) {
-                    ForEach(Array(carouselSlides.enumerated()), id: \.offset) { index, slide in
-                        ShopCatalogAssetImage(reference: slide.ref, mediaKey: slide.mediaKey)
-                            .frame(height: 400)
-                            .clipped()
-                            .tag(index)
-                            .onTapGesture {
-                                viewerReferences = carouselSlides.map(\.ref)
-                                viewerIndex = carouselIndex
-                                showsViewer = true
-                            }
-                    }
-                }
-                .tabViewStyle(PageTabViewStyle(indexDisplayMode: .never))
-                .frame(height: 400)
-
-                // 颜色标注：当前 slide 对应的颜色（同款不同色滑动切换时的定位提示）
-                // 与分页胶囊共用同一条底边留白，否则两者会各自半埋进卡片顶边。
-                if let colorLabel = carouselSlides.indices.contains(carouselIndex)
-                    ? carouselSlides[carouselIndex].colorLabel : nil {
-                    HStack {
-                        Text(colorLabel.appLocalized)
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundStyle(.white)
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 4)
-                            .background(Capsule().fill(Color.black.opacity(0.45)))
-                            .padding(.leading, 12)
-                        Spacer()
-                    }
-                    .padding(.bottom, Self.carouselOverlayBottomInset)
-                }
-
-                HStack(spacing: 4) {
-                    Text("\(min(carouselIndex + 1, carouselSlides.count))")
-                    Text("/")
-                    Text("\(carouselSlides.count)")
-                }
-                .font(.caption2)
-                .foregroundStyle(.white)
-                .themeSkinLegibleText(level: .badge, slot: .sectionCard)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
-                .background(Capsule().fill(Color.black.opacity(0.5)))
-                .padding(.bottom, Self.carouselOverlayBottomInset)
-            }
-        }
-    }
-
-    // MARK: 主信息卡（参考图5：名称 / 店家·年份 / 配色 / 尺码）
-
-    private var mainInfoCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            // 标题 = 款式名（与点菜页卡片、商品管理款式组同一口径）；
-            // 颜色只在下方「配色」行与轮播颜色胶囊里单独呈现。
-            if let productTitle {
-                ShopCatalogProductTitleLabel(
-                    title: productTitle,
-                    font: .title2.bold(),
-                    textColor: themeManager.primaryTextColor,
-                    annotationColor: themeManager.tertiaryTextColor,
-                    lineLimit: nil)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            } else {
-                Text(product?.name ?? "")
-                    .font(.title2.bold())
-                    .foregroundStyle(themeManager.primaryTextColor)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            }
-
-            HStack(spacing: 6) {
-                if let shop { Text(shop.name) }
-                if let yearMonth = series?.yearMonthText { Text("· \(yearMonth)") }
-                if let season = series?.season, !season.isEmpty { Text("· \(season)") }
-                if let category = product?.category { Text("· \(category)") }
-            }
-            .font(.caption)
-            .foregroundStyle(themeManager.secondaryTextColor)
-
-            Divider().background(themeManager.tertiaryTextColor.opacity(0.3))
-
-            if !colors.isEmpty {
-                specRow(label: "配色", values: colors)
-            }
-            if !sizes.isEmpty {
-                specRow(label: "尺码", values: sizes)
-            }
-            // 面料 / 款式描述：**款式级公共属性**（2026-09-23 录入端重构）——
-            // 读的是款式档案，同款各颜色显示同一份；不再是「每个颜色各存一份描述」。
-            // 款式描述对旧数据回退 `product.description`（重构前描述写在商品上）。
-            if let fabric = styleFabric {
-                specRow(label: "面料", values: [fabric])
-            }
-            if let desc = styleDescription, !desc.isEmpty {
-                Text(desc)
-                    .font(.system(size: 13))
-                    .foregroundStyle(themeManager.secondaryTextColor)
-            }
-        }
-        .padding(16)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .themeSkinSectionCard(cornerRadius: 16)
-    }
-
-    @ViewBuilder
-    private func specRow(label: String, values: [String]) -> some View {
-        HStack(alignment: .top, spacing: 10) {
-            Text(label.appLocalized)
-                .font(.caption)
-                .foregroundStyle(themeManager.secondaryTextColor)
-            ShopCatalogFlowChips(values: values)
-        }
     }
 
     /// 「配色」行 = **同款全部颜色**（本商品在前，同款其他颜色商品依次追加）。
@@ -797,7 +650,6 @@ struct ShopCatalogProductView: View {
     @State private var entryOption: ShopCatalogWardrobeEntryOption = .depositPaid
     /// 弹窗是否显示「加入方式」选择段（2026-09-24：预约中 / 预约已结束统一入口）
     @State private var showsEntryChoice = false
-    @State private var actionToast: String?
 
     /// 打开加购确认页（金额一律由系统从后台档案读取，用户不填写）
     ///
@@ -988,21 +840,7 @@ struct ShopCatalogProductView: View {
                                             showsEntryChoice: showsEntryChoice,
                                             phase: product.map { purchasePhase(for: $0.id) } ?? .neutral)
             }
-            .overlay(alignment: .bottom) {
-                if let actionToast {
-                    Text(actionToast)
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 8)
-                        .background(Capsule().fill(Color.black.opacity(0.75)))
-                        .padding(.bottom, 12)
-                        .task {
-                            try? await Task.sleep(nanoseconds: 1_600_000_000)
-                            await MainActor.run { self.actionToast = nil }
-                        }
-                }
-            }
+
         }
     }
 
@@ -1123,30 +961,38 @@ struct ShopCatalogProductView: View {
     }
 
     private func showActionToast(_ text: String) {
-        actionToast = text
+        ToastManager.shared.show(message: text.appLocalized)
     }
 
     private func addToWishlist(reminder: Bool) {
+        guard !isSavingToWardrobe else { return }
+        isSavingToWardrobe = true
+        Task { @MainActor in
+            defer { isSavingToWardrobe = false }
+            await performAddToWishlist(reminder: reminder)
+        }
+    }
+
+    private func performAddToWishlist(reminder: Bool) async {
         guard let draft = ShopCatalogWardrobeDraftBuilder.makeDraft(
             selection: .init(productID: productID, priceMode: .wishlist),
-            store: store, modelContext: modelContext
+            store: store
         ) else {
-            showActionToast("加入心愿失败：商品暂无价格档案")
+            ToastManager.shared.showError("加入心愿失败：商品暂无价格档案".appLocalized)
             return
         }
         do {
-            _ = try ShopCatalogWardrobeInserter.insert(
+            _ = try await ShopCatalogWardrobeAddition.add(
                 draft: draft,
                 selection: .init(productID: productID, priceMode: .wishlist),
-                store: store, modelContext: modelContext
+                store: store, modelContext: modelContext,
+                successMessage: "添加成功，已加入心愿".appLocalized
             )
             if reminder {
                 scheduleSaleReminderIfNeeded()
-            } else {
-                showActionToast("已加入心愿，可到心愿尾款查看")
             }
         } catch {
-            showActionToast("加入心愿失败：\(error.localizedDescription)")
+            ToastManager.shared.showError("加入心愿失败：%@".appLocalized(error.localizedDescription))
         }
     }
 
@@ -1155,7 +1001,7 @@ struct ShopCatalogProductView: View {
         let events = store.saleEvents(forProduct: productID)
         guard let fireDate = ShopCatalogSaleReminder.upcomingSaleStart(events: events) else {
             // 开售时间未定档：先入心愿，不定时提醒
-            showActionToast("已加入心愿（开售时间待公布，暂无法定时提醒）")
+            showActionToast("开售时间待公布，暂无法定时提醒")
             return
         }
         let productName = product?.name ?? ""
@@ -1168,8 +1014,8 @@ struct ShopCatalogProductView: View {
                 fireDate: fireDate
             )
             showActionToast(ok
-                ? "已加入心愿，\(ShopCatalogFormat.month(fireDate)) 开售时提醒你来买"
-                : "已加入心愿；通知权限未开启，请到系统设置开启后才能收到开售提醒")
+                ? "\(ShopCatalogFormat.month(fireDate)) 开售时提醒你来买"
+                : "通知权限未开启，请到系统设置开启后才能收到开售提醒")
         }
     }
 }
@@ -1267,7 +1113,7 @@ struct ShopCatalogImageViewer: View {
 
     @Environment(\.dismiss) private var dismiss
     @State private var page: Int
-    @State private var savedTip: String?
+    @State private var isSavingPhotos = false
     /// 多选批量保存模式（计划 §14）
     @State private var isSelecting = false
     @State private var selected: Set<Int> = []
@@ -1354,14 +1200,7 @@ struct ShopCatalogImageViewer: View {
                 }
             }
 
-            if let savedTip {
-                Text(savedTip)
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 8)
-                    .background(Capsule().fill(Color.black.opacity(0.7)))
-            }
+
         }
     }
 
@@ -1387,7 +1226,7 @@ struct ShopCatalogImageViewer: View {
                     .padding(.vertical, 9)
                     .background(Capsule().fill(selected.isEmpty ? Color.gray : Color.pink))
             }
-            .disabled(selected.isEmpty)
+            .disabled(selected.isEmpty || isSavingPhotos)
         }
         .padding(.horizontal, 16)
         .padding(.bottom, 24)
@@ -1417,31 +1256,22 @@ struct ShopCatalogImageViewer: View {
     }
 
     private func saveBatch() {
-        var saved = 0
-        for index in selected.sorted() where references.indices.contains(index) {
-            guard let url = ShopCatalogImageResolver.url(for: references[index]),
-                  let image = UIImage(contentsOfFile: url.path) ?? remoteImage(url)
-            else { continue }
-            UIImageWriteToSavedPhotosAlbum(image, nil, nil, nil)
-            saved += 1
-        }
-        showToast(saved > 0 ? "已保存 \(saved) 张到相册" : "保存失败：找不到原图")
-        isSelecting = false
-        selected = []
-    }
-
-    private func showToast(_ text: String) {
-        savedTip = text
-        Task {
-            try? await Task.sleep(nanoseconds: 1_400_000_000)
-            await MainActor.run { savedTip = nil }
+        guard !isSavingPhotos else { return }
+        let chosen = selected.sorted().filter { references.indices.contains($0) }.map { references[$0] }
+        isSavingPhotos = true
+        Task { @MainActor in
+            defer { isSavingPhotos = false }
+            do {
+                let count = try await ShopCatalogPhotoSaver.save(references: chosen)
+                ToastManager.shared.showSuccess("已保存 %@ 张到相册".appLocalized(String(count)))
+                isSelecting = false
+                selected = []
+            } catch {
+                ToastManager.shared.showError(error.localizedDescription)
+            }
         }
     }
 
-    private func remoteImage(_ url: URL) -> UIImage? {
-        guard let data = try? Data(contentsOf: url) else { return nil }
-        return UIImage(data: data)
-    }
 }
 
 // MARK: - 可缩放单图
@@ -1483,6 +1313,7 @@ struct ShopCatalogReservationSheet: View {
     /// 当前购买阶段：选择段候选与选项文案的唯一依据（由详情页按同一份阶段口径传入）
     var phase: ShopCatalogPurchasePhase = .reservationEnded
 
+    @State private var isSavingToWardrobe = false
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
     @Environment(ThemeManager.self) private var themeManager
@@ -1642,6 +1473,14 @@ struct ShopCatalogReservationSheet: View {
                          : "定金入橱：按后台已付定金记账，尾款自动进入心愿尾款等你补款。")
                 }
             }
+            .disabled(isSavingToWardrobe)
+            .overlay {
+                if isSavingToWardrobe {
+                    ProgressView("正在保存图片…".appLocalized)
+                        .padding(20)
+                        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
+                }
+            }
             .navigationTitle(showsEntryChoice
                              ? "加入衣橱"
                              : (isFullPaid ? "全款加购" : "付定金加购"))
@@ -1649,6 +1488,7 @@ struct ShopCatalogReservationSheet: View {
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button("取消") { dismiss() }
+                        .disabled(isSavingToWardrobe)
                 }
             }
             .onAppear {
@@ -1662,6 +1502,7 @@ struct ShopCatalogReservationSheet: View {
                 }
             }
         }
+        .interactiveDismissDisabled(isSavingToWardrobe)
         .presentationDetents([.medium, .large])
     }
 
@@ -1710,6 +1551,15 @@ struct ShopCatalogReservationSheet: View {
     }
 
     private func confirmEntry() {
+        guard !isSavingToWardrobe else { return }
+        isSavingToWardrobe = true
+        Task { @MainActor in
+            defer { isSavingToWardrobe = false }
+            await performConfirmEntry()
+        }
+    }
+
+    private func performConfirmEntry() async {
         guard effectiveOption != .wishlist else { return }
         // 取数校验按**所选口径**判：现货价全款只要求有现货价，其余口径要求有预约价
         let requiredPrice = effectiveOption == .fullStockPaid ? stockPrice : reservationPrice
@@ -1731,7 +1581,7 @@ struct ShopCatalogReservationSheet: View {
         )
         guard var draft = ShopCatalogWardrobeDraftBuilder.makeDraft(
             selection: selection,
-            store: store, modelContext: modelContext
+            store: store
         ) else {
             errorText = "生成衣橱记录失败"
             return
@@ -1742,7 +1592,7 @@ struct ShopCatalogReservationSheet: View {
             draft = draft.with(finalPaymentDate: tailDate, finalPaymentEndDate: tailDate)
         }
         do {
-            _ = try ShopCatalogWardrobeInserter.insert(
+            _ = try await ShopCatalogWardrobeAddition.add(
                 draft: draft,
                 selection: selection,
                 store: store, modelContext: modelContext

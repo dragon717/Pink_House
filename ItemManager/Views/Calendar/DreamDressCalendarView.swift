@@ -306,8 +306,6 @@ struct RecentTimelineView: View {
             }
             .padding()
         }
-        // 底部悬浮 Dock 避让：时间轴最后一个日程会被 Dock 盖住。
-        .avoidingBottomDock()
     }
     
     @ViewBuilder
@@ -507,8 +505,6 @@ struct DualMonthScrollView: View {
             }
             .padding(.bottom, 40)
         }
-        // 底部悬浮 Dock 避让：双月视图最后一天会被 Dock 盖住。
-        .avoidingBottomDock()
     }
     
     @ViewBuilder
@@ -632,8 +628,6 @@ struct YearlyHeatmapView: View {
                 .padding()
             }
         }
-        // 底部悬浮 Dock 避让：年度概览最后一排月份会被 Dock 盖住。
-        .avoidingBottomDock()
     }
 }
 

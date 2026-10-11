@@ -316,12 +316,12 @@ final class ShopCatalogSeriesSalePhaseStoreTests: XCTestCase {
         let context = modelContext()
         let depositDraft = try XCTUnwrap(ShopCatalogWardrobeDraftBuilder.makeDraft(
             selection: .init(productID: "prod-phase-test", priceMode: .reservation(depositPaid: 91)),
-            store: store, modelContext: context))
+            store: store))
         XCTAssertEqual(Decimal(depositDraft.balance), 227, "定金 + 尾款必须仍然可记")
 
         let fullDraft = try XCTUnwrap(ShopCatalogWardrobeDraftBuilder.makeDraft(
             selection: .init(productID: "prod-phase-test", priceMode: .fullReservation),
-            store: store, modelContext: context))
+            store: store))
         XCTAssertEqual(Decimal(fullDraft.priceTotal), 318)
         XCTAssertEqual(Decimal(fullDraft.balance), 0)
     }

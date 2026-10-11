@@ -33,10 +33,6 @@ struct CopyableText: View {
     private func copyToClipboard() {
         UIPasteboard.general.string = text
         
-        // 触发触觉反馈
-        let impact = UIImpactFeedbackGenerator(style: .light)
-        impact.impactOccurred()
-        
         // 使用全局提示管理器显示提示
         CopyToastManager.shared.show(text: text)
     }
