@@ -85,7 +85,7 @@ struct WardrobeStorageRoomView: View {
                             if displayed.isEmpty && (!query.isEmpty || shoeFilter != .all) {
                                 emptySearch
                             } else if !listMode {
-                                WardrobeStorageCabinet(category: category, entries: displayed, width: width, showPrice: showPrice, onSelect: select)
+                                WardrobeStorageCabinet(category: category, entries: displayed, width: width, height: geometry.size.height, showPrice: showPrice, onSelect: select)
                                     .id(destination.id)
                             } else if displayed.isEmpty {
                                 emptyCollection

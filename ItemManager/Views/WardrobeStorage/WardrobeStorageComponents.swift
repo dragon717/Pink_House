@@ -204,76 +204,118 @@ struct WardrobeStorageShelf: View {
     }
 }
 
+/// The available room, rather than inventory size, determines the furniture's frame.
+struct WardrobeStorageCabinetLayout {
+    let width: CGFloat
+    let crownHeight: CGFloat
+    let baseHeight: CGFloat
+    let viewportHeight: CGFloat
+    let shelfHeight: CGFloat
+
+    init(size: CGSize, category: WardrobeStorageCategory) {
+        let middleRatio = category.shelfHeightRatio
+        // Preserve both ends and at least one complete bay in compact / landscape rooms.
+        width = max(1, min(size.width - 28, (size.height - 30) / (555.0 / 780 + middleRatio)))
+        crownHeight = width * 281 / 780
+        baseHeight = width * 274 / 780
+        viewportHeight = max(0, size.height - 30 - crownHeight - baseHeight)
+        shelfHeight = width * middleRatio
+    }
+
+    func rowCount(for entryCount: Int) -> Int {
+        // Empty bays also fill tall viewports, so the columns never end above the base.
+        max(4, Int(ceil(viewportHeight / shelfHeight)), (entryCount + 1) / 2)
+    }
+}
+
 struct WardrobeStorageCabinet: View {
     let category: WardrobeStorageCategory
     let entries: [WardrobeStorageEntry]
     let width: CGFloat
+    let height: CGFloat
     let showPrice: Bool
     @Environment(\.wardrobeStoragePalette) private var palette
     let onSelect: (WardrobeStorageEntry) -> Void
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    private var rowCount: Int { max(4, (entries.count + 1) / 2) }
-    // Leave room for the furniture's silhouette and cast shadow within the rear plane.
-    private var cabinetWidth: CGFloat { max(1, width - 28) }
-
     var body: some View {
         let shouldReduceMotion = reduceMotion
+        let layout = WardrobeStorageCabinetLayout(size: CGSize(width: width, height: height), category: category)
         VStack(spacing: 0) {
-            // The crown stays outside the clipped / snapping viewport, so scrolling cannot
-            // tuck its bow and carved tip underneath the room controls.
-            crown
+            // Only the bays scroll; both ends retain their position and original proportions.
+            crown(layout: layout)
                 .zIndex(1)
             ScrollView {
                 LazyVStack(spacing: 0) {
-                    ForEach(0..<rowCount, id: \.self) { row in
+                    ForEach(0..<layout.rowCount(for: entries.count), id: \.self) { row in
                         let start = min(row * 2, entries.count)
                         let end = min(start + 2, entries.count)
-                        WardrobeStorageShelf(category: category, entries: Array(entries[start..<end]), width: cabinetWidth, number: row + 1, showPrice: showPrice, onSelect: onSelect)
+                        WardrobeStorageShelf(category: category, entries: Array(entries[start..<end]), width: layout.width, number: row + 1, showPrice: showPrice, onSelect: onSelect)
+                            .id(row)
                             .scrollTransition(.interactive, axis: .vertical) { content, phase in
                                 content
                                     .opacity(shouldReduceMotion || phase.isIdentity ? 1 : 0.94)
                             }
                     }
-                    if UIImage(named: "storage_cabinet_base") != nil {
-                        Image("storage_cabinet_base")
-                            .resizable().frame(width: cabinetWidth, height: cabinetWidth * 274 / 780)
-                            .wardrobeFurnitureLight(size: CGSize(width: cabinetWidth, height: cabinetWidth * 274 / 780), part: .base, enabled: palette.isDark)
-                            .accessibilityHidden(true)
-                    }
                 }
                 .scrollTargetLayout()
-                .padding(.bottom, 18)
                 .frame(maxWidth: .infinity)
             }
+            .frame(height: layout.viewportHeight)
+            .clipped()
             .scrollIndicators(.hidden)
             .scrollTargetBehavior(.viewAligned)
             .defaultScrollAnchor(.top)
+            .accessibilityIdentifier("storage.cabinet.shelves")
+            base(layout: layout)
+                .zIndex(1)
         }
-        .frame(width: cabinetWidth)
+        .frame(width: layout.width)
         // One shadow for the visible silhouette avoids dark bands between individual shelves.
         .compositingGroup()
         .shadow(color: Color(red: 0.32, green: 0.20, blue: 0.18).opacity(palette.isDark ? 0.55 : 0.23), radius: 9, x: -4, y: 7)
         .shadow(color: .black.opacity(palette.isDark ? 0.4 : 0.09), radius: 2, x: -1, y: 2)
         .padding(.horizontal, 14)
         .padding(.top, 12)
+        .padding(.bottom, 18)
+        .frame(width: width, height: height, alignment: .top)
         .accessibilityIdentifier("storage.cabinet")
     }
 
     @ViewBuilder
-    private var crown: some View {
+    private func crown(layout: WardrobeStorageCabinetLayout) -> some View {
         if UIImage(named: "storage_cabinet_crown") != nil {
             Image("storage_cabinet_crown")
-                .resizable().frame(width: cabinetWidth, height: cabinetWidth * 281 / 780)
-                .wardrobeFurnitureLight(size: CGSize(width: cabinetWidth, height: cabinetWidth * 281 / 780), part: .crown, enabled: palette.isDark)
+                .resizable().frame(width: layout.width, height: layout.crownHeight)
+                .wardrobeFurnitureLight(size: CGSize(width: layout.width, height: layout.crownHeight), part: .crown, enabled: palette.isDark)
                 .accessibilityHidden(true)
         } else {
             Image(systemName: "gift")
                 .font(.system(size: 32, weight: .ultraLight))
                 .foregroundStyle(palette.accent.color)
-                .frame(width: cabinetWidth, height: 72)
+                .frame(width: layout.width, height: layout.crownHeight)
                 .accessibilityHidden(true)
         }
+    }
+
+    @ViewBuilder
+    private func base(layout: WardrobeStorageCabinetLayout) -> some View {
+        Group {
+            if UIImage(named: "storage_cabinet_base") != nil {
+                Image("storage_cabinet_base").resizable()
+            } else {
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(LinearGradient(colors: [WardrobeStorageArt.cream, Color(red: 0.83, green: 0.72, blue: 0.61)], startPoint: .top, endPoint: .bottom))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 8)
+                            .strokeBorder(WardrobeStorageArt.rose.opacity(0.3), lineWidth: 2)
+                            .padding(10)
+                    }
+            }
+        }
+        .frame(width: layout.width, height: layout.baseHeight)
+        .wardrobeFurnitureLight(size: CGSize(width: layout.width, height: layout.baseHeight), part: .base, enabled: palette.isDark)
+        .accessibilityHidden(true)
     }
 }
 
