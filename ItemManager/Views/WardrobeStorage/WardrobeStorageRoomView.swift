@@ -211,7 +211,7 @@ struct WardrobeStorageRoomView: View {
                             else { withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.22)) { selectedDestination = item } }
                         } label: {
                             VStack(spacing: 5) {
-                                WardrobeStorageIcon(kind: item.icon, size: 37, selected: item.id == destination.id)
+                                WardrobeStorageIcon(kind: item.icon, size: 37, selected: item.id == destination.id, imageFile: item.iconImageFile)
                                 Text(item.title.appLocalized).font(.system(size: 10, weight: .medium)).lineLimit(2)
                                     .padding(3).background(palette.label.color, in: RoundedRectangle(cornerRadius: 5))
                             }

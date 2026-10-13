@@ -1,10 +1,13 @@
 import SwiftUI
+import UIKit
 
 /// Small vector illustrations stay crisp in both the rail and drawer.
 struct WardrobeStorageIcon: View {
     let kind: WardrobeStorageIconKind
     var size: CGFloat = 42
     var selected = false
+    var imageFile: String? = nil
+    var imageData: Data? = nil
     @Environment(\.wardrobeStoragePalette) private var palette
 
     var body: some View {
@@ -14,6 +17,21 @@ struct WardrobeStorageIcon: View {
                                      startPoint: .topLeading, endPoint: .bottomTrailing))
                 .overlay { Circle().strokeBorder(selected ? palette.accent.color : palette.border.color, lineWidth: 1) }
                 .shadow(color: palette.accent.color.opacity(selected ? 0.18 : 0.08), radius: 3, y: 2)
+            if let customImage = imageData.flatMap({ UIImage(data: $0) })
+                ?? imageFile.flatMap({ WardrobeStorageIconStore.shared.image(named: $0) }) {
+                Image(uiImage: customImage).resizable().scaledToFill()
+                    .frame(width: size * 0.84, height: size * 0.84)
+                    .clipShape(Circle())
+            } else {
+                illustration
+                    .padding(size * 0.04)
+            }
+        }
+        .frame(width: size, height: size)
+        .accessibilityHidden(true)
+    }
+
+    private var illustration: some View {
             Canvas { context, canvasSize in
                 var context = context
                 context.scaleBy(x: canvasSize.width / 100, y: canvasSize.height / 100)
@@ -98,9 +116,5 @@ struct WardrobeStorageIcon: View {
                 let glint = Path(ellipseIn: CGRect(x: 76, y: 19, width: 5, height: 5))
                 context.fill(glint, with: .color(palette.gold.color))
             }
-            .padding(size * 0.04)
-        }
-        .frame(width: size, height: size)
-        .accessibilityHidden(true)
     }
 }

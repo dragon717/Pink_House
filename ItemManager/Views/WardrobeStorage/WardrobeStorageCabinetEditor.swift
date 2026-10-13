@@ -1,5 +1,7 @@
 import SwiftUI
 import SwiftData
+import PhotosUI
+import UIKit
 
 struct WardrobeStorageCabinetEditor: View {
     @Environment(\.dismiss) private var dismiss
@@ -7,6 +9,11 @@ struct WardrobeStorageCabinetEditor: View {
     @State private var settings = WardrobeStorageSettings.shared
     @State private var name: String
     @State private var icon: WardrobeStorageIconKind
+    @State private var useCustomIcon: Bool
+    @State private var customIconData: Data?
+    @State private var selectedPhoto: PhotosPickerItem?
+    @State private var cropRequest: CropRequest?
+    @State private var isLoadingPhoto = false
     @State private var error: String?
     let cabinet: WardrobeStorageCustomCabinet?
     let onSave: (WardrobeStorageDestination) -> Void
@@ -15,6 +22,7 @@ struct WardrobeStorageCabinetEditor: View {
         self.cabinet = cabinet; self.onSave = onSave
         _name = State(initialValue: cabinet?.name ?? "")
         _icon = State(initialValue: cabinet?.icon ?? .accessories)
+        _useCustomIcon = State(initialValue: cabinet?.iconImageFile != nil)
     }
 
     var body: some View {
@@ -33,21 +41,64 @@ struct WardrobeStorageCabinetEditor: View {
                 Section {
                     LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 4), spacing: 16) {
                         ForEach(WardrobeStorageIconKind.allCases) { option in
-                            Button { icon = option } label: {
+                            Button { icon = option; useCustomIcon = false; error = nil } label: {
                                 VStack(spacing: 6) {
-                                    WardrobeStorageIcon(kind: option, size: 50, selected: icon == option)
+                                    WardrobeStorageIcon(kind: option, size: 50, selected: !useCustomIcon && icon == option)
                                     Text(option.title.appLocalized).font(.caption).foregroundStyle(palette.primary.color)
                                 }
                             }
                             .buttonStyle(.plain)
                             .accessibilityLabel(option.title.appLocalized)
-                            .accessibilityAddTraits(icon == option ? .isSelected : [])
+                            .accessibilityAddTraits(!useCustomIcon && icon == option ? .isSelected : [])
                             .accessibilityIdentifier("storage.custom.icon.\(option.rawValue)")
                         }
                     }
                     .padding(.vertical, 8)
+                    .disabled(isLoadingPhoto)
                 } header: {
-                    Text("选择图标".appLocalized).foregroundStyle(palette.secondary.color)
+                    Text("内置图标".appLocalized).foregroundStyle(palette.secondary.color)
+                        .padding(4).background(palette.label.color, in: RoundedRectangle(cornerRadius: 5))
+                }
+                .listRowBackground(palette.label.color)
+                Section {
+                    HStack(spacing: 14) {
+                        Button { useCustomIcon = true; error = nil } label: {
+                            if hasCustomImage {
+                                WardrobeStorageIcon(kind: icon, size: 60, selected: useCustomIcon,
+                                                    imageFile: cabinet?.iconImageFile, imageData: customIconData)
+                            } else {
+                                Image(systemName: "photo.badge.plus").font(.system(size: 24))
+                                    .foregroundStyle(palette.accent.color)
+                                    .frame(width: 60, height: 60)
+                                    .background(palette.selected.color, in: Circle())
+                                    .overlay { Circle().strokeBorder(palette.border.color, lineWidth: 1) }
+                            }
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(!hasCustomImage || isLoadingPhoto)
+                        .accessibilityLabel("使用自定义图标".appLocalized)
+                        .accessibilityAddTraits(useCustomIcon ? .isSelected : [])
+                        .accessibilityIdentifier("storage.custom.photo.use")
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("选择喜欢的图片作为图标".appLocalized)
+                                .font(.caption).foregroundStyle(palette.secondary.color)
+                            PhotosPicker(selection: $selectedPhoto, matching: .images, preferredItemEncoding: .current) {
+                                Label((hasCustomImage ? "更换图片" : "从照片选择").appLocalized, systemImage: "photo")
+                                    .foregroundStyle(palette.accent.color)
+                            }
+                            .disabled(isLoadingPhoto)
+                            .accessibilityIdentifier("storage.custom.photo.select")
+                        }
+                        Spacer(minLength: 0)
+                        if isLoadingPhoto { ProgressView().tint(palette.accent.color) }
+                        else if useCustomIcon {
+                            Image(systemName: "checkmark.circle.fill").foregroundStyle(palette.accent.color)
+                                .accessibilityHidden(true)
+                        }
+                    }
+                    .padding(.vertical, 6)
+                } header: {
+                    Text("自定义图标".appLocalized).foregroundStyle(palette.secondary.color)
                         .padding(4).background(palette.label.color, in: RoundedRectangle(cornerRadius: 5))
                 }
                 .listRowBackground(palette.label.color)
@@ -64,18 +115,51 @@ struct WardrobeStorageCabinetEditor: View {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("保存".appLocalized) {
                         do {
-                            let destination = try settings.saveCabinet(id: cabinet?.id, name: name, icon: icon)
+                            let update: WardrobeStorageIconUpdate = useCustomIcon
+                                ? customIconData.map(WardrobeStorageIconUpdate.replace) ?? .keep : .useBuiltIn
+                            let destination = try settings.saveCabinet(id: cabinet?.id, name: name, icon: icon, iconUpdate: update)
                             onSave(destination)
                             dismiss()
                         } catch { self.error = error.localizedDescription.appLocalized }
                     }
-                    .disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    .disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isLoadingPhoto || cropRequest != nil)
                     .accessibilityIdentifier("storage.custom.save")
                 }
             }
         }
         .tint(palette.accent.color)
+        .task(id: selectedPhoto) {
+            guard let item = selectedPhoto else { isLoadingPhoto = false; return }
+            isLoadingPhoto = true
+            defer { if selectedPhoto == item { isLoadingPhoto = false } }
+            do {
+                guard let data = try await item.loadTransferable(type: Data.self) else {
+                    throw WardrobeStorageIconStore.ImageError.invalidImage
+                }
+                let decoded = await Task.detached(priority: .userInitiated) {
+                    WardrobeStorageIconStore.cropImage(from: data)
+                }.value
+                guard !Task.isCancelled else { return }
+                guard let decoded else { throw WardrobeStorageIconStore.ImageError.invalidImage }
+                cropRequest = CropRequest(image: UIImage(cgImage: decoded), isNewSelection: true)
+            } catch {
+                guard !Task.isCancelled else { return }
+                self.error = error.localizedDescription.appLocalized
+                selectedPhoto = nil
+            }
+        }
+        .sheet(item: $cropRequest, onDismiss: { selectedPhoto = nil }) { request in
+            ImageCropView(image: request.image, aspectRatio: 1, targetWidth: 256, overlayType: .circle, contentMode: .fill,
+                onCrop: { image in
+                    if let data = image.pngData() {
+                        customIconData = data; useCustomIcon = true; error = nil
+                    } else { error = WardrobeStorageIconStore.ImageError.invalidImage.localizedDescription.appLocalized }
+                    cropRequest = nil; selectedPhoto = nil
+                }, onCancel: { cropRequest = nil; selectedPhoto = nil })
+        }
     }
+
+    private var hasCustomImage: Bool { customIconData != nil || cabinet?.iconImageFile != nil }
 }
 
 struct WardrobeStorageContentsEditor: View {

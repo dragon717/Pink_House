@@ -57,7 +57,7 @@ struct WardrobeStorageDrawer: View {
                                 let statusCount = entries.filter { $0.statusLabel != nil }.count
                                 Button { onSelect(category) } label: {
                                     HStack(spacing: 16) {
-                                        WardrobeStorageIcon(kind: category.icon, size: 45)
+                                        WardrobeStorageIcon(kind: category.icon, size: 45, imageFile: category.iconImageFile)
                                         VStack(alignment: .leading, spacing: 5) {
                                             Text(category.title.appLocalized).font(.system(size: 17, weight: .medium))
                                             Text("\(count)" + category.category.unit.appLocalized + (statusCount > 0 ? " · \(statusCount)条状态记录" : ""))

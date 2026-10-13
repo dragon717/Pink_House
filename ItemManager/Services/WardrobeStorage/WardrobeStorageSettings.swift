@@ -32,17 +32,20 @@ nonisolated struct WardrobeStorageDestination: Identifiable, Hashable, Sendable 
     let title: String
     let category: WardrobeStorageCategory
     let icon: WardrobeStorageIconKind
+    let iconImageFile: String?
     let customID: UUID?
 
     init(_ category: WardrobeStorageCategory) {
         id = category.rawValue; title = category.title; self.category = category
         icon = WardrobeStorageIconKind(rawValue: category.rawValue) ?? .accessories
         customID = nil
+        iconImageFile = nil
     }
 
     init(custom: WardrobeStorageCustomCabinet) {
         id = "custom/" + custom.id.uuidString; title = custom.name
         category = custom.icon.style; icon = custom.icon; customID = custom.id
+        iconImageFile = custom.iconImageFile
     }
 
     static var defaults: [Self] { WardrobeStorageCategory.defaultCategories.map(Self.init) }
@@ -53,6 +56,11 @@ nonisolated struct WardrobeStorageCustomCabinet: Codable, Identifiable, Hashable
     var name: String
     var icon: WardrobeStorageIconKind
     var clothingIDs: Set<UUID> = []
+    var iconImageFile: String? = nil
+}
+
+nonisolated enum WardrobeStorageIconUpdate: Sendable {
+    case keep, useBuiltIn, replace(Data)
 }
 
 /// Local display organization only. Clothing, photos and CloudKit models are unchanged.
@@ -70,10 +78,12 @@ final class WardrobeStorageSettings {
     }()
     private(set) var cabinets: [WardrobeStorageCustomCabinet]
     @ObservationIgnored private let defaults: UserDefaults
+    @ObservationIgnored private let iconStore: WardrobeStorageIconStore
     @ObservationIgnored private let key = "wardrobe.storage.custom-cabinets.v1"
 
-    init(defaults: UserDefaults = .standard) {
+    init(defaults: UserDefaults = .standard, iconStore: WardrobeStorageIconStore? = nil) {
         self.defaults = defaults
+        self.iconStore = iconStore ?? .shared
         cabinets = defaults.data(forKey: key).flatMap {
             try? JSONDecoder().decode([WardrobeStorageCustomCabinet].self, from: $0)
         } ?? []
@@ -83,7 +93,8 @@ final class WardrobeStorageSettings {
         WardrobeStorageDestination.defaults + cabinets.map(WardrobeStorageDestination.init(custom:))
     }
 
-    func saveCabinet(id: UUID? = nil, name: String, icon: WardrobeStorageIconKind) throws -> WardrobeStorageDestination {
+    func saveCabinet(id: UUID? = nil, name: String, icon: WardrobeStorageIconKind,
+                     iconUpdate: WardrobeStorageIconUpdate = .keep) throws -> WardrobeStorageDestination {
         let name = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !name.isEmpty, name.count <= 12 else { throw ValidationError.invalidName }
         let names = WardrobeStorageCategory.defaultCategories.map(\.title) + cabinets.filter { $0.id != id }.map(\.name)
@@ -91,15 +102,35 @@ final class WardrobeStorageSettings {
             throw ValidationError.duplicateName
         }
         var updated = cabinets
-        let cabinet: WardrobeStorageCustomCabinet
-        if let id, let index = updated.firstIndex(where: { $0.id == id }) {
-            updated[index].name = name; updated[index].icon = icon; cabinet = updated[index]
+        let index: Int
+        if let id, let existing = updated.firstIndex(where: { $0.id == id }) {
+            index = existing
+            updated[index].name = name; updated[index].icon = icon
         } else {
-            cabinet = WardrobeStorageCustomCabinet(name: name, icon: icon)
-            updated.append(cabinet)
+            index = updated.count
+            updated.append(WardrobeStorageCustomCabinet(name: name, icon: icon))
         }
-        try persist(updated)
-        return WardrobeStorageDestination(custom: cabinet)
+        let previousImage = updated[index].iconImageFile
+        var createdImage: String?
+        do {
+            switch iconUpdate {
+            case .keep: break
+            case .useBuiltIn: updated[index].iconImageFile = nil
+            case .replace(let data):
+                let file = try iconStore.save(data)
+                createdImage = file
+                updated[index].iconImageFile = file
+            }
+            try persist(updated)
+        } catch {
+            if let createdImage { iconStore.remove(named: createdImage) }
+            throw error
+        }
+        if let previousImage, previousImage != updated[index].iconImageFile,
+           !updated.contains(where: { $0.iconImageFile == previousImage }) {
+            iconStore.remove(named: previousImage)
+        }
+        return WardrobeStorageDestination(custom: updated[index])
     }
 
     func setContents(_ clothingIDs: Set<UUID>, for id: UUID) throws {
