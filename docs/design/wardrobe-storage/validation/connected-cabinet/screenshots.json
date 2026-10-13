@@ -1,0 +1,65 @@
+[
+  {
+    "file": "album-series-light.png",
+    "testIdentifier": "ShopCatalogAlbumAppearanceTests/testRenderYearRailAndSeriesNamesInBothSchemes()",
+    "sourceBundle": "/private/tmp/pink-house-album-connected-cabinet-pass-20261014.xcresult",
+    "pixelsSHA256": "f653c4b6dcb5dc78f5541244b5bbbc40a50a17bfece5319eb9ccf07798142c39",
+    "pixelPreservingCompression": true
+  },
+  {
+    "file": "album-2026-dark.png",
+    "testIdentifier": "ShopCatalogAlbumAppearanceTests/testRenderYearRailAndSeriesNamesInBothSchemes()",
+    "sourceBundle": "/private/tmp/pink-house-album-connected-cabinet-pass-20261014.xcresult",
+    "pixelsSHA256": "1a1acf29df41dc025918d2119d36ecddae61ddc4e3a5192c7a9d9d829b200c84",
+    "pixelPreservingCompression": true
+  },
+  {
+    "file": "album-all-light.png",
+    "testIdentifier": "ShopCatalogAlbumAppearanceTests/testRenderYearRailAndSeriesNamesInBothSchemes()",
+    "sourceBundle": "/private/tmp/pink-house-album-connected-cabinet-pass-20261014.xcresult",
+    "pixelsSHA256": "ed8d677c3127ed18b09a8d8d3b8cc1b5afdbca2a9dded39f7a0d553212894305",
+    "pixelPreservingCompression": true
+  },
+  {
+    "file": "bags-dark-overscroll-bottom.png",
+    "testIdentifier": "WardrobeStorageCabinetFrameTests/testRenderedCrownAndBaseStayFixedWhileLastInventoryRowIsReachable()",
+    "sourceBundle": "/private/tmp/pink-house-album-connected-cabinet-pass-20261014.xcresult",
+    "pixelsSHA256": "387edec51fbb5e6829d4bc1b7a3e2b3f41f5d7923b35527405a4cc338662cfd8",
+    "pixelPreservingCompression": true
+  },
+  {
+    "file": "bags-dark-overscroll-top.png",
+    "testIdentifier": "WardrobeStorageCabinetFrameTests/testRenderedCrownAndBaseStayFixedWhileLastInventoryRowIsReachable()",
+    "sourceBundle": "/private/tmp/pink-house-album-connected-cabinet-pass-20261014.xcresult",
+    "pixelsSHA256": "19ea7ac21b04f3b4766633520eb658cd3d4022225bdf3c86025f11b7ba838afd",
+    "pixelPreservingCompression": true
+  },
+  {
+    "file": "bags-dark-24-items-last.png",
+    "testIdentifier": "WardrobeStorageCabinetFrameTests/testRenderedCrownAndBaseStayFixedWhileLastInventoryRowIsReachable()",
+    "sourceBundle": "/private/tmp/pink-house-album-connected-cabinet-pass-20261014.xcresult",
+    "pixelsSHA256": "675e2bd4851f4016472ba14c3d06232340b2b5451b94205133b28040e690b080",
+    "pixelPreservingCompression": true
+  },
+  {
+    "file": "shoes-light-overscroll-bottom.png",
+    "testIdentifier": "WardrobeStorageCabinetFrameTests/testRenderedCrownAndBaseStayFixedWhileLastInventoryRowIsReachable()",
+    "sourceBundle": "/private/tmp/pink-house-album-connected-cabinet-pass-20261014.xcresult",
+    "pixelsSHA256": "6db7f9f4206fa55e9f306a1103d3994a14d5c93a2b458df64c606221edbf2ee0",
+    "pixelPreservingCompression": true
+  },
+  {
+    "file": "shoes-light-overscroll-top.png",
+    "testIdentifier": "WardrobeStorageCabinetFrameTests/testRenderedCrownAndBaseStayFixedWhileLastInventoryRowIsReachable()",
+    "sourceBundle": "/private/tmp/pink-house-album-connected-cabinet-pass-20261014.xcresult",
+    "pixelsSHA256": "b1718640dd3ad05761151b3b35798015eb4e1015ae41c39b822e53ebd5449a54",
+    "pixelPreservingCompression": true
+  },
+  {
+    "file": "shoes-light-24-items-last.png",
+    "testIdentifier": "WardrobeStorageCabinetFrameTests/testRenderedCrownAndBaseStayFixedWhileLastInventoryRowIsReachable()",
+    "sourceBundle": "/private/tmp/pink-house-album-connected-cabinet-pass-20261014.xcresult",
+    "pixelsSHA256": "ffee3c97944c831674784028f15dc93d558b6447b1cb70689544a7770d2e5bac",
+    "pixelPreservingCompression": true
+  }
+]

@@ -59,7 +59,7 @@ final class WardrobeStorageCabinetFrameTests: XCTestCase {
                     .environment(\.wardrobeStoragePalette, palette)
                     .environment(\.colorScheme, dark ? .dark : .light)
                     .transaction { $0.animation = nil }
-                    .background(palette.scene.color).ignoresSafeArea()
+                    .background(Color.cyan).ignoresSafeArea()
                 let host = UIHostingController(rootView: root)
                 window.rootViewController = host
                 window.makeKeyAndVisible()
@@ -99,6 +99,35 @@ final class WardrobeStorageCabinetFrameTests: XCTestCase {
             let scroll = try XCTUnwrap(findScrollView(in: try XCTUnwrap(window.rootViewController?.view)))
             XCTAssertEqual(scroll.contentOffset.y + scroll.bounds.height - scroll.adjustedContentInset.bottom,
                            scroll.contentSize.height, accuracy: 2, "The last stored row must be fully reachable")
+
+            let column = CGRect(x: 14 + layout.width * 0.055, y: 12 + layout.crownHeight + 2,
+                                width: layout.width * 0.05, height: layout.viewportHeight - 4)
+            let fixedColumn = try pixels(first, in: column)
+            // Color.cyan is a system color; sample its actual RGB instead of assuming 0/255/255.
+            let wallpaperRGB = Array(try pixels(first, in: CGRect(x: 0, y: 0, width: 1, height: 1)).prefix(3))
+            for (stage, offset) in [("overscroll-top", CGFloat(-72)),
+                                     ("overscroll-bottom", scroll.contentSize.height - scroll.bounds.height + 72)] {
+                scroll.setContentOffset(CGPoint(x: 0, y: offset), animated: false)
+                // Capture the pull before the system's next run-loop snaps it back to a bay.
+                scroll.layoutIfNeeded()
+                XCTAssertEqual(scroll.contentOffset.y, offset, accuracy: 2, "Fixture must actually expose elastic overscroll")
+                let pulled = try capture(stage)
+                XCTAssertEqual(scroll.contentOffset.y, offset, accuracy: 2, "Capture must retain the pulled position")
+                let currentColumn = try pixels(pulled, in: column)
+                XCTAssertEqual(fixedColumn.count, currentColumn.count)
+                // Native GPU compositing rounds the same fixed artwork by up to two levels.
+                let difference = zip(fixedColumn, currentColumn).map { abs(Int($0) - Int($1)) }.max() ?? 0
+                XCTAssertLessThanOrEqual(difference, 3, "Cabinet posts must remain attached")
+                let bay = CGRect(x: 14 + layout.width * 0.2, y: 12 + layout.crownHeight + 2,
+                                 width: layout.width * 0.6, height: layout.viewportHeight - 4)
+                let data = try pixels(pulled, in: bay)
+                let exposedWallpaper = data.withUnsafeBytes { (bytes: UnsafeRawBufferPointer) in
+                    stride(from: 0, to: bytes.count, by: 4).contains { index in
+                        (0..<3).allSatisfy { abs(Int(bytes[index + $0]) - Int(wallpaperRGB[$0])) <= 2 }
+                    }
+                }
+                XCTAssertFalse(exposedWallpaper, "\(stage) detached the cabinet and exposed the cyan room wallpaper")
+            }
         }
     }
 

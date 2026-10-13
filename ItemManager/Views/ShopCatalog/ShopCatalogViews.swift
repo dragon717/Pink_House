@@ -2,10 +2,10 @@
 //  ShopCatalogViews.swift
 //  ItemManager
 //
-//  「店家上新」浏览页（计划 §7-12 + 附录A 参考图2/3/4）：
+//  「店铺时光册」浏览页：
 //    · ShopCatalogBrowseView   —— 浏览根（独立 NavigationStack，时光馆 Tab 首屏）
 //    · ShopCatalogListView     —— 店家列表（§9：Logo / 名称 / 最近上新 / 系列数 / 别名搜索，参考图3 列表风格）
-//    · ShopCatalogShopView     —— 店家主页（§10：当前上新 + [当前上新][2026][2025]…年份翻阅；
+//    · ShopCatalogShopView     —— 左侧年份、顶部系列名称筛选；
 //      系列卡点击直达「点菜式选购页」ShopCatalogSeriesMenuView，原合并大卡中转页已删除）
 //
 //  视觉：约束 1「不改变现有 UI」——全部沿用 themeManager 令牌 + themeSkinSectionCard
@@ -34,7 +34,7 @@ enum ShopCatalogFormat {
 
 // MARK: - 浏览根
 
-/// 时光馆首屏「店家上新」（直接作为底部 Tab 根视图）。
+/// 时光馆首屏「店铺时光册」（直接作为底部 Tab 根视图）。
 struct ShopCatalogBrowseView: View {
     @ObservedObject private var store = ShopCatalogStore.shared
     /// 尾款阶段同步需要显式传入 context（内部不默认拿生产容器）
@@ -58,7 +58,7 @@ struct ShopCatalogBrowseView: View {
                     .ignoresSafeArea()
                 ShopCatalogListView(onRefresh: refreshCatalog)
             }
-            .navigationTitle("店家上新")
+            .navigationTitle("店铺时光册")
             .navigationBarTitleDisplayMode(.inline)
             .navigationDestination(isPresented: showsDeepLinkProduct) {
                 if let productID = tabNav.pendingShopCatalogProductID {
@@ -215,58 +215,52 @@ struct ShopCatalogListView: View {
     }
 }
 
-// MARK: - 店家主页（计划 §10，参考图4：[当前上新][2026][2025]…）
+// MARK: - 店铺时光册：年份侧栏 + 系列名称筛选
 
 struct ShopCatalogShopView: View {
     let shopID: String
 
     @Environment(ThemeManager.self) private var themeManager
-    @ObservedObject private var store = ShopCatalogStore.shared
-    /// 店主页系列筛选：当前上新 / 未标年份 / 具体年份
-    enum YearFilter: Equatable {
-        case current
-        case noYear
-        case year(Int)
-    }
-    @State private var yearFilter: YearFilter = .current
+    @Environment(\.colorScheme) private var colorScheme
+    @ObservedObject private var store: ShopCatalogStore
+    @State private var selection = ShopCatalogAlbumSelection()
     /// 系列卡直达「点菜式选购页」（原合并大卡中转页已删除）
     @State private var menuSeries: CatalogSeries?
 
-    private var shop: CatalogShop? { store.shop(id: shopID) }
-
-    private var visibleSeries: [CatalogSeries] {
-        switch yearFilter {
-        case .current:
-            return store.currentSeries(inShop: shopID)
-        // 年份/未标年份筛选覆盖**全量系列**（含正在上新的）：
-        // 曾只用 archiveSeries（= 全量 − 当前上新），导致「正在上新的系列」
-        // 在它自己标注的年份下永远查不到（2026-09-24 用户实测：系列填 2026-4、
-        // 现货在售，点「2026」chip 却显示「该年份暂无收录系列」）。
-        // 「当前上新」是活动维度，年份是档案维度，两者正交。
-        case .noYear:
-            return store.series(inShop: shopID).filter { $0.year == nil }
-        case .year(let year):
-            return store.series(inShop: shopID).filter { $0.year == year }
-        }
+    init(shopID: String, store: ShopCatalogStore? = nil, initialSelection: ShopCatalogAlbumSelection = .init()) {
+        self.shopID = shopID
+        _store = ObservedObject(wrappedValue: store ?? .shared)
+        _selection = State(initialValue: initialSelection)
     }
 
-    /// 无年份的系列（运营发布时年份选填），存在则显示「未标年份」chip 兜底
-    private var hasNoYearArchiveSeries: Bool {
-        store.series(inShop: shopID).contains { $0.year == nil }
+    private var shop: CatalogShop? { store.shop(id: shopID) }
+
+    private var allSeries: [CatalogSeries] { store.series(inShop: shopID) }
+    private var yearSeries: [CatalogSeries] { selection.seriesInYear(allSeries) }
+    private var visibleSeries: [CatalogSeries] { selection.visibleSeries(allSeries) }
+    private var surface: Color { themeManager.cardSurfaceColor(for: colorScheme) }
+    private var palette: AdaptivePaletteV2 {
+        themeManager.getPaletteForContainer(containerBackground: .solid(color: surface), colorScheme: colorScheme)
     }
 
     var body: some View {
         ZStack {
             LiquidBackground(themeSkinWallpaperContext: .timeHall)
                 .ignoresSafeArea()
-            ScrollView(.vertical, showsIndicators: false) {
-                VStack(spacing: 14) {
-                    yearStrip
-                    seriesSection
+            HStack(alignment: .top, spacing: 12) {
+                yearRail
+                VStack(spacing: 12) {
+                    seriesStrip
+                    ScrollView(.vertical, showsIndicators: false) {
+                        seriesSection
+                            .padding(.bottom, 16)
+                            .frame(maxWidth: .infinity)
+                    }
+                    .id(selection.year.id + "/" + (selection.seriesID ?? "all"))
                 }
-                .padding(16)
-                .padding(.bottom, 40)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             }
+            .padding(.horizontal, 12).padding(.top, 12)
         }
         .navigationTitle(shop?.name ?? "")
         .navigationBarTitleDisplayMode(.inline)
@@ -274,34 +268,60 @@ struct ShopCatalogShopView: View {
             ShopCatalogSeriesMenuView(store: store, seriesID: series.id)
                 .presentationDetents([.large])
         }
+        .onChange(of: allSeries) { _, series in selection.reconcile(with: series) }
+        .onAppear { selection.reconcile(with: allSeries) }
+        .accessibilityIdentifier("shop.album")
     }
 
-    private var yearStrip: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                chip(title: "当前上新", isSelected: yearFilter == .current) { yearFilter = .current }
-                ForEach(store.years(inShop: shopID), id: \.self) { year in
-                    chip(title: String(year), isSelected: yearFilter == .year(year)) { yearFilter = .year(year) }
-                }
-                if hasNoYearArchiveSeries {
-                    chip(title: "未标年份", isSelected: yearFilter == .noYear) { yearFilter = .noYear }
+    private var yearRail: some View {
+        ScrollView(.vertical, showsIndicators: false) {
+            VStack(spacing: 8) {
+                ForEach(ShopCatalogAlbumSelection.years(in: allSeries)) { year in
+                    chip(title: year.title.appLocalized, isSelected: selection.year == year) {
+                        selection.selectYear(year)
+                    }
+                    .accessibilityIdentifier("shop.album.year.\(year.id)")
                 }
             }
         }
+        .frame(width: 78)
+        .accessibilityLabel("年份".appLocalized)
+    }
+
+    private var seriesStrip: some View {
+        ScrollViewReader { proxy in
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    chip(title: "全部".appLocalized, isSelected: selection.seriesID == nil) { selection.seriesID = nil }
+                        .id("all").accessibilityIdentifier("shop.album.series.all")
+                    ForEach(yearSeries) { series in
+                        chip(title: series.name, isSelected: selection.seriesID == series.id) { selection.seriesID = series.id }
+                            .id(series.id).accessibilityIdentifier("shop.album.series.\(series.id)")
+                    }
+                }
+                .padding(.vertical, 2)
+            }
+            .onChange(of: selection.year) { _, _ in proxy.scrollTo("all", anchor: .leading) }
+        }
+        .fixedSize(horizontal: false, vertical: true)
+        .accessibilityLabel("系列".appLocalized)
     }
 
     private func chip(title: String, isSelected: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            Text(title.appLocalized)
+            Text(title)
                 .font(.system(size: 13, weight: isSelected ? .semibold : .regular))
-                .foregroundStyle(isSelected ? .white : themeManager.secondaryTextColor)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 7)
+                .foregroundStyle(isSelected ? palette.primary : palette.secondary)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 10)
+                .frame(minHeight: 44)
                 .background(
-                    Capsule().fill(isSelected ? Color.pink : Color.secondary.opacity(0.12))
+                    RoundedRectangle(cornerRadius: 12).fill(surface)
                 )
+                .overlay { RoundedRectangle(cornerRadius: 12).strokeBorder(isSelected ? palette.accent : palette.divider, lineWidth: isSelected ? 1.5 : 0.5) }
         }
         .buttonStyle(.plain)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 
     @ViewBuilder
@@ -310,15 +330,15 @@ struct ShopCatalogShopView: View {
             VStack(spacing: 8) {
                 Image(systemName: "clock.arrow.circlepath")
                     .font(.system(size: 24))
-                    .foregroundStyle(themeManager.tertiaryTextColor)
-                Text(yearFilter == .current ? "暂无进行中的上新" : "该年份暂无收录系列")
+                    .foregroundStyle(palette.tertiary)
+                Text("该年份暂无收录系列".appLocalized)
                     .font(.system(size: 14))
-                    .foregroundStyle(themeManager.secondaryTextColor)
+                    .foregroundStyle(palette.secondary)
             }
             .frame(maxWidth: .infinity)
             .padding(.top, 48)
         } else {
-            VStack(spacing: 12) {
+            LazyVStack(spacing: 12) {
                 ForEach(visibleSeries) { s in
                     Button {
                         menuSeries = s
@@ -326,6 +346,7 @@ struct ShopCatalogShopView: View {
                         seriesCard(s)
                     }
                     .buttonStyle(.plain)
+                    .accessibilityIdentifier("shop.album.open.\(s.id)")
                 }
             }
         }
@@ -340,19 +361,20 @@ struct ShopCatalogShopView: View {
             VStack(alignment: .leading, spacing: 6) {
                 Text(s.name)
                     .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(themeManager.primaryTextColor)
+                    .foregroundStyle(palette.primary)
                     .lineLimit(2)
-                HStack(spacing: 6) {
+                VStack(alignment: .leading, spacing: 3) {
                     if let latest = store.latestSeriesActivity(s) {
                         Text("\(ShopCatalogFormat.month(latest)) 上新".appLocalized)
                             .font(.system(size: 12))
-                            .foregroundStyle(themeManager.secondaryTextColor)
+                            .foregroundStyle(palette.secondary)
                     }
-                    Text("· \(store.productCount(inSeries: s.id)) 件商品".appLocalized)
+                    Text("\(store.productCount(inSeries: s.id)) 件商品".appLocalized)
                         .font(.system(size: 12))
-                        .foregroundStyle(themeManager.secondaryTextColor)
+                        .foregroundStyle(palette.secondary)
                 }
             }
+            .padding(5).background(surface, in: RoundedRectangle(cornerRadius: 8))
             Spacer(minLength: 0)
             Image(systemName: "chevron.right")
                 .font(.system(size: 13, weight: .semibold))

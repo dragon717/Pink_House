@@ -204,6 +204,27 @@ struct WardrobeStorageShelf: View {
     }
 }
 
+/// A fixed shell keeps both ends connected even during native elastic overscroll.
+private struct WardrobeStorageCabinetBackdrop: View {
+    let category: WardrobeStorageCategory
+    let width: CGFloat
+    let height: CGFloat
+
+    var body: some View {
+        let bayHeight = width * category.shelfHeightRatio
+        VStack(spacing: 0) {
+            ForEach(0..<max(1, Int(ceil(height / bayHeight))), id: \.self) { row in
+                WardrobeStorageShelf(category: category, entries: [], width: width, number: row + 1,
+                                     showPrice: false, onSelect: { _ in })
+            }
+        }
+        .frame(width: width, height: height, alignment: .top)
+        .clipped()
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+}
+
 /// The available room, rather than inventory size, determines the furniture's frame.
 struct WardrobeStorageCabinetLayout {
     let width: CGFloat
@@ -236,37 +257,45 @@ struct WardrobeStorageCabinet: View {
     let showPrice: Bool
     @Environment(\.wardrobeStoragePalette) private var palette
     let onSelect: (WardrobeStorageEntry) -> Void
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
     var body: some View {
-        let shouldReduceMotion = reduceMotion
         let layout = WardrobeStorageCabinetLayout(size: CGSize(width: width, height: height), category: category)
         VStack(spacing: 0) {
             // Only the bays scroll; both ends retain their position and original proportions.
             crown(layout: layout)
                 .zIndex(1)
-            ScrollView {
-                LazyVStack(spacing: 0) {
-                    ForEach(0..<layout.rowCount(for: entries.count), id: \.self) { row in
-                        let start = min(row * 2, entries.count)
-                        let end = min(start + 2, entries.count)
-                        WardrobeStorageShelf(category: category, entries: Array(entries[start..<end]), width: layout.width, number: row + 1, showPrice: showPrice, onSelect: onSelect)
-                            .id(row)
-                            .scrollTransition(.interactive, axis: .vertical) { content, phase in
-                                content
-                                    .opacity(shouldReduceMotion || phase.isIdentity ? 1 : 0.94)
-                            }
+            ZStack {
+                // Pulling either end reveals an empty bay, never the room wallpaper.
+                backdrop(layout: layout)
+                ScrollView {
+                    LazyVStack(spacing: 0) {
+                        ForEach(0..<layout.rowCount(for: entries.count), id: \.self) { row in
+                            let start = min(row * 2, entries.count)
+                            let end = min(start + 2, entries.count)
+                            WardrobeStorageShelf(category: category, entries: Array(entries[start..<end]), width: layout.width, number: row + 1, showPrice: showPrice, onSelect: onSelect)
+                                .id(row)
+                        }
                     }
+                    .scrollTargetLayout()
+                    .frame(maxWidth: .infinity)
                 }
-                .scrollTargetLayout()
-                .frame(maxWidth: .infinity)
+                .frame(height: layout.viewportHeight)
+                .clipped()
+                .scrollIndicators(.hidden)
+                .scrollTargetBehavior(.viewAligned)
+                .defaultScrollAnchor(.top)
+                .accessibilityIdentifier("storage.cabinet.shelves")
+                // Fixed carved posts connect the crown and base in front of moving shelves.
+                backdrop(layout: layout)
+                    .mask {
+                        HStack(spacing: 0) {
+                            Rectangle().frame(width: layout.width * 0.13)
+                            Spacer(minLength: 0)
+                            Rectangle().frame(width: layout.width * 0.13)
+                        }
+                    }
             }
-            .frame(height: layout.viewportHeight)
+            .frame(width: layout.width, height: layout.viewportHeight)
             .clipped()
-            .scrollIndicators(.hidden)
-            .scrollTargetBehavior(.viewAligned)
-            .defaultScrollAnchor(.top)
-            .accessibilityIdentifier("storage.cabinet.shelves")
             base(layout: layout)
                 .zIndex(1)
         }
@@ -280,6 +309,10 @@ struct WardrobeStorageCabinet: View {
         .padding(.bottom, 18)
         .frame(width: width, height: height, alignment: .top)
         .accessibilityIdentifier("storage.cabinet")
+    }
+
+    private func backdrop(layout: WardrobeStorageCabinetLayout) -> some View {
+        WardrobeStorageCabinetBackdrop(category: category, width: layout.width, height: layout.viewportHeight)
     }
 
     @ViewBuilder
