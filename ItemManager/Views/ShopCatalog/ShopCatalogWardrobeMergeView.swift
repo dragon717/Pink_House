@@ -461,6 +461,8 @@ struct ShopCatalogWardrobeMergeView: View {
             _ = try await ShopCatalogWardrobeAddition.addSet(
                 drafts: pairs,
                 accessoryProductIDs: keptAccessoryIDs,
+                accessorySelections: Dictionary(selections.filter { keptAccessoryIDs.contains($0.productID) }
+                    .map { ($0.productID, $0) }, uniquingKeysWith: { first, _ in first }),
                 store: store,
                 modelContext: modelContext
             )

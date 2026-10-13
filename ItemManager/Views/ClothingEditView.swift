@@ -1182,6 +1182,7 @@ struct ClothingEditView: View {
 
     private var initialBrandID: UUID?
     private var initialTypes: Set<String>?
+    private var onSaved: ((Clothing) -> Void)?
     @State private var originalReservationKind: ClothingReservationKind = .owned
     @State private var originalCondition: String = ""
 
@@ -1190,13 +1191,15 @@ struct ClothingEditView: View {
         initialBrandID: UUID? = nil,
         initialTypes: Set<String>? = nil,
         continueFromDraft: Bool = true,
-        activityDraft: ClothingEditDraft? = nil
+        activityDraft: ClothingEditDraft? = nil,
+        onSaved: ((Clothing) -> Void)? = nil
     ) {
         _clothing = State(initialValue: clothing)
         self.initialBrandID = initialBrandID
         self.initialTypes = initialTypes
         self.continueFromDraft = continueFromDraft
         self.activityDraft = activityDraft
+        self.onSaved = onSaved
         print("ClothingEditView: INIT called, isEditing: \(clothing != nil), continueFromDraft: \(continueFromDraft)")
     }
 
@@ -2882,6 +2885,7 @@ struct ClothingEditView: View {
         // Save context and sync widget
         do {
             try modelContext.save()
+            if let notificationTarget { onSaved?(notificationTarget) }
             NotificationCenter.default.post(name: .depositPlanDataDidChange, object: notificationTarget?.id)
             if let notificationTarget {
                 NotificationManager.shared.scheduleNotification(for: notificationTarget, modelContext: modelContext)

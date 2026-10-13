@@ -19,6 +19,7 @@ extension ShopCatalogWardrobeInserter {
     static func insertSetWithImages(
         drafts: [(draft: ClothingEditDraft, selection: ShopCatalogWardrobeDraftBuilder.Selection?)],
         accessoryProductIDs: Set<String>,
+        accessorySelections: [String: ShopCatalogWardrobeDraftBuilder.Selection] = [:],
         store: ShopCatalogStore,
         modelContext: ModelContext
     ) async throws -> [Clothing] {
@@ -32,7 +33,8 @@ extension ShopCatalogWardrobeInserter {
                     throw ShopCatalogWardrobeError.productNotFound(selection.productID)
                 }
                 let paths = try await ShopCatalogWardrobeImageImporter.materialize(
-                    product: product, store: store, modelContext: modelContext)
+                    product: product, store: store, modelContext: modelContext,
+                    selectedColor: selection.color ?? entry.draft.colors)
                 acquiredPaths += paths
                 prepared[index].draft = entry.draft.with(imagePaths: paths)
             }
@@ -41,7 +43,8 @@ extension ShopCatalogWardrobeInserter {
                     throw ShopCatalogWardrobeError.productNotFound(id)
                 }
                 let paths = try await ShopCatalogWardrobeImageImporter.materialize(
-                    product: product, store: store, modelContext: modelContext)
+                    product: product, store: store, modelContext: modelContext,
+                    selectedColor: accessorySelections[id]?.color)
                 acquiredPaths += paths
                 accessoryImages[id] = paths
             }

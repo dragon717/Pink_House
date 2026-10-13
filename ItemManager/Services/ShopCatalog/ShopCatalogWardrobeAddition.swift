@@ -17,11 +17,13 @@ enum ShopCatalogWardrobeAddition {
     @discardableResult
     static func addSet(
         drafts: [(draft: ClothingEditDraft, selection: ShopCatalogWardrobeDraftBuilder.Selection?)],
-        accessoryProductIDs: Set<String>, store: ShopCatalogStore,
+        accessoryProductIDs: Set<String>,
+        accessorySelections: [String: ShopCatalogWardrobeDraftBuilder.Selection] = [:],
+        store: ShopCatalogStore,
         modelContext: ModelContext, successMessage: String? = nil
     ) async throws -> [Clothing] {
         let inserted = try await ShopCatalogWardrobeInserter.insertSetWithImages(
-            drafts: drafts, accessoryProductIDs: accessoryProductIDs,
+            drafts: drafts, accessoryProductIDs: accessoryProductIDs, accessorySelections: accessorySelections,
             store: store, modelContext: modelContext)
         WardrobeOperationFeedback.completeTimeHallAddition(inserted, context: modelContext,
                                                           message: successMessage)

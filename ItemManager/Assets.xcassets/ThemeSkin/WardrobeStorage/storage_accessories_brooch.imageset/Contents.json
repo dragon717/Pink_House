@@ -1,0 +1,12 @@
+{
+  "images" : [
+    {
+      "filename" : "storage_accessories_brooch.png",
+      "idiom" : "universal"
+    }
+  ],
+  "info" : {
+    "author" : "xcode",
+    "version" : 1
+  }
+}

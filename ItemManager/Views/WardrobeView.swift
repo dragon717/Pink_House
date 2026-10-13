@@ -33,6 +33,7 @@ private struct WardrobeFilterSignature: Hashable {
     let depositStatusFilterRawValue: String
     let sortOptionRawValue: String
     let clothingRevisions: [WardrobeClothingRevision]
+    let storageCabinets: [WardrobeStorageCustomCabinet]
 
     init(
         searchText: String,
@@ -46,7 +47,8 @@ private struct WardrobeFilterSignature: Hashable {
         selectedAccessories: Set<String>,
         depositStatusFilterRawValue: String,
         sortOptionRawValue: String,
-        clothingRevisions: [WardrobeClothingRevision]
+        clothingRevisions: [WardrobeClothingRevision],
+        storageCabinets: [WardrobeStorageCustomCabinet] = []
     ) {
         self.searchText = searchText
         self.selectedTagIDs = selectedTagIDs.sorted { $0.uuidString < $1.uuidString }
@@ -60,10 +62,11 @@ private struct WardrobeFilterSignature: Hashable {
         self.depositStatusFilterRawValue = depositStatusFilterRawValue
         self.sortOptionRawValue = sortOptionRawValue
         self.clothingRevisions = clothingRevisions
+        self.storageCabinets = storageCabinets
     }
 }
 
-private struct WardrobeClothingSnapshot: Sendable {
+struct WardrobeClothingSnapshot: Sendable {
     let id: UUID
     let name: String
     let brandID: UUID?
@@ -124,7 +127,7 @@ private struct WardrobeClothingSnapshot: Sendable {
     }
 }
 
-private struct WardrobeFilterInput: Sendable {
+struct WardrobeFilterInput: Sendable {
     let snapshots: [WardrobeClothingSnapshot]
     let searchText: String
     let selectedTagIDs: Set<UUID>
@@ -137,6 +140,7 @@ private struct WardrobeFilterInput: Sendable {
     let selectedAccessories: Set<String>
     let depositStatusFilterRawValue: String
     let sortOptionRawValue: String
+    var storageCabinets: [WardrobeStorageCustomCabinet] = []
 }
 
 struct WardrobeStatsSummary: Equatable, Sendable {
@@ -153,19 +157,24 @@ struct WardrobeStatsSummary: Equatable, Sendable {
     )
 }
 
-private struct WardrobeFilterResult: Sendable {
+struct WardrobeFilterResult: Sendable {
     let ids: [UUID]
     let stats: WardrobeStatsSummary
     let conditionOptions: [String]
 }
 
-private enum WardrobeFilterEngine {
+enum WardrobeFilterEngine {
     nonisolated static func evaluate(_ input: WardrobeFilterInput) -> WardrobeFilterResult {
         if Task.isCancelled {
             return WardrobeFilterResult(ids: [], stats: .empty, conditionOptions: ["全新"])
         }
 
-        var result = input.snapshots.filter { !$0.isDeleted && $0.deletedAt == nil }
+        let homeSnapshots = input.snapshots.filter {
+            !$0.isDeleted && $0.deletedAt == nil &&
+            WardrobeStorageCategory.destination(clothingID: $0.id, name: $0.name, types: $0.types, accessories: $0.accessories,
+                customCabinets: input.storageCabinets).id == WardrobeStorageCategory.wardrobe.rawValue
+        }
+        var result = homeSnapshots
         let query = input.searchText.trimmingCharacters(in: .whitespacesAndNewlines)
 
         if !query.isEmpty {
@@ -186,7 +195,7 @@ private enum WardrobeFilterEngine {
 
         result = sorted(result, sortOptionRawValue: input.sortOptionRawValue)
         let stats = statsSummary(for: result)
-        let conditionOptions = conditionOptions(from: input.snapshots)
+        let conditionOptions = conditionOptions(from: homeSnapshots)
 
         return WardrobeFilterResult(
             ids: result.map(\.id),
@@ -548,6 +557,7 @@ struct WardrobeView: View {
     @State private var didReconcilePaidFinalPaymentsForWardrobe = false
     @ObservedObject private var themeSkinManager = ThemeSkinManager.shared
     @AppStorage("privacyShowPrice") private var showPrice = true
+    @State private var storageSettings = WardrobeStorageSettings.shared
     @AppStorage("privacyShowOriginalPrice") private var showOriginalPrice = true
     
     // Edit Mode States
@@ -875,7 +885,8 @@ struct WardrobeView: View {
                     isDepositPlan: clothing.isDepositPlan,
                     isFullPaymentReservation: clothing.isFullPaymentReservation
                 )
-            }
+            },
+            storageCabinets: storageSettings.cabinets
         )
     }
 
@@ -2529,7 +2540,8 @@ struct WardrobeView: View {
             selectedConditions: selectedConditions,
             selectedAccessories: selectedAccessories,
             depositStatusFilterRawValue: depositStatusFilter.rawValue,
-            sortOptionRawValue: sortOption.rawValue
+            sortOptionRawValue: sortOption.rawValue,
+            storageCabinets: storageSettings.cabinets
         )
 
         let result = await Task.detached(priority: .userInitiated) {

@@ -424,6 +424,9 @@ struct HomeView: View {
 
     @Binding var selectedTab: HomeTab
     @State private var showingAddSheet = false
+    @State private var showingStorageDrawer = false
+    @State private var storageCategory: WardrobeStorageDestination?
+    @Environment(\.accessibilityReduceMotion) private var reduceStorageMotion
     @State private var showingBatchImportSheet = false
     @State private var batchImportUnlockAlert: FeatureUnlockAlert?
     @State private var isSelectionMode = false
@@ -640,6 +643,9 @@ struct HomeView: View {
                     transaction.disablesAnimations = true
                 }
             }
+            .overlay(alignment: .trailing) {
+                storageEdgeGesture
+            }
             .onChange(of: viewLayout) { _, _ in
                 RewardManager.shared.triggerReward(type: .firstTimeFeature("ViewLayoutChange"))
             }
@@ -652,6 +658,9 @@ struct HomeView: View {
             }
             .sheet(isPresented: $showingBatchImportSheet) {
                 BatchImportView()
+            }
+            .navigationDestination(item: $storageCategory) { category in
+                WardrobeStorageRoomView(destination: category)
             }
             .onChange(of: showingBatchImportSheet) { _, newValue in
                 if newValue {
@@ -776,6 +785,18 @@ struct HomeView: View {
             .floatingPetHidden(.wardrobeEditing, isActive: isInWardrobeEditMode)
             .floatingPetHidden(.presentationActive, isActive: isFloatingPetPresentationActive)
         }
+        .accessibilityHidden(showingStorageDrawer)
+        .overlay {
+            if showingStorageDrawer {
+                WardrobeStorageDrawer(onClose: closeStorageDrawer) { category in
+                    closeStorageDrawer()
+                    if category.id != WardrobeStorageCategory.wardrobe.rawValue { storageCategory = category }
+                }
+                .transition(.move(edge: .trailing).combined(with: .opacity))
+                .zIndex(100)
+            }
+        }
+        .floatingPetHidden(.presentationActive, isActive: showingStorageDrawer)
     }
 
     private func openNotificationClothingDetail(_ clothingID: UUID) {
@@ -1102,7 +1123,8 @@ struct HomeView: View {
     }
 
     private var isFloatingPetPresentationActive: Bool {
-        showingBatchImportSheet ||
+        showingStorageDrawer ||
+            showingBatchImportSheet ||
             showingAddSheet ||
             showingDepositNotificationSheet ||
             showingMultiDimensionalFilterSheet ||
@@ -1604,6 +1626,11 @@ struct HomeView: View {
         if selectedTab == .wardrobe {
             Divider()
 
+            Button(action: openStorageDrawer) {
+                Label("我的收纳柜".appLocalized, systemImage: "cabinet")
+            }
+            .accessibilityIdentifier("storage.open")
+
             if !isSelectionMode {
                 Button {
                     enterWardrobeSelectionMode()
@@ -1627,6 +1654,33 @@ struct HomeView: View {
         DispatchQueue.main.async {
             isSearchActive = true
             isWardrobeSearchFocused = true
+        }
+    }
+
+    private func openStorageDrawer() {
+        withAnimation(reduceStorageMotion ? nil : .spring(response: 0.38, dampingFraction: 0.88)) {
+            showingStorageDrawer = true
+        }
+    }
+
+    @ViewBuilder
+    private var storageEdgeGesture: some View {
+        if selectedTab == .wardrobe && !showingStorageDrawer && !isInWardrobeEditMode && !isSearchActive {
+            Color.clear
+                .frame(width: 20)
+                .contentShape(Rectangle())
+                .gesture(DragGesture(minimumDistance: 24).onEnded { value in
+                    guard value.translation.width < -44,
+                          abs(value.translation.height) < abs(value.translation.width) * 0.6 else { return }
+                    openStorageDrawer()
+                })
+                .accessibilityHidden(true)
+        }
+    }
+
+    private func closeStorageDrawer() {
+        withAnimation(reduceStorageMotion ? nil : .spring(response: 0.32, dampingFraction: 0.90)) {
+            showingStorageDrawer = false
         }
     }
 
@@ -1666,6 +1720,8 @@ struct HomeView: View {
 
         if selectedTab == .wardrobe {
             items.append(.divider)
+
+            items.append(.action(title: "我的收纳柜", systemImage: "cabinet", action: openStorageDrawer))
 
             if !isSelectionMode {
                 items.append(

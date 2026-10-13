@@ -1,6 +1,7 @@
 import Foundation
 import SwiftData
 import UIKit
+import SharedCatalog
 
 /// Catalog 的下载缓存可被清理；入橱图片必须进入 ImageManager 的持久化与引用计数体系。
 @MainActor
@@ -21,6 +22,7 @@ enum ShopCatalogWardrobeImageImporter {
         product: CatalogProduct,
         store: ShopCatalogStore,
         modelContext: ModelContext,
+        selectedColor: String? = nil,
         mediaStore: ShopCatalogMediaStore? = nil,
         session: URLSession = .shared,
         maxCount: Int = 6
@@ -29,7 +31,7 @@ enum ShopCatalogWardrobeImageImporter {
         var paths: [String] = []
         var seen = Set<ShopCatalogImageSource>()
         do {
-            for reference in product.images {
+            for reference in references(product: product, store: store, selectedColor: selectedColor) {
                 guard paths.count < maxCount else { break }
                 try Task.checkCancellation()
                 let source = ShopCatalogImageSource.resolve(reference, asset: { store.asset(id: $0) })
@@ -46,6 +48,39 @@ enum ShopCatalogWardrobeImageImporter {
         } catch {
             release(paths, modelContext: modelContext)
             throw error
+        }
+    }
+
+    /// 多色商品只取得所选配色绑定的图；未绑定的全商品图无法证明属于该颜色。
+    /// 单色商品仍保留该色的细节图。规格代表图可以不在 product.images 中。
+    static func references(product: CatalogProduct, store: ShopCatalogStore, selectedColor: String?) -> [String] {
+        func colorKey(_ value: String?) -> String? {
+            CatalogVariantColorGrouping.normalizedColor(value)?
+                .folding(options: [.caseInsensitive, .widthInsensitive], locale: nil)
+        }
+        func identity(_ reference: String) -> String {
+            let source = ShopCatalogImageSource.resolve(reference, asset: { store.asset(id: $0) })
+            return source.mediaKey.map { "media/" + $0 } ?? source.references.first ?? reference
+        }
+        guard let selected = colorKey(selectedColor) else { return product.images }
+        let variants = store.variants(forProduct: product.id)
+        let colors = Set(variants.compactMap { colorKey($0.color) })
+        let matching = variants.filter { colorKey($0.color) == selected }
+            .compactMap { CatalogVariantColorGrouping.normalizedColor($0.imageAssetID) }
+        let otherImages = Set(variants.filter {
+            if let color = colorKey($0.color) { return color != selected }
+            return false
+        }.compactMap { CatalogVariantColorGrouping.normalizedColor($0.imageAssetID) }.map(identity))
+        let matchingImages = Set(matching.map(identity)).subtracting(otherImages)
+        let isSingleColor = colors == Set([selected])
+        // 缺少配色绑定时留空，不能用其它颜色的商品封面冒充用户选定的颜色。
+        let candidates = matching + product.images.filter {
+            matchingImages.contains(identity($0)) || (isSingleColor && !otherImages.contains(identity($0)))
+        }
+        var seen = Set<String>()
+        return candidates.filter {
+            let key = identity($0)
+            return !otherImages.contains(key) && seen.insert(key).inserted
         }
     }
 

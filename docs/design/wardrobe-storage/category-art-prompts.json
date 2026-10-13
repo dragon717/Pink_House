@@ -1,0 +1,30 @@
+[
+  {
+    "category": "bags",
+    "output": "bag-sprites-source.png",
+    "mode": "built-in image_gen",
+    "transparent_background": true,
+    "prompt": "Use case: stylized-concept. Asset type: a single production sprite atlas for a romantic 3D bag display cabinet in a mobile wardrobe app. Primary request: four exquisite miniature Lolita handbags as four isolated cutout sprites on a genuinely transparent background. Composition: square atlas, strict 2 by 2 equal cells. Top left one blush pink structured handbag with satin bow and pearl clasp; top right one ivory heart-shaped bag with thin gold chain tucked beside it; bottom left one small black quilted bow handbag; bottom right one pale cream lace-trimmed picnic basket bag. Each object fits fully inside its own quadrant with 12% transparent margins, no overlap, no text, no lines or dividers. Style: refined soft 3D collectible product render, believable volume, porcelain and satin details, pale rose and warm ivory with delicate brass. Camera: front three-quarter view slightly from above, consistent light from upper left, subtle contact shading attached to object only. No cabinet, no shelf, no room, no background, no labels, no logos, no watermark. Alpha outside each object must be truly zero."
+  },
+  {
+    "category": "accessories",
+    "output": "accessory-sprites-source.png",
+    "mode": "built-in image_gen",
+    "transparent_background": true,
+    "prompt": "Use case: stylized-concept. Asset type: one production sprite atlas for a romantic 3D accessories cabinet in a mobile wardrobe app. Four isolated collectible accessories, strict square 2 by 2 atlas with equal cells, genuinely transparent alpha background. Top left one blush pink satin bow headband with fine lace, top right one pearl necklace draped on a small ivory velvet jewelry bust, bottom left one ivory miniature bonnet with rose ribbon and delicate lace, bottom right one small gold rose brooch with tiny pearls resting on a blush velvet cushion. Each entire object stays inside its quadrant with 12% transparent padding, no overlap. Soft realistic 3D collectible product render with handcrafted lace, velvet and pearl materials. Camera front three-quarter slightly above, light upper left. Warm ivory, pale blush and soft brass. These are cutout objects to sit on shelves: no cabinet, no background surface, no environment, no text, no divider lines, no labels, no watermark, no logos, outside alpha truly zero."
+  },
+  {
+    "category": "beauty",
+    "output": "beauty-sprites-source.png",
+    "mode": "built-in image_gen",
+    "transparent_background": true,
+    "prompt": "Use case: stylized-concept. Asset type: one production sprite atlas for a romantic 3D beauty cabinet in a mobile wardrobe app. Four isolated unbranded beauty collectibles on a genuinely transparent alpha background, strict square 2 by 2 equal-cell atlas. Top left one faceted clear perfume bottle with pale rose liquid and satin ribbon; top right one elegant blush enamel lipstick, lid standing next to it within the same cell; bottom left one small ivory round face powder compact open to reveal powder and a gold-rimmed mirror; bottom right one pastel rose skincare jar with a tiny pearl-accent lid. Entire objects inside their own quadrant with generous 14% transparent margins and no overlap. Refined soft realistic 3D product render, porcelain, glass, satin, subtle gold metal, warm ivory and pale blush palette, consistent front three-quarter camera slightly above, lighting upper left. No letters or brands, no cabinet, no background surface, no environment, no borders, no divider lines, no watermark. Outside objects truly zero alpha."
+  },
+  {
+    "category": "lifestyle",
+    "output": "lifestyle-sprites-source.png",
+    "mode": "built-in image_gen",
+    "transparent_background": true,
+    "prompt": "Use case: stylized-concept. Asset type: one production sprite atlas for a romantic 3D lifestyle collectibles cabinet in a mobile wardrobe app. Four isolated collectible objects on a genuinely transparent alpha background, strict square 2 by 2 equal-cell atlas. Top left one warm cream plush teddy bear sitting with a blush satin bow; top right one delicate ivory porcelain teacup and matching saucer with tiny rose flowers and gold edge, no text; bottom left one closed blush pink journal with a ribbon bow, pearl clasp and an ivory pen beside it in the same cell; bottom right one small seated ivory ceramic bunny figurine holding a pale pink rose. Whole objects fit their own quadrant with 14% transparent margins, no overlap. Refined soft realistic 3D miniature product render, handcrafted plush texture, porcelain glaze and satin ribbon, warm ivory and blush palette, consistent front three-quarter view slightly above, soft light upper left. No cabinet, no shelf, no environment, no background surface, no borders, no divider lines, no labels, no text, no logos, no watermark. Outside each object truly zero alpha."
+  }
+]

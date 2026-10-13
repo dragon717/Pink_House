@@ -742,13 +742,19 @@ final class ShopCatalogWardrobeEntryTests: XCTestCase {
     /// 确认加购时，Bundle 图也应进入衣橱持久化文件体系。
     func testInsertionMaterializesProductImagesIntoWardrobe() async throws {
         let context = modelContext()
+        // 此用例验证 Bundle 图片持久化。明确为单色，避免沿用旧的「多色全图入橱」夹具。
+        var imageCatalog = ShopCatalogSeedFixture.makeCatalog()
+        imageCatalog.variants.removeAll { $0.productID == "prod-ag-xueguo-jsk" }
+        imageCatalog.variants.append(CatalogProductVariant(id: "single-blue-image", productID: "prod-ag-xueguo-jsk",
+                                                           color: "夜空蓝", imageAssetID: "asset-ag-jsk-1"))
+        let imageStore = ShopCatalogStore(catalog: imageCatalog)
         let selection = ShopCatalogWardrobeDraftBuilder.Selection(
             productID: "prod-ag-xueguo-jsk", priceMode: .stock)
         let draft = try XCTUnwrap(ShopCatalogWardrobeDraftBuilder.makeDraft(
-            selection: selection, store: store))
+            selection: selection, store: imageStore))
         XCTAssertTrue(draft.imagePaths.isEmpty, "组装金额资料时不应产生图片文件")
         let clothing = try await ShopCatalogWardrobeInserter.insertWithImages(
-            draft: draft, selection: selection, store: store, modelContext: context)
+            draft: draft, selection: selection, store: imageStore, modelContext: context)
         XCTAssertEqual(clothing.imagePaths.count, 3)
         for path in clothing.imagePaths {
             XCTAssertNotNil(UIImage(contentsOfFile: ImageManager.shared.imagesDirectory
