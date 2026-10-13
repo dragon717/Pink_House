@@ -48,6 +48,7 @@ struct WardrobeStorageDrawer: View {
                         .accessibilityIdentifier("storage.close")
                     }
                     .padding(.horizontal, 20).padding(.top, 22).padding(.bottom, 18)
+                    .background(palette.label.color)
                     ScrollView {
                         VStack(spacing: 10) {
                             ForEach(storageSettings.destinations) { category in
@@ -68,7 +69,7 @@ struct WardrobeStorageDrawer: View {
                                     }
                                     .padding(.horizontal, 18).padding(.vertical, 16)
                                     .frame(maxWidth: .infinity, alignment: .leading)
-                                    .background(category.id == WardrobeStorageCategory.shoes.rawValue ? palette.selected.color : palette.card.color, in: RoundedRectangle(cornerRadius: 19))
+                                    .background(category.id == WardrobeStorageCategory.shoes.rawValue ? palette.selected.color : palette.label.color, in: RoundedRectangle(cornerRadius: 19))
                                     .overlay {
                                         RoundedRectangle(cornerRadius: 19)
                                             .strokeBorder(palette.accent.color.opacity(category.id == WardrobeStorageCategory.shoes.rawValue ? 0.24 : 0.10), lineWidth: 1)
@@ -92,7 +93,7 @@ struct WardrobeStorageDrawer: View {
                                 }
                                 .foregroundStyle(palette.accent.color)
                                 .padding(.horizontal, 18).padding(.vertical, 8)
-                                .background(palette.card.color, in: RoundedRectangle(cornerRadius: 19))
+                                .background(palette.label.color, in: RoundedRectangle(cornerRadius: 19))
                                 .overlay { RoundedRectangle(cornerRadius: 19).strokeBorder(palette.accent.color.opacity(0.25), style: StrokeStyle(lineWidth: 1, dash: [4, 4])) }
                             }
                             .buttonStyle(.plain)
@@ -102,11 +103,13 @@ struct WardrobeStorageDrawer: View {
                     }
                     Text("收藏生活中的每一份美好".appLocalized)
                         .font(.system(size: 13, weight: .light, design: .serif))
-                        .foregroundStyle(palette.secondary.color).padding(.bottom, 22)
+                        .foregroundStyle(palette.secondary.color).padding(12)
+                        .background(palette.label.color, in: RoundedRectangle(cornerRadius: 10)).padding(.bottom, 10)
                 }
                 .frame(width: width)
                 .frame(maxHeight: .infinity)
-                .background(palette.rear.color)
+                .background { CardBackgroundView(cornerRadius: 30) }
+                .background { LiquidBackground(themeSkinWallpaperContext: .wardrobe) }
                 .overlay(alignment: .leading) {
                     Rectangle().fill(palette.accent.color.opacity(0.15)).frame(width: 1)
                 }

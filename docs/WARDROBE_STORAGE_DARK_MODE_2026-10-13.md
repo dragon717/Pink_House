@@ -79,3 +79,5 @@ LOG=/private/tmp/pink-house-storage-night-acceptance-build.log \
 构建环境修复：首次发现缺少 Metal Toolchain，已通过官方 `xcodebuild -downloadComponent MetalToolchain` 安装 27A266a。后续全量构建超过默认 180 秒，因此本次最终验收时限调整为 600 秒。提交快照读取与工作区相同的、未被 Git 跟踪的 Package.resolved（generative-ai-swift revision `44a40daf54bcb8db2695f4af618107e72c472b36`）并复用本地依赖缓存；不改依赖版本。
 
 验证边界：没有真机、iOS 17.4 运行时或 Instruments 帧率/能耗验收；不宣称已经测得真机性能。既有 MainActor / Sendable 警告、extension 与 parent 的 CFBundleVersion 不一致、资源去重脚本每次运行提示及 Xcode `exit code 0 but produced no further output` 诊断仍存在，本轮不修改这些无关代码。Device Hub 偶发 AXError，已重新读取并以实际截图确认结果。
+
+后续用户要求统一主题配色与背景：本页的独立深色背景描述已由 [收纳柜接入统一主题](WARDROBE_STORAGE_UNIFIED_THEME_2026-10-13.md) 取代，柜体灯光继续沿用。

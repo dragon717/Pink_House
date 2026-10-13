@@ -58,7 +58,6 @@ struct WardrobeStorageRoomView: View {
 
         ZStack {
             LiquidBackground(themeSkinWallpaperContext: .wardrobe).ignoresSafeArea()
-            if palette.isDark { palette.scene.color.ignoresSafeArea() }
             HStack(alignment: .top, spacing: 8) {
                 categoryRail
                 VStack(spacing: 10) {
@@ -77,6 +76,7 @@ struct WardrobeStorageRoomView: View {
                     if imageFailureCount > 0 {
                         Text("有 %lld 张图片暂未抠出，可点右上角重试。".appLocalized(Int64(imageFailureCount)))
                             .font(.system(size: 11)).foregroundStyle(palette.secondary.color)
+                            .padding(5).background(palette.label.color, in: RoundedRectangle(cornerRadius: 8))
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
                     GeometryReader { geometry in
@@ -91,7 +91,7 @@ struct WardrobeStorageRoomView: View {
                                 emptyCollection
                             } else {
                                 WardrobeStorageGrid(entries: displayed, width: width, showPrice: showPrice, onSelect: select)
-                                    .background(palette.rear.color, in: RoundedRectangle(cornerRadius: 20))
+                                    .background { CardBackgroundView(cornerRadius: 20) }
                             }
                         }
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -107,7 +107,9 @@ struct WardrobeStorageRoomView: View {
         }
         .navigationTitle("我的收纳柜".appLocalized)
         .navigationBarTitleDisplayMode(.inline)
-        .toolbarBackground(.hidden, for: .navigationBar)
+        .toolbarBackground(palette.label.color, for: .navigationBar)
+        .toolbarBackground(.visible, for: .navigationBar)
+        .toolbarColorScheme(palette.label.luminance < 0.18 ? .dark : .light, for: .navigationBar)
         .toolbar {
             if customCabinet != nil {
                 ToolbarItem(placement: .topBarTrailing) {
@@ -210,7 +212,8 @@ struct WardrobeStorageRoomView: View {
                         } label: {
                             VStack(spacing: 5) {
                                 WardrobeStorageIcon(kind: item.icon, size: 37, selected: item.id == destination.id)
-                                Text(item.title.appLocalized).font(.system(size: 9, weight: .medium)).lineLimit(2)
+                                Text(item.title.appLocalized).font(.system(size: 10, weight: .medium)).lineLimit(2)
+                                    .padding(3).background(palette.label.color, in: RoundedRectangle(cornerRadius: 5))
                             }
                             .frame(width: 48).frame(minHeight: 62)
                             .foregroundStyle(item.id == destination.id ? palette.accent.color : palette.secondary.color)
@@ -227,7 +230,7 @@ struct WardrobeStorageRoomView: View {
                 Image(systemName: "plus").font(.system(size: 17, weight: .medium))
                     .frame(width: 38, height: 38)
                     .foregroundStyle(palette.accent.color)
-                    .background(palette.card.color, in: Circle())
+                    .background(palette.label.color, in: Circle())
                     .overlay { Circle().strokeBorder(palette.accent.color.opacity(0.25), style: StrokeStyle(lineWidth: 1, dash: [3, 3])) }
             }
             .buttonStyle(.plain)
@@ -263,7 +266,8 @@ struct WardrobeStorageRoomView: View {
             .accessibilityLabel(destination.customID == nil ? "添加".appLocalized + destination.title.appLocalized : "收纳物品".appLocalized)
             .accessibilityIdentifier("storage.add")
         }
-        .padding(.horizontal, 4)
+        .padding(8)
+        .background(palette.label.color, in: RoundedRectangle(cornerRadius: 18))
     }
 
     private var searchField: some View {
@@ -281,7 +285,7 @@ struct WardrobeStorageRoomView: View {
             }
         }
         .padding(.horizontal, 12).frame(height: 40)
-        .background(palette.card.color, in: RoundedRectangle(cornerRadius: 14))
+        .background(palette.label.color, in: RoundedRectangle(cornerRadius: 14))
     }
 
     private var shoeFilters: some View {
@@ -295,7 +299,7 @@ struct WardrobeStorageRoomView: View {
                             .font(.system(size: 12, weight: shoeFilter == filter ? .semibold : .regular))
                             .padding(.horizontal, 11).frame(height: 36)
                             .foregroundStyle(shoeFilter == filter ? palette.accent.color : palette.secondary.color)
-                            .background(shoeFilter == filter ? palette.selected.color : palette.card.color, in: Capsule())
+                            .background(shoeFilter == filter ? palette.selected.color : palette.label.color, in: Capsule())
                     }
                     .buttonStyle(.plain)
                     .accessibilityAddTraits(shoeFilter == filter ? .isSelected : [])
@@ -318,7 +322,8 @@ struct WardrobeStorageRoomView: View {
         .font(.system(size: 12))
         .foregroundStyle(palette.secondary.color)
         .frame(minHeight: 32)
-        .padding(.horizontal, 4)
+        .padding(6)
+        .background(palette.label.color, in: RoundedRectangle(cornerRadius: 10))
     }
 
     private var emptySearch: some View {
@@ -329,6 +334,7 @@ struct WardrobeStorageRoomView: View {
         } actions: {
             Button("清除筛选".appLocalized) { searchText = ""; shoeFilter = .all }
         }
+        .background(palette.label.color, in: RoundedRectangle(cornerRadius: 20))
     }
 
     private var emptyCollection: some View {
@@ -339,6 +345,7 @@ struct WardrobeStorageRoomView: View {
         } actions: {
             Button("添加收藏".appLocalized) { if destination.customID != nil { showingContents = true } else { showingAdd = true } }
         }
+        .background(palette.label.color, in: RoundedRectangle(cornerRadius: 20))
     }
 
     private func select(_ entry: WardrobeStorageEntry) { detailClothing = entry.clothing }

@@ -20,13 +20,17 @@ struct WardrobeStorageCabinetEditor: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section("柜子名称".appLocalized) {
+                Section {
                     TextField("", text: $name, prompt: Text("例如：礼帽柜、袜子柜".appLocalized).foregroundColor(palette.secondary.color))
                         .accessibilityIdentifier("storage.custom.name")
                         .submitLabel(.done)
                     if let error { Text(error).font(.footnote).foregroundStyle(.red) }
+                } header: {
+                    Text("柜子名称".appLocalized).foregroundStyle(palette.secondary.color)
+                        .padding(4).background(palette.label.color, in: RoundedRectangle(cornerRadius: 5))
                 }
-                Section("选择图标".appLocalized) {
+                .listRowBackground(palette.label.color)
+                Section {
                     LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 4), spacing: 16) {
                         ForEach(WardrobeStorageIconKind.allCases) { option in
                             Button { icon = option } label: {
@@ -42,10 +46,19 @@ struct WardrobeStorageCabinetEditor: View {
                         }
                     }
                     .padding(.vertical, 8)
+                } header: {
+                    Text("选择图标".appLocalized).foregroundStyle(palette.secondary.color)
+                        .padding(4).background(palette.label.color, in: RoundedRectangle(cornerRadius: 5))
                 }
+                .listRowBackground(palette.label.color)
             }
+            .scrollContentBackground(.hidden)
+            .background { LiquidBackground(themeSkinWallpaperContext: .wardrobe) }
             .navigationTitle((cabinet == nil ? "添加柜子" : "编辑柜子").appLocalized)
             .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(palette.label.color, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
+            .toolbarColorScheme(palette.label.luminance < 0.18 ? .dark : .light, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("取消".appLocalized) { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
@@ -91,7 +104,8 @@ struct WardrobeStorageContentsEditor: View {
                     Button(action: onCreateNew) { Label("新建物品".appLocalized, systemImage: "plus") }
                         .accessibilityIdentifier("storage.custom.new-item")
                 }
-                Section("选择收纳物品".appLocalized) {
+                .listRowBackground(palette.label.color)
+                Section {
                     if displayed.isEmpty {
                         Text(eligible.isEmpty ? "还没有可收纳的物品".appLocalized : "没有找到这件物品".appLocalized)
                             .foregroundStyle(palette.secondary.color)
@@ -112,12 +126,21 @@ struct WardrobeStorageContentsEditor: View {
                         }
                         .buttonStyle(.plain)
                     }
+                } header: {
+                    Text("选择收纳物品".appLocalized).foregroundStyle(palette.secondary.color)
+                        .padding(4).background(palette.label.color, in: RoundedRectangle(cornerRadius: 5))
                 }
-                if let error { Text(error).foregroundStyle(.red) }
+                .listRowBackground(palette.label.color)
+                if let error { Text(error).foregroundStyle(.red).listRowBackground(palette.label.color) }
             }
+            .scrollContentBackground(.hidden)
+            .background { LiquidBackground(themeSkinWallpaperContext: .wardrobe) }
             .searchable(text: $search, prompt: Text("搜索物品".appLocalized).foregroundColor(palette.secondary.color))
             .navigationTitle(cabinet.name)
             .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(palette.label.color, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
+            .toolbarColorScheme(palette.label.luminance < 0.18 ? .dark : .light, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("取消".appLocalized) { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {

@@ -61,30 +61,8 @@ struct CardBackgroundView: View {
     
     /// 魔法配色下的卡片背景色 - 基于用户设置的背景色动态计算
     private var magicCardBackgroundColor: Color {
-        // 客制化配色模式：使用预设主题的卡片背景色
-        if themeManager.colorSchemeMode == .custom {
-            let isDark = colorScheme == .dark
-            let cardColors = themeManager.themeColorConfig.customColorConfig.currentCustom.cardColors(forDarkMode: isDark)
-            return cardColors.backgroundRGBA.color
-        }
-        
-        // 魔法配色模式：基于用户设置的背景色生成卡片背景色
-        let isDark = colorScheme == .dark
-        let bgColor = themeManager.backgroundColor
-        
-        if isDark {
-            // 暗夜模式：比背景色稍亮一点，增加层次感
-            return bgColor.opacity(0.9)
-        } else {
-            // 亮色模式：使用半透明白色，与背景色融合
-            if bgColor.isDark {
-                return Color.white.opacity(0.95)
-            } else {
-                return Color.white.opacity(0.85)
-            }
-        }
+        themeManager.cardSurfaceColor(for: colorScheme)
     }
-    
     private var glassFallbackColor: Color {
         #if DEBUG
         if colorScheme == .dark {
@@ -127,5 +105,33 @@ struct CardBackgroundView: View {
             themeManager.cardTintColor.opacity(colorScheme == .dark ? 0.05 : 0.1)
         ]
         #endif
+    }
+}
+
+extension ThemeManager {
+    /// Shared by card rendering and nearby text palettes; use the view's scheme.
+    func cardSurfaceColor(for colorScheme: ColorScheme) -> Color {
+        // 客制化配色模式：使用预设主题的卡片背景色
+        if colorSchemeMode == .custom {
+            let isDark = colorScheme == .dark
+            let cardColors = themeColorConfig.customColorConfig.currentCustom.cardColors(forDarkMode: isDark)
+            return cardColors.backgroundRGBA.color
+        }
+
+        // 魔法配色模式：基于用户设置的背景色生成卡片背景色
+        let isDark = colorScheme == .dark
+        let bgColor = backgroundColor
+
+        if isDark {
+            // 暗夜模式：比背景色稍亮一点，增加层次感
+            return bgColor.opacity(0.9)
+        } else {
+            // 亮色模式：使用半透明白色，与背景色融合
+            if bgColor.isDark {
+                return Color.white.opacity(0.95)
+            } else {
+                return Color.white.opacity(0.85)
+            }
+        }
     }
 }

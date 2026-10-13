@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Opaque surfaces make small labels predictable even over a user-selected wallpaper.
+/// A contrast adapter for the shared theme. Small labels use opaque, theme-derived plates.
 nonisolated struct WardrobeStorageRGB: Equatable, Sendable {
     let r: Double
     let g: Double
@@ -62,8 +62,9 @@ nonisolated struct WardrobeStoragePalette: Equatable, Sendable {
     let iconFill: WardrobeStorageRGB
     let gold: WardrobeStorageRGB
 
-    var textSurfaces: [WardrobeStorageRGB] { [scene, rear, card, selected, label] }
+    var textSurfaces: [WardrobeStorageRGB] { [label, selected] }
 
+    /// Fallback for standalone art previews without a ThemeManager environment.
     static func resolve(dark: Bool, increasedContrast: Bool = false, accent: WardrobeStorageRGB? = nil) -> Self {
         let scene = WardrobeStorageRGB(hex: dark ? 0x181319 : 0xFAEEF1)
         let rear = WardrobeStorageRGB(hex: dark ? 0x221A23 : 0xF7EBEE)
@@ -86,6 +87,31 @@ nonisolated struct WardrobeStoragePalette: Equatable, Sendable {
                     iconFill: WardrobeStorageRGB(hex: dark ? 0x926477 : 0xEFADB8),
                     gold: WardrobeStorageRGB(hex: dark ? 0xE5BA84 : 0xAE8052))
     }
+
+    /// Rendering surfaces are supplied by the app's theme, not a second set of theme swatches.
+    static func fromUnified(dark: Bool, increasedContrast: Bool, scene: WardrobeStorageRGB,
+                            surface: WardrobeStorageRGB, primary: WardrobeStorageRGB,
+                            secondary: WardrobeStorageRGB, accent: WardrobeStorageRGB) -> Self {
+        let minimum = increasedContrast ? 9.0 : 7.0
+        let lightText = surface.luminance < 0.18
+        let endpoint = WardrobeStorageRGB(hex: lightText ? 0xFFFFFF : 0x000000)
+        // Mid-tone cards cannot provide 7:1 with any text. Only the small reading plate
+        // receives the minimum adjustment; the theme's wallpaper/card drawing stays intact.
+        let label = surface.ensuringContrast(on: [endpoint], dark: !lightText, minimum: minimum)
+        let selected = label.mixed(with: accent, fraction: 0.08)
+            .ensuringContrast(on: [endpoint], dark: !lightText, minimum: minimum)
+        let plates = [label, selected]
+        let readablePrimary = primary.ensuringContrast(on: plates, dark: lightText, minimum: minimum)
+        let readableSecondary = secondary.ensuringContrast(on: plates, dark: lightText, minimum: minimum)
+        let readableAccent = accent.ensuringContrast(on: plates, dark: lightText, minimum: minimum)
+        return Self(isDark: dark, increasedContrast: increasedContrast, scene: scene, rear: surface, card: surface,
+                    selected: selected, label: label, primary: readablePrimary, secondary: readableSecondary,
+                    accent: readableAccent, border: readableSecondary,
+                    iconTop: label.mixed(with: readableAccent, fraction: 0.16), iconBottom: label,
+                    iconFill: label.mixed(with: readableAccent, fraction: 0.48),
+                    gold: readableAccent.mixed(with: readablePrimary, fraction: 0.20))
+    }
+
 }
 
 private struct WardrobeStoragePaletteKey: EnvironmentKey {
@@ -107,9 +133,20 @@ extension EnvironmentValues {
 
 extension WardrobeStoragePalette {
     @MainActor static func themed(_ manager: ThemeManager, scheme: ColorScheme, contrast: ColorSchemeContrast) -> Self {
-        let rgb = manager.cardTintColor.rgba
-        return resolve(dark: scheme == .dark, increasedContrast: contrast == .increased,
-                       accent: rgb.map { WardrobeStorageRGB($0.r, $0.g, $0.b) })
+        let surfaceColor = manager.cardSurfaceColor(for: scheme)
+        let unified = manager.getPaletteForContainer(containerBackground: .solid(color: surfaceColor), colorScheme: scheme)
+        let surfaceRGBA = surfaceColor.rgba
+        let sceneRGBA = manager.backgroundColor.rgba
+        let surface = surfaceRGBA.map { WardrobeStorageRGB($0.r, $0.g, $0.b) }
+            ?? WardrobeStorageRGB(hex: scheme == .dark ? 0x202020 : 0xFFFFFF)
+        func textRGB(_ color: Color) -> WardrobeStorageRGB {
+            guard let rgba = color.rgba else { return surface.luminance < 0.18 ? .init(hex: 0xFFFFFF) : .init(hex: 0x000000) }
+            return surface.mixed(with: WardrobeStorageRGB(rgba.r, rgba.g, rgba.b), fraction: rgba.a)
+        }
+        return fromUnified(dark: scheme == .dark, increasedContrast: contrast == .increased,
+                           scene: sceneRGBA.map { WardrobeStorageRGB($0.r, $0.g, $0.b) } ?? surface,
+                           surface: surface, primary: textRGB(unified.primary), secondary: textRGB(unified.secondary),
+                           accent: textRGB(unified.accent))
     }
 }
 
@@ -119,7 +156,9 @@ private struct WardrobeStorageAppearanceModifier: ViewModifier {
     @Environment(\.colorSchemeContrast) private var contrast
     func body(content: Content) -> some View {
         let palette = WardrobeStoragePalette.themed(manager, scheme: scheme, contrast: contrast)
-        content.environment(\.wardrobeStoragePalette, palette)
+        let unified = manager.getPaletteForContainer(containerBackground: .solid(color: manager.cardSurfaceColor(for: scheme)), colorScheme: scheme)
+        content.environment(\.containerPalette, unified)
+            .environment(\.wardrobeStoragePalette, palette)
             .foregroundStyle(palette.primary.color).tint(palette.accent.color)
     }
 }

@@ -13,8 +13,7 @@ struct WardrobeStorageRearPlane: View {
     @Environment(\.wardrobeStoragePalette) private var palette
 
     var body: some View {
-        RoundedRectangle(cornerRadius: 26)
-            .fill(palette.rear.color)
+        CardBackgroundView(cornerRadius: 26)
             .overlay {
                 RoundedRectangle(cornerRadius: 26)
                     .strokeBorder(palette.border.color.opacity(palette.increasedContrast ? 0.8 : 0.35), lineWidth: 1)
@@ -297,12 +296,15 @@ struct WardrobeStorageGrid: View {
                                 .font(.system(size: 12, weight: .medium))
                                 .lineLimit(2)
                                 .foregroundStyle(palette.primary.color)
+                                .padding(3).background(palette.label.color, in: RoundedRectangle(cornerRadius: 5))
                             if showPrice, let price = entry.price {
                                 Text(price, format: .currency(code: "CNY"))
                                     .font(.system(size: 11)).foregroundStyle(palette.secondary.color)
+                                    .padding(3).background(palette.label.color, in: RoundedRectangle(cornerRadius: 5))
                             }
                             if let status = entry.statusLabel {
                                 Text(status.appLocalized).font(.caption2).foregroundStyle(palette.accent.color)
+                                    .padding(3).background(palette.label.color, in: Capsule())
                             }
                         }
                         .frame(maxWidth: .infinity, alignment: .topLeading)
