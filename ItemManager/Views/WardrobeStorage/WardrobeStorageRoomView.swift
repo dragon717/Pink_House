@@ -15,7 +15,6 @@ struct WardrobeStorageRoomView: View {
     @State private var storageSettings = WardrobeStorageSettings.shared
     @State private var listMode = false
     @State private var searchText = ""
-    @State private var shoeFilter: WardrobeShoeFilter = .all
     @State private var showingAdd = false
     @State private var showingCabinetEditor = false
     @State private var showingContents = false
@@ -38,8 +37,6 @@ struct WardrobeStorageRoomView: View {
         customCabinet.map(WardrobeStorageDestination.init(custom:)) ?? selectedDestination
     }
     private var category: WardrobeStorageCategory { destination.category }
-    private var isShoeCabinet: Bool { destination.customID == nil && category == .shoes }
-
 
     private var palette: WardrobeStoragePalette {
         .themed(themeManager, scheme: colorScheme, contrast: contrast)
@@ -49,10 +46,7 @@ struct WardrobeStorageRoomView: View {
         let inventory = WardrobeStorageInventory.entries(clothings: clothings, cutouts: cutouts, customCabinets: storageSettings.cabinets)
         let collection = inventory.filter { $0.storageID == destination.id }
         let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
-        let displayed = collection.filter {
-            (query.isEmpty || $0.searchTerms.localizedCaseInsensitiveContains(query)) &&
-            (!isShoeCabinet || shoeFilter.matches($0.searchTerms))
-        }
+        let displayed = collection.filter { query.isEmpty || $0.searchTerms.localizedCaseInsensitiveContains(query) }
         let imageSources = preparationSources(inventory)
         let preparationKey = String(cutoutRefresh) + imageSources.map(\.key).joined(separator: "/")
 
@@ -65,13 +59,8 @@ struct WardrobeStorageRoomView: View {
                     if listMode {
                         searchField
                     }
-                    if isShoeCabinet {
-                        if listMode {
-                            shoeFilters
-                        }
-                    }
-                    if !listMode && (!query.isEmpty || shoeFilter != .all) {
-                        activeCabinetFilter
+                    if !listMode && !query.isEmpty {
+                        activeCabinetSearch
                     }
                     if imageFailureCount > 0 {
                         Text("有 %lld 张图片暂未抠出，可点右上角重试。".appLocalized(Int64(imageFailureCount)))
@@ -82,7 +71,7 @@ struct WardrobeStorageRoomView: View {
                     GeometryReader { geometry in
                         let width = min(geometry.size.width, 520)
                         Group {
-                            if displayed.isEmpty && (!query.isEmpty || shoeFilter != .all) {
+                            if displayed.isEmpty && !query.isEmpty {
                                 emptySearch
                             } else if !listMode {
                                 WardrobeStorageCabinet(category: category, entries: displayed, width: width, height: geometry.size.height, showPrice: showPrice, onSelect: select)
@@ -186,7 +175,6 @@ struct WardrobeStorageRoomView: View {
         .floatingPetHidden(.presentationActive, isActive: true)
         .onChange(of: destination.id) { _, _ in
             searchText = ""
-            shoeFilter = .all
         }
         .sensoryFeedback(.selection, trigger: category)
         .accessibilityIdentifier("storage.room")
@@ -288,36 +276,14 @@ struct WardrobeStorageRoomView: View {
         .background(palette.label.color, in: RoundedRectangle(cornerRadius: 14))
     }
 
-    private var shoeFilters: some View {
-        ScrollView(.horizontal) {
-            HStack(spacing: 6) {
-                ForEach(WardrobeShoeFilter.allCases) { filter in
-                    Button {
-                        shoeFilter = filter
-                    } label: {
-                        Text(filter.rawValue.appLocalized)
-                            .font(.system(size: 12, weight: shoeFilter == filter ? .semibold : .regular))
-                            .padding(.horizontal, 11).frame(height: 36)
-                            .foregroundStyle(shoeFilter == filter ? palette.accent.color : palette.secondary.color)
-                            .background(shoeFilter == filter ? palette.selected.color : palette.label.color, in: Capsule())
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityAddTraits(shoeFilter == filter ? .isSelected : [])
-                    .accessibilityIdentifier("storage.filter.\(filter.nameForIdentifier)")
-                }
-            }
-        }
-        .scrollIndicators(.hidden)
-    }
-
-    private var activeCabinetFilter: some View {
+    private var activeCabinetSearch: some View {
         HStack {
             Button { listMode = true } label: {
-                Label(searchText.isEmpty ? shoeFilter.rawValue.appLocalized : searchText, systemImage: "line.3.horizontal.decrease")
+                Label(searchText, systemImage: "magnifyingglass")
                     .lineLimit(1)
             }
             Spacer(minLength: 4)
-            Button("查看全部".appLocalized) { searchText = ""; shoeFilter = .all }
+            Button("查看全部".appLocalized) { searchText = "" }
         }
         .font(.system(size: 12))
         .foregroundStyle(palette.secondary.color)
@@ -332,7 +298,7 @@ struct WardrobeStorageRoomView: View {
         } description: {
             Text("换个关键词，或看看全部收藏。".appLocalized)
         } actions: {
-            Button("清除筛选".appLocalized) { searchText = ""; shoeFilter = .all }
+            Button("清除搜索".appLocalized) { searchText = "" }
         }
         .background(palette.label.color, in: RoundedRectangle(cornerRadius: 20))
     }
@@ -350,17 +316,4 @@ struct WardrobeStorageRoomView: View {
 
     private func select(_ entry: WardrobeStorageEntry) { detailClothing = entry.clothing }
 
-}
-
-private extension WardrobeShoeFilter {
-    var nameForIdentifier: String {
-        switch self {
-        case .all: return "all"
-        case .sneakers: return "sneakers"
-        case .whiteSneakers: return "white"
-        case .boots: return "boots"
-        case .maryJanes: return "maryjanes"
-        case .heels: return "heels"
-        }
-    }
 }
