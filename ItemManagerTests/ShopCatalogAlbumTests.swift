@@ -43,6 +43,31 @@ final class ShopCatalogAlbumTests: XCTestCase {
         XCTAssertEqual(selection.visibleSeries([]), [])
     }
 
+    func testSearchFindsSeriesAndLiveProductNamesWithinYearAndShop() {
+        let entries = [series("rose", year: 2026, name: "Rose Series"),
+                       series("swan", year: 2026, name: "天鹅之歌"),
+                       series("old", year: 2025, name: "历史系列")]
+        let products = [
+            CatalogProduct(id: "dress", shopID: "album-shop", seriesID: "swan", name: "白色连衣裙", category: "JSK", designName: "Étoile"),
+            CatalogProduct(id: "old", shopID: "album-shop", seriesID: "old", name: "白色连衣裙", category: "JSK"),
+            CatalogProduct(id: "removed", shopID: "album-shop", seriesID: "rose", name: "已退场", category: "包", archivedAt: Date()),
+            CatalogProduct(id: "other", shopID: "other-shop", seriesID: "rose", name: "其他店商品", category: "包")
+        ]
+        var selection = ShopCatalogAlbumSelection(year: .year(2026), keyword: "  ｒＯＳＥ  ")
+        XCTAssertEqual(selection.visibleSeries(entries, products: products).map(\.id), ["rose"])
+        selection.keyword = "ｊｓｋ 白色"
+        XCTAssertEqual(selection.visibleSeries(entries, products: products).map(\.id), ["swan"])
+        selection.keyword = "etoile"
+        XCTAssertEqual(selection.visibleSeries(entries, products: products).map(\.id), ["swan"])
+        for excluded in ["已退场", "其他店商品", "没有这个词"] {
+            selection.keyword = excluded
+            XCTAssertTrue(selection.visibleSeries(entries, products: products).isEmpty)
+        }
+        selection.keyword = " \n "
+        XCTAssertFalse(selection.hasSearch)
+        XCTAssertEqual(selection.visibleSeries(entries, products: products).map(\.id), ["rose", "swan"])
+    }
+
     func testAlbumUsesAllLiveSeriesIncludingEndedSalesAndExcludesOtherShopsAndArchives() throws {
         let json = #"""
         {"version":1,"shops":[{"id":"album-shop","name":"店铺时光册"}],

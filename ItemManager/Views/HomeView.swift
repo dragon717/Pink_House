@@ -407,6 +407,7 @@ struct HomeView: View {
     @Environment(\.isRoutePageActive) private var isRoutePageActive
     @Environment(ThemeManager.self) private var themeManager
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.colorSchemeContrast) private var colorSchemeContrast
     @ObservedObject private var themeSkinManager = ThemeSkinManager.shared
     @StateObject private var guideManager = AppFirstLaunchGuideManager.shared
     @StateObject private var tabNavigationManager = TabNavigationManager.shared
@@ -1666,15 +1667,49 @@ struct HomeView: View {
     @ViewBuilder
     private var storageEdgeGesture: some View {
         if selectedTab == .wardrobe && !showingStorageDrawer && !isInWardrobeEditMode && !isSearchActive {
-            Color.clear
-                .frame(width: 20)
-                .contentShape(Rectangle())
-                .gesture(DragGesture(minimumDistance: 24).onEnded { value in
-                    guard value.translation.width < -44,
-                          abs(value.translation.height) < abs(value.translation.width) * 0.6 else { return }
-                    openStorageDrawer()
-                })
-                .accessibilityHidden(true)
+            let palette = WardrobeStoragePalette.themed(themeManager, scheme: colorScheme, contrast: colorSchemeContrast)
+            ZStack(alignment: .trailing) {
+                Color.clear
+                    .frame(width: 24).frame(maxHeight: .infinity)
+                    .contentShape(Rectangle())
+                    .gesture(storageDrawerSwipe)
+                    .accessibilityHidden(true)
+                Button(action: openStorageDrawer) {
+                    VStack(spacing: 5) {
+                        HStack(spacing: 3) {
+                            Image(systemName: "chevron.left")
+                                .font(.system(size: 10, weight: .bold))
+                            WardrobeStorageIcon(kind: .wardrobe, size: 28)
+                        }
+                        Text("收纳柜".appLocalized)
+                            .font(.system(size: 12, weight: .semibold))
+                        Text("左滑打开".appLocalized)
+                            .font(.system(size: 10)).foregroundStyle(palette.secondary.color)
+                    }
+                    .foregroundStyle(palette.primary.color)
+                    .padding(.vertical, 12).padding(.leading, 10).padding(.trailing, 6)
+                    .background(palette.label.color, in: UnevenRoundedRectangle(topLeadingRadius: 18, bottomLeadingRadius: 18))
+                    .overlay {
+                        UnevenRoundedRectangle(topLeadingRadius: 18, bottomLeadingRadius: 18)
+                            .strokeBorder(palette.accent.color.opacity(0.32), lineWidth: 1)
+                    }
+                    .shadow(color: palette.accent.color.opacity(0.14), radius: 8, x: -3, y: 2)
+                    .environment(\.wardrobeStoragePalette, palette)
+                }
+                .buttonStyle(.plain)
+                .simultaneousGesture(storageDrawerSwipe)
+                .accessibilityLabel("我的收纳柜".appLocalized)
+                .accessibilityHint("点击或向左滑动打开收纳柜".appLocalized)
+                .accessibilityIdentifier("storage.open.handle")
+            }
+        }
+    }
+
+    private var storageDrawerSwipe: some Gesture {
+        DragGesture(minimumDistance: 24).onEnded { value in
+            guard value.translation.width < -44,
+                  abs(value.translation.height) < abs(value.translation.width) * 0.6 else { return }
+            openStorageDrawer()
         }
     }
 

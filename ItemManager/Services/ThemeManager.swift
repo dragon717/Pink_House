@@ -53,6 +53,8 @@ enum SkirtFillMode: String, CaseIterable, Identifiable {
 
 @Observable
 class ThemeManager {
+    // 无 actor 收尾业务；避免 SDK 27 的析构回部署在旧运行时崩溃。
+    nonisolated deinit {}
     static let shared = ThemeManager()
     static var themeSkinBackgroundHarmonyAppendix: String {
         "为了让这套主题更完整，已帮你切回纯色背景；停用主题后可再使用图片背景。".appLocalized

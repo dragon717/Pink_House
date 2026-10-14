@@ -8,12 +8,36 @@
 //    · ShopCatalogShopView     —— 左侧年份、顶部系列名称筛选；
 //      系列卡点击直达「点菜式选购页」ShopCatalogSeriesMenuView，原合并大卡中转页已删除）
 //
-//  视觉：约束 1「不改变现有 UI」——全部沿用 themeManager 令牌 + themeSkinSectionCard
+//  视觉：沿用 themeManager 令牌 + themeSkinSectionCard
 //  + LiquidBackground(.timeHall)，不自创配色。
 //
 
 import SwiftUI
 import SwiftData
+
+/// 页面文字与卡片文字分别按实际所在底色取色。
+private enum ShopCatalogAppearance {
+    static func cardPalette(_ manager: ThemeManager, scheme: ColorScheme, skins: ThemeSkinManager) -> AdaptivePaletteV2 {
+        let descriptor = skins.activeThemeDescriptor(for: .sectionCard, state: .default)
+        if SkyConcertThemeSkin.hasDedicatedVisualProfile(descriptor) {
+            // 两套皮肤的卡面仍是浅色素材，夜间也无需另加文字底框。
+            return .generate(from: SkyConcertThemeSkin.shellFillBottom(for: descriptor),
+                             accentColor: SkyConcertThemeSkin.accent(for: descriptor))
+        }
+        return manager.getPaletteForContainer(containerBackground: .solid(color: manager.cardSurfaceColor(for: scheme)), colorScheme: scheme)
+    }
+
+    static func pagePalette(_ manager: ThemeManager, scheme: ColorScheme, skins: ThemeSkinManager) -> AdaptivePaletteV2 {
+        if skins.activeProduct != nil {
+            return .generate(from: manager.backgroundColor, isDark: scheme == .dark, accentColor: manager.accentTextColor)
+        }
+        return manager.getPaletteForContainer(containerBackground: .solid(color: manager.backgroundColor), colorScheme: scheme)
+    }
+
+    static func navigationScheme(_ manager: ThemeManager, scheme: ColorScheme, skins: ThemeSkinManager) -> ColorScheme {
+        skins.activeProduct != nil ? scheme : (manager.backgroundColor.isDark ? .dark : .light)
+    }
+}
 
 // MARK: - 格式化工具
 
@@ -36,6 +60,9 @@ enum ShopCatalogFormat {
 
 /// 时光馆首屏「店铺时光册」（直接作为底部 Tab 根视图）。
 struct ShopCatalogBrowseView: View {
+    @Environment(ThemeManager.self) private var themeManager
+    @Environment(\.colorScheme) private var colorScheme
+    @ObservedObject private var themeSkinManager = ThemeSkinManager.shared
     @ObservedObject private var store = ShopCatalogStore.shared
     /// 尾款阶段同步需要显式传入 context（内部不默认拿生产容器）
     @Environment(\.modelContext) private var modelContext
@@ -60,6 +87,7 @@ struct ShopCatalogBrowseView: View {
             }
             .navigationTitle("店铺时光册")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbarColorScheme(ShopCatalogAppearance.navigationScheme(themeManager, scheme: colorScheme, skins: themeSkinManager), for: .navigationBar)
             .navigationDestination(isPresented: showsDeepLinkProduct) {
                 if let productID = tabNav.pendingShopCatalogProductID {
                     ShopCatalogProductView(productID: productID)
@@ -98,11 +126,19 @@ struct ShopCatalogListView: View {
         await ShopCatalogCloudSyncService.shared.syncIfNeeded(force: true)
     }
     @Environment(ThemeManager.self) private var themeManager
+    @Environment(\.colorScheme) private var colorScheme
+    @ObservedObject private var themeSkinManager = ThemeSkinManager.shared
     @ObservedObject private var store = ShopCatalogStore.shared
     @State private var keyword = ""
 
     private var shops: [CatalogShop] {
         store.searchShops(keyword: keyword)
+    }
+    private var cardPalette: AdaptivePaletteV2 {
+        ShopCatalogAppearance.cardPalette(themeManager, scheme: colorScheme, skins: themeSkinManager)
+    }
+    private var pagePalette: AdaptivePaletteV2 {
+        ShopCatalogAppearance.pagePalette(themeManager, scheme: colorScheme, skins: themeSkinManager)
     }
 
     var body: some View {
@@ -141,9 +177,11 @@ struct ShopCatalogListView: View {
         HStack(spacing: 8) {
             Image(systemName: "magnifyingglass")
                 .font(.system(size: 15, weight: .medium))
-                .foregroundStyle(themeManager.secondaryTextColor)
-            TextField("搜索店家名称".appLocalized, text: $keyword)
+                .foregroundStyle(pagePalette.secondary)
+            TextField("搜索店家名称".appLocalized, text: $keyword,
+                      prompt: Text("搜索店家名称".appLocalized).foregroundColor(pagePalette.secondary))
                 .font(.system(size: 15))
+                .foregroundStyle(pagePalette.primary)
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
             if !keyword.isEmpty {
@@ -152,7 +190,7 @@ struct ShopCatalogListView: View {
                 } label: {
                     Image(systemName: "xmark.circle.fill")
                         .font(.system(size: 15))
-                        .foregroundStyle(themeManager.tertiaryTextColor)
+                        .foregroundStyle(pagePalette.secondary)
                 }
                 .buttonStyle(.plain)
             }
@@ -173,16 +211,16 @@ struct ShopCatalogListView: View {
             VStack(alignment: .leading, spacing: 5) {
                 Text(shop.name)
                     .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(themeManager.primaryTextColor)
+                    .foregroundStyle(cardPalette.primary)
                     .lineLimit(2)
                 Text("最近上新：\(ShopCatalogFormat.month(store.latestActivityDate(shopID: shop.id)))".appLocalized)
                     .font(.system(size: 12))
-                    .foregroundStyle(themeManager.secondaryTextColor)
+                    .foregroundStyle(cardPalette.secondary)
             }
             Spacer(minLength: 0)
             Image(systemName: "chevron.right")
                 .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(themeManager.tertiaryTextColor)
+                .foregroundStyle(cardPalette.tertiary)
         }
         .padding(12)
         .themeSkinSectionCard(cornerRadius: 16)
@@ -205,10 +243,10 @@ struct ShopCatalogListView: View {
         VStack(spacing: 8) {
             Image(systemName: "magnifyingglass")
                 .font(.system(size: 26))
-                .foregroundStyle(themeManager.tertiaryTextColor)
+                .foregroundStyle(pagePalette.tertiary)
             Text("没有找到对应店家".appLocalized)
                 .font(.system(size: 15, weight: .medium))
-                .foregroundStyle(themeManager.secondaryTextColor)
+                .foregroundStyle(pagePalette.secondary)
         }
         .frame(maxWidth: .infinity)
         .padding(.top, 56)
@@ -222,8 +260,10 @@ struct ShopCatalogShopView: View {
 
     @Environment(ThemeManager.self) private var themeManager
     @Environment(\.colorScheme) private var colorScheme
+    @ObservedObject private var themeSkinManager = ThemeSkinManager.shared
     @ObservedObject private var store: ShopCatalogStore
     @State private var selection = ShopCatalogAlbumSelection()
+    @FocusState private var isSearchFocused: Bool
     /// 系列卡直达「点菜式选购页」（原合并大卡中转页已删除）
     @State private var menuSeries: CatalogSeries?
 
@@ -237,55 +277,169 @@ struct ShopCatalogShopView: View {
 
     private var allSeries: [CatalogSeries] { store.series(inShop: shopID) }
     private var yearSeries: [CatalogSeries] { selection.seriesInYear(allSeries) }
-    private var visibleSeries: [CatalogSeries] { selection.visibleSeries(allSeries) }
+    private var visibleSeries: [CatalogSeries] { selection.visibleSeries(allSeries, products: store.catalog?.products ?? []) }
+    private var yearOptions: [ShopCatalogAlbumSelection.Year] { ShopCatalogAlbumSelection.years(in: allSeries) }
     private var surface: Color { themeManager.cardSurfaceColor(for: colorScheme) }
     private var palette: AdaptivePaletteV2 {
         themeManager.getPaletteForContainer(containerBackground: .solid(color: surface), colorScheme: colorScheme)
+    }
+    private var seriesCardPalette: AdaptivePaletteV2 {
+        ShopCatalogAppearance.cardPalette(themeManager, scheme: colorScheme, skins: themeSkinManager)
+    }
+    private var pagePalette: AdaptivePaletteV2 {
+        ShopCatalogAppearance.pagePalette(themeManager, scheme: colorScheme, skins: themeSkinManager)
     }
 
     var body: some View {
         ZStack {
             LiquidBackground(themeSkinWallpaperContext: .timeHall)
                 .ignoresSafeArea()
-            HStack(alignment: .top, spacing: 12) {
-                yearRail
-                VStack(spacing: 12) {
-                    seriesStrip
-                    ScrollView(.vertical, showsIndicators: false) {
-                        seriesSection
-                            .padding(.bottom, 16)
-                            .frame(maxWidth: .infinity)
+            VStack(spacing: 12) {
+                shopSearchBar
+                if yearOptions.count <= 3 {
+                    // A short archive needs no full-height empty column.
+                    HStack(spacing: 10) {
+                        compactYearPicker
+                        seriesStrip
                     }
-                    .id(selection.year.id + "/" + (selection.seriesID ?? "all"))
+                    seriesResults
+                } else {
+                    HStack(alignment: .top, spacing: 10) {
+                        yearRail
+                        VStack(spacing: 12) {
+                            seriesStrip
+                            seriesResults
+                        }
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                    }
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             }
             .padding(.horizontal, 12).padding(.top, 12)
         }
         .navigationTitle(shop?.name ?? "")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbarColorScheme(ShopCatalogAppearance.navigationScheme(themeManager, scheme: colorScheme, skins: themeSkinManager), for: .navigationBar)
         .sheet(item: $menuSeries) { series in
             ShopCatalogSeriesMenuView(store: store, seriesID: series.id)
                 .presentationDetents([.large])
         }
         .onChange(of: allSeries) { _, series in selection.reconcile(with: series) }
         .onAppear { selection.reconcile(with: allSeries) }
+        .onChange(of: selection.keyword) { _, _ in selection.seriesID = nil }
         .accessibilityIdentifier("shop.album")
     }
 
-    private var yearRail: some View {
-        ScrollView(.vertical, showsIndicators: false) {
-            VStack(spacing: 8) {
-                ForEach(ShopCatalogAlbumSelection.years(in: allSeries)) { year in
-                    chip(title: year.title.appLocalized, isSelected: selection.year == year) {
-                        selection.selectYear(year)
-                    }
-                    .accessibilityIdentifier("shop.album.year.\(year.id)")
+    private var shopSearchBar: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "magnifyingglass").foregroundStyle(palette.secondary)
+            TextField("搜索系列或商品".appLocalized, text: $selection.keyword,
+                      prompt: Text("搜索系列或商品".appLocalized).foregroundColor(palette.secondary))
+                .font(.system(size: 14)).foregroundStyle(palette.primary)
+                .textInputAutocapitalization(.never).autocorrectionDisabled()
+                .submitLabel(.search)
+                .focused($isSearchFocused)
+                .onSubmit { isSearchFocused = false }
+                .accessibilityIdentifier("shop.album.search")
+            if !selection.keyword.isEmpty {
+                Button { selection.keyword = "" } label: {
+                    Image(systemName: "xmark.circle.fill").foregroundStyle(palette.secondary)
+                        .frame(width: 32, height: 32)
                 }
+                .buttonStyle(.plain).accessibilityLabel("清除搜索".appLocalized)
+                .accessibilityIdentifier("shop.album.search.clear")
             }
         }
-        .frame(width: 78)
+        .padding(.horizontal, 12).frame(minHeight: 46)
+        .background(surface, in: RoundedRectangle(cornerRadius: 14))
+        .overlay { RoundedRectangle(cornerRadius: 14).strokeBorder(palette.divider, lineWidth: 0.5) }
+    }
+
+    private func seriesCount(for year: ShopCatalogAlbumSelection.Year) -> Int {
+        ShopCatalogAlbumSelection(year: year).seriesInYear(allSeries).count
+    }
+
+    private var compactYearPicker: some View {
+        Menu {
+            ForEach(yearOptions) { year in
+                Button { selection.selectYear(year) } label: {
+                    if selection.year == year {
+                        Label(year.title.appLocalized, systemImage: "checkmark")
+                    } else {
+                        Text(year.title.appLocalized)
+                    }
+                }
+            }
+        } label: {
+            HStack(spacing: 5) {
+                VStack(spacing: 3) {
+                    Text(selection.year.title.appLocalized).font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(palette.primary)
+                    Text("%lld 个系列".appLocalized(Int64(seriesCount(for: selection.year))))
+                        .font(.system(size: 10)).foregroundStyle(palette.secondary)
+                }
+                Image(systemName: "chevron.down").font(.system(size: 9, weight: .semibold))
+                    .foregroundStyle(palette.secondary)
+            }
+            .frame(width: 90, height: 48)
+            .background(surface, in: RoundedRectangle(cornerRadius: 12))
+            .overlay { RoundedRectangle(cornerRadius: 12).strokeBorder(palette.accent, lineWidth: 1) }
+        }
         .accessibilityLabel("年份".appLocalized)
+        .accessibilityValue(selection.year.title.appLocalized)
+        .accessibilityIdentifier("shop.album.year.picker")
+    }
+
+    private var yearRail: some View {
+        GeometryReader { geometry in
+            ScrollView(.vertical, showsIndicators: false) {
+                VStack(spacing: 4) {
+                    Label("年份".appLocalized, systemImage: "calendar")
+                        .font(.system(size: 10, weight: .medium)).foregroundStyle(palette.secondary)
+                        .padding(.vertical, 10)
+                    ForEach(yearOptions) { year in
+                        Button { selection.selectYear(year) } label: {
+                            VStack(spacing: 4) {
+                                Text(year.title.appLocalized)
+                                    .font(.system(size: 12, weight: selection.year == year ? .semibold : .regular))
+                                    .foregroundStyle(selection.year == year ? palette.primary : palette.secondary)
+                                Text("%lld 系列".appLocalized(Int64(seriesCount(for: year))))
+                                    .font(.system(size: 10)).foregroundStyle(palette.secondary)
+                            }
+                            .frame(maxWidth: .infinity, minHeight: 54)
+                            .background(selection.year == year ? palette.accent.opacity(0.12) : Color.clear,
+                                        in: RoundedRectangle(cornerRadius: 10))
+                            .overlay(alignment: .leading) {
+                                if selection.year == year {
+                                    Capsule().fill(palette.accent).frame(width: 3, height: 22)
+                                }
+                            }
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityAddTraits(selection.year == year ? .isSelected : [])
+                        .accessibilityIdentifier("shop.album.year.\(year.id)")
+                    }
+                }
+                .padding(.horizontal, 4).padding(.bottom, 6)
+            }
+            .frame(height: min(geometry.size.height, CGFloat(yearOptions.count) * 58 + 42))
+            .background(surface, in: RoundedRectangle(cornerRadius: 14))
+            .overlay { RoundedRectangle(cornerRadius: 14).strokeBorder(palette.divider, lineWidth: 0.5) }
+        }
+        .frame(width: 68)
+    }
+
+    private var seriesResults: some View {
+        ScrollView(.vertical, showsIndicators: false) {
+            VStack(alignment: .leading, spacing: 10) {
+                Text((selection.hasSearch ? "找到 %lld 个系列" : "共 %lld 个系列").appLocalized(Int64(visibleSeries.count)))
+                    .font(.system(size: 12)).foregroundStyle(pagePalette.secondary)
+                    .padding(.horizontal, 4)
+                seriesSection
+            }
+            .padding(.bottom, 16).frame(maxWidth: .infinity)
+        }
+        .scrollDismissesKeyboard(.interactively)
+        .id(selection.year.id + "/" + (selection.seriesID ?? "all") + "/" + selection.keyword)
     }
 
     private var seriesStrip: some View {
@@ -304,7 +458,7 @@ struct ShopCatalogShopView: View {
             .onChange(of: selection.year) { _, _ in proxy.scrollTo("all", anchor: .leading) }
         }
         .fixedSize(horizontal: false, vertical: true)
-        .accessibilityLabel("系列".appLocalized)
+        .accessibilityElement(children: .contain)
     }
 
     private func chip(title: String, isSelected: Bool, action: @escaping () -> Void) -> some View {
@@ -330,10 +484,15 @@ struct ShopCatalogShopView: View {
             VStack(spacing: 8) {
                 Image(systemName: "clock.arrow.circlepath")
                     .font(.system(size: 24))
-                    .foregroundStyle(palette.tertiary)
-                Text("该年份暂无收录系列".appLocalized)
+                    .foregroundStyle(pagePalette.tertiary)
+                Text((selection.hasSearch ? "没有找到相关系列或商品" : "该年份暂无收录系列").appLocalized)
                     .font(.system(size: 14))
-                    .foregroundStyle(palette.secondary)
+                    .foregroundStyle(pagePalette.secondary)
+                if selection.hasSearch {
+                    Button("清除搜索".appLocalized) { selection.keyword = "" }
+                        .font(.system(size: 14, weight: .medium)).foregroundStyle(pagePalette.primary)
+                        .frame(minHeight: 44)
+                }
             }
             .frame(maxWidth: .infinity)
             .padding(.top, 48)
@@ -361,24 +520,23 @@ struct ShopCatalogShopView: View {
             VStack(alignment: .leading, spacing: 6) {
                 Text(s.name)
                     .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(palette.primary)
+                    .foregroundStyle(seriesCardPalette.primary)
                     .lineLimit(2)
                 VStack(alignment: .leading, spacing: 3) {
                     if let latest = store.latestSeriesActivity(s) {
                         Text("\(ShopCatalogFormat.month(latest)) 上新".appLocalized)
                             .font(.system(size: 12))
-                            .foregroundStyle(palette.secondary)
+                            .foregroundStyle(seriesCardPalette.secondary)
                     }
                     Text("\(store.productCount(inSeries: s.id)) 件商品".appLocalized)
                         .font(.system(size: 12))
-                        .foregroundStyle(palette.secondary)
+                        .foregroundStyle(seriesCardPalette.secondary)
                 }
             }
-            .padding(5).background(surface, in: RoundedRectangle(cornerRadius: 8))
             Spacer(minLength: 0)
             Image(systemName: "chevron.right")
                 .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(themeManager.tertiaryTextColor)
+                .foregroundStyle(seriesCardPalette.tertiary)
         }
         .padding(10)
         .themeSkinSectionCard(cornerRadius: 16)

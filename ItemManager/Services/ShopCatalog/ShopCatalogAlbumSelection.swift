@@ -22,6 +22,9 @@ nonisolated struct ShopCatalogAlbumSelection: Equatable {
 
     var year: Year = .all
     var seriesID: String?
+    var keyword: String = ""
+
+    var hasSearch: Bool { !keyword.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
 
     static func years(in series: [CatalogSeries]) -> [Year] {
         [.all] + Set(series.compactMap(\.year)).sorted(by: >).map(Year.year)
@@ -38,10 +41,23 @@ nonisolated struct ShopCatalogAlbumSelection: Equatable {
         }
     }
 
-    func visibleSeries(_ series: [CatalogSeries]) -> [CatalogSeries] {
+    func visibleSeries(_ series: [CatalogSeries], products: [CatalogProduct] = []) -> [CatalogSeries] {
         let inYear = seriesInYear(series)
-        guard let seriesID else { return inYear }
-        return inYear.filter { $0.id == seriesID }
+        let selected = inYear.filter { seriesID == nil || $0.id == seriesID }
+        let terms = Self.normalized(keyword).split(whereSeparator: { $0.isWhitespace }).map(String.init)
+        guard !terms.isEmpty else { return selected }
+        let bySeries = Dictionary(grouping: products.filter { $0.archivedAt == nil }, by: \.seriesID)
+        return selected.filter { entry in
+            let names = (bySeries[entry.id] ?? []).filter { $0.shopID == entry.shopID }
+                .flatMap { [$0.name, $0.designName ?? "", $0.category] }
+            let text = Self.normalized(([entry.name] + names).joined(separator: " "))
+            return terms.allSatisfy { text.contains($0) }
+        }
+    }
+
+    private static func normalized(_ text: String) -> String {
+        text.folding(options: [.caseInsensitive, .diacriticInsensitive, .widthInsensitive],
+                     locale: Locale(identifier: "zh_CN"))
     }
 
     mutating func selectYear(_ year: Year) {

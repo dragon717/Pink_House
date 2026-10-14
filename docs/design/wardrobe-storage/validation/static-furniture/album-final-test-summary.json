@@ -1,0 +1,90 @@
+{
+  "devicesAndConfigurations": [
+    {
+      "device": {
+        "architecture": "arm64",
+        "deviceId": "826F5E71-D2BC-4E76-A8C5-4251C526A5D4",
+        "deviceName": "iPhone 17 Pro",
+        "modelName": "iPhone 17 Pro",
+        "osBuildNumber": "23D8133",
+        "osVersion": "26.3.1",
+        "platform": "iOS Simulator"
+      },
+      "expectedFailures": 0,
+      "failedTests": 0,
+      "passedTests": 1,
+      "skippedTests": 0,
+      "testPlanConfiguration": {
+        "configurationId": "1",
+        "configurationName": "Test Scheme Action"
+      }
+    }
+  ],
+  "environmentDescription": "ItemManager · Built with macOS 27.0.1",
+  "expectedFailures": 0,
+  "failedTests": 0,
+  "finishTime": 1791947859.569,
+  "passedTests": 1,
+  "result": "Passed",
+  "runtimeWarnings": [],
+  "skippedTests": 0,
+  "startTime": 1791947666.532,
+  "statistics": [],
+  "testFailures": [],
+  "title": "Test - ItemManager",
+  "topInsights": [],
+  "totalTestCount": 1,
+  "archivedAttachments": [
+    {
+      "file": "album-swan-dark.png",
+      "test": "ShopCatalogAlbumAppearanceTests/testRenderYearRailAndSeriesNamesInBothSchemes()",
+      "pixelsUnchanged": true
+    },
+    {
+      "file": "album-swan-light.png",
+      "test": "ShopCatalogAlbumAppearanceTests/testRenderYearRailAndSeriesNamesInBothSchemes()",
+      "pixelsUnchanged": true
+    },
+    {
+      "file": "album-sky-dark.png",
+      "test": "ShopCatalogAlbumAppearanceTests/testRenderYearRailAndSeriesNamesInBothSchemes()",
+      "pixelsUnchanged": true
+    },
+    {
+      "file": "album-sky-light.png",
+      "test": "ShopCatalogAlbumAppearanceTests/testRenderYearRailAndSeriesNamesInBothSchemes()",
+      "pixelsUnchanged": true
+    },
+    {
+      "file": "album-dark-background-light-system.png",
+      "test": "ShopCatalogAlbumAppearanceTests/testRenderYearRailAndSeriesNamesInBothSchemes()",
+      "pixelsUnchanged": true
+    },
+    {
+      "file": "album-search-empty-dark.png",
+      "test": "ShopCatalogAlbumAppearanceTests/testRenderYearRailAndSeriesNamesInBothSchemes()",
+      "pixelsUnchanged": true
+    },
+    {
+      "file": "album-search-dark.png",
+      "test": "ShopCatalogAlbumAppearanceTests/testRenderYearRailAndSeriesNamesInBothSchemes()",
+      "pixelsUnchanged": true
+    },
+    {
+      "file": "album-compact-light.png",
+      "test": "ShopCatalogAlbumAppearanceTests/testRenderYearRailAndSeriesNamesInBothSchemes()",
+      "pixelsUnchanged": true
+    },
+    {
+      "file": "album-rail-light.png",
+      "test": "ShopCatalogAlbumAppearanceTests/testRenderYearRailAndSeriesNamesInBothSchemes()",
+      "pixelsUnchanged": true
+    }
+  ],
+  "sourceSHA256": {
+    "ItemManager/Views/ShopCatalog/ShopCatalogViews.swift": "f7ebf65076a093d1366d235cabde5e57ec5289c47bb2f7ce1d4a96f83a862636",
+    "ItemManager/Views/HomeView.swift": "59f69e416a702996adf074cf7a5f4e66c7e3c4d6b4d6e064394172b94f164904",
+    "ItemManagerTests/ShopCatalogAlbumAppearanceTests.swift": "48f841807d0577760e9a915a7504fc5d1cab46eaa4ebe4bedf9d3d83ac33c1d9"
+  },
+  "scope": "Final album appearance: compact/many-year navigation, search results, empty search, both skins in light/dark, light system with dark background. Homepage tap/swipe separately verified through Computer Use."
+}

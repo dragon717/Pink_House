@@ -106,21 +106,15 @@ struct WardrobeStorageShelf: View {
     let width: CGFloat
     let number: Int
     let showPrice: Bool
+    var bayHeight: CGFloat? = nil
     @Environment(\.wardrobeStoragePalette) private var palette
     let onSelect: (WardrobeStorageEntry) -> Void
-    private var height: CGFloat { width * category.shelfHeightRatio }
+    private var height: CGFloat { bayHeight ?? width * category.shelfHeightRatio }
 
     var body: some View {
         ZStack(alignment: .topLeading) {
             furniture
             if palette.isDark { WardrobeStorageShelfLight(width: width, height: height) }
-            ForEach(entries.indices, id: \.self) { index in
-                Ellipse().fill(.black.opacity(palette.isDark ? 0.46 : 0.12))
-                    .frame(width: width * 0.26, height: height * 0.035)
-                    .blur(radius: 3)
-                    .position(x: width * (index == 0 ? 0.31 : 0.69), y: height * 0.72)
-                    .accessibilityHidden(true)
-            }
             if category != .shoes {
                 ForEach(entries.indices, id: \.self) { index in
                     displaySupport
@@ -129,31 +123,8 @@ struct WardrobeStorageShelf: View {
                         .accessibilityHidden(true)
                 }
             }
-            ForEach(Array(entries.enumerated()), id: \.element.id) { index, entry in
-                Button { onSelect(entry) } label: {
-                    VStack(spacing: 2) {
-                        WardrobeStorageItemImage(entry: entry, size: CGSize(width: width * 0.34, height: height * (showPrice ? 0.55 : 0.67)))
-                            .shadow(color: .black.opacity(0.12), radius: 2, x: 0, y: 3)
-                        WardrobeStorageItemLabel(entry: entry, showPrice: showPrice)
-                    }
-                    .frame(width: width * 0.36, height: height * 0.85)
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .overlay(alignment: .topTrailing) {
-                    if let status = entry.statusLabel {
-                        Text(status.appLocalized).font(.system(size: 9, weight: .medium))
-                            .padding(4).background(palette.label.color, in: Capsule())
-                            .foregroundStyle(palette.accent.color)
-                            .allowsHitTesting(false)
-                    }
-                }
-                .position(x: width * (index == 0 ? 0.31 : 0.69), y: height * 0.44)
-                .accessibilityLabel(entry.title + (entry.statusLabel.map { "，" + $0.appLocalized } ?? ""))
-                .accessibilityValue(showPrice ? entry.price.map { $0.formatted(.currency(code: "CNY")) } ?? "" : "")
-                .accessibilityHint("查看收藏详情".appLocalized)
-            }
-
+            WardrobeStorageShelfContents(category: category, entries: entries, width: width, height: height,
+                                         number: number, showPrice: showPrice, onSelect: onSelect)
         }
         .frame(width: width, height: height)
         .environment(\.wardrobeStorageCabinetLighting, true)
@@ -204,18 +175,71 @@ struct WardrobeStorageShelf: View {
     }
 }
 
+/// Only stored objects, their cast shadows and labels participate in scrolling.
+struct WardrobeStorageShelfContents: View {
+    let category: WardrobeStorageCategory
+    let entries: [WardrobeStorageEntry]
+    let width: CGFloat
+    let height: CGFloat
+    let number: Int
+    let showPrice: Bool
+    @Environment(\.wardrobeStoragePalette) private var palette
+    let onSelect: (WardrobeStorageEntry) -> Void
+
+    var body: some View {
+        ZStack(alignment: .topLeading) {
+            ForEach(entries.indices, id: \.self) { index in
+                Ellipse().fill(.black.opacity(palette.isDark ? 0.46 : 0.12))
+                    .frame(width: width * 0.26, height: height * 0.035)
+                    .blur(radius: 3)
+                    .position(x: width * (index == 0 ? 0.31 : 0.69), y: height * 0.72)
+                    .accessibilityHidden(true)
+            }
+            ForEach(Array(entries.enumerated()), id: \.element.id) { index, entry in
+                Button { onSelect(entry) } label: {
+                    VStack(spacing: 2) {
+                        WardrobeStorageItemImage(entry: entry, size: CGSize(width: width * 0.34, height: height * (showPrice ? 0.55 : 0.67)))
+                            .shadow(color: .black.opacity(0.12), radius: 2, x: 0, y: 3)
+                        WardrobeStorageItemLabel(entry: entry, showPrice: showPrice)
+                    }
+                    .frame(width: width * 0.36, height: height * 0.85)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .overlay(alignment: .topTrailing) {
+                    if let status = entry.statusLabel {
+                        Text(status.appLocalized).font(.system(size: 9, weight: .medium))
+                            .padding(4).background(palette.label.color, in: Capsule())
+                            .foregroundStyle(palette.accent.color)
+                            .allowsHitTesting(false)
+                    }
+                }
+                .position(x: width * (index == 0 ? 0.31 : 0.69), y: height * 0.44)
+                .accessibilityLabel(entry.title + (entry.statusLabel.map { "，" + $0.appLocalized } ?? ""))
+                .accessibilityValue(showPrice ? entry.price.map { $0.formatted(.currency(code: "CNY")) } ?? "" : "")
+                .accessibilityHint("查看收藏详情".appLocalized)
+            }
+        }
+        .frame(width: width, height: height)
+        .environment(\.wardrobeStorageCabinetLighting, true)
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("第 %lld 层".appLocalized(Int64(number)))
+    }
+}
+
 /// A fixed shell keeps both ends connected even during native elastic overscroll.
 private struct WardrobeStorageCabinetBackdrop: View {
     let category: WardrobeStorageCategory
     let width: CGFloat
     let height: CGFloat
+    let bayHeight: CGFloat
+    let visibleRows: Int
 
     var body: some View {
-        let bayHeight = width * category.shelfHeightRatio
         VStack(spacing: 0) {
-            ForEach(0..<max(1, Int(ceil(height / bayHeight))), id: \.self) { row in
+            ForEach(0..<visibleRows, id: \.self) { row in
                 WardrobeStorageShelf(category: category, entries: [], width: width, number: row + 1,
-                                     showPrice: false, onSelect: { _ in })
+                                     showPrice: false, bayHeight: bayHeight, onSelect: { _ in })
             }
         }
         .frame(width: width, height: height, alignment: .top)
@@ -232,6 +256,7 @@ struct WardrobeStorageCabinetLayout {
     let baseHeight: CGFloat
     let viewportHeight: CGFloat
     let shelfHeight: CGFloat
+    let visibleRowCount: Int
 
     init(size: CGSize, category: WardrobeStorageCategory) {
         let middleRatio = category.shelfHeightRatio
@@ -240,12 +265,13 @@ struct WardrobeStorageCabinetLayout {
         crownHeight = width * 281 / 780
         baseHeight = width * 274 / 780
         viewportHeight = max(0, size.height - 30 - crownHeight - baseHeight)
-        shelfHeight = width * middleRatio
+        // Whole visible bays let every resting item row align with stationary shelves.
+        visibleRowCount = max(1, Int(floor(viewportHeight / (width * middleRatio) + 0.0001)))
+        shelfHeight = viewportHeight / CGFloat(visibleRowCount)
     }
 
     func rowCount(for entryCount: Int) -> Int {
-        // Empty bays also fill tall viewports, so the columns never end above the base.
-        max(4, Int(ceil(viewportHeight / shelfHeight)), (entryCount + 1) / 2)
+        max(4, visibleRowCount, (entryCount + 1) / 2)
     }
 }
 
@@ -260,18 +286,18 @@ struct WardrobeStorageCabinet: View {
     var body: some View {
         let layout = WardrobeStorageCabinetLayout(size: CGSize(width: width, height: height), category: category)
         VStack(spacing: 0) {
-            // Only the bays scroll; both ends retain their position and original proportions.
+            // Furniture is stationary; additional logical bays belong to the item scroll only.
             crown(layout: layout)
                 .zIndex(1)
             ZStack {
-                // Pulling either end reveals an empty bay, never the room wallpaper.
+                // The complete shelf grid, carved posts and lighting never enter the scroll view.
                 backdrop(layout: layout)
                 ScrollView {
                     LazyVStack(spacing: 0) {
                         ForEach(0..<layout.rowCount(for: entries.count), id: \.self) { row in
                             let start = min(row * 2, entries.count)
                             let end = min(start + 2, entries.count)
-                            WardrobeStorageShelf(category: category, entries: Array(entries[start..<end]), width: layout.width, number: row + 1, showPrice: showPrice, onSelect: onSelect)
+                            WardrobeStorageShelfContents(category: category, entries: Array(entries[start..<end]), width: layout.width, height: layout.shelfHeight, number: row + 1, showPrice: showPrice, onSelect: onSelect)
                                 .id(row)
                         }
                     }
@@ -284,15 +310,6 @@ struct WardrobeStorageCabinet: View {
                 .scrollTargetBehavior(.viewAligned)
                 .defaultScrollAnchor(.top)
                 .accessibilityIdentifier("storage.cabinet.shelves")
-                // Fixed carved posts connect the crown and base in front of moving shelves.
-                backdrop(layout: layout)
-                    .mask {
-                        HStack(spacing: 0) {
-                            Rectangle().frame(width: layout.width * 0.13)
-                            Spacer(minLength: 0)
-                            Rectangle().frame(width: layout.width * 0.13)
-                        }
-                    }
             }
             .frame(width: layout.width, height: layout.viewportHeight)
             .clipped()
@@ -312,7 +329,8 @@ struct WardrobeStorageCabinet: View {
     }
 
     private func backdrop(layout: WardrobeStorageCabinetLayout) -> some View {
-        WardrobeStorageCabinetBackdrop(category: category, width: layout.width, height: layout.viewportHeight)
+        WardrobeStorageCabinetBackdrop(category: category, width: layout.width, height: layout.viewportHeight,
+                                       bayHeight: layout.shelfHeight, visibleRows: layout.visibleRowCount)
     }
 
     @ViewBuilder

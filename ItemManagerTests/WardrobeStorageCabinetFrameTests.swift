@@ -16,6 +16,9 @@ final class WardrobeStorageCabinetFrameTests: XCTestCase {
                 XCTAssertEqual(layout.rowCount(for: emptyRows * 2 + 1), emptyRows + 1)
                 XCTAssertEqual(layout.rowCount(for: 101), 51)
                 XCTAssertGreaterThanOrEqual(CGFloat(emptyRows) * layout.shelfHeight, layout.viewportHeight)
+                XCTAssertEqual(CGFloat(layout.visibleRowCount) * layout.shelfHeight, layout.viewportHeight, accuracy: 0.001)
+                let lastOffset = CGFloat(layout.rowCount(for: 101) - layout.visibleRowCount) * layout.shelfHeight
+                XCTAssertEqual(lastOffset / layout.shelfHeight, (lastOffset / layout.shelfHeight).rounded(), accuracy: 0.001)
                 XCTAssertEqual(layout.crownHeight + layout.viewportHeight + layout.baseHeight + 30, size.height, accuracy: 0.001)
             }
         }
@@ -84,7 +87,7 @@ final class WardrobeStorageCabinetFrameTests: XCTestCase {
             try await Task.sleep(for: .milliseconds(600))
             let last = try capture("24-items-last")
 
-            // The moving shelf can change the cast shadow below the curved crown.
+            // Moving objects can change the cast shadow below the curved crown.
             // Compare the carved end itself, excluding that adjacent shadow region.
             let crownBand = CGRect(x: 14, y: 12, width: size.width - 28, height: layout.crownHeight - 24)
             let baseBand = CGRect(x: 14, y: size.height - 18 - layout.baseHeight + 32,
@@ -95,7 +98,7 @@ final class WardrobeStorageCabinetFrameTests: XCTestCase {
                 XCTAssertEqual(baseline, try pixels(last, in: band), "Scrolling moved or changed an end of \(category)")
             }
             let viewport = CGRect(x: 50, y: 14 + layout.crownHeight, width: 220, height: layout.viewportHeight - 4)
-            XCTAssertNotEqual(try pixels(first, in: viewport), try pixels(last, in: viewport), "Middle shelves did not scroll")
+            XCTAssertNotEqual(try pixels(first, in: viewport), try pixels(last, in: viewport), "Stored objects did not scroll")
             let scroll = try XCTUnwrap(findScrollView(in: try XCTUnwrap(window.rootViewController?.view)))
             XCTAssertEqual(scroll.contentOffset.y + scroll.bounds.height - scroll.adjustedContentInset.bottom,
                            scroll.contentSize.height, accuracy: 2, "The last stored row must be fully reachable")
@@ -103,6 +106,23 @@ final class WardrobeStorageCabinetFrameTests: XCTestCase {
             let column = CGRect(x: 14 + layout.width * 0.055, y: 12 + layout.crownHeight + 2,
                                 width: layout.width * 0.05, height: layout.viewportHeight - 4)
             let fixedColumn = try pixels(first, in: column)
+            // The gap between the two object columns exposes every fixed shelf and lamp.
+            let grid = CGRect(x: 14 + layout.width * 0.5 - 2, y: 12 + layout.crownHeight + 2,
+                              width: 4, height: layout.viewportHeight - 4)
+            let fixedGrid = try pixels(first, in: grid)
+            func assertFixedGrid(_ image: UIImage) throws {
+                let current = try pixels(image, in: grid)
+                XCTAssertEqual(current.count, fixedGrid.count)
+                let difference = zip(fixedGrid, current).map { abs(Int($0) - Int($1)) }.max() ?? 0
+                XCTAssertLessThanOrEqual(difference, 3, "Horizontal shelves and lamps must stay still")
+            }
+            try assertFixedGrid(last)
+            let partialOffset = layout.shelfHeight * 2.37
+            scroll.setContentOffset(CGPoint(x: 0, y: partialOffset), animated: false)
+            scroll.layoutIfNeeded()
+            let partial = try capture("between-rows")
+            XCTAssertEqual(scroll.contentOffset.y, partialOffset, accuracy: 2)
+            try assertFixedGrid(partial)
             // Color.cyan is a system color; sample its actual RGB instead of assuming 0/255/255.
             let wallpaperRGB = Array(try pixels(first, in: CGRect(x: 0, y: 0, width: 1, height: 1)).prefix(3))
             for (stage, offset) in [("overscroll-top", CGFloat(-72)),
@@ -113,6 +133,7 @@ final class WardrobeStorageCabinetFrameTests: XCTestCase {
                 XCTAssertEqual(scroll.contentOffset.y, offset, accuracy: 2, "Fixture must actually expose elastic overscroll")
                 let pulled = try capture(stage)
                 XCTAssertEqual(scroll.contentOffset.y, offset, accuracy: 2, "Capture must retain the pulled position")
+                try assertFixedGrid(pulled)
                 let currentColumn = try pixels(pulled, in: column)
                 XCTAssertEqual(fixedColumn.count, currentColumn.count)
                 // Native GPU compositing rounds the same fixed artwork by up to two levels.

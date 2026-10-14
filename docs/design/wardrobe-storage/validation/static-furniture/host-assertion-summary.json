@@ -1,0 +1,27 @@
+{
+  "result": "Passed",
+  "sourceDerivedCases": 6,
+  "assertions": 177,
+  "runtime": "macOS host / Swift 6.4",
+  "scope": [
+    "year/series selection",
+    "series and product name search",
+    "archive and shop isolation",
+    "whole visible bays",
+    "logical row growth",
+    "compact room proportions"
+  ],
+  "doesNotCover": [
+    "SwiftUI drawing",
+    "native touch scrolling",
+    "system keyboard interaction"
+  ],
+  "sourceSHA256": {
+    "ItemManager/Services/ShopCatalog/ShopCatalogAlbumSelection.swift": "53c776f51dce99d271ba0d8edf9f02c2bc33e6b6dd4311eac665ba1be2f9c055",
+    "ItemManager/Views/WardrobeStorage/WardrobeStorageComponents.swift": "279e0d4ffc8d656063f98cea65d17b59da5b7054c9294193d1a1f664034bcee0",
+    "ItemManager/Views/WardrobeStorage/WardrobeStorageInventory.swift": "bb3958ffc2ad12a36652b7b3979ccafd7a96eb01cef418037fb7b7dc0880eff6",
+    "ItemManagerTests/ShopCatalogAlbumTests.swift": "49fdb852de0f85580844037f644d8b9a20fcaeded64644c0699e9c7ae5ab7e06",
+    "ItemManagerTests/WardrobeStorageCabinetFrameTests.swift": "80d7633309f53e1cee9d5302737afd874ae6ab80c02529c895f939238d8be818"
+  },
+  "runnerDirectory": "/private/tmp/pink-house-host-assertions-20261014"
+}
