@@ -150,6 +150,7 @@ final class Clothing {
     var catalogProductID: String? = nil // 公共 Catalog 的商品 ID
     var catalogVariantID: String? = nil // 公共 Catalog 的配色/尺码规格 ID
     var catalogSaleEventID: String? = nil // 生成该条记录所依据的销售记录（预约/现货）ID
+    var catalogReservationBatchID: String? = nil // 入橱时选定的预约团次，改名不影响归属
 
     /// 转单（闲鱼收单等他人转手）：衣橱卡片状态标签「转单」（2026-09-23 需求 N）。
     /// 与付款口径（全款 / 已付定）互相独立，可同时出现；默认 false 供旧数据轻量迁移。

@@ -363,7 +363,7 @@ struct OpsCatalogEditorView: View {
         }
         .contextMenu {
             Button("编辑系列…") { sheet = .seriesForm(existingID: series.id) }
-            Button("配置发售阶段与价格表…") { sheet = .seriesConfig(seriesID: series.id) }
+            Button("配置团次、发售阶段与价格表…") { sheet = .seriesConfig(seriesID: series.id) }
             Divider()
             Button("删除系列（含商品）", role: .destructive) {
                 if workspace.removeSeries(id: series.id), workspace.saveCatalogEditorChanges() { clampSelection() }
@@ -399,7 +399,7 @@ struct OpsCatalogEditorView: View {
                 Button {
                     sheet = .seriesConfig(seriesID: series.id)
                 } label: {
-                    Label("配置发售阶段与价格表…", systemImage: "calendar.badge.clock")
+                    Label("配置团次、发售阶段与价格表…", systemImage: "calendar.badge.clock")
                 }
                 .controlSize(.small)
             }
@@ -1067,21 +1067,7 @@ private struct BindImagesSheet: View {
 /// （空白会被读成「图丢了」，占位图标读成「这里本来就没图」）。
 private struct OpsAssetThumbnail: View {
     let url: URL?
-
-    var body: some View {
-        Group {
-            if let url, let image = NSImage(contentsOf: url) {
-                Image(nsImage: image)
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-            } else {
-                Image(systemName: "photo").foregroundStyle(.secondary)
-            }
-        }
-        .frame(width: 40, height: 40)
-        .clipShape(RoundedRectangle(cornerRadius: 6))
-        .background(Color.secondary.opacity(0.12), in: RoundedRectangle(cornerRadius: 6))
-    }
+    var body: some View { OpsPreviewableThumbnail(url: url) }
 }
 
 private func assetTypeLabel(_ type: CatalogAssetType) -> String {

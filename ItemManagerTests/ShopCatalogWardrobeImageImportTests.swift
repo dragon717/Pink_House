@@ -136,7 +136,7 @@ final class ShopCatalogWardrobeImageImportTests: XCTestCase {
         XCTAssertEqual(try context.fetch(FetchDescriptor<StoredImage>()).first?.refCount, 2)
     }
 
-    func testSelectedColorUsesOnlyItsBoundImagesAcrossSizesAndReferences() {
+    func testSelectedColorPrefersBoundImagesAndKeepsGenericGalleryAcrossSizes() {
         let product = product(images: ["blue", "detail", "pink", "pink-alias"])
         let key = String(repeating: "a", count: 64)
         let store = ShopCatalogStore(catalog: ShopCatalog(products: [product], variants: [
@@ -145,8 +145,8 @@ final class ShopCatalogWardrobeImageImportTests: XCTestCase {
             CatalogProductVariant(id: "blue-s", productID: product.id, color: "蓝色", size: "S", imageAssetID: "blue")
         ], assets: [CatalogAsset(id: "pink", type: .productImage, originalURL: "", mediaKey: key),
                     CatalogAsset(id: "pink-alias", type: .productImage, originalURL: "", mediaKey: key)]))
-        XCTAssertEqual(ShopCatalogWardrobeImageImporter.references(product: product, store: store, selectedColor: " 粉色 "), ["pink"])
-        XCTAssertEqual(ShopCatalogWardrobeImageImporter.references(product: product, store: store, selectedColor: "蓝色"), ["blue"])
+        XCTAssertEqual(ShopCatalogWardrobeImageImporter.references(product: product, store: store, selectedColor: " 粉色 "), ["pink", "detail"])
+        XCTAssertEqual(ShopCatalogWardrobeImageImporter.references(product: product, store: store, selectedColor: "蓝色"), ["blue", "detail"])
         XCTAssertEqual(ShopCatalogWardrobeImageImporter.references(product: product, store: store, selectedColor: nil), product.images)
         XCTAssertTrue(ShopCatalogWardrobeImageImporter.references(product: product, store: store, selectedColor: "绿色").isEmpty)
     }
@@ -160,17 +160,98 @@ final class ShopCatalogWardrobeImageImportTests: XCTestCase {
                        ["white-cover", "detail-a", "detail-b"])
     }
 
-    func testMissingAndSharedColorBindingsDoNotFallBackToOtherColor() {
-        let product = product(images: ["shared", "blue-cover", "unknown-detail"])
+    func testMissingBindingsKeepGenericGalleryButExcludeImagesBoundToAnotherColor() {
+        let product = product(images: ["shared", "gallery-cover", "unknown-detail"])
         let store = ShopCatalogStore(catalog: ShopCatalog(products: [product], variants: [
             CatalogProductVariant(id: "pink", productID: product.id, color: "粉色", imageAssetID: "shared"),
             CatalogProductVariant(id: "blue", productID: product.id, color: "蓝色", imageAssetID: "shared"),
             CatalogProductVariant(id: "green", productID: product.id, color: "绿色")
         ]))
-        XCTAssertTrue(ShopCatalogWardrobeImageImporter.references(product: product, store: store, selectedColor: "粉色").isEmpty)
-        XCTAssertTrue(ShopCatalogWardrobeImageImporter.references(product: product, store: store, selectedColor: "绿色").isEmpty)
-        XCTAssertTrue(ShopCatalogWardrobeImageImporter.references(product: product,
-            store: ShopCatalogStore(catalog: ShopCatalog(products: [product])), selectedColor: "粉色").isEmpty)
+        XCTAssertEqual(ShopCatalogWardrobeImageImporter.references(product: product, store: store, selectedColor: "粉色"),
+                       ["gallery-cover", "unknown-detail"])
+        XCTAssertEqual(ShopCatalogWardrobeImageImporter.references(product: product, store: store, selectedColor: "绿色"),
+                       ["gallery-cover", "unknown-detail"])
+        XCTAssertEqual(ShopCatalogWardrobeImageImporter.references(product: product,
+            store: ShopCatalogStore(catalog: ShopCatalog(products: [product])), selectedColor: "粉色"), product.images)
+    }
+
+    func testProductGalleryPersistsWhenChosenColorHasNoVariantImageBinding() async throws {
+        let reference = try XCTUnwrap(ShopCatalogImageStore.save(imageData()))
+        let url = try XCTUnwrap(ShopCatalogImageStore.url(for: reference))
+        defer { try? FileManager.default.removeItem(at: url) }
+        var dress = product(images: [reference])
+        dress.name = "粉色大蝴蝶结背心裙"
+        for variants in [[], [CatalogProductVariant(id: "pink", productID: dress.id, color: "粉色"),
+                              CatalogProductVariant(id: "red", productID: dress.id, color: "红色")]] {
+            let store = ShopCatalogStore(catalog: ShopCatalog(products: [dress], variants: variants))
+            let selection = ShopCatalogWardrobeDraftBuilder.Selection(productID: dress.id, color: "粉色")
+            let draft = try XCTUnwrap(ShopCatalogWardrobeDraftBuilder.makeDraft(selection: selection, store: store))
+            let clothing = try await ShopCatalogWardrobeInserter.insertWithImages(
+                draft: draft, selection: selection, store: store, modelContext: context)
+            savedPaths += clothing.imagePaths
+            XCTAssertEqual(clothing.imagePaths.count, 1, "没有规格图绑定也必须保留商品相册")
+            XCTAssertNotNil(UIImage(contentsOfFile: ImageManager.shared.imagesDirectory
+                .appendingPathComponent(try XCTUnwrap(clothing.imagePaths.first)).path))
+        }
+    }
+
+    func testNoUsableSelectedColorImageFailsBeforeCreatingBlankWardrobeRecord() async throws {
+        let dress = product(images: ["other-color"])
+        let store = ShopCatalogStore(catalog: ShopCatalog(products: [dress], variants: [
+            CatalogProductVariant(id: "pink", productID: dress.id, color: "粉色"),
+            CatalogProductVariant(id: "blue", productID: dress.id, color: "蓝色", imageAssetID: "other-color")
+        ]))
+        let selection = ShopCatalogWardrobeDraftBuilder.Selection(productID: dress.id, color: "粉色")
+        let draft = try XCTUnwrap(ShopCatalogWardrobeDraftBuilder.makeDraft(selection: selection, store: store))
+        do {
+            _ = try await ShopCatalogWardrobeInserter.insertWithImages(
+                draft: draft, selection: selection, store: store, modelContext: context)
+            XCTFail("不能把已有图片的商品静默保存成空图衣物")
+        } catch {
+            XCTAssertTrue(error is ShopCatalogWardrobeImageImporter.ImportError)
+        }
+        XCTAssertEqual(try context.fetchCount(FetchDescriptor<Clothing>()), 0)
+        XCTAssertEqual(try context.fetchCount(FetchDescriptor<StoredImage>()), 0)
+    }
+
+    func testChosenBatchAndProductGalleryAreSavedTogetherWithCorrectFinalPaymentDates() async throws {
+        let reference = try XCTUnwrap(ShopCatalogImageStore.save(imageData()))
+        let url = try XCTUnwrap(ShopCatalogImageStore.url(for: reference))
+        defer { try? FileManager.default.removeItem(at: url) }
+        let dress = product(images: [reference])
+        let firstDate = Date(timeIntervalSince1970: 1_800_000_000)
+        let secondDate = firstDate.addingTimeInterval(86_400 * 60)
+        let series = CatalogSeries(id: dress.seriesID, shopID: dress.shopID, name: "分团商品",
+            reservationBatches: [
+                .init(id: "first", name: "先行团", balanceDueKind: .exact, balanceDueAt: firstDate),
+                .init(id: "second", name: "二团", balanceDueKind: .exact, balanceDueAt: secondDate)
+            ])
+        let store = ShopCatalogStore(catalog: ShopCatalog(
+            shops: [.init(id: dress.shopID, name: "店家")], series: [series], products: [dress],
+            saleEvents: [.init(id: "reservation", productID: dress.id, type: .reservation,
+                              price: 400, deposit: 100, balance: 300, currency: .cny)]))
+        for mode: ShopCatalogWardrobeDraftBuilder.PriceMode in [.stock, .reservation(depositPaid: 100), .fullReservation, .fullStock] {
+            XCTAssertNil(ShopCatalogWardrobeDraftBuilder.makeDraft(
+                selection: .init(productID: dress.id, priceMode: mode), store: store),
+                "有多团的已购商品必须选择购买团次")
+        }
+        for (id, date) in [("first", firstDate), ("second", secondDate)] {
+            let selection = ShopCatalogWardrobeDraftBuilder.Selection(productID: dress.id, color: "粉色",
+                priceMode: .reservation(depositPaid: 100), reservationBatchID: id)
+            let draft = try XCTUnwrap(ShopCatalogWardrobeDraftBuilder.makeDraft(selection: selection, store: store))
+            XCTAssertThrowsError(try ShopCatalogWardrobeInserter.insert(draft: draft,
+                selection: .init(productID: dress.id), store: store, modelContext: context))
+            let clothing = try await ShopCatalogWardrobeInserter.insertWithImages(
+                draft: draft, selection: selection, store: store, modelContext: context)
+            savedPaths += clothing.imagePaths
+            XCTAssertEqual(clothing.catalogReservationBatchID, id)
+            XCTAssertEqual(clothing.finalPaymentDate, date)
+            XCTAssertEqual(clothing.finalPaymentEndDate, date)
+            XCTAssertEqual(clothing.pendingFinalPaymentAmount, 300)
+            XCTAssertTrue(clothing.isFinalPaymentPlan)
+            XCTAssertEqual(clothing.imagePaths.count, 1)
+        }
+        XCTAssertEqual(try context.fetchCount(FetchDescriptor<Clothing>()), 2)
     }
 
     func testConfirmedInsertionPersistsSelectedColorOnlyIncludingAttachedAccessory() async throws {

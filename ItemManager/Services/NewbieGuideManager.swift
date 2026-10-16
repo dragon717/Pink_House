@@ -4018,9 +4018,9 @@ struct FeatureExperienceGuideOverlay: View {
                         currentStep: magicStickerGuideDisplayStep(for: .step1_clickMagicStickerEntry),
                         totalSteps: magicStickerGuideTotalSteps,
                         accent: .pink,
-                        actionTitle: "打开魔法贴纸",
+                        actionTitle: "打开DIY搭配",
                         onAction: {
-                            TabNavigationManager.shared.navigate(to: .magicSticker)
+                            TabNavigationManager.shared.openDIYOutfitFromWardrobe()
                         }
                     )
                 case .step2_magicStickerExplanation:

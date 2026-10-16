@@ -36,12 +36,11 @@
 
 import Foundation
 
-// MARK: - 类型枚举（保留现有分类 + 扩展入口）
+// MARK: - 类型预设（固定选项 + 自定义入口）
 
-/// 系列内可选的类型/分类。需求 §S3：「类型可以来自现有分类，保留现有分类枚举和后续扩展入口」。
-/// 现有分类对齐 iOS 端品类（JSK / OP / SK / KC / 小物…）；`custom` 走自由输入，不进枚举。
+/// 运营添加类型的固定选项，按用户指定顺序展示；自定义与历史类型仍以原字符串保存。
 enum OpsSeriesEntryCategory {
-    static let known = ["JSK", "OP", "SK", "KC", "小物"]
+    static let known = ["OP", "JSK", "SK", "开衫", "衬衫", "内搭", "围裙/罩裙", "斗篷", "小物", "包", "其他"]
 }
 
 // MARK: - 颜色 SKU
@@ -272,6 +271,8 @@ struct OpsSeriesEntryDraft: Codable, Equatable {
     /// 尾款结束时间（可选，**仅展示与提醒，不自动切换为现货**）
     var hasBalanceEnd: Bool
     var balanceEndAt: Date
+    /// nil = 本次不编辑团次；空列表 = 明确撤下分团。旧向导 JSON 缺键时保留系列声明。
+    var reservationBatches: [CatalogReservationBatch]?
 
     // MARK: S2：系列价格表（可选）
     //
@@ -296,7 +297,26 @@ struct OpsSeriesEntryDraft: Codable, Equatable {
     var priceChartImageAssetIDs: [String]
 
     // S3：类型条目
-    var typeEntries: [OpsSeriesTypeEntry]
+    var typeEntries: [OpsSeriesTypeEntry] {
+        didSet { typeEntries = Self.entriesWithUniqueIDs(typeEntries) }
+    }
+
+    /// 旧草稿可能保留复制前的行标识。只修复空值或重复值，逐行保留全部输入与顺序。
+    /// 在解码及后续数组写入时统一修复，避免 List 选中、编辑或删除串到另一条款式。
+    private static func entriesWithUniqueIDs(_ entries: [OpsSeriesTypeEntry]) -> [OpsSeriesTypeEntry] {
+        var reserved = Set(entries.map(\.id))
+        var seen = Set<String>()
+        return entries.map { entry in
+            var result = entry
+            if result.id.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                || !seen.insert(result.id).inserted {
+                repeat { result.id = UUID().uuidString } while reserved.contains(result.id)
+                reserved.insert(result.id)
+                seen.insert(result.id)
+            }
+            return result
+        }
+    }
 
     init(
         shopID: String = "",
@@ -319,6 +339,7 @@ struct OpsSeriesEntryDraft: Codable, Equatable {
         balanceStartAt: Date = Date(),
         hasBalanceEnd: Bool = false,
         balanceEndAt: Date = Date(),
+        reservationBatches: [CatalogReservationBatch]? = nil,
         declaresPriceChart: Bool = false,
         priceChartUnit: String = "",
         priceChartColumnsText: String = "",
@@ -346,12 +367,13 @@ struct OpsSeriesEntryDraft: Codable, Equatable {
         self.balanceStartAt = balanceStartAt
         self.hasBalanceEnd = hasBalanceEnd
         self.balanceEndAt = balanceEndAt
+        self.reservationBatches = reservationBatches
         self.declaresPriceChart = declaresPriceChart
         self.priceChartUnit = priceChartUnit
         self.priceChartColumnsText = priceChartColumnsText
         self.priceChartRowsText = priceChartRowsText
         self.priceChartImageAssetIDs = priceChartImageAssetIDs
-        self.typeEntries = typeEntries
+        self.typeEntries = Self.entriesWithUniqueIDs(typeEntries)
     }
 }
 
@@ -363,6 +385,7 @@ extension OpsSeriesEntryDraft {
         case coverAssetID, declaresPhase, phaseRawValue
         case hasReservationEnd, reservationEndAt
         case hasBalanceStart, balanceStartAt, hasBalanceEnd, balanceEndAt
+        case reservationBatches
         case declaresPriceChart, priceChartUnit, priceChartColumnsText, priceChartRowsText
         case priceChartImageAssetIDs
         case typeEntries
@@ -392,6 +415,7 @@ extension OpsSeriesEntryDraft {
             balanceStartAt: try c.decodeIfPresent(Date.self, forKey: .balanceStartAt) ?? Date(),
             hasBalanceEnd: try c.decodeIfPresent(Bool.self, forKey: .hasBalanceEnd) ?? false,
             balanceEndAt: try c.decodeIfPresent(Date.self, forKey: .balanceEndAt) ?? Date(),
+            reservationBatches: try c.decodeIfPresent([CatalogReservationBatch].self, forKey: .reservationBatches),
             declaresPriceChart: try c.decodeIfPresent(Bool.self, forKey: .declaresPriceChart) ?? false,
             priceChartUnit: try c.decodeIfPresent(String.self, forKey: .priceChartUnit) ?? "",
             priceChartColumnsText: try c.decodeIfPresent(String.self, forKey: .priceChartColumnsText) ?? "",
@@ -629,10 +653,25 @@ enum OpsSeriesEntryValidator {
             add("所选系列不存在，请重新选择。", area: .shopSeries)
         }
 
-        // S2：发售阶段（「预约中」必须有结束时间 —— 自动流转靠它）
-        if let phase = draft.phase, phase == .reservationActive, !draft.hasReservationEnd {
-            add("发售阶段是「预约中」时必须填预约结束时间 —— 缺了它系列会一直停在预约中。",
+        let batches = draft.reservationBatches
+            ?? catalog.series.first { $0.id == draft.seriesID }?.reservationBatches ?? []
+        let allBatchesHaveEnd = !batches.isEmpty && batches.allSatisfy { $0.reservationEndAt != nil }
+        // S2：预约结束可统一设置，也可由每团独立设置。
+        if draft.phase == .reservationActive, !draft.hasReservationEnd, !allBatchesHaveEnd {
+            add("预约中需要填写预约结束时间，或为每个团次分别填写预约结束时间。",
                 area: .seriesProfile)
+        }
+        if let batches = draft.reservationBatches,
+           let error = CatalogReservationBatch.validationError(in: batches) {
+            add(error, area: .seriesProfile)
+        }
+        if batches.isEmpty {
+            if draft.hasBalanceEnd && !draft.hasBalanceStart {
+                add("请先填写尾款开始时间，再填写尾款结束时间。", area: .seriesProfile)
+            } else if draft.hasBalanceStart && draft.hasBalanceEnd,
+                      draft.balanceEndAt < draft.balanceStartAt {
+                add("尾款结束时间不能早于开始时间。", area: .seriesProfile)
+            }
         }
 
         // S2：系列价格表（开关关着时 `issues` 恒为空 —— 不碰就不校验）。

@@ -532,15 +532,15 @@ enum MagicStickerGuideStep: Int, CaseIterable, GuideStepDescribable {
 
     var title: String {
         switch self {
-        case .step1_clickMagicStickerEntry: return "点击「魔法贴纸」"
-        case .step2_magicStickerExplanation: return "认识魔法贴纸"
+        case .step1_clickMagicStickerEntry: return "点击「DIY搭配」"
+        case .step2_magicStickerExplanation: return "认识DIY搭配"
         }
     }
 
     var message: String {
         switch self {
-        case .step1_clickMagicStickerEntry: return "从底部导航或 House 房间里的「魔法贴纸」入口进入默认贴纸页。"
-        case .step2_magicStickerExplanation: return "这里会直接进入默认贴纸页。主体区域是贴纸编辑内容；如果把贴纸加入手帐，还能继续回到对应手帐里编辑。"
+        case .step1_clickMagicStickerEntry: return "点击衣橱顶部统计卡片中的「DIY搭配」，就能开始自由拼搭。统计卡片收起时，也可以从衣橱右上角「更多」打开。"
+        case .step2_magicStickerExplanation: return "从衣物素材库挑选单品，在画布上自由拖动、缩放和旋转来组合搭配。完成后可以加入穿搭手帐，继续记录和编辑。"
         }
     }
 

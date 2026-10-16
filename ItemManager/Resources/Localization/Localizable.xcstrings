@@ -6026,6 +6026,9 @@
     "%lld 个单品" : {
 
     },
+    "%lld 个批次" : {
+
+    },
     "%lld 个新任务" : {
       "localizations" : {
         "en" : {
@@ -13666,6 +13669,64 @@
         }
       }
     },
+    "DIY搭配" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "DIY-Outfits"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "DIY Outfits"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Conjuntos DIY"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tenues DIY"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "DIYコーデ"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "DIY 코디"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Looks DIY"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "DIY搭配"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "DIY搭配"
+          }
+        }
+      }
+    },
     "DS_API_KEY" : {
       "localizations" : {
         "en" : {
@@ -20259,6 +20320,7 @@
       }
     },
     "书页管理" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -28013,6 +28075,7 @@
       }
     },
     "保持在默认手帐" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -33678,6 +33741,9 @@
         }
       }
     },
+    "写下你想记录的内容" : {
+
+    },
     "冬季" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -37667,6 +37733,7 @@
       }
     },
     "加入其他手帐" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -42386,6 +42453,9 @@
         }
       }
     },
+    "可识别的开始描述用于估算提醒；结束时长从预计尾款开始日算，一个月按日历月计算。大致时间不参与销售阶段自动流转。" : {
+
+    },
     "可选" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -42979,6 +43049,9 @@
 
     },
     "同款不同色合并为一张卡片；点颜色 / 尺码选择规格，双价并存可自选现货 / 预约价加入" : {
+
+    },
+    "同款商品可有先行团、一团、二团等，每团分别填写尾款时间；入橱时选择所属团次。团次资料由同系列商品共用。关闭编辑开关会沿用已保存团次。" : {
 
     },
     "同步中" : {
@@ -46255,6 +46328,12 @@
         }
       }
     },
+    "团次与尾款" : {
+
+    },
+    "团次与尾款时间" : {
+
+    },
     "图%lld" : {
 
     },
@@ -47475,6 +47554,9 @@
       }
     },
     "在此录入一次，该系列全部商品详情页自动展示；无需在单品编辑页上传。用「粘贴文本录入」把整段表格文本贴进来最省事。" : {
+
+    },
+    "在此次上传中编辑团次与尾款" : {
 
     },
     "在沙漠中找到绿洲的旅人" : {
@@ -48909,6 +48991,12 @@
         }
       }
     },
+    "备注（选填，写下你想记录的内容）" : {
+
+    },
+    "备注（选填）" : {
+
+    },
     "复制" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -50021,7 +50109,7 @@
         }
       }
     },
-    "大致时间只作展示，不参与自动流转——它不是确定时刻，系统不拿它做判断。" : {
+    "大致尾款时间（如 1月上旬、圣诞节前）" : {
 
     },
     "大草原" : {
@@ -56476,6 +56564,9 @@
         }
       }
     },
+    "尾款开始" : {
+
+    },
     "尾款开始（大致，如：大货到后 1 个月）" : {
 
     },
@@ -56685,13 +56776,19 @@
     "尾款时间" : {
 
     },
+    "尾款时间：%@" : {
+
+    },
     "尾款期" : {
 
     },
     "尾款期已过声明的结束时间。若尾款已收齐，可把发售阶段改为「现货」——系统不会自动改。" : {
 
     },
-    "尾款结束（大致，选填，如：大货到后 2 个月）" : {
+    "尾款结束" : {
+
+    },
+    "尾款结束 / 时长（选填，如十天、十五天、一个月）" : {
 
     },
     "尾款结束时间" : {
@@ -57611,7 +57708,7 @@
         }
       }
     },
-    "已公布尾款时间" : {
+    "已公布尾款结束时间" : {
 
     },
     "已关联图鉴商品" : {
@@ -62249,13 +62346,13 @@
     "店家 / 系列 / 商品管理（编辑、归档、删除）" : {
 
     },
-    "店家上新" : {
-
-    },
     "店家商品库" : {
 
     },
     "店家商品库暂不可用" : {
+
+    },
+    "店铺时光册" : {
 
     },
     "座位号: %@" : {
@@ -64616,6 +64713,7 @@
       }
     },
     "当前书页在'默认手帐'中，您可以选择保持现状或移动到其他手帐" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -75955,6 +76053,9 @@
     "批次信息" : {
 
     },
+    "批次名称（如一团、二团、1P、2P）" : {
+
+    },
     "批次详情" : {
 
     },
@@ -78045,6 +78146,9 @@
           }
         }
       }
+    },
+    "按实际团数添加先行团、一团、二团等，每团单独填写尾款时间。入橱时按所选团次确定日期；没有分团时沿用系列尾款期。" : {
+
     },
     "按日期回看收藏" : {
       "extractionState" : "stale",
@@ -88107,9 +88211,6 @@
     "暂无草稿。点上方「＋ 补录上新」开始。" : {
 
     },
-    "暂无进行中的上新" : {
-
-    },
     "暂无选项" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -89884,6 +89985,9 @@
           }
         }
       }
+    },
+    "未公布" : {
+
     },
     "未决定" : {
       "extractionState" : "stale",
@@ -92694,6 +92798,9 @@
         }
       }
     },
+    "查看时间" : {
+
+    },
     "查看结果" : {
       "localizations" : {
         "en" : {
@@ -95216,6 +95323,65 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "正在保存到手帳..."
+          }
+        }
+      }
+    },
+    "正在准备DIY搭配..." : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "DIY-Outfit wird vorbereitet..."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Preparing DIY outfit..."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Preparando conjunto DIY..."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Préparation de la tenue DIY..."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "DIYコーデを準備中..."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "DIY 코디 준비 중..."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Preparando look DIY..."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在准备DIY搭配..."
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在準備DIY搭配..."
           }
         }
       }
@@ -99214,6 +99380,9 @@
           }
         }
       }
+    },
+    "添加团次" : {
+
     },
     "添加图片" : {
       "localizations" : {
@@ -115495,6 +115664,9 @@
         }
       }
     },
+    "结束可填十天、十五天、一个月，从预计尾款开始日推算；一个月按日历月计算。月份和旬取中间日：上旬5日、中旬15日、下旬25日。节日前按节日当天提前6天估算；省略年份按录入时间固定，也可写明年份。" : {
+
+    },
     "结束打工" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -119571,6 +119743,9 @@
           }
         }
       }
+    },
+    "自行设置尾款时间" : {
+
     },
     "至少填写预约价或现货价之一；尾款 = 预约价 − 定金，自动计算。价格整组写入本款每条颜色草稿。" : {
 
@@ -125753,7 +125928,13 @@
         }
       }
     },
-    "该年份暂无收录系列" : {
+    "该团尾款期" : {
+
+    },
+    "该团预约结束" : {
+
+    },
+    "该团预约结束时间（选填）" : {
 
     },
     "该开关只决定本机是否放行创作者界面。能否真正写入线上内容库，取决于当前 iCloud 账户是否已在 CloudKit 创作者名单中；未获授权的提交会失败并给出提示。" : {
@@ -127896,6 +128077,9 @@
         }
       }
     },
+    "请选择团次或批次" : {
+
+    },
     "请重新选择一张图片以进行裁剪和移动。" : {
       "localizations" : {
         "en" : {
@@ -129052,6 +129236,9 @@
           }
         }
       }
+    },
+    "购买批次" : {
+
     },
     "购买日期" : {
       "extractionState" : "stale",
@@ -140304,6 +140491,9 @@
         }
       }
     },
+    "预计尾款日期：%@（估算）" : {
+
+    },
     "预计尾款时间" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -140385,6 +140575,9 @@
           }
         }
       }
+    },
+    "预计结束日期：%@（估算）" : {
+
     },
     "预计还有几分钟即可抵达%@..." : {
       "extractionState" : "stale",
@@ -142639,6 +142832,7 @@
       }
     },
     "魔法贴纸" : {
+      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {

@@ -30,7 +30,7 @@ struct OpsColorImagesSheet: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             Text("批量填充颜色图片 · \(entry.displayName)").font(.title3.weight(.semibold))
-            Text("勾选右侧颜色，再点击左侧图片完成分配；可以为多个颜色使用同一张图。")
+            Text("点击图片填充选中颜色，填好后自动选中下一个颜色；点击图片下方的文件名查看大图。支持勾选多个颜色共用一张图。")
                 .font(.callout).foregroundStyle(.secondary)
             HSplitView {
                 imageLibrary.frame(minWidth: 450, maxWidth: .infinity)
@@ -83,7 +83,7 @@ struct OpsColorImagesSheet: View {
                         uploadsOnly = true
                         searchText = ""
                     }
-                    feedback = "本次导入 \(outcome.assetIDs.count) 张图片。勾选右侧颜色后，点击图片分配。"
+                    feedback = "本次导入 \(outcome.assetIDs.count) 张图片。点击图片即可填充选中颜色。"
                     isImporting = false
                 }
             case .failure(let error):
@@ -134,34 +134,51 @@ struct OpsColorImagesSheet: View {
 
     private func imageTile(_ item: OpsImageLibraryItem) -> some View {
         let assignedCount = assignments.values.filter { $0 == item.id }.count
-        return Button {
-            guard !selectedColorIDs.isEmpty else {
-                feedback = "请先勾选右侧需要配图的颜色。"
-                return
-            }
-            guard let assetID = workspace.useImageLibraryItem(item) else {
-                saveError = workspace.lastError ?? "无法读取历史图片，请重试。"
-                return
-            }
-            for colorID in selectedColorIDs { assignments[colorID] = assetID }
-            feedback = "已为 \(selectedColorIDs.count) 个颜色分配图片，点击「确定」保存。"
-            saveError = nil
-        } label: {
-            VStack(spacing: 5) {
+        return VStack(spacing: 5) {
+            Button { assign(item) } label: {
                 OpsThumbnail(url: item.fileURL, size: 104)
-                Text(item.name).font(.caption).lineLimit(1).truncationMode(.middle)
-                Text(assignedCount == 0 ? "点击分配" : "已分配 \(assignedCount) 个颜色")
-                    .font(.caption2)
-                    .foregroundStyle(assignedCount == 0 ? Color.secondary : Color.accentColor)
             }
-            .padding(5)
-            .frame(maxWidth: .infinity)
-            .background(assignedCount == 0 ? Color.clear : Color.accentColor.opacity(0.08),
-                        in: RoundedRectangle(cornerRadius: 10))
-            .contentShape(RoundedRectangle(cornerRadius: 10))
+            .buttonStyle(.plain)
+            .disabled(selectedColorIDs.isEmpty)
+            .help("点击填充选中的颜色，完成后自动选择下一个颜色")
+            .accessibilityLabel("填充图片「\(item.name)」")
+            Text(item.name).font(.caption).lineLimit(1).truncationMode(.middle)
+                .foregroundStyle(Color.accentColor)
+                .opsImagePreview(url: item.fileURL)
+                .help("点击文件名查看大图")
+                .accessibilityLabel("查看原图「\(item.name)」")
+            if assignedCount > 0 {
+                Text("已分配 \(assignedCount) 个颜色").font(.caption2).foregroundStyle(Color.accentColor)
+            }
         }
-        .buttonStyle(.plain)
-        .help("为勾选的颜色分配「\(item.name)」")
+        .padding(5)
+        .frame(maxWidth: .infinity)
+        .background(assignedCount == 0 ? Color.clear : Color.accentColor.opacity(0.08),
+                    in: RoundedRectangle(cornerRadius: 10))
+    }
+
+    private func assign(_ item: OpsImageLibraryItem) {
+        guard !selectedColorIDs.isEmpty else {
+            feedback = "请先勾选右侧需要配图的颜色。"
+            return
+        }
+        guard let assetID = workspace.useImageLibraryItem(item) else {
+            saveError = workspace.lastError ?? "无法读取历史图片，请重试。"
+            return
+        }
+        let filledCount = selectedColorIDs.count
+        for colorID in selectedColorIDs { assignments[colorID] = assetID }
+        // 按右侧显示顺序向后推进，已配过图的下一颜色也可连续换图；到末尾停止，避免回绕覆盖。
+        if let lastIndex = entry.colors.lastIndex(where: { selectedColorIDs.contains($0.id) }),
+           entry.colors.indices.contains(lastIndex + 1) {
+            let nextColor = entry.colors[lastIndex + 1]
+            selectedColorIDs = [nextColor.id]
+            feedback = "已为 \(filledCount) 个颜色填充图片，接下来为「\(nextColor.name.isEmpty ? "未命名颜色" : nextColor.name)」选择图片。点击「确定」保存。"
+        } else {
+            selectedColorIDs = []
+            feedback = "已为 \(filledCount) 个颜色填充图片，已到最后一个颜色。点击「确定」保存；需要调整时可重新选择颜色。"
+        }
+        saveError = nil
     }
 
     private var colorList: some View {
@@ -173,10 +190,17 @@ struct OpsColorImagesSheet: View {
                 Spacer()
             }
             .controlSize(.small)
-            ScrollView {
-                VStack(spacing: 8) {
-                    ForEach(entry.colors) { color in
-                        colorRow(color)
+            ScrollViewReader { proxy in
+                ScrollView {
+                    VStack(spacing: 8) {
+                        ForEach(entry.colors) { color in
+                            colorRow(color).id(color.id)
+                        }
+                    }
+                }
+                .onChange(of: selectedColorIDs) { _, ids in
+                    if let next = entry.colors.first(where: { ids.contains($0.id) }) {
+                        proxy.scrollTo(next.id, anchor: .center)
                     }
                 }
             }
@@ -195,16 +219,14 @@ struct OpsColorImagesSheet: View {
             Button {
                 selectedColorIDs = [color.id]
             } label: {
-                HStack {
-                    Text(color.name.isEmpty ? "未命名颜色" : color.name)
-                        .font(.callout).frame(maxWidth: .infinity, alignment: .leading)
-                    OpsThumbnail(url: assetID.flatMap {
-                        workspace.stagedFileURL(forReference: workspace.asset(for: $0)?.originalURL)
-                    }, size: 44)
-                }
-                .contentShape(Rectangle())
+                Text(color.name.isEmpty ? "未命名颜色" : color.name)
+                    .font(.callout).frame(maxWidth: .infinity, alignment: .leading)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            OpsPreviewableThumbnail(url: assetID.flatMap {
+                workspace.stagedImageURL(forReference: $0)
+            }, size: 44)
             Button {
                 assignments.removeValue(forKey: color.id)
                 saveError = nil

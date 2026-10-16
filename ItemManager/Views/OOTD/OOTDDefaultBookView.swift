@@ -22,6 +22,7 @@ extension Notification.Name {
 }
 
 struct OOTDDefaultBookView: View {
+    let onBack: (() -> Void)?
     @Environment(\.modelContext) private var modelContext
     @Query(filter: #Predicate<BookGroup> { $0.deletedAt == nil }, sort: \BookGroup.sortIndex, order: .forward) private var books: [BookGroup]
     @Query private var magicStickerPages: [Outfit]
@@ -30,12 +31,12 @@ struct OOTDDefaultBookView: View {
 
     // Toast 状态
 
-    // 获取默认手帐（魔法贴纸使用"默认手帐"作为默认名，不借用其他手帐）
+    // 获取默认手帐（DIY搭配使用"默认手帐"作为默认名，不借用其他手帐）
     private var defaultBook: BookGroup? {
         books.first { $0.title == MagicStickerDefaults.bookTitle }
     }
 
-    // 获取魔法贴纸专用书页，不复用默认手帐中的其他书页
+    // 获取DIY搭配专用书页，不复用默认手帐中的其他书页
     private var magicStickerPage: Outfit? {
         guard let book = defaultBook else { return nil }
         return magicStickerPages
@@ -44,7 +45,8 @@ struct OOTDDefaultBookView: View {
             .first
     }
 
-    init() {
+    init(onBack: (() -> Void)? = nil) {
+        self.onBack = onBack
         let pageTitle = MagicStickerDefaults.pageTitle
         _magicStickerPages = Query(
             filter: #Predicate<Outfit> { page in
@@ -66,7 +68,7 @@ struct OOTDDefaultBookView: View {
                 Group {
                     if let book = defaultBook {
                         if let page = magicStickerPage {
-                            // 直接显示编辑界面（魔法贴纸模式：隐藏工具栏，显示贴纸库）
+                            // 直接显示编辑界面（DIY搭配模式：隐藏工具栏，显示贴纸库）
                             OOTDEditorView(
                                 outfit: page,
                                 onPageChange: { newOutfit in
@@ -74,7 +76,8 @@ struct OOTDDefaultBookView: View {
                                     navigationPath.append(newOutfit)
                                 },
                                 initialToolbarVisible: false,
-                                initialStickerLibraryVisible: true
+                                initialStickerLibraryVisible: true,
+                                navigationTitleOverride: "DIY搭配".appLocalized
                             )
                         } else {
                             // 手帐存在但没有书页，显示空状态并允许创建新书页
@@ -88,9 +91,24 @@ struct OOTDDefaultBookView: View {
 
 
             }
-            .navigationTitle("魔法贴纸".appLocalized)
+            .navigationTitle("DIY搭配".appLocalized)
             .navigationBarTitleDisplayMode(.inline)
             .toolbarBackground(.hidden, for: .navigationBar)
+            .toolbar {
+                if let onBack {
+                    ToolbarItem(placement: .topBarLeading) {
+                        Button(action: onBack) {
+                            Label("返回".appLocalized, systemImage: "chevron.left")
+                                .labelStyle(.titleAndIcon)
+                        }
+                        .accessibilityLabel("返回".appLocalized)
+                        .accessibilityIdentifier("diyOutfit.back")
+                    }
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    MagicStickerPageManagementButton()
+                }
+            }
         }
         .onReceive(NotificationCenter.default.publisher(for: .magicStickerPageMoved)) { notification in
             if let bookTitle = notification.userInfo?["bookTitle"] as? String,
@@ -142,7 +160,7 @@ struct OOTDDefaultBookView: View {
     }
 }
 
-// MARK: - 自动创建手帐视图（魔法贴纸无需手动创建）
+// MARK: - 自动创建手帐视图（DIY搭配无需手动创建）
 private struct AutoCreateBookView: View {
     let onAutoCreate: () -> Void
 
@@ -154,7 +172,7 @@ private struct AutoCreateBookView: View {
                 .font(.system(size: 60))
                 .foregroundColor(.pink.opacity(0.6))
 
-            Text("正在准备魔法贴纸...".appLocalized)
+            Text("正在准备DIY搭配...".appLocalized)
                 .font(.title2)
                 .foregroundColor(.primary)
 
@@ -173,7 +191,7 @@ private struct AutoCreateBookView: View {
     }
 }
 
-// MARK: - 空书页视图（魔法贴纸自动创建书页）
+// MARK: - 空书页视图（DIY搭配自动创建书页）
 private struct EmptyPageView: View {
     let book: BookGroup
     @Environment(\.modelContext) private var modelContext
@@ -197,7 +215,7 @@ private struct EmptyPageView: View {
             Spacer()
         }
         .onAppear {
-            // 魔法贴纸模式：自动创建空白书页
+            // DIY搭配模式：自动创建空白书页
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                 createNewPage()
             }

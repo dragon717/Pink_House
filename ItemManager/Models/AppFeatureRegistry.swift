@@ -154,9 +154,9 @@ enum AppFeatureRegistry {
         ),
         AppFeatureDescriptor(
             id: .magicSticker,
-            title: "魔法贴纸",
-            subtitle: "默认贴纸页与手帐创作",
-            systemImage: "book.pages.fill",
+            title: "DIY搭配",
+            subtitle: "挑选衣物，自由拼搭并保存到手帐",
+            systemImage: "tshirt.fill",
             tintHex: "#FF69B4",
             route: .smallWorld(.ootdDefaultBook),
             unlockFeature: .ootdDefaultBook,

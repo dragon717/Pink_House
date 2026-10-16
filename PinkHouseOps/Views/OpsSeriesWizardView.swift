@@ -198,9 +198,8 @@ struct OpsSeriesWizardView: View {
                         if draft.seriesID.isEmpty {
                             newSeriesFields
                         }
-                        // 需求 §S1：不显示、不保存任务名称与批次
-                        OpsFootnote(text: "本流程**没有**「任务名称」与「批次」（需求 §S1）："
-                                    + "一次上新的归属就是店家 → 系列。")
+                        OpsFootnote(text: "商品归属为店家 → 系列；先行团、一团、二团等购买团次，"
+                                    + "在下一步「系列资料」里分别设置尾款时间。")
                     }
                 }
                 affiliationSummary
@@ -222,7 +221,7 @@ struct OpsSeriesWizardView: View {
                 if oldValue != newValue {
                     workspace.seriesEntry.managesShopLogo = false
                     workspace.seriesEntry.shopLogoReference = nil
-                    workspace.seriesEntry.seriesID = ""
+                    workspace.selectSeriesForEntry("")
                 }
                 if newValue == Self.newShopChoiceTag {
                     workspace.seriesEntry.createsNewShop = true
@@ -251,7 +250,7 @@ struct OpsSeriesWizardView: View {
         Binding(
             get: { draft.seriesID },
             set: { newValue in
-                workspace.seriesEntry.seriesID = newValue == "__new__" ? "" : newValue
+                workspace.selectSeriesForEntry(newValue == "__new__" ? "" : newValue)
                 // ⚠️ 切系列必须**重新装载价格表块**，否则就是数据损坏：
                 // 向导草稿是长期存在的（`seriesEntryJSON`），在 A 系列填/传的价格表
                 // 会被原样写进 B 系列，而界面上完全看不出异常。
@@ -377,6 +376,7 @@ struct OpsSeriesWizardView: View {
                     }
                 }
 
+                reservationBatchCard
                 priceChartCard
 
                 OpsCard(title: "销售阶段与时间", systemImage: "calendar.badge.clock") {
@@ -388,17 +388,19 @@ struct OpsSeriesWizardView: View {
                             }
                         }
                         OpsOptionalDateField(
-                            label: "预约结束时间（声明「预约中」时**必填**，驱动自动流转）",
+                            label: "统一预约结束时间（也可在每个团次中分别设置）",
                             isOn: bind(\.hasReservationEnd),
                             date: bind(\.reservationEndAt))
-                        OpsOptionalDateField(
-                            label: "尾款开始时间（可选）",
-                            isOn: bind(\.hasBalanceStart),
-                            date: bind(\.balanceStartAt))
-                        OpsOptionalDateField(
-                            label: "尾款结束时间（可选，**仅展示和提醒，不自动切换为现货**）",
-                            isOn: bind(\.hasBalanceEnd),
-                            date: bind(\.balanceEndAt))
+                        if effectiveReservationBatches.isEmpty {
+                            OpsOptionalDateField(
+                                label: "尾款开始时间（可选）",
+                                isOn: bind(\.hasBalanceStart),
+                                date: bind(\.balanceStartAt))
+                            OpsOptionalDateField(
+                                label: "尾款结束时间（可选，**仅展示和提醒，不自动切换为现货**）",
+                                isOn: bind(\.hasBalanceEnd),
+                                date: bind(\.balanceEndAt))
+                        }
                         OpsFootnote(text: "本页面**不填写商品价格** —— 价格统一放到下一步，"
                                     + "按当前类型与该类型的颜色、尺码放在一起（需求 §S2）。"
                                     + "上面那张「系列价格表」是给客户看的**展示表**，不是定价来源。")
@@ -420,6 +422,39 @@ struct OpsSeriesWizardView: View {
                 }
             case .failure(let error):
                 workspace.reportFailure("图片上传失败：\(error.localizedDescription)")
+            }
+        }
+    }
+
+    private var effectiveReservationBatches: [CatalogReservationBatch] {
+        draft.reservationBatches
+            ?? workspace.catalog.series.first { $0.id == draft.seriesID }?.reservationBatches ?? []
+    }
+
+    private var reservationBatchCard: some View {
+        OpsCard(title: "团次与尾款时间", systemImage: "person.3") {
+            VStack(alignment: .leading, spacing: 10) {
+                Toggle("在此次上传中编辑团次与尾款", isOn: Binding(
+                    get: { draft.reservationBatches != nil },
+                    set: { enabled in
+                        workspace.seriesEntry.reservationBatches = enabled ? effectiveReservationBatches : nil
+                    }))
+                if draft.reservationBatches != nil {
+                    OpsReservationBatchEditor(batches: Binding(
+                        get: { draft.reservationBatches ?? [] },
+                        set: { workspace.seriesEntry.reservationBatches = $0 }),
+                        reservationEndAt: draft.hasReservationEnd ? draft.reservationEndAt : nil)
+                    if let error = CatalogReservationBatch.validationError(in: draft.reservationBatches ?? []) {
+                        Label(error, systemImage: "exclamationmark.triangle")
+                            .font(.caption).foregroundStyle(.orange)
+                    }
+                } else if !effectiveReservationBatches.isEmpty {
+                    OpsReservationBatchSummary(batches: effectiveReservationBatches,
+                        reservationEndAt: draft.hasReservationEnd ? draft.reservationEndAt : nil)
+                }
+                OpsFootnote(text: "同款商品可以同时有先行团、一团、二团等，每团分别填写尾款时间。"
+                            + "购买者入橱时选择所属团次，尾款提醒跟随该团。关闭编辑开关会沿用已保存团次。"
+                            + "团次资料由同系列商品共用。")
             }
         }
     }
@@ -574,7 +609,7 @@ struct OpsSeriesWizardView: View {
                 OpsImageUploadThumbnail(
                     url: workspace.stagedFileURL(
                         forReference: workspace.asset(for: assetID)?.originalURL),
-                    size: 64, title: "点击添加价格表原图（可多选）") {
+                    size: 64, title: "点击添加价格表原图（可多选）", actionTitle: "添加图片") {
                         priceChartUploadError = nil
                         showsPriceChartImporter = true
                     }
@@ -836,13 +871,18 @@ struct OpsSeriesWizardReviewView: View {
                     LabeledContent("预约结束", value: draft.reservationEndAt.formatted(
                         .dateTime.year().month().day().hour().minute()))
                 }
-                if draft.hasBalanceStart {
+                if effectiveReservationBatches.isEmpty, draft.hasBalanceStart {
                     LabeledContent("尾款开始", value: draft.balanceStartAt.formatted(
                         .dateTime.year().month().day().hour().minute()))
                 }
-                if draft.hasBalanceEnd {
+                if effectiveReservationBatches.isEmpty, draft.hasBalanceEnd {
                     LabeledContent("尾款结束（仅提醒）", value: draft.balanceEndAt.formatted(
                         .dateTime.year().month().day().hour().minute()))
+                }
+                if !effectiveReservationBatches.isEmpty {
+                    LabeledContent("团次数", value: "\(effectiveReservationBatches.count) 团")
+                    OpsReservationBatchSummary(batches: effectiveReservationBatches,
+                        reservationEndAt: draft.hasReservationEnd ? draft.reservationEndAt : nil)
                 }
                 LabeledContent("已选类型", value: draft.selectedCategorySummary)
                 LabeledContent("系列价格表", value: priceChartSummaryLine)
@@ -850,6 +890,11 @@ struct OpsSeriesWizardReviewView: View {
                             + "发现问题用每张卡右上角的「返回修改」。")
             }
         }
+    }
+
+    private var effectiveReservationBatches: [CatalogReservationBatch] {
+        draft.reservationBatches
+            ?? workspace.catalog.series.first { $0.id == draft.seriesID }?.reservationBatches ?? []
     }
 
     /// S4 的系列价格表摘要（只读）。
@@ -909,7 +954,7 @@ struct OpsSeriesWizardReviewView: View {
                 Divider()
                 ForEach(entry.colors) { color in
                     HStack(spacing: 8) {
-                        OpsThumbnail(url: color.imageAssetID.flatMap {
+                        OpsPreviewableThumbnail(url: color.imageAssetID.flatMap {
                             workspace.stagedFileURL(forReference: workspace.asset(for: $0)?.originalURL)
                         }, size: 28)
                         Text(color.name.isEmpty ? "（未命名颜色）" : color.name)

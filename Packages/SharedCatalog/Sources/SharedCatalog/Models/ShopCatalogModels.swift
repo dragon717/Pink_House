@@ -317,6 +317,10 @@ public struct CatalogSeries: Codable, Identifiable, Hashable, Sendable {
     /// `CatalogSeriesSalePhaseResolver.balancePhaseExitsByDeclarationOnly`）。
     public var balanceDueEndAt: Date? = nil
 
+    /// 预约团次（先行团、一团、二团等）。nil / 空列表沿用旧系列共用尾款期。
+    /// 团次 ID 稳定保存，改名或调整顺序不改变用户入橱归属。
+    public var reservationBatches: [CatalogReservationBatch]? = nil
+
     // 跨模块构造入口：`public` 结构体的合成逐成员 init 是 internal，外部模块必须显式声明。
     public init(
         id: String,
@@ -336,7 +340,8 @@ public struct CatalogSeries: Codable, Identifiable, Hashable, Sendable {
         balanceDueText: String? = nil,
         balanceDueAt: Date? = nil,
         balanceDueEndText: String? = nil,
-        balanceDueEndAt: Date? = nil
+        balanceDueEndAt: Date? = nil,
+        reservationBatches: [CatalogReservationBatch]? = nil
     ) {
         self.id = id
         self.shopID = shopID
@@ -356,6 +361,7 @@ public struct CatalogSeries: Codable, Identifiable, Hashable, Sendable {
         self.balanceDueAt = balanceDueAt
         self.balanceDueEndText = balanceDueEndText
         self.balanceDueEndAt = balanceDueEndAt
+        self.reservationBatches = reservationBatches
     }
 }
 

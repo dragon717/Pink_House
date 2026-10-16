@@ -64,10 +64,24 @@ struct OpsSeriesEntryCommitReport: Equatable {
 
 extension OpsWorkspace {
 
+    /// 仅在运营切换系列时载入团次，恢复草稿或视图重建不覆盖未提交输入。
+    func selectSeriesForEntry(_ seriesID: String) {
+        let series = catalog.series.first { $0.id == seriesID }
+        seriesEntry.seriesID = seriesID
+        seriesEntry.reservationBatches = series?.reservationBatches
+        seriesEntry.phase = series?.salePhase
+        seriesEntry.hasReservationEnd = series?.reservationEndAt != nil
+        if let end = series?.reservationEndAt { seriesEntry.reservationEndAt = end }
+        seriesEntry.hasBalanceStart = series?.balanceDueKind == .exact && series?.balanceDueAt != nil
+        if let start = series?.balanceDueAt { seriesEntry.balanceStartAt = start }
+        seriesEntry.hasBalanceEnd = series?.balanceDueKind == .exact && series?.balanceDueEndAt != nil
+        if let end = series?.balanceDueEndAt { seriesEntry.balanceEndAt = end }
+    }
+
     /// 复制当前表单原文，不重新解析价格/尺码，也不复制已提交商品的身份。
     /// 先把原条目和副本一起保存，成功后才插入列表并交给界面选中。
     func duplicateSeriesTypeEntry(id: String) -> String? {
-        guard canMutate(), let draft,
+        guard canMutate(),
               let index = seriesEntry.typeEntries.firstIndex(where: { $0.id == id }) else { return nil }
         var copy = seriesEntry.typeEntries[index]
         copy.id = UUID().uuidString
@@ -76,19 +90,61 @@ extension OpsWorkspace {
         copy.lastCommitOK = nil
         var updated = seriesEntry
         updated.typeEntries.insert(copy, at: index + 1)
+        guard saveSeriesEntryEdit(updated, success: "已复制款式「\(copy.displayName)」，可直接修改副本。",
+                                  failure: "复制款式保存失败，原内容已保留") else { return nil }
+        return copy.id
+    }
+
+    /// 删除只按当前行的独立身份执行一次；同名、同类型及共用图片不参与匹配。
+    @discardableResult
+    func removeSeriesTypeEntry(id: String) -> Bool {
+        guard canMutate(),
+              let index = seriesEntry.typeEntries.firstIndex(where: { $0.id == id }) else { return false }
+        var updated = seriesEntry
+        let removed = updated.typeEntries.remove(at: index)
+        return saveSeriesEntryEdit(updated, success: "已删除款式「\(removed.displayName)」的草稿条目。",
+                                   failure: "删除款式保存失败，原条目已保留")
+    }
+
+    /// 对应 List.onMove 的插入位置语义。先持久化，保存失败时界面保持原顺序。
+    @discardableResult
+    func moveSeriesTypeEntries(fromOffsets source: IndexSet, toOffset destination: Int) -> Bool {
+        guard canMutate(), !source.isEmpty,
+              source.allSatisfy({ seriesEntry.typeEntries.indices.contains($0) }),
+              (0...seriesEntry.typeEntries.count).contains(destination) else { return false }
+        var updated = seriesEntry
+        let moving = source.map { updated.typeEntries[$0] }
+        for index in source.reversed() { updated.typeEntries.remove(at: index) }
+        let insertionIndex = destination - source.filter { $0 < destination }.count
+        updated.typeEntries.insert(contentsOf: moving, at: insertionIndex)
+        guard updated != seriesEntry else { return true }
+        return saveSeriesEntryEdit(updated, success: "款式顺序已保存。",
+                                   failure: "排序保存失败，原顺序已保留")
+    }
+
+    /// 拖放使用独立行身份定位，插入位置由 List 的放置标记确定。
+    @discardableResult
+    func moveSeriesTypeEntry(id: String, toOffset destination: Int) -> Bool {
+        guard let source = seriesEntry.typeEntries.firstIndex(where: { $0.id == id }) else { return false }
+        return moveSeriesTypeEntries(fromOffsets: IndexSet(integer: source),
+                                     toOffset: destination)
+    }
+
+    private func saveSeriesEntryEdit(_ updated: OpsSeriesEntryDraft, success: String, failure: String) -> Bool {
+        guard let draft else { return false }
         let previousJSON = draft.seriesEntryJSON
         do {
             draft.seriesEntryJSON = try ShopCatalogJSONCoding.encoder().encode(updated)
             try saveCatalogContext(context)
         } catch {
             draft.seriesEntryJSON = previousJSON
-            lastError = "复制款式保存失败，原内容已保留：\(error.localizedDescription)"
-            return nil
+            lastError = "\(failure)：\(error.localizedDescription)"
+            return false
         }
         seriesEntry = updated
         lastError = nil
-        statusMessage = "已复制款式「\(copy.displayName)」，可直接修改副本。"
-        return copy.id
+        statusMessage = success
+        return true
     }
 
     /// 把向导工作副本写进当前草稿记录。**与目录内容分开保存**：
@@ -238,6 +294,7 @@ extension OpsWorkspace {
             let saved = saveImportedImageHistory([(assetID, url.lastPathComponent)])
             if !saved {
                 lastError = "图片已导入，但上传历史落盘失败：" + (lastError ?? "未知原因")
+                return nil
             } else {
                 lastError = nil
                 statusMessage = "已导入图片（\(url.lastPathComponent)）"
@@ -250,6 +307,46 @@ extension OpsWorkspace {
             lastError = "图片导入失败（\(url.lastPathComponent)）：\(error.localizedDescription)"
             return nil
         }
+    }
+
+    /// 更换原图必须把稳定款式 ID 的绑定立即保存，不能只保存素材、再依赖视图绑定和防抖写盘。
+    @discardableResult
+    func replaceSeriesSizeChartImage(entryID: String, from url: URL, expectedDraftID: String) -> Bool {
+        guard canMutate() else { return false }
+        guard draft?.id == expectedDraftID,
+              seriesEntry.typeEntries.contains(where: { $0.id == entryID }) else {
+            lastError = "草稿或款式已变化，原尺码表图片保留，请重新打开当前款式后更换。"
+            return false
+        }
+        guard let assetID = importSingleImage(from: url) else { return false }
+        return setSeriesSizeChartImage(entryID: entryID, assetID: assetID)
+    }
+
+    /// 上传与选择已有素材共用同一保存入口；失败保留原绑定、表格和尺码勾选。
+    @discardableResult
+    func setSeriesSizeChartImage(entryID: String, assetID: String?) -> Bool {
+        guard canMutate() else { return false }
+        guard let index = seriesEntry.typeEntries.firstIndex(where: { $0.id == entryID }) else {
+            lastError = "当前款式已不存在，原尺码表图片未改动。"
+            return false
+        }
+        if let assetID, asset(for: assetID) == nil {
+            lastError = "所选尺码表图片已不存在，原图保留，请重新选择。"
+            return false
+        }
+        var updated = seriesEntry
+        updated.typeEntries[index].chartSourceImageAssetID = assetID
+        // 复用可售尺码政策，仅补齐尚未选择有效尺码的颜色，手动取消结果保持原样。
+        if assetID != nil, updated.typeEntries[index].usesSizeChart,
+           let chart = OpsSeriesSizeChartParsing.parse(entry: updated.typeEntries[index]).chart {
+            for colorIndex in updated.typeEntries[index].colors.indices {
+                updated.typeEntries[index].colors[colorIndex].selectedSizes = CatalogSizeSelectionPolicy.autoFilled(
+                    updated.typeEntries[index].colors[colorIndex].selectedSizes, allLabels: chart.sizeLabels)
+            }
+        }
+        return saveSeriesEntryEdit(updated,
+            success: assetID == nil ? "已清除当前款式的尺码表原图并保存。" : "已更换当前款式的尺码表原图并保存。",
+            failure: "尺码表图片绑定保存失败，原图已保留")
     }
 
     /// 批量导入共用单图的规范化入口，整批保存一次；失败原因逐文件保留。
@@ -554,7 +651,12 @@ extension OpsWorkspace {
         report.seriesID = seriesID
 
         // ── S2：系列资料（只写向导管理的字段，未管理的字段原样保留）──
-        applySeriesPhaseFromWizard(seriesID: seriesID)
+        guard applySeriesPhaseFromWizard(seriesID: seriesID) else {
+            report.blockedByValidation = [OpsSeriesEntryIssue(
+                entryID: nil, entryName: "", message: lastError ?? "团次与尾款时间保存失败。",
+                area: .seriesProfile)]
+            return report
+        }
         if let coverID = seriesEntry.coverAssetID {
             _ = updateSeriesCover(seriesID: seriesID, assetID: coverID)
         }
@@ -753,12 +855,13 @@ extension OpsWorkspace {
 
     /// 把向导 S2 的发售阶段写进系列。**只写向导管理的字段**：
     /// 预约开始时间、大致尾款描述等 S2 没有的字段，保留系列上已有值。
-    private func applySeriesPhaseFromWizard(seriesID: String) {
-        guard let series = catalog.series.first(where: { $0.id == seriesID }) else { return }
+    private func applySeriesPhaseFromWizard(seriesID: String) -> Bool {
+        guard let series = catalog.series.first(where: { $0.id == seriesID }) else { return false }
         let phase = seriesEntry.phase
 
         // 尾款区间：向导填了具体时间 → exact；一个都没填 → 保留系列已有值
-        let declaresBalance = seriesEntry.hasBalanceStart || seriesEntry.hasBalanceEnd
+        let batches = seriesEntry.reservationBatches ?? series.reservationBatches ?? []
+        let declaresBalance = batches.isEmpty && (seriesEntry.hasBalanceStart || seriesEntry.hasBalanceEnd)
         let balanceKind: CatalogBalanceDueKind?
         let balanceText: String?
         let balanceAt: Date?
@@ -775,7 +878,7 @@ extension OpsWorkspace {
             balanceEndAt = series.balanceDueEndAt
         }
 
-        _ = updateSeriesSalePhase(
+        return updateSeriesSalePhase(
             id: seriesID,
             phase: phase,
             // S2 不收集预约开始时间：保留已有值
@@ -784,7 +887,8 @@ extension OpsWorkspace {
             balanceDueKind: balanceKind,
             balanceDueText: balanceText,
             balanceDueAt: balanceAt,
-            balanceDueEndAt: balanceEndAt)
+            balanceDueEndAt: balanceEndAt,
+            reservationBatches: seriesEntry.reservationBatches)
     }
 
     /// 写系列封面（CatalogAsset id）。返回是否成功。

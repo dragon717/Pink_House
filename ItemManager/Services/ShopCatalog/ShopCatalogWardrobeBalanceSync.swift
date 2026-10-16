@@ -19,10 +19,8 @@
 //     全款记录（`isFullPaymentReservation`，不生成尾款任务）与已付清记录
 //     （`markFinalPaymentCompleted` 之后）一律不动。
 //
-//  3. **只同步「尾款中」系列**：`CatalogSeriesSalePhaseResolver.effectivePhase`
-//     （读取时判定的唯一口径）为 `.balancePending` 才同步——预约中阶段的窗口
-//     在加购时已按声明快照（见 DraftBuilder），运营后续微调声明也以到「尾款中」
-//     这一时刻为准，避免预约期间反复改写用户记录。
+//  3. 已明确选择团次的记录随该团声明更新，不等待系列进入尾款阶段。
+//     未分团系列仍只在 `.balancePending` 同步，保留原有规则。
 //
 //  4. **窗口来源唯一**：`CatalogBalanceDueApproximation.declaredWindow(of:anchor:)`
 //     —— 具体时间直接用；大致时间（上旬/中旬/中下旬/下旬）按「约一个月」基准
@@ -31,8 +29,7 @@
 //     估算不含 `Date()` 输入 → 同一数据重算结果恒定 → 幂等，重复调用零副作用。
 //
 //  5. **绝不碰的东西**：金额（deposit/balance/priceTotal）、状态（isDepositPlan）、
-//     用户已录入的其他字段。同步只在窗口值**确实变化**时写入，并往备注追加一条
-//     留痕（同一内容不重复追加）。
+//     用户已录入的其他字段。同步只在窗口值**确实变化**时写入，备注始终保留用户原文。
 //
 //  6. **数据独立（2026-09-25 需求一）**：商品已被运营删除 / 下架
 //     （`store.product(id:) == nil`）→ 跳过，用户记录原样保留——
@@ -87,23 +84,29 @@ enum ShopCatalogWardrobeBalanceSync {
             // 数据独立：商品已被运营删除/下架 → 跳过，用户记录原样保留
             guard let productID = clothing.catalogProductID,
                   let product = store.product(id: productID),
-                  let series = store.series(id: product.seriesID) else { continue }
+                  let series = store.seriesForPurchase(id: product.seriesID) else { continue }
 
-            // 只有「尾款中」才同步（生效阶段 = 读取时判定的唯一口径）
-            guard CatalogSeriesSalePhaseResolver.effectivePhase(of: series, now: now) == .balancePending
+            // 多团记录只读取所属团次；旧记录未选团不能套用任意一团的时间。
+            guard let schedule = series.paymentSchedule(batchID: clothing.catalogReservationBatchID)
+            else { continue }
+            // 已选团次的待付记录应随该团声明及时更新，无需等系列进入尾款阶段。
+            guard !(series.reservationBatches ?? []).isEmpty ||
+                    CatalogSeriesSalePhaseResolver.effectivePhase(of: schedule, now: now) == .balancePending
             else { continue }
 
             // 窗口来源唯一：声明直接用 / 大致估算成固定具体日期；缺依据 → 跳过
+            let batchEventAnchor: Date? = (series.reservationBatches ?? []).isEmpty ? nil
+                : (clothing.catalogSaleEventID.flatMap { store.saleEvent(id: $0)?.endAt }
+                    ?? store.priceArchive(forProduct: productID).reservation?.endAt)
             guard let window = CatalogBalanceDueApproximation.declaredWindow(
-                of: series,
-                anchor: series.reservationEndAt) else { continue }
+                of: schedule,
+                anchor: schedule.reservationEndAt ?? batchEventAnchor) else { continue }
 
             guard clothing.finalPaymentDate != window.start
                     || clothing.finalPaymentEndDate != window.end else { continue }
 
             clothing.finalPaymentDate = window.start
             clothing.finalPaymentEndDate = window.end
-            appendSyncNote(to: clothing, window: window)
             report.updatedCount += 1
             didChange = true
         }
@@ -114,13 +117,4 @@ enum ShopCatalogWardrobeBalanceSync {
         return report
     }
 
-    // MARK: - 备注留痕
-
-    /// 追加一条同步留痕；同一天的同一内容不重复追加（重复触发不刷屏）。
-    private static func appendSyncNote(to clothing: Clothing, window: CatalogBalanceDueApproximation.Window) {
-        let line = "尾款阶段同步：尾款时间更新为 \(CatalogSeriesBalanceDue.shortDateText(window.start))（\(window.basis)）"
-        let existing = clothing.note
-        if existing.contains(line) { return }
-        clothing.note = existing.isEmpty ? line : existing + "\n" + line
-    }
 }

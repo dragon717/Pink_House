@@ -8,6 +8,211 @@ import SwiftUI
 
 @MainActor
 final class OpsCatalogEditorPersistenceTests: XCTestCase {
+    func testPublishingAnotherEnvironmentDoesNotDiscardProductionAncestor() throws {
+        let store = try container()
+        let workspace = OpsWorkspace(context: store.mainContext)
+        suppressNetwork(workspace)
+        let id = try XCTUnwrap(workspace.addShopReturningID(name: "原店家"))
+        let original = workspace.catalog
+        XCTAssertTrue(workspace.recordConfirmedPublish(releaseSeq: 14, rootIndexHash: nil,
+            environment: "production", revision: workspace.currentRevision, publishedCatalog: original))
+        XCTAssertTrue(workspace.recordConfirmedPublish(releaseSeq: 21, rootIndexHash: nil,
+            environment: "development", revision: workspace.currentRevision, publishedCatalog: original))
+        XCTAssertTrue(workspace.updateShop(id: id, name: "本机新名", aliases: []))
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".json")
+        defer { try? FileManager.default.removeItem(at: url) }
+        try ShopCatalogJSONCoding.encoder().encode(original).write(to: url)
+        XCTAssertEqual(workspace.mergePreview(from: url, environment: "production")?.conflicts, [],
+            "Production 未改字段；切换环境后仍必须认得该环境的共同祖先")
+        XCTAssertTrue(workspace.saveDraft())
+        let restored = OpsWorkspace(context: ModelContext(store))
+        suppressNetwork(restored)
+        XCTAssertEqual(restored.mergePreview(from: url, environment: "production")?.conflicts, [],
+            "环境基线随草稿重启恢复")
+    }
+
+    func testScopedReceiptSavesOnlyAcknowledgedFieldsAndKeepsNewerPendingRequest() throws {
+        let store = try container()
+        let workspace = OpsWorkspace(context: store.mainContext)
+        suppressNetwork(workspace)
+        let shop = try XCTUnwrap(workspace.addShopReturningID(name: "店家"))
+        let series = try XCTUnwrap(workspace.addSeriesReturningID(shopID: shop, name: "系列", year: nil, month: nil, season: nil))
+        let original = workspace.catalog
+        XCTAssertTrue(workspace.recordConfirmedPublish(releaseSeq: 14, rootIndexHash: nil,
+            environment: "production", revision: workspace.currentRevision, publishedCatalog: original))
+        var saved = try XCTUnwrap(original.series.first)
+        saved.reservationBatches = [.init(id: "first", name: "先行团")]
+        workspace.catalog.series[0] = saved
+        workspace.catalog.series[0].cover = "尚未发布的封面"
+        workspace.draft?.catalogSyncRequestID = "newer-request"
+        try workspace.recordConfirmedSeriesSync(requestID: "old-request",
+            updates: [.init(series: saved, shop: nil, fields: [.schedule])], previousRemote: original,
+            head: .init(releaseSeq: 16, rootIndexHash: String(repeating: "a", count: 64), environment: "production"))
+        XCTAssertEqual(workspace.draft?.catalogSyncRequestID, "newer-request")
+        XCTAssertNil(workspace.draft?.catalogSyncSeriesReceiptsJSON)
+        let ancestor = try XCTUnwrap(workspace.draft?.mergeBaseline(environment: "production"))
+        XCTAssertEqual(ancestor.catalog.series[0].reservationBatches, saved.reservationBatches)
+        XCTAssertNil(ancestor.catalog.series[0].cover)
+        XCTAssertEqual(workspace.catalog.series[0].cover, "尚未发布的封面")
+        XCTAssertEqual(ancestor.head.releaseSeq, 16)
+    }
+
+    func testScopedReceiptDiskFailureRollsBackBaselineAndReceiptTogether() throws {
+        let store = try container()
+        var fails = false
+        let workspace = OpsWorkspace(context: store.mainContext, saveCatalogContext: {
+            if fails { throw NSError(domain: "test.baseline", code: 1) }
+            try $0.save()
+        })
+        suppressNetwork(workspace)
+        let shop = try XCTUnwrap(workspace.addShopReturningID(name: "店家"))
+        _ = try XCTUnwrap(workspace.addSeriesReturningID(shopID: shop, name: "系列", year: nil, month: nil, season: nil))
+        let previous = workspace.catalog
+        let saved = try XCTUnwrap(previous.series.first)
+        workspace.draft?.catalogSyncRequestID = "request"
+        let before = workspace.draft?.environmentBaselinesJSON
+        fails = true
+        XCTAssertThrowsError(try workspace.recordConfirmedSeriesSync(requestID: "request",
+            updates: [.init(series: saved, shop: nil, fields: [.schedule])], previousRemote: previous,
+            head: .init(releaseSeq: 16, environment: "production")))
+        XCTAssertEqual(workspace.draft?.environmentBaselinesJSON, before)
+        XCTAssertNil(workspace.draft?.catalogSyncSeriesReceiptsJSON)
+        XCTAssertEqual(workspace.draft?.catalogSyncRequestID, "request")
+    }
+
+    func testMergeDiskFailureDoesNotAdvancePerEnvironmentAncestor() throws {
+        let store = try container()
+        var fails = false
+        let workspace = OpsWorkspace(context: store.mainContext, saveCatalogContext: {
+            if fails { throw NSError(domain: "test.merge", code: 1) }
+            try $0.save()
+        })
+        suppressNetwork(workspace)
+        _ = try XCTUnwrap(workspace.addShopReturningID(name: "店家"))
+        XCTAssertTrue(workspace.recordConfirmedPublish(releaseSeq: 14, rootIndexHash: nil,
+            environment: "production", revision: workspace.currentRevision, publishedCatalog: workspace.catalog))
+        let before = workspace.draft?.environmentBaselinesJSON
+        var remote = workspace.catalog
+        remote.shops[0].aliases = ["线上别名"]
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".json")
+        defer { try? FileManager.default.removeItem(at: url) }
+        try ShopCatalogJSONCoding.encoder().encode(remote).write(to: url)
+        fails = true
+        XCTAssertNil(workspace.mergeRemoteIntoLocal(from: url, baseline: .init(releaseSeq: 16, environment: "production")))
+        XCTAssertEqual(workspace.draft?.environmentBaselinesJSON, before)
+        XCTAssertEqual(workspace.draft?.baseline.releaseSeq, 14)
+        XCTAssertEqual(workspace.catalog.shops[0].aliases, ["线上别名"], "内存编辑保留供重试")
+    }
+
+    func testLegacyPreflightBlockedBatchSaveResumesAutomaticallyAsScopedTwoEnvironmentUpdate() throws {
+        let store = try container()
+        let workspace = OpsWorkspace(context: store.mainContext)
+        suppressNetwork(workspace)
+        let shopID = try XCTUnwrap(workspace.addShopReturningID(name: "店家"))
+        let seriesID = try XCTUnwrap(workspace.addSeriesReturningID(shopID: shopID, name: "系列", year: 2026, month: 10, season: nil))
+        XCTAssertTrue(workspace.updateSeriesSalePhase(id: seriesID, phase: nil,
+            reservationStartAt: nil, reservationEndAt: nil, balanceDueKind: nil, balanceDueText: nil,
+            balanceDueAt: nil, balanceDueEndAt: nil, reservationBatches: [.init(id: "stable", name: "先行团")]))
+        XCTAssertTrue(workspace.saveCatalogEditorChanges())
+        let oldRequest = workspace.draft?.catalogSyncRequestID
+        workspace.draft?.catalogSyncError = "上传前待修复 1 项，尚未发送发布请求；下载内容已保留"
+        workspace.draft?.catalogSyncAttemptedID = oldRequest
+        try store.mainContext.save()
+        workspace.resumeCatalogEditorSync()
+        XCTAssertNotEqual(workspace.draft?.catalogSyncRequestID, oldRequest)
+        let updates = try JSONDecoder().decode([OpsSeriesConfigUpdate].self,
+            from: XCTUnwrap(workspace.draft?.catalogSyncSeriesUpdatesJSON))
+        XCTAssertEqual(updates.first?.series.id, seriesID)
+        XCTAssertEqual(updates.first?.series.reservationBatches?.first?.id, "stable")
+        XCTAssertEqual(updates.first?.fields, [.schedule])
+        XCTAssertNil(workspace.draft?.catalogSyncError)
+    }
+
+    func testSeriesConfigSaveAutomaticallyQueuesBothEnvironmentsAndRestoresScopedFields() async throws {
+        let store = try container()
+        let workspace = OpsWorkspace(context: store.mainContext)
+        suppressNetwork(workspace)
+        let shopID = try XCTUnwrap(workspace.addShopReturningID(name: "自动同步店家"))
+        let seriesID = try XCTUnwrap(workspace.addSeriesReturningID(shopID: shopID, name: "自动同步系列", year: 2026, month: 10, season: nil))
+        let batches = [CatalogReservationBatch(id: "first", name: "先行团"), .init(id: "second", name: "二团")]
+        XCTAssertTrue(workspace.updateSeriesSalePhase(id: seriesID, phase: nil,
+            reservationStartAt: nil, reservationEndAt: nil, balanceDueKind: nil,
+            balanceDueText: nil, balanceDueAt: nil, balanceDueEndAt: nil, reservationBatches: batches))
+        XCTAssertTrue(workspace.saveCatalogEditorChanges(seriesID: seriesID, fields: [.schedule]))
+        let restored = OpsWorkspace(context: ModelContext(store))
+        var calls = 0
+        restored.catalogEditSyncQueue = restored.makeCatalogEditSyncQueue(publishSeries: { _, updates in
+            calls += 1
+            XCTAssertEqual(updates.first?.fields, [.schedule])
+            XCTAssertEqual(updates.first?.series.reservationBatches, batches)
+            restored.draft?.catalogSyncSeriesReceiptsJSON = try? JSONEncoder().encode(["development": 22, "production": 15])
+            return .confirmed(releaseSeq: 22)
+        })
+        restored.resumeCatalogEditorSync()
+        await restored.catalogEditSyncQueue.waitUntilIdle()
+        XCTAssertEqual(calls, 1, "一次保存自动调用两环境更新任务，不依赖再次发布")
+        XCTAssertNil(restored.draft?.catalogSyncRequestID)
+        XCTAssertNil(restored.draft?.catalogSyncSeriesUpdatesJSON)
+        XCTAssertTrue(restored.catalogEditSyncMessage?.contains("Development 22，Production 15") == true)
+    }
+
+    func testSeriesConfigPartialSyncRetainsPendingUpdateAndReportsFailedEnvironment() async throws {
+        let store = try container()
+        let workspace = OpsWorkspace(context: store.mainContext)
+        suppressNetwork(workspace)
+        let shopID = try XCTUnwrap(workspace.addShopReturningID(name: "店家"))
+        let seriesID = try XCTUnwrap(workspace.addSeriesReturningID(shopID: shopID, name: "系列", year: 2026, month: 10, season: nil))
+        workspace.catalogEditSyncQueue = workspace.makeCatalogEditSyncQueue(publishSeries: { _, _ in
+            .failed("Development 已确认发布号 22；Production 网络失败")
+        })
+        XCTAssertTrue(workspace.saveCatalogEditorChanges(seriesID: seriesID, fields: [.schedule]))
+        await workspace.catalogEditSyncQueue.waitUntilIdle()
+        XCTAssertNotNil(workspace.draft?.catalogSyncSeriesUpdatesJSON)
+        XCTAssertNotNil(workspace.draft?.catalogSyncRequestID)
+        XCTAssertTrue(workspace.catalogEditSyncMessage?.contains("Production 网络失败") == true)
+        XCTAssertFalse(workspace.catalogEditSyncMessage?.contains("均已回读确认") == true)
+    }
+
+    func testSeriesConfigRetryKeepsFrozenRequestAndConfirmedEnvironmentReceipt() async throws {
+        let store = try container()
+        let workspace = OpsWorkspace(context: store.mainContext)
+        suppressNetwork(workspace)
+        let shopID = try XCTUnwrap(workspace.addShopReturningID(name: "店家"))
+        let seriesID = try XCTUnwrap(workspace.addSeriesReturningID(shopID: shopID, name: "系列", year: 2026, month: 10, season: nil))
+        var ids: [String] = []
+        workspace.catalogEditSyncQueue = workspace.makeCatalogEditSyncQueue(publishSeries: { request, _ in
+            ids.append(request.id)
+            if ids.count == 1 {
+                workspace.draft?.catalogSyncSeriesReceiptsJSON = try? JSONEncoder().encode(["development": 24])
+                return .failed("Development 已确认；Production 结果待确认")
+            }
+            XCTAssertEqual(try? JSONDecoder().decode([String: Int].self,
+                from: workspace.draft!.catalogSyncSeriesReceiptsJSON!), ["development": 24])
+            workspace.draft?.catalogSyncSeriesReceiptsJSON = try? JSONEncoder().encode(["development": 24, "production": 17])
+            return .confirmed(releaseSeq: 24)
+        })
+        XCTAssertTrue(workspace.saveCatalogEditorChanges(seriesID: seriesID, fields: [.schedule]))
+        let originalID = try XCTUnwrap(workspace.draft?.catalogSyncRequestID)
+        let savedFields = workspace.draft?.catalogSyncSeriesUpdatesJSON
+        await workspace.catalogEditSyncQueue.waitUntilIdle()
+        workspace.resumeCatalogEditorSync()
+        await workspace.catalogEditSyncQueue.waitUntilIdle()
+        XCTAssertEqual(ids, [originalID], "失败不得自动循环发送")
+        XCTAssertTrue(workspace.canRetrySavedSeriesSync)
+        let restored = OpsWorkspace(context: ModelContext(store))
+        XCTAssertTrue(restored.canRetrySavedSeriesSync, "重启后仍能找到明确的重试入口")
+        XCTAssertEqual(restored.draft?.catalogSyncRequestID, originalID)
+        XCTAssertEqual(restored.draft?.catalogSyncSeriesUpdatesJSON, savedFields)
+        XCTAssertTrue(workspace.retrySavedSeriesSync())
+        XCTAssertEqual(workspace.draft?.catalogSyncRequestID, originalID)
+        XCTAssertEqual(workspace.draft?.catalogSyncAttemptedID, originalID)
+        await workspace.catalogEditSyncQueue.waitUntilIdle()
+        XCTAssertEqual(ids, [originalID, originalID])
+        XCTAssertFalse(workspace.canRetrySavedSeriesSync)
+        XCTAssertNil(workspace.draft?.catalogSyncRequestID)
+        XCTAssertTrue(workspace.catalogEditSyncMessage?.contains("Development 24，Production 17") == true)
+    }
+
     private func container() throws -> ModelContainer {
         let schema = Schema([OpsCatalogDraftRecord.self, OpsSeriesPublishJob.self])
         return try ModelContainer(for: schema, configurations: [
@@ -39,6 +244,7 @@ final class OpsCatalogEditorPersistenceTests: XCTestCase {
         XCTAssertNil(entry.coverAssetID, file: file, line: line)
         XCTAssertFalse(entry.declaresPhase, file: file, line: line)
         XCTAssertFalse(entry.hasBalanceStart, file: file, line: line)
+        XCTAssertNil(entry.reservationBatches, file: file, line: line)
         XCTAssertFalse(entry.declaresPriceChart, file: file, line: line)
         XCTAssertTrue(entry.priceChartImageAssetIDs.isEmpty, file: file, line: line)
         XCTAssertTrue(entry.typeEntries.isEmpty, file: file, line: line)
@@ -770,6 +976,144 @@ final class OpsCatalogEditorPersistenceTests: XCTestCase {
         XCTAssertEqual(workspace.seriesEntry, before)
     }
 
+    func testRemoveOnlyTargetStyleKeepsSameNameCategorySharedImagesAndCatalog() throws {
+        let store = try container()
+        let workspace = OpsWorkspace(context: store.mainContext)
+        suppressNetwork(workspace)
+        workspace.seriesEntry = completedSeriesInput()
+        XCTAssertTrue(workspace.commitSeriesEntry().allOK)
+        let original = workspace.seriesEntry.typeEntries[0]
+        let copyID = try XCTUnwrap(workspace.duplicateSeriesTypeEntry(id: original.id))
+        workspace.seriesEntry.typeEntries[0].chartSourceImageAssetID = "shared-image"
+        workspace.seriesEntry.typeEntries[1].chartSourceImageAssetID = "shared-image"
+        let other = OpsSeriesTypeEntry(category: original.category, designName: "其它款式")
+        workspace.seriesEntry.typeEntries.append(other)
+        let keep = [workspace.seriesEntry.typeEntries[0], other]
+        let catalog = workspace.catalog
+
+        XCTAssertTrue(workspace.removeSeriesTypeEntry(id: copyID))
+        XCTAssertEqual(workspace.seriesEntry.typeEntries, keep)
+        XCTAssertEqual(workspace.catalog, catalog, "删除向导条目不删除商品、规格或共用图片")
+        XCTAssertFalse(workspace.removeSeriesTypeEntry(id: copyID), "旧删除目标不能转而删除下一条")
+        XCTAssertEqual(workspace.seriesEntry.typeEntries, keep)
+        XCTAssertEqual(OpsWorkspace(context: ModelContext(store)).seriesEntry.typeEntries, keep)
+    }
+
+    func testMoveStylesPreservesInputAndPersistsOrderForReopening() throws {
+        let store = try container()
+        let workspace = OpsWorkspace(context: store.mainContext)
+        suppressNetwork(workspace)
+        let first = OpsSeriesTypeEntry(category: "OP", designName: "同名款式", chartRowsText: "未完成",
+            reservationPriceText: "57.", colors: [.init(name: "粉色", imageAssetID: "image", selectedSizes: ["S"])])
+        let second = OpsSeriesTypeEntry(category: "OP", designName: "同名款式", depositText: "待确认")
+        let third = OpsSeriesTypeEntry(category: "KC", designName: "发带", committedProductID: "product", lastCommitOK: true)
+        workspace.seriesEntry.typeEntries = [first, second, third]
+        let catalog = workspace.catalog
+        XCTAssertTrue(workspace.moveSeriesTypeEntry(id: third.id, toOffset: 0))
+        XCTAssertEqual(workspace.seriesEntry.typeEntries, [third, first, second])
+        XCTAssertTrue(workspace.moveSeriesTypeEntry(id: first.id, toOffset: 3))
+        XCTAssertEqual(workspace.seriesEntry.typeEntries, [third, second, first])
+        XCTAssertEqual(workspace.catalog, catalog)
+        XCTAssertEqual(OpsWorkspace(context: ModelContext(store)).seriesEntry.typeEntries, [third, second, first])
+        XCTAssertTrue(workspace.removeSeriesTypeEntry(id: second.id))
+        XCTAssertEqual(workspace.seriesEntry.typeEntries, [third, first], "拖动后仍按行身份删除")
+    }
+
+    func testMultiRowMovesAndInvalidOffsetsNeverRemoveUnrelatedStyles() throws {
+        let store = try container()
+        let workspace = OpsWorkspace(context: store.mainContext)
+        suppressNetwork(workspace)
+        let entries = (0..<5).map { OpsSeriesTypeEntry(category: "OP", designName: "款式\($0)") }
+        workspace.seriesEntry.typeEntries = entries
+        XCTAssertTrue(workspace.moveSeriesTypeEntries(fromOffsets: [1, 3], toOffset: 5))
+        XCTAssertEqual(workspace.seriesEntry.typeEntries, [entries[0], entries[2], entries[4], entries[1], entries[3]])
+        let before = workspace.seriesEntry
+        let json = workspace.draft?.seriesEntryJSON
+        XCTAssertTrue(workspace.moveSeriesTypeEntries(fromOffsets: [0], toOffset: 1), "原位移动不重写资料")
+        XCTAssertFalse(workspace.moveSeriesTypeEntries(fromOffsets: [], toOffset: 0))
+        XCTAssertFalse(workspace.moveSeriesTypeEntries(fromOffsets: [5], toOffset: 0))
+        XCTAssertFalse(workspace.moveSeriesTypeEntries(fromOffsets: [0], toOffset: -1))
+        XCTAssertFalse(workspace.moveSeriesTypeEntries(fromOffsets: [0], toOffset: 6))
+        XCTAssertFalse(workspace.removeSeriesTypeEntry(id: "missing"))
+        XCTAssertFalse(workspace.moveSeriesTypeEntry(id: "missing", toOffset: 0))
+        XCTAssertEqual(workspace.seriesEntry, before)
+        XCTAssertEqual(workspace.draft?.seriesEntryJSON, json)
+    }
+
+    func testStyleDeleteAndReorderSaveFailuresPreserveMemoryAndStoredRows() throws {
+        let store = try container()
+        var fails = false
+        let workspace = OpsWorkspace(context: store.mainContext, saveCatalogContext: {
+            if fails { throw NSError(domain: "test.styleOrder.disk", code: 1) }
+            try $0.save()
+        })
+        suppressNetwork(workspace)
+        workspace.seriesEntry.typeEntries = [OpsSeriesTypeEntry(category: "OP", designName: "A"),
+                                            OpsSeriesTypeEntry(category: "OP", designName: "B")]
+        workspace.persistSeriesEntryState()
+        let before = workspace.seriesEntry
+        let json = workspace.draft?.seriesEntryJSON
+        fails = true
+        XCTAssertFalse(workspace.removeSeriesTypeEntry(id: before.typeEntries[0].id))
+        XCTAssertTrue(workspace.lastError?.contains("删除款式保存失败") == true)
+        XCTAssertEqual(workspace.seriesEntry, before)
+        XCTAssertEqual(workspace.draft?.seriesEntryJSON, json)
+        XCTAssertFalse(workspace.moveSeriesTypeEntries(fromOffsets: [0], toOffset: 2))
+        XCTAssertTrue(workspace.lastError?.contains("排序保存失败") == true)
+        XCTAssertEqual(workspace.seriesEntry, before)
+        XCTAssertEqual(workspace.draft?.seriesEntryJSON, json)
+        XCTAssertEqual(OpsWorkspace(context: ModelContext(store)).seriesEntry.typeEntries, before.typeEntries)
+    }
+
+    func testLegacyDuplicateRowIDsAreRepairedWithoutLosingAnyStyleAndStayStableAfterSave() throws {
+        let store = try container()
+        let workspace = OpsWorkspace(context: store.mainContext)
+        suppressNetwork(workspace)
+        let entries = (0..<3).map { OpsSeriesTypeEntry(category: "OP", designName: "同名款式",
+            chartRowsText: "尺码原文\($0)", stockPriceText: "\(100 + $0)",
+            colors: [.init(name: "粉色", imageAssetID: "shared-image")]) }
+        var input = OpsSeriesEntryDraft(typeEntries: entries)
+        let encoded = try ShopCatalogJSONCoding.encoder().encode(input)
+        var legacy = try XCTUnwrap(JSONSerialization.jsonObject(with: encoded) as? [String: Any])
+        var rows = try XCTUnwrap(legacy["typeEntries"] as? [[String: Any]])
+        rows[0]["id"] = "legacy-shared-id"
+        rows[1]["id"] = "legacy-shared-id"
+        rows[2]["id"] = ""
+        legacy["typeEntries"] = rows
+        workspace.draft?.seriesEntryJSON = try JSONSerialization.data(withJSONObject: legacy)
+        workspace.loadSeriesEntryState()
+        let repaired = workspace.seriesEntry.typeEntries
+        XCTAssertEqual(repaired.count, 3)
+        XCTAssertEqual(repaired[0].id, "legacy-shared-id")
+        XCTAssertEqual(Set(repaired.map(\.id)).count, 3)
+        XCTAssertFalse(repaired.contains { $0.id.isEmpty })
+        for index in entries.indices {
+            var expected = entries[index]
+            expected.id = repaired[index].id
+            XCTAssertEqual(repaired[index], expected)
+        }
+        workspace.persistSeriesEntryState()
+        XCTAssertEqual(OpsWorkspace(context: ModelContext(store)).seriesEntry.typeEntries, repaired)
+        XCTAssertTrue(workspace.removeSeriesTypeEntry(id: repaired[1].id))
+        XCTAssertEqual(workspace.seriesEntry.typeEntries, [repaired[0], repaired[2]])
+        input.typeEntries = [entries[0], entries[0]]
+        XCTAssertEqual(Set(input.typeEntries.map(\.id)).count, 2, "内存写入同样保证独立行身份")
+    }
+
+    func testReadOnlyDraftRejectsStyleReorderAndDelete() throws {
+        let store = try container()
+        let workspace = OpsWorkspace(context: store.mainContext)
+        suppressNetwork(workspace)
+        workspace.seriesEntry.typeEntries = [OpsSeriesTypeEntry(category: "OP"), OpsSeriesTypeEntry(category: "OP")]
+        workspace.draft?.catalogJSON = Data("broken".utf8)
+        workspace.draft?.corruptionDetected = true
+        XCTAssertTrue(workspace.draft?.isCorrupted == true)
+        let before = workspace.seriesEntry
+        XCTAssertFalse(workspace.removeSeriesTypeEntry(id: before.typeEntries[0].id))
+        XCTAssertFalse(workspace.moveSeriesTypeEntries(fromOffsets: [0], toOffset: 2))
+        XCTAssertEqual(workspace.seriesEntry, before)
+    }
+
     private func writeImage(into directory: URL, name: String, rgb: (UInt8, UInt8, UInt8) = (205, 90, 135)) throws -> URL {
         let bitmap = try XCTUnwrap(NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: 16, pixelsHigh: 16,
             bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
@@ -921,6 +1265,135 @@ final class OpsCatalogEditorPersistenceTests: XCTestCase {
         let restored = OpsWorkspace(context: ModelContext(store))
         XCTAssertEqual(restored.imageUploadHistory.count, 1)
         XCTAssertEqual(restored.imageUploadHistory.first?.name, "已保存历史.png")
+    }
+
+    func testSingleImageSaveFailureDoesNotReturnAUsableReplacement() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let store = try container()
+        var fails = false
+        let workspace = OpsWorkspace(context: store.mainContext, saveCatalogContext: {
+            if fails { throw NSError(domain: "test.imageReplacement.disk", code: 1) }
+            try $0.save()
+        })
+        suppressNetwork(workspace)
+        defer { try? FileManager.default.removeItem(at: workspace.stagingDirectory) }
+        let original = try XCTUnwrap(workspace.importSingleImage(from: writeImage(into: directory, name: "原尺码表.png")))
+        let entry = OpsSeriesTypeEntry(category: "JSK", designName: "保留旧图", chartSourceImageAssetID: original)
+        workspace.seriesEntry.typeEntries = [entry]
+        workspace.persistSeriesEntryState()
+        fails = true
+        let replacement = workspace.importSingleImage(from: try writeImage(into: directory, name: "新尺码表.png", rgb: (45, 120, 220)))
+        XCTAssertNil(replacement, "图片未保存时不能把资源 ID 当作换图成功返回给界面")
+        XCTAssertTrue(workspace.lastError?.contains("保存失败") == true || workspace.lastError?.contains("落盘失败") == true)
+        let restored = OpsWorkspace(context: ModelContext(store))
+        suppressNetwork(restored)
+        XCTAssertEqual(restored.seriesEntry.typeEntries.first?.chartSourceImageAssetID, original)
+        XCTAssertEqual(restored.imageUploadHistory.count, 1)
+    }
+
+    func testSizeChartReplacementWithSameFilenamePersistsNewImageOnlyForTargetStyle() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let store = try container()
+        let workspace = OpsWorkspace(context: store.mainContext)
+        suppressNetwork(workspace)
+        defer { try? FileManager.default.removeItem(at: workspace.stagingDirectory) }
+        let originalURL = try writeImage(into: directory, name: "尺码表 同名.png")
+        let original = try XCTUnwrap(workspace.importSingleImage(from: originalURL))
+        let entry = OpsSeriesTypeEntry(id: "target", category: "JSK", designName: "同名款式",
+            chartUnit: "cm", chartColumnsText: "胸围,裙长", chartRowsText: "S = 84,92\nM = 88,96",
+            chartSourceImageAssetID: original, stockPriceText: "399", colors: [
+                .init(name: "蓝色", selectedSizes: ["S"]), .init(name: "粉色")])
+        var other = entry
+        other.id = "other"
+        workspace.seriesEntry.typeEntries = [entry, other]
+        workspace.persistSeriesEntryState()
+        let newURL = try writeImage(into: directory, name: "尺码表 同名.png", rgb: (45, 120, 220))
+        XCTAssertTrue(workspace.replaceSeriesSizeChartImage(entryID: "target", from: newURL,
+            expectedDraftID: try XCTUnwrap(workspace.draft?.id)))
+        let newID = try XCTUnwrap(workspace.seriesEntry.typeEntries[0].chartSourceImageAssetID)
+        XCTAssertNotEqual(newID, original, "同文件名的新内容必须使用新的图片身份和预览路径")
+        XCTAssertNotEqual(workspace.stagedImageURL(forReference: newID), workspace.stagedImageURL(forReference: original))
+        let restored = OpsWorkspace(context: ModelContext(store))
+        suppressNetwork(restored)
+        let updated = try XCTUnwrap(restored.seriesEntry.typeEntries.first)
+        XCTAssertEqual(updated.chartSourceImageAssetID, newID)
+        XCTAssertNotNil(restored.stagedImageURL(forReference: newID))
+        XCTAssertEqual(updated.colors[0].selectedSizes, ["S"], "保留手动取消的 M")
+        XCTAssertEqual(updated.colors[1].selectedSizes, ["S", "M"], "空尺码按共用政策补齐并一起保存")
+        XCTAssertEqual(updated.chartColumnsText, entry.chartColumnsText)
+        XCTAssertEqual(updated.chartRowsText, entry.chartRowsText)
+        XCTAssertEqual(updated.stockPriceText, entry.stockPriceText)
+        XCTAssertEqual(restored.seriesEntry.typeEntries[1], other, "同名同类型且共用旧原图的款式保持原样")
+        XCTAssertNil(restored.draft?.catalogSyncRequestID, "更换向导原图不自动发布未完成的商品")
+    }
+
+    func testSizeChartBindingSaveFailureRetainsOldImageAndRetriesWithoutLosingUpload() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let store = try container()
+        var remainingSavesBeforeFailure: Int?
+        let workspace = OpsWorkspace(context: store.mainContext, saveCatalogContext: {
+            if let count = remainingSavesBeforeFailure {
+                if count == 0 { throw NSError(domain: "test.chartBinding.disk", code: 1) }
+                remainingSavesBeforeFailure = count - 1
+            }
+            try $0.save()
+        })
+        suppressNetwork(workspace)
+        defer { try? FileManager.default.removeItem(at: workspace.stagingDirectory) }
+        let original = try XCTUnwrap(workspace.importSingleImage(from: writeImage(into: directory, name: "旧图.png")))
+        let entry = OpsSeriesTypeEntry(category: "OP", designName: "保留资料", chartSourceImageAssetID: original)
+        workspace.seriesEntry.typeEntries = [entry]
+        workspace.persistSeriesEntryState()
+        remainingSavesBeforeFailure = 1 // 素材及上传历史成功，款式绑定保存失败。
+        let newURL = try writeImage(into: directory, name: "新图.png", rgb: (45, 120, 220))
+        XCTAssertFalse(workspace.replaceSeriesSizeChartImage(entryID: entry.id, from: newURL,
+            expectedDraftID: try XCTUnwrap(workspace.draft?.id)))
+        XCTAssertEqual(workspace.seriesEntry.typeEntries, [entry])
+        XCTAssertTrue(workspace.lastError?.contains("绑定保存失败") == true)
+        let restored = OpsWorkspace(context: ModelContext(store))
+        suppressNetwork(restored)
+        XCTAssertEqual(restored.seriesEntry.typeEntries, [entry])
+        XCTAssertEqual(restored.imageUploadHistory.count, 2, "已上传的图片仍可重用")
+        remainingSavesBeforeFailure = nil
+        XCTAssertTrue(workspace.replaceSeriesSizeChartImage(entryID: entry.id, from: newURL,
+            expectedDraftID: try XCTUnwrap(workspace.draft?.id)))
+        XCTAssertNotEqual(workspace.seriesEntry.typeEntries[0].chartSourceImageAssetID, original)
+    }
+
+    func testSizeChartReplacementRejectsStaleTargetsAndInvalidImageBeforeChangingBinding() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let store = try container()
+        let workspace = OpsWorkspace(context: store.mainContext)
+        suppressNetwork(workspace)
+        defer { try? FileManager.default.removeItem(at: workspace.stagingDirectory) }
+        let image = try writeImage(into: directory, name: "原图.png")
+        let original = try XCTUnwrap(workspace.importSingleImage(from: image))
+        let entry = OpsSeriesTypeEntry(category: "JSK", chartSourceImageAssetID: original)
+        workspace.seriesEntry.typeEntries = [entry]
+        workspace.persistSeriesEntryState()
+        XCTAssertFalse(workspace.replaceSeriesSizeChartImage(entryID: entry.id, from: image, expectedDraftID: "old-draft"))
+        XCTAssertFalse(workspace.replaceSeriesSizeChartImage(entryID: "deleted", from: image,
+            expectedDraftID: try XCTUnwrap(workspace.draft?.id)))
+        let invalid = directory.appendingPathComponent("无法解码.png")
+        try Data("invalid image".utf8).write(to: invalid)
+        XCTAssertFalse(workspace.replaceSeriesSizeChartImage(entryID: entry.id, from: invalid,
+            expectedDraftID: try XCTUnwrap(workspace.draft?.id)))
+        XCTAssertEqual(workspace.seriesEntry.typeEntries, [entry])
+        XCTAssertEqual(workspace.imageUploadHistory.count, 1)
+        XCTAssertFalse(workspace.setSeriesSizeChartImage(entryID: entry.id, assetID: "missing"))
+        XCTAssertEqual(workspace.seriesEntry.typeEntries, [entry])
+        XCTAssertTrue(workspace.setSeriesSizeChartImage(entryID: entry.id, assetID: nil))
+        let restored = OpsWorkspace(context: ModelContext(store))
+        suppressNetwork(restored)
+        XCTAssertNil(restored.seriesEntry.typeEntries[0].chartSourceImageAssetID)
     }
 
     func testSQLiteReopenPreservesUploadedImagesAndOriginalChineseNames() throws {
@@ -1218,9 +1691,200 @@ final class OpsCatalogEditorPersistenceTests: XCTestCase {
         XCTAssertEqual(workspace.draft?.catalogSyncRequestID, id)
         XCTAssertNil(workspace.draft?.lastPublishedRevision)
         XCTAssertNil(workspace.baselineCatalog)
+        XCTAssertTrue(workspace.draft?.environmentBaselines.isEmpty == true)
         fails = false
         XCTAssertTrue(workspace.recordConfirmedPublish(releaseSeq: 10, rootIndexHash: nil,
             environment: environment, revision: workspace.currentRevision, publishedCatalog: workspace.catalog))
         XCTAssertNil(workspace.draft?.catalogSyncRequestID)
     }
+
+    func testUploadedReservationBatchesSurviveDraftAndPublishSnapshot() throws {
+        let store = try container()
+        let workspace = OpsWorkspace(context: store.mainContext)
+        suppressNetwork(workspace)
+        workspace.seriesEntry = completedSeriesInput()
+        let batches = [
+            CatalogReservationBatch(id: "early", name: "先行团", balanceDueKind: .exact,
+                balanceDueAt: Date(timeIntervalSince1970: 1_800_000_000),
+                balanceDueEndAt: Date(timeIntervalSince1970: 1_800_086_400)),
+            CatalogReservationBatch(id: "third", name: "三团", balanceDueKind: .approximate,
+                balanceDueText: "12月上旬", balanceDueEndText: "12月中旬")
+        ]
+        workspace.seriesEntry.reservationBatches = batches
+        workspace.persistSeriesEntryState()
+        let restored = OpsWorkspace(context: ModelContext(store))
+        suppressNetwork(restored)
+        XCTAssertEqual(restored.seriesEntry.reservationBatches, batches)
+        XCTAssertTrue(restored.saveSeriesEntryToDraft().allOK)
+        assertBlankSeries(restored.seriesEntry)
+        XCTAssertEqual(restored.catalog.products.count, 1, "同款不会为每团重复建商品")
+        XCTAssertEqual(restored.catalog.series.first?.reservationBatches, batches)
+        let job = try XCTUnwrap(restored.seriesPublishJobs().first)
+        let snapshot = try ShopCatalogJSONCoding.decoder().decode(ShopCatalog.self,
+            from: XCTUnwrap(job.catalogSnapshotJSON))
+        XCTAssertEqual(snapshot.series.first?.reservationBatches, batches)
+        XCTAssertEqual(snapshot.series.first?.paymentSchedule(batchID: "early")?.balanceDueAt,
+            batches[0].balanceDueAt)
+        XCTAssertEqual(snapshot.series.first?.paymentSchedule(batchID: "third")?.balanceDueText, "12月上旬")
+    }
+
+    func testApproximateBatchWithoutReservationEndSurvivesPublishSnapshot() throws {
+        let store = try container()
+        let workspace = OpsWorkspace(context: store.mainContext)
+        suppressNetwork(workspace)
+        workspace.seriesEntry = completedSeriesInput()
+        workspace.seriesEntry.phase = .reservationEnded
+        workspace.seriesEntry.hasReservationEnd = false
+        let reference = Calendar.current.date(from: DateComponents(year: 2026, month: 10, day: 15, hour: 12))!
+        let batch = CatalogReservationBatch(id: "early", name: "先行团", balanceDueKind: .approximate,
+            balanceDueText: "1月上旬", balanceDueReferenceAt: reference)
+        workspace.seriesEntry.reservationBatches = [batch]
+        workspace.persistSeriesEntryState()
+        let restored = OpsWorkspace(context: ModelContext(store))
+        suppressNetwork(restored)
+        XCTAssertEqual(restored.seriesEntry.reservationBatches, [batch])
+        XCTAssertTrue(restored.saveSeriesEntryToDraft().allOK)
+        let job = try XCTUnwrap(restored.seriesPublishJobs().first)
+        let snapshot = try ShopCatalogJSONCoding.decoder().decode(ShopCatalog.self,
+            from: XCTUnwrap(job.catalogSnapshotJSON))
+        let series = try XCTUnwrap(snapshot.series.first)
+        let savedBatch = try XCTUnwrap(series.reservationBatches?.first)
+        XCTAssertEqual(savedBatch.balanceDueText, "1月上旬")
+        XCTAssertEqual(savedBatch.balanceDueReferenceAt, reference)
+        XCTAssertNil(savedBatch.reservationEndAt)
+        XCTAssertNil(series.reservationEndAt)
+        let schedule = try XCTUnwrap(series.paymentSchedule(batchID: "early"))
+        let window = try XCTUnwrap(CatalogBalanceDueEstimate.declaredWindow(of: schedule, anchor: nil))
+        XCTAssertEqual(Calendar.current.dateComponents([.year, .month, .day], from: window.start),
+            DateComponents(year: 2027, month: 1, day: 5))
+        XCTAssertNil(schedule.balanceDueAt)
+    }
+
+    func testInvalidUploadBatchesBlockAllCatalogWritesAndKeepInput() throws {
+        let store = try container()
+        let workspace = OpsWorkspace(context: store.mainContext)
+        suppressNetwork(workspace)
+        workspace.seriesEntry = completedSeriesInput()
+        workspace.seriesEntry.reservationBatches = [
+            .init(id: "a", name: "一团"), .init(id: "b", name: " 一团 ")]
+        let before = workspace.seriesEntry
+        let report = workspace.commitSeriesEntry()
+        XCTAssertFalse(report.allOK)
+        XCTAssertEqual(report.blockedByValidation.first?.area, .seriesProfile)
+        XCTAssertTrue(report.blockedByValidation.first?.message.contains("重复") == true)
+        XCTAssertTrue(workspace.catalog.shops.isEmpty)
+        XCTAssertTrue(workspace.catalog.series.isEmpty)
+        XCTAssertTrue(workspace.catalog.products.isEmpty)
+        XCTAssertEqual(workspace.seriesEntry, before)
+        workspace.seriesEntry.reservationBatches = [.init(name: "二团", balanceDueKind: .exact,
+            balanceDueAt: Date(timeIntervalSince1970: 200), balanceDueEndAt: Date(timeIntervalSince1970: 100))]
+        XCTAssertTrue(workspace.commitSeriesEntry().blockedByValidation.first?.message.contains("早于") == true)
+        XCTAssertTrue(workspace.catalog.series.isEmpty)
+    }
+
+    func testEveryUploadBatchCanDeclareItsOwnReservationEnd() throws {
+        let store = try container()
+        let workspace = OpsWorkspace(context: store.mainContext)
+        suppressNetwork(workspace)
+        workspace.seriesEntry = completedSeriesInput()
+        workspace.seriesEntry.phase = .reservationActive
+        workspace.seriesEntry.reservationBatches = [
+            .init(id: "early", name: "先行团", reservationEndAt: Date(timeIntervalSince1970: 100),
+                balanceDueKind: .exact, balanceDueAt: Date(timeIntervalSince1970: 200)),
+            .init(id: "second", name: "二团", reservationEndAt: Date(timeIntervalSince1970: 300),
+                balanceDueKind: .exact, balanceDueAt: Date(timeIntervalSince1970: 400))]
+        XCTAssertTrue(workspace.commitSeriesEntry().allOK)
+        let series = try XCTUnwrap(workspace.catalog.series.first)
+        XCTAssertNil(series.reservationEndAt)
+        XCTAssertEqual(series.paymentSchedule(batchID: "early")?.reservationEndAt, Date(timeIntervalSince1970: 100))
+        XCTAssertEqual(series.paymentSchedule(batchID: "second")?.reservationEndAt, Date(timeIntervalSince1970: 300))
+        workspace.seriesEntry.reservationBatches?[1].reservationEndAt = nil
+        let report = workspace.commitSeriesEntry()
+        XCTAssertFalse(report.allOK)
+        XCTAssertTrue(report.blockedByValidation.first?.message.contains("预约结束") == true)
+        XCTAssertEqual(workspace.catalog.series.first, series)
+    }
+
+    func testSwitchingUploadSeriesReloadsStableBatchIDsAndClearsPreviousInput() throws {
+        let store = try container()
+        let workspace = OpsWorkspace(context: store.mainContext)
+        suppressNetwork(workspace)
+        workspace.seriesEntry = completedSeriesInput()
+        workspace.seriesEntry.reservationBatches = [.init(id: "early", name: "先行团")]
+        XCTAssertTrue(workspace.commitSeriesEntry().allOK)
+        let firstID = workspace.seriesEntry.seriesID
+        let secondID = try XCTUnwrap(workspace.addSeriesReturningID(shopID: workspace.seriesEntry.shopID,
+            name: "另一个系列", year: 2026, month: 10, season: nil))
+        workspace.selectSeriesForEntry(firstID)
+        XCTAssertEqual(workspace.seriesEntry.reservationBatches?.first?.id, "early")
+        workspace.seriesEntry.reservationBatches?[0].name = "未保存的改名"
+        workspace.selectSeriesForEntry(secondID)
+        XCTAssertNil(workspace.seriesEntry.reservationBatches)
+        workspace.selectSeriesForEntry(firstID)
+        XCTAssertEqual(workspace.seriesEntry.reservationBatches?.first?.name, "先行团")
+        workspace.selectSeriesForEntry("")
+        XCTAssertNil(workspace.seriesEntry.reservationBatches)
+    }
+
+    func testLegacyUploadPreservesGroupsAndExplicitEditsDoNotDuplicateProduct() throws {
+        let store = try container()
+        let workspace = OpsWorkspace(context: store.mainContext)
+        suppressNetwork(workspace)
+        workspace.seriesEntry = completedSeriesInput()
+        workspace.seriesEntry.reservationBatches = [.init(id: "second", name: "二团")]
+        XCTAssertTrue(workspace.commitSeriesEntry().allOK)
+        let productID = try XCTUnwrap(workspace.catalog.products.first?.id)
+        let events = workspace.catalog.saleEvents
+        var json = try XCTUnwrap(JSONSerialization.jsonObject(
+            with: ShopCatalogJSONCoding.encoder().encode(workspace.seriesEntry)) as? [String: Any])
+        json.removeValue(forKey: "reservationBatches")
+        workspace.seriesEntry = try ShopCatalogJSONCoding.decoder().decode(OpsSeriesEntryDraft.self,
+            from: JSONSerialization.data(withJSONObject: json))
+        XCTAssertNil(workspace.seriesEntry.reservationBatches)
+        XCTAssertTrue(workspace.commitSeriesEntry().allOK)
+        XCTAssertEqual(workspace.catalog.series.first?.reservationBatches?.first?.id, "second")
+        workspace.seriesEntry.reservationBatches = [.init(id: "second", name: "二团", balanceDueKind: .exact,
+            balanceDueAt: Date(timeIntervalSince1970: 1_800_000_000))]
+        XCTAssertTrue(workspace.commitSeriesEntry().allOK)
+        XCTAssertEqual(workspace.catalog.products.map(\.id), [productID])
+        XCTAssertEqual(workspace.catalog.saleEvents, events)
+        XCTAssertEqual(workspace.catalog.series.first?.reservationBatches?.first?.balanceDueAt,
+            Date(timeIntervalSince1970: 1_800_000_000))
+        workspace.seriesEntry.reservationBatches = []
+        XCTAssertTrue(workspace.commitSeriesEntry().allOK)
+        XCTAssertNil(workspace.catalog.series.first?.reservationBatches)
+    }
+
+    func testReservationBatchesSaveReloadAndValidateWithoutNetworking() throws {
+        let store = try container()
+        let workspace = OpsWorkspace(context: store.mainContext)
+        suppressNetwork(workspace)
+        let shopID = try XCTUnwrap(workspace.addShopReturningID(name: "分团店家"))
+        let id = try XCTUnwrap(workspace.addSeriesReturningID(shopID: shopID, name: "分团系列",
+            year: 2026, month: 10, season: nil))
+        let batches = [
+            CatalogReservationBatch(id: "first", name: "先行团", balanceDueKind: .exact,
+                                    balanceDueAt: Date(timeIntervalSince1970: 1_790_000_000)),
+            CatalogReservationBatch(id: "second", name: "二团", balanceDueKind: .approximate,
+                                    balanceDueText: "11月上旬")
+        ]
+        XCTAssertTrue(workspace.updateSeriesSalePhase(id: id, phase: .reservationEnded,
+            reservationStartAt: nil, reservationEndAt: nil, balanceDueKind: .approximate,
+            balanceDueText: nil, balanceDueAt: nil, balanceDueEndAt: nil, reservationBatches: batches))
+        XCTAssertTrue(workspace.saveCatalogEditorChanges())
+        let restored = OpsWorkspace(context: ModelContext(store))
+        suppressNetwork(restored)
+        XCTAssertEqual(restored.catalog.series.first { $0.id == id }?.reservationBatches, batches)
+        var invalid = batches
+        invalid[1].name = "先行团"
+        XCTAssertFalse(restored.updateSeriesSalePhase(id: id, phase: .reservationEnded,
+            reservationStartAt: nil, reservationEndAt: nil, balanceDueKind: nil,
+            balanceDueText: nil, balanceDueAt: nil, balanceDueEndAt: nil, reservationBatches: invalid))
+        XCTAssertEqual(restored.catalog.series.first { $0.id == id }?.reservationBatches, batches)
+        XCTAssertTrue(restored.updateSeriesSalePhase(id: id, phase: .reservationEnded,
+            reservationStartAt: nil, reservationEndAt: nil, balanceDueKind: nil,
+            balanceDueText: nil, balanceDueAt: nil, balanceDueEndAt: nil, reservationBatches: []))
+        XCTAssertNil(restored.catalog.series.first { $0.id == id }?.reservationBatches)
+    }
+
 }

@@ -38,6 +38,8 @@ final class OpsSyncWorkflowTests: XCTestCase {
             merge: { .init(.completed, "已保存") }, changed: { _ in })
         XCTAssertEqual(result.steps.map(\.state), [.completed, .blocked, .completed])
         XCTAssertEqual(result.issues, [issue])
+        XCTAssertTrue(result.summary.contains("某尺码表：缺少 img.jpg"),
+                      "系列配置的同步反馈必须说明具体问题，不能只显示待修复数量")
     }
 
     @MainActor func testNoTrustedCatalogNeverAttemptsUpload() async {

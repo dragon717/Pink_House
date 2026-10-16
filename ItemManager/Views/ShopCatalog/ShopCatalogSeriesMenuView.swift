@@ -34,7 +34,7 @@ struct ShopCatalogSeriesMenuView: View {
     /// 大图预览：正在查看的单品（点击行内缩略图弹出，关闭即返回原页面）
     @State private var viewerProduct: CatalogProduct?
 
-    private var series: CatalogSeries? { store.series(id: seriesID) }
+    private var series: CatalogSeries? { store.seriesForPurchase(id: seriesID) }
     private var products: [CatalogProduct] { store.products(inSeries: seriesID) }
     private var categories: [String] { store.categories(inSeries: seriesID) }
 
@@ -46,6 +46,10 @@ struct ShopCatalogSeriesMenuView: View {
                 ScrollView(.vertical, showsIndicators: false) {
                     VStack(alignment: .leading, spacing: 18) {
                         headerCard
+                        if let series {
+                            ShopCatalogSeriesScheduleDisclosure(series: series,
+                                anchor: products.compactMap { store.priceArchive(forProduct: $0.id).reservation?.endAt }.min())
+                        }
                         ForEach(categories, id: \.self) { category in
                             let items = products.filter { $0.category == category }
                             if !items.isEmpty {
@@ -77,7 +81,8 @@ struct ShopCatalogSeriesMenuView: View {
                         },
                         sizeByProduct: checked.reduce(into: [:]) { dict, id in
                             if let p = store.product(id: id) { dict[id] = effectiveSize(for: p) }
-                        }
+                        },
+                        store: store
                     ) { _ in
                         checked = []
                     }
@@ -261,7 +266,7 @@ struct ShopCatalogSeriesMenuView: View {
 
                 VStack(alignment: .leading, spacing: 6) {
                     NavigationLink {
-                        ShopCatalogProductView(productID: p.id)
+                        ShopCatalogProductView(productID: p.id, store: store)
                     } label: {
                         HStack(spacing: 4) {
                             // 标题 = 款式名（与商品详情页同一句话；内外一致口径 2026-09-23）。

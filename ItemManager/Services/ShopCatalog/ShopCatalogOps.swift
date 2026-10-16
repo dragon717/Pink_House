@@ -28,6 +28,8 @@ nonisolated enum ShopCatalogDraftStoreError: LocalizedError {
     case productNotFound(String)
     /// 同款同步的模板草稿不存在（列表已刷新 / 脏引用）
     case sourceDraftNotFound(String)
+    case invalidReservationBatch(String)
+    case seriesNotFound(String)
 
     var errorDescription: String? {
         switch self {
@@ -42,6 +44,8 @@ nonisolated enum ShopCatalogDraftStoreError: LocalizedError {
             return "未找到商品 \(id)，可能已被删除——请刷新后重试"
         case .sourceDraftNotFound(let id):
             return "未找到作为模板的草稿 \(id)，可能已被删除——请返回列表刷新后重试"
+        case .invalidReservationBatch(let detail): return detail
+        case .seriesNotFound(let id): return "未找到系列 \(id)，请刷新后重试"
         }
     }
 }
@@ -1225,6 +1229,9 @@ final class ShopCatalogDraftStore: ObservableObject {
     @discardableResult
     func saveSeriesConfig(_ series: CatalogSeries, batchID: String? = nil) throws -> Int {
         try CreatorAccess.requireCreator(.listingEdit)
+        if let error = CatalogReservationBatch.validationError(in: series.reservationBatches ?? []) {
+            throw ShopCatalogDraftStoreError.invalidReservationBatch(error)
+        }
         try Self.upsertEntity(series, keyPath: \.series)
         guard let batchID else { return 0 }
         let inherited = drafts.filter {
@@ -1238,6 +1245,30 @@ final class ShopCatalogDraftStore: ObservableObject {
         }
         try upsert(linked)
         return linked.count
+    }
+
+    /// 上传款式时只修改团次，基于最新目录合并，避免覆盖其他窗口刚保存的系列资料。
+    func updateReservationBatches(seriesID: String, batches: [CatalogReservationBatch],
+                                  store: ShopCatalogStore) throws {
+        try CreatorAccess.requireCreator(.listingEdit)
+        if let error = CatalogReservationBatch.validationError(in: batches) {
+            throw ShopCatalogDraftStoreError.invalidReservationBatch(error)
+        }
+        var overlay = Self.loadOverlay() ?? ShopCatalog()
+        guard var series = Self.seriesEntity(id: seriesID, overlay: overlay, catalog: store.catalog),
+              !overlay.removedSeriesIDs.contains(seriesID) else {
+            throw ShopCatalogDraftStoreError.seriesNotFound(seriesID)
+        }
+        let normalized = batches.isEmpty ? nil : batches.map(\.normalized)
+        guard series.reservationBatches != normalized else { return }
+        series.reservationBatches = normalized
+        if let index = overlay.series.firstIndex(where: { $0.id == seriesID }) {
+            overlay.series[index] = series
+        } else {
+            overlay.series.append(series)
+        }
+        try Self.saveOverlay(overlay)
+        store.reloadWithOverlay()
     }
 
     // MARK: 同款不同色：款式公共资料一键同步（2026-09-23）

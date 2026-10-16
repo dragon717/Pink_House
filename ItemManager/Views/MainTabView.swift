@@ -361,7 +361,7 @@ struct NativeTabNavigation: View {
         case .wealth(_): return "来财".appLocalized
         case .pet: return petDataManager.status.displayName
         case .ootd: return "穿搭手帐".appLocalized
-        case .ootdDefaultBook: return "魔法贴纸".appLocalized
+        case .ootdDefaultBook: return "DIY搭配".appLocalized
         case .menu: return "House".appLocalized
         case .wardrobe: return "衣橱".appLocalized
         case .depositPlan: return "心愿尾款".appLocalized
@@ -375,7 +375,7 @@ struct NativeTabNavigation: View {
         case .wealth(_): return "yensign.circle"
         case .pet: return "pawprint"
         case .ootd: return "book.pages"
-        case .ootdDefaultBook: return "book.pages"
+        case .ootdDefaultBook: return "tshirt.fill"
         case .menu: return "house.fill"
         case .wardrobe: return "cabinet.fill"
         case .depositPlan: return "tag.fill"
@@ -567,74 +567,16 @@ struct OOTDDefaultBookViewWithBackButton: View {
     @Binding var selectedTab: Int
     @Binding var homeTab: HomeTab
     @Binding var destination: SmallWorldDestination
-    @Environment(\.modelContext) private var modelContext
+    @ObservedObject private var tabNavigationManager = TabNavigationManager.shared
 
     var body: some View {
-        OOTDDefaultBookView()
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    MagicStickerBackButton(
-                        selectedTab: $selectedTab,
-                        homeTab: $homeTab,
-                        destination: $destination
-                    )
-                }
-            }
+        OOTDDefaultBookView(onBack: goBack)
             .onReceive(NotificationCenter.default.publisher(for: .navigateToBook)) { _ in
                 // 导航到 OOTD 手帐列表
                 performWithoutRouteContentAnimation {
                     destination = .ootd
                 }
             }
-    }
-}
-
-// MARK: - 魔法贴纸返回按钮（带菜单）- iOS 18以下
-struct MagicStickerBackButton: View {
-    @Binding var selectedTab: Int
-    @Binding var homeTab: HomeTab
-    @Binding var destination: SmallWorldDestination
-    @Environment(\.modelContext) private var modelContext
-    @Query(filter: #Predicate<BookGroup> { $0.deletedAt == nil && $0.title != "默认手帐" }, sort: \BookGroup.sortIndex) private var otherBooks: [BookGroup]
-
-    @ObservedObject private var tabNavigationManager = TabNavigationManager.shared
-    @State private var showingMoveOptions = false
-    @State private var showingBookPicker = false
-
-    var body: some View {
-        Button {
-            showingMoveOptions = true
-        } label: {
-            Image(systemName: "chevron.left")
-                .font(.system(size: 16, weight: .medium))
-                .foregroundStyle(.primary)
-        }
-        .confirmationDialog("书页管理", isPresented: $showingMoveOptions, titleVisibility: .visible) {
-            Button("保持在默认手帐") {
-                goBack()
-            }
-
-            if !otherBooks.isEmpty {
-                Button("加入其他手帐") {
-                    showingBookPicker = true
-                }
-            }
-
-            Button("取消", role: .cancel) {}
-        } message: {
-            Text("当前书页在'默认手帐'中，您可以选择保持现状或移动到其他手帐")
-        }
-        .sheet(isPresented: $showingBookPicker) {
-            BookPickerSheet(
-                books: otherBooks,
-                onSelect: { selectedBook in
-                    moveCurrentPage(to: selectedBook)
-                },
-                onCancel: {
-                    showingBookPicker = false
-                }
-            )
-        }
     }
 
     private func goBack() {
@@ -653,6 +595,32 @@ struct MagicStickerBackButton: View {
                 } else {
                     destination = .menu
                 }
+            }
+        }
+    }
+}
+
+// MARK: - DIY搭配书页管理（与返回操作分开）
+struct MagicStickerPageManagementButton: View {
+    @Environment(\.modelContext) private var modelContext
+    @Query(filter: #Predicate<BookGroup> { $0.deletedAt == nil && $0.title != "默认手帐" }, sort: \BookGroup.sortIndex) private var otherBooks: [BookGroup]
+    @State private var showingBookPicker = false
+
+    var body: some View {
+        if !otherBooks.isEmpty {
+            Button {
+                showingBookPicker = true
+            } label: {
+                Label("加入其他手帐".appLocalized, systemImage: "book.closed")
+                    .labelStyle(.iconOnly)
+            }
+            .accessibilityIdentifier("diyOutfit.moveToBook")
+            .sheet(isPresented: $showingBookPicker) {
+                BookPickerSheet(
+                    books: otherBooks,
+                    onSelect: moveCurrentPage,
+                    onCancel: { showingBookPicker = false }
+                )
             }
         }
     }
@@ -988,7 +956,11 @@ struct MainTabView: View {
             startFeatureGuideAfterNavigation(feature)
         case .ootdDefaultBook:
             if isUnlocked {
-                AppFirstLaunchGuideManager.shared.startFeatureExperienceGuide(for: .ootdDefaultBook)
+                performWithoutRouteContentAnimation {
+                    selectedTab = 0
+                    homeTabSelection = .wardrobe
+                }
+                startFeatureGuideAfterNavigation(feature)
             } else {
                 performWithoutRouteContentAnimation {
                     selectedTab = 0

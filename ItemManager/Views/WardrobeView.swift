@@ -2667,6 +2667,7 @@ struct WardrobeStatsView: View {
     
     @Environment(ThemeManager.self) private var themeManager
     @Environment(\.containerPalette) private var palette
+    @ObservedObject private var featureManager = FeatureUnlockManager.shared
     
     @State private var showDailyCheckIn = false
     
@@ -2711,7 +2712,7 @@ struct WardrobeStatsView: View {
                 }
                 .frame(height: 52)
 
-                // Bottom Actions - 三个功能入口
+                // 衣橱创作入口与记录、统计放在同一区域。
                 HStack(spacing: 8) {
                     // 今日穿搭色按钮 - 使用主题强调色
                     Button {
@@ -2735,6 +2736,38 @@ struct WardrobeStatsView: View {
                         )
                         .foregroundStyle(palette.accent)
                         .clipShape(RoundedRectangle(cornerRadius: 8))
+                    }
+
+                    if featureManager.isVisible(.ootdDefaultBook) {
+                        Button {
+                            TabNavigationManager.shared.openDIYOutfitFromWardrobe()
+                        } label: {
+                            VStack(spacing: 4) {
+                                Image(systemName: "tshirt.fill")
+                                    .font(.system(size: 20))
+                                    .overlay(alignment: .bottomTrailing) {
+                                        if !featureManager.isUnlocked(.ootdDefaultBook) {
+                                            Image(systemName: "lock.fill")
+                                                .font(.system(size: 8))
+                                                .padding(2)
+                                                .background(themeManager.cardBackgroundColor, in: Circle())
+                                                .offset(x: 4, y: 3)
+                                        }
+                                    }
+                                Text("DIY搭配".appLocalized)
+                                    .font(.system(size: 11, weight: .medium))
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.8)
+                                    .themeSkinLegibleText(level: .inline, slot: .statsCard)
+                            }
+                            .padding(.vertical, 8)
+                            .frame(maxWidth: .infinity)
+                            .background(palette.accent.opacity(0.1))
+                            .foregroundStyle(palette.accent)
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                        }
+                        .accessibilityIdentifier("wardrobe.diyOutfit")
+                        .accessibilityHint("挑选衣物，在画布上自由拼搭".appLocalized)
                     }
 
                     // 穿搭手帐按钮 - 使用主题强调色

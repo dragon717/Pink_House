@@ -47,6 +47,8 @@ nonisolated struct ShopCatalogSeriesConfigForm: Equatable, Codable {
     var balanceDueAt: Date
     var balanceDueHasEnd: Bool
     var balanceDueEndAt: Date
+    /// Optional 保持旧编辑快照缺字段时仍可解码。
+    var reservationBatches: [CatalogReservationBatch]? = nil
 
     // ② 视觉与简介
     var cover: String
@@ -80,6 +82,7 @@ nonisolated struct ShopCatalogSeriesConfigForm: Equatable, Codable {
         balanceDueAt = due.exactAt
         balanceDueHasEnd = due.hasEnd
         balanceDueEndAt = due.endAt
+        reservationBatches = series.reservationBatches
         cover = series.cover ?? ""
         descriptionText = series.description ?? ""
         if let chart = series.priceChart {
@@ -120,7 +123,10 @@ nonisolated struct ShopCatalogSeriesConfigForm: Equatable, Codable {
     /// 且预约结束时间就在眼前可改的唯一阶段；其余阶段表单里没有可比对的基准，
     /// 就不猜（与 `CatalogSeriesBalanceDue` 的口径一致）。
     func balanceDueValidationErrorText() -> String? {
-        CatalogSeriesBalanceDue.validationErrorText(
+        if let batches = reservationBatches, !batches.isEmpty {
+            return CatalogReservationBatch.validationError(in: batches)
+        }
+        return CatalogSeriesBalanceDue.validationErrorText(
             kind: balanceDueKind,
             text: balanceDueText,
             endText: balanceDueEndText,
@@ -159,6 +165,7 @@ nonisolated struct ShopCatalogSeriesConfigForm: Equatable, Codable {
         updated.balanceDueEndText = due.endText
         updated.balanceDueAt = due.at
         updated.balanceDueEndAt = due.endAt
+        updated.reservationBatches = reservationBatches?.map(\.normalized)
         updated.cover = Self.trimmedOrNil(cover)
         updated.description = Self.trimmedOrNil(descriptionText)
         updated.priceChart = makePriceChart(keeping: series)
@@ -242,6 +249,16 @@ struct ShopCatalogSeriesConfigSections: View {
 
     var body: some View {
         salePhaseSection
+        Section {
+            ShopCatalogReservationBatchEditor(batches: Binding(
+                get: { form.reservationBatches ?? [] },
+                set: { form.reservationBatches = $0.isEmpty ? nil : $0 }),
+                reservationEndAt: form.reservationEndAt)
+        } header: {
+            ShopCatalogSeriesSharedHeader(title: "预约团次与尾款时间")
+        } footer: {
+            Text("按实际团数添加先行团、一团、二团等，每团单独填写尾款时间。入橱时按所选团次确定日期；没有分团时沿用系列尾款期。")
+        }
         visualSection
         priceChartSection
     }
@@ -259,7 +276,8 @@ struct ShopCatalogSeriesConfigSections: View {
             if CatalogSeriesSalePhaseResolver.requiresReservationEndAt(form.salePhase) {
                 reservationInputs
             }
-            if CatalogSeriesSalePhaseResolver.showsBalanceDueInput(form.salePhase) {
+            if (form.reservationBatches ?? []).isEmpty,
+               CatalogSeriesSalePhaseResolver.showsBalanceDueInput(form.salePhase) {
                 balanceDueInputs
             }
             if let note = autoFlowNote {
@@ -326,8 +344,8 @@ struct ShopCatalogSeriesConfigSections: View {
         switch form.balanceDueKind {
         case .approximate:
             TextField("尾款开始（大致，如：大货到后 1 个月）", text: $form.balanceDueText)
-            TextField("尾款结束（大致，选填，如：大货到后 2 个月）", text: $form.balanceDueEndText)
-            Text("大致时间只作展示，不参与自动流转——它不是确定时刻，系统不拿它做判断。")
+            TextField("尾款结束 / 时长（选填，如十天、十五天、一个月）", text: $form.balanceDueEndText)
+            Text("可识别的开始描述用于估算提醒；结束时长从预计尾款开始日算，一个月按日历月计算。大致时间不参与销售阶段自动流转。")
                 .font(.system(size: 10))
                 .foregroundStyle(.secondary)
         case .exact:
@@ -350,6 +368,7 @@ struct ShopCatalogSeriesConfigSections: View {
 
     /// 尾款期已过声明结束时间（只提示，不自动改阶段）
     private var showsBalanceDueEndedNote: Bool {
+        guard (form.reservationBatches ?? []).isEmpty else { return false }
         guard form.balanceDueKind == .exact, form.balanceDueHasEnd else { return false }
         guard CatalogSeriesSalePhaseResolver.showsBalanceDueInput(form.salePhase) else { return false }
         return CatalogSeriesBalanceDue.isEnded(kind: .exact, at: form.balanceDueEndAt, now: Date())
@@ -357,6 +376,7 @@ struct ShopCatalogSeriesConfigSections: View {
 
     /// 自动流转提示：说明保存后**生效阶段**会与所选声明不同（只提示，不拦保存）
     private var autoFlowNote: String? {
+        guard (form.reservationBatches ?? []).isEmpty else { return "已分团：尾款日期按各团声明分别确定。" }
         guard CatalogSeriesSalePhaseResolver.hasAutoFlowed(
             declared: form.salePhase,
             reservationEndAt: form.reservationEndAt,

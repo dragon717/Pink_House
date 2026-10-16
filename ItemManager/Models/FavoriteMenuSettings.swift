@@ -23,13 +23,18 @@ enum FavoriteMenuItem: String, CaseIterable, Identifiable {
     }
     
     var id: String { rawValue }
+
+    /// rawValue 保留历史菜单存档标识，展示名称跟随功能改名。
+    var displayName: String {
+        (self == .ootd ? "DIY搭配" : rawValue).appLocalized
+    }
     
     var icon: String {
         switch self {
         case .wardrobe: return "cabinet.fill"
         case .finalPayment: return "tag.fill"
         case .pet: return "pawprint.fill"
-        case .ootd: return "book.pages.fill"
+        case .ootd: return "tshirt.fill"
         case .fashionJournal: return "book.closed.fill"
         case .smallWorld: return "house.fill"
         case .wealth: return "yensign.circle.fill"

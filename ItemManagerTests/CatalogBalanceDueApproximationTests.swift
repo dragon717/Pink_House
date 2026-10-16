@@ -5,7 +5,7 @@
 //  大致尾款时间 → 固定具体日期 估算契约（2026-09-25 需求三）。
 //
 //  口径（与实现文件头一致）：
-//    · 上旬/月初 → 10 日；中旬 → 20 日；中下旬 → 25 日；下旬/月末/月底 → 当月最后一天
+//    · 上旬/月初 → 5 日；中旬 → 15 日；下旬 → 25 日；中下旬 → 20 日；月末/月底 → 当月最后一天
 //    · 显式月份优先；未带 → 锚点所在月 + 1（约一个月为基准）
 //    · 估算只向后看（候选早于锚点 → 整月推进）
 //    · 同一输入 → 同一日期（不掺 Date()）；无旬关键词 → nil（缺依据不猜）
@@ -35,42 +35,42 @@ final class CatalogBalanceDueApproximationTests: XCTestCase {
 
     // MARK: 1. 无显式月份：锚点 + 1 个月，旬定日
 
-    func testUpperDecadeDefaultsToNextMonthDay10() throws {
+    func testUpperDecadeDefaultsToNextMonthDay5() throws {
         let result = try XCTUnwrap(CatalogBalanceDueApproximation.estimatedDate(
             text: "上旬", anchor: date(2026, 9, 30), calendar: calendar))
-        XCTAssertEqual(result, date(2026, 10, 10))
+        XCTAssertEqual(result, date(2026, 10, 5))
     }
 
-    func testMiddleDecadeDefaultsToNextMonthDay20() throws {
+    func testMiddleDecadeDefaultsToNextMonthDay15() throws {
         let result = try XCTUnwrap(CatalogBalanceDueApproximation.estimatedDate(
             text: "中旬", anchor: date(2026, 9, 30), calendar: calendar))
+        XCTAssertEqual(result, date(2026, 10, 15))
+    }
+
+    func testMiddleLateDecadeDefaultsToNextMonthDay20() throws {
+        let result = try XCTUnwrap(CatalogBalanceDueApproximation.estimatedDate(
+            text: "中下旬", anchor: date(2026, 9, 30), calendar: calendar))
         XCTAssertEqual(result, date(2026, 10, 20))
     }
 
-    func testMiddleLateDecadeDefaultsToNextMonthDay25() throws {
-        let result = try XCTUnwrap(CatalogBalanceDueApproximation.estimatedDate(
-            text: "中下旬", anchor: date(2026, 9, 30), calendar: calendar))
-        XCTAssertEqual(result, date(2026, 10, 25))
-    }
-
-    func testLowerDecadeDefaultsToLastDayOfNextMonth() throws {
+    func testLowerDecadeDefaultsToNextMonthDay25() throws {
         // 10 月有 31 天
         let result = try XCTUnwrap(CatalogBalanceDueApproximation.estimatedDate(
             text: "下旬", anchor: date(2026, 9, 30), calendar: calendar))
-        XCTAssertEqual(result, date(2026, 10, 31))
+        XCTAssertEqual(result, date(2026, 10, 25))
     }
 
-    func testLowerDecadeClampsToMonthEnd() throws {
-        // 11 月只有 30 天 → 「下旬」落在 11-30，而不是溢出到 12-01
+    func testLowerDecadeUsesMidpointInThirtyDayMonth() throws {
+        // 11 月有 30 天，下旬同样固定取 25 日。
         let result = try XCTUnwrap(CatalogBalanceDueApproximation.estimatedDate(
             text: "下旬", anchor: date(2026, 10, 15), calendar: calendar))
-        XCTAssertEqual(result, date(2026, 11, 30))
-        XCTAssertEqual(day(of: result, in: calendar), 30)
+        XCTAssertEqual(result, date(2026, 11, 25))
+        XCTAssertEqual(day(of: result, in: calendar), 25)
     }
 
     func testMonthStartAndEndSynonyms() throws {
         XCTAssertEqual(try XCTUnwrap(CatalogBalanceDueApproximation.estimatedDate(
-            text: "月初", anchor: date(2026, 9, 30), calendar: calendar)), date(2026, 10, 10))
+            text: "月初", anchor: date(2026, 9, 30), calendar: calendar)), date(2026, 10, 5))
         XCTAssertEqual(try XCTUnwrap(CatalogBalanceDueApproximation.estimatedDate(
             text: "月底", anchor: date(2026, 9, 30), calendar: calendar)), date(2026, 10, 31))
         XCTAssertEqual(try XCTUnwrap(CatalogBalanceDueApproximation.estimatedDate(
@@ -81,7 +81,7 @@ final class CatalogBalanceDueApproximationTests: XCTestCase {
         // 12 月 + 1 个月 = 次年 1 月
         let result = try XCTUnwrap(CatalogBalanceDueApproximation.estimatedDate(
             text: "上旬", anchor: date(2026, 12, 20), calendar: calendar))
-        XCTAssertEqual(result, date(2027, 1, 10))
+        XCTAssertEqual(result, date(2027, 1, 5))
     }
 
     // MARK: 2. 显式月份
@@ -89,37 +89,37 @@ final class CatalogBalanceDueApproximationTests: XCTestCase {
     func testExplicitArabicMonthOverridesAnchorMonth() throws {
         let result = try XCTUnwrap(CatalogBalanceDueApproximation.estimatedDate(
             text: "11月上旬", anchor: date(2026, 9, 25), calendar: calendar))
-        XCTAssertEqual(result, date(2026, 11, 10))
+        XCTAssertEqual(result, date(2026, 11, 5))
     }
 
     func testExplicitYearAndMonth() throws {
         let result = try XCTUnwrap(CatalogBalanceDueApproximation.estimatedDate(
             text: "2027年3月中旬", anchor: date(2026, 9, 25), calendar: calendar))
-        XCTAssertEqual(result, date(2027, 3, 20))
+        XCTAssertEqual(result, date(2027, 3, 15))
     }
 
     func testExplicitMonthAlreadyPassedRollsToNextYear() throws {
         // 锚点 11 月，「10月上旬」今年已过 → 明年 10 月
         let result = try XCTUnwrap(CatalogBalanceDueApproximation.estimatedDate(
             text: "10月上旬", anchor: date(2026, 11, 20), calendar: calendar))
-        XCTAssertEqual(result, date(2027, 10, 10))
+        XCTAssertEqual(result, date(2027, 10, 5))
     }
 
     func testExplicitChineseNumeralMonth() throws {
         XCTAssertEqual(try XCTUnwrap(CatalogBalanceDueApproximation.estimatedDate(
-            text: "十月上旬", anchor: date(2026, 8, 15), calendar: calendar)), date(2026, 10, 10))
+            text: "十月上旬", anchor: date(2026, 8, 15), calendar: calendar)), date(2026, 10, 5))
         XCTAssertEqual(try XCTUnwrap(CatalogBalanceDueApproximation.estimatedDate(
-            text: "十二月下旬", anchor: date(2026, 8, 15), calendar: calendar)), date(2026, 12, 31))
+            text: "十二月下旬", anchor: date(2026, 8, 15), calendar: calendar)), date(2026, 12, 25))
     }
 
     // MARK: 3. 显式月份是硬约束；无显式月份的候选天然晚于锚点
 
     func testExplicitPassedMonthIsHardConstraintRollsToNextYear() throws {
-        // 锚点已在 10 月，「9月下旬」（今年 9 月已过）→ 明年 9 月 30 日：
+        // 锚点已在 10 月，「9月下旬」（今年 9 月已过）→ 明年 9 月 25 日：
         // 显式月份不松绑成「最近一个满足旬的月末」，说 9 月就是 9 月
         let result = try XCTUnwrap(CatalogBalanceDueApproximation.estimatedDate(
             text: "9月下旬", anchor: date(2026, 10, 5), calendar: calendar))
-        XCTAssertEqual(result, date(2027, 9, 30))
+        XCTAssertEqual(result, date(2027, 9, 25))
     }
 
     // MARK: 4. 确定性：同一输入 → 同一日期（不含 Date() 输入）
@@ -140,7 +140,7 @@ final class CatalogBalanceDueApproximationTests: XCTestCase {
         XCTAssertNil(CatalogBalanceDueApproximation.estimatedDate(
             text: "大货到后 1 个月", anchor: date(2026, 9, 30), calendar: calendar))
         XCTAssertNil(CatalogBalanceDueApproximation.estimatedDate(
-            text: "春节前", anchor: date(2026, 9, 30), calendar: calendar))
+            text: "发货前", anchor: date(2026, 9, 30), calendar: calendar))
         XCTAssertNil(CatalogBalanceDueApproximation.estimatedDate(
             text: "   ", anchor: date(2026, 9, 30), calendar: calendar))
         XCTAssertNil(CatalogBalanceDueApproximation.estimatedDate(
@@ -173,8 +173,8 @@ final class CatalogBalanceDueApproximationTests: XCTestCase {
             kind: .approximate, text: "上旬", endText: "中下旬",
             at: nil, endAt: nil,
             anchor: date(2026, 9, 30), calendar: calendar))
-        XCTAssertEqual(window.start, date(2026, 10, 10))
-        XCTAssertEqual(window.end, date(2026, 10, 25))
+        XCTAssertEqual(window.start, date(2026, 10, 5))
+        XCTAssertEqual(window.end, date(2026, 10, 20))
         XCTAssertTrue(window.basis.contains("上旬"), "来源说明必须带上运营原文")
         XCTAssertTrue(window.basis.contains("约一个月"), "来源说明必须说清估算基准")
     }
@@ -185,8 +185,8 @@ final class CatalogBalanceDueApproximationTests: XCTestCase {
             kind: .approximate, text: "下旬", endText: "月初",
             at: nil, endAt: nil,
             anchor: date(2026, 9, 30), calendar: calendar))
-        XCTAssertEqual(window.start, date(2026, 10, 31))
-        XCTAssertEqual(window.end, date(2026, 10, 31))
+        XCTAssertEqual(window.start, date(2026, 10, 25))
+        XCTAssertEqual(window.end, date(2026, 10, 25))
     }
 
     func testDeclaredWindowReturnsNilWithoutBasis() {
@@ -200,7 +200,7 @@ final class CatalogBalanceDueApproximationTests: XCTestCase {
             anchor: nil, calendar: calendar))
         // 大致描述但无旬关键词
         XCTAssertNil(CatalogBalanceDueApproximation.declaredWindow(
-            kind: .approximate, text: "春节前", endText: nil, at: nil, endAt: nil,
+            kind: .approximate, text: "发货前", endText: nil, at: nil, endAt: nil,
             anchor: date(2026, 9, 30), calendar: calendar))
         // 声明了 exact 却没给时间
         XCTAssertNil(CatalogBalanceDueApproximation.declaredWindow(

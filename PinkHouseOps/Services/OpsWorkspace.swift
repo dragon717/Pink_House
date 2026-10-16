@@ -103,6 +103,7 @@ final class OpsWorkspace: ObservableObject {
         self.context = context
         self.saveCatalogContext = saveCatalogContext
         loadOrCreateDraft()
+        restoreConfirmedSeriesBaselines()
         // 向导草稿：编辑停顿后自动落盘（失败只报告，绝不清空内存里的输入）
         seriesEntryPersistCancellable = $seriesEntry
             .dropFirst()
@@ -457,6 +458,9 @@ final class OpsWorkspace: ObservableObject {
     /// 所以严格策略的作用域会暂时按「整份目录」算 —— 这一点在界面上要说出来。
     func adoptBaseline(_ head: ShopCatalogOnlineHead) {
         guard let draft else { return }
+        var states = draft.environmentBaselines
+        states.removeValue(forKey: head.environment)
+        draft.environmentBaselines = states
         draft.baselineCatalog = nil
         draft.baseline = ShopCatalogBaseline(
             releaseSeq: head.releaseSeq,
@@ -481,6 +485,7 @@ final class OpsWorkspace: ObservableObject {
                                draft.lastPublishedRevision, draft.lastPublishedAt)
         let previousBaseline = (draft.baselineJSON, draft.baselineCatalogJSON,
                                 draft.baseReleaseSeq, draft.baseRootIndexHash)
+        let previousEnvironments = draft.environmentBaselinesJSON
         let previousSync = (draft.catalogSyncRequestID, draft.catalogSyncRevision,
                             draft.catalogSyncEnvironment, draft.catalogSyncError)
         let coversEditorSave = draft.catalogSyncRequestID != nil
@@ -514,6 +519,7 @@ final class OpsWorkspace: ObservableObject {
              draft.lastPublishedRevision, draft.lastPublishedAt) = previousPublish
             (draft.baselineJSON, draft.baselineCatalogJSON,
              draft.baseReleaseSeq, draft.baseRootIndexHash) = previousBaseline
+            draft.environmentBaselinesJSON = previousEnvironments
             (draft.catalogSyncRequestID, draft.catalogSyncRevision,
              draft.catalogSyncEnvironment, draft.catalogSyncError) = previousSync
             lastError = "记录发布结果失败（发布本身已完成，但本机没记下来）：\(error.localizedDescription)"
@@ -549,7 +555,8 @@ final class OpsWorkspace: ObservableObject {
 
     private func mergedCatalog(remote: ShopCatalog, environment: String?, preferLocalOnConflict: Bool = false) -> ShopCatalogThreeWayMerge.Result? {
         do {
-            let base = draft?.baseline.environment == environment ? baselineCatalog : nil
+            let state = environment.flatMap { draft?.mergeBaseline(environment: $0) }
+            let base = state?.catalog
             var mediaHashes: [String: String] = [:]
             // 比较图的内容身份，避免 local: 文件名变成 thmedia: 后制造假冲突。
             for item in ShopCatalogMediaReferences.all(in: base ?? ShopCatalog())
@@ -560,7 +567,8 @@ final class OpsWorkspace: ObservableObject {
                 }
             }
             return try ShopCatalogThreeWayMerge.merge(local: catalog, remote: remote,
-                                                       baseline: base, mediaHashesByLocalReference: mediaHashes,
+                                                       baseline: base, knownBaselineFields: state?.knownFields,
+                                                       mediaHashesByLocalReference: mediaHashes,
                                                        preferLocalOnConflict: preferLocalOnConflict)
         } catch {
             lastError = "合并失败（草稿未改动）：\(error.localizedDescription)"
@@ -601,6 +609,7 @@ final class OpsWorkspace: ObservableObject {
         let oldBaseHash = draft?.baseRootIndexHash
         let oldBaseline = draft?.baselineJSON
         let oldSnapshot = draft?.baselineCatalogJSON
+        let oldEnvironments = draft?.environmentBaselinesJSON
         let oldCatalogJSON = draft?.catalogJSON
         let oldSavedRevision = draft?.savedRevision
         catalog = result.catalog
@@ -609,6 +618,9 @@ final class OpsWorkspace: ObservableObject {
 
         // 基线必须是远端内容：本地新增、编辑、删除仍须留在待发布差分里。
         if advanceBaseline {
+            if let environment = baseline.environment {
+                draft.setMergeBaseline(.init(head: baseline, catalog: remote), environment: environment)
+            }
             draft.baselineCatalog = remote
             draft.baseline = baseline
         }
@@ -617,7 +629,7 @@ final class OpsWorkspace: ObservableObject {
             draft.catalogJSON = try ShopCatalogJSONCoding.encoder(prettyPrinted: true).encode(catalog)
             draft.savedRevision = draft.currentRevision
             draft.updatedAt = Date()
-            try context.save()
+            try saveCatalogContext(context)
             loadSeriesEntryState()
             let seq = baseline.releaseSeq.map(String.init) ?? "未知"
             let baselineMessage = advanceBaseline
@@ -631,6 +643,7 @@ final class OpsWorkspace: ObservableObject {
             // 保存失败后仍保留内存编辑，但不得把未落盘基线当成已同步版本。
             draft.baselineJSON = oldBaseline
             draft.baselineCatalogJSON = oldSnapshot
+            draft.environmentBaselinesJSON = oldEnvironments
             draft.baseReleaseSeq = oldBaseSeq
             draft.baseRootIndexHash = oldBaseHash
             if let oldCatalogJSON { draft.catalogJSON = oldCatalogJSON }

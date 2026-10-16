@@ -422,6 +422,75 @@ final class ShopCatalogCloudSyncTests: XCTestCase {
         XCTAssertNil(store.shop(id: "shop-remote-new"), "远端层应整体卸载")
     }
 
+    func testPurchaseScheduleUsesPublishedBatchesWithoutOverwritingLocalOperatorCopy() async throws {
+        let store = ShopCatalogSeedFixture.makeStore()
+        var local = try XCTUnwrap(store.series(id: "series-ag-xueguo-2026"))
+        local.name = "本机待发布的系列名"
+        local.cover = "local:my-cover.jpg"
+        local.description = "保留本机编辑"
+        local.balanceDueKind = .exact
+        local.balanceDueAt = releasedAt
+        try ShopCatalogDraftStore.replaceOverlay(with: ShopCatalog(series: [local]))
+        store.reloadWithOverlay()
+        let originalBytes = try Data(contentsOf: ShopCatalogDraftStore.overlayURL)
+        var remote = try makeRemoteCatalog()
+        let index = try XCTUnwrap(remote.series.firstIndex { $0.id == local.id })
+        remote.series[index].balanceDueKind = nil
+        remote.series[index].balanceDueAt = nil
+        remote.series[index].reservationBatches = [
+            .init(id: "first", name: "先行团", balanceDueKind: .approximate,
+                balanceDueText: "2026年圣诞节前", balanceDueEndText: "一个月"),
+            .init(id: "second", name: "非圣诞先行团", balanceDueKind: .approximate,
+                balanceDueText: "2027年2月中旬", balanceDueEndText: "十五天")]
+        store.installRemoteCatalog(remote)
+        XCTAssertNil(store.series(id: local.id)?.reservationBatches, "运营编辑仍看到原副本")
+        let purchase = try XCTUnwrap(store.seriesForPurchase(id: local.id))
+        XCTAssertEqual(purchase.reservationBatches, remote.series[index].reservationBatches)
+        XCTAssertNil(purchase.balanceDueAt, "旧具体日期不能覆盖新团次档期")
+        XCTAssertEqual(purchase.reservationEndAt, remote.series[index].reservationEndAt)
+        XCTAssertEqual(purchase.name, local.name)
+        XCTAssertEqual(purchase.cover, local.cover)
+        XCTAssertEqual(purchase.description, local.description)
+        XCTAssertTrue(ShopCatalogPurchaseBatchSelection().requiresSelection(for: [purchase]))
+        XCTAssertEqual(try Data(contentsOf: ShopCatalogDraftStore.overlayURL), originalBytes)
+    }
+
+    func testPublishedBatchChangesAndRemovalAreNotPinnedByLocalDraft() async throws {
+        let store = ShopCatalogSeedFixture.makeStore()
+        var local = try XCTUnwrap(store.series(id: "series-ag-xueguo-2026"))
+        local.reservationBatches = [.init(id: "old", name: "本机旧团次")]
+        try ShopCatalogDraftStore.replaceOverlay(with: ShopCatalog(series: [local]))
+        store.reloadWithOverlay()
+        var remote = try makeRemoteCatalog()
+        let index = try XCTUnwrap(remote.series.firstIndex { $0.id == local.id })
+        remote.series[index].reservationBatches = [.init(id: "online", name: "线上一团")]
+        store.installRemoteCatalog(remote)
+        XCTAssertEqual(store.seriesForPurchase(id: local.id)?.reservationBatches?.first?.id, "online")
+        remote.series[index].reservationBatches?[0].name = "线上更名"
+        store.installRemoteCatalog(remote)
+        XCTAssertEqual(store.seriesForPurchase(id: local.id)?.reservationBatches?.first?.name, "线上更名")
+        remote.series[index].reservationBatches = nil
+        store.installRemoteCatalog(remote)
+        XCTAssertNil(store.seriesForPurchase(id: local.id)?.reservationBatches, "已撤销的线上分团不能被旧副本恢复")
+        XCTAssertEqual(store.series(id: local.id)?.reservationBatches?.first?.id, "old")
+        store.installRemoteCatalog(nil)
+        XCTAssertEqual(store.seriesForPurchase(id: local.id)?.reservationBatches?.first?.id, "old", "纯本机商品沿用原规则")
+        XCTAssertNil(store.seriesForPurchase(id: "missing"))
+    }
+
+    func testPurchaseScheduleStillRespectsTombstoneAndArchive() async throws {
+        let store = ShopCatalogSeedFixture.makeStore()
+        var remote = try makeRemoteCatalog()
+        remote.removedSeriesIDs = ["series-ag-xueguo-2026"]
+        store.installRemoteCatalog(remote)
+        XCTAssertNil(store.seriesForPurchase(id: "series-ag-xueguo-2026"))
+        remote.removedSeriesIDs = []
+        let index = try XCTUnwrap(remote.series.firstIndex { $0.id == "series-ag-xueguo-2026" })
+        remote.series[index].archivedAt = releasedAt
+        store.installRemoteCatalog(remote)
+        XCTAssertNil(store.seriesForPurchase(id: "series-ag-xueguo-2026"))
+    }
+
     // MARK: - 同步服务编排（stub Reader）
 
     /// nonisolated：协议是非隔离 Sendable 的，嵌套类型默认会被推导成 MainActor

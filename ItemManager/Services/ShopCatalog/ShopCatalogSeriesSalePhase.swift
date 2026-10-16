@@ -102,7 +102,16 @@ nonisolated enum CatalogSeriesSalePhaseResolver {
 
     /// `CatalogSeries` 便捷入口（唯一读法，视图别再自己拼字段）
     static func effectivePhase(of series: CatalogSeries, now: Date) -> CatalogSeriesSalePhase? {
-        effectivePhase(declared: series.salePhase,
+        if let batches = series.reservationBatches, !batches.isEmpty {
+            let phases = batches.compactMap { batch in
+                series.paymentSchedule(batchID: batch.id).flatMap { effectivePhase(of: $0, now: now) }
+            }
+            // 系列总览展示已开始收尾款的团；入橱与同步传所选团投影，单独判断。
+            if phases.contains(.balancePending) { return .balancePending }
+            if phases.contains(.reservationActive) { return .reservationActive }
+            return phases.first
+        }
+        return effectivePhase(declared: series.salePhase,
                        reservationEndAt: series.reservationEndAt,
                        balanceDueKind: series.balanceDueKind,
                        balanceDueAt: series.balanceDueAt,
@@ -146,11 +155,8 @@ nonisolated enum CatalogSeriesSalePhaseResolver {
 
     /// `CatalogSeries` 便捷入口
     static func hasAutoFlowed(of series: CatalogSeries, now: Date) -> Bool {
-        hasAutoFlowed(declared: series.salePhase,
-                      reservationEndAt: series.reservationEndAt,
-                      balanceDueKind: series.balanceDueKind,
-                      balanceDueAt: series.balanceDueAt,
-                      now: now)
+        guard let declared = series.salePhase else { return false }
+        return effectivePhase(of: series, now: now) != declared
     }
 
     // MARK: 加购引导（§二 业务背景 + 用户裁定）

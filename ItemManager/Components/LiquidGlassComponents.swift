@@ -49,7 +49,7 @@ struct LiquidBackground: View {
     var body: some View {
         ZStack {
             // 1. Base Layer (Color or Image)
-            themeManager.backgroundColor
+            themeManager.backgroundBaseColor(for: colorScheme)
                 .ignoresSafeArea()
 
             if let activeProduct = themeSkinManager.activeProduct {

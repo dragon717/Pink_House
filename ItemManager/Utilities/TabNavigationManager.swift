@@ -71,6 +71,18 @@ class TabNavigationManager: ObservableObject {
         }
     }
 
+    /// 衣橱常驻入口与折叠菜单共用访问检查和返回来源。
+    func openDIYOutfitFromWardrobe() {
+        let feature = AppFeatureRegistry.descriptor(for: .magicSticker)
+        guard feature.isAvailableInUI else { return }
+        guard feature.isUnlocked else {
+            NotificationCenter.default.post(name: .navigateToMagicTasks, object: nil)
+            return
+        }
+        recordEnteringSmallWorldFromHomeTab(.wardrobe)
+        navigate(to: .magicSticker)
+    }
+
     func navigateToDepositNotificationClothing(_ clothingID: UUID) {
         navigateToHomeTab = .depositPlan
         navigateToClothingID = clothingID

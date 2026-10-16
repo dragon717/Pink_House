@@ -138,6 +138,7 @@ class ImageSaver: NSObject {
 
 struct ZoomableImageView: UIViewRepresentable {
     let imagePath: String
+    var preloadedImage: UIImage? = nil
 
     func makeUIView(context: Context) -> UIScrollView {
         let scrollView = UIScrollView()
@@ -177,10 +178,8 @@ struct ZoomableImageView: UIViewRepresentable {
             imageView.heightAnchor.constraint(equalTo: frameGuide.heightAnchor),
         ])
 
-        // 父级缩略图（ChartImagePicker / sizeChartThumbnail）通常已经在
-        // 内存 cache 里同步加载过这张图，这里同步取出直接 set，避免异步
-        // loadImageAsync 走磁盘/iCloud 时的黑屏窗口。
-        if let image = ImageManager.shared.loadImage(fileName: imagePath) {
+        // 优先使用点击时已经显示的图片，让预览的第一次布局就有内容。
+        if let image = preloadedImage ?? ImageManager.shared.loadImage(fileName: imagePath) {
             imageView.image = image
             context.coordinator.currentPath = imagePath
         }
@@ -193,10 +192,18 @@ struct ZoomableImageView: UIViewRepresentable {
     }
 
     func updateUIView(_ uiView: UIScrollView, context: Context) {
-        if context.coordinator.currentPath != imagePath {
+        let pathChanged = context.coordinator.currentPath != imagePath
+        if pathChanged {
             context.coordinator.currentPath = imagePath
             uiView.zoomScale = 1.0
+        }
 
+        if let preloadedImage {
+            context.coordinator.imageView?.image = preloadedImage
+            return
+        }
+
+        if pathChanged {
             // 快路径：缓存命中就同步 set，避免 async set 跟 layout 抢时序。
             if let image = ImageManager.shared.loadImage(fileName: imagePath) {
                 context.coordinator.imageView?.image = image
@@ -207,6 +214,7 @@ struct ZoomableImageView: UIViewRepresentable {
             Task {
                 if let image = await ImageManager.shared.loadImageAsync(fileName: imagePath) {
                     await MainActor.run {
+                        guard context.coordinator.currentPath == imagePath else { return }
                         context.coordinator.imageView?.image = image
                     }
                 }

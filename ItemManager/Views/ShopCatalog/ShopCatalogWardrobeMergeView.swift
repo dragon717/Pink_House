@@ -32,6 +32,17 @@ struct ShopCatalogWardrobeMergeView: View {
     @Environment(ThemeManager.self) private var themeManager
     @ObservedObject private var store = ShopCatalogStore.shared
 
+    init(selectedProductIDs: [String], priceChoices: [String: ShopCatalogCardPriceChoice] = [:],
+         colorByProduct: [String: String] = [:], sizeByProduct: [String: String] = [:],
+         store: ShopCatalogStore = .shared, onFinished: @escaping (Int) -> Void) {
+        self.selectedProductIDs = selectedProductIDs
+        self.priceChoices = priceChoices
+        self.colorByProduct = colorByProduct
+        self.sizeByProduct = sizeByProduct
+        self.onFinished = onFinished
+        _store = ObservedObject(wrappedValue: store)
+    }
+
     /// 默认第一件主衣物；小物不预选，保留用户每次勾选 / 取消的结果。
     @State private var selection = ShopCatalogWardrobeMergeSelection()
     /// 各单品选定的「加入方式」（2026-09-27 需求：所有入口统一在确认页按阶段选择）。
@@ -39,6 +50,13 @@ struct ShopCatalogWardrobeMergeView: View {
     @State private var entryOptionByProduct: [String: ShopCatalogWardrobeEntryOption] = [:]
     @State private var errorText: String?
     @State private var isInserting = false
+    @State private var purchaseBatchSelection = ShopCatalogPurchaseBatchSelection()
+    @State private var userNote = ""
+
+    private var reservationBatchBySeries: [String: String] { purchaseBatchSelection.selectedIDs }
+    private var needsPurchaseBatchSelection: Bool {
+        purchaseBatchSelection.requiresSelection(for: batchSeries)
+    }
 
     // MARK: 加入方式（按阶段，与详情页弹窗同一口径）
 
@@ -48,7 +66,10 @@ struct ShopCatalogWardrobeMergeView: View {
             hasReservationPrice: Bool,
             hasStockPrice: Bool) {
         let archive = store.priceArchive(forProduct: productID)
-        let series = store.product(id: productID).flatMap { store.series(id: $0.seriesID) }
+        let originalSeries = store.product(id: productID).flatMap { store.seriesForPurchase(id: $0.seriesID) }
+        let series = originalSeries.flatMap {
+            $0.paymentSchedule(batchID: reservationBatchBySeries[$0.id])
+        } ?? originalSeries
         let phase = ShopCatalogWardrobeEntryPolicy.purchasePhase(
             for: productID, series: series, store: store)
         return (phase,
@@ -67,7 +88,7 @@ struct ShopCatalogWardrobeMergeView: View {
 
     /// 实际生效的加入方式：用户已选优先；尚未初始化（首帧渲染）时按阶段策略取
     private func effectiveEntryOption(for productID: String) -> ShopCatalogWardrobeEntryOption? {
-        if let chosen = entryOptionByProduct[productID] { return chosen }
+        if let chosen = entryOptionByProduct[productID], entryCandidates(for: productID).contains(chosen) { return chosen }
         let info = entryPhaseAndPrices(for: productID)
         return ShopCatalogWardrobeEntryPolicy.mergeEntryInitialOption(
             preferredCardChoice: priceChoices[productID],
@@ -127,23 +148,7 @@ struct ShopCatalogWardrobeMergeView: View {
     }
 
     var body: some View {
-        ScrollView(.vertical, showsIndicators: false) {
-            VStack(spacing: 16) {
-                selectedSection
-                entryChoiceSection
-                primarySection
-                if !accessoryCandidates.isEmpty {
-                    accessorySection
-                }
-                if primaryItems.count > 1 {
-                    splitNotice
-                }
-                totalSection
-                confirmButton
-            }
-            .padding(16)
-            .padding(.bottom, 24)
-        }
+        confirmationContent
         .background(
             LiquidBackground(themeSkinWallpaperContext: .timeHall)
                 .ignoresSafeArea()
@@ -152,6 +157,9 @@ struct ShopCatalogWardrobeMergeView: View {
         .disabled(isInserting)
         .navigationTitle("加入少女衣橱")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarLeading) { Button("取消") { dismiss() } }
+        }
         .alert("无法加入衣橱", isPresented: Binding(
             get: { errorText != nil },
             set: { if !$0 { errorText = nil } }
@@ -171,7 +179,53 @@ struct ShopCatalogWardrobeMergeView: View {
         }
     }
 
+    private var confirmationContent: some View {
+        ScrollView(.vertical, showsIndicators: false) {
+            VStack(spacing: 16) {
+                selectedSection
+                entryChoiceSection
+                reservationBatchSection
+                primarySection
+                if !accessoryCandidates.isEmpty {
+                    accessorySection
+                }
+                if primaryItems.count > 1 {
+                    splitNotice
+                }
+                totalSection
+                TextField("备注（选填，写下你想记录的内容）", text: $userNote, axis: .vertical)
+                    .padding(14)
+                    .themeSkinSectionCard(cornerRadius: 16)
+                confirmButton
+            }
+            .padding(16)
+            .padding(.bottom, 24)
+        }
+    }
+
     @Environment(\.colorScheme) private var colorScheme
+
+    private var batchSeries: [CatalogSeries] {
+        ShopCatalogPurchaseBatchSelection.requirements(in:
+            includedItems.compactMap { store.seriesForPurchase(id: $0.product.seriesID) })
+    }
+
+    @ViewBuilder
+    private var reservationBatchSection: some View {
+        if !batchSeries.isEmpty {
+            VStack(alignment: .leading, spacing: 10) {
+                ForEach(batchSeries) { series in
+                    if batchSeries.count > 1 { Text(series.name).font(.subheadline) }
+                    ShopCatalogPurchaseBatchPicker(series: series, selectedID: Binding(
+                        get: { purchaseBatchSelection.selectedIDs[series.id] },
+                        set: { purchaseBatchSelection.selectedIDs[series.id] = $0 }))
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(14)
+            .themeSkinSectionCard(cornerRadius: 16)
+        }
+    }
 
     // MARK: 已选择的商品
 
@@ -398,14 +452,15 @@ struct ShopCatalogWardrobeMergeView: View {
             .frame(maxWidth: .infinity)
         }
         .buttonStyle(ThemeSkinPrimaryButtonStyle(fallbackTint: .pink, cornerRadius: 16, verticalPadding: 14))
-        .disabled(isInserting)
+        .disabled(isInserting || needsPurchaseBatchSelection)
+        .accessibilityIdentifier("catalog.wardrobe.confirm")
     }
 
     // MARK: 入库
 
     /// 按页内每件商品已选的加入方式直接保存，不再次要求选择。
     private func confirmInsert() {
-        guard !isInserting else { return }
+        guard !isInserting, !needsPurchaseBatchSelection else { return }
         isInserting = true
         Task { @MainActor in
             defer { isInserting = false }
@@ -419,6 +474,10 @@ struct ShopCatalogWardrobeMergeView: View {
             return
         }
         let keptAccessoryIDs = selection.includedAccessoryIDs
+        if needsPurchaseBatchSelection {
+            errorText = "请选择购买的团次或批次"
+            return
+        }
         // 价格口径（2026-09-27 需求）：按用户在「加入方式」段选定的口径落库，
         // 映射唯一口径 `ShopCatalogWardrobeEntryPolicy.priceMode`（与详情页弹窗共用）；
         // 预约价口径须有可用预约记录（makeDraft 会 guard），缺记录回退现货兜底；
@@ -448,7 +507,8 @@ struct ShopCatalogWardrobeMergeView: View {
                 productID: id,
                 color: colorByProduct[id],
                 size: sizeByProduct[id],
-                priceMode: resolvedMode
+                priceMode: resolvedMode,
+                reservationBatchID: reservationBatchBySeries[item.product.seriesID]
             )
         }
         do {
@@ -459,7 +519,7 @@ struct ShopCatalogWardrobeMergeView: View {
                 primaryProductID: selection.primaryID
             )
             _ = try await ShopCatalogWardrobeAddition.addSet(
-                drafts: pairs,
+                drafts: pairs.map { (draft: $0.draft.with(note: userNote), selection: $0.selection) },
                 accessoryProductIDs: keptAccessoryIDs,
                 accessorySelections: Dictionary(selections.filter { keptAccessoryIDs.contains($0.productID) }
                     .map { ($0.productID, $0) }, uniquingKeysWith: { first, _ in first }),

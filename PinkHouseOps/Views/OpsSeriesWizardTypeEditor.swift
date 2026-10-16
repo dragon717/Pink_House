@@ -36,6 +36,86 @@ struct OpsSeriesWizardTypeEntriesView: View {
     @State private var customCategoryText = ""
     @State private var entryPendingRemoval: OpsSeriesTypeEntry?
     @State private var showCustomCategory = false
+    @State private var draggingEntry: EntryDrag?
+    /// 只保存窗口展示状态，按草稿与系列隔离，不改动商品或草稿内容。
+    @SceneStorage("ops.series-entry.collapsed-categories.v1") private var collapsedCategoriesJSON = "{}"
+
+    private struct CategoryGroup: Identifiable {
+        let id: String
+        let entries: [OpsSeriesTypeEntry]
+    }
+
+    private static func categoryKey(_ entry: OpsSeriesTypeEntry) -> String {
+        let category = entry.category.trimmingCharacters(in: .whitespacesAndNewlines)
+        return category.isEmpty ? "未命名类型" : category
+    }
+
+    private var categoryGroups: [CategoryGroup] {
+        var order: [String] = []
+        var grouped: [String: [OpsSeriesTypeEntry]] = [:]
+        for entry in draft.typeEntries {
+            let key = Self.categoryKey(entry)
+            if grouped[key] == nil { order.append(key) }
+            grouped[key, default: []].append(entry)
+        }
+        return order.map { CategoryGroup(id: $0, entries: grouped[$0] ?? []) }
+    }
+
+    private var collapseScope: String { "\(workspace.draft?.id ?? "current")/\(draft.shopID)/\(draft.seriesID)" }
+    private var collapsedCategories: Set<String> {
+        let states = (try? JSONDecoder().decode([String: [String]].self,
+            from: Data(collapsedCategoriesJSON.utf8))) ?? [:]
+        return Set(states[collapseScope] ?? [])
+    }
+
+    private func setExpanded(_ expanded: Bool, category: String) {
+        var states = (try? JSONDecoder().decode([String: [String]].self,
+            from: Data(collapsedCategoriesJSON.utf8))) ?? [:]
+        var collapsed = Set(states[collapseScope] ?? [])
+        if expanded { collapsed.remove(category) } else { collapsed.insert(category) }
+        states[collapseScope] = collapsed.sorted()
+        if let data = try? JSONEncoder().encode(states), let text = String(data: data, encoding: .utf8) {
+            collapsedCategoriesJSON = text
+        }
+        draggingEntry = nil
+        clampSelection()
+    }
+
+    private struct EntryDrag {
+        let draftID: String
+        let entryID: String
+    }
+    private static let entryDragType = UTType(exportedAs: "bugod2.ItemManager.Ops.series-type-entry", conformingTo: .data)
+
+    private struct EntryDropDelegate: DropDelegate {
+        let workspace: OpsWorkspace
+        let targetID: String
+        @Binding var draggingEntry: EntryDrag?
+
+        func validateDrop(info: DropInfo) -> Bool {
+            guard let draggingEntry, draggingEntry.draftID == workspace.draft?.id,
+                  info.hasItemsConforming(to: [entryDragType]),
+                  let source = workspace.seriesEntry.typeEntries.first(where: { $0.id == draggingEntry.entryID }),
+                  let target = workspace.seriesEntry.typeEntries.first(where: { $0.id == targetID }) else { return false }
+            return categoryKey(source) == categoryKey(target)
+        }
+
+        func dropEntered(info: DropInfo) {
+            guard validateDrop(info: info), let source = draggingEntry,
+                  source.entryID != targetID,
+                  let from = workspace.seriesEntry.typeEntries.firstIndex(where: { $0.id == source.entryID }),
+                  let to = workspace.seriesEntry.typeEntries.firstIndex(where: { $0.id == targetID }) else { return }
+            workspace.moveSeriesTypeEntry(id: source.entryID, toOffset: to > from ? to + 1 : to)
+        }
+
+        func dropUpdated(info: DropInfo) -> DropProposal? { DropProposal(operation: .move) }
+
+        func performDrop(info: DropInfo) -> Bool {
+            guard validateDrop(info: info) else { return false }
+            draggingEntry = nil
+            return true
+        }
+    }
 
     private var draft: OpsSeriesEntryDraft { workspace.seriesEntry }
 
@@ -54,20 +134,6 @@ struct OpsSeriesWizardTypeEntriesView: View {
         draft.typeEntries.first { $0.id == selectedEntryID }
     }
 
-    private var selectedBinding: Binding<OpsSeriesTypeEntry> {
-        Binding(
-            get: {
-                draft.typeEntries.first { $0.id == selectedEntryID }
-                    ?? draft.typeEntries.first
-                    ?? OpsSeriesTypeEntry(category: "")
-            },
-            set: { newValue in
-                if let index = workspace.seriesEntry.typeEntries.firstIndex(where: { $0.id == newValue.id }) {
-                    workspace.seriesEntry.typeEntries[index] = newValue
-                }
-            })
-    }
-
     var body: some View {
         HSplitView {
             entryListColumn
@@ -77,7 +143,7 @@ struct OpsSeriesWizardTypeEntriesView: View {
                 // 且每次「上一步/下一步」重建 S3 时按 ideal 宽度重排，必然复现。
                 // 因此：左列 200 + 编辑器 460 = 660 ≤ 720；编辑器用 maxWidth: .infinity 吃掉余量。
                 .frame(minWidth: 200, idealWidth: 240, maxWidth: 320)
-            if let entry = selectedEntry ?? draft.typeEntries.first {
+            if let entry = selectedEntry, !collapsedCategories.contains(Self.categoryKey(entry)) {
                 OpsSeriesWizardTypeEditorView(workspace: workspace, entry: selectedBindingFor(entry))
                     // 每个条目拥有自己的编辑器状态；切到副本不会触发旧编辑器的
                     // 颜色数量/身份变化回调，把复制保留的尺码勾选重新补满。
@@ -90,21 +156,26 @@ struct OpsSeriesWizardTypeEntriesView: View {
         }
         .onAppear { clampSelection() }
         .onChange(of: draft.typeEntries.count) { _, _ in clampSelection() }
+        .onChange(of: collapseScope) { _, _ in
+            draggingEntry = nil
+            clampSelection()
+        }
         .confirmationDialog(
-            "删除类型「\(entryPendingRemoval?.displayName ?? "")」？",
+            "删除款式「\(entryPendingRemoval?.displayName ?? "")」？",
             isPresented: Binding(
                 get: { entryPendingRemoval != nil },
                 set: { if !$0 { entryPendingRemoval = nil } }),
             titleVisibility: .visible) {
-            Button("删除这个类型的草稿资料", role: .destructive) {
+            Button("只删除这条款式", role: .destructive) {
                 if let target = entryPendingRemoval {
-                    workspace.seriesEntry.typeEntries.removeAll { $0.id == target.id }
+                    workspace.removeSeriesTypeEntry(id: target.id)
+                    clampSelection()
                 }
                 entryPendingRemoval = nil
             }
             Button("取消", role: .cancel) { entryPendingRemoval = nil }
         } message: {
-            opsMarkdown("只删除该类型**尚未提交**的草稿资料，不影响同系列的其他类型，也不影响已写入目录的商品。")
+            opsMarkdown("只删除这一条款式的草稿资料，同名款式、相同类型的其他条目及已写入目录的商品均保留。")
                 .font(.callout)
         }
     }
@@ -122,9 +193,8 @@ struct OpsSeriesWizardTypeEntriesView: View {
     }
 
     private func clampSelection() {
-        if !draft.typeEntries.contains(where: { $0.id == selectedEntryID }) {
-            selectedEntryID = draft.typeEntries.first?.id
-        }
+        if let selectedEntry, !collapsedCategories.contains(Self.categoryKey(selectedEntry)) { return }
+        selectedEntryID = draft.typeEntries.first { !collapsedCategories.contains(Self.categoryKey($0)) }?.id
     }
 
     private var emptyEditor: some View {
@@ -132,8 +202,9 @@ struct OpsSeriesWizardTypeEntriesView: View {
             Image(systemName: "rectangle.stack.badge.plus")
                 .font(.system(size: 30))
                 .foregroundStyle(OpsFlowPalette.textSecondary)
-            opsMarkdown("先在左上方**勾选类型**（如 JSK、OP、小物）——"
-                        + "每个已选类型都会生成一套独立编辑区。")
+            opsMarkdown(draft.typeEntries.isEmpty
+                        ? "先在左上方**勾选类型**（如 OP、JSK、开衫）——每个已选类型都会生成一套独立编辑区。"
+                        : "类型已收起。展开左侧 **OP、JSK 等类型**后，选择款式继续编辑。")
                 .font(.callout)
                 .foregroundStyle(OpsFlowPalette.textSecondary)
                 .multilineTextAlignment(.center)
@@ -158,6 +229,9 @@ struct OpsSeriesWizardTypeEntriesView: View {
                 Text("添加同类型另一款款式").font(.subheadline.weight(.semibold))
                     .foregroundStyle(OpsFlowPalette.textPrimary)
                 addSameCategoryRow
+                Text("点击类型收起或展开；拖动同类款式排序；删除只作用于指定款式。")
+                    .font(.caption)
+                    .foregroundStyle(OpsFlowPalette.textSecondary)
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 10)
@@ -171,9 +245,33 @@ struct OpsSeriesWizardTypeEntriesView: View {
                     .padding(14)
             } else {
                 List(selection: $selectedEntryID) {
-                    ForEach(draft.typeEntries) { entry in
-                        entryRow(entry).tag(entry.id)
-                            .listRowBackground(Color.clear)
+                    ForEach(categoryGroups) { group in
+                        Section {
+                            if !collapsedCategories.contains(group.id) {
+                                ForEach(group.entries) { entry in
+                                    draggableEntryRow(entry)
+                                }
+                            }
+                        } header: {
+                            Button {
+                                setExpanded(collapsedCategories.contains(group.id), category: group.id)
+                            } label: {
+                                HStack(spacing: 6) {
+                                    Image(systemName: collapsedCategories.contains(group.id) ? "chevron.right" : "chevron.down")
+                                        .font(.caption.weight(.semibold)).frame(width: 12)
+                                    Text(group.id).font(.subheadline.weight(.semibold))
+                                    Spacer(minLength: 2)
+                                    Text("\(group.entries.count) 款").font(.caption)
+                                }
+                                .foregroundStyle(OpsFlowPalette.textPrimary)
+                                .padding(.vertical, 7)
+                                .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                            .help(collapsedCategories.contains(group.id) ? "展开这个类型的款式" : "收起这个类型的款式，资料会保留")
+                            .accessibilityLabel("\(collapsedCategories.contains(group.id) ? "展开" : "收起")\(group.id)，\(group.entries.count)款")
+                            .accessibilityIdentifier("ops.typeGroup.\(group.id)")
+                        }
                     }
                 }
                 .listStyle(.inset)
@@ -188,6 +286,25 @@ struct OpsSeriesWizardTypeEntriesView: View {
         .shadow(color: OpsFlowPalette.cardShadow, radius: 10, x: 0, y: 4)
         .padding(12)
         .frame(maxHeight: .infinity)
+    }
+
+    private func draggableEntryRow(_ entry: OpsSeriesTypeEntry) -> some View {
+        entryRow(entry).tag(entry.id)
+            .listRowBackground(Color.clear)
+            .onDrag {
+                guard workspace.canMutate(), let draftID = workspace.draft?.id else { return NSItemProvider() }
+                selectedEntryID = entry.id
+                draggingEntry = EntryDrag(draftID: draftID, entryID: entry.id)
+                let provider = NSItemProvider()
+                provider.registerDataRepresentation(forTypeIdentifier: Self.entryDragType.identifier,
+                                                    visibility: .ownProcess) { completion in
+                    completion(Data(entry.id.utf8), nil)
+                    return nil
+                }
+                return provider
+            }
+            .onDrop(of: [Self.entryDragType], delegate: EntryDropDelegate(
+                workspace: workspace, targetID: entry.id, draggingEntry: $draggingEntry))
     }
 
     /// 类型多选区（需求：多选，不是单选下拉框；保留枚举 + 扩展入口）
@@ -242,15 +359,19 @@ struct OpsSeriesWizardTypeEntriesView: View {
         draft.typeEntries.filter { $0.category == category }.count
     }
 
-    /// 勾选 = 该类型至少有一条条目；勾上 → 建条目，取消 → 询问后删（走确认弹窗）
+    /// 取消勾选只定位该类型下已选中的款式；未选中时不猜测要删除哪一条。
     private func bindingForKnownCategory(_ category: String) -> Binding<Bool> {
         Binding(
             get: { entryCount(for: category) > 0 },
             set: { isOn in
                 if isOn {
                     appendEntry(category: category)
-                } else if let first = draft.typeEntries.first(where: { $0.category == category }) {
-                    entryPendingRemoval = first
+                } else if let selected = selectedEntry, selected.category == category {
+                    entryPendingRemoval = selected
+                } else if entryCount(for: category) == 1 {
+                    entryPendingRemoval = draft.typeEntries.first { $0.category == category }
+                } else {
+                    workspace.statusMessage = "请先选中要删除的 \(category) 款式，或使用该条目的删除按钮。"
                 }
             })
     }
@@ -265,6 +386,7 @@ struct OpsSeriesWizardTypeEntriesView: View {
     private func appendEntry(category: String) {
         let entry = OpsSeriesTypeEntry(category: category)
         workspace.seriesEntry.typeEntries.append(entry)
+        setExpanded(true, category: Self.categoryKey(entry))
         selectedEntryID = entry.id
     }
 
@@ -275,6 +397,9 @@ struct OpsSeriesWizardTypeEntriesView: View {
             selected: entry.id == selectedEntryID) {
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 6) {
+                    Image(systemName: "line.3.horizontal")
+                        .foregroundStyle(OpsFlowPalette.textSecondary)
+                        .help("拖动条目调整顺序")
                     Text(entry.displayName).lineLimit(1)
                         .font(.callout.weight(.medium))
                         .foregroundStyle(OpsFlowPalette.textPrimary)
@@ -290,6 +415,12 @@ struct OpsSeriesWizardTypeEntriesView: View {
                     .buttonStyle(.borderless)
                     .help("复制款式（保留全部填写内容）")
                     .accessibilityLabel("复制款式「\(entry.displayName)」")
+                    Button(role: .destructive) { entryPendingRemoval = entry } label: {
+                        Image(systemName: "trash")
+                    }
+                    .buttonStyle(.borderless)
+                    .help("只删除这条款式")
+                    .accessibilityLabel("删除款式「\(entry.displayName)」")
                 }
                 HStack(spacing: 8) {
                     Text("\(entry.colors.count) 颜色")
@@ -311,13 +442,14 @@ struct OpsSeriesWizardTypeEntriesView: View {
         .contextMenu {
             Button("复制款式", systemImage: "doc.on.doc") { duplicateEntry(entry.id) }
             Divider()
-            Button("删除这个类型…", role: .destructive) { entryPendingRemoval = entry }
+            Button("只删除这条款式…", role: .destructive) { entryPendingRemoval = entry }
         }
     }
 
     private func duplicateEntry(_ id: String) {
         if let copiedID = workspace.duplicateSeriesTypeEntry(id: id) { selectedEntryID = copiedID }
     }
+
 }
 
 // MARK: - 单个类型条目的编辑区（S3-A/B/C/D）
@@ -326,11 +458,13 @@ struct OpsSeriesWizardTypeEditorView: View {
     @ObservedObject var workspace: OpsWorkspace
     @Binding var entry: OpsSeriesTypeEntry
 
-    /// 图片导入的目标槽位（封面在 S2，这里只有尺码表原图与颜色图）
-    private enum ImageSlot: Equatable {
-        case chartSource
+    /// 选择文件前固定目标，完成时不能把图片写到新选中的款式或另一份草稿。
+    private struct SizeChartImportTarget {
+        let draftID: String
+        let entryID: String
     }
-    @State private var importSlot: ImageSlot?
+    @State private var sizeChartImportTarget: SizeChartImportTarget?
+    @State private var sizeChartImportError: String?
     @State private var showsImporter = false
     @State private var batchImageTarget: BatchImageTarget?
 
@@ -475,17 +609,23 @@ struct OpsSeriesWizardTypeEditorView: View {
             isPresented: $showsImporter,
             allowedContentTypes: [.image],
             allowsMultipleSelection: false) { result in
-            guard let slot = importSlot else { return }
+            defer { sizeChartImportTarget = nil }
             switch result {
             case .success(let urls):
                 guard let url = urls.first else { return }
-                if let assetID = workspace.importSingleImage(from: url) {
-                    assignAsset(assetID, to: slot)
+                guard let target = sizeChartImportTarget else {
+                    sizeChartImportError = "未找到要更换原图的款式，请重新点击「更换图片」。"
+                    return
                 }
+                let saved = workspace.replaceSeriesSizeChartImage(
+                    entryID: target.entryID, from: url, expectedDraftID: target.draftID)
+                sizeChartImportError = saved ? nil : workspace.lastError
             case .failure(let error):
-                workspace.reportFailure("图片上传失败：\(error.localizedDescription)")
+                if (error as NSError).code != NSUserCancelledError {
+                    sizeChartImportError = "尺码表图片更换失败，原图保留：\(error.localizedDescription)"
+                    workspace.reportFailure(sizeChartImportError!)
+                }
             }
-            importSlot = nil
         }
         // 触发点 ⑤（切换类型）：换到另一个类型时，它可能本来就有一张有效尺码表
         // 而颜色还没勾过（例如草稿从别的会话恢复）。幂等规则在这儿也是安全的。
@@ -498,17 +638,6 @@ struct OpsSeriesWizardTypeEditorView: View {
             Button("取消", role: .cancel) {}
         } message: {
             Text("当前的列名与数据行会被模板替换掉，这一步不能撤销。")
-        }
-    }
-
-    private func assignAsset(_ assetID: String, to slot: ImageSlot) {
-        switch slot {
-        case .chartSource:
-            entry.chartSourceImageAssetID = assetID
-            // 触发点 ①：用户原话就是「尺码表识别**并上传**成功后自动勾选」。
-            // 尺码表现在还没识别成功（`parsedChart == nil`）也不打紧 ——
-            // 文本那边一旦有效，触发点 ③ 会接手补上。
-            autoSelectSellableSizes()
         }
     }
 
@@ -604,21 +733,36 @@ struct OpsSeriesWizardTypeEditorView: View {
     }
 
     private var chartSourceRow: some View {
-        HStack(spacing: 8) {
-            OpsImageUploadThumbnail(
-                url: entry.chartSourceImageAssetID.flatMap {
-                    workspace.stagedFileURL(forReference: workspace.asset(for: $0)?.originalURL)
-                }, size: 40, title: "点击上传或更换尺码表原图") {
-                    importSlot = .chartSource
-                    showsImporter = true
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 8) {
+                OpsImageUploadThumbnail(
+                    url: workspace.stagedImageURL(forReference: entry.chartSourceImageAssetID),
+                    size: 40, title: "点击上传或更换尺码表原图") {
+                        guard let draftID = workspace.draft?.id else { return }
+                        sizeChartImportError = nil
+                        sizeChartImportTarget = SizeChartImportTarget(draftID: draftID, entryID: entry.id)
+                        showsImporter = true
+                    }
+                Picker("尺码表原图", selection: Binding(
+                    get: { entry.chartSourceImageAssetID },
+                    set: { assetID in
+                        sizeChartImportError = workspace.setSeriesSizeChartImage(entryID: entry.id, assetID: assetID)
+                            ? nil : workspace.lastError
+                    })) {
+                    Text("不指定").tag(String?.none)
+                    if let current = entry.chartSourceImageAssetID, workspace.asset(for: current) == nil {
+                        Text("当前原图").tag(String?.some(current))
+                    }
+                    ForEach(workspace.catalog.assets) { asset in
+                        Text(assetFileLabel(asset)).tag(String?.some(asset.id))
+                    }
                 }
-            Picker("尺码表原图", selection: $entry.chartSourceImageAssetID) {
-                Text("不指定").tag(String?.none)
-                ForEach(workspace.catalog.assets) { asset in
-                    Text(assetFileLabel(asset)).tag(String?.some(asset.id))
-                }
+                .controlSize(.small)
             }
-            .controlSize(.small)
+            if let sizeChartImportError {
+                Text(sizeChartImportError).font(.caption).foregroundStyle(.orange)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
     }
 
@@ -762,7 +906,7 @@ struct OpsSeriesWizardTypeEditorView: View {
                 OpsImageUploadThumbnail(
                     url: color.wrappedValue.imageAssetID.flatMap {
                         workspace.stagedFileURL(forReference: workspace.asset(for: $0)?.originalURL)
-                    }, size: 36, title: "点击打开颜色批量配图") {
+                    }, size: 36, title: "点击打开颜色批量配图", actionTitle: "重新配图") {
                         batchImageTarget = BatchImageTarget(id: entry.id, colorID: color.wrappedValue.id)
                     }
                 TextField("颜色名称（必填，如「绯红」）", text: color.name)

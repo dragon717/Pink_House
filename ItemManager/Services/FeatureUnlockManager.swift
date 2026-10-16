@@ -149,7 +149,7 @@ enum FeatureItem: String, CaseIterable, Identifiable {
         case .finalPayment: return "心愿尾款".appLocalized
         case .pet: return "萌宠".appLocalized
         case .ootd: return "穿搭手帐".appLocalized
-        case .ootdDefaultBook: return "魔法贴纸".appLocalized
+        case .ootdDefaultBook: return "DIY搭配".appLocalized
         case .wealth: return "来财".appLocalized
         case .calendar: return "梦裙日历".appLocalized
         case .recycleBin: return "回收站".appLocalized
@@ -191,7 +191,7 @@ enum FeatureItem: String, CaseIterable, Identifiable {
         case .finalPayment: return "tag.fill"
         case .pet: return "pawprint.fill"
         case .ootd: return "book.closed.fill"
-        case .ootdDefaultBook: return "book.pages.fill"
+        case .ootdDefaultBook: return "tshirt.fill"
         case .wealth: return "yensign.circle.fill"
         case .calendar: return "calendar"
         case .recycleBin: return "trash.fill"

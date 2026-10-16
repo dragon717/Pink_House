@@ -61,6 +61,38 @@ final class ShopCatalogBatchSeriesConfigSyncTests: XCTestCase {
 
     // MARK: 1. 保存配置 → 只链接「未自报系列」的草稿
 
+    func testUploadBatchUpdatePreservesLatestSeriesMetadataAndRejectsInvalidInput() throws {
+        var series = try XCTUnwrap(store.series(id: "series-ag-xueguo-2026"))
+        series.description = "另一个窗口刚保存的简介"
+        series.balanceDueKind = .exact
+        series.balanceDueAt = Date(timeIntervalSince1970: 1_800_000_000)
+        try draftStore.saveSeriesConfig(series)
+        // store 故意未重载，写入必须读取最新覆盖层，而非旧表单副本。
+        let batches = [CatalogReservationBatch(id: "first", name: " 先行团 ", balanceDueKind: .exact,
+            balanceDueAt: Date(timeIntervalSince1970: 1_810_000_000)),
+            CatalogReservationBatch(id: "second", name: "二团")]
+        try draftStore.updateReservationBatches(seriesID: series.id, batches: batches, store: store)
+        let saved = try XCTUnwrap(store.series(id: series.id))
+        XCTAssertEqual(saved.description, series.description)
+        XCTAssertEqual(saved.balanceDueAt, series.balanceDueAt)
+        XCTAssertEqual(saved.reservationBatches?.map(\.name), ["先行团", "二团"])
+        XCTAssertEqual(saved.paymentSchedule(batchID: "first")?.balanceDueAt, batches[0].balanceDueAt)
+        XCTAssertNil(saved.paymentSchedule(batchID: "second")?.balanceDueAt)
+        XCTAssertThrowsError(try draftStore.updateReservationBatches(seriesID: series.id,
+            batches: [.init(name: "二团"), .init(name: "二团")], store: store))
+        XCTAssertEqual(ShopCatalogDraftStore.loadOverlay()?.series.first { $0.id == series.id }, saved)
+        try draftStore.updateReservationBatches(seriesID: series.id, batches: [], store: store)
+        XCTAssertNil(store.series(id: series.id)?.reservationBatches)
+        XCTAssertEqual(store.series(id: series.id)?.description, series.description)
+    }
+
+    func testInvalidBatchesCannotBeSavedThroughSeriesConfig() throws {
+        var series = try XCTUnwrap(store.series(id: "series-ag-xueguo-2026"))
+        series.reservationBatches = [.init(name: "")]
+        XCTAssertThrowsError(try draftStore.saveSeriesConfig(series))
+        XCTAssertNil(ShopCatalogDraftStore.loadOverlay()?.series.first { $0.id == series.id })
+    }
+
     func testSaveSeriesConfigLinksInheritedDraftsOnly() throws {
         let session = try makeBatch(draftNames: ["继承款", "自报款"])
         let own = try XCTUnwrap(drafts(in: session.id).first { $0.name == "自报款" })

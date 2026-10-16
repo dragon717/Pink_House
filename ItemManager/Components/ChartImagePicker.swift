@@ -22,7 +22,7 @@ struct ChartImagePicker: View {
     @State private var showingPhotosPicker = false
     @State private var imageToCrop: UIImage?
     @State private var showingCropper = false
-    @State private var showingFullScreenViewer = false
+    @State private var imagePreview: ChartImagePreview?
     @State private var showingDeleteAlert = false
     @State private var loadedThumbnail: UIImage?
 
@@ -34,7 +34,7 @@ struct ChartImagePicker: View {
                 if editMode {
                     showingDeleteAlert = true
                 } else {
-                    showingFullScreenViewer = true
+                    presentPreview()
                 }
             } else {
                 showingPhotosPicker = true
@@ -89,18 +89,16 @@ struct ChartImagePicker: View {
                 )
             }
         }
-        .sheet(isPresented: $showingFullScreenViewer) {
-            if let path = imagePath {
-                ChartImageViewer(imagePath: path) { [self] in
-                    showingFullScreenViewer = false
-                }
-                .presentationBackground(.black)
-                .ignoresSafeArea()
+        .sheet(item: $imagePreview) { preview in
+            ChartImageViewer(preview: preview) {
+                imagePreview = nil
             }
+            .presentationBackground(.black)
+            .ignoresSafeArea()
         }
         .alert("修改表图".appLocalized, isPresented: $showingDeleteAlert) {
             Button("查看大图".appLocalized) {
-                showingFullScreenViewer = true
+                presentPreview()
             }
             Button("更换图片".appLocalized) {
                 showingPhotosPicker = true
@@ -112,7 +110,7 @@ struct ChartImagePicker: View {
         } message: {
             Text("选择操作".appLocalized)
         }
-        .task {
+        .task(id: imagePath) {
             await loadThumbnail()
         }
     }
@@ -130,6 +128,14 @@ struct ChartImagePicker: View {
         .clipShape(RoundedRectangle(cornerRadius: 6))
     }
 
+    private func presentPreview() {
+        guard let path = imagePath else { return }
+        imagePreview = ChartImagePreview(
+            imagePath: path,
+            image: ImageManager.shared.cachedImage(fileName: path) ?? loadedThumbnail
+        )
+    }
+
     private func saveImage(_ image: UIImage) {
         let previousPath = imagePath
         if let fileName = ImageManager.shared.saveChartImage(image, context: modelContext) {
@@ -140,7 +146,6 @@ struct ChartImagePicker: View {
                previousPath != fileName {
                 ImageManager.shared.deleteImage(fileName: previousPath, context: modelContext)
             }
-            Task { await loadThumbnail() }
         }
     }
 
@@ -155,11 +160,11 @@ struct ChartImagePicker: View {
     }
 
     private func loadThumbnail() async {
+        loadedThumbnail = nil
         guard let path = imagePath else { return }
         let thumbnail = await ImageManager.shared.loadImageAsync(fileName: path, targetSize: CGSize(width: thumbnailSize * 2, height: thumbnailSize * 2))
-        await MainActor.run {
-            loadedThumbnail = thumbnail
-        }
+        guard !Task.isCancelled, imagePath == path else { return }
+        loadedThumbnail = thumbnail
     }
 }
 

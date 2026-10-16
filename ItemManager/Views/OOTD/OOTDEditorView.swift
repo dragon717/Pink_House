@@ -17,6 +17,7 @@ struct OOTDEditorView: View {
     // 初始状态配置（用于魔法贴纸模式）
     var initialToolbarVisible: Bool = true
     var initialStickerLibraryVisible: Bool = false
+    var navigationTitleOverride: String? = nil
     
     // States copied from OOTDView
     @State private var isListExpanded = false
@@ -55,11 +56,12 @@ struct OOTDEditorView: View {
     @State private var isAvatarMotionEnabled = false
     
     // 初始化时设置默认值
-    init(outfit: Outfit, onPageChange: ((Outfit) -> Void)? = nil, initialToolbarVisible: Bool = true, initialStickerLibraryVisible: Bool = false) {
+    init(outfit: Outfit, onPageChange: ((Outfit) -> Void)? = nil, initialToolbarVisible: Bool = true, initialStickerLibraryVisible: Bool = false, navigationTitleOverride: String? = nil) {
         self.outfit = outfit
         self.onPageChange = onPageChange
         self.initialToolbarVisible = initialToolbarVisible
         self.initialStickerLibraryVisible = initialStickerLibraryVisible
+        self.navigationTitleOverride = navigationTitleOverride
         if let bookID = outfit.book?.id {
             _bookPages = Query(
                 filter: #Predicate<Outfit> { page in
@@ -124,7 +126,7 @@ struct OOTDEditorView: View {
                 mainContentArea(geometry: geometry)
             }
         }
-        .navigationTitle(outfit.note.isEmpty ? "编辑书页".appLocalized : outfit.note)
+        .navigationTitle(navigationTitleOverride ?? (outfit.note.isEmpty ? "编辑书页".appLocalized : outfit.note))
         .navigationBarTitleDisplayMode(.inline)
         .onDisappear {
             isAvatarMotionEnabled = false

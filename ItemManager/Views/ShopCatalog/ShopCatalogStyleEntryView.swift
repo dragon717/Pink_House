@@ -73,6 +73,8 @@ struct ShopCatalogStyleEntrySheet: View {
     @State private var deposit: Double?
     @State private var balance: Double?
     @State private var currency: CatalogCurrency = .cny
+    /// nil 表示此次上传不编辑，保留系列已有团次。
+    @State private var reservationBatches: [CatalogReservationBatch]?
 
     // MARK: 第 2 步 · 颜色（SKU）
 
@@ -100,6 +102,7 @@ struct ShopCatalogStyleEntrySheet: View {
                 } else {
                     inheritedStyleSection
                 }
+                reservationBatchSection
                 colorsSection
             }
             .navigationTitle("录入款式")
@@ -159,6 +162,32 @@ struct ShopCatalogStyleEntrySheet: View {
     }
 
     // MARK: - 第 1 步（新建款式）
+
+    private var reservationBatchSection: some View {
+        Section("团次与尾款时间") {
+            Toggle("在此次上传中编辑团次与尾款", isOn: Binding(
+                get: { reservationBatches != nil },
+                set: { enabled in
+                    reservationBatches = enabled
+                        ? (store.series(id: series.id)?.reservationBatches ?? []) : nil
+                }))
+            if reservationBatches != nil {
+                ShopCatalogReservationBatchEditor(batches: Binding(
+                    get: { reservationBatches ?? [] }, set: { reservationBatches = $0 }))
+                if let error = CatalogReservationBatch.validationError(in: reservationBatches ?? []) {
+                    Text(error).font(.footnote).foregroundStyle(.orange)
+                }
+            } else if let current = store.series(id: series.id),
+                      let batches = current.reservationBatches, !batches.isEmpty {
+                ForEach(batches) { batch in
+                    LabeledContent(batch.name, value: current.paymentSchedule(batchID: batch.id)
+                        .flatMap { CatalogSeriesBalanceDue.valueText(of: $0) } ?? "待公布")
+                }
+            }
+            Text("同款商品可有先行团、一团、二团等，每团分别填写尾款时间；入橱时选择所属团次。团次资料由同系列商品共用。关闭编辑开关会沿用已保存团次。")
+                .font(.footnote).foregroundStyle(.secondary)
+        }
+    }
 
     private var stylePublicSection: some View {
         Section {
@@ -477,6 +506,10 @@ struct ShopCatalogStyleEntrySheet: View {
         defer { isSubmitting = false }
         do {
             let plan = try buildSubmissionPlan()
+            if let reservationBatches {
+                try draftStore.updateReservationBatches(seriesID: series.id,
+                    batches: reservationBatches, store: store)
+            }
             var publishedCount = 0
             var firstProductID: String?
             for draft in plan.drafts {
@@ -527,6 +560,10 @@ struct ShopCatalogStyleEntrySheet: View {
     }
 
     private func buildSubmissionPlan() throws -> SubmissionPlan {
+        if let reservationBatches,
+           let error = CatalogReservationBatch.validationError(in: reservationBatches) {
+            throw ShopCatalogDraftStoreError.invalidReservationBatch(error)
+        }
         let designName: String
         let categoryValue: String
         let chart: CatalogSizeChart?

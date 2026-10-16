@@ -842,7 +842,7 @@ struct PetChatBubble: View {
             } label: {
                 HStack(spacing: 6) {
                     Image(systemName: "wand.and.stars")
-                    Text("魔法贴纸".appLocalized)
+                    Text("DIY搭配".appLocalized)
                         .themeSkinLegibleText(level: .chip, slot: .primaryButton, descriptor: primaryButtonDescriptor)
                 }
                 .font(.subheadline)

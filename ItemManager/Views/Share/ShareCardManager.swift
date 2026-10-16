@@ -741,8 +741,8 @@ struct ShareCardBackground: View {
     
     var body: some View {
         ZStack {
-            // 基础背景色
-            themeManager.backgroundColor
+            // 图片背景使用中性底色，透明度不混入主题色。
+            themeManager.backgroundBaseColor(for: colorScheme)
                 .ignoresSafeArea()
             
             // 背景图片（如果有）

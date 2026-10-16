@@ -10,6 +10,7 @@ public nonisolated enum ShopCatalogThreeWayMerge {
 
     public static func merge(
         local: ShopCatalog, remote: ShopCatalog, baseline: ShopCatalog?,
+        knownBaselineFields: [String: Set<String>]? = nil,
         mediaHashesByLocalReference: [String: String] = [:],
         preferLocalOnConflict: Bool = false
     ) throws -> Result {
@@ -44,8 +45,12 @@ public nonisolated enum ShopCatalogThreeWayMerge {
             for item in remoteItems {
                 let id = item["id"] as! String
                 if let localItem = localIndex[id] {
-                    items.append(mergeObject(localItem, item, baseIndex[id],
-                                             path: "\(field).\(id)", conflicts: &conflicts, mediaHashes: mediaHashesByLocalReference, preferLocal: preferLocalOnConflict))
+                    let path = "\(field).\(id)"
+                    let known = knownBaselineFields?[path]
+                    let baseItem = knownBaselineFields == nil || known != nil ? baseIndex[id] : nil
+                    items.append(mergeObject(localItem, item, baseItem,
+                                             knownKeys: known?.contains("*") == true ? nil : known,
+                                             path: path, conflicts: &conflicts, mediaHashes: mediaHashesByLocalReference, preferLocal: preferLocalOnConflict))
                 } else {
                     items.append(item)
                 }
@@ -100,15 +105,17 @@ public nonisolated enum ShopCatalogThreeWayMerge {
 
     private static func mergeObject(
         _ local: [String: Any], _ remote: [String: Any], _ baseline: [String: Any]?,
+        knownKeys: Set<String>? = nil,
         path: String, conflicts: inout [String], mediaHashes: [String: String], preferLocal: Bool
     ) -> [String: Any] {
         var result: [String: Any] = [:]
         for key in Set(local.keys).union(remote.keys).union(baseline?.keys.map { $0 } ?? []).sorted() {
             let l = local[key], r = remote[key], b = baseline?[key]
+            let hasBaseline = baseline != nil && (knownKeys == nil || knownKeys!.contains(key))
             if same(l, r, mediaHashes: mediaHashes) { result[key] = l }
-            else if baseline != nil && same(r, b, mediaHashes: mediaHashes) { result[key] = l }
-            else if baseline != nil && same(l, b, mediaHashes: mediaHashes) { result[key] = r }
-            else if let ld = l as? [String: Any], let rd = r as? [String: Any],
+            else if hasBaseline && same(r, b, mediaHashes: mediaHashes) { result[key] = l }
+            else if hasBaseline && same(l, b, mediaHashes: mediaHashes) { result[key] = r }
+            else if hasBaseline, let ld = l as? [String: Any], let rd = r as? [String: Any],
                     let bd = b as? [String: Any] {
                 result[key] = mergeObject(ld, rd, bd, path: "\(path).\(key)", conflicts: &conflicts, mediaHashes: mediaHashes, preferLocal: preferLocal)
             } else {

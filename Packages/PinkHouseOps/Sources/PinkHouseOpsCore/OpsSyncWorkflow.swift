@@ -67,7 +67,9 @@ public nonisolated struct OpsSyncReport: Codable, Equatable, Sendable {
         return hasProgress ? "同步部分完成" : "同步未完成"
     }
     public var summary: String {
-        steps.map { "\($0.step.title)：\($0.state.title)（\($0.detail)）" }.joined(separator: "\n")
+        let progress = steps.map { "\($0.step.title)：\($0.state.title)（\($0.detail)）" }.joined(separator: "\n")
+        guard !issues.isEmpty else { return progress }
+        return progress + "\n" + issues.map { "待处理 · \($0.owner)：\($0.message)" }.joined(separator: "\n")
     }
     public mutating func update(_ step: OpsSyncStep, state: OpsSyncState, detail: String,
                                 progress: Double? = nil, logPaths: [String] = []) {

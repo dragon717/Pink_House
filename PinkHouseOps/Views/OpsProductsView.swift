@@ -327,7 +327,7 @@ struct OpsProductsView: View {
                         HStack(spacing: 8) {
                             ForEach(Array(product.images.enumerated()), id: \.offset) { index, assetID in
                                 VStack(spacing: 3) {
-                                    OpsThumbnail(url: workspace.stagedFileURL(
+                                    OpsPreviewableThumbnail(url: workspace.stagedFileURL(
                                         forReference: workspace.asset(for: assetID)?.originalURL),
                                                  size: 72)
                                     Text(index == 0 ? "首图" : "\(index + 1)")
@@ -1001,7 +1001,7 @@ private struct ProductImagesSheet: View {
                                 .font(.caption.monospacedDigit())
                                 .foregroundStyle(.secondary)
                                 .frame(width: 18, alignment: .trailing)
-                            OpsThumbnail(url: thumbURL(assetID), size: 36)
+                            OpsPreviewableThumbnail(url: thumbURL(assetID), size: 36)
                             VStack(alignment: .leading, spacing: 1) {
                                 Text(assetLabel(assetID)).font(.callout).lineLimit(1)
                                 if index == 0 { OpsTag(text: "首图", tint: .accentColor) }
@@ -1036,7 +1036,7 @@ private struct ProductImagesSheet: View {
             } else {
                 List(candidates) { asset in
                     HStack(spacing: 8) {
-                        OpsThumbnail(url: thumbURL(asset.id), size: 36)
+                        OpsPreviewableThumbnail(url: thumbURL(asset.id), size: 36)
                         VStack(alignment: .leading, spacing: 1) {
                             Text(assetLabel(asset.id)).font(.callout).lineLimit(1)
                             Text("\(asset.width ?? 0)×\(asset.height ?? 0)")
@@ -1180,12 +1180,11 @@ struct SizeChartFormSheet: View {
                         Text(assetLabel(asset)).tag(asset.id)
                     }
                 }
-                Button { importsSource = true } label: {
-                    OpsThumbnail(url: workspace.stagedFileURL(forReference:
-                        workspace.asset(for: sourceAssetID)?.originalURL ?? sourceAssetID), size: 72)
-                }
-                .buttonStyle(.plain).help("点击上传或替换尺码表原图")
-                Text("点击图片上传或替换尺码表原图").font(.caption).foregroundStyle(.secondary)
+                OpsImageUploadThumbnail(url: workspace.stagedFileURL(forReference:
+                    workspace.asset(for: sourceAssetID)?.originalURL ?? sourceAssetID),
+                    size: 72, title: "上传或替换尺码表原图") { importsSource = true }
+                Text(sourceAssetID.isEmpty ? "点击图片框上传尺码表原图" : "点击图片查看大图")
+                    .font(.caption).foregroundStyle(.secondary)
                 if let localError {
                     Label(localError, systemImage: "exclamationmark.triangle.fill")
                         .font(.caption).foregroundStyle(.orange)

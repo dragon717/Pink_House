@@ -51,8 +51,13 @@ struct ShopCatalogProductView: View {
     /// `ShopCatalogChartDisclosure.plan` 推导——视图不再自己拼折叠分支。
     @State private var isSizeChartImageExpanded = false
 
+    init(productID: String, store: ShopCatalogStore = .shared) {
+        self.productID = productID
+        _store = ObservedObject(wrappedValue: store)
+    }
+
     private var product: CatalogProduct? { store.product(id: productID) }
-    private var series: CatalogSeries? { product.map { store.series(id: $0.seriesID) } ?? nil }
+    private var series: CatalogSeries? { product.map { store.seriesForPurchase(id: $0.seriesID) } ?? nil }
     private var shop: CatalogShop? { series.map { store.shop(id: $0.shopID) } ?? nil }
 
     // 图片和信息卡按正常布局顺序排列，不用负 offset 覆盖图片下沿。
@@ -81,6 +86,11 @@ struct ShopCatalogProductView: View {
                             colors: colors, sizes: sizes,
                             fabric: styleFabric, description: styleDescription)
                             .padding(.horizontal)
+                        if let series {
+                            ShopCatalogSeriesScheduleDisclosure(series: series,
+                                anchor: store.priceArchive(forProduct: productID).reservation?.endAt)
+                                .padding(.horizontal)
+                        }
                         sizeChartCard
                             .padding(.horizontal)
                         seriesPriceChartCard
@@ -105,7 +115,7 @@ struct ShopCatalogProductView: View {
             ShopCatalogImageViewer(references: viewerReferences, startIndex: viewerIndex)
         }
         .sheet(isPresented: $showsMergeSheet) {
-            ShopCatalogSingleInsertSheet(productID: productID)
+            ShopCatalogSingleInsertSheet(productID: productID, store: store)
                 .presentationDetents([.medium, .large])
         }
     }
@@ -861,7 +871,8 @@ struct ShopCatalogProductView: View {
         //    未声明（旧数据 salePhase == nil）→ 落到第 2 步的档期推导，
         //    行为与改动前完全一致（不需要给存量系列做任何数据迁移）。
         // 2. 既有口径：按销售事件档期推导
-        ShopCatalogWardrobeEntryPolicy.purchasePhase(for: productID, series: series, store: store)
+        ShopCatalogWardrobeEntryPolicy.purchasePhase(for: productID,
+            series: product.flatMap { store.seriesForPurchase(id: $0.seriesID) }, store: store)
     }
 
     /// 是否有可买的现货（现货窗口进行中，或价格档案含现货价）
@@ -925,6 +936,7 @@ struct ShopCatalogProductView: View {
 
     /// 「尾款中」标签文案（含尾款期，若运营填过）——只在系列级数据里取，不落任何本地状态
     private var balanceDueTagText: String {
+        guard (series?.reservationBatches ?? []).isEmpty else { return "尾款中" }
         guard let series, let value = CatalogSeriesBalanceDue.valueText(of: series) else {
             return "尾款中"
         }
@@ -934,6 +946,7 @@ struct ShopCatalogProductView: View {
 
     /// 状态说明里追加的尾款时间后缀（未声明尾款时间 → 空串，不产生多余标点）
     private var balanceDueCaptionSuffix: String {
+        guard (series?.reservationBatches ?? []).isEmpty else { return "" }
         guard let series, let value = CatalogSeriesBalanceDue.valueText(of: series) else { return "" }
         // 「尾款期」还是「尾款时间」看有没有声明结束（2026-09-24 需求五）
         return CatalogSeriesBalanceDue.hasDeclaredEnd(of: series)
@@ -1075,10 +1088,11 @@ enum ShopCatalogPurchasePhase: Equatable {
 
 struct ShopCatalogSingleInsertSheet: View {
     let productID: String
+    var store: ShopCatalogStore = .shared
 
     var body: some View {
         NavigationStack {
-            ShopCatalogWardrobeMergeView(selectedProductIDs: [productID], onFinished: { _ in })
+            ShopCatalogWardrobeMergeView(selectedProductIDs: [productID], store: store, onFinished: { _ in })
         }
     }
 }
@@ -1321,6 +1335,7 @@ struct ShopCatalogReservationSheet: View {
 
     /// 当前生效的加购口径：选择段里用户可切换（默认选中 = 外部按阶段规则传入）
     @State private var selectedOption: ShopCatalogWardrobeEntryOption = .depositPaid
+    @State private var didInitializeEntryOption = false
     /// 防御：候选与选中项必须自洽（候选随阶段 / 价格档案变化），
     /// 选中的那一项万一不在候选里就退回候选第一项 ——
     /// 否则确认按钮会按一个界面上根本看不到的口径落库。
@@ -1331,16 +1346,38 @@ struct ShopCatalogReservationSheet: View {
 
     @State private var selectedColor: String?
     @State private var selectedSize: String?
+    @State private var purchaseBatchSelection = ShopCatalogPurchaseBatchSelection()
+    @State private var userNote = ""
     /// 尾款时间：nil = 待公布（仅付定金口径可设）
     @State private var hasTailDate = false
     @State private var tailDate = Date()
     @State private var errorText: String?
 
     private var product: CatalogProduct? { store.product(id: productID) }
-    private var series: CatalogSeries? { product.map { store.series(id: $0.seriesID) } ?? nil }
+    private var series: CatalogSeries? { product.map { store.seriesForPurchase(id: $0.seriesID) } ?? nil }
     private var shop: CatalogShop? { series.map { store.shop(id: $0.shopID) } ?? nil }
     private var archive: CatalogPriceArchive {
         store.priceArchive(forProduct: productID)
+    }
+
+    private var batchSeries: [CatalogSeries] { series.map { [$0] } ?? [] }
+    private var needsPurchaseBatchSelection: Bool {
+        purchaseBatchSelection.requiresSelection(for: batchSeries)
+    }
+    private var selectedReservationBatchID: String? {
+        series.flatMap { purchaseBatchSelection.selectedIDs[$0.id] }
+    }
+
+    private var entryPhase: ShopCatalogPurchasePhase {
+        guard let series, !(series.reservationBatches ?? []).isEmpty,
+              let schedule = series.paymentSchedule(batchID: selectedReservationBatchID) else { return phase }
+        return ShopCatalogWardrobeEntryPolicy.purchasePhase(for: productID, series: schedule, store: store)
+    }
+
+    private var declaredTailWindow: CatalogBalanceDueApproximation.Window? {
+        guard let schedule = series?.paymentSchedule(batchID: selectedReservationBatchID) else { return nil }
+        return CatalogBalanceDueApproximation.declaredWindow(
+            of: schedule, anchor: schedule.reservationEndAt ?? archive.reservation?.endAt)
     }
 
     /// 后台预约价（= 定金 + 尾款总和）；「预约价全款」口径的入橱金额
@@ -1388,7 +1425,7 @@ struct ShopCatalogReservationSheet: View {
     /// 视图不再自己写死 `[.depositPaid, .fullPaid]`，否则策略改了界面不动。
     private var choiceOptions: [ShopCatalogWardrobeEntryOption] {
         ShopCatalogWardrobeEntryPolicy.options(
-            phase: phase,
+            phase: entryPhase,
             hasReservationPrice: hasReservationPrice,
             hasStockPrice: hasStockPrice
         )
@@ -1399,80 +1436,7 @@ struct ShopCatalogReservationSheet: View {
 
     var body: some View {
         NavigationStack {
-            Form {
-                Section("商品") {
-                    LabeledContent("商品", value: product?.name ?? "")
-                    LabeledContent("店家", value: shop?.name ?? "—")
-                    LabeledContent("系列", value: series.map { "\($0.name)\($0.yearMonthText.map { " · \($0)" } ?? "")" } ?? "—")
-                }
-                if showsEntryChoice && !choiceOptions.isEmpty {
-                    // 加入方式选择段（2026-09-24 需求）：候选与默认选中都按阶段策略取 ——
-                    //   · 预约中 / 预约已结束 / 尾款中：定金+尾款 / 预约价全款
-                    //   · 现货阶段：仅全款，两个价格口径（预约价 / 现货价）
-                    // 用户**必须在此选定**，下方金额预览与确认按钮随所选口径实时联动 ——
-                    // 不存在静默默认路径
-                    Section(phase == .inStock ? "全款计价方式" : "加入方式") {
-                        ForEach(choiceOptions, id: \.self) { candidate in
-                            entryChoiceRow(
-                                option: candidate,
-                                isSelected: selectedOption == candidate
-                            ) { selectedOption = candidate }
-                        }
-                    }
-                }
-                if !store.colors(forProduct: productID).isEmpty {
-                    Section("配色") {
-                        chipGrid(store.colors(forProduct: productID), selection: $selectedColor)
-                    }
-                }
-                if !sizeRun.isEmpty {
-                    Section("尺码") {
-                        chipGrid(sizeRun, selection: $selectedSize)
-                    }
-                }
-                Section("金额（自动读取，无需填写）") {
-                    if hasReservationPrice {
-                        LabeledContent("预约价", value: ShopCatalogFormat.price(reservationPrice))
-                        LabeledContent("已付定金", value: ShopCatalogFormat.price(backendDeposit))
-                    }
-                    // 现货价行：现货阶段的第二个价格口径要靠它对比（没有就不显示，避免空行）
-                    if hasStockPrice {
-                        LabeledContent("现货价", value: ShopCatalogFormat.price(stockPrice))
-                    }
-                    LabeledContent("待付尾款", value: ShopCatalogFormat.price(pendingBalance))
-                        .foregroundStyle(isFullPaid ? themeManager.secondaryTextColor : themeManager.accentTextColor)
-                    LabeledContent(isFullPaid ? "本次入橱（全款·\(fullPaymentBasisText)）" : "本次入橱（已付定）",
-                                   value: ShopCatalogFormat.price(entryAmount))
-                        .foregroundStyle(themeManager.accentTextColor)
-                    // 全款口径不生成任何尾款任务，因此也不提供尾款时间设置
-                    if !isFullPaid {
-                        Toggle("已公布尾款时间", isOn: $hasTailDate.animation())
-                        if hasTailDate {
-                            DatePicker("尾款时间", selection: $tailDate, displayedComponents: .date)
-                        }
-                    }
-                }
-                Section {
-                    Button {
-                        confirmEntry()
-                    } label: {
-                        Text(isFullPaid ? "确认全款入橱（已全款）" : "确认定金入橱（已付定）")
-                            .frame(maxWidth: .infinity)
-                            .font(.system(size: 15, weight: .semibold))
-                            .foregroundStyle(.white)
-                    }
-                    .listRowBackground(Color.pink)
-                    if let errorText {
-                        Text(errorText)
-                            .font(.system(size: 12))
-                            .foregroundStyle(.red)
-                    }
-                } footer: {
-                    Text(isFullPaid
-                         ? "全款入橱：按后台\(fullPaymentBasisText)一次记清，衣橱记为「已全款」，**不会**生成任何心愿尾款任务。"
-                         : "定金入橱：按后台已付定金记账，尾款自动进入心愿尾款等你补款。")
-                }
-            }
+            confirmationForm
             .disabled(isSavingToWardrobe)
             .overlay {
                 if isSavingToWardrobe {
@@ -1495,15 +1459,104 @@ struct ShopCatalogReservationSheet: View {
                 store.loadFromBundleIfNeeded()
                 // 默认选中 = 外部按「阶段化默认口径」传入的选项（预约中 → 心愿尾款；
                 // 预约已结束 → 全款预约）；选择段内用户可随时切换
-                selectedOption = option
-                if let end = archive.reservation?.endAt {
-                    hasTailDate = true
-                    tailDate = end
+                if !didInitializeEntryOption {
+                    selectedOption = option
+                    didInitializeEntryOption = true
                 }
             }
+            .onChange(of: selectedReservationBatchID) { _, _ in hasTailDate = false }
         }
         .interactiveDismissDisabled(isSavingToWardrobe)
         .presentationDetents([.medium, .large])
+    }
+
+    private var confirmationForm: some View {
+        Form {
+            Section("商品") {
+                LabeledContent("商品", value: product?.name ?? "")
+                LabeledContent("店家", value: shop?.name ?? "—")
+                LabeledContent("系列", value: series.map { "\($0.name)\($0.yearMonthText.map { " · \($0)" } ?? "")" } ?? "—")
+            }
+            if let series, !(series.reservationBatches ?? []).isEmpty {
+                Section("购买批次") {
+                    ShopCatalogPurchaseBatchPicker(series: series, selectedID: Binding(
+                        get: { purchaseBatchSelection.selectedIDs[series.id] },
+                        set: { purchaseBatchSelection.selectedIDs[series.id] = $0 }))
+                }
+            }
+            if showsEntryChoice && !choiceOptions.isEmpty {
+                // 加入方式选择段（2026-09-24 需求）：候选与默认选中都按阶段策略取 ——
+                //   · 预约中 / 预约已结束 / 尾款中：定金+尾款 / 预约价全款
+                //   · 现货阶段：仅全款，两个价格口径（预约价 / 现货价）
+                // 用户**必须在此选定**，下方金额预览与确认按钮随所选口径实时联动 ——
+                // 不存在静默默认路径
+                Section(entryPhase == .inStock ? "全款计价方式" : "加入方式") {
+                    ForEach(choiceOptions, id: \.self) { candidate in
+                        entryChoiceRow(
+                            option: candidate,
+                            isSelected: effectiveOption == candidate
+                        ) { selectedOption = candidate }
+                    }
+                }
+            }
+            if !store.colors(forProduct: productID).isEmpty {
+                Section("配色") {
+                    chipGrid(store.colors(forProduct: productID), selection: $selectedColor)
+                }
+            }
+            if !sizeRun.isEmpty {
+                Section("尺码") {
+                    chipGrid(sizeRun, selection: $selectedSize)
+                }
+            }
+            Section("金额（自动读取，无需填写）") {
+                if hasReservationPrice {
+                    LabeledContent("预约价", value: ShopCatalogFormat.price(reservationPrice))
+                    LabeledContent("已付定金", value: ShopCatalogFormat.price(backendDeposit))
+                }
+                // 现货价行：现货阶段的第二个价格口径要靠它对比（没有就不显示，避免空行）
+                if hasStockPrice {
+                    LabeledContent("现货价", value: ShopCatalogFormat.price(stockPrice))
+                }
+                LabeledContent("待付尾款", value: ShopCatalogFormat.price(pendingBalance))
+                    .foregroundStyle(isFullPaid ? themeManager.secondaryTextColor : themeManager.accentTextColor)
+                LabeledContent(isFullPaid ? "本次入橱（全款·\(fullPaymentBasisText)）" : "本次入橱（已付定）",
+                               value: ShopCatalogFormat.price(entryAmount))
+                    .foregroundStyle(themeManager.accentTextColor)
+                // 全款口径不生成任何尾款任务，因此也不提供尾款时间设置
+                if !isFullPaid, (series?.reservationBatches ?? []).isEmpty, declaredTailWindow == nil {
+                    Toggle("自行设置尾款时间", isOn: $hasTailDate.animation())
+                    if hasTailDate {
+                        DatePicker("尾款时间", selection: $tailDate, displayedComponents: .date)
+                    }
+                }
+            }
+            Section("备注（选填）") {
+                TextField("写下你想记录的内容", text: $userNote, axis: .vertical)
+            }
+            Section {
+                Button {
+                    confirmEntry()
+                } label: {
+                    Text(isFullPaid ? "确认全款入橱（已全款）" : "确认定金入橱（已付定）")
+                        .frame(maxWidth: .infinity)
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(.white)
+                }
+                .listRowBackground(Color.pink)
+                .disabled(isSavingToWardrobe || needsPurchaseBatchSelection)
+                .accessibilityIdentifier("catalog.wardrobe.confirm")
+                if let errorText {
+                    Text(errorText)
+                        .font(.system(size: 12))
+                        .foregroundStyle(.red)
+                }
+            } footer: {
+                Text(isFullPaid
+                     ? "全款入橱：按后台\(fullPaymentBasisText)一次记清，衣橱记为「已全款」，**不会**生成任何心愿尾款任务。"
+                     : "定金入橱：按后台已付定金记账，尾款自动进入心愿尾款等你补款。")
+            }
+        }
     }
 
     private func chipGrid(_ values: [String], selection: Binding<String?>) -> some View {
@@ -1537,7 +1590,7 @@ struct ShopCatalogReservationSheet: View {
                     .foregroundStyle(isSelected ? Color.pink : Color.secondary)
                     .padding(.top, 1)
                 VStack(alignment: .leading, spacing: 3) {
-                    Text(ShopCatalogWardrobeEntryPolicy.choiceTitle(for: option, phase: phase))
+                    Text(ShopCatalogWardrobeEntryPolicy.choiceTitle(for: option, phase: entryPhase))
                         .font(.system(size: 14, weight: isSelected ? .semibold : .regular))
                         .foregroundStyle(themeManager.primaryTextColor)
                     Text(ShopCatalogWardrobeEntryPolicy.choiceCaption(for: option))
@@ -1551,7 +1604,7 @@ struct ShopCatalogReservationSheet: View {
     }
 
     private func confirmEntry() {
-        guard !isSavingToWardrobe else { return }
+        guard !isSavingToWardrobe, !needsPurchaseBatchSelection else { return }
         isSavingToWardrobe = true
         Task { @MainActor in
             defer { isSavingToWardrobe = false }
@@ -1561,6 +1614,10 @@ struct ShopCatalogReservationSheet: View {
 
     private func performConfirmEntry() async {
         guard effectiveOption != .wishlist else { return }
+        if needsPurchaseBatchSelection {
+            errorText = "请选择购买的团次或批次"
+            return
+        }
         // 取数校验按**所选口径**判：现货价全款只要求有现货价，其余口径要求有预约价
         let requiredPrice = effectiveOption == .fullStockPaid ? stockPrice : reservationPrice
         guard requiredPrice > 0 else {
@@ -1577,7 +1634,9 @@ struct ShopCatalogReservationSheet: View {
             productID: productID,
             color: selectedColor,
             size: selectedSize,
-            priceMode: priceMode
+            priceMode: priceMode,
+            reservationBatchID: selectedReservationBatchID,
+            hasCustomFinalPaymentDate: !isFullPaid && hasTailDate && declaredTailWindow == nil
         )
         guard var draft = ShopCatalogWardrobeDraftBuilder.makeDraft(
             selection: selection,
@@ -1588,9 +1647,10 @@ struct ShopCatalogReservationSheet: View {
         }
         // §17：尾款时间可设置；未设置 = 待公布（沿用草稿里的占位）。
         // 全款口径没有尾款任务，不写尾款时间。
-        if !isFullPaid, hasTailDate {
+        if !isFullPaid, hasTailDate, declaredTailWindow == nil {
             draft = draft.with(finalPaymentDate: tailDate, finalPaymentEndDate: tailDate)
         }
+        draft = draft.with(note: userNote)
         do {
             _ = try await ShopCatalogWardrobeAddition.add(
                 draft: draft,

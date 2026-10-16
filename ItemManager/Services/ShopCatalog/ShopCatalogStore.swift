@@ -304,6 +304,25 @@ final class ShopCatalogStore: ObservableObject {
         catalog?.series.first { $0.id == id && Self.isLive($0.archivedAt) }
     }
 
+    /// 用户购买、入橱和尾款同步使用已发布的档期；本机运营副本继续留给编辑器。
+    /// 旧整包导入可能复制了整个系列，没有编辑团次也会遮住后来发布的配置。
+    /// 这里只替换购买档期，不写覆盖层，也不覆盖本机图片、名称或价格表编辑。
+    func seriesForPurchase(id: String) -> CatalogSeries? {
+        guard var result = series(id: id) else { return nil }
+        guard let published = remoteCatalog?.series.first(where: { $0.id == id }) else { return result }
+        guard Self.isLive(published.archivedAt) else { return nil }
+        result.salePhase = published.salePhase
+        result.reservationStartAt = published.reservationStartAt
+        result.reservationEndAt = published.reservationEndAt
+        result.balanceDueKind = published.balanceDueKind
+        result.balanceDueText = published.balanceDueText
+        result.balanceDueEndText = published.balanceDueEndText
+        result.balanceDueAt = published.balanceDueAt
+        result.balanceDueEndAt = published.balanceDueEndAt
+        result.reservationBatches = published.reservationBatches
+        return result
+    }
+
     /// 店家的全部系列，按年份倒序（无年份的排最后；排除已归档系列）
     func series(inShop shopID: String) -> [CatalogSeries] {
         guard let catalog else { return [] }

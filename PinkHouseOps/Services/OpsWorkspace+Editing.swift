@@ -663,33 +663,42 @@ extension OpsWorkspace {
         balanceDueKind: CatalogBalanceDueKind?,
         balanceDueText: String?,
         balanceDueAt: Date?,
-        balanceDueEndAt: Date?
+        balanceDueEndAt: Date?,
+        reservationBatches: [CatalogReservationBatch]? = nil
     ) -> Bool {
         guard canMutate() else { return false }
         guard let index = catalog.series.firstIndex(where: { $0.id == id }) else {
             lastError = "找不到系列 \(id)。"
             return false
         }
+        if let batches = reservationBatches,
+           let error = CatalogReservationBatch.validationError(in: batches) {
+            lastError = error
+            return false
+        }
+        let batches = reservationBatches ?? catalog.series[index].reservationBatches ?? []
+        let hasBatches = !batches.isEmpty
         if let start = reservationStartAt, let end = reservationEndAt, start > end {
             lastError = "预约开始时间不能晚于预约结束时间。"
             return false
         }
-        if let start = balanceDueAt, let end = balanceDueEndAt, start > end {
+        if !hasBatches, let start = balanceDueAt, let end = balanceDueEndAt, start > end {
             lastError = "尾款开始时间不能晚于尾款结束时间。"
             return false
         }
         // 「预约中」必须有结束时间：它是自动流转的唯一依据。
         // 没有它，系列会在预约期结束后一直显示「预约中」—— 用户端还能付定金。
-        if phase == .reservationActive, reservationEndAt == nil {
+        if phase == .reservationActive, reservationEndAt == nil,
+           !(hasBatches && batches.allSatisfy { $0.reservationEndAt != nil }) {
             lastError = "声明「预约中」必须填预约结束时间 —— 自动流转靠它，"
                 + "缺了它系列会一直停在预约中。"
             return false
         }
-        if balanceDueKind == .exact, balanceDueAt == nil {
+        if !hasBatches, balanceDueKind == .exact, balanceDueAt == nil {
             lastError = "尾款时间选了「具体时间」，请填上时间（或改回「大致时间」）。"
             return false
         }
-        if balanceDueKind == .approximate, (balanceDueText?.isEmpty ?? true) {
+        if !hasBatches, balanceDueKind == .approximate, (balanceDueText?.isEmpty ?? true) {
             lastError = "尾款时间选了「大致时间」，请写上描述（如「大货到后 1 个月」）。"
             return false
         }
@@ -703,6 +712,10 @@ extension OpsWorkspace {
             balanceDueKind == .approximate ? normalized(balanceDueText) : nil
         catalog.series[index].balanceDueAt = balanceDueKind == .exact ? balanceDueAt : nil
         catalog.series[index].balanceDueEndAt = balanceDueKind == .exact ? balanceDueEndAt : nil
+        if let reservationBatches {
+            catalog.series[index].reservationBatches = reservationBatches.isEmpty
+                ? nil : reservationBatches.map(\.normalized)
+        }
         markDirty()
         statusMessage = "已更新系列发售阶段（草稿未保存）。注意：这里**不碰任何价格**。"
         return true

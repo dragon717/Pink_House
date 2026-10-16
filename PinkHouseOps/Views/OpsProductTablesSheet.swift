@@ -138,8 +138,7 @@ private struct OpsTableImage: View {
            let image = NSImage(contentsOf: url) {
             Image(nsImage: image).resizable().scaledToFit()
                 .frame(maxWidth: .infinity, maxHeight: 300)
-                .onTapGesture { NSWorkspace.shared.open(url) }
-                .help("点击查看原图")
+                .opsImagePreview(url: url)
         } else {
             Label("已关联原图，本机尚未下载图片；同步完成后可查看。", systemImage: "photo")
                 .font(.caption).foregroundStyle(.secondary)

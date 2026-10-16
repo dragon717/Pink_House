@@ -211,7 +211,10 @@ nonisolated enum CatalogSeriesBalanceDue {
 
     /// `CatalogSeries` 便捷入口（视图/服务层统一读这里，别自己写 `if now > at`）
     static func isDue(of series: CatalogSeries, now: Date) -> Bool {
-        isDue(kind: series.balanceDueKind, at: series.balanceDueAt, now: now)
+        if let batches = series.reservationBatches, !batches.isEmpty {
+            return batches.contains { isDue(kind: $0.balanceDueKind, at: $0.balanceDueAt, now: now) }
+        }
+        return isDue(kind: series.balanceDueKind, at: series.balanceDueAt, now: now)
     }
 
     /// 尾款期是否**已经过了声明的结束时间**。
@@ -226,7 +229,10 @@ nonisolated enum CatalogSeriesBalanceDue {
 
     /// `CatalogSeries` 便捷入口
     static func isEnded(of series: CatalogSeries, now: Date) -> Bool {
-        isEnded(kind: series.balanceDueKind, at: series.balanceDueEndAt, now: now)
+        if let batches = series.reservationBatches, !batches.isEmpty {
+            return batches.allSatisfy { isEnded(kind: $0.balanceDueKind, at: $0.balanceDueEndAt, now: now) }
+        }
+        return isEnded(kind: series.balanceDueKind, at: series.balanceDueEndAt, now: now)
     }
 
     /// 是否填过尾款期（大致或具体都算「填过」——用于列表上的展示判定）
@@ -310,7 +316,16 @@ extension CatalogSeriesBalanceDue {
 
     /// 值文本（用 App 当前 locale）
     static func valueText(of series: CatalogSeries) -> String? {
-        valueText(kind: series.balanceDueKind,
+        if let batches = series.reservationBatches, !batches.isEmpty {
+            return batches.map { batch in
+                let value = valueText(kind: batch.balanceDueKind,
+                    text: batch.balanceDueText, endText: batch.balanceDueEndText,
+                    at: batch.balanceDueAt, endAt: batch.balanceDueEndAt,
+                    locale: LanguageManager.shared.locale) ?? "待公布"
+                return "\(batch.name)：\(value)"
+            }.joined(separator: "；")
+        }
+        return valueText(kind: series.balanceDueKind,
                   text: series.balanceDueText,
                   endText: series.balanceDueEndText,
                   at: series.balanceDueAt,
@@ -320,7 +335,10 @@ extension CatalogSeriesBalanceDue {
 
     /// 是否声明了结束时间（`CatalogSeries` 便捷入口）
     static func hasDeclaredEnd(of series: CatalogSeries) -> Bool {
-        hasDeclaredEnd(endText: series.balanceDueEndText, at: series.balanceDueEndAt)
+        if let batches = series.reservationBatches, !batches.isEmpty {
+            return batches.contains { hasDeclaredEnd(endText: $0.balanceDueEndText, at: $0.balanceDueEndAt) }
+        }
+        return hasDeclaredEnd(endText: series.balanceDueEndText, at: series.balanceDueEndAt)
     }
 
     /// 「尾款时间：xxx」/「尾款期：起 — 止」整行文案；未填 → `nil`。

@@ -26,8 +26,7 @@ struct ClothingDetailView: View {
     @State private var showingShareSheet = false
     
     // 表图大图查看状态
-    @State private var showingChartImageViewer = false
-    @State private var chartImagePathToView: String? = nil
+    @State private var chartImagePreview: ChartImagePreview?
 
     @AppStorage("isPayBalanceCelebrationEnabled") private var isPayBalanceCelebrationEnabled = false
 
@@ -206,8 +205,8 @@ struct ClothingDetailView: View {
                 ImageViewer(imagePaths: clothing.imagePaths, selectedIndex: $currentImageIndex)
             }
         }
-        .sheet(isPresented: $showingChartImageViewer) {
-            chartImageViewerSheet
+        .sheet(item: $chartImagePreview) { preview in
+            ChartImageViewer(preview: preview, onDismiss: { chartImagePreview = nil })
                 .presentationBackground(.black)
                 .ignoresSafeArea()
         }
@@ -754,8 +753,7 @@ struct ClothingDetailView: View {
                         .stroke(Color.gray.opacity(0.3), lineWidth: 1)
                 )
                 .onTapGesture {
-                    chartImagePathToView = path
-                    showingChartImageViewer = true
+                    chartImagePreview = ChartImagePreview(imagePath: path, image: image)
                 }
         }
     }
@@ -833,9 +831,7 @@ struct ClothingDetailView: View {
                                 .stroke(Color.gray.opacity(0.3), lineWidth: 1)
                         )
                         .onTapGesture {
-                            // 点击查看大图
-                            chartImagePathToView = path
-                            showingChartImageViewer = true
+                            chartImagePreview = ChartImagePreview(imagePath: path, image: image)
                         }
                 }
             }
@@ -962,18 +958,6 @@ struct ClothingDetailView: View {
         .themeSkinSectionCard(cornerRadius: 16)
     }
     
-    /// 表图大图查看 Sheet
-    private var chartImageViewerSheet: some View {
-        // 使用 Group 确保视图立即创建，避免 if let 导致的延迟
-        Group {
-            if let path = chartImagePathToView {
-                ChartImageViewer(imagePath: path, onDismiss: { showingChartImageViewer = false })
-            } else {
-                Color.black
-            }
-        }
-    }
-
     private var fullPaymentReservationStatusLabel: some View {
         HStack(spacing: 8) {
             Image(systemName: "shippingbox.fill")

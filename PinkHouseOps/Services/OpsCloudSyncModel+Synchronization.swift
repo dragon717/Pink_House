@@ -60,6 +60,10 @@ extension OpsCloudSyncModel {
                     mergeFailed = workspace.lastError ?? "下载内容无法合并"
                     return .init(.blocked, "合并预处理受阻，尚未尝试上传：\(mergeFailed!)")
                 }
+                let ancestor = workspace.draft?.mergeBaseline(environment: environment)
+                self.appendOperationLog("字段比较基线：\(environment)，发布号 \(ancestor?.head.releaseSeq.map(String.init) ?? "未知")，"
+                    + (ancestor == nil ? "没有共同内容快照" : ancestor?.knownFields == nil ? "完整共同快照" : "按已确认实体/字段比较")
+                    + "；字段冲突 \(preview.conflicts.count) 项。")
                 let baseline = ShopCatalogBaseline(releaseSeq: pulled.releaseSeq,
                     rootIndexHash: pulled.rootIndexHash, environment: environment, observedAt: pulled.pulledAt)
                 // 暂留争议字段的本地值且不推进共同基线，保证下次仍能看到未确认冲突。
@@ -70,7 +74,7 @@ extension OpsCloudSyncModel {
                 }
                 let issues = mediaIssues + self.uploadIssues(workspace: workspace) + preview.conflicts.map {
                     OpsSyncIssue(id: "conflict-\($0)", step: .upload, owner: $0,
-                                 message: "双方都修改了此字段，暂保留本地值；请核对双方修改后再发布")
+                                 message: workspace.mergeConflictReason(path: $0, environment: environment))
                 }
                 if !issues.isEmpty {
                     return .init(.blocked, "上传前待修复 \(issues.count) 项，尚未发送发布请求；下载内容已保留", issues: issues)

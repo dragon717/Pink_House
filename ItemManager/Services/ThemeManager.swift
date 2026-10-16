@@ -552,6 +552,14 @@ class ThemeManager {
     var backgroundColor: Color {
         Color(hex: backgroundColorHex)
     }
+
+    /// 图片降低不透明度时透出中性底色，避免混入纯色背景的主题色。
+    func backgroundBaseColor(for colorScheme: ColorScheme) -> Color {
+        guard effectiveBackgroundStyle == .image, backgroundImage != nil else {
+            return backgroundColor
+        }
+        return colorScheme == .dark ? .black : .white
+    }
     
     func getOriginalImageURL() -> URL? {
         return originalImageURL

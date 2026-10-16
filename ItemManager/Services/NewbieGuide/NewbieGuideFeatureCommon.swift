@@ -702,7 +702,7 @@ extension FeatureExperienceGuideOverlay {
         case .ootd:
             return "在菜单里选择「手动创建」或「批量导入」任一方式，先把裙子准备好，后面就能解锁穿搭手帐。"
         case .ootdDefaultBook:
-            return "在菜单里选择「手动创建」或「批量导入」任一方式，先准备几件裙子，魔法贴纸体验会更完整。"
+            return "在菜单里选择「手动创建」或「批量导入」任一方式，先准备几件裙子，DIY搭配体验会更完整。"
         case .calendar:
             return "在菜单里选择「手动创建」或「批量导入」任一方式，先录入裙子，梦裙日历才会有内容。"
         case .spaceBook:

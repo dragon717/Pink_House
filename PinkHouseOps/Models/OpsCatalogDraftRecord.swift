@@ -31,6 +31,7 @@
 
 import Foundation
 import SwiftData
+import PinkHouseOpsCore
 
 @Model
 final class OpsCatalogDraftRecord {
@@ -93,6 +94,8 @@ final class OpsCatalogDraftRecord {
     /// ⚠️ 没有这个快照（从未发布过）时，作用域按「整份目录」算 —— 这些内容
     /// 本来就是要首次发出去的，严格是对的。
     var baselineCatalogJSON: Data?
+    /// 环境各自的共同祖先与局部字段知识；可空列兼容旧草稿。
+    var environmentBaselinesJSON: Data?
 
     // MARK: 最近成功发布（列表标签「已上线 / 线上待回读」的数据来源）
 
@@ -109,6 +112,10 @@ final class OpsCatalogDraftRecord {
     var catalogSyncEnvironment: String?
     var catalogSyncAttemptedID: String?
     var catalogSyncError: String?
+    /// 系列配置保存同时更新两种环境；冻结字段与分环境回执随草稿恢复。
+    var catalogSyncSeriesUpdatesJSON: Data?
+    var catalogSyncSeriesReceiptsJSON: Data?
+    var catalogSyncFullCatalogAfterSeries: Bool?
 
     // MARK: 工作台恢复
 
@@ -190,6 +197,31 @@ final class OpsCatalogDraftRecord {
         }
     }
 
+    var environmentBaselines: [String: OpsCatalogMergeBaseline] {
+        get {
+            guard let environmentBaselinesJSON else { return [:] }
+            return (try? ShopCatalogJSONCoding.decoder().decode(
+                [String: OpsCatalogMergeBaseline].self, from: environmentBaselinesJSON)) ?? [:]
+        }
+        set { environmentBaselinesJSON = try? ShopCatalogJSONCoding.encoder().encode(newValue) }
+    }
+
+    func mergeBaseline(environment: String) -> OpsCatalogMergeBaseline? {
+        if let stored = environmentBaselines[environment] { return stored }
+        guard baseline.environment == environment, let catalog = baselineCatalog else { return nil }
+        return .init(head: baseline, catalog: catalog)
+    }
+
+    func setMergeBaseline(_ value: OpsCatalogMergeBaseline, environment: String) {
+        var states = environmentBaselines
+        if let oldEnvironment = baseline.environment, states[oldEnvironment] == nil,
+           let oldCatalog = baselineCatalog {
+            states[oldEnvironment] = .init(head: baseline, catalog: oldCatalog)
+        }
+        states[environment] = value
+        environmentBaselines = states
+    }
+
     /// 是否还有「本地已改但没发布」的内容（商品列表的「本地已改」标签用它）。
     var hasUnpublishedEdits: Bool { currentRevision != (lastPublishedRevision ?? 0) }
 
@@ -221,11 +253,10 @@ final class OpsCatalogDraftRecord {
         lastPublishedRootIndexHash = rootIndexHash
         lastPublishedRevision = revision
         lastPublishedAt = date
+        let confirmedHead = ShopCatalogBaseline(releaseSeq: releaseSeq, rootIndexHash: rootIndexHash,
+            environment: environment, observedAt: date)
+        setMergeBaseline(.init(head: confirmedHead, catalog: catalog), environment: environment)
         baselineCatalog = catalog
-        baseline = ShopCatalogBaseline(
-            releaseSeq: releaseSeq,
-            rootIndexHash: rootIndexHash,
-            environment: environment,
-            observedAt: date)
+        baseline = confirmedHead
     }
 }

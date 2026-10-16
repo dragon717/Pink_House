@@ -52,7 +52,7 @@ struct OutfitStickerFlowView: View {
                 }
                 .padding()
             }
-            .navigationTitle("魔法贴纸")
+            .navigationTitle("DIY搭配")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {

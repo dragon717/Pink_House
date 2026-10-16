@@ -7,11 +7,21 @@
 
 import SwiftUI
 
+/// 路径与首帧图片一起驱动弹窗，避免弹窗先于图片内容出现。
+struct ChartImagePreview: Identifiable {
+    let imagePath: String
+    let image: UIImage?
+
+    var id: String { imagePath }
+}
+
 /// 单张表图大图查看器
 struct ChartImageViewer: View {
-    let imagePath: String
+    let preview: ChartImagePreview
     let onDismiss: () -> Void
-    
+
+    @State private var loadedImage: UIImage?
+    @State private var loadFailed = false
     @State private var isSaving = false
     @State private var saveMessage: String?
     @State private var showSaveAlert = false
@@ -20,8 +30,15 @@ struct ChartImageViewer: View {
         ZStack {
             Color.black.ignoresSafeArea()
             
-            // 直接使用 ZoomableImageView，它会在 updateUIView 时加载图片
-            ZoomableImageView(imagePath: imagePath)
+            if let image = loadedImage ?? preview.image {
+                ZoomableImageView(imagePath: preview.imagePath, preloadedImage: image)
+            } else if loadFailed {
+                Label("无法加载图片".appLocalized, systemImage: "photo")
+                    .foregroundStyle(.white)
+            } else {
+                ProgressView()
+                    .tint(.white)
+            }
             
             // 顶部控制栏
             VStack {
@@ -47,12 +64,21 @@ struct ChartImageViewer: View {
                             .padding(10)
                             .background(Circle().fill(.ultraThinMaterial))
                     }
+                    .disabled(isSaving)
                 }
                 .padding()
                 .padding(.top, 40)
                 
                 Spacer()
             }
+        }
+        .task(id: preview.imagePath) {
+            loadedImage = nil
+            loadFailed = false
+            let image = await ImageManager.shared.loadImageAsync(fileName: preview.imagePath)
+            guard !Task.isCancelled else { return }
+            loadedImage = image
+            loadFailed = image == nil
         }
         .alert("保存结果".appLocalized, isPresented: $showSaveAlert) {
             Button("确定".appLocalized, role: .cancel) { }
@@ -65,7 +91,7 @@ struct ChartImageViewer: View {
         isSaving = true
         
         Task {
-            if let image = await ImageManager.shared.loadImageAsync(fileName: imagePath) {
+            if let image = await ImageManager.shared.loadImageAsync(fileName: preview.imagePath) {
                 let saver = ImageSaver()
                 do {
                     try await saver.saveImage(image)
@@ -83,5 +109,5 @@ struct ChartImageViewer: View {
 }
 
 #Preview {
-    ChartImageViewer(imagePath: "", onDismiss: {})
+    ChartImageViewer(preview: ChartImagePreview(imagePath: "", image: nil), onDismiss: {})
 }

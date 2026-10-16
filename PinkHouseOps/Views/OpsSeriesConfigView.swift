@@ -25,10 +25,119 @@
 //
 
 import SwiftUI
+import AppKit
 import PinkHouseOpsCore
+
+struct OpsReservationBatchEditor: View {
+    @Binding var batches: [CatalogReservationBatch]
+    var reservationEndAt: Date? = nil
+
+    var body: some View {
+        ForEach($batches) { $batch in
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    TextField("团次名称（如先行团、一团）", text: $batch.name)
+                    Button("删除", role: .destructive) { batches.removeAll { $0.id == batch.id } }
+                }
+                Picker("该团尾款期", selection: Binding(
+                    get: { batch.balanceDueKind },
+                    set: {
+                        batch.balanceDueKind = $0
+                        if $0 == .exact, batch.balanceDueAt == nil { batch.balanceDueAt = Date() }
+                    })) {
+                    ForEach(CatalogBalanceDueKind.allCases) { kind in
+                        Text(kind.displayName).tag(Optional(kind))
+                    }
+                    Text("未公布").tag(Optional<CatalogBalanceDueKind>.none)
+                }
+                .pickerStyle(.segmented)
+                if batch.balanceDueKind == .approximate {
+                    TextField("大致尾款时间（如 1月上旬、圣诞节前）", text: Binding(
+                        get: { batch.balanceDueText ?? "" }, set: {
+                            batch.balanceDueText = $0
+                            batch.balanceDueReferenceAt = Date()
+                        }))
+                    TextField("尾款结束 / 时长（选填，如十天、十五天、一个月）", text: Binding(
+                        get: { batch.balanceDueEndText ?? "" }, set: {
+                            batch.balanceDueEndText = $0
+                            if batch.balanceDueReferenceAt == nil { batch.balanceDueReferenceAt = Date() }
+                        }))
+                    if let window = batch.estimatedWindow(anchor: reservationEndAt) {
+                        Text("预计尾款日期：\(window.start, format: .dateTime.year().month().day())")
+                            .font(.callout).foregroundStyle(.secondary)
+                        Text(window.basis).font(.caption).foregroundStyle(.secondary)
+                        if window.end != window.start {
+                            Text("预计结束日期：\(window.end, format: .dateTime.year().month().day())")
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
+                    }
+                    OpsFootnote(text: "结束可填十天、十五天、一个月，从预计尾款开始日推算；一个月按日历月计算。月份和旬取中间日：上旬5日、中旬15日、下旬25日。节日前按节日当天提前6天估算；省略年份按录入时间固定，也可写明年份。")
+                } else if batch.balanceDueKind == .exact {
+                    DatePicker("尾款开始", selection: Binding(
+                        get: { batch.balanceDueAt ?? Date() }, set: { batch.balanceDueAt = $0 }))
+                    OpsOptionalDateField(label: "尾款结束（选填）",
+                        isOn: Binding(get: { batch.balanceDueEndAt != nil },
+                                      set: { batch.balanceDueEndAt = $0 ? batch.balanceDueAt : nil }),
+                        date: Binding(get: { batch.balanceDueEndAt ?? batch.balanceDueAt ?? Date() },
+                                      set: { batch.balanceDueEndAt = $0 }))
+                }
+                OpsOptionalDateField(label: "该团预约结束时间（选填）",
+                    isOn: Binding(get: { batch.reservationEndAt != nil },
+                                  set: { batch.reservationEndAt = $0 ? Date() : nil }),
+                    date: Binding(get: { batch.reservationEndAt ?? Date() },
+                                  set: { batch.reservationEndAt = $0 }))
+            }
+            .padding(10)
+            .background(.quaternary, in: RoundedRectangle(cornerRadius: 8))
+        }
+        Button("添加团次", systemImage: "plus") {
+            batches.append(CatalogReservationBatch(name: "", balanceDueKind: .approximate,
+                balanceDueReferenceAt: Date()))
+        }
+    }
+}
+
+struct OpsReservationBatchSummary: View {
+    let batches: [CatalogReservationBatch]
+    var reservationEndAt: Date? = nil
+
+    var body: some View {
+        ForEach(batches) { batch in
+            VStack(alignment: .leading, spacing: 3) {
+                Text(batch.name).font(.callout.weight(.semibold))
+                if let end = batch.reservationEndAt {
+                    Text("预约结束：\(end, format: .dateTime.year().month().day().hour().minute())")
+                }
+                switch batch.balanceDueKind {
+                case .exact:
+                    if let start = batch.balanceDueAt {
+                        Text("尾款开始：\(start, format: .dateTime.year().month().day().hour().minute())")
+                    }
+                    if let end = batch.balanceDueEndAt {
+                        Text("尾款结束：\(end, format: .dateTime.year().month().day().hour().minute())")
+                    }
+                case .approximate:
+                    Text("尾款开始：\(batch.balanceDueText ?? "待公布")")
+                    if let end = batch.balanceDueEndText { Text("尾款结束：\(end)") }
+                    if let window = batch.estimatedWindow(anchor: reservationEndAt) {
+                        Text("预计尾款日期：\(window.start, format: .dateTime.year().month().day())（估算）")
+                        if window.end != window.start {
+                            Text("预计结束日期：\(window.end, format: .dateTime.year().month().day())（估算）")
+                        }
+                        Text(window.basis)
+                    }
+                case .none:
+                    Text("尾款时间待公布")
+                }
+            }
+            .font(.caption)
+        }
+    }
+}
 
 struct SeriesConfigSheet: View {
     @ObservedObject var workspace: OpsWorkspace
+    @ObservedObject private var cloud = OpsCloudSyncModel.shared
     let seriesID: String
     @Environment(\.dismiss) private var dismiss
 
@@ -45,6 +154,7 @@ struct SeriesConfigSheet: View {
     @State private var balanceDueAt = Date()
     @State private var hasBalanceDueEndAt = false
     @State private var balanceDueEndAt = Date()
+    @State private var reservationBatches: [CatalogReservationBatch] = []
     @State private var phaseError: String?
 
     // 封面（§6.2 系列级可编辑）
@@ -82,6 +192,21 @@ struct SeriesConfigSheet: View {
                     Text(message).font(.caption).foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
+                if workspace.canRetrySavedSeriesSync {
+                    HStack {
+                        Button("重试更新开发环境和用户环境") { workspace.retrySavedSeriesSync() }
+                            .disabled(cloud.isRunning || cloud.isSyncing)
+                        if let url = cloud.lastRunLogURL {
+                            Button("打开更新日志") { NSWorkspace.shared.open(url) }
+                        }
+                    }
+                    Text("失败原因见上方；凭证或连接配置可在工具栏齿轮「设置」中检查。重试会先核对已发送请求的结果。")
+                        .font(.caption).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Text("保存后自动更新开发环境和用户环境；以上方两端回读结果为准，无需再次发布。手机端可在时光馆首页下拉刷新。")
+                    .font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
                 OpsFootnote(text: "这里是这一份系列配置的**唯一入口**。保存只写各自负责的字段："
                             + "第一阶段那组**不碰任何价格**，价格表那组**不碰阶段与区间**。")
             }
@@ -132,26 +257,33 @@ struct SeriesConfigSheet: View {
                 date: $reservationEndAt,
                 help: "选填。但声明「预约中」时必须填 —— 缺了它系列会一直停在预约中。")
 
-            Picker("尾款时间粒度", selection: $balanceDueKind) {
-                ForEach(CatalogBalanceDueKind.allCases) { item in
-                    Text(item.displayName).tag(item)
+            if reservationBatches.isEmpty {
+                Picker("尾款时间粒度", selection: $balanceDueKind) {
+                    ForEach(CatalogBalanceDueKind.allCases) { item in
+                        Text(item.displayName).tag(item)
+                    }
+                }
+                .pickerStyle(.segmented)
+                if balanceDueKind == .approximate {
+                    TextField("尾款大致时间（如「大货到后 1 个月」）", text: $balanceDueText)
+                    OpsFootnote(text: "大致时间是**人的描述**，不是时间点：它只展示、**不驱动**自动流转。")
+                } else {
+                    OpsOptionalDateField(
+                        label: "尾款开始时间（**驱动自动流转**）",
+                        isOn: $hasBalanceDueAt,
+                        date: $balanceDueAt,
+                        help: "选了「具体时间」就必须填")
+                    OpsOptionalDateField(
+                        label: "尾款结束时间（选填）",
+                        isOn: $hasBalanceDueEndAt,
+                        date: $balanceDueEndAt)
                 }
             }
-            .pickerStyle(.segmented)
-            if balanceDueKind == .approximate {
-                TextField("尾款大致时间（如「大货到后 1 个月」）", text: $balanceDueText)
-                OpsFootnote(text: "大致时间是**人的描述**，不是时间点：它只展示、**不驱动**自动流转。")
-            } else {
-                OpsOptionalDateField(
-                    label: "尾款开始时间（**驱动自动流转**）",
-                    isOn: $hasBalanceDueAt,
-                    date: $balanceDueAt,
-                    help: "选了「具体时间」就必须填")
-                OpsOptionalDateField(
-                    label: "尾款结束时间（选填）",
-                    isOn: $hasBalanceDueEndAt,
-                    date: $balanceDueEndAt)
-            }
+            Divider()
+            Text("预约团次与尾款时间").font(.subheadline.weight(.semibold))
+            OpsReservationBatchEditor(batches: $reservationBatches,
+                reservationEndAt: hasReservationEnd ? reservationEndAt : nil)
+            OpsFootnote(text: "按实际团数添加先行团、一团、二团等。每团单独填写尾款时间，入橱按所选团次确定日期。")
             if let phaseError {
                 Label(phaseError, systemImage: "exclamationmark.triangle.fill")
                     .font(.caption).foregroundStyle(.orange)
@@ -171,12 +303,17 @@ struct SeriesConfigSheet: View {
 
     private func saveSalePhase() {
         phaseError = nil
-        if declaresPhase, phase == .reservationActive, !hasReservationEnd {
+        if declaresPhase, phase == .reservationActive, !hasReservationEnd,
+           !( !reservationBatches.isEmpty && reservationBatches.allSatisfy { $0.reservationEndAt != nil }) {
             phaseError = "声明「预约中」必须填预约结束时间 —— 自动流转靠它。"
             return
         }
-        if balanceDueKind == .exact, hasBalanceDueEndAt, !hasBalanceDueAt {
+        if reservationBatches.isEmpty, balanceDueKind == .exact, hasBalanceDueEndAt, !hasBalanceDueAt {
             phaseError = "尾款时间选了「具体时间」，请填上时间。"
+            return
+        }
+        if let error = CatalogReservationBatch.validationError(in: reservationBatches) {
+            phaseError = error
             return
         }
         let input = OpsSeriesSalePhaseInput(
@@ -194,7 +331,8 @@ struct SeriesConfigSheet: View {
             balanceDueKind: input.balanceDueKind,
             balanceDueText: input.balanceDueText,
             balanceDueAt: input.balanceDueAt,
-            balanceDueEndAt: input.balanceDueEndAt) && workspace.saveCatalogEditorChanges()
+            balanceDueEndAt: input.balanceDueEndAt,
+            reservationBatches: reservationBatches) && workspace.saveCatalogEditorChanges(seriesID: seriesID, fields: [.schedule])
         if !ok { phaseError = workspace.statusText ?? "保存失败，请看上方的提示。" }
     }
 
@@ -204,7 +342,7 @@ struct SeriesConfigSheet: View {
         VStack(alignment: .leading, spacing: 8) {
             Text("系列封面").font(.subheadline.weight(.semibold))
             HStack(spacing: 10) {
-                OpsThumbnail(
+                OpsPreviewableThumbnail(
                     url: workspace.stagedImageURL(forReference: coverAssetID), size: 48)
                 Picker("封面", selection: $coverAssetID) {
                     Text("不指定").tag(String?.none)
@@ -216,7 +354,7 @@ struct SeriesConfigSheet: View {
                 Button("保存封面") {
                     if let coverAssetID,
                        workspace.updateSeriesCover(seriesID: seriesID, assetID: coverAssetID),
-                       workspace.saveCatalogEditorChanges() {
+                       workspace.saveCatalogEditorChanges(seriesID: seriesID, fields: [.cover]) {
                         coverMessage = nil
                     } else if coverAssetID == nil {
                         coverMessage = "请先选择一张图（封面不提供「清除」——要换就换一张）。"
@@ -297,7 +435,7 @@ struct SeriesConfigSheet: View {
                 .controlSize(.small)
                 Button("清空价格表") {
                     guard workspace.clearSeriesPriceChart(seriesID: seriesID),
-                          workspace.saveCatalogEditorChanges() else {
+                          workspace.saveCatalogEditorChanges(seriesID: seriesID, fields: [.priceChart]) else {
                         chartError = workspace.statusText; return
                     }
                     chartUnit = ""
@@ -336,7 +474,7 @@ struct SeriesConfigSheet: View {
             unit: chartUnit,
             columns: parsed.columns,
             rows: parsed.rows,
-            sourceImages: images) && workspace.saveCatalogEditorChanges()
+            sourceImages: images) && workspace.saveCatalogEditorChanges(seriesID: seriesID, fields: [.priceChart])
         if !ok { chartError = workspace.statusText ?? "保存失败，请看上方的提示。" }
     }
 
@@ -408,6 +546,7 @@ struct SeriesConfigSheet: View {
         }
         balanceDueKind = series.balanceDueKind ?? .approximate
         balanceDueText = series.balanceDueText ?? ""
+        reservationBatches = series.reservationBatches ?? []
         coverAssetID = series.cover
         if let at = series.balanceDueAt {
             hasBalanceDueAt = true

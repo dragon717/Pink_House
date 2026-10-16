@@ -609,6 +609,10 @@ struct HomeView: View {
                         filterDescription: getFilterDescription(),
                         onClearFilter: clearAllFilters
                     )
+                    // 为窄边入口留出独立区域，卡片及其点击范围不延伸到入口下方。
+                    .safeAreaInset(edge: .trailing, spacing: 0) {
+                        storageEdgeGesture
+                    }
                     // Force recreation when sortOption changes to ensure proper sorting
                     .id("wardrobe_\(sortOption.id)")
                     .environment(\.isRoutePageActive, isRoutePageActive && selectedTab == .wardrobe)
@@ -643,9 +647,6 @@ struct HomeView: View {
                     transaction.animation = nil
                     transaction.disablesAnimations = true
                 }
-            }
-            .overlay(alignment: .trailing) {
-                storageEdgeGesture
             }
             .onChange(of: viewLayout) { _, _ in
                 RewardManager.shared.triggerReward(type: .firstTimeFeature("ViewLayoutChange"))
@@ -1648,6 +1649,15 @@ struct HomeView: View {
                     Label("调整顺序".appLocalized, systemImage: "list.number")
                 }
             }
+
+            if AppFeatureRegistry.descriptor(for: .magicSticker).isAvailableInUI {
+                Button {
+                    TabNavigationManager.shared.openDIYOutfitFromWardrobe()
+                } label: {
+                    Label("DIY搭配".appLocalized, systemImage: "tshirt.fill")
+                }
+                .accessibilityIdentifier("wardrobe.diyOutfit.menu")
+            }
         }
     }
 
@@ -1666,34 +1676,28 @@ struct HomeView: View {
 
     @ViewBuilder
     private var storageEdgeGesture: some View {
-        if selectedTab == .wardrobe && !showingStorageDrawer && !isInWardrobeEditMode && !isSearchActive {
+        if selectedTab == .wardrobe && !isInWardrobeEditMode && !isSearchActive {
             let palette = WardrobeStoragePalette.themed(themeManager, scheme: colorScheme, contrast: colorSchemeContrast)
             ZStack(alignment: .trailing) {
                 Color.clear
-                    .frame(width: 24).frame(maxHeight: .infinity)
+                    .frame(width: 32).frame(maxHeight: .infinity)
                     .contentShape(Rectangle())
                     .gesture(storageDrawerSwipe)
                     .accessibilityHidden(true)
                 Button(action: openStorageDrawer) {
-                    VStack(spacing: 5) {
-                        HStack(spacing: 3) {
-                            Image(systemName: "chevron.left")
-                                .font(.system(size: 10, weight: .bold))
-                            WardrobeStorageIcon(kind: .wardrobe, size: 28)
-                        }
-                        Text("收纳柜".appLocalized)
-                            .font(.system(size: 12, weight: .semibold))
-                        Text("左滑打开".appLocalized)
-                            .font(.system(size: 10)).foregroundStyle(palette.secondary.color)
+                    HStack(spacing: 2) {
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 8, weight: .bold))
+                        WardrobeStorageIcon(kind: .wardrobe, size: 18)
                     }
                     .foregroundStyle(palette.primary.color)
-                    .padding(.vertical, 12).padding(.leading, 10).padding(.trailing, 6)
-                    .background(palette.label.color, in: UnevenRoundedRectangle(topLeadingRadius: 18, bottomLeadingRadius: 18))
+                    .frame(width: 32, height: 52)
+                    .background(palette.label.color, in: UnevenRoundedRectangle(topLeadingRadius: 12, bottomLeadingRadius: 12))
                     .overlay {
-                        UnevenRoundedRectangle(topLeadingRadius: 18, bottomLeadingRadius: 18)
+                        UnevenRoundedRectangle(topLeadingRadius: 12, bottomLeadingRadius: 12)
                             .strokeBorder(palette.accent.color.opacity(0.32), lineWidth: 1)
                     }
-                    .shadow(color: palette.accent.color.opacity(0.14), radius: 8, x: -3, y: 2)
+                    .shadow(color: palette.accent.color.opacity(0.10), radius: 3, x: 0, y: 1)
                     .environment(\.wardrobeStoragePalette, palette)
                 }
                 .buttonStyle(.plain)
@@ -1702,6 +1706,8 @@ struct HomeView: View {
                 .accessibilityHint("点击或向左滑动打开收纳柜".appLocalized)
                 .accessibilityIdentifier("storage.open.handle")
             }
+            .opacity(showingStorageDrawer ? 0 : 1)
+            .allowsHitTesting(!showingStorageDrawer)
         }
     }
 
@@ -1777,6 +1783,12 @@ struct HomeView: View {
                         action: startWardrobeCustomSortEditing
                     )
                 )
+            }
+
+            if AppFeatureRegistry.descriptor(for: .magicSticker).isAvailableInUI {
+                items.append(.action(title: "DIY搭配", systemImage: "tshirt.fill", action: {
+                    TabNavigationManager.shared.openDIYOutfitFromWardrobe()
+                }))
             }
         }
 

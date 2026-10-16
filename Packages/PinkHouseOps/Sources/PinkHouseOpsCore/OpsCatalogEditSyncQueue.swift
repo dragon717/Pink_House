@@ -52,4 +52,11 @@ public final class OpsCatalogEditSyncQueue {
     }
 
     public func waitUntilIdle() async { await worker?.value }
+
+    /// 显式重试沿用原请求；是否查询冻结结果由发布层决定，队列不生成新请求。
+    public func retryFailedRequest() {
+        guard worker == nil else { return }
+        failedRequest = nil
+        resume()
+    }
 }

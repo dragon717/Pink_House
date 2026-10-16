@@ -1,7 +1,7 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
-/// 图片自身就是上传/替换入口；文件先复制到应用 staging，再保存引用。
+/// 已有 Logo 点击预览，更换使用独立入口；文件先复制到 staging，再保存引用。
 struct OpsShopLogoPicker: View {
     @ObservedObject var workspace: OpsWorkspace
     @Binding var reference: String?
@@ -17,7 +17,7 @@ struct OpsShopLogoPicker: View {
                         reference.flatMap { workspace.asset(for: $0)?.originalURL ?? $0 }),
                     size: 64, title: "点击上传或替换店家 Logo") { importsImage = true }
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("点击图片上传或替换").font(.caption).foregroundStyle(.secondary)
+                    Text(reference == nil ? "点击图片框上传" : "点击图片查看大图").font(.caption).foregroundStyle(.secondary)
                     if reference != nil {
                         Button("清除 Logo") { reference = nil; error = nil }
                             .controlSize(.small)

@@ -240,6 +240,17 @@ struct MainContentView: View {
             guard scenePhase == .active, !ShopCatalogAutoRefresh.isTestHost else { return }
             await ShopCatalogAutoRefresh.shared.runWhileActive()
         }
+        .onReceive(ShopCatalogCloudSyncService.shared.$state) { state in
+            guard !ShopCatalogAutoRefresh.isTestHost else { return }
+            switch state {
+            case .updated, .upToDate: break
+            default: return
+            }
+            let report = ShopCatalogWardrobeBalanceSync.syncIfNeeded(store: .shared, modelContext: modelContext)
+            if report.updatedCount > 0 {
+                Task { await syncDepositNotificationsIfNeeded(reason: "catalog-update") }
+            }
+        }
         .onChange(of: scenePhase) { _, newPhase in
             if newPhase == .background || newPhase == .inactive {
                 Task {

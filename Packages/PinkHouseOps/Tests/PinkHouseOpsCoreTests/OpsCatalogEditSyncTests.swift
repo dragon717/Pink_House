@@ -60,6 +60,22 @@ final class OpsCatalogEditSyncTests: XCTestCase {
         XCTAssertEqual(calls, 1)
     }
 
+    @MainActor func testExplicitRetryKeepsSameRequestAndDoesNotStartAnAutomaticFailureLoop() async {
+        let original = request(1)
+        var pending: OpsCatalogEditSyncQueue.Request? = original
+        var calls: [OpsCatalogEditSyncQueue.Request] = []
+        let queue = OpsCatalogEditSyncQueue(pending: { pending }, isBusy: { false }, publish: {
+            calls.append($0)
+            return calls.count == 1 ? .failed("结果待确认") : .confirmed(24)
+        }, finished: { _, result in if case .confirmed = result { pending = nil } }, debounce: {})
+        queue.resume(); await queue.waitUntilIdle()
+        queue.resume(); await queue.waitUntilIdle()
+        XCTAssertEqual(calls, [original])
+        queue.retryFailedRequest(); await queue.waitUntilIdle()
+        XCTAssertEqual(calls, [original, original])
+        XCTAssertNil(pending)
+    }
+
     @MainActor func testSwitchingDraftDuringDebounceUsesNewOwner() async {
         var pending: OpsCatalogEditSyncQueue.Request? = request(1)
         var owners: [String] = []

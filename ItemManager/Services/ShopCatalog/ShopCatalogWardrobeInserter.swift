@@ -59,6 +59,8 @@ enum ShopCatalogWardrobeDraftBuilder {
         var color: String? = nil
         var size: String? = nil
         var priceMode: PriceMode = .stock
+        var reservationBatchID: String? = nil
+        var hasCustomFinalPaymentDate = false
     }
 
     /// 单件草稿。失败（查不到商品）返回 nil。
@@ -67,12 +69,15 @@ enum ShopCatalogWardrobeDraftBuilder {
         store: ShopCatalogStore
     ) -> ClothingEditDraft? {
         guard let product = store.product(id: selection.productID) else { return nil }
-        let series = store.series(id: product.seriesID)
+        let series = store.seriesForPurchase(id: product.seriesID)
+        let schedule = series?.paymentSchedule(batchID: selection.reservationBatchID)
+        if !(series?.reservationBatches ?? []).isEmpty, schedule == nil {
+            switch selection.priceMode {
+            case .wishlist: break
+            default: return nil
+            }
+        }
         let shop = store.shop(id: product.shopID)
-
-        var noteLines: [String] = []
-        if let series { noteLines.append("系列：\(series.name)") }
-        if let yearMonth = series?.yearMonthText { noteLines.append("年月：\(yearMonth)") }
 
         // 价格口径（计划 §13/§16/§17）：预约 → 定金尾款；心愿 → 全记待付尾款；现货 → 总价。
         var depositAmount: Decimal = 0
@@ -81,9 +86,6 @@ enum ShopCatalogWardrobeDraftBuilder {
         var isDepositPlan = false
         var finalPaymentStart: Date = Date()
         var finalPaymentEnd: Date = Date()
-        var saleEventID: String? = nil
-        /// 全款口径的价格来源（预约价 / 现货价）：只用来在备注里写清「这个全款是按哪个价记的」
-        var fullPriceBasisText: String? = nil
 
         // 币种（R02）：整条记录统一用商品的生效币种，日元不按人民币入库。
         let archive = store.priceArchive(forProduct: product.id)
@@ -106,21 +108,6 @@ enum ShopCatalogWardrobeDraftBuilder {
             )
             totalAmount = event.price
             isDepositPlan = true
-            saleEventID = event.id
-            // 后台三价不自洽时不静默：如实留痕，说明尾款取了哪个数
-            if ShopCatalogWardrobeAmount.isBackendPriceInconsistent(
-                deposit: event.deposit,
-                balance: archive.currentBalance,
-                reservationPrice: event.price
-            ) {
-                let symbol = currency.symbol
-                noteLines.append(
-                    "后台三价不自洽：定金 \(symbol)\(NSDecimalNumber(decimal: event.deposit ?? 0).stringValue)"
-                    + " + 尾款 \(symbol)\(NSDecimalNumber(decimal: archive.currentBalance ?? 0).stringValue)"
-                    + " ≠ 预约价 \(symbol)\(NSDecimalNumber(decimal: event.price).stringValue)"
-                    + "；待补尾款按「录入的尾款」记账"
-                )
-            }
             // 尾款窗口（§17）：预约结束 = 尾款开始；结束未公布 → 待公布（用开始时间占位）
             finalPaymentStart = event.endAt ?? Date()
             finalPaymentEnd = finalPaymentStart
@@ -133,8 +120,6 @@ enum ShopCatalogWardrobeDraftBuilder {
             balanceAmount = 0
             totalAmount = event.price
             isDepositPlan = true
-            saleEventID = event.id
-            fullPriceBasisText = "按预约价"
             finalPaymentStart = event.endAt ?? Date()
             finalPaymentEnd = finalPaymentStart
         case .fullStock:
@@ -147,8 +132,6 @@ enum ShopCatalogWardrobeDraftBuilder {
             balanceAmount = 0
             totalAmount = price
             isDepositPlan = true
-            saleEventID = archive.stock?.id
-            fullPriceBasisText = "按现货价"
             // 现货全款不挂预约窗口：没有「尾款时间」可言，保持默认（不生成任务）
             finalPaymentStart = Date()
             finalPaymentEnd = finalPaymentStart
@@ -159,46 +142,18 @@ enum ShopCatalogWardrobeDraftBuilder {
             isDepositPlan = true
         }
 
-        // 金额与币种一起留痕：个人记录事后要能回答「这笔钱是什么币」
-        if currency.isUnknown {
-            noteLines.append("币种待确认（来源未标注币种；金额按原值记录，未做换算）")
-        } else if currency != .cny {
-            noteLines.append("原始币种：\(currency.displayName)（\(currency.symbol)\(NSDecimalNumber(decimal: totalAmount).stringValue)，未做换算）")
-        }
-
-        if isDepositPlan {
-            let symbol = currency.symbol
-            func money(_ value: Decimal) -> String {
-                "\(symbol)\(NSDecimalNumber(decimal: value).stringValue)"
-            }
-            if balanceAmount == 0 {
-                // 全款：已付清，心愿尾款里不会留下待补任务（需求 N §II）。
-                // 现货阶段的「全款」有两个价格口径，必须写清按哪个价记的，
-                // 否则事后无法从备注分辨这一笔到底按预约价还是现货价入的橱。
-                let basisText = fullPriceBasisText.map { "\($0)，" } ?? ""
-                noteLines.append("价格口径：全款 \(money(totalAmount))（\(basisText)已付清，不生成尾款任务）")
-            } else if depositAmount + balanceAmount == totalAmount {
-                noteLines.append("价格口径：定金 \(money(depositAmount)) + 尾款 \(money(balanceAmount)) = \(money(totalAmount))")
-            } else {
-                // 后台三价不自洽：不能写「A + B = C」这种算不平的等式，
-                // 但也不许偷偷改数——照实写，并点明以哪个为准。
-                noteLines.append("价格口径：定金 \(money(depositAmount)) + 尾款 \(money(balanceAmount))（预约价 \(money(totalAmount))，以后台录入为准）")
-            }
-        }
-
         // 尾款窗口来源（2026-09-25 需求二/三）：运营已声明尾款期 → 用户记录以声明为准；
         // 大致描述（上旬/中旬/中下旬/下旬）→ 以「约一个月」为基准估算成**固定具体日期**
         //（锚点是运营侧事实：系列预约结束时间 → 预约销售记录结束时间，绝不用加购当天）。
         // 窗口解法唯一口径 `CatalogBalanceDueApproximation.declaredWindow`（与同步共用）。
         // 全款（balance == 0）不生成尾款任务，窗口无意义，不在此改。
-        // 完全无声明 → 维持旧行为（预约结束 = 尾款开始；结束未公布用开始时间占位）。
-        if isDepositPlan, balanceAmount > 0, let series {
-            let anchor = series.reservationEndAt ?? archive.reservation?.endAt
-            if let window = CatalogBalanceDueApproximation.declaredWindow(of: series, anchor: anchor),
+        // 备注留给用户，来源说明在确认页展示。完全无声明 → 维持旧行为（预约结束 = 尾款开始；结束未公布用开始时间占位）。
+        if isDepositPlan, balanceAmount > 0, let schedule {
+            let anchor = schedule.reservationEndAt ?? archive.reservation?.endAt
+            if let window = CatalogBalanceDueApproximation.declaredWindow(of: schedule, anchor: anchor),
                window.start != finalPaymentStart || window.end != finalPaymentEnd {
                 finalPaymentStart = window.start
                 finalPaymentEnd = window.end
-                noteLines.append("尾款时间：\(window.basis)，按 \(CatalogSeriesBalanceDue.shortDateText(window.start)) 记录")
             }
         }
 
@@ -246,7 +201,7 @@ enum ShopCatalogWardrobeDraftBuilder {
             reservationKindRawValue: ClothingReservationKind.owned.rawValue,
             finalPaymentDate: finalPaymentStart,
             finalPaymentEndDate: finalPaymentEnd,
-            note: noteLines.joined(separator: "\n"),
+            note: "",
             accessoryList: [],
             sizeChartImagePath: nil
         )
@@ -303,13 +258,6 @@ enum ShopCatalogWardrobeDraftBuilder {
             primaryEntries.isEmpty
                 ? [built.first { $0.product.id == primaryProductID } ?? built[0]] : primaryEntries
 
-        func accessoryPriceLine(_ product: CatalogProduct) -> String {
-            let archive = store.priceArchive(forProduct: product.id)
-            let price = archive.currentStockPrice ?? archive.historicalReservationPrice
-            let symbol = (archive.currentCurrency ?? .unknown).symbol
-            return price.map { "\(symbol)\(NSDecimalNumber(decimal: $0).stringValue)" } ?? "价格未填"
-        }
-
         /// 主衣物的币种：小物只与同币种的主衣物合并计价（§7.5：跨币种不直接合计）
         let headCurrency = entryHeads.first.map {
             store.priceArchive(forProduct: $0.product.id).currentCurrency
@@ -332,13 +280,6 @@ enum ShopCatalogWardrobeDraftBuilder {
                 let archive = store.priceArchive(forProduct: item.product.id)
                 return sum + (archive.currentStockPrice ?? archive.historicalReservationPrice ?? 0)
             }
-            var noteLines = head.draft.note.components(separatedBy: "\n")
-            for item in accessoryEntries {
-                let line = "小物：\(item.product.name)（\(accessoryPriceLine(item.product))）"
-                noteLines.append(isSameCurrencyAsHead(item.product)
-                                 ? line : line + "（币种不同，未计入合计）")
-            }
-
             let accessoryTotalDouble = NSDecimalNumber(decimal: accessoryPriceTotal).doubleValue
             // 预约套装：小物价计入尾款（§24 尾款多件写入）
             let mergedBalance = head.draft.isDepositPlan
@@ -354,8 +295,7 @@ enum ShopCatalogWardrobeDraftBuilder {
                 accessories: names.joined(separator: "、"), // §21 写入现有「小物」栏
                 accessoriesPrice: accessoryTotalDouble,
                 priceTotal: head.draft.priceTotal + accessoryTotalDouble,
-                balance: mergedBalance,
-                note: noteLines.joined(separator: "\n")
+                balance: mergedBalance
             )
             return (draft: merged, selection: head.selection)
         }
@@ -436,9 +376,29 @@ enum ShopCatalogWardrobeInserter {
         store: ShopCatalogStore,
         modelContext: ModelContext
     ) throws -> Clothing {
+        if let selection, selection.priceMode != .wishlist,
+           let product = store.product(id: selection.productID),
+           let series = store.seriesForPurchase(id: product.seriesID),
+           !(series.reservationBatches ?? []).isEmpty,
+           series.reservationBatch(id: selection.reservationBatchID) == nil {
+            throw ShopCatalogWardrobeError.reservationBatchRequired(series.name)
+        }
         let clothing = try TimeHallWardrobeQuickInserter.insert(draft: draft, modelContext: modelContext)
         if let selection, let product = store.product(id: selection.productID) {
             clothing.catalogProductID = product.id
+            clothing.catalogReservationBatchID = store.seriesForPurchase(id: product.seriesID)?
+                .reservationBatch(id: selection.reservationBatchID)?.id
+            // 已分团但该团尚未公布时间：不把预约结束日或加购当天冒充尾款日。
+            if let series = store.seriesForPurchase(id: product.seriesID),
+               !(series.reservationBatches ?? []).isEmpty,
+               !selection.hasCustomFinalPaymentDate,
+               let schedule = series.paymentSchedule(batchID: selection.reservationBatchID),
+               CatalogBalanceDueApproximation.declaredWindow(
+                   of: schedule, anchor: schedule.reservationEndAt
+                       ?? store.priceArchive(forProduct: product.id).reservation?.endAt) == nil {
+                clothing.finalPaymentDate = nil
+                clothing.finalPaymentEndDate = nil
+            }
             if let color = selection.color, let size = selection.size {
                 clothing.catalogVariantID = store.variants(forProduct: product.id).first {
                     $0.color == color && $0.size == size
@@ -549,6 +509,7 @@ enum ShopCatalogWardrobeInserter {
 nonisolated enum ShopCatalogWardrobeError: LocalizedError {
     case emptySelection
     case productNotFound(String)
+    case reservationBatchRequired(String)
     case multiplePrimaries([String])
     /// §23：主衣物（JSK/OP/SK/Blouse）不能被勾为小物
     case primaryMarkedAsAccessory([String])
@@ -559,6 +520,8 @@ nonisolated enum ShopCatalogWardrobeError: LocalizedError {
             return "尚未选择任何商品"
         case .productNotFound(let id):
             return "商品不存在或已被下架（\(id)）"
+        case .reservationBatchRequired(let series):
+            return "请选择「\(series)」的购买团次"
         case .multiplePrimaries(let names):
             // 计划 §23：多主衣物需用户先取消多余主衣物
             return "一次只能加入一件主衣物，当前选中了多件：\(names.joined(separator: "、"))。请取消多余的 JSK/OP/SK/Blouse 后重试。"

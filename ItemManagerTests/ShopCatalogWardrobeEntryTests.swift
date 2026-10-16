@@ -572,7 +572,7 @@ final class ShopCatalogWardrobeEntryTests: XCTestCase {
     }
 
     /// 端到端：后台三价不自洽（定金 128 + 尾款 300 ≠ 预约价 430）时，
-    /// 衣橱待补尾款 = 录入的 300，且备注如实留痕、不写算不平的等式。
+    /// 衣橱待补尾款 = 录入的 300，且不自动填写用户备注。
     func testInconsistentBackendPricesAreRecordedVerbatim() throws {
         let oddStore = ShopCatalogStore(catalog: ShopCatalog(
             products: [
@@ -592,8 +592,7 @@ final class ShopCatalogWardrobeEntryTests: XCTestCase {
         XCTAssertEqual(Decimal(draft.deposit), 128)
         XCTAssertEqual(Decimal(draft.balance), 300, "尾款必须取后台录入值，而不是 430 − 128")
         XCTAssertEqual(Decimal(draft.priceTotal), 430, "入橱金额仍以后台预约价为准")
-        XCTAssertTrue(draft.note.contains("不自洽"), "不自洽必须留痕：\(draft.note)")
-        XCTAssertTrue(draft.note.contains("以后台录入为准"), "要说明取了哪个数：\(draft.note)")
+        XCTAssertEqual(draft.note, "", "备注留给用户填写")
 
         let clothing = try ShopCatalogWardrobeInserter.insert(
             draft: draft, store: oddStore, modelContext: context
@@ -627,8 +626,8 @@ final class ShopCatalogWardrobeEntryTests: XCTestCase {
             XCTAssertTrue(entry.isDepositPlan, "全款口径复用同一套「已付清」存储口径")
             XCTAssertEqual(Decimal(entry.balance), 0, "全款口径都不留尾款")
         }
-        XCTAssertTrue(byReservation.note.contains("按预约价"), byReservation.note)
-        XCTAssertTrue(byStock.note.contains("按现货价"), byStock.note)
+        XCTAssertEqual(byReservation.note, "", "备注留给用户填写")
+        XCTAssertEqual(byStock.note, "", "备注留给用户填写")
 
         // 该商品此刻的购买阶段：预约窗口全关、有现货价 → 现货阶段（详情页据此弹选择弹窗）
         XCTAssertEqual(
@@ -661,7 +660,7 @@ final class ShopCatalogWardrobeEntryTests: XCTestCase {
         XCTAssertEqual(Decimal(draft.priceTotal), 568)
         XCTAssertEqual(Decimal(draft.deposit), 568)
         XCTAssertEqual(Decimal(draft.balance), 0)
-        XCTAssertTrue(draft.note.contains("按现货价"), "备注必须写明价格口径：\(draft.note)")
+        XCTAssertEqual(draft.note, "", "备注留给用户填写")
 
         let clothing = try ShopCatalogWardrobeInserter.insert(
             draft: draft, selection: selection, store: store, modelContext: context)

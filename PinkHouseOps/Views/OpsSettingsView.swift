@@ -40,6 +40,7 @@ struct OpsSettingsView: View {
             }
             Section {
                 DisclosureGroup("导入与数据修复") {
+                    Button("导出发布诊断…") { exportPublicationDiagnostics() }
                     HStack {
                         Button("导入整包…") { chooseAndImport(kind: .bundle) }
                         Button("导入 JSON…") { chooseAndImport(kind: .jsonOnly) }
@@ -78,6 +79,22 @@ struct OpsSettingsView: View {
 
     private func refreshCounters() {
         missingCount = holder.workspace?.missingStagedImages().count ?? 0
+    }
+
+    private func exportPublicationDiagnostics() {
+        guard let workspace = holder.workspace else { return }
+        let panel = NSSavePanel()
+        panel.allowedContentTypes = [.json]
+        panel.nameFieldStringValue = "ops-publication-diagnostics.json"
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        do {
+            try workspace.publicationDiagnostics().write(to: url, options: .atomic)
+            repairFailed = false
+            repairMessage = "已导出发布诊断（目录、基线和下载快照，不含凭证或图片字节）。"
+        } catch {
+            repairFailed = true
+            repairMessage = "导出发布诊断失败：\(error.localizedDescription)"
+        }
     }
 
     private func repairDangling() {

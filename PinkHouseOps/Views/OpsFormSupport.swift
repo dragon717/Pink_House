@@ -176,21 +176,111 @@ struct OpsThumbnail: View {
     }
 }
 
-/// 可点击的图片上传入口：已选图片和空占位框都能打开同一个文件选择器。
+/// 点击时冻结图片及路径，让预览首帧直接显示当前图片。
+struct OpsImagePreviewSource: Identifiable {
+    let id = UUID()
+    let url: URL
+    let image: NSImage?
+
+    init(url: URL) {
+        self.url = url
+        self.image = NSImage(contentsOf: url)
+    }
+}
+
+struct OpsImagePreview: View {
+    let source: OpsImagePreviewSource
+    @Environment(\.dismiss) private var dismiss
+    @State private var zoom: CGFloat = 1
+
+    var body: some View {
+        VStack(spacing: 12) {
+            HStack {
+                Text("图片预览").font(.headline)
+                Text(source.url.lastPathComponent).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                Spacer()
+                Button("关闭") { dismiss() }.keyboardShortcut(.cancelAction)
+            }
+            if let image = source.image {
+                GeometryReader { geometry in
+                    let ratio = min(geometry.size.width / max(image.size.width, 1),
+                                    geometry.size.height / max(image.size.height, 1))
+                    ScrollView([.horizontal, .vertical]) {
+                        Image(nsImage: image).resizable()
+                            .frame(width: image.size.width * ratio * zoom, height: image.size.height * ratio * zoom)
+                            .frame(minWidth: geometry.size.width, minHeight: geometry.size.height)
+                    }
+                }
+                HStack {
+                    Button("适应窗口") { zoom = 1 }
+                    Spacer()
+                    Text("放大")
+                    Slider(value: $zoom, in: 1...4).frame(width: 160)
+                        .accessibilityLabel("图片缩放")
+                    Text("\(Int(zoom * 100))%").monospacedDigit().frame(width: 48)
+                }
+                .controlSize(.small)
+            } else {
+                ContentUnavailableView("无法加载图片", systemImage: "photo",
+                    description: Text("图片可能尚未下载或文件已不可用，请关闭后重新上传或同步。"))
+            }
+        }
+        .padding(16)
+        .frame(width: 840, height: 640)
+        .background(Color(nsColor: .windowBackgroundColor))
+    }
+}
+
+private struct OpsImagePreviewModifier: ViewModifier {
+    let url: URL?
+    @State private var preview: OpsImagePreviewSource?
+
+    func body(content: Content) -> some View {
+        Button {
+            if let url { preview = OpsImagePreviewSource(url: url) }
+        } label: { content.contentShape(Rectangle()) }
+        .buttonStyle(.plain)
+        .disabled(url == nil)
+        .help(url == nil ? "本机尚无可预览的图片" : "点击查看大图")
+        .accessibilityLabel("查看图片")
+        .sheet(item: $preview) { OpsImagePreview(source: $0) }
+    }
+}
+
+extension View {
+    func opsImagePreview(url: URL?) -> some View { modifier(OpsImagePreviewModifier(url: url)) }
+}
+
+struct OpsPreviewableThumbnail: View {
+    let url: URL?
+    var size: CGFloat = 40
+    var body: some View { OpsThumbnail(url: url, size: size).opsImagePreview(url: url) }
+}
+
+/// 空图片点击上传；已有图片点击预览，更换 / 添加由独立按钮触发。
 struct OpsImageUploadThumbnail: View {
     let url: URL?
     var size: CGFloat = 40
     let title: String
+    var actionTitle: String = "更换图片"
     let action: () -> Void
 
     var body: some View {
-        Button(action: action) {
-            OpsThumbnail(url: url, size: size)
-                .contentShape(RoundedRectangle(cornerRadius: size * 0.14))
+        if url != nil {
+            VStack(spacing: 4) {
+                OpsPreviewableThumbnail(url: url, size: size)
+                Button(actionTitle, action: action).buttonStyle(.link).font(.caption)
+                    .help(title)
+            }
+        } else {
+            Button(action: action) {
+                OpsThumbnail(url: nil, size: size)
+                    .contentShape(RoundedRectangle(cornerRadius: size * 0.14))
+            }
+            .buttonStyle(.plain)
+            .help(title)
+            .accessibilityLabel(Text(title))
         }
-        .buttonStyle(.plain)
-        .help(title)
-        .accessibilityLabel(Text(title))
     }
 }
 
