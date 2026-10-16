@@ -54,7 +54,7 @@ struct PinkHouseOpsApp: App {
     }()
 
     var body: some Scene {
-        WindowGroup("Pink House 运营") {
+        WindowGroup("少女心愿运营") {
             OpsRootView()
         }
         .modelContainer(container)
