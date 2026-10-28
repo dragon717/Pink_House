@@ -175,15 +175,16 @@ final class ShopCatalogCloudSyncService: ObservableObject {
             Self.log("发布头 seq=\(header.releaseSeq) schema=\(header.schemaVersion) "
                      + "（本地已装 seq=\(control.installedReleaseSeq)，内存有远端层=\(hasRemoteLayer)）")
 
-            // 3) 序号未变**且**本地确实有远端层 → 零下载。
-            //    序号未变但内存里没有（缓存恢复失败/首次启动）时不能跳过，否则永远装不上。
-            guard header.releaseSeq != control.installedReleaseSeq || !hasRemoteLayer else {
+            // 3) 序号与内容身份都一致，且内存已安装远端层，才允许零下载。
+            // Development / Production 的发布号可能相同；旧缓存未记录根摘要时须补核验。
+            guard header.releaseSeq != control.installedReleaseSeq
+                    || header.rootIndexHash != control.installedRootIndexHash || !hasRemoteLayer else {
                 control.lastCheckedAt = now()
                 ShopCatalogPackCache.saveControl(control)
                 state = header.releaseSeq > 0
                     ? .upToDate(releaseSeq: header.releaseSeq)
                     : .idle
-                Self.log("序号未变且本地已有内容，零下载")
+                Self.log("发布号与根摘要均一致且本地已有内容，零下载")
                 return
             }
 
@@ -205,6 +206,7 @@ final class ShopCatalogCloudSyncService: ObservableObject {
             guard let partition = rootIndex.shopCatalogPartition else {
                 control.lastCheckedAt = now()
                 control.installedReleaseSeq = header.releaseSeq
+                control.installedRootIndexHash = header.rootIndexHash
                 control.installedPayloadHash = nil
                 ShopCatalogPackCache.saveControl(control)
                 store.installRemoteCatalog(nil)
@@ -225,6 +227,7 @@ final class ShopCatalogCloudSyncService: ObservableObject {
                 _ = try ShopCatalogCloudSyncValidator.validatedShopCatalog(
                     header: header, rootIndexData: rootData, packCompressed: cached)
                 control.installedReleaseSeq = header.releaseSeq
+                control.installedRootIndexHash = header.rootIndexHash
                 control.revocationEpoch = max(control.revocationEpoch, header.revocationEpoch)
                 control.lastCheckedAt = now()
                 ShopCatalogPackCache.saveControl(control)
@@ -247,6 +250,7 @@ final class ShopCatalogCloudSyncService: ObservableObject {
             //    顺序反过来会出现「状态说装了、文件不存在」或「文件在、状态没记」
             try ShopCatalogPackCache.installPack(compressed, payloadHash: partition.payloadHash)
             control.installedReleaseSeq = header.releaseSeq
+            control.installedRootIndexHash = header.rootIndexHash
             control.installedPayloadHash = partition.payloadHash
             control.revocationEpoch = max(control.revocationEpoch, header.revocationEpoch)
             control.lastCheckedAt = now()

@@ -552,6 +552,47 @@ final class ShopCatalogCloudSyncTests: XCTestCase {
         }
     }
 
+    func testSameSequenceWithDifferentContentCannotKeepOldWithinCategoryOrder() async throws {
+        let shop = CatalogShop(id: "order-shop", name: "排序店家")
+        let series = CatalogSeries(id: "order-series", shopID: shop.id, name: "排序系列")
+        let old = ShopCatalog(shops: [shop], series: [series], products: [
+            .init(id: "a", shopID: shop.id, seriesID: series.id, name: "第一款 OP", category: "OP", displayOrder: 0),
+            .init(id: "b", shopID: shop.id, seriesID: series.id, name: "第二款 OP", category: "OP", displayOrder: 1)
+        ])
+        var changed = old
+        changed.products[0].displayOrder = 1; changed.products[1].displayOrder = 0
+        let first = try validRelease(seq: 7, catalog: old)
+        let next = try validRelease(seq: 7, catalog: changed)
+        XCTAssertNotEqual(first.header.rootIndexHash, next.header.rootIndexHash)
+        let counter = Counter(); let reader = CountingStubReader(release: first, counter: counter)
+        let store = ShopCatalogStore(baseCatalog: old)
+        let service = ShopCatalogCloudSyncService(reader: reader, store: store)
+        await service.syncIfNeeded(force: true)
+        XCTAssertEqual(store.products(inSeries: series.id).map(\.id), ["a", "b"])
+        reader.header = next.header; reader.rootData = next.rootData; reader.pack = next.pack
+        await service.syncIfNeeded(force: true)
+        XCTAssertEqual(counter.packReads, 2, "发布号属于各环境各自的计数；内容摘要变化必须取新包")
+        XCTAssertEqual(store.products(inSeries: series.id).map(\.id), ["b", "a"])
+        XCTAssertEqual(ShopCatalogPackCache.loadControl().installedRootIndexHash, next.header.rootIndexHash)
+        await service.syncIfNeeded(force: true)
+        XCTAssertEqual(counter.packReads, 2, "内容身份不变时仍然零重复下载")
+    }
+
+    func testLegacyControlWithoutRootHashRevalidatesCachedOrderWithoutRedownloading() async throws {
+        let release = try validRelease(seq: 7, catalog: makeRemoteCatalog())
+        let hash = ShopCatalogSyncProtocol.sha256Hex(release.pack)
+        try ShopCatalogPackCache.installPack(release.pack, payloadHash: hash)
+        ShopCatalogPackCache.saveControl(.init(installedReleaseSeq: 7, installedPayloadHash: hash))
+        let counter = Counter(); let reader = CountingStubReader(release: release, counter: counter)
+        let store = ShopCatalogSeedFixture.makeStore()
+        let service = ShopCatalogCloudSyncService(reader: reader, store: store)
+        await service.syncIfNeeded(force: true)
+        XCTAssertEqual(counter.value, 1)
+        XCTAssertEqual(counter.packReads, 0)
+        XCTAssertEqual(ShopCatalogPackCache.loadControl().installedRootIndexHash, release.header.rootIndexHash)
+        XCTAssertEqual(service.state, .upToDate(releaseSeq: 7))
+    }
+
     /// 远端层只在内存，进程重启即归零；包缓存是不可变正文、跨启动仍在。
     /// 旧实现「序号没变 → 直接 return」，缓存里的包永远装不回 Store →
     /// 装过一次之后每次冷启动商店内容都是空的。

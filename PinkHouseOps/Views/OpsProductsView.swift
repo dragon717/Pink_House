@@ -22,9 +22,7 @@
 //     并且价格修正的表单里明确写「留空 = 清除这一项」—— 因为它是完整快照语义。
 //  2. **删除靠归档**：商品不给「删除」，只有「归档 / 恢复」。归档条目在发布时
 //     被剥离（线上下架），本机还留着可追溯。
-//  3. **改名是款式级，Mac 端不复制那套口径**：已上线过的商品改名会被
-//     `updateProduct` 拒绝并说明去哪改；本页把「编辑归属与命名」的入口留着，
-//     让运营**当场看到那条拒绝原因**，而不是以为 App 坏了。
+//  3. **改名是款式级**：两端共用 SharedCatalog 的计划，已上线商品可以直接修改。
 //
 
 import SwiftUI
@@ -124,7 +122,9 @@ struct OpsProductsView: View {
     // MARK: 左：商品列表
 
     private var listColumn: some View {
-        VStack(alignment: .leading, spacing: 0) {
+        // 列表复用同一差分，不能每一行都解码整份线上基线。
+        let changes = workspace.changeSet
+        return VStack(alignment: .leading, spacing: 0) {
             VStack(alignment: .leading, spacing: 8) {
                 HStack(spacing: 6) {
                     Text("商品").font(.headline)
@@ -172,7 +172,7 @@ struct OpsProductsView: View {
             } else {
                 List(selection: $selectedProductID) {
                     ForEach(filteredProducts) { product in
-                        productRow(product).tag(product.id)
+                        productRow(product, changes: changes).tag(product.id)
                     }
                 }
                 .listStyle(.inset)
@@ -186,8 +186,8 @@ struct OpsProductsView: View {
     /// 这里不用可选 case 是为了让 `ProductSheet` 的 id 稳定（同一 sheet 不重建）。
     private var newProductIDPlaceholder: String { "" }
 
-    private func productRow(_ product: CatalogProduct) -> some View {
-        let tags = workspace.publicationTags(forProduct: product.id)
+    private func productRow(_ product: CatalogProduct, changes: ShopCatalogChangeSet) -> some View {
+        let tags = workspace.publicationTags(forProduct: product.id, changes: changes)
         return VStack(alignment: .leading, spacing: 3) {
             HStack(spacing: 6) {
                 Text(product.name).lineLimit(1)
@@ -286,8 +286,7 @@ struct OpsProductsView: View {
                 LabeledContent("品类", value: product.category.isEmpty ? "（未填）" : product.category)
                 HStack(spacing: 10) {
                     Button("编辑…") { sheet = .edit(product.id) }
-                    OpsFootnote(text: "已上线过的商品改名会被拒绝 —— 改名是款式级口径，"
-                                + "Mac 端不复制它（避免和 iOS 出现两套规则）。")
+                    OpsFootnote(text: "修改名称或品类时，同款其他颜色与款式资料一起更新。")
                 }
             }
         }
@@ -713,8 +712,8 @@ struct OpsProductsView: View {
     // MARK: 变更与发布状态
 
     private func changeCard(_ product: CatalogProduct) -> some View {
-        let tags = workspace.publicationTags(forProduct: product.id)
         let changeSet = workspace.changeSet
+        let tags = workspace.publicationTags(forProduct: product.id, changes: changeSet)
         let kinds: [ShopCatalogEntityKind] = [.product, .variant, .sizeChart, .saleEvent]
         return OpsCard(title: "本地变更与线上状态", systemImage: "arrow.triangle.2.circlepath") {
             VStack(alignment: .leading, spacing: 8) {
@@ -830,7 +829,7 @@ private struct ProductIdentitySheet: View {
             title: isNew ? "新增商品" : "编辑归属与命名",
             subtitle: isNew
                 ? "商品是操作单位：一次上新里做的都是单个商品上的动作。"
-                : "改动会递增编辑版本号，并作废上一次校验结果。",
+                : "已上线商品也可以修改，保存后自动同步到 App。",
             content: {
                 Picker("店家", selection: $shopID) {
                     ForEach(workspace.catalog.shops) { shop in
@@ -849,9 +848,9 @@ private struct ProductIdentitySheet: View {
                 }
                 TextField("商品名（如「星月夜 JSK 粉色」）", text: $name)
                 TextField("品类（如 JSK / OP / SK / 小物）", text: $category)
-                if !isNew {
-                    OpsFootnote(text: "已上线过的商品改名会被拒绝（改名是款式级口径，"
-                                + "Mac 端不复制 iOS 的实现）。改品类同理。")
+                if !isNew, let preview = workspace.productRenamePreview(
+                    productID: productID, name: name, category: category) {
+                    OpsFootnote(text: preview)
                 }
             },
             onCancel: { dismiss() },
@@ -878,7 +877,7 @@ private struct ProductIdentitySheet: View {
             return workspace.addProduct(
                 shopID: shopID, seriesID: seriesID, name: name, category: category)
         }
-        return workspace.updateProduct(
+        return workspace.saveProductIdentity(
             id: productID, shopID: shopID, seriesID: seriesID, name: name, category: category)
     }
 }
@@ -895,7 +894,7 @@ private struct ProductDetailSheet: View {
     var body: some View {
         OpsFormFrame(
             title: "卖点描述与款式名",
-            subtitle: "款式名是**款式级属性**：改它等于改整款的展示名。已上线过的商品不能在这里改。",
+            subtitle: "修改款式名后，同款其他颜色和款式资料一起更新；保存后自动同步到 App。",
             width: 520,
             contentHeight: 260,
             content: {
@@ -911,10 +910,12 @@ private struct ProductDetailSheet: View {
             },
             onCancel: { dismiss() },
             onConfirm: {
-                workspace.updateProductDetail(
-                    id: productID,
-                    description: description,
-                    designName: designName)
+                workspace.saveProductEdit {
+                    workspace.updateProductDetail(
+                        id: productID,
+                        description: description,
+                        designName: designName)
+                }
             }
         )
         .onAppear {

@@ -19,12 +19,8 @@
 //  2. **删除靠归档**：被引用的实体不物理删（`archivedAt` 表达下架）。
 //     归档条目在发布时会被剥离 —— 这正是「归档 ≠ 删除」的意义：
 //     本机留着追溯，线上不再下发。
-//  3. **不做款式级扇出**：同款归组（`ShopCatalogSameDesignGrouper`）、
-//     尺码表款式级归一化（`ShopCatalogSizeChartSharing`）、商品改名扇出
-//     （`ShopCatalogProductRename`）都只有 iOS 一处实现。Mac 端复制一份
-//     就是第二套口径，两边迟早分叉（分叉的表现是「同款被拆成两款」）。
-//     所以这里给的是**显式动作**（例如「把尺码表复制到指定商品」），
-//     由运营点名，不需要一套归组谓词。
+//  3. 商品改名与款式档案迁移采用 SharedCatalog 中的唯一实现，两端共用；
+//     尺码表复制仍是运营点名的显式动作，不额外改动其内容。
 //
 
 import Foundation
@@ -36,7 +32,7 @@ extension OpsWorkspace {
     /// 改商品的描述与款式名。
     ///
     /// 款式名（`designName`）是**款式级属性** —— 改它等于改整款的展示名。
-    /// 已发布过的商品不给改（理由同 `renameGuard`），未发布的新录入内容可以改。
+    /// 已发布商品同样可改，款式名改变时采用共享计划更新整款与档案键。
     @discardableResult
     func updateProductDetail(
         id: String, description: String?, designName: String?
@@ -52,16 +48,19 @@ extension OpsWorkspace {
             .trimmingCharacters(in: .whitespacesAndNewlines)
 
         let newDesign = (trimmedDesign?.isEmpty ?? true) ? nil : trimmedDesign
-        if newDesign != catalog.products[index].designName,
-           isPublishedEntity(id) {
-            lastError = "款式名是款式级属性，已发布过的商品不能在 Mac 端改（改名口径只有 iOS 一处实现）。"
-            return false
+        let stored = catalog.products[index]
+        if newDesign != stored.designName {
+            let plan = ShopCatalogProductRename.plan(edited: stored, basedOn: stored,
+                among: catalog.products, profiles: catalog.styleProfiles,
+                explicitDesignName: newDesign ?? ShopCatalogSameDesignGrouper.baseName(for: stored.name))
+            applyProductRenamePlan(plan)
         }
 
         catalog.products[index].description =
             (trimmedDescription?.isEmpty ?? true) ? nil : trimmedDescription
         catalog.products[index].designName = newDesign
         markDirty()
+        lastError = nil
         return true
     }
 
@@ -810,14 +809,16 @@ extension OpsWorkspace {
     }
 
     /// 商品列表标签（**不合并两条状态轴**：编辑状态与发布状态各说各的）
-    func publicationTags(forProduct productID: String) -> [String] {
+    func publicationTags(forProduct productID: String,
+                         changes suppliedChanges: ShopCatalogChangeSet? = nil) -> [String] {
         var tags: [String] = []
         if let product = catalog.products.first(where: { $0.id == productID }),
            product.archivedAt != nil {
             tags.append("已归档")
         }
-        let delta = changeSet.delta(of: .product)
-        if baselineCatalog == nil {
+        let changes = suppliedChanges ?? changeSet
+        let delta = changes.delta(of: .product)
+        if !changes.hasBaseline {
             // 没有基线快照 → 只敢说「本地内容」，不敢说「相对线上新增」
             tags.append("本地内容")
         } else if delta.addedIDs.contains(productID) {

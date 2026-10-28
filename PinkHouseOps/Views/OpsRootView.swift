@@ -131,6 +131,10 @@ struct OpsMainView: View {
         } detail: {
             VStack(spacing: 0) {
                 OpsStatusBanner(workspace: workspace)
+                if workspace.catalogEditSyncProgress != nil {
+                    OpsCatalogEditSyncStatus(workspace: workspace)
+                        .padding(.horizontal, 14).padding(.bottom, 8)
+                }
                 Divider()
                 content
             }
@@ -139,6 +143,7 @@ struct OpsMainView: View {
         .onAppear { workspace.resumeCatalogEditorSync() }
         .onChange(of: workspace.draft?.id) { _, _ in
             workspace.catalogEditSyncMessage = nil
+            workspace.catalogEditSyncProgress = nil
             workspace.resumeCatalogEditorSync()
         }
         .onChange(of: cloudSync.targetEnvironment) { _, _ in workspace.resumeCatalogEditorSync() }
@@ -147,6 +152,9 @@ struct OpsMainView: View {
         }
         .onChange(of: cloudSync.isSyncing) { _, running in
             if !running, !dataSync.isRunning { workspace.resumeCatalogEditorSync() }
+        }
+        .onChange(of: dataSync.isRunning) { _, running in
+            if !running { workspace.resumeCatalogEditorSync() }
         }
         .toolbar {
             ToolbarItem(placement: .primaryAction) {

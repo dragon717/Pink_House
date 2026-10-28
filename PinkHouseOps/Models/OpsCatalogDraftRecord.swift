@@ -116,6 +116,12 @@ final class OpsCatalogDraftRecord {
     var catalogSyncSeriesUpdatesJSON: Data?
     var catalogSyncSeriesReceiptsJSON: Data?
     var catalogSyncFullCatalogAfterSeries: Bool?
+    /// 普通编辑的字段差分也须逐环境确认，不能只发设置中选中的一个环境。
+    var catalogSyncEditorUpdatesJSON: Data?
+    var catalogSyncProgressJSON: Data?
+    var catalogEditorDualSyncVersion: Int?
+    /// 旧排序任务可能跳过目标环境缺失商品；新版一次性补核对已保存排序。
+    var catalogOrderDualSyncVersion: Int?
 
     // MARK: 工作台恢复
 

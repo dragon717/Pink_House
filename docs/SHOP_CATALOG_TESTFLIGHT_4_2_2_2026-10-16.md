@@ -1,5 +1,7 @@
 # TestFlight 团次修复包 4.2（2）（2026-10-16）
 
+> **后续分发候选已更新为 [4.2（3）排序修复本地归档](SHOP_CATALOG_TESTFLIGHT_ORDER_CLIENT_FIX_2026-10-17.md)。** 本文的 4.2（2）只保留历史记录，恢复分发时应使用更新后的归档；TestFlight 上传仍需用户明确恢复。
+
 > **用户已暂停TestFlight上传。** 直连分发尝试另返回“Account credentials have expired”，未上传成功；原系统代理已恢复。后续还完成了[入橱同页选择批次的界面调整](SHOP_CATALOG_INLINE_BATCH_PICKER_2026-10-16.md)，新本地归档另行保留，未继续上传。只有用户明确恢复分发才继续；下文是暂停前的准备与排障记录。
 
 ## 原因与数据口径

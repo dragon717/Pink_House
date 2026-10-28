@@ -153,6 +153,11 @@ struct ShopCatalogListView: View {
                                            description: Text(message))
                 }
                 searchBar
+                Text("以图鉴查询为主，收录店家、系列与商品资料，不作为上新资讯。".appLocalized)
+                    .font(.footnote)
+                    .foregroundStyle(pagePalette.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .fixedSize(horizontal: false, vertical: true)
                 if shops.isEmpty {
                     emptyState
                 } else {

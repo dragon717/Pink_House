@@ -12,7 +12,7 @@ extension OpsWorkspace {
         let previous = (draft.catalogSyncRequestID, draft.catalogSyncRevision,
                         draft.catalogSyncEnvironment, draft.catalogSyncError,
                         draft.catalogSyncSeriesUpdatesJSON, draft.catalogSyncSeriesReceiptsJSON,
-                        draft.catalogSyncFullCatalogAfterSeries)
+                        draft.catalogSyncFullCatalogAfterSeries, draft.catalogSyncEditorUpdatesJSON, draft.catalogSyncProgressJSON, draft.catalogEditorDualSyncVersion, draft.catalogOrderDualSyncVersion)
         if let seriesID {
             guard let series = catalog.series.first(where: { $0.id == seriesID }), !fields.isEmpty else {
                 lastError = "找不到需要同步的系列配置。"; return false
@@ -24,41 +24,62 @@ extension OpsWorkspace {
                 let references = Set(ShopCatalogMediaReferences.all(in: ShopCatalog(series: [mediaSeries])).map(\.reference))
                 let update = OpsSeriesConfigUpdate(series: series,
                     shop: catalog.shops.first { $0.id == series.shopID }, fields: fields,
-                    assets: catalog.assets.filter { references.contains($0.id) })
+                    assets: catalog.assets.filter { references.contains($0.id) },
+                    productOrders: fields.contains(.productOrder) ? Dictionary(uniqueKeysWithValues: catalog.products
+                        .filter { $0.seriesID == seriesID && $0.archivedAt == nil }
+                        .compactMap { product in product.displayOrder.map { (product.id, $0) } }) : nil,
+                    publishedOrderCatalog: fields.contains(.productOrder) ? publishedCatalogForProductOrder(seriesID: seriesID) : nil)
                 let pending = try draft.catalogSyncSeriesUpdatesJSON.map {
                     try JSONDecoder().decode([OpsSeriesConfigUpdate].self, from: $0)
                 } ?? []
                 draft.catalogSyncSeriesUpdatesJSON = try JSONEncoder().encode(
                     OpsSeriesConfigUpdate.coalescing(pending, with: update))
                 draft.catalogSyncSeriesReceiptsJSON = nil
+                if fields.contains(.productOrder) { draft.catalogOrderDualSyncVersion = 2 }
             } catch { lastError = "保存系列同步任务失败：\(error.localizedDescription)"; return false }
-        } else if draft.catalogSyncSeriesUpdatesJSON != nil {
-            // 系列同步等待期间又显式保存商品/店家编辑，仍保留其原有整目录同步意图。
-            draft.catalogSyncFullCatalogAfterSeries = true
+        } else {
+            do {
+                let before = try ShopCatalogJSONCoding.decoder().decode(ShopCatalog.self, from: draft.catalogJSON)
+                let update = OpsCatalogEditorUpdate(before: before, after: catalog)
+                var pending = try draft.catalogSyncEditorUpdatesJSON.map {
+                    try ShopCatalogJSONCoding.decoder().decode([OpsCatalogEditorUpdate].self, from: $0)
+                } ?? []
+                if !update.isEmpty { pending.append(update) }
+                draft.catalogSyncEditorUpdatesJSON = try ShopCatalogJSONCoding.encoder().encode(pending)
+            } catch { lastError = "保存商品同步任务失败：\(error.localizedDescription)"; return false }
         }
+        draft.catalogEditorDualSyncVersion = 1
+        draft.catalogSyncFullCatalogAfterSeries = nil
+        draft.catalogSyncSeriesReceiptsJSON = nil
         draft.catalogSyncRequestID = UUID().uuidString
         draft.catalogSyncRevision = currentRevision
         draft.catalogSyncEnvironment = OpsCloudSyncModel.shared.targetEnvironment.rawValue
         draft.catalogSyncError = nil
+        let progress = OpsCatalogEditProgress(requestID: draft.catalogSyncRequestID!, revision: currentRevision)
+        draft.catalogSyncProgressJSON = try? JSONEncoder().encode(progress)
         guard saveDraft() else {
             (draft.catalogSyncRequestID, draft.catalogSyncRevision,
              draft.catalogSyncEnvironment, draft.catalogSyncError,
              draft.catalogSyncSeriesUpdatesJSON, draft.catalogSyncSeriesReceiptsJSON,
-             draft.catalogSyncFullCatalogAfterSeries) = previous
+             draft.catalogSyncFullCatalogAfterSeries, draft.catalogSyncEditorUpdatesJSON, draft.catalogSyncProgressJSON, draft.catalogEditorDualSyncVersion, draft.catalogOrderDualSyncVersion) = previous
             return false
         }
-        catalogEditSyncMessage = draft.catalogSyncSeriesUpdatesJSON != nil
-            ? "已保存到本机，正在自动同步到开发环境和用户环境…"
-            : "已保存到本机，正在同步到 App（\(OpsCloudSyncModel.shared.targetEnvironment.displayName)）…"
+        catalogEditSyncProgress = progress
+        catalogEditSyncMessage = "已保存到本机，等待分别同步开发环境和线上环境…"
         catalogEditSyncQueue.resume()
         return true
     }
 
     func resumeCatalogEditorSync() {
         let cloud = OpsCloudSyncModel.shared
+        if catalogEditSyncProgress == nil, let data = draft?.catalogSyncProgressJSON {
+            catalogEditSyncProgress = try? JSONDecoder().decode(OpsCatalogEditProgress.self, from: data)
+        }
         guard !cloud.isRunning, !cloud.isSyncing else { return }
+        enqueueLegacyNameRepairIfNeeded()
+        enqueueLegacyProductOrderRepairIfNeeded()
         // 旧版本的系列保存可能被整目录预检拦下。明确未发送过请求时，自动接续已保存团次。
-        if let draft, draft.catalogSyncRequestID != nil, draft.catalogSyncSeriesUpdatesJSON == nil,
+        if let draft, draft.catalogSyncRequestID != nil, draft.catalogSyncSeriesUpdatesJSON == nil, draft.catalogSyncEditorUpdatesJSON == nil,
            draft.catalogSyncError?.contains("尚未发送发布请求") == true, !hasUnsavedChanges {
             let baseline = baselineCatalog
             let changed = catalog.series.filter { series in
@@ -72,13 +93,13 @@ extension OpsWorkspace {
                 return
             }
         }
-        if draft?.catalogSyncSeriesUpdatesJSON == nil, let environment = draft?.catalogSyncEnvironment,
+        if draft?.catalogSyncSeriesUpdatesJSON == nil, draft?.catalogSyncEditorUpdatesJSON == nil, let environment = draft?.catalogSyncEnvironment,
            environment != cloud.targetEnvironment.rawValue {
             let name = ShopCatalogPublishTargetEnvironment(rawValue: environment)?.displayName ?? environment
             catalogEditSyncMessage = "本地已保存，等待切换回 \(name) 后同步。"
         } else if let error = draft?.catalogSyncError {
             catalogEditSyncMessage = "本地已保存，云端同步未完成：\(error)"
-        } else if let draft, draft.catalogSyncSeriesUpdatesJSON == nil, draft.catalogSyncRequestID != nil,
+        } else if let draft, draft.catalogSyncSeriesUpdatesJSON == nil, draft.catalogSyncEditorUpdatesJSON == nil, draft.catalogSyncRequestID != nil,
                   draft.catalogSyncRequestID == draft.catalogSyncAttemptedID {
             catalogEditSyncMessage = "本地已保存，上次同步未确认完成；请先查看云端更新结果。"
         }
@@ -87,7 +108,7 @@ extension OpsWorkspace {
 
     var canRetrySavedSeriesSync: Bool {
         guard let draft, draft.catalogSyncRequestID != nil,
-              draft.catalogSyncSeriesUpdatesJSON != nil else { return false }
+              (draft.catalogSyncSeriesUpdatesJSON != nil || draft.catalogSyncEditorUpdatesJSON != nil) else { return false }
         return draft.catalogSyncError != nil
     }
 
@@ -115,10 +136,10 @@ extension OpsWorkspace {
         return OpsCatalogEditSyncQueue(pending: { [weak self] in
             guard let draft = self?.draft, let id = draft.catalogSyncRequestID,
                   (id != draft.catalogSyncAttemptedID ||
-                    (draft.catalogSyncSeriesUpdatesJSON != nil && draft.catalogSyncError == nil)),
+                    ((draft.catalogSyncSeriesUpdatesJSON != nil || draft.catalogSyncEditorUpdatesJSON != nil) && draft.catalogSyncError == nil)),
                   let revision = draft.catalogSyncRevision,
                   let environment = draft.catalogSyncEnvironment,
-                  (draft.catalogSyncSeriesUpdatesJSON != nil || environment == cloud.targetEnvironment.rawValue) else { return nil }
+                  (draft.catalogSyncSeriesUpdatesJSON != nil || draft.catalogSyncEditorUpdatesJSON != nil || environment == cloud.targetEnvironment.rawValue) else { return nil }
             return .init(id: id, draftID: draft.id, revision: revision, environment: environment)
         }, isBusy: { cloud.isRunning || cloud.isSyncing }, publish: { [weak self] request in
             guard let self, let draft = self.draft, draft.id == request.draftID else {
@@ -132,17 +153,18 @@ extension OpsWorkspace {
                 return .failed("同步状态保存失败：\(error.localizedDescription)")
             }
             var result: OpsPublishInvocationResult
-            if let data = draft.catalogSyncSeriesUpdatesJSON {
+            if draft.catalogSyncSeriesUpdatesJSON != nil || draft.catalogSyncEditorUpdatesJSON != nil {
                 do {
-                    let updates = try JSONDecoder().decode([OpsSeriesConfigUpdate].self, from: data)
+                    let updates = try draft.catalogSyncSeriesUpdatesJSON.map {
+                        try JSONDecoder().decode([OpsSeriesConfigUpdate].self, from: $0)
+                    } ?? []
+                    let edits = try draft.catalogSyncEditorUpdatesJSON.map {
+                        try ShopCatalogJSONCoding.decoder().decode([OpsCatalogEditorUpdate].self, from: $0)
+                    } ?? []
                     if let publishSeries { result = await publishSeries(request, updates) }
-                    else { result = await self.synchronizeSavedSeries(requestID: request.id, updates: updates, cloud: cloud) }
+                    else { result = await self.synchronizeSavedSeries(requestID: request.id, updates: updates, cloud: cloud, editorUpdates: edits) }
                 } catch { result = .failed("系列同步任务无法读取：\(error.localizedDescription)") }
             } else { result = await cloud.publishNow(workspace: self) }
-            if case .confirmed = result, draft.catalogSyncFullCatalogAfterSeries == true,
-               draft.catalogSyncRequestID == request.id {
-                result = await cloud.publishNow(workspace: self)
-            }
             switch result {
             case .confirmed(let seq): return .confirmed(seq)
             case .failed(let reason): return .failed(reason)
@@ -150,30 +172,9 @@ extension OpsWorkspace {
         }, finished: { [weak self] request, result in
             guard let self, let draft = self.draft, draft.id == request.draftID,
                   draft.catalogSyncEnvironment == request.environment,
-                  (draft.catalogSyncSeriesUpdatesJSON != nil || cloud.targetEnvironment.rawValue == request.environment) else { return }
-            if draft.catalogSyncSeriesUpdatesJSON != nil {
-                guard draft.catalogSyncRequestID == request.id else { return }
-                switch result {
-                case .confirmed:
-                    let receipts = draft.catalogSyncSeriesReceiptsJSON.flatMap {
-                        try? JSONDecoder().decode([String: Int].self, from: $0)
-                    } ?? [:]
-                    self.catalogEditSyncMessage = "已自动同步到开发环境和用户环境，均已回读确认"
-                        + (receipts.isEmpty ? "。" : "（Development \(receipts["development"] ?? 0)，Production \(receipts["production"] ?? 0)）。")
-                    draft.catalogSyncRequestID = nil
-                    draft.catalogSyncRevision = nil
-                    draft.catalogSyncEnvironment = nil
-                    draft.catalogSyncError = nil
-                    draft.catalogSyncSeriesUpdatesJSON = nil
-                    draft.catalogSyncSeriesReceiptsJSON = nil
-                    draft.catalogSyncFullCatalogAfterSeries = nil
-                case .failed(let reason):
-                    draft.catalogSyncError = reason
-                    self.catalogEditSyncMessage = "本地已保存，自动同步未完成：\(reason)"
-                }
-                do { try self.saveCatalogContext(self.context) } catch {
-                    self.catalogEditSyncMessage = "云端结果已收到，同步状态保存失败：\(error.localizedDescription)"
-                }
+                  (draft.catalogSyncSeriesUpdatesJSON != nil || draft.catalogSyncEditorUpdatesJSON != nil || cloud.targetEnvironment.rawValue == request.environment) else { return }
+            if draft.catalogSyncSeriesUpdatesJSON != nil || draft.catalogSyncEditorUpdatesJSON != nil {
+                self.finishSavedCatalogSync(request: request, result: result)
                 return
             }
             switch result {

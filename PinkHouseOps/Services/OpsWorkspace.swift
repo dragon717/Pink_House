@@ -98,6 +98,7 @@ final class OpsWorkspace: ObservableObject {
 
     lazy var catalogEditSyncQueue = makeCatalogEditSyncQueue()
     @Published var catalogEditSyncMessage: String?
+    @Published var catalogEditSyncProgress: OpsCatalogEditProgress?
 
     init(context: ModelContext, saveCatalogContext: @escaping (ModelContext) throws -> Void = { try $0.save() }) {
         self.context = context
@@ -489,6 +490,7 @@ final class OpsWorkspace: ObservableObject {
         let previousSync = (draft.catalogSyncRequestID, draft.catalogSyncRevision,
                             draft.catalogSyncEnvironment, draft.catalogSyncError)
         let coversEditorSave = draft.catalogSyncRequestID != nil
+            && draft.catalogSyncEditorUpdatesJSON == nil && draft.catalogSyncSeriesUpdatesJSON == nil
             && draft.catalogSyncEnvironment == environment
             && (draft.catalogSyncRevision ?? Int.max) <= revision
         draft.recordConfirmedPublish(
@@ -927,41 +929,27 @@ final class OpsWorkspace: ObservableObject {
             lastError = "所选系列不属于所选店家，请重新选择。"
             return false
         }
-        if let reason = renameGuard(productID: id, newName: trimmed, newCategory: category) {
-            lastError = reason
-            return false
+        let stored = catalog.products[index]
+        let trimmedCategory = category.trimmingCharacters(in: .whitespacesAndNewlines)
+        let changesIdentity = trimmed != stored.name || trimmedCategory != stored.category
+        if changesIdentity {
+            guard shopID == stored.shopID, seriesID == stored.seriesID else {
+                lastError = "请先保存商品名称或品类修改，再单独调整店家和系列。"
+                return false
+            }
+            var edited = stored
+            edited.name = trimmed
+            edited.category = trimmedCategory
+            let plan = ShopCatalogProductRename.plan(edited: edited, basedOn: stored,
+                among: catalog.products, profiles: catalog.styleProfiles)
+            applyProductRenamePlan(plan)
+        } else {
+            catalog.products[index].shopID = shopID
+            catalog.products[index].seriesID = seriesID
         }
-        catalog.products[index].shopID = shopID
-        catalog.products[index].seriesID = seriesID
-        catalog.products[index].name = trimmed
-        catalog.products[index].category = category.trimmingCharacters(in: .whitespacesAndNewlines)
         markDirty()
+        lastError = nil
         return true
-    }
-
-    /// 改名守卫（仓库红线「商品改名 = 款式级」）。
-    ///
-    /// 改名不是「改一个字段」：它要把整款（含已归档）一起改、要改款式档案的**键**、
-    /// 要让尺码表的尺码范围跟着走、还要保证颜色词不丢。这套口径在 iOS 端只有
-    /// 一处实现（`ShopCatalogProductRename`）。
-    ///
-    /// Mac 端**不复制**它 —— 复制出来就是第二套口径，两边迟早分叉，而分叉的
-    /// 表现是「改名之后同款被拆成两款」。所以这里只允许改**从未发布过**的商品名
-    /// （那些内容还没有线上副本，改了不会造成两边不一致），已发布过的拒绝并说明去哪里改。
-    private func renameGuard(productID: String, newName: String, newCategory: String) -> String? {
-        guard let product = catalog.products.first(where: { $0.id == productID }) else { return nil }
-        let category = newCategory.trimmingCharacters(in: .whitespacesAndNewlines)
-        let nameChanged = newName != product.name
-        let categoryChanged = category != product.category
-        guard nameChanged || categoryChanged else { return nil }
-        // 从未确认发布过：整份草稿都还没有线上副本，改名不会与线上分叉
-        guard draft?.hasEverPublished == true else { return nil }
-        // 已在基线快照里存在 = 线上有它 → 改名要走款式级口径
-        guard let baseline = baselineCatalog,
-              baseline.products.contains(where: { $0.id == productID }) else { return nil }
-        return "「\(product.name)」已经上线过，改名/改品类会牵动整款（同款颜色子项、款式档案、尺码表范围）。"
-            + "这套规则在 iOS 端只有一处实现，Mac 端本版不复制它（避免出现第二套口径）。"
-            + "本版 Mac 端支持的是：新录入内容的编辑、规格、尺码表、价格与归档。"
     }
 
     // MARK: 删除店家 / 系列（运营可直接级联删除全部下级）

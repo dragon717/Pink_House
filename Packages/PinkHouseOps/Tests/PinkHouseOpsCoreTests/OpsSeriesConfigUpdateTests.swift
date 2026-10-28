@@ -3,6 +3,133 @@ import SharedCatalog
 @testable import PinkHouseOpsCore
 
 final class OpsSeriesConfigUpdateTests: XCTestCase {
+    func testExistingProductOrderUpdatesOnlyRankWithoutPublishingLocalContent() throws {
+        var remote = catalog(cover: "remote-cover")
+        remote.products[0].priceCorrection = .init(stockPrice: 100)
+        var localSeries = remote.series[0]
+        localSeries.name = "本机未发布的系列名称"
+        localSeries.cover = "unpublished-cover"
+        let update = OpsSeriesConfigUpdate(series: localSeries, shop: shop, fields: [.productOrder],
+            productOrders: ["product": 3, "unpublished-product": 0])
+        for _ in ["development", "production"] {
+            let result = try OpsSeriesConfigUpdate.applying([update], to: remote)
+            XCTAssertEqual(result.products[0].displayOrder, 3)
+            XCTAssertEqual(result.products[0].priceCorrection, remote.products[0].priceCorrection)
+            XCTAssertEqual(result.products[0].images, remote.products[0].images)
+            XCTAssertEqual(result.products.count, 1)
+            XCTAssertEqual(result.series, remote.series)
+        }
+    }
+
+    func testOrderDoesNotCreateOrRestoreSeriesAndRejectsForeignProduct() throws {
+        let source = catalog(cover: "cover").series[0]
+        let update = OpsSeriesConfigUpdate(series: source, shop: shop, fields: [.productOrder], productOrders: ["product": 0])
+        let empty = ShopCatalog(shops: [shop])
+        XCTAssertEqual(try OpsSeriesConfigUpdate.applying([update], to: empty), empty)
+        let removed = ShopCatalog(shops: [shop], removedSeriesIDs: [source.id])
+        XCTAssertEqual(try OpsSeriesConfigUpdate.applying([update], to: removed), removed)
+        var foreign = catalog(cover: "cover")
+        foreign.series.append(.init(id: "other", shopID: shop.id, name: "另一系列"))
+        foreign.products[0].seriesID = "other"
+        XCTAssertThrowsError(try OpsSeriesConfigUpdate.applying([update], to: foreign))
+    }
+
+    func testOrderVerificationCannotTreatMissingPublishedProductAsSuccess() throws {
+        let source = catalog(cover: "cover")
+        let update = OpsSeriesConfigUpdate(series: source.series[0], shop: shop, fields: [.productOrder],
+            productOrders: ["product": 0], publishedOrderCatalog: source)
+        var remote = source; remote.products = []
+        XCTAssertThrowsError(try OpsSeriesConfigUpdate.verifyProductOrders([update], in: remote))
+        XCTAssertThrowsError(try OpsSeriesConfigUpdate.verifyProductOrders([update], in: source), "旧顺序也不能确认")
+        remote = try OpsSeriesConfigUpdate.applying([update], to: source)
+        XCTAssertNoThrow(try OpsSeriesConfigUpdate.verifyProductOrders([update], in: remote))
+        var legacy = update; legacy.publishedOrderCatalog = nil
+        remote.products = []
+        XCTAssertThrowsError(try OpsSeriesConfigUpdate.verifyProductOrders([legacy], in: remote), "旧任务也不能静默跳过缺商品")
+    }
+
+    func testOrderSeedOnlyRestoresAlreadyPublishedProductAndPreservesExistingTargetPrice() throws {
+        var source = catalog(cover: "source-cover")
+        source.products[0].priceCorrection = .init(stockPrice: 100)
+        source.products.append(.init(id: "second", shopID: shop.id, seriesID: source.series[0].id,
+            name: "另一件已发布商品", category: "OP"))
+        source.variants = [.init(id: "v-second", productID: "second", color: "蓝色")]
+        source.saleEvents = [.init(id: "sale-second", productID: "second", type: .stock, price: 200, currency: .cny)]
+        let update = OpsSeriesConfigUpdate(series: source.series[0], shop: shop, fields: [.productOrder],
+            productOrders: ["second": 0, "product": 1, "local-unpublished": 2], publishedOrderCatalog: source)
+        var target = catalog(cover: "target-cover")
+        target.products[0].priceCorrection = .init(stockPrice: 300)
+        let ranked = try OpsSeriesConfigUpdate.applying([update], to: target)
+        let seed = try XCTUnwrap(update.productOrderDependencySeed())
+        let dependency = try XCTUnwrap(OpsCatalogEditorUpdate.missingProductDependencies([seed], in: ranked))
+        var result = try OpsCatalogEditorUpdate.applying([dependency], to: ranked)
+        XCTAssertEqual(result.products.count, 2)
+        XCTAssertEqual(result.products.first { $0.id == "product" }?.priceCorrection?.stockPrice, 300)
+        XCTAssertEqual(result.series[0].cover, "target-cover")
+        XCTAssertEqual(CatalogProductOrdering.ordered(result.products).map(\.id), ["second", "product"])
+        XCTAssertEqual(result.saleEvents, source.saleEvents)
+        XCTAssertEqual(result.variants, source.variants)
+        XCTAssertThrowsError(try OpsSeriesConfigUpdate.verifyProductOrders([update], in: result),
+                            "关联补齐追加的商品也必须在发布前落实数组顺序")
+        result.products = CatalogProductOrdering.publicationOrder(result.products)
+        XCTAssertNoThrow(try OpsSeriesConfigUpdate.verifyProductOrders([update], in: result))
+        target.removedProductIDs = ["second"]
+        XCTAssertThrowsError(try OpsCatalogEditorUpdate.missingProductDependencies([seed], in: target))
+    }
+
+    func testPublishedOrderSnapshotSurvivesScheduleCoalescingAndEncoding() throws {
+        let source = catalog(cover: "cover")
+        let order = OpsSeriesConfigUpdate(series: source.series[0], shop: shop, fields: [.productOrder],
+            productOrders: ["product": 0], publishedOrderCatalog: source)
+        let combined = OpsSeriesConfigUpdate.coalescing([order], with: .init(series: source.series[0], shop: nil, fields: [.schedule]))
+        let restored = try JSONDecoder().decode([OpsSeriesConfigUpdate].self, from: JSONEncoder().encode(combined))
+        XCTAssertEqual(restored[0].publishedOrderCatalog, source)
+        XCTAssertEqual(restored[0].productOrders, ["product": 0])
+    }
+
+    func testReadbackWithCorrectRanksButOldPhysicalArrayCannotConfirmOrder() throws {
+        var remote = catalog(cover: "cover")
+        remote.products[0].displayOrder = 1
+        var first = remote.products[0]; first.id = "first"; first.name = "先显示的组合款"; first.displayOrder = 0
+        remote.products.append(first)
+        let update = OpsSeriesConfigUpdate(series: remote.series[0], shop: shop, fields: [.productOrder],
+            productOrders: ["first": 0, "product": 1], publishedOrderCatalog: remote)
+        XCTAssertThrowsError(try OpsSeriesConfigUpdate.verifyProductOrders([update], in: remote))
+        let fixed = try OpsSeriesConfigUpdate.applying([update], to: remote)
+        XCTAssertEqual(fixed.products.map(\.id), ["first", "product"])
+        XCTAssertEqual(Set(fixed.products), Set(remote.products))
+        XCTAssertNoThrow(try OpsSeriesConfigUpdate.verifyProductOrders([update], in: fixed))
+        XCTAssertEqual(try OpsSeriesConfigUpdate.applying([update], to: fixed), fixed)
+    }
+
+    func testSortAndScheduleSavesCoalesceWithoutLosingSortAndSurviveDecoding() throws {
+        let source = catalog(cover: "cover").series[0]
+        let order = OpsSeriesConfigUpdate(series: source, shop: shop, fields: [.productOrder], productOrders: ["product": 1])
+        var updates = OpsSeriesConfigUpdate.coalescing([order], with: .init(series: source, shop: shop, fields: [.schedule]))
+        XCTAssertEqual(updates[0].productOrders, ["product": 1])
+        updates = OpsSeriesConfigUpdate.coalescing(updates, with: .init(series: source, shop: shop, fields: [.productOrder], productOrders: ["product": 0]))
+        let restored = try JSONDecoder().decode([OpsSeriesConfigUpdate].self, from: JSONEncoder().encode(updates))
+        XCTAssertEqual(restored[0].fields, [.schedule, .productOrder])
+        XCTAssertEqual(restored[0].productOrders, ["product": 0])
+    }
+
+    func testConfirmedSortUpdatesOnlyItsBaselineFieldAndNextLocalSortDoesNotConflict() throws {
+        var remote = catalog(cover: "cover")
+        remote.products[0].description = "原描述"
+        let update = OpsSeriesConfigUpdate(series: remote.series[0], shop: shop,
+            fields: [.productOrder], productOrders: ["product": 1])
+        let head = ShopCatalogBaseline(releaseSeq: 18, environment: "production")
+        let ancestor = try OpsCatalogMergeBaseline(head: head, catalog: remote).acknowledging([update], head: head)
+        var online = try OpsSeriesConfigUpdate.applying([update], to: remote)
+        online.products[0].description = "另一端稍后修改描述"
+        var local = remote
+        local.products[0].displayOrder = 0
+        let result = try ShopCatalogThreeWayMerge.merge(local: local, remote: online, baseline: ancestor.catalog)
+        XCTAssertEqual(result.conflicts, [])
+        XCTAssertEqual(result.catalog.products[0].displayOrder, 0)
+        XCTAssertEqual(result.catalog.products[0].description, "另一端稍后修改描述")
+    }
+
     func testFrozenPublishRetryRequiresSuccessfulQueryAndExactOriginalBaseline() {
         let request = ShopCatalogPublishRequest(requestID: "frozen", jobID: "saved", draftID: "draft",
             draftRevision: 8, baseReleaseSeq: 23, baseRootIndexHash: "original-hash",

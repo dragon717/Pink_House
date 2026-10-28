@@ -301,6 +301,11 @@ public struct OpsBridgeSettings: Codable, Equatable {
 /// 早先留过这两个字段，但它们恒为 `false`（`run` 在构造结果之前就 throw 了），
 /// 读的人会以为「返回了结果就说明没超时」—— 那是假的。
 public struct OpsBridgeRunResult: Sendable {
+    public init(exitCode: Int32, events: [ShopCatalogPublishEvent], nonJSONLines: [String],
+                executablePath: String, scriptPath: String) {
+        self.exitCode = exitCode; self.events = events; self.nonJSONLines = nonJSONLines
+        self.executablePath = executablePath; self.scriptPath = scriptPath
+    }
 
     public var exitCode: Int32
     public var events: [ShopCatalogPublishEvent]

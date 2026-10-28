@@ -353,7 +353,16 @@ final class ShopCatalogStore: ObservableObject {
     /// 系列下某分类的商品；`nil` = 全部分类（排除已归档商品）
     func products(inSeries seriesID: String, category: String? = nil) -> [CatalogProduct] {
         guard let catalog else { return [] }
-        let all = catalog.products.filter { $0.seriesID == seriesID && Self.isLive($0.archivedAt) }
+        // 公开排序采用最新已发布值，避免旧的本机运营覆盖层遮住 Mac 新发布的顺序。
+        let publishedProducts = Dictionary((remoteCatalog?.products ?? [])
+            .filter { $0.seriesID == seriesID }.map { ($0.id, $0) }, uniquingKeysWith: { _, new in new })
+        let all = CatalogProductOrdering.ordered(catalog.products
+            .filter { $0.seriesID == seriesID && Self.isLive($0.archivedAt) }
+            .map { product in
+                var displayed = product
+                if let published = publishedProducts[product.id] { displayed.displayOrder = published.displayOrder }
+                return displayed
+            })
         guard let category else { return all }
         return all.filter { $0.category == category }
     }
@@ -393,28 +402,10 @@ final class ShopCatalogStore: ObservableObject {
         return result
     }
 
-    /// 系列分区顺序（点菜页 / 系列详情共用口径）：
-    /// 固定品类（canonicalCategoryOrder，除「其他」）在前；
-    /// 其余分类按**商品录入顺序**（catalog 数组首次出现序）追加，去重。
-    ///
-    /// 2026-09-25 根因修复（点菜页分区乱跳）：之前非固定品类用
-    /// `Array(Set(products.map(\.category)))` 派生顺序 —— Set 的遍历序取决于
-    /// **进程级随机哈希种子**，每次冷启动都换一个排法，用户看到的就是
-    /// 「商品列表不断重新排序、位置频繁变动」。与是否切换颜色无关，
-    /// 只是乱序恰好在反复进出页面 / 重启调试时被观察到。
-    /// 唯一确定性来源是 catalog 数组本身的录入顺序（持久化，跨启动稳定）。
+    /// 系列选购按运营发布顺序分区，旧目录沿用 OP → JSK 等运营类型顺序。
+    /// 自定义类型保留；同序号和未排序商品稳定沿用输入顺序，不使用无序 Set 排列。
     func categories(inSeries seriesID: String) -> [String] {
-        var present: [String] = []
-        var seen = Set<String>()
-        for p in products(inSeries: seriesID) where seen.insert(p.category).inserted {
-            present.append(p.category)
-        }
-        var ordered = Self.canonicalCategoryOrder.filter { $0 != "其他" && present.contains($0) }
-        let known = Set(ordered)
-        let tail = present.filter { !known.contains($0) }
-        ordered.append(contentsOf: tail.filter { $0 != "其他" })
-        if tail.contains("其他") { ordered.append("其他") }
-        return ordered
+        CatalogProductOrdering.categories(in: products(inSeries: seriesID))
     }
 
     // MARK: 商品与规格（计划 §13）

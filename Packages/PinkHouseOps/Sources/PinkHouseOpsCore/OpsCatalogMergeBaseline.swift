@@ -51,6 +51,11 @@ public struct OpsCatalogMergeBaseline: Codable, Equatable, Sendable {
                 if update.fields.contains(.priceChart) { keys.insert("priceChart") }
                 result.knownFields?[path] = keys
                 for asset in update.assets { result.knownFields?["assets." + asset.id] = ["*"] }
+                if update.fields.contains(.productOrder) {
+                    for id in update.productOrders?.keys.sorted() ?? [] where result.catalog.products.contains(where: { $0.id == id }) {
+                        result.knownFields?["products." + id, default: []].insert("displayOrder")
+                    }
+                }
             }
         }
         return result
@@ -109,6 +114,14 @@ public struct OpsCatalogMergeBaseline: Codable, Equatable, Sendable {
         for shop in confirmed.shops where !prior.shops.contains(where: { $0.id == shop.id }) {
             if !seed.catalog.shops.contains(where: { $0.id == shop.id }) { seed.catalog.shops.append(shop) }
             if seed.knownFields != nil { seed.knownFields?["shops." + shop.id] = ["*"] }
+        }
+        for product in confirmed.products {
+            guard let before = prior.products.first(where: { $0.id == product.id }),
+                  before.displayOrder != product.displayOrder else { continue }
+            if let index = seed.catalog.products.firstIndex(where: { $0.id == product.id }) {
+                seed.catalog.products[index].displayOrder = product.displayOrder
+                if seed.knownFields != nil { seed.knownFields?["products." + product.id, default: []].insert("displayOrder") }
+            }
         }
         for asset in confirmed.assets where prior.assets.first(where: { $0.id == asset.id }) != asset {
             if let index = seed.catalog.assets.firstIndex(where: { $0.id == asset.id }) {

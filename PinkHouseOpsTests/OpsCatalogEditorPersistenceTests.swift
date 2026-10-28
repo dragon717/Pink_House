@@ -8,6 +8,595 @@ import SwiftUI
 
 @MainActor
 final class OpsCatalogEditorPersistenceTests: XCTestCase {
+    func testBridgeConfirmedWithoutBothReceiptsCannotClearSavedNameUpdate() async throws {
+        let store = try container()
+        let workspace = OpsWorkspace(context: store.mainContext)
+        suppressNetwork(workspace)
+        let product = try publishedRenameFixture(workspace)
+        workspace.catalogEditSyncQueue = workspace.makeCatalogEditSyncQueue(publishSeries: { _, _ in
+            workspace.draft?.catalogSyncSeriesReceiptsJSON = try? JSONEncoder().encode(["development": 9])
+            return .confirmed(releaseSeq: 9)
+        })
+        XCTAssertTrue(workspace.saveProductIdentity(id: product.id, shopID: product.shopID,
+            seriesID: product.seriesID, name: "蓝色新名称", category: "JSK"))
+        await workspace.catalogEditSyncQueue.waitUntilIdle()
+        XCTAssertNotNil(workspace.draft?.catalogSyncRequestID)
+        XCTAssertEqual(workspace.catalogEditSyncProgress?.state, .failed)
+        XCTAssertLessThan(workspace.catalogEditSyncProgress?.fraction ?? 1, 1)
+        XCTAssertTrue(workspace.canRetrySavedSeriesSync)
+    }
+
+    func testFinalSyncStatusDiskFailureRetainsRequestAndReceiptsForSafeRetry() throws {
+        let store = try container()
+        var fails = false
+        let workspace = OpsWorkspace(context: store.mainContext, saveCatalogContext: {
+            if fails { throw NSError(domain: "test.sync.finalStatus", code: 1) }
+            try $0.save()
+        })
+        suppressNetwork(workspace)
+        let product = try publishedRenameFixture(workspace)
+        XCTAssertTrue(workspace.saveProductIdentity(id: product.id, shopID: product.shopID,
+            seriesID: product.seriesID, name: "蓝色新名称", category: "JSK"))
+        let request = OpsCatalogEditSyncQueue.Request(id: workspace.draft!.catalogSyncRequestID!,
+            draftID: workspace.draft!.id, revision: workspace.currentRevision,
+            environment: workspace.draft!.catalogSyncEnvironment!)
+        workspace.draft?.catalogSyncSeriesReceiptsJSON = try JSONEncoder().encode(["development": 9, "production": 10])
+        fails = true
+        workspace.finishSavedCatalogSync(request: request, result: .confirmed(10))
+        XCTAssertEqual(workspace.draft?.catalogSyncRequestID, request.id)
+        XCTAssertNotNil(workspace.draft?.catalogSyncSeriesReceiptsJSON)
+        XCTAssertEqual(workspace.catalogEditSyncProgress?.state, .failed)
+        XCTAssertLessThan(workspace.catalogEditSyncProgress?.fraction ?? 1, 1)
+        fails = false
+        workspace.finishSavedCatalogSync(request: request, result: .confirmed(10))
+        XCTAssertNil(workspace.draft?.catalogSyncRequestID)
+        XCTAssertEqual(workspace.catalogEditSyncProgress?.state, .complete)
+    }
+
+    func testOlderEnvironmentReceiptAndCompletionDoNotClearNewerNameSave() throws {
+        let store = try container()
+        let workspace = OpsWorkspace(context: store.mainContext)
+        suppressNetwork(workspace)
+        let product = try publishedRenameFixture(workspace)
+        XCTAssertTrue(workspace.saveProductIdentity(id: product.id, shopID: product.shopID,
+            seriesID: product.seriesID, name: "蓝色第一次名称", category: "JSK"))
+        let request = OpsCatalogEditSyncQueue.Request(id: workspace.draft!.catalogSyncRequestID!,
+            draftID: workspace.draft!.id, revision: workspace.currentRevision,
+            environment: workspace.draft!.catalogSyncEnvironment!)
+        let previous = workspace.catalog
+        XCTAssertTrue(workspace.saveProductIdentity(id: product.id, shopID: product.shopID,
+            seriesID: product.seriesID, name: "蓝色第二次名称", category: "JSK"))
+        let newerID = workspace.draft?.catalogSyncRequestID
+        try workspace.recordConfirmedEditorSync(requestID: request.id, verified: previous,
+            head: .init(releaseSeq: 9, rootIndexHash: String(repeating: "a", count: 64), environment: "development"))
+        workspace.finishSavedCatalogSync(request: request, result: .confirmed(9))
+        XCTAssertEqual(workspace.draft?.catalogSyncRequestID, newerID)
+        XCTAssertNil(workspace.draft?.catalogSyncSeriesReceiptsJSON)
+        XCTAssertEqual(workspace.catalogEditSyncProgress?.requestID, newerID)
+        XCTAssertNotEqual(workspace.catalogEditSyncProgress?.state, .complete)
+    }
+    func testLegacySingleEnvironmentNameSaveQueuesDurableFieldOnlyRepair() throws {
+        let store = try container()
+        let workspace = OpsWorkspace(context: store.mainContext)
+        suppressNetwork(workspace)
+        let shop = try XCTUnwrap(workspace.addShopReturningID(name: "店家"))
+        let series = try XCTUnwrap(workspace.addSeriesReturningID(shopID: shop, name: "系列", year: nil, month: nil, season: nil))
+        _ = try XCTUnwrap(workspace.addProductReturningID(shopID: shop, seriesID: series, name: "旧名称", category: "JSK"))
+        let development = workspace.catalog
+        workspace.catalog.products[0].name = "新名称"
+        workspace.catalog.products[0].designName = "新名称"
+        let published = workspace.catalog
+        XCTAssertTrue(workspace.recordConfirmedPublish(releaseSeq: 22, rootIndexHash: String(repeating: "a", count: 64),
+            environment: "production", revision: workspace.currentRevision, publishedCatalog: published))
+        workspace.draft?.setMergeBaseline(.init(head: .init(releaseSeq: 18, environment: "development"), catalog: development), environment: "development")
+        XCTAssertTrue(workspace.enqueueLegacyNameRepairIfNeeded())
+        let frozen = try XCTUnwrap(workspace.draft?.catalogSyncEditorUpdatesJSON)
+        let updates = try ShopCatalogJSONCoding.decoder().decode([OpsCatalogEditorUpdate].self, from: frozen)
+        let expected = try OpsCatalogEditorUpdate.applying(updates, to: development)
+        XCTAssertEqual(expected.products[0].name, "新名称")
+        XCTAssertEqual(expected.products[0].images, development.products[0].images)
+        XCTAssertEqual(expected.saleEvents, development.saleEvents)
+        XCTAssertEqual(workspace.catalog, published)
+        let restored = OpsWorkspace(context: ModelContext(store))
+        suppressNetwork(restored)
+        XCTAssertEqual(restored.draft?.catalogSyncEditorUpdatesJSON, frozen)
+        XCTAssertFalse(restored.enqueueLegacyNameRepairIfNeeded(), "补救只排队一次，退出也不丢失")
+    }
+    func testLegacyNameRepairUsesObservedOldIdentityWhenTargetBaselineOmitsProduct() throws {
+        let store = try container()
+        let workspace = OpsWorkspace(context: store.mainContext)
+        suppressNetwork(workspace)
+        let product = try publishedRenameFixture(workspace)
+        let prior = workspace.catalog
+        workspace.catalog.products[0].name = "新名称"
+        workspace.catalog.products[0].designName = "新名称"
+        let published = workspace.catalog
+        XCTAssertTrue(workspace.recordConfirmedPublish(releaseSeq: 22, rootIndexHash: String(repeating: "a", count: 64),
+            environment: "production", revision: workspace.currentRevision, publishedCatalog: published))
+        var partial = prior
+        partial.products = []
+        workspace.draft?.setMergeBaseline(.init(head: .init(releaseSeq: 23, environment: "development"), catalog: partial), environment: "development")
+        XCTAssertTrue(workspace.enqueueLegacyNameRepairIfNeeded(previousSourceCatalog: prior))
+        let updates = try ShopCatalogJSONCoding.decoder().decode([OpsCatalogEditorUpdate].self,
+            from: XCTUnwrap(workspace.draft?.catalogSyncEditorUpdatesJSON))
+        XCTAssertEqual(try OpsCatalogEditorUpdate.applying(updates, to: prior).products.first { $0.id == product.id }?.name, "新名称")
+        var conflicting = prior
+        conflicting.products[0].name = "另一位运营刚改的名称"
+        XCTAssertThrowsError(try OpsCatalogEditorUpdate.applying(updates, to: conflicting))
+        XCTAssertEqual(workspace.catalog, published)
+    }
+
+    func testLegacyNameRepairDoesNotReverseDirectionAfterManualPullMovesBaseline() throws {
+        let store = try container()
+        let workspace = OpsWorkspace(context: store.mainContext)
+        suppressNetwork(workspace)
+        _ = try publishedRenameFixture(workspace)
+        let old = workspace.catalog
+        workspace.catalog.products[0].name = "已确认新名称"
+        workspace.catalog.products[0].designName = "已确认新名称"
+        let published = workspace.catalog
+        XCTAssertTrue(workspace.recordConfirmedPublish(releaseSeq: 22, rootIndexHash: String(repeating: "a", count: 64),
+            environment: "production", revision: workspace.currentRevision, publishedCatalog: published))
+        workspace.draft?.baselineCatalog = old
+        workspace.draft?.baseline = .init(releaseSeq: 23, rootIndexHash: String(repeating: "b", count: 64), environment: "development")
+        workspace.draft?.setMergeBaseline(.init(head: workspace.draft!.baseline, catalog: old), environment: "development")
+        XCTAssertTrue(workspace.enqueueLegacyNameRepairIfNeeded())
+        let updates = try ShopCatalogJSONCoding.decoder().decode([OpsCatalogEditorUpdate].self,
+            from: XCTUnwrap(workspace.draft?.catalogSyncEditorUpdatesJSON))
+        XCTAssertEqual(try OpsCatalogEditorUpdate.applying(updates, to: old).products[0].name, "已确认新名称")
+        XCTAssertEqual(try OpsCatalogEditorUpdate.applying(updates, to: published).products[0].name, "已确认新名称")
+    }
+
+    func testOrdinaryNameSaveReachesBothEnvironmentsAndVerifiesBusinessContent() async throws {
+        try await exerciseSavedNameSync(staleProductionReadback: false)
+    }
+
+    func testConfirmedPublishWithStaleContentStaysIncompleteAndRetrySkipsConfirmedEnvironment() async throws {
+        try await exerciseSavedNameSync(staleProductionReadback: true)
+    }
+
+    func testOrdinaryNameSaveRepairsMissingDevelopmentProductThroughRealPipeline() async throws {
+        try await exerciseSavedNameSync(staleProductionReadback: false, missingDevelopmentProduct: true)
+    }
+
+    func testMissingProductDependencySnapshotSurvivesUnconfirmedReadbackAndQuery() async throws {
+        try await exerciseSavedNameSync(staleProductionReadback: true, missingDevelopmentProduct: true,
+                                       staleReadbackEnvironment: "development")
+    }
+
+    func testSavedOrderBootstrapsPublishedProductAndSeriesBeforeConfirmingBothEnvironments() async throws {
+        try await exerciseSavedNameSync(staleProductionReadback: false, missingDevelopmentProduct: true,
+                                       sorting: true, missingDevelopmentSeries: true)
+    }
+
+    func testSavedOrderRejectsStaleReadbackAndQueriesSameFrozenMissingProductTask() async throws {
+        try await exerciseSavedNameSync(staleProductionReadback: true, missingDevelopmentProduct: true,
+                                       staleReadbackEnvironment: "development", sorting: true)
+    }
+
+    private func exerciseSavedNameSync(staleProductionReadback: Bool, missingDevelopmentProduct: Bool = false,
+                                      staleReadbackEnvironment: String = "production", sorting: Bool = false,
+                                      missingDevelopmentSeries: Bool = false) async throws {
+        let store = try container()
+        let workspace = OpsWorkspace(context: store.mainContext)
+        suppressNetwork(workspace)
+        let shop = try XCTUnwrap(workspace.addShopReturningID(name: "店家"))
+        let series = try XCTUnwrap(workspace.addSeriesReturningID(shopID: shop, name: "系列", year: nil, month: nil, season: nil))
+        let product = try XCTUnwrap(workspace.addProductReturningID(shopID: shop, seriesID: series, name: "旧名称", category: "JSK"))
+        XCTAssertTrue(workspace.saveDraft())
+        let original = workspace.catalog
+        if sorting {
+            XCTAssertTrue(workspace.recordConfirmedPublish(releaseSeq: 11, rootIndexHash: String(repeating: "b", count: 64),
+                environment: "production", revision: workspace.currentRevision, publishedCatalog: original))
+            XCTAssertTrue(workspace.saveProductDisplayOrder(seriesID: series, orderedIDs: [product],
+                expectedProducts: original.products, expectedDraftID: workspace.draft!.id))
+        } else {
+            XCTAssertTrue(workspace.saveProductIdentity(id: product, shopID: shop, seriesID: series,
+                name: "新名称", category: "JSK"))
+        }
+        let edits = try workspace.draft?.catalogSyncEditorUpdatesJSON.map {
+            try ShopCatalogJSONCoding.decoder().decode([OpsCatalogEditorUpdate].self, from: $0)
+        } ?? []
+        let updates = try workspace.draft?.catalogSyncSeriesUpdatesJSON.map {
+            try ShopCatalogJSONCoding.decoder().decode([OpsSeriesConfigUpdate].self, from: $0)
+        } ?? []
+        let requestID = try XCTUnwrap(workspace.draft?.catalogSyncRequestID)
+        let request = OpsCatalogEditSyncQueue.Request(id: requestID, draftID: workspace.draft!.id,
+            revision: workspace.currentRevision, environment: workspace.draft!.catalogSyncEnvironment!)
+        var catalogs = ["development": original, "production": original]
+        if missingDevelopmentProduct { catalogs["development"]?.products = [] }
+        if missingDevelopmentSeries { catalogs["development"]?.series = [] }
+        var versions = ["development": 5, "production": 11]
+        var published: [String] = []
+        var returnStaleContent = staleProductionReadback
+        func hash(_ environment: String) -> String {
+            String(repeating: environment == "development" ? "a" : "b", count: 64)
+        }
+        let bridge: (OpsBridgeMode, ShopCatalogPublishRequest, URL) async -> OpsBridgeRunResult? = { mode, frozen, _ in
+            let env = frozen.targetEnvironment.rawValue
+            var result = OpsBridgeRunResult(exitCode: 0, events: [], nonJSONLines: [], executablePath: "test", scriptPath: "test")
+            result.outcome = .confirmed
+            switch mode {
+            case .pullCatalog:
+                let directory = URL(fileURLWithPath: frozen.outputDirectory)
+                try! FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+                let catalog = returnStaleContent && env == staleReadbackEnvironment && directory.lastPathComponent == "verified"
+                    ? original : catalogs[env]!
+                let path = directory.appendingPathComponent("shop-catalog.json")
+                try! ShopCatalogJSONCoding.encoder().encode(catalog).write(to: path)
+                result.pulledCatalogPath = path.path
+            case .publish:
+                published.append(env)
+                catalogs[env] = try! OpsCatalogMergeBaseline.catalogInArchive(Data(contentsOf: URL(fileURLWithPath: frozen.archivePath)))
+                versions[env] = frozen.releaseSeq
+                let directory = URL(fileURLWithPath: frozen.outputDirectory)
+                try! FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+                try! JSONSerialization.data(withJSONObject: ["rootIndexHash": hash(env)])
+                    .write(to: directory.appendingPathComponent("release.json"))
+                result.receipt = .init(environment: env, applied: true, releaseSeq: frozen.releaseSeq,
+                    rootIndexHash: hash(env), requestID: frozen.requestID, jobID: frozen.jobID,
+                    draftID: frozen.draftID, draftRevision: frozen.draftRevision,
+                    artifactDigest: frozen.payloadHash, readBackConfirmed: true)
+            case .query: break
+            default: XCTFail("Unexpected bridge mode: \(mode)")
+            }
+            result.onlineHead = .init(environment: env, releaseSeq: versions[env]!, rootIndexHash: hash(env))
+            return result
+        }
+        let first = await workspace.synchronizeSavedSeries(requestID: requestID, updates: updates, cloud: .shared,
+            editorUpdates: edits, bridge: bridge)
+        if staleProductionReadback {
+            guard case .failed = first else { return XCTFail("旧内容不能因发布回执 confirmed 被判为成功") }
+            workspace.finishSavedCatalogSync(request: request, result: .failed("线上内容回读不一致"))
+            XCTAssertEqual(workspace.catalogEditSyncProgress?.state, .failed)
+            XCTAssertLessThan(workspace.catalogEditSyncProgress?.fraction ?? 1, 1)
+            XCTAssertNotNil(workspace.draft?.catalogSyncRequestID)
+            let restored = OpsWorkspace(context: ModelContext(store))
+            suppressNetwork(restored)
+            restored.resumeCatalogEditorSync()
+            XCTAssertEqual(restored.catalogEditSyncProgress?.state, .failed)
+            returnStaleContent = false
+            let retry = await workspace.synchronizeSavedSeries(requestID: requestID, updates: updates, cloud: .shared,
+                editorUpdates: edits, bridge: bridge)
+            guard case .confirmed(let seq) = retry else { return XCTFail("同一冻结任务查询后应恢复确认：\(retry)") }
+            workspace.finishSavedCatalogSync(request: request, result: .confirmed(seq))
+        } else {
+            guard case .confirmed(let seq) = first else { return XCTFail("\(first)") }
+            workspace.finishSavedCatalogSync(request: request, result: .confirmed(seq))
+        }
+        XCTAssertEqual(published, ["development", "production"], "查询重试不重复发布已确认环境")
+        XCTAssertEqual(workspace.catalogEditSyncProgress?.state, .complete)
+        XCTAssertEqual(workspace.catalogEditSyncProgress?.fraction, 1)
+        XCTAssertNil(workspace.draft?.catalogSyncRequestID)
+        XCTAssertNil(workspace.draft?.catalogSyncEditorUpdatesJSON)
+        if sorting {
+            XCTAssertEqual(workspace.draft?.mergeBaseline(environment: "development")?.catalog.products[0].displayOrder, 0)
+            XCTAssertEqual(workspace.draft?.mergeBaseline(environment: "production")?.catalog.products[0].displayOrder, 0)
+        }
+        XCTAssertEqual(workspace.draft?.mergeBaseline(environment: "development")?.catalog.products[0].name, sorting ? "旧名称" : "新名称")
+        XCTAssertEqual(workspace.draft?.mergeBaseline(environment: "production")?.catalog.products[0].name, sorting ? "旧名称" : "新名称")
+    }
+
+    private func publishedRenameFixture(_ workspace: OpsWorkspace) throws -> CatalogProduct {
+        let shopID = try XCTUnwrap(workspace.addShopReturningID(name: "改名验证店家"))
+        let seriesID = try XCTUnwrap(workspace.addSeriesReturningID(shopID: shopID,
+            name: "改名验证系列", year: nil, month: nil, season: nil))
+        let products = [
+            CatalogProduct(id: "rename-blue", shopID: shopID, seriesID: seriesID,
+                name: "蓝色华丽款 JSK+项链+项链", category: "JSK", images: ["photo"],
+                designName: "华丽款 JSK+项链+项链", displayOrder: 2),
+            CatalogProduct(id: "rename-pink", shopID: shopID, seriesID: seriesID,
+                name: "粉色华丽款 JSK+项链+项链", category: "JSK", images: ["pink-photo"],
+                archivedAt: Date(timeIntervalSince1970: 100), designName: "华丽款 JSK+项链+项链"),
+            CatalogProduct(id: "another-design", shopID: shopID, seriesID: seriesID,
+                name: "另一款", category: "JSK", images: [], designName: "另一款")
+        ]
+        workspace.catalog.products = products
+        let key = ShopCatalogStyleProfileSharing.styleKey(of: products[0])
+        workspace.catalog.styleProfiles = [.init(id: key, seriesID: seriesID, category: "JSK",
+            designName: "华丽款 JSK+项链+项链", fabric: "提花布", styleDescription: "蕾丝装饰")]
+        workspace.catalog.sizeCharts = [.init(id: "chart", productID: products[0].id,
+            columns: ["S", "M"], rows: [.init(label: "胸围", values: ["80", "84"])], sourceImage: "chart-photo")]
+        workspace.catalog.variants = [.init(id: "sku", productID: products[0].id, color: "蓝色", size: "M")]
+        workspace.catalog.saleEvents = [.init(id: "sale", productID: products[0].id,
+            type: .reservation, price: 399, deposit: 100, balance: 299, currency: .cny)]
+        workspace.draft?.lastPublishedReleaseSeq = 8
+        workspace.draft?.baselineCatalog = workspace.catalog
+        XCTAssertTrue(workspace.saveDraft())
+        return products[0]
+    }
+
+    func testPublishedProductRenamePersistsWholeDesignWithoutLosingImagesOrSizeCharts() throws {
+        let store = try container()
+        let workspace = OpsWorkspace(context: store.mainContext)
+        suppressNetwork(workspace)
+        let product = try publishedRenameFixture(workspace)
+        let before = workspace.catalog
+        XCTAssertTrue(workspace.saveProductIdentity(id: product.id, shopID: product.shopID,
+            seriesID: product.seriesID, name: "蓝色华丽款 JSK+项链", category: "JSK"))
+        XCTAssertNil(workspace.lastError)
+        XCTAssertEqual(workspace.catalog.products[0].name, "蓝色华丽款 JSK+项链")
+        XCTAssertEqual(workspace.catalog.products[0].designName, "华丽款 JSK+项链")
+        XCTAssertEqual(workspace.catalog.products[1].name, "粉色华丽款 JSK+项链")
+        XCTAssertEqual(workspace.catalog.products[1].archivedAt, before.products[1].archivedAt)
+        XCTAssertEqual(workspace.catalog.products[2], before.products[2])
+        XCTAssertEqual(workspace.catalog.products.map(\.id), before.products.map(\.id))
+        XCTAssertEqual(workspace.catalog.products.map(\.images), before.products.map(\.images))
+        XCTAssertEqual(workspace.catalog.products.map(\.displayOrder), before.products.map(\.displayOrder))
+        XCTAssertEqual(workspace.catalog.sizeCharts, before.sizeCharts)
+        XCTAssertEqual(workspace.catalog.variants, before.variants)
+        XCTAssertEqual(workspace.catalog.saleEvents, before.saleEvents)
+        XCTAssertEqual(workspace.catalog.styleProfiles.first?.fabric, "提花布")
+        XCTAssertEqual(workspace.catalog.styleProfiles.first?.styleDescription, "蕾丝装饰")
+        XCTAssertEqual(workspace.catalog.styleProfiles.first?.id,
+            ShopCatalogStyleProfileSharing.styleKey(of: workspace.catalog.products[0]))
+        XCTAssertNotNil(workspace.draft?.catalogSyncRequestID)
+        XCTAssertFalse(workspace.hasUnsavedChanges)
+        let reopened = OpsWorkspace(context: ModelContext(store))
+        suppressNetwork(reopened)
+        // 目录日期按既有 ISO8601 秒精度持久化；比较同一编解码边界的完整事实。
+        let persisted = try ShopCatalogJSONCoding.decoder().decode(ShopCatalog.self,
+            from: ShopCatalogJSONCoding.encoder().encode(workspace.catalog))
+        XCTAssertEqual(reopened.catalog, persisted)
+    }
+
+    func testPublishedCategoryEditAndExplicitDesignEditUseSharedRenamePlan() throws {
+        let store = try container()
+        let workspace = OpsWorkspace(context: store.mainContext)
+        suppressNetwork(workspace)
+        let product = try publishedRenameFixture(workspace)
+        XCTAssertTrue(workspace.saveProductIdentity(id: product.id, shopID: product.shopID,
+            seriesID: product.seriesID, name: product.name, category: "OP"))
+        XCTAssertEqual(workspace.catalog.products.prefix(2).map(\.category), ["OP", "OP"])
+        XCTAssertTrue(workspace.saveProductEdit {
+            workspace.updateProductDetail(id: product.id, description: "新描述", designName: "华丽款套装")
+        })
+        XCTAssertEqual(workspace.catalog.products.prefix(2).map(\.designName), ["华丽款套装", "华丽款套装"])
+        XCTAssertEqual(workspace.catalog.products[0].description, "新描述")
+        XCTAssertEqual(workspace.catalog.styleProfiles.first?.designName, "华丽款套装")
+        XCTAssertEqual(workspace.catalog.styleProfiles.first?.category, "OP")
+    }
+
+    func testProductRenameSaveFailureRollsBackEntireDesignAndKeepsPendingSync() throws {
+        let store = try container()
+        var fail = false
+        let workspace = OpsWorkspace(context: store.mainContext, saveCatalogContext: {
+            if fail { throw NSError(domain: "test.rename.disk", code: 1) }
+            try $0.save()
+        })
+        suppressNetwork(workspace)
+        let product = try publishedRenameFixture(workspace)
+        workspace.draft?.catalogSyncRequestID = "previous-request"
+        let before = workspace.catalog
+        let revision = workspace.currentRevision
+        fail = true
+        XCTAssertFalse(workspace.saveProductIdentity(id: product.id, shopID: product.shopID,
+            seriesID: product.seriesID, name: "蓝色华丽款套装", category: "JSK"))
+        XCTAssertEqual(workspace.catalog, before)
+        XCTAssertEqual(workspace.currentRevision, revision)
+        XCTAssertEqual(workspace.draft?.catalogSyncRequestID, "previous-request")
+        XCTAssertTrue(workspace.lastError?.contains("保存失败") == true)
+        fail = false
+        XCTAssertTrue(workspace.saveProductIdentity(id: product.id, shopID: product.shopID,
+            seriesID: product.seriesID, name: "蓝色华丽款套装", category: "JSK"))
+        XCTAssertEqual(workspace.catalog.products[1].name, "粉色华丽款套装")
+    }
+
+    func testInvalidRenameAndCombinedMoveDoNotPartiallyMutateTheCatalog() throws {
+        let store = try container()
+        let workspace = OpsWorkspace(context: store.mainContext)
+        suppressNetwork(workspace)
+        let product = try publishedRenameFixture(workspace)
+        let another = try XCTUnwrap(workspace.addSeriesReturningID(shopID: product.shopID,
+            name: "其他系列", year: nil, month: nil, season: nil))
+        let before = workspace.catalog
+        for (name, seriesID) in [("  ", product.seriesID), ("新名称", another)] {
+            XCTAssertFalse(workspace.saveProductIdentity(id: product.id, shopID: product.shopID,
+                seriesID: seriesID, name: name, category: "JSK"))
+            XCTAssertEqual(workspace.catalog, before)
+        }
+        workspace.draft?.corruptionDetected = true
+        XCTAssertFalse(workspace.saveProductIdentity(id: product.id, shopID: product.shopID,
+            seriesID: product.seriesID, name: "新名称", category: "JSK"))
+        XCTAssertEqual(workspace.catalog, before)
+    }
+
+    func testSubmittedProductsCanReorderBothTypesAndStylesWithoutReopeningWizard() throws {
+        let store = try container()
+        let workspace = OpsWorkspace(context: store.mainContext)
+        suppressNetwork(workspace)
+        workspace.seriesEntry = completedSeriesInput()
+        workspace.seriesEntry.typeEntries = [
+            .init(category: "OP", designName: "同名款式", stockPriceText: "100", colors: [.init(name: "白色")]),
+            .init(category: "OP", designName: "另一款", stockPriceText: "200", colors: [.init(name: "蓝色")]),
+            .init(category: "JSK", designName: "背心裙", stockPriceText: "300", colors: [.init(name: "粉色")])
+        ]
+        XCTAssertTrue(workspace.saveSeriesEntryToDraft().allOK)
+        XCTAssertTrue(workspace.seriesEntry.typeEntries.isEmpty)
+        let original = workspace.catalog
+        let products = original.products
+        let seriesID = try XCTUnwrap(products.first?.seriesID)
+        let draftID = try XCTUnwrap(workspace.draft?.id)
+        let order = [products[2].id, products[1].id, products[0].id]
+        XCTAssertTrue(workspace.saveProductDisplayOrder(seriesID: seriesID, orderedIDs: order,
+            expectedProducts: products, expectedDraftID: draftID))
+        XCTAssertEqual(CatalogProductOrdering.ordered(workspace.catalog.products).map(\.id), order)
+        XCTAssertEqual(workspace.catalog.saleEvents, original.saleEvents)
+        XCTAssertEqual(workspace.catalog.variants, original.variants)
+        XCTAssertEqual(workspace.catalog.assets, original.assets)
+        XCTAssertEqual(workspace.catalog.series, original.series)
+        XCTAssertEqual(workspace.catalog.products.map(\.name), original.products.map(\.name))
+        XCTAssertTrue(workspace.seriesEntry.typeEntries.isEmpty)
+        let updates = try JSONDecoder().decode([OpsSeriesConfigUpdate].self,
+            from: XCTUnwrap(workspace.draft?.catalogSyncSeriesUpdatesJSON))
+        XCTAssertEqual(updates[0].fields, [.productOrder])
+        XCTAssertEqual(updates[0].productOrders?[products[2].id], 0)
+        let reopened = OpsWorkspace(context: ModelContext(store))
+        suppressNetwork(reopened)
+        XCTAssertEqual(CatalogProductOrdering.ordered(reopened.catalog.products).map(\.id), order)
+    }
+
+    func testResavingIdenticalOrderStillQueuesFreshTwoEnvironmentVerification() throws {
+        let store = try container(); let workspace = OpsWorkspace(context: store.mainContext)
+        suppressNetwork(workspace)
+        workspace.seriesEntry = completedSeriesInput()
+        XCTAssertTrue(workspace.saveSeriesEntryToDraft().allOK)
+        let products = workspace.catalog.products
+        let seriesID = try XCTUnwrap(products.first?.seriesID)
+        let ids = CatalogProductOrdering.ordered(products).map(\.id)
+        XCTAssertTrue(workspace.saveProductDisplayOrder(seriesID: seriesID, orderedIDs: ids,
+            expectedProducts: products, expectedDraftID: workspace.draft!.id))
+        let old = workspace.draft?.catalogSyncRequestID
+        let originalRevision = workspace.currentRevision
+        XCTAssertTrue(workspace.saveProductDisplayOrder(seriesID: seriesID, orderedIDs: ids,
+            expectedProducts: workspace.catalog.products, expectedDraftID: workspace.draft!.id))
+        XCTAssertNotEqual(workspace.draft?.catalogSyncRequestID, old)
+        XCTAssertEqual(workspace.currentRevision, originalRevision)
+        XCTAssertNotEqual(workspace.catalogEditSyncProgress?.state, .complete)
+    }
+
+    func testLegacySavedOrderRepairFreezesPublishedContentAndSurvivesRestart() throws {
+        let store = try container(); let workspace = OpsWorkspace(context: store.mainContext)
+        suppressNetwork(workspace)
+        let product = try publishedRenameFixture(workspace)
+        workspace.catalog.series[0].balanceDueAt = Date(timeIntervalSince1970: 1_800_000_000)
+        let published = workspace.catalog
+        XCTAssertTrue(workspace.recordConfirmedPublish(releaseSeq: 23, rootIndexHash: String(repeating: "a", count: 64),
+            environment: "production", revision: workspace.currentRevision, publishedCatalog: published))
+        var unpublished = product; unpublished.id = "not-published"; unpublished.name = "本机新草稿"; unpublished.displayOrder = 3
+        workspace.catalog.products.append(unpublished)
+        workspace.catalog.products[0].priceCorrection = .init(stockPrice: 999)
+        XCTAssertTrue(workspace.saveDraft())
+        let local = workspace.catalog
+        workspace.draft?.catalogOrderDualSyncVersion = 1
+        XCTAssertTrue(workspace.enqueueLegacyProductOrderRepairIfNeeded())
+        let frozen = try XCTUnwrap(workspace.draft?.catalogSyncSeriesUpdatesJSON)
+        let updates = try JSONDecoder().decode([OpsSeriesConfigUpdate].self, from: frozen)
+        XCTAssertEqual(updates[0].series.balanceDueAt, workspace.catalog.series[0].balanceDueAt)
+        let source = try XCTUnwrap(updates[0].publishedOrderCatalog)
+        XCTAssertFalse(source.products.contains { $0.id == "not-published" })
+        XCTAssertEqual(source.products.first { $0.id == product.id }?.priceCorrection, product.priceCorrection)
+        XCTAssertEqual(workspace.catalog, local)
+        let restored = OpsWorkspace(context: ModelContext(store)); suppressNetwork(restored)
+        XCTAssertEqual(restored.draft?.catalogSyncSeriesUpdatesJSON, frozen)
+        XCTAssertEqual(restored.draft?.catalogOrderDualSyncVersion, 2)
+        XCTAssertFalse(restored.enqueueLegacyProductOrderRepairIfNeeded())
+    }
+
+    func testStaleOrIncompleteExistingProductSortCannotChangeAnyRecord() throws {
+        let store = try container()
+        let workspace = OpsWorkspace(context: store.mainContext)
+        suppressNetwork(workspace)
+        workspace.seriesEntry = completedSeriesInput()
+        XCTAssertTrue(workspace.commitSeriesEntry().allOK)
+        let before = workspace.catalog
+        let p = try XCTUnwrap(before.products.first)
+        let draftID = try XCTUnwrap(workspace.draft?.id)
+        for ids in [[], [p.id, p.id], ["missing"]] {
+            XCTAssertFalse(workspace.saveProductDisplayOrder(seriesID: p.seriesID, orderedIDs: ids,
+                expectedProducts: before.products, expectedDraftID: draftID))
+            XCTAssertEqual(workspace.catalog, before)
+        }
+        XCTAssertFalse(workspace.saveProductDisplayOrder(seriesID: p.seriesID, orderedIDs: [p.id],
+            expectedProducts: before.products, expectedDraftID: "other-draft"))
+        workspace.catalog.products[0].displayOrder = 5
+        let latest = workspace.catalog
+        XCTAssertFalse(workspace.saveProductDisplayOrder(seriesID: p.seriesID, orderedIDs: [p.id],
+            expectedProducts: before.products, expectedDraftID: draftID))
+        XCTAssertEqual(workspace.catalog, latest)
+    }
+
+    func testExistingProductSortDiskFailurePreservesOrderAndPendingSync() throws {
+        let store = try container()
+        var fails = false
+        let workspace = OpsWorkspace(context: store.mainContext, saveCatalogContext: {
+            if fails { throw NSError(domain: "test.sort", code: 1) }
+            try $0.save()
+        })
+        suppressNetwork(workspace)
+        workspace.seriesEntry = completedSeriesInput()
+        XCTAssertTrue(workspace.commitSeriesEntry().allOK)
+        let before = workspace.catalog
+        let p = try XCTUnwrap(before.products.first)
+        workspace.catalog.products[0].displayOrder = nil
+        XCTAssertTrue(workspace.saveDraft())
+        let original = workspace.catalog
+        let revision = workspace.draft?.draftRevision
+        let data = workspace.draft?.catalogJSON
+        fails = true
+        XCTAssertFalse(workspace.saveProductDisplayOrder(seriesID: p.seriesID, orderedIDs: [p.id],
+            expectedProducts: original.products, expectedDraftID: workspace.draft!.id))
+        XCTAssertEqual(workspace.catalog, original)
+        XCTAssertEqual(workspace.draft?.draftRevision, revision)
+        XCTAssertEqual(workspace.draft?.catalogJSON, data)
+        XCTAssertNil(workspace.draft?.catalogSyncRequestID)
+    }
+
+    func testSortQueueAutomaticallyUsesTwoEnvironmentScopedUpdate() async throws {
+        let store = try container()
+        let workspace = OpsWorkspace(context: store.mainContext)
+        suppressNetwork(workspace)
+        workspace.seriesEntry = completedSeriesInput()
+        XCTAssertTrue(workspace.saveSeriesEntryToDraft().allOK)
+        workspace.catalog.products[0].displayOrder = nil
+        let products = workspace.catalog.products
+        var calls = 0
+        workspace.catalogEditSyncQueue = workspace.makeCatalogEditSyncQueue(publishSeries: { _, updates in
+            calls += 1
+            XCTAssertEqual(updates[0].fields, [.productOrder])
+            XCTAssertEqual(updates[0].productOrders?[products[0].id], 0)
+            workspace.draft?.catalogSyncSeriesReceiptsJSON = try? JSONEncoder().encode(["development": 24, "production": 18])
+            return .confirmed(releaseSeq: 18)
+        })
+        XCTAssertTrue(workspace.saveProductDisplayOrder(seriesID: products[0].seriesID, orderedIDs: products.map(\.id),
+            expectedProducts: products, expectedDraftID: workspace.draft!.id))
+        await workspace.catalogEditSyncQueue.waitUntilIdle()
+        XCTAssertEqual(calls, 1)
+        XCTAssertNil(workspace.draft?.catalogSyncRequestID)
+        XCTAssertEqual(workspace.catalogEditSyncProgress?.state, .complete)
+    }
+
+    func testStyleDragOrderIsCommittedIntoProductsAndFrozenPublicationSnapshot() throws {
+        let store = try container()
+        let workspace = OpsWorkspace(context: store.mainContext)
+        suppressNetwork(workspace)
+        workspace.seriesEntry = completedSeriesInput()
+        workspace.seriesEntry.typeEntries = [
+            .init(category: "OP", designName: "第一款", stockPriceText: "100", colors: [.init(name: "白色")]),
+            .init(category: "OP", designName: "第二款", stockPriceText: "200", colors: [.init(name: "白色")]),
+            .init(category: "JSK", designName: "背心裙", stockPriceText: "300", colors: [.init(name: "白色")])
+        ]
+        XCTAssertTrue(workspace.commitSeriesEntry().allOK)
+        let ids = workspace.seriesEntry.typeEntries.compactMap(\.committedProductID)
+        let moving = workspace.seriesEntry.typeEntries[1].id
+        XCTAssertTrue(workspace.moveSeriesTypeEntry(id: moving, toOffset: 0))
+        XCTAssertTrue(workspace.commitSeriesEntry().allOK)
+        XCTAssertEqual(CatalogProductOrdering.ordered(workspace.catalog.products).map(\.id), [ids[1], ids[0], ids[2]])
+        XCTAssertEqual(workspace.catalog.products.count, 3, "重新排序只更新稳定商品，不复制同名商品")
+        let restored = OpsWorkspace(context: ModelContext(store))
+        suppressNetwork(restored)
+        XCTAssertEqual(CatalogProductOrdering.ordered(restored.catalog.products).map(\.id), [ids[1], ids[0], ids[2]])
+        XCTAssertTrue(workspace.saveSeriesEntryToDraft().allOK)
+        let job = try XCTUnwrap(workspace.seriesPublishJobs().first)
+        let frozen = try ShopCatalogJSONCoding.decoder().decode(ShopCatalog.self, from: XCTUnwrap(job.catalogSnapshotJSON))
+        XCTAssertEqual(CatalogProductOrdering.ordered(frozen.products).map(\.id), [ids[1], ids[0], ids[2]])
+    }
+
+    func testOrderingKeepsUnlistedAndOtherSeriesProducts() throws {
+        let store = try container()
+        let workspace = OpsWorkspace(context: store.mainContext)
+        suppressNetwork(workspace)
+        workspace.catalog = ShopCatalog(products: [
+            .init(id: "old", shopID: "shop", seriesID: "series", name: "旧款", category: "OP", displayOrder: 0),
+            .init(id: "edited", shopID: "shop", seriesID: "series", name: "当前款", category: "OP", displayOrder: 1),
+            .init(id: "elsewhere", shopID: "shop", seriesID: "other", name: "另一系列", category: "OP", displayOrder: 7)
+        ])
+        workspace.seriesEntry.typeEntries = [.init(category: "OP", designName: "当前款", committedProductID: "edited")]
+        workspace.applySeriesProductDisplayOrder(seriesID: "series")
+        XCTAssertEqual(workspace.catalog.products.map(\.displayOrder), [1, 0, 7])
+        XCTAssertEqual(workspace.catalog.products.map(\.id), ["old", "edited", "elsewhere"])
+    }
+
     func testPublishingAnotherEnvironmentDoesNotDiscardProductionAncestor() throws {
         let store = try container()
         let workspace = OpsWorkspace(context: store.mainContext)
@@ -115,6 +704,7 @@ final class OpsCatalogEditorPersistenceTests: XCTestCase {
             balanceDueAt: nil, balanceDueEndAt: nil, reservationBatches: [.init(id: "stable", name: "先行团")]))
         XCTAssertTrue(workspace.saveCatalogEditorChanges())
         let oldRequest = workspace.draft?.catalogSyncRequestID
+        workspace.draft?.catalogSyncEditorUpdatesJSON = nil // 模拟旧版单环境任务
         workspace.draft?.catalogSyncError = "上传前待修复 1 项，尚未发送发布请求；下载内容已保留"
         workspace.draft?.catalogSyncAttemptedID = oldRequest
         try store.mainContext.save()
@@ -153,7 +743,7 @@ final class OpsCatalogEditorPersistenceTests: XCTestCase {
         XCTAssertEqual(calls, 1, "一次保存自动调用两环境更新任务，不依赖再次发布")
         XCTAssertNil(restored.draft?.catalogSyncRequestID)
         XCTAssertNil(restored.draft?.catalogSyncSeriesUpdatesJSON)
-        XCTAssertTrue(restored.catalogEditSyncMessage?.contains("Development 22，Production 15") == true)
+        XCTAssertEqual(restored.catalogEditSyncProgress?.state, .complete)
     }
 
     func testSeriesConfigPartialSyncRetainsPendingUpdateAndReportsFailedEnvironment() async throws {
@@ -210,7 +800,7 @@ final class OpsCatalogEditorPersistenceTests: XCTestCase {
         XCTAssertEqual(ids, [originalID, originalID])
         XCTAssertFalse(workspace.canRetrySavedSeriesSync)
         XCTAssertNil(workspace.draft?.catalogSyncRequestID)
-        XCTAssertTrue(workspace.catalogEditSyncMessage?.contains("Development 24，Production 17") == true)
+        XCTAssertEqual(workspace.catalogEditSyncProgress?.state, .complete)
     }
 
     private func container() throws -> ModelContainer {
@@ -1623,11 +2213,13 @@ final class OpsCatalogEditorPersistenceTests: XCTestCase {
         suppressNetwork(workspace)
         let id = try XCTUnwrap(workspace.addShopReturningID(name: "原店家"))
         XCTAssertTrue(workspace.saveCatalogEditorChanges())
+        workspace.draft?.catalogSyncEditorUpdatesJSON = nil // 模拟已保存的旧版发布意图
         let frozenRevision = workspace.currentRevision
         let frozenCatalog = workspace.catalog
         let environment = try XCTUnwrap(workspace.draft?.catalogSyncEnvironment)
         XCTAssertTrue(workspace.updateShop(id: id, name: "再修改店家", aliases: []))
         XCTAssertTrue(workspace.saveCatalogEditorChanges())
+        workspace.draft?.catalogSyncEditorUpdatesJSON = nil // 模拟已保存的旧版发布意图
         let pending = workspace.draft?.catalogSyncRequestID
         XCTAssertTrue(workspace.recordConfirmedPublish(releaseSeq: 10, rootIndexHash: nil,
             environment: environment, revision: frozenRevision, publishedCatalog: frozenCatalog))
@@ -1659,6 +2251,7 @@ final class OpsCatalogEditorPersistenceTests: XCTestCase {
             suppressNetwork(workspace)
             shopID = try XCTUnwrap(workspace.addShopReturningID(name: "磁盘店家", logo: logo))
             XCTAssertTrue(workspace.saveCatalogEditorChanges())
+            workspace.draft?.catalogSyncEditorUpdatesJSON = nil // 旧版单环境任务
             // 模拟上次进程在网络请求后退出；新进程不能盲目重发。
             workspace.draft?.catalogSyncAttemptedID = workspace.draft?.catalogSyncRequestID
             try store.mainContext.save()
@@ -1683,6 +2276,7 @@ final class OpsCatalogEditorPersistenceTests: XCTestCase {
         suppressNetwork(workspace)
         _ = try XCTUnwrap(workspace.addShopReturningID(name: "店家"))
         XCTAssertTrue(workspace.saveCatalogEditorChanges())
+        workspace.draft?.catalogSyncEditorUpdatesJSON = nil // 模拟已保存的旧版发布意图
         let id = workspace.draft?.catalogSyncRequestID
         let environment = try XCTUnwrap(workspace.draft?.catalogSyncEnvironment)
         fails = true

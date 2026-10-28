@@ -31,6 +31,8 @@ nonisolated struct ShopCatalogSyncControl: Codable, Equatable, Sendable {
     var installedReleaseSeq: Int = 0
     /// 已安装数据包的 payloadHash（与根清单比对，决定要不要下载）
     var installedPayloadHash: String?
+    /// 发布号只在各环境内部递增，须与已安装根摘要一起比较；旧缓存缺键为 nil。
+    var installedRootIndexHash: String?
     /// 最近一次检查发布头的时间（节流用；失败也会推进，避免节流被错误状态击穿）
     var lastCheckedAt: Date?
     /// 已知的撤回控制版本
@@ -41,10 +43,12 @@ nonisolated struct ShopCatalogSyncControl: Codable, Equatable, Sendable {
         installedReleaseSeq: Int = 0,
         installedPayloadHash: String? = nil,
         lastCheckedAt: Date? = nil,
-        revocationEpoch: Int = 0
+        revocationEpoch: Int = 0,
+        installedRootIndexHash: String? = nil
     ) {
         self.installedReleaseSeq = installedReleaseSeq
         self.installedPayloadHash = installedPayloadHash
+        self.installedRootIndexHash = installedRootIndexHash
         self.lastCheckedAt = lastCheckedAt
         self.revocationEpoch = revocationEpoch
     }
@@ -55,7 +59,8 @@ nonisolated struct ShopCatalogSyncControl: Codable, Equatable, Sendable {
             installedReleaseSeq: try container.decodeIfPresent(Int.self, forKey: .installedReleaseSeq) ?? 0,
             installedPayloadHash: try container.decodeIfPresent(String.self, forKey: .installedPayloadHash),
             lastCheckedAt: try container.decodeIfPresent(Date.self, forKey: .lastCheckedAt),
-            revocationEpoch: try container.decodeIfPresent(Int.self, forKey: .revocationEpoch) ?? 0
+            revocationEpoch: try container.decodeIfPresent(Int.self, forKey: .revocationEpoch) ?? 0,
+            installedRootIndexHash: try container.decodeIfPresent(String.self, forKey: .installedRootIndexHash)
         )
     }
 }

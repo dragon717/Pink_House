@@ -3,6 +3,26 @@ import SharedCatalog
 import PinkHouseOpsCore
 
 extension OpsWorkspace {
+    /// 只认重新下载且业务字段通过核验的远端快照；分环境回执与祖先同次持久化。
+    func recordConfirmedEditorSync(requestID: String, verified: ShopCatalog, head: ShopCatalogBaseline) throws {
+        guard let draft, !draft.isCorrupted, let environment = head.environment else {
+            throw NSError(domain: "OpsSavedEditSync", code: 1)
+        }
+        let old = (draft.environmentBaselinesJSON, draft.catalogSyncSeriesReceiptsJSON)
+        draft.setMergeBaseline(.init(head: head, catalog: verified), environment: environment)
+        if draft.catalogSyncRequestID == requestID {
+            var receipts = try draft.catalogSyncSeriesReceiptsJSON.map {
+                try JSONDecoder().decode([String: Int].self, from: $0)
+            } ?? [:]
+            receipts[environment] = head.releaseSeq
+            draft.catalogSyncSeriesReceiptsJSON = try JSONEncoder().encode(receipts)
+        }
+        do { try saveCatalogContext(context) }
+        catch {
+            (draft.environmentBaselinesJSON, draft.catalogSyncSeriesReceiptsJSON) = old
+            throw error
+        }
+    }
     /// 回执与比较祖先同次落盘；网络中途的新保存不会被旧任务清掉。
     func recordConfirmedSeriesSync(requestID: String, updates: [OpsSeriesConfigUpdate],
                                    previousRemote: ShopCatalog, head: ShopCatalogBaseline) throws {
@@ -15,7 +35,20 @@ extension OpsWorkspace {
         let ancestor = try draft.mergeBaseline(environment: environment)
             ?? OpsCatalogMergeBaseline.commonAncestor(legacy: baselineCatalog,
                 previouslyConfirmed: previousRemote, head: head)
-        let confirmed = try ancestor.acknowledging(updates, head: head)
+        let acknowledged = updates.map { update in
+            var actual = update
+            if update.fields.contains(.productOrder) {
+                let liveIDs = Set(previousRemote.products.filter {
+                    $0.seriesID == update.series.id && $0.shopID == update.series.shopID && $0.archivedAt == nil
+                        && !previousRemote.removedProductIDs.contains($0.id)
+                        && !previousRemote.removedSeriesIDs.contains($0.seriesID)
+                        && !previousRemote.removedShopIDs.contains($0.shopID)
+                }.map(\.id))
+                actual.productOrders = update.productOrders?.filter { liveIDs.contains($0.key) }
+            }
+            return actual
+        }
+        let confirmed = try ancestor.acknowledging(acknowledged, head: head)
         draft.setMergeBaseline(confirmed, environment: environment)
         if draft.catalogSyncRequestID == requestID {
             var receipts = try oldReceipts.map { try JSONDecoder().decode([String: Int].self, from: $0) } ?? [:]

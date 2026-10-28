@@ -270,6 +270,27 @@ def build_pack(
     return descriptor, compressed, payload
 
 
+def shop_catalog_publication_order(products: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Match CatalogProductOrdering.publicationOrder, including legacy array readers."""
+    groups: Dict[Tuple[str, str], List[Dict[str, Any]]] = {}
+    for product in products:
+        key = (str(product.get("shopID", "")), str(product.get("seriesID", "")))
+        groups.setdefault(key, []).append(product)
+
+    def rank(product):
+        value = product.get("displayOrder")
+        return value if isinstance(value, int) and not isinstance(value, bool) and value >= 0 else None
+
+    ordered = {}
+    for key, group in groups.items():
+        if any(rank(product) is not None for product in group):
+            ranked = sorted(group, key=lambda product: (rank(product) is None, rank(product) or 0))
+            categories = dict.fromkeys(product.get("category", "") for product in ranked)
+            group = [product for category in categories for product in ranked if product.get("category", "") == category]
+        ordered[key] = iter(group)
+    return [next(ordered[(str(product.get("shopID", "")), str(product.get("seriesID", "")))]) for product in products]
+
+
 def build_shop_catalog_pack(
     brand: Dict[str, Any],
     doc: Dict[str, Any],
@@ -312,6 +333,9 @@ def build_shop_catalog_pack(
     # 发布包里带着它们只是白耗流量；更关键的是连带剔除必须做干净 ——
     # 只删商品不删它的规格/销售事件会留下悬空引用，客户端整个包拒绝安装。
     doc, archived_report = strip_archived_shop_catalog(doc)
+    # 旧版 App 按商品数组展示；不能只写 displayOrder 而仍发送旧数组顺序。
+    doc = dict(doc)
+    doc["products"] = shop_catalog_publication_order(doc.get("products") or [])
     if any(archived_report.values()):
         detail = "、".join(
             "{} -{}".format(field, archived_report[field])

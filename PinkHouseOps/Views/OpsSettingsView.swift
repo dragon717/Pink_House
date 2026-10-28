@@ -15,6 +15,13 @@ struct OpsSettingsView: View {
 
     var body: some View {
         Form {
+            if let workspace = holder.workspace {
+                Section("已保存修改的同步进度") {
+                    OpsCatalogEditSyncStatus(workspace: workspace)
+                    Text("商品、店家和系列的保存会分别更新开发环境与线上环境；下方拉取与迁移是独立操作。")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+            }
             OpsDataSyncSection()
             Section("发布环境") {
                 Picker("编辑内容发布到", selection: $model.targetEnvironment) {
@@ -39,8 +46,8 @@ struct OpsSettingsView: View {
                 }
             }
             Section {
+                Button("导出发布诊断…") { exportPublicationDiagnostics() }
                 DisclosureGroup("导入与数据修复") {
-                    Button("导出发布诊断…") { exportPublicationDiagnostics() }
                     HStack {
                         Button("导入整包…") { chooseAndImport(kind: .bundle) }
                         Button("导入 JSON…") { chooseAndImport(kind: .jsonOnly) }

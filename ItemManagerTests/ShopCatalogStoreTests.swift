@@ -182,9 +182,8 @@ final class ShopCatalogStoreTests: XCTestCase {
         let s1 = ShopCatalogStore(baseCatalog: catalog)
         let s2 = ShopCatalogStore(baseCatalog: catalog)
 
-        let expected = ["JSK", "外套", "衬衫", "内搭", "开衫", "其他"]
-        // 录入顺序 = p1 外套 → p2 衬衫 → p3 内搭 → p4 开衫 → p5 其他 → p6 JSK；
-        // 自定义段必须严格等于首次出现序（外套 → 衬衫 → 内搭 → 开衫），「其他」垫底
+        let expected = ["JSK", "开衫", "衬衫", "内搭", "外套", "其他"]
+        // 旧目录没有明确发布顺序：采用运营固定类型顺序，自定义类型沿用首次出现序。
         XCTAssertEqual(s1.categories(inSeries: "series-custom-1"), expected)
         // 重复调用 & 另一个同数据实例：结果必须完全一致（无隐藏随机源）
         XCTAssertEqual(s1.categories(inSeries: "series-custom-1"), expected)

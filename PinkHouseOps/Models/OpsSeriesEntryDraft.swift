@@ -35,12 +35,13 @@
 //
 
 import Foundation
+import SharedCatalog
 
 // MARK: - 类型预设（固定选项 + 自定义入口）
 
 /// 运营添加类型的固定选项，按用户指定顺序展示；自定义与历史类型仍以原字符串保存。
 enum OpsSeriesEntryCategory {
-    static let known = ["OP", "JSK", "SK", "开衫", "衬衫", "内搭", "围裙/罩裙", "斗篷", "小物", "包", "其他"]
+    static let known = CatalogProductOrdering.operatorCategories
 }
 
 // MARK: - 颜色 SKU

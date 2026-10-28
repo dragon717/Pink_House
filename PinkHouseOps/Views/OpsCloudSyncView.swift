@@ -92,6 +92,7 @@ final class OpsCloudSyncModel: ObservableObject {
     @Published var isSyncing = false
     @Published var isPromotingEnvironment = false
     @Published var syncReport: OpsSyncReport?
+    var savedEditorProgress: ((ShopCatalogPublishEvent, OpsBridgeMode, ShopCatalogPublishTargetEnvironment) -> Void)?
     var syncEnvironmentGeneration: Int { environmentGeneration }
     @Published private(set) var runningMode: OpsBridgeMode?
     @Published private(set) var operationProgress: OpsDataSyncProgress?
@@ -770,6 +771,7 @@ final class OpsCloudSyncModel: ObservableObject {
                             self.append(progress.title + (progress.countText.map { " · " + $0 } ?? ""))
                         }
                         self.receiveSyncProgress(event, mode: mode)
+                        self.savedEditorProgress?(event, mode, selectedEnvironment)
                         if let line = event.displayLine {
                             self.append(event.type == "stage" ? (event.message ?? line) : line)
                         }

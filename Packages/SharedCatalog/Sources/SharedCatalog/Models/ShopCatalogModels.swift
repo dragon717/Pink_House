@@ -429,11 +429,15 @@ public struct CatalogProduct: Codable, Identifiable, Hashable, Sendable {
     /// Optional 字段由合成 Decodable 以 decodeIfPresent 处理，旧 JSON 缺键自动置 nil。
     public var designName: String? = nil
 
+    /// 运营系列内的展示顺序。随商品发布，不依赖 JSON 数组排列或商品名称。
+    /// 旧目录缺键为 nil，前端按运营固定类型顺序兜底。
+    public var displayOrder: Int? = nil
+
     /// 兼容旧格式：images 缺失时兜底为空数组（理由同 CatalogShop.init(from:)）
     public init(id: String, shopID: String, seriesID: String, name: String,
          category: String, images: [String] = [], description: String? = nil,
          archivedAt: Date? = nil, priceCorrection: CatalogPriceCorrection? = nil,
-         designName: String? = nil) {
+         designName: String? = nil, displayOrder: Int? = nil) {
         self.id = id
         self.shopID = shopID
         self.seriesID = seriesID
@@ -444,6 +448,7 @@ public struct CatalogProduct: Codable, Identifiable, Hashable, Sendable {
         self.archivedAt = archivedAt
         self.priceCorrection = priceCorrection
         self.designName = designName
+        self.displayOrder = displayOrder
     }
 
     public init(from decoder: Decoder) throws {
@@ -458,7 +463,8 @@ public struct CatalogProduct: Codable, Identifiable, Hashable, Sendable {
             description: try c.decodeIfPresent(String.self, forKey: .description),
             archivedAt: try c.decodeIfPresent(Date.self, forKey: .archivedAt),
             priceCorrection: try c.decodeIfPresent(CatalogPriceCorrection.self, forKey: .priceCorrection),
-            designName: try c.decodeIfPresent(String.self, forKey: .designName))
+            designName: try c.decodeIfPresent(String.self, forKey: .designName),
+            displayOrder: try c.decodeIfPresent(Int.self, forKey: .displayOrder))
     }
 }
 

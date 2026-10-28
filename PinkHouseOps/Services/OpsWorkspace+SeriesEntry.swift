@@ -672,6 +672,7 @@ extension OpsWorkspace {
             report.entryResults.append(result)
             seriesEntry.typeEntries[index].lastCommitOK = result.ok
         }
+        applySeriesProductDisplayOrder(seriesID: seriesID)
 
         // ── 落盘（R02：保存失败绝不报告成功）──
         let saved = saveDraft()
@@ -708,7 +709,7 @@ extension OpsWorkspace {
         var productID: String
         if let existingID = entry.committedProductID,
            catalog.products.contains(where: { $0.id == existingID }) {
-            // 名称/归属：只在变化时写（updateProduct 的改名守卫仍会拦已上线的改名）
+            // 名称/归属：只在变化时写；改名共用两端的款式级计划。
             if let existing = catalog.products.first(where: { $0.id == existingID }) {
                 if existing.name != entry.designName || existing.category != entry.category
                     || existing.seriesID != seriesID || existing.shopID != shopID {

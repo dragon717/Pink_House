@@ -95,6 +95,8 @@ struct OpsCatalogEditorView: View {
                 BindImagesSheet(workspace: workspace, productID: productID)
             case .productTables(let productID):
                 OpsProductTablesSheet(workspace: workspace, productID: productID)
+            case .productOrder(let seriesID):
+                OpsProductOrderSheet(workspace: workspace, seriesID: seriesID)
             }
         }
         .onAppear { clampSelection() }
@@ -192,9 +194,9 @@ struct OpsCatalogEditorView: View {
 
     private var productsUnderSelectedSeries: [CatalogProduct] {
         guard let selectedSeriesID else { return [] }
-        return workspace.catalog.products
+        return CatalogProductOrdering.ordered(workspace.catalog.products
             .filter { $0.seriesID == selectedSeriesID }
-            .filter { matchesSearch($0.name) }
+            .filter { matchesSearch($0.name) })
     }
 
     /// 店家列（图1 第一步「店家一览」）：搜索命中名称或别名
@@ -204,14 +206,9 @@ struct OpsCatalogEditorView: View {
         }
     }
 
-    /// 该系列下的类型分组（§6.1）：按商品**首次出现顺序**，绝不用无序集合遍历序
+    /// 已提交商品与用户侧共用发布排序。
     private var orderedCategoriesInSelectedSeries: [String] {
-        var ordered: [String] = []
-        for product in productsUnderSelectedSeries
-        where !ordered.contains(product.category) {
-            ordered.append(product.category)
-        }
-        return ordered
+        CatalogProductOrdering.categories(in: productsUnderSelectedSeries)
     }
 
     /// 选择态对不上数据时收敛回第一个 —— 列表是数据派生的，
@@ -436,9 +433,7 @@ struct OpsCatalogEditorView: View {
             addDisabled: selectedSeriesID == nil
         ) {
             List(selection: $selectedProductID) {
-                // 需求 §6.1：商品列表按 JSK、OP、小物等**类型分组**。
-                // 分组顺序 = 该系列下商品的**首次出现顺序**（禁用 Set/Dictionary 遍历序派生
-                // —— 冷启动换排法是仓库红线的同类坑）。
+                // 类型与款式顺序共用运营发布值，不按名称或无序集合排列。
                 ForEach(orderedCategoriesInSelectedSeries, id: \.self) { category in
                     Section {
                         ForEach(productsUnderSelectedSeries.filter { $0.category == category }) { product in
@@ -478,6 +473,17 @@ struct OpsCatalogEditorView: View {
             }
             .listStyle(.plain)
             .scrollContentBackground(.hidden)
+            .safeAreaInset(edge: .top) {
+                HStack {
+                    Button {
+                        if let selectedSeriesID { sheet = .productOrder(seriesID: selectedSeriesID) }
+                    } label: { Label("调整排序…", systemImage: "arrow.up.arrow.down") }
+                    .disabled(!workspace.canEdit || !workspace.catalog.products.contains {
+                        $0.seriesID == selectedSeriesID && $0.archivedAt == nil
+                    })
+                    Spacer()
+                }.padding(10).background(OpsFlowPalette.cardBackground)
+            }
             .safeAreaInset(edge: .bottom) { productFooter }
         }
         .frame(minWidth: 280, idealWidth: 320)
@@ -589,6 +595,7 @@ private enum EditorSheet: Identifiable {
     case productForm(existingID: String?)
     case bindImages(productID: String)
     case productTables(productID: String)
+    case productOrder(seriesID: String)
 
     var id: String {
         switch self {
@@ -598,6 +605,7 @@ private enum EditorSheet: Identifiable {
         case .productForm(let existingID): return "product-\(existingID ?? "new")"
         case .bindImages(let productID): return "bind-\(productID)"
         case .productTables(let productID): return "tables-\(productID)"
+        case .productOrder(let seriesID): return "productorder-\(seriesID)"
         }
     }
 }
@@ -831,6 +839,11 @@ private struct ProductFormSheet: View {
             }
             TextField("商品名（如「星月夜 JSK 蓝色」）", text: $name)
             TextField("品类（如 JSK / OP / SK / 小物）", text: $category)
+            if let existingID, let preview = workspace.productRenamePreview(
+                productID: existingID, name: name, category: category) {
+                Text(preview).font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
             Text("保存后自动同步到 App").font(.caption).foregroundStyle(.secondary)
             if let formError { Text(formError).font(.caption).foregroundStyle(.orange) }
         } onCancel: {
@@ -839,15 +852,15 @@ private struct ProductFormSheet: View {
             // R05：只有成功才关窗
             let ok: Bool
             if let existingID = existingID ?? createdID {
-                ok = workspace.updateProduct(
+                ok = workspace.saveProductIdentity(
                     id: existingID, shopID: shopID, seriesID: seriesID,
                     name: name, category: category)
             } else {
                 createdID = workspace.addProductReturningID(
                     shopID: shopID, seriesID: seriesID, name: name, category: category)
-                ok = createdID != nil
+                ok = createdID != nil && workspace.saveCatalogEditorChanges()
             }
-            if ok && workspace.saveCatalogEditorChanges() { dismiss() }
+            if ok { dismiss() }
             else { formError = workspace.statusText ?? "保存失败。" }
         }
         .onAppear {

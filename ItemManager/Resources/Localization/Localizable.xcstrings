@@ -37814,9 +37814,6 @@
         }
       }
     },
-    "加入少女衣橱" : {
-
-    },
     "加入心愿失败：%@" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -38314,9 +38311,6 @@
           }
         }
       }
-    },
-    "勾选合并加入少女衣橱" : {
-
     },
     "匀速移动" : {
       "extractionState" : "stale",
